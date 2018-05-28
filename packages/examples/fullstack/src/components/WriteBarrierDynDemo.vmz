@@ -1,0 +1,37 @@
+<template>
+  <section>
+    <strong>{user.count}</strong>
+    <ul>
+      <li each={tags} as="tag" key={tag.id}>{tag.label}</li>
+    </ul>
+  </section>
+</template>
+
+<script client>
+export type Tag = { id: string; label: string };
+
+export default class WriteBarrierDynDemo {
+  selected = 0;
+  user = { count: 0 };
+  tags: Tag[] = [
+    { id: "a", label: "A" },
+    { id: "b", label: "B" },
+  ];
+
+  setSelectedLabel(n: string) {
+    this.tags[this.selected].label = n;
+  }
+
+  setAt(i: number, n: string) {
+    this.tags[i].label = n;
+  }
+
+  bump() {
+    this.user.count += 1;
+  }
+
+  bumpAgain() {
+    this.user.count++;
+  }
+}
+</script>

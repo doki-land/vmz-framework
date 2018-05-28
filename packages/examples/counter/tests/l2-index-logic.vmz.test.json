@@ -1,0 +1,32 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "l2.logic.index.mount",
+    "title": "L2: Index page mount with registered CounterButton",
+    "modes": ["logic"],
+    "program": {
+        "chunkId": "pages/index",
+        "unitName": "IndexPage",
+        "components": {
+            "CounterButton": "components/CounterButton"
+        }
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "mount"
+        }
+    ],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "text",
+            "expect": {
+                "contains": "count"
+            }
+        }
+    ]
+}

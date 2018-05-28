@@ -1,0 +1,12 @@
+[package]
+name = "vmz-inspector"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "VMZ inspector: vmz check (hard) + vmz lint (convention advice)"
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+vmz-compiler.workspace = true

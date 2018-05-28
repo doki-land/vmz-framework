@@ -1,0 +1,84 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "b2.logic.branch",
+    "title": "B2: BranchDemo toggle + inactive branch isolation",
+    "modes": ["logic"],
+    "program": {
+        "chunkId": "components/BranchDemo",
+        "unitName": "BranchDemo"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "mount"
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "assert",
+            "assertion": "text",
+            "expect": {
+                "contains": "A"
+            }
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "write",
+            "field": "showA",
+            "value": false
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "flush"
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "assert",
+            "assertion": "text",
+            "expect": {
+                "contains": "B",
+                "notContains": "A"
+            }
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "write",
+            "field": "aText",
+            "value": "A2"
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "flush"
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "assert",
+            "assertion": "text",
+            "expect": {
+                "notContains": "A2"
+            }
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "write",
+            "field": "showA",
+            "value": true
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "flush"
+        }
+    ],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "text",
+            "expect": {
+                "contains": "A2"
+            }
+        }
+    ]
+}

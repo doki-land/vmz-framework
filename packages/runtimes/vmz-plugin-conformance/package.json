@@ -1,0 +1,20 @@
+{
+    "name": "vmz-plugin-conformance",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Conformance plugin for structured plugin contributions",
+    "license": "MIT",
+    "main": "./index.js",
+    "exports": {
+        ".": "./index.js"
+    },
+    "dependencies": {
+        "@vmz/plugin": "workspace:*"
+    },
+    "keywords": [
+        "vmz",
+        "plugin",
+        "conformance"
+    ]
+}

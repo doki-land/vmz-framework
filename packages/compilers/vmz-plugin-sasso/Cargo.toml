@@ -1,0 +1,12 @@
+[package]
+name = "vmz-plugin-sasso"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "VMZ SCSS style plugin: <style> → sasso → CSS (compiler-side)"
+publish = false
+
+[dependencies]
+sasso = "0.8"
+vmz-compiler.workspace = true

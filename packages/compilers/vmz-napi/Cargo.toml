@@ -1,0 +1,23 @@
+[package]
+name = "vmz-napi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "N-API bridge: Node host ↔ Rust workspace session (N1)"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "3", default-features = true, features = ["napi4"] }
+napi-derive = "3"
+vmz-compiler.workspace = true
+vmz-inspector.workspace = true
+vmz-protocol.workspace = true
+vmz-plugin-tailwind.workspace = true
+vmz-plugin-sasso.workspace = true
+
+[build-dependencies]
+napi-build = "2"

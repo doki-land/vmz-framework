@@ -1,0 +1,41 @@
+<template>
+  <main class="welcome-shell">
+    <div class="welcome-atmosphere" aria-hidden="true">
+      <span class="welcome-grid"></span>
+      <span class="welcome-orb welcome-orb--a"></span>
+      <span class="welcome-orb welcome-orb--b"></span>
+      <span class="welcome-scan"></span>
+      <span class="welcome-constellation">
+        <i class="welcome-star welcome-star--1"></i>
+        <i class="welcome-star welcome-star--2"></i>
+        <i class="welcome-star welcome-star--3"></i>
+        <i class="welcome-star welcome-star--4"></i>
+        <i class="welcome-star welcome-star--5"></i>
+        <i class="welcome-beam welcome-beam--1"></i>
+        <i class="welcome-beam welcome-beam--2"></i>
+        <i class="welcome-beam welcome-beam--3"></i>
+      </span>
+    </div>
+
+    <section class="welcome-stage" aria-labelledby="welcome-brand">
+      <p class="welcome-kicker">Vue-Familiar · Multi-Platform · Zero-Cost</p>
+      <h1 id="welcome-brand" class="welcome-mark">
+        <span class="welcome-mark__word">VMZ</span>
+        <span class="welcome-mark__pulse" aria-hidden="true"></span>
+      </h1>
+      <p class="welcome-tagline">一份程序图，编译全栈。</p>
+      <div class="welcome-actions">
+        <a class="vmz-btn vmz-btn--primary welcome-actions__primary" href="/">进入落地页</a>
+        <a class="vmz-btn vmz-btn--ghost welcome-actions__ghost" href="/d/">阅读文档</a>
+      </div>
+    </section>
+
+    <p class="welcome-foot" aria-hidden="true">application compiler · direct schedule · no VDOM</p>
+    <span class="vmz-scale-anchor" aria-hidden="true"></span>
+    <span class="vmz-status-rail" aria-hidden="true"></span>
+  </main>
+</template>
+
+<script client>
+export default class WelcomePage {}
+</script>

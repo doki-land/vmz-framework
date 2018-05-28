@@ -1,0 +1,23 @@
+<template>
+  <div class="katex-host" html={format(tex, display)}></div>
+</template>
+
+<script client>
+import katex from 'katex';
+
+function format(tex, display) {
+  try {
+    return katex.renderToString(tex ?? '', {
+      displayMode: !!display,
+      throwOnError: false,
+    });
+  } catch {
+    return '';
+  }
+}
+
+export default class Katex {
+  public tex: string = '';
+  public display: boolean = false;
+}
+</script>

@@ -1,0 +1,67 @@
+{
+    "name": "vmz",
+    "displayName": "VMZ",
+    "description": "Syntax highlighting for .vmz (grammar from vmz-textmate)",
+    "version": "0.1.0",
+    "private": true,
+    "publisher": "vmz-framework",
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "main": "./extension.js",
+    "scripts": {
+        "sync": "node ../../../scripts/sync-vscode-textmate.mjs",
+        "prepackage": "pnpm sync",
+        "package": "echo \"run vsce package after pnpm sync\""
+    },
+    "dependencies": {
+        "json5": "^2.2.3",
+        "vmz-textmate": "workspace:*"
+    },
+    "contributes": {
+        "languages": [
+            {
+                "id": "vmz",
+                "aliases": [
+                    "VMZ",
+                    "vmz"
+                ],
+                "extensions": [
+                    ".vmz"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "vmz",
+                "scopeName": "source.vmz",
+                "path": "./syntaxes/vmz.tmLanguage.json",
+                "embeddedLanguages": {
+                    "source.ts": "typescript",
+                    "source.css": "css",
+                    "text.html.derivative.vmz": "html",
+                    "meta.interpolation.vmz": "typescript",
+                    "meta.embedded.expression.vmz": "typescript"
+                },
+                "tokenTypes": {
+                    "meta.interpolation.vmz": "other",
+                    "meta.embedded.expression.vmz": "other"
+                }
+            },
+            {
+                "scopeName": "markdown.vmz.codeblock",
+                "path": "./syntaxes/vmz-markdown-injection.json",
+                "injectTo": [
+                    "text.html.markdown"
+                ],
+                "embeddedLanguages": {
+                    "meta.embedded.block.vmz": "vmz"
+                }
+            }
+        ]
+    }
+}

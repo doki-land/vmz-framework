@@ -1,0 +1,11 @@
+{
+    "color": {
+        "fg": { "value": "#1a1a1a" },
+        "bg": { "value": "#ffffff" },
+        "border": { "value": "#e5e5e5" },
+        "accent": { "value": "#0b6e4f" }
+    },
+    "font": {
+        "sans": { "value": "\"IBM Plex Sans\", system-ui, sans-serif" }
+    }
+}

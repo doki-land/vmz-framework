@@ -1,0 +1,24 @@
+{
+    "entries": [
+        {
+            "key": { "path": ["action", "primary", "background"] },
+            "value": "#0D57DB"
+        },
+        {
+            "key": { "path": ["action", "primary", "foreground"] },
+            "value": "#FFFFFF"
+        },
+        {
+            "key": { "path": ["action", "primary", "hover"] },
+            "value": "#1047AD"
+        },
+        {
+            "key": { "path": ["action", "primary", "active"] },
+            "value": "#123C87"
+        },
+        {
+            "key": { "path": ["focus", "ring"] },
+            "value": "#176BFF"
+        }
+    ]
+}

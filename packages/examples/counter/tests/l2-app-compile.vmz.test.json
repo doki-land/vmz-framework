@@ -1,0 +1,25 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "l2.compile.app.slot",
+    "title": "L2: App slot Direct",
+    "modes": ["compile"],
+    "program": {
+        "chunkId": "Application",
+        "unitName": "Application"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "graph",
+            "expect": {
+                "direct": true,
+                "includes": "api.el(\"slot\")"
+            }
+        }
+    ]
+}

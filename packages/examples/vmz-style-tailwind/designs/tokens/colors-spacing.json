@@ -1,0 +1,10 @@
+{
+    "colors": {
+        "action": "#3366ff",
+        "action-hover": "#254eda"
+    },
+    "spacing": {
+        "2": "0.5rem",
+        "4": "1rem"
+    }
+}

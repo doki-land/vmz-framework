@@ -1,0 +1,20 @@
+<template>
+  <button type="button" onClick={() => count++}>
+    count: {count}
+  </button>
+</template>
+
+<script client>
+export default class CounterButton {
+  public initial: number = 0;
+
+  count = this.initial;
+
+  // AsyncTask fixture for gate:l4-async-graph (compiler lifts to RunTask).
+  async softLoad() {
+    await new Promise((r) => setTimeout(r, 40));
+    if (this.__vmzDestroyed) return;
+    this.count = 7;
+  }
+}
+</script>

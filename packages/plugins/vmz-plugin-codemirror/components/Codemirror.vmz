@@ -1,0 +1,33 @@
+<template>
+  <div class="codemirror-host" data-vmz-codemirror style="min-height: 200px; width: 100%"></div>
+</template>
+
+<script client>
+import { mountCodemirror } from '@vmz/plugin-codemirror/runtime';
+
+export default class Codemirror {
+  public value: string = '';
+
+  #api: { dispose: () => void } | null = null;
+
+  async onMount() {
+    const root = this.__vmzDomRoot;
+    const el =
+      (root && root.nodeType === 1 && root.matches?.('[data-vmz-codemirror]') && root) ||
+      root?.querySelector?.('[data-vmz-codemirror]') ||
+      root;
+    if (!el || el.nodeType !== 1) return;
+    this.#api = await mountCodemirror(el, {
+      value: this.value,
+      onChange: (v) => {
+        this.value = v;
+      },
+    });
+  }
+
+  onDestroy() {
+    this.#api?.dispose();
+    this.#api = null;
+  }
+}
+</script>

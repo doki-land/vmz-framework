@@ -1,0 +1,8 @@
+<template>
+  <!-- `components/CounterButton.vmz` auto-imported -->
+  <CounterButton initial={7} />
+</template>
+
+<script client>
+export default class IndexPage {}
+</script>

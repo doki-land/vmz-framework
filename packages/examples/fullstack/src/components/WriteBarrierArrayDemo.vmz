@@ -1,0 +1,31 @@
+<template>
+  <section>
+    <ul>
+      <li each={tags} as="tag" key={tag.id}>{tag.label}</li>
+    </ul>
+  </section>
+</template>
+
+<script client>
+export type Tag = { id: string; label: string };
+
+export default class WriteBarrierArrayDemo {
+  tags: Tag[] = [
+    { id: "a", label: "A" },
+    { id: "b", label: "B" },
+  ];
+
+  addTag(tag: Tag) {
+    this.tags.push(tag);
+  }
+
+  addViaAlias(tag: Tag) {
+    const t = this.tags;
+    t.push(tag);
+  }
+
+  setFirstLabel(n: string) {
+    this.tags[0].label = n;
+  }
+}
+</script>

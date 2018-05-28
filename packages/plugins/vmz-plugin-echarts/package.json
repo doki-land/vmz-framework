@@ -1,0 +1,32 @@
+{
+    "name": "@vmz/plugin-echarts",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "VMZ ECharts chart adapter - <Echarts>",
+    "license": "MIT",
+    "main": "./vmz.plugin.ts",
+    "types": "./vmz.plugin.ts",
+    "exports": {
+        ".": {
+            "types": "./vmz.plugin.ts",
+            "default": "./vmz.plugin.ts"
+        },
+        "./runtime": {
+            "types": "./runtime.ts",
+            "default": "./runtime.ts"
+        }
+    },
+    "dependencies": {
+        "@vmz/plugin": "workspace:*"
+    },
+    "peerDependencies": {
+        "echarts": ">=5"
+    },
+    "keywords": [
+        "vmz",
+        "plugin",
+        "echarts",
+        "chart"
+    ]
+}

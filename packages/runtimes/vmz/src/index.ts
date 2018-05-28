@@ -1,0 +1,1117 @@
+// @ts-nocheck
+/**
+ * VMZ Node host: N-API workspace + npm CLI.
+ * Coarse-grained only — no transform hooks / per-AST callbacks.
+ */
+
+import { createRequire } from 'node:module';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+export {
+    HOST_PROTOCOL,
+    COMPILER_PROTOCOL,
+    PROGRAM_IR_SCHEMA,
+    PLAN_SCHEMA,
+    PLUGIN_PROTOCOL,
+    DX_PROTOCOL,
+    DX_SYMBOL_SCHEMA,
+    DX_REFERENCE_SCHEMA,
+    DX_EXPLAIN_SCHEMA,
+    DX_WORKSPACE_EDIT_SCHEMA,
+    DX_CODE_ACTION_SCHEMA,
+    DX_AFFECTED_SCHEMA,
+    DX_RENAME_SCHEMA,
+    DX_TEST_SELECTION_SCHEMA,
+    DX_SOURCE_MAP_SCHEMA,
+    DX_SYMBOL_INDEX_SCHEMA,
+    DX_X2_CHECK_SCHEMA,
+    DX_SEMANTIC_TRANSACTION_SCHEMA,
+    DX_CANCEL_SCHEMA,
+    DX_AFFECTED_PREVIEW_SCHEMA,
+    DX_HMR_PLAN_SCHEMA,
+    DX_BUDGET_SCHEMA,
+    DX_X3_CHECK_SCHEMA,
+    DX_BOUNDARY_VALIDATOR_SCHEMA,
+    DX_LEAKAGE_SCHEMA,
+    DX_CAPABILITY_TARGET_SCHEMA,
+    DX_DEAD_GRAPH_SCHEMA,
+    DX_X4_CHECK_SCHEMA,
+    DX_TRACE_SCHEMA,
+    DX_CAUSAL_REPLAY_SCHEMA,
+    DX_X5_CHECK_SCHEMA,
+    APPLICATION_PROTOCOL,
+    APPLICATION_DESCRIPTOR_SCHEMA,
+    APPLICATIONS_CONFIG_SCHEMA,
+    APPLICATION_CATALOG_SCHEMA,
+    APPLICATION_CHECK_SCHEMA,
+    APPLICATION_BASE_SCHEMA,
+    APPLICATION_RELOCATION_SCHEMA,
+    APPLICATION_RELOCATED_SCHEMA,
+    APPLICATION_RELOCATABLE_CHECK_SCHEMA,
+    APPLICATION_ARTIFACT_SCHEMA,
+    APPLICATION_MOUNT_TABLE_SCHEMA,
+    APPLICATION_ARTIFACT_BOUNDARY_SCHEMA,
+    APPLICATION_ISOLATION_SCHEMA,
+    APPLICATION_ISOLATION_CHECK_SCHEMA,
+    APPLICATION_CROSS_LINK_SCHEMA,
+    APPLICATION_HOST_COMPOSITION_SCHEMA,
+    APPLICATION_DEV_SESSIONS_SCHEMA,
+    APPLICATION_AFFECTED_SCHEMA,
+    APPLICATION_PROXY_DISPATCH_SCHEMA,
+    APPLICATION_MOUNTED_TEST_SCHEMA,
+    APPLICATION_DEPLOY_ADAPTER_SCHEMA,
+    APPLICATION_DEV_CHECK_SCHEMA,
+    PROTOCOL_CATALOG_SCHEMA,
+    TEST_PROTOCOL,
+    TEST_MANIFEST_SCHEMA,
+    TEST_REPORT_SCHEMA,
+    protocolCatalog,
+    dxCatalog,
+    testCatalog,
+    applicationCatalog,
+    TARGET_PROTOCOL,
+    TARGET_VIEW_OPS_SCHEMA,
+    TARGET_PLATFORM_PROFILE_SCHEMA,
+    TARGET_MINI_PROGRAM_ARTIFACT_SCHEMA,
+    TARGET_CHECK_SCHEMA,
+    TARGET_DIAG_DOM_LEAK_IN_PLAN,
+    targetCatalog,
+    PROFILE_PROTOCOL,
+    PROFILE_HOST_SCHEMA,
+    PROFILE_DELIVERY_SCHEMA,
+    PROFILE_CHECK_SCHEMA,
+    PROFILE_DIAG_HOST_PROFILE_INVALID,
+    PROFILE_DIAG_RESOLUTION_DIGEST_MISMATCH,
+    PROFILE_DIAG_CORE_ID_OVERRIDE,
+    PROFILE_DIAG_HOST_PROFILE_REF_UNRESOLVED,
+    PROFILE_SURFACE_KINDS,
+    PROFILE_UNIFIED_LIFECYCLE_EVENTS,
+    PROFILE_CORE_ID_PREFIX,
+    PROFILE_SOLVER_CHECK_SCHEMA,
+    PROFILE_HOST_RESOLUTION_MANIFEST_SCHEMA,
+    PROFILE_EXECUTOR_CHECK_SCHEMA,
+    PROFILE_EXECUTOR_SCENARIO_SCHEMA,
+    PROFILE_DIAG_SURFACE_NO_MATCH,
+    PROFILE_DIAG_SURFACE_AMBIGUOUS,
+    PROFILE_DIAG_CAPABILITY_UNRESOLVED,
+    PROFILE_DIAG_CAPABILITY_PERMISSION_UNDECLARED,
+    PROFILE_DIAG_ROUTE_UNREALIZABLE,
+    PROFILE_DIAG_STALE_GENERATION,
+    PROFILE_DIAG_MISSING_ENVELOPE_IDS,
+    PROFILE_DIAG_SURFACE_OWNS_STATE,
+    PROFILE_DIAG_PRIVATE_OBJECT_CROSSING,
+    PROFILE_DIAG_SPLIT_TRANSACTION,
+    PROFILE_DIAG_DISPOSE_NOT_AUTHORITATIVE,
+    PROFILE_DIAG_CANCEL_NOT_PROPAGATED,
+    PROFILE_LIFECYCLE_MAPPING_ENTRY_SCHEMA,
+    PROFILE_LIFECYCLE_MAPPING_TABLE_SCHEMA,
+    PROFILE_RECOVERY_POLICY_SCHEMA,
+    PROFILE_LIFECYCLE_SCENARIO_SCHEMA,
+    PROFILE_LIFECYCLE_RECOVERY_CHECK_SCHEMA,
+    PROFILE_LIFECYCLE_HOST_KINDS,
+    PROFILE_PERSISTENCE_WINDOWS,
+    PROFILE_DIAG_LIFECYCLE_UNPROVEN,
+    PROFILE_DIAG_LIFECYCLE_MAPPING_INCOMPLETE,
+    PROFILE_DIAG_RECOVERY_DUPLICATES_OWNER,
+    PROFILE_DIAG_RECOVERY_ASSUMES_HEAP,
+    PROFILE_DIAG_PERSISTENCE_WINDOW_INVALID,
+    PROFILE_DELIVERY_PACKAGE_CONSTRAINTS_SCHEMA,
+    PROFILE_DELIVERY_SECURITY_POLICY_SCHEMA,
+    PROFILE_DELIVERY_UPDATE_POLICY_SCHEMA,
+    PROFILE_DELIVERY_ARTIFACT_MANIFEST_SCHEMA,
+    PROFILE_DELIVERY_PROOF_MANIFEST_SCHEMA,
+    PROFILE_DELIVERY_PROOF_SCENARIO_SCHEMA,
+    PROFILE_DELIVERY_PROOF_CHECK_SCHEMA,
+    PROFILE_DELIVERY_UPDATE_CHANNELS,
+    PROFILE_DELIVERY_ASSET_STRATEGIES,
+    PROFILE_DIAG_DELIVERY_CONSTRAINT_EXCEEDED,
+    PROFILE_DIAG_HOST_PLAN_VERSION_MISMATCH,
+    PROFILE_DIAG_PROOF_MANIFEST_INCOMPLETE,
+    PROFILE_DIAG_PROOF_COPIES_SEMANTIC_IR,
+    PROFILE_DIAG_UPDATE_WITHOUT_REPROOF,
+    PROFILE_DIAG_SECURITY_POLICY_INSECURE,
+    PROFILE_CONFORMANCE_FIXTURE_SCHEMA,
+    PROFILE_CONFORMANCE_STATE_SNAPSHOT_SCHEMA,
+    PROFILE_CONFORMANCE_TRACE_SCHEMA,
+    PROFILE_CONFORMANCE_HOST_RUN_SCHEMA,
+    PROFILE_CONFORMANCE_SCENARIO_SCHEMA,
+    PROFILE_CONFORMANCE_CHECK_SCHEMA,
+    PROFILE_CONFORMANCE_SURFACE_ROLES,
+    PROFILE_DIAG_STABLE_ID_DIVERGENCE,
+    PROFILE_DIAG_STATE_RESULT_DIVERGENCE,
+    PROFILE_DIAG_TRACE_INVARIANT_BROKEN,
+    PROFILE_DIAG_CONFORMANCE_HOST_INCOMPLETE,
+    PROFILE_DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH,
+    profileCatalog,
+    NATIVE_HOST_PROTOCOL,
+    NATIVE_HOST_WEBVIEW_DEPLOYMENT_SCHEMA,
+    NATIVE_HOST_CAPABILITY_SCHEMA,
+    NATIVE_HOST_BRIDGE_SCHEMA,
+    NATIVE_HOST_APPLICATION_IDENTITY_SCHEMA,
+    NATIVE_HOST_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_ARBITRARY_BRIDGE,
+    NATIVE_HOST_SHELL_SCHEMA,
+    NATIVE_HOST_SHELL_CHECK_SCHEMA,
+    NATIVE_HOST_DEEP_LINK_SCHEMA,
+    NATIVE_HOST_LOCAL_BUNDLE_SCHEMA,
+    NATIVE_HOST_DIAG_MISSING_SHELL_HOOK,
+    NATIVE_HOST_DIAG_PLATFORM_SEMANTIC_FORK,
+    NATIVE_HOST_DIAG_REMOTE_ENTRY_DEFAULT,
+    NATIVE_HOST_DIAG_MISSING_ENTRY_ARTIFACT,
+    NATIVE_HOST_REQUIRED_SHELL_HOOKS,
+    NATIVE_HOST_CAPABILITY_CALL_SCHEMA,
+    NATIVE_HOST_BRIDGE_TRACE_SCHEMA,
+    NATIVE_HOST_BRIDGE_STUB_CATALOG_SCHEMA,
+    NATIVE_HOST_BRIDGE_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_MISSING_NONCE,
+    NATIVE_HOST_DIAG_CALL_NOT_ALLOWLISTED,
+    NATIVE_HOST_FIRST_BATCH_STUB_IDS,
+    NATIVE_HOST_LIFECYCLE_SCHEMA,
+    NATIVE_HOST_LIFECYCLE_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_BACKGROUND_IS_DESTROY,
+    NATIVE_HOST_DIAG_CRASH_ASSUMES_JS_HEAP,
+    NATIVE_HOST_DIAG_MISSING_LIFECYCLE_EVENT,
+    NATIVE_HOST_REQUIRED_LIFECYCLE_EVENTS,
+    NATIVE_HOST_FULLSTACK_SCHEMA,
+    NATIVE_HOST_FULLSTACK_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_BRIDGE_BYPASSES_SERVER,
+    NATIVE_HOST_DIAG_REMOTE_WITHOUT_INTEGRITY,
+    NATIVE_HOST_DIAG_MISSING_SERVER_TRANSPORT,
+    NATIVE_HOST_NATIVE_SURFACE_SCHEMA,
+    NATIVE_HOST_NATIVE_SURFACE_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_SURFACE_IS_CAPABILITY,
+    NATIVE_HOST_DIAG_IMPLICIT_STATE_SHARE,
+    NATIVE_HOST_HIGH_VALUE_SURFACE_KINDS,
+    NATIVE_HOST_MULTI_PLATFORM_SCHEMA,
+    NATIVE_HOST_MULTI_PLATFORM_SHARED_SCHEMA,
+    NATIVE_HOST_MULTI_PLATFORM_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_MISSING_PLATFORM_ADAPTER,
+    NATIVE_HOST_DIAG_PLATFORM_PRIVATE_SCHEMA,
+    NATIVE_HOST_DIAG_ADAPTER_IS_SEMANTIC_CORE,
+    NATIVE_HOST_REQUIRED_MULTI_PLATFORMS,
+    NATIVE_HOST_MULTI_PLATFORM_ADAPTER_KIND,
+    nativeHostCatalog,
+    LOCALE_PROTOCOL,
+    LOCALE_MANIFEST_SCHEMA,
+    LOCALE_MESSAGE_CATALOG_SCHEMA,
+    LOCALE_MESSAGE_NODE_SCHEMA,
+    LOCALE_CHECK_SCHEMA,
+    LOCALE_TYPED_MODULE_SCHEMA,
+    LOCALE_RENAME_SCHEMA,
+    LOCALE_APPLICATION_CONTEXT_SCHEMA,
+    LOCALE_FORMATTER_CONTEXT_SCHEMA,
+    LOCALE_TRANSITION_SCHEMA,
+    LOCALE_RUNTIME_CHECK_SCHEMA,
+    LOCALE_FALLBACK_RESOLUTION_SCHEMA,
+    FORMATTER_DATA_VERSION,
+    LOCALE_ROUTE_REALIZATION_SCHEMA,
+    LOCALE_PAGE_META_SCHEMA,
+    LOCALE_LINK_RESOLUTION_SCHEMA,
+    LOCALE_ROUTER_CHECK_SCHEMA,
+    LOCALE_DELIVERY_RESOLUTION_SCHEMA,
+    LOCALE_CHUNK_MANIFEST_SCHEMA,
+    LOCALE_NATIVE_PACK_SCHEMA,
+    LOCALE_MINI_PACKAGE_PROOF_SCHEMA,
+    LOCALE_SERVER_ERROR_ENVELOPE_SCHEMA,
+    LOCALE_DELIVERY_CHECK_SCHEMA,
+    LOCALE_EXPLAIN_SCHEMA,
+    LOCALE_DIFF_SCHEMA,
+    LOCALE_EXTRACT_SCHEMA,
+    LOCALE_PSEUDO_SCHEMA,
+    LOCALE_CONFORMANCE_SCHEMA,
+    LOCALE_DIAG_MANIFEST_MISSING,
+    LOCALE_DIAG_ID_INVALID,
+    LOCALE_DIAG_FALLBACK_CYCLE,
+    LOCALE_DIAG_MESSAGE_PARAMETER_MISMATCH,
+    LOCALE_DIAG_MESSAGE_UNUSED,
+    LOCALE_DIAG_FORMATTER_CONTEXT_INCOMPLETE,
+    LOCALE_DIAG_FORMATTER_VERSION_MISMATCH,
+    LOCALE_DIAG_DIGEST_MISMATCH,
+    LOCALE_DIAG_TRANSITION_PARTIAL,
+    LOCALE_DIAG_TRANSITION_UNSUPPORTED,
+    LOCALE_DIAG_TRANSITION_LOAD_FAILED,
+    LOCALE_DIAG_MACHINE_DEFAULT_FORBIDDEN,
+    LOCALE_DIAG_MESSAGE_MIXED_LOCALE,
+    LOCALE_DIAG_STALE_GENERATION,
+    LOCALE_DIAG_ROUTE_COLLISION,
+    LOCALE_DIAG_CANONICAL_MISSING,
+    LOCALE_DIAG_HREFLANG_INCOMPLETE,
+    LOCALE_DIAG_META_LOCALE_MISMATCH,
+    LOCALE_DIAG_LINK_HARDCODED_PATH,
+    LOCALE_DIAG_CACHE_KEY_STEALS_CONTENT,
+    LOCALE_DIAG_PREFIX_OMIT_WITHOUT_REDIRECT,
+    LOCALE_DIAG_DELIVERY_FULL_BUNDLE,
+    LOCALE_DIAG_CHUNK_HASH_MISMATCH,
+    LOCALE_DIAG_NATIVE_PACK_UNSIGNED,
+    LOCALE_DIAG_NATIVE_PACK_HAS_JS,
+    LOCALE_DIAG_NATIVE_PACK_APP_MISMATCH,
+    LOCALE_DIAG_MINI_CROSS_PACKAGE_UNPROVEN,
+    LOCALE_DIAG_SERVER_TRANSLATED_ERROR,
+    LOCALE_DIAG_SERVER_FORMAT_WITHOUT_CONTEXT,
+    LOCALE_DIAG_HOST_MESSAGE_DIVERGENCE,
+    LOCALE_DIAG_MESSAGE_DYNAMIC_ID_UNBOUNDED,
+    LOCALE_DIAG_HARDCODED_TEXT,
+    LOCALE_DIAG_PSEUDO_PRODUCTION_FORBIDDEN,
+    LOCALE_DIAG_CONFORMANCE_DIVERGENCE,
+    LOCALE_DIAG_EXPLAIN_UNKNOWN,
+    LOCALE_VIRTUAL_MODULE_PREFIX,
+    localeCatalog,
+} from '@vmz/protocol';
+import {
+    HOST_PROTOCOL,
+    COMPILER_PROTOCOL,
+    PROGRAM_IR_SCHEMA,
+    PLUGIN_PROTOCOL,
+    DX_PROTOCOL,
+    DX_SYMBOL_SCHEMA,
+    DX_REFERENCE_SCHEMA,
+    DX_EXPLAIN_SCHEMA,
+    DX_WORKSPACE_EDIT_SCHEMA,
+    DX_CODE_ACTION_SCHEMA,
+    DX_AFFECTED_SCHEMA,
+    DX_RENAME_SCHEMA,
+    DX_TEST_SELECTION_SCHEMA,
+    DX_SOURCE_MAP_SCHEMA,
+    DX_SYMBOL_INDEX_SCHEMA,
+    DX_X2_CHECK_SCHEMA,
+    DX_SEMANTIC_TRANSACTION_SCHEMA,
+    DX_CANCEL_SCHEMA,
+    DX_AFFECTED_PREVIEW_SCHEMA,
+    DX_HMR_PLAN_SCHEMA,
+    DX_BUDGET_SCHEMA,
+    DX_X3_CHECK_SCHEMA,
+    DX_BOUNDARY_VALIDATOR_SCHEMA,
+    DX_LEAKAGE_SCHEMA,
+    DX_CAPABILITY_TARGET_SCHEMA,
+    DX_DEAD_GRAPH_SCHEMA,
+    DX_X4_CHECK_SCHEMA,
+    DX_TRACE_SCHEMA,
+    DX_CAUSAL_REPLAY_SCHEMA,
+    DX_X5_CHECK_SCHEMA,
+    APPLICATION_PROTOCOL,
+    APPLICATION_DESCRIPTOR_SCHEMA,
+    APPLICATIONS_CONFIG_SCHEMA,
+    APPLICATION_CATALOG_SCHEMA,
+    APPLICATION_CHECK_SCHEMA,
+    APPLICATION_BASE_SCHEMA,
+    APPLICATION_RELOCATION_SCHEMA,
+    APPLICATION_RELOCATED_SCHEMA,
+    APPLICATION_RELOCATABLE_CHECK_SCHEMA,
+    APPLICATION_ARTIFACT_SCHEMA,
+    APPLICATION_MOUNT_TABLE_SCHEMA,
+    APPLICATION_ARTIFACT_BOUNDARY_SCHEMA,
+    APPLICATION_ISOLATION_SCHEMA,
+    APPLICATION_ISOLATION_CHECK_SCHEMA,
+    APPLICATION_CROSS_LINK_SCHEMA,
+    APPLICATION_HOST_COMPOSITION_SCHEMA,
+    APPLICATION_DEV_SESSIONS_SCHEMA,
+    APPLICATION_AFFECTED_SCHEMA,
+    APPLICATION_PROXY_DISPATCH_SCHEMA,
+    APPLICATION_MOUNTED_TEST_SCHEMA,
+    APPLICATION_DEPLOY_ADAPTER_SCHEMA,
+    APPLICATION_DEV_CHECK_SCHEMA,
+    PROTOCOL_CATALOG_SCHEMA,
+    TARGET_PROTOCOL,
+    TARGET_VIEW_OPS_SCHEMA,
+    TARGET_PLATFORM_PROFILE_SCHEMA,
+    TARGET_MINI_PROGRAM_ARTIFACT_SCHEMA,
+    TARGET_CHECK_SCHEMA,
+    TARGET_DIAG_DOM_LEAK_IN_PLAN,
+    targetCatalog,
+    PROFILE_PROTOCOL,
+    PROFILE_HOST_SCHEMA,
+    PROFILE_DELIVERY_SCHEMA,
+    PROFILE_CHECK_SCHEMA,
+    PROFILE_DIAG_HOST_PROFILE_INVALID,
+    PROFILE_DIAG_RESOLUTION_DIGEST_MISMATCH,
+    PROFILE_DIAG_CORE_ID_OVERRIDE,
+    PROFILE_DIAG_HOST_PROFILE_REF_UNRESOLVED,
+    PROFILE_SURFACE_KINDS,
+    PROFILE_UNIFIED_LIFECYCLE_EVENTS,
+    PROFILE_CORE_ID_PREFIX,
+    PROFILE_SOLVER_CHECK_SCHEMA,
+    PROFILE_HOST_RESOLUTION_MANIFEST_SCHEMA,
+    PROFILE_EXECUTOR_CHECK_SCHEMA,
+    PROFILE_EXECUTOR_SCENARIO_SCHEMA,
+    PROFILE_DIAG_SURFACE_NO_MATCH,
+    PROFILE_DIAG_SURFACE_AMBIGUOUS,
+    PROFILE_DIAG_CAPABILITY_UNRESOLVED,
+    PROFILE_DIAG_CAPABILITY_PERMISSION_UNDECLARED,
+    PROFILE_DIAG_ROUTE_UNREALIZABLE,
+    PROFILE_DIAG_STALE_GENERATION,
+    PROFILE_DIAG_MISSING_ENVELOPE_IDS,
+    PROFILE_DIAG_SURFACE_OWNS_STATE,
+    PROFILE_DIAG_PRIVATE_OBJECT_CROSSING,
+    PROFILE_DIAG_SPLIT_TRANSACTION,
+    PROFILE_DIAG_DISPOSE_NOT_AUTHORITATIVE,
+    PROFILE_DIAG_CANCEL_NOT_PROPAGATED,
+    PROFILE_LIFECYCLE_MAPPING_ENTRY_SCHEMA,
+    PROFILE_LIFECYCLE_MAPPING_TABLE_SCHEMA,
+    PROFILE_RECOVERY_POLICY_SCHEMA,
+    PROFILE_LIFECYCLE_SCENARIO_SCHEMA,
+    PROFILE_LIFECYCLE_RECOVERY_CHECK_SCHEMA,
+    PROFILE_LIFECYCLE_HOST_KINDS,
+    PROFILE_PERSISTENCE_WINDOWS,
+    PROFILE_DIAG_LIFECYCLE_UNPROVEN,
+    PROFILE_DIAG_LIFECYCLE_MAPPING_INCOMPLETE,
+    PROFILE_DIAG_RECOVERY_DUPLICATES_OWNER,
+    PROFILE_DIAG_RECOVERY_ASSUMES_HEAP,
+    PROFILE_DIAG_PERSISTENCE_WINDOW_INVALID,
+    PROFILE_DELIVERY_PACKAGE_CONSTRAINTS_SCHEMA,
+    PROFILE_DELIVERY_SECURITY_POLICY_SCHEMA,
+    PROFILE_DELIVERY_UPDATE_POLICY_SCHEMA,
+    PROFILE_DELIVERY_ARTIFACT_MANIFEST_SCHEMA,
+    PROFILE_DELIVERY_PROOF_MANIFEST_SCHEMA,
+    PROFILE_DELIVERY_PROOF_SCENARIO_SCHEMA,
+    PROFILE_DELIVERY_PROOF_CHECK_SCHEMA,
+    PROFILE_DELIVERY_UPDATE_CHANNELS,
+    PROFILE_DELIVERY_ASSET_STRATEGIES,
+    PROFILE_DIAG_DELIVERY_CONSTRAINT_EXCEEDED,
+    PROFILE_DIAG_HOST_PLAN_VERSION_MISMATCH,
+    PROFILE_DIAG_PROOF_MANIFEST_INCOMPLETE,
+    PROFILE_DIAG_PROOF_COPIES_SEMANTIC_IR,
+    PROFILE_DIAG_UPDATE_WITHOUT_REPROOF,
+    PROFILE_DIAG_SECURITY_POLICY_INSECURE,
+    PROFILE_CONFORMANCE_FIXTURE_SCHEMA,
+    PROFILE_CONFORMANCE_STATE_SNAPSHOT_SCHEMA,
+    PROFILE_CONFORMANCE_TRACE_SCHEMA,
+    PROFILE_CONFORMANCE_HOST_RUN_SCHEMA,
+    PROFILE_CONFORMANCE_SCENARIO_SCHEMA,
+    PROFILE_CONFORMANCE_CHECK_SCHEMA,
+    PROFILE_CONFORMANCE_SURFACE_ROLES,
+    PROFILE_DIAG_STABLE_ID_DIVERGENCE,
+    PROFILE_DIAG_STATE_RESULT_DIVERGENCE,
+    PROFILE_DIAG_TRACE_INVARIANT_BROKEN,
+    PROFILE_DIAG_CONFORMANCE_HOST_INCOMPLETE,
+    PROFILE_DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH,
+    profileCatalog,
+    NATIVE_HOST_PROTOCOL,
+    NATIVE_HOST_WEBVIEW_DEPLOYMENT_SCHEMA,
+    NATIVE_HOST_CAPABILITY_SCHEMA,
+    NATIVE_HOST_BRIDGE_SCHEMA,
+    NATIVE_HOST_APPLICATION_IDENTITY_SCHEMA,
+    NATIVE_HOST_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_ARBITRARY_BRIDGE,
+    NATIVE_HOST_SHELL_SCHEMA,
+    NATIVE_HOST_SHELL_CHECK_SCHEMA,
+    NATIVE_HOST_DEEP_LINK_SCHEMA,
+    NATIVE_HOST_LOCAL_BUNDLE_SCHEMA,
+    NATIVE_HOST_DIAG_MISSING_SHELL_HOOK,
+    NATIVE_HOST_DIAG_PLATFORM_SEMANTIC_FORK,
+    NATIVE_HOST_DIAG_REMOTE_ENTRY_DEFAULT,
+    NATIVE_HOST_DIAG_MISSING_ENTRY_ARTIFACT,
+    NATIVE_HOST_REQUIRED_SHELL_HOOKS,
+    NATIVE_HOST_CAPABILITY_CALL_SCHEMA,
+    NATIVE_HOST_BRIDGE_TRACE_SCHEMA,
+    NATIVE_HOST_BRIDGE_STUB_CATALOG_SCHEMA,
+    NATIVE_HOST_BRIDGE_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_MISSING_NONCE,
+    NATIVE_HOST_DIAG_CALL_NOT_ALLOWLISTED,
+    NATIVE_HOST_FIRST_BATCH_STUB_IDS,
+    NATIVE_HOST_LIFECYCLE_SCHEMA,
+    NATIVE_HOST_LIFECYCLE_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_BACKGROUND_IS_DESTROY,
+    NATIVE_HOST_DIAG_CRASH_ASSUMES_JS_HEAP,
+    NATIVE_HOST_DIAG_MISSING_LIFECYCLE_EVENT,
+    NATIVE_HOST_REQUIRED_LIFECYCLE_EVENTS,
+    NATIVE_HOST_FULLSTACK_SCHEMA,
+    NATIVE_HOST_FULLSTACK_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_BRIDGE_BYPASSES_SERVER,
+    NATIVE_HOST_DIAG_REMOTE_WITHOUT_INTEGRITY,
+    NATIVE_HOST_DIAG_MISSING_SERVER_TRANSPORT,
+    NATIVE_HOST_NATIVE_SURFACE_SCHEMA,
+    NATIVE_HOST_NATIVE_SURFACE_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_SURFACE_IS_CAPABILITY,
+    NATIVE_HOST_DIAG_IMPLICIT_STATE_SHARE,
+    NATIVE_HOST_HIGH_VALUE_SURFACE_KINDS,
+    NATIVE_HOST_MULTI_PLATFORM_SCHEMA,
+    NATIVE_HOST_MULTI_PLATFORM_SHARED_SCHEMA,
+    NATIVE_HOST_MULTI_PLATFORM_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_MISSING_PLATFORM_ADAPTER,
+    NATIVE_HOST_DIAG_PLATFORM_PRIVATE_SCHEMA,
+    NATIVE_HOST_DIAG_ADAPTER_IS_SEMANTIC_CORE,
+    NATIVE_HOST_REQUIRED_MULTI_PLATFORMS,
+    NATIVE_HOST_MULTI_PLATFORM_ADAPTER_KIND,
+    nativeHostCatalog,
+    LOCALE_PROTOCOL,
+    LOCALE_MANIFEST_SCHEMA,
+    LOCALE_MESSAGE_CATALOG_SCHEMA,
+    LOCALE_MESSAGE_NODE_SCHEMA,
+    LOCALE_CHECK_SCHEMA,
+    LOCALE_TYPED_MODULE_SCHEMA,
+    LOCALE_RENAME_SCHEMA,
+    LOCALE_APPLICATION_CONTEXT_SCHEMA,
+    LOCALE_FORMATTER_CONTEXT_SCHEMA,
+    LOCALE_TRANSITION_SCHEMA,
+    LOCALE_RUNTIME_CHECK_SCHEMA,
+    LOCALE_FALLBACK_RESOLUTION_SCHEMA,
+    FORMATTER_DATA_VERSION,
+    LOCALE_ROUTE_REALIZATION_SCHEMA,
+    LOCALE_PAGE_META_SCHEMA,
+    LOCALE_LINK_RESOLUTION_SCHEMA,
+    LOCALE_ROUTER_CHECK_SCHEMA,
+    LOCALE_DELIVERY_RESOLUTION_SCHEMA,
+    LOCALE_CHUNK_MANIFEST_SCHEMA,
+    LOCALE_NATIVE_PACK_SCHEMA,
+    LOCALE_MINI_PACKAGE_PROOF_SCHEMA,
+    LOCALE_SERVER_ERROR_ENVELOPE_SCHEMA,
+    LOCALE_DELIVERY_CHECK_SCHEMA,
+    LOCALE_EXPLAIN_SCHEMA,
+    LOCALE_DIFF_SCHEMA,
+    LOCALE_EXTRACT_SCHEMA,
+    LOCALE_PSEUDO_SCHEMA,
+    LOCALE_CONFORMANCE_SCHEMA,
+    LOCALE_DIAG_MANIFEST_MISSING,
+    LOCALE_DIAG_ID_INVALID,
+    LOCALE_DIAG_FALLBACK_CYCLE,
+    LOCALE_DIAG_MESSAGE_PARAMETER_MISMATCH,
+    LOCALE_DIAG_MESSAGE_UNUSED,
+    LOCALE_DIAG_FORMATTER_CONTEXT_INCOMPLETE,
+    LOCALE_DIAG_FORMATTER_VERSION_MISMATCH,
+    LOCALE_DIAG_DIGEST_MISMATCH,
+    LOCALE_DIAG_TRANSITION_PARTIAL,
+    LOCALE_DIAG_TRANSITION_UNSUPPORTED,
+    LOCALE_DIAG_TRANSITION_LOAD_FAILED,
+    LOCALE_DIAG_MACHINE_DEFAULT_FORBIDDEN,
+    LOCALE_DIAG_MESSAGE_MIXED_LOCALE,
+    LOCALE_DIAG_STALE_GENERATION,
+    LOCALE_DIAG_ROUTE_COLLISION,
+    LOCALE_DIAG_CANONICAL_MISSING,
+    LOCALE_DIAG_HREFLANG_INCOMPLETE,
+    LOCALE_DIAG_META_LOCALE_MISMATCH,
+    LOCALE_DIAG_LINK_HARDCODED_PATH,
+    LOCALE_DIAG_CACHE_KEY_STEALS_CONTENT,
+    LOCALE_DIAG_PREFIX_OMIT_WITHOUT_REDIRECT,
+    LOCALE_DIAG_DELIVERY_FULL_BUNDLE,
+    LOCALE_DIAG_CHUNK_HASH_MISMATCH,
+    LOCALE_DIAG_NATIVE_PACK_UNSIGNED,
+    LOCALE_DIAG_NATIVE_PACK_HAS_JS,
+    LOCALE_DIAG_NATIVE_PACK_APP_MISMATCH,
+    LOCALE_DIAG_MINI_CROSS_PACKAGE_UNPROVEN,
+    LOCALE_DIAG_SERVER_TRANSLATED_ERROR,
+    LOCALE_DIAG_SERVER_FORMAT_WITHOUT_CONTEXT,
+    LOCALE_DIAG_HOST_MESSAGE_DIVERGENCE,
+    LOCALE_DIAG_MESSAGE_DYNAMIC_ID_UNBOUNDED,
+    LOCALE_DIAG_HARDCODED_TEXT,
+    LOCALE_DIAG_PSEUDO_PRODUCTION_FORBIDDEN,
+    LOCALE_DIAG_CONFORMANCE_DIVERGENCE,
+    LOCALE_DIAG_EXPLAIN_UNKNOWN,
+    LOCALE_VIRTUAL_MODULE_PREFIX,
+    localeCatalog,
+} from '@vmz/protocol';
+
+const require = createRequire(import.meta.url);
+const here = path.dirname(fileURLToPath(import.meta.url));
+const pkgRoot = path.join(here, '..');
+
+/**
+ * @returns {{ hostProtocol: string, compilerProtocol: string, programIrSchema: string, pluginProtocol: string }}
+ */
+export function expectedProtocol() {
+    return {
+        hostProtocol: HOST_PROTOCOL,
+        compilerProtocol: COMPILER_PROTOCOL,
+        programIrSchema: PROGRAM_IR_SCHEMA,
+        pluginProtocol: PLUGIN_PROTOCOL,
+    };
+}
+
+function platformTriple() {
+    const { platform, arch } = process;
+    if (platform === 'win32' && arch === 'x64') return 'win32-x64-msvc';
+    if (platform === 'win32' && arch === 'arm64') return 'win32-arm64-msvc';
+    if (platform === 'darwin' && arch === 'arm64') return 'darwin-arm64';
+    if (platform === 'darwin' && arch === 'x64') return 'darwin-x64';
+    if (platform === 'linux' && arch === 'x64') return 'linux-x64-gnu';
+    if (platform === 'linux' && arch === 'arm64') return 'linux-arm64-gnu';
+    return `${platform}-${arch}`;
+}
+
+/**
+ * Resolve native `.node` (built by `scripts/build-napi.mjs`).
+ * @returns {string}
+ */
+export function resolveNativePath() {
+    const triple = platformTriple();
+    const candidates = [
+        path.join(pkgRoot, `vmz.${triple}.node`),
+        path.join(pkgRoot, 'vmz.node'),
+        // optionalDependencies platform package (published layout)
+        path.join(pkgRoot, '..', `vmz-${triple}`, `vmz.${triple}.node`),
+        path.join(pkgRoot, '..', `vmz-${triple}`, 'vmz.node'),
+        // monorepo sibling (packages/runtimes/vmz-<triple>)
+        path.join(pkgRoot, `../vmz-${triple}`, `vmz.${triple}.node`),
+        path.join(pkgRoot, `../vmz-${triple}`, 'vmz.node'),
+        // cargo + build-napi copy targets (repo root target/)
+        path.join(pkgRoot, '../../../target/debug', 'vmz_napi.node'),
+        path.join(pkgRoot, '../../../target/release', 'vmz_napi.node'),
+    ];
+    for (const p of candidates) {
+        if (existsSync(p)) return p;
+    }
+    throw new Error(
+        `vmz native addon not found for ${triple}. Run: pnpm --filter vmz build:native\n` +
+            `Looked in:\n${candidates.map((c) => `  - ${c}`).join('\n')}`,
+    );
+}
+
+let _native;
+
+/**
+ * @returns {typeof import('./index.js') extends never ? any : any}
+ */
+export function loadNative() {
+    if (_native) return _native;
+    const addonPath = resolveNativePath();
+    _native = require(addonPath);
+    return _native;
+}
+
+/**
+ * @typedef {object} ProtocolVersions
+ * @property {string} hostProtocol
+ * @property {string} compilerProtocol
+ * @property {string} programIrSchema
+ * @property {string} pluginProtocol
+ */
+
+/**
+ * @returns {ProtocolVersions}
+ */
+export function getProtocolVersions() {
+    const native = loadNative();
+    const n = native.getProtocolVersions();
+    return {
+        hostProtocol: n.hostProtocol,
+        compilerProtocol: n.compilerProtocol,
+        programIrSchema: n.programIrSchema,
+        pluginProtocol: n.pluginProtocol,
+    };
+}
+
+/**
+ * @param {ProtocolVersions} [host]
+ */
+export function handshake(host = expectedProtocol()) {
+    const native = loadNative();
+    native.handshakeProtocols({
+        hostProtocol: host.hostProtocol,
+        compilerProtocol: host.compilerProtocol,
+        programIrSchema: host.programIrSchema,
+        pluginProtocol: host.pluginProtocol,
+    });
+}
+
+/**
+ * @typedef {object} WorkspaceOptions
+ * @property {string} root
+ * @property {string} [outDir]
+ * @property {ProtocolVersions} [protocol]
+ */
+
+/**
+ * Create a long-lived compile workspace (N1).
+ * @param {WorkspaceOptions} options
+ */
+export function createWorkspace(options) {
+    const native = loadNative();
+    const protocol = options.protocol ?? expectedProtocol();
+    return native.JsWorkspace.create({
+        root: options.root,
+        outDir: options.outDir,
+        protocol: {
+            hostProtocol: protocol.hostProtocol,
+            compilerProtocol: protocol.compilerProtocol,
+            programIrSchema: protocol.programIrSchema,
+            pluginProtocol: protocol.pluginProtocol,
+        },
+    });
+}
+
+/**
+ * M0: frozen application composition protocol catalog.
+ * @returns {string}
+ */
+export function queryApplicationProtocolCatalog() {
+    const native = loadNative();
+    return native.queryApplicationProtocolCatalog();
+}
+
+/**
+ * M0: check host applications.config.json5 against workspace package descriptors.
+ * @param {string} hostRoot
+ * @param {string[]} packageRoots
+ * @returns {string} ApplicationCheckReport JSON
+ */
+export function checkApplicationsJson(hostRoot, packageRoots) {
+    const native = loadNative();
+    return native.checkApplicationsJson(hostRoot, packageRoots);
+}
+
+export function queryTargetProtocolCatalog() {
+    const native = loadNative();
+    return native.queryTargetProtocolCatalog();
+}
+
+export function checkMp0TargetContractJson(rootPath) {
+    const native = loadNative();
+    return native.checkMp0TargetContractJson(rootPath);
+}
+
+export function queryProfileProtocolCatalog() {
+    const native = loadNative();
+    return native.queryProfileProtocolCatalog();
+}
+
+export function checkP0ProfileProtocolJson(rootPath) {
+    const native = loadNative();
+    return native.checkP0ProfileProtocolJson(rootPath);
+}
+
+export function checkP1ProfileSolverJson(rootPath) {
+    const native = loadNative();
+    return native.checkP1ProfileSolverJson(rootPath);
+}
+
+export function checkP2UnifiedExecutorJson(rootPath) {
+    const native = loadNative();
+    return native.checkP2UnifiedExecutorJson(rootPath);
+}
+
+export function checkP3LifecycleRecoveryJson(rootPath) {
+    const native = loadNative();
+    return native.checkP3LifecycleRecoveryJson(rootPath);
+}
+
+export function checkP4DeliveryProofJson(rootPath) {
+    const native = loadNative();
+    return native.checkP4DeliveryProofJson(rootPath);
+}
+
+export function checkP5CrossHostConformanceJson(rootPath) {
+    const native = loadNative();
+    return native.checkP5CrossHostConformanceJson(rootPath);
+}
+
+export function queryNativeHostProtocolCatalog() {
+    const native = loadNative();
+    return native.queryNativeHostProtocolCatalog();
+}
+
+export function checkNw0NativeHostContractJson(rootPath) {
+    const native = loadNative();
+    return native.checkNw0NativeHostContractJson(rootPath);
+}
+
+export function checkNw1NativeShellContractJson(rootPath) {
+    const native = loadNative();
+    return native.checkNw1NativeShellContractJson(rootPath);
+}
+
+export function checkNw2NativeBridgeContractJson(rootPath) {
+    const native = loadNative();
+    return native.checkNw2NativeBridgeContractJson(rootPath);
+}
+
+export function checkNw3NativeLifecycleContractJson(rootPath) {
+    const native = loadNative();
+    return native.checkNw3NativeLifecycleContractJson(rootPath);
+}
+
+export function checkNw4NativeFullstackContractJson(rootPath) {
+    const native = loadNative();
+    return native.checkNw4NativeFullstackContractJson(rootPath);
+}
+
+export function checkNw5NativeSurfaceContractJson(rootPath) {
+    const native = loadNative();
+    return native.checkNw5NativeSurfaceContractJson(rootPath);
+}
+
+export function checkNw6MultiPlatformContractJson(rootPath) {
+    const native = loadNative();
+    return native.checkNw6MultiPlatformContractJson(rootPath);
+}
+
+/**
+ * M1: prove independent `/` + non-root ApplicationBase; scan non-relocatable URLs.
+ * @param {string} packageRoot
+ * @param {string} [relocateBase]
+ * @returns {string}
+ */
+export function checkApplicationRelocatableJson(packageRoot, relocateBase) {
+    const native = loadNative();
+    return native.checkApplicationRelocatableJson(packageRoot, relocateBase ?? null);
+}
+
+/**
+ * M1: apply ApplicationBase to a logical relocation manifest.
+ * @param {string} manifestJson
+ * @param {string} base
+ * @returns {string}
+ */
+export function relocateApplicationManifestJson(manifestJson, base) {
+    const native = loadNative();
+    return native.relocateApplicationManifestJson(manifestJson, base);
+}
+
+/**
+ * M2: independent ApplicationArtifact + MountTable/Catalog boundary (refs only).
+ * @param {string} hostRoot
+ * @param {string[]} packageRoots
+ * @returns {string}
+ */
+export function checkApplicationArtifactBoundaryJson(hostRoot, packageRoots) {
+    const native = loadNative();
+    return native.checkApplicationArtifactBoundaryJson(hostRoot, packageRoots);
+}
+
+/**
+ * M3: absolute isolation namespaces + failure containment.
+ * @param {string} hostRoot
+ * @param {string[]} packageRoots
+ * @returns {string}
+ */
+export function checkApplicationIsolationJson(hostRoot, packageRoots) {
+    const native = loadNative();
+    return native.checkApplicationIsolationJson(hostRoot, packageRoots);
+}
+
+/**
+ * M4: host catalog consumption + cross-application Link resolution.
+ * @param {string} hostRoot
+ * @param {string[]} packageRoots
+ * @returns {string}
+ */
+export function checkApplicationHostCompositionJson(hostRoot, packageRoots) {
+    const native = loadNative();
+    return native.checkApplicationHostCompositionJson(hostRoot, packageRoots);
+}
+
+/**
+ * M5: multi-session affected rebuild + MountTable proxy + mounted tests + deploy adapter.
+ * @param {string} hostRoot
+ * @param {string[]} packageRoots
+ * @param {string[]} [dirtyPaths]
+ * @returns {string}
+ */
+export function checkApplicationDevTestDeployJson(hostRoot, packageRoots, dirtyPaths = []) {
+    const native = loadNative();
+    return native.checkApplicationDevTestDeployJson(hostRoot, packageRoots, dirtyPaths);
+}
+
+export { createDevSession, listWatchedFiles, srcFingerprint } from './dev-session.js';
+export { runCli, parseArgs, printHelp } from './cli.js';
+export { resolveWorkspaceDirs, findPackageJson, readPackageMeta } from './resolve.js';
+export { resolvePackageRoot, resolveWorkspacePackages } from './packages.js';
+export { log } from './log.js';
+export { cmdApplication, runCheck as runApplicationCheck } from './application-cmd.js';
+export {
+    buildApplicationContext,
+    buildFormatterContext,
+    checkLocaleRuntime,
+    checkSsrClientParity,
+    createLocaleSession,
+    formatMessageTemplate,
+    formatterContextDigest,
+    negotiateLocale,
+    resolveMessageVariant,
+    validateFormatterContext,
+} from './locale-runtime.js';
+export {
+    absoluteUrl,
+    assertLocaleCacheKey,
+    buildLocalePageMeta,
+    buildLocaleRouteRealizationTable,
+    checkLocaleRouter,
+    commitLocaleRouteMetaTransition,
+    localeAwareCacheKey,
+    parseLocaleFromPath,
+    planLocalePathNavigation,
+    realizeRoutePath,
+    resolveLinkHref,
+} from './locale-router.js';
+export {
+    assertHostMessageInvariant,
+    assertServerErrorEnvelope,
+    assertServerFormatContext,
+    buildLocaleDeliveryResolution,
+    checkLocaleDelivery,
+    fallbackDigest,
+    messageCatalogHash,
+    proveMiniPackageMessages,
+    validateNativeLocalePack,
+} from './locale-delivery.js';
+export {
+    checkLocaleConformance,
+    diffLocaleCatalogs,
+    explainLocaleMessage,
+    extractHardcodedText,
+    pseudoLocalizeCatalog,
+} from './locale-tooling.js';
+export {
+    applyPlugins,
+    contentHash,
+    defineConfig,
+    definePlugin,
+    loadVmzConfig,
+} from './plugin-host.js';
+export {
+    createRolldownPluginVmzAdapter,
+    createVitePluginVmzAdapter,
+    loadDeploymentIr,
+    planAffectedBundleInputs,
+    planBundleInputs,
+} from './bundler-adapter.js';
+
+export default {
+    HOST_PROTOCOL,
+    COMPILER_PROTOCOL,
+    PROGRAM_IR_SCHEMA,
+    PLUGIN_PROTOCOL,
+    DX_PROTOCOL,
+    DX_SYMBOL_SCHEMA,
+    DX_REFERENCE_SCHEMA,
+    DX_EXPLAIN_SCHEMA,
+    DX_WORKSPACE_EDIT_SCHEMA,
+    DX_CODE_ACTION_SCHEMA,
+    DX_AFFECTED_SCHEMA,
+    DX_RENAME_SCHEMA,
+    DX_TEST_SELECTION_SCHEMA,
+    DX_SOURCE_MAP_SCHEMA,
+    DX_SYMBOL_INDEX_SCHEMA,
+    DX_X2_CHECK_SCHEMA,
+    DX_SEMANTIC_TRANSACTION_SCHEMA,
+    DX_CANCEL_SCHEMA,
+    DX_AFFECTED_PREVIEW_SCHEMA,
+    DX_HMR_PLAN_SCHEMA,
+    DX_BUDGET_SCHEMA,
+    DX_X3_CHECK_SCHEMA,
+    DX_BOUNDARY_VALIDATOR_SCHEMA,
+    DX_LEAKAGE_SCHEMA,
+    DX_CAPABILITY_TARGET_SCHEMA,
+    DX_DEAD_GRAPH_SCHEMA,
+    DX_X4_CHECK_SCHEMA,
+    DX_TRACE_SCHEMA,
+    DX_CAUSAL_REPLAY_SCHEMA,
+    DX_X5_CHECK_SCHEMA,
+    APPLICATION_PROTOCOL,
+    APPLICATION_DESCRIPTOR_SCHEMA,
+    APPLICATIONS_CONFIG_SCHEMA,
+    APPLICATION_CATALOG_SCHEMA,
+    APPLICATION_CHECK_SCHEMA,
+    APPLICATION_BASE_SCHEMA,
+    APPLICATION_RELOCATION_SCHEMA,
+    APPLICATION_RELOCATED_SCHEMA,
+    APPLICATION_RELOCATABLE_CHECK_SCHEMA,
+    APPLICATION_ARTIFACT_SCHEMA,
+    APPLICATION_MOUNT_TABLE_SCHEMA,
+    APPLICATION_ARTIFACT_BOUNDARY_SCHEMA,
+    APPLICATION_ISOLATION_SCHEMA,
+    APPLICATION_ISOLATION_CHECK_SCHEMA,
+    APPLICATION_CROSS_LINK_SCHEMA,
+    APPLICATION_HOST_COMPOSITION_SCHEMA,
+    APPLICATION_DEV_SESSIONS_SCHEMA,
+    APPLICATION_AFFECTED_SCHEMA,
+    APPLICATION_PROXY_DISPATCH_SCHEMA,
+    APPLICATION_MOUNTED_TEST_SCHEMA,
+    APPLICATION_DEPLOY_ADAPTER_SCHEMA,
+    APPLICATION_DEV_CHECK_SCHEMA,
+    PROTOCOL_CATALOG_SCHEMA,
+    expectedProtocol,
+    resolveNativePath,
+    loadNative,
+    getProtocolVersions,
+    handshake,
+    createWorkspace,
+    queryApplicationProtocolCatalog,
+    checkApplicationsJson,
+    queryTargetProtocolCatalog,
+    checkMp0TargetContractJson,
+    queryProfileProtocolCatalog,
+    checkP0ProfileProtocolJson,
+    checkP1ProfileSolverJson,
+    checkP2UnifiedExecutorJson,
+    checkP3LifecycleRecoveryJson,
+    checkP4DeliveryProofJson,
+    checkP5CrossHostConformanceJson,
+    PROFILE_CONFORMANCE_SCENARIO_SCHEMA,
+    PROFILE_CONFORMANCE_CHECK_SCHEMA,
+    PROFILE_CONFORMANCE_SURFACE_ROLES,
+    PROFILE_DIAG_STABLE_ID_DIVERGENCE,
+    PROFILE_DIAG_STATE_RESULT_DIVERGENCE,
+    PROFILE_DIAG_TRACE_INVARIANT_BROKEN,
+    PROFILE_DIAG_CONFORMANCE_HOST_INCOMPLETE,
+    PROFILE_DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH,
+    PROFILE_DELIVERY_PROOF_SCENARIO_SCHEMA,
+    PROFILE_DELIVERY_PROOF_CHECK_SCHEMA,
+    PROFILE_DIAG_DELIVERY_CONSTRAINT_EXCEEDED,
+    PROFILE_DIAG_HOST_PLAN_VERSION_MISMATCH,
+    PROFILE_DIAG_PROOF_COPIES_SEMANTIC_IR,
+    PROFILE_DIAG_UPDATE_WITHOUT_REPROOF,
+    PROFILE_DIAG_SECURITY_POLICY_INSECURE,
+    PROFILE_CONFORMANCE_FIXTURE_SCHEMA,
+    PROFILE_CONFORMANCE_STATE_SNAPSHOT_SCHEMA,
+    PROFILE_CONFORMANCE_TRACE_SCHEMA,
+    PROFILE_CONFORMANCE_HOST_RUN_SCHEMA,
+    PROFILE_CONFORMANCE_SCENARIO_SCHEMA,
+    PROFILE_CONFORMANCE_CHECK_SCHEMA,
+    PROFILE_CONFORMANCE_SURFACE_ROLES,
+    PROFILE_DIAG_STABLE_ID_DIVERGENCE,
+    PROFILE_DIAG_STATE_RESULT_DIVERGENCE,
+    PROFILE_DIAG_TRACE_INVARIANT_BROKEN,
+    PROFILE_DIAG_CONFORMANCE_HOST_INCOMPLETE,
+    PROFILE_DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH,
+    PROFILE_LIFECYCLE_SCENARIO_SCHEMA,
+    PROFILE_LIFECYCLE_RECOVERY_CHECK_SCHEMA,
+    PROFILE_LIFECYCLE_HOST_KINDS,
+    PROFILE_PERSISTENCE_WINDOWS,
+    PROFILE_DIAG_LIFECYCLE_UNPROVEN,
+    PROFILE_DIAG_LIFECYCLE_MAPPING_INCOMPLETE,
+    PROFILE_DIAG_RECOVERY_DUPLICATES_OWNER,
+    PROFILE_DIAG_RECOVERY_ASSUMES_HEAP,
+    PROFILE_DIAG_PERSISTENCE_WINDOW_INVALID,
+    PROFILE_DELIVERY_PACKAGE_CONSTRAINTS_SCHEMA,
+    PROFILE_DELIVERY_SECURITY_POLICY_SCHEMA,
+    PROFILE_DELIVERY_UPDATE_POLICY_SCHEMA,
+    PROFILE_DELIVERY_ARTIFACT_MANIFEST_SCHEMA,
+    PROFILE_DELIVERY_PROOF_MANIFEST_SCHEMA,
+    PROFILE_DELIVERY_PROOF_SCENARIO_SCHEMA,
+    PROFILE_DELIVERY_PROOF_CHECK_SCHEMA,
+    PROFILE_DELIVERY_UPDATE_CHANNELS,
+    PROFILE_DELIVERY_ASSET_STRATEGIES,
+    PROFILE_DIAG_DELIVERY_CONSTRAINT_EXCEEDED,
+    PROFILE_DIAG_HOST_PLAN_VERSION_MISMATCH,
+    PROFILE_DIAG_PROOF_MANIFEST_INCOMPLETE,
+    PROFILE_DIAG_PROOF_COPIES_SEMANTIC_IR,
+    PROFILE_DIAG_UPDATE_WITHOUT_REPROOF,
+    PROFILE_DIAG_SECURITY_POLICY_INSECURE,
+    PROFILE_CONFORMANCE_FIXTURE_SCHEMA,
+    PROFILE_CONFORMANCE_STATE_SNAPSHOT_SCHEMA,
+    PROFILE_CONFORMANCE_TRACE_SCHEMA,
+    PROFILE_CONFORMANCE_HOST_RUN_SCHEMA,
+    PROFILE_CONFORMANCE_SCENARIO_SCHEMA,
+    PROFILE_CONFORMANCE_CHECK_SCHEMA,
+    PROFILE_CONFORMANCE_SURFACE_ROLES,
+    PROFILE_DIAG_STABLE_ID_DIVERGENCE,
+    PROFILE_DIAG_STATE_RESULT_DIVERGENCE,
+    PROFILE_DIAG_TRACE_INVARIANT_BROKEN,
+    PROFILE_DIAG_CONFORMANCE_HOST_INCOMPLETE,
+    PROFILE_DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH,
+    PROFILE_SOLVER_CHECK_SCHEMA,
+    PROFILE_HOST_RESOLUTION_MANIFEST_SCHEMA,
+    PROFILE_EXECUTOR_CHECK_SCHEMA,
+    PROFILE_EXECUTOR_SCENARIO_SCHEMA,
+    PROFILE_DIAG_SURFACE_NO_MATCH,
+    PROFILE_DIAG_SURFACE_AMBIGUOUS,
+    PROFILE_DIAG_CAPABILITY_UNRESOLVED,
+    PROFILE_DIAG_CAPABILITY_PERMISSION_UNDECLARED,
+    PROFILE_DIAG_ROUTE_UNREALIZABLE,
+    PROFILE_DIAG_STALE_GENERATION,
+    PROFILE_DIAG_MISSING_ENVELOPE_IDS,
+    PROFILE_DIAG_SURFACE_OWNS_STATE,
+    PROFILE_DIAG_PRIVATE_OBJECT_CROSSING,
+    PROFILE_DIAG_SPLIT_TRANSACTION,
+    PROFILE_DIAG_DISPOSE_NOT_AUTHORITATIVE,
+    PROFILE_DIAG_CANCEL_NOT_PROPAGATED,
+    PROFILE_PROTOCOL,
+    PROFILE_HOST_SCHEMA,
+    PROFILE_DELIVERY_SCHEMA,
+    PROFILE_CHECK_SCHEMA,
+    PROFILE_DIAG_HOST_PROFILE_INVALID,
+    PROFILE_DIAG_RESOLUTION_DIGEST_MISMATCH,
+    PROFILE_DIAG_CORE_ID_OVERRIDE,
+    PROFILE_DIAG_HOST_PROFILE_REF_UNRESOLVED,
+    PROFILE_SURFACE_KINDS,
+    PROFILE_UNIFIED_LIFECYCLE_EVENTS,
+    PROFILE_CORE_ID_PREFIX,
+    PROFILE_SOLVER_CHECK_SCHEMA,
+    PROFILE_HOST_RESOLUTION_MANIFEST_SCHEMA,
+    PROFILE_EXECUTOR_CHECK_SCHEMA,
+    PROFILE_EXECUTOR_SCENARIO_SCHEMA,
+    PROFILE_DIAG_SURFACE_NO_MATCH,
+    PROFILE_DIAG_SURFACE_AMBIGUOUS,
+    PROFILE_DIAG_CAPABILITY_UNRESOLVED,
+    PROFILE_DIAG_CAPABILITY_PERMISSION_UNDECLARED,
+    PROFILE_DIAG_ROUTE_UNREALIZABLE,
+    PROFILE_DIAG_STALE_GENERATION,
+    PROFILE_DIAG_MISSING_ENVELOPE_IDS,
+    PROFILE_DIAG_SURFACE_OWNS_STATE,
+    PROFILE_DIAG_PRIVATE_OBJECT_CROSSING,
+    PROFILE_DIAG_SPLIT_TRANSACTION,
+    PROFILE_DIAG_DISPOSE_NOT_AUTHORITATIVE,
+    PROFILE_DIAG_CANCEL_NOT_PROPAGATED,
+    profileCatalog,
+    localeCatalog,
+    queryNativeHostProtocolCatalog,
+    checkNw0NativeHostContractJson,
+    checkNw1NativeShellContractJson,
+    checkNw2NativeBridgeContractJson,
+    checkNw3NativeLifecycleContractJson,
+    checkNw4NativeFullstackContractJson,
+    checkNw5NativeSurfaceContractJson,
+    checkNw6MultiPlatformContractJson,
+    NATIVE_HOST_PROTOCOL,
+    NATIVE_HOST_NATIVE_SURFACE_SCHEMA,
+    NATIVE_HOST_NATIVE_SURFACE_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_SURFACE_IS_CAPABILITY,
+    NATIVE_HOST_DIAG_IMPLICIT_STATE_SHARE,
+    NATIVE_HOST_HIGH_VALUE_SURFACE_KINDS,
+    NATIVE_HOST_MULTI_PLATFORM_SCHEMA,
+    NATIVE_HOST_MULTI_PLATFORM_SHARED_SCHEMA,
+    NATIVE_HOST_MULTI_PLATFORM_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_PLATFORM_SEMANTIC_FORK,
+    NATIVE_HOST_DIAG_MISSING_PLATFORM_ADAPTER,
+    NATIVE_HOST_DIAG_PLATFORM_PRIVATE_SCHEMA,
+    NATIVE_HOST_DIAG_ADAPTER_IS_SEMANTIC_CORE,
+    NATIVE_HOST_REQUIRED_MULTI_PLATFORMS,
+    NATIVE_HOST_MULTI_PLATFORM_ADAPTER_KIND,
+    NATIVE_HOST_FULLSTACK_SCHEMA,
+    NATIVE_HOST_FULLSTACK_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_BRIDGE_BYPASSES_SERVER,
+    NATIVE_HOST_DIAG_REMOTE_WITHOUT_INTEGRITY,
+    NATIVE_HOST_DIAG_MISSING_SERVER_TRANSPORT,
+    NATIVE_HOST_LIFECYCLE_SCHEMA,
+    NATIVE_HOST_LIFECYCLE_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_BACKGROUND_IS_DESTROY,
+    NATIVE_HOST_DIAG_CRASH_ASSUMES_JS_HEAP,
+    NATIVE_HOST_DIAG_MISSING_LIFECYCLE_EVENT,
+    NATIVE_HOST_REQUIRED_LIFECYCLE_EVENTS,
+    NATIVE_HOST_CAPABILITY_CALL_SCHEMA,
+    NATIVE_HOST_BRIDGE_TRACE_SCHEMA,
+    NATIVE_HOST_BRIDGE_STUB_CATALOG_SCHEMA,
+    NATIVE_HOST_BRIDGE_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_MISSING_NONCE,
+    NATIVE_HOST_DIAG_CALL_NOT_ALLOWLISTED,
+    NATIVE_HOST_FIRST_BATCH_STUB_IDS,
+    NATIVE_HOST_SHELL_SCHEMA,
+    NATIVE_HOST_SHELL_CHECK_SCHEMA,
+    NATIVE_HOST_DEEP_LINK_SCHEMA,
+    NATIVE_HOST_LOCAL_BUNDLE_SCHEMA,
+    NATIVE_HOST_DIAG_MISSING_SHELL_HOOK,
+    NATIVE_HOST_DIAG_PLATFORM_SEMANTIC_FORK,
+    NATIVE_HOST_DIAG_REMOTE_ENTRY_DEFAULT,
+    NATIVE_HOST_DIAG_MISSING_ENTRY_ARTIFACT,
+    NATIVE_HOST_REQUIRED_SHELL_HOOKS,
+    NATIVE_HOST_WEBVIEW_DEPLOYMENT_SCHEMA,
+    NATIVE_HOST_CAPABILITY_SCHEMA,
+    NATIVE_HOST_BRIDGE_SCHEMA,
+    NATIVE_HOST_APPLICATION_IDENTITY_SCHEMA,
+    NATIVE_HOST_CHECK_SCHEMA,
+    NATIVE_HOST_DIAG_ARBITRARY_BRIDGE,
+    nativeHostCatalog,
+    TARGET_PROTOCOL,
+    TARGET_VIEW_OPS_SCHEMA,
+    TARGET_PLATFORM_PROFILE_SCHEMA,
+    TARGET_MINI_PROGRAM_ARTIFACT_SCHEMA,
+    TARGET_CHECK_SCHEMA,
+    targetCatalog,
+    checkApplicationRelocatableJson,
+    relocateApplicationManifestJson,
+    checkApplicationArtifactBoundaryJson,
+    checkApplicationIsolationJson,
+    checkApplicationHostCompositionJson,
+    checkApplicationDevTestDeployJson,
+};

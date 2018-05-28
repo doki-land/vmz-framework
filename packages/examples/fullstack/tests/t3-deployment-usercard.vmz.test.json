@@ -1,0 +1,41 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "t3.deployment.usercard.isolation",
+    "title": "T3: Deployment IR + UserCard server capability isolation",
+    "modes": ["deployment"],
+    "program": {
+        "chunkId": "components/UserCard",
+        "unitName": "UserCard"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "deploymentFile",
+            "expect": {
+                "schema": "vmz.deployment.v0"
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "serverCapability",
+            "expect": {
+                "chunkId": "components/UserCard",
+                "serverModuleId": "#server/components/UserCard",
+                "capabilities": ["fetchUser", "getMe"]
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "serverIsolation",
+            "expect": {
+                "chunkId": "components/UserCard",
+                "capabilities": ["fetchUser", "getMe"]
+            }
+        }
+    ]
+}

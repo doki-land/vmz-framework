@@ -1,0 +1,35 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "l5.zerojs.event.shell.compile",
+    "title": "L5: event-only page emits EventEntry strategy=event",
+    "modes": ["compile"],
+    "program": {
+        "chunkId": "pages/index",
+        "unitName": "IndexPage"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "deployment",
+            "expect": {
+                "resumeComponent": "EventButton",
+                "strategy": "event",
+                "deploymentFileSchema": "vmz.deployment.v0",
+                "deploymentResumeComponent": "EventButton",
+                "deploymentChunkIncludes": "pages/index"
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "graph",
+            "expect": {
+                "includes": "api.component(this, \"EventButton\""
+            }
+        }
+    ]
+}

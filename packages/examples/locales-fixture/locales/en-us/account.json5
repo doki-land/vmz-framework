@@ -1,0 +1,8 @@
+{
+  actions: {
+    save: 'Save',
+    cancel: 'Cancel',
+  },
+  greeting: 'Hello, {name}',
+  itemCount: '{count, plural, =0 {No items} one {# item} other {# items}}',
+}

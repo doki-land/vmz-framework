@@ -1,0 +1,2 @@
+[alias]
+vmz = ["run", "-p", "vmz-tools", "--"]

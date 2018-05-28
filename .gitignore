@@ -1,13 +1,38 @@
-# OS
-
-# Editor
+# IDE
 .idea/
-
+.trae/
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
 
 # Rust
-/target
-
+target/
 
 # Node
 node_modules/
-dist
+pnpm-lock.yaml
+.turbo/
+dist/
+coverage/
+*.log
+*.tsbuildinfo
+*.node
+
+# Generated
+**/src/auto-imports.d.ts
+**/src/typed-router.d.ts
+**/.eslintrc-auto-import.json
+
+# Legacy outputs
+runtimes/*/dist/
+!runtimes/vmz-test/dist/
+!runtimes/vmz-test/dist/**
+compilers/*/dist/
+
+# Placeholder npm status / trust list cache (OTP window)
+.placeholder-npm-cache.json
+
+# N-API local build artifacts (copied by scripts/build-napi.mjs)
+runtimes/vmz/*.node
+runtimes/vmz-*/vmz*.node

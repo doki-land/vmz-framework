@@ -1,0 +1,23 @@
+<template>
+  <section>
+    <p>{primary.name}</p>
+    <p>{secondary.name}</p>
+  </section>
+</template>
+
+<script client>
+export default class WriteBarrierSharedDemo {
+  primary = { name: "p" };
+  secondary = { name: "s" };
+
+  share() {
+    const shared = { name: "shared" };
+    this.primary = shared;
+    this.secondary = shared;
+  }
+
+  setSecondary(n: string) {
+    this.secondary.name = n;
+  }
+}
+</script>

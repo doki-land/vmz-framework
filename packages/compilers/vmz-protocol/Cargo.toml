@@ -1,0 +1,12 @@
+[package]
+name = "vmz-protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "VMZ versioned wire protocols (host / program / plugin / dx / test / application)"
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }

@@ -1,0 +1,37 @@
+<template>
+  <section>
+    <p if={!user}>Loading...</p>
+    <div else>
+      <h2>{user.name}</h2>
+      <ul>
+        <li each={tags} as="tag" key={tag.id}>{tag.label}</li>
+      </ul>
+      <button type="button" onClick={() => count++}>count: {count}</button>
+    </div>
+  </section>
+</template>
+
+<script client>
+import type { User } from '#server/db/users';
+
+export default class Demo {
+  public title: string = 'Demo';
+  user!: User;
+  tags: { id: string; label: string }[] = [];
+  count = 0;
+}
+</script>
+
+<script server>
+export default class DemoServer {
+  async fetch() {
+    return { name: 'Ada' };
+  }
+}
+</script>
+
+<style>
+section {
+  padding: 1rem;
+}
+</style>

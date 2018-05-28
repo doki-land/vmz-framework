@@ -1,0 +1,15 @@
+{
+    "name": "@vmz-examples/documents-fixture",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "check": "vmz document check . --strict",
+        "dev": "vmz document dev",
+        "build": "vmz document build",
+        "serve": "vmz document serve"
+    },
+    "devDependencies": {
+        "vmz": "workspace:*"
+    }
+}

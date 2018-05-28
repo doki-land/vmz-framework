@@ -1,0 +1,24 @@
+<template>
+  <section>
+    <span>{user.flag}</span>
+    <em>{user.name}</em>
+  </section>
+</template>
+
+<script client>
+export default class WriteBarrierLogicalDemo {
+  user: { flag: string; name: string | null } = { flag: "", name: null };
+
+  ensureFlag() {
+    this.user.flag ||= "on";
+  }
+
+  ensureName() {
+    this.user.name ??= "anon";
+  }
+
+  clearFlag() {
+    this.user.flag &&= "";
+  }
+}
+</script>

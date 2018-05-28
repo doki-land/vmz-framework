@@ -1,0 +1,25 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "l2.compile.like.ternary",
+    "title": "L2: LikeButton ternary Direct",
+    "modes": ["compile"],
+    "program": {
+        "chunkId": "components/LikeButton",
+        "unitName": "LikeButton"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "graph",
+            "expect": {
+                "direct": true,
+                "includesAll": ["api.bindText(this,", "stable:", "branches:"]
+            }
+        }
+    ]
+}

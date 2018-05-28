@@ -1,0 +1,42 @@
+{
+    "name": "@vmz/core",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "VMZ production runtime core — DOM / SSR / HTTP / WriteBarrier (no compiler)",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/server.js"
+        },
+        "./dom": {
+            "types": "./dist/dom.d.ts",
+            "default": "./dist/dom.js"
+        },
+        "./server": {
+            "types": "./dist/server.d.ts",
+            "default": "./dist/server.js"
+        },
+        "./http": {
+            "types": "./dist/http.d.ts",
+            "default": "./dist/http.js"
+        }
+    },
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "keywords": [
+        "vmz",
+        "runtime"
+    ],
+    "main": "./dist/server.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsc -p tsconfig.json && node ../../../scripts/copy-serve-host-mjs.mjs"
+    },
+    "devDependencies": {
+        "@types/node": "^22.15.0",
+        "typescript": "^5.8.3"
+    }
+}

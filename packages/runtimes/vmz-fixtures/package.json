@@ -1,0 +1,35 @@
+{
+    "name": "vmz-fixtures",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Private gate fixtures (not a plugin package — name must not contain plugin)",
+    "license": "MIT",
+    "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        }
+    },
+    "dependencies": {
+        "@vmz/plugin": "workspace:*"
+    },
+    "keywords": [
+        "vmz",
+        "fixtures"
+    ],
+    "types": "./dist/index.d.ts",
+    "files": [
+        "dist",
+        "src",
+        "README.md"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json"
+    },
+    "devDependencies": {
+        "@types/node": "^22.15.0",
+        "typescript": "^5.8.3"
+    }
+}

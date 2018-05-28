@@ -1,0 +1,8 @@
+{
+  actions: {
+    save: '保存',
+    cancel: '取消',
+  },
+  greeting: '你好，{name}',
+  itemCount: '{count, plural, =0 {没有项目} one {# 个项目} other {# 个项目}}',
+}

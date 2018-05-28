@@ -1,0 +1,47 @@
+{
+    "brand": {
+        "primary": "#176BFF",
+        "energy": "#FFB000"
+    },
+    "scale": {
+        "50": "#EDF5FF",
+        "100": "#D8E9FF",
+        "200": "#B5D4FF",
+        "300": "#82B5FF",
+        "400": "#4A91FF",
+        "500": "#176BFF",
+        "600": "#0D57DB",
+        "700": "#1047AD",
+        "800": "#123C87",
+        "900": "#102F63",
+        "950": "#091C3E"
+    },
+    "surface": {
+        "paper": "#FFFFFF",
+        "mist": "#F4F6F8",
+        "ink": "#121416",
+        "graphite": "#292D31"
+    },
+    "text": {
+        "ink": "#121416",
+        "steel": "#66707A",
+        "on-brand": "#FFFFFF",
+        "on-ink": "#F4F6F8"
+    },
+    "line": {
+        "default": "#D9DEE3",
+        "strong": "#292D31"
+    },
+    "status": {
+        "success": "#00A86B",
+        "warning": "#D97706",
+        "error": "#E5484D",
+        "analysis": "#8B5CF6",
+        "runtime": "#00A6C8"
+    },
+    "font": {
+        "sans": "\"IBM Plex Sans\", \"Segoe UI\", sans-serif",
+        "mono": "\"IBM Plex Mono\", ui-monospace, monospace",
+        "display": "\"Space Grotesk\", \"IBM Plex Sans\", sans-serif"
+    }
+}

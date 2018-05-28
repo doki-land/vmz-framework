@@ -1,28 +1,35 @@
 {
-    "$schema": "https://biomejs.dev/schemas/2.3.11/schema.json",
+    "$schema": "https://biomejs.dev/schemas/2.5.7/schema.json",
     "vcs": {
         "enabled": true,
         "clientKind": "git",
         "useIgnoreFile": true
     },
-    "files": {
-        "ignoreUnknown": true
-    },
     "formatter": {
         "enabled": true,
         "indentStyle": "space",
         "indentWidth": 4,
+        "lineWidth": 144,
         "lineEnding": "lf"
     },
     "linter": {
         "enabled": true,
         "rules": {
-            "recommended": true
+            "preset": "recommended",
+            "style": {
+                "noNonNullAssertion": "off"
+            },
+            "complexity": {
+                "noForEach": "off"
+            },
+            "suspicious": {
+                "noExplicitAny": "off"
+            }
         }
     },
     "javascript": {
         "formatter": {
-            "quoteStyle": "double",
+            "quoteStyle": "single",
             "trailingCommas": "all"
         }
     },
@@ -33,27 +40,28 @@
     },
     "overrides": [
         {
-            "includes": ["**/lib/**", "target/**"],
-            "linter": {
-                "enabled": false
-            },
+            "includes": ["*.ts", "*.tsx"],
             "formatter": {
-                "enabled": false
+                "indentWidth": 4
             }
         },
         {
-            "includes": ["*.yaml", "*.yml", "*.toml"],
+            "includes": ["*.vue"],
+            "formatter": {
+                "indentWidth": 2
+            }
+        },
+        {
+            "includes": ["*.json", "*.jsonc"],
+            "formatter": {
+                "indentWidth": 4
+            }
+        },
+        {
+            "includes": ["*.yaml", "*.yml"],
             "formatter": {
                 "indentWidth": 2
             }
         }
-    ],
-    "assist": {
-        "enabled": true,
-        "actions": {
-            "source": {
-                "organizeImports": "on"
-            }
-        }
-    }
+    ]
 }

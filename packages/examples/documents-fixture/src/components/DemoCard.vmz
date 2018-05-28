@@ -1,0 +1,8 @@
+<template>
+  <p>{label}</p>
+</template>
+<script client>
+export default class DemoCard {
+  public label = 'demo';
+}
+</script>

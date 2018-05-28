@@ -1,0 +1,25 @@
+<template>
+  <div class="mathjax-host" html={html != null ? html : fallback(tex)}></div>
+</template>
+
+<script client>
+import { renderMathjax, renderMathjaxFallback } from '@vmz/plugin-mathjax/runtime';
+
+function fallback(tex) {
+  return renderMathjaxFallback(tex);
+}
+
+export default class Mathjax {
+  public tex: string = '';
+  public display: boolean = false;
+  html: string | null = null;
+
+  async onMount() {
+    try {
+      this.html = await renderMathjax(this.tex, this.display);
+    } catch {
+      this.html = renderMathjaxFallback(this.tex);
+    }
+  }
+}
+</script>

@@ -1,0 +1,35 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "l4.compile.branch.lifetime",
+    "title": "L4: BranchDemo lifetime + owns + dispose_region",
+    "modes": ["compile"],
+    "program": {
+        "chunkId": "components/BranchDemo",
+        "unitName": "BranchDemo"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "lifetime",
+            "expect": {
+                "status": "partial",
+                "nonEmptyRegions": true,
+                "regionKinds": ["if"],
+                "hasDisposeRegion": true
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "graph",
+            "expect": {
+                "ownsUnitToRegion": true,
+                "includesAll": ["api.ifBlock(this,", "__vmzPlan =", "dispose_region"]
+            }
+        }
+    ]
+}

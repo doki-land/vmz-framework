@@ -1,0 +1,11 @@
+<template>
+  <p>Hello, {name}</p>
+</template>
+
+<script client>
+// File name `Greeting.vmz` → template tag <Greeting />.
+// `public` fields are props.
+export default class Greeting {
+  public name: string;
+}
+</script>

@@ -1,0 +1,20 @@
+{
+    "name": "@vmz/homepage",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "VMZ official site — homepage + integrated documents at /d/",
+    "scripts": {
+        "check": "vmz check .",
+        "build": "vmz build .",
+        "dev": "vmz dev .",
+        "document:check": "vmz document check . --strict",
+        "document:dev": "vmz document dev"
+    },
+    "dependencies": {
+        "@vmz/ui": "workspace:*"
+    },
+    "devDependencies": {
+        "vmz": "workspace:*"
+    }
+}

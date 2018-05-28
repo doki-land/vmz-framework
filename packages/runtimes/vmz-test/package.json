@@ -1,0 +1,49 @@
+{
+    "name": "@vmz/test",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "VMZ native test protocol + Compile/Logic/Browser/SSR/Resume/Deployment hosts",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./protocol": {
+            "types": "./dist/protocol.d.ts",
+            "default": "./dist/protocol.js"
+        },
+        "./discover": {
+            "types": "./dist/discover.d.ts",
+            "default": "./dist/discover.js"
+        }
+    },
+    "files": [
+        "dist",
+        "src",
+        "README.md"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json"
+    },
+    "dependencies": {
+        "@vmz/core": "workspace:*",
+        "@vmz/protocol": "workspace:*",
+        "linkedom": "^0.18.13",
+        "puppeteer-core": "^24.11.2"
+    },
+    "engines": {
+        "node": ">=20"
+    },
+    "devDependencies": {
+        "@types/node": "^22.15.0",
+        "typescript": "^5.8.3"
+    },
+    "keywords": [
+        "vmz",
+        "test",
+        "browser-host"
+    ]
+}

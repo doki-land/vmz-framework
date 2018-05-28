@@ -1,0 +1,22 @@
+{
+    "name": "@vmz/ui",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "description": "VMZ UI — official UI framework (component contracts + semantic token requirements). Not a theme. Not a plugin.",
+    "license": "MIT",
+    "exports": {
+        "./contracts/token-requirements": "./contracts/token-requirements.v0.json",
+        "./Button": "./src/components/Button.vmz"
+    },
+    "files": [
+        "src",
+        "contracts",
+        "README.md"
+    ],
+    "keywords": [
+        "vmz",
+        "ui",
+        "components"
+    ]
+}

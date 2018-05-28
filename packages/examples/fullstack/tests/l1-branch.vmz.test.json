@@ -1,0 +1,35 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "l1.view.branch",
+    "title": "L1: BranchDemo native view + if Direct",
+    "modes": ["compile"],
+    "program": {
+        "chunkId": "components/BranchDemo",
+        "unitName": "BranchDemo"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "view",
+            "expect": {
+                "status": "native",
+                "nonEmptyRoots": true,
+                "kinds": ["if"]
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "graph",
+            "expect": {
+                "direct": true,
+                "noRender": true,
+                "includes": "api.ifBlock(this,"
+            }
+        }
+    ]
+}

@@ -1,0 +1,978 @@
+//! Reactive view of the VMZ Program Graph.
+//!
+//! [`ReactiveModule`] is **not** the long-term sole IR — it is the Reactive view
+//! lifted into [`crate::program_ir::ProgramModule`]. Milestone 1 still emits
+//! `*.reactive.json` for path precision; `*.program.json` is the expanding shell.
+//! String `deps` in blueprints remain a transitional adapter.
+
+use crate::FieldKind;
+use crate::dep_key::{DepKey, PathSeg};
+use std::collections::HashMap;
+use std::fmt;
+
+/// Stable numeric ids within one [`ReactiveComponent`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FieldId(pub u32);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PropertyId(pub u32);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BindingId(pub u32);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EffectId(pub u32);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RegionId(pub u32);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ExprId(pub u32);
+
+/// One `.vmz` file's reactive analysis snapshot.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReactiveModule {
+    pub source: String,
+    pub components: Vec<ReactiveComponent>,
+}
+
+/// Component-level reactive graph.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReactiveComponent {
+    pub name: String,
+    pub state_slots: Vec<StateSlot>,
+    pub properties: Vec<PropertySlot>,
+    pub bindings: Vec<Binding>,
+    pub effects: Vec<Effect>,
+    pub control_regions: Vec<ControlRegion>,
+    pub exprs: Vec<ExprSlot>,
+}
+
+impl ReactiveComponent {
+    /// Debug / IR-json stable strings from structured paths (may include `tags[key=…].label`).
+    pub fn stable_deps(&self, paths: &[IrDepPath]) -> Vec<String> {
+        paths
+            .iter()
+            .map(|p| p.to_stable_string(&self.state_slots, &self.properties, &self.exprs))
+            .collect()
+    }
+
+    /// Transitional runtime `deps` adapter.
+    ///
+    /// ListItem / DynamicPath with leaf props → `tags.*.label` (path channel; not bare `tags.*`).
+    /// Nested each → `groups.*.items.*.label`. Whole-item / empty path → `tags.*`.
+    /// DynamicPath also emits every step's `key_deps` stables.
+    pub fn transitional_deps(&self, paths: &[IrDepPath]) -> Vec<String> {
+        let mut out = Vec::new();
+        for p in paths {
+            match p {
+                IrDepPath::ListItem { list, frames, path: props } => {
+                    let name = self
+                        .state_slots
+                        .iter()
+                        .find(|s| s.id == *list)
+                        .map(|s| s.name.as_str())
+                        .unwrap_or("?");
+                    let mut s = name.to_string();
+                    for (i, fr) in frames.iter().enumerate() {
+                        if i == 0 {
+                            for prop in &fr.via {
+                                s.push('.');
+                                s.push_str(self.prop_name(*prop));
+                            }
+                            s.push_str(".*");
+                        } else {
+                            for prop in &fr.via {
+                                s.push('.');
+                                s.push_str(self.prop_name(*prop));
+                            }
+                            s.push_str(".*");
+                        }
+                    }
+                    if frames.is_empty() {
+                        s.push_str(".*");
+                    }
+                    for prop in props {
+                        s.push('.');
+                        s.push_str(self.prop_name(*prop));
+                    }
+                    if !out.iter().any(|x| x == &s) {
+                        out.push(s);
+                    }
+                }
+                IrDepPath::DynamicPath { root, steps, path: props } => {
+                    let name = self
+                        .state_slots
+                        .iter()
+                        .find(|s| s.id == *root)
+                        .map(|s| s.name.as_str())
+                        .unwrap_or("?");
+                    let mut s = name.to_string();
+                    for step in steps {
+                        for prop in &step.via {
+                            s.push('.');
+                            s.push_str(self.prop_name(*prop));
+                        }
+                        s.push_str(".*");
+                    }
+                    if steps.is_empty() {
+                        s.push_str(".*");
+                    }
+                    for prop in props {
+                        s.push('.');
+                        s.push_str(self.prop_name(*prop));
+                    }
+                    if !out.iter().any(|x| x == &s) {
+                        out.push(s);
+                    }
+                    for step in steps {
+                        for kd in &step.key_deps {
+                            for d in self.transitional_deps(std::slice::from_ref(kd)) {
+                                if !out.iter().any(|x| x == &d) {
+                                    out.push(d);
+                                }
+                            }
+                        }
+                    }
+                }
+                other => {
+                    let s =
+                        other.to_stable_string(&self.state_slots, &self.properties, &self.exprs);
+                    if !out.iter().any(|x| x == &s) {
+                        out.push(s);
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    pub fn expr_text(&self, id: ExprId) -> Option<&str> {
+        self.exprs.iter().find(|e| e.id == id).map(|e| e.text.as_str())
+    }
+
+    pub fn prop_name(&self, id: PropertyId) -> &str {
+        self.properties.iter().find(|p| p.id == id).map(|p| p.name.as_str()).unwrap_or("?")
+    }
+
+    pub fn field_name(&self, id: FieldId) -> &str {
+        self.state_slots.iter().find(|s| s.id == id).map(|s| s.name.as_str()).unwrap_or("?")
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StateSlot {
+    pub id: FieldId,
+    pub name: String,
+    pub kind: FieldKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PropertySlot {
+    pub id: PropertyId,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExprSlot {
+    pub id: ExprId,
+    /// Source text (template or script fragment) for debugging / MCP.
+    pub text: String,
+}
+
+/// One keyed `each` frame in a (possibly nested) [`IrDepPath::ListItem`].
+///
+/// Root `each={tags}` → `{ via: [], key }`.
+/// Nested `each={g.items}` → `{ via: [items], key }` after the outer frame.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ListItemFrame {
+    /// Props from the parent item to this nested list (empty for the root list).
+    pub via: Vec<PropertyId>,
+    pub key: Option<ExprId>,
+}
+
+/// One dynamic index step in a (possibly multi-segment) [`IrDepPath::DynamicPath`].
+///
+/// `items[i].label` → one step `{ via: [], key: i }` then path `[label]`.
+/// `rows[r].cells[c].v` → steps `[{via:[]},{via:[cells]}]` then path `[v]`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DynamicStep {
+    /// Static props after the previous index (or after root) before this index.
+    pub via: Vec<PropertyId>,
+    pub key: ExprId,
+    pub key_deps: Vec<IrDepPath>,
+}
+
+/// Structured dependency path (IR form; string roots via FieldId table).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum IrDepPath {
+    Field(FieldId),
+    StaticPath {
+        root: FieldId,
+        props: Vec<PropertyId>,
+    },
+    DynamicPath {
+        root: FieldId,
+        steps: Vec<DynamicStep>,
+        /// Trailing static props after the last dynamic index.
+        path: Vec<PropertyId>,
+    },
+    ListItem {
+        list: FieldId,
+        /// Outermost → innermost each frames.
+        frames: Vec<ListItemFrame>,
+        /// Props on the innermost item (`tag.label` → `[label]`).
+        path: Vec<PropertyId>,
+    },
+    /// Conservative widen to field root — explicit, never a silent miss.
+    Unknown(FieldId),
+}
+
+impl IrDepPath {
+    /// Stable string for transitional runtime / debug (`user.name`, `count`).
+    pub fn to_stable_string(
+        &self,
+        fields: &[StateSlot],
+        props: &[PropertySlot],
+        exprs: &[ExprSlot],
+    ) -> String {
+        let field_name = |id: FieldId| {
+            fields.iter().find(|s| s.id == id).map(|s| s.name.as_str()).unwrap_or("?")
+        };
+        let prop_name = |id: PropertyId| {
+            props.iter().find(|p| p.id == id).map(|p| p.name.as_str()).unwrap_or("?")
+        };
+        let expr_text =
+            |id: ExprId| exprs.iter().find(|e| e.id == id).map(|e| e.text.as_str()).unwrap_or("?");
+
+        match self {
+            Self::Field(id) | Self::Unknown(id) => field_name(*id).to_string(),
+            Self::StaticPath { root, props: segs } => {
+                let mut s = field_name(*root).to_string();
+                for p in segs {
+                    s.push('.');
+                    s.push_str(prop_name(*p));
+                }
+                s
+            }
+            Self::DynamicPath { root, steps, path: segs } => {
+                let mut s = field_name(*root).to_string();
+                for step in steps {
+                    for p in &step.via {
+                        s.push('.');
+                        s.push_str(prop_name(*p));
+                    }
+                    s.push_str(&format!("[{}]", expr_text(step.key)));
+                }
+                for p in segs {
+                    s.push('.');
+                    s.push_str(prop_name(*p));
+                }
+                s
+            }
+            Self::ListItem { list, frames, path } => {
+                let mut s = field_name(*list).to_string();
+                for fr in frames {
+                    for p in &fr.via {
+                        s.push('.');
+                        s.push_str(prop_name(*p));
+                    }
+                    if let Some(k) = fr.key {
+                        s.push_str(&format!("[key={}]", expr_text(k)));
+                    } else {
+                        s.push_str("[key=?]");
+                    }
+                }
+                if frames.is_empty() {
+                    s.push_str("[key=?]");
+                }
+                for p in path {
+                    s.push('.');
+                    s.push_str(prop_name(*p));
+                }
+                s
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BindingKind {
+    Text,
+    Attr,
+    IfCond,
+    EachList,
+    EachKey,
+    Event,
+    ComponentProp,
+}
+
+impl BindingKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Text => "text",
+            Self::Attr => "attr",
+            Self::IfCond => "if_cond",
+            Self::EachList => "each_list",
+            Self::EachKey => "each_key",
+            Self::Event => "event",
+            Self::ComponentProp => "component_prop",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Binding {
+    pub id: BindingId,
+    pub kind: BindingKind,
+    pub reads: Vec<IrDepPath>,
+    pub region: Option<RegionId>,
+    /// Optional expression / patch hint for humans and tools.
+    pub expr: Option<ExprId>,
+    pub attr: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WritePath {
+    pub path: IrDepPath,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Effect {
+    pub id: EffectId,
+    pub name: String,
+    pub reads: Vec<IrDepPath>,
+    pub writes: Vec<WritePath>,
+    pub async_boundary: bool,
+    pub calls: Vec<String>,
+    /// Dynamic / unresolved callee — summaries must widen (stage 02).
+    pub opaque_callee: bool,
+    /// `(field, reason)` provenance for `field.*` Unknown widenings.
+    pub star_reasons: Vec<(String, String)>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ControlBranch {
+    /// Condition expression when present (`if` / `else-if` / ternary test); `None` = else / alt.
+    pub cond: Option<ExprId>,
+    pub cond_reads: Vec<IrDepPath>,
+    pub body_bindings: Vec<BindingId>,
+    /// Expression reads for this arm (ternary consequent/alternate; optional for template if).
+    pub body_reads: Vec<IrDepPath>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ControlRegion {
+    pub id: RegionId,
+    pub stable: Vec<IrDepPath>,
+    pub branches: Vec<ControlBranch>,
+}
+
+/// Builder for one component — allocates stable ids.
+#[derive(Debug, Default)]
+pub struct ReactiveComponentBuilder {
+    name: String,
+    state_slots: Vec<StateSlot>,
+    properties: Vec<PropertySlot>,
+    prop_index: HashMap<String, PropertyId>,
+    field_index: HashMap<String, FieldId>,
+    bindings: Vec<Binding>,
+    effects: Vec<Effect>,
+    control_regions: Vec<ControlRegion>,
+    exprs: Vec<ExprSlot>,
+    next_binding: u32,
+    next_effect: u32,
+    next_region: u32,
+    next_expr: u32,
+}
+
+impl ReactiveComponentBuilder {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { name: name.into(), ..Default::default() }
+    }
+
+    pub fn add_field(&mut self, name: impl Into<String>, kind: FieldKind) -> FieldId {
+        let name = name.into();
+        if let Some(id) = self.field_index.get(&name) {
+            return *id;
+        }
+        let id = FieldId(self.state_slots.len() as u32);
+        self.field_index.insert(name.clone(), id);
+        self.state_slots.push(StateSlot { id, name, kind });
+        id
+    }
+
+    pub fn field_id(&self, name: &str) -> Option<FieldId> {
+        self.field_index.get(name).copied()
+    }
+
+    pub fn intern_prop(&mut self, name: impl Into<String>) -> PropertyId {
+        let name = name.into();
+        if let Some(id) = self.prop_index.get(&name) {
+            return *id;
+        }
+        let id = PropertyId(self.properties.len() as u32);
+        self.prop_index.insert(name.clone(), id);
+        self.properties.push(PropertySlot { id, name });
+        id
+    }
+
+    pub fn intern_expr(&mut self, text: impl Into<String>) -> ExprId {
+        let text = text.into();
+        if let Some(e) = self.exprs.iter().find(|e| e.text == text) {
+            return e.id;
+        }
+        let id = ExprId(self.next_expr);
+        self.next_expr += 1;
+        self.exprs.push(ExprSlot { id, text });
+        id
+    }
+
+    /// Convert a transitional [`DepKey`] into [`IrDepPath`] using field table.
+    pub fn from_dep_key(&mut self, key: &DepKey) -> Option<IrDepPath> {
+        match key {
+            DepKey::Field(name) => {
+                let id = self.field_id(name)?;
+                Some(IrDepPath::Field(id))
+            }
+            DepKey::FieldStar(name) => {
+                // Represent as Unknown until FieldStar is a first-class IR path.
+                let id = self.field_id(name)?;
+                Some(IrDepPath::Unknown(id))
+            }
+            DepKey::Path(p) => {
+                let root = self.field_id(&p.root)?;
+                let mut steps: Vec<DynamicStep> = Vec::new();
+                let mut via: Vec<PropertyId> = Vec::new();
+                let mut saw_dyn = false;
+                for seg in &p.segs {
+                    match seg {
+                        PathSeg::Ident(n) => via.push(self.intern_prop(n.clone())),
+                        PathSeg::StaticIndex(n) => via.push(self.intern_prop(n.to_string())),
+                        PathSeg::DynIndex(sym) => {
+                            saw_dyn = true;
+                            let key = self.intern_expr(sym.clone());
+                            let mut key_deps = Vec::new();
+                            if let Some(fid) = self.field_id(sym) {
+                                key_deps.push(IrDepPath::Field(fid));
+                            }
+                            steps.push(DynamicStep {
+                                via: std::mem::take(&mut via),
+                                key,
+                                key_deps,
+                            });
+                        }
+                    }
+                }
+                if saw_dyn {
+                    return Some(IrDepPath::DynamicPath { root, steps, path: via });
+                }
+                if via.is_empty() {
+                    Some(IrDepPath::Field(root))
+                } else {
+                    Some(IrDepPath::StaticPath { root, props: via })
+                }
+            }
+            DepKey::IndexPath { root, index, segs } => {
+                let id = self.field_id(root)?;
+                match index {
+                    PathSeg::DynIndex(sym) => {
+                        let key = self.intern_expr(sym.clone());
+                        let mut key_deps = Vec::new();
+                        if let Some(fid) = self.field_id(sym) {
+                            key_deps.push(IrDepPath::Field(fid));
+                        }
+                        let mut steps = vec![DynamicStep { via: Vec::new(), key, key_deps }];
+                        let mut via: Vec<PropertyId> = Vec::new();
+                        for seg in segs {
+                            match seg {
+                                PathSeg::Ident(n) => via.push(self.intern_prop(n.clone())),
+                                PathSeg::StaticIndex(n) => {
+                                    via.push(self.intern_prop(n.to_string()))
+                                }
+                                PathSeg::DynIndex(sym2) => {
+                                    let key2 = self.intern_expr(sym2.clone());
+                                    let mut kd2 = Vec::new();
+                                    if let Some(fid) = self.field_id(sym2) {
+                                        kd2.push(IrDepPath::Field(fid));
+                                    }
+                                    steps.push(DynamicStep {
+                                        via: std::mem::take(&mut via),
+                                        key: key2,
+                                        key_deps: kd2,
+                                    });
+                                }
+                            }
+                        }
+                        Some(IrDepPath::DynamicPath { root: id, steps, path: via })
+                    }
+                    PathSeg::StaticIndex(n) => {
+                        let mut props = vec![self.intern_prop(n.to_string())];
+                        let mut steps: Vec<DynamicStep> = Vec::new();
+                        let mut via: Vec<PropertyId> = Vec::new();
+                        let mut building_static = true;
+                        for seg in segs {
+                            match seg {
+                                PathSeg::Ident(name) if building_static => {
+                                    props.push(self.intern_prop(name.clone()))
+                                }
+                                PathSeg::StaticIndex(i) if building_static => {
+                                    props.push(self.intern_prop(i.to_string()))
+                                }
+                                PathSeg::DynIndex(sym) => {
+                                    building_static = false;
+                                    let key = self.intern_expr(sym.clone());
+                                    let mut key_deps = Vec::new();
+                                    if let Some(fid) = self.field_id(sym) {
+                                        key_deps.push(IrDepPath::Field(fid));
+                                    }
+                                    let step_via = if steps.is_empty() {
+                                        std::mem::take(&mut props)
+                                    } else {
+                                        std::mem::take(&mut via)
+                                    };
+                                    steps.push(DynamicStep { via: step_via, key, key_deps });
+                                }
+                                PathSeg::Ident(name) => via.push(self.intern_prop(name.clone())),
+                                PathSeg::StaticIndex(i) => {
+                                    via.push(self.intern_prop(i.to_string()))
+                                }
+                            }
+                        }
+                        if steps.is_empty() {
+                            Some(IrDepPath::StaticPath { root: id, props })
+                        } else {
+                            Some(IrDepPath::DynamicPath { root: id, steps, path: via })
+                        }
+                    }
+                    PathSeg::Ident(_) => Some(IrDepPath::Unknown(id)),
+                }
+            }
+        }
+    }
+
+    pub fn binding_count(&self) -> u32 {
+        self.next_binding
+    }
+
+    pub fn binding_kind(&self, id: BindingId) -> Option<BindingKind> {
+        self.bindings.iter().find(|b| b.id == id).map(|b| b.kind)
+    }
+
+    pub fn binding_region(&self, id: BindingId) -> Option<RegionId> {
+        self.bindings.iter().find(|b| b.id == id).and_then(|b| b.region)
+    }
+
+    pub fn set_binding_region(&mut self, id: BindingId, region: RegionId) {
+        if let Some(b) = self.bindings.iter_mut().find(|b| b.id == id) {
+            b.region = Some(region);
+        }
+    }
+
+    pub fn add_binding(
+        &mut self,
+        kind: BindingKind,
+        reads: Vec<IrDepPath>,
+        region: Option<RegionId>,
+        expr: Option<ExprId>,
+        attr: Option<String>,
+    ) -> BindingId {
+        let id = BindingId(self.next_binding);
+        self.next_binding += 1;
+        self.bindings.push(Binding { id, kind, reads, region, expr, attr });
+        id
+    }
+
+    pub fn add_effect(
+        &mut self,
+        name: impl Into<String>,
+        reads: Vec<IrDepPath>,
+        writes: Vec<WritePath>,
+        async_boundary: bool,
+        calls: Vec<String>,
+        opaque_callee: bool,
+        star_reasons: Vec<(String, String)>,
+    ) -> EffectId {
+        let id = EffectId(self.next_effect);
+        self.next_effect += 1;
+        self.effects.push(Effect {
+            id,
+            name: name.into(),
+            reads,
+            writes,
+            async_boundary,
+            calls,
+            opaque_callee,
+            star_reasons,
+        });
+        id
+    }
+
+    pub fn add_control_region(
+        &mut self,
+        stable: Vec<IrDepPath>,
+        branches: Vec<ControlBranch>,
+    ) -> RegionId {
+        let id = RegionId(self.next_region);
+        self.next_region += 1;
+        self.control_regions.push(ControlRegion { id, stable, branches });
+        id
+    }
+
+    pub fn finish(self) -> ReactiveComponent {
+        ReactiveComponent {
+            name: self.name,
+            state_slots: self.state_slots,
+            properties: self.properties,
+            bindings: self.bindings,
+            effects: self.effects,
+            control_regions: self.control_regions,
+            exprs: self.exprs,
+        }
+    }
+}
+
+impl ReactiveModule {
+    /// Stable, sorted-enough JSON for `*.reactive.json` (no serde).
+    pub fn to_json(&self) -> String {
+        let mut out = String::new();
+        out.push_str("{\n");
+        out.push_str(&format!("  \"source\": {:?},\n", self.source));
+        out.push_str("  \"components\": [\n");
+        for (ci, c) in self.components.iter().enumerate() {
+            if ci > 0 {
+                out.push_str(",\n");
+            }
+            out.push_str(&reactive_component_json(c, "    "));
+        }
+        out.push_str("\n  ]\n}\n");
+        out
+    }
+}
+
+/// JSON object for one reactive component (also embedded under Program IR `reactive`).
+pub fn reactive_component_json(c: &ReactiveComponent, indent: &str) -> String {
+    let ind2 = format!("{indent}  ");
+    let ind3 = format!("{indent}    ");
+    let mut s = String::new();
+    s.push_str(&format!("{indent}{{\n"));
+    s.push_str(&format!("{ind2}\"name\": {:?},\n", c.name));
+
+    s.push_str(&format!("{ind2}\"state_slots\": [\n"));
+    for (i, slot) in c.state_slots.iter().enumerate() {
+        if i > 0 {
+            s.push_str(",\n");
+        }
+        let kind = match slot.kind {
+            FieldKind::Prop => "prop",
+            FieldKind::State => "state",
+        };
+        s.push_str(&format!(
+            "{ind3}{{ \"id\": {}, \"name\": {:?}, \"kind\": {:?} }}",
+            slot.id.0, slot.name, kind
+        ));
+    }
+    s.push_str(&format!("\n{ind2}],\n"));
+
+    s.push_str(&format!("{ind2}\"properties\": [\n"));
+    for (i, p) in c.properties.iter().enumerate() {
+        if i > 0 {
+            s.push_str(",\n");
+        }
+        s.push_str(&format!("{ind3}{{ \"id\": {}, \"name\": {:?} }}", p.id.0, p.name));
+    }
+    s.push_str(&format!("\n{ind2}],\n"));
+
+    s.push_str(&format!("{ind2}\"exprs\": [\n"));
+    for (i, e) in c.exprs.iter().enumerate() {
+        if i > 0 {
+            s.push_str(",\n");
+        }
+        s.push_str(&format!("{ind3}{{ \"id\": {}, \"text\": {:?} }}", e.id.0, e.text));
+    }
+    s.push_str(&format!("\n{ind2}],\n"));
+
+    s.push_str(&format!("{ind2}\"bindings\": [\n"));
+    for (i, b) in c.bindings.iter().enumerate() {
+        if i > 0 {
+            s.push_str(",\n");
+        }
+        s.push_str(&binding_json(b, c, &ind3));
+    }
+    s.push_str(&format!("\n{ind2}],\n"));
+
+    s.push_str(&format!("{ind2}\"effects\": [\n"));
+    for (i, e) in c.effects.iter().enumerate() {
+        if i > 0 {
+            s.push_str(",\n");
+        }
+        s.push_str(&effect_json(e, c, &ind3));
+    }
+    s.push_str(&format!("\n{ind2}],\n"));
+
+    s.push_str(&format!("{ind2}\"control_regions\": [\n"));
+    for (i, r) in c.control_regions.iter().enumerate() {
+        if i > 0 {
+            s.push_str(",\n");
+        }
+        s.push_str(&region_json(r, c, &ind3));
+    }
+    s.push_str(&format!("\n{ind2}]\n"));
+    s.push_str(&format!("{indent}}}"));
+    s
+}
+
+fn path_json(path: &IrDepPath, c: &ReactiveComponent) -> String {
+    let stable = path.to_stable_string(&c.state_slots, &c.properties, &c.exprs);
+    match path {
+        IrDepPath::Field(id) => {
+            format!("{{ \"kind\": \"field\", \"field\": {}, \"stable\": {:?} }}", id.0, stable)
+        }
+        IrDepPath::StaticPath { root, props } => {
+            let props_js: Vec<String> = props.iter().map(|p| p.0.to_string()).collect();
+            format!(
+                "{{ \"kind\": \"static_path\", \"root\": {}, \"props\": [{}], \"stable\": {:?} }}",
+                root.0,
+                props_js.join(", "),
+                stable
+            )
+        }
+        IrDepPath::DynamicPath { root, steps, path } => {
+            let steps_js: Vec<String> = steps
+                .iter()
+                .map(|st| {
+                    let via_js: Vec<String> = st.via.iter().map(|p| p.0.to_string()).collect();
+                    let deps: Vec<String> = st.key_deps.iter().map(|d| path_json(d, c)).collect();
+                    format!(
+                        "{{ \"via\": [{}], \"key\": {}, \"key_deps\": [{}] }}",
+                        via_js.join(", "),
+                        st.key.0,
+                        deps.join(", ")
+                    )
+                })
+                .collect();
+            let props_js: Vec<String> = path.iter().map(|p| p.0.to_string()).collect();
+            format!(
+                "{{ \"kind\": \"dynamic_path\", \"root\": {}, \"steps\": [{}], \"path\": [{}], \"stable\": {:?} }}",
+                root.0,
+                steps_js.join(", "),
+                props_js.join(", "),
+                stable
+            )
+        }
+        IrDepPath::ListItem { list, frames, path } => {
+            let frames_js: Vec<String> = frames
+                .iter()
+                .map(|fr| {
+                    let via_js: Vec<String> = fr.via.iter().map(|p| p.0.to_string()).collect();
+                    let key_js = fr.key.map(|k| k.0.to_string()).unwrap_or_else(|| "null".into());
+                    format!("{{ \"via\": [{}], \"key\": {} }}", via_js.join(", "), key_js)
+                })
+                .collect();
+            let props_js: Vec<String> = path.iter().map(|p| p.0.to_string()).collect();
+            format!(
+                "{{ \"kind\": \"list_item\", \"list\": {}, \"frames\": [{}], \"path\": [{}], \"stable\": {:?} }}",
+                list.0,
+                frames_js.join(", "),
+                props_js.join(", "),
+                stable
+            )
+        }
+        IrDepPath::Unknown(id) => {
+            format!("{{ \"kind\": \"unknown\", \"field\": {}, \"stable\": {:?} }}", id.0, stable)
+        }
+    }
+}
+
+fn binding_json(b: &Binding, c: &ReactiveComponent, indent: &str) -> String {
+    let reads: Vec<String> = b.reads.iter().map(|r| path_json(r, c)).collect();
+    let region = b.region.map(|r| r.0.to_string()).unwrap_or_else(|| "null".into());
+    let expr = b.expr.map(|e| e.0.to_string()).unwrap_or_else(|| "null".into());
+    let attr = b.attr.as_ref().map(|a| format!("{a:?}")).unwrap_or_else(|| "null".into());
+    format!(
+        "{indent}{{ \"id\": {}, \"kind\": {:?}, \"reads\": [{}], \"region\": {}, \"expr\": {}, \"attr\": {} }}",
+        b.id.0,
+        b.kind.as_str(),
+        reads.join(", "),
+        region,
+        expr,
+        attr
+    )
+}
+
+fn effect_json(e: &Effect, c: &ReactiveComponent, indent: &str) -> String {
+    let reads: Vec<String> = e.reads.iter().map(|r| path_json(r, c)).collect();
+    let writes: Vec<String> = e.writes.iter().map(|w| path_json(&w.path, c)).collect();
+    let calls: Vec<String> = e.calls.iter().map(|c| format!("{c:?}")).collect();
+    let reasons: Vec<String> = e
+        .star_reasons
+        .iter()
+        .map(|(f, r)| format!("{{ \"field\": {f:?}, \"reason\": {r:?} }}"))
+        .collect();
+    format!(
+        "{indent}{{ \"id\": {}, \"name\": {:?}, \"reads\": [{}], \"writes\": [{}], \"async_boundary\": {}, \"calls\": [{}], \"opaque_callee\": {}, \"star_reasons\": [{}] }}",
+        e.id.0,
+        e.name,
+        reads.join(", "),
+        writes.join(", "),
+        e.async_boundary,
+        calls.join(", "),
+        e.opaque_callee,
+        reasons.join(", ")
+    )
+}
+
+fn region_json(r: &ControlRegion, c: &ReactiveComponent, indent: &str) -> String {
+    let ind2 = format!("{indent}  ");
+    let stable: Vec<String> = r.stable.iter().map(|p| path_json(p, c)).collect();
+    let mut branches = String::new();
+    for (i, b) in r.branches.iter().enumerate() {
+        if i > 0 {
+            branches.push_str(",\n");
+        }
+        let cond = b.cond.map(|e| e.0.to_string()).unwrap_or_else(|| "null".into());
+        let cond_reads: Vec<String> = b.cond_reads.iter().map(|p| path_json(p, c)).collect();
+        let body: Vec<String> = b.body_bindings.iter().map(|id| id.0.to_string()).collect();
+        let body_reads: Vec<String> = b.body_reads.iter().map(|p| path_json(p, c)).collect();
+        branches.push_str(&format!(
+            "{ind2}{{ \"cond\": {}, \"cond_reads\": [{}], \"body_bindings\": [{}], \"body_reads\": [{}] }}",
+            cond,
+            cond_reads.join(", "),
+            body.join(", "),
+            body_reads.join(", ")
+        ));
+    }
+    format!(
+        "{indent}{{\n{indent}  \"id\": {},\n{indent}  \"stable\": [{}],\n{indent}  \"branches\": [\n{branches}\n{indent}  ]\n{indent}}}",
+        r.id.0,
+        stable.join(", ")
+    )
+}
+
+impl fmt::Display for IrDepPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dep_key::DepPath;
+
+    #[test]
+    fn static_path_distinguishes_siblings() {
+        let mut b = ReactiveComponentBuilder::new("Card");
+        b.add_field("user", FieldKind::State);
+        let name = b.from_dep_key(&DepKey::path(DepPath::prop("user", "name"))).unwrap();
+        let avatar = b.from_dep_key(&DepKey::path(DepPath::prop("user", "avatar"))).unwrap();
+        let c = b.finish();
+        assert_eq!(name.to_stable_string(&c.state_slots, &c.properties, &c.exprs), "user.name");
+        assert_eq!(avatar.to_stable_string(&c.state_slots, &c.properties, &c.exprs), "user.avatar");
+        assert_ne!(name, avatar);
+    }
+
+    #[test]
+    fn module_json_contains_stable_paths() {
+        let mut b = ReactiveComponentBuilder::new("Card");
+        b.add_field("user", FieldKind::State);
+        let reads = vec![b.from_dep_key(&DepKey::path(DepPath::prop("user", "name"))).unwrap()];
+        let expr = b.intern_expr("user.name");
+        b.add_binding(BindingKind::Text, reads, None, Some(expr), None);
+        let module = ReactiveModule { source: "src/Card.vmz".into(), components: vec![b.finish()] };
+        let json = module.to_json();
+        assert!(json.contains("user.name"), "{json}");
+        assert!(json.contains("\"kind\": \"static_path\""), "{json}");
+    }
+
+    #[test]
+    fn list_item_stable_and_json() {
+        let mut b = ReactiveComponentBuilder::new("TagList");
+        let tags = b.add_field("tags", FieldKind::State);
+        let label = b.intern_prop("label");
+        let key = b.intern_expr("tag.id");
+        let path = IrDepPath::ListItem {
+            list: tags,
+            frames: vec![ListItemFrame { via: vec![], key: Some(key) }],
+            path: vec![label],
+        };
+        b.add_binding(BindingKind::Text, vec![path.clone()], None, None, None);
+        let c = b.finish();
+        assert_eq!(
+            path.to_stable_string(&c.state_slots, &c.properties, &c.exprs),
+            "tags[key=tag.id].label"
+        );
+        let module = ReactiveModule { source: "TagList.vmz".into(), components: vec![c] };
+        let json = module.to_json();
+        assert!(json.contains("\"kind\": \"list_item\""), "{json}");
+        assert!(json.contains("tags[key=tag.id].label"), "{json}");
+    }
+
+    #[test]
+    fn dynamic_path_from_index_and_leaf() {
+        use crate::dep_key::PathSeg;
+        let mut b = ReactiveComponentBuilder::new("Pick");
+        b.add_field("items", FieldKind::State);
+        b.add_field("selected", FieldKind::State);
+        let key = DepKey::path(DepPath {
+            root: "items".into(),
+            segs: vec![PathSeg::DynIndex("selected".into()), PathSeg::Ident("label".into())],
+        });
+        let path = b.from_dep_key(&key).unwrap();
+        let c = b.finish();
+        assert!(
+            matches!(
+                &path,
+                IrDepPath::DynamicPath {
+                    steps,
+                    path: props,
+                    ..
+                } if steps.len() == 1 && !steps[0].key_deps.is_empty() && props.len() == 1
+            ),
+            "{path:?}"
+        );
+        assert_eq!(
+            path.to_stable_string(&c.state_slots, &c.properties, &c.exprs),
+            "items[selected].label"
+        );
+        let deps = c.transitional_deps(&[path]);
+        assert!(deps.iter().any(|d| d == "items.*.label"), "{deps:?}");
+        assert!(deps.iter().any(|d| d == "selected"), "{deps:?}");
+    }
+
+    #[test]
+    fn multi_segment_dynamic_path_from_dep_key() {
+        use crate::dep_key::PathSeg;
+        let mut b = ReactiveComponentBuilder::new("Grid");
+        b.add_field("rows", FieldKind::State);
+        b.add_field("ri", FieldKind::State);
+        b.add_field("ci", FieldKind::State);
+        let key = DepKey::path(DepPath {
+            root: "rows".into(),
+            segs: vec![
+                PathSeg::DynIndex("ri".into()),
+                PathSeg::Ident("cells".into()),
+                PathSeg::DynIndex("ci".into()),
+                PathSeg::Ident("value".into()),
+            ],
+        });
+        let path = b.from_dep_key(&key).unwrap();
+        let c = b.finish();
+        assert!(
+            matches!(
+                &path,
+                IrDepPath::DynamicPath { steps, path: props, .. }
+                    if steps.len() == 2 && props.len() == 1
+            ),
+            "{path:?}"
+        );
+        assert_eq!(
+            path.to_stable_string(&c.state_slots, &c.properties, &c.exprs),
+            "rows[ri].cells[ci].value"
+        );
+        let deps = c.transitional_deps(&[path]);
+        assert!(deps.iter().any(|d| d == "rows.*.cells.*.value"), "{deps:?}");
+        assert!(deps.iter().any(|d| d == "ri"), "{deps:?}");
+        assert!(deps.iter().any(|d| d == "ci"), "{deps:?}");
+    }
+}

@@ -1,0 +1,41 @@
+{
+    "name": "@vmz/plugin-shiki",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "VMZ Shiki adapter - <Shiki> + code engine registration",
+    "license": "MIT",
+    "main": "./vmz.plugin.ts",
+    "types": "./vmz.plugin.ts",
+    "exports": {
+        ".": {
+            "types": "./vmz.plugin.ts",
+            "default": "./vmz.plugin.ts"
+        },
+        "./runtime": {
+            "types": "./runtime.ts",
+            "default": "./runtime.ts"
+        }
+    },
+    "dependencies": {
+        "@vmz/plugin": "workspace:*"
+    },
+    "peerDependencies": {
+        "shiki": ">=3",
+        "vmz-textmate": "workspace:*"
+    },
+    "peerDependenciesMeta": {
+        "shiki": {
+            "optional": false
+        },
+        "vmz-textmate": {
+            "optional": true
+        }
+    },
+    "keywords": [
+        "vmz",
+        "plugin",
+        "shiki",
+        "code"
+    ]
+}

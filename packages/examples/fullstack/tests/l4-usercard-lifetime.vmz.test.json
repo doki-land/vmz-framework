@@ -1,0 +1,33 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "l4.compile.usercard.lifetime",
+    "title": "L4: UserCard each lifetime + disposes edges",
+    "modes": ["compile"],
+    "program": {
+        "chunkId": "components/UserCard",
+        "unitName": "UserCard"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "lifetime",
+            "expect": {
+                "regionKinds": ["each"],
+                "hasDisposeRegion": true,
+                "disposeTag": "each"
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "graph",
+            "expect": {
+                "disposesMin": 1
+            }
+        }
+    ]
+}

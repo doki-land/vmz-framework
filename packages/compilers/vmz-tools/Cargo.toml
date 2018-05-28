@@ -1,0 +1,22 @@
+[package]
+name = "vmz-tools"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "VMZ CLI (vmz.exe): format, check, lint, build, serve, dev — driven by oxc"
+publish = false
+
+[[bin]]
+name = "vmz"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+vmz-compiler.workspace = true
+vmz-inspector.workspace = true
+vmz-plugin-tailwind.workspace = true
+vmz-plugin-sasso.workspace = true
+vmz-types.workspace = true
+walkdir.workspace = true

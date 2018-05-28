@@ -1,0 +1,14 @@
+<template>
+  <main>
+    <h1>Hello, VMZ</h1>
+    <!-- `components/Greeting.vmz` auto-available — no import. -->
+    <Greeting name={name} />
+  </main>
+</template>
+
+<script client>
+// `pages/index.vmz` → `/`
+export default class IndexPage {
+  public name: string = 'VMZ';
+}
+</script>

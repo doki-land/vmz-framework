@@ -1,0 +1,13 @@
+{
+    "name": "@vmz-examples/test-utils",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "exports": {
+        ".": "./helpers.ts",
+        "./helpers": "./helpers.ts"
+    },
+    "dependencies": {
+        "linkedom": "^0.18.13"
+    }
+}

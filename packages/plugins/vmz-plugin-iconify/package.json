@@ -1,0 +1,37 @@
+{
+    "name": "@vmz/plugin-iconify",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "VMZ Iconify adapter - <Iconify>",
+    "license": "MIT",
+    "main": "./vmz.plugin.ts",
+    "types": "./vmz.plugin.ts",
+    "exports": {
+        ".": {
+            "types": "./vmz.plugin.ts",
+            "default": "./vmz.plugin.ts"
+        },
+        "./runtime": {
+            "types": "./runtime.ts",
+            "default": "./runtime.ts"
+        }
+    },
+    "dependencies": {
+        "@vmz/plugin": "workspace:*"
+    },
+    "peerDependencies": {
+        "@iconify/utils": ">=2"
+    },
+    "peerDependenciesMeta": {
+        "@iconify/utils": {
+            "optional": true
+        }
+    },
+    "keywords": [
+        "vmz",
+        "plugin",
+        "iconify",
+        "icon"
+    ]
+}

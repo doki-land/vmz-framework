@@ -1,0 +1,42 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "b1.logic.patch",
+    "title": "B1: mount + write path patch (logic host)",
+    "modes": ["logic"],
+    "program": {
+        "chunkId": "components/CounterButton",
+        "unitName": "CounterButton"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "mount",
+            "props": {
+                "initial": 4
+            }
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "write",
+            "field": "count",
+            "value": 11
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "flush"
+        }
+    ],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "text",
+            "expect": {
+                "contains": "11"
+            }
+        }
+    ]
+}

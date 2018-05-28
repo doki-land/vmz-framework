@@ -1,0 +1,376 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "VMZ",
+    "scopeName": "source.vmz",
+    "fileTypes": ["vmz"],
+    "patterns": [
+        {
+            "include": "#vmz-comment"
+        },
+        {
+            "include": "#template-block"
+        },
+        {
+            "include": "#style-block"
+        },
+        {
+            "include": "#script-client-block"
+        },
+        {
+            "include": "#script-server-block"
+        }
+    ],
+    "repository": {
+        "vmz-comment": {
+            "begin": "<!--",
+            "end": "-->",
+            "name": "comment.block.html.vmz"
+        },
+        "template-block": {
+            "begin": "(<)(template)\\b",
+            "beginCaptures": {
+                "1": {
+                    "name": "punctuation.definition.tag.begin.html.vmz"
+                },
+                "2": {
+                    "name": "entity.name.tag.template.vmz"
+                }
+            },
+            "end": "(</)(template)(>)",
+            "endCaptures": {
+                "1": {
+                    "name": "punctuation.definition.tag.begin.html.vmz"
+                },
+                "2": {
+                    "name": "entity.name.tag.template.vmz"
+                },
+                "3": {
+                    "name": "punctuation.definition.tag.end.html.vmz"
+                }
+            },
+            "patterns": [
+                {
+                    "include": "#tag-stuff"
+                },
+                {
+                    "begin": "(>)",
+                    "beginCaptures": {
+                        "1": {
+                            "name": "punctuation.definition.tag.end.html.vmz"
+                        }
+                    },
+                    "end": "(?=</template>)",
+                    "contentName": "text.html.derivative.vmz",
+                    "patterns": [
+                        {
+                            "include": "#template-body"
+                        }
+                    ]
+                }
+            ]
+        },
+        "style-block": {
+            "begin": "(<)(style)\\b",
+            "beginCaptures": {
+                "1": {
+                    "name": "punctuation.definition.tag.begin.html.vmz"
+                },
+                "2": {
+                    "name": "entity.name.tag.style.vmz"
+                }
+            },
+            "end": "(</)(style)(>)",
+            "endCaptures": {
+                "1": {
+                    "name": "punctuation.definition.tag.begin.html.vmz"
+                },
+                "2": {
+                    "name": "entity.name.tag.style.vmz"
+                },
+                "3": {
+                    "name": "punctuation.definition.tag.end.html.vmz"
+                }
+            },
+            "patterns": [
+                {
+                    "include": "#tag-stuff"
+                },
+                {
+                    "begin": "(>)",
+                    "beginCaptures": {
+                        "1": {
+                            "name": "punctuation.definition.tag.end.html.vmz"
+                        }
+                    },
+                    "end": "(?=</style>)",
+                    "contentName": "source.css",
+                    "patterns": [
+                        {
+                            "include": "source.css"
+                        }
+                    ]
+                }
+            ]
+        },
+        "script-client-block": {
+            "begin": "(<)(script)\\b(?=[^>]*\\bclient\\b)",
+            "beginCaptures": {
+                "1": {
+                    "name": "punctuation.definition.tag.begin.html.vmz"
+                },
+                "2": {
+                    "name": "entity.name.tag.script.vmz"
+                }
+            },
+            "end": "(</)(script)(>)",
+            "endCaptures": {
+                "1": {
+                    "name": "punctuation.definition.tag.begin.html.vmz"
+                },
+                "2": {
+                    "name": "entity.name.tag.script.vmz"
+                },
+                "3": {
+                    "name": "punctuation.definition.tag.end.html.vmz"
+                }
+            },
+            "patterns": [
+                {
+                    "include": "#script-tag-attrs"
+                },
+                {
+                    "begin": "(>)",
+                    "beginCaptures": {
+                        "1": {
+                            "name": "punctuation.definition.tag.end.html.vmz"
+                        }
+                    },
+                    "end": "(?=</script>)",
+                    "contentName": "source.ts",
+                    "patterns": [
+                        {
+                            "include": "source.ts"
+                        }
+                    ]
+                }
+            ]
+        },
+        "script-server-block": {
+            "begin": "(<)(script)\\b(?=[^>]*\\bserver\\b)",
+            "beginCaptures": {
+                "1": {
+                    "name": "punctuation.definition.tag.begin.html.vmz"
+                },
+                "2": {
+                    "name": "entity.name.tag.script.vmz"
+                }
+            },
+            "end": "(</)(script)(>)",
+            "endCaptures": {
+                "1": {
+                    "name": "punctuation.definition.tag.begin.html.vmz"
+                },
+                "2": {
+                    "name": "entity.name.tag.script.vmz"
+                },
+                "3": {
+                    "name": "punctuation.definition.tag.end.html.vmz"
+                }
+            },
+            "patterns": [
+                {
+                    "include": "#script-tag-attrs"
+                },
+                {
+                    "begin": "(>)",
+                    "beginCaptures": {
+                        "1": {
+                            "name": "punctuation.definition.tag.end.html.vmz"
+                        }
+                    },
+                    "end": "(?=</script>)",
+                    "contentName": "source.ts",
+                    "patterns": [
+                        {
+                            "include": "source.ts"
+                        }
+                    ]
+                }
+            ]
+        },
+        "script-tag-attrs": {
+            "patterns": [
+                {
+                    "match": "\\b(client|server)\\b",
+                    "name": "keyword.other.script-kind.vmz"
+                },
+                {
+                    "include": "#tag-stuff"
+                }
+            ]
+        },
+        "tag-stuff": {
+            "patterns": [
+                {
+                    "include": "#tag-id-attribute"
+                },
+                {
+                    "include": "#tag-generic-attribute"
+                },
+                {
+                    "include": "#string-double-quoted"
+                },
+                {
+                    "include": "#string-single-quoted"
+                }
+            ]
+        },
+        "tag-id-attribute": {
+            "begin": "\\b([a-zA-Z_:][a-zA-Z0-9:._-]*)(=)",
+            "beginCaptures": {
+                "1": {
+                    "name": "entity.other.attribute-name.html.vmz"
+                },
+                "2": {
+                    "name": "punctuation.separator.key-value.html.vmz"
+                }
+            },
+            "end": "(?<=['\"}])|(?=[\\s>/])",
+            "patterns": [
+                {
+                    "include": "#string-double-quoted"
+                },
+                {
+                    "include": "#string-single-quoted"
+                },
+                {
+                    "include": "#attr-expression"
+                }
+            ]
+        },
+        "tag-generic-attribute": {
+            "match": "\\b([a-zA-Z_:][a-zA-Z0-9:._-]*)\\b(?!\\s*=)",
+            "name": "entity.other.attribute-name.html.vmz"
+        },
+        "string-double-quoted": {
+            "begin": "\"",
+            "end": "\"",
+            "name": "string.quoted.double.html.vmz",
+            "patterns": [
+                {
+                    "include": "#interpolation"
+                }
+            ]
+        },
+        "string-single-quoted": {
+            "begin": "'",
+            "end": "'",
+            "name": "string.quoted.single.html.vmz",
+            "patterns": [
+                {
+                    "include": "#interpolation"
+                }
+            ]
+        },
+        "attr-expression": {
+            "begin": "\\{",
+            "end": "\\}",
+            "name": "meta.embedded.expression.vmz",
+            "contentName": "source.ts",
+            "patterns": [
+                {
+                    "include": "source.ts"
+                }
+            ]
+        },
+        "template-body": {
+            "patterns": [
+                {
+                    "include": "#vmz-comment"
+                },
+                {
+                    "include": "#interpolation"
+                },
+                {
+                    "include": "#html-tag"
+                }
+            ]
+        },
+        "interpolation": {
+            "begin": "\\{",
+            "end": "\\}",
+            "name": "meta.interpolation.vmz",
+            "contentName": "source.ts",
+            "patterns": [
+                {
+                    "include": "source.ts"
+                }
+            ]
+        },
+        "html-tag": {
+            "begin": "(</?)(([A-Z][A-Za-z0-9]*)|([a-z][A-Za-z0-9:-]*))",
+            "beginCaptures": {
+                "1": {
+                    "name": "punctuation.definition.tag.begin.html.vmz"
+                },
+                "2": {
+                    "name": "entity.name.tag.html.vmz"
+                },
+                "3": {
+                    "name": "entity.name.tag.component.vmz"
+                },
+                "4": {
+                    "name": "entity.name.tag.html.vmz"
+                }
+            },
+            "end": "(/?>)",
+            "endCaptures": {
+                "1": {
+                    "name": "punctuation.definition.tag.end.html.vmz"
+                }
+            },
+            "patterns": [
+                {
+                    "include": "#vmz-directive-attrs"
+                },
+                {
+                    "include": "#tag-stuff"
+                },
+                {
+                    "include": "#attr-expression"
+                }
+            ]
+        },
+        "vmz-directive-attrs": {
+            "patterns": [
+                {
+                    "match": "\\b(if|else-if|each|as|key|client)\\b",
+                    "name": "keyword.control.directive.vmz"
+                },
+                {
+                    "match": "\\b(else)\\b(?!\\s*=)",
+                    "name": "keyword.control.directive.vmz"
+                },
+                {
+                    "begin": "\\b(on[A-Za-z]+)\\s*(=)\\s*\\{",
+                    "beginCaptures": {
+                        "1": {
+                            "name": "entity.other.attribute-name.event.vmz"
+                        },
+                        "2": {
+                            "name": "punctuation.separator.key-value.html.vmz"
+                        }
+                    },
+                    "end": "\\}",
+                    "name": "meta.embedded.expression.vmz",
+                    "contentName": "source.ts",
+                    "patterns": [
+                        {
+                            "include": "source.ts"
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}

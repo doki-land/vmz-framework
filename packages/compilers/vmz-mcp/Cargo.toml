@@ -1,0 +1,17 @@
+[package]
+name = "vmz-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "MCP server for the VMZ toolchain (oxc-backed)"
+publish = false
+
+[[bin]]
+name = "vmz-mcp"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+oxc.workspace = true
+vmz-types.workspace = true

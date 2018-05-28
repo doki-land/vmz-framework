@@ -1,0 +1,26 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "b1.compile.index",
+    "title": "B1/L2: IndexPage Direct api.component",
+    "modes": ["compile"],
+    "program": {
+        "chunkId": "pages/index",
+        "unitName": "IndexPage"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "graph",
+            "expect": {
+                "direct": true,
+                "noRender": true,
+                "includes": "api.component(this,"
+            }
+        }
+    ]
+}

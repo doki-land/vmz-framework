@@ -1,0 +1,14 @@
+<template>
+  <div>
+    <p if={showA}>{aText}</p>
+    <p else>{bText}</p>
+  </div>
+</template>
+
+<script client>
+export default class BranchDemo {
+  showA = true;
+  aText = "A";
+  bText = "B";
+}
+</script>

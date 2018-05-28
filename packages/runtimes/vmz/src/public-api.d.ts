@@ -1,0 +1,808 @@
+/** VMZ Node host — N-API workspace session + CLI + plugins. */
+
+export {
+    HOST_PROTOCOL,
+    COMPILER_PROTOCOL,
+    PROGRAM_IR_SCHEMA,
+    PLAN_SCHEMA,
+    PLUGIN_PROTOCOL,
+    DX_PROTOCOL,
+    DX_SYMBOL_SCHEMA,
+    DX_REFERENCE_SCHEMA,
+    DX_EXPLAIN_SCHEMA,
+    DX_WORKSPACE_EDIT_SCHEMA,
+    DX_CODE_ACTION_SCHEMA,
+    DX_AFFECTED_SCHEMA,
+    DX_RENAME_SCHEMA,
+    DX_TEST_SELECTION_SCHEMA,
+    DX_SOURCE_MAP_SCHEMA,
+    DX_SYMBOL_INDEX_SCHEMA,
+    DX_X2_CHECK_SCHEMA,
+    DX_SEMANTIC_TRANSACTION_SCHEMA,
+    DX_CANCEL_SCHEMA,
+    DX_AFFECTED_PREVIEW_SCHEMA,
+    DX_HMR_PLAN_SCHEMA,
+    DX_BUDGET_SCHEMA,
+    DX_X3_CHECK_SCHEMA,
+    DX_BOUNDARY_VALIDATOR_SCHEMA,
+    DX_LEAKAGE_SCHEMA,
+    DX_CAPABILITY_TARGET_SCHEMA,
+    DX_DEAD_GRAPH_SCHEMA,
+    DX_X4_CHECK_SCHEMA,
+    DX_TRACE_SCHEMA,
+    DX_CAUSAL_REPLAY_SCHEMA,
+    DX_X5_CHECK_SCHEMA,
+    APPLICATION_PROTOCOL,
+    APPLICATION_DESCRIPTOR_SCHEMA,
+    APPLICATIONS_CONFIG_SCHEMA,
+    APPLICATION_CATALOG_SCHEMA,
+    APPLICATION_CHECK_SCHEMA,
+    APPLICATION_BASE_SCHEMA,
+    APPLICATION_RELOCATION_SCHEMA,
+    APPLICATION_RELOCATED_SCHEMA,
+    APPLICATION_RELOCATABLE_CHECK_SCHEMA,
+    APPLICATION_ARTIFACT_SCHEMA,
+    APPLICATION_MOUNT_TABLE_SCHEMA,
+    APPLICATION_ARTIFACT_BOUNDARY_SCHEMA,
+    APPLICATION_ISOLATION_SCHEMA,
+    APPLICATION_ISOLATION_CHECK_SCHEMA,
+    APPLICATION_CROSS_LINK_SCHEMA,
+    APPLICATION_HOST_COMPOSITION_SCHEMA,
+    APPLICATION_DEV_SESSIONS_SCHEMA,
+    APPLICATION_AFFECTED_SCHEMA,
+    APPLICATION_PROXY_DISPATCH_SCHEMA,
+    APPLICATION_MOUNTED_TEST_SCHEMA,
+    APPLICATION_DEPLOY_ADAPTER_SCHEMA,
+    APPLICATION_DEV_CHECK_SCHEMA,
+    PROTOCOL_CATALOG_SCHEMA,
+    TEST_PROTOCOL,
+    TEST_MANIFEST_SCHEMA,
+    TEST_REPORT_SCHEMA,
+    protocolCatalog,
+    dxCatalog,
+    testCatalog,
+    applicationCatalog,
+} from '@vmz/protocol';
+export type { ProtocolCatalog, ProtocolDomain, DomainCatalog } from '@vmz/protocol';
+
+export interface ProtocolVersions {
+    hostProtocol: string;
+    compilerProtocol: string;
+    programIrSchema: string;
+    pluginProtocol: string;
+}
+
+export interface WorkspaceOptions {
+    root: string;
+    outDir?: string;
+    protocol?: ProtocolVersions;
+}
+
+export interface FileChange {
+    path: string;
+    kind: 'update' | 'delete';
+}
+
+export interface Diagnostic {
+    path: string;
+    severity: string;
+    message: string;
+}
+
+export interface CheckReport {
+    filesChecked: number;
+    diagnostics: Diagnostic[];
+    dirtyCount: number;
+}
+
+export interface BuildReport {
+    emitted: string[];
+    diagnostics: Diagnostic[];
+    dirtyCount: number;
+    full?: boolean;
+    affectedSources?: string[];
+    affectedChunks?: string[];
+    seedChunks?: string[];
+    islandHmr?: boolean;
+}
+
+export interface FormatReport {
+    filesChecked: number;
+    filesWritten: number;
+    filesNeedWrite: number;
+    diagnostics: Diagnostic[];
+}
+
+export interface AffectedPlan {
+    full: boolean;
+    rebuildRuntime: boolean;
+    rebuildServerTree: boolean;
+    units: Array<{ source: string; kind: string; chunkId: string }>;
+    seedChunks?: string[];
+    islandOnly?: boolean;
+}
+
+export interface ApplyContributionsReport {
+    accepted: number;
+    rejected: Array<{ plugin: string; itemId: string; reason: string }>;
+    diff: { added: string[]; removed: string[]; unchanged: string[] };
+}
+
+export interface Workspace {
+    root(): string;
+
+    outDir(): string;
+
+    contributionCount(): number;
+
+    updateFiles(changes: FileChange[]): void;
+
+    dirtyPaths(): string[];
+
+    applyPluginContributions(batch: ContributionBatch): ApplyContributionsReport;
+
+    check(denyWarnings?: boolean): CheckReport;
+
+    /** Lint: check + convention advice. */
+    lint(denyWarnings?: boolean): CheckReport;
+
+    format(checkOnly?: boolean): FormatReport;
+
+    build(release?: boolean): BuildReport;
+
+    queryAffected(): AffectedPlan;
+
+    queryProgramGraph(source: string): string;
+
+    querySessionGraph(): string;
+
+    sessionGeneration(): number;
+
+    explain(target: string): string;
+
+    /** DX catalog JSON (`vmz.dx.v0`). */
+    queryDxCatalog(): string;
+
+    /** Umbrella protocol catalog (`vmz.protocol.v0`). */
+    queryProtocolCatalog(): string;
+
+    /** Affected plan as DX JSON (`vmz.dx.affected.v0`). */
+    queryAffectedDx(): string;
+
+    /** X1: plan rename → WorkspaceEditPlan JSON. */
+    planRename(intentJson: string): string;
+
+    /** X1: atomically apply WorkspaceEditPlan JSON. */
+    applyWorkspaceEdit(planJson: string): string;
+
+    /** X1: graph→test selection JSON. */
+    selectTestsAffected(): string;
+
+    /** X1: rename causal explain chain JSON. */
+    explainRenameChain(intentJson: string): string;
+
+    /** X2: Symbol/Reference/source-map/safe_fix report JSON. */
+    checkDxX2(): string;
+
+    /** X2: Symbol index document JSON. */
+    querySymbols(): string;
+
+    /** X2: references for `kind:id`. */
+    queryReferences(target: string): string;
+
+    /** X2: CodeAction list JSON. */
+    listCodeActions(): string;
+
+    /** X3: atomic TextEdit batch JSON (`vmz.dx.semantic_transaction.v0`). */
+    applySemanticTransaction(editsJson: string): string;
+
+    /** X3: open analysis/build ticket (`vmz.dx.cancel.v0`). */
+    beginAnalysis(): string;
+
+    /** X3: cancel analysis ticket. */
+    cancelAnalysis(ticketId: number): string;
+
+    /** X3: affected preview JSON (`vmz.dx.affected_preview.v0`). */
+    queryAffectedPreview(): string;
+
+    /** X3: HMR plan JSON (`vmz.dx.hmr_plan.v0`). */
+    queryHmrPlan(): string;
+
+    /** X3: route/chunk budget JSON (`vmz.dx.budget.v0`). */
+    queryBudget(): string;
+
+    /** X3: umbrella incremental DX report (`vmz.dx.x3_check.v0`). */
+    checkDxX3(): string;
+
+    /** X4: boundary validators JSON (`vmz.dx.boundary_validator.v0`). */
+    queryBoundaryValidators(): string;
+
+    /** X4: leakage findings JSON (`vmz.dx.leakage.v0`). */
+    queryLeakage(): string;
+
+    /** X4: capability targets JSON (`vmz.dx.capability_target.v0`). */
+    queryCapabilityTargets(): string;
+
+    /** X4: dead graph JSON (`vmz.dx.dead_graph.v0`). */
+    queryDeadGraph(): string;
+
+    /** X4: umbrella deployment proof (`vmz.dx.x4_check.v0`). */
+    checkDxX4(): string;
+
+    /** X5: ingest StableId trace JSON (`vmz.dx.trace.v0`). */
+    ingestRuntimeTrace(traceJson: string): string;
+
+    /** X5: causal replay JSON (`vmz.dx.causal_replay.v0`). */
+    replayCausal(traceJson: string): string;
+
+    /** X5: umbrella deep-explain report (`vmz.dx.x5_check.v0`). */
+    checkDxX5(): string;
+
+    /** MP0: target-neutral contract check JSON. */
+    checkMp0TargetContract(): string;
+
+    /** P0: HostProfile / DeliveryProfile protocol check JSON. */
+    checkP0ProfileProtocol(): string;
+
+    /** P1: deterministic Surface/capability/route solver check JSON. */
+    checkP1ProfileSolver(): string;
+
+    /** P2: Unified Executor algebraic check JSON. */
+    checkP2UnifiedExecutor(): string;
+
+    /** P3: Lifecycle / Recovery algebraic check JSON. */
+    checkP3LifecycleRecovery(): string;
+
+    /** P4: Delivery Proof algebraic check JSON. */
+    checkP4DeliveryProof(): string;
+
+    /** P5: Cross-Host Conformance algebraic check JSON. */
+    checkP5CrossHostConformance(): string;
+
+    /** P0: profile protocol catalog JSON. */
+    queryProfileCatalog(): string;
+
+    /** MP0: target protocol catalog JSON. */
+    queryTargetCatalog(): string;
+
+    /** NW0: NativeAppHost / WebView contract check JSON. */
+    checkNw0NativeHostContract(): string;
+
+    /** NW0: native-host protocol catalog JSON. */
+    queryNativeHostCatalog(): string;
+
+    /** NW1: Native WebView shell contract check JSON. */
+    checkNw1NativeShellContract(): string;
+
+    /** NW2: typed Native Capability Bridge contract check JSON. */
+    checkNw2NativeBridgeContract(): string;
+
+    /** NW3: NativeAppHost lifecycle contract check JSON. */
+    checkNw3NativeLifecycleContract(): string;
+
+    /** NW4: NativeAppHost full-stack contract check JSON. */
+    checkNw4NativeFullstackContract(): string;
+
+    /** NW5: NativeSurface contract check JSON. */
+    checkNw5NativeSurfaceContract(): string;
+
+    /** NW6: multi-platform shared Host Profile contract check JSON. */
+    checkNw6MultiPlatformContract(): string;
+
+    dispose(): void;
+}
+
+export interface ContributionBatch {
+    pluginName: string;
+    pluginVersion: string;
+    protocol: string;
+    stage: string;
+    cacheKey: string;
+    deterministic?: boolean;
+    items: Array<Record<string, unknown>>;
+}
+
+export function contentHash(content: string | Buffer): string;
+
+export function definePlugin(def: import('@vmz/plugin').DefinePluginInput): import('@vmz/plugin').VmzPlugin;
+
+export function defineConfig(config: import('@vmz/plugin').VmzUserConfig): import('@vmz/plugin').VmzUserConfig;
+
+export function loadVmzConfig(project: string): Promise<{
+    plugins: import('@vmz/plugin').VmzPlugin[];
+    engines: import('@vmz/plugin').VmzEngines;
+    path: string | null;
+    pluginPath: string | null;
+}>;
+
+export function applyPlugins(
+    workspace: Workspace,
+    plugins: import('@vmz/plugin').VmzPlugin[],
+    opts: {
+        project: string;
+        outDir: string;
+        stages?: string[];
+        engines?: import('@vmz/plugin').VmzEngines;
+    },
+): Promise<ApplyContributionsReport[]>;
+
+export type {
+    VmzUserConfig,
+    VmzEngines,
+    VmzPlugin,
+    PluginContext,
+    DefinePluginInput,
+} from '@vmz/plugin';
+
+export function loadDeploymentIr(outDir: string): {
+    schema: string;
+    units: Array<Record<string, unknown>>;
+    affectedChunks?: string[];
+    seedChunks?: string[];
+    islandHmr?: boolean;
+    full?: boolean;
+};
+
+export function planBundleInputs(
+    outDir: string,
+    ir?: ReturnType<typeof loadDeploymentIr>,
+): Array<{
+    chunkId: string;
+    kind: string;
+    entry: string;
+    programIr: string;
+    source: string;
+    rebuilt: boolean;
+}>;
+
+export function planAffectedBundleInputs(outDir: string, ir?: ReturnType<typeof loadDeploymentIr>): ReturnType<typeof planBundleInputs>;
+
+export function createVitePluginVmzAdapter(options?: { outDir?: string; root?: string }): {
+    name: string;
+};
+
+export function createRolldownPluginVmzAdapter(options?: { outDir?: string; root?: string }): {
+    name: string;
+};
+
+export interface DevSessionOptions {
+    project: string;
+    outDir: string;
+    host?: string;
+    port?: number;
+    pollMs?: number;
+    signal?: AbortSignal;
+}
+
+export interface DevSession {
+    ws: Workspace;
+
+    rebuild(changes?: FileChange[]): BuildReport;
+
+    start(): Promise<void>;
+
+    stop(): Promise<void>;
+
+    project: string;
+    outDir: string;
+    host: string;
+    port: number;
+}
+
+export function expectedProtocol(): ProtocolVersions;
+
+export function resolveNativePath(): string;
+
+export function loadNative(): unknown;
+
+export function getProtocolVersions(): ProtocolVersions;
+
+export function handshake(host?: ProtocolVersions): void;
+
+export function createWorkspace(options: WorkspaceOptions): Workspace;
+
+/** M0: frozen application composition protocol catalog JSON. */
+export function queryApplicationProtocolCatalog(): string;
+
+/** M0: ApplicationCheckReport JSON for host + workspace package roots. */
+export function checkApplicationsJson(hostRoot: string, packageRoots: string[]): string;
+
+/** M1: ApplicationRelocatableReport JSON for a package root (+ optional relocate base). */
+export function checkApplicationRelocatableJson(packageRoot: string, relocateBase?: string | null): string;
+
+/** M1: apply ApplicationBase to a logical relocation manifest JSON. */
+export function relocateApplicationManifestJson(manifestJson: string, base: string): string;
+
+/** M2: ApplicationArtifactBoundaryReport JSON (artifacts + MountTable/Catalog refs). */
+export function checkApplicationArtifactBoundaryJson(hostRoot: string, packageRoots: string[]): string;
+
+/** M3: ApplicationIsolationCheckReport JSON (namespaces + failure containment). */
+export function checkApplicationIsolationJson(hostRoot: string, packageRoots: string[]): string;
+
+/** M4: ApplicationHostCompositionReport JSON (catalog + cross-app Links). */
+export function checkApplicationHostCompositionJson(hostRoot: string, packageRoots: string[]): string;
+
+/** M5: ApplicationDevCheckReport JSON (sessions / affected / proxy / tests / deploy). */
+export function checkApplicationDevTestDeployJson(hostRoot: string, packageRoots: string[], dirtyPaths?: string[]): string;
+
+export function createDevSession(options: DevSessionOptions): DevSession;
+
+export function srcFingerprint(srcDir: string): number;
+
+export function listWatchedFiles(srcDir: string): string[];
+
+export function resolveWorkspaceDirs(opts?: { cwd?: string; path?: string; outDir?: string }): {
+    project: string;
+    outDir: string;
+    cwd: string;
+};
+
+export function findPackageJson(startDir: string): string | null;
+
+export function readPackageMeta(projectRoot: string): { name?: string } | null;
+
+export function resolveWorkspacePackages(project: string): Array<{
+    name: string;
+    root: string;
+    private?: boolean;
+    hasSrc: boolean;
+    version?: string;
+}>;
+
+export function resolvePackageRoot(project: string, name: string): string | null;
+
+export function runCli(argv: string[]): Promise<number>;
+
+export function parseArgs(argv: string[]): Record<string, string | boolean> & { _: string[] };
+
+export function printHelp(): void;
+
+export declare const log: {
+    info(...args: unknown[]): void;
+    warn(...args: unknown[]): void;
+    error(...args: unknown[]): void;
+    diagnostic(d: Diagnostic): void;
+    diagnostics(diagnostics: Diagnostic[]): number;
+};
+
+declare const _default: {
+    HOST_PROTOCOL: string;
+    COMPILER_PROTOCOL: string;
+    PROGRAM_IR_SCHEMA: string;
+    PLUGIN_PROTOCOL: string;
+    expectedProtocol: typeof expectedProtocol;
+    resolveNativePath: typeof resolveNativePath;
+    loadNative: typeof loadNative;
+    getProtocolVersions: typeof getProtocolVersions;
+    handshake: typeof handshake;
+    createWorkspace: typeof createWorkspace;
+};
+export default _default;
+
+export const TARGET_PROTOCOL: string;
+export const TARGET_VIEW_OPS_SCHEMA: string;
+export const TARGET_PLATFORM_PROFILE_SCHEMA: string;
+export const TARGET_MINI_PROGRAM_ARTIFACT_SCHEMA: string;
+export const TARGET_CHECK_SCHEMA: string;
+export function targetCatalog(): {
+    schema: string;
+    protocol: string;
+    documents: Array<{ kind: string; schema: string }>;
+    diagnostics: string[];
+    viewOperations: string[];
+};
+export function queryTargetProtocolCatalog(): string;
+export function checkMp0TargetContractJson(rootPath: string): string;
+
+export const PROFILE_PROTOCOL: string;
+export const PROFILE_HOST_SCHEMA: string;
+export const PROFILE_DELIVERY_SCHEMA: string;
+export const PROFILE_CHECK_SCHEMA: string;
+export const PROFILE_DIAG_HOST_PROFILE_INVALID: string;
+export const PROFILE_DIAG_RESOLUTION_DIGEST_MISMATCH: string;
+export const PROFILE_DIAG_CORE_ID_OVERRIDE: string;
+export const PROFILE_DIAG_HOST_PROFILE_REF_UNRESOLVED: string;
+export const PROFILE_SURFACE_KINDS: string[];
+export const PROFILE_UNIFIED_LIFECYCLE_EVENTS: string[];
+export const PROFILE_CORE_ID_PREFIX: string;
+export function profileCatalog(): {
+    schema: string;
+    protocol: string;
+    documents: Array<{ kind: string; schema: string }>;
+    diagnostics: string[];
+    surfaceKinds: string[];
+    unifiedLifecycleEvents: string[];
+    coreIdPrefix: string;
+};
+
+export const LOCALE_PROTOCOL: string;
+export const LOCALE_MANIFEST_SCHEMA: string;
+export const LOCALE_MESSAGE_CATALOG_SCHEMA: string;
+export const LOCALE_MESSAGE_NODE_SCHEMA: string;
+export const LOCALE_CHECK_SCHEMA: string;
+export const LOCALE_TYPED_MODULE_SCHEMA: string;
+export const LOCALE_RENAME_SCHEMA: string;
+export const LOCALE_APPLICATION_CONTEXT_SCHEMA: string;
+export const LOCALE_FORMATTER_CONTEXT_SCHEMA: string;
+export const LOCALE_TRANSITION_SCHEMA: string;
+export const LOCALE_RUNTIME_CHECK_SCHEMA: string;
+export const LOCALE_FALLBACK_RESOLUTION_SCHEMA: string;
+export const FORMATTER_DATA_VERSION: string;
+export const LOCALE_ROUTE_REALIZATION_SCHEMA: string;
+export const LOCALE_PAGE_META_SCHEMA: string;
+export const LOCALE_LINK_RESOLUTION_SCHEMA: string;
+export const LOCALE_ROUTER_CHECK_SCHEMA: string;
+export const LOCALE_DELIVERY_RESOLUTION_SCHEMA: string;
+export const LOCALE_CHUNK_MANIFEST_SCHEMA: string;
+export const LOCALE_NATIVE_PACK_SCHEMA: string;
+export const LOCALE_MINI_PACKAGE_PROOF_SCHEMA: string;
+export const LOCALE_SERVER_ERROR_ENVELOPE_SCHEMA: string;
+export const LOCALE_DELIVERY_CHECK_SCHEMA: string;
+export const LOCALE_EXPLAIN_SCHEMA: string;
+export const LOCALE_DIFF_SCHEMA: string;
+export const LOCALE_EXTRACT_SCHEMA: string;
+export const LOCALE_PSEUDO_SCHEMA: string;
+export const LOCALE_CONFORMANCE_SCHEMA: string;
+export const LOCALE_DIAG_MANIFEST_MISSING: string;
+export const LOCALE_DIAG_ID_INVALID: string;
+export const LOCALE_DIAG_FALLBACK_CYCLE: string;
+export const LOCALE_DIAG_MESSAGE_PARAMETER_MISMATCH: string;
+export const LOCALE_DIAG_MESSAGE_UNUSED: string;
+export const LOCALE_DIAG_FORMATTER_CONTEXT_INCOMPLETE: string;
+export const LOCALE_DIAG_FORMATTER_VERSION_MISMATCH: string;
+export const LOCALE_DIAG_DIGEST_MISMATCH: string;
+export const LOCALE_DIAG_TRANSITION_PARTIAL: string;
+export const LOCALE_DIAG_TRANSITION_UNSUPPORTED: string;
+export const LOCALE_DIAG_TRANSITION_LOAD_FAILED: string;
+export const LOCALE_DIAG_MACHINE_DEFAULT_FORBIDDEN: string;
+export const LOCALE_DIAG_MESSAGE_MIXED_LOCALE: string;
+export const LOCALE_DIAG_STALE_GENERATION: string;
+export const LOCALE_DIAG_ROUTE_COLLISION: string;
+export const LOCALE_DIAG_CANONICAL_MISSING: string;
+export const LOCALE_DIAG_HREFLANG_INCOMPLETE: string;
+export const LOCALE_DIAG_META_LOCALE_MISMATCH: string;
+export const LOCALE_DIAG_LINK_HARDCODED_PATH: string;
+export const LOCALE_DIAG_CACHE_KEY_STEALS_CONTENT: string;
+export const LOCALE_DIAG_PREFIX_OMIT_WITHOUT_REDIRECT: string;
+export const LOCALE_DIAG_DELIVERY_FULL_BUNDLE: string;
+export const LOCALE_DIAG_CHUNK_HASH_MISMATCH: string;
+export const LOCALE_DIAG_NATIVE_PACK_UNSIGNED: string;
+export const LOCALE_DIAG_NATIVE_PACK_HAS_JS: string;
+export const LOCALE_DIAG_NATIVE_PACK_APP_MISMATCH: string;
+export const LOCALE_DIAG_MINI_CROSS_PACKAGE_UNPROVEN: string;
+export const LOCALE_DIAG_SERVER_TRANSLATED_ERROR: string;
+export const LOCALE_DIAG_SERVER_FORMAT_WITHOUT_CONTEXT: string;
+export const LOCALE_DIAG_HOST_MESSAGE_DIVERGENCE: string;
+export const LOCALE_DIAG_MESSAGE_DYNAMIC_ID_UNBOUNDED: string;
+export const LOCALE_DIAG_HARDCODED_TEXT: string;
+export const LOCALE_DIAG_PSEUDO_PRODUCTION_FORBIDDEN: string;
+export const LOCALE_DIAG_CONFORMANCE_DIVERGENCE: string;
+export const LOCALE_DIAG_EXPLAIN_UNKNOWN: string;
+export const LOCALE_VIRTUAL_MODULE_PREFIX: string;
+export function localeCatalog(): {
+    schema: string;
+    protocol: string;
+    documents: Array<{ kind: string; schema: string }>;
+    diagnostics: string[];
+    virtualModulePrefix: string;
+    formatterDataVersion: string;
+};
+export function negotiateLocale(input: {
+    supportedLocales: string[];
+    defaultLocale: string;
+    routeLocale?: string | null;
+    userChoice?: string | null;
+    preference?: string | null;
+    hostCandidates?: string[];
+}): string;
+export function buildApplicationContext(opts: {
+    applicationId: string;
+    deliveryId: string;
+    localeId: string;
+    timeZone: string;
+    calendar?: string;
+    numberingSystem?: string;
+    direction?: string;
+    generation?: number;
+}): Record<string, unknown>;
+export function buildFormatterContext(app: Record<string, unknown>, opts?: { currency?: string }): Record<string, unknown>;
+export function formatterContextDigest(formatter: Record<string, unknown>): string;
+export function validateFormatterContext(
+    formatter: Record<string, unknown>,
+    opts?: { allowMachineDefault?: boolean },
+): { ok: boolean; diagnostics: Array<{ code: string; severity: string; message: string }> };
+export function checkSsrClientParity(input: {
+    ssr: {
+        localeId: string;
+        formatterDigest: string;
+        formatterDataVersion?: string;
+        texts: Record<string, string>;
+    };
+    client: {
+        localeId: string;
+        formatterDigest: string;
+        formatterDataVersion?: string;
+        texts: Record<string, string>;
+    };
+}): { schema: string; status: string; diagnostics: Array<{ code: string; severity: string; message: string }> };
+export function createLocaleSession(opts: Record<string, unknown>): {
+    transition: (targetLocaleId: string, opts?: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    renderAll: (argMap?: Record<string, Record<string, unknown>>) => {
+        bindings: Record<string, { text: string; resolvedLocale: string }>;
+        resolvedLocales: string[];
+    };
+    snapshot: () => Record<string, unknown>;
+    applicationContext: Record<string, unknown>;
+    formatterContext: Record<string, unknown>;
+    formatterDigest: string;
+};
+export function formatMessageTemplate(template: string, args?: Record<string, unknown>): string;
+export function resolveMessageVariant(input: Record<string, unknown>): Record<string, unknown>;
+export function checkLocaleRuntime(input: Record<string, unknown>): Record<string, unknown>;
+export function realizeRoutePath(localeId: string, pathPattern: string, routing?: Record<string, unknown>): Record<string, unknown>;
+export function buildLocaleRouteRealizationTable(input: Record<string, unknown>): Record<string, unknown>;
+export function buildLocalePageMeta(input: Record<string, unknown>): Record<string, unknown>;
+export function resolveLinkHref(input: Record<string, unknown>): Record<string, unknown>;
+export function planLocalePathNavigation(input: Record<string, unknown>): Record<string, unknown>;
+export function localeAwareCacheKey(input: { routeId: string; localeId: string; path: string }): string;
+export function assertLocaleCacheKey(input: Record<string, unknown>): {
+    ok: boolean;
+    diagnostics: Array<{ code: string; severity: string; message: string }>;
+};
+export function commitLocaleRouteMetaTransition(input: Record<string, unknown>): Record<string, unknown>;
+export function checkLocaleRouter(input: Record<string, unknown>): Record<string, unknown>;
+export function buildLocaleDeliveryResolution(input: Record<string, unknown>): Record<string, unknown>;
+export function validateNativeLocalePack(input: Record<string, unknown>): Record<string, unknown>;
+export function proveMiniPackageMessages(input: Record<string, unknown>): Record<string, unknown>;
+export function assertServerErrorEnvelope(payload: unknown): Record<string, unknown>;
+export function assertServerFormatContext(input: Record<string, unknown>): {
+    ok: boolean;
+    diagnostics: Array<{ code: string; severity: string; message: string }>;
+};
+export function assertHostMessageInvariant(resolutions: Array<Record<string, unknown>>): {
+    ok: boolean;
+    diagnostics: Array<{ code: string; severity: string; message: string }>;
+};
+export function checkLocaleDelivery(input: Record<string, unknown>): Record<string, unknown>;
+export function fallbackDigest(fallback?: Record<string, string[]>): string;
+export function messageCatalogHash(messages: Array<Record<string, unknown>>, localeId: string, reachableIds?: string[]): string;
+export function explainLocaleMessage(input: Record<string, unknown>): Record<string, unknown>;
+export function diffLocaleCatalogs(input: Record<string, unknown>): Record<string, unknown>;
+export function extractHardcodedText(projectRoot: string, opts?: { check?: boolean }): Record<string, unknown>;
+export function pseudoLocalizeCatalog(input: Record<string, unknown>): Record<string, unknown>;
+export function checkLocaleConformance(input: Record<string, unknown>): Record<string, unknown>;
+
+export function queryProfileProtocolCatalog(): string;
+export function checkP0ProfileProtocolJson(rootPath: string): string;
+
+export const PROFILE_SOLVER_CHECK_SCHEMA: string;
+export const PROFILE_HOST_RESOLUTION_MANIFEST_SCHEMA: string;
+export const PROFILE_EXECUTOR_CHECK_SCHEMA: string;
+export const PROFILE_EXECUTOR_SCENARIO_SCHEMA: string;
+export const PROFILE_DIAG_SURFACE_NO_MATCH: string;
+export const PROFILE_DIAG_SURFACE_AMBIGUOUS: string;
+export const PROFILE_DIAG_CAPABILITY_UNRESOLVED: string;
+export const PROFILE_DIAG_CAPABILITY_PERMISSION_UNDECLARED: string;
+export const PROFILE_DIAG_ROUTE_UNREALIZABLE: string;
+export const PROFILE_DIAG_STALE_GENERATION: string;
+export const PROFILE_DIAG_MISSING_ENVELOPE_IDS: string;
+export const PROFILE_DIAG_SURFACE_OWNS_STATE: string;
+export const PROFILE_DIAG_PRIVATE_OBJECT_CROSSING: string;
+export const PROFILE_DIAG_SPLIT_TRANSACTION: string;
+export const PROFILE_DIAG_DISPOSE_NOT_AUTHORITATIVE: string;
+export const PROFILE_DIAG_CANCEL_NOT_PROPAGATED: string;
+export const PROFILE_LIFECYCLE_MAPPING_ENTRY_SCHEMA: string;
+export const PROFILE_LIFECYCLE_MAPPING_TABLE_SCHEMA: string;
+export const PROFILE_RECOVERY_POLICY_SCHEMA: string;
+export const PROFILE_LIFECYCLE_SCENARIO_SCHEMA: string;
+export const PROFILE_LIFECYCLE_RECOVERY_CHECK_SCHEMA: string;
+export const PROFILE_LIFECYCLE_HOST_KINDS: string[];
+export const PROFILE_PERSISTENCE_WINDOWS: string[];
+export const PROFILE_DIAG_LIFECYCLE_UNPROVEN: string;
+export const PROFILE_DIAG_LIFECYCLE_MAPPING_INCOMPLETE: string;
+export const PROFILE_DIAG_RECOVERY_DUPLICATES_OWNER: string;
+export const PROFILE_DIAG_RECOVERY_ASSUMES_HEAP: string;
+export const PROFILE_DIAG_PERSISTENCE_WINDOW_INVALID: string;
+export function checkP1ProfileSolverJson(rootPath: string): string;
+export function checkP2UnifiedExecutorJson(rootPath: string): string;
+export function checkP3LifecycleRecoveryJson(rootPath: string): string;
+export const PROFILE_DELIVERY_PACKAGE_CONSTRAINTS_SCHEMA: string;
+export const PROFILE_DELIVERY_SECURITY_POLICY_SCHEMA: string;
+export const PROFILE_DELIVERY_UPDATE_POLICY_SCHEMA: string;
+export const PROFILE_DELIVERY_ARTIFACT_MANIFEST_SCHEMA: string;
+export const PROFILE_DELIVERY_PROOF_MANIFEST_SCHEMA: string;
+export const PROFILE_DELIVERY_PROOF_SCENARIO_SCHEMA: string;
+export const PROFILE_DELIVERY_PROOF_CHECK_SCHEMA: string;
+export const PROFILE_DELIVERY_UPDATE_CHANNELS: string[];
+export const PROFILE_DELIVERY_ASSET_STRATEGIES: string[];
+export const PROFILE_DIAG_DELIVERY_CONSTRAINT_EXCEEDED: string;
+export const PROFILE_DIAG_HOST_PLAN_VERSION_MISMATCH: string;
+export const PROFILE_DIAG_PROOF_MANIFEST_INCOMPLETE: string;
+export const PROFILE_DIAG_PROOF_COPIES_SEMANTIC_IR: string;
+export const PROFILE_DIAG_UPDATE_WITHOUT_REPROOF: string;
+export const PROFILE_DIAG_SECURITY_POLICY_INSECURE: string;
+export function checkP4DeliveryProofJson(rootPath: string): string;
+export const PROFILE_CONFORMANCE_FIXTURE_SCHEMA: string;
+export const PROFILE_CONFORMANCE_STATE_SNAPSHOT_SCHEMA: string;
+export const PROFILE_CONFORMANCE_TRACE_SCHEMA: string;
+export const PROFILE_CONFORMANCE_HOST_RUN_SCHEMA: string;
+export const PROFILE_CONFORMANCE_SCENARIO_SCHEMA: string;
+export const PROFILE_CONFORMANCE_CHECK_SCHEMA: string;
+export const PROFILE_CONFORMANCE_SURFACE_ROLES: string[];
+export const PROFILE_DIAG_STABLE_ID_DIVERGENCE: string;
+export const PROFILE_DIAG_STATE_RESULT_DIVERGENCE: string;
+export const PROFILE_DIAG_TRACE_INVARIANT_BROKEN: string;
+export const PROFILE_DIAG_CONFORMANCE_HOST_INCOMPLETE: string;
+export const PROFILE_DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH: string;
+export function checkP5CrossHostConformanceJson(rootPath: string): string;
+
+export const NATIVE_HOST_PROTOCOL: string;
+export const NATIVE_HOST_WEBVIEW_DEPLOYMENT_SCHEMA: string;
+export const NATIVE_HOST_CAPABILITY_SCHEMA: string;
+export const NATIVE_HOST_BRIDGE_SCHEMA: string;
+export const NATIVE_HOST_APPLICATION_IDENTITY_SCHEMA: string;
+export const NATIVE_HOST_CHECK_SCHEMA: string;
+export const NATIVE_HOST_DIAG_ARBITRARY_BRIDGE: string;
+export function nativeHostCatalog(): {
+    schema: string;
+    protocol: string;
+    documents: Array<{ kind: string; schema: string }>;
+    diagnostics: string[];
+    capabilityClasses: string[];
+    forbiddenBridgePatterns: string[];
+};
+export function queryNativeHostProtocolCatalog(): string;
+export function checkNw0NativeHostContractJson(rootPath: string): string;
+
+export const NATIVE_HOST_SHELL_SCHEMA: string;
+export const NATIVE_HOST_SHELL_CHECK_SCHEMA: string;
+export const NATIVE_HOST_DEEP_LINK_SCHEMA: string;
+export const NATIVE_HOST_LOCAL_BUNDLE_SCHEMA: string;
+export const NATIVE_HOST_DIAG_MISSING_SHELL_HOOK: string;
+export const NATIVE_HOST_DIAG_PLATFORM_SEMANTIC_FORK: string;
+export const NATIVE_HOST_DIAG_REMOTE_ENTRY_DEFAULT: string;
+export const NATIVE_HOST_DIAG_MISSING_ENTRY_ARTIFACT: string;
+export const NATIVE_HOST_REQUIRED_SHELL_HOOKS: string[];
+export function checkNw1NativeShellContractJson(rootPath: string): string;
+
+export const NATIVE_HOST_CAPABILITY_CALL_SCHEMA: string;
+export const NATIVE_HOST_BRIDGE_TRACE_SCHEMA: string;
+export const NATIVE_HOST_BRIDGE_STUB_CATALOG_SCHEMA: string;
+export const NATIVE_HOST_BRIDGE_CHECK_SCHEMA: string;
+export const NATIVE_HOST_DIAG_MISSING_NONCE: string;
+export const NATIVE_HOST_DIAG_CALL_NOT_ALLOWLISTED: string;
+export const NATIVE_HOST_FIRST_BATCH_STUB_IDS: string[];
+export function checkNw2NativeBridgeContractJson(rootPath: string): string;
+
+export const NATIVE_HOST_LIFECYCLE_SCHEMA: string;
+export const NATIVE_HOST_LIFECYCLE_CHECK_SCHEMA: string;
+export const NATIVE_HOST_DIAG_BACKGROUND_IS_DESTROY: string;
+export const NATIVE_HOST_DIAG_CRASH_ASSUMES_JS_HEAP: string;
+export const NATIVE_HOST_DIAG_MISSING_LIFECYCLE_EVENT: string;
+export const NATIVE_HOST_REQUIRED_LIFECYCLE_EVENTS: string[];
+export function checkNw3NativeLifecycleContractJson(rootPath: string): string;
+
+export const NATIVE_HOST_FULLSTACK_SCHEMA: string;
+export const NATIVE_HOST_FULLSTACK_CHECK_SCHEMA: string;
+export const NATIVE_HOST_DIAG_BRIDGE_BYPASSES_SERVER: string;
+export const NATIVE_HOST_DIAG_REMOTE_WITHOUT_INTEGRITY: string;
+export const NATIVE_HOST_DIAG_MISSING_SERVER_TRANSPORT: string;
+export function checkNw4NativeFullstackContractJson(rootPath: string): string;
+
+export const NATIVE_HOST_NATIVE_SURFACE_SCHEMA: string;
+export const NATIVE_HOST_NATIVE_SURFACE_CHECK_SCHEMA: string;
+export const NATIVE_HOST_DIAG_SURFACE_IS_CAPABILITY: string;
+export const NATIVE_HOST_DIAG_IMPLICIT_STATE_SHARE: string;
+export const NATIVE_HOST_HIGH_VALUE_SURFACE_KINDS: string[];
+export function checkNw5NativeSurfaceContractJson(rootPath: string): string;
+
+export const NATIVE_HOST_MULTI_PLATFORM_SCHEMA: string;
+export const NATIVE_HOST_MULTI_PLATFORM_SHARED_SCHEMA: string;
+export const NATIVE_HOST_MULTI_PLATFORM_CHECK_SCHEMA: string;
+export const NATIVE_HOST_DIAG_PLATFORM_SEMANTIC_FORK: string;
+export const NATIVE_HOST_DIAG_MISSING_PLATFORM_ADAPTER: string;
+export const NATIVE_HOST_DIAG_PLATFORM_PRIVATE_SCHEMA: string;
+export const NATIVE_HOST_DIAG_ADAPTER_IS_SEMANTIC_CORE: string;
+export const NATIVE_HOST_REQUIRED_MULTI_PLATFORMS: string[];
+export const NATIVE_HOST_MULTI_PLATFORM_ADAPTER_KIND: string;
+export function checkNw6MultiPlatformContractJson(rootPath: string): string;

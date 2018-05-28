@@ -1,0 +1,65 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "counter.logic.increment",
+    "title": "CounterButton click increments via Direct plan (logic host)",
+    "modes": ["logic"],
+    "program": {
+        "chunkId": "components/CounterButton",
+        "unitName": "CounterButton"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "mount",
+            "props": {
+                "initial": 0
+            }
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "precision_reset"
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "click",
+            "selector": "button"
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "flush"
+        }
+    ],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "text",
+            "expect": {
+                "contains": "count: 1"
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "state",
+            "expect": {
+                "count": 1
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "precision",
+            "expect": {
+                "minWrites": 1,
+                "maxWrites": 1,
+                "maxBindingEvals": 1,
+                "maxPatchExecs": 1,
+                "writesIncludeRoot": "count",
+                "patchesIncludeDep": "count",
+                "domCreates": 0
+            }
+        }
+    ]
+}

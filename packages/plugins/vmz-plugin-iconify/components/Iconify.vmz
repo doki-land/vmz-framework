@@ -1,0 +1,17 @@
+<template>
+  <span class="iconify-host" html={html != null ? html : iconFallback(name)}></span>
+</template>
+
+<script client>
+import { loadIconSvg, iconFallback } from '@vmz/plugin-iconify/runtime';
+
+export default class Iconify {
+  /** Iconify id, e.g. `mdi:home`. */
+  public name: string = '';
+  html: string | null = null;
+
+  async onMount() {
+    this.html = (await loadIconSvg(this.name)) || iconFallback(this.name);
+  }
+}
+</script>

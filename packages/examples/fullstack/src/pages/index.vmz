@@ -1,0 +1,10 @@
+<template>
+  <main>
+    <h1>Full-stack VMZ</h1>
+    <UserCard />
+  </main>
+</template>
+
+<script client>
+export default class IndexPage {}
+</script>

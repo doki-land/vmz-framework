@@ -1,0 +1,19 @@
+<template>
+  <footer class="site-footer">
+    <div class="site-footer__brand">
+      <span class="site-footer__mark">VMZ</span>
+      <p class="site-footer__tag">Vue-Familiar · Multi-Platform · Zero-Cost</p>
+    </div>
+    <nav class="site-footer__nav" aria-label="Footer">
+      <a href="/d/">文档</a>
+      <a href="/d/zh-hans/guide/">入门指南</a>
+      <a href="/welcome">Welcome</a>
+      <a href="/d/zh-hans/plugins/">官方插件</a>
+    </nav>
+    <p class="site-footer__note">普通 VMZ application · 无 homepage 特判</p>
+  </footer>
+</template>
+
+<script client>
+export default class SiteFooter {}
+</script>

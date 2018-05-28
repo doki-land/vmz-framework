@@ -1,0 +1,59 @@
+<template>
+  <button
+    type={type}
+    class="vmz-ui-btn"
+    disabled={disabled}
+    onClick={onClick}
+  >
+    <slot />
+  </button>
+</template>
+
+<style>
+.vmz-ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.95rem;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  background: var(--vmz-action-primary-background);
+  color: var(--vmz-action-primary-foreground);
+  outline: none;
+}
+
+.vmz-ui-btn:hover:not(:disabled) {
+  background: var(--vmz-action-primary-hover);
+}
+
+.vmz-ui-btn:active:not(:disabled) {
+  background: var(--vmz-action-primary-active);
+}
+
+.vmz-ui-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — Button probe (UI0).
+ * Colors come only from Style Theme semantic tokens — never brand hex.
+ * Requirements: contracts/token-requirements.v0.json
+ */
+export default class Button {
+  public type: string = 'button';
+  public disabled: boolean = false;
+  public onClick: ((e: Event) => void) | null = null;
+}
+</script>

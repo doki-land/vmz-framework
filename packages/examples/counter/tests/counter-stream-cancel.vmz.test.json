@@ -1,0 +1,38 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "counter.ssr.stream.cancel",
+    "title": "T2 stream SSR: AbortSignal stops yields; pull delay is backpressure",
+    "modes": ["ssr"],
+    "program": {
+        "chunkId": "components/CounterButton",
+        "unitName": "CounterButton"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "renderToStream",
+            "props": {
+                "initial": 3
+            },
+            "abortAfterChunks": 2,
+            "pullDelayMs": 25
+        }
+    ],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "stream",
+            "expect": {
+                "aborted": true,
+                "chunkCountMin": 1,
+                "chunkCountMax": 2,
+                "pullGapMinMs": 20,
+                "firstChunkContains": "<button"
+            }
+        }
+    ]
+}

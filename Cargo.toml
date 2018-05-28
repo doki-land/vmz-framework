@@ -1,90 +1,51 @@
 [workspace]
-members = [
-    "compilers/hxo-bundler",
-    "compilers/hxo-compiler",
-    "compilers/hxo-cli",
-    "compilers/hxo-hydrate",
-    "compilers/hxo-ir",
-    "compilers/hxo-lsp",
-    "compilers/hxo-optimizer",
-    "compilers/hxo-parser",
-    "compilers/hxo-parser-css",
-    "compilers/hxo-parser-json",
-    "compilers/hxo-parser-less",
-    "compilers/hxo-parser-markdown",
-    "compilers/hxo-parser-sass",
-    "compilers/hxo-parser-scss",
-    "compilers/hxo-parser-stylus",
-    "compilers/hxo-parser-tailwind",
-    "compilers/hxo-parser-template",
-    "compilers/hxo-parser-toml",
-    "compilers/hxo-parser-expression",
-    "compilers/hxo-parser-yaml",
-    "compilers/hxo-parser-pug",
-    "compilers/hxo-parser-properties",
-    "compilers/hxo-parser-rust",
-    "compilers/hxo-parser-fluent",
-    "compilers/hxo-target-wasm",
-    "compilers/hxo-script-analyzer",
-    "compilers/hxo-style-processor",
-    "compilers/hxo-source-map",
-    "compilers/hxo-ssr",
-    "compilers/hxo-target-dts",
-    "compilers/hxo-target-css",
-    "compilers/hxo-target-html",
-    "compilers/hxo-target-js",
-    "compilers/hxo-types",
-    "compilers/hxo-wit",
-]
 resolver = "2"
+members = [
+    "packages/compilers/vmz-protocol",
+    "packages/compilers/vmz-types",
+    "packages/compilers/vmz-compiler",
+    "packages/compilers/vmz-inspector",
+    "packages/compilers/vmz-tools",
+    "packages/compilers/vmz-lsp",
+    "packages/compilers/vmz-mcp",
+    "packages/compilers/vmz-napi",
+    "packages/compilers/vmz-plugin-tailwind",
+    "packages/compilers/vmz-plugin-sasso",
+]
+default-members = ["packages/compilers/vmz-tools"]
 
 [workspace.package]
 version = "0.1.0"
-authors = ["HXO Team"]
-edition = "2021"
+edition = "2024"
 license = "MIT"
-repository = "https://github.com/hxo-framework/hxo"
-homepage = "https://hxo.dev"
+repository = "https://github.com/vmz-framework/vmz-framework"
+rust-version = "1.85"
 
 [workspace.dependencies]
-hxo-types = { path = "compilers/hxo-types" }
-hxo-source-map = { path = "compilers/hxo-source-map" }
-hxo-parser = { path = "compilers/hxo-parser" }
-hxo-lsp = { path = "compilers/hxo-lsp" }
-hxo-compiler = { path = "compilers/hxo-compiler" }
-hxo-cli = { path = "compilers/hxo-cli" }
-hxo-ir = { path = "compilers/hxo-ir" }
-hxo-ssr = { path = "compilers/hxo-ssr" }
-hxo-hydrate = { path = "compilers/hxo-hydrate" }
-hxo-target-wasm = { path = "compilers/hxo-target-wasm" }
-hxo-bundler = { path = "compilers/hxo-bundler" }
-hxo-optimizer = { path = "compilers/hxo-optimizer" }
-hxo-target-js = { path = "compilers/hxo-target-js" }
-hxo-target-html = { path = "compilers/hxo-target-html" }
-hxo-target-css = { path = "compilers/hxo-target-css" }
-hxo-target-dts = { path = "compilers/hxo-target-dts" }
-hxo-parser-css = { path = "compilers/hxo-parser-css" }
-hxo-parser-json = { path = "compilers/hxo-parser-json" }
-hxo-parser-less = { path = "compilers/hxo-parser-less" }
-hxo-parser-markdown = { path = "compilers/hxo-parser-markdown" }
-hxo-parser-sass = { path = "compilers/hxo-parser-sass" }
-hxo-parser-scss = { path = "compilers/hxo-parser-scss" }
-hxo-parser-stylus = { path = "compilers/hxo-parser-stylus" }
-hxo-parser-tailwind = { path = "compilers/hxo-parser-tailwind" }
-hxo-parser-template = { path = "compilers/hxo-parser-template" }
-hxo-parser-toml = { path = "compilers/hxo-parser-toml" }
-hxo-parser-expression = { path = "compilers/hxo-parser-expression" }
-hxo-parser-yaml = { path = "compilers/hxo-parser-yaml" }
-hxo-parser-pug = { path = "compilers/hxo-parser-pug" }
-hxo-parser-properties = { path = "compilers/hxo-parser-properties" }
-hxo-parser-rust = { path = "compilers/hxo-parser-rust" }
-hxo-parser-fluent = { path = "compilers/hxo-parser-fluent" }
-hxo-script-analyzer = { path = "compilers/hxo-script-analyzer" }
-hxo-style-processor = { path = "compilers/hxo-style-processor" }
-serde = { version = "1.0", features = ["derive"] }
-url = "2.5"
-tower-lsp = "0.20"
-serde_json = "1.0"
-clap = { version = "4.5", features = ["derive"] }
-dashmap = "5.5"
-tokio = "1.36"
+vmz-protocol = { path = "packages/compilers/vmz-protocol" }
+vmz-types = { path = "packages/compilers/vmz-types" }
+vmz-compiler = { path = "packages/compilers/vmz-compiler" }
+vmz-inspector = { path = "packages/compilers/vmz-inspector" }
+vmz-plugin-tailwind = { path = "packages/compilers/vmz-plugin-tailwind" }
+vmz-plugin-sasso = { path = "packages/compilers/vmz-plugin-sasso" }
+
+oxc = { version = "0.143", features = ["full"] }
+oxc_allocator = "0.143"
+oxc_ast = "0.143"
+oxc_diagnostics = "0.143"
+oxc_parser = "0.143"
+oxc_span = "0.143"
+
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+json5 = "1"
+thiserror = "2"
+walkdir = "2"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "symbols"

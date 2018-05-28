@@ -1,0 +1,32 @@
+<template>
+  <div>{{ user.name }}</div>
+</template>
+
+<script client>
+export default class Application {
+  user = { name: 'x', bio: 'y' };
+  tags = [1, 2];
+
+  rename() {
+    const u = this.user;
+    u.name = 'Ada';
+  }
+
+  onOpaque(name) {
+    this[name]();
+  }
+
+  onArray() {
+    const [head] = this.tags;
+    return head;
+  }
+
+  onClick() {
+    const u = this.user;
+    const go = () => {
+      u.bio = 'z';
+    };
+    go();
+  }
+}
+</script>

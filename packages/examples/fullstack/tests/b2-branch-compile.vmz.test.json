@@ -1,0 +1,26 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "b2.compile.branch",
+    "title": "B2: BranchDemo ifBlock Direct",
+    "modes": ["compile"],
+    "program": {
+        "chunkId": "components/BranchDemo",
+        "unitName": "BranchDemo"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "graph",
+            "expect": {
+                "direct": true,
+                "noRender": true,
+                "includes": "api.ifBlock(this,"
+            }
+        }
+    ]
+}

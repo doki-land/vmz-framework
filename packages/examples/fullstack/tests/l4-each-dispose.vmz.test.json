@@ -1,0 +1,87 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "l4.logic.each.dispose",
+    "title": "L4: each key drop disposes DOM",
+    "modes": ["logic"],
+    "program": {
+        "chunkId": "components/UserCard",
+        "unitName": "UserCard"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "stub_onMount"
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "mount"
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "write",
+            "field": "user",
+            "value": {
+                "name": "n",
+                "bio": "b"
+            }
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "write",
+            "field": "tags",
+            "value": [
+                {
+                    "id": "a",
+                    "label": "A"
+                },
+                {
+                    "id": "b",
+                    "label": "B"
+                }
+            ]
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "flush"
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "assert",
+            "assertion": "domKeys",
+            "expect": {
+                "attr": "data-vmz-key",
+                "includes": ["a", "b"]
+            }
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "write",
+            "field": "tags",
+            "value": [
+                {
+                    "id": "a",
+                    "label": "A"
+                }
+            ]
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "flush"
+        }
+    ],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "domKeys",
+            "expect": {
+                "attr": "data-vmz-key",
+                "includes": ["a"],
+                "excludes": ["b"]
+            }
+        }
+    ]
+}

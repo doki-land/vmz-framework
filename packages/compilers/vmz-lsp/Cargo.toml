@@ -1,0 +1,17 @@
+[package]
+name = "vmz-lsp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Language server for `.vmz` files (oxc-backed)"
+publish = false
+
+[[bin]]
+name = "vmz-lsp"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+oxc.workspace = true
+vmz-types.workspace = true

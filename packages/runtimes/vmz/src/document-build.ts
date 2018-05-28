@@ -1,0 +1,306 @@
+// @ts-nocheck
+/**
+ * Document D1 Static + D3 Interactive artifacts.
+ * Design: 规划设计/vmz/19 §5–6 · D1/D3
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { checkDocuments, manifestHasErrors } from './document-check.js';
+import { resolveDocumentDesignsCss } from './document-designs.js';
+import { enrichDocumentContent, pageHtmlRel } from './document-enrich.js';
+import { enrichDocumentEvidence } from './document-evidence.js';
+import {
+    artifactHrefFromHtml,
+    buildDocumentIslands,
+    buildDocumentSearch,
+    collectFenceBodies,
+    renderIslandShellsHtml,
+} from './document-interactive.js';
+import { resolveMarkdownEngine } from './document-markdown.js';
+import { DOCUMENT_VIEW_SCHEMA } from './document-schema.js';
+import { createWorkspace } from './index.js';
+
+/**
+ * @param {{ projectRoot: string, outDir?: string, strict?: boolean, engines?: { markdown?: string } }} opts
+ */
+export async function buildDocuments(opts) {
+    const projectRoot = path.resolve(opts.projectRoot);
+    const outDir = path.resolve(opts.outDir || path.join(projectRoot, 'dist', 'documents'));
+    const strict = Boolean(opts.strict);
+    const manifest = checkDocuments({ projectRoot, strict });
+    const engine = await resolveMarkdownEngine({ engines: opts.engines, projectRoot });
+    const enriched = enrichDocumentContent(manifest, {
+        analyzeMarkdown: engine.analyzeMarkdown,
+        projectRoot,
+    });
+    manifest.diagnostics = enriched.diagnostics;
+    const evidence = await enrichDocumentEvidence(manifest, {
+        analyzeMarkdown: engine.analyzeMarkdown,
+        projectRoot,
+        createWorkspace,
+    });
+    manifest.diagnostics = evidence.diagnostics;
+    manifest.evidence = evidence.evidence;
+    if (manifestHasErrors(manifest)) {
+        return { ok: false, manifest, outDir, pages: [] };
+    }
+
+    /** @type {Map<string, any>} */
+    const analyzedByPageId = new Map();
+    for (const page of manifest.pages) {
+        const abs = path.isAbsolute(page.sourcePath) ? page.sourcePath : path.join(manifest.root, page.sourcePath);
+        const source = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : '';
+        const id = `${page.identity.locale}:${page.identity.pageKey}`;
+        analyzedByPageId.set(id, engine.analyzeMarkdown(source));
+    }
+    const fenceBodies = collectFenceBodies(analyzedByPageId, manifest.pages);
+    const search = buildDocumentSearch({
+        manifest,
+        enriched,
+        evidence: evidence.evidence,
+        version: null,
+    });
+    const islands = buildDocumentIslands({
+        evidence: evidence.evidence,
+        searchHref: 'document.search.json',
+        fenceBodies,
+    });
+    manifest.search = search;
+    manifest.islands = islands;
+
+    const hostChrome = resolveHostSiteChrome(projectRoot);
+    const useHostShell = Boolean(hostChrome) && (manifest.mounts || []).some((m) => m.mode === 'integrated');
+
+    fs.mkdirSync(outDir, { recursive: true });
+    const designs = resolveDocumentDesignsCss(projectRoot);
+    /** @type {string | null} */
+    let designsHref = null;
+    if (designs.css && designs.href) {
+        const cssPath = path.join(outDir, designs.href);
+        fs.mkdirSync(path.dirname(cssPath), { recursive: true });
+        fs.writeFileSync(cssPath, designs.css, 'utf8');
+        designsHref = designs.href;
+    }
+    const viewsDir = path.join(outDir, 'views');
+    fs.mkdirSync(viewsDir, { recursive: true });
+    /** @type {Array<{ route: string, htmlPath: string, viewPath: string }>} */
+    const written = [];
+    for (const page of manifest.pages) {
+        const id = `${page.identity.locale}:${page.identity.pageKey}`;
+        const info = enriched.byId.get(id);
+        if (!info) continue;
+        const nav = enriched.navByLocale[page.identity.locale] || [];
+        const htmlRel = pageHtmlRel(enriched.routeBase, page.identity.locale, page.identity.pageKey);
+        const htmlAbs = path.join(outDir, htmlRel);
+        fs.mkdirSync(path.dirname(htmlAbs), { recursive: true });
+        const searchIndexHref = artifactHrefFromHtml(htmlRel, 'document.search.json');
+        const shells = renderIslandShellsHtml({
+            islands,
+            searchIndexHref,
+            pageKey: page.identity.pageKey,
+            locale: page.identity.locale,
+        });
+        const view = {
+            schema: DOCUMENT_VIEW_SCHEMA,
+            pageKey: page.identity.pageKey,
+            locale: page.identity.locale,
+            route: info.route,
+            title: info.title,
+            headings: info.headings,
+            nav,
+            bodyKind: 'html',
+            html: info.html,
+            designsCss: designsHref,
+            noJsReadable: true,
+            hydrate: 'island-only',
+            hostShell: useHostShell,
+            islands: ['DocumentSearch'].concat(
+                (islands.islands || [])
+                    .filter(
+                        (isl) =>
+                            isl.kind === 'playground' &&
+                            isl.fence?.locale === page.identity.locale &&
+                            isl.fence?.pageKey === page.identity.pageKey,
+                    )
+                    .map((isl) => isl.name),
+            ),
+        };
+        const viewRel = path.posix.join(
+            'views',
+            page.identity.locale,
+            `${page.identity.pageKey === 'index' ? 'index' : page.identity.pageKey}.view.json`,
+        );
+        const viewAbs = path.join(outDir, viewRel);
+        fs.mkdirSync(path.dirname(viewAbs), { recursive: true });
+        fs.writeFileSync(viewAbs, JSON.stringify(view, null, 2) + '\n', 'utf8');
+        const html = renderStaticHtml({
+            title: info.title,
+            locale: page.identity.locale,
+            route: info.route,
+            nav,
+            bodyHtml: info.html,
+            headings: info.headings,
+            designsHref,
+            htmlRel,
+            searchShellHtml: shells.searchHtml,
+            playgroundShellHtml: shells.playgroundHtml,
+            hostChrome: useHostShell ? hostChrome : null,
+        });
+        fs.writeFileSync(htmlAbs, html, 'utf8');
+        written.push({ route: info.route, htmlPath: htmlRel, viewPath: viewRel });
+    }
+    const manifestOut = {
+        ...manifest,
+        schema: manifest.schema,
+        evidence: evidence.evidence,
+        search,
+        islands,
+        build: {
+            engine: engine.engine,
+            outDir: path.relative(projectRoot, outDir).replace(/\\/g, '/') || '.',
+            designs: designs.source,
+            designsCss: designsHref,
+            pages: written,
+            evidence: 'document.evidence.json',
+            search: 'document.search.json',
+            islands: 'document.islands.json',
+        },
+    };
+    fs.writeFileSync(path.join(outDir, 'document.manifest.json'), JSON.stringify(manifestOut, null, 2) + '\n', 'utf8');
+    fs.writeFileSync(path.join(outDir, 'document.evidence.json'), JSON.stringify(evidence.evidence, null, 2) + '\n', 'utf8');
+    fs.writeFileSync(path.join(outDir, 'document.search.json'), JSON.stringify(search, null, 2) + '\n', 'utf8');
+    fs.writeFileSync(path.join(outDir, 'document.islands.json'), JSON.stringify(islands, null, 2) + '\n', 'utf8');
+    return { ok: true, manifest: manifestOut, outDir, pages: written, search, islands };
+}
+
+/**
+ * No-JS readable static HTML: nav + main landmarks, Island shells without scripts.
+ * Integrated mounts reuse host SiteHeader/SiteFooter templates when present.
+ */
+function renderStaticHtml({
+    title,
+    locale,
+    route,
+    nav,
+    bodyHtml,
+    headings,
+    designsHref,
+    htmlRel,
+    searchShellHtml = '',
+    playgroundShellHtml = '',
+    hostChrome = null,
+}) {
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const depth = htmlRel.split('/').length - 1;
+    const prefix = depth > 0 ? '../'.repeat(depth) : './';
+    /** @type {string[]} */
+    const cssHrefs = [];
+    if (hostChrome) {
+        // Same application stylesheet as landing pages (header/footer chrome).
+        cssHrefs.push(`${prefix}vmz.css`);
+    }
+    if (designsHref) cssHrefs.push(prefix + designsHref);
+    const cssLink = cssHrefs.map((href) => `  <link rel="stylesheet" href="${esc(href)}" />`).join('\n') + (cssHrefs.length ? '\n' : '');
+    const navItems = nav
+        .map((n) => {
+            const href = relativeHref(htmlRel, n.href, route);
+            const current = n.href === route ? ' aria-current="page"' : '';
+            return `      <li><a href="${esc(href)}"${current}>${esc(n.title)}</a></li>`;
+        })
+        .join('\n');
+    const toc =
+        headings.length > 1
+            ? `<nav aria-label="On this page" class="toc">\n    <ol>\n${headings
+                  .map((h) => `      <li class="h${h.level}"><a href="#${esc(h.id)}">${esc(h.text)}</a></li>`)
+                  .join('\n')}\n    </ol>\n  </nav>\n`
+            : '';
+    const docsNav = `  <nav aria-label="Documents" class="doc-subnav">
+    <ul>
+${navItems}
+    </ul>
+  </nav>`;
+
+    if (hostChrome) {
+        const header = hostChrome.header.replace(/(<a\s+href="\/d\/?")([^>]*>文档<\/a>)/, '$1 aria-current="page"$2');
+        return `<!DOCTYPE html>
+<html lang="${esc(locale)}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${esc(title)}</title>
+${cssLink}</head>
+<body data-vmz-hydrate="island-only">
+  <div class="site site--docs">
+  <a class="skip-link" href="#main">Skip to content</a>
+${header}
+${docsNav}
+${searchShellHtml}
+  <div class="doc-body">
+  ${toc}<main id="main">
+${bodyHtml}
+${playgroundShellHtml}
+  </main>
+  </div>
+${hostChrome.footer}
+  </div>
+</body>
+</html>
+`;
+    }
+
+    return `<!DOCTYPE html>
+<html lang="${esc(locale)}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${esc(title)}</title>
+${cssLink}</head>
+<body data-vmz-hydrate="island-only">
+  <a class="skip-link" href="#main">Skip to content</a>
+${docsNav}
+${searchShellHtml}
+  ${toc}<main id="main">
+${bodyHtml}
+${playgroundShellHtml}
+  </main>
+</body>
+</html>
+`;
+}
+
+/**
+ * Integrated DocumentMount: reuse host SiteHeader / SiteFooter .vmz templates.
+ * @param {string} projectRoot
+ * @returns {{ header: string, footer: string } | null}
+ */
+function resolveHostSiteChrome(projectRoot) {
+    const headerPath = path.join(projectRoot, 'src', 'components', 'SiteHeader.vmz');
+    const footerPath = path.join(projectRoot, 'src', 'components', 'SiteFooter.vmz');
+    if (!fs.existsSync(headerPath) || !fs.existsSync(footerPath)) return null;
+    const header = extractVmzTemplateHtml(headerPath);
+    const footer = extractVmzTemplateHtml(footerPath);
+    if (!header || !footer) return null;
+    return { header, footer };
+}
+
+/** @param {string} filePath */
+function extractVmzTemplateHtml(filePath) {
+    const src = fs.readFileSync(filePath, 'utf8');
+    const m = src.match(/<template>([\s\S]*?)<\/template>/);
+    return m ? m[1].trim() : '';
+}
+
+function relativeHref(fromHtmlRel, toRoute, _fromRoute) {
+    const toParts = String(toRoute).replace(/^\//, '').split('/').filter(Boolean);
+    let toRel;
+    if (toParts.length <= 2) {
+        toRel = [...toParts, 'index.html'].join('/');
+    } else {
+        const file = toParts.slice(2).join('/') + '.html';
+        toRel = [...toParts.slice(0, 2), file].join('/');
+    }
+    const fromDir = path.posix.dirname(fromHtmlRel.replace(/\\/g, '/'));
+    let rel = path.posix.relative(fromDir, toRel);
+    if (!rel.startsWith('.') && !rel.startsWith('/')) rel = './' + rel;
+    return rel || './index.html';
+}

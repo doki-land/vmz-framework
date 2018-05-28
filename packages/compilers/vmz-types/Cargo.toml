@@ -1,0 +1,14 @@
+[package]
+name = "vmz-types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "VMZ-specific types layered on the oxc toolchain"
+publish = false
+
+[dependencies]
+oxc_span.workspace = true
+serde = { workspace = true }
+serde_json = { workspace = true }
+vmz-protocol.workspace = true

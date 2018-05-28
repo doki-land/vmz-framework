@@ -1,0 +1,21 @@
+<template>
+  <section>
+    <h2>{user.name}</h2>
+    <p>{user.bio}</p>
+  </section>
+</template>
+
+<script client>
+export default class WriteBarrierDemo {
+  user = { name: "anon", bio: "none" };
+
+  setName(n: string) {
+    this.user.name = n;
+  }
+
+  setViaAlias(n: string) {
+    const u = this.user;
+    u.name = n;
+  }
+}
+</script>

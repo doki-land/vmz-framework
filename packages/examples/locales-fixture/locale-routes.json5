@@ -1,0 +1,19 @@
+{
+  routes: [
+    { routeId: 'account.index', path: '/account' },
+    { routeId: 'account.profile', path: '/account/profile' },
+  ],
+  origin: 'https://example.test',
+  titles: {
+    'account.index': {
+      'zh-hans': '账户',
+      'zh-hant': '帳戶',
+      'en-us': 'Account',
+    },
+    'account.profile': {
+      'zh-hans': '个人资料',
+      'zh-hant': '個人資料',
+      'en-us': 'Profile',
+    },
+  },
+}

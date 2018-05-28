@@ -1,0 +1,37 @@
+{
+    "name": "@vmz/plugin-katex",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "VMZ KaTeX adapter - <Katex> + math engine registration",
+    "license": "MIT",
+    "main": "./vmz.plugin.ts",
+    "types": "./vmz.plugin.ts",
+    "exports": {
+        ".": {
+            "types": "./vmz.plugin.ts",
+            "default": "./vmz.plugin.ts"
+        },
+        "./runtime": {
+            "types": "./runtime.ts",
+            "default": "./runtime.ts"
+        }
+    },
+    "dependencies": {
+        "@vmz/plugin": "workspace:*"
+    },
+    "peerDependencies": {
+        "katex": ">=0.16"
+    },
+    "peerDependenciesMeta": {
+        "katex": {
+            "optional": false
+        }
+    },
+    "keywords": [
+        "vmz",
+        "plugin",
+        "katex",
+        "math"
+    ]
+}

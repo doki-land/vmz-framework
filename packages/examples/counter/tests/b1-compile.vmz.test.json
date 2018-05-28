@@ -1,0 +1,27 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "b1.compile.counter",
+    "title": "B1: CounterButton Direct leaf + Index api.component",
+    "modes": ["compile"],
+    "program": {
+        "chunkId": "components/CounterButton",
+        "unitName": "CounterButton"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "graph",
+            "expect": {
+                "direct": true,
+                "create": true,
+                "noRender": true,
+                "includes": "api.bindText(this,"
+            }
+        }
+    ]
+}

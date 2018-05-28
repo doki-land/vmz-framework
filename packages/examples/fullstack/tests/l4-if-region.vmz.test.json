@@ -1,0 +1,29 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "l4.logic.if.region",
+    "title": "L4: if host data-vmz-region",
+    "modes": ["logic"],
+    "program": {
+        "chunkId": "components/BranchDemo",
+        "unitName": "BranchDemo"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "mount"
+        }
+    ],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "exists",
+            "expect": {
+                "selector": "[data-vmz-if][data-vmz-region]"
+            }
+        }
+    ]
+}

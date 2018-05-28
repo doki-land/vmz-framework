@@ -1,0 +1,46 @@
+# Trusted Publisher 合同（与 npm trust / placeholder:trust 对齐）：
+#   file = release-npm.yml
+#   repo = doki-land/vmz-framework
+#   env  = NPM_PUBLISH
+#
+# 仓库需存在同名 GitHub Environment（Settings → Environments → NPM_PUBLISH）。
+# 本 workflow 不使用 NPM_TOKEN；鉴权走 OIDC（permissions.id-token: write）。
+
+name: Release npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  release:
+    name: Trusted Publisher smoke / placeholder publish
+    runs-on: ubuntu-latest
+    environment: NPM_PUBLISH
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+
+      - name: Ensure npm supports Trusted Publishing
+        run: npm install -g npm@latest
+
+      - name: Show toolchain
+        run: |
+          node -v
+          npm -v
+          echo "GITHUB_REF=$GITHUB_REF"
+          echo "GITHUB_ENVIRONMENT=$GITHUB_ENVIRONMENT"
+
+      - name: Publish / prove OIDC
+        run: node scripts/ci-release-npm.mjs

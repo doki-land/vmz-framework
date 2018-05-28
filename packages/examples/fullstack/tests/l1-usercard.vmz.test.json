@@ -1,0 +1,35 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "l1.view.usercard",
+    "title": "L1: UserCard native view + if/each Direct",
+    "modes": ["compile"],
+    "program": {
+        "chunkId": "components/UserCard",
+        "unitName": "UserCard"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "view",
+            "expect": {
+                "status": "native",
+                "nonEmptyRoots": true,
+                "kinds": ["if", "element"],
+                "hasEach": true
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "graph",
+            "expect": {
+                "direct": true,
+                "includesAll": ["api.ifBlock(this,", "api.eachBlock(this,"]
+            }
+        }
+    ]
+}

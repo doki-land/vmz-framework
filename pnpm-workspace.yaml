@@ -1,3 +1,7 @@
 packages:
-  - 'runtimes/*'
-  - 'examples/*'
+  - 'packages/examples/*'
+  - 'packages/runtimes/*'
+  - 'packages/editors/*'
+  - 'packages/plugins/*'
+  - 'packages/ui/*'
+  - 'packages/homepage'

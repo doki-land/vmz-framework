@@ -1,0 +1,19 @@
+[package]
+name = "vmz-plugin-tailwind"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "VMZ TW style plugin: style:tw / designs → tailwind-rs → CSS (compiler-side)"
+publish = false
+
+[dependencies]
+oxc_diagnostics.workspace = true
+oxc_span.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+thiserror.workspace = true
+vmz-compiler.workspace = true
+# Neutral TW engine from tailwind-rs `dev` (not a path checkout).
+tailwind = { git = "https://github.com/oovm/tailwind-rs.git", branch = "dev" }
+tailwind-css = { git = "https://github.com/oovm/tailwind-rs.git", branch = "dev" }

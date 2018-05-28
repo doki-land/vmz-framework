@@ -1,0 +1,374 @@
+// @ts-nocheck
+/**
+ * Node CLI command implementations (N2).
+ */
+
+import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { HOST_PROTOCOL, createWorkspace, getProtocolVersions } from './index.js';
+import { createDevSession } from './dev-session.js';
+import { log } from './log.js';
+import { readPackageMeta, resolveWorkspaceDirs } from './resolve.js';
+import { cmdTest } from './test-cmd.js';
+import { cmdDocument } from './document-cmd.js';
+import { buildIntegratedDocuments, projectHasDocuments } from './document-integrate.js';
+import { cmdLocale } from './locale-cmd.js';
+import { cmdApplication } from './application-cmd.js';
+import { cmdRefactor } from './refactor-cmd.js';
+import { cmdExplain } from './explain-cmd.js';
+
+/**
+ * @param {string[]} argv
+ */
+export function parseArgs(argv) {
+    /** @type {Record<string, string | boolean> & { _: string[] }} */
+    const out = { _: [] };
+    for (let i = 0; i < argv.length; i++) {
+        const a = argv[i];
+        if (a === '--') {
+            out._.push(...argv.slice(i + 1));
+            break;
+        }
+        if (a.startsWith('--')) {
+            const eq = a.indexOf('=');
+            if (eq !== -1) {
+                out[a.slice(2, eq)] = a.slice(eq + 1);
+                continue;
+            }
+            const key = a.slice(2);
+            const next = argv[i + 1];
+            if (next && !next.startsWith('-')) {
+                out[key] = next;
+                i += 1;
+            } else {
+                out[key] = true;
+            }
+            continue;
+        }
+        if (a.startsWith('-') && a.length === 2) {
+            const key = a === '-o' ? 'out-dir' : a.slice(1);
+            const next = argv[i + 1];
+            if (next && !next.startsWith('-')) {
+                out[key] = next;
+                i += 1;
+            } else {
+                out[key] = true;
+            }
+            continue;
+        }
+        out._.push(a);
+    }
+    return out;
+}
+
+export function printHelp() {
+    console.log(`vmz — Node toolchain host (N-API workspace)
+
+Usage:
+  vmz check [path]              Check project via Workspace
+  vmz build [path] [options]    Build project via Workspace
+  vmz serve [path] [options]    Serve dist (optional --build)
+  vmz dev [path] [options]      Long-lived rebuild session (no CLI spawn)
+  vmz format [path] [--check]   Format .vmz via N-API (oxc codegen)
+  vmz lint [path] [--deny-warnings]  Lint (= check) via N-API
+  vmz test [path] [options]     Native test discover / report (T0+)
+  vmz document|docs <cmd>       Project /documents domain (D0: check)
+  vmz application <cmd>         Application Collection / Mount (M0–M5)
+  vmz refactor <cmd>            DX rename plans / apply (X1)
+  vmz explain [style] <target>  DX causal explain (style Theme chain)
+  vmz version                   Show host + native protocol versions
+  vmz help                      Show this help
+
+Options:
+  --out-dir, -o <dir>   Output directory (default: dist)
+  --release             Release build (build only)
+  --host <host>         Listen host (default: 127.0.0.1)
+  --port <port>         Listen port (default: 5173)
+  --poll-ms <ms>        Dev watch poll interval (default: 300)
+  --build               Build before serve
+  --check               Format check-only (format)
+  --deny-warnings       Treat warnings as errors (lint)
+  --list                List discovered tests (test)
+  --json [file]         Emit TestReport / DocumentManifest / ApplicationCheckReport JSON
+  --mode <modes>        compile|logic|browser|ssr|resume|deployment|all (test)
+  --filter <pattern>    Filter by test id or file (test)
+  --application <id>    Run only tests for ApplicationId (standalone scope)
+  --mounted <id>        Run relocation + host-boundary tests for ApplicationId
+  --affected            Select tests from dirty VPG units (test; DX)
+  --root <dir>          Project root (document check)
+  --strict              Strict document locale/PageKey coverage (document check)
+`);
+}
+
+/**
+ * @param {string[]} argv
+ * @returns {Promise<number>}
+ */
+export async function runCli(argv) {
+    const [cmd, ...rest] = argv;
+    if (!cmd || cmd === 'help' || cmd === '-h' || cmd === '--help') {
+        printHelp();
+        return 0;
+    }
+    if (cmd === 'version' || cmd === '-V' || cmd === '--version') {
+        return cmdVersion();
+    }
+
+    const args = parseArgs(rest);
+    switch (cmd) {
+        case 'check':
+            return cmdCheck(args);
+        case 'build':
+            return cmdBuild(args);
+        case 'serve':
+            return cmdServe(args);
+        case 'dev':
+            return cmdDev(args);
+        case 'format':
+            return cmdFormat(args);
+        case 'lint':
+            return cmdLint(args);
+        case 'test':
+            return cmdTest(args);
+        case 'document':
+        case 'docs':
+            return cmdDocument(rest);
+        case 'locale':
+        case 'locales':
+            return cmdLocale(rest);
+        case 'application':
+        case 'applications':
+        case 'app':
+            return cmdApplication(rest);
+        case 'refactor':
+            return cmdRefactor(rest);
+        case 'explain':
+            return cmdExplain(rest);
+        default:
+            log.error(`unknown command \`${cmd}\``);
+            printHelp();
+            return 1;
+    }
+}
+
+function cmdVersion() {
+    const native = getProtocolVersions();
+    console.log(`vmz host ${HOST_PROTOCOL}`);
+    console.log(
+        `native host=${native.hostProtocol} compiler=${native.compilerProtocol} program_ir=${native.programIrSchema} plugin=${native.pluginProtocol}`,
+    );
+    return 0;
+}
+
+/**
+ * @param {Record<string, string | boolean> & { _: string[] }} args
+ */
+function cmdCheck(args) {
+    const pathArg = args._[0] ?? '.';
+    const { project, outDir } = resolveWorkspaceDirs({
+        path: pathArg,
+        outDir: typeof args['out-dir'] === 'string' ? args['out-dir'] : undefined,
+    });
+    const meta = readPackageMeta(project);
+    log.info(`check ${project}${meta?.name ? ` (${meta.name})` : ''}`);
+    const ws = createWorkspace({ root: project, outDir });
+    try {
+        return runWithPlugins(ws, project, outDir, async () => {
+            const report = ws.check();
+            const errors = log.diagnostics(report.diagnostics ?? []);
+            log.info(`checked ${report.filesChecked} file(s)`);
+            return errors ? 1 : 0;
+        });
+    } finally {
+        ws.dispose();
+    }
+}
+
+/**
+ * @param {import('./index.js').Workspace} ws
+ * @param {string} project
+ * @param {string} outDir
+ * @param {() => Promise<number> | number} fn
+ */
+async function runWithPlugins(ws, project, outDir, fn) {
+    const { loadVmzConfig, applyPlugins } = await import('./plugin-host.js');
+    const { plugins, engines } = await loadVmzConfig(project);
+    if (plugins.length) {
+        await applyPlugins(ws, plugins, { project, outDir, engines });
+    }
+    return await fn();
+}
+
+/**
+ * @param {Record<string, string | boolean> & { _: string[] }} args
+ */
+async function cmdBuild(args) {
+    const pathArg = args._[0] ?? '.';
+    const { project, outDir } = resolveWorkspaceDirs({
+        path: pathArg,
+        outDir: typeof args['out-dir'] === 'string' ? args['out-dir'] : undefined,
+    });
+    log.info(`build ${project} → ${outDir}`);
+    const ws = createWorkspace({ root: project, outDir });
+    try {
+        const code = await runWithPlugins(ws, project, outDir, () => {
+            const report = ws.build(Boolean(args.release));
+            const errors = log.diagnostics(report.diagnostics ?? []);
+            if (errors) return 1;
+            for (const p of report.emitted ?? []) {
+                console.log(`emitted ${p}`);
+            }
+            log.info(`build ok (${(report.emitted ?? []).length} file(s))`);
+            return 0;
+        });
+        if (code !== 0) return code;
+        if (projectHasDocuments(project)) {
+            const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
+            if (!docs.ok) return 1;
+        }
+        return 0;
+    } finally {
+        ws.dispose();
+    }
+}
+
+/**
+ * @param {Record<string, string | boolean> & { _: string[] }} args
+ */
+async function cmdServe(args) {
+    const pathArg = args._[0] ?? '.';
+    if (args.build) {
+        const code = await cmdBuild(args);
+        if (code !== 0) return code;
+    }
+    const { project, outDir } = resolveWorkspaceDirs({
+        path: pathArg,
+        outDir: typeof args['out-dir'] === 'string' ? args['out-dir'] : undefined,
+    });
+    const hostJs = path.join(outDir, 'vmz-serve-host.mjs');
+    if (!existsSync(hostJs)) {
+        log.error(`missing ${hostJs} — run \`vmz build\` first (or pass --build)`);
+        return 1;
+    }
+    const host = typeof args.host === 'string' ? args.host : '127.0.0.1';
+    const port = Number(args.port ?? 5173);
+    log.info(`serve http://${host}:${port}`);
+    const node = process.env.VMZ_NODE || process.execPath;
+    const child = spawn(node, [hostJs], {
+        cwd: project,
+        env: {
+            ...process.env,
+            VMZ_DIST: outDir,
+            VMZ_PORT: String(port),
+            VMZ_HOST: host,
+        },
+        stdio: 'inherit',
+    });
+
+    return await new Promise((resolve) => {
+        const shutdown = () => {
+            child.kill();
+        };
+        process.once('SIGINT', shutdown);
+        process.once('SIGTERM', shutdown);
+        child.on('exit', (code, signal) => {
+            process.off('SIGINT', shutdown);
+            process.off('SIGTERM', shutdown);
+            if (signal) resolve(0);
+            else resolve(code ?? 1);
+        });
+    });
+}
+
+/**
+ * @param {Record<string, string | boolean> & { _: string[] }} args
+ */
+async function cmdDev(args) {
+    const pathArg = args._[0] ?? '.';
+    const { project, outDir } = resolveWorkspaceDirs({
+        path: pathArg,
+        outDir: typeof args['out-dir'] === 'string' ? args['out-dir'] : undefined,
+    });
+    const host = typeof args.host === 'string' ? args.host : '127.0.0.1';
+    const port = Number(args.port ?? 5173);
+    const pollMs = Number(args['poll-ms'] ?? 300);
+
+    const ac = new AbortController();
+    const onSig = () => {
+        log.info('shutting down…');
+        ac.abort();
+    };
+    process.on('SIGINT', onSig);
+    process.on('SIGTERM', onSig);
+
+    const session = createDevSession({
+        project,
+        outDir,
+        host,
+        port,
+        pollMs,
+        signal: ac.signal,
+    });
+
+    try {
+        await session.start();
+        return 0;
+    } catch (err) {
+        if (ac.signal.aborted) return 0;
+        log.error(String(err));
+        return 1;
+    } finally {
+        process.off('SIGINT', onSig);
+        process.off('SIGTERM', onSig);
+        await session.stop();
+    }
+}
+
+/**
+ * @param {Record<string, string | boolean> & { _: string[] }} args
+ */
+function cmdFormat(args) {
+    const pathArg = args._[0] ?? '.';
+    const { project, outDir } = resolveWorkspaceDirs({
+        path: pathArg,
+        outDir: typeof args['out-dir'] === 'string' ? args['out-dir'] : undefined,
+    });
+    const checkOnly = Boolean(args.check);
+    log.info(`format ${project}${checkOnly ? ' --check' : ''}`);
+    const ws = createWorkspace({ root: project, outDir });
+    try {
+        const report = ws.format(checkOnly);
+        const errors = log.diagnostics(report.diagnostics ?? []);
+        if (checkOnly) {
+            log.info(`checked ${report.filesChecked} file(s); ${report.filesNeedWrite} need write`);
+            return errors || report.filesNeedWrite > 0 ? 1 : 0;
+        }
+        log.info(`formatted ${report.filesWritten}/${report.filesChecked} file(s)`);
+        return errors ? 1 : 0;
+    } finally {
+        ws.dispose();
+    }
+}
+
+/**
+ * @param {Record<string, string | boolean> & { _: string[] }} args
+ */
+function cmdLint(args) {
+    const pathArg = args._[0] ?? '.';
+    const { project, outDir } = resolveWorkspaceDirs({
+        path: pathArg,
+        outDir: typeof args['out-dir'] === 'string' ? args['out-dir'] : undefined,
+    });
+    const denyWarnings = Boolean(args['deny-warnings']);
+    log.info(`lint ${project}`);
+    const ws = createWorkspace({ root: project, outDir });
+    try {
+        const report = ws.lint(denyWarnings);
+        const errors = log.diagnostics(report.diagnostics ?? [], { denyWarnings });
+        log.info(`linted ${report.filesChecked} file(s)`);
+        return errors ? 1 : 0;
+    } finally {
+        ws.dispose();
+    }
+}

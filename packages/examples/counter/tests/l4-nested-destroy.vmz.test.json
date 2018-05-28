@@ -1,0 +1,48 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "l4.logic.nested.destroy",
+    "title": "L4: nested CounterButton destroyed with parent Index",
+    "modes": ["logic"],
+    "program": {
+        "chunkId": "pages/index",
+        "unitName": "IndexPage",
+        "components": {
+            "CounterButton": "components/CounterButton"
+        }
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "mount"
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "capture_child",
+            "selector": "[data-vmz=\"CounterButton\"]"
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "destroy"
+        }
+    ],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "childDestroyed",
+            "expect": {
+                "value": true
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "destroyed",
+            "expect": {
+                "value": true
+            }
+        }
+    ]
+}

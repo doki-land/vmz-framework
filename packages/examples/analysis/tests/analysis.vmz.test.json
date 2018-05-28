@@ -1,0 +1,71 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "analysis.fieldrw.opaque",
+    "title": "Analysis: graph + FieldRw / opaque / array_destructure / closure",
+    "modes": ["compile"],
+    "program": {
+        "chunkId": "app",
+        "unitName": "App"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "analysis",
+            "expect": {
+                "exactMin": 0,
+                "widenedOrUnknownMin": 1
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "reactive",
+            "expect": {
+                "effect": "rename",
+                "writesInclude": "user.name"
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "reactive",
+            "expect": {
+                "effect": "onOpaque",
+                "opaqueCallee": true
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "graph",
+            "expect": {
+                "unknownsVia": "effect:onOpaque",
+                "unknownReason": "opaque_callee",
+                "unknownReasonNot": "ir_unknown"
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "reactive",
+            "expect": {
+                "effect": "onArray",
+                "starReasons": [
+                    {
+                        "field": "tags",
+                        "reason": "array_destructure"
+                    }
+                ]
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "reactive",
+            "expect": {
+                "effect": "onClick",
+                "writesInclude": "user.bio"
+            }
+        }
+    ]
+}

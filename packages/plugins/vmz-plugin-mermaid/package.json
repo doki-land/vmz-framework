@@ -1,0 +1,32 @@
+{
+    "name": "@vmz/plugin-mermaid",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "VMZ Mermaid diagram adapter - <Mermaid>",
+    "license": "MIT",
+    "main": "./vmz.plugin.ts",
+    "types": "./vmz.plugin.ts",
+    "exports": {
+        ".": {
+            "types": "./vmz.plugin.ts",
+            "default": "./vmz.plugin.ts"
+        },
+        "./runtime": {
+            "types": "./runtime.ts",
+            "default": "./runtime.ts"
+        }
+    },
+    "dependencies": {
+        "@vmz/plugin": "workspace:*"
+    },
+    "peerDependencies": {
+        "mermaid": ">=11"
+    },
+    "keywords": [
+        "vmz",
+        "plugin",
+        "mermaid",
+        "diagram"
+    ]
+}

@@ -1,0 +1,39 @@
+<template>
+  <div class="monaco-host" data-vmz-monaco style="min-height: 240px; width: 100%"></div>
+</template>
+
+<script client>
+import { mountMonaco } from '@vmz/plugin-monaco/runtime';
+
+export default class Monaco {
+  public value: string = '';
+  public language: string = 'typescript';
+  public theme: string = 'vs-dark';
+  public readOnly: boolean = false;
+
+  #api: { dispose: () => void } | null = null;
+
+  async onMount() {
+    const root = this.__vmzDomRoot;
+    const el =
+      (root && root.nodeType === 1 && root.matches?.('[data-vmz-monaco]') && root) ||
+      root?.querySelector?.('[data-vmz-monaco]') ||
+      root;
+    if (!el || el.nodeType !== 1) return;
+    this.#api = await mountMonaco(el, {
+      value: this.value,
+      language: this.language,
+      theme: this.theme,
+      readOnly: this.readOnly,
+      onChange: (v) => {
+        this.value = v;
+      },
+    });
+  }
+
+  onDestroy() {
+    this.#api?.dispose();
+    this.#api = null;
+  }
+}
+</script>

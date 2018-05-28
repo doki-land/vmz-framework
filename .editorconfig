@@ -1,11 +1,18 @@
+# Align with biome.json (JetBrains / VS Code / Cursor).
+# Without this file, IDEs keep rewriting indentation against biome.
+
+root = true
+
 [*]
 charset = utf-8
-
-
-[*.pest]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
 indent_style = space
 indent_size = 4
 
-[*.toml]
-indent_style = space
-indent_size = 4
+[*.{yml,yaml,vue}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false

@@ -1,0 +1,17 @@
+{
+    "schema": "vmz.ui.token_requirements.v0",
+    "package": "@vmz/ui",
+    "cssVar": {
+        "prefix": "--vmz-",
+        "fromDotted": "split on '.' then join with '-'"
+    },
+    "forbiddenBrandHex": ["#176BFF", "#0D57DB", "#FFB000", "#00C878", "#121416"],
+    "components": {
+        "Button": {
+            "source": "src/components/Button.vmz",
+            "stableHint": "ui.Button",
+            "tokens": ["action.primary.background", "action.primary.foreground", "action.primary.hover", "action.primary.active", "focus.ring"],
+            "surfaces": ["WebSurface"]
+        }
+    }
+}

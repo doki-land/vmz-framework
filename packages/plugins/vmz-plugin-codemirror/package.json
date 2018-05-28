@@ -1,0 +1,34 @@
+{
+    "name": "@vmz/plugin-codemirror",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "VMZ CodeMirror 6 editor adapter - <Codemirror>",
+    "license": "MIT",
+    "main": "./vmz.plugin.ts",
+    "types": "./vmz.plugin.ts",
+    "exports": {
+        ".": {
+            "types": "./vmz.plugin.ts",
+            "default": "./vmz.plugin.ts"
+        },
+        "./runtime": {
+            "types": "./runtime.ts",
+            "default": "./runtime.ts"
+        }
+    },
+    "dependencies": {
+        "@vmz/plugin": "workspace:*"
+    },
+    "peerDependencies": {
+        "codemirror": ">=6",
+        "@codemirror/view": ">=6",
+        "@codemirror/state": ">=6"
+    },
+    "keywords": [
+        "vmz",
+        "plugin",
+        "codemirror",
+        "editor"
+    ]
+}

@@ -1,0 +1,11 @@
+<template>
+  <button class="save-button" style:tw="px-4 py-2 bg-action">Save</button>
+</template>
+<style>
+@tailwind {
+  .chip { @apply rounded px-2; }
+}
+</style>
+<script client>
+export default class Application {}
+</script>

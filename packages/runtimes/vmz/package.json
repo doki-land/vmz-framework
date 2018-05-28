@@ -1,0 +1,90 @@
+{
+    "name": "vmz",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "VMZ Node toolchain — N-API workspace session + CLI",
+    "license": "MIT",
+    "bin": {
+        "vmz": "./bin/vmz.js"
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./cli": {
+            "types": "./dist/cli.d.ts",
+            "default": "./dist/cli.js"
+        },
+        "./dev-session": {
+            "types": "./dist/dev-session.d.ts",
+            "default": "./dist/dev-session.js"
+        },
+        "./plugin-host": {
+            "types": "./dist/plugin-host.d.ts",
+            "default": "./dist/plugin-host.js"
+        },
+        "./bundler-adapter": {
+            "types": "./dist/bundler-adapter.d.ts",
+            "default": "./dist/bundler-adapter.js"
+        },
+        "./test-protocol": {
+            "types": "./dist/test-protocol.d.ts",
+            "default": "./dist/test-protocol.js"
+        },
+        "./test-discover": {
+            "types": "./dist/test-discover.d.ts",
+            "default": "./dist/test-discover.js"
+        },
+        "./document-check": {
+            "types": "./dist/document-check.d.ts",
+            "default": "./dist/document-check.js"
+        },
+        "./document-schema": {
+            "types": "./dist/document-schema.d.ts",
+            "default": "./dist/document-schema.js"
+        }
+    },
+    "dependencies": {
+        "@vmz/plugin": "workspace:*",
+        "@vmz/plugin-markdown-it": "workspace:*",
+        "@vmz/protocol": "workspace:*",
+        "@vmz/test": "workspace:*",
+        "jiti": "^2.6.1",
+        "json5": "^2.2.3",
+        "typescript": "^5.8.3"
+    },
+    "files": [
+        "bin",
+        "dist",
+        "*.node",
+        "README.md"
+    ],
+    "scripts": {
+        "build:native": "node ../../../scripts/build-napi.mjs",
+        "build": "pnpm run build:native && pnpm run build:js",
+        "test": "node ./tests/run-node-tests.mjs",
+        "build:js": "tsc -p tsconfig.json && node ../../../scripts/copy-vmz-public-api.mjs"
+    },
+    "devDependencies": {
+        "@types/node": "^22.15.0",
+        "@vmz/core": "workspace:*",
+        "@vmz/plugin": "workspace:*",
+        "@vmz/plugin-katex": "workspace:*",
+        "@vmz/plugin-shiki": "workspace:*",
+        "linkedom": "^0.18.13",
+        "vmz-plugin-conformance": "workspace:*"
+    },
+    "keywords": [
+        "vmz",
+        "napi",
+        "compiler",
+        "cli"
+    ],
+    "optionalDependencies": {
+        "vmz-win32-x64-msvc": "workspace:*"
+    }
+}

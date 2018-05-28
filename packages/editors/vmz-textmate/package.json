@@ -1,0 +1,49 @@
+{
+    "name": "vmz-textmate",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Shared TextMate grammar for .vmz — VS Code + Shiki (homepage)",
+    "license": "MIT",
+    "exports": {
+        ".": {
+            "types": "./src/index.ts",
+            "default": "./src/index.ts"
+        },
+        "./shiki": {
+            "types": "./src/shiki.ts",
+            "default": "./src/shiki.ts"
+        },
+        "./grammar": "./grammars/vmz.tmLanguage.json",
+        "./grammars/vmz.tmLanguage.json": "./grammars/vmz.tmLanguage.json",
+        "./grammars/vmz-markdown-injection.json": "./grammars/vmz-markdown-injection.json",
+        "./language-configuration.json": "./language-configuration.json"
+    },
+    "files": [
+        "grammars",
+        "language-configuration.json",
+        "src",
+        "fixtures"
+    ],
+    "scripts": {
+        "test": "node ./tests/run-node-tests.mjs"
+    },
+    "devDependencies": {
+        "shiki": "^3.12.2"
+    },
+    "peerDependencies": {
+        "shiki": ">=3"
+    },
+    "peerDependenciesMeta": {
+        "shiki": {
+            "optional": true
+        }
+    },
+    "keywords": [
+        "vmz",
+        "textmate",
+        "shiki",
+        "vscode",
+        "grammar"
+    ]
+}
