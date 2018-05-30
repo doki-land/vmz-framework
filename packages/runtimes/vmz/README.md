@@ -28,21 +28,25 @@ toolchains.
 
 ## One tool, several views of the same program
 
-| Workflow | The question it should answer |
-|---|---|
-| Development | What changed, and which application regions are affected? |
-| Checking | Which state, route, server, or lifetime boundary cannot be proven? |
-| Building | What belongs in browser, SSR, resume, and server output? |
-| Testing | Did the application behave correctly and avoid unrelated work? |
-| Documents | Are project documents connected, localized, and deployable? |
+| Workflow    | The question it should answer                                      |
+|-------------|--------------------------------------------------------------------|
+| Development | What changed, and which application regions are affected?          |
+| Checking    | Which state, route, server, or lifetime boundary cannot be proven? |
+| Building    | What belongs in browser, SSR, resume, and server output?           |
+| Testing     | Did the application behave correctly and avoid unrelated work?     |
+| Documents   | Are project documents connected, localized, and deployable?        |
 
 ### Designed for the npm world
 
-VMZ does not ask users to abandon JavaScript packaging. Node remains the npm, plugin, development-server, and orchestration host. A long-lived N-API bridge connects that ecosystem to Rust and oxc without reducing semantic analysis to a sequence of tiny file transforms.
+VMZ does not ask users to abandon JavaScript packaging. Node remains the npm, plugin, development-server, and
+orchestration host. A long-lived N-API bridge connects that ecosystem to Rust and oxc without reducing semantic analysis
+to a sequence of tiny file transforms.
 
 ### More than pass or fail
 
-The interesting future of the CLI is explanation. A useful compiler should expose the source span, graph edge, owner, deployment boundary, and fallback reason behind a decision. That is a better developer experience than adding more colored output to an opaque build. 🧭
+The interesting future of the CLI is explanation. A useful compiler should expose the source span, graph edge, owner,
+deployment boundary, and fallback reason behind a decision. That is a better developer experience than adding more
+colored output to an opaque build. 🧭
 
 ## License
 

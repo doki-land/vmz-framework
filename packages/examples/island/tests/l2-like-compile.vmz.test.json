@@ -1,7 +1,7 @@
 {
     "schema": "vmz.test.manifest.v0",
     "id": "l2.compile.like.ternary",
-    "title": "L2: LikeButton ternary Direct",
+    "title": ": LikeButton ternary Direct",
     "modes": ["compile"],
     "program": {
         "chunkId": "components/LikeButton",

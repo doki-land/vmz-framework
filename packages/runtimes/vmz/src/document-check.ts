@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * Build DocumentManifest + run D0 / --strict checks.
+ * Build DocumentManifest + run / --strict checks.
  */
 
 import fs from 'node:fs';
@@ -46,7 +46,7 @@ export function loadDocumentsConfig(documentsRoot) {
 }
 
 /**
- * D0: only declaration objects — no arbitrary hooks.
+ *: only declaration objects — no arbitrary hooks.
  * @param {string} raw
  * @param {string} filename
  */
@@ -97,7 +97,7 @@ export function checkDocuments(opts) {
         diagnostics.push({
             code: DIAG.CONFIG_MISSING,
             severity: strict ? 'error' : 'warning',
-            message: 'documents.config.json|ts missing; D0 requires defaultLocale + locales for strict coverage checks',
+            message: 'documents.config.json|ts missing; strict mode requires defaultLocale + locales for strict coverage checks',
             path: documentsRoot,
         });
     }
@@ -190,7 +190,7 @@ export function checkDocuments(opts) {
         }
     }
 
-    // D0: no silent whole-page fallback by default
+    // no silent whole-page fallback by default
     if (config && config.fallback === true) {
         diagnostics.push({
             code: DIAG.FALLBACK_SILENT,

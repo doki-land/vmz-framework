@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 
-use anyhow::{Context, Result, bail};
 use clap::Args as ClapArgs;
+use vmz_compiler::{Result, ResultExt, bail};
 
 #[derive(Debug, ClapArgs)]
 pub struct Args {
@@ -46,7 +46,7 @@ pub fn run(args: Args) -> Result<()> {
     eprintln!("vmz serve — {} (http://{}:{})", host_js.display(), args.host, args.port);
 
     let mut child = spawn_host(&project, &dist, &args.host, args.port)?;
-    let status = child.wait().with_context(|| "wait for vmz-serve-host")?;
+    let status = child.wait().context("wait for vmz-serve-host")?;
     if !status.success() {
         bail!("vmz serve failed: {status}");
     }

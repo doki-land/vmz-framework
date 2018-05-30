@@ -1,7 +1,7 @@
 {
     "schema": "vmz.test.manifest.v0",
     "id": "counter.ssr.stream.cancel",
-    "title": "T2 stream SSR: AbortSignal stops yields; pull delay is backpressure",
+    "title": " stream SSR: AbortSignal stops yields; pull delay is backpressure",
     "modes": ["ssr"],
     "program": {
         "chunkId": "components/CounterButton",

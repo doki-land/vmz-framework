@@ -1,7 +1,6 @@
 // @ts-nocheck
 /**
- * Plugin protocol v1 helpers (N3) + typed config loading.
- * Design: 瑙勫垝璁捐/vmz/14-Node-NAPI涓庢彃浠跺涓?md
+ * Plugin protocol v1 helpers + typed config loading.
  */
 
 import { existsSync } from 'node:fs';
@@ -164,7 +163,7 @@ export async function applyPlugins(workspace, plugins, opts) {
 }
 
 /**
- * Only math/code/markdown register interchangeable engines (see design doc 23 §1.1).
+ * Only math/code/markdown register interchangeable engines (see design .
  * @param {{ code: Set<string>, math: Set<string>, markdown: Set<string> }} registered
  * @param {any} item
  */

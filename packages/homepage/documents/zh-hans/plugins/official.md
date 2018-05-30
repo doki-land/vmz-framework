@@ -2,19 +2,20 @@
 
 媒体 / 文档 / 编辑类有引擎阻抗，由官方维护。
 
-| 包                       | 作者表面                                | 说明 |
-|--------------------------|-----------------------------------------|------|
-| `@vmz/plugin`            | `definePlugin` / `defineConfig`         | 协议 |
+| 包                       | 作者表面                                | 说明           |
+|--------------------------|-----------------------------------------|----------------|
+| `@vmz/plugin`            | `definePlugin` / `defineConfig`         | 协议           |
 | `@vmz/plugin-katex`      | `<Katex>` / `<Math engine="katex">`     | `engines.math` |
 | `@vmz/plugin-mathjax`    | `<Mathjax>` / `<Math engine="mathjax">` | `engines.math` |
 | `@vmz/plugin-shiki`      | `<Shiki>` / `<Code engine="shiki">`     | `engines.code` |
-| `@vmz/plugin-monaco`     | `<Monaco>`                              | 具体组件 |
-| `@vmz/plugin-codemirror` | `<Codemirror>`                          | 具体组件 |
-| `@vmz/plugin-mermaid`    | `<Mermaid>`                             | 具体组件 |
-| `@vmz/plugin-echarts`    | `<Echarts>`                             | 具体组件 |
-| `@vmz/plugin-iconify`    | `<Iconify>`                             | 具体组件 |
+| `@vmz/plugin-monaco`     | `<Monaco>`                              | 具体组件       |
+| `@vmz/plugin-codemirror` | `<Codemirror>`                          | 具体组件       |
+| `@vmz/plugin-mermaid`    | `<Mermaid>`                             | 具体组件       |
+| `@vmz/plugin-echarts`    | `<Echarts>`                             | 具体组件       |
+| `@vmz/plugin-iconify`    | `<Iconify>`                             | 具体组件       |
 
-**引擎槽仅 math / code：** 只有公式与代码高亮合同够同质，才 materialize `<Math>` / `<Code>`。Monaco、Mermaid、ECharts、Iconify 能力参差大，直接用组件名，不做 `<Editor>` / `<Diagram>` / `<Chart>` / `<Icon>` facade。
+**引擎槽仅 math / code：** 只有公式与代码高亮合同够同质，才 materialize `<Math>` / `<Code>`。Monaco、Mermaid、ECharts、Iconify
+能力参差大，直接用组件名，不做 `<Editor>` / `<Diagram>` / `<Chart>` / `<Icon>` facade。
 
 **与 DaVinci：** ECharts / Mermaid 是 VMZ 媒体组件；DaVinci 平行且未稳，产品图表优先 `<Echarts>`。
 

@@ -1,4 +1,4 @@
-//! NativeAppHost / WebView deployment contracts (doc 27 · NW0).
+//! NativeAppHost / WebView deployment contracts .
 //!
 //! Freezes WebViewDeploymentProfile, NativeCapability, bridge protocol,
 //! application identity, and security/version fields.
@@ -15,26 +15,26 @@ pub const BRIDGE_PROTOCOL_SCHEMA: &str = "vmz.native_host.bridge.v0";
 pub const APPLICATION_IDENTITY_SCHEMA: &str = "vmz.native_host.application_identity.v0";
 pub const NATIVE_HOST_CHECK_SCHEMA: &str = "vmz.native_host.check.v0";
 
-/// NW1: minimal WebView shell + local bundled entry contract.
+/// minimal WebView shell + local bundled entry contract.
 pub const SHELL_SCHEMA: &str = "vmz.native_host.shell.v0";
 pub const SHELL_CHECK_SCHEMA: &str = "vmz.native_host.shell_check.v0";
 pub const DEEP_LINK_SCHEMA: &str = "vmz.native_host.deep_link.v0";
 pub const LOCAL_BUNDLE_SCHEMA: &str = "vmz.native_host.local_bundle.v0";
 
-/// NW2: typed capability call + permission / nonce / cancel / trace.
+/// typed capability call + permission / nonce / cancel / trace.
 pub const CAPABILITY_CALL_SCHEMA: &str = "vmz.native_host.capability_call.v0";
 pub const BRIDGE_TRACE_SCHEMA: &str = "vmz.native_host.bridge_trace.v0";
 pub const BRIDGE_STUB_CATALOG_SCHEMA: &str = "vmz.native_host.bridge_stub_catalog.v0";
 pub const BRIDGE_CHECK_SCHEMA: &str = "vmz.native_host.bridge_check.v0";
 
-/// NW3: app lifecycle + persistence + update/offline policies.
+/// app lifecycle + persistence + update/offline policies.
 pub const LIFECYCLE_SCHEMA: &str = "vmz.native_host.lifecycle.v0";
 pub const PERSISTENCE_SCHEMA: &str = "vmz.native_host.persistence.v0";
 pub const UPDATE_POLICY_SCHEMA: &str = "vmz.native_host.update_policy.v0";
 pub const OFFLINE_POLICY_SCHEMA: &str = "vmz.native_host.offline_policy.v0";
 pub const LIFECYCLE_CHECK_SCHEMA: &str = "vmz.native_host.lifecycle_check.v0";
 
-/// NW4: SSR first-paint + #server transport + auth/session + network/delivery.
+/// SSR first-paint + #server transport + auth/session + network/delivery.
 pub const FULLSTACK_SCHEMA: &str = "vmz.native_host.fullstack.v0";
 pub const SSR_FIRST_PAINT_SCHEMA: &str = "vmz.native_host.ssr_first_paint.v0";
 pub const SERVER_TRANSPORT_SCHEMA: &str = "vmz.native_host.server_transport.v0";
@@ -43,7 +43,7 @@ pub const PUSH_POLICY_SCHEMA: &str = "vmz.native_host.push_policy.v0";
 pub const NETWORK_POLICY_SCHEMA: &str = "vmz.native_host.network_policy.v0";
 pub const FULLSTACK_CHECK_SCHEMA: &str = "vmz.native_host.fullstack_check.v0";
 
-/// NW5: NativeSurfaceId + ownership / lifetime contract.
+/// NativeSurfaceId + ownership / lifetime contract.
 pub const NATIVE_SURFACE_SCHEMA: &str = "vmz.native_host.native_surface.v0";
 pub const NATIVE_SURFACE_ID_SCHEMA: &str = "vmz.native_host.native_surface_id.v0";
 pub const NATIVE_SURFACE_BOUNDARY_SCHEMA: &str = "vmz.native_host.native_surface_boundary.v0";
@@ -56,10 +56,10 @@ pub const DIAG_IMPLICIT_STATE_SHARE: &str = "vmz::native_host::implicit_state_sh
 pub const DIAG_SURFACE_IS_CAPABILITY: &str = "vmz::native_host::surface_is_capability";
 pub const DIAG_SURFACE_IS_SEMANTIC_TRUTH: &str = "vmz::native_host::surface_is_semantic_truth";
 
-/// NW5 first high-value surface kinds (doc 27 §10).
+/// first high-value surface kinds .
 pub const HIGH_VALUE_SURFACE_KINDS: &[&str] = &["camera", "map", "video"];
 
-/// NW6: iOS/Android share one Host Profile contract set (algebraic — no real Xcode/Gradle).
+/// iOS/Android share one Host Profile contract set (algebraic — no real Xcode/Gradle).
 pub const MULTI_PLATFORM_SCHEMA: &str = "vmz.native_host.multi_platform.v0";
 pub const MULTI_PLATFORM_SHARED_SCHEMA: &str = "vmz.native_host.multi_platform_shared.v0";
 pub const MULTI_PLATFORM_ADAPTER_SCHEMA: &str = "vmz.native_host.multi_platform_adapter.v0";
@@ -70,10 +70,10 @@ pub const DIAG_MISSING_PLATFORM_ADAPTER: &str = "vmz::native_host::missing_platf
 pub const DIAG_PLATFORM_PRIVATE_SCHEMA: &str = "vmz::native_host::platform_private_schema";
 pub const DIAG_ADAPTER_IS_SEMANTIC_CORE: &str = "vmz::native_host::adapter_is_semantic_core";
 
-/// Platforms that must share one bridge/surface/deployment/test contract (doc 27 §10 NW6).
+/// Platforms that must share one bridge/surface/deployment/test contract .
 pub const REQUIRED_MULTI_PLATFORMS: &[&str] = &["ios", "android"];
 
-/// NW6 adapter kind — packaging stub only; real Xcode/Gradle are later packaging/conformance.
+/// adapter kind — packaging stub only; real Xcode/Gradle are later packaging/conformance.
 pub const MULTI_PLATFORM_ADAPTER_KIND: &str = "packaging_stub";
 
 pub const DIAG_MISSING_SSR_FIRST_PAINT: &str = "vmz::native_host::missing_ssr_first_paint";
@@ -92,7 +92,7 @@ pub const DIAG_MISSING_PERSISTENCE: &str = "vmz::native_host::missing_persistenc
 pub const DIAG_MISSING_UPDATE_POLICY: &str = "vmz::native_host::missing_update_policy";
 pub const DIAG_MISSING_OFFLINE_POLICY: &str = "vmz::native_host::missing_offline_policy";
 
-/// Required lifecycle events (doc 27 §5.2).
+/// Required lifecycle events .
 pub const REQUIRED_LIFECYCLE_EVENTS: &[&str] = &[
     "launch",
     "create",
@@ -114,7 +114,7 @@ pub const DIAG_MISSING_TIMEOUT: &str = "vmz::native_host::missing_timeout";
 pub const DIAG_UNKNOWN_STUB: &str = "vmz::native_host::unknown_stub";
 pub const DIAG_CALL_NOT_ALLOWLISTED: &str = "vmz::native_host::call_not_allowlisted";
 
-/// First-batch NativeBacked stubs (doc 27 §10 NW2).
+/// First-batch NativeBacked stubs .
 pub const FIRST_BATCH_STUB_IDS: &[&str] =
     &["camera.capture", "file.pick", "share.send", "storage.get", "storage.set"];
 
@@ -125,7 +125,7 @@ pub const DIAG_REMOTE_ENTRY_DEFAULT: &str = "vmz::native_host::remote_entry_defa
 pub const DIAG_MISSING_DEEP_LINK: &str = "vmz::native_host::missing_deep_link";
 pub const DIAG_MISSING_LOG_POLICY: &str = "vmz::native_host::missing_log_policy";
 
-/// Required shell host hooks for NW1 (doc 27 §10).
+/// Required shell host hooks for .
 pub const REQUIRED_SHELL_HOOKS: &[&str] = &["load", "error", "exit", "deepLink", "log"];
 
 /// Platforms that must share one shell schema (no semantic fork).
@@ -150,22 +150,22 @@ pub struct NativeHostProtocolCatalog {
     pub protocol: String,
     pub documents: Vec<NativeHostDocumentKind>,
     pub diagnostics: Vec<String>,
-    /// Capability classes (doc 27 §4.2).
+    /// Capability classes .
     #[serde(rename = "capabilityClasses")]
     pub capability_classes: Vec<String>,
     /// Forbidden arbitrary-bridge patterns (must fail check).
     #[serde(rename = "forbiddenBridgePatterns")]
     pub forbidden_bridge_patterns: Vec<String>,
-    /// NW2 first-batch capability stub ids.
+    /// first-batch capability stub ids.
     #[serde(rename = "firstBatchStubIds", default)]
     pub first_batch_stub_ids: Vec<String>,
-    /// NW3 required lifecycle events.
+    /// required lifecycle events.
     #[serde(rename = "requiredLifecycleEvents", default)]
     pub required_lifecycle_events: Vec<String>,
-    /// NW5 high-value NativeSurface kinds.
+    /// high-value NativeSurface kinds.
     #[serde(rename = "highValueSurfaceKinds", default)]
     pub high_value_surface_kinds: Vec<String>,
-    /// NW6 platforms that must share one Host Profile contract set.
+    /// platforms that must share one Host Profile contract set.
     #[serde(rename = "requiredMultiPlatforms", default)]
     pub required_multi_platforms: Vec<String>,
 }
@@ -386,7 +386,7 @@ impl NativeHostProtocolCatalog {
     }
 }
 
-/// Patterns that must never be the bridge contract (doc 27 §4).
+/// Patterns that must never be the bridge contract .
 pub const FORBIDDEN_BRIDGE_PATTERNS: &[&str] = &[
     "window.native",
     "window.webkit.messageHandlers",
@@ -578,7 +578,7 @@ pub struct NativeHostDiagnostic {
     pub code: Option<String>,
 }
 
-/// NW0 check report.
+/// check report.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeHostCheckReport {
     pub schema: String,
@@ -656,7 +656,7 @@ pub struct ShellPlatformAdapter {
     pub shell_schema: String,
 }
 
-/// NW1 Native WebView shell manifest (algebraic — not Xcode/Gradle projects).
+/// Native WebView shell manifest (algebraic — not Xcode/Gradle projects).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeWebViewShellManifest {
     pub schema: String,
@@ -710,7 +710,7 @@ impl NativeWebViewShellManifest {
     }
 }
 
-/// NW1 shell check report.
+/// shell check report.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeShellCheckReport {
     pub schema: String,
@@ -885,7 +885,7 @@ impl BridgeStubCatalog {
     }
 }
 
-/// NW2 bridge check report.
+/// bridge check report.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeBridgeCheckReport {
     pub schema: String,
@@ -928,11 +928,11 @@ pub struct UpdatePolicy {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct OfflinePolicy {
     pub schema: String,
-    /// e.g. `bundled_only` | `hybrid_cache` — not `none` for NW3.
+    /// e.g. `bundled_only` | `hybrid_cache` — not `none` for .
     pub mode: String,
 }
 
-/// NW3 NativeAppHost lifecycle policy.
+/// NativeAppHost lifecycle policy.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeAppLifecyclePolicy {
     pub schema: String,
@@ -981,7 +981,7 @@ impl NativeAppLifecyclePolicy {
     }
 }
 
-/// NW3 lifecycle check report.
+/// lifecycle check report.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeLifecycleCheckReport {
     pub schema: String,
@@ -1037,7 +1037,7 @@ pub struct AuthSessionPolicy {
     pub reauth_on_webview_crash: bool,
 }
 
-/// Push capability declaration (stub ok for NW4).
+/// Push capability declaration (stub ok for ).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PushPolicy {
     pub schema: String,
@@ -1055,7 +1055,7 @@ pub struct NetworkPolicy {
     pub allow_cleartext: bool,
 }
 
-/// NW4 NativeAppHost full-stack profile.
+/// NativeAppHost full-stack profile.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeFullstackProfile {
     pub schema: String,
@@ -1116,7 +1116,7 @@ impl NativeFullstackProfile {
     }
 }
 
-/// NW4 fullstack check report.
+/// fullstack check report.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeFullstackCheckReport {
     pub schema: String,
@@ -1144,13 +1144,13 @@ pub struct NativeSurfaceBoundary {
     pub trace_required: bool,
 }
 
-/// NW5 NativeSurface manifest (local Surface driver — not a second semantic core).
+/// NativeSurface manifest (local Surface driver — not a second semantic core).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeSurfaceManifest {
     pub schema: String,
     #[serde(rename = "surfaceId")]
     pub surface_id: String,
-    /// `camera` | `map` | `video` for NW5 first high-value surface.
+    /// `camera` | `map` | `video` for first high-value surface.
     pub kind: String,
     #[serde(rename = "ownerRegionId")]
     pub owner_region_id: String,
@@ -1204,7 +1204,7 @@ impl NativeSurfaceManifest {
     }
 }
 
-/// NW5 native surface check report.
+/// native surface check report.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeSurfaceCheckReport {
     pub schema: String,
@@ -1221,7 +1221,7 @@ impl NativeSurfaceCheckReport {
     }
 }
 
-/// NW6 shared Host Profile schemas — identical for every platform adapter.
+/// shared Host Profile schemas — identical for every platform adapter.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MultiPlatformSharedContracts {
     pub schema: String,
@@ -1256,12 +1256,12 @@ impl MultiPlatformSharedContracts {
     }
 }
 
-/// NW6 platform packaging adapter (stub only — not Xcode/Gradle semantics).
+/// platform packaging adapter (stub only — not Xcode/Gradle semantics).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MultiPlatformAdapter {
     pub schema: String,
     pub platform: String,
-    /// Must be `packaging_stub` for NW6 first version.
+    /// Must be `packaging_stub` for first version.
     pub kind: String,
     #[serde(rename = "bridgeSchema")]
     pub bridge_schema: String,
@@ -1304,7 +1304,7 @@ impl MultiPlatformAdapter {
     }
 }
 
-/// NW6 multi-platform Host Profile freeze (iOS + Android, shared schemas).
+/// multi-platform Host Profile freeze (iOS + Android, shared schemas).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeMultiPlatformManifest {
     pub schema: String,
@@ -1336,7 +1336,7 @@ impl NativeMultiPlatformManifest {
     }
 }
 
-/// NW6 multi-platform check report.
+/// multi-platform check report.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeMultiPlatformCheckReport {
     pub schema: String,

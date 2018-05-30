@@ -25,19 +25,22 @@ It is useful for:
 
 ## What the grammar recognizes
 
-| Surface | Reading benefit |
-|---|---|
+| Surface                            | Reading benefit                                     |
+|------------------------------------|-----------------------------------------------------|
 | Template structure and expressions | Markup remains distinct from embedded program logic |
-| TypeScript blocks | Standard language constructs look familiar |
-| Client and server blocks | Execution boundaries are visually apparent |
-| Style and metadata blocks | Supporting concerns remain easy to scan |
-| Markdown VMZ fences | Documentation examples match editor source |
+| TypeScript blocks                  | Standard language constructs look familiar          |
+| Client and server blocks           | Execution boundaries are visually apparent          |
+| Style and metadata blocks          | Supporting concerns remain easy to scan             |
+| Markdown VMZ fences                | Documentation examples match editor source          |
 
 ## A foundation, not the finish line
 
-TextMate highlighting works in many editors and renderers, which makes it an excellent universal baseline. Semantic diagnostics, graph explanations, safe renames, route intelligence, and boundary proofs belong to richer VMZ language tooling layered above it.
+TextMate highlighting works in many editors and renderers, which makes it an excellent universal baseline. Semantic
+diagnostics, graph explanations, safe renames, route intelligence, and boundary proofs belong to richer VMZ language
+tooling layered above it.
 
-That division gives readers immediate visual clarity today without pretending that colors alone understand the application. ✨
+That division gives readers immediate visual clarity today without pretending that colors alone understand the
+application. ✨
 
 ## Who should care
 

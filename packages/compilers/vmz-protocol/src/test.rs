@@ -1,4 +1,4 @@
-//! Native test protocol (T0) schema ids.
+//! Native test protocol schema ids.
 
 use serde::{Deserialize, Serialize};
 

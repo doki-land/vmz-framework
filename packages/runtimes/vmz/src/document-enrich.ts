@@ -1,7 +1,6 @@
 // @ts-nocheck
 /**
- * Document D1 — enrich manifest with routes, anchors, nav; diagnose links.
- * Design: 规划设计/vmz/19 §5–6
+ * Document — enrich manifest with routes, anchors, nav; diagnose links.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -113,7 +112,7 @@ export function enrichDocumentContent(manifest, ctx) {
             if (!href || href.startsWith('mailto:') || href.startsWith('http://') || href.startsWith('https://')) {
                 continue;
             }
-            // D2 API refs are resolved by evidence, not as page links.
+            // API refs are resolved by evidence, not as page links.
             if (href.startsWith('vmz-api:') || href.startsWith('api:')) {
                 continue;
             }

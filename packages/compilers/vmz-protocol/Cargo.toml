@@ -3,6 +3,7 @@ name = "vmz-protocol"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors.workspace = true
 rust-version.workspace = true
 description = "VMZ versioned wire protocols (host / program / plugin / dx / test / application)"
 publish = false

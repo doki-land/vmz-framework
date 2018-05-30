@@ -1,7 +1,7 @@
 {
     "schema": "vmz.test.manifest.v0",
     "id": "l4.logic.each.dispose",
-    "title": "L4: each key drop disposes DOM",
+    "title": ": each key drop disposes DOM",
     "modes": ["logic"],
     "program": {
         "chunkId": "components/UserCard",

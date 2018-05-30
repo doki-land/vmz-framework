@@ -1,5 +1,5 @@
 /**
- * Discover VMZ native test manifests (T0).
+ * Discover VMZ native test manifests .
  */
 
 import fs from 'node:fs';

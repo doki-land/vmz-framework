@@ -1,7 +1,7 @@
 {
     "schema": "vmz.test.manifest.v0",
     "id": "l1.view.branch",
-    "title": "L1: BranchDemo native view + if Direct",
+    "title": ": BranchDemo native view + if Direct",
     "modes": ["compile"],
     "program": {
         "chunkId": "components/BranchDemo",

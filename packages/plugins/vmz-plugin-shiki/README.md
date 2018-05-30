@@ -34,4 +34,5 @@ plugin should make code easier to understand without becoming a parallel applica
 - **Theme-aware presentation:** technical content can belong to the surrounding design.
 - **Graceful fallback:** source remains readable when rich highlighting is unavailable.
 
-Use Shiki where code itself is part of the product. If users are meant to edit the code, pair the reading experience with CodeMirror or Monaco rather than stretching a highlighter into an editor.
+Use Shiki where code itself is part of the product. If users are meant to edit the code, pair the reading experience
+with CodeMirror or Monaco rather than stretching a highlighter into an editor.

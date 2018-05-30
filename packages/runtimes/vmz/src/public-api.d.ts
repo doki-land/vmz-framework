@@ -17,21 +17,21 @@ export {
     DX_TEST_SELECTION_SCHEMA,
     DX_SOURCE_MAP_SCHEMA,
     DX_SYMBOL_INDEX_SCHEMA,
-    DX_X2_CHECK_SCHEMA,
+    DX_CROSS_SFC_CHECK_SCHEMA,
     DX_SEMANTIC_TRANSACTION_SCHEMA,
     DX_CANCEL_SCHEMA,
     DX_AFFECTED_PREVIEW_SCHEMA,
     DX_HMR_PLAN_SCHEMA,
     DX_BUDGET_SCHEMA,
-    DX_X3_CHECK_SCHEMA,
+    DX_TRANSACTION_CHECK_SCHEMA,
     DX_BOUNDARY_VALIDATOR_SCHEMA,
     DX_LEAKAGE_SCHEMA,
     DX_CAPABILITY_TARGET_SCHEMA,
     DX_DEAD_GRAPH_SCHEMA,
-    DX_X4_CHECK_SCHEMA,
+    DX_DEPLOYMENT_PROOF_CHECK_SCHEMA,
     DX_TRACE_SCHEMA,
     DX_CAUSAL_REPLAY_SCHEMA,
-    DX_X5_CHECK_SCHEMA,
+    DX_CAUSAL_REPLAY_CHECK_SCHEMA,
     APPLICATION_PROTOCOL,
     APPLICATION_DESCRIPTOR_SCHEMA,
     APPLICATIONS_CONFIG_SCHEMA,
@@ -75,6 +75,8 @@ export interface ProtocolVersions {
 export interface WorkspaceOptions {
     root: string;
     outDir?: string;
+    /** Absolute path to `@vmz/core` dist/; Node resolves when omitted. */
+    runtimeDist?: string;
     protocol?: ProtocolVersions;
 }
 
@@ -169,125 +171,125 @@ export interface Workspace {
     /** Affected plan as DX JSON (`vmz.dx.affected.v0`). */
     queryAffectedDx(): string;
 
-    /** X1: plan rename → WorkspaceEditPlan JSON. */
+    /** plan rename → WorkspaceEditPlan JSON. */
     planRename(intentJson: string): string;
 
-    /** X1: atomically apply WorkspaceEditPlan JSON. */
+    /** atomically apply WorkspaceEditPlan JSON. */
     applyWorkspaceEdit(planJson: string): string;
 
-    /** X1: graph→test selection JSON. */
+    /** graph→test selection JSON. */
     selectTestsAffected(): string;
 
-    /** X1: rename causal explain chain JSON. */
+    /** rename causal explain chain JSON. */
     explainRenameChain(intentJson: string): string;
 
-    /** X2: Symbol/Reference/source-map/safe_fix report JSON. */
-    checkDxX2(): string;
+    /** Symbol/Reference/source-map/safe_fix report JSON. */
+    checkCrossSfc(): string;
 
-    /** X2: Symbol index document JSON. */
+    /** Symbol index document JSON. */
     querySymbols(): string;
 
-    /** X2: references for `kind:id`. */
+    /** references for `kind:id`. */
     queryReferences(target: string): string;
 
-    /** X2: CodeAction list JSON. */
+    /** CodeAction list JSON. */
     listCodeActions(): string;
 
-    /** X3: atomic TextEdit batch JSON (`vmz.dx.semantic_transaction.v0`). */
+    /** atomic TextEdit batch JSON (`vmz.dx.semantic_transaction.v0`). */
     applySemanticTransaction(editsJson: string): string;
 
-    /** X3: open analysis/build ticket (`vmz.dx.cancel.v0`). */
+    /** open analysis/build ticket (`vmz.dx.cancel.v0`). */
     beginAnalysis(): string;
 
-    /** X3: cancel analysis ticket. */
+    /** cancel analysis ticket. */
     cancelAnalysis(ticketId: number): string;
 
-    /** X3: affected preview JSON (`vmz.dx.affected_preview.v0`). */
+    /** affected preview JSON (`vmz.dx.affected_preview.v0`). */
     queryAffectedPreview(): string;
 
-    /** X3: HMR plan JSON (`vmz.dx.hmr_plan.v0`). */
+    /** HMR plan JSON (`vmz.dx.hmr_plan.v0`). */
     queryHmrPlan(): string;
 
-    /** X3: route/chunk budget JSON (`vmz.dx.budget.v0`). */
+    /** route/chunk budget JSON (`vmz.dx.budget.v0`). */
     queryBudget(): string;
 
-    /** X3: umbrella incremental DX report (`vmz.dx.x3_check.v0`). */
-    checkDxX3(): string;
+    /** umbrella incremental DX report (`vmz.dx.transaction_check.v0`). */
+    checkTransaction(): string;
 
-    /** X4: boundary validators JSON (`vmz.dx.boundary_validator.v0`). */
+    /** boundary validators JSON (`vmz.dx.boundary_validator.v0`). */
     queryBoundaryValidators(): string;
 
-    /** X4: leakage findings JSON (`vmz.dx.leakage.v0`). */
+    /** leakage findings JSON (`vmz.dx.leakage.v0`). */
     queryLeakage(): string;
 
-    /** X4: capability targets JSON (`vmz.dx.capability_target.v0`). */
+    /** capability targets JSON (`vmz.dx.capability_target.v0`). */
     queryCapabilityTargets(): string;
 
-    /** X4: dead graph JSON (`vmz.dx.dead_graph.v0`). */
+    /** dead graph JSON (`vmz.dx.dead_graph.v0`). */
     queryDeadGraph(): string;
 
-    /** X4: umbrella deployment proof (`vmz.dx.x4_check.v0`). */
-    checkDxX4(): string;
+    /** umbrella deployment proof (`vmz.dx.deployment_proof_check.v0`). */
+    checkDeploymentProof(): string;
 
-    /** X5: ingest StableId trace JSON (`vmz.dx.trace.v0`). */
+    /** ingest StableId trace JSON (`vmz.dx.trace.v0`). */
     ingestRuntimeTrace(traceJson: string): string;
 
-    /** X5: causal replay JSON (`vmz.dx.causal_replay.v0`). */
+    /** causal replay JSON (`vmz.dx.causal_replay.v0`). */
     replayCausal(traceJson: string): string;
 
-    /** X5: umbrella deep-explain report (`vmz.dx.x5_check.v0`). */
-    checkDxX5(): string;
+    /** umbrella deep-explain report (`vmz.dx.causal_replay_check.v0`). */
+    checkCausalReplay(): string;
 
-    /** MP0: target-neutral contract check JSON. */
-    checkMp0TargetContract(): string;
+    /** miniprogram: target-neutral contract check JSON. */
+    checkMiniprogramTargetContract(): string;
 
-    /** P0: HostProfile / DeliveryProfile protocol check JSON. */
-    checkP0ProfileProtocol(): string;
+    /** HostProfile / DeliveryProfile protocol check JSON. */
+    checkHostProfileProtocol(): string;
 
-    /** P1: deterministic Surface/capability/route solver check JSON. */
-    checkP1ProfileSolver(): string;
+    /** deterministic Surface/capability/route solver check JSON. */
+    checkProfileSolver(): string;
 
-    /** P2: Unified Executor algebraic check JSON. */
-    checkP2UnifiedExecutor(): string;
+    /** Unified Executor algebraic check JSON. */
+    checkUnifiedExecutor(): string;
 
-    /** P3: Lifecycle / Recovery algebraic check JSON. */
-    checkP3LifecycleRecovery(): string;
+    /** Lifecycle / Recovery algebraic check JSON. */
+    checkLifecycleRecovery(): string;
 
-    /** P4: Delivery Proof algebraic check JSON. */
-    checkP4DeliveryProof(): string;
+    /** Delivery Proof algebraic check JSON. */
+    checkDeliveryProof(): string;
 
-    /** P5: Cross-Host Conformance algebraic check JSON. */
-    checkP5CrossHostConformance(): string;
+    /** Cross-Host Conformance algebraic check JSON. */
+    checkCrossHostConformance(): string;
 
-    /** P0: profile protocol catalog JSON. */
+    /** profile protocol catalog JSON. */
     queryProfileCatalog(): string;
 
-    /** MP0: target protocol catalog JSON. */
+    /** miniprogram: target protocol catalog JSON. */
     queryTargetCatalog(): string;
 
-    /** NW0: NativeAppHost / WebView contract check JSON. */
-    checkNw0NativeHostContract(): string;
+    /** native: NativeAppHost / WebView contract check JSON. */
+    checkNativeHostContract(): string;
 
-    /** NW0: native-host protocol catalog JSON. */
+    /** native: native-host protocol catalog JSON. */
     queryNativeHostCatalog(): string;
 
-    /** NW1: Native WebView shell contract check JSON. */
-    checkNw1NativeShellContract(): string;
+    /** native: Native WebView shell contract check JSON. */
+    checkNativeShellContract(): string;
 
-    /** NW2: typed Native Capability Bridge contract check JSON. */
-    checkNw2NativeBridgeContract(): string;
+    /** native: typed Native Capability Bridge contract check JSON. */
+    checkNativeBridgeContract(): string;
 
-    /** NW3: NativeAppHost lifecycle contract check JSON. */
-    checkNw3NativeLifecycleContract(): string;
+    /** native: NativeAppHost lifecycle contract check JSON. */
+    checkNativeLifecycleContract(): string;
 
-    /** NW4: NativeAppHost full-stack contract check JSON. */
-    checkNw4NativeFullstackContract(): string;
+    /** native: NativeAppHost full-stack contract check JSON. */
+    checkNativeFullstackContract(): string;
 
-    /** NW5: NativeSurface contract check JSON. */
-    checkNw5NativeSurfaceContract(): string;
+    /** native: NativeSurface contract check JSON. */
+    checkNativeSurfaceContract(): string;
 
-    /** NW6: multi-platform shared Host Profile contract check JSON. */
-    checkNw6MultiPlatformContract(): string;
+    /** native: multi-platform shared Host Profile contract check JSON. */
+    checkMultiPlatformContract(): string;
 
     dispose(): void;
 }
@@ -393,6 +395,9 @@ export function expectedProtocol(): ProtocolVersions;
 
 export function resolveNativePath(): string;
 
+/** Absolute path to `@vmz/core` dist/ (via `@vmz/core/server`), or null. */
+export function resolveCoreRuntimeDist(): string | null;
+
 export function loadNative(): unknown;
 
 export function getProtocolVersions(): ProtocolVersions;
@@ -401,28 +406,28 @@ export function handshake(host?: ProtocolVersions): void;
 
 export function createWorkspace(options: WorkspaceOptions): Workspace;
 
-/** M0: frozen application composition protocol catalog JSON. */
+/** frozen application composition protocol catalog JSON. */
 export function queryApplicationProtocolCatalog(): string;
 
-/** M0: ApplicationCheckReport JSON for host + workspace package roots. */
+/** ApplicationCheckReport JSON for host + workspace package roots. */
 export function checkApplicationsJson(hostRoot: string, packageRoots: string[]): string;
 
-/** M1: ApplicationRelocatableReport JSON for a package root (+ optional relocate base). */
+/** ApplicationRelocatableReport JSON for a package root (+ optional relocate base). */
 export function checkApplicationRelocatableJson(packageRoot: string, relocateBase?: string | null): string;
 
-/** M1: apply ApplicationBase to a logical relocation manifest JSON. */
+/** apply ApplicationBase to a logical relocation manifest JSON. */
 export function relocateApplicationManifestJson(manifestJson: string, base: string): string;
 
-/** M2: ApplicationArtifactBoundaryReport JSON (artifacts + MountTable/Catalog refs). */
+/** ApplicationArtifactBoundaryReport JSON (artifacts + MountTable/Catalog refs). */
 export function checkApplicationArtifactBoundaryJson(hostRoot: string, packageRoots: string[]): string;
 
-/** M3: ApplicationIsolationCheckReport JSON (namespaces + failure containment). */
+/** ApplicationIsolationCheckReport JSON (namespaces + failure containment). */
 export function checkApplicationIsolationJson(hostRoot: string, packageRoots: string[]): string;
 
-/** M4: ApplicationHostCompositionReport JSON (catalog + cross-app Links). */
+/** ApplicationHostCompositionReport JSON (catalog + cross-app Links). */
 export function checkApplicationHostCompositionJson(hostRoot: string, packageRoots: string[]): string;
 
-/** M5: ApplicationDevCheckReport JSON (sessions / affected / proxy / tests / deploy). */
+/** ApplicationDevCheckReport JSON (sessions / affected / proxy / tests / deploy). */
 export function checkApplicationDevTestDeployJson(hostRoot: string, packageRoots: string[], dirtyPaths?: string[]): string;
 
 export function createDevSession(options: DevSessionOptions): DevSession;
@@ -492,7 +497,7 @@ export function targetCatalog(): {
     viewOperations: string[];
 };
 export function queryTargetProtocolCatalog(): string;
-export function checkMp0TargetContractJson(rootPath: string): string;
+export function checkMiniprogramTargetContractJson(rootPath: string): string;
 
 export const PROFILE_PROTOCOL: string;
 export const PROFILE_HOST_SCHEMA: string;
@@ -673,7 +678,7 @@ export function pseudoLocalizeCatalog(input: Record<string, unknown>): Record<st
 export function checkLocaleConformance(input: Record<string, unknown>): Record<string, unknown>;
 
 export function queryProfileProtocolCatalog(): string;
-export function checkP0ProfileProtocolJson(rootPath: string): string;
+export function checkHostProfileProtocolJson(rootPath: string): string;
 
 export const PROFILE_SOLVER_CHECK_SCHEMA: string;
 export const PROFILE_HOST_RESOLUTION_MANIFEST_SCHEMA: string;
@@ -703,9 +708,9 @@ export const PROFILE_DIAG_LIFECYCLE_MAPPING_INCOMPLETE: string;
 export const PROFILE_DIAG_RECOVERY_DUPLICATES_OWNER: string;
 export const PROFILE_DIAG_RECOVERY_ASSUMES_HEAP: string;
 export const PROFILE_DIAG_PERSISTENCE_WINDOW_INVALID: string;
-export function checkP1ProfileSolverJson(rootPath: string): string;
-export function checkP2UnifiedExecutorJson(rootPath: string): string;
-export function checkP3LifecycleRecoveryJson(rootPath: string): string;
+export function checkProfileSolverJson(rootPath: string): string;
+export function checkUnifiedExecutorJson(rootPath: string): string;
+export function checkLifecycleRecoveryJson(rootPath: string): string;
 export const PROFILE_DELIVERY_PACKAGE_CONSTRAINTS_SCHEMA: string;
 export const PROFILE_DELIVERY_SECURITY_POLICY_SCHEMA: string;
 export const PROFILE_DELIVERY_UPDATE_POLICY_SCHEMA: string;
@@ -721,7 +726,7 @@ export const PROFILE_DIAG_PROOF_MANIFEST_INCOMPLETE: string;
 export const PROFILE_DIAG_PROOF_COPIES_SEMANTIC_IR: string;
 export const PROFILE_DIAG_UPDATE_WITHOUT_REPROOF: string;
 export const PROFILE_DIAG_SECURITY_POLICY_INSECURE: string;
-export function checkP4DeliveryProofJson(rootPath: string): string;
+export function checkDeliveryProofJson(rootPath: string): string;
 export const PROFILE_CONFORMANCE_FIXTURE_SCHEMA: string;
 export const PROFILE_CONFORMANCE_STATE_SNAPSHOT_SCHEMA: string;
 export const PROFILE_CONFORMANCE_TRACE_SCHEMA: string;
@@ -734,7 +739,7 @@ export const PROFILE_DIAG_STATE_RESULT_DIVERGENCE: string;
 export const PROFILE_DIAG_TRACE_INVARIANT_BROKEN: string;
 export const PROFILE_DIAG_CONFORMANCE_HOST_INCOMPLETE: string;
 export const PROFILE_DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH: string;
-export function checkP5CrossHostConformanceJson(rootPath: string): string;
+export function checkCrossHostConformanceJson(rootPath: string): string;
 
 export const NATIVE_HOST_PROTOCOL: string;
 export const NATIVE_HOST_WEBVIEW_DEPLOYMENT_SCHEMA: string;
@@ -752,7 +757,7 @@ export function nativeHostCatalog(): {
     forbiddenBridgePatterns: string[];
 };
 export function queryNativeHostProtocolCatalog(): string;
-export function checkNw0NativeHostContractJson(rootPath: string): string;
+export function checkNativeHostContractJson(rootPath: string): string;
 
 export const NATIVE_HOST_SHELL_SCHEMA: string;
 export const NATIVE_HOST_SHELL_CHECK_SCHEMA: string;
@@ -763,7 +768,7 @@ export const NATIVE_HOST_DIAG_PLATFORM_SEMANTIC_FORK: string;
 export const NATIVE_HOST_DIAG_REMOTE_ENTRY_DEFAULT: string;
 export const NATIVE_HOST_DIAG_MISSING_ENTRY_ARTIFACT: string;
 export const NATIVE_HOST_REQUIRED_SHELL_HOOKS: string[];
-export function checkNw1NativeShellContractJson(rootPath: string): string;
+export function checkNativeShellContractJson(rootPath: string): string;
 
 export const NATIVE_HOST_CAPABILITY_CALL_SCHEMA: string;
 export const NATIVE_HOST_BRIDGE_TRACE_SCHEMA: string;
@@ -772,7 +777,7 @@ export const NATIVE_HOST_BRIDGE_CHECK_SCHEMA: string;
 export const NATIVE_HOST_DIAG_MISSING_NONCE: string;
 export const NATIVE_HOST_DIAG_CALL_NOT_ALLOWLISTED: string;
 export const NATIVE_HOST_FIRST_BATCH_STUB_IDS: string[];
-export function checkNw2NativeBridgeContractJson(rootPath: string): string;
+export function checkNativeBridgeContractJson(rootPath: string): string;
 
 export const NATIVE_HOST_LIFECYCLE_SCHEMA: string;
 export const NATIVE_HOST_LIFECYCLE_CHECK_SCHEMA: string;
@@ -780,21 +785,21 @@ export const NATIVE_HOST_DIAG_BACKGROUND_IS_DESTROY: string;
 export const NATIVE_HOST_DIAG_CRASH_ASSUMES_JS_HEAP: string;
 export const NATIVE_HOST_DIAG_MISSING_LIFECYCLE_EVENT: string;
 export const NATIVE_HOST_REQUIRED_LIFECYCLE_EVENTS: string[];
-export function checkNw3NativeLifecycleContractJson(rootPath: string): string;
+export function checkNativeLifecycleContractJson(rootPath: string): string;
 
 export const NATIVE_HOST_FULLSTACK_SCHEMA: string;
 export const NATIVE_HOST_FULLSTACK_CHECK_SCHEMA: string;
 export const NATIVE_HOST_DIAG_BRIDGE_BYPASSES_SERVER: string;
 export const NATIVE_HOST_DIAG_REMOTE_WITHOUT_INTEGRITY: string;
 export const NATIVE_HOST_DIAG_MISSING_SERVER_TRANSPORT: string;
-export function checkNw4NativeFullstackContractJson(rootPath: string): string;
+export function checkNativeFullstackContractJson(rootPath: string): string;
 
 export const NATIVE_HOST_NATIVE_SURFACE_SCHEMA: string;
 export const NATIVE_HOST_NATIVE_SURFACE_CHECK_SCHEMA: string;
 export const NATIVE_HOST_DIAG_SURFACE_IS_CAPABILITY: string;
 export const NATIVE_HOST_DIAG_IMPLICIT_STATE_SHARE: string;
 export const NATIVE_HOST_HIGH_VALUE_SURFACE_KINDS: string[];
-export function checkNw5NativeSurfaceContractJson(rootPath: string): string;
+export function checkNativeSurfaceContractJson(rootPath: string): string;
 
 export const NATIVE_HOST_MULTI_PLATFORM_SCHEMA: string;
 export const NATIVE_HOST_MULTI_PLATFORM_SHARED_SCHEMA: string;
@@ -805,4 +810,4 @@ export const NATIVE_HOST_DIAG_PLATFORM_PRIVATE_SCHEMA: string;
 export const NATIVE_HOST_DIAG_ADAPTER_IS_SEMANTIC_CORE: string;
 export const NATIVE_HOST_REQUIRED_MULTI_PLATFORMS: string[];
 export const NATIVE_HOST_MULTI_PLATFORM_ADAPTER_KIND: string;
-export function checkNw6MultiPlatformContractJson(rootPath: string): string;
+export function checkMultiPlatformContractJson(rootPath: string): string;

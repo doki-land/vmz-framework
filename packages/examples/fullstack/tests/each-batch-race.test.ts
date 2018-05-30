@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { describe, it } from 'node:test';
-import { expect } from '../../../../scripts/test-expect.mjs';
+import { expect } from '../../../../scripts/test/expect.mjs';
 import { exampleDist, importDist, installDocument, installServerResolver, loadDom, loadRuntime, readJson } from '@vmz-examples/test-utils';
 
 const dist = exampleDist('fullstack');
@@ -107,6 +107,6 @@ describe('fullstack each / batch / race', () => {
         expect(meta.methodRw?.onMount?.writes).toEqual(expect.arrayContaining(['user', 'tags']));
     });
 
-    // Former createDom generation race case deleted with Gate 3 blueprint wipe.
-    // Direct each generation races belong in vmz test (T1/T2), not Vitest.
+    // Former createDom generation race case deleted with production Direct emit blueprint wipe.
+    // Direct each generation races belong in vmz test, not Vitest.
 });

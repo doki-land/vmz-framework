@@ -33,4 +33,5 @@ whole application into an eager client runtime.
 - Strong fit for multi-file playgrounds and browser workbenches.
 - An interaction surface substantial enough to justify an isolated delivery boundary.
 
-Monaco works best when users arrive to edit, inspect, or debug code. VMZ's Island and application boundaries make that tradeoff explicit: deliver the IDE when the user reaches the IDE experience.
+Monaco works best when users arrive to edit, inspect, or debug code. VMZ's Island and application boundaries make that
+tradeoff explicit: deliver the IDE when the user reaches the IDE experience.

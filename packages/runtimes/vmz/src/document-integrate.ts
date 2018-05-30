@@ -2,7 +2,6 @@
 /**
  * Integrated DocumentMount — build /documents into the host app dist so
  * routeBase (e.g. /d) is served as static HTML next to SSR pages.
- * Design: 规划设计/vmz/19 · Integrated DocumentMount (same project, no separate package).
  */
 
 import fs from 'node:fs';

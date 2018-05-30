@@ -3,6 +3,7 @@ name = "vmz-napi"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors.workspace = true
 rust-version.workspace = true
 description = "N-API bridge: Node host ↔ Rust workspace session (N1)"
 publish = false
@@ -11,8 +12,8 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-napi = { version = "3", default-features = true, features = ["napi4"] }
-napi-derive = "3"
+napi.workspace = true
+napi-derive.workspace = true
 vmz-compiler.workspace = true
 vmz-inspector.workspace = true
 vmz-protocol.workspace = true

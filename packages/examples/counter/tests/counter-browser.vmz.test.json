@@ -1,7 +1,7 @@
 {
     "schema": "vmz.test.manifest.v0",
     "id": "counter.browser.increment",
-    "title": "T2 Browser Host: real Chrome document + Direct click patch + node identity",
+    "title": " Browser Host: real Chrome document + Direct click patch + node identity",
     "modes": ["browser"],
     "program": {
         "chunkId": "components/CounterButton",

@@ -1,5 +1,5 @@
 /**
- * SSR / hydrate / stream host for `vmz test --mode ssr` (T2).
+ * SSR / hydrate / stream host for `vmz test --mode ssr` .
  * Same Direct schedule as production via linkedom + renderToString / renderToStream / hydrate.
  */
 

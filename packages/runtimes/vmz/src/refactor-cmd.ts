@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * `vmz refactor` — X1 RouteId/field safe rename (plan + atomic apply).
+ * `vmz refactor` — RouteId/field safe rename (plan + atomic apply).
  */
 
 import { createWorkspace } from './index.js';
@@ -26,7 +26,7 @@ export async function cmdRefactor(argv) {
 }
 
 function printRefactorHelp() {
-    console.log(`vmz refactor — workspace edit plans (X1)
+    console.log(`vmz refactor — workspace edit plans
 
 Usage:
   vmz refactor rename --kind <route_id|field|method|component|capability> --from <id> --to <id> [path]
@@ -144,16 +144,16 @@ function cmdRename(argv) {
         } else {
             log.info(`rename ${kind} \`${from}\` → \`${to}\` → ${plan.status}`);
             for (const p of plan.preconditions || []) {
-                console.log(`  precondition: ${p}`);
+                console.log(` precondition: ${p}`);
             }
             for (const e of plan.edits || []) {
-                console.log(`  edit ${e.path} @${e.start}..${e.end} → ${JSON.stringify(e.newText)}`);
+                console.log(` edit ${e.path} @${e.start}..${e.end} → ${JSON.stringify(e.newText)}`);
             }
             for (const d of plan.diagnostics || []) {
-                console.log(`  ${d.severity || 'info'}: ${d.message}`);
+                console.log(` ${d.severity || 'info'}: ${d.message}`);
             }
             if ((plan.edits || []).length === 0) {
-                console.log('  edits: (none)');
+                console.log(' edits: (none)');
             }
         }
 

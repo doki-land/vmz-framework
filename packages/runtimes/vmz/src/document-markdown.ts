@@ -1,10 +1,10 @@
 // @ts-nocheck
 /**
- * Document D1 — resolve engines.markdown via the official plugin runtime.
- * Design: 规划设计/vmz/19 §3 · 23 §0（runtime.ts；与 plugin-host 同一 importMaybeTs）.
+ * Document — resolve engines.markdown via the official plugin runtime.
  */
 
 import { createRequire } from 'node:module';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { importMaybeTs } from './plugin-host.js';
@@ -17,17 +17,25 @@ const require = createRequire(import.meta.url);
 export async function resolveMarkdownEngine(opts = {}) {
     const id = opts.engines?.markdown || 'markdown-it';
     if (id !== 'markdown-it') {
-        throw new Error(`unsupported engines.markdown ${JSON.stringify(id)} (D1: markdown-it only)`);
+        throw new Error(`unsupported engines.markdown ${JSON.stringify(id)} (markdown-it only)`);
     }
 
-    let runtimeFile;
+    let runtimeFile = null;
     try {
         const pkg = require.resolve('@vmz/plugin-markdown-it/package.json');
         runtimeFile = path.join(path.dirname(pkg), 'runtime.ts');
-    } catch (e) {
-        // Workspace fallback when package exports omit package.json.
+    } catch {
+        // Developer mode: monorepo source checkout.
         const here = path.dirname(fileURLToPath(import.meta.url));
-        runtimeFile = path.resolve(here, '../../../plugins/vmz-plugin-markdown-it/runtime.ts');
+        const fallback = path.resolve(here, '../../../plugins/vmz-plugin-markdown-it/runtime.ts');
+        if (existsSync(fallback)) runtimeFile = fallback;
+    }
+
+    if (!runtimeFile || !existsSync(runtimeFile)) {
+        throw new Error(
+            'markdown engine needs `@vmz/plugin-markdown-it` (optional peer of `@vmz/vmz`).\n' +
+                '  Install:  pnpm add -D @vmz/plugin-markdown-it',
+        );
     }
 
     const mod = await importMaybeTs(runtimeFile);

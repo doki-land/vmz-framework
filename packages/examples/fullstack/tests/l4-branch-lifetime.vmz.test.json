@@ -1,7 +1,7 @@
 {
     "schema": "vmz.test.manifest.v0",
     "id": "l4.compile.branch.lifetime",
-    "title": "L4: BranchDemo lifetime + owns + dispose_region",
+    "title": ": BranchDemo lifetime + owns + dispose_region",
     "modes": ["compile"],
     "program": {
         "chunkId": "components/BranchDemo",

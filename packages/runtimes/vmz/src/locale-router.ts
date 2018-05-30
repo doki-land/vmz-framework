@@ -1,8 +1,7 @@
 // @ts-nocheck
 /**
- * Locale I3 router / PageMeta: route realization · canonical · hreflang ·
+ * Locale router / PageMeta: route realization · canonical · hreflang ·
  * Link locale retain · locale-aware cache key.
- * Design: 规划设计/vmz/28 §6 · §10 · 20
  *
  * LocaleId is a RouteNode realization dimension — not part of stable RouteId.
  */
@@ -35,7 +34,7 @@ function normalizePath(path) {
 /**
  * Join locale prefix with a stable route path pattern.
  * @param {string} localeId
- * @param {string} pathPattern  stable path without locale (e.g. /account/profile)
+ * @param {string} pathPattern stable path without locale (e.g. /account/profile)
  * @param {{ strategy?: string, defaultPrefix?: string, defaultLocale?: string }} routing
  */
 export function realizeRoutePath(localeId, pathPattern, routing = {}) {
@@ -80,10 +79,10 @@ export function realizeRoutePath(localeId, pathPattern, routing = {}) {
 /**
  * Build RouteId × LocaleId realization table.
  * @param {{
- *   routes: Array<{ routeId: string, path: string }>,
- *   locales: string[],
- *   defaultLocale: string,
- *   routing?: { strategy?: string, defaultPrefix?: string },
+ * routes: Array<{ routeId: string, path: string }>,
+ * locales: string[],
+ * defaultLocale: string,
+ * routing?: { strategy?: string, defaultPrefix?: string },
  * }} input
  */
 export function buildLocaleRouteRealizationTable(input) {
@@ -144,15 +143,15 @@ export function absoluteUrl(origin, path) {
 /**
  * Locale-aware PageMeta for one RouteId × LocaleId.
  * @param {{
- *   routeId: string,
- *   localeId: string,
- *   direction?: string,
- *   title: string,
- *   description?: string,
- *   origin: string,
- *   realizations: Array<{ routeId: string, localeId: string, path: string }>,
- *   locales: string[],
- *   defaultLocale: string,
+ * routeId: string,
+ * localeId: string,
+ * direction?: string,
+ * title: string,
+ * description?: string,
+ * origin: string,
+ * realizations: Array<{ routeId: string, localeId: string, path: string }>,
+ * locales: string[],
+ * defaultLocale: string,
  * }} input
  */
 export function buildLocalePageMeta(input) {
@@ -214,9 +213,9 @@ export function buildLocalePageMeta(input) {
 /**
  * `<Link to="routeId">` retains current locale — never hand-written localized paths.
  * @param {{
- *   to: string,
- *   currentLocale: string,
- *   realizations: Array<{ routeId: string, localeId: string, path: string }>,
+ * to: string,
+ * currentLocale: string,
+ * realizations: Array<{ routeId: string, localeId: string, path: string }>,
  * }} input
  */
 export function resolveLinkHref(input) {
@@ -286,13 +285,13 @@ export function parseLocaleFromPath(pathname, supportedLocales) {
 /**
  * Plan redirect / negotiation for an incoming URL (omit-prefix aware).
  * @param {{
- *   pathname: string,
- *   supportedLocales: string[],
- *   defaultLocale: string,
- *   routing?: { strategy?: string, defaultPrefix?: string },
- *   hostCandidates?: string[],
- *   preference?: string|null,
- *   userChoice?: string|null,
+ * pathname: string,
+ * supportedLocales: string[],
+ * defaultLocale: string,
+ * routing?: { strategy?: string, defaultPrefix?: string },
+ * hostCandidates?: string[],
+ * preference?: string|null,
+ * userChoice?: string|null,
  * }} input
  */
 export function planLocalePathNavigation(input) {
@@ -384,11 +383,11 @@ export function assertLocaleCacheKey(input) {
 /**
  * LocaleTransition must commit Route realization + PageMeta together.
  * @param {{
- *   fromLocale: string,
- *   toLocale: string,
- *   routeId: string,
- *   realizations: Array<{ routeId: string, localeId: string, path: string }>,
- *   pageMetaByLocale: Record<string, { locale: string, canonical: string }>,
+ * fromLocale: string,
+ * toLocale: string,
+ * routeId: string,
+ * realizations: Array<{ routeId: string, localeId: string, path: string }>,
+ * pageMetaByLocale: Record<string, { locale: string, canonical: string }>,
  * }} input
  */
 export function commitLocaleRouteMetaTransition(input) {
@@ -432,16 +431,16 @@ export function commitLocaleRouteMetaTransition(input) {
 }
 
 /**
- * Aggregate I3 router/meta proof.
+ * Aggregate router/meta proof.
  * @param {{
- *   manifest: {
- *     defaultLocale: string,
- *     locales: Array<{ id: string, direction?: string }>,
- *     routing?: { strategy?: string, defaultPrefix?: string },
- *   },
- *   routes: Array<{ routeId: string, path: string }>,
- *   titles?: Record<string, Record<string, string>>,
- *   origin?: string,
+ * manifest: {
+ * defaultLocale: string,
+ * locales: Array<{ id: string, direction?: string }>,
+ * routing?: { strategy?: string, defaultPrefix?: string },
+ * },
+ * routes: Array<{ routeId: string, path: string }>,
+ * titles?: Record<string, Record<string, string>>,
+ * origin?: string,
  * }} input
  */
 export function checkLocaleRouter(input) {

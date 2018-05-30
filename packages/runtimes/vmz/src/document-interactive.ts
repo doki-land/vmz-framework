@@ -1,7 +1,6 @@
 // @ts-nocheck
 /**
- * Document D3 Interactive — search index + Island-only resume plan.
- * Design: 规划设计/vmz/19 §5–6 · §8 D3
+ * Document Interactive — search index + Island-only resume plan.
  *
  * Not a Doc IR: build artifacts + ResumeEntry-shaped island hosts.
  * Static HTML stays no-JS readable; islands resume later, never full-page hydrate.
@@ -29,10 +28,10 @@ export function htmlToSearchText(html) {
 
 /**
  * @param {{
- *   manifest: any,
- *   enriched: { byId: Map<string, any> },
- *   evidence: any,
- *   version?: string | null,
+ * manifest: any,
+ * enriched: { byId: Map<string, any> },
+ * evidence: any,
+ * version?: string | null,
  * }} opts
  */
 export function buildDocumentSearch(opts) {
@@ -120,9 +119,9 @@ export function buildDocumentSearch(opts) {
 /**
  * Island-only resume plan for document surfaces.
  * @param {{
- *   evidence: any,
- *   searchHref?: string,
- *   fenceBodies?: Map<string, string>,
+ * evidence: any,
+ * searchHref?: string,
+ * fenceBodies?: Map<string, string>,
  * }} opts
  */
 export function buildDocumentIslands(opts) {
@@ -226,10 +225,10 @@ export function collectFenceBodies(analyzedByPageId, pages) {
 /**
  * Render SSR island shells (no script — resume later).
  * @param {{
- *   islands: any,
- *   searchIndexHref: string,
- *   pageKey: string,
- *   locale: string,
+ * islands: any,
+ * searchIndexHref: string,
+ * pageKey: string,
+ * locale: string,
  * }} opts
  */
 export function renderIslandShellsHtml(opts) {

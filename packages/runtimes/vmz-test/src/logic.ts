@@ -1,6 +1,5 @@
 /**
  * Logic-mode host — headless document (linkedom), same Direct __vmzCreate as production.
- * Design: 规划设计/vmz/16 — not Browser Host / Playwright.
  */
 
 import fs from 'node:fs';

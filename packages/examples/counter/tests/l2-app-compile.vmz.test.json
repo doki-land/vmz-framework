@@ -1,7 +1,7 @@
 {
     "schema": "vmz.test.manifest.v0",
     "id": "l2.compile.app.slot",
-    "title": "L2: App slot Direct",
+    "title": ": App slot Direct",
     "modes": ["compile"],
     "program": {
         "chunkId": "Application",

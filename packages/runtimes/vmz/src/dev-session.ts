@@ -1,9 +1,9 @@
 // @ts-nocheck
 /**
- * Long-lived Node dev session (N2/N4).
+ * Long-lived Node dev session (/session).
  *
  * Rebuilds go through the N-API `Workspace` — never spawn `cargo` / `vmz-tools`.
- * N4: only dirty leaves are marked; Workspace emits affected deployment units.
+ * session: only dirty leaves are marked; Workspace emits affected deployment units.
  */
 
 import { spawn } from 'node:child_process';
@@ -72,7 +72,7 @@ export function createDevSession(options) {
         }
 
         log.info('initial build (N-API workspace, full)…');
-        // Empty dirty → full project build (N4).
+        // Empty dirty → full project build (session).
         const initial = rebuild();
         if (!printReport(initial, 'build')) {
             throw new Error('vmz dev: initial build failed');

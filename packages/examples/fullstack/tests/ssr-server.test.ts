@@ -2,7 +2,7 @@ import http from 'node:http';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
-import { expect } from '../../../../scripts/test-expect.mjs';
+import { expect } from '../../../../scripts/test/expect.mjs';
 import { exampleDist, importDist, installDocument, installServerResolver, loadDom, loadRuntime, readJson } from '@vmz-examples/test-utils';
 
 const dist = exampleDist('fullstack');

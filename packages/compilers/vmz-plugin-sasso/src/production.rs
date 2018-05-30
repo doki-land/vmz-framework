@@ -197,31 +197,3 @@ fn list_style_files(dir: &Path) -> Vec<PathBuf> {
     }
     out
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn strips_at_tailwind_block() {
-        let src = ".a{color:red}\n@tailwind {\n  .x { @apply px-2; }\n}\n.b{color:blue}\n";
-        let out = strip_at_tailwind(src);
-        assert!(out.contains(".a{color:red}"));
-        assert!(out.contains(".b{color:blue}"));
-        assert!(!out.contains("@tailwind"));
-        assert!(!out.contains("@apply"));
-    }
-
-    #[test]
-    fn compiles_nested_scss() {
-        let css = compile_source(
-            ".save-button {\n  color: #333;\n  &:hover { color: #111; }\n}\n".into(),
-            StyleLanguage::Scss,
-            Path::new("t.vmz"),
-            Path::new("."),
-        )
-        .expect("compile");
-        assert!(css.contains(".save-button"));
-        assert!(css.contains(":hover") || css.contains(".save-button:hover"));
-    }
-}

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it } from 'node:test';
-import { expect } from '../../../../scripts/test-expect.mjs';
+import { expect } from '../../../../scripts/test/expect.mjs';
 import { createVmzHighlighter, vmzGrammar, vmzLanguage, vmzLanguageId } from '../src/index.ts';
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

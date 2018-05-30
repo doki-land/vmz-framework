@@ -9,8 +9,8 @@
  *
  * `VMZ_DEV=1`: POST `/__vmz/reload` soft-reloads modules (cache-bust import);
  * GET `/__vmz/events` SSE notifies the browser:
- *   - island HMR → re-import `entry-client.js` (no full document reload)
- *   - otherwise → `location.reload()`
+ * - island HMR → re-import `entry-client.js` (no full document reload)
+ * - otherwise → `location.reload`
  */
 import http from 'node:http';
 import path from 'node:path';

@@ -1,6 +1,5 @@
 /**
- * Deterministic CommonMark-ish subset for documents + `<Markdown>` (D1).
- * HTML / JS / MDX disabled — see 规划设计/vmz/19 §3.
+ * Deterministic CommonMark-ish subset for documents + `<Markdown>` .
  */
 import MarkdownIt from 'markdown-it';
 
@@ -30,10 +29,10 @@ export function renderMarkdown(source) {
 /**
  * @param {string} source
  * @returns {{
- *   html: string,
- *   headings: Array<{ level: number, id: string, text: string }>,
- *   links: Array<{ href: string, text: string }>,
- *   fences: Array<{ lang: string, info: string, content: string, lineStart: number, lineEnd: number }>
+ * html: string,
+ * headings: Array<{ level: number, id: string, text: string }>,
+ * links: Array<{ href: string, text: string }>,
+ * fences: Array<{ lang: string, info: string, content: string, lineStart: number, lineEnd: number }>
  * }}
  */
 export function analyzeMarkdown(source) {

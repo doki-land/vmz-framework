@@ -9,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '../../../..');
-const resolveHook = pathToFileURL(path.join(root, 'scripts/resolve-ts-from-js.mjs')).href;
+const resolveHook = pathToFileURL(path.join(root, 'scripts/test/resolve-ts-from-js.mjs')).href;
 const files = [
     'ssr-server.test.ts',
     'host.test.ts',

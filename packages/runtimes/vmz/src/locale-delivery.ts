@@ -1,8 +1,7 @@
 // @ts-nocheck
 /**
- * Locale I4 multi-host delivery: Web chunks · Mini packages · Native packs ·
+ * Locale multi-host delivery: Web chunks · Mini packages · Native packs ·
  * Server error envelope / formatter resources.
- * Design: 规划设计/vmz/28 §9–§10
  *
  * Same MessageNode projects to all Surfaces; LocaleId is not a WebSurface concern.
  */
@@ -67,18 +66,18 @@ export function messageCatalogHash(messages, localeId, reachableIds) {
 /**
  * Build LocaleDeliveryResolution for one Host surface.
  * @param {{
- *   host: 'web'|'mini'|'native'|'server',
- *   applicationId: string,
- *   deliveryId: string,
- *   planVersion?: string,
- *   supportedLocales: string[],
- *   defaultLocale: string,
- *   fallback?: Record<string, string[]>,
- *   routingRealization?: unknown,
- *   messages: Array<{ messageId: string, variants: Record<string, { template: string }> }>,
- *   reachableMessageIds?: string[],
- *   bundledLocales?: string[],
- *   allowFullClientBundle?: boolean,
+ * host: 'web'|'mini'|'native'|'server',
+ * applicationId: string,
+ * deliveryId: string,
+ * planVersion?: string,
+ * supportedLocales: string[],
+ * defaultLocale: string,
+ * fallback?: Record<string, string[]>,
+ * routingRealization?: unknown,
+ * messages: Array<{ messageId: string, variants: Record<string, { template: string }> }>,
+ * reachableMessageIds?: string[],
+ * bundledLocales?: string[],
+ * allowFullClientBundle?: boolean,
  * }} input
  */
 export function buildLocaleDeliveryResolution(input) {
@@ -156,19 +155,19 @@ export function buildLocaleDeliveryResolution(input) {
 /**
  * Validate a Native optional locale pack (signed, no JS, bound to app/plan/schema).
  * @param {{
- *   pack: {
- *     schema?: string,
- *     applicationId: string,
- *     planVersion: string,
- *     localeId: string,
- *     signature?: string,
- *     catalog?: Record<string, string>,
- *     formatterDataVersion?: string,
- *     entries?: Array<{ path: string, kind?: string }>,
- *     executable?: boolean,
- *   },
- *   expectedApplicationId: string,
- *   expectedPlanVersion: string,
+ * pack: {
+ * schema?: string,
+ * applicationId: string,
+ * planVersion: string,
+ * localeId: string,
+ * signature?: string,
+ * catalog?: Record<string, string>,
+ * formatterDataVersion?: string,
+ * entries?: Array<{ path: string, kind?: string }>,
+ * executable?: boolean,
+ * },
+ * expectedApplicationId: string,
+ * expectedPlanVersion: string,
  * }} input
  */
 export function validateNativeLocalePack(input) {
@@ -242,8 +241,8 @@ export function validateNativeLocalePack(input) {
 /**
  * Mini cross-subpackage message dependencies must be proven.
  * @param {{
- *   packages: Array<{ id: string, messageIds: string[] }>,
- *   edges: Array<{ fromPackage: string, toPackage: string, messageId: string }>,
+ * packages: Array<{ id: string, messageIds: string[] }>,
+ * edges: Array<{ fromPackage: string, toPackage: string, messageId: string }>,
  * }} input
  */
 export function proveMiniPackageMessages(input) {
@@ -377,18 +376,18 @@ export function assertHostMessageInvariant(resolutions) {
 }
 
 /**
- * Aggregate I4 delivery proof for fixture / CLI.
+ * Aggregate delivery proof for fixture / CLI.
  * @param {{
- *   manifest: {
- *     defaultLocale: string,
- *     locales: Array<{ id: string }>,
- *     fallback?: Record<string, string[]>,
- *     routing?: unknown,
- *   },
- *   messages: Array<{ messageId: string, variants: Record<string, { template: string }> }>,
- *   applicationId?: string,
- *   planVersion?: string,
- *   reachableMessageIds?: string[],
+ * manifest: {
+ * defaultLocale: string,
+ * locales: Array<{ id: string }>,
+ * fallback?: Record<string, string[]>,
+ * routing?: unknown,
+ * },
+ * messages: Array<{ messageId: string, variants: Record<string, { template: string }> }>,
+ * applicationId?: string,
+ * planVersion?: string,
+ * reachableMessageIds?: string[],
  * }} input
  */
 export function checkLocaleDelivery(input) {

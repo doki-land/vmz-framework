@@ -1,7 +1,7 @@
 {
     "schema": "vmz.test.manifest.v0",
     "id": "l2.logic.index.mount",
-    "title": "L2: Index page mount with registered CounterButton",
+    "title": ": Index page mount with registered CounterButton",
     "modes": ["logic"],
     "program": {
         "chunkId": "pages/index",

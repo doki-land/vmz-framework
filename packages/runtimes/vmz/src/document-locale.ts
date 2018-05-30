@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * Locale key validation & canonicalization (D0).
+ * Locale key validation & canonicalization .
  */
 
 import { LOCALE_ALIASES } from './document-schema.js';

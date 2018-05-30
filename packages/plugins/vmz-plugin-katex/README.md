@@ -32,4 +32,6 @@ deployment. Using formulas should not create a separate rendering or state model
 - Technical articles that must remain readable in SSR output.
 - Dashboards and scientific tools where formulas support, rather than dominate, the interface.
 
-KaTeX keeps the common path simple: polished mathematics without turning an otherwise lightweight page into a mathematics runtime. Start here when you are unsure; move to MathJax when a real content requirement exceeds its coverage.
+KaTeX keeps the common path simple: polished mathematics without turning an otherwise lightweight page into a
+mathematics runtime. Start here when you are unsure; move to MathJax when a real content requirement exceeds its
+coverage.

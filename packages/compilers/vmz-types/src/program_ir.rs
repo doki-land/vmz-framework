@@ -3,7 +3,7 @@
 //! Reactive IR ([`crate::reactive_ir`]) is one **view** of this graph, not the core.
 //! Other views start as stubs that share the same unit identity and field/binding ids.
 //!
-//! Milestone A: `ProgramModule` + `*.program.json` so tools stop treating
+//! `ProgramModule` + `*.program.json` so tools stop treating
 //! `ReactiveModule` as the only extension surface.
 
 use crate::reactive_ir::{
@@ -53,10 +53,10 @@ pub struct ProgramUnit {
     pub semantic: SemanticView,
     pub reactive: ReactiveComponent,
     pub view: ViewView,
-    /// Shared Execution Plan derived from Native View (L3) — Browser/SSR/Test lowerings.
+    // Shared Execution Plan derived from Native View — Browser/SSR/Test lowerings.
     pub plan: ExecutionPlan,
     pub resource: ResourceView,
-    /// Lifetime regions projected from control / each / unit ownership (L4).
+    // Lifetime regions projected from control / each / unit ownership .
     pub lifetime: LifetimeView,
     pub server: ServerView,
     pub deployment: DeploymentView,
@@ -87,7 +87,7 @@ pub struct SemanticMethod {
     pub async_boundary: bool,
 }
 
-/// Structural / Native View — first-class query view of the unified Program Graph (L1).
+// Structural / Native View — first-class query view of the unified Program Graph .
 ///
 /// When [`ViewStatus::Native`], [`Self::roots`] is the sole structure source for
 /// direct emit (`emit_direct`); TemplateIr must not be re-scanned for if/each/element.
@@ -151,7 +151,7 @@ pub struct ViewEach {
     pub key_expr: Option<String>,
     pub list_binding: Option<BindingId>,
     pub key_binding: Option<BindingId>,
-    /// Control / lifetime region for this each (L4).
+    // Control / lifetime region for this each .
     pub region: Option<RegionId>,
 }
 
@@ -216,14 +216,14 @@ pub struct ResourceDecl {
     pub name: String,
     /// Owning client method / effect when known.
     pub owner: Option<String>,
-    /// AsyncTask protocol states (13 §10); empty for non-task resources.
+    /// AsyncTask protocol states (13 ); empty for non-task resources.
     pub states: Vec<String>,
     pub cancelable: bool,
     /// Generation / supersede protocol (same as runtime `__vmzRunTask`).
     pub generation: bool,
 }
 
-/// Lifetime / ownership projection (L4) — not a competing IR.
+// Lifetime / ownership projection — not a competing IR.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct LifetimeView {
     pub status: StubStatus,
@@ -330,7 +330,7 @@ pub struct ServerAttach {
     pub client_calls: Vec<ClientServerCall>,
 }
 
-/// Deployment / Island / chunk view (N4 / N4.2 / L5).
+/// Deployment / Island / chunk view (deployment / island / chunk).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct DeploymentView {
     pub status: StubStatus,
@@ -350,7 +350,7 @@ pub struct DeploymentView {
     pub server_module_id: Option<String>,
     /// Client method → server capability edges (method names).
     pub client_calls: Vec<(String, Option<String>)>,
-    /// Island / ResumeEntry products derived from View `client:*` (L5) — not a Resume IR.
+    /// Island / ResumeEntry products derived from View `client:*` (resume) — not a Resume IR.
     pub resume_entries: Vec<ResumeEntryDecl>,
 }
 
@@ -420,7 +420,7 @@ impl ProgramModule {
 }
 
 impl ProgramUnit {
-    /// Collect Island ResumeEntry products from Native View `client:*` (L5).
+    /// Collect Island ResumeEntry products from Native View `client:*` (resume).
     pub fn collect_resume_entries_from_view(&self) -> Vec<ResumeEntryDecl> {
         let mut out = Vec::new();
         fn walk(node: &ViewNode, out: &mut Vec<ResumeEntryDecl>) {
@@ -565,7 +565,7 @@ impl ProgramUnit {
         let mut next_res = 0u32;
         for e in &self.reactive.effects {
             if e.async_boundary {
-                // AsyncTask enters the graph (13 §10): pending/success/error/cancelled + cancel/generation.
+                // AsyncTask enters the graph (13 ): pending/success/error/cancelled + cancel/generation.
                 resources.push(ResourceDecl {
                     id: next_res,
                     kind: "async_task".into(),
@@ -601,7 +601,7 @@ impl ProgramUnit {
             resources,
         };
 
-        // L4: LifetimeRegion projection from Native View + control regions (same RegionId).
+        // LifetimeRegion projection from Native View + control regions (same RegionId).
         let mut kind_by_region: std::collections::BTreeMap<u32, String> =
             std::collections::BTreeMap::new();
         fn walk_lifetime_kinds(node: &ViewNode, map: &mut std::collections::BTreeMap<u32, String>) {
@@ -767,7 +767,7 @@ impl ProgramUnit {
                 });
             }
         }
-        // L4 ownership edges: unit owns lifetime regions; regions/unit dispose resources.
+        // ownership edges: unit owns lifetime regions; regions/unit dispose resources.
         let unit_from = format!("unit:{}", self.name);
         for lr in &self.lifetime.regions {
             edges.push(ProgramEdge {
@@ -1270,95 +1270,4 @@ fn server_json(server: &ServerView, indent: &str) -> String {
     s.push_str(&format!("\n{ind2}]\n"));
     s.push_str(&format!("{indent}}}"));
     s
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::FieldKind;
-    use crate::reactive_ir::{BindingKind, ReactiveComponentBuilder};
-
-    #[test]
-    fn program_wraps_reactive_as_one_view() {
-        let mut b = ReactiveComponentBuilder::new("Card");
-        b.add_field("user", FieldKind::State);
-        let expr = b.intern_expr("user.name");
-        let reads = vec![
-            b.from_dep_key(&crate::DepKey::path(crate::DepPath::prop("user", "name"))).unwrap(),
-        ];
-        b.add_binding(BindingKind::Text, reads, None, Some(expr), None);
-        let reactive = ReactiveModule { source: "Card.vmz".into(), components: vec![b.finish()] };
-        let program = ProgramModule::from_reactive(reactive);
-        let json = program.to_json();
-        assert!(json.contains(PROGRAM_SCHEMA), "{json}");
-        assert!(json.contains("\"semantic\""), "{json}");
-        assert!(json.contains("\"reactive\""), "{json}");
-        assert!(json.contains("derived_from_reactive"), "{json}");
-        assert!(json.contains("user.name"), "{json}");
-        assert!(json.contains("\"graph\""), "{json}");
-        assert!(json.contains("\"edges\""), "{json}");
-        assert!(json.contains("\"reads\""), "{json}");
-        // resource empty (no async/server); graph partial (has binding reads)
-        assert!(json.contains("\"status\": \"empty\""), "{json}");
-        assert!(json.contains("\"status\": \"partial\""), "{json}");
-        let u = &program.units[0];
-        assert_eq!(u.semantic.fields[0].name, "user");
-        assert_eq!(u.view.binding_ids.len(), 1);
-        assert_eq!(u.reactive.bindings[0].id, u.view.binding_ids[0]);
-        assert!(!u.graph.edges.is_empty());
-        assert_eq!(u.graph.edges[0].kind, "reads");
-        assert_eq!(u.graph.edges[0].to, "user.name");
-    }
-
-    #[test]
-    fn resource_and_call_edges_from_server_attach() {
-        use oxc_span::SPAN;
-        let mut b = ReactiveComponentBuilder::new("Card");
-        b.add_field("user", FieldKind::State);
-        b.add_effect("onMount", vec![], vec![], true, vec![], false, vec![]);
-        let reactive = b.finish();
-        let mut unit = ProgramUnit::from_reactive_component(UnitId(0), reactive);
-        unit.attach_server(&ServerAttach {
-            module_id: "#server/components/Card".into(),
-            class_name: "CardServer".into(),
-            methods: vec![crate::MethodDecl {
-                name: "fetchUser".into(),
-                is_async: true,
-                is_static: false,
-                is_private: false,
-                http: None,
-                reads: vec![],
-                writes: vec![],
-                calls: vec![],
-                opaque_callee: false,
-                star_reasons: Vec::new(),
-                span: SPAN,
-            }],
-            client_calls: vec![ClientServerCall {
-                server_method: "fetchUser".into(),
-                from_client_method: Some("onMount".into()),
-            }],
-        });
-        assert_eq!(unit.resource.status, StubStatus::Partial);
-        assert!(unit.resource.resources.iter().any(|r| r.kind == "async_task"
-            && r.name == "onMount"
-            && r.cancelable
-            && r.generation
-            && r.states.iter().any(|s| s == "cancelled")));
-        assert!(
-            unit.resource
-                .resources
-                .iter()
-                .any(|r| r.kind == "server_capability" && r.name == "fetchUser")
-        );
-        assert!(unit.graph.edges.iter().any(|e| {
-            e.kind == "calls" && e.from == "effect:onMount" && e.to == "capability:fetchUser"
-        }));
-        assert!(unit.graph.edges.iter().any(|e| {
-            e.kind == "spawns" && e.from == "effect:onMount" && e.to.starts_with("task:")
-        }));
-        assert!(unit.graph.edges.iter().any(|e| {
-            e.kind == "cancels" && e.from == "lifecycle:destroy" && e.to.starts_with("task:")
-        }));
-    }
 }

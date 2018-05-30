@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { describe, it } from 'node:test';
-import { expect } from '../../../../scripts/test-expect.mjs';
+import { expect } from '../../../../scripts/test/expect.mjs';
 import { exampleDist, importDist, installDocument, loadDom, readJson } from '@vmz-examples/test-utils';
 
 const dist = exampleDist('fullstack');

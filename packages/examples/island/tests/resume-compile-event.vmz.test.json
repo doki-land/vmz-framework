@@ -1,0 +1,28 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "resume.compile.event.entry",
+    "title": "Resume: EventButton resumeEntries strategy=event",
+    "modes": ["compile"],
+    "program": {
+        "chunkId": "pages/index",
+        "unitName": "IndexPage"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "deployment",
+            "expect": {
+                "resumeComponent": "EventButton",
+                "strategy": "event",
+                "deploymentFileSchema": "vmz.deployment.v0",
+                "deploymentResumeComponent": "EventButton",
+                "deploymentChunkIncludes": "pages/index"
+            }
+        }
+    ]
+}

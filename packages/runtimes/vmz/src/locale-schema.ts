@@ -1,7 +1,6 @@
 // @ts-nocheck
 /**
- * Locale I0–I5 schema constants & diagnostic codes.
- * Design: 规划设计/vmz/28
+ * Locale – schema constants & diagnostic codes.
  */
 export {
     FORMATTER_DATA_VERSION,

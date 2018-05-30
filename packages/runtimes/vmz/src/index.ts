@@ -26,21 +26,21 @@ export {
     DX_TEST_SELECTION_SCHEMA,
     DX_SOURCE_MAP_SCHEMA,
     DX_SYMBOL_INDEX_SCHEMA,
-    DX_X2_CHECK_SCHEMA,
+    DX_CROSS_SFC_CHECK_SCHEMA,
     DX_SEMANTIC_TRANSACTION_SCHEMA,
     DX_CANCEL_SCHEMA,
     DX_AFFECTED_PREVIEW_SCHEMA,
     DX_HMR_PLAN_SCHEMA,
     DX_BUDGET_SCHEMA,
-    DX_X3_CHECK_SCHEMA,
+    DX_TRANSACTION_CHECK_SCHEMA,
     DX_BOUNDARY_VALIDATOR_SCHEMA,
     DX_LEAKAGE_SCHEMA,
     DX_CAPABILITY_TARGET_SCHEMA,
     DX_DEAD_GRAPH_SCHEMA,
-    DX_X4_CHECK_SCHEMA,
+    DX_DEPLOYMENT_PROOF_CHECK_SCHEMA,
     DX_TRACE_SCHEMA,
     DX_CAUSAL_REPLAY_SCHEMA,
-    DX_X5_CHECK_SCHEMA,
+    DX_CAUSAL_REPLAY_CHECK_SCHEMA,
     APPLICATION_PROTOCOL,
     APPLICATION_DESCRIPTOR_SCHEMA,
     APPLICATIONS_CONFIG_SCHEMA,
@@ -275,21 +275,21 @@ import {
     DX_TEST_SELECTION_SCHEMA,
     DX_SOURCE_MAP_SCHEMA,
     DX_SYMBOL_INDEX_SCHEMA,
-    DX_X2_CHECK_SCHEMA,
+    DX_CROSS_SFC_CHECK_SCHEMA,
     DX_SEMANTIC_TRANSACTION_SCHEMA,
     DX_CANCEL_SCHEMA,
     DX_AFFECTED_PREVIEW_SCHEMA,
     DX_HMR_PLAN_SCHEMA,
     DX_BUDGET_SCHEMA,
-    DX_X3_CHECK_SCHEMA,
+    DX_TRANSACTION_CHECK_SCHEMA,
     DX_BOUNDARY_VALIDATOR_SCHEMA,
     DX_LEAKAGE_SCHEMA,
     DX_CAPABILITY_TARGET_SCHEMA,
     DX_DEAD_GRAPH_SCHEMA,
-    DX_X4_CHECK_SCHEMA,
+    DX_DEPLOYMENT_PROOF_CHECK_SCHEMA,
     DX_TRACE_SCHEMA,
     DX_CAUSAL_REPLAY_SCHEMA,
-    DX_X5_CHECK_SCHEMA,
+    DX_CAUSAL_REPLAY_CHECK_SCHEMA,
     APPLICATION_PROTOCOL,
     APPLICATION_DESCRIPTOR_SCHEMA,
     APPLICATIONS_CONFIG_SCHEMA,
@@ -529,30 +529,41 @@ function platformTriple() {
     return `${platform}-${arch}`;
 }
 
+/** npm optionalDependency short id (@vmz/vmz-win32-x64) from cargo triple */
+function platformShort(triple = platformTriple()) {
+    if (triple === 'win32-x64-msvc') return 'win32-x64';
+    if (triple === 'win32-arm64-msvc') return 'win32-arm64';
+    if (triple === 'linux-x64-gnu') return 'linux-x64';
+    if (triple === 'linux-arm64-gnu') return 'linux-arm64';
+    return triple;
+}
+
 /**
- * Resolve native `.node` (built by `scripts/build-napi.mjs`).
+ * Resolve native `.node` via the platform optionalDependency only
+ * (`@vmz/vmz-<short>` from pnpm workspace or published npm).
  * @returns {string}
  */
 export function resolveNativePath() {
     const triple = platformTriple();
-    const candidates = [
-        path.join(pkgRoot, `vmz.${triple}.node`),
-        path.join(pkgRoot, 'vmz.node'),
-        // optionalDependencies platform package (published layout)
-        path.join(pkgRoot, '..', `vmz-${triple}`, `vmz.${triple}.node`),
-        path.join(pkgRoot, '..', `vmz-${triple}`, 'vmz.node'),
-        // monorepo sibling (packages/runtimes/vmz-<triple>)
-        path.join(pkgRoot, `../vmz-${triple}`, `vmz.${triple}.node`),
-        path.join(pkgRoot, `../vmz-${triple}`, 'vmz.node'),
-        // cargo + build-napi copy targets (repo root target/)
-        path.join(pkgRoot, '../../../target/debug', 'vmz_napi.node'),
-        path.join(pkgRoot, '../../../target/release', 'vmz_napi.node'),
-    ];
+    const short = platformShort(triple);
+    const name = `@vmz/vmz-${short}`;
+    /** @type {string[]} */
+    const candidates = [];
+    try {
+        const resolved = require.resolve(`${name}/package.json`);
+        const dir = path.dirname(resolved);
+        // Prefer platform-named binary; plain `vmz.node` is legacy-only.
+        candidates.push(path.join(dir, `vmz.${triple}.node`), path.join(dir, 'vmz.node'));
+    } catch {
+        /* optional dep not installed */
+    }
+    // pnpm may nest under the vmz package's node_modules
+    candidates.push(path.join(pkgRoot, 'node_modules', name, `vmz.${triple}.node`), path.join(pkgRoot, 'node_modules', name, 'vmz.node'));
     for (const p of candidates) {
         if (existsSync(p)) return p;
     }
     throw new Error(
-        `vmz native addon not found for ${triple}. Run: pnpm --filter vmz build:native\n` +
+        `vmz native addon not found for ${name}. Run: pnpm napi:build (writes packages/runtimes/vmz-${short}/)\n` +
             `Looked in:\n${candidates.map((c) => `  - ${c}`).join('\n')}`,
     );
 }
@@ -605,22 +616,42 @@ export function handshake(host = expectedProtocol()) {
 }
 
 /**
+ * Resolve `@vmz/core` package `dist/` for runtime JS copies into app outDir.
+ * @returns {string | null}
+ */
+export function resolveCoreRuntimeDist() {
+    try {
+        // Prefer a real export subpath — `package.json` is often blocked by "exports".
+        const serverJs = require.resolve('@vmz/core/server');
+        return path.dirname(serverJs);
+    } catch {
+        /* not installed / not linked beside this host */
+    }
+    const nested = path.join(pkgRoot, 'node_modules', '@vmz', 'core', 'dist');
+    if (existsSync(path.join(nested, 'server.js'))) return nested;
+    return null;
+}
+
+/**
  * @typedef {object} WorkspaceOptions
  * @property {string} root
  * @property {string} [outDir]
+ * @property {string} [runtimeDist]
  * @property {ProtocolVersions} [protocol]
  */
 
 /**
- * Create a long-lived compile workspace (N1).
+ * Create a long-lived compile workspace .
  * @param {WorkspaceOptions} options
  */
 export function createWorkspace(options) {
     const native = loadNative();
     const protocol = options.protocol ?? expectedProtocol();
+    const runtimeDist = options.runtimeDist ?? resolveCoreRuntimeDist() ?? undefined;
     return native.JsWorkspace.create({
         root: options.root,
         outDir: options.outDir,
+        runtimeDist,
         protocol: {
             hostProtocol: protocol.hostProtocol,
             compilerProtocol: protocol.compilerProtocol,
@@ -631,7 +662,7 @@ export function createWorkspace(options) {
 }
 
 /**
- * M0: frozen application composition protocol catalog.
+ * frozen application composition protocol catalog.
  * @returns {string}
  */
 export function queryApplicationProtocolCatalog() {
@@ -640,7 +671,7 @@ export function queryApplicationProtocolCatalog() {
 }
 
 /**
- * M0: check host applications.config.json5 against workspace package descriptors.
+ * check host applications.config.json5 against workspace package descriptors.
  * @param {string} hostRoot
  * @param {string[]} packageRoots
  * @returns {string} ApplicationCheckReport JSON
@@ -655,9 +686,9 @@ export function queryTargetProtocolCatalog() {
     return native.queryTargetProtocolCatalog();
 }
 
-export function checkMp0TargetContractJson(rootPath) {
+export function checkMiniprogramTargetContractJson(rootPath) {
     const native = loadNative();
-    return native.checkMp0TargetContractJson(rootPath);
+    return native.checkMiniprogramTargetContractJson(rootPath);
 }
 
 export function queryProfileProtocolCatalog() {
@@ -665,34 +696,34 @@ export function queryProfileProtocolCatalog() {
     return native.queryProfileProtocolCatalog();
 }
 
-export function checkP0ProfileProtocolJson(rootPath) {
+export function checkHostProfileProtocolJson(rootPath) {
     const native = loadNative();
-    return native.checkP0ProfileProtocolJson(rootPath);
+    return native.checkHostProfileProtocolJson(rootPath);
 }
 
-export function checkP1ProfileSolverJson(rootPath) {
+export function checkProfileSolverJson(rootPath) {
     const native = loadNative();
-    return native.checkP1ProfileSolverJson(rootPath);
+    return native.checkProfileSolverJson(rootPath);
 }
 
-export function checkP2UnifiedExecutorJson(rootPath) {
+export function checkUnifiedExecutorJson(rootPath) {
     const native = loadNative();
-    return native.checkP2UnifiedExecutorJson(rootPath);
+    return native.checkUnifiedExecutorJson(rootPath);
 }
 
-export function checkP3LifecycleRecoveryJson(rootPath) {
+export function checkLifecycleRecoveryJson(rootPath) {
     const native = loadNative();
-    return native.checkP3LifecycleRecoveryJson(rootPath);
+    return native.checkLifecycleRecoveryJson(rootPath);
 }
 
-export function checkP4DeliveryProofJson(rootPath) {
+export function checkDeliveryProofJson(rootPath) {
     const native = loadNative();
-    return native.checkP4DeliveryProofJson(rootPath);
+    return native.checkDeliveryProofJson(rootPath);
 }
 
-export function checkP5CrossHostConformanceJson(rootPath) {
+export function checkCrossHostConformanceJson(rootPath) {
     const native = loadNative();
-    return native.checkP5CrossHostConformanceJson(rootPath);
+    return native.checkCrossHostConformanceJson(rootPath);
 }
 
 export function queryNativeHostProtocolCatalog() {
@@ -700,43 +731,43 @@ export function queryNativeHostProtocolCatalog() {
     return native.queryNativeHostProtocolCatalog();
 }
 
-export function checkNw0NativeHostContractJson(rootPath) {
+export function checkNativeHostContractJson(rootPath) {
     const native = loadNative();
-    return native.checkNw0NativeHostContractJson(rootPath);
+    return native.checkNativeHostContractJson(rootPath);
 }
 
-export function checkNw1NativeShellContractJson(rootPath) {
+export function checkNativeShellContractJson(rootPath) {
     const native = loadNative();
-    return native.checkNw1NativeShellContractJson(rootPath);
+    return native.checkNativeShellContractJson(rootPath);
 }
 
-export function checkNw2NativeBridgeContractJson(rootPath) {
+export function checkNativeBridgeContractJson(rootPath) {
     const native = loadNative();
-    return native.checkNw2NativeBridgeContractJson(rootPath);
+    return native.checkNativeBridgeContractJson(rootPath);
 }
 
-export function checkNw3NativeLifecycleContractJson(rootPath) {
+export function checkNativeLifecycleContractJson(rootPath) {
     const native = loadNative();
-    return native.checkNw3NativeLifecycleContractJson(rootPath);
+    return native.checkNativeLifecycleContractJson(rootPath);
 }
 
-export function checkNw4NativeFullstackContractJson(rootPath) {
+export function checkNativeFullstackContractJson(rootPath) {
     const native = loadNative();
-    return native.checkNw4NativeFullstackContractJson(rootPath);
+    return native.checkNativeFullstackContractJson(rootPath);
 }
 
-export function checkNw5NativeSurfaceContractJson(rootPath) {
+export function checkNativeSurfaceContractJson(rootPath) {
     const native = loadNative();
-    return native.checkNw5NativeSurfaceContractJson(rootPath);
+    return native.checkNativeSurfaceContractJson(rootPath);
 }
 
-export function checkNw6MultiPlatformContractJson(rootPath) {
+export function checkMultiPlatformContractJson(rootPath) {
     const native = loadNative();
-    return native.checkNw6MultiPlatformContractJson(rootPath);
+    return native.checkMultiPlatformContractJson(rootPath);
 }
 
 /**
- * M1: prove independent `/` + non-root ApplicationBase; scan non-relocatable URLs.
+ * prove independent `/` + non-root ApplicationBase; scan non-relocatable URLs.
  * @param {string} packageRoot
  * @param {string} [relocateBase]
  * @returns {string}
@@ -747,7 +778,7 @@ export function checkApplicationRelocatableJson(packageRoot, relocateBase) {
 }
 
 /**
- * M1: apply ApplicationBase to a logical relocation manifest.
+ * apply ApplicationBase to a logical relocation manifest.
  * @param {string} manifestJson
  * @param {string} base
  * @returns {string}
@@ -758,7 +789,7 @@ export function relocateApplicationManifestJson(manifestJson, base) {
 }
 
 /**
- * M2: independent ApplicationArtifact + MountTable/Catalog boundary (refs only).
+ * independent ApplicationArtifact + MountTable/Catalog boundary (refs only).
  * @param {string} hostRoot
  * @param {string[]} packageRoots
  * @returns {string}
@@ -769,7 +800,7 @@ export function checkApplicationArtifactBoundaryJson(hostRoot, packageRoots) {
 }
 
 /**
- * M3: absolute isolation namespaces + failure containment.
+ * absolute isolation namespaces + failure containment.
  * @param {string} hostRoot
  * @param {string[]} packageRoots
  * @returns {string}
@@ -780,7 +811,7 @@ export function checkApplicationIsolationJson(hostRoot, packageRoots) {
 }
 
 /**
- * M4: host catalog consumption + cross-application Link resolution.
+ * host catalog consumption + cross-application Link resolution.
  * @param {string} hostRoot
  * @param {string[]} packageRoots
  * @returns {string}
@@ -791,7 +822,7 @@ export function checkApplicationHostCompositionJson(hostRoot, packageRoots) {
 }
 
 /**
- * M5: multi-session affected rebuild + MountTable proxy + mounted tests + deploy adapter.
+ * multi-session affected rebuild + MountTable proxy + mounted tests + deploy adapter.
  * @param {string} hostRoot
  * @param {string[]} packageRoots
  * @param {string[]} [dirtyPaths]
@@ -803,7 +834,16 @@ export function checkApplicationDevTestDeployJson(hostRoot, packageRoots, dirtyP
 }
 
 export { createDevSession, listWatchedFiles, srcFingerprint } from './dev-session.js';
-export { runCli, parseArgs, printHelp } from './cli.js';
+export { runCli, parseArgs, printHelp, printGlobalHelp, printProjectHelp } from './cli.js';
+export {
+    findNearestProjectVmz,
+    getInvocationContext,
+    isGlobalAllowedCommand,
+    isUnderNodeModules,
+    resolveThisPackageRoot,
+    resolveVmzBin,
+    gateGlobalProjectCommand,
+} from './invocation.js';
 export { resolveWorkspaceDirs, findPackageJson, readPackageMeta } from './resolve.js';
 export { resolvePackageRoot, resolveWorkspacePackages } from './packages.js';
 export { log } from './log.js';
@@ -882,21 +922,21 @@ export default {
     DX_TEST_SELECTION_SCHEMA,
     DX_SOURCE_MAP_SCHEMA,
     DX_SYMBOL_INDEX_SCHEMA,
-    DX_X2_CHECK_SCHEMA,
+    DX_CROSS_SFC_CHECK_SCHEMA,
     DX_SEMANTIC_TRANSACTION_SCHEMA,
     DX_CANCEL_SCHEMA,
     DX_AFFECTED_PREVIEW_SCHEMA,
     DX_HMR_PLAN_SCHEMA,
     DX_BUDGET_SCHEMA,
-    DX_X3_CHECK_SCHEMA,
+    DX_TRANSACTION_CHECK_SCHEMA,
     DX_BOUNDARY_VALIDATOR_SCHEMA,
     DX_LEAKAGE_SCHEMA,
     DX_CAPABILITY_TARGET_SCHEMA,
     DX_DEAD_GRAPH_SCHEMA,
-    DX_X4_CHECK_SCHEMA,
+    DX_DEPLOYMENT_PROOF_CHECK_SCHEMA,
     DX_TRACE_SCHEMA,
     DX_CAUSAL_REPLAY_SCHEMA,
-    DX_X5_CHECK_SCHEMA,
+    DX_CAUSAL_REPLAY_CHECK_SCHEMA,
     APPLICATION_PROTOCOL,
     APPLICATION_DESCRIPTOR_SCHEMA,
     APPLICATIONS_CONFIG_SCHEMA,
@@ -922,6 +962,7 @@ export default {
     PROTOCOL_CATALOG_SCHEMA,
     expectedProtocol,
     resolveNativePath,
+    resolveCoreRuntimeDist,
     loadNative,
     getProtocolVersions,
     handshake,
@@ -929,14 +970,14 @@ export default {
     queryApplicationProtocolCatalog,
     checkApplicationsJson,
     queryTargetProtocolCatalog,
-    checkMp0TargetContractJson,
+    checkMiniprogramTargetContractJson,
     queryProfileProtocolCatalog,
-    checkP0ProfileProtocolJson,
-    checkP1ProfileSolverJson,
-    checkP2UnifiedExecutorJson,
-    checkP3LifecycleRecoveryJson,
-    checkP4DeliveryProofJson,
-    checkP5CrossHostConformanceJson,
+    checkHostProfileProtocolJson,
+    checkProfileSolverJson,
+    checkUnifiedExecutorJson,
+    checkLifecycleRecoveryJson,
+    checkDeliveryProofJson,
+    checkCrossHostConformanceJson,
     PROFILE_CONFORMANCE_SCENARIO_SCHEMA,
     PROFILE_CONFORMANCE_CHECK_SCHEMA,
     PROFILE_CONFORMANCE_SURFACE_ROLES,
@@ -1046,13 +1087,13 @@ export default {
     profileCatalog,
     localeCatalog,
     queryNativeHostProtocolCatalog,
-    checkNw0NativeHostContractJson,
-    checkNw1NativeShellContractJson,
-    checkNw2NativeBridgeContractJson,
-    checkNw3NativeLifecycleContractJson,
-    checkNw4NativeFullstackContractJson,
-    checkNw5NativeSurfaceContractJson,
-    checkNw6MultiPlatformContractJson,
+    checkNativeHostContractJson,
+    checkNativeShellContractJson,
+    checkNativeBridgeContractJson,
+    checkNativeLifecycleContractJson,
+    checkNativeFullstackContractJson,
+    checkNativeSurfaceContractJson,
+    checkMultiPlatformContractJson,
     NATIVE_HOST_PROTOCOL,
     NATIVE_HOST_NATIVE_SURFACE_SCHEMA,
     NATIVE_HOST_NATIVE_SURFACE_CHECK_SCHEMA,

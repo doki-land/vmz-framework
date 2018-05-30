@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * Scan /documents tree → pages + locale dirs (D0).
+ * Scan /documents tree → pages + locale dirs .
  */
 
 import fs from 'node:fs';
@@ -50,9 +50,9 @@ export function pageKeyFromRel(relMd) {
 /**
  * @param {string} documentsRoot absolute path to .../documents
  * @returns {{
- *   locales: string[],
- *   pages: Array<{ identity: { pageKey: string, locale: string }, sourcePath: string }>,
- *   diagnostics: Array<{ code: string, severity: string, message: string, path?: string }>,
+ * locales: string[],
+ * pages: Array<{ identity: { pageKey: string, locale: string }, sourcePath: string }>,
+ * diagnostics: Array<{ code: string, severity: string, message: string, path?: string }>,
  * }}
  */
 export function scanDocumentsTree(documentsRoot) {

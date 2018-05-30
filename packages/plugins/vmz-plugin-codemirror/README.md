@@ -33,4 +33,6 @@ testable.
 - A focused coding exercise that does not need a full IDE workbench.
 - A structured text tool whose extensions are chosen for the domain.
 
-The surrounding page should load as a normal VMZ page. The editor region becomes interactive when needed and owns its state and lifetime without forcing unrelated content into an eager client shell. That is why CodeMirror is often an intentional choice, not merely “the smaller Monaco.”
+The surrounding page should load as a normal VMZ page. The editor region becomes interactive when needed and owns its
+state and lifetime without forcing unrelated content into an eager client shell. That is why CodeMirror is often an
+intentional choice, not merely “the smaller Monaco.”

@@ -27,7 +27,8 @@ npm 安装，不要期待第二套语义主链。
 | Element Plus / Ant Design / MUI / Naive / Vuetify 全量移植 | 第二套组件语义；官方不做全量端口 |
 | Tailwind utility 塞进普通 `class`                          | 用 `style:tw` / `@tailwind`      |
 
-生产交互图用官方 `<Echarts>`（`@vmz/plugin-echarts`）。DaVinci 与之平行、未稳，勿当生产默认。Recharts / Chart.js 可直接依赖，官方暂不跟进第二套 chart 组件。
+生产交互图用官方 `<Echarts>`（`@vmz/plugin-echarts`）。DaVinci 与之平行、未稳，勿当生产默认。Recharts / Chart.js
+可直接依赖，官方暂不跟进第二套 chart 组件。
 
 ## 取数 / 表单
 

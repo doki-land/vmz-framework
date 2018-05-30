@@ -3,8 +3,9 @@ name = "vmz-tools"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors.workspace = true
 rust-version.workspace = true
-description = "VMZ CLI (vmz.exe): format, check, lint, build, serve, dev — driven by oxc"
+description = "VMZ CLI (vmz): the only native binary — new, format, check, lint, build, serve, dev, lsp, mcp"
 publish = false
 
 [[bin]]
@@ -12,9 +13,10 @@ name = "vmz"
 path = "src/main.rs"
 
 [dependencies]
-anyhow.workspace = true
 clap.workspace = true
+serde_json.workspace = true
 vmz-compiler.workspace = true
+vmz-debugger.workspace = true
 vmz-inspector.workspace = true
 vmz-plugin-tailwind.workspace = true
 vmz-plugin-sasso.workspace = true

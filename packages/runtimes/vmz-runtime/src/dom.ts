@@ -2,7 +2,6 @@
 /**
  * VMZ DOM / SSR runtime — precise patches, no VDOM diff.
  *
- * Design: 规划设计/vmz/04 · Gate 3 (no production `render()`)
  *
  * Direct components expose `__vmzCreate` / `__vmzSerialize` / `__vmzPlan`.
  * Mount, SSR, hydrate, and resume all run that same schedule.
@@ -14,7 +13,6 @@ const components = Object.create(null);
 
 /**
  * Precision lab counters (test / MCP / benchmarks — not a user API).
- * Design: 规划设计/vmz/12 §7
  * Primary keys: BindingId (IR). `*ByDep` is transitional stable-string adapter.
  */
 const precision = {
@@ -38,7 +36,7 @@ const precision = {
     patchesByBinding: Object.create(null),
 };
 
-/** X5: optional StableId event ring (enabled with precision or __vmzTraceEnable). */
+/** optional StableId event ring (enabled with precision or __vmzTraceEnable). */
 const TRACE_CAP = 256;
 /** @type {{ enabled: boolean, events: Array<{ kind: string, stableId: { kind: string, id: string }, dep?: string|null, t?: number, chunkId?: string|null }> }} */
 const traceBuf = {
@@ -94,7 +92,7 @@ export function __vmzTraceReset() {
 }
 
 /**
- * X5 StableId event snapshot (`vmz.dx.trace.v0` shape without schema stamp —
+ * StableId event snapshot (`vmz.dx.trace.v0` shape without schema stamp —
  * host may wrap via ingestRuntimeTrace).
  * @returns {{ schema: string, events: typeof traceBuf.events, status: string }}
  */
@@ -183,9 +181,9 @@ export async function renderToString(Component, props = {}) {
     if (typeof inst.onMount === 'function') {
         await inst.onMount();
     }
-    // Gate 3: SSR only via Direct serialize schedule — never `render()`.
+    // production Direct emit: SSR only via Direct serialize schedule — never `render`.
     if (!(Component && Component.__vmzDirect && typeof Component.__vmzCreate === 'function')) {
-        throw new Error(`vmz:dom renderToString() requires __vmzCreate (Direct); blueprint render() removed (Gate 3)`);
+        throw new Error(`vmz:dom renderToString() requires __vmzCreate (Direct); blueprint render() removed (production Direct emit)`);
     }
     const root = await runDirectSerializeTreeWithMounts(Component, inst);
     return flattenSerializeNode(root);
@@ -211,7 +209,7 @@ export async function* renderToStream(Component, props = {}, opts = {}) {
         }
         if (aborted()) return;
         if (!(Component && Component.__vmzDirect && typeof Component.__vmzCreate === 'function')) {
-            throw new Error(`vmz:dom renderToStream() requires __vmzCreate (Direct); blueprint render() removed (Gate 3)`);
+            throw new Error(`vmz:dom renderToStream() requires __vmzCreate (Direct); blueprint render() removed (production Direct emit)`);
         }
         const root = await runDirectSerializeTreeWithMounts(Component, inst);
         if (aborted()) return;
@@ -222,14 +220,14 @@ export async function* renderToStream(Component, props = {}, opts = {}) {
             await Promise.resolve();
         }
     } finally {
-        // Abort and normal completion both dispose the SSR instance (L4 lifetime).
+        // Abort and normal completion both dispose the SSR instance (lifetime).
         destroy(inst);
     }
 }
 
 /**
  * Mount once; later updates are dep patches only (never re-run structure).
- * Requires compiler `__vmzCreate` (Gate 3 — no blueprint fallback).
+ * Requires compiler `__vmzCreate` (production Direct emit — no blueprint fallback).
  * @param {new (props?: object) => any} Component
  * @param {Element} container
  * @param {object} [props]
@@ -258,7 +256,7 @@ export async function mount(Component, container, props = {}) {
 }
 
 /**
- * Nested Direct `component()` schedules child onMount asynchronously; drain before return
+ * Nested Direct `component` schedules child onMount asynchronously; drain before return
  * so SSR/hydrate callers see post-mount DOM (e.g. UserCard Ada, not Loading…).
  * @param {object} inst
  */
@@ -281,7 +279,7 @@ async function settlePendingChildMounts(inst) {
 }
 
 /**
- * Direct create only (Gate 3).
+ * Direct create only (production Direct emit).
  * @param {new (props?: object) => any} Component
  * @param {object} inst
  */
@@ -289,7 +287,7 @@ async function createFromComponent(Component, inst) {
     if (Component && Component.__vmzDirect && typeof Component.__vmzCreate === 'function') {
         return runDirectCreate(Component, inst);
     }
-    throw new Error(`vmz:dom mount requires __vmzCreate (Direct); blueprint render() removed (Gate 3)`);
+    throw new Error(`vmz:dom mount requires __vmzCreate (Direct); blueprint render() removed (production Direct emit)`);
 }
 
 /**
@@ -306,7 +304,7 @@ function runDirectCreate(Component, inst) {
 }
 
 /**
- * L3 SSR: run the same __vmzCreate schedule against a serialize host (no render()).
+ * SSR: run the same __vmzCreate schedule against a serialize host (no render).
  * @param {new (props?: object) => any} Component
  * @param {object} inst
  */
@@ -585,7 +583,7 @@ const serializeApi = {
             else resolved[k] = v;
         }
         if (client) {
-            // L5: Island SSR includes body + ResumeEntry slice (same Direct schedule).
+            // resume: Island SSR includes body + ResumeEntry slice (same Direct schedule).
             const child = serializeApi._ssrChildInstance(Ctor, resolved);
             let body = null;
             if (Ctor.__vmzDirect && typeof Ctor.__vmzCreate === 'function') {
@@ -656,15 +654,15 @@ const serializeApi = {
 const directApi = {
     /** @type {object | null} */
     _inst: null,
-    /** @type {Array<{ deps: string[], fn: () => any, bindingId?: number|string|null }> | null} */
+    /** @type {Array<{ deps: string[], fn: => any, bindingId?: number|string|null }> | null} */
     _branchBinds: null,
-    /** @type {Array<() => void> | null} */
+    /** @type {Array< => void> | null} */
     _itemPatches: null,
     /**
-     * Active keyed-each context (P0/P1): item binds + event delegation.
+     * Active keyed-each context (/): item binds + event delegation.
      * @type {null | {
-     *   noteItemBind: (bindingId: number|string|null, deps: string[], fn: () => void) => void,
-     *   needDelegate: (type: string) => void,
+     * noteItemBind: (bindingId: number|string|null, deps: string[], fn: => void) => void,
+     * needDelegate: (type: string) => void,
      * }}
      */
     _eachCtx: null,
@@ -707,7 +705,7 @@ const directApi = {
      * @param {string[]} deps
      * @param {() => any} get
      * @param {Text} textNode
-     * @param {{ stable: string[], branches: Array<{ cond?: () => any, deps: string[] }> } | null | undefined} [cf]
+     * @param {{ stable: string[], branches: Array<{ cond?: => any, deps: string[] }> } | null | undefined} [cf]
      */
     bindText(inst, bindingId, deps, get, textNode, cf) {
         wireDirectBind(
@@ -728,7 +726,7 @@ const directApi = {
      * @param {() => any} get
      * @param {Element} el
      * @param {string} name
-     * @param {{ stable: string[], branches: Array<{ cond?: () => any, deps: string[] }> } | null | undefined} [cf]
+     * @param {{ stable: string[], branches: Array<{ cond?: => any, deps: string[] }> } | null | undefined} [cf]
      */
     bindAttr(inst, bindingId, deps, get, el, name, cf) {
         wireDirectBind(
@@ -758,7 +756,7 @@ const directApi = {
      * @param {string[]} deps
      * @param {() => any} get
      * @param {Element} el
-     * @param {{ stable: string[], branches: Array<{ cond?: () => any, deps: string[] }> } | null | undefined} [cf]
+     * @param {{ stable: string[], branches: Array<{ cond?: => any, deps: string[] }> } | null | undefined} [cf]
      */
     bindHtml(inst, bindingId, deps, get, el, cf) {
         wireDirectBind(
@@ -797,7 +795,7 @@ const directApi = {
             if (isEventEntryStrategy(String(client))) {
                 host.setAttribute('data-vmz-entry', 'event');
             }
-            // L5: resume on schedule; EventEntry may lazy-load chunk via __vmzLoadComponent.
+            // resume: resume on schedule; EventEntry may lazy-load chunk via __vmzLoadComponent.
             scheduleClientOn(host, String(client), async () => {
                 const Ctor = await resolveComponent(name);
                 if (!Ctor) throw new Error(`vmz:dom unknown component <${name} />`);
@@ -831,7 +829,7 @@ const directApi = {
      * @param {object} inst
      * @param {number|string|null} bindingId
      * @param {string[]} deps
-     * @param {Array<{ cond?: () => any, create: (api: typeof directApi) => Node }>} branches
+     * @param {Array<{ cond?: => any, create: (api: typeof directApi) => Node }>} branches
      * @param {number|string|null} [regionId]
      */
     ifBlock(inst, bindingId, deps, branches, regionId = null) {
@@ -841,7 +839,7 @@ const directApi = {
         if (regionId != null) host.setAttribute('data-vmz-region', String(regionId));
         /** @type {Array<Node | null>} */
         const cached = branches.map(() => null);
-        /** @type {Array<Array<{ deps: string[], fn: () => any, bindingId?: number|string|null }>>} */
+        /** @type {Array<Array<{ deps: string[], fn: => any, bindingId?: number|string|null }>>} */
         const branchBinds = branches.map(() => []);
         let active = -1;
         let gen = 0;
@@ -919,7 +917,7 @@ const directApi = {
 
         registerBind(inst, deps || [], apply, bindingId);
         if (directApi._itemPatches) directApi._itemPatches.push(apply);
-        // L4: parent destroy disposes all cached branch trees (pause ≠ destroy on switch).
+        // parent destroy disposes all cached branch trees (pause ≠ destroy on switch).
         host.__vmzDispose = () => {
             for (let i = 0; i < cached.length; i++) {
                 unwireBranch(i);
@@ -933,11 +931,11 @@ const directApi = {
     },
     /**
      * Direct keyed each — no blueprint `kind: "each"` dispatch.
-     * P0/P1: Set/Map + Fragment batch insert; item-local binds; host selected; event delegate.
+     * /: Set/Map + Fragment batch insert; item-local binds; host selected; event delegate.
      * @param {object} inst
      * @param {number|string|null} bindingId
      * @param {string[]} deps
-     * @param {{ as?: string, list: () => any, key?: (box: {item:any,index:number}) => any, createItem: (api: typeof directApi, box: {item:any,index:number}) => Node }} spec
+     * @param {{ as?: string, list: => any, key?: (box: {item:any,index:number}) => any, createItem: (api: typeof directApi, box: {item:any,index:number}) => Node }} spec
      * @param {number|string|null} [regionId]
      */
     eachBlock(inst, bindingId, deps, spec, regionId = null) {
@@ -948,11 +946,11 @@ const directApi = {
         frag.appendChild(start);
         frag.appendChild(end);
 
-        /** @type {Map<any, { box: { item: any, index: number }, dom: Node, patches: Array<() => void> }>} */
+        /** @type {Map<any, { box: { item: any, index: number }, dom: Node, patches: Array< => void> }>} */
         const keyed = new Map();
         let gen = 0;
 
-        /** @type {Map<string, () => void>} */
+        /** @type {Map<string, => void>} */
         const listDispatchers = new Map();
         /** @type {Set<string>} */
         const hostDispatchers = new Set();
@@ -1183,7 +1181,6 @@ const directApi = {
                 const box = { item: list[i], index: i };
                 const k = itemKey(box);
                 if (seen.has(k)) {
-                    console.error(`vmz:dom each: duplicate key ${String(k)} — undefined reuse; fix the key expression (规划设计/vmz/10 §7)`);
                 }
                 seen.add(k);
                 let entry = keyed.get(k);
@@ -1265,7 +1262,7 @@ const directApi = {
                 entry.box.index = i;
                 tagItemPatches(entry.patches, i);
                 for (const p of entry.patches) {
-                    // Leaf BindingId patches are owned by list/host dispatchers (P1).
+                    // Leaf BindingId patches are owned by list/host dispatchers .
                     if (p.__vmzBindingId != null) continue;
                     if (patchHasBindingId(inst, p)) continue;
                     try {
@@ -1294,7 +1291,7 @@ function trackDirectBind(inst, deps, fn, bindingId = null) {
         if (directApi._itemPatches) directApi._itemPatches.push(fn);
         return;
     }
-    // P1: item binds stay on entry.patches; eachBlock registers one dispatcher per BindingId.
+    // item binds stay on entry.patches; eachBlock registers one dispatcher per BindingId.
     if (directApi._itemPatches) {
         fn.__vmzItemLocal = true;
         directApi._itemPatches.push(fn);
@@ -1312,7 +1309,7 @@ function trackDirectBind(inst, deps, fn, bindingId = null) {
  * @param {string[]} deps
  * @param {() => any} get
  * @param {(raw: any) => void} write
- * @param {{ stable: string[], branches: Array<{ cond?: () => any, deps: string[] }> } | null | undefined} [cf]
+ * @param {{ stable: string[], branches: Array<{ cond?: => any, deps: string[] }> } | null | undefined} [cf]
  */
 function wireDirectBind(inst, bindingId, deps, get, write, cf) {
     let activeBranch = -1;
@@ -1355,7 +1352,7 @@ function wireDirectBind(inst, bindingId, deps, get, write, cf) {
         const branch = cf.branches[next];
         const nextDeps = [...(cf.stable || []), ...((branch && branch.deps) || [])];
         const uniq = [...new Set(nextDeps)];
-        // Item-local binds must never enter the global binder table (P1 / jfb select).
+        // Item-local binds must never enter the global binder table ( / jfb select).
         if (apply.__vmzItemLocal) {
             liveDeps = uniq;
             return;
@@ -1415,7 +1412,7 @@ function eachHostApi(start, end) {
 }
 
 /**
- * Snapshot plain state/prop field values for Island HMR (N4.3).
+ * Snapshot plain state/prop field values for Island HMR (session).
  * @param {object} inst
  * @returns {Record<string, unknown> | null}
  */
@@ -1452,7 +1449,7 @@ export function applyPreservedState(inst, state) {
 }
 
 /**
- * L5: attach to existing Island DOM without re-running construct structure or onMount.
+ * resume: attach to existing Island DOM without re-running construct structure or onMount.
  * Consumes ResumeEntry product (`data-vmz-resume`) derived from the same Execution Plan.
  * @param {new (props?: object) => any} Component
  * @param {HTMLElement} container
@@ -1501,12 +1498,12 @@ export async function resume(Component, container, slice = null) {
                 container.appendChild(node);
             }
         } else {
-            // Island leaf adopt: preserve Element identity (L5 nodeIdentity).
+            // Island leaf adopt: preserve Element identity (resume nodeIdentity).
             const node = runDirectResume(Component, inst, container);
             if (node) inst.__vmzDomRoot = node;
         }
     } else {
-        throw new Error(`vmz:dom resume() requires __vmzCreate (Direct); blueprint render() removed (Gate 3)`);
+        throw new Error(`vmz:dom resume() requires __vmzCreate (Direct); blueprint render() removed (production Direct emit)`);
     }
     container.__vmzInst = inst;
     container.__vmzResumed = true;
@@ -1564,7 +1561,7 @@ export function attachEventEntries(root = globalThis.document) {
 }
 
 /**
- * Adopt existing Island DOM while running the same `__vmzCreate` schedule (L5).
+ * Adopt existing Island DOM while running the same `__vmzCreate` schedule (resume).
  * @param {new (props?: object) => any} Component
  * @param {object} inst
  * @param {Element} container
@@ -1647,9 +1644,9 @@ export async function hydrate(Component, container, props = {}, opts = {}) {
         applyPreservedState(inst, preserved);
     }
 
-    // Gate 3: hydrate uses the same Direct schedule as resume (no render()).
+    // production Direct emit: hydrate uses the same Direct schedule as resume (no render).
     if (!(Component && Component.__vmzDirect && typeof Component.__vmzCreate === 'function')) {
-        throw new Error(`vmz:dom hydrate() requires __vmzCreate (Direct); blueprint render() removed (Gate 3)`);
+        throw new Error(`vmz:dom hydrate() requires __vmzCreate (Direct); blueprint render() removed (production Direct emit)`);
     }
 
     // Wire DOM + events BEFORE awaiting onMount. SSR shell is already visible; if we
@@ -1684,14 +1681,14 @@ export async function hydrate(Component, container, props = {}, opts = {}) {
 /**
  * Tear down binders and stop patches. Safe to call more than once.
  * Field writes after destroy no longer update DOM (values may still change).
- * L4: also dispose owned DOM trees (child __vmzInst / region __vmzDispose).
+ *: also dispose owned DOM trees (child __vmzInst / region __vmzDispose).
  * @param {object} inst
  */
 export function destroy(inst) {
     if (!inst || inst.__vmzDestroyed) return;
     inst.__vmzDestroyed = true;
     inst.__vmzFlushScheduled = false;
-    // L4 async cancel: abort in-flight tasks before tearing down DOM.
+    // async cancel: abort in-flight tasks before tearing down DOM.
     __vmzCancelTasks(inst);
     if (inst.__vmzDomRoot) {
         disposeDomTree(inst.__vmzDomRoot);
@@ -1713,7 +1710,7 @@ export function destroy(inst) {
 }
 
 /**
- * L4: walk a DOM subtree and run lifetime dispose hooks + nested instance destroy.
+ *: walk a DOM subtree and run lifetime dispose hooks + nested instance destroy.
  * Does not mark the *calling* parent destroyed; safe from destroy(inst).
  * @param {Node | null | undefined} root
  */
@@ -1750,7 +1747,7 @@ export function disposeDomTree(root) {
  * @param {ParentNode} [root]
  */
 export function hydrateIslands(root = globalThis.document) {
-    // L5: hydrateIslands is an alias for resumeIslands (same Plan attach).
+    // resume: hydrateIslands is an alias for resumeIslands (same Plan attach).
     return resumeIslands(root);
 }
 
@@ -1850,7 +1847,7 @@ export function __vmzRunTask(inst, key, fn) {
     };
     inst.__vmzTasks[k] = entry;
 
-    // Invoke synchronously so event handlers can call preventDefault() before
+    // Invoke synchronously so event handlers can call preventDefault before
     // the browser continues the default action (form submit → native navigation).
     // Async work still continues via the returned Promise.
     let syncResult;
@@ -1926,7 +1923,7 @@ function createInstance(Component, props = {}) {
     inst.__vmzDepToBindings = Object.create(null);
     makeReactive(inst, Component.__vmzState || []);
     makeReactive(inst, Component.__vmzProps || []);
-    // L4 WriteBarrier: path / array writes call Component helpers (no import needed).
+    // WriteBarrier: path / array writes call Component helpers (no import needed).
     Component.__vmzWritePath = __vmzWritePath;
     Component.__vmzWritePathLogical = __vmzWritePathLogical;
     Component.__vmzReadPath = __vmzReadPath;
@@ -1938,14 +1935,13 @@ function createInstance(Component, props = {}) {
 
 /** Shared plain-object owners under WriteBarrier (no Proxy). */
 const wbSharedOwners = new WeakMap();
-/** Objects explicitly marked OK to share across component instances (13 §7.3). */
+/** Objects explicitly marked OK to share across component instances (13 ). */
 const wbAllowShared = new WeakSet();
 /** @type {Array<{ kind: string, message: string }>} */
 const wbCrossComponentDiags = [];
 
 /**
  * Mark a plain object as intentionally shared across ownership boundaries.
- * Suppresses cross-component shared diagnostics (规划设计/vmz/13 §7.3).
  * @param {any} value
  */
 export function __vmzAllowShared(value) {
@@ -1994,11 +1990,10 @@ function registerWbOwner(value, report, baseSegs = [], inst = null) {
         return;
     }
     entry.owners.push({ report, baseSegs: baseSegs.slice(), inst });
-    // Cross-component share without explicit allow → diagnose (13 §7.3).
+    // Cross-component share without explicit allow → diagnose (13 ).
     if (!wbAllowShared.has(value) && inst) {
         const other = entry.owners.find((o) => o.inst && o.inst !== inst);
         if (other) {
-            const msg = 'vmz: plain object shared across component instances without __vmzAllowShared (规划设计/vmz/13 §7.3)';
             if (!wbCrossComponentDiags.some((d) => d.message === msg)) {
                 wbCrossComponentDiags.push({ kind: 'shared_cross_component', message: msg });
             }
@@ -2065,7 +2060,6 @@ export function __vmzWritePathLogical(inst, root, segs, kind, rhs) {
 }
 
 /**
- * Compiler-inserted path write barrier (规划设计/vmz/13 §7.3).
  * Mutates a plain owned object/array and schedules the same path notice Proxy would.
  *
  * Root-array index assigns (`tags[0] = x`) notify as field replace (structural),
@@ -2190,7 +2184,7 @@ const reactiveProxies = new WeakMap();
 const writeBarrierOwned = new WeakSet();
 
 /**
- * L4 WriteBarrier: true when value is an owned plain object with path barriers (no Proxy).
+ * WriteBarrier: true when value is an owned plain object with path barriers (no Proxy).
  * @param {any} value
  */
 export function __vmzIsWriteBarrierOwned(value) {
@@ -2252,7 +2246,7 @@ function notifyOwners(owners, localSegs) {
 
 /**
  * Field-owned write traps for plain objects / arrays on state fields.
- * Plain objects: WriteBarrier via defineProperty (no Proxy) — L4 / 13 §7.3.
+ * Plain objects: WriteBarrier via defineProperty (no Proxy) — .
  * Arrays: transitional Proxy until keyed collection barriers land.
  * Shared raw objects notify **all** current owners.
  *
@@ -2453,11 +2447,10 @@ function wrapArray(arr, report, pathSegs) {
  * Still precise deps — never a full-tree re-render. Flush runs as a microtask;
  * call `await flushPending(inst)` to apply synchronously (tests / immediate UI).
  *
- * Design: 规划设计/vmz/12 §6 — parent write covers children; siblings stay separate.
  *
  * @param {object} inst
  * @param {{ type: 'replace', root: string } | { type: 'path', root: string, segs: string[] } | string} notice
- *        string form is transitional field-root alias for replace.
+ * string form is transitional field-root alias for replace.
  */
 function scheduleRefresh(inst, notice) {
     if (!inst || inst.__vmzDestroyed) return;
@@ -2721,7 +2714,6 @@ function pathDirtyCovers(node, depSegs) {
 
 /**
  * Dual-track match retained for tests / tooling.
- * Design: 规划设计/vmz/11 §2.2 + 12 §6 parent-covers-children.
  * @param {{ type: string, root: string, segs?: string[] }} notice
  * @param {string} key
  */

@@ -1,7 +1,7 @@
 {
     "name": "vmz",
     "displayName": "VMZ",
-    "description": "Syntax highlighting for .vmz (grammar from vmz-textmate)",
+    "description": "VMZ language support — TextMate grammar + LSP via `vmz lsp`",
     "version": "0.1.0",
     "private": true,
     "publisher": "vmz-framework",
@@ -11,17 +11,49 @@
     "categories": [
         "Programming Languages"
     ],
+    "activationEvents": [
+        "onLanguage:vmz"
+    ],
     "main": "./extension.js",
     "scripts": {
-        "sync": "node ../../../scripts/sync-vscode-textmate.mjs",
+        "sync": "node ../../../scripts/dev/sync-vscode-textmate.mjs",
         "prepackage": "pnpm sync",
         "package": "echo \"run vsce package after pnpm sync\""
     },
     "dependencies": {
         "json5": "^2.2.3",
+        "vscode-languageclient": "^9.0.1",
         "vmz-textmate": "workspace:*"
     },
     "contributes": {
+        "configuration": {
+            "title": "VMZ",
+            "properties": {
+                "vmz.lsp.path": {
+                    "type": "string",
+                    "default": "",
+                    "markdownDescription": "Absolute path to the **native** `vmz` binary (vmz-tools). Empty = auto-detect (`VMZ_NATIVE`, workspace `target/{release,debug}/vmz`, then `vmz` on PATH)."
+                },
+                "vmz.lsp.arguments": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "description": "Extra arguments after `lsp` (for example `--out-dir dist`)."
+                },
+                "vmz.lsp.trace": {
+                    "type": "string",
+                    "enum": [
+                        "off",
+                        "messages",
+                        "verbose"
+                    ],
+                    "default": "off",
+                    "description": "Trace communication between VS Code and `vmz lsp`."
+                }
+            }
+        },
         "languages": [
             {
                 "id": "vmz",

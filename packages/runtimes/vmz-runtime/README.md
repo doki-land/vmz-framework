@@ -31,7 +31,8 @@ state write
   -> direct patch / switch / reconcile
 ```
 
-There is no default detour through “execute every component that might matter, build virtual nodes, then compare them.” If analysis must widen, it widens to a safe region and should preserve the reason.
+There is no default detour through “execute every component that might matter, build virtual nodes, then compare them.”
+If analysis must widen, it widens to a safe region and should preserve the reason.
 
 ## More than DOM updates
 
@@ -41,7 +42,8 @@ There is no default detour through “execute every component that might matter,
 - **Resumption:** the browser attaches to server-produced work at the smallest reachable boundary.
 - **Zero-JS delivery:** pages with no interactive requirement do not need an eager framework shell.
 
-The runtime should not grow a second compiler made of reflection, string dependencies, or generic proxies. Its quality comes from faithfully executing the generated plan while keeping the production surface focused.
+The runtime should not grow a second compiler made of reflection, string dependencies, or generic proxies. Its quality
+comes from faithfully executing the generated plan while keeping the production surface focused.
 
 ## License
 

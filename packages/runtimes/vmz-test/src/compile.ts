@@ -1,5 +1,5 @@
 /**
- * Compile-mode host for `vmz test` / `@vmz/test` (T1+).
+ * Compile-mode host for `vmz test` / `@vmz/test` (+).
  * Builds the project and checks graph/plan/view assertions against dist artifacts.
  */
 
@@ -305,7 +305,7 @@ export function runCompileManifest(manifest: Record<string, unknown>, ctx: { out
                 }
                 if (expect.noRender === true || expect.noRenderFallback === true) {
                     if (clientJs.includes('prototype.render')) {
-                        fail('production client must not emit prototype.render (Gate 3)');
+                        fail('production client must not emit prototype.render (production Direct emit)');
                     }
                 }
                 if (typeof expect.includes === 'string' && !clientJs.includes(expect.includes)) {

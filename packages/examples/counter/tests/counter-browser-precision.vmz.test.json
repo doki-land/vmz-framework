@@ -1,7 +1,7 @@
 {
     "schema": "vmz.test.manifest.v0",
     "id": "counter.browser.precision",
-    "title": "T2 Browser: precision patch on real document (no remount)",
+    "title": " Browser: precision patch on real document (no remount)",
     "modes": ["browser"],
     "program": {
         "chunkId": "components/CounterButton",

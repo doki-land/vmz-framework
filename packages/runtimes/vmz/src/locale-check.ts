@@ -1,7 +1,6 @@
 // @ts-nocheck
 /**
- * Locale I0 check + I1 message contracts / typed module projection.
- * Design: 规划设计/vmz/28 · I0/I1
+ * Locale check + message contracts / typed module projection.
  *
  * Not an I18n IR: filesystem + MessageCatalogManifest projection into VPG-shaped views.
  */
@@ -511,7 +510,7 @@ export function checkLocales(opts) {
         }
     }
 
-    // I1: scan source for #locales/* imports / message references.
+    // scan source for #locales/* imports / message references.
     const used = scanLocaleUsages(projectRoot);
     /** @type {any[]} */
     const typedModules = [];
@@ -643,7 +642,7 @@ function walkCatalogFiles(dir, fn) {
 
 /**
  * Scan src for `#locales/<catalog>` imports and `messageId` string literals after import.
- * First-slice heuristic — full VPG edges land with compiler I1 deepen.
+ * First-slice heuristic — full VPG edges land with compiler deepen.
  */
 export function scanLocaleUsages(projectRoot) {
     /** @type {Set<string>} */
@@ -688,7 +687,7 @@ function walkSource(dir, fn) {
 }
 
 /**
- * Emit typed module stubs for `#locales/*` (I1 surface).
+ * Emit typed module stubs for `#locales/*` ( surface).
  * @param {ReturnType<typeof checkLocales>} report
  * @param {string} outDir
  */
@@ -726,7 +725,7 @@ export function emitLocaleTypedModules(report, outDir) {
 }
 
 /**
- * MessageId rename plan (I1) — WorkspaceEdit-shaped, no parallel rename IR.
+ * MessageId rename plan — WorkspaceEdit-shaped, no parallel rename IR.
  * @param {ReturnType<typeof checkLocales>} report
  * @param {string} fromId
  * @param {string} toId

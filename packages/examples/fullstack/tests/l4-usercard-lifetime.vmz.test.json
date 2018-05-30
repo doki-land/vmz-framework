@@ -1,7 +1,7 @@
 {
     "schema": "vmz.test.manifest.v0",
     "id": "l4.compile.usercard.lifetime",
-    "title": "L4: UserCard each lifetime + disposes edges",
+    "title": ": UserCard each lifetime + disposes edges",
     "modes": ["compile"],
     "program": {
         "chunkId": "components/UserCard",

@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test';
-import { expect } from '../../../../scripts/test-expect.mjs';
+import { expect } from '../../../../scripts/test/expect.mjs';
 import { exampleDist, importDist, installDocument, installServerResolver, loadDom, loadRuntime } from '@vmz-examples/test-utils';
 
 const dist = exampleDist('fullstack');
@@ -36,7 +36,7 @@ describe('path trie scheduling', () => {
         }
         inst.__vmzBinders['user.address.city'].push(cityFn);
 
-        // Parent write: replace address object  - ?path notice user.address
+        // Parent write: replace address object - ?path notice user.address
         inst.user.address = { city: 'Paris' };
         await flushPending(inst);
 

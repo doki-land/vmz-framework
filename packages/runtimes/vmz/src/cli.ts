@@ -1,13 +1,14 @@
 // @ts-nocheck
 /**
- * Node CLI command implementations (N2).
+ * Node CLI command implementations .
  */
 
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { copyFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { HOST_PROTOCOL, createWorkspace, getProtocolVersions } from './index.js';
+import { HOST_PROTOCOL, createWorkspace, getProtocolVersions, resolveCoreRuntimeDist } from './index.js';
 import { createDevSession } from './dev-session.js';
+import { gateGlobalProjectCommand, getInvocationContext, isGlobalAllowedCommand } from './invocation.js';
 import { log } from './log.js';
 import { readPackageMeta, resolveWorkspaceDirs } from './resolve.js';
 import { cmdTest } from './test-cmd.js';
@@ -17,6 +18,7 @@ import { cmdLocale } from './locale-cmd.js';
 import { cmdApplication } from './application-cmd.js';
 import { cmdRefactor } from './refactor-cmd.js';
 import { cmdExplain } from './explain-cmd.js';
+import { resolveNativeVmzCli } from './resolve-native-cli.js';
 
 /**
  * @param {string[]} argv
@@ -62,21 +64,50 @@ export function parseArgs(argv) {
     return out;
 }
 
-export function printHelp() {
-    console.log(`vmz — Node toolchain host (N-API workspace)
+export function printGlobalHelp() {
+    console.log(`vmz — global mode (scaffold only)
+
+Three install modes:
+  developer  monorepo source (packages/runtimes/vmz) — full CLI
+  project    app node_modules/@vmz/vmz (or vmz) — full CLI
+  global     npm/pnpm -g — only new/init/help/version
+
+You are in global mode. Pin \`@vmz/vmz\` in the app so check/build/lsp
+use a traceable project install.
 
 Usage:
+  vmz new|init <dir>            Scaffold (native CLI; Node only gates + forwards)
+  vmz version                   Show host + native protocol versions
+  vmz help                      Show this help
+
+Project commands:
+  pnpm add -D @vmz/vmz
+  pnpm exec vmz check
+  # or: vmz new my-app && cd my-app && pnpm install
+
+If a project \`node_modules/@vmz/vmz\` (or \`vmz\`) exists, a global
+\`vmz <cmd>\` re-execs that bin.
+`);
+}
+
+export function printProjectHelp() {
+    console.log(`vmz — Node toolchain host (project / developer mode)
+
+Usage:
+  vmz new|init <dir>            Scaffold a minimal app (native CLI)
   vmz check [path]              Check project via Workspace
   vmz build [path] [options]    Build project via Workspace
   vmz serve [path] [options]    Serve dist (optional --build)
   vmz dev [path] [options]      Long-lived rebuild session (no CLI spawn)
   vmz format [path] [--check]   Format .vmz via N-API (oxc codegen)
   vmz lint [path] [--deny-warnings]  Lint (= check) via N-API
-  vmz test [path] [options]     Native test discover / report (T0+)
-  vmz document|docs <cmd>       Project /documents domain (D0: check)
-  vmz application <cmd>         Application Collection / Mount (M0–M5)
-  vmz refactor <cmd>            DX rename plans / apply (X1)
+  vmz test [path] [options]     Native test discover / report
+  vmz document|docs <cmd>       Project /documents domain 
+  vmz application <cmd>         Application Collection / Mount 
+  vmz refactor <cmd>            DX rename plans / apply 
   vmz explain [style] <target>  DX causal explain (style Theme chain)
+  vmz lsp [root] [--out-dir]    Language server (stdio; native CLI)
+  vmz mcp [root] [--out-dir]    MCP server (stdio; native CLI)
   vmz version                   Show host + native protocol versions
   vmz help                      Show this help
 
@@ -101,22 +132,52 @@ Options:
 `);
 }
 
+/** @deprecated use printProjectHelp / printGlobalHelp */
+export function printHelp() {
+    printProjectHelp();
+}
+
 /**
  * @param {string[]} argv
+ * @param {{
+ * cwd?: string,
+ * thisPackageRoot?: string,
+ * reexec?: (bin: string, argv: string[]) => Promise<number>,
+ * }} [opts]
  * @returns {Promise<number>}
  */
-export async function runCli(argv) {
+export async function runCli(argv, opts = {}) {
     const [cmd, ...rest] = argv;
+    const inv = getInvocationContext({
+        cwd: opts.cwd,
+        thisPackageRoot: opts.thisPackageRoot,
+    });
+
     if (!cmd || cmd === 'help' || cmd === '-h' || cmd === '--help') {
-        printHelp();
+        if (inv.mode === 'global') printGlobalHelp();
+        else printProjectHelp();
         return 0;
     }
     if (cmd === 'version' || cmd === '-V' || cmd === '--version') {
         return cmdVersion();
     }
 
+    if (!isGlobalAllowedCommand(cmd)) {
+        const gated = await gateGlobalProjectCommand({
+            argv,
+            cwd: opts.cwd,
+            thisPackageRoot: opts.thisPackageRoot,
+            reexec: opts.reexec,
+            logError: (msg) => log.error(msg),
+        });
+        if (gated.action === 'exit') return gated.code;
+    }
+
     const args = parseArgs(rest);
     switch (cmd) {
+        case 'new':
+        case 'init':
+            return cmdNativeForward(cmd, rest);
         case 'check':
             return cmdCheck(args);
         case 'build':
@@ -145,11 +206,45 @@ export async function runCli(argv) {
             return cmdRefactor(rest);
         case 'explain':
             return cmdExplain(rest);
+        case 'lsp':
+            return cmdNativeForward('lsp', rest);
+        case 'mcp':
+            return cmdNativeForward('mcp', rest);
         default:
             log.error(`unknown command \`${cmd}\``);
-            printHelp();
+            if (inv.mode === 'global') printGlobalHelp();
+            else printProjectHelp();
             return 1;
     }
+}
+
+/**
+ * Forward to the single native `vmz` binary (vmz-tools).
+ * Scaffold / stdio servers live in Rust — Node only gates + re-execs.
+ *
+ * @param {'new' | 'init' | 'lsp' | 'mcp'} sub
+ * @param {string[]} argv
+ * @returns {Promise<number>}
+ */
+function cmdNativeForward(sub, argv) {
+    const bin = resolveNativeVmzCli();
+    if (!bin) {
+        log.error('native `vmz` CLI not found (vmz-tools).');
+        log.error('Build: cargo build -p vmz-tools');
+        log.error('Or set VMZ_NATIVE to the absolute path of that binary.');
+        return Promise.resolve(1);
+    }
+    return new Promise((resolve) => {
+        const child = spawn(bin, [sub, ...argv], { stdio: 'inherit' });
+        child.on('error', (err) => {
+            log.error(`failed to spawn ${bin}: ${err.message}`);
+            resolve(1);
+        });
+        child.on('exit', (code, signal) => {
+            if (signal) resolve(1);
+            else resolve(code ?? 1);
+        });
+    });
 }
 
 function cmdVersion() {
@@ -248,8 +343,15 @@ async function cmdServe(args) {
     });
     const hostJs = path.join(outDir, 'vmz-serve-host.mjs');
     if (!existsSync(hostJs)) {
-        log.error(`missing ${hostJs} — run \`vmz build\` first (or pass --build)`);
-        return 1;
+        const coreDist = resolveCoreRuntimeDist();
+        const src = coreDist ? path.join(coreDist, 'serve-host.mjs') : null;
+        if (src && existsSync(src)) {
+            copyFileSync(src, hostJs);
+            log.info(`materialized ${hostJs} from @vmz/core (release builds omit it)`);
+        } else {
+            log.error(`missing ${hostJs} — run \`vmz build\` (without --release) or ensure @vmz/core is installed`);
+            return 1;
+        }
     }
     const host = typeof args.host === 'string' ? args.host : '127.0.0.1';
     const port = Number(args.port ?? 5173);

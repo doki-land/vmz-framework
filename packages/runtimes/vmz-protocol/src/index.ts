@@ -293,21 +293,21 @@ export const DX_RENAME_SCHEMA = 'vmz.dx.rename.v0';
 export const DX_TEST_SELECTION_SCHEMA = 'vmz.dx.test_selection.v0';
 export const DX_SOURCE_MAP_SCHEMA = 'vmz.dx.source_map.v0';
 export const DX_SYMBOL_INDEX_SCHEMA = 'vmz.dx.symbol_index.v0';
-export const DX_X2_CHECK_SCHEMA = 'vmz.dx.x2_check.v0';
+export const DX_CROSS_SFC_CHECK_SCHEMA = 'vmz.dx.cross_sfc_check.v0';
 export const DX_SEMANTIC_TRANSACTION_SCHEMA = 'vmz.dx.semantic_transaction.v0';
 export const DX_CANCEL_SCHEMA = 'vmz.dx.cancel.v0';
 export const DX_AFFECTED_PREVIEW_SCHEMA = 'vmz.dx.affected_preview.v0';
 export const DX_HMR_PLAN_SCHEMA = 'vmz.dx.hmr_plan.v0';
 export const DX_BUDGET_SCHEMA = 'vmz.dx.budget.v0';
-export const DX_X3_CHECK_SCHEMA = 'vmz.dx.x3_check.v0';
+export const DX_TRANSACTION_CHECK_SCHEMA = 'vmz.dx.transaction_check.v0';
 export const DX_BOUNDARY_VALIDATOR_SCHEMA = 'vmz.dx.boundary_validator.v0';
 export const DX_LEAKAGE_SCHEMA = 'vmz.dx.leakage.v0';
 export const DX_CAPABILITY_TARGET_SCHEMA = 'vmz.dx.capability_target.v0';
 export const DX_DEAD_GRAPH_SCHEMA = 'vmz.dx.dead_graph.v0';
-export const DX_X4_CHECK_SCHEMA = 'vmz.dx.x4_check.v0';
+export const DX_DEPLOYMENT_PROOF_CHECK_SCHEMA = 'vmz.dx.deployment_proof_check.v0';
 export const DX_TRACE_SCHEMA = 'vmz.dx.trace.v0';
 export const DX_CAUSAL_REPLAY_SCHEMA = 'vmz.dx.causal_replay.v0';
-export const DX_X5_CHECK_SCHEMA = 'vmz.dx.x5_check.v0';
+export const DX_CAUSAL_REPLAY_CHECK_SCHEMA = 'vmz.dx.causal_replay_check.v0';
 
 export const TEST_PROTOCOL = 'vmz.test.protocol.v0';
 export const TEST_MANIFEST_SCHEMA = 'vmz.test.manifest.v0';
@@ -341,13 +341,13 @@ export const APPLICATION_DEV_CHECK_SCHEMA = 'vmz.application.dev_check.v0';
 
 /**
  * @returns {{
- *   schema: string,
- *   host: string,
- *   compiler: string,
- *   plugin: string,
- *   program: string,
- *   plan: string,
- *   domains: Array<{ kind: string, schema: string }>
+ * schema: string,
+ * host: string,
+ * compiler: string,
+ * plugin: string,
+ * program: string,
+ * plan: string,
+ * domains: Array<{ kind: string, schema: string }>
  * }}
  */
 export function protocolCatalog() {
@@ -372,9 +372,9 @@ export function protocolCatalog() {
 
 /**
  * @returns {{
- *   schema: string,
- *   protocol: string,
- *   documents: Array<{ kind: string, schema: string }>
+ * schema: string,
+ * protocol: string,
+ * documents: Array<{ kind: string, schema: string }>
  * }}
  */
 export function dxCatalog() {
@@ -392,30 +392,30 @@ export function dxCatalog() {
             { kind: 'test_selection', schema: DX_TEST_SELECTION_SCHEMA },
             { kind: 'source_map', schema: DX_SOURCE_MAP_SCHEMA },
             { kind: 'symbol_index', schema: DX_SYMBOL_INDEX_SCHEMA },
-            { kind: 'x2_check', schema: DX_X2_CHECK_SCHEMA },
+            { kind: 'cross_sfc_check', schema: DX_CROSS_SFC_CHECK_SCHEMA },
             { kind: 'semantic_transaction', schema: DX_SEMANTIC_TRANSACTION_SCHEMA },
             { kind: 'cancel', schema: DX_CANCEL_SCHEMA },
             { kind: 'affected_preview', schema: DX_AFFECTED_PREVIEW_SCHEMA },
             { kind: 'hmr_plan', schema: DX_HMR_PLAN_SCHEMA },
             { kind: 'budget', schema: DX_BUDGET_SCHEMA },
-            { kind: 'x3_check', schema: DX_X3_CHECK_SCHEMA },
+            { kind: 'transaction_check', schema: DX_TRANSACTION_CHECK_SCHEMA },
             { kind: 'boundary_validator', schema: DX_BOUNDARY_VALIDATOR_SCHEMA },
             { kind: 'leakage', schema: DX_LEAKAGE_SCHEMA },
             { kind: 'capability_target', schema: DX_CAPABILITY_TARGET_SCHEMA },
             { kind: 'dead_graph', schema: DX_DEAD_GRAPH_SCHEMA },
-            { kind: 'x4_check', schema: DX_X4_CHECK_SCHEMA },
+            { kind: 'deployment_proof_check', schema: DX_DEPLOYMENT_PROOF_CHECK_SCHEMA },
             { kind: 'trace', schema: DX_TRACE_SCHEMA },
             { kind: 'causal_replay', schema: DX_CAUSAL_REPLAY_SCHEMA },
-            { kind: 'x5_check', schema: DX_X5_CHECK_SCHEMA },
+            { kind: 'causal_replay_check', schema: DX_CAUSAL_REPLAY_CHECK_SCHEMA },
         ],
     };
 }
 
 /**
  * @returns {{
- *   schema: string,
- *   protocol: string,
- *   documents: Array<{ kind: string, schema: string }>
+ * schema: string,
+ * protocol: string,
+ * documents: Array<{ kind: string, schema: string }>
  * }}
  */
 export function testCatalog() {
@@ -434,9 +434,9 @@ export function testCatalog() {
 
 /**
  * @returns {{
- *   schema: string,
- *   protocol: string,
- *   documents: Array<{ kind: string, schema: string }>
+ * schema: string,
+ * protocol: string,
+ * documents: Array<{ kind: string, schema: string }>
  * }}
  */
 export function applicationCatalog() {
@@ -492,11 +492,11 @@ export interface DomainCatalog {
 
 /**
  * @returns {{
- *   schema: string,
- *   protocol: string,
- *   documents: Array<{ kind: string, schema: string }>,
- *   diagnostics: string[],
- *   viewOperations: string[]
+ * schema: string,
+ * protocol: string,
+ * documents: Array<{ kind: string, schema: string }>,
+ * diagnostics: string[],
+ * viewOperations: string[]
  * }}
  */
 export function targetCatalog() {
@@ -533,17 +533,17 @@ export function targetCatalog() {
 
 /**
  * @returns {{
- *   schema: string,
- *   protocol: string,
- *   documents: Array<{ kind: string, schema: string }>,
- *   diagnostics: string[],
- *   capabilityClasses: string[],
- *   forbiddenBridgePatterns: string[],
- *   requiredShellHooks: string[],
- *   firstBatchStubIds: string[],
- *   requiredLifecycleEvents: string[],
- *   highValueSurfaceKinds: string[],
- *   requiredMultiPlatforms: string[]
+ * schema: string,
+ * protocol: string,
+ * documents: Array<{ kind: string, schema: string }>,
+ * diagnostics: string[],
+ * capabilityClasses: string[],
+ * forbiddenBridgePatterns: string[],
+ * requiredShellHooks: string[],
+ * firstBatchStubIds: string[],
+ * requiredLifecycleEvents: string[],
+ * highValueSurfaceKinds: string[],
+ * requiredMultiPlatforms: string[]
  * }}
  */
 export function nativeHostCatalog() {
@@ -642,13 +642,13 @@ export function nativeHostCatalog() {
 
 /**
  * @returns {{
- *   schema: string,
- *   protocol: string,
- *   documents: Array<{ kind: string, schema: string }>,
- *   diagnostics: string[],
- *   surfaceKinds: string[],
- *   unifiedLifecycleEvents: string[],
- *   coreIdPrefix: string
+ * schema: string,
+ * protocol: string,
+ * documents: Array<{ kind: string, schema: string }>,
+ * diagnostics: string[],
+ * surfaceKinds: string[],
+ * unifiedLifecycleEvents: string[],
+ * coreIdPrefix: string
  * }}
  */
 export function profileCatalog() {
@@ -748,11 +748,11 @@ export function profileCatalog() {
 
 /**
  * @returns {{
- *   schema: string,
- *   protocol: string,
- *   documents: Array<{ kind: string, schema: string }>,
- *   diagnostics: string[],
- *   virtualModulePrefix: string
+ * schema: string,
+ * protocol: string,
+ * documents: Array<{ kind: string, schema: string }>,
+ * diagnostics: string[],
+ * virtualModulePrefix: string
  * }}
  */
 export function localeCatalog() {

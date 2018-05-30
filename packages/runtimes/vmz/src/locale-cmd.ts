@@ -1,7 +1,6 @@
 // @ts-nocheck
 /**
- * `vmz locale` CLI (I0–I5).
- * Design: 规划设计/vmz/28 §12
+ * `vmz locale` CLI (–).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,7 +20,7 @@ import {
 import { log } from './log.js';
 
 function printLocaleHelp() {
-    console.log(`vmz locale — /locales application i18n (I0–I5)
+    console.log(`vmz locale — /locales application i18n (–)
 
 Usage:
   vmz locale check [project]       Check locales.json5 + catalogs + param contracts
@@ -168,7 +167,7 @@ function cmdLocaleRename(args) {
         log.error(plan.error || 'rename failed');
     } else {
         log.info(`rename plan ${fromId} → ${toId} edits=${plan.edits.length}`);
-        for (const e of plan.edits) console.log(`  ${e.path}`);
+        for (const e of plan.edits) console.log(` ${e.path}`);
     }
     return plan.status === 'ready' ? 0 : 1;
 }
@@ -331,7 +330,7 @@ function cmdLocaleExplain(args) {
             `explain ${report.messageId}: resolved=${report.resolvedLocale} params=${(report.params || []).map((p) => p.name).join(',') || '(none)'}`,
         );
         for (const [loc, v] of Object.entries(report.variants || {})) {
-            console.log(`  ${loc}\t${v.template}`);
+            console.log(` ${loc}\t${v.template}`);
         }
     }
     return report.status === 'ready' ? 0 : 1;
@@ -357,8 +356,8 @@ function cmdLocaleDiff(args) {
         log.info(
             `diff ${baseLocale} → ${targetLocale}: missing=${report.summary.missingInTarget} changed=${report.summary.changed} params=${report.summary.paramMismatches}`,
         );
-        for (const id of report.missingInTarget || []) console.log(`  - missing ${id}`);
-        for (const c of report.changed || []) console.log(`  ~ ${c.messageId}`);
+        for (const id of report.missingInTarget || []) console.log(` - missing ${id}`);
+        for (const c of report.changed || []) console.log(` ~ ${c.messageId}`);
     }
     return 0;
 }

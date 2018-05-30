@@ -1,7 +1,6 @@
 // @ts-nocheck
 /**
- * Document D2 Evidence — fence check + API refs from Program Graph.
- * Design: 规划设计/vmz/19 §4 · §8 D2
+ * Document Evidence — fence check + API refs from Program Graph.
  *
  * Not a Doc IR: filesystem/manifest projection + Workspace/Program Graph queries.
  */
@@ -108,10 +107,10 @@ export function resolveApiSymbol(index, query) {
 /**
  * @param {import('./document-schema.js').DocumentManifest} manifest
  * @param {{
- *   analyzeMarkdown: Function,
- *   projectRoot: string,
- *   createWorkspace?: Function,
- *   ensureProgramGraph?: boolean,
+ * analyzeMarkdown: Function,
+ * projectRoot: string,
+ * createWorkspace?: Function,
+ * ensureProgramGraph?: boolean,
  * }} ctx
  */
 export async function enrichDocumentEvidence(manifest, ctx) {
@@ -429,21 +428,30 @@ function checkScriptFence({ fence, meta, sourcePath, page }) {
             diagnostics.push({
                 code: DIAG.FENCE_CHECK,
                 severity: 'error',
-                message: `${meta.lang} fence parse produced empty SourceFile`,
+                message: `${meta.lang} fence parse produced no SourceFile`,
                 path: `${sourcePath}:${fence.lineStart}`,
             });
-            return { record: { status: 'failed' }, diagnostics };
+            return { record: { status: 'failed', detail: 'parse' }, diagnostics };
         }
-        return { record: { status: 'ok', detail: 'syntax' }, diagnostics };
+        return { record: { status: 'ok' }, diagnostics };
     } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (/Cannot find module ['\"]typescript['\"]/i.test(msg) || e?.code === 'MODULE_NOT_FOUND') {
+            diagnostics.push({
+                code: DIAG.FENCE_CHECK,
+                severity: 'error',
+                message: 'TS/JS fence check needs `typescript` (optional peer of `@vmz/vmz`). Install: pnpm add -D typescript',
+                path: `${sourcePath}:${fence.lineStart}`,
+            });
+            return { record: { status: 'failed', detail: 'missing-typescript' }, diagnostics };
+        }
         diagnostics.push({
             code: DIAG.FENCE_CHECK,
             severity: 'error',
-            message: `${meta.lang} fence check unavailable: ${e.message || e}`,
+            message: `${meta.lang} fence check failed: ${msg}`,
             path: `${sourcePath}:${fence.lineStart}`,
-            pageKey: page?.identity?.pageKey,
         });
-        return { record: { status: 'failed', detail: 'engine' }, diagnostics };
+        return { record: { status: 'failed', detail: 'exception' }, diagnostics };
     }
 }
 

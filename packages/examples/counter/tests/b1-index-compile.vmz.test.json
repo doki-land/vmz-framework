@@ -1,7 +1,7 @@
 {
     "schema": "vmz.test.manifest.v0",
     "id": "b1.compile.index",
-    "title": "B1/L2: IndexPage Direct api.component",
+    "title": "B1/: IndexPage Direct api.component",
     "modes": ["compile"],
     "program": {
         "chunkId": "pages/index",

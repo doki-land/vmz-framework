@@ -1,7 +1,6 @@
 // @ts-nocheck
 /**
- * Shared project path resolution for the Node CLI host (N2).
- * Design: `规划设计/vmz/14-Node-NAPI与插件宿主.md`
+ * Shared project path resolution for the Node CLI host .
  */
 
 import { existsSync, readFileSync } from 'node:fs';

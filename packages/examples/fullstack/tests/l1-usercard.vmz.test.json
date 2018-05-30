@@ -1,7 +1,7 @@
 {
     "schema": "vmz.test.manifest.v0",
     "id": "l1.view.usercard",
-    "title": "L1: UserCard native view + if/each Direct",
+    "title": ": UserCard native view + if/each Direct",
     "modes": ["compile"],
     "program": {
         "chunkId": "components/UserCard",

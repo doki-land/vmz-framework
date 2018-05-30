@@ -1,11 +1,11 @@
-//! Soft convention lints（「建议」级）。
-//! 不改变语义；默认 Warning，供 `vmz lint` / `--deny-warnings` 消费。
+//! Soft convention lints (advice-level).
+//! Does not change semantics; default Warning for vmz lint / --deny-warnings.
 
 use std::path::Path;
 
 use vmz_compiler::{CheckReport, ReportedDiagnostic, VmzModuleKind, discover_vmz_files};
 
-/// Route-group boundary role filenames（硬识别集合；小写变体不当角色）。
+/// Route-group boundary role filenames (hard set; lowercase variants are not roles).
 pub const BOUNDARY_ROLE_FILES: &[&str] =
     &["Layout.vmz", "Loading.vmz", "Error.vmz", "NotFound.vmz"];
 

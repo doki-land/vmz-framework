@@ -1,4 +1,4 @@
-//! Target / multi-platform backend contracts (doc 24 · MP0).
+//! Target / multi-platform backend contracts .
 //!
 //! Freezes target-neutral View Operations, PlatformCapabilityProfile,
 //! MiniProgramArtifact schema ids, and DOM-leak diagnostic codes.
@@ -15,7 +15,7 @@ pub const VIEW_OPS_SCHEMA: &str = "vmz.target.view_ops.v0";
 pub const PLATFORM_PROFILE_SCHEMA: &str = "vmz.target.platform_profile.v0";
 /// Mini Program artifact envelope (lowering product, not IR).
 pub const MINI_PROGRAM_ARTIFACT_SCHEMA: &str = "vmz.target.mini_program_artifact.v0";
-/// MP0 target-contract check report.
+/// target-contract check report.
 pub const TARGET_CHECK_SCHEMA: &str = "vmz.target.check.v0";
 
 pub const DIAG_DOM_LEAK_IN_PLAN: &str = "vmz::target::dom_leak_in_plan";
@@ -36,7 +36,7 @@ pub struct TargetProtocolCatalog {
     pub protocol: String,
     pub documents: Vec<TargetDocumentKind>,
     pub diagnostics: Vec<String>,
-    /// Frozen View Operation kind names (doc 24 §3).
+    /// Frozen View Operation kind names .
     #[serde(rename = "viewOperations")]
     pub view_operations: Vec<String>,
 }
@@ -74,7 +74,7 @@ impl TargetProtocolCatalog {
     }
 }
 
-/// Canonical target-neutral View Operation kinds (doc 24 §3).
+/// Canonical target-neutral View Operation kinds .
 pub const VIEW_OPERATION_KINDS: &[&str] = &[
     "CreateNode",
     "SetStaticProperty",
@@ -178,7 +178,7 @@ pub struct CapabilityVerdict {
     pub reason: Option<String>,
 }
 
-/// Versioned platform capability profile (doc 24 §4).
+/// Versioned platform capability profile .
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PlatformCapabilityProfile {
     pub schema: String,
@@ -316,7 +316,7 @@ impl PlatformCapabilityProfile {
     }
 }
 
-/// Mini Program artifact envelope — lowering product only (doc 24 §2).
+/// Mini Program artifact envelope — lowering product only .
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MiniProgramArtifact {
     pub schema: String,
@@ -369,7 +369,7 @@ pub struct TargetDiagnostic {
     pub code: Option<String>,
 }
 
-/// MP0 check report.
+/// check report.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TargetCheckReport {
     pub schema: String,

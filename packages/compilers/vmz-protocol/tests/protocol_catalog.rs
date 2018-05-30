@@ -209,17 +209,17 @@ fn dx_catalog_lists_x0_plus_x1_documents() {
     assert!(json.contains(EXPLAIN_SCHEMA));
     assert!(json.contains(RENAME_SCHEMA));
     assert!(json.contains(TEST_SELECTION_SCHEMA));
-    assert!(json.contains(X2_CHECK_SCHEMA));
+    assert!(json.contains(CROSS_SFC_CHECK_SCHEMA));
     assert!(json.contains(SEMANTIC_TRANSACTION_SCHEMA));
-    assert!(json.contains(X3_CHECK_SCHEMA));
+    assert!(json.contains(TRANSACTION_CHECK_SCHEMA));
     assert!(json.contains(BOUNDARY_VALIDATOR_SCHEMA));
     assert!(json.contains(LEAKAGE_SCHEMA));
     assert!(json.contains(CAPABILITY_TARGET_SCHEMA));
     assert!(json.contains(DEAD_GRAPH_SCHEMA));
-    assert!(json.contains(X4_CHECK_SCHEMA));
+    assert!(json.contains(DEPLOYMENT_PROOF_CHECK_SCHEMA));
     assert!(json.contains(TRACE_SCHEMA));
     assert!(json.contains(CAUSAL_REPLAY_SCHEMA));
-    assert!(json.contains(X5_CHECK_SCHEMA));
+    assert!(json.contains(CAUSAL_REPLAY_CHECK_SCHEMA));
 }
 
 #[test]
@@ -285,7 +285,7 @@ fn application_catalog_freezes_m0_schemas() {
 }
 
 #[test]
-fn target_catalog_freezes_mp0_schemas() {
+fn target_catalog_freezes_miniprogram_schemas() {
     let c = TargetProtocolCatalog::v0();
     assert_eq!(c.protocol, TARGET_PROTOCOL);
     assert!(c.documents.iter().any(|d| d.kind == "view_ops" && d.schema == VIEW_OPS_SCHEMA));
@@ -308,7 +308,7 @@ fn target_catalog_freezes_mp0_schemas() {
 }
 
 #[test]
-fn native_host_catalog_freezes_nw0_schemas() {
+fn native_host_catalog_freezes_native_host_schemas() {
     let c = NativeHostProtocolCatalog::v0();
     assert_eq!(c.protocol, NATIVE_HOST_PROTOCOL);
     assert!(c.documents.iter().any(|d| d.kind == "webview_deployment"));

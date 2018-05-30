@@ -1,8 +1,7 @@
 /**
  * VMZ Homepage integrated documents — mount at /d/
- * Design: 规划设计/vmz/19 · Integrated DocumentMount
  *
- * D0: declaration object only (JSON-compatible; double quotes).
+ *: declaration object only (JSON-compatible; double quotes).
  */
 export default {
     defaultLocale: 'zh-hans',

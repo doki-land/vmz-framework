@@ -65,12 +65,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anyhow"
-version = "1.0.104"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
-
-[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -97,6 +91,15 @@ name = "bitflags"
 version = "2.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b588b76d00fde79687d7646a9b5bdf3cc0f655e0bbd080335a95d7e96f3587da"
+
+[[package]]
+name = "block-buffer"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
+dependencies = [
+ "generic-array",
+]
 
 [[package]]
 name = "castaway"
@@ -197,6 +200,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "417bef24afe1460300965a25ff4a24b8b45ad011948302ec221e8a0a81eb2c79"
 
 [[package]]
+name = "cpufeatures"
+version = "0.2.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "crossbeam-deque"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -222,10 +234,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61803da095bee82a81bb1a452ecc25d3b2f1416d1897eb86430c6159ef717c17"
 
 [[package]]
+name = "crypto-common"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
+dependencies = [
+ "generic-array",
+ "typenum",
+]
+
+[[package]]
 name = "ctor"
 version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "914a755b7c2d4af2bdcff7ce1739e2db9a1b81a9b07123d8015786ae03c0980d"
+
+[[package]]
+name = "digest"
+version = "0.10.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
+dependencies = [
+ "block-buffer",
+ "crypto-common",
+]
 
 [[package]]
 name = "dragonbox_ecma"
@@ -349,6 +381,16 @@ dependencies = [
  "memchr",
  "pin-project-lite",
  "slab",
+]
+
+[[package]]
+name = "generic-array"
+version = "0.14.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
+dependencies = [
+ "typenum",
+ "version_check",
 ]
 
 [[package]]
@@ -589,30 +631,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d211803b9b6b570f68772237e415a029d5a50c65d382910b879fb19d3271f94d"
 
 [[package]]
-name = "oxc"
-version = "0.143.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "531adfdf5125834915ec86946c7e3e0ded20b9bc9d86a88756e7f191a530475d"
-dependencies = [
- "oxc_allocator",
- "oxc_ast",
- "oxc_ast_visit",
- "oxc_codegen",
- "oxc_diagnostics",
- "oxc_isolated_declarations",
- "oxc_mangler",
- "oxc_minifier",
- "oxc_parser",
- "oxc_regular_expression",
- "oxc_semantic",
- "oxc_span",
- "oxc_str",
- "oxc_syntax",
- "oxc_transformer",
- "oxc_transformer_plugins",
-]
-
-[[package]]
 name = "oxc-browserslist"
 version = "3.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -766,19 +784,14 @@ version = "0.143.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33440685fff66ad5af668cce75130267db8a864938e6433bc264975cd40b2f2c"
 dependencies = [
- "cow-utils",
  "dragonbox_ecma",
  "itoa",
  "num-bigint",
  "num-traits",
- "oxc_allocator",
  "oxc_ast",
- "oxc_compat",
  "oxc_data_structures",
- "oxc_regular_expression",
  "oxc_span",
  "oxc_syntax",
- "smallvec",
 ]
 
 [[package]]
@@ -795,68 +808,6 @@ checksum = "191884bee6c3744909a51acc7d78d4ae370d817b25875b10642f632327b6296e"
 dependencies = [
  "nonmax",
  "serde",
-]
-
-[[package]]
-name = "oxc_isolated_declarations"
-version = "0.143.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ee7c46d0d291d8ac4c035ccf1b2543d2101bcc07d73d20195d0f0bdf97abbd7"
-dependencies = [
- "bitflags",
- "oxc_allocator",
- "oxc_ast",
- "oxc_ast_visit",
- "oxc_diagnostics",
- "oxc_ecmascript",
- "oxc_span",
- "oxc_str",
- "oxc_syntax",
- "rustc-hash",
-]
-
-[[package]]
-name = "oxc_mangler"
-version = "0.143.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8eec62c37b157f6d7e5502740333740ba3a1068cdd26d12c16abef07efed4806"
-dependencies = [
- "itertools",
- "oxc_allocator",
- "oxc_ast",
- "oxc_data_structures",
- "oxc_ecmascript",
- "oxc_index",
- "oxc_semantic",
- "oxc_span",
- "oxc_str",
- "oxc_syntax",
- "rustc-hash",
-]
-
-[[package]]
-name = "oxc_minifier"
-version = "0.143.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d50fd0b8794dafe409e41cca3dad851310a0f4850b1f10fd2622cfe847c9ab2"
-dependencies = [
- "cow-utils",
- "itoa",
- "oxc_allocator",
- "oxc_ast",
- "oxc_ast_visit",
- "oxc_compat",
- "oxc_data_structures",
- "oxc_ecmascript",
- "oxc_index",
- "oxc_mangler",
- "oxc_parser",
- "oxc_semantic",
- "oxc_span",
- "oxc_str",
- "oxc_syntax",
- "oxc_traverse",
- "rustc-hash",
 ]
 
 [[package]]
@@ -1010,29 +961,6 @@ dependencies = [
  "rustc-hash",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "oxc_transformer_plugins"
-version = "0.143.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "720a5cd0f3d14ee9794a3fedd7ece4e68d6abb3aac880bb640cb4bafe3595387"
-dependencies = [
- "cow-utils",
- "itoa",
- "oxc_allocator",
- "oxc_ast",
- "oxc_ast_visit",
- "oxc_diagnostics",
- "oxc_ecmascript",
- "oxc_parser",
- "oxc_semantic",
- "oxc_span",
- "oxc_str",
- "oxc_syntax",
- "oxc_transformer",
- "oxc_traverse",
- "rustc-hash",
 ]
 
 [[package]]
@@ -1258,6 +1186,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha2"
+version = "0.10.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "digest",
+]
+
+[[package]]
 name = "siphasher"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1414,6 +1353,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "typenum"
+version = "1.20.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
+
+[[package]]
 name = "ucd-trie"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1462,49 +1407,50 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
+name = "version_check"
+version = "0.9.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
 name = "vmz-compiler"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "json5",
- "oxc",
  "oxc_allocator",
  "oxc_ast",
+ "oxc_ast_visit",
+ "oxc_codegen",
  "oxc_diagnostics",
  "oxc_parser",
+ "oxc_semantic",
  "oxc_span",
+ "oxc_syntax",
+ "oxc_transformer",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror",
+ "vmz-debugger",
  "vmz-protocol",
  "vmz-types",
  "walkdir",
 ]
 
 [[package]]
+name = "vmz-debugger"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "vmz-protocol",
+]
+
+[[package]]
 name = "vmz-inspector"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "vmz-compiler",
-]
-
-[[package]]
-name = "vmz-lsp"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "oxc",
- "vmz-types",
-]
-
-[[package]]
-name = "vmz-mcp"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "oxc",
- "vmz-types",
 ]
 
 [[package]]
@@ -1555,9 +1501,10 @@ dependencies = [
 name = "vmz-tools"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "clap",
+ "serde_json",
  "vmz-compiler",
+ "vmz-debugger",
  "vmz-inspector",
  "vmz-plugin-sasso",
  "vmz-plugin-tailwind",

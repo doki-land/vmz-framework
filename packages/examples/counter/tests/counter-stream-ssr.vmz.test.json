@@ -1,7 +1,7 @@
 {
     "schema": "vmz.test.manifest.v0",
     "id": "counter.ssr.stream",
-    "title": "T2 stream SSR: Direct serialize chunks join === renderToString",
+    "title": " stream SSR: Direct serialize chunks join === renderToString",
     "modes": ["ssr"],
     "program": {
         "chunkId": "components/CounterButton",

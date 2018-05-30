@@ -1,6 +1,5 @@
 /**
  * @vmz/plugin — protocol helpers (no N-API).
- * Design: 规划设计/vmz/14-Node-NAPI与插件宿主.md
  */
 
 import { createHash } from 'node:crypto';

@@ -1,5 +1,5 @@
 ﻿/**
- * Conformance plugin for N3 — proves structured contributions without VPG mutation.
+ * Conformance plugin for — proves structured contributions without VPG mutation.
  *
  * Stages: workspace_resolve (optional virtual note file), analyzer advice, target manifest.
  */

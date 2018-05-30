@@ -1,8 +1,8 @@
-//! X0/X1 unified DX query protocol.
+//! Unified DX query protocol.
 //!
 //! CLI / LSP / MCP / DevTools must share these schema ids and stable ID shapes.
-//! X0 froze Symbol/Reference/Explain/WorkspaceEdit/CodeAction/Affected.
-//! X1: RenameIntent + TestSelection + Symbol/Reference-proven WorkspaceEdit apply.
+//! froze Symbol/Reference/Explain/WorkspaceEdit/CodeAction/Affected.
+//! RenameIntent + TestSelection + Symbol/Reference-proven WorkspaceEdit apply.
 
 use serde::{Deserialize, Serialize};
 
@@ -12,51 +12,51 @@ pub const DX_PROTOCOL: &str = "vmz.dx.v0";
 pub const SYMBOL_SCHEMA: &str = "vmz.dx.symbol.v0";
 pub const REFERENCE_SCHEMA: &str = "vmz.dx.reference.v0";
 pub const EXPLAIN_SCHEMA: &str = "vmz.dx.explain.v0";
-/// Legacy N4 explain id — still recognized; new emits use [`EXPLAIN_SCHEMA`].
+/// Legacy explain id — still recognized; new emits use [`EXPLAIN_SCHEMA`].
 pub const EXPLAIN_SCHEMA_LEGACY: &str = "vmz.explain.v0";
 pub const WORKSPACE_EDIT_SCHEMA: &str = "vmz.dx.workspace_edit.v0";
 pub const CODE_ACTION_SCHEMA: &str = "vmz.dx.code_action.v0";
 pub const AFFECTED_SCHEMA: &str = "vmz.dx.affected.v0";
-/// X1 rename intent envelope (plans still emit [`WORKSPACE_EDIT_SCHEMA`]).
+/// rename intent envelope (plans still emit [`WORKSPACE_EDIT_SCHEMA`]).
 pub const RENAME_SCHEMA: &str = "vmz.dx.rename.v0";
-/// X1 graph-driven test selection (`vmz test --affected` / `--target changed`).
+/// graph-driven test selection (`vmz test --affected` / `--target changed`).
 pub const TEST_SELECTION_SCHEMA: &str = "vmz.dx.test_selection.v0";
-/// X2 template↔script source map entries.
+/// template↔script source map entries.
 pub const SOURCE_MAP_SCHEMA: &str = "vmz.dx.source_map.v0";
-/// X2 workspace Symbol/Reference index document.
+/// workspace Symbol/Reference index document.
 pub const SYMBOL_INDEX_SCHEMA: &str = "vmz.dx.symbol_index.v0";
-/// X2 conformance umbrella report.
-pub const X2_CHECK_SCHEMA: &str = "vmz.dx.x2_check.v0";
-/// X3 semantic transaction (atomic TextEdit batch).
+/// conformance umbrella report.
+pub const CROSS_SFC_CHECK_SCHEMA: &str = "vmz.dx.cross_sfc_check.v0";
+/// semantic transaction (atomic TextEdit batch).
 pub const SEMANTIC_TRANSACTION_SCHEMA: &str = "vmz.dx.semantic_transaction.v0";
-/// X3 analysis/build cancel ticket.
+/// analysis/build cancel ticket.
 pub const CANCEL_SCHEMA: &str = "vmz.dx.cancel.v0";
-/// X3 affected preview (chunks + tests + routes + regions).
+/// affected preview (chunks + tests + routes + regions).
 pub const AFFECTED_PREVIEW_SCHEMA: &str = "vmz.dx.affected_preview.v0";
-/// X3 HMR plan.
+/// HMR plan.
 pub const HMR_PLAN_SCHEMA: &str = "vmz.dx.hmr_plan.v0";
-/// X3 route/chunk budget (algebraic unitCost).
+/// route/chunk budget (algebraic unitCost).
 pub const BUDGET_SCHEMA: &str = "vmz.dx.budget.v0";
-/// X3 conformance umbrella report.
-pub const X3_CHECK_SCHEMA: &str = "vmz.dx.x3_check.v0";
-/// X4 deployment boundary validators (route / resume / rpc / action).
+/// conformance umbrella report.
+pub const TRANSACTION_CHECK_SCHEMA: &str = "vmz.dx.transaction_check.v0";
+/// deployment boundary validators (route / resume / rpc / action).
 pub const BOUNDARY_VALIDATOR_SCHEMA: &str = "vmz.dx.boundary_validator.v0";
-/// X4 client/server leakage findings.
+/// client/server leakage findings.
 pub const LEAKAGE_SCHEMA: &str = "vmz.dx.leakage.v0";
-/// X4 capability → target mapping.
+/// capability → target mapping.
 pub const CAPABILITY_TARGET_SCHEMA: &str = "vmz.dx.capability_target.v0";
-/// X4 dead chunk / unreferenced capability report.
+/// dead chunk / unreferenced capability report.
 pub const DEAD_GRAPH_SCHEMA: &str = "vmz.dx.dead_graph.v0";
-/// X4 conformance umbrella report.
-pub const X4_CHECK_SCHEMA: &str = "vmz.dx.x4_check.v0";
-/// X5 runtime trace events tagged with StableIds.
+/// conformance umbrella report.
+pub const DEPLOYMENT_PROOF_CHECK_SCHEMA: &str = "vmz.dx.deployment_proof_check.v0";
+/// runtime trace events tagged with StableIds.
 pub const TRACE_SCHEMA: &str = "vmz.dx.trace.v0";
-/// X5 join of trace events ↔ explain causal chain.
+/// join of trace events ↔ explain causal chain.
 pub const CAUSAL_REPLAY_SCHEMA: &str = "vmz.dx.causal_replay.v0";
-/// X5 conformance umbrella report.
-pub const X5_CHECK_SCHEMA: &str = "vmz.dx.x5_check.v0";
+/// conformance umbrella report.
+pub const CAUSAL_REPLAY_CHECK_SCHEMA: &str = "vmz.dx.causal_replay_check.v0";
 
-/// Catalog of frozen schema ids for gate / host handshake.
+/// Catalog of frozen schema ids for host handshake.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DxCatalog {
     pub schema: String,
@@ -92,7 +92,10 @@ impl DxCatalog {
                 },
                 DxDocumentKind { kind: "source_map".into(), schema: SOURCE_MAP_SCHEMA.into() },
                 DxDocumentKind { kind: "symbol_index".into(), schema: SYMBOL_INDEX_SCHEMA.into() },
-                DxDocumentKind { kind: "x2_check".into(), schema: X2_CHECK_SCHEMA.into() },
+                DxDocumentKind {
+                    kind: "cross_sfc_check".into(),
+                    schema: CROSS_SFC_CHECK_SCHEMA.into(),
+                },
                 DxDocumentKind {
                     kind: "semantic_transaction".into(),
                     schema: SEMANTIC_TRANSACTION_SCHEMA.into(),
@@ -104,7 +107,10 @@ impl DxCatalog {
                 },
                 DxDocumentKind { kind: "hmr_plan".into(), schema: HMR_PLAN_SCHEMA.into() },
                 DxDocumentKind { kind: "budget".into(), schema: BUDGET_SCHEMA.into() },
-                DxDocumentKind { kind: "x3_check".into(), schema: X3_CHECK_SCHEMA.into() },
+                DxDocumentKind {
+                    kind: "transaction_check".into(),
+                    schema: TRANSACTION_CHECK_SCHEMA.into(),
+                },
                 DxDocumentKind {
                     kind: "boundary_validator".into(),
                     schema: BOUNDARY_VALIDATOR_SCHEMA.into(),
@@ -115,13 +121,19 @@ impl DxCatalog {
                     schema: CAPABILITY_TARGET_SCHEMA.into(),
                 },
                 DxDocumentKind { kind: "dead_graph".into(), schema: DEAD_GRAPH_SCHEMA.into() },
-                DxDocumentKind { kind: "x4_check".into(), schema: X4_CHECK_SCHEMA.into() },
+                DxDocumentKind {
+                    kind: "deployment_proof_check".into(),
+                    schema: DEPLOYMENT_PROOF_CHECK_SCHEMA.into(),
+                },
                 DxDocumentKind { kind: "trace".into(), schema: TRACE_SCHEMA.into() },
                 DxDocumentKind {
                     kind: "causal_replay".into(),
                     schema: CAUSAL_REPLAY_SCHEMA.into(),
                 },
-                DxDocumentKind { kind: "x5_check".into(), schema: X5_CHECK_SCHEMA.into() },
+                DxDocumentKind {
+                    kind: "causal_replay_check".into(),
+                    schema: CAUSAL_REPLAY_CHECK_SCHEMA.into(),
+                },
             ],
         }
     }
@@ -146,7 +158,7 @@ pub struct StableId {
     pub id: String,
 }
 
-/// Cross-SFC symbol (X0 shape; index filled in X1/X2).
+/// Cross-SFC symbol ( shape; index filled in /).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Symbol {
     pub schema: String,
@@ -184,7 +196,7 @@ impl Reference {
     }
 }
 
-/// Causal explain document (N4 explain upgraded to DX schema).
+/// Causal explain document ( explain upgraded to DX schema).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ExplainDocument {
     pub schema: String,
@@ -225,7 +237,7 @@ impl ExplainDocument {
     }
 }
 
-/// Workspace edit plan (apply deferred to X1+).
+/// Workspace edit plan (apply deferred to +).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct WorkspaceEditPlan {
     pub schema: String,
@@ -295,7 +307,7 @@ impl WorkspaceEditPlan {
     }
 }
 
-/// Code action proposal (execution deferred to X2 safe-fix).
+/// Code action proposal (execution deferred to safe-fix).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CodeAction {
     pub schema: String,
@@ -314,7 +326,7 @@ impl CodeAction {
     }
 }
 
-/// Affected rebuild plan (N4 plan under DX schema).
+/// Affected rebuild plan ( plan under DX schema).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AffectedDocument {
     pub schema: String,
@@ -344,7 +356,7 @@ impl AffectedDocument {
     }
 }
 
-/// X1 rename intent — input to `plan_rename` (edit apply is separate).
+/// rename intent — input to `plan_rename` (edit apply is separate).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RenameIntent {
     pub schema: String,
@@ -373,7 +385,7 @@ impl RenameIntent {
     }
 }
 
-/// Graph-selected tests for affected rebuild (X1+ / doc 21 § affected → test).
+/// Graph-selected tests for affected rebuild (+ / .
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TestSelectionDocument {
     pub schema: String,
@@ -433,7 +445,7 @@ pub fn normalize_rename_kind(kind: &str) -> Option<&'static str> {
     }
 }
 
-/// X3 semantic transaction document.
+/// semantic transaction document.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SemanticTransactionDocument {
     pub schema: String,
@@ -482,7 +494,7 @@ impl SemanticTransactionDocument {
     }
 }
 
-/// X3 analysis/build cancel ticket.
+/// analysis/build cancel ticket.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CancelDocument {
     pub schema: String,
@@ -502,7 +514,7 @@ impl CancelDocument {
     }
 }
 
-/// X3 affected preview composing chunk plan + tests + routes + regions.
+/// affected preview composing chunk plan + tests + routes + regions.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AffectedPreviewDocument {
     pub schema: String,
@@ -523,7 +535,7 @@ impl AffectedPreviewDocument {
     }
 }
 
-/// X3 HMR plan (query before soft-reload).
+/// HMR plan (query before soft-reload).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HmrPlanDocument {
     pub schema: String,
@@ -551,7 +563,7 @@ impl HmrPlanDocument {
     }
 }
 
-/// X3 route/chunk budget (v0: algebraic unitCost, not byte enforcement).
+/// route/chunk budget (v0: algebraic unitCost, not byte enforcement).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BudgetDocument {
     pub schema: String,
@@ -597,9 +609,9 @@ impl BudgetDocument {
     }
 }
 
-/// X3 umbrella check report.
+/// umbrella check report.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct X3CheckReport {
+pub struct TransactionCheckReport {
     pub schema: String,
     #[serde(rename = "affectedPreview", skip_serializing_if = "Option::is_none")]
     pub affected_preview: Option<AffectedPreviewDocument>,
@@ -613,13 +625,13 @@ pub struct X3CheckReport {
     pub status: String,
 }
 
-impl X3CheckReport {
+impl TransactionCheckReport {
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
-/// X5 runtime trace event (StableId-tagged).
+/// runtime trace event (StableId-tagged).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TraceEvent {
     /// `write` | `binding_eval` | `patch` | `effect` | `route` | `capability`
@@ -634,7 +646,7 @@ pub struct TraceEvent {
     pub chunk_id: Option<String>,
 }
 
-/// X5 ordered runtime / synthetic trace document.
+/// ordered runtime / synthetic trace document.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TraceDocument {
     pub schema: String,
@@ -675,7 +687,7 @@ pub struct CausalReplayMatch {
     pub explain: Option<ExplainDocument>,
 }
 
-/// X5 causal replay joining trace ↔ `vmz.dx.explain.v0` chains.
+/// causal replay joining trace ↔ `vmz.dx.explain.v0` chains.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CausalReplayDocument {
     pub schema: String,
@@ -694,9 +706,9 @@ impl CausalReplayDocument {
     }
 }
 
-/// X5 umbrella check.
+/// Umbrella check.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct X5CheckReport {
+pub struct CausalReplayCheckReport {
     pub schema: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sample_explain: Option<ExplainDocument>,
@@ -708,7 +720,7 @@ pub struct X5CheckReport {
     pub status: String,
 }
 
-impl X5CheckReport {
+impl CausalReplayCheckReport {
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }

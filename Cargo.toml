@@ -4,10 +4,9 @@ members = [
     "packages/compilers/vmz-protocol",
     "packages/compilers/vmz-types",
     "packages/compilers/vmz-compiler",
+    "packages/compilers/vmz-debugger",
     "packages/compilers/vmz-inspector",
     "packages/compilers/vmz-tools",
-    "packages/compilers/vmz-lsp",
-    "packages/compilers/vmz-mcp",
     "packages/compilers/vmz-napi",
     "packages/compilers/vmz-plugin-tailwind",
     "packages/compilers/vmz-plugin-sasso",
@@ -18,6 +17,7 @@ default-members = ["packages/compilers/vmz-tools"]
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
+authors = ["VMZ Contributors"]
 repository = "https://github.com/vmz-framework/vmz-framework"
 rust-version = "1.85"
 
@@ -25,6 +25,7 @@ rust-version = "1.85"
 vmz-protocol = { path = "packages/compilers/vmz-protocol" }
 vmz-types = { path = "packages/compilers/vmz-types" }
 vmz-compiler = { path = "packages/compilers/vmz-compiler" }
+vmz-debugger = { path = "packages/compilers/vmz-debugger" }
 vmz-inspector = { path = "packages/compilers/vmz-inspector" }
 vmz-plugin-tailwind = { path = "packages/compilers/vmz-plugin-tailwind" }
 vmz-plugin-sasso = { path = "packages/compilers/vmz-plugin-sasso" }
@@ -32,17 +33,28 @@ vmz-plugin-sasso = { path = "packages/compilers/vmz-plugin-sasso" }
 oxc = { version = "0.143", features = ["full"] }
 oxc_allocator = "0.143"
 oxc_ast = "0.143"
+oxc_ast_visit = "0.143"
+oxc_codegen = "0.143"
 oxc_diagnostics = "0.143"
 oxc_parser = "0.143"
+oxc_semantic = "0.143"
 oxc_span = "0.143"
+oxc_syntax = "0.143"
+oxc_transformer = "0.143"
 
-anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 json5 = "1"
+sha2 = "0.10"
 thiserror = "2"
 walkdir = "2"
+
+napi = { version = "3", default-features = true, features = ["napi4"] }
+napi-derive = "3"
+sasso = "0.8"
+tailwind = { git = "https://github.com/oovm/tailwind-rs.git", branch = "dev" }
+tailwind-css = { git = "https://github.com/oovm/tailwind-rs.git", branch = "dev" }
 
 [profile.release]
 lto = true

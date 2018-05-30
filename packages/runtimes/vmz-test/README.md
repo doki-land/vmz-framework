@@ -26,24 +26,29 @@ safe server boundaries, SSR that does not needlessly replay, and application beh
 
 ## One scenario, several kinds of evidence
 
-| Surface | Evidence VMZ can collect |
-|---|---|
-| Compile | Diagnostics, graph identities, and generated boundaries |
-| Logic | State transitions, derived work, and cancellation |
-| Browser | Real input, semantic locators, DOM, accessibility, and screenshots |
-| Router | Matched RouteId, layout retention, loading, errors, and disposal |
-| SSR / Resume | HTML, serialized state, event entries, and replay avoidance |
-| Deployment | Client/server reachability, capabilities, artifacts, and traces |
+| Surface      | Evidence VMZ can collect                                           |
+|--------------|--------------------------------------------------------------------|
+| Compile      | Diagnostics, graph identities, and generated boundaries            |
+| Logic        | State transitions, derived work, and cancellation                  |
+| Browser      | Real input, semantic locators, DOM, accessibility, and screenshots |
+| Router       | Matched RouteId, layout retention, loading, errors, and disposal   |
+| SSR / Resume | HTML, serialized state, event entries, and replay avoidance        |
+| Deployment   | Client/server reachability, capabilities, artifacts, and traces    |
 
 ### UI automation without a borrowed worldview
 
-VMZ can use a real browser protocol as transport while owning locator, action, waiting, and expectation semantics. Tests can find elements by role, label, text, RouteId, or stable test identity; CSS remains an escape hatch rather than the default contract.
+VMZ can use a real browser protocol as transport while owning locator, action, waiting, and expectation semantics. Tests
+can find elements by role, label, text, RouteId, or stable test identity; CSS remains an escape hatch rather than the
+default contract.
 
-Auto-waiting can observe navigation, pending work, region commits, and server activity instead of guessing with arbitrary delays. A failure can connect the visible symptom to the application work that produced it.
+Auto-waiting can observe navigation, pending work, region commits, and server activity instead of guessing with
+arbitrary delays. A failure can connect the visible symptom to the application work that produced it.
 
 ### Precision is testable
 
-A fine-grained compiler should prove that nothing unrelated ran. VMZ tests can check that the intended binding changed, unrelated computations stayed idle, an obsolete generation was cancelled, and a disposed owner received no late write. That turns testing into a competitive feature rather than a bundled convenience.
+A fine-grained compiler should prove that nothing unrelated ran. VMZ tests can check that the intended binding changed,
+unrelated computations stayed idle, an obsolete generation was cancelled, and a disposed owner received no late write.
+That turns testing into a competitive feature rather than a bundled convenience.
 
 ## License
 

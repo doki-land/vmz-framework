@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use anyhow::{Context, Result, bail};
 use clap::Args as ClapArgs;
+use vmz_compiler::{Result, ResultExt, bail};
 use walkdir::WalkDir;
 
 use crate::commands::serve::{resolve_dirs, soft_reload_host, spawn_host_with, stop_host};
@@ -102,7 +102,8 @@ fn build_project(project: &Path, out_dir: &Path) -> Result<()> {
 }
 
 /// Cheap change detector: path + mtime + size for watched extensions under `src/`.
-pub(crate) fn src_fingerprint(src: &Path) -> Result<u64> {
+/// Fingerprint `src/` for the native `vmz dev` poll loop.
+pub fn src_fingerprint(src: &Path) -> Result<u64> {
     let mut h: u64 = 0xcbf29ce484222325;
     let mut paths: Vec<PathBuf> = WalkDir::new(src)
         .into_iter()
@@ -133,26 +134,5 @@ fn is_watched_source(path: &Path) -> bool {
     match path.extension().and_then(|e| e.to_str()) {
         Some("vmz" | "ts" | "tsx" | "js" | "mjs" | "css" | "json") => true,
         _ => false,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-
-    #[test]
-    fn fingerprint_changes_when_file_updates() {
-        let dir = std::env::temp_dir().join(format!("vmz-dev-fp-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).unwrap();
-        let file = dir.join("x.vmz");
-        fs::write(&file, "a").unwrap();
-        let a = src_fingerprint(&dir).unwrap();
-        thread::sleep(Duration::from_millis(20));
-        fs::write(&file, "b").unwrap();
-        let b = src_fingerprint(&dir).unwrap();
-        assert_ne!(a, b);
-        let _ = fs::remove_dir_all(&dir);
     }
 }

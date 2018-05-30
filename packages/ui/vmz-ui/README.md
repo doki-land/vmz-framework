@@ -9,8 +9,8 @@ VMZ Design  ≠  VMZ UI
 ```
 
 - Declares **semantic token requirements** (see `contracts/`).
-- Ships ordinary `.vmz` under **`src/components/`** (same hard convention as apps) — **not** `@vmz/plugin-*`, no `componentsRoot` config.
+- Ships ordinary `.vmz` under **`src/components/`** (same hard convention as apps) — **not** `@vmz/plugin-*`, no
+  `componentsRoot` config.
 - **Never** hardcodes brand hex (`#176BFF`, etc.). Applications provide values via `/designs`.
-- Naming / ownership: `规划设计/vmz/29`. Architecture: `规划设计/vmz/31` (UI0→UI5).
 
-UI0 scope: package skeleton + `Button` probe + token requirement contract + `pnpm gate:ui0`.
+ui-automation scope: package skeleton + `Button` probe + token requirement contract + `pnpm verify`.

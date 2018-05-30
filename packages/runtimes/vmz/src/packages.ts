@@ -1,7 +1,6 @@
 // @ts-nocheck
 /**
- * npm / pnpm workspace package resolution helpers (N4.3).
- * Design: `规划设计/vmz/14` — Node owns package resolution; Rust owns semantics.
+ * npm / pnpm workspace package resolution helpers (session).
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';

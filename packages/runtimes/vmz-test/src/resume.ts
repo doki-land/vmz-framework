@@ -1,5 +1,5 @@
 /**
- * Resume host for `vmz test --mode resume` (T2/T3 first slice).
+ * Resume host for `vmz test --mode resume` (/ first slice).
  * SSR shell → resume adopt → event patch; onMount must not run.
  */
 

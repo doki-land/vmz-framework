@@ -1,5 +1,5 @@
-use anyhow::{Result, bail};
 use clap::Args as ClapArgs;
+use vmz_compiler::{Result, bail};
 use vmz_inspector::{InspectOptions, InspectProfile, failed, inspect_path};
 
 use crate::cli::PathArgs;

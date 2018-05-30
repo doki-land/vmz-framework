@@ -1,7 +1,7 @@
 {
     "schema": "vmz.test.manifest.v0",
     "id": "counter.browser.destroy",
-    "title": "T2 Browser: destroy nested CounterButton on real document",
+    "title": " Browser: destroy nested CounterButton on real document",
     "modes": ["browser"],
     "program": {
         "chunkId": "pages/index",

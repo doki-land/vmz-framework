@@ -1,8 +1,7 @@
 use std::path::PathBuf;
 
-use anyhow::{Result, bail};
 use clap::Args as ClapArgs;
-use vmz_compiler::{BuildRequest, Workspace, WorkspaceOptions};
+use vmz_compiler::{BuildRequest, Result, Workspace, WorkspaceOptions, bail};
 use vmz_plugin_sasso::default_scss_compiler;
 use vmz_plugin_tailwind::default_tw_compiler;
 
@@ -31,6 +30,7 @@ pub fn run(args: Args) -> Result<()> {
         out_dir: dist.clone(),
         tw: Some(default_tw_compiler()),
         scss: Some(default_scss_compiler()),
+        runtime_dist: None,
     });
     let report = ws.build_with(&BuildRequest { release: args.release, analysis_ticket: None })?;
     for d in &report.diagnostics {

@@ -20,7 +20,7 @@ Installing a plugin should enrich the product without silently creating a second
 | A lightweight embedded editor         | `@vmz/plugin-codemirror` | Documentation playgrounds and tools where bundle cost matters                     |
 | A full IDE-like editor                | `@vmz/plugin-monaco`     | Serious browser IDEs, code playgrounds, and professional editing tools            |
 | Text-authored diagrams                | `@vmz/plugin-mermaid`    | Architecture, flow, sequence, and process documentation                           |
-| Interactive data charts               | `@vmz/plugin-echarts`    | Dashboards, analytics, monitoring, and exploratory product data                    |
+| Interactive data charts               | `@vmz/plugin-echarts`    | Dashboards, analytics, monitoring, and exploratory product data                   |
 | Broad icon collections                | `@vmz/plugin-iconify`    | Product UI, navigation, and documentation that benefit from established icon sets |
 
 ## What plugins do not do
@@ -42,11 +42,13 @@ documentation.
 - Choose **Mermaid** for reviewable explanatory diagrams, not for bespoke visual design.
 - Choose **`<Echarts>`** for production interactive charts; DaVinci is parallel and not production-ready yet.
 - Choose **Iconify** for breadth; choose curated local assets when control and offline delivery matter more.
-- Only **math** and **code** get interchangeable `engines.*` facades (`<Math>` / `<Code>`). Editors, diagrams, charts, and icons are concrete components — no fake shared slot.
+- Only **math** and **code** get interchangeable `engines.*` facades (`<Math>` / `<Code>`). Editors, diagrams, charts,
+  and icons are concrete components — no fake shared slot.
 
 ## What “native” should feel like
 
-An official plugin should not feel like an iframe or an unrelated mini-application pasted into the page. It should participate naturally in VMZ concerns:
+An official plugin should not feel like an iframe or an unrelated mini-application pasted into the page. It should
+participate naturally in VMZ concerns:
 
 - server-rendered content remains readable where the capability allows it;
 - expensive browser code can stay behind an Island or interaction boundary;
@@ -56,6 +58,9 @@ An official plugin should not feel like an iframe or an unrelated mini-applicati
 
 ## A small ecosystem with clear choices
 
-VMZ does not need three official adapters for every popular library. The useful ecosystem is one where each integration answers a distinct product need and its tradeoffs are easy to explain. Community packages can expand that range through the same contribution protocol without making the official namespace a popularity leaderboard.
+VMZ does not need three official adapters for every popular library. The useful ecosystem is one where each integration
+answers a distinct product need and its tradeoffs are easy to explain. Community packages can expand that range through
+the same contribution protocol without making the official namespace a popularity leaderboard.
 
-The result should feel curated rather than restrictive: fewer accidental choices, clearer defaults, and room for specialized tools when a real product requires them. ✨
+The result should feel curated rather than restrictive: fewer accidental choices, clearer defaults, and room for
+specialized tools when a real product requires them. ✨

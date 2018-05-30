@@ -1,6 +1,5 @@
 /* Document chrome — uses VMZ Design semantic tokens from vmz-designs.css
  * Integrated mounts also load host vmz.css (SiteHeader / SiteFooter).
- * Spec: 规划设计/vmz/19 · 30
  */
 
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");

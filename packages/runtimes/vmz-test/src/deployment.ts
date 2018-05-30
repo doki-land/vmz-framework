@@ -1,5 +1,5 @@
 /**
- * Deployment host for `vmz test --mode deployment` (T3).
+ * Deployment host for `vmz test --mode deployment` .
  * Proves deployment IR + server capability isolation (client stubs vs #server body).
  */
 

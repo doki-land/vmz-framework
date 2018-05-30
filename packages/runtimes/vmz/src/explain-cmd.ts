@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * `vmz explain` — DX causal explain queries (doc 21).
+ * `vmz explain` — DX causal explain queries .
  *
  * @param {string[]} argv args after `explain`
  */
@@ -67,10 +67,10 @@ export function cmdExplain(argv) {
     for (const e of chain) {
         const from = e.from ? `${e.from.kind}:${e.from.id}` : '?';
         const to = e.to ? `${e.to.kind}:${e.to.id}` : '?';
-        console.log(`  ${from} -> ${to}  (${e.reason})`);
+        console.log(` ${from} -> ${to} (${e.reason})`);
     }
     if (chain.length === 0) {
-        console.log('  (empty chain)');
+        console.log(' (empty chain)');
     }
     return 0;
 }

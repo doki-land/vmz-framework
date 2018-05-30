@@ -2,7 +2,6 @@
 /**
  * Minimal VMZ runtime — `#server` invoke + RPC/REST HTTP + optional static/SSR.
  *
- * Design: 规划设计/vmz/08-虚拟server.md, 07-REST接口.md
  *
  * Browser-safe: no static `node:*` imports. Node builtins are loaded only inside
  * Node/SSR request handlers so client bundles can `import { callServer }`.
@@ -12,12 +11,12 @@
 /** @typedef {{ verb: string, path: string, moduleId: string, method: string, className?: string }} Route */
 /**
  * @typedef {{
- *   distDir?: string,
- *   renderIndex?: () => Promise<string> | string,
- *   renderIndexStream?: (opts?: { signal?: AbortSignal }) => AsyncIterable<string>,
- *   renderPage?: (pathname: string) => Promise<string | null> | string | null,
- *   renderPageStream?: (pathname: string, opts?: { signal?: AbortSignal, searchParams?: URLSearchParams, cookieHeader?: string }) => Promise<AsyncIterable<string> | null> | AsyncIterable<string> | null,
- *   req?: import('node:http').IncomingMessage,
+ * distDir?: string,
+ * renderIndex?: => Promise<string> | string,
+ * renderIndexStream?: (opts?: { signal?: AbortSignal }) => AsyncIterable<string>,
+ * renderPage?: (pathname: string) => Promise<string | null> | string | null,
+ * renderPageStream?: (pathname: string, opts?: { signal?: AbortSignal, searchParams?: URLSearchParams, cookieHeader?: string }) => Promise<AsyncIterable<string> | null> | AsyncIterable<string> | null,
+ * req?: import('node:http').IncomingMessage,
  * }} NodeRequestOptions
  */
 
@@ -30,7 +29,7 @@ let resolveServerModule = null;
 let routes = [];
 
 /**
- * Map `#server/foo` → filesystem / URL the host can `import()`.
+ * Map `#server/foo` → filesystem / URL the host can `import`.
  * Only set this in Node/SSR hosts — browser bundles must omit it so RPC goes HTTP.
  */
 export function setServerModuleResolver(fn) {

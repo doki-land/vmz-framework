@@ -1,7 +1,8 @@
-//! Node N-API bindings for the VMZ workspace session (N1–N3).
+//! Node N-API bindings for the VMZ workspace session (–).
 //!
 //! Coarse-grained only — no per-AST JS callbacks.
 
+#![warn(missing_docs)]
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -88,6 +89,8 @@ pub struct JsWorkspaceOptions {
     pub root: String,
     pub out_dir: Option<String>,
     pub protocol: Option<JsProtocolVersions>,
+    /// Absolute path to `@vmz/core` dist/ (Node resolves via npm).
+    pub runtime_dist: Option<String>,
 }
 
 #[napi(object)]
@@ -236,122 +239,122 @@ pub fn handshake_protocols(host: JsProtocolVersions) -> Result<()> {
     handshake(&owned_protocol(&host)).map_err(|e| Error::from_reason(e.to_string()))
 }
 
-/// M0: frozen application composition schema catalog (`vmz.application.protocol.v0`).
+/// frozen application composition schema catalog (`vmz.application.protocol.v0`).
 #[napi]
 pub fn query_application_protocol_catalog() -> String {
     ApplicationProtocolCatalog::v0().to_json()
 }
 
-/// MP0: target protocol catalog (`vmz.target.protocol.v0`).
+/// miniprogram: target protocol catalog (`vmz.target.protocol.v0`).
 #[napi]
 pub fn query_target_protocol_catalog() -> String {
     vmz_protocol::TargetProtocolCatalog::v0().to_json()
 }
 
-/// NW0: native-host protocol catalog.
+/// native: native-host protocol catalog.
 #[napi]
 pub fn query_native_host_protocol_catalog() -> String {
     vmz_protocol::NativeHostProtocolCatalog::v0().to_json()
 }
 
-/// NW0: check NativeAppHost / WebView contract for a workspace root.
+/// native: check NativeAppHost / WebView contract for a workspace root.
 #[napi]
-pub fn check_nw0_native_host_contract_json(root: String) -> String {
-    vmz_compiler::nw0_native_host::check_nw0_native_host_contract(std::path::Path::new(&root))
+pub fn check_native_host_contract_json(root: String) -> String {
+    vmz_compiler::native_host::check_native_host_contract(std::path::Path::new(&root)).to_json()
+}
+
+/// native: check Native WebView shell contract for a workspace root.
+#[napi]
+pub fn check_native_shell_contract_json(root: String) -> String {
+    vmz_compiler::native_shell::check_native_shell_contract(std::path::Path::new(&root)).to_json()
+}
+
+/// native: check typed Native Capability Bridge contract for a workspace root.
+#[napi]
+pub fn check_native_bridge_contract_json(root: String) -> String {
+    vmz_compiler::native_bridge::check_native_bridge_contract(std::path::Path::new(&root)).to_json()
+}
+
+/// native: check NativeAppHost lifecycle contract for a workspace root.
+#[napi]
+pub fn check_native_lifecycle_contract_json(root: String) -> String {
+    vmz_compiler::native_lifecycle::check_native_lifecycle_contract(std::path::Path::new(&root))
         .to_json()
 }
 
-/// NW1: check Native WebView shell contract for a workspace root.
+/// native: check NativeAppHost full-stack contract for a workspace root.
 #[napi]
-pub fn check_nw1_native_shell_contract_json(root: String) -> String {
-    vmz_compiler::nw1_shell::check_nw1_native_shell_contract(std::path::Path::new(&root)).to_json()
-}
-
-/// NW2: check typed Native Capability Bridge contract for a workspace root.
-#[napi]
-pub fn check_nw2_native_bridge_contract_json(root: String) -> String {
-    vmz_compiler::nw2_bridge::check_nw2_native_bridge_contract(std::path::Path::new(&root))
+pub fn check_native_fullstack_contract_json(root: String) -> String {
+    vmz_compiler::native_fullstack::check_native_fullstack_contract(std::path::Path::new(&root))
         .to_json()
 }
 
-/// NW3: check NativeAppHost lifecycle contract for a workspace root.
+/// native: check NativeSurface contract for a workspace root.
 #[napi]
-pub fn check_nw3_native_lifecycle_contract_json(root: String) -> String {
-    vmz_compiler::nw3_lifecycle::check_nw3_native_lifecycle_contract(std::path::Path::new(&root))
+pub fn check_native_surface_contract_json(root: String) -> String {
+    vmz_compiler::native_surface::check_native_surface_contract(std::path::Path::new(&root))
         .to_json()
 }
 
-/// NW4: check NativeAppHost full-stack contract for a workspace root.
+/// native: check multi-platform shared Host Profile contract for a workspace root.
 #[napi]
-pub fn check_nw4_native_fullstack_contract_json(root: String) -> String {
-    vmz_compiler::nw4_fullstack::check_nw4_native_fullstack_contract(std::path::Path::new(&root))
+pub fn check_multi_platform_contract_json(root: String) -> String {
+    vmz_compiler::multi_platform::check_multi_platform_contract(std::path::Path::new(&root))
         .to_json()
 }
 
-/// NW5: check NativeSurface contract for a workspace root.
+/// miniprogram: check target-neutral contract for a workspace root.
 #[napi]
-pub fn check_nw5_native_surface_contract_json(root: String) -> String {
-    vmz_compiler::nw5_surface::check_nw5_native_surface_contract(std::path::Path::new(&root))
+pub fn check_miniprogram_target_contract_json(root: String) -> String {
+    vmz_compiler::miniprogram_target::check_miniprogram_target_contract(std::path::Path::new(&root))
         .to_json()
 }
 
-/// NW6: check multi-platform shared Host Profile contract for a workspace root.
-#[napi]
-pub fn check_nw6_multi_platform_contract_json(root: String) -> String {
-    vmz_compiler::nw6_multi_platform::check_nw6_multi_platform_contract(std::path::Path::new(&root))
-        .to_json()
-}
-
-/// MP0: check target-neutral contract for a workspace root.
-#[napi]
-pub fn check_mp0_target_contract_json(root: String) -> String {
-    vmz_compiler::mp0_target::check_mp0_target_contract(std::path::Path::new(&root)).to_json()
-}
-
-/// P0: profile protocol catalog.
+/// profile protocol catalog.
 #[napi]
 pub fn query_profile_protocol_catalog() -> String {
     vmz_protocol::ProfileProtocolCatalog::v0().to_json()
 }
 
-/// P0: check HostProfile / DeliveryProfile protocol for a workspace root.
+/// check HostProfile / DeliveryProfile protocol for a workspace root.
 #[napi]
-pub fn check_p0_profile_protocol_json(root: String) -> String {
-    vmz_compiler::p0_profile::check_p0_profile_protocol(std::path::Path::new(&root)).to_json()
+pub fn check_host_profile_protocol_json(root: String) -> String {
+    vmz_compiler::host_profile::check_host_profile_protocol(std::path::Path::new(&root)).to_json()
 }
 
-/// P1: check deterministic profile solver for a workspace root.
+/// check deterministic profile solver for a workspace root.
 #[napi]
-pub fn check_p1_profile_solver_json(root: String) -> String {
-    vmz_compiler::p1_solver::check_p1_profile_solver(std::path::Path::new(&root)).to_json()
+pub fn check_profile_solver_json(root: String) -> String {
+    vmz_compiler::profile_solver::check_profile_solver(std::path::Path::new(&root)).to_json()
 }
 
-/// P2: check Unified Executor algebraic scenario for a workspace root.
+/// check Unified Executor algebraic scenario for a workspace root.
 #[napi]
-pub fn check_p2_unified_executor_json(root: String) -> String {
-    vmz_compiler::p2_executor::check_p2_unified_executor(std::path::Path::new(&root)).to_json()
+pub fn check_unified_executor_json(root: String) -> String {
+    vmz_compiler::unified_executor::check_unified_executor(std::path::Path::new(&root)).to_json()
 }
 
-/// P3: check Lifecycle / Recovery algebraic scenario for a workspace root.
+/// check Lifecycle / Recovery algebraic scenario for a workspace root.
 #[napi]
-pub fn check_p3_lifecycle_recovery_json(root: String) -> String {
-    vmz_compiler::p3_lifecycle::check_p3_lifecycle_recovery(std::path::Path::new(&root)).to_json()
-}
-
-/// P4: check Delivery Proof algebraic scenario for a workspace root.
-#[napi]
-pub fn check_p4_delivery_proof_json(root: String) -> String {
-    vmz_compiler::p4_delivery::check_p4_delivery_proof(std::path::Path::new(&root)).to_json()
-}
-
-/// P5: check Cross-Host Conformance algebraic scenario for a workspace root.
-#[napi]
-pub fn check_p5_cross_host_conformance_json(root: String) -> String {
-    vmz_compiler::p5_conformance::check_p5_cross_host_conformance(std::path::Path::new(&root))
+pub fn check_lifecycle_recovery_json(root: String) -> String {
+    vmz_compiler::lifecycle_recovery::check_lifecycle_recovery(std::path::Path::new(&root))
         .to_json()
 }
 
-/// M0: check host `applications.config.json5` + workspace package descriptors.
+/// check Delivery Proof algebraic scenario for a workspace root.
+#[napi]
+pub fn check_delivery_proof_json(root: String) -> String {
+    vmz_compiler::delivery_proof::check_delivery_proof(std::path::Path::new(&root)).to_json()
+}
+
+/// check Cross-Host Conformance algebraic scenario for a workspace root.
+#[napi]
+pub fn check_cross_host_conformance_json(root: String) -> String {
+    vmz_compiler::cross_host_conformance::check_cross_host_conformance(std::path::Path::new(&root))
+        .to_json()
+}
+
+// check host `applications.config.json5` + workspace package descriptors.
 /// `package_roots` come from Node workspace resolution (never inferred as gallery membership).
 #[napi]
 pub fn check_applications_json(host_root: String, package_roots: Vec<String>) -> String {
@@ -359,7 +362,7 @@ pub fn check_applications_json(host_root: String, package_roots: Vec<String>) ->
     check_applications(PathBuf::from(host_root), &roots).to_json()
 }
 
-/// M1: prove independent `/` + non-root ApplicationBase relocation; scan non-relocatable URLs.
+/// prove independent `/` + non-root ApplicationBase relocation; scan non-relocatable URLs.
 #[napi]
 pub fn check_application_relocatable_json(
     package_root: String,
@@ -368,13 +371,13 @@ pub fn check_application_relocatable_json(
     check_application_relocatable(PathBuf::from(package_root), relocate_base.as_deref()).to_json()
 }
 
-/// M1: apply ApplicationBase to a logical relocation manifest JSON.
+/// apply ApplicationBase to a logical relocation manifest JSON.
 #[napi]
 pub fn relocate_application_manifest_json(manifest_json: String, base: String) -> Result<String> {
     relocate_manifest_json(&manifest_json, &base).map_err(Error::from_reason)
 }
 
-/// M2: independent ApplicationArtifact + MountTable/Catalog boundary (refs only).
+/// independent ApplicationArtifact + MountTable/Catalog boundary (refs only).
 #[napi]
 pub fn check_application_artifact_boundary_json(
     host_root: String,
@@ -384,14 +387,14 @@ pub fn check_application_artifact_boundary_json(
     check_application_artifact_boundary(PathBuf::from(host_root), &roots).to_json()
 }
 
-/// M3: absolute isolation namespaces + failure containment (503 unavailable).
+/// absolute isolation namespaces + failure containment (503 unavailable).
 #[napi]
 pub fn check_application_isolation_json(host_root: String, package_roots: Vec<String>) -> String {
     let roots: Vec<PathBuf> = package_roots.into_iter().map(PathBuf::from).collect();
     check_application_isolation(PathBuf::from(host_root), &roots).to_json()
 }
 
-/// M4: host catalog consumption + cross-application Link resolution.
+/// host catalog consumption + cross-application Link resolution.
 #[napi]
 pub fn check_application_host_composition_json(
     host_root: String,
@@ -401,7 +404,7 @@ pub fn check_application_host_composition_json(
     check_application_host_composition(PathBuf::from(host_root), &roots).to_json()
 }
 
-/// M5: multi-session affected rebuild + proxy dispatch + mounted tests + deploy adapter.
+/// multi-session affected rebuild + proxy dispatch + mounted tests + deploy adapter.
 #[napi]
 pub fn check_application_dev_test_deploy_json(
     host_root: String,
@@ -434,6 +437,7 @@ impl JsWorkspace {
                 out_dir,
                 tw: Some(vmz_plugin_tailwind::default_tw_compiler()),
                 scss: Some(vmz_plugin_sasso::default_scss_compiler()),
+                runtime_dist: options.runtime_dist.map(PathBuf::from),
             })),
         })
     }
@@ -484,7 +488,7 @@ impl JsWorkspace {
         Ok(ws.dirty_paths().map(|p| p.display().to_string()).collect())
     }
 
-    /// N3: validate + merge structured plugin contributions (no VPG mutation).
+    /// validate + merge structured plugin contributions (no VPG mutation).
     #[napi]
     pub fn apply_plugin_contributions(
         &self,
@@ -522,7 +526,7 @@ impl JsWorkspace {
         })
     }
 
-    /// Inspect lint profile：语义 check + 约定建议（`vmz-inspector`）。
+    /// Inspect lint profile: semantic check + convention advice (`vmz-inspector`).
     #[napi]
     pub fn lint(&self, deny_warnings: Option<bool>) -> Result<JsCheckReport> {
         let mut ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
@@ -538,7 +542,7 @@ impl JsWorkspace {
         })
     }
 
-    /// N4.1: format workspace `.vmz` files (no cargo spawn).
+    /// format workspace `.vmz` files (no cargo spawn).
     #[napi]
     pub fn format(&self, check_only: Option<bool>) -> Result<JsFormatReport> {
         let mut ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
@@ -586,7 +590,7 @@ impl JsWorkspace {
         })
     }
 
-    /// N4: query which deployment units current dirty set would rebuild.
+    /// session: query which deployment units current dirty set would rebuild.
     #[napi]
     pub fn query_affected(&self) -> Result<JsAffectedPlan> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
@@ -620,7 +624,7 @@ impl JsWorkspace {
         ws.query_program_graph(source).map_err(|e| Error::from_reason(e.to_string()))
     }
 
-    /// N4.3: in-memory session Deployment/VPG index.
+    /// in-memory session Deployment/VPG index.
     #[napi]
     pub fn query_session_graph(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
@@ -639,7 +643,7 @@ impl JsWorkspace {
         Ok(ws.explain(&target))
     }
 
-    /// X0: DX protocol catalog (`vmz.dx.v0`).
+    /// DX protocol catalog (`vmz.dx.v0`).
     #[napi]
     pub fn query_dx_catalog(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
@@ -653,287 +657,287 @@ impl JsWorkspace {
         Ok(ws.query_protocol_catalog())
     }
 
-    /// X0: Affected as `vmz.dx.affected.v0` JSON document.
+    /// Affected as `vmz.dx.affected.v0` JSON document.
     #[napi]
     pub fn query_affected_dx(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.query_affected_dx())
     }
 
-    /// X1: plan rename -> `vmz.dx.workspace_edit.v0` (TextEdits when refs proven).
+    /// plan rename -> `vmz.dx.workspace_edit.v0` (TextEdits when refs proven).
     #[napi]
     pub fn plan_rename(&self, intent_json: String) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.plan_rename(&intent_json))
     }
 
-    /// X1: atomically apply WorkspaceEditPlan.
+    /// atomically apply WorkspaceEditPlan.
     #[napi]
     pub fn apply_workspace_edit(&self, plan_json: String) -> Result<String> {
         let mut ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.apply_workspace_edit(&plan_json))
     }
 
-    /// X1: test selection for current dirty/affected set (`vmz.dx.test_selection.v0`).
+    /// test selection for current dirty/affected set (`vmz.dx.test_selection.v0`).
     #[napi]
     pub fn select_tests_affected(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.select_tests_affected())
     }
 
-    /// X1: rename causal explain chain.
+    /// rename causal explain chain.
     #[napi]
     pub fn explain_rename_chain(&self, intent_json: String) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.explain_rename_chain(&intent_json))
     }
 
-    /// X2: Symbol/Reference index + source map + safe_fix report.
+    /// Symbol/Reference index + source map + safe_fix report.
     #[napi]
-    pub fn check_dx_x2(&self) -> Result<String> {
+    pub fn check_cross_sfc(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_dx_x2())
+        Ok(ws.check_cross_sfc())
     }
 
-    /// X2: Symbol index document JSON.
+    /// Symbol index document JSON.
     #[napi]
     pub fn query_symbols(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.query_symbols())
     }
 
-    /// X2: references for `kind:id`.
+    /// references for `kind:id`.
     #[napi]
     pub fn query_references(&self, target: String) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.query_references(&target))
     }
 
-    /// X2: CodeAction list JSON.
+    /// CodeAction list JSON.
     #[napi]
     pub fn list_code_actions(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.list_code_actions())
     }
 
-    /// X3: atomic TextEdit batch (`vmz.dx.semantic_transaction.v0`).
+    /// atomic TextEdit batch (`vmz.dx.semantic_transaction.v0`).
     #[napi]
     pub fn apply_semantic_transaction(&self, edits_json: String) -> Result<String> {
         let mut ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.apply_semantic_transaction(&edits_json))
     }
 
-    /// X3: open analysis ticket (`vmz.dx.cancel.v0`).
+    /// open analysis ticket (`vmz.dx.cancel.v0`).
     #[napi]
     pub fn begin_analysis(&self) -> Result<String> {
         let mut ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.begin_analysis())
     }
 
-    /// X3: cancel analysis ticket.
+    /// cancel analysis ticket.
     #[napi]
     pub fn cancel_analysis(&self, ticket_id: u32) -> Result<String> {
         let mut ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.cancel_analysis(u64::from(ticket_id)))
     }
 
-    /// X3: affected preview JSON.
+    /// affected preview JSON.
     #[napi]
     pub fn query_affected_preview(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.query_affected_preview())
     }
 
-    /// X3: HMR plan JSON.
+    /// HMR plan JSON.
     #[napi]
     pub fn query_hmr_plan(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.query_hmr_plan())
     }
 
-    /// X3: route/chunk budget JSON.
+    /// route/chunk budget JSON.
     #[napi]
     pub fn query_budget(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.query_budget())
     }
 
-    /// X3: umbrella incremental DX report.
+    /// umbrella incremental DX report.
     #[napi]
-    pub fn check_dx_x3(&self) -> Result<String> {
+    pub fn check_transaction(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_dx_x3())
+        Ok(ws.check_transaction())
     }
 
-    /// X4: boundary validators JSON (`vmz.dx.boundary_validator.v0`).
+    /// boundary validators JSON (`vmz.dx.boundary_validator.v0`).
     #[napi]
     pub fn query_boundary_validators(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.query_boundary_validators())
     }
 
-    /// X4: leakage findings JSON (`vmz.dx.leakage.v0`).
+    /// leakage findings JSON (`vmz.dx.leakage.v0`).
     #[napi]
     pub fn query_leakage(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.query_leakage())
     }
 
-    /// X4: capability targets JSON (`vmz.dx.capability_target.v0`).
+    /// capability targets JSON (`vmz.dx.capability_target.v0`).
     #[napi]
     pub fn query_capability_targets(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.query_capability_targets())
     }
 
-    /// X4: dead graph JSON (`vmz.dx.dead_graph.v0`).
+    /// dead graph JSON (`vmz.dx.dead_graph.v0`).
     #[napi]
     pub fn query_dead_graph(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.query_dead_graph())
     }
 
-    /// X4: umbrella deployment proof (`vmz.dx.x4_check.v0`).
+    /// umbrella deployment proof (`vmz.dx.deployment_proof_check.v0`).
     #[napi]
-    pub fn check_dx_x4(&self) -> Result<String> {
+    pub fn check_deployment_proof(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_dx_x4())
+        Ok(ws.check_deployment_proof())
     }
 
-    /// X5: ingest StableId trace JSON (`vmz.dx.trace.v0`).
+    /// ingest StableId trace JSON (`vmz.dx.trace.v0`).
     #[napi]
     pub fn ingest_runtime_trace(&self, trace_json: String) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.ingest_runtime_trace(&trace_json))
     }
 
-    /// X5: causal replay JSON (`vmz.dx.causal_replay.v0`).
+    /// causal replay JSON (`vmz.dx.causal_replay.v0`).
     #[napi]
     pub fn replay_causal(&self, trace_json: String) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.replay_causal(&trace_json))
     }
 
-    /// X5: umbrella deep-explain report (`vmz.dx.x5_check.v0`).
+    /// umbrella deep-explain report (`vmz.dx.causal_replay_check.v0`).
     #[napi]
-    pub fn check_dx_x5(&self) -> Result<String> {
+    pub fn check_causal_replay(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_dx_x5())
+        Ok(ws.check_causal_replay())
     }
 
-    /// MP0: target-neutral contract check JSON.
+    /// miniprogram: target-neutral contract check JSON.
     #[napi]
-    pub fn check_mp0_target_contract(&self) -> Result<String> {
+    pub fn check_miniprogram_target_contract(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_mp0_target_contract())
+        Ok(ws.check_miniprogram_target_contract())
     }
 
-    /// P0: HostProfile / DeliveryProfile protocol check.
+    /// HostProfile / DeliveryProfile protocol check.
     #[napi]
-    pub fn check_p0_profile_protocol(&self) -> Result<String> {
+    pub fn check_host_profile_protocol(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_p0_profile_protocol())
+        Ok(ws.check_host_profile_protocol())
     }
 
-    /// P1: deterministic Surface/capability/route solver check.
+    /// deterministic Surface/capability/route solver check.
     #[napi]
-    pub fn check_p1_profile_solver(&self) -> Result<String> {
+    pub fn check_profile_solver(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_p1_profile_solver())
+        Ok(ws.check_profile_solver())
     }
 
-    /// P2: Unified Executor algebraic check.
+    /// Unified Executor algebraic check.
     #[napi]
-    pub fn check_p2_unified_executor(&self) -> Result<String> {
+    pub fn check_unified_executor(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_p2_unified_executor())
+        Ok(ws.check_unified_executor())
     }
 
-    /// P3: Lifecycle / Recovery algebraic check JSON.
+    /// Lifecycle / Recovery algebraic check JSON.
     #[napi]
-    pub fn check_p3_lifecycle_recovery(&self) -> Result<String> {
+    pub fn check_lifecycle_recovery(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_p3_lifecycle_recovery())
+        Ok(ws.check_lifecycle_recovery())
     }
 
-    /// P4: Delivery Proof algebraic check JSON.
+    /// Delivery Proof algebraic check JSON.
     #[napi]
-    pub fn check_p4_delivery_proof(&self) -> Result<String> {
+    pub fn check_delivery_proof(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_p4_delivery_proof())
+        Ok(ws.check_delivery_proof())
     }
 
-    /// P5: Cross-Host Conformance algebraic check JSON.
+    /// Cross-Host Conformance algebraic check JSON.
     #[napi]
-    pub fn check_p5_cross_host_conformance(&self) -> Result<String> {
+    pub fn check_cross_host_conformance(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_p5_cross_host_conformance())
+        Ok(ws.check_cross_host_conformance())
     }
 
-    /// P0: profile protocol catalog JSON.
+    /// profile protocol catalog JSON.
     #[napi]
     pub fn query_profile_catalog(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.query_profile_catalog())
     }
 
-    /// MP0: target protocol catalog JSON.
+    /// miniprogram: target protocol catalog JSON.
     #[napi]
     pub fn query_target_catalog(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.query_target_catalog())
     }
 
-    /// NW5: NativeSurface contract check.
+    /// native: NativeSurface contract check.
     #[napi]
-    pub fn check_nw5_native_surface_contract(&self) -> Result<String> {
+    pub fn check_native_surface_contract(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_nw5_native_surface_contract())
+        Ok(ws.check_native_surface_contract())
     }
 
-    /// NW6: multi-platform shared Host Profile contract check.
+    /// native: multi-platform shared Host Profile contract check.
     #[napi]
-    pub fn check_nw6_multi_platform_contract(&self) -> Result<String> {
+    pub fn check_multi_platform_contract(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_nw6_multi_platform_contract())
+        Ok(ws.check_multi_platform_contract())
     }
 
-    /// NW4: NativeAppHost full-stack contract check.
+    /// native: NativeAppHost full-stack contract check.
     #[napi]
-    pub fn check_nw4_native_fullstack_contract(&self) -> Result<String> {
+    pub fn check_native_fullstack_contract(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_nw4_native_fullstack_contract())
+        Ok(ws.check_native_fullstack_contract())
     }
 
-    /// NW3: NativeAppHost lifecycle contract check.
+    /// native: NativeAppHost lifecycle contract check.
     #[napi]
-    pub fn check_nw3_native_lifecycle_contract(&self) -> Result<String> {
+    pub fn check_native_lifecycle_contract(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_nw3_native_lifecycle_contract())
+        Ok(ws.check_native_lifecycle_contract())
     }
 
-    /// NW2: typed Native Capability Bridge contract check.
+    /// native: typed Native Capability Bridge contract check.
     #[napi]
-    pub fn check_nw2_native_bridge_contract(&self) -> Result<String> {
+    pub fn check_native_bridge_contract(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_nw2_native_bridge_contract())
+        Ok(ws.check_native_bridge_contract())
     }
 
-    /// NW1: Native WebView shell contract check.
+    /// native: Native WebView shell contract check.
     #[napi]
-    pub fn check_nw1_native_shell_contract(&self) -> Result<String> {
+    pub fn check_native_shell_contract(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_nw1_native_shell_contract())
+        Ok(ws.check_native_shell_contract())
     }
 
-    /// NW0: NativeAppHost / WebView contract check.
+    /// native: NativeAppHost / WebView contract check.
     #[napi]
-    pub fn check_nw0_native_host_contract(&self) -> Result<String> {
+    pub fn check_native_host_contract(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        Ok(ws.check_nw0_native_host_contract())
+        Ok(ws.check_native_host_contract())
     }
 
-    /// NW0: native-host catalog.
+    /// native: native-host catalog.
     #[napi]
     pub fn query_native_host_catalog(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;

@@ -31,4 +31,6 @@ and explainable application delivery.
 - Operational tools can cover many domains without commissioning every utility icon.
 - Design systems can prototype broadly before curating a final set.
 
-The production question is not simply “does an icon exist?” It is how the application guarantees that icon in development, CI, SSR, offline use, and long-term design consistency. Iconify solves discovery and breadth; a mature product may then freeze the exact assets it depends on.
+The production question is not simply “does an icon exist?” It is how the application guarantees that icon in
+development, CI, SSR, offline use, and long-term design consistency. Iconify solves discovery and breadth; a mature
+product may then freeze the exact assets it depends on.

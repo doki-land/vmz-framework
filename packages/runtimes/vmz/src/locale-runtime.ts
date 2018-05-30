@@ -1,8 +1,7 @@
 // @ts-nocheck
 /**
- * Locale I2 runtime: LocaleContext · FormatterContext · negotiation ·
+ * Locale runtime: LocaleContext · FormatterContext · negotiation ·
  * atomic LocaleTransition · SSR/client parity.
- * Design: 规划设计/vmz/28 §5–§8
  *
  * Not an I18n IR — ApplicationContext + Delivery projections over VPG Message views.
  */
@@ -26,14 +25,14 @@ import {
 } from './locale-schema.js';
 
 /**
- * Fixed negotiation priority (doc 28 §6). Host only supplies candidates.
+ * Fixed negotiation priority (locale notes ). Host only supplies candidates.
  * @param {{
- *   supportedLocales: string[],
- *   defaultLocale: string,
- *   routeLocale?: string|null,
- *   userChoice?: string|null,
- *   preference?: string|null,
- *   hostCandidates?: string[],
+ * supportedLocales: string[],
+ * defaultLocale: string,
+ * routeLocale?: string|null,
+ * userChoice?: string|null,
+ * preference?: string|null,
+ * hostCandidates?: string[],
  * }} input
  */
 export function negotiateLocale(input) {
@@ -55,14 +54,14 @@ export function negotiateLocale(input) {
 
 /**
  * @param {{
- *   applicationId: string,
- *   deliveryId: string,
- *   localeId: string,
- *   timeZone: string,
- *   calendar?: string,
- *   numberingSystem?: string,
- *   direction?: string,
- *   generation?: number,
+ * applicationId: string,
+ * deliveryId: string,
+ * localeId: string,
+ * timeZone: string,
+ * calendar?: string,
+ * numberingSystem?: string,
+ * direction?: string,
+ * generation?: number,
  * }} opts
  */
 export function buildApplicationContext(opts) {
@@ -160,10 +159,10 @@ export function validateFormatterContext(formatter, opts = {}) {
 /**
  * Resolve one MessageBinding to a single locale variant (whole-message, no mix).
  * @param {{
- *   messageId: string,
- *   requestedLocale: string,
- *   variants: Record<string, { template: string }>,
- *   fallback?: Record<string, string[]>,
+ * messageId: string,
+ * requestedLocale: string,
+ * variants: Record<string, { template: string }>,
+ * fallback?: Record<string, string[]>,
  * }} input
  */
 export function resolveMessageVariant(input) {
@@ -195,7 +194,7 @@ export function resolveMessageVariant(input) {
 }
 
 /**
- * Minimal ICU MessageFormat subset for I2 parity proofs (params + plural + #).
+ * Minimal ICU MessageFormat subset for parity proofs (params + plural + #).
  * @param {string} template
  * @param {Record<string, any>} [args]
  */
@@ -227,17 +226,17 @@ export function formatMessageTemplate(template, args = {}) {
 
 /**
  * @param {{
- *   applicationId: string,
- *   deliveryId: string,
- *   supportedLocales: string[],
- *   defaultLocale: string,
- *   fallback?: Record<string, string[]>,
- *   directions?: Record<string, string>,
- *   messages: Record<string, { variants: Record<string, { template: string }> }>,
- *   initialLocaleId: string,
- *   timeZone: string,
- *   generation?: number,
- *   loadedChunks?: Set<string>|string[],
+ * applicationId: string,
+ * deliveryId: string,
+ * supportedLocales: string[],
+ * defaultLocale: string,
+ * fallback?: Record<string, string[]>,
+ * directions?: Record<string, string>,
+ * messages: Record<string, { variants: Record<string, { template: string }> }>,
+ * initialLocaleId: string,
+ * timeZone: string,
+ * generation?: number,
+ * loadedChunks?: Set<string>|string[],
  * }} opts
  */
 export function createLocaleSession(opts) {
@@ -296,12 +295,12 @@ export function createLocaleSession(opts) {
     }
 
     /**
-     * Atomic LocaleTransition (doc 28 §5).
+     * Atomic LocaleTransition (locale notes ).
      * @param {string} targetLocaleId
      * @param {{
-     *   generation?: number,
-     *   loadChunk?: (localeId: string) => boolean|Promise<boolean>,
-     *   timeZone?: string,
+     * generation?: number,
+     * loadChunk?: (localeId: string) => boolean|Promise<boolean>,
+     * timeZone?: string,
      * }} [transitionOpts]
      */
     async function transition(targetLocaleId, transitionOpts = {}) {
@@ -437,8 +436,8 @@ export function createLocaleSession(opts) {
 /**
  * SSR and client must share the same resolved FormatterContext digest and texts.
  * @param {{
- *   ssr: { localeId: string, formatterDigest: string, formatterDataVersion?: string, texts: Record<string, string> },
- *   client: { localeId: string, formatterDigest: string, formatterDataVersion?: string, texts: Record<string, string> },
+ * ssr: { localeId: string, formatterDigest: string, formatterDataVersion?: string, texts: Record<string, string> },
+ * client: { localeId: string, formatterDigest: string, formatterDataVersion?: string, texts: Record<string, string> },
  * }} input
  */
 export function checkSsrClientParity(input) {
@@ -487,13 +486,13 @@ export function checkSsrClientParity(input) {
 }
 
 /**
- * Aggregate I2 runtime proof for a project check report + explicit contexts.
+ * Aggregate runtime proof for a project check report + explicit contexts.
  * @param {{
- *   manifest: { defaultLocale: string, locales: Array<{id:string,direction?:string}>, fallback?: Record<string,string[]> },
- *   messages: Array<{ messageId: string, variants: Record<string, { template: string }> }>,
- *   applicationId?: string,
- *   deliveryId?: string,
- *   timeZone?: string,
+ * manifest: { defaultLocale: string, locales: Array<{id:string,direction?:string}>, fallback?: Record<string,string[]> },
+ * messages: Array<{ messageId: string, variants: Record<string, { template: string }> }>,
+ * applicationId?: string,
+ * deliveryId?: string,
+ * timeZone?: string,
  * }} input
  */
 export function checkLocaleRuntime(input) {

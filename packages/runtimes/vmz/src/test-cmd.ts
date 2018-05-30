@@ -1,30 +1,52 @@
 // @ts-nocheck
 /**
- * `vmz test` command 鈥?discovery / build / filter / TestReport orchestration.
- * Semantics live in `@vmz/test`.
+ * `vmz test` command — discovery / build / filter / TestReport orchestration.
+ * Semantics live in `@vmz/test` (optional peer — not installed with bare `@vmz/vmz`).
  */
 
 import path from 'node:path';
-import {
-    discoverTestManifests,
-    buildTestReport,
-    parseModes,
-    buildForCompile,
-    runCompileManifest,
-    runLogicManifest,
-    runSsrManifest,
-    runResumeManifest,
-    runBrowserManifest,
-    runDeploymentManifest,
-} from '@vmz/test';
 import { createWorkspace } from './index.js';
 import { log } from './log.js';
+
+/**
+ * @returns {Promise<typeof import('@vmz/test')>}
+ */
+async function loadTestPackage() {
+    try {
+        return await import('@vmz/test');
+    } catch (e) {
+        const detail = e instanceof Error ? e.message : String(e);
+        throw new Error(
+            '`vmz test` needs `@vmz/test` (optional peer of `@vmz/vmz`).\n' + '  Install:  pnpm add -D @vmz/test\n' + `  Detail: ${detail}`,
+        );
+    }
+}
 
 /**
  * @param {Record<string, string | boolean> & { _: string[] }} args
  * @returns {Promise<number>}
  */
 export async function cmdTest(args) {
+    let test;
+    try {
+        test = await loadTestPackage();
+    } catch (e) {
+        log.error(e instanceof Error ? e.message : String(e));
+        return 1;
+    }
+    const {
+        discoverTestManifests,
+        buildTestReport,
+        parseModes,
+        buildForCompile,
+        runCompileManifest,
+        runLogicManifest,
+        runSsrManifest,
+        runResumeManifest,
+        runBrowserManifest,
+        runDeploymentManifest,
+    } = test;
+
     const project = path.resolve(String(args._[0] || '.'));
     let modes;
     try {
@@ -89,7 +111,7 @@ export async function cmdTest(args) {
         const ws = createWorkspace({ root: project, outDir });
         try {
             if (typeof ws.selectTestsAffected !== 'function') {
-                log.error('selectTestsAffected missing on Workspace 鈥?rebuild native (`pnpm napi:build`)');
+                log.error('selectTestsAffected missing on Workspace — rebuild native (`pnpm napi:build`)');
                 return 1;
             }
             const raw = ws.selectTestsAffected();
@@ -100,14 +122,14 @@ export async function cmdTest(args) {
                 return 1;
             }
             log.info(
-                `affected selection: ${testSelection.status} 鈥?${testSelection.reason} (chunks=${(testSelection.affectedChunkIds || []).length})`,
+                `affected selection: ${testSelection.status} — ${testSelection.reason} (chunks=${(testSelection.affectedChunkIds || []).length})`,
             );
             const ids = new Set((testSelection.testIds || []).map(String));
             const chunks = new Set((testSelection.affectedChunkIds || []).map(String));
             if (ids.size > 0) {
                 selected = selected.filter((m) => ids.has(String(m.id || '')));
             } else if (chunks.size > 0) {
-                // Scaffold fallback: match manifest program.chunkId until graph鈫抰est edges exist.
+                // Scaffold fallback: match manifest program.chunkId until graph->test edges exist.
                 selected = selected.filter((m) => {
                     const program = m.program && typeof m.program === 'object' ? m.program : {};
                     const chunk = program.chunkId ? String(program.chunkId) : '';
@@ -129,13 +151,13 @@ export async function cmdTest(args) {
     }
 
     /** @type {Array<{
-     *   testId: string,
-     *   file: string,
-     *   modes: string[],
-     *   programId: string|null,
-     *   planId: string|null,
-     *   status: string,
-     *   diagnostics: unknown[],
+     * testId: string,
+     * file: string,
+     * modes: string[],
+     * programId: string|null,
+     * planId: string|null,
+     * status: string,
+     * diagnostics: unknown[],
      * }>} */
     let tests;
 
@@ -317,7 +339,7 @@ export async function cmdTest(args) {
         } else {
             console.log(`vmz test: ${tests.length} test(s) under ${project}`);
             for (const t of tests) {
-                console.log(`  ${t.testId}\t${t.file}\t[${t.modes.join(',')}]`);
+                console.log(` ${t.testId}\t${t.file}\t[${t.modes.join(',')}]`);
             }
         }
         if (errors.length) {
@@ -344,10 +366,10 @@ export async function cmdTest(args) {
 
     console.log(`vmz test: ${tests.length} test(s) — ${reportStatus}`);
     for (const t of tests) {
-        console.log(`  ${t.status}\t${t.testId}\t${t.file}`);
+        console.log(` ${t.status}\t${t.testId}\t${t.file}`);
         for (const d of t.diagnostics || []) {
             if (d && typeof d === 'object' && d.severity === 'error') {
-                console.log(`    ! ${d.message}`);
+                console.log(` ! ${d.message}`);
                 if (process.env.GITHUB_ACTIONS === 'true') {
                     const msg = String(d.message || 'error').replace(/[\r\n]+/g, ' ');
                     console.log(`::error title=vmz test ${t.testId}::${msg}`);
@@ -363,7 +385,7 @@ export async function cmdTest(args) {
         }
     }
     if (tests.length === 0) {
-        console.log('  (add *.vmz.test.json manifests)');
+        console.log(' (add *.vmz.test.json manifests)');
     }
     if (errors.length) return 2;
     if (failed) return 1;

@@ -1,8 +1,7 @@
 //! Format `.vmz` via oxc codegen (script blocks) + SFC reassemble.
 
-use anyhow::{Result, bail};
 use clap::Args as ClapArgs;
-use vmz_compiler::{FormatOptions, format_path};
+use vmz_compiler::{FormatOptions, Result, bail, format_path};
 
 use crate::cli::PathArgs;
 

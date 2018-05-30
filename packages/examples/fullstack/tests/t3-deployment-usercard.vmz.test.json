@@ -1,7 +1,7 @@
 {
     "schema": "vmz.test.manifest.v0",
     "id": "t3.deployment.usercard.isolation",
-    "title": "T3: Deployment IR + UserCard server capability isolation",
+    "title": ": Deployment IR + UserCard server capability isolation",
     "modes": ["deployment"],
     "program": {
         "chunkId": "components/UserCard",

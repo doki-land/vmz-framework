@@ -1,4 +1,4 @@
-//! Application Collection / Mount contract (M0).
+//! Application Collection / Mount contract.
 //!
 //! Freezes descriptor + host `applications.config.json5` schemas and diagnostic codes.
 //! No Mount IR: mounts are application/deployment edges; catalog/mount-table are artifacts.
@@ -42,22 +42,22 @@ pub const APPLICATION_RELOCATION_SCHEMA: &str = "vmz.application.relocation.v0";
 /// Relocated URL surfaces after applying [`ApplicationBase`].
 pub const APPLICATION_RELOCATED_SCHEMA: &str = "vmz.application.relocated.v0";
 
-/// Result of relocatable source / manifest checks (M1).
+/// Result of relocatable source / manifest checks.
 pub const APPLICATION_RELOCATABLE_CHECK_SCHEMA: &str = "vmz.application.relocatable.v0";
 
-/// Independent application build artifact (M2). No sibling Program Graph embedded.
+/// Independent application build artifact. No sibling Program Graph embedded.
 pub const APPLICATION_ARTIFACT_SCHEMA: &str = "vmz.application.artifact.v0";
 
-/// Host mount table artifact (M2). Refs only — never embeds child graphs/plans.
+/// Host mount table artifact. Refs only — never embeds child graphs/plans.
 pub const APPLICATION_MOUNT_TABLE_SCHEMA: &str = "vmz.application.mount_table.v0";
 
-/// Result of artifact-boundary ownership checks (M2).
+/// Result of artifact-boundary ownership checks.
 pub const APPLICATION_ARTIFACT_BOUNDARY_SCHEMA: &str = "vmz.application.artifact_boundary.v0";
 
-/// Per-application isolation namespace proof (M3).
+/// Per-application isolation namespace proof.
 pub const APPLICATION_ISOLATION_SCHEMA: &str = "vmz.application.isolation.v0";
 
-/// Host+children isolation conformance report (M3).
+/// Host+children isolation conformance report.
 pub const APPLICATION_ISOLATION_CHECK_SCHEMA: &str = "vmz.application.isolation_check.v0";
 
 pub const DIAG_ISOLATION_UNPROVEN: &str = "vmz::application::isolation_unproven";
@@ -65,28 +65,28 @@ pub const DIAG_FAILURE_CONTAINMENT: &str = "vmz::application::failure_containmen
 pub const DIAG_ROUTE_NOT_PUBLIC: &str = "vmz::application::route_not_public";
 pub const DIAG_MOUNT_UNREACHABLE: &str = "vmz::application::mount_unreachable";
 
-/// Cross-application `<Link application to>` contract (M4).
+/// Cross-application `<Link application to>` contract.
 pub const APPLICATION_CROSS_LINK_SCHEMA: &str = "vmz.application.cross_link.v0";
 
-/// Host composition conformance report (M4).
+/// Host composition conformance report.
 pub const APPLICATION_HOST_COMPOSITION_SCHEMA: &str = "vmz.application.host_composition.v0";
 
-/// Per-ApplicationId independent dev session row (M5).
+/// Per-ApplicationId independent dev session row.
 pub const APPLICATION_DEV_SESSIONS_SCHEMA: &str = "vmz.application.dev_sessions.v0";
 
-/// Dirty paths → affected ApplicationIds (M5).
+/// Dirty paths → affected ApplicationIds.
 pub const APPLICATION_AFFECTED_SCHEMA: &str = "vmz.application.affected.v0";
 
-/// MountTable reverse-proxy dispatch proof (M5).
+/// MountTable reverse-proxy dispatch proof.
 pub const APPLICATION_PROXY_DISPATCH_SCHEMA: &str = "vmz.application.proxy_dispatch.v0";
 
-/// `vmz test --application` / `--mounted` selection contract (M5).
+/// `vmz test --application` / `--mounted` selection contract.
 pub const APPLICATION_MOUNTED_TEST_SCHEMA: &str = "vmz.application.mounted_test.v0";
 
-/// Deployment adapter boundary proof (M5).
+/// Deployment adapter boundary proof.
 pub const APPLICATION_DEPLOY_ADAPTER_SCHEMA: &str = "vmz.application.deploy_adapter.v0";
 
-/// Umbrella Dev/Test/Deploy conformance report (M5).
+/// Umbrella Dev/Test/Deploy conformance report.
 pub const APPLICATION_DEV_CHECK_SCHEMA: &str = "vmz.application.dev_check.v0";
 
 pub const DIAG_SESSION_SHARED: &str = "vmz::application::session_shared";
@@ -431,7 +431,7 @@ pub struct RelocatedApplicationUrls {
     pub entries: Vec<RelocatedUrlEntry>,
 }
 
-/// M1 relocatable check report.
+/// relocatable check report.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApplicationRelocatableReport {
     pub schema: String,
@@ -467,7 +467,7 @@ pub struct ArtifactRef {
     pub hash: String,
 }
 
-/// Independent per-application build artifact (M2).
+/// Independent per-application build artifact.
 ///
 /// Owns Program Graph / Execution Plan / routes / assets by **reference**.
 /// Host MountTable must not embed these bodies.
@@ -519,7 +519,7 @@ pub struct ApplicationMountTableEntry {
     pub integrity: String,
 }
 
-/// Host ApplicationMountTable artifact (M2).
+/// Host ApplicationMountTable artifact.
 ///
 /// Forbidden fields (must never appear): programGraph, executionPlan, executable modules.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -531,7 +531,7 @@ pub struct ApplicationMountTable {
     pub integrity: String,
 }
 
-/// M2 artifact-boundary ownership report.
+/// artifact-boundary ownership report.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApplicationArtifactBoundaryReport {
     pub schema: String,
@@ -552,7 +552,7 @@ impl ApplicationArtifactBoundaryReport {
     }
 }
 
-/// Namespaced isolation surfaces for one ApplicationId (M3).
+/// Namespaced isolation surfaces for one ApplicationId.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApplicationIsolationNamespace {
     pub schema: String,
@@ -610,7 +610,7 @@ impl ApplicationIsolationCheckReport {
     }
 }
 
-/// Declared or scanned cross-application `<Link application to>` (M4).
+/// Declared or scanned cross-application `<Link application to>`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CrossApplicationLink {
     pub schema: String,
@@ -632,7 +632,7 @@ pub struct CrossApplicationLink {
     pub path: Option<String>,
 }
 
-/// M4 host composition conformance report.
+/// host composition conformance report.
 ///
 /// Catalog is read-only data for ordinary host pages — VMZ does not emit gallery UI.
 /// Cross-app Links resolve to real `<a href>` document navigation.
@@ -663,7 +663,7 @@ impl ApplicationHostCompositionReport {
     }
 }
 
-/// One independent N-API/dev session keyed by ApplicationId (M5).
+/// One independent N-API/dev session keyed by ApplicationId.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApplicationDevSession {
     #[serde(rename = "applicationId")]
@@ -682,7 +682,7 @@ pub struct ApplicationDevSessions {
     pub sessions: Vec<ApplicationDevSession>,
 }
 
-/// One dirty → ApplicationId rebuild unit (M5).
+/// One dirty → ApplicationId rebuild unit.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApplicationAffectedUnit {
     #[serde(rename = "applicationId")]
@@ -700,7 +700,7 @@ pub struct ApplicationAffectedPlan {
     pub not_rebuilt: Vec<ApplicationId>,
 }
 
-/// One reverse-proxy dispatch case (M5).
+/// One reverse-proxy dispatch case.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApplicationProxyCase {
     pub url: String,
@@ -748,7 +748,7 @@ pub struct ApplicationDeployAdapterProof {
     pub per_application_deployment_refs: bool,
 }
 
-/// M5 Dev/Test/Deploy umbrella report.
+/// Dev/Test/Deploy umbrella report.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApplicationDevCheckReport {
     pub schema: String,

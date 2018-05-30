@@ -36,17 +36,25 @@ For a reader evaluating VMZ, that makes the site more than a brochure: it is the
 ## The site as a capability map 🗺️
 
 - **The landing experience** exercises ordinary VMZ pages, layouts, metadata, styles, and server rendering.
-- **The documentation** exercises locale-first content, navigation, code fences, search-ready metadata, and stable page identity.
-- **The examples index** is ordinary host UI over an explicit application collection. VMZ does not generate its cards or categories.
-- **Each mounted application** remains independently deployable and owns its own graph, routes, runtime, styles, state, and server behavior.
+- **The documentation** exercises locale-first content, navigation, code fences, search-ready metadata, and stable page
+  identity.
+- **The examples index** is ordinary host UI over an explicit application collection. VMZ does not generate its cards or
+  categories.
+- **Each mounted application** remains independently deployable and owns its own graph, routes, runtime, styles, state,
+  and server behavior.
 - **Interactive areas** exercise the same Island and resume decisions available to product applications.
 
 ## Why no specialization is a product feature
 
-A special homepage pipeline would make the site easier to fake and harder to trust. By refusing that shortcut, every limitation found while building the site becomes feedback for a general VMZ capability. Better documents improve project documents. Better example mounting improves application composition. Better source presentation improves every technical product built with VMZ.
+A special homepage pipeline would make the site easier to fake and harder to trust. By refusing that shortcut, every
+limitation found while building the site becomes feedback for a general VMZ capability. Better documents improve project
+documents. Better example mounting improves application composition. Better source presentation improves every technical
+product built with VMZ.
 
 That creates useful pressure: the public experience cannot outrun the framework by secretly using a better stack. 🐾
 
 ## What success looks like
 
-Visitors should be able to understand VMZ without installing it, inspect working applications without first learning how the project is organized, and move from a product claim to a real page that demonstrates it. The site earns confidence by being evidence, not by publishing implementation trivia.
+Visitors should be able to understand VMZ without installing it, inspect working applications without first learning how
+the project is organized, and move from a product claim to a real page that demonstrates it. The site earns confidence
+by being evidence, not by publishing implementation trivia.

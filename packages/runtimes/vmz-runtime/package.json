@@ -33,7 +33,7 @@
     "main": "./dist/server.js",
     "types": "./dist/index.d.ts",
     "scripts": {
-        "build": "tsc -p tsconfig.json && node ../../../scripts/copy-serve-host-mjs.mjs"
+        "build": "tsc -p tsconfig.json && node ../../../scripts/build/copy-serve-host-mjs.mjs"
     },
     "devDependencies": {
         "@types/node": "^22.15.0",

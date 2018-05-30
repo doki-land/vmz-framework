@@ -31,6 +31,9 @@ Use it if you want to explore VMZ in the place where most framework decisions be
 
 ## Why this can go beyond autocomplete
 
-Most framework extensions reconstruct meaning from conventions after the compiler has already made its choices. VMZ's advantage is that editor tooling can query the same provenance and program graph used for generation. The goal is not merely more completion items; it is an editor that can answer why the application behaves as it does. 🔍
+Most framework extensions reconstruct meaning from conventions after the compiler has already made its choices. VMZ's
+advantage is that editor tooling can query the same provenance and program graph used for generation. The goal is not
+merely more completion items; it is an editor that can answer why the application behaves as it does. 🔍
 
-For newcomers, syntax clarity lowers the first barrier. For experienced teams, semantic explanations can eventually make large full-stack applications safer to change.
+For newcomers, syntax clarity lowers the first barrier. For experienced teams, semantic explanations can eventually make
+large full-stack applications safer to change.

@@ -2,7 +2,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
-import { expect } from '../../../../scripts/test-expect.mjs';
+import { expect } from '../../../../scripts/test/expect.mjs';
 import { exampleDist, exampleRoot } from '@vmz-examples/test-utils';
 
 const dist = exampleDist('fullstack');

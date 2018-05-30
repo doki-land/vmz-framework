@@ -44,10 +44,14 @@ compiler-visible boundaries.
 
 ## Why contribution beats mutation
 
-Mutation is convenient for the first plugin and expensive for the fiftieth. If every plugin can rewrite any source, graph node, or generated artifact, composition order becomes application semantics and no tool can explain the final result.
+Mutation is convenient for the first plugin and expensive for the fiftieth. If every plugin can rewrite any source,
+graph node, or generated artifact, composition order becomes application semantics and no tool can explain the final
+result.
 
-A contribution says what capability is being added, which versioned schema it follows, what it reads, what it emits, and where it may execute. That extra structure is what allows npm extensibility and strong compilation to coexist.
+A contribution says what capability is being added, which versioned schema it follows, what it reads, what it emits, and
+where it may execute. That extra structure is what allows npm extensibility and strong compilation to coexist.
 
 ## The litmus test
 
-If installing the plugin makes `vmz check`, SSR, resume, tests, or deployment less able to explain the application, the integration is using the wrong boundary. A native plugin should leave VMZ more capable, not less coherent.
+If installing the plugin makes `vmz check`, SSR, resume, tests, or deployment less able to explain the application, the
+integration is using the wrong boundary. A native plugin should leave VMZ more capable, not less coherent.

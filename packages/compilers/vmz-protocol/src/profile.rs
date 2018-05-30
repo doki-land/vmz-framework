@@ -1,14 +1,14 @@
-//! HostProfile / DeliveryProfile protocol (doc 13 §4.5 / §4.14 P0).
+//! HostProfile / DeliveryProfile protocol (architecture notes / ).
 //!
 //! Algebraic first version: freeze HostProfile + DeliveryProfile + binding
 //! schemas, namespaced contribution rules, and resolution digest.
-//! P0: HostProfile / DeliveryProfile freeze.
-//! P1: Surface/capability/route solver artifacts + diagnostics.
-//! P2: Unified Executor envelopes / transaction / dispose (doc 13 §4.7).
-//! P3: Lifecycle mapping + crash recovery (doc 13 §4.8) — Browser/Mini/Native.
-//! P4: Delivery Proof — package/security/update constraints + proof manifest (§4.4/§4.12/§4.14).
-//! P5: Cross-Host Conformance — shared stable IDs / state / trace across Web/Template/Mixed (§4.14).
-//! Does not replace MP0/NW* vertical evidence — those remain migration inputs.
+//! HostProfile / DeliveryProfile freeze.
+//! Surface/capability/route solver artifacts + diagnostics.
+//! Unified Executor envelopes / transaction / dispose (architecture notes).
+//! Lifecycle mapping + crash recovery (architecture notes) — Browser/Mini/Native.
+//! Delivery Proof — package/security/update constraints + proof manifest.
+//! Cross-Host Conformance — shared stable IDs / state / trace across Web/Template/Mixed.
+//! Does not replace /NW* vertical evidence — those remain migration inputs.
 
 use serde::{Deserialize, Serialize};
 
@@ -27,7 +27,7 @@ pub const RESOLUTION_DIGEST_SCHEMA: &str = "vmz.profile.resolution_digest.v0";
 pub const PROFILE_CONTRIBUTION_SCHEMA: &str = "vmz.profile.contribution.v0";
 pub const PROFILE_CHECK_SCHEMA: &str = "vmz.profile.check.v0";
 
-/// P1 solver artifact schemas (doc 13 §4.6 / §4.12).
+/// solver artifact schemas (architecture notes / ).
 pub const SURFACE_REQUIREMENTS_SCHEMA: &str = "vmz.profile.surface_requirements.v0";
 pub const CAPABILITY_REQUIREMENT_SCHEMA: &str = "vmz.profile.capability_requirement.v0";
 pub const SURFACE_ASSIGNMENT_TABLE_SCHEMA: &str = "vmz.profile.surface_assignment_table.v0";
@@ -37,7 +37,7 @@ pub const HOST_RESOLUTION_MANIFEST_SCHEMA: &str = "vmz.profile.host_resolution_m
 pub const SOLVER_INPUT_SCHEMA: &str = "vmz.profile.solver_input.v0";
 pub const SOLVER_CHECK_SCHEMA: &str = "vmz.profile.solver_check.v0";
 
-/// P2: Unified Executor envelopes / transaction / dispose (doc 13 §4.7 / §4.14).
+/// Unified Executor envelopes / transaction / dispose (architecture notes / ).
 pub const EXECUTOR_ENVELOPE_HEADER_SCHEMA: &str = "vmz.profile.executor_envelope_header.v0";
 pub const EVENT_ENVELOPE_SCHEMA: &str = "vmz.profile.event_envelope.v0";
 pub const EXECUTOR_TRANSACTION_SCHEMA: &str = "vmz.profile.executor_transaction.v0";
@@ -47,14 +47,14 @@ pub const CANCEL_REQUEST_SCHEMA: &str = "vmz.profile.cancel_request.v0";
 pub const EXECUTOR_SCENARIO_SCHEMA: &str = "vmz.profile.executor_scenario.v0";
 pub const EXECUTOR_CHECK_SCHEMA: &str = "vmz.profile.executor_check.v0";
 
-/// P3: Lifecycle mapping + crash recovery (doc 13 §4.8 / §4.14).
+/// Lifecycle mapping + crash recovery (architecture notes / ).
 pub const LIFECYCLE_MAPPING_ENTRY_SCHEMA: &str = "vmz.profile.lifecycle_mapping_entry.v0";
 pub const LIFECYCLE_MAPPING_TABLE_SCHEMA: &str = "vmz.profile.lifecycle_mapping_table.v0";
 pub const RECOVERY_POLICY_SCHEMA: &str = "vmz.profile.recovery_policy.v0";
 pub const LIFECYCLE_SCENARIO_SCHEMA: &str = "vmz.profile.lifecycle_scenario.v0";
 pub const LIFECYCLE_RECOVERY_CHECK_SCHEMA: &str = "vmz.profile.lifecycle_recovery_check.v0";
 
-/// P4: Delivery Proof — package/security/update + proof manifest (doc 13 §4.4 / §4.12 / §4.14).
+/// Delivery Proof — package/security/update + proof manifest (architecture notes / ).
 pub const DELIVERY_PACKAGE_CONSTRAINTS_SCHEMA: &str = "vmz.profile.delivery_package_constraints.v0";
 pub const DELIVERY_SECURITY_POLICY_SCHEMA: &str = "vmz.profile.delivery_security_policy.v0";
 pub const DELIVERY_UPDATE_POLICY_SCHEMA: &str = "vmz.profile.delivery_update_policy.v0";
@@ -63,7 +63,7 @@ pub const DELIVERY_PROOF_MANIFEST_SCHEMA: &str = "vmz.profile.delivery_proof_man
 pub const DELIVERY_PROOF_SCENARIO_SCHEMA: &str = "vmz.profile.delivery_proof_scenario.v0";
 pub const DELIVERY_PROOF_CHECK_SCHEMA: &str = "vmz.profile.delivery_proof_check.v0";
 
-/// P5: Cross-Host Conformance (doc 13 §4.14).
+/// Cross-Host Conformance (architecture notes).
 pub const CONFORMANCE_FIXTURE_SCHEMA: &str = "vmz.profile.conformance_fixture.v0";
 pub const CONFORMANCE_STATE_SNAPSHOT_SCHEMA: &str = "vmz.profile.conformance_state_snapshot.v0";
 pub const CONFORMANCE_TRACE_SCHEMA: &str = "vmz.profile.conformance_trace.v0";
@@ -71,22 +71,22 @@ pub const CONFORMANCE_HOST_RUN_SCHEMA: &str = "vmz.profile.conformance_host_run.
 pub const CONFORMANCE_SCENARIO_SCHEMA: &str = "vmz.profile.conformance_scenario.v0";
 pub const CONFORMANCE_CHECK_SCHEMA: &str = "vmz.profile.conformance_check.v0";
 
-/// Required surface roles for P5: WebSurface, TemplateSurface, Web+Native mixed.
+/// Required surface roles for WebSurface, TemplateSurface, Web+Native mixed.
 pub const CONFORMANCE_SURFACE_ROLES: &[&str] = &["web", "template", "mixed"];
 
 /// Allowed DeliveryUpdatePolicy.channel values.
 pub const DELIVERY_UPDATE_CHANNELS: &[&str] = &["rebuild", "store", "hot", "hybrid"];
 
-/// Allowed DeliveryProfile.assetStrategy values for P4 proof.
+/// Allowed DeliveryProfile.assetStrategy values for proof.
 pub const DELIVERY_ASSET_STRATEGIES: &[&str] = &["bundled", "remote", "hybrid"];
 
-/// Host kinds covered by P3 cross-host lifecycle proof.
+/// Host kinds covered by cross-host lifecycle proof.
 pub const LIFECYCLE_HOST_KINDS: &[&str] = &["browser", "mini", "native"];
 
-/// Allowed persistence windows on LifecycleBinding (doc 13 §4.8).
+/// Allowed persistence windows on LifecycleBinding (architecture notes).
 pub const PERSISTENCE_WINDOWS: &[&str] = &["none", "suspend", "crash", "owner"];
 
-/// P0 diagnostic codes (doc 13 §4.13 — profile protocol subset).
+/// diagnostic codes (architecture notes — profile protocol subset).
 pub const DIAG_HOST_PROFILE_INVALID: &str = "vmz::profile::host_profile_invalid";
 pub const DIAG_DELIVERY_PROFILE_INVALID: &str = "vmz::profile::delivery_profile_invalid";
 pub const DIAG_HOST_PROFILE_REF_UNRESOLVED: &str = "vmz::profile::host_profile_ref_unresolved";
@@ -96,7 +96,7 @@ pub const DIAG_CORE_ID_OVERRIDE: &str = "vmz::profile::core_id_override";
 pub const DIAG_CONTRIBUTION_NOT_NAMESPACED: &str = "vmz::profile::contribution_not_namespaced";
 pub const DIAG_PROFILE_VERSION_INVALID: &str = "vmz::profile::profile_version_invalid";
 
-/// P1 solver diagnostics (doc 13 §4.13).
+/// solver diagnostics (architecture notes).
 pub const DIAG_SURFACE_NO_MATCH: &str = "vmz::profile::surface_no_match";
 pub const DIAG_SURFACE_AMBIGUOUS: &str = "vmz::profile::surface_ambiguous";
 pub const DIAG_CAPABILITY_UNRESOLVED: &str = "vmz::profile::capability_unresolved";
@@ -104,7 +104,7 @@ pub const DIAG_CAPABILITY_PERMISSION_UNDECLARED: &str =
     "vmz::profile::capability_permission_undeclared";
 pub const DIAG_ROUTE_UNREALIZABLE: &str = "vmz::profile::route_unrealizable";
 
-/// P2 executor diagnostics (doc 13 §4.7).
+/// executor diagnostics (architecture notes).
 pub const DIAG_STALE_GENERATION: &str = "vmz::profile::stale_generation";
 pub const DIAG_MISSING_ENVELOPE_IDS: &str = "vmz::profile::missing_envelope_ids";
 pub const DIAG_SURFACE_OWNS_STATE: &str = "vmz::profile::surface_owns_state";
@@ -113,14 +113,14 @@ pub const DIAG_SPLIT_TRANSACTION: &str = "vmz::profile::split_transaction";
 pub const DIAG_DISPOSE_NOT_AUTHORITATIVE: &str = "vmz::profile::dispose_not_authoritative";
 pub const DIAG_CANCEL_NOT_PROPAGATED: &str = "vmz::profile::cancel_not_propagated";
 
-/// P3 lifecycle / recovery diagnostics (doc 13 §4.8 / §4.13).
+/// lifecycle / recovery diagnostics (architecture notes / ).
 pub const DIAG_LIFECYCLE_UNPROVEN: &str = "vmz::profile::lifecycle_unproven";
 pub const DIAG_LIFECYCLE_MAPPING_INCOMPLETE: &str = "vmz::profile::lifecycle_mapping_incomplete";
 pub const DIAG_RECOVERY_DUPLICATES_OWNER: &str = "vmz::profile::recovery_duplicates_owner";
 pub const DIAG_RECOVERY_ASSUMES_HEAP: &str = "vmz::profile::recovery_assumes_heap";
 pub const DIAG_PERSISTENCE_WINDOW_INVALID: &str = "vmz::profile::persistence_window_invalid";
 
-/// P4 delivery proof diagnostics (doc 13 §4.13).
+/// delivery proof diagnostics (architecture notes).
 pub const DIAG_DELIVERY_CONSTRAINT_EXCEEDED: &str = "vmz::profile::delivery_constraint_exceeded";
 pub const DIAG_HOST_PLAN_VERSION_MISMATCH: &str = "vmz::profile::host_plan_version_mismatch";
 pub const DIAG_PROOF_MANIFEST_INCOMPLETE: &str = "vmz::profile::proof_manifest_incomplete";
@@ -128,7 +128,7 @@ pub const DIAG_PROOF_COPIES_SEMANTIC_IR: &str = "vmz::profile::proof_copies_sema
 pub const DIAG_UPDATE_WITHOUT_REPROOF: &str = "vmz::profile::update_without_reproof";
 pub const DIAG_SECURITY_POLICY_INSECURE: &str = "vmz::profile::security_policy_insecure";
 
-/// P5 cross-host conformance diagnostics (doc 13 §4.14).
+/// cross-host conformance diagnostics (architecture notes).
 pub const DIAG_STABLE_ID_DIVERGENCE: &str = "vmz::profile::stable_id_divergence";
 pub const DIAG_STATE_RESULT_DIVERGENCE: &str = "vmz::profile::state_result_divergence";
 pub const DIAG_TRACE_INVARIANT_BROKEN: &str = "vmz::profile::trace_invariant_broken";
@@ -139,10 +139,10 @@ pub const DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH: &str =
 /// Reserved core ID prefix — contributions must not override these.
 pub const CORE_ID_PREFIX: &str = "vmz.";
 
-/// Surface kinds (doc 13 §4.5).
+/// Surface kinds (architecture notes).
 pub const SURFACE_KINDS: &[&str] = &["web", "template", "native", "headless"];
 
-/// Unified lifecycle events Host must map (doc 13 §4.8).
+/// Unified lifecycle events Host must map (architecture notes).
 pub const UNIFIED_LIFECYCLE_EVENTS: &[&str] =
     &["activate", "visible", "hidden", "suspend", "resume", "recover", "dispose"];
 
@@ -462,7 +462,7 @@ pub struct LifecycleBinding {
     pub guaranteed: bool,
     #[serde(rename = "mayBeMissingAfterCrash", default)]
     pub may_be_missing_after_crash: bool,
-    /// `none` | `suspend` | `crash` | `owner` — persistence window for resources (doc 13 §4.8).
+    /// `none` | `suspend` | `crash` | `owner` — persistence window for resources (architecture notes).
     #[serde(rename = "persistenceWindow", default)]
     pub persistence_window: String,
     /// Whether this lifecycle event cancels in-flight capabilities.
@@ -529,7 +529,7 @@ pub struct HostProfile {
 }
 
 impl HostProfile {
-    /// Build LifecycleBinding rows from host-event → unified-lifecycle pairs (doc 13 §4.8).
+    /// Build LifecycleBinding rows from host-event → unified-lifecycle pairs (architecture notes).
     pub fn lifecycle_from_pairs(pairs: &[(&str, &str)]) -> Vec<LifecycleBinding> {
         pairs
             .iter()
@@ -952,7 +952,7 @@ impl ProfileCheckReport {
     }
 }
 
-/// Region surface requirements inferred from VPG (algebraic fixture for P1).
+/// Region surface requirements inferred from VPG (algebraic fixture for ).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SurfaceRequirements {
     pub schema: String,
@@ -1167,7 +1167,7 @@ impl ProfileSolverCheckReport {
     }
 }
 
-/// Envelope header shared by Event / Patch / Capability / lifecycle envelopes (doc 13 §4.7).
+/// Envelope header shared by Event / Patch / Capability / lifecycle envelopes (architecture notes).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ExecutorEnvelopeHeader {
     pub schema: String,
@@ -1391,7 +1391,7 @@ impl ExecutorCheckReport {
     }
 }
 
-/// One host's lifecycle slice in a P3 cross-host scenario.
+/// One host's lifecycle slice in a cross-host scenario.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HostLifecycleSlice {
     #[serde(rename = "hostId")]
@@ -1403,7 +1403,7 @@ pub struct HostLifecycleSlice {
     pub lifecycle: Vec<LifecycleBinding>,
 }
 
-/// LifecycleMappingTable entry — refs host + unified event only (doc 13 §4.12).
+/// LifecycleMappingTable entry — refs host + unified event only (architecture notes).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LifecycleMappingEntry {
     pub schema: String,
@@ -1453,7 +1453,7 @@ impl LifecycleMappingTable {
     }
 }
 
-/// Crash recovery must reattach surfaces to the same owner — never duplicate (doc 13 §4.7/§4.8).
+/// Crash recovery must reattach surfaces to the same owner — never duplicate (architecture notes).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RecoveryPolicy {
     pub schema: String,
@@ -1477,7 +1477,7 @@ pub struct RecoveryPolicy {
     pub cancels_capabilities_only_on_owner_dispose: bool,
 }
 
-/// Algebraic P3 fixture: Browser + Mini + Native map to unified lifecycle + recovery.
+/// Algebraic fixture: Browser + Mini + Native map to unified lifecycle + recovery.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LifecycleScenario {
     pub schema: String,
@@ -1551,7 +1551,7 @@ impl LifecycleRecoveryCheckReport {
     }
 }
 
-/// Structured package constraints proved at Delivery assembly time (doc 13 §4.4).
+/// Structured package constraints proved at Delivery assembly time (architecture notes).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DeliveryPackageConstraints {
     pub schema: String,
@@ -1596,7 +1596,7 @@ pub struct DeliveryUpdatePolicy {
     pub rollback: String,
 }
 
-/// DeliveryArtifactManifest — refs stable IDs only (doc 13 §4.12).
+/// DeliveryArtifactManifest — refs stable IDs only (architecture notes).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DeliveryArtifactManifest {
     pub schema: String,
@@ -1644,7 +1644,7 @@ pub struct DeliveryProofManifest {
     pub explain_index_refs: Vec<String>,
 }
 
-/// One host+delivery+proof unit inside a P4 scenario.
+/// One host+delivery+proof unit inside a scenario.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DeliveryProofUnit {
     #[serde(rename = "hostKind")]
@@ -1654,7 +1654,7 @@ pub struct DeliveryProofUnit {
     pub proof: DeliveryProofManifest,
 }
 
-/// Algebraic P4 fixture: Browser / Mini / Native delivery proofs.
+/// Algebraic fixture: Browser / Mini / Native delivery proofs.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DeliveryProofScenario {
     pub schema: String,
@@ -1816,7 +1816,7 @@ impl DeliveryProofCheckReport {
     }
 }
 
-/// Shared conformance fixture — stable IDs only (doc 13 §4.14 P5).
+/// Shared conformance fixture — stable IDs only (architecture notes ).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConformanceFixture {
     pub schema: String,
@@ -1917,7 +1917,7 @@ pub struct ConformanceHostRun {
     pub uses_private_runtime_objects: bool,
 }
 
-/// P5 scenario: same fixture on WebSurface, TemplateSurface, Web+Native mixed.
+/// scenario: same fixture on WebSurface, TemplateSurface, Web+Native mixed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConformanceScenario {
     pub schema: String,

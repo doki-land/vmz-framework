@@ -1,7 +1,6 @@
 // @ts-nocheck
 /**
- * Locale I5 tooling: explain · diff · extract · pseudo · cross-host conformance.
- * Design: 规划设计/vmz/28 §12–§13
+ * Locale tooling: explain · diff · extract · pseudo · cross-host conformance.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,10 +23,10 @@ import { assertHostMessageInvariant, buildLocaleDeliveryResolution } from './loc
 /**
  * Explain one MessageId: definition, params, variants, fallback, delivery reachability.
  * @param {{
- *   messageId: string,
- *   locale?: string|null,
- *   deliveryId?: string|null,
- *   checkReport: any,
+ * messageId: string,
+ * locale?: string|null,
+ * deliveryId?: string|null,
+ * checkReport: any,
  * }} input
  */
 export function explainLocaleMessage(input) {
@@ -100,9 +99,9 @@ export function explainLocaleMessage(input) {
 /**
  * Diff two locales' catalogs.
  * @param {{
- *   baseLocale: string,
- *   targetLocale: string,
- *   messages: Array<{ messageId: string, variants: Record<string, { template: string, params?: any[] }> }>,
+ * baseLocale: string,
+ * targetLocale: string,
+ * messages: Array<{ messageId: string, variants: Record<string, { template: string, params?: any[] }> }>,
  * }} input
  */
 export function diffLocaleCatalogs(input) {
@@ -271,9 +270,9 @@ export function extractHardcodedText(projectRoot, opts = {}) {
  * Pseudo-localize a source locale for layout/overflow testing.
  * Preserves ICU placeholders; marks provenance — never a production fallback.
  * @param {{
- *   sourceLocale: string,
- *   messages: Array<{ messageId: string, variants: Record<string, { template: string }> }>,
- *   production?: boolean,
+ * sourceLocale: string,
+ * messages: Array<{ messageId: string, variants: Record<string, { template: string }> }>,
+ * production?: boolean,
  * }} input
  */
 export function pseudoLocalizeCatalog(input) {
@@ -318,9 +317,9 @@ export function pseudoLocalizeCatalog(input) {
 /**
  * Cross-host conformance: same MessageId set + catalog hashes + formatter version.
  * @param {{
- *   manifest: any,
- *   messages: any[],
- *   routeIds?: string[],
+ * manifest: any,
+ * messages: any[],
+ * routeIds?: string[],
  * }} input
  */
 export function checkLocaleConformance(input) {

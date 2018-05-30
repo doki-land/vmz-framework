@@ -4,6 +4,7 @@
 //! This crate only models `.vmz` component conventions that oxc does not own.
 //! Versioned wire protocols live in `vmz-protocol`.
 
+#![warn(missing_docs)]
 mod component;
 mod dep_key;
 mod program_ir;

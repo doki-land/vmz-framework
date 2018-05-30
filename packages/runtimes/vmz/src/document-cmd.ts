@@ -1,7 +1,6 @@
 // @ts-nocheck
 /**
- * `vmz document` / `vmz docs` CLI (D0 check · D1 build).
- * Design: 规划设计/vmz/19 §1 · §8
+ * `vmz document` / `vmz docs` CLI .
  */
 
 import fs from 'node:fs';
@@ -16,7 +15,7 @@ import { log } from './log.js';
 import { parseArgs } from './cli.js';
 
 function printDocumentHelp() {
-    console.log(`vmz document — project /documents domain (D0–D3)
+    console.log(`vmz document — project /documents domain
 
 Usage:
   vmz document check [project]   Check locale tree + links/anchors + fence/API evidence

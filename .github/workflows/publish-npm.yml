@@ -1,0 +1,145 @@
+# Manual / Trusted Publisher publish path (not placeholder stubs).
+#
+# Trusted Publisher contract:
+#   file = publish-npm.yml
+#   repo = doki-land/vmz-framework
+#   env  = NPM_PUBLISH
+#
+# Prefer tag-driven release via release-npm.yml. Use this workflow_dispatch
+# when Trusted Publisher is registered only on publish-npm.yml, or for retries.
+
+name: Publish npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version without v prefix'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-native:
+    name: Native ${{ matrix.short }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            short: win32-x64
+            triple: win32-x64-msvc
+          - os: ubuntu-latest
+            short: linux-x64
+            triple: linux-x64-gnu
+          - os: macos-latest
+            short: darwin-arm64
+            triple: darwin-arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build native (release)
+        run: node scripts/build/napi.mjs --release
+
+      - name: Stage native artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="artifacts/native/${{ matrix.short }}"
+          mkdir -p "$out"
+          src="packages/runtimes/vmz-${{ matrix.short }}"
+          # One platform-named binary only (vmz.<triple>.node) - no plain vmz.node twin.
+          named="vmz.${{ matrix.triple }}.node"
+          if [[ -f "$src/$named" ]]; then
+            cp "$src/$named" "$out/$named"
+          elif [[ -f "$src/vmz.node" ]]; then
+            # legacy local build: rename into platform name for the artifact
+            cp "$src/vmz.node" "$out/$named"
+          else
+            echo "missing native binary under $src (want $named)" >&2
+            ls -la "$src" || true
+            exit 1
+          fi
+          ls -la "$out"
+
+      - name: Upload native artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.short }}
+          path: artifacts/native/${{ matrix.short }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish packages
+    needs: build-native
+    runs-on: ubuntu-latest
+    environment: NPM_PUBLISH
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+
+      - name: Ensure npm supports Trusted Publishing
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build JS runtimes + tools
+        run: pnpm build:runtimes
+
+      - name: Download native artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: artifacts/native
+
+      - name: Normalize artifact layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/native-flat
+          for d in artifacts/native/native-* artifacts/native/*; do
+            [[ -d "$d" ]] || continue
+            base="$(basename "$d")"
+            short="${base#native-}"
+            mkdir -p "artifacts/native-flat/$short"
+            cp -r "$d"/. "artifacts/native-flat/$short/" || true
+          done
+          find artifacts/native-flat -type f -print
+
+      - name: Publish real packages
+        env:
+          VMZ_NATIVE_ARTIFACTS: ${{ github.workspace }}/artifacts/native-flat
+          GITHUB_REF: refs/tags/v${{ inputs.version }}
+        run: node scripts/ci/publish-npm.mjs --version=${{ inputs.version }}

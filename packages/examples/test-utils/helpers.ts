@@ -58,7 +58,7 @@ export function mirrorServerModules(dist: string): string {
     return dst;
 }
 
-/** Wire `#server/...`  - ?mirrored dist modules (no `#` in path). */
+/** Wire `#server/...` - ?mirrored dist modules (no `#` in path). */
 export function installServerResolver(setServerModuleResolver: (fn: (id: string) => string) => void, dist: string) {
     const mirror = mirrorServerModules(dist);
     setServerModuleResolver((moduleId) => {

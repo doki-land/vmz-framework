@@ -1,0 +1,49 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "l3.ssr.hydrate.counter",
+    "title": "/: SSR + hydrate content + patch (node identity TODO deep adopt)",
+    "modes": ["ssr"],
+    "program": {
+        "chunkId": "components/CounterButton",
+        "unitName": "CounterButton"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "hydrate",
+            "props": {
+                "initial": 5
+            }
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "write",
+            "field": "count",
+            "value": 9
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "flush"
+        }
+    ],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "html",
+            "expect": {
+                "contains": "count"
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "text",
+            "expect": {
+                "contains": "9"
+            }
+        }
+    ]
+}

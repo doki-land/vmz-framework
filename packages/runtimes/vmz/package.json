@@ -49,33 +49,50 @@
         }
     },
     "dependencies": {
+        "@vmz/core": "workspace:*",
         "@vmz/plugin": "workspace:*",
-        "@vmz/plugin-markdown-it": "workspace:*",
         "@vmz/protocol": "workspace:*",
-        "@vmz/test": "workspace:*",
         "jiti": "^2.6.1",
-        "json5": "^2.2.3",
+        "json5": "^2.2.3"
+    },
+    "peerDependencies": {
+        "@vmz/plugin-markdown-it": "workspace:*",
+        "@vmz/test": "workspace:*",
         "typescript": "^5.8.3"
+    },
+    "peerDependenciesMeta": {
+        "@vmz/plugin-markdown-it": {
+            "optional": true
+        },
+        "@vmz/test": {
+            "optional": true
+        },
+        "typescript": {
+            "optional": true
+        }
     },
     "files": [
         "bin",
         "dist",
-        "*.node",
         "README.md"
     ],
     "scripts": {
-        "build:native": "node ../../../scripts/build-napi.mjs",
+        "build:native": "node ../../../scripts/build/napi.mjs",
         "build": "pnpm run build:native && pnpm run build:js",
-        "test": "node ./tests/run-node-tests.mjs",
-        "build:js": "tsc -p tsconfig.json && node ../../../scripts/copy-vmz-public-api.mjs"
+        "test": "node --experimental-strip-types ./tests/run-node-tests.ts",
+        "verify": "node --import ../../../scripts/test/resolve-ts-from-js.mjs --experimental-strip-types ./tests/conformance/run.ts",
+        "verify:list": "node --import ../../../scripts/test/resolve-ts-from-js.mjs --experimental-strip-types ./tests/conformance/run.ts --list",
+        "build:js": "tsc -p tsconfig.json && node ../../../scripts/build/copy-vmz-public-api.mjs"
     },
     "devDependencies": {
         "@types/node": "^22.15.0",
-        "@vmz/core": "workspace:*",
         "@vmz/plugin": "workspace:*",
         "@vmz/plugin-katex": "workspace:*",
+        "@vmz/plugin-markdown-it": "workspace:*",
         "@vmz/plugin-shiki": "workspace:*",
+        "@vmz/test": "workspace:*",
         "linkedom": "^0.18.13",
+        "typescript": "^5.8.3",
         "vmz-plugin-conformance": "workspace:*"
     },
     "keywords": [
@@ -85,6 +102,11 @@
         "cli"
     ],
     "optionalDependencies": {
-        "vmz-win32-x64-msvc": "workspace:*"
+        "@vmz/vmz-win32-x64": "workspace:*",
+        "@vmz/vmz-win32-arm64": "workspace:*",
+        "@vmz/vmz-darwin-x64": "workspace:*",
+        "@vmz/vmz-darwin-arm64": "workspace:*",
+        "@vmz/vmz-linux-x64": "workspace:*",
+        "@vmz/vmz-linux-arm64": "workspace:*"
     }
 }

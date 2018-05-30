@@ -2,8 +2,6 @@
 
 本目录是 **VMZ 官方站点**（homepage + 一体文档）的 application design 真相源。
 
-品牌决策见工作区外：`规划设计/vmz/30-VMZ-Design品牌色与视觉识别.md`。
-
 ```text
 brand.primary  Electric Cobalt  #176BFF
 brand.energy   Pulse Amber      #FFB000

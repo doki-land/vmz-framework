@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * Track per-file fingerprints so dev rebuilds only dirty leaves (N4).
+ * Track per-file fingerprints so dev rebuilds only dirty leaves (session).
  */
 
 import { existsSync, readdirSync, statSync } from 'node:fs';

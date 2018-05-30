@@ -1,12 +1,11 @@
 /**
- * Browser Host for `vmz test --mode browser` (T2 close slice).
+ * Browser Host for `vmz test --mode browser` ( close slice).
  *
  * Real Chromium/Chrome via CDP. Transport may use puppeteer-core as a CDP
  * client — that is NOT the Playwright/Puppeteer *test model*. Manifest actions
  * and assertions remain the VMZ Browser Host protocol; same Direct schedule as
  * production (`__vmzCreate` in a real document).
  *
- * Design: 规划设计/vmz/16 §T2 · §5 浏览器连接
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';

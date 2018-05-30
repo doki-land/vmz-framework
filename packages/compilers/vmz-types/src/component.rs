@@ -64,11 +64,11 @@ pub struct MethodDecl {
     pub reads: Vec<String>,
     /// Field / path writes: local body plus composed summaries of known callees.
     pub writes: Vec<String>,
-    /// Sibling `this.method()` / `this.#method()` callees (filtered to known methods).
+    /// Sibling `this.method` / `this.#method` callees (filtered to known methods).
     /// Edges remain after composition so tools can explain the summary.
     pub calls: Vec<String>,
-    /// True when the body has a dynamic / unresolved callee (`this[k]()`, or
-    /// `this.foo()` where `foo` is not a known class method). Summaries must
+    /// True when the body has a dynamic / unresolved callee (`this[k]`, or
+    /// `this.foo` where `foo` is not a known class method). Summaries must
     /// conservatively widen — never pretend the call is a no-op.
     pub opaque_callee: bool,
     /// Provenance for `field.*` widenings: `(field, reason)`.

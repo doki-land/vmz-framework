@@ -1,7 +1,6 @@
 /**
- * VMZ native test protocol (T0) — validators + report builders.
+ * VMZ native test protocol — validators + report builders.
  * Schema ids live in `@vmz/protocol` (mirrors Rust `vmz-protocol`).
- * Design: 规划设计/vmz/16 — not a Test IR; references Program Graph + Execution Plan.
  */
 
 import { EXECUTION_PLAN_REF_SCHEMA, PLAN_SCHEMA, TEST_MANIFEST_SCHEMA, TEST_REPORT_SCHEMA } from '@vmz/protocol';
@@ -43,7 +42,7 @@ export function parseModes(raw: string | boolean | undefined | null): TestMode[]
 
 export type ManifestValidation = { ok: true; manifest: Record<string, unknown> } | { ok: false; error: string };
 
-/** Validate a discovered manifest object (narrow T0 checks). */
+/** Validate a discovered manifest object (narrow checks). */
 export function validateManifest(raw: unknown, file: string): ManifestValidation {
     if (!raw || typeof raw !== 'object') {
         return { ok: false, error: `${file}: manifest must be an object` };

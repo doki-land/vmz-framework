@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * Unified CLI logging / diagnostics (N2).
+ * Unified CLI logging / diagnostics .
  */
 
 /** @param {string} level */

@@ -1,7 +1,6 @@
 // @ts-nocheck
 /**
- * `vmz application` — Application Collection / Mount (M0–M5).
- * Design: `规划设计/vmz/22`
+ * `vmz application` — Application Collection / Mount .
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -36,18 +35,18 @@ export async function cmdApplication(argv) {
 }
 
 function printHelp() {
-    console.log(`vmz application — Application Collection / Mount (M0–M5)
+    console.log(`vmz application — Application Collection / Mount
 
 Usage:
   vmz application check [host]              Validate descriptors + applications.config.json5
   vmz application list [host]               List resolved ApplicationIds / collections / mounts
   vmz application schemas                   Print frozen protocol catalog JSON
-  vmz application relocatable [pkg]         M1: ApplicationBase / non_relocatable_url proof
-  vmz application relocate <manifest.json>  M1: apply ApplicationBase to relocation manifest
-  vmz application artifacts [host]          M2: ApplicationArtifact + MountTable boundary
-  vmz application isolation [host]          M3: isolation namespaces + failure containment
-  vmz application composition [host]        M4: catalog consumption + cross-app Link hrefs
-  vmz application dev [host]                M5: sessions / affected / proxy / mounted tests / deploy
+  vmz application relocatable [pkg]          ApplicationBase / non_relocatable_url proof
+  vmz application relocate <manifest.json>  apply ApplicationBase to relocation manifest
+  vmz application artifacts [host]          ApplicationArtifact + MountTable boundary
+  vmz application isolation [host]          isolation namespaces + failure containment
+  vmz application composition [host]        catalog consumption + cross-app Link hrefs
+  vmz application dev [host]                sessions / affected / proxy / mounted tests / deploy
 
 Options:
   --json [file]    Emit report JSON to stdout or file
@@ -117,7 +116,7 @@ function emitJson(args, json, printHuman) {
 
 function cmdSchemas() {
     const native = loadNative();
-    console.log(native.queryApplicationProtocolCatalog());
+    console.log(native.queryApplicationProtocolCatalog);
     return 0;
 }
 

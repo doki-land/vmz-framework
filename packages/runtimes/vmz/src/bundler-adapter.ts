@@ -1,8 +1,7 @@
 // @ts-nocheck
 /**
- * Bundler adapter (N4) — consumes Deployment IR; does not invent VMZ semantics.
+ * Bundler adapter (session) — consumes Deployment IR; does not invent VMZ semantics.
  *
- * Design: `规划设计/vmz/14` — VPG/Deployment IR → bundler executes pack/minify/assets.
  * Vite/Rolldown may call these helpers; they must not reverse the arrow.
  */
 
@@ -98,7 +97,7 @@ export function createVitePluginVmzAdapter(options = {}) {
 }
 
 /**
- * Thin Rolldown plugin factory (N4.2) — same contract as Vite adapter: read Deployment IR only.
+ * Thin Rolldown plugin factory (deployment) — same contract as Vite adapter: read Deployment IR only.
  * @param {{ outDir?: string, root?: string }} [options]
  */
 export function createRolldownPluginVmzAdapter(options = {}) {

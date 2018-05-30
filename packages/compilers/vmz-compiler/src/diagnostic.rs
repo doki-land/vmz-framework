@@ -1,6 +1,6 @@
-//! Diagnostics: oxc only ? no parallel Span/Diagnostic types.
+//! Diagnostics: oxc only — no parallel Span/Diagnostic types.
 //!
-//! Span / Diagnostic come from oxc；禁止平行造轮子。
+//! Span / Diagnostic come from oxc; do not invent a parallel model.
 //! [`ReportedDiagnostic`] only pairs a source path with [`OxcDiagnostic`] for CLI aggregation.
 
 use std::fmt;

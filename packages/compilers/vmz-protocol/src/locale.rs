@@ -1,4 +1,4 @@
-//! `/locales` application i18n protocol (doc 28 · I0–I5).
+//! `/locales` application i18n protocol (locale notes · –).
 //!
 //! Freezes LocaleManifest / MessageCatalog / LocaleContext / FormatterContext /
 //! LocaleTransition / LocaleRouteRealization / PageMeta / LocaleDeliveryResolution /
@@ -16,51 +16,51 @@ pub const MESSAGE_NODE_SCHEMA: &str = "vmz.locale.message_node.v0";
 pub const LOCALE_CHECK_SCHEMA: &str = "vmz.locale.check.v0";
 pub const LOCALE_TYPED_MODULE_SCHEMA: &str = "vmz.locale.typed_module.v0";
 pub const LOCALE_RENAME_SCHEMA: &str = "vmz.locale.rename.v0";
-/// I2: Application Execution Context locale slice.
+/// Application Execution Context locale slice.
 pub const LOCALE_APPLICATION_CONTEXT_SCHEMA: &str = "vmz.locale.application_context.v0";
-/// I2: deterministic number/date/plural formatting context.
+/// deterministic number/date/plural formatting context.
 pub const LOCALE_FORMATTER_CONTEXT_SCHEMA: &str = "vmz.locale.formatter_context.v0";
-/// I2: atomic language switch plan / result.
+/// atomic language switch plan / result.
 pub const LOCALE_TRANSITION_SCHEMA: &str = "vmz.locale.transition.v0";
-/// I2: runtime / SSR parity check report.
+/// runtime / SSR parity check report.
 pub const LOCALE_RUNTIME_CHECK_SCHEMA: &str = "vmz.locale.runtime_check.v0";
-/// I2: whole-message fallback resolution provenance.
+/// whole-message fallback resolution provenance.
 pub const LOCALE_FALLBACK_RESOLUTION_SCHEMA: &str = "vmz.locale.fallback_resolution.v0";
-/// I3: RouteId × LocaleId → path realization (LocaleId not in RouteId).
+/// RouteId × LocaleId → path realization (LocaleId not in RouteId).
 pub const LOCALE_ROUTE_REALIZATION_SCHEMA: &str = "vmz.locale.route_realization.v0";
-/// I3: locale-aware PageMeta (canonical / hreflang / html lang+dir).
+/// locale-aware PageMeta (canonical / hreflang / html lang+dir).
 pub const LOCALE_PAGE_META_SCHEMA: &str = "vmz.locale.page_meta.v0";
-/// I3: `<Link to=RouteId>` resolution retaining current locale.
+/// `<Link to=RouteId>` resolution retaining current locale.
 pub const LOCALE_LINK_RESOLUTION_SCHEMA: &str = "vmz.locale.link_resolution.v0";
-/// I3: router / meta / cache-key check report.
+/// router / meta / cache-key check report.
 pub const LOCALE_ROUTER_CHECK_SCHEMA: &str = "vmz.locale.router_check.v0";
-/// I4: multi-host LocaleDeliveryResolution.
+/// multi-host LocaleDeliveryResolution.
 pub const LOCALE_DELIVERY_RESOLUTION_SCHEMA: &str = "vmz.locale.delivery_resolution.v0";
-/// I4: per-locale / per-route message chunk manifest.
+/// per-locale / per-route message chunk manifest.
 pub const LOCALE_CHUNK_MANIFEST_SCHEMA: &str = "vmz.locale.chunk_manifest.v0";
-/// I4: signed Native optional locale pack (catalog+formatter only).
+/// signed Native optional locale pack (catalog+formatter only).
 pub const LOCALE_NATIVE_PACK_SCHEMA: &str = "vmz.locale.native_pack.v0";
-/// I4: Mini Program cross-subpackage message dependency proof.
+/// Mini Program cross-subpackage message dependency proof.
 pub const LOCALE_MINI_PACKAGE_PROOF_SCHEMA: &str = "vmz.locale.mini_package_proof.v0";
-/// I4: server ErrorCode envelope (no translated strings across boundary).
+/// server ErrorCode envelope (no translated strings across boundary).
 pub const LOCALE_SERVER_ERROR_ENVELOPE_SCHEMA: &str = "vmz.locale.server_error_envelope.v0";
-/// I4: multi-host delivery check report.
+/// multi-host delivery check report.
 pub const LOCALE_DELIVERY_CHECK_SCHEMA: &str = "vmz.locale.delivery_check.v0";
-/// I5: message explain document.
+/// message explain document.
 pub const LOCALE_EXPLAIN_SCHEMA: &str = "vmz.locale.explain.v0";
-/// I5: locale-to-locale catalog diff.
+/// locale-to-locale catalog diff.
 pub const LOCALE_DIFF_SCHEMA: &str = "vmz.locale.diff.v0";
-/// I5: hardcoded text extract / sink check.
+/// hardcoded text extract / sink check.
 pub const LOCALE_EXTRACT_SCHEMA: &str = "vmz.locale.extract.v0";
-/// I5: pseudo-localization catalog (dev/test only).
+/// pseudo-localization catalog (dev/test only).
 pub const LOCALE_PSEUDO_SCHEMA: &str = "vmz.locale.pseudo.v0";
-/// I5: cross-host conformance report.
+/// cross-host conformance report.
 pub const LOCALE_CONFORMANCE_SCHEMA: &str = "vmz.locale.conformance.v0";
 
 /// Shared formatter data version recorded in Delivery / Resume digests.
 pub const FORMATTER_DATA_VERSION: &str = "vmz.formatter.cldr.v0";
 
-/// I0 diagnostics (doc 28 §12).
+/// diagnostics (locale notes ).
 pub const DIAG_LOCALE_MANIFEST_MISSING: &str = "vmz::locale::manifest_missing";
 pub const DIAG_LOCALE_ID_INVALID: &str = "vmz::locale::id_invalid";
 pub const DIAG_LOCALE_ID_COLLISION: &str = "vmz::locale::id_collision";
@@ -79,7 +79,7 @@ pub const DIAG_MESSAGE_UNUSED: &str = "vmz::locale::message_unused";
 pub const DIAG_MESSAGE_HTML_FORBIDDEN: &str = "vmz::locale::message_html_forbidden";
 pub const DIAG_CATALOG_PARSE: &str = "vmz::locale::catalog_parse";
 pub const DIAG_CATALOG_CONFLICT: &str = "vmz::locale::catalog_conflict";
-/// I2 diagnostics (doc 28 §8 / §5 / §12).
+/// diagnostics (locale notes ).
 pub const DIAG_FORMATTER_CONTEXT_INCOMPLETE: &str = "vmz::locale::formatter_context_incomplete";
 pub const DIAG_FORMATTER_VERSION_MISMATCH: &str = "vmz::locale::formatter_version_mismatch";
 pub const DIAG_LOCALE_DIGEST_MISMATCH: &str = "vmz::locale::digest_mismatch";
@@ -89,7 +89,7 @@ pub const DIAG_LOCALE_TRANSITION_LOAD_FAILED: &str = "vmz::locale::transition_lo
 pub const DIAG_LOCALE_MACHINE_DEFAULT_FORBIDDEN: &str = "vmz::locale::machine_default_forbidden";
 pub const DIAG_MESSAGE_MIXED_LOCALE: &str = "vmz::locale::message_mixed_locale";
 pub const DIAG_LOCALE_STALE_GENERATION: &str = "vmz::locale::stale_generation";
-/// I3 diagnostics (doc 28 §6 / §10 / §12).
+/// diagnostics (locale notes ).
 pub const DIAG_LOCALE_ROUTE_COLLISION: &str = "vmz::locale::route_collision";
 pub const DIAG_LOCALE_CANONICAL_MISSING: &str = "vmz::locale::canonical_missing";
 pub const DIAG_LOCALE_HREFLANG_INCOMPLETE: &str = "vmz::locale::hreflang_incomplete";
@@ -98,7 +98,7 @@ pub const DIAG_LOCALE_LINK_HARDCODED_PATH: &str = "vmz::locale::link_hardcoded_p
 pub const DIAG_LOCALE_CACHE_KEY_STEALS_CONTENT: &str = "vmz::locale::cache_key_steals_content";
 pub const DIAG_LOCALE_PREFIX_OMIT_WITHOUT_REDIRECT: &str =
     "vmz::locale::prefix_omit_without_redirect";
-/// I4 diagnostics (doc 28 §9 / §10 / §12).
+/// diagnostics (locale notes ).
 pub const DIAG_LOCALE_DELIVERY_FULL_BUNDLE: &str = "vmz::locale::delivery_full_bundle";
 pub const DIAG_LOCALE_CHUNK_HASH_MISMATCH: &str = "vmz::locale::chunk_hash_mismatch";
 pub const DIAG_LOCALE_NATIVE_PACK_UNSIGNED: &str = "vmz::locale::native_pack_unsigned";
@@ -110,7 +110,7 @@ pub const DIAG_LOCALE_SERVER_TRANSLATED_ERROR: &str = "vmz::locale::server_trans
 pub const DIAG_LOCALE_SERVER_FORMAT_WITHOUT_CONTEXT: &str =
     "vmz::locale::server_format_without_context";
 pub const DIAG_LOCALE_HOST_MESSAGE_DIVERGENCE: &str = "vmz::locale::host_message_divergence";
-/// I5 diagnostics (doc 28 §12 / §13).
+/// diagnostics (locale notes ).
 pub const DIAG_MESSAGE_DYNAMIC_ID_UNBOUNDED: &str = "vmz::locale::message_dynamic_id_unbounded";
 pub const DIAG_LOCALE_HARDCODED_TEXT: &str = "vmz::locale::hardcoded_text";
 pub const DIAG_LOCALE_PSEUDO_PRODUCTION_FORBIDDEN: &str =
@@ -368,7 +368,7 @@ impl LocaleManifestFile {
     }
 }
 
-/// Application Execution Context locale slice (doc 28 §5).
+/// Application Execution Context locale slice (locale notes ).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LocaleApplicationContext {
     pub schema: String,
@@ -404,7 +404,7 @@ impl LocaleApplicationContext {
     }
 }
 
-/// Deterministic formatter context shared by SSR and client (doc 28 §8).
+/// Deterministic formatter context shared by SSR and client (locale notes ).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LocaleFormatterContext {
     pub schema: String,
@@ -432,51 +432,5 @@ impl LocaleFormatterContext {
             currency: currency.map(|s| s.to_string()),
             formatter_data_version: FORMATTER_DATA_VERSION.into(),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn catalog_freezes_i0_schemas() {
-        let c = LocaleProtocolCatalog::v0();
-        assert_eq!(c.protocol, LOCALE_PROTOCOL);
-        assert!(
-            c.documents.iter().any(|d| d.kind == "manifest" && d.schema == LOCALE_MANIFEST_SCHEMA)
-        );
-        assert!(c.diagnostics.iter().any(|d| d == DIAG_LOCALE_FALLBACK_CYCLE));
-        assert_eq!(c.virtual_module_prefix, "#locales/");
-        let m = LocaleManifestFile::example_three_locales();
-        assert_eq!(m.locales.len(), 3);
-        assert_eq!(m.default_locale, "zh-hans");
-    }
-
-    #[test]
-    fn catalog_freezes_i2_runtime_schemas() {
-        let c = LocaleProtocolCatalog::v0();
-        assert!(
-            c.documents.iter().any(|d| d.kind == "application_context"
-                && d.schema == LOCALE_APPLICATION_CONTEXT_SCHEMA)
-        );
-        assert!(
-            c.documents
-                .iter()
-                .any(|d| d.kind == "formatter_context"
-                    && d.schema == LOCALE_FORMATTER_CONTEXT_SCHEMA)
-        );
-        assert!(
-            c.documents
-                .iter()
-                .any(|d| d.kind == "transition" && d.schema == LOCALE_TRANSITION_SCHEMA)
-        );
-        assert!(c.diagnostics.iter().any(|d| d == DIAG_FORMATTER_CONTEXT_INCOMPLETE));
-        assert!(c.diagnostics.iter().any(|d| d == DIAG_LOCALE_DIGEST_MISMATCH));
-        let app = LocaleApplicationContext::example_zh_hans();
-        let fmt = LocaleFormatterContext::from_application(&app, None);
-        assert_eq!(fmt.formatter_data_version, FORMATTER_DATA_VERSION);
-        assert_eq!(fmt.locale_id, "zh-hans");
-        assert_eq!(fmt.time_zone, "Asia/Shanghai");
     }
 }

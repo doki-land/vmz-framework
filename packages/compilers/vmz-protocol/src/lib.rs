@@ -2,6 +2,7 @@
 //!
 //! Semantic IR stays in `vmz-types`. This crate owns schema ids and document shapes only.
 
+#![warn(missing_docs)]
 mod application;
 mod catalog;
 mod dx;
@@ -45,16 +46,17 @@ pub use catalog::{PROTOCOL_CATALOG_SCHEMA, ProtocolCatalog, ProtocolDomain};
 pub use dx::{
     AFFECTED_PREVIEW_SCHEMA, AFFECTED_SCHEMA, AffectedDocument, AffectedPreviewDocument,
     AffectedUnitDoc, BOUNDARY_VALIDATOR_SCHEMA, BUDGET_SCHEMA, BudgetChunkEntry, BudgetDocument,
-    BudgetRouteEntry, CANCEL_SCHEMA, CAPABILITY_TARGET_SCHEMA, CAUSAL_REPLAY_SCHEMA,
-    CODE_ACTION_SCHEMA, CancelDocument, CausalReplayDocument, CausalReplayMatch, CodeAction,
-    DEAD_GRAPH_SCHEMA, DX_PROTOCOL, DxCatalog, DxDiagnostic, DxDocumentKind, EXPLAIN_SCHEMA,
-    EXPLAIN_SCHEMA_LEGACY, ExplainDocument, ExplainEdge, HMR_PLAN_SCHEMA, HmrPlanDocument,
-    LEAKAGE_SCHEMA, REFERENCE_SCHEMA, RENAME_SCHEMA, Reference, RenameIntent,
-    SEMANTIC_TRANSACTION_SCHEMA, SOURCE_MAP_SCHEMA, SYMBOL_INDEX_SCHEMA, SYMBOL_SCHEMA,
-    SemanticTransactionDocument, SourceSpan, StableId, Symbol, TEST_SELECTION_SCHEMA, TRACE_SCHEMA,
-    TestSelectionDocument, TextEdit, TraceDocument, TraceEvent, WORKSPACE_EDIT_SCHEMA,
-    WorkspaceEditPlan, X2_CHECK_SCHEMA, X3_CHECK_SCHEMA, X3CheckReport, X4_CHECK_SCHEMA,
-    X5_CHECK_SCHEMA, X5CheckReport, normalize_rename_kind,
+    BudgetRouteEntry, CANCEL_SCHEMA, CAPABILITY_TARGET_SCHEMA, CAUSAL_REPLAY_CHECK_SCHEMA,
+    CAUSAL_REPLAY_SCHEMA, CODE_ACTION_SCHEMA, CROSS_SFC_CHECK_SCHEMA, CancelDocument,
+    CausalReplayCheckReport, CausalReplayDocument, CausalReplayMatch, CodeAction,
+    DEAD_GRAPH_SCHEMA, DEPLOYMENT_PROOF_CHECK_SCHEMA, DX_PROTOCOL, DxCatalog, DxDiagnostic,
+    DxDocumentKind, EXPLAIN_SCHEMA, EXPLAIN_SCHEMA_LEGACY, ExplainDocument, ExplainEdge,
+    HMR_PLAN_SCHEMA, HmrPlanDocument, LEAKAGE_SCHEMA, REFERENCE_SCHEMA, RENAME_SCHEMA, Reference,
+    RenameIntent, SEMANTIC_TRANSACTION_SCHEMA, SOURCE_MAP_SCHEMA, SYMBOL_INDEX_SCHEMA,
+    SYMBOL_SCHEMA, SemanticTransactionDocument, SourceSpan, StableId, Symbol,
+    TEST_SELECTION_SCHEMA, TRACE_SCHEMA, TRANSACTION_CHECK_SCHEMA, TestSelectionDocument, TextEdit,
+    TraceDocument, TraceEvent, TransactionCheckReport, WORKSPACE_EDIT_SCHEMA, WorkspaceEditPlan,
+    normalize_rename_kind,
 };
 pub use host::{COMPILER_PROTOCOL, HOST_PROTOCOL};
 pub use locale::{

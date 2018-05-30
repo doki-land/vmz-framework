@@ -1,7 +1,6 @@
 // @ts-nocheck
 /**
- * Document D1 Static + D3 Interactive artifacts.
- * Design: 规划设计/vmz/19 §5–6 · D1/D3
+ * Document Static + Interactive artifacts.
  */
 import fs from 'node:fs';
 import path from 'node:path';

@@ -1,7 +1,7 @@
 {
     "schema": "vmz.test.manifest.v0",
     "id": "t3.deployment.island.resume",
-    "title": "T3: Island deployment resumeEntries surface",
+    "title": ": Island deployment resumeEntries surface",
     "modes": ["deployment"],
     "program": {
         "chunkId": "pages/index",

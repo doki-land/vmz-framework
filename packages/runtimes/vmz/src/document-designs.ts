@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * Document D1 — wire project `/designs` into static document assets.
+ * Document — wire project `/designs` into static document assets.
  * Prefer compiled `vmz-designs.css` / `vmz.css`; else emit a minimal token CSS.
  */
 import fs from 'node:fs';

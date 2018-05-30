@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { describe, it } from 'node:test';
-import { expect } from '../../../../scripts/test-expect.mjs';
+import { expect } from '../../../../scripts/test/expect.mjs';
 import { exampleDist, importDist, installDocument, installServerResolver, loadDom, loadRuntime, readJson } from '@vmz-examples/test-utils';
 
 const dist = exampleDist('fullstack');
@@ -132,7 +132,7 @@ describe('precision', () => {
         expect(after.patchesByBinding[bioKey]).toBeGreaterThanOrEqual(1);
     });
 
-    // Control-flow binder wiring: BranchDemo in ownership-cf.test.ts (Gate 3 Direct).
+    // Control-flow binder wiring: BranchDemo in ownership-cf.test.ts (production Direct emit Direct).
 
     it('item leaf write patches BindingId without keyed reconcile', async () => {
         const ir = readJson<{

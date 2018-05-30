@@ -29,11 +29,12 @@ Mermaid adds diagram capability; it does not redefine VMZ document, routing, sta
 
 ## Why teams keep diagrams in text
 
-| Pain | Text-authored result |
-|---|---|
+| Pain                                             | Text-authored result                                |
+|--------------------------------------------------|-----------------------------------------------------|
 | A renamed service leaves an exported image stale | The diagram changes in the same review as the prose |
-| Localization requires separate image editing | Labels remain part of the content workflow |
-| Architecture history is hard to inspect | Version control shows structural changes |
-| A document is rendered in several targets | The same source can be transformed consistently |
+| Localization requires separate image editing     | Labels remain part of the content workflow          |
+| Architecture history is hard to inspect          | Version control shows structural changes            |
+| A document is rendered in several targets        | The same source can be transformed consistently     |
 
-Mermaid will not replace bespoke product visualization, but it is unusually effective for diagrams whose job is to explain rather than impress. That makes it a natural companion for VMZ documents. 📚
+Mermaid will not replace bespoke product visualization, but it is unusually effective for diagrams whose job is to
+explain rather than impress. That makes it a natural companion for VMZ documents. 📚
