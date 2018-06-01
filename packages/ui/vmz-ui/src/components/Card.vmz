@@ -1,0 +1,81 @@
+<template>
+  <section class="vmz-ui-card" data-vmz-ui="card">
+    <header if={title} class="vmz-ui-card__header">
+      <h2 class="vmz-ui-card__title">{title}</h2>
+      <p if={description} class="vmz-ui-card__description">{description}</p>
+    </header>
+    <div class="vmz-ui-card__body">
+      <slot />
+    </div>
+  </section>
+</template>
+
+<style>
+.vmz-ui-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vmz-density-control-gap);
+  padding: calc(var(--vmz-density-control-padding-y) + 0.35rem)
+    calc(var(--vmz-density-control-padding-x) + 0.25rem);
+  border: 1px solid var(--vmz-line-default);
+  border-radius: 2px;
+  background: var(--vmz-surface-paper);
+  color: var(--vmz-text-ink);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--vmz-line-default) 65%, transparent);
+}
+
+:where([data-density='compact']) .vmz-ui-card {
+  gap: var(--vmz-density-compact-gap);
+  padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+}
+
+:where([data-density='dense']) .vmz-ui-card {
+  gap: var(--vmz-density-dense-gap);
+  padding: var(--vmz-density-dense-padding-y) var(--vmz-density-dense-padding-x);
+}
+
+.vmz-ui-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.vmz-ui-card__title {
+  margin: 0;
+  font-family: var(--vmz-font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--vmz-text-ink);
+}
+
+.vmz-ui-card__description {
+  margin: 0;
+  color: var(--vmz-text-steel);
+  line-height: 1.45;
+}
+
+.vmz-ui-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vmz-density-control-gap);
+}
+
+:where([data-density='compact']) .vmz-ui-card__body {
+  gap: var(--vmz-density-compact-gap);
+}
+
+:where([data-density='dense']) .vmz-ui-card__body {
+  gap: var(--vmz-density-dense-gap);
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — Card (Commercial Surface).
+ * Surface container; spacing from density.*; chrome from surface/line/text.
+ */
+export default class Card {
+  public title: string = '';
+  public description: string = '';
+}
+</script>

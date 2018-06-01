@@ -20,8 +20,7 @@
                 "schema": "vmz.plan.v0",
                 "status": "partial",
                 "nonEmpty": true,
-                "anyStructuralKind": true,
-                "nodeIdsInClient": true
+                "anyStructuralKind": true
             }
         },
         {
@@ -32,8 +31,7 @@
                 "create": true,
                 "plan": true,
                 "serialize": true,
-                "noRender": true,
-                "includes": "vmz.plan.v0"
+                "noRender": true
             }
         }
     ]

@@ -1,0 +1,66 @@
+<template>
+  <nav class="vmz-ui-breadcrumb" data-vmz-ui="breadcrumb" aria-label={label}>
+    <ol class="vmz-ui-breadcrumb__list">
+      <li each={items} as="item" key={item.id} class="vmz-ui-breadcrumb__item" data-vmz-crumb={item.id}>
+        <a if={item.href} class="vmz-ui-breadcrumb__link" href={item.href}>{item.title}</a>
+        <span if={!item.href} class="vmz-ui-breadcrumb__current" aria-current="page">{item.title}</span>
+      </li>
+    </ol>
+  </nav>
+</template>
+
+<style>
+.vmz-ui-breadcrumb {
+  font: inherit;
+}
+
+.vmz-ui-breadcrumb__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  align-items: center;
+}
+
+.vmz-ui-breadcrumb__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 600;
+}
+
+.vmz-ui-breadcrumb__item:not(:last-child)::after {
+  content: '/';
+  color: var(--vmz-action-primary-active);
+  opacity: 0.55;
+  font-weight: 400;
+}
+
+.vmz-ui-breadcrumb__link {
+  color: var(--vmz-action-primary-background);
+  text-decoration: none;
+}
+
+.vmz-ui-breadcrumb__link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-breadcrumb__current {
+  color: var(--vmz-action-primary-active);
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — Breadcrumb (UI5 Console Surface).
+ * Parent owns items; last crumb typically has no href (current page).
+ */
+export default class Breadcrumb {
+  public label: string = 'Breadcrumb';
+  /** @type {{ id: string, title: string, href?: string }[]} */
+  public items: { id: string; title: string; href?: string }[] = [];
+}
+</script>

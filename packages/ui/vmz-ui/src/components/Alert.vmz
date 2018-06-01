@@ -1,0 +1,84 @@
+<template>
+  <div
+    class="vmz-ui-alert"
+    data-vmz-ui="alert"
+    data-tone={tone}
+    role={roleName}
+  >
+    <p if={title} class="vmz-ui-alert__title">{title}</p>
+    <p if={description} class="vmz-ui-alert__description">{description}</p>
+    <div class="vmz-ui-alert__actions">
+      <slot />
+    </div>
+  </div>
+</template>
+
+<style>
+.vmz-ui-alert {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vmz-density-control-gap);
+  padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
+  border: 1px solid var(--vmz-status-info-accent);
+  border-left-width: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--vmz-status-info-accent) 12%, transparent);
+  color: var(--vmz-status-info-foreground);
+}
+
+.vmz-ui-alert[data-tone='info'] {
+  border-color: var(--vmz-status-info-accent);
+  background: color-mix(in srgb, var(--vmz-status-info-accent) 12%, transparent);
+  color: var(--vmz-status-info-foreground);
+}
+
+.vmz-ui-alert[data-tone='success'] {
+  border-color: var(--vmz-status-success-accent);
+  background: color-mix(in srgb, var(--vmz-status-success-accent) 12%, transparent);
+  color: var(--vmz-status-success-foreground);
+}
+
+.vmz-ui-alert[data-tone='warning'] {
+  border-color: var(--vmz-status-warning-accent);
+  background: color-mix(in srgb, var(--vmz-status-warning-accent) 12%, transparent);
+  color: var(--vmz-status-warning-foreground);
+}
+
+.vmz-ui-alert[data-tone='danger'] {
+  border-color: var(--vmz-status-danger-accent);
+  background: color-mix(in srgb, var(--vmz-status-danger-accent) 12%, transparent);
+  color: var(--vmz-status-danger-foreground);
+}
+
+:where([data-density='compact']) .vmz-ui-alert {
+  gap: var(--vmz-density-compact-gap);
+  padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+}
+
+.vmz-ui-alert__title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.vmz-ui-alert__description {
+  margin: 0;
+  opacity: 0.9;
+}
+
+.vmz-ui-alert__actions:empty {
+  display: none;
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — Alert (UI4 status tone matrix).
+ * tone → status.{info|success|warning|danger}.* tokens from Style Theme.
+ */
+export default class Alert {
+  public title: string = '';
+  public description: string = '';
+  public tone: string = 'info';
+  public roleName: string = 'status';
+}
+</script>

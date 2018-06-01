@@ -249,7 +249,7 @@ export async function runSsrManifest(manifest: Record<string, unknown>, ctx: { o
             }
             continue;
         }
-        if (kind === 'graph' || kind === 'plan' || kind === 'view' || kind === 'diagnostic') {
+        if (kind === 'graph' || kind === 'plan' || kind === 'view' || kind === 'diagnostic' || kind === 'motion') {
             continue;
         }
         fail(`unknown ssr assertion ${JSON.stringify(kind)}`);

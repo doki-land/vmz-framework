@@ -13,11 +13,11 @@ VMZ-specific **semantic types** layered on the [oxc](https://github.com/oxc-proj
 - Types oxc does not provide: component/field kinds, program-IR oriented structures, VMZ-facing enums, etc.
 - Shared vocabulary for [`vmz-compiler`](../vmz-compiler/) and downstream crates
 
-## Non-goals / hard rules
+## Scope
 
-- **Do not** redefine `Span`, source-file, or diagnostic primitives that oxc already owns
-- No compile / check / explain pipelines
-- No wire-schema catalogs (those belong in [`vmz-protocol`](../vmz-protocol/))
+- Reuses oxc `Span`, source-file, and diagnostic primitives rather than defining parallel ones
+- Types only — no compile / check / explain pipelines
+- Wire-schema catalogs live in [`vmz-protocol`](../vmz-protocol/)
 
 ## Development
 

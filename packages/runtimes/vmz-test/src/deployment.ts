@@ -178,7 +178,7 @@ export function runDeploymentManifest(manifest: Record<string, unknown>, ctx: { 
             continue;
         }
 
-        if (kind === 'graph' || kind === 'plan' || kind === 'diagnostic') {
+        if (kind === 'graph' || kind === 'plan' || kind === 'diagnostic' || kind === 'motion') {
             continue;
         }
 

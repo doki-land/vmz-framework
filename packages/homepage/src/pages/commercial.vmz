@@ -1,0 +1,273 @@
+<template>
+  <div data-dogfood="commercial">
+    <AppShell brand="VMZ" homeHref="/" navLabel="Commercial" nav={navItems}>
+      <div if={notifyOpen} data-dogfood="commercial-notify">
+        <Notification
+          tone="success"
+          roleName="status"
+          title="Message queued"
+          description="We will reply to your work email within one business day."
+        >
+          <Button type="button" variant="ghost" onClick={() => (notifyOpen = false)}>Dismiss</Button>
+        </Notification>
+      </div>
+
+      <section class="vmz-commercial-hero" data-dogfood="commercial-hero" aria-labelledby="commercial-hero-title">
+        <Badge tone="brand">Official UI</Badge>
+        <h1 id="commercial-hero-title" class="vmz-commercial-hero__title">VMZ</h1>
+        <p class="vmz-commercial-hero__lead">
+          Vue-familiar authoring. Compile once into a Unified Program Graph — ship Commercial pages without a second design runtime.
+        </p>
+        <div class="vmz-commercial-hero__actions">
+          <Button type="button" onClick={() => this.scrollContact()}>Start a project</Button>
+          <Button type="button" variant="secondary" onClick={() => (drawerOpen = true)}>Open details</Button>
+          <Link href="/documents">Read the docs</Link>
+        </div>
+      </section>
+
+      <Alert
+        tone="info"
+        roleName="status"
+        title="Commercial composition"
+        description="AppShell, hero, feature comparison, pricing, Form, Notification, Empty, Dialog, and Drawer on one route."
+      />
+
+      <section data-dogfood="commercial-features" aria-labelledby="commercial-features-title">
+        <h2 id="commercial-features-title" class="vmz-commercial-section-title">What you get</h2>
+        <div class="vmz-commercial-grid">
+          <Card title="Router-first" description="One Route Graph owns URL, load, metadata, and resume boundaries." />
+          <Card title="Semantic tokens" description="Colors and density come from /designs — components never embed brand hex." />
+          <Card title="Proven overlays" description="Dialog and Drawer share focus ownership, Escape dismiss, and restore." />
+        </div>
+      </section>
+
+      <section data-dogfood="commercial-pricing" aria-labelledby="commercial-pricing-title">
+        <h2 id="commercial-pricing-title" class="vmz-commercial-section-title">Plans</h2>
+        <div class="vmz-commercial-grid vmz-commercial-grid--pricing">
+          <Card title="Starter" description="Local static host and CDN WebArtifact.">
+            <p class="vmz-commercial-price"><span>Open</span> source core</p>
+            <Badge tone="info">Self-serve</Badge>
+            <Button type="button" variant="secondary" onClick={() => this.scrollContact()}>Contact sales</Button>
+          </Card>
+          <Card title="Production" description="ServerArtifact parity, observability, and official dogfood gates.">
+            <p class="vmz-commercial-price"><span>Team</span> release proof</p>
+            <Badge tone="success">Recommended</Badge>
+            <Button type="button" onClick={() => this.scrollContact()}>Talk to us</Button>
+          </Card>
+        </div>
+      </section>
+
+      <Card title="Contact" description="Parent-owned Form values and validation — no parallel form store.">
+        <Form
+          label="Contact"
+          errorSummary={contactSummary}
+          summaryId="home-commercial-summary"
+          describedBy={contactDescribedBy}
+          onSubmit={() => this.confirmContact()}
+          onReset={() => this.resetContact()}
+        >
+          <Field
+            label="Work email"
+            description="We will not share this address"
+            controlId="home-commercial-email"
+            descriptionId="home-commercial-email-desc"
+            errorId="home-commercial-email-err"
+            describedBy={emailDescribedBy}
+            error={emailError}
+            invalidAttr={emailInvalid}
+            value={email}
+            onInput={(e) => this.onEmail(e)}
+          />
+          <p data-dogfood="commercial-email">email:{email}</p>
+          <div data-dogfood="commercial-form-actions" class="vmz-commercial-actions">
+            <Button type="submit">Confirm</Button>
+            <Button type="reset" variant="secondary">Clear</Button>
+            <span if={submitting} data-dogfood="commercial-spinner">
+              <Spinner label="Sending" />
+            </span>
+          </div>
+        </Form>
+        <Dialog
+          open={dialogOpen}
+          title="Send message"
+          titleId="home-commercial-dialog-title"
+          onClose={() => (dialogOpen = false)}
+        >
+          <p data-dogfood="commercial-dialog-body">Confirm sending to {email}</p>
+        </Dialog>
+      </Card>
+
+      <Card title="Workspace" description="Empty → success feedback stays inside the same composition.">
+        <div if={showEmpty}>
+          <Empty title="No projects yet" description="Create a project to see it listed here.">
+            <Button type="button" onClick={() => this.createProject()}>Create project</Button>
+          </Empty>
+        </div>
+        <div if={!showEmpty}>
+          <Alert
+            tone="success"
+            roleName="status"
+            title="Project ready"
+            description="Empty state dismissed — composition continues with feedback."
+          />
+        </div>
+        <Button type="button" variant="secondary" onClick={() => (drawerOpen = true)}>Open details</Button>
+        <Drawer
+          open={drawerOpen}
+          title="Project details"
+          titleId="home-commercial-drawer-title"
+          onClose={() => (drawerOpen = false)}
+        >
+          <p data-dogfood="commercial-drawer-body">Drawer inside commercial composition.</p>
+          <Link href="/console">Open Console surface</Link>
+        </Drawer>
+      </Card>
+    </AppShell>
+  </div>
+</template>
+
+<style>
+.vmz-commercial-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 1.75rem 0 0.5rem;
+}
+
+.vmz-commercial-hero__title {
+  margin: 0;
+  font-family: var(--vmz-font-display);
+  font-size: clamp(2.4rem, 6vw, 3.4rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--vmz-text-ink);
+}
+
+.vmz-commercial-hero__lead {
+  margin: 0;
+  max-width: 38rem;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: var(--vmz-text-steel);
+}
+
+.vmz-commercial-hero__actions,
+.vmz-commercial-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 0.85rem;
+}
+
+.vmz-commercial-section-title {
+  margin: 0 0 0.85rem;
+  font-family: var(--vmz-font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--vmz-text-ink);
+}
+
+.vmz-commercial-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.85rem;
+}
+
+.vmz-commercial-grid--pricing {
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.vmz-commercial-price {
+  margin: 0;
+  font-family: var(--vmz-font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--vmz-action-primary-active);
+}
+
+.vmz-commercial-price span {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--vmz-text-steel);
+}
+</style>
+
+<script client>
+export default class CommercialPage {
+  email = '';
+  emailError = '';
+  emailInvalid = 'false';
+  emailDescribedBy = 'home-commercial-email-desc';
+  contactSummary = '';
+  contactDescribedBy = '';
+  dialogOpen = false;
+  drawerOpen = false;
+  showEmpty = true;
+  notifyOpen = false;
+  submitting = false;
+  navItems = [
+    { id: 'ui', title: 'UI lab', href: '/ui' },
+    { id: 'commercial', title: 'Commercial', href: '/commercial' },
+    { id: 'form', title: 'Form', href: '/form' },
+    { id: 'console', title: 'Console', href: '/console' },
+    { id: 'ui4', title: 'UI4', href: '/ui4' },
+    { id: 'welcome', title: 'Welcome', href: '/welcome' },
+  ];
+
+  scrollContact() {
+    const el = document.getElementById('home-commercial-email');
+    if (el && typeof el.focus === 'function') el.focus();
+  }
+
+  onEmail(e) {
+    this.email = e && e.target ? e.target.value : '';
+    if (this.emailError) {
+      this.emailError = '';
+      this.emailInvalid = 'false';
+      this.emailDescribedBy = 'home-commercial-email-desc';
+      this.contactSummary = '';
+      this.contactDescribedBy = '';
+    }
+  }
+
+  confirmContact() {
+    const ok = /.+@.+\..+/.test(String(this.email || '').trim());
+    if (!ok) {
+      this.emailError = 'Enter a valid work email';
+      this.emailInvalid = 'true';
+      this.emailDescribedBy = 'home-commercial-email-desc home-commercial-email-err';
+      this.contactSummary = 'Fix the email before confirming';
+      this.contactDescribedBy = 'home-commercial-summary';
+      this.dialogOpen = false;
+      return;
+    }
+    this.emailError = '';
+    this.emailInvalid = 'false';
+    this.emailDescribedBy = 'home-commercial-email-desc';
+    this.contactSummary = '';
+    this.contactDescribedBy = '';
+    this.dialogOpen = true;
+  }
+
+  createProject() {
+    this.showEmpty = false;
+    this.notifyOpen = true;
+  }
+
+  resetContact() {
+    this.email = '';
+    this.emailError = '';
+    this.emailInvalid = 'false';
+    this.emailDescribedBy = 'home-commercial-email-desc';
+    this.contactSummary = '';
+    this.contactDescribedBy = '';
+    this.dialogOpen = false;
+    this.notifyOpen = false;
+  }
+}
+</script>

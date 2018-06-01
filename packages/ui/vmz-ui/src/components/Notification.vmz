@@ -1,0 +1,83 @@
+<template>
+  <div
+    class="vmz-ui-notification"
+    data-vmz-ui="notification"
+    data-tone={tone}
+    role={roleName}
+  >
+    <p if={title} class="vmz-ui-notification__title">{title}</p>
+    <p if={description} class="vmz-ui-notification__description">{description}</p>
+    <div class="vmz-ui-notification__actions">
+      <slot />
+    </div>
+  </div>
+</template>
+
+<style>
+.vmz-ui-notification {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vmz-density-control-gap);
+  padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
+  border: 1px solid var(--vmz-status-info-accent);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--vmz-status-info-accent) 10%, transparent);
+  color: var(--vmz-status-info-foreground);
+}
+
+.vmz-ui-notification[data-tone='info'] {
+  border-color: var(--vmz-status-info-accent);
+  background: color-mix(in srgb, var(--vmz-status-info-accent) 10%, transparent);
+  color: var(--vmz-status-info-foreground);
+}
+
+.vmz-ui-notification[data-tone='success'] {
+  border-color: var(--vmz-status-success-accent);
+  background: color-mix(in srgb, var(--vmz-status-success-accent) 10%, transparent);
+  color: var(--vmz-status-success-foreground);
+}
+
+.vmz-ui-notification[data-tone='warning'] {
+  border-color: var(--vmz-status-warning-accent);
+  background: color-mix(in srgb, var(--vmz-status-warning-accent) 10%, transparent);
+  color: var(--vmz-status-warning-foreground);
+}
+
+.vmz-ui-notification[data-tone='danger'] {
+  border-color: var(--vmz-status-danger-accent);
+  background: color-mix(in srgb, var(--vmz-status-danger-accent) 10%, transparent);
+  color: var(--vmz-status-danger-foreground);
+}
+
+:where([data-density='compact']) .vmz-ui-notification {
+  gap: var(--vmz-density-compact-gap);
+  padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+}
+
+.vmz-ui-notification__title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.vmz-ui-notification__description {
+  margin: 0;
+  opacity: 0.9;
+}
+
+.vmz-ui-notification__actions:empty {
+  display: none;
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — Notification (UI4 Commercial Surface).
+ * Ephemeral feedback surface; tones share status.* tokens with Alert.
+ */
+export default class Notification {
+  public title: string = '';
+  public description: string = '';
+  public tone: string = 'info';
+  public roleName: string = 'status';
+}
+</script>

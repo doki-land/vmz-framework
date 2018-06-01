@@ -330,8 +330,10 @@ this.user = await UserCardServer.fetchUser();
 "#,
             "UserCardServer",
         ),
+        secret_requirements: vec![],
     };
-    let program = build_program_module_with_server("UserCard.vmz", &decl, &tpl, Some(&attach));
+    let program =
+        build_program_module_with_server("UserCard.vmz", &decl, &tpl, Some(&attach), None);
     let server = &program.units[0].server;
     assert_eq!(server.status, vmz_types::StubStatus::Partial);
     assert_eq!(server.module_id.as_deref(), Some("#server/components/UserCard"));

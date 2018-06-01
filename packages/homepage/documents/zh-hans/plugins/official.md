@@ -20,7 +20,7 @@
 **与 DaVinci：** ECharts / Mermaid 是 VMZ 媒体组件；DaVinci 平行且未稳，产品图表优先 `<Echarts>`。
 
 ```ts
-import { defineConfig } from 'vmz';
+import {defineConfig} from 'vmz';
 import katex from '@vmz/plugin-katex';
 import shiki from '@vmz/plugin-shiki';
 import monaco from '@vmz/plugin-monaco';
@@ -29,12 +29,12 @@ import echarts from '@vmz/plugin-echarts';
 import iconify from '@vmz/plugin-iconify';
 
 export default defineConfig({
-  plugins: [katex, shiki, monaco, mermaid, echarts, iconify],
-  engines: {
-    math: 'katex',
-    code: 'shiki',
-  },
+    plugins: [katex, shiki, monaco, mermaid, echarts, iconify],
+    engines: {
+        math: 'katex',
+        code: 'shiki',
+    },
 });
 ```
 
-下一步：读 [明确不建议](./not-recommended.md)。
+下一步：读 [与默认路径的关系](./not-recommended.md)。

@@ -5,9 +5,9 @@
  * - 幂等：目标版本已在 registry 则 skip（成功），支持中断后重试；禁止因「已发布」失败
  * - 不使用 NPM_TOKEN；OIDC Trusted Publisher（permissions.id-token: write）
  * - 工作流合同：file=publish-npm.yml env=NPM_PUBLISH repo=doki-land/vmz-framework
- * （若包上仍只信任 release-npm.yml，需先 `npm trust` 加上 publish-npm.yml）
+ *   （npm Trusted Publisher 每包只能配一个；本仓唯一可信文件即 publish-npm.yml）
  *
- * 前置：JS 已 build；native 产物在 artifacts/native/<short>/ 下（见 publish-npm.yml）。
+ * 前置：JS 已 build；native 产物在 dist/<short>/ 下（见 publish-npm.yml → VMZ_NATIVE_ARTIFACTS）。
  */
 
 import { spawnSync } from 'node:child_process';
@@ -30,7 +30,7 @@ const NATIVE_PLATFORMS = [
 
 /**
  * Publish order: leaves first. `publishName` overrides package.json name when set
- * (workspace CLI is `vmz`; npm name is `@vmz/vmz`).
+ * (CLI package is `@vmz/vmz`; native optional packages are `@vmz/vmz-<platform>`).
  * @type {{ dir: string, publishName?: string }[]}
  */
 const JS_PACKAGES = [
@@ -115,7 +115,9 @@ function rewriteWorkspaceDeps(deps, version) {
     const out = {};
     for (const [k, v] of Object.entries(deps)) {
         if (typeof v === 'string' && (v.startsWith('workspace:') || v === '*')) {
-            const key = k === 'vmz' ? '@vmz/vmz' : k;
+            let key = k;
+            if (k === 'vmz' || k === '@vmz/vmz') key = '@vmz/vmz';
+            else if (k.startsWith('@vmz/vmz-')) key = `@vmz/vmz-${k.slice('@vmz/vmz-'.length)}`;
             out[key] = version;
         } else {
             out[k] = v;
@@ -141,13 +143,18 @@ function isAlreadyPublished(blob) {
 
 function isAuthFailure(blob) {
     // 勿把「403 + already published」当 auth；先走 isAlreadyPublished / versionExists。
-    return /ENEEDAUTH|Unable to authenticate|not authorized|OIDC|trusted publisher|two-factor|need to be logged|login|identity token/i.test(
+    // npm Trusted Publisher 未握手时常伪装成 E404 PUT（包其实已存在）。
+    return /ENEEDAUTH|Unable to authenticate|not authorized|OIDC|trusted publisher|two-factor|need to be logged|login|identity token|do not have permission to access it|Access token expired or revoked/i.test(
         blob,
     );
 }
 
 function isMissingPackage(blob) {
-    return /Package not found|does not exist on the registry|cannot publish.*before creating|This package has not been created/i.test(blob);
+    // 真缺包；勿把「404 + permission」OIDC 失败算进这里。
+    if (isAuthFailure(blob)) return false;
+    return /Package not found|does not exist on the registry|cannot publish.*before creating|This package has not been created|is not in this registry/i.test(
+        blob,
+    );
 }
 
 /** Exact version on registry? (not `latest`) — required for idempotent retries. */
@@ -307,7 +314,7 @@ function publishJs(version) {
             });
         }
 
-        // Strip accidental native binaries from the JS metapackage (they ship in platform pkgs).
+        // Strip accidental native binaries from the JS CLI package (they ship in platform pkgs).
         if (name === '@vmz/vmz') {
             for (const f of fs.readdirSync(stage)) {
                 if (f.endsWith('.node')) fs.unlinkSync(path.join(stage, f));
@@ -362,7 +369,7 @@ console.log(' Trusted Publisher contract: publish-npm.yml + env NPM_PUBLISH\n');
 delete process.env.NODE_AUTH_TOKEN;
 delete process.env.NPM_TOKEN;
 
-const artifactsRoot = process.env.VMZ_NATIVE_ARTIFACTS || path.join(ROOT, 'artifacts', 'native');
+const artifactsRoot = process.env.VMZ_NATIVE_ARTIFACTS || path.join(ROOT, 'dist');
 
 const native = publishNative(version, artifactsRoot);
 const js = publishJs(version);

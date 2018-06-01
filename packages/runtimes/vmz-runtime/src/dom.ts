@@ -176,16 +176,20 @@ async function resolveComponent(name) {
  * @param {new (props?: object) => any} Component
  * @param {object} [props]
  */
-export async function renderToString(Component, props = {}) {
+export async function renderToString(Component, props = {}, opts = {}) {
+    const signal = opts && opts.signal;
+    if (signal && signal.aborted) return '';
     const inst = createInstance(Component, props);
     if (typeof inst.onMount === 'function') {
         await inst.onMount();
     }
+    if (signal && signal.aborted) return '';
     // production Direct emit: SSR only via Direct serialize schedule — never `render`.
     if (!(Component && Component.__vmzDirect && typeof Component.__vmzCreate === 'function')) {
         throw new Error(`vmz:dom renderToString() requires __vmzCreate (Direct); blueprint render() removed (production Direct emit)`);
     }
     const root = await runDirectSerializeTreeWithMounts(Component, inst);
+    if (opts && opts.slotHtml != null) injectDefaultSlotHtml(root, opts.slotHtml);
     return flattenSerializeNode(root);
 }
 
@@ -195,7 +199,7 @@ export async function renderToString(Component, props = {}) {
  * Supports AbortSignal for cancel; consumers should respect backpressure (await between chunks).
  * @param {new (props?: object) => any} Component
  * @param {object} [props]
- * @param {{ signal?: AbortSignal }} [opts]
+ * @param {{ signal?: AbortSignal, slotHtml?: string }} [opts]
  * @returns {AsyncGenerator<string, void, void>}
  */
 export async function* renderToStream(Component, props = {}, opts = {}) {
@@ -212,6 +216,7 @@ export async function* renderToStream(Component, props = {}, opts = {}) {
             throw new Error(`vmz:dom renderToStream() requires __vmzCreate (Direct); blueprint render() removed (production Direct emit)`);
         }
         const root = await runDirectSerializeTreeWithMounts(Component, inst);
+        if (opts && opts.slotHtml != null) injectDefaultSlotHtml(root, opts.slotHtml);
         if (aborted()) return;
         for (const chunk of streamSerializeChunks(root)) {
             if (aborted()) return;
@@ -223,6 +228,107 @@ export async function* renderToStream(Component, props = {}, opts = {}) {
         // Abort and normal completion both dispose the SSR instance (lifetime).
         destroy(inst);
     }
+}
+
+/**
+ * Fill the layout-owned default `<slot>` with pre-rendered HTML (layout SSR wrap).
+ * Skips nested component hosts (`data-vmz`) — their slots are for child projection
+ * (e.g. Button label), not the page outlet. Without this, DFS hits LocaleToggle→Button
+ * before Layout's `<main><slot>`, and the entire page HTML lands inside a button.
+ * @param {any} node
+ * @param {string} html
+ */
+function injectDefaultSlotHtml(node, html) {
+    if (!node || typeof node !== 'object') return false;
+    if (node.__kind === 'el' && node.tag === 'slot' && !(node.attrs && node.attrs.name)) {
+        node.__rawHtml = String(html ?? '');
+        node.children = [];
+        return true;
+    }
+    // Nested Direct component wrapper from serializeApi.component — do not search inside.
+    if (node.__kind === 'el' && node.attrs && node.attrs['data-vmz'] != null) {
+        return false;
+    }
+    const kids = node.children;
+    if (Array.isArray(kids)) {
+        for (const c of kids) {
+            if (injectDefaultSlotHtml(c, html)) return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Live-DOM counterpart: first default `<slot>` owned by this tree, not by a nested
+ * `[data-vmz]` component (Button/Link labels, etc.).
+ * @param {Element | null | undefined} root
+ * @returns {Element | null}
+ */
+export function findOwnedDefaultSlot(root) {
+    if (!root || root.nodeType !== 1) return null;
+    const tag = String(root.tagName || '').toLowerCase();
+    if (tag === 'slot' && !root.getAttribute('name')) return root;
+    const kids = root.children;
+    if (!kids || !kids.length) return null;
+    for (let i = 0; i < kids.length; i++) {
+        const c = kids[i];
+        if (c.nodeType !== 1) continue;
+        // Nested component host — its slots are not the layout page outlet.
+        if (c.hasAttribute('data-vmz')) continue;
+        const hit = findOwnedDefaultSlot(c);
+        if (hit) return hit;
+    }
+    return null;
+}
+
+/**
+ * Hydrate/mount a file-route page inside an optional layout chain (outer → inner).
+ * Mirrors SSR `slotHtml` wrapping: each layout's owned default slot becomes the
+ * outlet for the next layout or the page. Retains layout instances on `container`
+ * so SPA transitions can dispose only the page host.
+ * @param {new (props?: object) => any} Page
+ * @param {Element} container
+ * @param {object} [props]
+ * @param {Array<new (props?: object) => any>} [layoutCtors] outer → inner
+ * @param {{ preserveState?: boolean | Record<string, unknown>, skipOnMount?: boolean }} [opts]
+ */
+export async function hydrateRoute(Page, container, props = {}, layoutCtors = [], opts = {}) {
+    if (typeof document === 'undefined') {
+        throw new Error('vmz:dom hydrateRoute() requires a document (browser)');
+    }
+    if (container.__vmzInst) {
+        destroy(container.__vmzInst);
+        container.__vmzInst = null;
+    }
+    container.__vmzPageHost = null;
+    container.__vmzLayoutInsts = null;
+
+    /** @type {object[]} */
+    const layoutInsts = [];
+    let host = container;
+    const ctors = Array.isArray(layoutCtors) ? layoutCtors.filter(Boolean) : [];
+
+    for (const Layout of ctors) {
+        const inst = await mount(Layout, host, {});
+        layoutInsts.push(inst);
+        const slot = findOwnedDefaultSlot(inst.__vmzDomRoot);
+        const outlet = document.createElement('div');
+        outlet.setAttribute('data-vmz-outlet', '');
+        if (slot && slot.parentNode) slot.replaceWith(outlet);
+        else if (inst.__vmzDomRoot && typeof inst.__vmzDomRoot.appendChild === 'function') {
+            inst.__vmzDomRoot.appendChild(outlet);
+        } else {
+            host.appendChild(outlet);
+        }
+        host = outlet;
+    }
+
+    const pageInst = await hydrate(Page, host, props, opts);
+    container.__vmzPageHost = host;
+    container.__vmzLayoutInsts = layoutInsts;
+    // Outer layout (or page if no layouts) owns the #app instance for destroy().
+    container.__vmzInst = layoutInsts[0] || pageInst;
+    return pageInst;
 }
 
 /**
@@ -295,11 +401,24 @@ async function createFromComponent(Component, inst) {
  * @param {object} inst
  */
 function runDirectCreate(Component, inst) {
+    // Nested component creates (e.g. Button inside parent ifBlock branch) must not
+    // leak bindAttr/bindText into the parent's `_branchBinds` / `_itemPatches` sink —
+    // that steals numeric BindingIds (0) and corrupts parent deps (density → type).
+    const prevInst = directApi._inst;
+    const prevBranch = directApi._branchBinds;
+    const prevItems = directApi._itemPatches;
+    const prevEach = directApi._eachCtx;
     directApi._inst = inst;
+    directApi._branchBinds = null;
+    directApi._itemPatches = null;
+    directApi._eachCtx = null;
     try {
         return Component.__vmzCreate.call(inst, directApi);
     } finally {
-        directApi._inst = null;
+        directApi._inst = prevInst;
+        directApi._branchBinds = prevBranch;
+        directApi._itemPatches = prevItems;
+        directApi._eachCtx = prevEach;
     }
 }
 
@@ -371,6 +490,7 @@ function flattenSerializeNode(node) {
     if (node.__kind === 'el') {
         const tag = node.tag || 'div';
         if (tag === 'slot') {
+            if (node.__rawHtml != null) return String(node.__rawHtml);
             return (node.children || []).map(flattenSerializeNode).join('');
         }
         const { open } = serializeOpenTag(node);
@@ -405,6 +525,10 @@ function* streamSerializeChunks(node) {
     if (node.__kind === 'el') {
         const tag = node.tag || 'div';
         if (tag === 'slot') {
+            if (node.__rawHtml != null) {
+                yield String(node.__rawHtml);
+                return;
+            }
             for (const c of node.children || []) yield* streamSerializeChunks(c);
             return;
         }
@@ -471,8 +595,7 @@ const serializeApi = {
     },
     attr(el, name, value) {
         if (!el || el.__kind !== 'el') return;
-        if (value == null) delete el.attrs[name];
-        else el.attrs[name] = String(value);
+        applySerializeAttr(el, name, value);
     },
     on() {
         /* events are no-ops during SSR */
@@ -493,9 +616,42 @@ const serializeApi = {
         } catch {
             raw = null;
         }
-        const key = name === 'className' ? 'class' : name;
-        if (raw == null) delete el.attrs[key];
-        else el.attrs[key] = String(raw);
+        applySerializeAttr(el, name, raw);
+    },
+    bindComponentProp() {
+        /* SSR: props already resolved into the child instance at create */
+    },
+    projectDefaultSlot(hostEl, node) {
+        if (!hostEl || node == null) return;
+        // serializeApi.component returns a serialize el tree (or island shell).
+        const root = hostEl.__kind === 'el' ? hostEl : null;
+        const findSlot = (n) => {
+            if (!n || n.__kind !== 'el') return null;
+            if (n.tag === 'slot' && !(n.attrs && n.attrs.name)) return n;
+            for (const c of n.children || []) {
+                const hit = findSlot(c);
+                if (hit) return hit;
+            }
+            return null;
+        };
+        // Prefer searching the component body (first child of host wrapper).
+        let slot = null;
+        if (root) {
+            for (const c of root.children || []) {
+                slot = findSlot(c);
+                if (slot) break;
+            }
+            if (!slot) slot = findSlot(root);
+        }
+        if (slot) {
+            slot.__rawHtml = null;
+            if (!Array.isArray(slot.children)) slot.children = [];
+            // Append — multiple projectDefaultSlot calls must accumulate (SSR).
+            // Client path replaces the live <slot> then appends siblings; serialize must push.
+            slot.children.push(node);
+            return;
+        }
+        if (root) root.appendChild(node);
     },
     setHtml(el, value) {
         if (!el || el.__kind !== 'el') return;
@@ -565,7 +721,7 @@ const serializeApi = {
             }
             const dom = spec.createItem.call(inst, serializeApi, box);
             if (dom) {
-                // Parity with Direct eachBlock: keyed items expose data-vmz-key for hydrate/tests.
+                // SSR only: serialize key into HTML for hydrate/debug. Direct client does not write this attr.
                 if (dom.__kind === 'el') serializeApi.attr(dom, 'data-vmz-key', String(k));
                 frag.appendChild(dom);
             }
@@ -679,8 +835,7 @@ const directApi = {
         return document.createDocumentFragment();
     },
     attr(el, name, value) {
-        if (value == null) el.removeAttribute(name);
-        else el.setAttribute(name, String(value));
+        applyDomAttr(el, name, value);
     },
     on(el, type, handler) {
         const inst = directApi._inst;
@@ -736,11 +891,11 @@ const directApi = {
             get,
             (raw) => {
                 if (name === 'class' || name === 'className') {
-                    el.setAttribute('class', String(raw ?? ''));
-                } else if (raw == null) {
-                    el.removeAttribute(name);
+                    const s = String(raw ?? '');
+                    if (s) el.setAttribute('class', s);
+                    else if (el.hasAttribute('class')) el.removeAttribute('class');
                 } else {
-                    el.setAttribute(name, String(raw));
+                    applyDomAttr(el, name, raw);
                 }
             },
             cf,
@@ -823,6 +978,56 @@ const directApi = {
             bag.push(pending);
         }
         return host;
+    },
+    /**
+     * Keep nested Direct child props live with parent field writes.
+     * @param {object} hostInst
+     * @param {HTMLElement} hostEl
+     * @param {string} propName
+     * @param {string[]} deps
+     * @param {() => any} get
+     */
+    bindComponentProp(hostInst, hostEl, propName, deps, get) {
+        // Use a stable BindingId so flushPending schedules this patch via the IR
+        // path. A null bindingId only lands in `__vmzBinders` and was skipped when
+        // the same parent field also had bindText/bindAttr BindingIds.
+        if (hostEl && hostEl.__vmzPropBindSeq == null) {
+            hostEl.__vmzPropBindSeq = ++directPropBindSeq;
+        }
+        const seq = hostEl && hostEl.__vmzPropBindSeq != null ? hostEl.__vmzPropBindSeq : ++directPropBindSeq;
+        const bindingId = `pc:${seq}:${propName}`;
+        wireDirectBind(hostInst, bindingId, deps, get, (raw) => {
+            const child = hostEl && hostEl.__vmzInst;
+            if (!child || child.__vmzDestroyed) return;
+            if (typeof propName !== 'string' || !propName || propName.startsWith('#')) return;
+            child[propName] = raw;
+            scheduleRefresh(child, { type: 'replace', root: propName });
+        });
+    },
+    /**
+     * Project parent children into nested Direct component default `<slot>`.
+     * @param {HTMLElement} hostEl
+     * @param {Node} node
+     */
+    projectDefaultSlot(hostEl, node) {
+        if (!hostEl || node == null) return;
+        const child = hostEl.__vmzInst;
+        const root = (child && child.__vmzDomRoot) || hostEl;
+        /** @type {Element | null} */
+        let slot = null;
+        if (root && root.nodeType === 1) {
+            if (String(root.tagName || '').toLowerCase() === 'slot' && !root.getAttribute('name')) {
+                slot = root;
+            } else if (typeof root.querySelector === 'function') {
+                slot = root.querySelector('slot:not([name])');
+            }
+        }
+        if (slot && slot.parentNode) {
+            slot.replaceWith(node);
+            return;
+        }
+        if (root && typeof root.appendChild === 'function') root.appendChild(node);
+        else hostEl.appendChild(node);
     },
     /**
      * Direct if/else — no blueprint `kind: "if"` dispatch.
@@ -931,7 +1136,7 @@ const directApi = {
     },
     /**
      * Direct keyed each — no blueprint `kind: "each"` dispatch.
-     * /: Set/Map + Fragment batch insert; item-local binds; host selected; event delegate.
+     * /: Set/Map + Fragment batch insert; item-local binds; host field dispatch; event delegate.
      * @param {object} inst
      * @param {number|string|null} bindingId
      * @param {string[]} deps
@@ -964,6 +1169,9 @@ const directApi = {
         let delegateRoot = null;
 
         const itemKey = (box) => {
+            if (rowKeyField != null && box && box.item != null) {
+                return box.item[rowKeyField];
+            }
             if (typeof spec.key === 'function') {
                 try {
                     return spec.key.call(inst, box);
@@ -972,6 +1180,13 @@ const directApi = {
                 }
             }
             return box.index;
+        };
+        /** Reused for keyed lookups — avoid per-row `{item,index}` alloc on create/update. */
+        const keyScratch = { item: null, index: 0 };
+        const keyOf = (item, index) => {
+            keyScratch.item = item;
+            keyScratch.index = index;
+            return itemKey(keyScratch);
         };
 
         const readList = () => {
@@ -986,10 +1201,26 @@ const directApi = {
         };
 
         const runEntryPatches = (entry, depKey, onlyBindingId) => {
-            if (!entry || !entry.patches) return;
+            if (!entry) return;
+            if (entryIsBp(entry) && applyBp) {
+                if (onlyBindingId != null && blueprintBindIds && !blueprintBindIds.has(String(onlyBindingId))) {
+                    return;
+                }
+                try {
+                    applyBp(entry);
+                } catch (err) {
+                    console.error('vmz:dom each item', err);
+                }
+                return;
+            }
+            if (!entry.patches) return;
             for (const p of entry.patches) {
-                if (onlyBindingId != null && p.__vmzBindingId != null && String(p.__vmzBindingId) !== String(onlyBindingId)) {
-                    continue;
+                if (onlyBindingId != null) {
+                    if (p.__vmzBindingIds) {
+                        if (!p.__vmzBindingIds.has(String(onlyBindingId))) continue;
+                    } else if (p.__vmzBindingId != null && String(p.__vmzBindingId) !== String(onlyBindingId)) {
+                        continue;
+                    }
                 }
                 try {
                     runPatch(p, depKey, onlyBindingId);
@@ -1004,13 +1235,17 @@ const directApi = {
             const allowIdx = itemIndicesAllowedForDeps(trie, leafDeps);
             const runAt = (i) => {
                 if (i < 0 || i >= list.length) return;
-                const box = { item: list[i], index: i };
-                const k = itemKey(box);
+                const item = list[i];
+                const k = rowKeyOf(item, i);
                 const entry = keyed.get(k);
                 if (!entry) return;
-                entry.box.item = list[i];
-                entry.box.index = i;
-                tagItemPatches(entry.patches, i);
+                if (entry.nodeType === 1) entry.__vmzBox = item;
+                else {
+                    entry.item = item;
+                    entry.index = i;
+                    if (entry.dom && entry.bp) entry.dom.__vmzBox = item;
+                }
+                if (entry.patches) tagItemPatches(entry.patches, i);
                 runEntryPatches(entry, (leafDeps && leafDeps[0]) || null, onlyBindingId);
             };
             if (allowIdx) {
@@ -1044,9 +1279,14 @@ const directApi = {
                 if (inst.__vmzDestroyed) return;
                 const trie = inst.__vmzFlushTrie;
                 const hostFields = [];
+                let listReplaced = false;
                 for (const d of leafDeps || []) {
                     if (!d) continue;
-                    if (d.includes('.*') || (d.includes('[') && d.includes(']'))) continue;
+                    if (d.includes('.*') || (d.includes('[') && d.includes(']'))) {
+                        const root = depRootField(d);
+                        if (trie && root && trie[root] && trie[root].replace) listReplaced = true;
+                        continue;
+                    }
                     hostFields.push(depRootField(d) || d);
                 }
                 const hostDirty =
@@ -1055,6 +1295,8 @@ const directApi = {
                         const n = trie[f];
                         return n && (n.replace || n.dirty);
                     });
+                // Full list replace is owned by eachBlock apply() — skip leaf re-walk.
+                if (listReplaced && !hostDirty) return;
                 if (hostDirty && hostFields.length) {
                     refreshHostKeyed(hostFields, bId);
                     return;
@@ -1115,9 +1357,16 @@ const directApi = {
                     let n = /** @type {Node | null} */ (ev.target);
                     while (n && n !== delegateRoot) {
                         if (n.nodeType === 1) {
-                            const bag = /** @type {Element} */ (n).__vmzEvt;
+                            const el = /** @type {Element} */ (n);
+                            const act = el.__vmzAct || el.getAttribute('data-vmz-act');
+                            if (typeof act === 'string' && act) {
+                                actionHandler(act).call(inst, ev, el);
+                                return;
+                            }
+                            const bag = el.__vmzEvt;
                             if (bag && typeof bag[type] === 'function') {
-                                bag[type].call(inst, ev);
+                                // Pass the element so shared each-item handlers can read __vmzBox.
+                                bag[type].call(inst, ev, el);
                                 return;
                             }
                         }
@@ -1142,25 +1391,734 @@ const directApi = {
             const walk = (node) => {
                 if (node.nodeType === 1) {
                     if (node.__vmzEvt) node.__vmzEvt = null;
+                    if (node.__vmzBox) node.__vmzBox = null;
+                    if (node.__vmzAct) node.__vmzAct = null;
+                    if (node.__vmzKey != null) node.__vmzKey = null;
                     for (let c = node.firstChild; c; c = c.nextSibling) walk(c);
                 }
             };
             walk(root);
         };
 
+        const pathFromRoot = (root, node) => {
+            /** @type {number[]} */
+            const path = [];
+            let n = /** @type {Node | null} */ (node);
+            while (n && n !== root) {
+                const parent = n.parentNode;
+                if (!parent) return null;
+                let i = 0;
+                for (let c = parent.firstChild; c; c = c.nextSibling) {
+                    if (c === n) break;
+                    i++;
+                }
+                path.push(i);
+                n = parent;
+            }
+            if (n !== root) return null;
+            path.reverse();
+            return path;
+        };
+
+        const nodeAtPath = (root, path) => {
+            let n = /** @type {Node | null} */ (root);
+            for (let i = 0; i < path.length; i++) {
+                if (!n) return null;
+                n = n.childNodes[path[i]] || null;
+            }
+            return n;
+        };
+
+        /**
+         * Shared each-item event handlers (one per method name for the whole block).
+         * Element carries `__vmzBox`; delegate passes the element as 2nd arg.
+         * @type {Record<string, (ev: Event, el: Element) => void>}
+         */
+        const sharedActions = Object.create(null);
+        /** @type {Record<string, string>} method → item field for action arg (fallback blueprint). */
+        const actionArgFields = Object.create(null);
+        const actionHandler = (method) => {
+            if (!sharedActions[method]) {
+                sharedActions[method] = function (ev, el) {
+                    let n = /** @type {Node | null} */ (el);
+                    while (n && n.nodeType === 1) {
+                        const box = /** @type {Element} */ (n).__vmzBox;
+                        if (box) {
+                            const item = box.item != null ? box.item : box;
+                            const argField =
+                                rowActArgField != null ? rowActArgField : actionArgFields[method] != null ? actionArgFields[method] : null;
+                            if (argField == null || item == null) return;
+                            const arg = item[argField];
+                            const fn = this[method];
+                            if (typeof fn === 'function') fn.call(this, arg);
+                            return;
+                        }
+                        n = n.parentNode;
+                    }
+                };
+            }
+            return sharedActions[method];
+        };
+
+        /**
+         * @returns {{ method: string, argField: string } | null}
+         */
+        const parseActionMethod = (handler) => {
+            if (typeof handler !== 'function') return null;
+            try {
+                const src = Function.prototype.toString.call(handler);
+                // this.m(box.item.<field>) — field from author surface.
+                const m = src.match(/this\.([A-Za-z_$][\w$]*)\s*\(\s*[A-Za-z_$][\w$]*\.item\.([A-Za-z_$][\w$]*)\s*\)/);
+                return m ? { method: m[1], argField: m[2] } : null;
+            } catch {
+                return null;
+            }
+        };
+
+        /**
+         * Row blueprint: first createItem records dynamic slots; later rows clone + hydrate
+         * without re-running compiled createItem (avoids per-row get/CF/on closures).
+         * @type {null | {
+         *   tpl: Element,
+         *   texts: Array<{ path: number[], bindingId: any, deps: string[], field: string, get: (root: Element) => Node }>,
+         *   attrs: Array<{ path: number[], bindingId: any, deps: string[], name: string, onVal: string, offVal: string, get: (root: Element) => Element }>,
+         *   ons: Array<{ path: number[], type: string, method: string, get: (root: Element) => Element }>,
+         *   bindIds: Set<string>,
+         * }}
+         */
+        let blueprint = null;
+        let blueprintOk = true;
+        /** @type {Set<string> | null} */
+        let blueprintBindIds = null;
+        /** @type {null | ((root: Element, entry: any) => void)} */
+        let hydrateBp = null;
+        /** @type {null | ((entry: any) => void)} */
+        let applyBp = null;
+        /**
+         * Compile-time rowKernel installed — static HTML rows, no nested component dispose.
+         * Shape-specific walks live in emitted hydrate/apply (Rust), not here.
+         */
+        let hasRowKernel = false;
+        /** @type {string | null} item field used as key when rowKernel.keyField is set */
+        let rowKeyField = null;
+        /** @type {string | null} item field passed to delegated actions (from rowKernel.actArgField) */
+        let rowActArgField = null;
+        /** Recycle object bp entries (runtime-recorded blueprint fallback). */
+        /** @type {any[]} */
+        const entryPool = [];
+        const allocBpEntry = () => {
+            const e = entryPool.pop();
+            if (e) return e;
+            return { item: null, dom: null, bp: 1, t0: null, t1: null };
+        };
+        const releaseBpEntry = (entry) => {
+            if (!entry) return;
+            // DOM-as-entry (Element): drop expandos.
+            if (entry.nodeType === 1) {
+                entry.__vmzBox = null;
+                entry.__vmzT0 = null;
+                entry.__vmzT1 = null;
+                entry.__vmzBp = null;
+                return;
+            }
+            if (!entry.bp || entryPool.length >= 4096) return;
+            entry.item = null;
+            entry.dom = null;
+            entry.t0 = null;
+            entry.t1 = null;
+            entry.a0 = null;
+            entry.patches = null;
+            entryPool.push(entry);
+        };
+        const entryDom = (entry) => (entry && entry.nodeType === 1 ? entry : entry && entry.dom);
+        const entryIsBp = (entry) => !!(entry && (entry.nodeType === 1 || entry.bp || entry.__vmzBp));
+        const entryItem = (entry) => {
+            if (!entry) return null;
+            if (entry.nodeType === 1) return entry.__vmzBox;
+            if (entry.bp) return entry.item;
+            return entry.box && entry.box.item;
+        };
+        const rowKeyOf = (item, index) => {
+            if (rowKeyField != null && item != null) return item[rowKeyField];
+            return keyOf(item, index);
+        };
+        /** Drop all row DOM between markers; rowKernel rows skip per-node dispose walks. */
+        const fastWipeRows = () => {
+            const parent = end.parentNode;
+            if (!parent) {
+                keyed.clear();
+                return;
+            }
+            let node = start.nextSibling;
+            if (node && node !== end) {
+                if (hasRowKernel || (blueprint && blueprintOk)) {
+                    const range = document.createRange();
+                    range.setStartBefore(node);
+                    range.setEndBefore(end);
+                    range.deleteContents();
+                } else {
+                    while (node && node !== end) {
+                        const next = node.nextSibling;
+                        noteDomRemove();
+                        clearDomEvt(node);
+                        disposeDomTree(node);
+                        node.remove();
+                        node = next;
+                    }
+                }
+            }
+            for (const [, entry] of keyed) releaseBpEntry(entry);
+            keyed.clear();
+        };
+
+        const makeChildGetter = (path) => {
+            const len = path.length;
+            if (len === 0) return (root) => root;
+            if (len === 1) {
+                const a = path[0];
+                return (root) => root.childNodes[a];
+            }
+            if (len === 2) {
+                const a = path[0];
+                const b = path[1];
+                return (root) => root.childNodes[a].childNodes[b];
+            }
+            if (len === 3) {
+                const a = path[0];
+                const b = path[1];
+                const c = path[2];
+                return (root) => root.childNodes[a].childNodes[b].childNodes[c];
+            }
+            return (root) => {
+                let n = /** @type {Node} */ (root);
+                for (let i = 0; i < len; i++) n = n.childNodes[path[i]];
+                return n;
+            };
+        };
+
+        const userCreateItem = spec.createItem;
+
+        // Compile-time row kernel (Rust Direct emit) — skip runtime blueprint recording.
+        if (spec.rowKernel && typeof spec.rowKernel.html === 'string' && typeof spec.rowKernel.hydrate === 'function') {
+            try {
+                const tplHost = document.createElement('template');
+                tplHost.innerHTML = spec.rowKernel.html;
+                const row = tplHost.content.firstElementChild;
+                if (row && row.nodeType === 1) {
+                    blueprint = {
+                        tpl: /** @type {Element} */ (row.cloneNode(true)),
+                        texts: [],
+                        attrs: [],
+                        ons: [],
+                        bindIds: new Set(),
+                    };
+                    blueprintOk = true;
+                    hasRowKernel = true;
+                    rowKeyField = typeof spec.rowKernel.keyField === 'string' && spec.rowKernel.keyField ? spec.rowKernel.keyField : null;
+                    rowActArgField =
+                        typeof spec.rowKernel.actArgField === 'string' && spec.rowKernel.actArgField ? spec.rowKernel.actArgField : null;
+                    blueprintBindIds = new Set(['__vmzRk']);
+                    for (const ev of spec.rowKernel.events || []) needDelegate(ev);
+                    for (const hf of spec.rowKernel.hostFields || []) {
+                        if (typeof hf === 'string' && hf) ensureHostDispatcher(hf);
+                    }
+                    // Leaf path writes (`rows.0.label`) need `rows.*.label`, not bare `rows.*`.
+                    {
+                        const listRoot = depRootField((deps && deps[0]) || '') || (deps && deps[0]) || '';
+                        if (listRoot) {
+                            /** @type {string[]} */
+                            const leafDeps = [`${listRoot}.*`];
+                            const fields = Array.isArray(spec.rowKernel.itemFields) ? spec.rowKernel.itemFields : [];
+                            for (const f of fields) {
+                                if (typeof f === 'string' && f) leafDeps.push(`${listRoot}.*.${f}`);
+                            }
+                            ensureListDispatcher('__vmzRk', leafDeps);
+                        }
+                    }
+                    const rkHydrate = spec.rowKernel.hydrate;
+                    const rkApply = spec.rowKernel.apply;
+                    hydrateBp = (root, entry) => {
+                        const item =
+                            entry && typeof entry === 'object' && 'item' in entry && entry.item != null
+                                ? entry.item
+                                : entry && entry.__vmzBox != null
+                                  ? entry.__vmzBox
+                                  : entry;
+                        rkHydrate.call(inst, root, item);
+                    };
+                    applyBp = (entry) => {
+                        const root = entry && entry.nodeType === 1 ? entry : entry.dom;
+                        const item = entry && entry.nodeType === 1 ? entry.__vmzBox : entry.item;
+                        if (typeof rkApply === 'function') rkApply.call(inst, root, item);
+                    };
+                }
+            } catch (err) {
+                console.error('vmz:dom rowKernel', err);
+                blueprint = null;
+                blueprintOk = true;
+                hasRowKernel = false;
+                rowKeyField = null;
+                rowActArgField = null;
+                hydrateBp = null;
+                applyBp = null;
+            }
+        }
+
+        const probeItemField = (get, box) => {
+            const item = box.item;
+            if (!item || (typeof item !== 'object' && typeof item !== 'function')) return null;
+            let field = null;
+            const proxy = new Proxy(item, {
+                get(t, p, r) {
+                    if (typeof p === 'string' || typeof p === 'symbol') field = String(p);
+                    return Reflect.get(t, p, r);
+                },
+            });
+            const prev = box.item;
+            box.item = proxy;
+            try {
+                get.call(inst);
+            } catch {
+                /* ignore */
+            }
+            box.item = prev;
+            return field;
+        };
+
+        /**
+         * Probe on/off class strings for `this.<host> === item.<itemField> ? … : …`.
+         * Host/item field names come from binding deps — not hardcoded.
+         */
+        const probeHostItemClass = (get, box, hostField, itemField) => {
+            if (!hostField || !itemField) return { onVal: '', offVal: '' };
+            const prev = inst[hostField];
+            const matchVal = box.item != null ? box.item[itemField] : undefined;
+            let onVal = '';
+            let offVal = '';
+            const quiet = !!inst.__vmzQuiet;
+            inst.__vmzQuiet = true;
+            try {
+                inst[hostField] = matchVal;
+                onVal = String(get.call(inst) ?? '');
+                // Distinct off value for number / other keys.
+                if (typeof matchVal === 'number') {
+                    inst[hostField] = matchVal === 0 ? -1 : 0;
+                    if (inst[hostField] === matchVal) inst[hostField] = undefined;
+                } else {
+                    inst[hostField] = matchVal === '' ? '__vmz_off__' : '';
+                    if (inst[hostField] === matchVal) inst[hostField] = undefined;
+                }
+                offVal = String(get.call(inst) ?? '');
+            } catch {
+                onVal = '';
+                offVal = '';
+            } finally {
+                inst[hostField] = prev;
+                inst.__vmzQuiet = quiet;
+            }
+            return { onVal, offVal };
+        };
+
+        const sealBlueprintDispatchers = () => {
+            if (!blueprint || blueprintBindIds) return;
+            /** @type {Set<string>} */
+            const ids = new Set();
+            for (const s of blueprint.texts) {
+                if (s.bindingId != null) {
+                    ids.add(String(s.bindingId));
+                    ensureListDispatcher(s.bindingId, s.deps);
+                }
+            }
+            for (const s of blueprint.attrs) {
+                if (s.bindingId != null) {
+                    ids.add(String(s.bindingId));
+                    ensureListDispatcher(s.bindingId, s.deps);
+                }
+                for (const d of s.deps || []) {
+                    if (!d || d.includes('.*') || (d.includes('[') && d.includes(']'))) continue;
+                    const rootField = depRootField(d) || d;
+                    if (rootField && rootField.indexOf('.') < 0) ensureHostDispatcher(rootField);
+                }
+            }
+            for (const s of blueprint.ons) {
+                needDelegate(s.type);
+            }
+            blueprintBindIds = ids;
+            blueprint.bindIds = ids;
+            compileBlueprintKernels();
+        };
+
+        const compileBlueprintKernels = () => {
+            if (!blueprint || hydrateBp) return;
+            const textSlots = blueprint.texts;
+            const attrSlots = blueprint.attrs;
+            const onSlots = blueprint.ons;
+            const nText = textSlots.length;
+            const nAttr = attrSlots.length;
+            const nOn = onSlots.length;
+
+            // Fallback only (no compile-time rowKernel). Field/path walks come from
+            // recorded slots — shape-specific kernels belong in row_kernel.rs.
+            hydrateBp = (root, entry) => {
+                const item = entry && entry.item != null ? entry.item : entry;
+                root.__vmzBox = item;
+                /** @type {Array<Text>} */
+                const textNodes = new Array(nText);
+                /** @type {Array<Element>} */
+                const attrEls = new Array(nAttr);
+                for (let i = 0; i < nText; i++) textNodes[i] = /** @type {Text} */ (textSlots[i].get(root));
+                for (let i = 0; i < nAttr; i++) attrEls[i] = attrSlots[i].get(root);
+                for (let i = 0; i < nOn; i++) {
+                    const el = onSlots[i].get(root);
+                    if (!el.getAttribute('data-vmz-act')) {
+                        el.setAttribute('data-vmz-act', onSlots[i].method);
+                        el.__vmzAct = onSlots[i].method;
+                    }
+                }
+                for (let i = 0; i < nText; i++) {
+                    const v = item == null ? '' : item[textSlots[i].field];
+                    textNodes[i].nodeValue = v == null ? '' : v + '';
+                }
+                for (let i = 0; i < nAttr; i++) {
+                    const s = attrSlots[i];
+                    const el = attrEls[i];
+                    const host = s.hostField;
+                    const itemKey = s.itemField;
+                    if (!host || !itemKey) continue;
+                    const hv = inst[host];
+                    if (hv != null && item && hv === item[itemKey]) {
+                        if (s.name === 'class' || s.name === 'className') el.className = s.onVal;
+                        else applyDomAttr(el, s.name, s.onVal);
+                    } else if (s.offVal) {
+                        if (s.name === 'class' || s.name === 'className') el.className = s.offVal;
+                        else applyDomAttr(el, s.name, s.offVal);
+                    }
+                }
+                entry.tn = textNodes;
+                entry.ae = attrEls;
+                entry.dom = root;
+                entry.bp = true;
+            };
+            applyBp = (entry) => {
+                const item = entry.item != null ? entry.item : entry.__vmzBox;
+                const textNodes = entry.tn;
+                const attrEls = entry.ae;
+                for (let i = 0; i < nText; i++) {
+                    const v = item == null ? '' : item[textSlots[i].field];
+                    textNodes[i].nodeValue = v == null ? '' : v + '';
+                }
+                for (let i = 0; i < nAttr; i++) {
+                    const s = attrSlots[i];
+                    const el = attrEls[i];
+                    if (!s.hostField || !s.itemField) continue;
+                    const raw = item && inst[s.hostField] === item[s.itemField] ? s.onVal : s.offVal;
+                    if (s.name === 'class' || s.name === 'className') el.className = raw;
+                    else applyDomAttr(el, s.name, raw);
+                }
+            };
+        };
+
+        const wireBlueprintItem = (root, box, patches) => {
+            if (!blueprint) return null;
+            sealBlueprintDispatchers();
+            const entry = {
+                item: box.item,
+                index: box.index,
+                dom: root,
+                bp: true,
+                t0: null,
+                t1: null,
+                a0: null,
+                tn: null,
+                ae: null,
+                patches: patches || null,
+            };
+            hydrateBp(root, entry);
+            if (patches) {
+                const applyAll = () => applyBp(entry);
+                applyAll.__vmzBindingIds = blueprintBindIds;
+                applyAll.__vmzBindingId = null;
+                applyAll.__vmzItemLocal = true;
+                applyAll.__vmzBpEntry = entry;
+                patches.push(applyAll);
+            }
+            return entry;
+        };
+
+        const recordFirstItem = (api, box, patches) => {
+            /** @type {Element | null} */
+            let root = null;
+            /** Pending slots keep live node refs — Direct emit binds before appendChild. */
+            /** @type {{ texts: any[], attrs: any[], ons: any[] }} */
+            const pending = { texts: [], attrs: [], ons: [] };
+            let recordFailed = false;
+
+            const recordingApi = Object.assign({}, api, {
+                el(tag) {
+                    const el = api.el(tag);
+                    if (!root) root = el;
+                    return el;
+                },
+                // Capture only — do not wireDirectBind (would orphan first-row binders).
+                bindText(i, bindingId, deps, get, textNode, cf) {
+                    if (!root) return;
+                    // Blueprint recording aborted: fall back to normal wiring for remaining binds.
+                    if (recordFailed) {
+                        api.bindText(i, bindingId, deps, get, textNode, cf);
+                        return;
+                    }
+                    try {
+                        const raw = get.call(inst);
+                        if (textNode.nodeType === 3) /** @type {Text} */ (textNode).nodeValue = String(raw ?? '');
+                        else textNode.textContent = String(raw ?? '');
+                    } catch {
+                        /* ignore */
+                    }
+                    pending.texts.push({
+                        node: textNode,
+                        bindingId,
+                        deps: Array.isArray(deps) ? deps.slice() : [],
+                        getFn: get,
+                    });
+                },
+                bindAttr(i, bindingId, deps, get, el, name, cf) {
+                    if (!root) return;
+                    if (recordFailed) {
+                        api.bindAttr(i, bindingId, deps, get, el, name, cf);
+                        return;
+                    }
+                    // Class bind eligible when deps include a bare host field (any name).
+                    const hasHostDep = (deps || []).some((d) => d && !d.includes('.*') && !d.includes('[') && String(d).indexOf('.') < 0);
+                    if ((name === 'class' || name === 'className') && hasHostDep) {
+                        try {
+                            const raw = get.call(inst);
+                            el.className = raw == null ? '' : String(raw);
+                        } catch {
+                            /* ignore */
+                        }
+                        pending.attrs.push({
+                            node: el,
+                            bindingId,
+                            deps: Array.isArray(deps) ? deps.slice() : [],
+                            name,
+                            getFn: get,
+                        });
+                    } else {
+                        recordFailed = true;
+                        api.bindAttr(i, bindingId, deps, get, el, name, cf);
+                    }
+                },
+                on(el, type, handler) {
+                    if (recordFailed) {
+                        api.on(el, type, handler);
+                        return;
+                    }
+                    const parsed = parseActionMethod(handler);
+                    if (parsed && root) {
+                        pending.ons.push({
+                            node: el,
+                            type,
+                            method: parsed.method,
+                            argField: parsed.argField,
+                        });
+                        actionArgFields[parsed.method] = parsed.argField;
+                        if (rowActArgField == null) rowActArgField = parsed.argField;
+                        root.__vmzBox = box;
+                        el.__vmzAct = parsed.method;
+                        // Attribute survives cloneNode — hydrate skips per-row __vmzAct writes.
+                        el.setAttribute('data-vmz-act', parsed.method);
+                        needDelegate(type);
+                        return;
+                    }
+                    api.on(el, type, handler);
+                    recordFailed = true;
+                },
+            });
+
+            const dom = userCreateItem.call(inst, recordingApi, box);
+            if (!recordFailed && dom && dom.nodeType === 1 && root === dom && (pending.texts.length > 0 || pending.attrs.length > 0)) {
+                /** @type {any[]} */
+                const texts = [];
+                /** @type {any[]} */
+                const attrs = [];
+                /** @type {any[]} */
+                const ons = [];
+                for (const p of pending.texts) {
+                    const path = pathFromRoot(root, p.node);
+                    const field = probeItemField(p.getFn, box);
+                    if (!path || !field) {
+                        recordFailed = true;
+                        break;
+                    }
+                    texts.push({
+                        path,
+                        bindingId: p.bindingId,
+                        deps: p.deps,
+                        field,
+                        get: makeChildGetter(path),
+                    });
+                }
+                if (!recordFailed) {
+                    for (const p of pending.attrs) {
+                        const path = pathFromRoot(root, p.node);
+                        if (!path) {
+                            recordFailed = true;
+                            break;
+                        }
+                        const hostField = (() => {
+                            for (const d of p.deps || []) {
+                                if (!d) continue;
+                                if (d.includes('.*') || d.includes('[')) continue;
+                                if (String(d).indexOf('.') < 0) return String(d);
+                            }
+                            return null;
+                        })();
+                        let itemField = null;
+                        for (const d of p.deps || []) {
+                            if (!d) continue;
+                            if (d.includes('.*')) {
+                                const m = String(d).match(/\*\.([A-Za-z_$][\w$]*)$/);
+                                if (m) itemField = m[1];
+                            }
+                        }
+                        if (!hostField || !itemField) {
+                            recordFailed = true;
+                            break;
+                        }
+                        const { onVal, offVal } = probeHostItemClass(p.getFn, box, hostField, itemField);
+                        attrs.push({
+                            path,
+                            bindingId: p.bindingId,
+                            deps: p.deps,
+                            name: p.name,
+                            onVal,
+                            offVal,
+                            hostField,
+                            itemField,
+                            get: makeChildGetter(path),
+                        });
+                    }
+                }
+                if (!recordFailed) {
+                    for (const p of pending.ons) {
+                        const path = pathFromRoot(root, p.node);
+                        if (!path) {
+                            recordFailed = true;
+                            break;
+                        }
+                        ons.push({
+                            path,
+                            type: p.type,
+                            method: p.method,
+                            get: makeChildGetter(path),
+                        });
+                    }
+                }
+                if (!recordFailed) {
+                    const tpl = /** @type {Element} */ (dom.cloneNode(true));
+                    clearDomEvt(tpl);
+                    blueprint = {
+                        tpl,
+                        texts,
+                        attrs,
+                        ons,
+                        bindIds: new Set(),
+                    };
+                }
+            }
+            if (!blueprint) blueprintOk = false;
+            return dom;
+        };
+
+        const createItem = (api, box, patches) => {
+            if (blueprint && blueprintOk) {
+                const root = /** @type {Element} */ (blueprint.tpl.cloneNode(true));
+                wireBlueprintItem(root, box, patches);
+                return root;
+            }
+            if (blueprintOk && typeof userCreateItem === 'function') {
+                const dom = recordFirstItem(api, box, patches);
+                if (blueprint && dom && dom.nodeType === 1) {
+                    patches.length = 0;
+                    wireBlueprintItem(dom, box, patches);
+                }
+                return dom;
+            }
+            return userCreateItem.call(inst, api, box);
+        };
+
+        /**
+         * Reorder / place item DOM with minimal mutations.
+         * - already-correct → no-op
+         * - pure 2-node swap → 1–2 insertBefore (common keyed list swap)
+         * - append prefix → Fragment insert only new tail
+         * - create / replace / complex → Fragment rebuild before `end`
+         */
         const reconcileDomOrder = (nextNodes) => {
             const parent = end.parentNode;
             if (!parent) return;
-            let ok = true;
-            let n = start.nextSibling;
-            for (let i = 0; i < nextNodes.length; i++) {
-                if (n !== nextNodes[i]) {
-                    ok = false;
-                    break;
-                }
-                n = n.nextSibling;
+
+            /** @type {ChildNode[]} */
+            const curr = [];
+            for (let n = start.nextSibling; n && n !== end; n = n.nextSibling) {
+                curr.push(n);
             }
-            if (ok && n === end) return;
+
+            if (curr.length === nextNodes.length) {
+                let same = true;
+                for (let i = 0; i < curr.length; i++) {
+                    if (curr[i] !== nextNodes[i]) {
+                        same = false;
+                        break;
+                    }
+                }
+                if (same) return;
+
+                // Fast path: exactly two positions swapped (benchmark swaprows).
+                /** @type {number[]} */
+                const diff = [];
+                for (let i = 0; i < curr.length; i++) {
+                    if (curr[i] !== nextNodes[i]) diff.push(i);
+                }
+                if (diff.length === 2 && curr[diff[0]] === nextNodes[diff[1]] && curr[diff[1]] === nextNodes[diff[0]]) {
+                    const a = curr[diff[0]];
+                    const b = curr[diff[1]];
+                    const aNext = a.nextSibling;
+                    const bNext = b.nextSibling;
+                    noteDomMove();
+                    noteDomMove();
+                    if (aNext === b) {
+                        parent.insertBefore(b, a);
+                    } else if (bNext === a) {
+                        parent.insertBefore(a, b);
+                    } else {
+                        parent.insertBefore(b, aNext);
+                        parent.insertBefore(a, bNext);
+                    }
+                    return;
+                }
+            }
+
+            // Append-only: existing live prefix unchanged, only new tail detached.
+            if (curr.length < nextNodes.length && curr.length > 0) {
+                let prefix = true;
+                for (let i = 0; i < curr.length; i++) {
+                    if (curr[i] !== nextNodes[i]) {
+                        prefix = false;
+                        break;
+                    }
+                }
+                if (prefix) {
+                    const batch = document.createDocumentFragment();
+                    for (let i = curr.length; i < nextNodes.length; i++) {
+                        batch.appendChild(nextNodes[i]);
+                    }
+                    parent.insertBefore(batch, end);
+                    return;
+                }
+            }
+
+            // Create / replace / complex reorder: one Fragment write.
             const batch = document.createDocumentFragment();
             for (const dom of nextNodes) {
                 if (dom.parentNode) noteDomMove();
@@ -1173,46 +2131,244 @@ const directApi = {
             if (inst.__vmzDestroyed) return;
             const applied = ++gen;
             const list = readList();
-            const seen = new Set();
-            const nextNodes = [];
+            const n = list.length;
 
-            for (let i = 0; i < list.length; i++) {
-                if (applied !== gen || inst.__vmzDestroyed) return;
-                const box = { item: list[i], index: i };
-                const k = itemKey(box);
-                if (seen.has(k)) {
+            // Clear all rows.
+            if (n === 0) {
+                if (keyed.size) fastWipeRows();
+                return;
+            }
+
+            // Full replace (no key reuse): wipe then fall into fresh create.
+            if (keyed.size > 0 && hasRowKernel) {
+                let reuse = false;
+                for (let i = 0; i < n; i++) {
+                    if (keyed.has(rowKeyOf(list[i], i))) {
+                        reuse = true;
+                        break;
+                    }
                 }
-                seen.add(k);
-                let entry = keyed.get(k);
-                if (!entry) {
-                    const patches = [];
+                if (!reuse) fastWipeRows();
+            }
+
+            // Fresh create into empty each: record blueprint once, then clone-only.
+            if (keyed.size === 0 && n > 0) {
+                const parent = end.parentNode;
+                const batch = document.createDocumentFragment();
+                let startIdx = 0;
+                if (!blueprint || !blueprintOk) {
+                    const box0 = { item: list[0], index: 0 };
+                    const patches0 = [];
                     const prevPatches = directApi._itemPatches;
                     const prevCtx = directApi._eachCtx;
-                    directApi._itemPatches = patches;
+                    directApi._itemPatches = patches0;
                     directApi._eachCtx = eachCtx;
-                    let dom = null;
+                    let dom0 = null;
                     try {
-                        dom = spec.createItem.call(inst, directApi, box);
+                        dom0 = createItem(directApi, box0, patches0);
                     } finally {
                         directApi._itemPatches = prevPatches;
                         directApi._eachCtx = prevCtx;
                     }
                     if (applied !== gen || inst.__vmzDestroyed) return;
-                    tagItemPatches(patches, i);
-                    if (dom) {
-                        if (dom.nodeType === 1) {
-                            dom.setAttribute('data-vmz-key', String(k));
+                    if (!dom0) return;
+                    const k0 = itemKey(box0);
+                    if (dom0.nodeType === 1) /** @type {Element} */ (dom0).__vmzKey = k0;
+                    // First row may already be blueprint-wired (patches cleared + hydrate).
+                    let entry0 = keyed.get(k0);
+                    if (!entry0) {
+                        if (patches0.length && patches0[0] && patches0[0].__vmzBpEntry) {
+                            entry0 = patches0[0].__vmzBpEntry;
+                            entry0.patches = patches0;
+                        } else if (blueprint && blueprintOk) {
+                            entry0 = wireBlueprintItem(/** @type {Element} */ (dom0), box0, patches0);
+                        } else {
+                            tagItemPatches(patches0, 0);
+                            entry0 = { box: box0, dom: dom0, patches: patches0 };
                         }
-                        entry = { box, dom, patches };
-                        keyed.set(k, entry);
+                        keyed.set(k0, entry0);
+                    }
+                    batch.appendChild(dom0);
+                    startIdx = 1;
+                }
+                if (blueprint && blueprintOk) {
+                    sealBlueprintDispatchers();
+                    const tpl = blueprint.tpl;
+                    if (hasRowKernel && spec.rowKernel && typeof spec.rowKernel.create === 'function') {
+                        // Shape-specific create loop is Rust-emitted (rowKernel.create).
+                        // Direct parent.insertBefore (no Fragment). When parent has only the
+                        // each markers as children, detach parent for the fill then reattach —
+                        // same structural trick as hand-tuned keyed apps (not app-specific).
+                        if (parent) {
+                            let detached = null;
+                            let reinsertAt = null;
+                            if (parent.nodeType === 1 && parent.parentNode) {
+                                let onlyMarkers = true;
+                                for (let c = parent.firstChild; c; c = c.nextSibling) {
+                                    if (c !== start && c !== end) {
+                                        onlyMarkers = false;
+                                        break;
+                                    }
+                                }
+                                if (onlyMarkers) {
+                                    detached = parent.parentNode;
+                                    reinsertAt = parent.nextSibling;
+                                    detached.removeChild(parent);
+                                }
+                            }
+                            spec.rowKernel.create.call(inst, list, startIdx, tpl, keyed, parent, end, rowKeyOf);
+                            if (detached) detached.insertBefore(parent, reinsertAt);
+                        } else {
+                            const hydrate = spec.rowKernel.hydrate;
+                            for (let i = startIdx; i < n; i++) {
+                                if (applied !== gen || inst.__vmzDestroyed) return;
+                                const item = list[i];
+                                const root = /** @type {Element} */ (tpl.cloneNode(true));
+                                hydrate.call(inst, root, item);
+                                const k = rowKeyOf(item, i);
+                                root.__vmzKey = k;
+                                keyed.set(k, root);
+                                batch.appendChild(root);
+                            }
+                        }
+                    } else if (hasRowKernel && hydrateBp) {
+                        const hydrate = spec.rowKernel.hydrate;
+                        for (let i = startIdx; i < n; i++) {
+                            if (applied !== gen || inst.__vmzDestroyed) return;
+                            const item = list[i];
+                            const root = /** @type {Element} */ (tpl.cloneNode(true));
+                            hydrate.call(inst, root, item);
+                            const k = rowKeyOf(item, i);
+                            root.__vmzKey = k;
+                            keyed.set(k, root);
+                            batch.appendChild(root);
+                        }
+                    } else {
+                        for (let i = startIdx; i < n; i++) {
+                            if (applied !== gen || inst.__vmzDestroyed) return;
+                            const item = list[i];
+                            const k = keyOf(item, i);
+                            const root = /** @type {Element} */ (tpl.cloneNode(true));
+                            const entry = {
+                                item,
+                                index: i,
+                                dom: root,
+                                bp: true,
+                                t0: null,
+                                t1: null,
+                                a0: null,
+                                patches: null,
+                            };
+                            hydrateBp(root, entry);
+                            root.__vmzKey = k;
+                            keyed.set(k, entry);
+                            batch.appendChild(root);
+                        }
                     }
                 } else {
-                    entry.box.item = list[i];
-                    entry.box.index = i;
-                    tagItemPatches(entry.patches, i);
-                    for (const p of entry.patches) runPatch(p, null);
+                    for (let i = startIdx; i < n; i++) {
+                        if (applied !== gen || inst.__vmzDestroyed) return;
+                        const box = { item: list[i], index: i };
+                        const k = itemKey(box);
+                        const patches = [];
+                        const prevPatches = directApi._itemPatches;
+                        const prevCtx = directApi._eachCtx;
+                        directApi._itemPatches = patches;
+                        directApi._eachCtx = eachCtx;
+                        let dom = null;
+                        try {
+                            dom = createItem(directApi, box, patches);
+                        } finally {
+                            directApi._itemPatches = prevPatches;
+                            directApi._eachCtx = prevCtx;
+                        }
+                        if (applied !== gen || inst.__vmzDestroyed) return;
+                        if (!dom) continue;
+                        tagItemPatches(patches, i);
+                        if (dom.nodeType === 1) /** @type {Element} */ (dom).__vmzKey = k;
+                        keyed.set(k, { box, dom, patches });
+                        batch.appendChild(dom);
+                    }
                 }
-                if (entry) nextNodes.push(entry.dom);
+                if (applied !== gen || inst.__vmzDestroyed) return;
+                if (parent && batch.firstChild) parent.insertBefore(batch, end);
+                if (end.isConnected) ensureDelegateAttached();
+                else
+                    queueMicrotask(() => {
+                        if (!inst.__vmzDestroyed) ensureDelegateAttached();
+                    });
+                return;
+            }
+
+            const seen = new Set();
+            /** @type {Node[]} */
+            const nextNodes = [];
+
+            for (let i = 0; i < n; i++) {
+                if (applied !== gen || inst.__vmzDestroyed) return;
+                const item = list[i];
+                const k = rowKeyOf(item, i);
+                seen.add(k);
+                let entry = keyed.get(k);
+                if (!entry) {
+                    if (hasRowKernel && blueprint && blueprintOk && hydrateBp) {
+                        const root = /** @type {Element} */ (blueprint.tpl.cloneNode(true));
+                        spec.rowKernel.hydrate.call(inst, root, item);
+                        root.__vmzKey = k;
+                        keyed.set(k, root);
+                        entry = root;
+                    } else {
+                        const box = { item, index: i };
+                        const patches = [];
+                        const prevPatches = directApi._itemPatches;
+                        const prevCtx = directApi._eachCtx;
+                        directApi._itemPatches = patches;
+                        directApi._eachCtx = eachCtx;
+                        let dom = null;
+                        try {
+                            dom = createItem(directApi, box, patches);
+                        } finally {
+                            directApi._itemPatches = prevPatches;
+                            directApi._eachCtx = prevCtx;
+                        }
+                        if (applied !== gen || inst.__vmzDestroyed) return;
+                        tagItemPatches(patches, i);
+                        if (dom) {
+                            if (dom.nodeType === 1) {
+                                // Client identity: expando only (see 01 each identity). SSR uses data-vmz-key.
+                                /** @type {Element} */ (dom).__vmzKey = k;
+                            }
+                            entry = { box, dom, patches };
+                            keyed.set(k, entry);
+                        }
+                    }
+                } else {
+                    const sameItem = entryItem(entry) === item;
+                    if (entry.nodeType === 1) {
+                        entry.__vmzBox = item;
+                    } else if (entry.bp) {
+                        entry.item = item;
+                        entry.index = i;
+                        if (entry.dom) entry.dom.__vmzBox = entry.item;
+                    } else {
+                        entry.box.item = item;
+                        entry.box.index = i;
+                        tagItemPatches(entry.patches, i);
+                    }
+                    // Pure reorder (swap / move) keeps object identity — skip leaf patches.
+                    if (!sameItem) {
+                        if (entryIsBp(entry) && applyBp) {
+                            try {
+                                applyBp(entry);
+                            } catch (err) {
+                                console.error('vmz:dom each item', err);
+                            }
+                        } else if (entry.patches) {
+                            for (const p of entry.patches) runPatch(p, null);
+                        }
+                    }
+                }
+                if (entry) nextNodes.push(entryDom(entry));
             }
 
             if (applied !== gen || inst.__vmzDestroyed) return;
@@ -1220,10 +2376,16 @@ const directApi = {
             for (const [k, entry] of [...keyed.entries()]) {
                 if (seen.has(k)) continue;
                 noteDomRemove();
-                clearDomEvt(entry.dom);
-                disposeDomTree(entry.dom);
-                if (entry.dom && entry.dom.parentNode) entry.dom.remove();
+                const dom = entryDom(entry);
+                if (hasRowKernel) {
+                    if (dom && dom.parentNode) dom.remove();
+                } else {
+                    clearDomEvt(dom);
+                    disposeDomTree(dom);
+                    if (dom && dom.parentNode) dom.remove();
+                }
                 keyed.delete(k);
+                releaseBpEntry(entry);
             }
 
             reconcileDomOrder(nextNodes);
@@ -1240,25 +2402,35 @@ const directApi = {
         if (directApi._itemPatches) directApi._itemPatches.push(apply);
         start.__vmzDispose = () => {
             teardownDelegate();
-            for (const [, entry] of [...keyed.entries()]) {
-                clearDomEvt(entry.dom);
-                disposeDomTree(entry.dom);
-                if (entry.dom && entry.dom.parentNode) entry.dom.remove();
-            }
-            keyed.clear();
+            fastWipeRows();
         };
 
         const softDeps = [...new Set((deps || []).map((d) => `${depRootField(d)}.*`))];
         const softRefresh = () => {
             if (inst.__vmzDestroyed) return;
+            const trie = inst.__vmzFlushTrie;
+            const listRoot = depRootField((deps && deps[0]) || '') || '';
+            // Full list replace is owned by apply(); soft channel is item/structure churn.
+            if (trie && listRoot && trie[listRoot] && trie[listRoot].replace) return;
             const list = readList();
-            const softKey = softDeps[0] || `${depRootField((deps && deps[0]) || '')}.*`;
+            const softKey = softDeps[0] || `${listRoot}.*`;
             for (let i = 0; i < list.length; i++) {
-                const box = { item: list[i], index: i };
-                const k = itemKey(box);
+                const item = list[i];
+                const k = rowKeyOf(item, i);
                 const entry = keyed.get(k);
                 if (!entry) continue;
-                entry.box.item = list[i];
+                if (entryIsBp(entry)) {
+                    if (entry.nodeType === 1) entry.__vmzBox = item;
+                    else {
+                        entry.item = item;
+                        entry.index = i;
+                        if (entry.dom) entry.dom.__vmzBox = item;
+                    }
+                    if (applyBp) applyBp(entry);
+                    else if (hydrateBp) hydrateBp(entryDom(entry), entry);
+                    continue;
+                }
+                entry.box.item = item;
                 entry.box.index = i;
                 tagItemPatches(entry.patches, i);
                 for (const p of entry.patches) {
@@ -1314,7 +2486,7 @@ function trackDirectBind(inst, deps, fn, bindingId = null) {
 function wireDirectBind(inst, bindingId, deps, get, write, cf) {
     let activeBranch = -1;
     /** @type {string[]} */
-    let liveDeps = Array.isArray(deps) ? [...deps] : [];
+    let liveDeps = Array.isArray(deps) ? deps.slice() : [];
 
     const pickCf = () => {
         if (!cf || !Array.isArray(cf.branches)) return -1;
@@ -1329,6 +2501,12 @@ function wireDirectBind(inst, bindingId, deps, get, write, cf) {
         }
         return cf.branches.length - 1;
     };
+
+    // Item-local CF whose branches only gate the same stable deps: skip branch switching.
+    let simpleCf = false;
+    if (cf && Array.isArray(cf.branches) && directApi._itemPatches) {
+        simpleCf = cf.branches.every((b) => !b.deps || b.deps.length === 0);
+    }
 
     const apply = () => {
         if (precision.enabled) {
@@ -1345,28 +2523,25 @@ function wireDirectBind(inst, bindingId, deps, get, write, cf) {
             raw = null;
         }
         write(raw);
-        if (!cf || !Array.isArray(cf.branches)) return;
+        if (!cf || !Array.isArray(cf.branches) || simpleCf || apply.__vmzItemLocal) return;
         const next = pickCf();
         if (next === activeBranch) return;
         activeBranch = next;
         const branch = cf.branches[next];
         const nextDeps = [...(cf.stable || []), ...((branch && branch.deps) || [])];
         const uniq = [...new Set(nextDeps)];
-        // Item-local binds must never enter the global binder table ( / jfb select).
-        if (apply.__vmzItemLocal) {
-            liveDeps = uniq;
-            return;
-        }
         unregisterBind(inst, liveDeps, apply, bindingId);
         liveDeps = uniq;
         registerBind(inst, liveDeps, apply, bindingId);
     };
 
-    if (cf && Array.isArray(cf.branches)) {
+    if (cf && Array.isArray(cf.branches) && !simpleCf) {
         activeBranch = pickCf();
         const branch = cf.branches[activeBranch];
         liveDeps = [...(cf.stable || []), ...((branch && branch.deps) || [])];
         liveDeps = [...new Set(liveDeps)];
+    } else if (cf && Array.isArray(cf.branches) && simpleCf) {
+        liveDeps = Array.isArray(cf.stable) && cf.stable.length ? cf.stable : liveDeps;
     }
     // Mark before first apply so CF branch switches never hit global registerBind.
     if (directApi._itemPatches) apply.__vmzItemLocal = true;
@@ -1376,6 +2551,70 @@ function wireDirectBind(inst, bindingId, deps, get, write, cf) {
 
 function isEventPropName(name) {
     return typeof name === 'string' && /^on[A-Z]/.test(name);
+}
+
+/** Monotonic id for `bindComponentProp` BindingIds (per process). */
+let directPropBindSeq = 0;
+
+/** HTML boolean attributes: presence means true; `false`/`null` must remove the attr. */
+const BOOLEAN_HTML_ATTRS = new Set([
+    'disabled',
+    'checked',
+    'selected',
+    'readonly',
+    'required',
+    'multiple',
+    'hidden',
+    'autofocus',
+    'autoplay',
+    'controls',
+    'loop',
+    'muted',
+    'open',
+    'novalidate',
+    'formnovalidate',
+    'defer',
+    'async',
+    'ismap',
+    'default',
+    'inert',
+]);
+
+/**
+ * @param {Element} el
+ * @param {string} name
+ * @param {any} value
+ */
+function applyDomAttr(el, name, value) {
+    const key = name === 'className' ? 'class' : name;
+    if (BOOLEAN_HTML_ATTRS.has(String(key).toLowerCase())) {
+        if (value === false || value == null || value === '') {
+            el.removeAttribute(key);
+        } else {
+            el.setAttribute(key, value === true ? '' : String(value));
+        }
+        return;
+    }
+    if (value == null || value === false) el.removeAttribute(key);
+    else el.setAttribute(key, value === true ? '' : String(value));
+}
+
+/**
+ * Serialize-tree attr write (SSR).
+ * @param {any} el
+ * @param {string} name
+ * @param {any} value
+ */
+function applySerializeAttr(el, name, value) {
+    if (!el || el.__kind !== 'el') return;
+    const key = name === 'className' ? 'class' : name;
+    if (BOOLEAN_HTML_ATTRS.has(String(key).toLowerCase())) {
+        if (value === false || value == null || value === '') delete el.attrs[key];
+        else el.attrs[key] = value === true ? '' : String(value);
+        return;
+    }
+    if (value == null || value === false) delete el.attrs[key];
+    else el.attrs[key] = value === true ? '' : String(value);
 }
 
 function stripFns(obj) {
@@ -1598,15 +2837,15 @@ function runDirectResume(Component, inst, container) {
             return document.createTextNode(String(s ?? ''));
         },
         attr(el, name, value) {
-            if (name === 'className') el.setAttribute('class', String(value ?? ''));
-            else if (value == null || value === false) el.removeAttribute(name);
-            else el.setAttribute(name, value === true ? '' : String(value));
+            applyDomAttr(el, name, value);
         },
         on(el, type, handler) {
             el.addEventListener(type, handler);
         },
         bindText: directApi.bindText,
         bindAttr: directApi.bindAttr,
+        bindComponentProp: directApi.bindComponentProp,
+        projectDefaultSlot: directApi.projectDefaultSlot,
         setHtml: directApi.setHtml,
         bindHtml: directApi.bindHtml,
         ifBlock: directApi.ifBlock,
@@ -2246,8 +3485,9 @@ function notifyOwners(owners, localSegs) {
 
 /**
  * Field-owned write traps for plain objects / arrays on state fields.
- * Plain objects: WriteBarrier via defineProperty (no Proxy) — .
- * Arrays: transitional Proxy until keyed collection barriers land.
+ * Plain objects: WriteBarrier via defineProperty (no Proxy).
+ * Arrays: transitional Proxy tracks list identity/mutators only; elements stay plain
+ * (no per-item wrap on large assign — nested notifies via `__vmzWritePath`).
  * Shared raw objects notify **all** current owners.
  *
  * @param {any} value
@@ -2331,6 +3571,12 @@ function installOwnedProp(obj, prop, entry) {
     });
 }
 
+/**
+ * Transitional array Proxy: track list identity / mutators only.
+ * Elements stay plain — no per-item defineProperty on `this.rows = largeArray`
+ * (design: WriteBarrier / list replace must not wrap 1k items). Nested field
+ * notifies go through `__vmzWritePath` or whole-array replace.
+ */
 function wrapArray(arr, report, pathSegs) {
     const existing = reactiveProxies.get(arr);
     if (existing) {
@@ -2346,84 +3592,29 @@ function wrapArray(arr, report, pathSegs) {
     };
     addOwner(entry, report, pathSegs);
 
-    for (let i = 0; i < arr.length; i++) {
-        const item = arr[i];
-        for (const o of entry.owners) {
-            arr[i] = wrapReactive(item, o.report, [...o.baseSegs, String(i)]);
-        }
-    }
+    const isArrayIndex = (prop) => typeof prop === 'string' && prop !== 'length' && String(Number(prop)) === prop;
 
     const proxy = new Proxy(arr, {
         get(target, prop, receiver) {
             if (typeof prop === 'string' && ARRAY_MUTATORS.has(prop)) {
                 const fn = target[prop];
                 return (...args) => {
-                    const wrappedArgs = args.map((a, idx) => {
-                        if (prop === 'splice' && idx >= 2) {
-                            let w = a;
-                            for (const o of entry.owners) {
-                                w = wrapReactive(a, o.report, o.baseSegs.slice());
-                            }
-                            return w;
-                        }
-                        if ((prop === 'push' || prop === 'unshift') && typeof a === 'object') {
-                            let w = a;
-                            for (const o of entry.owners) {
-                                w = wrapReactive(a, o.report, o.baseSegs.slice());
-                            }
-                            return w;
-                        }
-                        if (prop === 'fill') {
-                            let w = a;
-                            for (const o of entry.owners) {
-                                w = wrapReactive(a, o.report, o.baseSegs.slice());
-                            }
-                            return w;
-                        }
-                        return a;
-                    });
-                    const ret = fn.apply(target, wrappedArgs);
+                    const ret = fn.apply(target, args);
                     notifyOwners(entry.owners, null);
                     return ret;
                 };
             }
-            const v = Reflect.get(target, prop, receiver);
-            if (v && typeof v === 'object' && typeof prop === 'string') {
-                let nested = null;
-                for (const o of entry.owners) {
-                    nested = wrapReactive(v, o.report, [...o.baseSegs, prop]);
-                }
-                return nested;
-            }
-            return v;
+            // Indices / length / methods: return as-is (plain elements).
+            return Reflect.get(target, prop, receiver);
         },
         set(target, prop, next, receiver) {
-            const isIndex = typeof prop === 'string' && prop !== 'length' && String(Number(prop)) === prop;
-            const allRoot = entry.owners.every((o) => o.baseSegs.length === 0);
-            if (isIndex && allRoot) {
-                let wrapped = next;
-                for (const o of entry.owners) {
-                    wrapped = wrapReactive(next, o.report, [...o.baseSegs, prop]);
-                }
-                const prev = target[prop];
-                if (Object.is(prev, wrapped)) return true;
-                const ok = Reflect.set(target, prop, wrapped, receiver);
-                if (ok) notifyOwners(entry.owners, null);
-                return ok;
-            }
-            const local = prop === 'length' || typeof prop !== 'string' ? [] : [prop];
-            let wrapped = next;
-            if (prop !== 'length') {
-                for (const o of entry.owners) {
-                    wrapped = wrapReactive(next, o.report, [...o.baseSegs, ...local]);
-                }
-            }
             const prev = target[prop];
-            if (Object.is(prev, wrapped)) return true;
-            const ok = Reflect.set(target, prop, wrapped, receiver);
+            if (Object.is(prev, next)) return true;
+            const ok = Reflect.set(target, prop, next, receiver);
             if (ok) {
-                if (prop === 'length') notifyOwners(entry.owners, null);
-                else notifyOwners(entry.owners, local);
+                if (prop === 'length' || isArrayIndex(prop)) notifyOwners(entry.owners, null);
+                else if (typeof prop === 'string') notifyOwners(entry.owners, [prop]);
+                else notifyOwners(entry.owners, null);
             }
             return ok;
         },
@@ -2453,7 +3644,7 @@ function wrapArray(arr, report, pathSegs) {
  * string form is transitional field-root alias for replace.
  */
 function scheduleRefresh(inst, notice) {
-    if (!inst || inst.__vmzDestroyed) return;
+    if (!inst || inst.__vmzDestroyed || inst.__vmzQuiet) return;
     const n = typeof notice === 'string' ? { type: 'replace', root: notice } : notice;
     if (!n || !n.root) return;
     if (precision.enabled) {
@@ -2547,8 +3738,10 @@ export async function flushPending(inst) {
                 jobs.push(...refreshBinding(inst, id, trie));
             }
             for (const key of binderKeysMatchingTrie(inst, trie)) {
-                if (coveredDeps[key]) continue;
-                if (inst.__vmzDepToBindings && inst.__vmzDepToBindings[key]?.length) {
+                if (coveredDeps[key] || (inst.__vmzDepToBindings && inst.__vmzDepToBindings[key]?.length)) {
+                    // BindingId path already flushed IR patches for this dep.
+                    // Still run binder-only patches (bindComponentProp uses bindingId null).
+                    jobs.push(...refreshFieldBinderOnly(inst, key));
                     continue;
                 }
                 jobs.push(...refreshField(inst, key));
@@ -2806,6 +3999,30 @@ function refreshField(inst, field) {
         return jobs;
     }
     for (const fn of binders[field]) {
+        try {
+            const ret = runPatch(fn, field, null);
+            if (ret && typeof ret.then === 'function') jobs.push(ret);
+        } catch (err) {
+            console.error('vmz:dom patch', err);
+        }
+    }
+    return jobs;
+}
+
+/**
+ * Run `__vmzBinders` patches that are not owned by a BindingId entry.
+ * Needed so `bindComponentProp` (bindingId null) still flushes when the same
+ * dep also has IR bindText/bindAttr BindingIds.
+ * @returns {Promise[]}
+ */
+function refreshFieldBinderOnly(inst, field) {
+    const binders = inst.__vmzBinders;
+    const jobs = [];
+    if (!inst || inst.__vmzDestroyed || !field || !binders || !binders[field]) {
+        return jobs;
+    }
+    for (const fn of binders[field]) {
+        if (patchHasBindingId(inst, fn)) continue;
         try {
             const ret = runPatch(fn, field, null);
             if (ret && typeof ret.then === 'function') jobs.push(ret);

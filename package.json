@@ -25,6 +25,7 @@
         "placeholder": "node scripts/ci/publish-placeholder.mjs",
         "placeholder:publish": "node scripts/ci/publish-placeholder.mjs publish",
         "placeholder:trust": "node scripts/ci/publish-placeholder.mjs trust",
+        "ci:status": "node scripts/ci/status.mjs",
         "lint": "biome check .",
         "fmt": "biome format --write . && cargo fmt --all --manifest-path Cargo.toml",
         "fmt:check": "biome format . && cargo fmt --all --check --manifest-path Cargo.toml",

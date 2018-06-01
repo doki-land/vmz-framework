@@ -1,0 +1,270 @@
+<template>
+  <div class="vmz-ui-menu" data-vmz-ui="menu" data-vmz-overlay-open={open}>
+    <button
+      type="button"
+      class="vmz-ui-menu__trigger"
+      data-vmz-menu="trigger"
+      aria-haspopup="menu"
+      aria-expanded={open ? 'true' : 'false'}
+      aria-controls={menuId}
+      onClick={toggle}
+      onKeyDown={onTriggerKeyDown}
+    >
+      {label}
+    </button>
+    <div
+      if={open}
+      id={menuId}
+      class="vmz-ui-menu__panel"
+      role="menu"
+      data-vmz-overlay="menu"
+      data-vmz-overlay-owner="menu"
+      data-vmz-focus="enter"
+      tabindex="-1"
+      onKeyDown={onMenuKeyDown}
+    >
+      <button
+        each={items}
+        as="item"
+        key={item.id}
+        type="button"
+        class="vmz-ui-menu__item"
+        role="menuitem"
+        data-vmz-menu-item={item.id}
+        onClick={onItemClick}
+      >
+        {item.title}
+      </button>
+    </div>
+  </div>
+</template>
+
+<style>
+.vmz-ui-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.vmz-ui-menu__trigger {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--vmz-action-primary-background);
+  border-radius: 2px;
+  cursor: pointer;
+  background: var(--vmz-action-primary-background);
+  color: var(--vmz-action-primary-foreground);
+  outline: none;
+}
+
+.vmz-ui-menu__trigger:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-menu__panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  min-width: 10rem;
+  padding: 0.25rem;
+  border: 1px solid var(--vmz-action-primary-background);
+  border-radius: 2px;
+  background: var(--vmz-action-primary-foreground);
+  color: var(--vmz-action-primary-active);
+  outline: none;
+}
+
+.vmz-ui-menu__panel:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-menu__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  padding: 0.4rem 0.65rem;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  outline: none;
+}
+
+.vmz-ui-menu__item:hover,
+.vmz-ui-menu__item:focus-visible {
+  background: color-mix(in srgb, var(--vmz-action-primary-background) 18%, transparent);
+}
+
+.vmz-ui-menu__item:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — Menu (UI2).
+ * Parent owns `open`; Escape / choose closes via onClose; focus restore to trigger.
+ */
+export default class Menu {
+  public label: string = 'Menu';
+  public open: boolean = false;
+  public menuId: string = 'vmz-menu';
+  /** @type {{ id: string, title: string }[]} */
+  public items: { id: string; title: string }[] = [];
+  public onOpenChange: ((open: boolean) => void) | null = null;
+  public onSelect: ((id: string) => void) | null = null;
+
+  _restoreFocus = null;
+  _panel = null;
+  _docKeyHandler = null;
+  _docPointerHandler = null;
+  _observer = null;
+
+  async onMount() {
+    if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return;
+    const root = this.__vmzDomRoot;
+    if (!root || typeof root.querySelector !== 'function') return;
+    this._observer = new MutationObserver(() => this._syncFromDom());
+    this._observer.observe(root, { childList: true, subtree: true });
+    this._syncFromDom();
+  }
+
+  onDestroy() {
+    if (this._observer) {
+      this._observer.disconnect();
+      this._observer = null;
+    }
+    this._teardownDoc();
+    this._panel = null;
+    this._restoreFocus = null;
+  }
+
+  toggle() {
+    if (typeof this.onOpenChange === 'function') this.onOpenChange(!this.open);
+  }
+
+  close() {
+    if (typeof this.onOpenChange === 'function') this.onOpenChange(false);
+  }
+
+  choose(id) {
+    if (typeof this.onSelect === 'function') this.onSelect(id);
+    this.close();
+  }
+
+  onItemClick(ev) {
+    const el = ev?.currentTarget;
+    const id = el && typeof el.getAttribute === 'function' ? el.getAttribute('data-vmz-menu-item') : null;
+    if (id) this.choose(id);
+  }
+
+  onTriggerKeyDown(ev) {
+    if (!ev) return;
+    if ((ev.key === 'ArrowDown' || ev.key === 'Enter' || ev.key === ' ') && !this.open) {
+      ev.preventDefault();
+      if (typeof this.onOpenChange === 'function') this.onOpenChange(true);
+    }
+  }
+
+  onMenuKeyDown(ev) {
+    if (!ev || !this._panel) return;
+    if (ev.key === 'Escape') {
+      ev.preventDefault();
+      this.close();
+      return;
+    }
+    const nodes = [...this._panel.querySelectorAll('[role="menuitem"]')].filter(
+      (n) => n instanceof HTMLElement && n.offsetParent !== null,
+    );
+    if (!nodes.length) return;
+    const idx = nodes.indexOf(document.activeElement);
+    if (ev.key === 'ArrowDown') {
+      ev.preventDefault();
+      nodes[(idx + 1 + nodes.length) % nodes.length].focus();
+    } else if (ev.key === 'ArrowUp') {
+      ev.preventDefault();
+      nodes[(idx - 1 + nodes.length) % nodes.length].focus();
+    } else if (ev.key === 'Home') {
+      ev.preventDefault();
+      nodes[0].focus();
+    } else if (ev.key === 'End') {
+      ev.preventDefault();
+      nodes[nodes.length - 1].focus();
+    }
+  }
+
+  _syncFromDom() {
+    const root = this.__vmzDomRoot;
+    const panel =
+      root && typeof root.querySelector === 'function'
+        ? root.querySelector('[data-vmz-overlay="menu"][data-vmz-focus="enter"]')
+        : null;
+    if (panel && !this._panel) this._enterFocus(panel);
+    else if (!panel && this._panel) this._exitFocus();
+  }
+
+  _enterFocus(panel) {
+    if (typeof document === 'undefined') return;
+    const root = this.__vmzDomRoot;
+    const trigger =
+      root && typeof root.querySelector === 'function'
+        ? root.querySelector('[data-vmz-menu="trigger"]')
+        : null;
+    const active = document.activeElement;
+    if (!this._restoreFocus) {
+      if (trigger instanceof HTMLElement) this._restoreFocus = trigger;
+      else if (active instanceof HTMLElement) this._restoreFocus = active;
+    }
+    this._panel = panel instanceof HTMLElement ? panel : null;
+    const first =
+      this._panel && typeof this._panel.querySelector === 'function'
+        ? this._panel.querySelector('[role="menuitem"]')
+        : null;
+    if (first && typeof first.focus === 'function') first.focus();
+    else if (this._panel && typeof this._panel.focus === 'function') this._panel.focus();
+
+    if (!this._docKeyHandler) {
+      this._docKeyHandler = (ev) => {
+        if (ev.key === 'Escape') {
+          ev.preventDefault();
+          this.close();
+        }
+      };
+      document.addEventListener('keydown', this._docKeyHandler);
+    }
+    if (!this._docPointerHandler) {
+      this._docPointerHandler = (ev) => {
+        const t = ev.target;
+        if (!(t instanceof Node)) return;
+        if (root && typeof root.contains === 'function' && root.contains(t)) return;
+        this.close();
+      };
+      document.addEventListener('pointerdown', this._docPointerHandler, true);
+    }
+  }
+
+  _exitFocus() {
+    this._teardownDoc();
+    this._panel = null;
+    const restore = this._restoreFocus;
+    this._restoreFocus = null;
+    if (restore && typeof restore.focus === 'function' && document.contains(restore)) {
+      restore.focus();
+    }
+  }
+
+  _teardownDoc() {
+    if (typeof document !== 'undefined') {
+      if (this._docKeyHandler) document.removeEventListener('keydown', this._docKeyHandler);
+      if (this._docPointerHandler) {
+        document.removeEventListener('pointerdown', this._docPointerHandler, true);
+      }
+    }
+    this._docKeyHandler = null;
+    this._docPointerHandler = null;
+  }
+}
+</script>

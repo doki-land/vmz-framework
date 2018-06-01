@@ -1,0 +1,18 @@
+<template>
+  <main>
+    <h1>Shop home</h1>
+    <p>route-shop</p>
+    <Link to="ShopOfferPage">Offer</Link>
+  </main>
+</template>
+
+<script client>
+export default class ShopIndexPage {
+  static meta() {
+    return {
+      title: 'Shop · Production Router',
+      description: 'Shop index under shared Layout',
+    };
+  }
+}
+</script>

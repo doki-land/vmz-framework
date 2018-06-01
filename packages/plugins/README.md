@@ -23,14 +23,13 @@ Installing a plugin should enrich the product without silently creating a second
 | Interactive data charts               | `@vmz/plugin-echarts`    | Dashboards, analytics, monitoring, and exploratory product data                   |
 | Broad icon collections                | `@vmz/plugin-iconify`    | Product UI, navigation, and documentation that benefit from established icon sets |
 
-## What plugins do not do
+## Plugin boundary
 
-Official plugins do not turn VMZ into a generic “install anything and hope the hooks agree” platform. They must not
-redefine state semantics, register arbitrary runtime routing, smuggle server dependencies into the client, or bypass VMZ
-testing and deployment boundaries.
+Official plugins extend a VMZ application through versioned contributions. State semantics, routing, server/client
+placement, testing, and deployment stay on the VMZ spine — plugins enrich capabilities without becoming a second runtime
+architecture.
 
-That discipline is what lets a project use familiar ecosystem capabilities while retaining the reason to choose VMZ in
-the first place: a whole application that can be analyzed and explained as one program.
+That boundary is what lets a project use familiar ecosystem tools while keeping one analyzable, explainable program.
 
 Each package README describes the practical tradeoffs of its adapter. Configuration and API reference belong in the user
 documentation.

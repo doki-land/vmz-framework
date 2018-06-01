@@ -14,19 +14,19 @@ assets without forcing every project to adopt a bespoke compiler fork.
 
 ## The promise to application authors
 
-An extension must not make the application opaque. A VMZ plugin is not an unrestricted `transform(code)` escape hatch
-and not an invitation to mutate the compiler's program graph in place. Contributions are versioned and declared so VMZ
-can continue to reason about ownership, execution placement, SSR, resume, testing, diagnostics, and deployment.
+Extensions stay transparent to the application model. A VMZ plugin is a versioned contribution surface — not an
+unrestricted `transform(code)` escape hatch or an in-place rewrite of the program graph. Declared contributions keep
+ownership, execution placement, SSR, resume, testing, diagnostics, and deployment explainable.
 
 This is the tradeoff: plugin authors gain a stable way to participate in VMZ, while users retain a coherent application
 model after installing the plugin. If an integration requires arbitrary runtime injection or hidden semantic rewrites,
 it belongs outside the core VMZ plugin contract.
 
-| A plugin should contribute...                      | A plugin should not become...                            |
-|----------------------------------------------------|----------------------------------------------------------|
-| A declared capability with known inputs and output | A hidden second application runtime                      |
-| Versioned integration behavior                     | An unrestricted semantic rewrite                         |
-| Assets or adapters VMZ can place and test          | A way around server, lifecycle, or deployment boundaries |
+| A plugin contributes...                            | So that VMZ can still...                           |
+|----------------------------------------------------|----------------------------------------------------|
+| A declared capability with known inputs and output | Keep one application runtime and Program Graph     |
+| Versioned integration behavior                     | Explain ownership, placement, and diagnostics      |
+| Assets or adapters VMZ can place and test          | Honor server, lifecycle, and deployment boundaries |
 
 ## Who should use it
 

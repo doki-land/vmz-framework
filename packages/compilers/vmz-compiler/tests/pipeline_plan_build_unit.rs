@@ -21,7 +21,7 @@ fn builds_if_and_dispose_region() {
                 body: Box::new(ViewNode::Element {
                     tag: "p".into(),
                     attrs: vec![],
-                    children: vec![ViewNode::Text("hi".into())],
+                    children: vec![ViewNode::Text { value: "hi".into() }],
                     each: None,
                 }),
             }],

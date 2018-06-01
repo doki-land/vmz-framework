@@ -22,7 +22,10 @@ function rewrite(deps) {
     const out = {};
     for (const [k, v] of Object.entries(deps)) {
         if (typeof v === 'string' && (v.startsWith('workspace:') || v === '*')) {
-            out[k === 'vmz' ? '@vmz/vmz' : k] = VER;
+            let key = k;
+            if (k === 'vmz' || k === '@vmz/vmz') key = '@vmz/vmz';
+            else if (k.startsWith('@vmz/vmz-')) key = `@vmz/vmz-${k.slice('@vmz/vmz-'.length)}`;
+            out[key] = VER;
         } else {
             out[k] = v;
         }
@@ -70,9 +73,9 @@ for (const p of packs) {
         encoding: 'utf8',
         shell: true,
     });
-    const tail = `${r.stdout}\n${r.stderr}`.trim().split(/\n/).filter(Boolean).at(-1);
-    console.log(p.name, `status=${r.status}`, tail);
-    if (r.status !== 0) process.exit(1);
+    if (r.status !== 0) {
+        console.error(r.stdout, r.stderr);
+        process.exit(1);
+    }
+    console.log(`packed ${p.name}`);
 }
-
-console.log('STAGE', STAGE);

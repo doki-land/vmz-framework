@@ -1,0 +1,72 @@
+<template>
+  <form
+    class="vmz-ui-form"
+    data-vmz-ui="form"
+    data-disabled={disabledAttr}
+    data-novalidate="true"
+    aria-label={label}
+    aria-describedby={describedBy}
+    onSubmit={onSubmitGuard}
+    onReset={onResetGuard}
+  >
+    <div if={errorSummary} id={summaryId} class="vmz-ui-form__summary" role="alert" data-vmz-form="summary">
+      {errorSummary}
+    </div>
+    <slot />
+  </form>
+</template>
+
+<style>
+.vmz-ui-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vmz-density-control-gap);
+  max-width: 36rem;
+}
+
+.vmz-ui-form[data-disabled='true'] {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.vmz-ui-form__summary {
+  margin: 0;
+  padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
+  border: 1px solid var(--vmz-status-danger-accent);
+  border-left-width: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--vmz-status-danger-accent) 12%, transparent);
+  color: var(--vmz-status-danger-foreground);
+  font-weight: 600;
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — Form (hand-written commercial form shell).
+ * Parent owns field values + validation presentation; no parallel form store.
+ * Native submit/reset guarded; browser HTML5 validation left off (data-novalidate + preventDefault).
+ */
+export default class Form {
+  public label: string = 'Form';
+  public errorSummary: string = '';
+  public summaryId: string = 'vmz-form-summary';
+  public describedBy: string = '';
+  public disabled: boolean = false;
+  public disabledAttr: string = 'false';
+  public onSubmit: (() => void) | null = null;
+  public onReset: (() => void) | null = null;
+
+  onSubmitGuard(ev) {
+    if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
+    if (this.disabled) return;
+    if (typeof this.onSubmit === 'function') this.onSubmit();
+  }
+
+  onResetGuard(ev) {
+    if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
+    if (this.disabled) return;
+    if (typeof this.onReset === 'function') this.onReset();
+  }
+}
+</script>

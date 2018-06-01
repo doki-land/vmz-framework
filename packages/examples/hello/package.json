@@ -9,6 +9,9 @@
         "format": "vmz format .",
         "build": "vmz build ."
     },
+    "dependencies": {
+        "@vmz/core": "workspace:*"
+    },
     "devDependencies": {
         "vmz": "workspace:*"
     }

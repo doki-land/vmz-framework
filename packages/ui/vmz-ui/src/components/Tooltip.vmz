@@ -1,0 +1,68 @@
+<template>
+  <div
+    class="vmz-ui-tooltip"
+    data-vmz-ui="tooltip"
+    data-open={openAttr}
+  >
+    <div class="vmz-ui-tooltip__trigger" data-vmz-tooltip="trigger">
+      <slot />
+    </div>
+    <div
+      if={open}
+      class="vmz-ui-tooltip__bubble"
+      role="tooltip"
+      id={tooltipId}
+      data-vmz-tooltip="bubble"
+    >
+      {content}
+    </div>
+  </div>
+</template>
+
+<style>
+.vmz-ui-tooltip {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  max-width: 28rem;
+}
+
+.vmz-ui-tooltip__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.vmz-ui-tooltip__bubble {
+  box-sizing: border-box;
+  max-width: 18rem;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid var(--vmz-line-default);
+  border-radius: 2px;
+  background: var(--vmz-surface-paper);
+  color: var(--vmz-text-ink);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--vmz-line-default) 70%, transparent);
+}
+
+.vmz-ui-tooltip[data-open='true'] .vmz-ui-tooltip__trigger :where(button, a, [tabindex]):focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — Tooltip.
+ * Parent owns live `open` + content string. Not a second overlay runtime;
+ * Escape/outside policies stay with richer Popover/Dialog when needed.
+ */
+export default class Tooltip {
+  public open: boolean = false;
+  public openAttr: string = 'false';
+  public content: string = '';
+  public tooltipId: string = 'vmz-tooltip';
+}
+</script>

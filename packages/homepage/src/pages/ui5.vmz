@@ -1,0 +1,164 @@
+<template>
+  <div data-dogfood="ui5" data-density="compact">
+    <ConsoleShell
+      brand="VMZ"
+      homeHref="/"
+      title="Console UI5"
+      navLabel="Console"
+      nav={navItems}
+    >
+      <Breadcrumb label="Console path" items={crumbs} />
+
+      <QueryForm label="Dense query" onSubmit={() => this.applyQuery()}>
+        <Field
+          label="Name"
+          controlId="home-ui5-name"
+          descriptionId="home-ui5-name-desc"
+          errorId="home-ui5-name-err"
+          describedBy="home-ui5-name-desc"
+          value={nameQuery}
+          onInput={(e) => (nameQuery = e.target.value)}
+        />
+        <Field
+          label="Status"
+          controlId="home-ui5-status"
+          descriptionId="home-ui5-status-desc"
+          errorId="home-ui5-status-err"
+          describedBy="home-ui5-status-desc"
+          value={statusQuery}
+          onInput={(e) => (statusQuery = e.target.value)}
+        />
+        <Button type="button" onClick={() => this.applyQuery()}>Search</Button>
+        <Button type="button" disabled={writeDisabled}>Export</Button>
+      </QueryForm>
+
+      <p data-dogfood="ui5-query">name:{nameQuery};status:{statusQuery}</p>
+      <p data-dogfood="ui5-sort">sort:{sortKey}:{sortDir}</p>
+      <p data-dogfood="ui5-perm">write:{writeDisabled ? 'denied' : 'allowed'}</p>
+
+      <Button type="button" onClick={() => this.toggleLoading()}>Toggle loading</Button>
+      <Button type="button" onClick={() => this.toggleWrite()}>Toggle write</Button>
+
+      <Skeleton loading={loading} loadingAttr={loadingAttr}>
+        <Table
+          columns={columns}
+          rows={rows}
+          hasRowAction={rowAction}
+          rowActionDisabled={writeDisabled}
+          actionTitle="Detail"
+          actionLabel="Open"
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onSort={(id) => this.sortBy(id)}
+          onRowAction={(id) => this.openDetail(id)}
+        />
+      </Skeleton>
+
+      <Timeline label="Audit" items={auditItems} />
+
+      <Drawer
+        open={drawerOpen}
+        title="Row detail"
+        titleId="home-ui5-drawer-title"
+        onClose={() => (drawerOpen = false)}
+      >
+        <p data-dogfood="ui5-drawer-body">detail:{detailId}</p>
+      </Drawer>
+    </ConsoleShell>
+  </div>
+</template>
+
+<script client>
+export default class Ui5Page {
+  nameQuery = '';
+  statusQuery = '';
+  loading = true;
+  loadingAttr = 'true';
+  writeDisabled = true;
+  rowAction = true;
+  drawerOpen = false;
+  detailId = '';
+  sortKey = 'name';
+  sortDir = 'asc';
+  columns = [
+    { id: 'name', title: 'Name' },
+    { id: 'status', title: 'Status' },
+  ];
+  allRows = [
+    { id: 'r1', cells: ['Alpha', 'Active'] },
+    { id: 'r2', cells: ['Beta', 'Paused'] },
+    { id: 'r3', cells: ['Gamma', 'Active'] },
+  ];
+  rows = [
+    { id: 'r1', cells: ['Alpha', 'Active'] },
+    { id: 'r2', cells: ['Beta', 'Paused'] },
+    { id: 'r3', cells: ['Gamma', 'Active'] },
+  ];
+  crumbs = [
+    { id: 'home', title: 'Home', href: '/' },
+    { id: 'console', title: 'Console', href: '/console' },
+    { id: 'ui5', title: 'UI5' },
+  ];
+  auditItems = [
+    { id: 'a1', time: '10:01', title: 'Filter applied', detail: 'Initial console load' },
+    { id: 'a2', time: '10:02', title: 'Permission check', detail: 'Export denied' },
+  ];
+  navItems = [
+    { id: 'ui5', title: 'UI5', href: '/ui5' },
+    { id: 'console', title: 'Console', href: '/console' },
+    { id: 'ui4', title: 'UI4', href: '/ui4' },
+  ];
+
+  applyQuery() {
+    const name = (this.nameQuery || '').trim().toLowerCase();
+    const status = (this.statusQuery || '').trim().toLowerCase();
+    let list = this.allRows.slice();
+    if (name) {
+      list = list.filter((row) => String(row.cells[0]).toLowerCase().includes(name));
+    }
+    if (status) {
+      list = list.filter((row) => String(row.cells[1]).toLowerCase().includes(status));
+    }
+    this.rows = this.sortRows(list);
+    this.loading = false;
+    this.loadingAttr = 'false';
+  }
+
+  sortRows(list) {
+    const key = this.sortKey === 'status' ? 1 : 0;
+    const dir = this.sortDir === 'desc' ? -1 : 1;
+    return list.slice().sort((a, b) => {
+      const av = String(a.cells[key] || '');
+      const bv = String(b.cells[key] || '');
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return 0;
+    });
+  }
+
+  sortBy(id) {
+    if (this.sortKey === id) {
+      this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortKey = id;
+      this.sortDir = 'asc';
+    }
+    this.rows = this.sortRows(this.rows);
+  }
+
+  toggleLoading() {
+    this.loading = !this.loading;
+    this.loadingAttr = this.loading ? 'true' : 'false';
+  }
+
+  toggleWrite() {
+    this.writeDisabled = !this.writeDisabled;
+  }
+
+  openDetail(id) {
+    if (this.writeDisabled) return;
+    this.detailId = id;
+    this.drawerOpen = true;
+  }
+}
+</script>

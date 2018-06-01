@@ -1,0 +1,50 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "production.catalog.logic.list",
+    "title": "production catalog: CatalogList logic mount + keyed list text",
+    "modes": ["logic"],
+    "program": {
+        "chunkId": "components/CatalogList",
+        "unitName": "CatalogList",
+        "components": {
+            "ProductRow": "components/ProductRow"
+        }
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "mount",
+            "props": {}
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "write",
+            "field": "selected",
+            "value": "Beta"
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "flush"
+        }
+    ],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "text",
+            "expect": {
+                "contains": "Beta"
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "text",
+            "expect": {
+                "contains": "Gamma"
+            }
+        }
+    ]
+}

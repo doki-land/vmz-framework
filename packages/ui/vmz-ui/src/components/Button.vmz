@@ -2,6 +2,10 @@
   <button
     type={type}
     class="vmz-ui-btn"
+    data-vmz-ui="button"
+    data-vmz-motion="control"
+    data-vmz-motion-token="motion.control"
+    data-variant={variant}
     disabled={disabled}
     onClick={onClick}
   >
@@ -15,7 +19,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  padding: 0.55rem 0.95rem;
+  padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
   border: 1px solid transparent;
   border-radius: 2px;
   font: inherit;
@@ -25,6 +29,11 @@
   background: var(--vmz-action-primary-background);
   color: var(--vmz-action-primary-foreground);
   outline: none;
+  transition:
+    background-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+    border-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+    color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+    box-shadow var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
 }
 
 .vmz-ui-btn:hover:not(:disabled) {
@@ -35,6 +44,49 @@
   background: var(--vmz-action-primary-active);
 }
 
+.vmz-ui-btn[data-variant='secondary'] {
+  background: var(--vmz-action-secondary-background);
+  color: var(--vmz-action-secondary-foreground);
+  border-color: var(--vmz-action-secondary-border);
+}
+
+.vmz-ui-btn[data-variant='secondary']:hover:not(:disabled) {
+  background: var(--vmz-action-secondary-hover);
+}
+
+.vmz-ui-btn[data-variant='secondary']:active:not(:disabled) {
+  background: var(--vmz-action-secondary-hover);
+  border-color: var(--vmz-action-primary-active);
+}
+
+.vmz-ui-btn[data-variant='ghost'] {
+  background: transparent;
+  color: var(--vmz-text-ink);
+  border-color: transparent;
+}
+
+.vmz-ui-btn[data-variant='ghost']:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--vmz-surface-mist) 85%, transparent);
+}
+
+.vmz-ui-btn[data-variant='ghost']:active:not(:disabled) {
+  background: var(--vmz-surface-mist);
+}
+
+.vmz-ui-btn[data-variant='danger'] {
+  background: var(--vmz-status-danger-accent);
+  color: var(--vmz-action-primary-foreground);
+  border-color: transparent;
+}
+
+.vmz-ui-btn[data-variant='danger']:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--vmz-status-danger-accent) 82%, var(--vmz-text-ink));
+}
+
+.vmz-ui-btn[data-variant='danger']:active:not(:disabled) {
+  background: var(--vmz-status-danger-foreground);
+}
+
 .vmz-ui-btn:focus-visible {
   box-shadow: 0 0 0 2px var(--vmz-focus-ring);
 }
@@ -43,16 +95,31 @@
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+:where([data-density='compact']) .vmz-ui-btn {
+  padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+}
+
+:where([data-density='dense']) .vmz-ui-btn {
+  padding: var(--vmz-density-dense-padding-y) var(--vmz-density-dense-padding-x);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vmz-ui-btn {
+    transition: none;
+  }
+}
 </style>
 
 <script client>
 /**
- * VMZ UI — Button probe (UI0).
- * Colors come only from Style Theme semantic tokens — never brand hex.
- * Requirements: contracts/token-requirements.v0.json
+ * VMZ UI — Button (variants + motion control feedback).
+ * Colors / motion come only from Style Theme semantic tokens — never brand hex.
+ * Variants: primary | secondary | ghost | danger
  */
 export default class Button {
   public type: string = 'button';
+  public variant: string = 'primary';
   public disabled: boolean = false;
   public onClick: ((e: Event) => void) | null = null;
 }

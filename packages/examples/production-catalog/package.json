@@ -1,0 +1,19 @@
+{
+    "name": "@vmz-examples/production-catalog",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "check": "vmz check .",
+        "lint": "vmz lint .",
+        "format": "vmz format .",
+        "build": "vmz build .",
+        "test": "vmz test ."
+    },
+    "dependencies": {
+        "@vmz/core": "workspace:*"
+    },
+    "devDependencies": {
+        "vmz": "workspace:*"
+    }
+}

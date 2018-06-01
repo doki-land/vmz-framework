@@ -1,6 +1,15 @@
 <template>
-  <div class="monaco-host" data-vmz-monaco style="min-height: 240px; width: 100%"></div>
+  <div class="monaco-host" data-vmz-monaco></div>
 </template>
+
+<style>
+.monaco-host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+</style>
 
 <script client>
 import { mountMonaco } from '@vmz/plugin-monaco/runtime';
@@ -10,10 +19,19 @@ export default class Monaco {
   public language: string = 'typescript';
   public theme: string = 'vs-dark';
   public readOnly: boolean = false;
+  /** Parent callback — keeps page state authoritative (same pattern as Switch.onChange). */
+  public onChange: ((v: string) => void) | null = null;
 
-  #api: { dispose: () => void } | null = null;
+  #api: {
+    getValue: () => string;
+    setValue: (v: string) => void;
+    dispose: () => void;
+  } | null = null;
+  #applyingExternal = false;
+  #valueWatch: (() => void) | null = null;
 
   async onMount() {
+    if (typeof window === 'undefined') return;
     const root = this.__vmzDomRoot;
     const el =
       (root && root.nodeType === 1 && root.matches?.('[data-vmz-monaco]') && root) ||
@@ -26,12 +44,31 @@ export default class Monaco {
       theme: this.theme,
       readOnly: this.readOnly,
       onChange: (v) => {
+        this.#applyingExternal = true;
         this.value = v;
+        this.#applyingExternal = false;
+        if (typeof this.onChange === 'function') this.onChange(v);
       },
     });
+    // Parent may push a new `value` after mount (loadSpec). Sync into the editor.
+    let last = this.value;
+    const tick = () => {
+      if (!this.#api || this.__vmzDestroyed) return;
+      if (this.#applyingExternal) return;
+      if (this.value !== last) {
+        last = this.value;
+        if (this.#api.getValue() !== this.value) {
+          this.#api.setValue(this.value ?? '');
+        }
+      }
+    };
+    const id = window.setInterval(tick, 50);
+    this.#valueWatch = () => window.clearInterval(id);
   }
 
   onDestroy() {
+    this.#valueWatch?.();
+    this.#valueWatch = null;
     this.#api?.dispose();
     this.#api = null;
   }

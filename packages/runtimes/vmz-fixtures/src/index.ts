@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Gate fixture: a legal `definePlugin` sample for protocol smoke tests.
  * Package is `vmz-fixtures` (no `plugin` in the package/dir name).
  */

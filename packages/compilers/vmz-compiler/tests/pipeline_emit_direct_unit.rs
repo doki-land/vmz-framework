@@ -151,3 +151,22 @@ export default class HtmlDemo {
     assert!(js.contains("api.bindHtml(this,"), "{js}");
     assert!(!js.contains("api.bindAttr(this,"), "{js}");
 }
+
+#[test]
+fn at_click_method_emits_api_on() {
+    let src = r#"
+export default class CatalogList {
+  selected = null;
+  selectFirst() { this.selected = "Alpha"; }
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<button type="button" @click={selectFirst}>select</button>"#);
+    let roots = &tpl.roots;
+    assert_eq!(roots.len(), 1, "button must parse as one element, not text/@click split");
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains("api.on("), "{js}");
+    assert!(js.contains("\"click\""), "{js}");
+    assert!(js.contains("this.selectFirst") || js.contains("selectFirst(ev)"), "{js}");
+    assert!(!js.contains("api.text(\"@click=\")"), "{js}");
+}

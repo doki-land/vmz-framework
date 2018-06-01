@@ -5,6 +5,8 @@
 ## 目录
 
 - [入门](./guide/index.md)
+- [Zero-Cost](./guide/zero-cost.md)
+- [优化](./guide/optimizations/index.md)
 - [官方插件](./plugins/index.md)
     - [白名单](./plugins/official.md)
-    - [明确不建议](./plugins/not-recommended.md)
+    - [与默认路径的关系](./plugins/not-recommended.md)

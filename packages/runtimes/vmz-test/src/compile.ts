@@ -297,8 +297,13 @@ export function runCompileManifest(manifest: Record<string, unknown>, ctx: { out
                 if (expect.create === true && !clientJs.includes('__vmzCreate')) {
                     fail('missing __vmzCreate');
                 }
-                if (expect.plan === true && !clientJs.includes('__vmzPlan')) {
-                    fail('missing __vmzPlan');
+                if (expect.plan === true) {
+                    // Plan identity is *.program.json; client `__vmzPlan` embed is opt-in (VMZ_EMIT_PLAN).
+                    const hasClientPlan = clientJs.includes('__vmzPlan');
+                    const hasProgramPlan = typeof prog.schema === 'string' || Boolean(arts.programPath) || Boolean(plan);
+                    if (!hasClientPlan && !hasProgramPlan) {
+                        fail('missing plan (client __vmzPlan or *.program.json)');
+                    }
                 }
                 if (expect.serialize === true && !clientJs.includes('__vmzSerialize')) {
                     fail('missing __vmzSerialize');
@@ -450,6 +455,76 @@ export function runCompileManifest(manifest: Record<string, unknown>, ctx: { out
                 if (!nodes.some((n) => n.tag === expect.disposeTag)) {
                     fail(`dispose_region missing tag=${expect.disposeTag}: ${JSON.stringify(nodes)}`);
                 }
+            }
+            continue;
+        }
+
+        if (kind === 'motion') {
+            const motion = (unit.motion as Record<string, unknown> | null) || null;
+            const transitions = (motion?.transitions as Array<Record<string, unknown>>) || [];
+            const edges = ((unit.graph as Record<string, unknown> | null)?.edges as Array<Record<string, unknown>>) || [];
+            if (expect.status != null) {
+                if (!motion || motion.status !== expect.status) {
+                    fail(`motion.status want ${expect.status}, got ${motion?.status}`);
+                }
+            }
+            if (expect.nonEmpty === true && transitions.length === 0) {
+                fail('motion.transitions empty');
+            }
+            if (Array.isArray(expect.kinds)) {
+                const have = new Set(transitions.map((t) => String(t.kind || '')));
+                for (const k of expect.kinds) {
+                    if (!have.has(String(k))) fail(`motion missing kind=${k}: ${[...have]}`);
+                }
+            }
+            if (typeof expect.token === 'string') {
+                if (!transitions.some((t) => t.token === expect.token)) {
+                    fail(`motion missing token=${expect.token}: ${JSON.stringify(transitions)}`);
+                }
+            }
+            if (Array.isArray(expect.tokens)) {
+                for (const tok of expect.tokens) {
+                    if (!transitions.some((t) => t.token === tok)) {
+                        fail(`motion missing token=${tok}: ${JSON.stringify(transitions)}`);
+                    }
+                }
+            }
+            if (expect.cancelable === true) {
+                if (!transitions.some((t) => t.cancelable === true)) {
+                    fail(`motion missing cancelable transition: ${JSON.stringify(transitions)}`);
+                }
+            }
+            if (expect.generation === true) {
+                if (!transitions.some((t) => t.generation === true)) {
+                    fail(`motion missing generation transition: ${JSON.stringify(transitions)}`);
+                }
+            }
+            if (typeof expect.reducedMotion === 'string') {
+                if (!transitions.every((t) => t.reduced_motion === expect.reducedMotion)) {
+                    fail(`motion.reduced_motion want ${expect.reducedMotion}: ${JSON.stringify(transitions)}`);
+                }
+            }
+            if (expect.hasRegion === true) {
+                if (!transitions.some((t) => t.region != null)) {
+                    fail(`motion missing region on transitions: ${JSON.stringify(transitions)}`);
+                }
+            }
+            if (expect.affectsRegion === true) {
+                const hit = edges.some(
+                    (e) => e.kind === 'affects' && String(e.from).startsWith('motion:') && String(e.to).startsWith('region:'),
+                );
+                if (!hit)
+                    fail(`missing motion→region affects edges: ${JSON.stringify(edges.filter((e) => String(e.from).startsWith('motion:')))}`);
+            }
+            if (Array.isArray(expect.cancelsFrom)) {
+                for (const from of expect.cancelsFrom) {
+                    const hit = edges.some((e) => e.kind === 'cancels' && e.from === from && String(e.to).startsWith('motion:'));
+                    if (!hit) fail(`missing cancels from ${from}: ${JSON.stringify(edges.filter((e) => e.kind === 'cancels'))}`);
+                }
+            }
+            if (expect.planMotionTransition === true) {
+                const nodes = ((plan?.nodes as Array<Record<string, unknown>>) || []).filter((n) => n.kind === 'motion_transition');
+                if (!nodes.length) fail('plan missing motion_transition nodes');
             }
             continue;
         }

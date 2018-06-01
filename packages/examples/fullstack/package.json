@@ -12,6 +12,9 @@
         "dev": "vmz dev .",
         "test": "vmz build . && vmz test . && node ./tests/run-node-tests.mjs"
     },
+    "dependencies": {
+        "@vmz/core": "workspace:*"
+    },
     "devDependencies": {
         "@vmz-examples/test-utils": "workspace:*",
         "vmz": "workspace:*"

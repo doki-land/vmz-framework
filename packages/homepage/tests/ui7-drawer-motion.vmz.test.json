@@ -1,0 +1,33 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "ui7.drawer.motion.compile",
+    "title": "Drawer Motion IR — vmz test compile semantic motion assertions",
+    "modes": ["compile"],
+    "program": {
+        "chunkId": "components/Drawer",
+        "unitName": "Drawer"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "motion",
+            "expect": {
+                "status": "partial",
+                "kinds": ["overlay-enter", "overlay-exit"],
+                "token": "motion.overlay",
+                "cancelable": true,
+                "generation": true,
+                "reducedMotion": "honor",
+                "hasRegion": true,
+                "affectsRegion": true,
+                "cancelsFrom": ["motion:reverse", "effect:_cancelExit", "lifecycle:destroy"],
+                "planMotionTransition": true
+            }
+        }
+    ]
+}

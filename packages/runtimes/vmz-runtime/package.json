@@ -20,6 +20,10 @@
         "./http": {
             "types": "./dist/http.d.ts",
             "default": "./dist/http.js"
+        },
+        "./client-nav": {
+            "types": "./dist/client-nav.d.ts",
+            "default": "./dist/client-nav.js"
         }
     },
     "files": [

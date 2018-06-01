@@ -1,0 +1,102 @@
+<template>
+  <div class="vmz-ui-upload" data-vmz-ui="upload" data-invalid={invalidAttr}>
+    <label if={label} class="vmz-ui-upload__label" for={controlId}>{label}</label>
+    <input
+      id={controlId}
+      class="vmz-ui-upload__control"
+      type="file"
+      accept={accept}
+      disabled={disabled}
+      aria-invalid={error ? 'true' : 'false'}
+      aria-describedby={describedBy}
+      onChange={onChange}
+    />
+    <p if={fileName} class="vmz-ui-upload__file" data-vmz-upload="file">Selected: {fileName}</p>
+    <p if={emptyHint} class="vmz-ui-upload__empty" data-vmz-upload="empty">{emptyText}</p>
+    <p if={description} id={descriptionId} class="vmz-ui-upload__description">{description}</p>
+    <p if={error} id={errorId} class="vmz-ui-upload__error" role="alert">{error}</p>
+  </div>
+</template>
+
+<style>
+.vmz-ui-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 28rem;
+}
+
+.vmz-ui-upload__label {
+  font: inherit;
+  font-weight: 600;
+}
+
+.vmz-ui-upload__control {
+  font: inherit;
+  padding: var(--vmz-density-control-padding-y) 0;
+  color: inherit;
+  outline: none;
+}
+
+.vmz-ui-upload__control:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-upload__control:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.vmz-ui-upload[data-invalid='true'] .vmz-ui-upload__label {
+  color: var(--vmz-status-danger-foreground);
+}
+
+.vmz-ui-upload__file {
+  margin: 0;
+  font-family: var(--vmz-font-mono);
+  font-size: 0.88rem;
+  color: var(--vmz-text-ink);
+}
+
+.vmz-ui-upload__empty {
+  margin: 0;
+  color: var(--vmz-text-steel);
+  font-size: 0.9em;
+}
+
+.vmz-ui-upload__description {
+  margin: 0;
+  opacity: 0.75;
+  font-size: 0.9em;
+}
+
+.vmz-ui-upload__error {
+  margin: 0;
+  color: var(--vmz-status-danger-foreground);
+  font-size: 0.9em;
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — Upload.
+ * Native file input; parent owns selected fileName presentation.
+ * No network upload runtime / second form store — pick + validate only.
+ */
+export default class Upload {
+  public label: string = '';
+  public description: string = '';
+  public error: string = '';
+  public fileName: string = '';
+  public emptyText: string = 'No file selected';
+  public emptyHint: boolean = true;
+  public accept: string = '';
+  public disabled: boolean = false;
+  public invalidAttr: string = 'false';
+  public controlId: string = 'vmz-upload';
+  public descriptionId: string = 'vmz-upload-desc';
+  public errorId: string = 'vmz-upload-err';
+  public describedBy: string = '';
+  public onChange: ((e: Event) => void) | null = null;
+}
+</script>

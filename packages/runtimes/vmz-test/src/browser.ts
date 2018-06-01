@@ -551,7 +551,7 @@ export async function runBrowserManifest(
                 }
                 continue;
             }
-            if (kind === 'graph' || kind === 'plan' || kind === 'diagnostic' || kind === 'view') {
+            if (kind === 'graph' || kind === 'plan' || kind === 'diagnostic' || kind === 'view' || kind === 'motion') {
                 continue;
             }
             fail(`unknown browser assertion ${JSON.stringify(kind)}`);

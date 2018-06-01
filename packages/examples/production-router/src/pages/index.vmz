@@ -1,0 +1,22 @@
+<template>
+  <main>
+    <h1>Production router home</h1>
+    <p>route-home</p>
+    <nav>
+      <Link to="AboutPage">About</Link>
+      <Link to="ProductPage" params={ id: 'sku-1' }>Product</Link>
+      <Link to="ShopIndexPage">Shop</Link>
+    </nav>
+  </main>
+</template>
+
+<script client>
+export default class IndexPage {
+  static meta() {
+    return {
+      title: 'Home · Production Router',
+      description: 'VMZ production-router home',
+    };
+  }
+}
+</script>

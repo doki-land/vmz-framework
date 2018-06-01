@@ -219,6 +219,16 @@ code {
   animation: vmz-rise 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.landing-slogan {
+  margin: 0;
+  font-family: var(--vmz-font-display);
+  font-size: clamp(1.15rem, 2.4vw, 1.45rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--vmz-text-ink);
+  animation: vmz-rise 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .landing-brand {
   display: inline-flex;
   align-items: baseline;
@@ -436,6 +446,52 @@ code {
   font-size: 0.95rem;
   line-height: 1.45;
   color: var(--vmz-text-steel);
+}
+
+.opt-rail {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--vmz-line-default);
+  border: 1px solid var(--vmz-line-default);
+}
+
+.opt-rail li {
+  display: grid;
+  gap: 0.4rem;
+  padding: 1.1rem 1.05rem;
+  background: var(--vmz-surface-mist);
+}
+
+.opt-rail strong {
+  font-family: var(--vmz-font-display);
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+  color: var(--vmz-text-ink);
+}
+
+.opt-rail strong a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.opt-rail strong a:hover {
+  color: var(--vmz-brand-primary);
+  text-decoration: underline;
+}
+
+.opt-rail span {
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--vmz-text-steel);
+}
+
+.opt-rail code {
+  font-family: var(--vmz-font-mono);
+  font-size: 0.84em;
 }
 
 .host-strip {
@@ -972,6 +1028,7 @@ code {
 
 @media (prefers-reduced-motion: reduce) {
   .landing-brand,
+  .landing-slogan,
   .landing-kicker,
   .landing-lede,
   .landing-cta,
@@ -1008,6 +1065,7 @@ code {
   }
 
   .fact-rail,
+  .opt-rail,
   .landing-band__inner--split {
     grid-template-columns: 1fr;
   }

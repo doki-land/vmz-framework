@@ -29,7 +29,7 @@ import {
     negotiateLocale,
     resolveMessageVariant,
     validateFormatterContext,
-} from '../packages/runtimes/vmz/dist/locale-runtime.js';
+} from '../../../dist/locale-runtime.js';
 
 const root = repoRoot(import.meta.url);
 const fixture = path.join(root, 'packages', 'examples', 'locales-fixture');

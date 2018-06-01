@@ -1,0 +1,425 @@
+<template>
+  <div data-dogfood="form">
+    <AppShell brand="VMZ" homeHref="/" navLabel="Form" nav={navItems}>
+      <Alert
+        tone="info"
+        roleName="status"
+        title="Form depth"
+        description="Form / FormItem / Field / Select / TextArea / RadioGroup / Autocomplete / Tooltip / DatePicker / Upload — parent owns values and validation."
+      />
+
+      <Card title="Contact request">
+        <Form
+          label="Contact request"
+          errorSummary={errorSummary}
+          summaryId="home-form-summary"
+          describedBy={formDescribedBy}
+          disabled={submitting}
+          disabledAttr={disabledAttr}
+          onSubmit={() => this.submit()}
+          onReset={() => this.reset()}
+        >
+          <div class="vmz-form-email-row" data-dogfood="form-email-row">
+            <Field
+              label="Work email"
+              description="Required for reply"
+              controlId="home-form-email"
+              descriptionId="home-form-email-desc"
+              errorId="home-form-email-err"
+              describedBy={emailDescribedBy}
+              error={emailError}
+              invalidAttr={emailInvalid}
+              value={email}
+              onInput={(e) => this.onEmail(e)}
+            />
+            <Tooltip open={tipOpen} openAttr={tipOpenAttr} content="Use your company domain when possible." tooltipId="home-form-email-tip">
+              <Button type="button" variant="ghost" onClick={() => this.toggleTip()}>Why?</Button>
+            </Tooltip>
+          </div>
+
+          <FormItem
+            label="Role"
+            description="Who should we route this to"
+            required={roleRequired}
+            requiredAttr="true"
+            error={roleError}
+            invalidAttr={roleInvalid}
+            controlId="home-form-role"
+            descriptionId="home-form-role-desc"
+            errorId="home-form-role-err"
+          >
+            <Select
+              label=""
+              controlId="home-form-role"
+              describedBy={roleDescribedBy}
+              error=""
+              invalidAttr={roleInvalid}
+              value={role}
+              options={roleOptions}
+              onChange={(e) => this.onRole(e)}
+            />
+          </FormItem>
+
+          <Autocomplete
+            label="Team"
+            description="Parent filters options — no query runtime"
+            controlId="home-form-team"
+            listId="home-form-team-list"
+            descriptionId="home-form-team-desc"
+            errorId="home-form-team-err"
+            describedBy={teamDescribedBy}
+            error={teamError}
+            invalidAttr={teamInvalid}
+            value={team}
+            options={teamOptions}
+            listOpen={teamListOpen}
+            openAttr={teamOpenAttr}
+            showEmpty={teamEmpty}
+            emptyText="No matching team"
+            onInput={(e) => this.onTeamInput(e)}
+            onSelect={(v) => this.onTeamSelect(v)}
+            onClose={() => this.closeTeamList()}
+          />
+          <p data-dogfood="form-team">team:{team}</p>
+
+          <DatePicker
+            label="Preferred date"
+            description="ISO date from native picker"
+            controlId="home-form-date"
+            descriptionId="home-form-date-desc"
+            errorId="home-form-date-err"
+            describedBy={dateDescribedBy}
+            error={dateError}
+            invalidAttr={dateInvalid}
+            value={preferredDate}
+            onInput={(e) => this.onDate(e)}
+          />
+
+          <Upload
+            label="Attachment"
+            description="Pick a file — no upload runtime"
+            controlId="home-form-file"
+            descriptionId="home-form-file-desc"
+            errorId="home-form-file-err"
+            describedBy={fileDescribedBy}
+            error={fileError}
+            invalidAttr={fileInvalid}
+            fileName={fileName}
+            emptyHint={fileEmpty}
+            emptyText="No file selected"
+            accept=".txt,.md,.pdf"
+            onChange={(e) => this.onFile(e)}
+          />
+
+          <TextArea
+            label="Message"
+            description="Optional context"
+            controlId="home-form-message"
+            descriptionId="home-form-message-desc"
+            errorId="home-form-message-err"
+            describedBy="home-form-message-desc"
+            value={message}
+            onInput={(e) => (message = e.target.value)}
+          />
+
+          <RadioGroup
+            label="Plan"
+            name="home-form-plan"
+            description="Billing intent"
+            descriptionId="home-form-plan-desc"
+            errorId="home-form-plan-err"
+            describedBy={planDescribedBy}
+            error={planError}
+            invalidAttr={planInvalid}
+            value={plan}
+            items={planItems}
+            onChange={(v) => this.onPlan(v)}
+          />
+
+          <Checkbox
+            label="I agree to be contacted"
+            controlId="home-form-agree"
+            checked={agree}
+            onChange={(e) => this.onAgree(e)}
+          />
+          <p if={agreeError} data-dogfood="form-agree-error" role="alert">{agreeError}</p>
+
+          <div data-dogfood="form-actions">
+            <Button type="submit">Send request</Button>
+            <Button type="reset" variant="secondary">Reset</Button>
+          </div>
+        </Form>
+
+        <p data-dogfood="form-state">email:{email};role:{role};team:{team};date:{preferredDate};file:{fileName};plan:{plan};agree:{agree ? 'yes' : 'no'};submitted:{submitted}</p>
+        <div if={submitted} data-dogfood="form-success">
+          <Result status="success" title="Request accepted" description="Validation cleared — form depth dogfood complete." />
+        </div>
+      </Card>
+    </AppShell>
+  </div>
+</template>
+
+<style>
+.vmz-form-email-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.55rem 0.75rem;
+}
+</style>
+
+<script client>
+export default class FormPage {
+  email = '';
+  role = '';
+  team = '';
+  preferredDate = '';
+  fileName = '';
+  fileEmpty = true;
+  message = '';
+  plan = '';
+  agree = false;
+  submitted = false;
+  submitting = false;
+  disabledAttr = 'false';
+  tipOpen = false;
+  tipOpenAttr = 'false';
+  errorSummary = '';
+  formDescribedBy = '';
+  emailError = '';
+  emailInvalid = 'false';
+  emailDescribedBy = 'home-form-email-desc';
+  roleError = '';
+  roleInvalid = 'false';
+  roleDescribedBy = 'home-form-role-desc';
+  teamError = '';
+  teamInvalid = 'false';
+  teamDescribedBy = 'home-form-team-desc';
+  teamListOpen = false;
+  teamOpenAttr = 'false';
+  teamEmpty = false;
+  dateError = '';
+  dateInvalid = 'false';
+  dateDescribedBy = 'home-form-date-desc';
+  fileError = '';
+  fileInvalid = 'false';
+  fileDescribedBy = 'home-form-file-desc';
+  planError = '';
+  planInvalid = 'false';
+  planDescribedBy = 'home-form-plan-desc';
+  agreeError = '';
+  roleRequired = true;
+  roleOptions = [
+    { value: '', label: 'Select a role' },
+    { value: 'ops', label: 'Operations' },
+    { value: 'eng', label: 'Engineering' },
+    { value: 'sales', label: 'Sales' },
+  ];
+  teamAll = [
+    { value: 'alpha', label: 'Alpha Platform' },
+    { value: 'beta', label: 'Beta Edge' },
+    { value: 'gamma', label: 'Gamma Docs' },
+  ];
+  teamOptions = [
+    { value: 'alpha', label: 'Alpha Platform' },
+    { value: 'beta', label: 'Beta Edge' },
+    { value: 'gamma', label: 'Gamma Docs' },
+  ];
+  planItems = [
+    { id: 'home-form-plan-starter', value: 'starter', label: 'Starter' },
+    { id: 'home-form-plan-pro', value: 'pro', label: 'Pro' },
+    { id: 'home-form-plan-ent', value: 'enterprise', label: 'Enterprise' },
+  ];
+  navItems = [
+    { id: 'ui', title: 'UI lab', href: '/ui' },
+    { id: 'commercial', title: 'Commercial', href: '/commercial' },
+    { id: 'form', title: 'Form', href: '/form' },
+    { id: 'product', title: 'Product', href: '/product' },
+    { id: 'console', title: 'Console', href: '/console' },
+    { id: 'welcome', title: 'Welcome', href: '/welcome' },
+  ];
+
+  toggleTip() {
+    this.tipOpen = !this.tipOpen;
+    this.tipOpenAttr = this.tipOpen ? 'true' : 'false';
+  }
+
+  onEmail(e) {
+    this.email = e && e.target ? e.target.value : '';
+    if (this.emailError) this.clearEmailError();
+  }
+
+  onRole(e) {
+    this.role = e && e.target ? e.target.value : '';
+    if (this.roleError) this.clearRoleError();
+  }
+
+  onTeamInput(e) {
+    this.team = e && e.target ? e.target.value : '';
+    if (this.teamError) this.clearTeamError();
+    this.refreshTeamOptions();
+  }
+
+  onTeamSelect(v) {
+    const next = String(v || '');
+    const hit = this.teamAll.find((item) => item.value === next);
+    this.team = hit ? hit.label : next;
+    this.teamListOpen = false;
+    this.teamOpenAttr = 'false';
+    this.teamEmpty = false;
+    this.teamOptions = this.teamAll.slice();
+    if (this.teamError) this.clearTeamError();
+  }
+
+  closeTeamList() {
+    this.teamListOpen = false;
+    this.teamOpenAttr = 'false';
+  }
+
+  refreshTeamOptions() {
+    const q = String(this.team || '')
+      .trim()
+      .toLowerCase();
+    const filtered = !q
+      ? this.teamAll.slice()
+      : this.teamAll.filter(
+          (item) =>
+            String(item.label).toLowerCase().includes(q) || String(item.value).toLowerCase().includes(q),
+        );
+    this.teamOptions = filtered;
+    this.teamEmpty = filtered.length === 0;
+    this.teamListOpen = true;
+    this.teamOpenAttr = 'true';
+  }
+
+  onPlan(v) {
+    this.plan = v || '';
+    if (this.planError) this.clearPlanError();
+  }
+
+  onDate(e) {
+    this.preferredDate = e && e.target ? e.target.value : '';
+    if (this.dateError) this.clearDateError();
+  }
+
+  onFile(e) {
+    const input = e && e.target;
+    const file = input && input.files && input.files[0] ? input.files[0] : null;
+    this.fileName = file && file.name ? String(file.name) : '';
+    this.fileEmpty = !this.fileName;
+    if (this.fileError) this.clearFileError();
+  }
+
+  onAgree(e) {
+    this.agree = !!(e && e.target && e.target.checked);
+    if (this.agreeError) this.agreeError = '';
+  }
+
+  clearEmailError() {
+    this.emailError = '';
+    this.emailInvalid = 'false';
+    this.emailDescribedBy = 'home-form-email-desc';
+  }
+
+  clearRoleError() {
+    this.roleError = '';
+    this.roleInvalid = 'false';
+    this.roleDescribedBy = 'home-form-role-desc';
+  }
+
+  clearTeamError() {
+    this.teamError = '';
+    this.teamInvalid = 'false';
+    this.teamDescribedBy = 'home-form-team-desc';
+  }
+
+  clearDateError() {
+    this.dateError = '';
+    this.dateInvalid = 'false';
+    this.dateDescribedBy = 'home-form-date-desc';
+  }
+
+  clearFileError() {
+    this.fileError = '';
+    this.fileInvalid = 'false';
+    this.fileDescribedBy = 'home-form-file-desc';
+  }
+
+  clearPlanError() {
+    this.planError = '';
+    this.planInvalid = 'false';
+    this.planDescribedBy = 'home-form-plan-desc';
+  }
+
+  submit() {
+    const emailOk = /.+@.+\..+/.test(String(this.email || '').trim());
+    const roleOk = !!this.role;
+    const teamOk = !!String(this.team || '').trim();
+    const dateOk = !!String(this.preferredDate || '').trim();
+    const fileOk = !!String(this.fileName || '').trim();
+    const planOk = !!this.plan;
+    const agreeOk = !!this.agree;
+
+    this.emailError = emailOk ? '' : 'Enter a valid work email';
+    this.emailInvalid = emailOk ? 'false' : 'true';
+    this.emailDescribedBy = emailOk ? 'home-form-email-desc' : 'home-form-email-desc home-form-email-err';
+
+    this.roleError = roleOk ? '' : 'Choose a role';
+    this.roleInvalid = roleOk ? 'false' : 'true';
+    this.roleDescribedBy = roleOk ? 'home-form-role-desc' : 'home-form-role-desc home-form-role-err';
+
+    this.teamError = teamOk ? '' : 'Pick a team';
+    this.teamInvalid = teamOk ? 'false' : 'true';
+    this.teamDescribedBy = teamOk ? 'home-form-team-desc' : 'home-form-team-desc home-form-team-err';
+
+    this.dateError = dateOk ? '' : 'Pick a preferred date';
+    this.dateInvalid = dateOk ? 'false' : 'true';
+    this.dateDescribedBy = dateOk ? 'home-form-date-desc' : 'home-form-date-desc home-form-date-err';
+
+    this.fileError = fileOk ? '' : 'Attach a file';
+    this.fileInvalid = fileOk ? 'false' : 'true';
+    this.fileDescribedBy = fileOk ? 'home-form-file-desc' : 'home-form-file-desc home-form-file-err';
+
+    this.planError = planOk ? '' : 'Pick a plan';
+    this.planInvalid = planOk ? 'false' : 'true';
+    this.planDescribedBy = planOk ? 'home-form-plan-desc' : 'home-form-plan-desc home-form-plan-err';
+
+    this.agreeError = agreeOk ? '' : 'Consent is required';
+
+    const ok = emailOk && roleOk && teamOk && dateOk && fileOk && planOk && agreeOk;
+    this.errorSummary = ok ? '' : 'Fix the highlighted fields before sending';
+    this.formDescribedBy = ok ? '' : 'home-form-summary';
+    this.submitted = ok;
+    this.closeTeamList();
+    this.tipOpen = false;
+    this.tipOpenAttr = 'false';
+  }
+
+  reset() {
+    this.email = '';
+    this.role = '';
+    this.team = '';
+    this.preferredDate = '';
+    this.fileName = '';
+    this.fileEmpty = true;
+    this.message = '';
+    this.plan = '';
+    this.agree = false;
+    this.submitted = false;
+    this.errorSummary = '';
+    this.formDescribedBy = '';
+    this.agreeError = '';
+    this.teamOptions = this.teamAll.slice();
+    this.teamEmpty = false;
+    this.closeTeamList();
+    this.tipOpen = false;
+    this.tipOpenAttr = 'false';
+    this.clearEmailError();
+    this.clearRoleError();
+    this.clearTeamError();
+    this.clearDateError();
+    this.clearFileError();
+    this.clearPlanError();
+  }
+}
+</script>

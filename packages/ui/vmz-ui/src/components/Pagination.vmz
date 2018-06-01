@@ -1,0 +1,81 @@
+<template>
+  <nav class="vmz-ui-pagination" data-vmz-ui="pagination" aria-label={label}>
+    <button
+      type="button"
+      class="vmz-ui-pagination__btn"
+      disabled={prevDisabled}
+      onClick={onPrevClick}
+    >
+      Previous
+    </button>
+    <p class="vmz-ui-pagination__status" data-dogfood="page-status">{status}</p>
+    <button
+      type="button"
+      class="vmz-ui-pagination__btn"
+      disabled={nextDisabled}
+      onClick={onNextClick}
+    >
+      Next
+    </button>
+  </nav>
+</template>
+
+<style>
+.vmz-ui-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+}
+
+.vmz-ui-pagination__btn {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--vmz-action-primary-background);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--vmz-action-primary-active);
+  cursor: pointer;
+  outline: none;
+}
+
+.vmz-ui-pagination__btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-pagination__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.vmz-ui-pagination__status {
+  margin: 0;
+  font-weight: 600;
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — Pagination (Console composition skeleton).
+ * Parent owns page / pageCount; buttons call onPrev / onNext.
+ */
+export default class Pagination {
+  public label: string = 'Pagination';
+  public status: string = 'Page 1 / 1';
+  public prevDisabled: boolean = true;
+  public nextDisabled: boolean = true;
+  public onPrev: (() => void) | null = null;
+  public onNext: (() => void) | null = null;
+
+  onPrevClick() {
+    if (this.prevDisabled) return;
+    if (typeof this.onPrev === 'function') this.onPrev();
+  }
+
+  onNextClick() {
+    if (this.nextDisabled) return;
+    if (typeof this.onNext === 'function') this.onNext();
+  }
+}
+</script>

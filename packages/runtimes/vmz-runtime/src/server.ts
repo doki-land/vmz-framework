@@ -15,7 +15,7 @@
  * renderIndex?: => Promise<string> | string,
  * renderIndexStream?: (opts?: { signal?: AbortSignal }) => AsyncIterable<string>,
  * renderPage?: (pathname: string) => Promise<string | null> | string | null,
- * renderPageStream?: (pathname: string, opts?: { signal?: AbortSignal, searchParams?: URLSearchParams, cookieHeader?: string }) => Promise<AsyncIterable<string> | null> | AsyncIterable<string> | null,
+ * renderPageStream?: (pathname: string, opts?: { signal?: AbortSignal, searchParams?: URLSearchParams, cookieHeader?: string, method?: string, body?: unknown }) => Promise<AsyncIterable<string> | { status?: number, stream?: AsyncIterable<string>, redirect?: string, headers?: Record<string, string> } | null> | AsyncIterable<string> | null,
  * req?: import('node:http').IncomingMessage,
  * }} NodeRequestOptions
  */
@@ -143,12 +143,19 @@ export async function handleNodeRequest(req, res, opts = {}) {
             return sendJson(res, 200, result);
         }
 
-        // Static first (integrated DocumentMount + assets) so /d/… is not swallowed by SSR 404 shells.
+        // Static first for assets + DocumentMount (`/d/…`) so docs aren't swallowed by SSR 404 shells.
+        // web-static route HTML (`index.html`, `about/index.html`, …) is a CDN/deploy projection only —
+        // when Server Host SSR is active, those files must not shadow live render (local/dev ≡ SSR truth).
         if (verb === 'GET' && opts.distDir) {
             const nodePath = await import('node:path');
             const { readFile, stat } = await import('node:fs/promises');
             const file = await resolveDistStatic(opts.distDir, url.pathname, nodePath, stat);
-            if (file) {
+            const hasSsr =
+                typeof opts.renderPageStream === 'function' ||
+                typeof opts.renderPage === 'function' ||
+                typeof opts.renderIndexStream === 'function' ||
+                typeof opts.renderIndex === 'function';
+            if (file && !(hasSsr && isWebStaticHtmlShadow(file, url.pathname, nodePath))) {
                 try {
                     const body = await readFile(file);
                     return sendBytes(res, 200, body, contentType(file, nodePath));
@@ -162,35 +169,62 @@ export async function handleNodeRequest(req, res, opts = {}) {
             }
         }
 
-        if (verb === 'GET' && (opts.renderPageStream || opts.renderPage || opts.renderIndexStream || opts.renderIndex)) {
+        if ((verb === 'GET' || verb === 'POST') && (opts.renderPageStream || opts.renderPage || opts.renderIndexStream || opts.renderIndex)) {
             const ac = new AbortController();
-            const onClose = () => {
+            const onClientGone = () => {
                 try {
                     ac.abort();
                 } catch {
                     /* ignore */
                 }
             };
-            req.on('close', onClose);
-            req.on('aborted', onClose);
+            // Do not abort on IncomingMessage `close` — that fires after a POST body is
+            // fully read (normal), which would cancel SSR before the first chunk.
+            req.on('aborted', onClientGone);
+            res.on('close', () => {
+                if (!res.writableEnded) onClientGone();
+            });
             try {
                 if (typeof opts.renderPageStream === 'function') {
+                    /** @type {unknown} */
+                    let body;
+                    if (verb === 'POST') {
+                        const ctype = String(req.headers['content-type'] || '');
+                        if (ctype.includes('application/json')) {
+                            body = await readJson(req);
+                        } else {
+                            const raw = await readRawBody(req);
+                            body = parseFormBody(raw, ctype);
+                        }
+                    }
                     const rendered = await opts.renderPageStream(url.pathname, {
                         signal: ac.signal,
                         searchParams: url.searchParams,
                         cookieHeader: String(req.headers.cookie || ''),
+                        method: verb,
+                        body,
                     });
                     if (rendered) {
+                        if (typeof rendered === 'object' && rendered.redirect) {
+                            const status = Number(rendered.status) || 302;
+                            const headers = {
+                                Location: String(rendered.redirect),
+                                ...(rendered.headers && typeof rendered.headers === 'object' ? rendered.headers : {}),
+                            };
+                            res.writeHead(status, headers);
+                            res.end();
+                            return;
+                        }
                         const status = rendered && typeof rendered === 'object' && 'status' in rendered ? Number(rendered.status) || 200 : 200;
                         const stream = rendered && typeof rendered === 'object' && rendered.stream ? rendered.stream : rendered;
                         return await sendHtmlStream(res, status, stream, ac.signal);
                     }
-                } else if (typeof opts.renderPage === 'function') {
+                } else if (verb === 'GET' && typeof opts.renderPage === 'function') {
                     const html = await opts.renderPage(url.pathname);
                     if (html != null) {
                         return sendHtml(res, 200, html);
                     }
-                } else if (url.pathname === '/' || url.pathname === '/index.html') {
+                } else if (verb === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
                     // Legacy index-only SSR (pre multi-page file routes).
                     if (typeof opts.renderIndexStream === 'function') {
                         return await sendHtmlStream(res, 200, opts.renderIndexStream({ signal: ac.signal }), ac.signal);
@@ -200,8 +234,7 @@ export async function handleNodeRequest(req, res, opts = {}) {
                     }
                 }
             } finally {
-                req.off('close', onClose);
-                req.off('aborted', onClose);
+                req.off('aborted', onClientGone);
             }
         }
 
@@ -240,6 +273,23 @@ function safeDistFile(distDir, pathname, nodePath) {
     const full = nodePath.resolve(root, rel);
     if (full !== root && !full.startsWith(root + nodePath.sep)) return null;
     return full;
+}
+
+/**
+ * web-static emits per-route HTML beside client assets. That HTML is for CDN / local-static
+ * delivery hosts — not for Server Host when SSR is available. DocumentMount stays static.
+ * @param {string} file
+ * @param {string} pathname
+ * @param {typeof import('node:path')} nodePath
+ */
+function isWebStaticHtmlShadow(file, pathname, nodePath) {
+    const ext = nodePath.extname(file).toLowerCase();
+    if (ext !== '.html' && ext !== '.htm') return false;
+    let rel = decodeURIComponent(String(pathname || '').split('?')[0] || '/');
+    if (!rel.startsWith('/')) rel = `/${rel}`;
+    // Integrated DocumentMount — keep static-first (see resolveDistStatic comment).
+    if (rel === '/d' || rel.startsWith('/d/')) return false;
+    return true;
 }
 
 /**
@@ -350,6 +400,38 @@ function readJson(req) {
         });
         req.on('error', reject);
     });
+}
+
+/**
+ * @param {import('node:http').IncomingMessage} req
+ * @returns {Promise<string>}
+ */
+function readRawBody(req) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        req.on('data', (c) => chunks.push(c));
+        req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+        req.on('error', reject);
+    });
+}
+
+/**
+ * @param {string} raw
+ * @param {string} contentType
+ * @returns {Record<string, string> | string}
+ */
+function parseFormBody(raw, contentType) {
+    if (!raw) return {};
+    if (contentType.includes('application/x-www-form-urlencoded')) {
+        const out = {};
+        for (const [k, v] of new URLSearchParams(raw)) out[k] = v;
+        return out;
+    }
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return { raw };
+    }
 }
 
 /**

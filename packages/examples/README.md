@@ -50,13 +50,7 @@ should remain close enough to real applications to expose the behavior that prod
 | Compiled styling             | `vmz-style-tailwind` | How explicit utility style input meets `/designs` semantics |
 | Native documentation         | `documents-fixture`  | Locale identity, page keys, and document checks             |
 
-## What these applications deliberately avoid
+## What the source looks like
 
-- No React-style hooks or `createX` state factories.
-- No Vue runtime or component compatibility layer.
-- No default VDOM or whole-component rerender path.
-- No `import '*.vmz'` ceremony to make components exist.
-- No hidden host prefix embedded in a mounted application's source.
-
-The examples should feel pleasantly unsurprising to read. The sophistication belongs in what the compiler can prove and
-generate, not in extra author-facing rituals. 🔬
+These applications stay on the ordinary VMZ authoring surface: class fields for state, file routes, Direct updates, and
+explicit mounts. The interesting part is what the compiler can prove and generate — not extra author-facing ritual. 🔬

@@ -1,0 +1,80 @@
+<template>
+  <div data-dogfood="inspector" data-density={density} dir={dir}>
+    <AppShell brand="Inspector" homeHref="/" navLabel="Panel" nav={navItems}>
+      <p data-dogfood-explain>explain:route=InspectorPage</p>
+      <p data-dogfood-trace>trace:facet=route</p>
+      <p data-dogfood="inspector-state">density:{density};dir:{dir}</p>
+
+      <div class="inspector-actions">
+        <Button type="button" onClick={() => this.cycleDensity()}>Cycle density</Button>
+        <Button type="button" variant="secondary" onClick={() => this.toggleDir()}>Toggle RTL</Button>
+      </div>
+
+      <Field
+        label="Query"
+        description="StableId or diagnostic code"
+        error={queryError}
+        controlId="inspector-query"
+        descriptionId="inspector-query-desc"
+        errorId="inspector-query-err"
+        describedBy={queryDescribedBy}
+        value={query}
+        onInput={(e) => this.onQueryInput(e)}
+      />
+
+      <Button type="button" onClick={() => this.openDialog()}>Replay error</Button>
+      <Dialog open={open} title="Error replay" titleId="inspector-dialog-title" onClose={() => this.closeDialog()}>
+        <p data-dogfood-replay>replay:generation=1</p>
+      </Dialog>
+    </AppShell>
+  </div>
+</template>
+
+<style>
+.inspector-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.75rem;
+}
+</style>
+
+<script client>
+export default class InspectorPage {
+  density = 'comfortable';
+  dir = 'ltr';
+  query = '';
+  queryError = '';
+  queryDescribedBy = 'inspector-query-desc';
+  open = false;
+  navItems = [
+    { id: 'inspect', title: 'Inspect', href: '/' },
+    { id: 'replay', title: 'Replay', href: '/#replay' },
+  ];
+
+  cycleDensity() {
+    if (this.density === 'comfortable') this.density = 'compact';
+    else if (this.density === 'compact') this.density = 'dense';
+    else this.density = 'comfortable';
+  }
+
+  toggleDir() {
+    this.dir = this.dir === 'rtl' ? 'ltr' : 'rtl';
+  }
+
+  openDialog() {
+    this.open = true;
+  }
+
+  closeDialog() {
+    this.open = false;
+  }
+
+  onQueryInput(e) {
+    this.query = e?.target?.value ?? '';
+    this.queryError = this.query.includes(' ') ? 'No spaces in StableId' : '';
+    this.queryDescribedBy = this.queryError
+      ? 'inspector-query-desc inspector-query-err'
+      : 'inspector-query-desc';
+  }
+}
+</script>

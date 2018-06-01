@@ -1,0 +1,77 @@
+<template>
+  <div data-dogfood="ui6" data-density={density} dir={dir}>
+    <AppShell brand="VMZ" homeHref="/" navLabel="UI6" nav={navItems}>
+      <Alert
+        tone="info"
+        roleName="status"
+        title="UI6 Density / RTL / Preset"
+        description="comfortable → compact → dense; dir ltr/rtl; high-contrast theme overlay from /designs."
+      />
+
+      <p data-dogfood="ui6-state">density:{density};dir:{dir};theme:{theme}</p>
+      <div class="vmz-ui6-actions">
+        <Button type="button" onClick={() => this.cycleDensity()}>Cycle density</Button>
+        <Button type="button" variant="secondary" onClick={() => this.toggleDir()}>Toggle RTL</Button>
+        <Button type="button" variant="ghost" onClick={() => this.toggleTheme()}>Toggle high-contrast</Button>
+      </div>
+
+      <Card title="Density sample" description="Button padding follows data-density; chrome from Style Theme.">
+        <Field
+          label="Sample field"
+          description="Control spacing from density tokens"
+          controlId="home-ui6-sample"
+          descriptionId="home-ui6-sample-desc"
+          value={sample}
+          onInput={(e) => this.onSample(e)}
+        />
+        <Button type="button">Probe control</Button>
+      </Card>
+    </AppShell>
+  </div>
+</template>
+
+<style>
+.vmz-ui6-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.75rem;
+}
+</style>
+
+<script client>
+export default class Ui6Page {
+  density = 'comfortable';
+  dir = 'ltr';
+  theme = 'default';
+  sample = '';
+  navItems = [
+    { id: 'ui6', title: 'UI6', href: '/ui6' },
+    { id: 'ui4', title: 'UI4', href: '/ui4' },
+    { id: 'ui5', title: 'UI5', href: '/ui5' },
+    { id: 'commercial', title: 'Commercial', href: '/commercial' },
+  ];
+
+  cycleDensity() {
+    if (this.density === 'comfortable') this.density = 'compact';
+    else if (this.density === 'compact') this.density = 'dense';
+    else this.density = 'comfortable';
+  }
+
+  toggleDir() {
+    this.dir = this.dir === 'rtl' ? 'ltr' : 'rtl';
+  }
+
+  toggleTheme() {
+    const next = this.theme === 'high-contrast' ? 'default' : 'high-contrast';
+    this.theme = next;
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', next);
+    }
+  }
+
+  onSample(e) {
+    const t = e?.target;
+    this.sample = t && 'value' in t ? String(t.value) : '';
+  }
+}
+</script>

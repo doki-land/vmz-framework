@@ -1,11 +1,17 @@
 # Getting started
 
 VMZ is an oxc-based full-stack application compiler: Vue- *familiar* surface, oxc-native compile, **VMZ-native
-semantics** (not a Vue/React compatibility layer).
+semantics**.
+
+**Convention over configuration** — directories are routes / components / server entrypoints; config is for exceptions.
+Brand line: **Vue-Familiar · Multi-Platform · Zero-Cost**.
 
 ```bash
-pnpm add -D vmz
+pnpm add @vmz/core
+pnpm add -D @vmz/vmz
 ```
+
+Add `@vmz/ui` when you need the official UI; add `@vmz/plugin-*` when you need compiler plugins.
 
 Prefer typed config:
 
@@ -17,4 +23,6 @@ export default defineConfig({
 });
 ```
 
-More guides and plugin docs live on this site under `/d/`.
+- [Zero-Cost](./zero-cost.md)
+- [Optimizations](./optimizations/index.md)
+- More guides and plugin docs live under `/d/`

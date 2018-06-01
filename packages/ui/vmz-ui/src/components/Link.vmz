@@ -1,0 +1,48 @@
+<template>
+  <a
+    class="vmz-ui-link"
+    data-vmz-ui="link"
+    href={href}
+    target={target}
+    rel={rel}
+  >
+    <slot />
+  </a>
+</template>
+
+<style>
+.vmz-ui-link {
+  font: inherit;
+  font-weight: 600;
+  color: var(--vmz-action-primary-background);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  text-decoration-thickness: 1px;
+  outline: none;
+}
+
+.vmz-ui-link:hover {
+  color: var(--vmz-action-primary-hover);
+}
+
+.vmz-ui-link:active {
+  color: var(--vmz-action-primary-active);
+}
+
+.vmz-ui-link:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+  border-radius: 2px;
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — Link (Foundation).
+ * Navigation / inline text link; tokens only, no brand hex.
+ */
+export default class Link {
+  public href: string = '#';
+  public target: string = '';
+  public rel: string = '';
+}
+</script>

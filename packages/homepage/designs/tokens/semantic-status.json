@@ -1,0 +1,36 @@
+{
+    "entries": [
+        {
+            "key": { "path": ["status", "info", "accent"] },
+            "value": "#00A6C8"
+        },
+        {
+            "key": { "path": ["status", "info", "foreground"] },
+            "value": "#0E4A5C"
+        },
+        {
+            "key": { "path": ["status", "success", "accent"] },
+            "value": "#00A86B"
+        },
+        {
+            "key": { "path": ["status", "success", "foreground"] },
+            "value": "#065F46"
+        },
+        {
+            "key": { "path": ["status", "warning", "accent"] },
+            "value": "#D97706"
+        },
+        {
+            "key": { "path": ["status", "warning", "foreground"] },
+            "value": "#92400E"
+        },
+        {
+            "key": { "path": ["status", "danger", "accent"] },
+            "value": "#E5484D"
+        },
+        {
+            "key": { "path": ["status", "danger", "foreground"] },
+            "value": "#9F1239"
+        }
+    ]
+}

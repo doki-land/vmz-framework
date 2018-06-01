@@ -462,6 +462,165 @@ export function parseArgs(argv: string[]): Record<string, string | boolean> & { 
 
 export function printHelp(): void;
 
+export const STATIC_DELIVERY_MANIFEST_SCHEMA: string;
+
+export function emitWebStatic(
+    distDir: string,
+    opts?: {
+        origin?: string;
+        applicationId?: string;
+        staticParams?: Record<string, Array<Record<string, string>>>;
+    },
+): Promise<{
+    manifest: Record<string, unknown>;
+    htmlFiles: string[];
+    skipped: Array<Record<string, unknown>>;
+    digest: string;
+    assets?: Record<string, unknown>;
+    cdnPolicy?: Record<string, unknown>;
+    cdnAdapters?: Record<string, unknown>;
+}>;
+
+export const CONTENT_ADDRESSED_ASSETS_SCHEMA: string;
+export function emitContentAddressedAssets(
+    distDir: string,
+    opts?: { candidates?: string[]; rewriteHtml?: boolean },
+): {
+    manifest: Record<string, unknown>;
+    assetsDir: string;
+    rewrites: Record<string, string>;
+    manifestPath: string;
+};
+export function resolveAssetByDigest(
+    distDir: string,
+    digest: string,
+    ext?: string,
+): { assetPath: string; digest: string; bytes: number } | null;
+export function assertSharedAssetPath(
+    distDir: string,
+    a: Buffer | string,
+    b: Buffer | string,
+    ext?: string,
+): { ok: boolean; assetPath?: string; digest?: string; reason?: string; digestA?: string; digestB?: string; rel?: string };
+export function contentAddressedAssetsDigest(manifest: Record<string, unknown>): string;
+
+export const CDN_POLICY_MANIFEST_SCHEMA: string;
+export const CDN_ADAPTER_PROJECTION_SCHEMA: string;
+export const CACHE_HTML: string;
+export const CACHE_ASSET_IMMUTABLE: string;
+export const CACHE_META: string;
+
+export function buildCdnPolicyManifest(
+    staticManifest: Record<string, unknown>,
+    opts?: { redirects?: Array<{ from: string; to: string; status?: number; reason?: string }> },
+): Record<string, unknown>;
+
+export function emitCdnPolicy(
+    distDir: string,
+    staticManifest: Record<string, unknown>,
+    opts?: { redirects?: Array<{ from: string; to: string; status?: number; reason?: string }> },
+): { policy: Record<string, unknown>; adapters: Record<string, unknown> };
+
+export function projectCdnAdapter(policy: Record<string, unknown>, adapterId: 'local-static' | 'netlify'): Record<string, unknown>;
+
+export function createLocalStaticHandler(
+    distDir: string,
+    policy: Record<string, unknown>,
+): (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void;
+
+export function listenLocalStaticHost(
+    distDir: string,
+    policy: Record<string, unknown>,
+    opts?: { host?: string; port?: number },
+): Promise<{ host: string; port: number; baseUrl: string; close: () => Promise<void> }>;
+
+export function matchGlob(pattern: string, pathname: string): boolean;
+
+export const SITE_DELIVERY_CONTRACT_SCHEMA: string;
+export const SITE_DELIVERY_RESOLUTION_SCHEMA: string;
+
+export function defineSite<T extends Record<string, unknown>>(delivery: T): T;
+
+export function normalizeSiteDelivery(
+    raw: unknown,
+    opts?: { siteId?: string; projectRoot?: string },
+): { ok: true; contract: Record<string, unknown> } | { ok: false; diagnostics: Array<{ code: string; message: string }> };
+
+export function normalizeSourceProbe(probe?: Record<string, unknown>): Record<string, unknown>;
+
+export function resolveSiteRelease(
+    contract: Record<string, unknown>,
+    probes?: Record<string, Record<string, unknown>>,
+): Record<string, unknown>;
+
+export function probeReleaseDirectory(releaseDir: string): Record<string, unknown>;
+
+export function emitSiteDelivery(
+    outDir: string,
+    deliveryRaw: unknown,
+    opts?: { siteId?: string; probes?: Record<string, unknown> },
+): { contract: Record<string, unknown>; resolution: Record<string, unknown> | null };
+
+export const PRODUCTION_SCENARIO_PACK_SCHEMA: string;
+export const PRODUCTION_CI_PROFILE_SCHEMA: string;
+export const PRODUCTION_TEST_REPORT_SCHEMA: string;
+
+export function browserProductionScenarioPack(): Record<string, unknown>;
+export function browserProductionCiProfile(overrides?: Record<string, unknown>): Record<string, unknown>;
+export function normalizeScenarioPack(
+    raw: unknown,
+): { ok: true; pack: Record<string, unknown> } | { ok: false; diagnostics: Array<{ code: string; message: string }> };
+export function normalizeCiProfile(raw: unknown): Record<string, unknown>;
+export function scenarioPackDigest(pack: Record<string, unknown>): string;
+export function ciProfileDigest(profile: Record<string, unknown>): string;
+export function buildProductionTestReport(input: {
+    pack: Record<string, unknown>;
+    profile: Record<string, unknown>;
+    results: Array<Record<string, unknown>>;
+    artifactsDir?: string;
+}): Record<string, unknown>;
+export function productionTestReportDigest(report: Record<string, unknown>): string;
+export function emitProductionTestArtifacts(
+    root: string,
+    report: Record<string, unknown>,
+    pack: Record<string, unknown>,
+    profile: Record<string, unknown>,
+): {
+    reportPath: string;
+    packPath: string;
+    profilePath: string;
+    report: Record<string, unknown>;
+};
+export function assertNoForbiddenRunners(profile: Record<string, unknown>, importedNames?: string[]): string[];
+
+export const PRODUCTION_OBSERVABILITY_SCHEMA: string;
+export const PRODUCTION_TRACE_SCHEMA: string;
+export const REQUIRED_TRACE_FACETS: readonly string[];
+
+export function browserProductionObservability(overrides?: Record<string, unknown>): Record<string, unknown>;
+export function normalizeObservability(raw: unknown): Record<string, unknown>;
+export function redactSensitive(value: unknown, policy?: Record<string, unknown>, opts?: { privilege?: 'public' | 'operator' }): unknown;
+export function validateProductionTrace(raw: unknown, requiredFacets?: string[]): { ok: boolean; covered: string[]; errors: string[] };
+export function buildCoveringProductionTrace(meta?: Record<string, unknown>): Record<string, unknown>;
+export function checkProductionBudgets(
+    measured: Record<string, unknown>,
+    budgets: Record<string, unknown>,
+): { ok: boolean; violations: string[] };
+export function checkCapabilityClosure(cap: Record<string, unknown>, policy: Record<string, unknown>): { ok: boolean; errors: string[] };
+export function applySecurityHeadersToCdnPolicy(cdnPolicy: Record<string, unknown>, security: Record<string, unknown>): Record<string, unknown>;
+export function measureDistBudgets(distDir: string): Record<string, number>;
+export function emitProductionObservability(
+    distDir: string,
+    overrides?: Record<string, unknown>,
+    meta?: { applicationId?: string; artifactDigest?: string },
+): {
+    contract: Record<string, unknown>;
+    trace: Record<string, unknown>;
+    contractPath: string;
+    tracePath: string;
+};
+export function observabilityDigest(contract: Record<string, unknown>): string;
+
 export declare const log: {
     info(...args: unknown[]): void;
     warn(...args: unknown[]): void;

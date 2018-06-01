@@ -2,9 +2,11 @@
 /**
  * `vmz` CLI invocation modes (JS gate only; Rust binary stays full).
  *
+ * Product install face: workspace `vmz` / publish `@vmz/vmz` (bin still `vmz`).
+ *
  * Three modes — do not collapse them:
  * - **developer**: monorepo source checkout (`packages/runtimes/vmz`, not under node_modules)
- * - **project**: app's `node_modules/vmz` or `node_modules/@vmz/vmz` (pnpm/npm/yarn)
+ * - **project**: app's nearest `node_modules/vmz` or `node_modules/@vmz/vmz`
  * - **global**: npm/pnpm global (or any install under node_modules that is not the nearest project one)
  *
  */
@@ -16,8 +18,10 @@ import { fileURLToPath } from 'node:url';
 
 /** @typedef {'developer' | 'project' | 'global'} InvocationMode */
 
+const PROJECT_PKG_SEGMENTS = [['@vmz', 'vmz'], ['vmz']];
+
 /**
- * Package root of the running `vmz` / `@vmz/vmz` install (`…/vmz`, not `…/vmz/dist`).
+ * Package root of the running `vmz` / `@vmz/vmz` install.
  * @param {string} [fromUrl]
  */
 export function resolveThisPackageRoot(fromUrl = import.meta.url) {
@@ -36,15 +40,15 @@ function tryRealpath(p) {
 }
 
 /**
- * Walk from `startDir` for nearest project `vmz` / `@vmz/vmz` package root.
+ * Walk from `startDir` for nearest project CLI package root.
  * @param {string} startDir
- * @returns {string | null} realpath of package root
+ * @returns {string | null}
  */
 export function findNearestProjectVmz(startDir) {
     let dir = path.resolve(startDir);
     for (;;) {
-        const candidates = [path.join(dir, 'node_modules', 'vmz'), path.join(dir, 'node_modules', '@vmz', 'vmz')];
-        for (const candidate of candidates) {
+        for (const segments of PROJECT_PKG_SEGMENTS) {
+            const candidate = path.join(dir, 'node_modules', ...segments);
             const pkgJson = path.join(candidate, 'package.json');
             if (existsSync(pkgJson)) {
                 return tryRealpath(candidate);
@@ -57,7 +61,7 @@ export function findNearestProjectVmz(startDir) {
 }
 
 /**
- * Resolve CLI entry for a `vmz` package root (`bin/vmz.js`).
+ * Resolve CLI entry (`bin/vmz.js`).
  * @param {string} packageRoot
  * @returns {string | null}
  */
@@ -68,8 +72,6 @@ export function resolveVmzBin(packageRoot) {
 }
 
 /**
- * Install lives under a `node_modules` tree (npm -g, pnpm store link, etc.).
- * Workspace source checkout (`packages/runtimes/vmz`) does not → developer mode.
  * @param {string} packageRoot
  */
 export function isUnderNodeModules(packageRoot) {
@@ -79,27 +81,10 @@ export function isUnderNodeModules(packageRoot) {
 }
 
 /**
- * Classify how this process was launched.
- *
- * | mode | thisPackageRoot | rule |
- * |-------------|-----------------------------------------|-------------------------------------------|
- * | developer | monorepo `packages/runtimes/vmz` | not under `node_modules` |
- * | project | app `node_modules/(@vmz/)vmz` | under node_modules ∧ equals nearest |
- * | global | global / unrelated node_modules install | under node_modules ∧ not nearest project |
- *
  * @param {{
  * cwd?: string,
  * thisPackageRoot?: string,
  * }} [opts]
- * @returns {{
- * mode: InvocationMode,
- * cwd: string,
- * thisPackageRoot: string,
- * nearestProjectVmz: string | null,
- * isDeveloper: boolean,
- * isProjectLocal: boolean,
- * isGlobalLike: boolean,
- * }}
  */
 export function getInvocationContext(opts = {}) {
     const cwd = path.resolve(opts.cwd ?? process.cwd());
@@ -130,8 +115,6 @@ export function getInvocationContext(opts = {}) {
 }
 
 /**
- * Commands allowed in **global** mode without re-exec / refusal.
- * Developer + project modes allow the full CLI.
  * @param {string | undefined} cmd
  */
 export function isGlobalAllowedCommand(cmd) {
@@ -150,7 +133,7 @@ export function isGlobalAllowedCommand(cmd) {
 
 /**
  * @param {string} bin
- * @param {string[]} argv full argv including command (e.g. `['check', '.']`)
+ * @param {string[]} argv
  * @returns {Promise<number>}
  */
 export function reexecProjectVmz(bin, argv) {
@@ -168,9 +151,6 @@ export function reexecProjectVmz(bin, argv) {
 }
 
 /**
- * Guard for project-only commands when the current install is **global** mode.
- * Developer / project → proceed. Global + local present → re-exec. Global alone → refuse.
- *
  * @returns {Promise<{ action: 'proceed' } | { action: 'exit', code: number }>}
  */
 export async function gateGlobalProjectCommand(opts) {
@@ -182,7 +162,7 @@ export async function gateGlobalProjectCommand(opts) {
     if (ctx.nearestProjectVmz && ctx.nearestProjectVmz !== ctx.thisPackageRoot) {
         const bin = resolveVmzBin(ctx.nearestProjectVmz);
         if (!bin) {
-            logError('found project `@vmz/vmz` / `vmz` but bin/vmz.js is missing.');
+            logError('found project `vmz` / `@vmz/vmz` but bin/vmz.js is missing.');
             return { action: 'exit', code: 1 };
         }
         const code = await reexec(bin, argv);

@@ -41,7 +41,10 @@ pub fn inspect_path(
     options: &InspectOptions,
 ) -> vmz_compiler::Result<InspectReport> {
     let path = path.as_ref();
-    let check_opts = CheckOptions { deny_warnings: options.deny_warnings };
+    let check_opts = CheckOptions {
+        deny_warnings: options.deny_warnings,
+        require_browser_safe_server_slices: false,
+    };
     let mut report = check_path(path, &check_opts)?;
 
     if options.profile == InspectProfile::Lint {
@@ -69,5 +72,8 @@ pub fn inspect_project(
 }
 
 pub fn failed(report: &InspectReport, options: &InspectOptions) -> bool {
-    report.failed(&CheckOptions { deny_warnings: options.deny_warnings })
+    report.failed(&CheckOptions {
+        deny_warnings: options.deny_warnings,
+        require_browser_safe_server_slices: false,
+    })
 }

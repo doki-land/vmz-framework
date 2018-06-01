@@ -62,6 +62,16 @@ pub struct ScriptBlock {
 }
 
 #[derive(Debug, Clone)]
+pub struct DataBlock {
+    pub content: String,
+    pub content_start: usize,
+    /// `None` or `json5` (default); `yaml` reserved.
+    pub lang: Option<String>,
+    /// Opening-tag attributes (e.g. `<router path="/x" />` sugar → same RouteContract).
+    pub attrs: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct ParsedVmz {
     pub path: PathBuf,
     pub source: String,
@@ -69,6 +79,10 @@ pub struct ParsedVmz {
     pub style: Option<StyleBlock>,
     pub client: ScriptBlock,
     pub server: Option<ScriptBlock>,
+    /// Optional RouteContract data block (≤1).
+    pub router: Option<DataBlock>,
+    /// Optional PageMeta data block (≤1).
+    pub meta: Option<DataBlock>,
 }
 
 pub fn parse_vmz(path: impl AsRef<Path>, source: impl Into<String>) -> Result<ParsedVmz, SfcError> {
@@ -76,6 +90,8 @@ pub fn parse_vmz(path: impl AsRef<Path>, source: impl Into<String>) -> Result<Pa
     let source = source.into();
     let blocks = extract_blocks(&path, &source)?;
 
+    let mut router = None;
+    let mut meta = None;
     let mut template = None;
     let mut style = None;
     let mut client = None;
@@ -84,9 +100,45 @@ pub fn parse_vmz(path: impl AsRef<Path>, source: impl Into<String>) -> Result<Pa
 
     for block in blocks {
         match block.role {
+            BlockRole::Router => {
+                if !matches!(last_role, BlockRole::None | BlockRole::Meta) {
+                    return Err(err(
+                        &path,
+                        "`<router>` must appear before `<template>` (with optional `<meta>`)",
+                    ));
+                }
+                if router.is_some() {
+                    return Err(err(&path, "duplicate `<router>`"));
+                }
+                router = Some(DataBlock {
+                    content: block.content,
+                    content_start: block.content_start,
+                    lang: block.lang,
+                    attrs: block.attrs,
+                });
+                last_role = BlockRole::Router;
+            }
+            BlockRole::Meta => {
+                if !matches!(last_role, BlockRole::None | BlockRole::Router) {
+                    return Err(err(
+                        &path,
+                        "`<meta>` must appear before `<template>` (with optional `<router>`)",
+                    ));
+                }
+                if meta.is_some() {
+                    return Err(err(&path, "duplicate `<meta>`"));
+                }
+                meta = Some(DataBlock {
+                    content: block.content,
+                    content_start: block.content_start,
+                    lang: block.lang,
+                    attrs: block.attrs,
+                });
+                last_role = BlockRole::Meta;
+            }
             BlockRole::Template => {
-                if !matches!(last_role, BlockRole::None) {
-                    return Err(err(&path, "`<template>` must be the first block"));
+                if !matches!(last_role, BlockRole::None | BlockRole::Router | BlockRole::Meta) {
+                    return Err(err(&path, "`<template>` must be the first view block"));
                 }
                 if template.is_some() {
                     return Err(err(&path, "duplicate `<template>`"));
@@ -168,12 +220,14 @@ pub fn parse_vmz(path: impl AsRef<Path>, source: impl Into<String>) -> Result<Pa
     };
 
     let _ = last_role;
-    Ok(ParsedVmz { path, source, template, style, client, server })
+    Ok(ParsedVmz { path, source, template, style, client, server, router, meta })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BlockRole {
     None,
+    Router,
+    Meta,
     Template,
     Style,
     Client,
@@ -186,6 +240,7 @@ struct RawBlock {
     content: String,
     content_start: usize,
     lang: Option<String>,
+    attrs: String,
 }
 
 fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> {
@@ -225,7 +280,14 @@ fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> 
         i += 1; // '>'
         let content_start = i;
 
+        let self_closing = attrs.trim_end().ends_with('/');
+        if self_closing {
+            attrs = attrs.trim_end().trim_end_matches('/').to_string();
+        }
+
         let (role, close) = match name {
+            "router" => (BlockRole::Router, "</router>"),
+            "meta" => (BlockRole::Meta, "</meta>"),
             "template" => (BlockRole::Template, "</template>"),
             "style" => (BlockRole::Style, "</style>"),
             "script" => {
@@ -243,40 +305,76 @@ fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> 
             }
         };
 
-        let Some(rel) = source[content_start..].find(close) else {
-            return Err(err(path, &format!("missing closing `{close}`")));
+        if self_closing && !matches!(role, BlockRole::Router | BlockRole::Meta) {
+            return Err(err(
+                path,
+                &format!("self-closing `<{name} />` is only allowed for `<router>` / `<meta>`"),
+            ));
+        }
+
+        let (content, content_start) = if self_closing {
+            (String::new(), content_start)
+        } else {
+            let Some(rel) = source[content_start..].find(close) else {
+                return Err(err(path, &format!("missing closing `{close}`")));
+            };
+            let content_end = content_start + rel;
+            let content = source[content_start..content_end].to_string();
+            i = content_end + close.len();
+            (content, content_start)
         };
-        let content_end = content_start + rel;
-        let content = source[content_start..content_end].to_string();
-        i = content_end + close.len();
 
-        let lang = if matches!(role, BlockRole::Style) { parse_lang_attr(&attrs) } else { None };
+        let lang = if matches!(role, BlockRole::Style | BlockRole::Router | BlockRole::Meta) {
+            parse_lang_attr(&attrs)
+        } else {
+            None
+        };
 
-        blocks.push(RawBlock { role, content, content_start, lang });
+        blocks.push(RawBlock { role, content, content_start, lang, attrs });
     }
 
     Ok(blocks)
 }
 
 fn parse_lang_attr(attrs: &str) -> Option<String> {
+    parse_attr_value(attrs, "lang")
+}
+
+/// Read `name="value"` / `name='value'` from an HTML-like attribute list.
+pub fn parse_attr_value(attrs: &str, name: &str) -> Option<String> {
     let lower = attrs.to_ascii_lowercase();
-    let key = "lang";
-    let idx = lower.find(key)?;
-    let after = attrs[idx + key.len()..].trim_start();
-    let after = after.strip_prefix('=')?.trim_start();
-    if let Some(rest) = after.strip_prefix('"') {
-        let end = rest.find('"')?;
-        return Some(rest[..end].to_string());
+    let key = name.to_ascii_lowercase();
+    let mut search = 0;
+    while let Some(rel) = lower[search..].find(&key) {
+        let idx = search + rel;
+        let before_ok = idx == 0 || lower.as_bytes()[idx - 1].is_ascii_whitespace();
+        let after = idx + key.len();
+        let after_ok = after >= lower.len()
+            || lower.as_bytes()[after].is_ascii_whitespace()
+            || lower.as_bytes()[after] == b'=';
+        if before_ok && after_ok {
+            let rest = attrs[after..].trim_start();
+            let rest = rest.strip_prefix('=')?.trim_start();
+            if let Some(r) = rest.strip_prefix('"') {
+                let end = r.find('"')?;
+                return Some(r[..end].to_string());
+            }
+            if let Some(r) = rest.strip_prefix('\'') {
+                let end = r.find('\'')?;
+                return Some(r[..end].to_string());
+            }
+            let end = rest
+                .find(|c: char| c.is_ascii_whitespace() || c == '/' || c == '>')
+                .unwrap_or(rest.len());
+            let v = rest[..end].trim();
+            if !v.is_empty() {
+                return Some(v.to_string());
+            }
+            return None;
+        }
+        search = idx + 1;
     }
-    if let Some(rest) = after.strip_prefix('\'') {
-        let end = rest.find('\'')?;
-        return Some(rest[..end].to_string());
-    }
-    let end = after
-        .find(|c: char| c.is_ascii_whitespace() || c == '/' || c == '>')
-        .unwrap_or(after.len());
-    let v = after[..end].trim();
-    if v.is_empty() { None } else { Some(v.to_string()) }
+    None
 }
 
 fn skip_ws_and_comments(bytes: &[u8], i: &mut usize) {

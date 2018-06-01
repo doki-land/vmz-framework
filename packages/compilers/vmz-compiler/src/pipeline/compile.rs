@@ -14,7 +14,7 @@ use crate::template::parse_template;
 use crate::transpile::transpile_ts;
 use crate::tw::{TwCompilerHandle, TwEmitRequest, register_tw_from_parsed};
 use crate::virtual_server;
-use vmz_types::{DeploymentView, StubStatus};
+use vmz_types::{DeploymentClientCall, DeploymentView, StubStatus};
 use walkdir::WalkDir;
 
 #[derive(Clone)]
@@ -126,7 +126,7 @@ pub fn compile_path(
         let kind = VmzModuleKind::Other;
         let chunk = chunk_id_for(src_root, path);
         report.affected_chunks.push(chunk.clone());
-        emit_file(path, src_root, options, &mut report, kind, &chunk)?;
+        emit_file(path, src_root, options, &mut report, kind, &chunk, None)?;
         emit_routes_json(options, &mut report)?;
         let project_root =
             path.parent().and_then(|p| p.parent()).unwrap_or_else(|| path.parent().unwrap_or(path));
@@ -189,8 +189,25 @@ pub fn compile_project_with_dirty(
     if plan.rebuild_server_tree {
         emit_server_tree(&src_root, options, &mut report)?;
     }
+    // Plain `src/**/*.{ts,js}` helpers (not `#server`, not `.vmz`) → `dist/**/*.js`.
+    emit_client_modules(&src_root, options, &mut report)?;
+
+    // Full RouteTable from all pages (Link resolve must not depend on dirty set / filesystem probes).
+    let route_table = match build_project_route_table(root, &src_root, &mut report) {
+        Some(t) => t,
+        None => return Ok(report),
+    };
+
     for unit in &plan.units {
-        emit_file(&unit.source, &src_root, options, &mut report, unit.kind, &unit.chunk_id)?;
+        emit_file(
+            &unit.source,
+            &src_root,
+            options,
+            &mut report,
+            unit.kind,
+            &unit.chunk_id,
+            Some(&route_table),
+        )?;
     }
     if plan.full {
         emit_routes_json(options, &mut report)?;
@@ -200,6 +217,44 @@ pub fn compile_project_with_dirty(
     emit_stylesheets(root, options, &mut report)?;
     emit_deployment_json(root, &src_root, options, &plan, &mut report)?;
     Ok(report)
+}
+
+fn build_project_route_table(
+    root: &Path,
+    src_root: &Path,
+    report: &mut CompileReport,
+) -> Option<crate::pipeline::link::RouteTable> {
+    let mut parsed_pages = Vec::new();
+    for (path, kind) in discover_vmz_files(root) {
+        if kind != VmzModuleKind::Page {
+            continue;
+        }
+        let Ok(source) = fs::read_to_string(&path) else {
+            report
+                .diagnostics
+                .push(ReportedDiagnostic::error(&path, "failed to read page for RouteTable"));
+            continue;
+        };
+        let parsed = match parse_vmz(&path, source) {
+            Ok(p) => p,
+            Err(e) => {
+                report.diagnostics.push(ReportedDiagnostic::error(&path, e.to_string()));
+                continue;
+            }
+        };
+        let client = analyze_script(ScriptKind::Client, &parsed.client.content);
+        let chunk_id = chunk_id_for(src_root, &path);
+        parsed_pages.push((path, parsed, client.decl.name, chunk_id));
+    }
+    match crate::pipeline::link::collect_route_table(&parsed_pages) {
+        Ok(table) => Some(table),
+        Err(errs) => {
+            for e in errs {
+                report.diagnostics.push(ReportedDiagnostic::error(root, e));
+            }
+            None
+        }
+    }
 }
 
 fn emit_stylesheets(
@@ -471,8 +526,12 @@ fn emit_runtime_js(options: &CompileOptions, report: &mut CompileReport) -> crat
     let runtime_root = options.runtime_dist.clone().unwrap_or_else(|| {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../runtimes/vmz-runtime/dist")
     });
-    let mut copies =
-        vec![("server.js", "vmz-runtime.js"), ("dom.js", "vmz-dom.js"), ("http.js", "vmz-http.js")];
+    let mut copies = vec![
+        ("server.js", "vmz-runtime.js"),
+        ("dom.js", "vmz-dom.js"),
+        ("http.js", "vmz-http.js"),
+        ("client-nav.js", "vmz-client-nav.js"),
+    ];
     // Local `vmz serve` / `vmz dev` need the host; production `--release` deploys omit it
     // (~26KB) — Node CLI materializes from `@vmz/core` when serving if missing.
     if !options.release {
@@ -540,6 +599,61 @@ fn emit_server_tree(
     Ok(())
 }
 
+/// Mirror plain client helpers: `src/lib/foo.ts` → `dist/lib/foo.js` (skip `src/server/**`).
+fn emit_client_modules(
+    src_root: &Path,
+    options: &CompileOptions,
+    report: &mut CompileReport,
+) -> crate::Result<()> {
+    if !src_root.is_dir() {
+        return Ok(());
+    }
+    let server_root = src_root.join("server");
+    for entry in WalkDir::new(src_root).into_iter().filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        if path.strip_prefix(&server_root).is_ok() {
+            continue;
+        }
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "ts" && ext != "js" && ext != "mjs" {
+            continue;
+        }
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        if name.ends_with(".d.ts") {
+            continue;
+        }
+        let Ok(rel) = path.strip_prefix(src_root) else {
+            continue;
+        };
+        let out = options.out_dir.join(rel).with_extension("js");
+        if let Some(parent) = out.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let source = fs::read_to_string(path)?;
+        let js = if ext == "ts" {
+            match transpile_ts(&source, &path.display().to_string()) {
+                Ok(js) => js,
+                Err(e) => {
+                    report.diagnostics.push(ReportedDiagnostic::error(
+                        path,
+                        format!("client module emit failed: {e}"),
+                    ));
+                    continue;
+                }
+            }
+        } else {
+            source
+        };
+        let js = crate::emit::rewrite_ts_spec_imports(&js);
+        fs::write(&out, js)?;
+        report.emitted.push(out);
+    }
+    Ok(())
+}
+
 fn emit_file(
     path: &Path,
     src_root: &Path,
@@ -547,11 +661,19 @@ fn emit_file(
     report: &mut CompileReport,
     kind: VmzModuleKind,
     chunk_id: &str,
+    routes: Option<&crate::pipeline::link::RouteTable>,
 ) -> crate::Result<()> {
     let source = fs::read_to_string(path)?;
     let parsed = parse_vmz(path, source)?;
     register_tw_from_parsed(&parsed, &mut report.tw_registrations);
     let client = analyze_script(ScriptKind::Client, &parsed.client.content);
+    for finding in crate::secrets::collect_client_boundary_findings(&parsed.client.content) {
+        report.diagnostics.push(ReportedDiagnostic::error_at(
+            path,
+            format!("{}: {}", finding.code, finding.message),
+            finding.span,
+        ));
+    }
     let server = parsed.server.as_ref().map(|s| analyze_script(ScriptKind::Server, &s.content));
     let template_ir = parse_template(&parsed.template.content);
 
@@ -574,31 +696,45 @@ fn emit_file(
     });
 
     // Program IR first ?emit and routes consume the same fact source.
-    let server_attach = server.as_ref().zip(server_id.as_ref()).map(|(an, id)| {
-        let client_calls =
-            crate::server_calls::collect_server_class_calls(&parsed.client.content, &an.decl.name);
-        vmz_types::ServerAttach {
-            module_id: id.clone(),
-            class_name: an.decl.name.clone(),
-            methods: an.decl.methods.clone(),
-            client_calls,
-        }
-    });
+    let server_attach = server.as_ref().zip(server_id.as_ref()).zip(parsed.server.as_ref()).map(
+        |((an, id), server_block)| {
+            let client_calls = crate::server_calls::collect_server_class_calls(
+                &parsed.client.content,
+                &an.decl.name,
+            );
+            let mut secret_requirements =
+                crate::secrets::collect_secret_requirements(&server_block.content);
+            for s in &mut secret_requirements {
+                s.module_id = Some(id.clone());
+            }
+            vmz_types::ServerAttach {
+                module_id: id.clone(),
+                class_name: an.decl.name.clone(),
+                methods: an.decl.methods.clone(),
+                client_calls,
+                secret_requirements,
+            }
+        },
+    );
     let mut program = build_program_module_with_server(
         &path.display().to_string(),
         &client.decl,
         &template_ir,
         server_attach.as_ref(),
+        routes,
     );
     if let Some(unit) = program.units.first_mut() {
         let region_ids: Vec<u32> = unit.view.region_ids.iter().map(|r| r.0).collect();
         let capabilities: Vec<String> =
             unit.server.capabilities.iter().map(|c| c.method.clone()).collect();
-        let client_calls: Vec<(String, Option<String>)> = unit
+        let client_calls: Vec<DeploymentClientCall> = unit
             .server
             .calls
             .iter()
-            .map(|e| (e.method.clone(), e.from_client_method.clone()))
+            .map(|e| DeploymentClientCall {
+                method: e.method.clone(),
+                from_client_method: e.from_client_method.clone(),
+            })
             .collect();
         let server_module_id = unit.server.module_id.clone();
         let resume_entries = unit.collect_resume_entries_from_view();
@@ -660,7 +796,7 @@ fn emit_file(
         if js.contains("vmz:dom") && dom_path.exists() {
             js = crate::emit::rewrite_virtual_import(&js, &client_path, "vmz:dom", &dom_path);
         }
-        js
+        crate::emit::rewrite_ts_spec_imports(&js)
     };
     fs::write(&client_path, &client_js)?;
     report.emitted.push(client_path);

@@ -2,8 +2,8 @@
  * Build `vmz-napi` and install the `.node` into the current-platform workspace package
  * (`packages/runtimes/vmz-<short>/` → npm name `@vmz/vmz-<short>`).
  *
- * Does NOT drop binaries into `packages/runtimes/vmz/` — the JS metapackage loads via
- * optionalDependencies / `require.resolve('@vmz/vmz-<short>')` only.
+ * Does NOT drop binaries into `packages/runtimes/vmz/` — the JS CLI package loads via
+ * optionalDependencies / `require.resolve('@vmz/vmz-<short>')` only — loaded by `@vmz/vmz`.
  *
  * Usage: node scripts/build/napi.mjs [--release]
  */
@@ -106,7 +106,7 @@ if (!existsSync(pkgJsonPath)) {
                 name: `@vmz/vmz-${plat.short}`,
                 version: '0.1.0',
                 private: true,
-                description: `VMZ native N-API addon (${plat.short})`,
+                description: `VMZ native N-API addon for @vmz/vmz (${plat.short})`,
                 license: 'MIT',
                 os: plat.os,
                 cpu: plat.cpu,
@@ -119,9 +119,11 @@ if (!existsSync(pkgJsonPath)) {
         )}\n`,
     );
 } else {
-    // Keep main/files aligned with the triple-named binary.
+    // Keep name/main/files aligned with the triple-named binary and @vmz/vmz-* publish face.
     try {
         const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf8'));
+        pkg.name = `@vmz/vmz-${plat.short}`;
+        pkg.description = `VMZ native N-API addon for @vmz/vmz (${plat.short})`;
         pkg.main = binaryName;
         pkg.files = [binaryName, 'README.md'];
         writeFileSync(pkgJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);

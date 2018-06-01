@@ -539,31 +539,33 @@ function platformShort(triple = platformTriple()) {
 }
 
 /**
- * Resolve native `.node` via the platform optionalDependency only
- * (`@vmz/vmz-<short>` from pnpm workspace or published npm).
+ * Resolve native `.node` via the platform optionalDependency
+ * (`@vmz/vmz-<short>`; transitional fallback `@vmz/vmz-<short>`).
  * @returns {string}
  */
 export function resolveNativePath() {
     const triple = platformTriple();
     const short = platformShort(triple);
-    const name = `@vmz/vmz-${short}`;
+    const names = [`@vmz/vmz-${short}`, `@vmz/vmz-${short}`];
     /** @type {string[]} */
     const candidates = [];
-    try {
-        const resolved = require.resolve(`${name}/package.json`);
-        const dir = path.dirname(resolved);
-        // Prefer platform-named binary; plain `vmz.node` is legacy-only.
-        candidates.push(path.join(dir, `vmz.${triple}.node`), path.join(dir, 'vmz.node'));
-    } catch {
-        /* optional dep not installed */
+    for (const name of names) {
+        try {
+            const resolved = require.resolve(`${name}/package.json`);
+            const dir = path.dirname(resolved);
+            // Prefer platform-named binary; plain `vmz.node` is legacy-only.
+            candidates.push(path.join(dir, `vmz.${triple}.node`), path.join(dir, 'vmz.node'));
+        } catch {
+            /* optional dep not installed */
+        }
+        // pnpm may nest under the @vmz/vmz package's node_modules
+        candidates.push(path.join(pkgRoot, 'node_modules', name, `vmz.${triple}.node`), path.join(pkgRoot, 'node_modules', name, 'vmz.node'));
     }
-    // pnpm may nest under the vmz package's node_modules
-    candidates.push(path.join(pkgRoot, 'node_modules', name, `vmz.${triple}.node`), path.join(pkgRoot, 'node_modules', name, 'vmz.node'));
     for (const p of candidates) {
         if (existsSync(p)) return p;
     }
     throw new Error(
-        `vmz native addon not found for ${name}. Run: pnpm napi:build (writes packages/runtimes/vmz-${short}/)\n` +
+        `vmz native addon not found for @vmz/vmz-${short}. Run: pnpm napi:build (writes packages/runtimes/vmz-${short}/)\n` +
             `Looked in:\n${candidates.map((c) => `  - ${c}`).join('\n')}`,
     );
 }
@@ -834,6 +836,7 @@ export function checkApplicationDevTestDeployJson(hostRoot, packageRoots, dirtyP
 }
 
 export { createDevSession, listWatchedFiles, srcFingerprint } from './dev-session.js';
+export { findAvailablePort } from './port.js';
 export { runCli, parseArgs, printHelp, printGlobalHelp, printProjectHelp } from './cli.js';
 export {
     findNearestProjectVmz,
@@ -848,6 +851,90 @@ export { resolveWorkspaceDirs, findPackageJson, readPackageMeta } from './resolv
 export { resolvePackageRoot, resolveWorkspacePackages } from './packages.js';
 export { log } from './log.js';
 export { cmdApplication, runCheck as runApplicationCheck } from './application-cmd.js';
+export { cmdArtifact } from './release-cmd.js';
+export {
+    ARTIFACT_DIFF_SCHEMA,
+    DELIVERY_ARTIFACT_MANIFEST_SCHEMA,
+    RELEASE_ENVELOPE_SCHEMA,
+    ROUTE_REALIZATION_TABLE_SCHEMA,
+    atomicWritePointer,
+    canonicalJson,
+    diffArtifacts,
+    loadReleaseEnvelope,
+    packRelease,
+    publishRelease,
+    readPointer,
+    rollbackRelease,
+    sha256File,
+    sha256Hex,
+} from './release-pack.js';
+// APPLICATION_ARTIFACT_SCHEMA lives in @vmz/protocol (already re-exported above);
+// release-pack keeps a local constant for envelope writes — do not dual-export the name.
+export {
+    STATIC_DELIVERY_MANIFEST_SCHEMA,
+    emitWebStatic,
+} from './static-emit.js';
+export {
+    CONTENT_ADDRESSED_ASSETS_SCHEMA,
+    emitContentAddressedAssets,
+    resolveAssetByDigest,
+    assertSharedAssetPath,
+    contentAddressedAssetsDigest,
+} from './content-addressed-assets.js';
+export {
+    CDN_POLICY_MANIFEST_SCHEMA,
+    CDN_ADAPTER_PROJECTION_SCHEMA,
+    CACHE_HTML,
+    CACHE_ASSET_IMMUTABLE,
+    CACHE_META,
+    buildCdnPolicyManifest,
+    emitCdnPolicy,
+    projectCdnAdapter,
+    createLocalStaticHandler,
+    listenLocalStaticHost,
+    matchGlob,
+} from './cdn-policy.js';
+export {
+    SITE_DELIVERY_CONTRACT_SCHEMA,
+    SITE_DELIVERY_RESOLUTION_SCHEMA,
+    defineSite,
+    normalizeSiteDelivery,
+    normalizeSourceProbe,
+    resolveSiteRelease,
+    probeReleaseDirectory,
+    emitSiteDelivery,
+} from './site-delivery.js';
+export {
+    PRODUCTION_SCENARIO_PACK_SCHEMA,
+    PRODUCTION_CI_PROFILE_SCHEMA,
+    PRODUCTION_TEST_REPORT_SCHEMA,
+    browserProductionScenarioPack,
+    browserProductionCiProfile,
+    normalizeScenarioPack,
+    normalizeCiProfile,
+    scenarioPackDigest,
+    ciProfileDigest,
+    buildProductionTestReport,
+    productionTestReportDigest,
+    emitProductionTestArtifacts,
+    assertNoForbiddenRunners,
+} from './production-test-pack.js';
+export {
+    PRODUCTION_OBSERVABILITY_SCHEMA,
+    PRODUCTION_TRACE_SCHEMA,
+    REQUIRED_TRACE_FACETS,
+    browserProductionObservability,
+    normalizeObservability,
+    redactSensitive,
+    validateProductionTrace,
+    buildCoveringProductionTrace,
+    checkProductionBudgets,
+    checkCapabilityClosure,
+    applySecurityHeadersToCdnPolicy,
+    measureDistBudgets,
+    emitProductionObservability,
+    observabilityDigest,
+} from './production-observability.js';
 export {
     buildApplicationContext,
     buildFormatterContext,

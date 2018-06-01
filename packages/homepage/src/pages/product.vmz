@@ -1,0 +1,231 @@
+<template>
+  <div data-dogfood="product" data-density={density} dir={dir}>
+    <AppShell brand="VMZ" homeHref="/" navLabel="Product" nav={navItems}>
+      <div class="vmz-product-toolbar" data-dogfood="product-toolbar">
+        <Badge tone="brand">{versionLabel}</Badge>
+        <Button type="button" variant="secondary" onClick={() => this.toggleVersion()}>
+          Switch version
+        </Button>
+        <Button type="button" variant="ghost" onClick={() => this.toggleLocale()}>
+          Locale: {localeLabel}
+        </Button>
+        <Button type="button" onClick={() => this.cycleDensity()}>Cycle density</Button>
+        <Button type="button" variant="secondary" onClick={() => this.toggleDir()}>Toggle RTL</Button>
+        <Field
+          label="Search"
+          controlId="home-product-search"
+          descriptionId="home-product-search-desc"
+          errorId="home-product-search-err"
+          describedBy="home-product-search-desc"
+          value={search}
+          onInput={(e) => this.onSearch(e)}
+        />
+        <p data-dogfood="product-meta">
+          version:{version};locale:{locale};search:{search};copied:{copied};density:{density};dir:{dir}
+        </p>
+      </div>
+
+      <div class="vmz-product-layout">
+        <Toc label="On this page" items={tocItems} />
+
+        <Prose>
+          <div>
+            <h1 id="overview">{titleText}</h1>
+            <p class="lead">{leadText}</p>
+            <Callout
+              tone="info"
+              roleName="note"
+              title="Zero-JS readable"
+              description="Headings, callouts, and code remain in the first HTML. Copy and locale switch enhance, they do not own the content."
+            />
+          </div>
+
+          <div>
+            <h2 id="install">Install</h2>
+            <p>Install the official UI package and materialize tokens from application /designs.</p>
+            <div if={isV1}>
+              <CodeBlock
+                caption="shell"
+                code="pnpm add @vmz/ui"
+                copyLabel={copyLabel}
+                onCopy={() => this.copyInstall()}
+              />
+            </div>
+            <div if={isV0}>
+              <CodeBlock
+                caption="shell"
+                code="pnpm add @vmz/ui@0.0.0"
+                copyLabel={copyLabel}
+                onCopy={() => this.copyInstall()}
+              />
+            </div>
+            <p if={copiedYes} data-dogfood="product-copied" role="status">Copied install snippet</p>
+          </div>
+
+          <div>
+            <h2 id="contract">Composition contract</h2>
+            <p>
+              Document/Product pages prove Prose, Toc, Callout, and CodeBlock together — not a parallel markdown runtime.
+              Integrated docs at
+              <Link href="/d/">/d/</Link>
+              remain the collection mount.
+            </p>
+            <Callout
+              tone="warning"
+              roleName="note"
+              title="No second theme"
+              description="Components consume semantic tokens only. Brand hex stays in /designs."
+            />
+            <ul>
+              <li>Commercial · Console · Document/Product</li>
+              <li>SSR HTML carries meaning before resume</li>
+              <li>Search filters the outline without a Query runtime</li>
+            </ul>
+          </div>
+
+          <hr />
+          <p>
+            <Link href="/commercial">Commercial</Link>
+            ·
+            <Link href="/console">Console</Link>
+          </p>
+        </Prose>
+      </div>
+    </AppShell>
+  </div>
+</template>
+
+<style>
+.vmz-product-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.65rem 0.85rem;
+}
+
+.vmz-product-layout {
+  display: grid;
+  grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
+  gap: 1.25rem 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 48rem) {
+  .vmz-product-layout {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+
+<script client>
+export default class ProductPage {
+  version = 'v1';
+  locale = 'en';
+  density = 'comfortable';
+  dir = 'ltr';
+  search = '';
+  copied = 'no';
+  copiedYes = false;
+  copyLabel = 'Copy';
+  installCode = 'pnpm add @vmz/ui';
+  isV1 = true;
+  isV0 = false;
+  navItems = [
+    { id: 'product', title: 'Product', href: '/product' },
+    { id: 'commercial', title: 'Commercial', href: '/commercial' },
+    { id: 'console', title: 'Console', href: '/console' },
+    { id: 'form', title: 'Form', href: '/form' },
+    { id: 'ui6', title: 'UI6', href: '/ui6' },
+    { id: 'welcome', title: 'Welcome', href: '/welcome' },
+  ];
+  tocAll = [
+    { id: 'overview', title: 'Overview', href: '#overview' },
+    { id: 'install', title: 'Install', href: '#install' },
+    { id: 'contract', title: 'Composition contract', href: '#contract' },
+  ];
+  tocItems = [
+    { id: 'overview', title: 'Overview', href: '#overview' },
+    { id: 'install', title: 'Install', href: '#install' },
+    { id: 'contract', title: 'Composition contract', href: '#contract' },
+  ];
+  versionLabel = 'v1';
+  localeLabel = 'en-US';
+  titleText = 'VMZ Product surface';
+  leadText =
+    'One composition for documentation and product guides — Prose measure, Toc outline, Callout guidance, CodeBlock with copy.';
+
+  toggleVersion() {
+    if (this.version === 'v1') {
+      this.version = 'v0';
+      this.isV1 = false;
+      this.isV0 = true;
+      this.installCode = 'pnpm add @vmz/ui@0.0.0';
+    } else {
+      this.version = 'v1';
+      this.isV1 = true;
+      this.isV0 = false;
+      this.installCode = 'pnpm add @vmz/ui';
+    }
+    this.versionLabel = this.version;
+    this.copied = 'no';
+    this.copiedYes = false;
+    this.copyLabel = 'Copy';
+  }
+
+  toggleLocale() {
+    if (this.locale === 'en') {
+      this.locale = 'zh';
+      this.localeLabel = 'zh-Hans';
+      this.titleText = 'VMZ 产品文档表面';
+      this.leadText =
+        '文档与产品指南共用一套组合：Prose 排版、Toc 目录、Callout 提示、CodeBlock 复制。';
+    } else {
+      this.locale = 'en';
+      this.localeLabel = 'en-US';
+      this.titleText = 'VMZ Product surface';
+      this.leadText =
+        'One composition for documentation and product guides — Prose measure, Toc outline, Callout guidance, CodeBlock with copy.';
+    }
+  }
+
+  cycleDensity() {
+    if (this.density === 'comfortable') this.density = 'compact';
+    else if (this.density === 'compact') this.density = 'dense';
+    else this.density = 'comfortable';
+  }
+
+  toggleDir() {
+    this.dir = this.dir === 'rtl' ? 'ltr' : 'rtl';
+  }
+
+  onSearch(e) {
+    this.search = e && e.target ? e.target.value : '';
+    const q = String(this.search || '')
+      .trim()
+      .toLowerCase();
+    if (!q) {
+      this.tocItems = this.tocAll.slice();
+      return;
+    }
+    this.tocItems = this.tocAll.filter((item) => {
+      const title = String(item.title || '').toLowerCase();
+      const id = String(item.id || '').toLowerCase();
+      return title.includes(q) || id.includes(q);
+    });
+  }
+
+  copyInstall() {
+    const text = String(this.installCode || '');
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text);
+      }
+    } catch {
+      /* ignore */
+    }
+    this.copied = 'yes';
+    this.copiedYes = true;
+    this.copyLabel = 'Copied';
+  }
+}
+</script>

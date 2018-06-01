@@ -7,6 +7,20 @@
     <nav class="site-nav" aria-label="Primary">
       <a href="/d/">文档</a>
       <a href="/d/zh-hans/guide/">入门</a>
+      <a href="/d/zh-hans/guide/zero-cost/">Zero-Cost</a>
+      <a href="/d/zh-hans/guide/optimizations/">优化</a>
+      <a href="/ui">UI lab</a>
+      <a href="/commercial">Commercial</a>
+      <a href="/product">Product</a>
+      <a href="/form">Form</a>
+      <a href="/console">Console</a>
+      <a href="/datatable">DataTable</a>
+      <a href="/motion">Motion</a>
+      <a href="/ui4">UI4</a>
+      <a href="/ui5">UI5</a>
+      <a href="/ui6">UI6</a>
+      <a href="/structure">Structure</a>
+      <a href="/stacking">Stacking</a>
       <a href="/welcome">Welcome</a>
     </nav>
   </header>

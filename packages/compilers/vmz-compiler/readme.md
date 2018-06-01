@@ -22,15 +22,15 @@ Direct emit, and the long-lived **`Workspace`** session façade (N1).
 
 ## Non-goals
 
-| Capability                                        | Owner                                     |
-|---------------------------------------------------|-------------------------------------------|
-| Soft/hard inspect profiles (`vmz check` / `lint`) | [`vmz-inspector`](../vmz-inspector/)      |
-| Causal explain, trace, LSP/MCP protocol           | [`vmz-debugger`](../vmz-debugger/)        |
-| Tailwind / SCSS engine implementation             | `vmz-plugin-tailwind`, `vmz-plugin-sasso` |
-| Competing semantic IRs                            | **forbidden** (design `13` )              |
+| Capability                                        | Owner                                             |
+|---------------------------------------------------|---------------------------------------------------|
+| Soft/hard inspect profiles (`vmz check` / `lint`) | [`vmz-inspector`](../vmz-inspector/)              |
+| Causal explain, trace, LSP/MCP protocol           | [`vmz-debugger`](../vmz-debugger/)                |
+| Tailwind / SCSS engine implementation             | `vmz-plugin-tailwind`, `vmz-plugin-sasso`         |
+| Competing semantic IRs                            | Out of scope — one Program Graph / Execution Plan |
 
-Do **not** depend on concrete style engine crates from this package. Inject `TwCompiler` / `ScssCompiler` handles at the
-host boundary.
+Style engines plug in through `TwCompiler` / `ScssCompiler` handles at the host boundary; this crate does not depend on
+the concrete engine packages.
 
 ## Source layout
 

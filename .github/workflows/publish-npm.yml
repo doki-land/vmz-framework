@@ -1,21 +1,24 @@
-# Manual / Trusted Publisher publish path (not placeholder stubs).
-#
-# Trusted Publisher contract:
+# Trusted Publisher contract (sole npm trusted workflow — keep this filename):
 #   file = publish-npm.yml
 #   repo = doki-land/vmz-framework
 #   env  = NPM_PUBLISH
 #
-# Prefer tag-driven release via release-npm.yml. Use this workflow_dispatch
-# when Trusted Publisher is registered only on publish-npm.yml, or for retries.
+# Triggers:
+#   - push tag v*           (e.g. v0.0.4)
+#   - workflow_dispatch     (manual retry / version input)
+# Do not register Trusted Publisher on any other workflow file.
 
 name: Publish npm
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version without v prefix'
-        required: true
+        description: 'Version without v prefix (required for workflow_dispatch)'
+        required: false
         type: string
 
 permissions:
@@ -64,7 +67,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          out="artifacts/native/${{ matrix.short }}"
+          out="dist/${{ matrix.short }}"
           mkdir -p "$out"
           src="packages/runtimes/vmz-${{ matrix.short }}"
           # One platform-named binary only (vmz.<triple>.node) - no plain vmz.node twin.
@@ -85,7 +88,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: native-${{ matrix.short }}
-          path: artifacts/native/${{ matrix.short }}
+          path: dist/${{ matrix.short }}
           if-no-files-found: error
 
   publish:
@@ -97,6 +100,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            v="${{ inputs.version }}"
+            v="${v#v}"
+            if [[ -z "$v" ]]; then
+              echo "inputs.version required for workflow_dispatch" >&2
+              exit 1
+            fi
+          else
+            ref="${GITHUB_REF#refs/tags/}"
+            v="${ref#v}"
+            if [[ -z "$v" || "$v" == *"/"* ]]; then
+              echo "could not parse version from GITHUB_REF=$GITHUB_REF" >&2
+              exit 1
+            fi
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "resolved version=$v"
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -107,7 +133,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          registry-url: https://registry.npmjs.org
+          # Do NOT set registry-url: it writes _authToken=${NODE_AUTH_TOKEN} into
+          # the runner npmrc and blocks Trusted Publisher OIDC (npm E404 on PUT).
 
       - name: Ensure npm supports Trusted Publishing
         run: npm install -g npm@latest
@@ -122,24 +149,37 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           pattern: native-*
-          path: artifacts/native
+          path: dist/native-artifacts
 
       - name: Normalize artifact layout
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p artifacts/native-flat
-          for d in artifacts/native/native-* artifacts/native/*; do
+          mkdir -p dist/native-flat
+          for d in dist/native-artifacts/native-* dist/native-artifacts/*; do
             [[ -d "$d" ]] || continue
             base="$(basename "$d")"
             short="${base#native-}"
-            mkdir -p "artifacts/native-flat/$short"
-            cp -r "$d"/. "artifacts/native-flat/$short/" || true
+            mkdir -p "dist/native-flat/$short"
+            cp -r "$d"/. "dist/native-flat/$short/" || true
           done
-          find artifacts/native-flat -type f -print
+          find dist/native-flat -type f -print
+
+      - name: Strip token-style npmrc (OIDC only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset NODE_AUTH_TOKEN NPM_TOKEN || true
+          for f in "${HOME}/.npmrc" "${NPM_CONFIG_USERCONFIG:-}" "${RUNNER_TEMP:-}/.npmrc"; do
+            [[ -n "${f}" && -f "${f}" ]] || continue
+            if grep -q '_authToken' "${f}"; then
+              grep -v '_authToken' "${f}" > "${f}.oidc" && mv "${f}.oidc" "${f}"
+              echo "stripped _authToken from ${f}"
+            fi
+          done
 
       - name: Publish real packages
         env:
-          VMZ_NATIVE_ARTIFACTS: ${{ github.workspace }}/artifacts/native-flat
-          GITHUB_REF: refs/tags/v${{ inputs.version }}
-        run: node scripts/ci/publish-npm.mjs --version=${{ inputs.version }}
+          VMZ_NATIVE_ARTIFACTS: ${{ github.workspace }}/dist/native-flat
+          GITHUB_REF: refs/tags/v${{ steps.ver.outputs.version }}
+        run: node scripts/ci/publish-npm.mjs --version=${{ steps.ver.outputs.version }}

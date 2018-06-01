@@ -1,0 +1,93 @@
+<template>
+  <div class="vmz-ui-date-picker" data-vmz-ui="date-picker" data-invalid={invalidAttr}>
+    <label if={label} class="vmz-ui-date-picker__label" for={controlId}>{label}</label>
+    <input
+      id={controlId}
+      class="vmz-ui-date-picker__control"
+      type="date"
+      value={value}
+      min={min}
+      max={max}
+      disabled={disabled}
+      aria-invalid={error ? 'true' : 'false'}
+      aria-describedby={describedBy}
+      onInput={onInput}
+      onChange={onChange}
+    />
+    <p if={description} id={descriptionId} class="vmz-ui-date-picker__description">{description}</p>
+    <p if={error} id={errorId} class="vmz-ui-date-picker__error" role="alert">{error}</p>
+  </div>
+</template>
+
+<style>
+.vmz-ui-date-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 28rem;
+}
+
+.vmz-ui-date-picker__label {
+  font: inherit;
+  font-weight: 600;
+}
+
+.vmz-ui-date-picker__control {
+  font: inherit;
+  padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
+  border: 1px solid var(--vmz-action-primary-background);
+  border-radius: 2px;
+  background: transparent;
+  color: inherit;
+  outline: none;
+}
+
+.vmz-ui-date-picker[data-invalid='true'] .vmz-ui-date-picker__control {
+  border-color: var(--vmz-status-danger-accent);
+}
+
+.vmz-ui-date-picker__control:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-date-picker__control:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.vmz-ui-date-picker__description {
+  margin: 0;
+  opacity: 0.75;
+  font-size: 0.9em;
+}
+
+.vmz-ui-date-picker__error {
+  margin: 0;
+  color: var(--vmz-status-danger-foreground);
+  font-size: 0.9em;
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — DatePicker.
+ * WebSurface thin gate: native date input. Parent owns ISO value (YYYY-MM-DD).
+ * No calendar overlay runtime; richer picker stays out of @vmz/ui core until needed.
+ */
+export default class DatePicker {
+  public label: string = '';
+  public description: string = '';
+  public error: string = '';
+  public value: string = '';
+  public min: string = '';
+  public max: string = '';
+  public disabled: boolean = false;
+  public invalidAttr: string = 'false';
+  public controlId: string = 'vmz-date';
+  public descriptionId: string = 'vmz-date-desc';
+  public errorId: string = 'vmz-date-err';
+  public describedBy: string = '';
+  public onInput: ((e: Event) => void) | null = null;
+  public onChange: ((e: Event) => void) | null = null;
+}
+</script>

@@ -20,7 +20,7 @@ import {
     buildLocaleDeliveryResolution,
     proveMiniPackageMessages,
     validateNativeLocalePack,
-} from '../packages/runtimes/vmz/dist/locale-delivery.js';
+} from '../../../dist/locale-delivery.js';
 
 const root = repoRoot(import.meta.url);
 const fixture = path.join(root, 'packages', 'examples', 'locales-fixture');

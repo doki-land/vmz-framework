@@ -33,7 +33,8 @@ pub use parse::{analyze, format, sfc, template, transpile};
 
 pub use pipeline::{
     check, compile, dep_graph, emit, emit_direct, emit_ir, field_rw, method_compose, plan_build,
-    project, reactive_build, server_calls, structural_build, virtual_server, write_barrier,
+    project, reactive_build, secrets, server_calls, server_slice, structural_build, virtual_server,
+    write_barrier,
 };
 
 pub use style::designs;
@@ -113,8 +114,8 @@ pub use reactive_build::{build_program_module, build_program_module_with_server}
 pub use scss::{ScssCompiler, ScssCompilerHandle, ScssEmitRequest, ScssEmitResult};
 pub use session_graph::{SessionGraph, SessionUnit};
 pub use sfc::{
-    ParsedVmz, ScriptBlock, ScriptKind, SfcError, StyleBlock, StyleLanguage, TemplateBlock,
-    parse_vmz,
+    DataBlock, ParsedVmz, ScriptBlock, ScriptKind, SfcError, StyleBlock, StyleLanguage,
+    TemplateBlock, parse_vmz,
 };
 pub use style_emit::{StyleContribution, StyleEmitReport, StyleLayer, emit_style_bundle};
 pub use style_explain::explain_style;

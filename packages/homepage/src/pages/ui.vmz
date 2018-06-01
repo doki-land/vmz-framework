@@ -1,0 +1,106 @@
+<template>
+  <main class="ui-lab" data-dogfood="ui-lab">
+    <h1>UI lab</h1>
+    <p>Ordinary homepage route dogfooding @vmz/ui UI1 + UI2 Form / Disclosure.</p>
+
+    <section>
+      <Field
+        label="Display name"
+        description="Shown on public profile"
+        controlId="home-ui-name"
+        descriptionId="home-ui-name-desc"
+        errorId="home-ui-name-err"
+        describedBy="home-ui-name-desc"
+        value={name}
+        onInput={(e) => (name = e.target.value)}
+      />
+      <p data-dogfood="field-value">value:{name}</p>
+    </section>
+
+    <section data-dogfood="ui2-form">
+      <Checkbox
+        label="Accept terms"
+        controlId="home-ui-agree"
+        checked={agree}
+        onChange={(e) => (agree = e.target.checked)}
+      />
+      <p data-dogfood="checkbox-value">agree:{agree ? 'yes' : 'no'}</p>
+      <Switch
+        label="Email notifications"
+        controlId="home-ui-notify"
+        checked={notify}
+        onChange={(v) => (notify = v)}
+      />
+      <p data-dogfood="switch-value">notify:{notify ? 'on' : 'off'}</p>
+    </section>
+
+    <section data-dogfood="ui2-tabs">
+      <Tabs
+        label="Profile sections"
+        selected={tab}
+        panelId="home-ui-tabs-panel"
+        items={tabItems}
+        onSelect={(id) => (tab = id)}
+      >
+        <p data-dogfood="tab-panel">panel:{tab}</p>
+      </Tabs>
+    </section>
+
+    <section data-dogfood="ui2-menu">
+      <Menu
+        label="Actions"
+        menuId="home-ui-menu"
+        open={menuOpen}
+        items={menuItems}
+        onOpenChange={(v) => (menuOpen = v)}
+        onSelect={(id) => (menuChoice = id)}
+      />
+      <p data-dogfood="menu-choice">menu:{menuChoice || 'none'}</p>
+    </section>
+
+    <section data-dogfood="ui1-dialog">
+      <Button type="button" onClick={() => (open = true)}>Open dialog</Button>
+      <Dialog open={open} title="Confirm" titleId="home-ui-dialog-title" onClose={() => (open = false)}>
+        <p data-dogfood="dialog-body">Dialog body for homepage dogfood.</p>
+      </Dialog>
+    </section>
+
+    <section data-dogfood="ui2-drawer">
+      <Button type="button" onClick={() => (drawerOpen = true)}>Open drawer</Button>
+      <Drawer open={drawerOpen} title="Details" titleId="home-ui-drawer-title" onClose={() => (drawerOpen = false)}>
+        <p data-dogfood="drawer-body">Drawer body for homepage dogfood.</p>
+      </Drawer>
+    </section>
+
+    <section data-dogfood="ui2-popover">
+      <Button type="button" onClick={() => (popoverOpen = true)}>Open popover</Button>
+      <Popover open={popoverOpen} title="Hint" titleId="home-ui-popover-title" onClose={() => (popoverOpen = false)}>
+        <p data-dogfood="popover-body">Popover body for homepage dogfood.</p>
+      </Popover>
+    </section>
+  </main>
+</template>
+
+<script client>
+export default class UiLabPage {
+  name = '';
+  open = false;
+  agree = false;
+  notify = false;
+  tab = 'home-ui-tab-profile';
+  tabItems = [
+    { id: 'home-ui-tab-profile', title: 'Profile', controls: 'home-ui-tabs-panel' },
+    { id: 'home-ui-tab-security', title: 'Security', controls: 'home-ui-tabs-panel' },
+    { id: 'home-ui-tab-billing', title: 'Billing', controls: 'home-ui-tabs-panel' },
+  ];
+  menuOpen = false;
+  menuChoice = '';
+  menuItems = [
+    { id: 'edit', title: 'Edit' },
+    { id: 'share', title: 'Share' },
+    { id: 'archive', title: 'Archive' },
+  ];
+  drawerOpen = false;
+  popoverOpen = false;
+}
+</script>

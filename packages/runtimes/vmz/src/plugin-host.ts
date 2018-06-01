@@ -37,13 +37,24 @@ export async function importMaybeTs(full) {
 /**
  * Load `vmz.config.*` from project root (+ optional root `vmz.plugin.*`).
  * @param {string} project
- * @returns {Promise<{ plugins: import('@vmz/plugin').VmzPlugin[], engines: import('@vmz/plugin').VmzEngines, path: string | null, pluginPath: string | null }>}
+ * @returns {Promise<{
+ *   plugins: import('@vmz/plugin').VmzPlugin[],
+ *   engines: import('@vmz/plugin').VmzEngines,
+ *   delivery: import('@vmz/plugin').SiteDeliveryAuthoring | null,
+ *   application: { id?: string } | null,
+ *   path: string | null,
+ *   pluginPath: string | null,
+ * }>}
  */
 export async function loadVmzConfig(project) {
     /** @type {import('@vmz/plugin').VmzPlugin[]} */
     const plugins = [];
     /** @type {import('@vmz/plugin').VmzEngines} */
     let engines = {};
+    /** @type {import('@vmz/plugin').SiteDeliveryAuthoring | null} */
+    let delivery = null;
+    /** @type {{ id?: string } | null} */
+    let application = null;
     /** @type {string | null} */
     let configPath = null;
     /** @type {string | null} */
@@ -56,6 +67,12 @@ export async function loadVmzConfig(project) {
         const cfg = await importMaybeTs(full);
         const raw = cfg?.plugins ?? [];
         engines = cfg?.engines && typeof cfg.engines === 'object' ? { ...cfg.engines } : {};
+        if (cfg?.delivery && typeof cfg.delivery === 'object') {
+            delivery = cfg.delivery;
+        }
+        if (cfg?.application && typeof cfg.application === 'object') {
+            application = cfg.application;
+        }
         for (const entry of raw) {
             plugins.push(await resolvePluginEntry(project, entry));
         }
@@ -70,7 +87,7 @@ export async function loadVmzConfig(project) {
         break;
     }
 
-    return { plugins, engines, path: configPath, pluginPath };
+    return { plugins, engines, delivery, application, path: configPath, pluginPath };
 }
 
 /**

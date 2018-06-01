@@ -45,7 +45,7 @@ vmz-plugin-sasso ─────┴── style engines (hook into compiler; nev
 | Primary input  | `.vmz` + compiler diagnostics      | Emitted `*.program.json` + StableId traces               |
 | Primary output | Diagnostics                        | Explain / replay documents                               |
 
-One **Unified Program Graph** and one **Execution Plan**. Do not invent a second semantic IR “for tooling.”
+One **Unified Program Graph** and one **Execution Plan** are shared across the toolchain, including tooling surfaces.
 
 ## Non-goals for this directory
 

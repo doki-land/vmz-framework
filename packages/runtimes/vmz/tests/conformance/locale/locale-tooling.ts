@@ -27,7 +27,7 @@ import {
     explainLocaleMessage,
     extractHardcodedText,
     pseudoLocalizeCatalog,
-} from '../packages/runtimes/vmz/dist/locale-tooling.js';
+} from '../../../dist/locale-tooling.js';
 
 const root = repoRoot(import.meta.url);
 const fixture = path.join(root, 'packages', 'examples', 'locales-fixture');

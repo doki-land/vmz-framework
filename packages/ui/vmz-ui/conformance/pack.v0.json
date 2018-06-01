@@ -1,0 +1,7 @@
+{
+    "schema": "vmz.ui.conformance.pack.v0",
+    "id": "ui7",
+    "title": "@vmz/ui conformance pack (thin)",
+    "description": "External fixtures for Motion IR depth + overlay/control contracts. Consumed by pnpm verify -- ui7 (program.json + vmz test compile motion). Not a second test framework.",
+    "fixtures": ["fixtures/dialog-overlay-motion.json", "fixtures/drawer-overlay-motion.json", "fixtures/button-control-motion.json"]
+}

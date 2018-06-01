@@ -12,7 +12,8 @@
         "document:dev": "vmz document dev"
     },
     "dependencies": {
-        "@vmz/ui": "workspace:*"
+        "@vmz/ui": "workspace:*",
+        "@vmz/core": "workspace:*"
     },
     "devDependencies": {
         "vmz": "workspace:*"

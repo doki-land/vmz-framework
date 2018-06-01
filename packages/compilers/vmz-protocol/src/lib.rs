@@ -1,8 +1,8 @@
-//! VMZ versioned wire protocols — shared by CLI / N-API / LSP / MCP / `@vmz/test`.
+//! VMZ versioned wire protocols - shared by CLI / N-API / LSP / MCP / `@vmz/test`.
 //!
 //! Semantic IR stays in `vmz-types`. This crate owns schema ids and document shapes only.
 
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 mod application;
 mod catalog;
 mod dx;
@@ -12,6 +12,7 @@ mod native_host;
 mod plugin;
 mod profile;
 mod program;
+mod server;
 mod target;
 mod test;
 
@@ -177,7 +178,15 @@ pub use profile::{
     SurfaceAssignment, SurfaceAssignmentTable, SurfaceBinding, SurfaceReject, SurfaceRequirements,
     TRANSPORT_BINDING_SCHEMA, TransportBinding, UNIFIED_LIFECYCLE_EVENTS, canonical_digest_value,
 };
-pub use program::{PLAN_SCHEMA, PROGRAM_SCHEMA};
+pub use program::{
+    MOTION_SCHEMA, MOTION_TRANSITION_SCHEMA, PLAN_SCHEMA, PROGRAM_SCHEMA, REACTIVE_SCHEMA,
+};
+pub use server::{
+    DIAG_CLIENT_DATA_MAY_DUPLICATE_CAPABILITY, DIAG_CLIENT_MOCK_PROVIDER_FORBIDDEN,
+    DIAG_SECRET_BINDING_MISSING, DIAG_SECRET_CLIENT_LEAK, DIAG_SERVER_SLICE_NOT_BROWSER_SAFE,
+    SECRET_REQUIREMENT_SCHEMA, SERVER_PROTOCOL, SERVER_SLICE_PROOF_SCHEMA, ServerDocumentKind,
+    ServerProtocolCatalog,
+};
 pub use target::{
     DIAG_ARTIFACT_INVALID, DIAG_DOM_LEAK_IN_PLAN, DIAG_PLATFORM_UNSUPPORTED, DIAG_PROFILE_INVALID,
     DIAG_UNKNOWN_VIEW_OP, MINI_PROGRAM_ARTIFACT_SCHEMA, MiniProgramArtifact,

@@ -20,7 +20,7 @@ Mermaid, ECharts, and Iconify differ too much in capability — use the concrete
 `<Echarts>` for shipping charts.
 
 ```ts
-import { defineConfig } from 'vmz';
+import {defineConfig} from 'vmz';
 import katex from '@vmz/plugin-katex';
 import shiki from '@vmz/plugin-shiki';
 import monaco from '@vmz/plugin-monaco';
@@ -29,12 +29,12 @@ import echarts from '@vmz/plugin-echarts';
 import iconify from '@vmz/plugin-iconify';
 
 export default defineConfig({
-  plugins: [katex, shiki, monaco, mermaid, echarts, iconify],
-  engines: {
-    math: 'katex',
-    code: 'shiki',
-  },
+    plugins: [katex, shiki, monaco, mermaid, echarts, iconify],
+    engines: {
+        math: 'katex',
+        code: 'shiki',
+    },
 });
 ```
 
-See [Not recommended](./not-recommended.md).
+See [Relative to the default path](./not-recommended.md).

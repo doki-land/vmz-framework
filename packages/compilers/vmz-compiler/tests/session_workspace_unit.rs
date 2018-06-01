@@ -7,6 +7,7 @@ use vmz_compiler::plugin::{
     ContributionItem, ContributionKind, PluginIdentity, PluginStage, sha256_hex_bytes,
 };
 use vmz_compiler::session::workspace::*;
+use vmz_compiler::{CheckOptions, ContributionBatch, PLUGIN_PROTOCOL_V1};
 
 fn fixture_project(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!(

@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "type": "module",
-    "description": "VMZ Node toolchain — N-API workspace session + CLI",
+    "description": "VMZ Node toolchain — N-API workspace session + CLI (publish name @vmz/vmz)",
     "license": "MIT",
     "bin": {
         "vmz": "./bin/vmz.js"

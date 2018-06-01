@@ -6,9 +6,9 @@ VMZ is a new kind of web framework: a full-stack application compiler. You write
 TypeScript; VMZ understands the application as a whole and compiles it into direct browser updates, server work, SSR
 output, resumable interaction, tests, and deployment artifacts.
 
-Its source surface is intentionally familiar to developers who like template-based components, but VMZ is native in its
-semantics. It is not a Vue dialect, a React compatibility layer, or a new signal API. A `public` class field is a prop;
-ordinary fields are state; the compiler derives the update and execution boundaries.
+Its source surface is intentionally familiar to developers who like Vue-style single-file components, while the
+semantics stay VMZ-native. A `public` class field is a prop; a non-public field is component state; the compiler derives
+the update and execution boundaries.
 
 | Write                          | VMZ understands                               | VMZ can produce                                            |
 |--------------------------------|-----------------------------------------------|------------------------------------------------------------|
@@ -17,46 +17,50 @@ ordinary fields are state; the compiler derives the update and execution boundar
 | Server capabilities and routes | Execution and serialization boundaries        | Client/server partitions, SSR, HTTP, and deployment output |
 | Pages and interaction          | What must arrive now and what can wait        | Static HTML, Islands, and selective resumption             |
 
-```vmz
+```vue
+
 <template>
-  <article>
-    <p if={!user}>Loading profile...</p>
-    <section else>
-      <h2>{user.name}</h2>
-      <p>{user.bio}</p>
-      <button type="button" onClick={() => refresh()}>Refresh</button>
-    </section>
-  </article>
+    <article>
+        <h1>{heading}</h1>
+        <p if={!user}>Loading profile...</p>
+        <section else>
+            <h2>{user.name}</h2>
+            <p>{user.bio}</p>
+            <button type="button" onClick={()
+            => refresh()}>Refresh</button>
+        </section>
+    </article>
 </template>
 
 <script client>
-import type { User } from '#server/db/users'
-import { ProfileServer } from '#server/components/Profile'
+    import type {User} from '#server/db/users'
+    import {ProfileServer} from '#server/components/Profile'
 
-export default class Profile {
-  user!: User
+    export default class Profile {
+        public heading = 'Your profile' // prop: the parent may provide it
+        private user: User | null = null // state: private to this component, compiler-tracked
 
-  async onMount() {
-    this.user = await ProfileServer.load()
-  }
+        async onMount() {
+            this.user = await ProfileServer.load()
+        }
 
-  async refresh() {
-    this.user = await ProfileServer.load()
-  }
-}
+        async refresh() {
+            this.user = await ProfileServer.load()
+        }
+    }
 </script>
 
 <script server>
-import type { User } from '#server/db/users'
-import { UsersRepository } from '#server/db/users'
+    import type {User} from '#server/db/users'
+    import {UsersRepository} from '#server/db/users'
 
-export default class ProfileServer {
-  #users = new UsersRepository()
+    export default class ProfileServer {
+        #users = new UsersRepository()
 
-  async load(): Promise<User> {
-    return this.#users.findCurrent()
-  }
-}
+        async load(): Promise<User> {
+            return this.#users.findCurrent()
+        }
+    }
 </script>
 ```
 
@@ -72,9 +76,9 @@ capability, the data boundary, the asynchronous generation, and the exact UI reg
 | Bind each request to an async generation and owner               | A stale response cannot overwrite a newer page or disposed region           |
 | Connect `user` writes to the loading branch and profile bindings | The browser patches affected regions instead of rerunning an unrelated tree |
 
-In VMZ, ordinary class fields are state. A `public` field is a prop. You do not start by wrapping every value in a
-signal, `ref`, store, hook, or factory. The compiler analyzes reads, writes, calls, control flow, ownership, and
-execution placement, then emits the smallest safe full-stack plan it can prove.
+In VMZ, ordinary class fields are state. A `public` field is a prop. Authors start from those fields rather than
+wrapping every value in a signal, `ref`, store, hook, or factory. The compiler analyzes reads, writes, calls, control
+flow, ownership, and execution placement, then emits the smallest safe full-stack plan it can prove.
 
 ## Why it matters
 
@@ -97,12 +101,12 @@ The outcome is not just faster DOM work. It is an application model that stays c
 
 ## How it differs
 
-| Approach                                   | Primary model                                                  | What VMZ changes                                                                                                                     |
-|--------------------------------------------|----------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
-| React                                      | Components execute with runtime state APIs and reconciliation  | VMZ analyzes ordinary TypeScript state and emits direct region updates instead of default tree re-execution and VDOM diffing         |
-| Vue                                        | Component runtime, reactivity APIs, VDOM, and an ecosystem ABI | VMZ keeps a familiar template feel but is not Vue-compatible and does not adopt Vue runtime, component, macro, or reactive contracts |
-| Solid and other fine-grained UI frameworks | A reactive graph is built primarily at runtime                 | VMZ aims to construct a compiler-visible graph that spans UI, server capability, SSR, resumption, and deployment                     |
-| Conventional full-stack stacks             | Several specialized tools connected by conventions             | VMZ treats cross-stack boundaries as compiler facts derived from one program, not as unrelated integration layers                    |
+| Approach                                   | Primary model                                                  | What VMZ changes                                                                                                                        |
+|--------------------------------------------|----------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
+| React                                      | Components execute with runtime state APIs and reconciliation  | VMZ analyzes ordinary TypeScript state and emits direct region updates instead of default tree re-execution and VDOM diffing            |
+| Vue                                        | Component runtime, reactivity APIs, VDOM, and an ecosystem ABI | VMZ keeps a familiar template feel while staying on VMZ-native semantics — without Vue runtime, component, macro, or reactive contracts |
+| Solid and other fine-grained UI frameworks | A reactive graph is built primarily at runtime                 | VMZ aims to construct a compiler-visible graph that spans UI, server capability, SSR, resumption, and deployment                        |
+| Conventional full-stack stacks             | Several specialized tools connected by conventions             | VMZ treats cross-stack boundaries as compiler facts derived from one program, not as unrelated integration layers                       |
 
 VMZ is therefore not “Vue without VDOM,” nor a React replacement with different state helpers. It is an attempt to make
 the full application, rather than only the browser view, a first-class compilation target.
@@ -188,9 +192,8 @@ VMZ is a good fit for teams that want to build durable TypeScript applications a
 authoring ergonomics and runtime cost. It is especially relevant when you want a clear model for SSR, server execution,
 async ownership, progressive interaction, and deployment rather than a collection of framework-specific conventions.
 
-It is not the right choice when your priority is compatibility with the React or Vue component ecosystems. VMZ
-deliberately does not provide that compatibility layer; preserving static understanding matters more than accepting
-every existing runtime pattern.
+If the priority is drop-in compatibility with existing React or Vue component ecosystems, another route may fit better.
+VMZ invests in static understanding of one native model rather than mirroring every existing runtime pattern.
 
 | Choose VMZ when...                                                              | Consider another route when...                                              |
 |---------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
@@ -204,9 +207,8 @@ The VMZ site, documentation, and running applications are themselves built with 
 model applied to state, documents, styling, server boundaries, and progressive interaction instead of merely reading
 claims about it.
 
-VMZ is for early adopters who want to evaluate a new application architecture, not for teams looking for a compatibility
-layer over existing React or Vue code. If the model resonates, begin with the product documentation and the runnable
-applications.
+VMZ is for early adopters who want to evaluate a new application architecture built around one compiler-visible model.
+If the model resonates, begin with the product documentation and the runnable applications.
 
 ## License
 

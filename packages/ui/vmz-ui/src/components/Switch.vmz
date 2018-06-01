@@ -1,0 +1,109 @@
+<template>
+  <label class="vmz-ui-switch" data-vmz-ui="switch" for={controlId}>
+    <button
+      id={controlId}
+      type="button"
+      class="vmz-ui-switch__control"
+      role="switch"
+      aria-checked={checked}
+      aria-describedby={describedBy}
+      disabled={disabled}
+      onClick={toggle}
+      onKeyDown={onKeyDown}
+    >
+      <span class="vmz-ui-switch__thumb" aria-hidden="true"></span>
+    </button>
+    <span class="vmz-ui-switch__label">{label}</span>
+  </label>
+</template>
+
+<style>
+.vmz-ui-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.vmz-ui-switch__control {
+  position: relative;
+  width: 2.4rem;
+  height: 1.35rem;
+  padding: 0;
+  border: 1px solid var(--vmz-action-primary-background);
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+}
+
+.vmz-ui-switch__control[aria-checked='true'],
+.vmz-ui-switch__control[aria-checked=''] {
+  background: var(--vmz-action-primary-background);
+}
+
+.vmz-ui-switch__control:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-switch__control:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.vmz-ui-switch__thumb {
+  position: absolute;
+  top: 0.12rem;
+  left: 0.12rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: var(--vmz-action-primary-foreground);
+  transition: transform var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+}
+
+.vmz-ui-switch__control[aria-checked='true'] .vmz-ui-switch__thumb,
+.vmz-ui-switch__control[aria-checked=''] .vmz-ui-switch__thumb {
+  transform: translateX(1.05rem);
+}
+
+.vmz-ui-switch__label {
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vmz-ui-switch__thumb {
+    transition: none;
+  }
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — Switch (UI2).
+ * role=switch + aria-checked; parent owns checked (no parallel form store).
+ */
+export default class Switch {
+  public label: string = '';
+  public checked: boolean = false;
+  public disabled: boolean = false;
+  public controlId: string = 'vmz-switch';
+  public describedBy: string = '';
+  public onChange: ((checked: boolean) => void) | null = null;
+
+  toggle() {
+    if (this.disabled) return;
+    const next = !this.checked;
+    if (typeof this.onChange === 'function') this.onChange(next);
+  }
+
+  onKeyDown(ev) {
+    if (!ev) return;
+    if (ev.key === ' ' || ev.key === 'Enter') {
+      ev.preventDefault();
+      this.toggle();
+    }
+  }
+}
+</script>

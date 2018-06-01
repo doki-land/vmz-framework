@@ -1,4 +1,4 @@
-//! VMZ Program IR shell — unified program graph.
+//! VMZ Program IR shell 鈥?unified program graph.
 //!
 //! Reactive IR ([`crate::reactive_ir`]) is one **view** of this graph, not the core.
 //! Other views start as stubs that share the same unit identity and field/binding ids.
@@ -10,14 +10,20 @@ use crate::reactive_ir::{
     BindingId, EffectId, FieldId, IrDepPath, ReactiveComponent, ReactiveModule, RegionId,
 };
 use crate::{FieldKind, HttpRoute};
-use vmz_protocol::{PLAN_SCHEMA, PROGRAM_SCHEMA};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use vmz_protocol::{PLAN_SCHEMA, PROGRAM_SCHEMA, REACTIVE_SCHEMA};
 
 /// Stable id of a [`ProgramUnit`] within one [`ProgramModule`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct UnitId(pub u32);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub struct UnitId {
+    /// Numeric id within the module.
+    pub unit_id: u32,
+}
 
 /// Authoring / deployment kind of a program unit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum ProgramUnitKind {
     /// `.vmz` client component (may also host co-located server class edges later).
     Component,
@@ -38,14 +44,18 @@ impl ProgramUnitKind {
 }
 
 /// One `.vmz` / module file's program graph snapshot.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ProgramModule {
+    /// Wire schema id ([`PROGRAM_SCHEMA`]).
+    pub schema: String,
+    /// Workspace-relative source path.
     pub source: String,
+    /// Compilable units in this module.
     pub units: Vec<ProgramUnit>,
 }
 
 /// One compilable unit with layered views sharing field/binding ids.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ProgramUnit {
     pub id: UnitId,
     pub name: String,
@@ -53,10 +63,12 @@ pub struct ProgramUnit {
     pub semantic: SemanticView,
     pub reactive: ReactiveComponent,
     pub view: ViewView,
-    // Shared Execution Plan derived from Native View — Browser/SSR/Test lowerings.
+    /// Shared Execution Plan derived from Native View (Browser/SSR/Test lowerings).
     pub plan: ExecutionPlan,
     pub resource: ResourceView,
-    // Lifetime regions projected from control / each / unit ownership .
+    /// Motion transitions projected from Native View + cancel/generation contract.
+    pub motion: MotionView,
+    /// Lifetime regions projected from control / each / unit ownership.
     pub lifetime: LifetimeView,
     pub server: ServerView,
     pub deployment: DeploymentView,
@@ -64,14 +76,15 @@ pub struct ProgramUnit {
     pub graph: GraphView,
 }
 
-/// Semantic symbols (fields / methods) — shared identity for other views.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+/// Semantic symbols (fields / methods) 鈥?shared identity for other views.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 pub struct SemanticView {
     pub fields: Vec<SemanticField>,
     pub methods: Vec<SemanticMethod>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One semantic field shared across views.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct SemanticField {
     /// Same numeric id as [`FieldId`] in the reactive view.
     pub id: FieldId,
@@ -79,7 +92,8 @@ pub struct SemanticField {
     pub kind: FieldKind,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One semantic method shared across views.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct SemanticMethod {
     /// Same numeric id as [`EffectId`] when the method has an effect summary.
     pub id: EffectId,
@@ -87,11 +101,11 @@ pub struct SemanticMethod {
     pub async_boundary: bool,
 }
 
-// Structural / Native View — first-class query view of the unified Program Graph .
+/// Structural / Native View 鈥?first-class query view of the unified Program Graph.
 ///
 /// When [`ViewStatus::Native`], [`Self::roots`] is the sole structure source for
 /// direct emit (`emit_direct`); TemplateIr must not be re-scanned for if/each/element.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 pub struct ViewView {
     pub status: ViewStatus,
     pub binding_ids: Vec<BindingId>,
@@ -100,7 +114,9 @@ pub struct ViewView {
     pub roots: Vec<ViewNode>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+/// Whether Native View carries a structural tree or only reactive id lists.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum ViewStatus {
     /// Legacy ID-list projection only (no structural tree).
     #[default]
@@ -119,9 +135,10 @@ impl ViewStatus {
 }
 
 /// One node in the Native View structural tree.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ViewNode {
-    Text(String),
+    Text { value: String },
     Interp { expr: String, binding: Option<BindingId> },
     Element { tag: String, attrs: Vec<ViewAttr>, children: Vec<ViewNode>, each: Option<ViewEach> },
     If { region: Option<RegionId>, binding: Option<BindingId>, branches: Vec<ViewIfBranch> },
@@ -129,47 +146,71 @@ pub enum ViewNode {
     Slot { name: Option<String>, attrs: Vec<ViewAttr>, children: Vec<ViewNode> },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Attribute on a view element / component / slot.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ViewAttr {
     pub name: String,
     pub value: ViewAttrValue,
     pub binding: Option<BindingId>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Attribute value forms in Native View.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ViewAttrValue {
-    Static(String),
-    Interp(String),
+    Static {
+        value: String,
+    },
+    Interp {
+        expr: String,
+    },
     /// Present without value (e.g. `else`).
     Bare,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// `each` metadata on an element.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ViewEach {
     pub list_expr: String,
     pub as_name: String,
     pub key_expr: Option<String>,
     pub list_binding: Option<BindingId>,
     pub key_binding: Option<BindingId>,
-    // Control / lifetime region for this each .
+    /// Control / lifetime region for this each.
     pub region: Option<RegionId>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One branch of a view `if`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ViewIfBranch {
     pub cond: Option<String>,
     pub body: Box<ViewNode>,
 }
 
-/// Thin Execution Plan — schedule derived from Native View (not a competing IR).
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+/// Thin Execution Plan 鈥?schedule derived from Native View (not a competing IR).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ExecutionPlan {
+    /// Wire schema id ([`PLAN_SCHEMA`]).
+    pub schema: String,
     pub status: PlanStatus,
     pub root_ids: Vec<u32>,
     pub nodes: Vec<PlanNode>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+impl Default for ExecutionPlan {
+    fn default() -> Self {
+        Self {
+            schema: PLAN_SCHEMA.into(),
+            status: PlanStatus::Empty,
+            root_ids: Vec::new(),
+            nodes: Vec::new(),
+        }
+    }
+}
+
+/// Population status of an [`ExecutionPlan`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum PlanStatus {
     #[default]
     Empty,
@@ -187,7 +228,7 @@ impl PlanStatus {
 }
 
 /// One scheduled structural node in the shared plan.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct PlanNode {
     pub id: u32,
     /// `text` | `interp` | `element` | `if` | `each` | `component` | `slot` | `dispose_region`
@@ -200,15 +241,15 @@ pub struct PlanNode {
     pub branches: Vec<u32>,
 }
 
-/// Resource / async view (Program IR A — projected from effects + server caps).
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+/// Resource / async view projected from effects + server caps.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 pub struct ResourceView {
     pub status: StubStatus,
     pub resources: Vec<ResourceDecl>,
 }
 
-/// One async / server resource owned by this unit (skeleton → AsyncTask surface).
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One async / server resource owned by this unit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ResourceDecl {
     pub id: u32,
     /// `async_task` | `server_capability` | `http`
@@ -216,22 +257,54 @@ pub struct ResourceDecl {
     pub name: String,
     /// Owning client method / effect when known.
     pub owner: Option<String>,
-    /// AsyncTask protocol states (13 ); empty for non-task resources.
+    /// AsyncTask protocol states; empty for non-task resources.
     pub states: Vec<String>,
     pub cancelable: bool,
     /// Generation / supersede protocol (same as runtime `__vmzRunTask`).
     pub generation: bool,
 }
 
-// Lifetime / ownership projection — not a competing IR.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+/// Motion view 鈥?Program Graph projection of UI transitions.
+///
+/// Not a second animation runtime: facts only (owner, trigger, region, cancel, generation).
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+pub struct MotionView {
+    pub status: StubStatus,
+    pub transitions: Vec<MotionTransitionDecl>,
+}
+
+/// One motion transition owned by this unit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct MotionTransitionDecl {
+    pub id: u32,
+    /// `overlay-enter` | `overlay-exit` | `control`
+    pub kind: String,
+    pub name: String,
+    /// Owning unit / surface name.
+    pub owner: String,
+    /// Trigger event / method / prop (`open` | `dismiss` | `control`).
+    pub trigger: String,
+    /// Reachable LifetimeRegion when known (overlay inside `if`).
+    pub region: Option<u32>,
+    /// Style Theme token family (`motion.overlay` | `motion.control`).
+    pub token: String,
+    /// enter | exit | stable | cancelled | completed (subset by kind).
+    pub states: Vec<String>,
+    pub cancelable: bool,
+    pub generation: bool,
+    /// `honor` = prefers-reduced-motion changes presentation, not final state.
+    pub reduced_motion: String,
+}
+
+/// Lifetime / ownership projection 鈥?not a competing IR.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 pub struct LifetimeView {
     pub status: StubStatus,
     pub regions: Vec<LifetimeRegionDecl>,
 }
 
 /// One LifetimeRegion on the Program Graph (shares RegionId with control/each).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct LifetimeRegionDecl {
     pub id: u32,
     /// `if` | `each` | `ternary` | `unknown`
@@ -240,22 +313,22 @@ pub struct LifetimeRegionDecl {
     pub owner_unit: String,
 }
 
-/// First-class graph edges + Unknown provenance (Program IR A).
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+/// First-class graph edges + Unknown provenance.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 pub struct GraphView {
     pub status: StubStatus,
     pub edges: Vec<ProgramEdge>,
     pub unknowns: Vec<UnknownRecord>,
-    /// Stage 02 analysis closed-loop metrics.
+    /// Analysis closed-loop metrics.
     pub analysis: AnalysisStats,
 }
 
 /// Binding / effect path precision counts for analysis progress.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 pub struct AnalysisStats {
     /// Field / StaticPath / DynamicPath / ListItem reads+writes.
     pub exact: u32,
-    /// Unknown with a specific widen reason (opaque / destructure / closure…).
+    /// Unknown with a specific widen reason (opaque / destructure / closure...).
     pub widened: u32,
     /// Unknown with only generic `field_star` provenance.
     pub unknown: u32,
@@ -263,38 +336,57 @@ pub struct AnalysisStats {
     pub call_edges: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One directed Program Graph edge.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ProgramEdge {
-    /// `reads` | `writes` | `calls` | `region_stable` | `owns` | `disposes` | `spawns` | `cancels`
+    /// `reads` | `writes` | `calls` | `region_stable` | `owns` | `disposes` | `spawns` | `cancels` | `affects`
     pub kind: String,
     pub from: String,
     pub to: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Provenance for an Unknown path widening.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct UnknownRecord {
     pub field: String,
     pub reason: String,
     pub via: String,
 }
 
-/// Server capability view — co-located `#server` / server class surface.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+/// Server capability view 鈥?co-located `#server` / server class surface.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 pub struct ServerView {
     pub status: StubStatus,
     /// Virtual module id, e.g. `#server/components/UserCard`.
     pub module_id: Option<String>,
     pub class_name: Option<String>,
     pub capabilities: Vec<ServerCapability>,
-    /// Proven client → capability call edges (static surface match; not full CFG yet).
+    /// Proven client -> capability call edges (static surface match; not full CFG yet).
     pub calls: Vec<ServerCallEdge>,
+    /// Compiler-known secret bindings (names only 鈥?never values).
+    pub secret_requirements: Vec<SecretRequirement>,
+    /// True when this server slice has no secret requirements (browser-safe placement).
+    pub browser_safe: bool,
+}
+
+/// One `SecretRequirement` fact projected from `#server/secrets` / `secret('NAME')`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct SecretRequirement {
+    /// Environment binding name (`PAYMENTS_API_KEY`) 鈥?not a value.
+    pub binding_name: String,
+    /// Owning capability / method when known.
+    pub owner_capability: Option<String>,
+    /// Virtual module id of the server unit.
+    pub module_id: Option<String>,
 }
 
 /// Stable id of a server capability within one [`ProgramUnit`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(transparent)]
 pub struct CapabilityId(pub u32);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One server method exposed as a capability.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ServerCapability {
     pub id: CapabilityId,
     pub method: String,
@@ -305,7 +397,8 @@ pub struct ServerCapability {
     pub http: Option<HttpRoute>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Proven client -> capability call edge.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ServerCallEdge {
     pub capability: CapabilityId,
     pub method: String,
@@ -313,8 +406,8 @@ pub struct ServerCallEdge {
     pub from_client_method: Option<String>,
 }
 
-/// Proven client → server method call (filled by compiler oxc walk).
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Proven client -> server method call (filled by compiler oxc walk).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ClientServerCall {
     pub server_method: String,
     pub from_client_method: Option<String>,
@@ -328,10 +421,23 @@ pub struct ServerAttach {
     pub methods: Vec<crate::MethodDecl>,
     /// oxc-discovered `Class.method` calls with enclosing client method when known.
     pub client_calls: Vec<ClientServerCall>,
+    /// Secret bindings collected from server script (`secret('NAME')`).
+    pub secret_requirements: Vec<SecretRequirement>,
 }
 
-/// Deployment / Island / chunk view (deployment / island / chunk).
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+/// Client -> server method edge recorded on the deployment view.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DeploymentClientCall {
+    /// Server capability method name.
+    pub method: String,
+    /// Enclosing client method when known.
+    pub from_client_method: Option<String>,
+}
+
+/// Deployment / Island / chunk view.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct DeploymentView {
     pub status: StubStatus,
     /// `app` | `page` | `component` | `other`
@@ -348,25 +454,28 @@ pub struct DeploymentView {
     pub capabilities: Vec<String>,
     /// Virtual `#server/...` module id when co-located server exists.
     pub server_module_id: Option<String>,
-    /// Client method → server capability edges (method names).
-    pub client_calls: Vec<(String, Option<String>)>,
-    /// Island / ResumeEntry products derived from View `client:*` (resume) — not a Resume IR.
+    /// Client method -> server capability edges.
+    pub client_calls: Vec<DeploymentClientCall>,
+    /// Island / ResumeEntry products derived from View `client:*` (resume).
     pub resume_entries: Vec<ResumeEntryDecl>,
 }
 
 /// One Island resume product (SSR slice + client attach). Same Plan identity as Browser.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ResumeEntryDecl {
     pub component: String,
-    /// `idle` | `load` | `visible` | …
+    /// `idle` | `load` | `visible` | ...
     pub strategy: String,
     pub state_keys: Vec<String>,
     pub prop_keys: Vec<String>,
-    /// Plan root ids of the *island component unit* when known; else empty.
+    /// Plan root ids of the island component unit when known; else empty.
     pub plan_root_ids: Vec<u32>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+/// Stub population status for projected views.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum StubStatus {
     #[default]
     Empty,
@@ -389,33 +498,23 @@ impl ProgramModule {
             .components
             .into_iter()
             .enumerate()
-            .map(|(i, c)| ProgramUnit::from_reactive_component(UnitId(i as u32), c))
+            .map(|(i, c)| ProgramUnit::from_reactive_component(UnitId { unit_id: i as u32 }, c))
             .collect();
-        Self { source: module.source, units }
+        Self { schema: PROGRAM_SCHEMA.into(), source: module.source, units }
     }
 
     /// Project back to transitional [`ReactiveModule`] (tests / `*.reactive.json`).
     pub fn to_reactive_module(&self) -> ReactiveModule {
         ReactiveModule {
+            schema: REACTIVE_SCHEMA.into(),
             source: self.source.clone(),
             components: self.units.iter().map(|u| u.reactive.clone()).collect(),
         }
     }
 
+    /// Pretty-printed `*.program.json` via serde (no ad-hoc Value builders).
     pub fn to_json(&self) -> String {
-        let mut out = String::new();
-        out.push_str("{\n");
-        out.push_str(&format!("  \"schema\": {:?},\n", PROGRAM_SCHEMA));
-        out.push_str(&format!("  \"source\": {:?},\n", self.source));
-        out.push_str("  \"units\": [\n");
-        for (i, u) in self.units.iter().enumerate() {
-            if i > 0 {
-                out.push_str(",\n");
-            }
-            out.push_str(&unit_json(u, "    "));
-        }
-        out.push_str("\n  ]\n}\n");
-        out
+        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
@@ -456,7 +555,7 @@ impl ProgramUnit {
                         walk(&b.body, out);
                     }
                 }
-                ViewNode::Text(_) | ViewNode::Interp { .. } => {}
+                ViewNode::Text { .. } | ViewNode::Interp { .. } => {}
             }
         }
         for root in &self.view.roots {
@@ -497,6 +596,7 @@ impl ProgramUnit {
             view,
             plan: ExecutionPlan::default(),
             resource: ResourceView::default(),
+            motion: MotionView::default(),
             lifetime: LifetimeView::default(),
             server: ServerView::default(),
             deployment: DeploymentView::default(),
@@ -545,22 +645,31 @@ impl ProgramUnit {
             });
         }
 
+        let mut secret_requirements = attach.secret_requirements.clone();
+        for s in &mut secret_requirements {
+            if s.module_id.is_none() {
+                s.module_id = Some(attach.module_id.clone());
+            }
+        }
+        let status = if capabilities.is_empty() && secret_requirements.is_empty() {
+            StubStatus::Empty
+        } else {
+            StubStatus::Partial
+        };
         self.server = ServerView {
-            status: if capabilities.is_empty() { StubStatus::Empty } else { StubStatus::Partial },
+            status,
             module_id: Some(attach.module_id.clone()),
             class_name: Some(attach.class_name.clone()),
             capabilities,
             calls,
+            browser_safe: secret_requirements.is_empty(),
+            secret_requirements,
         };
         self.rebuild_projected_views();
     }
 
     /// Recompute resource + graph projections from reactive / server views.
     pub fn rebuild_projected_views(&mut self) {
-        let fields = &self.reactive.state_slots;
-        let props = &self.reactive.properties;
-        let exprs = &self.reactive.exprs;
-
         let mut resources = Vec::new();
         let mut next_res = 0u32;
         for e in &self.reactive.effects {
@@ -601,6 +710,11 @@ impl ProgramUnit {
             resources,
         };
 
+        // Motion transitions from Native View overlay/control markers + cancel methods.
+        // Must run before graph edges; do not hold reactive borrows across this mutation.
+        self.motion = project_motion_view(self);
+        append_motion_plan_nodes(self);
+
         // LifetimeRegion projection from Native View + control regions (same RegionId).
         let mut kind_by_region: std::collections::BTreeMap<u32, String> =
             std::collections::BTreeMap::new();
@@ -629,7 +743,7 @@ impl ProgramUnit {
                         walk_lifetime_kinds(c, map);
                     }
                 }
-                ViewNode::Text(_) | ViewNode::Interp { .. } => {}
+                ViewNode::Text { .. } | ViewNode::Interp { .. } => {}
             }
         }
         for root in &self.view.roots {
@@ -652,6 +766,10 @@ impl ProgramUnit {
             },
             regions: lifetime_regions,
         };
+
+        let fields = &self.reactive.state_slots;
+        let props = &self.reactive.properties;
+        let exprs = &self.reactive.exprs;
 
         let mut edges = Vec::new();
         let mut unknowns = Vec::new();
@@ -811,6 +929,46 @@ impl ProgramUnit {
                 }
             }
         }
+        for t in &self.motion.transitions {
+            let motion = format!("motion:{}", t.id);
+            edges.push(ProgramEdge {
+                kind: "owns".into(),
+                from: unit_from.clone(),
+                to: motion.clone(),
+            });
+            edges.push(ProgramEdge {
+                kind: "spawns".into(),
+                from: format!("trigger:{}", t.trigger),
+                to: motion.clone(),
+            });
+            if let Some(region) = t.region {
+                // Region fine edge: transition is confined to a LifetimeRegion.
+                edges.push(ProgramEdge {
+                    kind: "affects".into(),
+                    from: motion.clone(),
+                    to: format!("region:{region}"),
+                });
+            }
+            if t.cancelable {
+                edges.push(ProgramEdge {
+                    kind: "cancels".into(),
+                    from: "lifecycle:destroy".into(),
+                    to: motion.clone(),
+                });
+                edges.push(ProgramEdge {
+                    kind: "cancels".into(),
+                    from: "motion:reverse".into(),
+                    to: motion.clone(),
+                });
+                if self.semantic.methods.iter().any(|m| m.name == "_cancelExit") {
+                    edges.push(ProgramEdge {
+                        kind: "cancels".into(),
+                        from: "effect:_cancelExit".into(),
+                        to: motion,
+                    });
+                }
+            }
+        }
         for c in &self.server.calls {
             let from = c
                 .from_client_method
@@ -837,437 +995,174 @@ impl ProgramUnit {
     }
 }
 
-fn unit_json(u: &ProgramUnit, indent: &str) -> String {
-    let ind2 = format!("{indent}  ");
-    let ind3 = format!("{indent}    ");
-    let mut s = String::new();
-    s.push_str(&format!("{indent}{{\n"));
-    s.push_str(&format!("{ind2}\"id\": {},\n", u.id.0));
-    s.push_str(&format!("{ind2}\"name\": {:?},\n", u.name));
-    s.push_str(&format!("{ind2}\"kind\": {:?},\n", u.kind.as_str()));
-
-    s.push_str(&format!("{ind2}\"semantic\": {{\n"));
-    s.push_str(&format!("{ind3}\"fields\": [\n"));
-    for (i, f) in u.semantic.fields.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        let kind = match f.kind {
-            FieldKind::Prop => "prop",
-            FieldKind::State => "state",
-        };
-        s.push_str(&format!(
-            "{ind3}  {{ \"id\": {}, \"name\": {:?}, \"kind\": {:?} }}",
-            f.id.0, f.name, kind
-        ));
+fn project_motion_view(unit: &ProgramUnit) -> MotionView {
+    #[derive(Default)]
+    struct Scan {
+        overlay: Option<String>,
+        overlay_region: Option<u32>,
+        /// Author override via `data-vmz-motion-token` on overlay element.
+        overlay_token: Option<String>,
+        motion_kinds: Vec<String>,
+        /// Author override via `data-vmz-motion-token` on control motion element.
+        control_token: Option<String>,
     }
-    s.push_str(&format!("\n{ind3}],\n"));
-    s.push_str(&format!("{ind3}\"methods\": [\n"));
-    for (i, m) in u.semantic.methods.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        s.push_str(&format!(
-            "{ind3}  {{ \"id\": {}, \"name\": {:?}, \"async_boundary\": {} }}",
-            m.id.0, m.name, m.async_boundary
-        ));
-    }
-    s.push_str(&format!("\n{ind3}]\n"));
-    s.push_str(&format!("{ind2}}},\n"));
-
-    s.push_str(&format!("{ind2}\"reactive\": "));
-    s.push_str(&crate::reactive_ir::reactive_component_json(&u.reactive, &ind2));
-    s.push_str(",\n");
-
-    s.push_str(&format!("{ind2}\"view\": {{\n"));
-    s.push_str(&format!("{ind3}\"status\": {:?},\n", u.view.status.as_str()));
-    let bids: Vec<String> = u.view.binding_ids.iter().map(|id| id.0.to_string()).collect();
-    let rids: Vec<String> = u.view.region_ids.iter().map(|id| id.0.to_string()).collect();
-    s.push_str(&format!("{ind3}\"binding_ids\": [{}],\n", bids.join(", ")));
-    s.push_str(&format!("{ind3}\"region_ids\": [{}],\n", rids.join(", ")));
-    s.push_str(&format!("{ind3}\"roots\": [\n"));
-    for (i, n) in u.view.roots.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        s.push_str(&view_node_json(n, &format!("{ind3}  ")));
-    }
-    s.push_str(&format!("\n{ind3}]\n"));
-    s.push_str(&format!("{ind2}}},\n"));
-
-    s.push_str(&format!("{ind2}\"plan\": {{\n"));
-    s.push_str(&format!("{ind3}\"schema\": {:?},\n", PLAN_SCHEMA));
-    s.push_str(&format!("{ind3}\"status\": {:?},\n", u.plan.status.as_str()));
-    let root_ids: Vec<String> = u.plan.root_ids.iter().map(|id| id.to_string()).collect();
-    s.push_str(&format!("{ind3}\"root_ids\": [{}],\n", root_ids.join(", ")));
-    s.push_str(&format!("{ind3}\"nodes\": [\n"));
-    for (i, n) in u.plan.nodes.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        let binding = n.binding.map(|b| b.to_string()).unwrap_or_else(|| "null".into());
-        let region = n.region.map(|r| r.to_string()).unwrap_or_else(|| "null".into());
-        let tag = match &n.tag {
-            Some(t) => format!("{t:?}"),
-            None => "null".into(),
-        };
-        let kids: Vec<String> = n.children.iter().map(|c| c.to_string()).collect();
-        let brs: Vec<String> = n.branches.iter().map(|c| c.to_string()).collect();
-        s.push_str(&format!(
-            "{ind3}  {{ \"id\": {}, \"kind\": {:?}, \"binding\": {binding}, \"region\": {region}, \"tag\": {tag}, \"children\": [{}], \"branches\": [{}] }}",
-            n.id,
-            n.kind,
-            kids.join(", "),
-            brs.join(", ")
-        ));
-    }
-    s.push_str(&format!("\n{ind3}]\n"));
-    s.push_str(&format!("{ind2}}},\n"));
-
-    s.push_str(&format!("{ind2}\"resource\": {{\n"));
-    s.push_str(&format!("{ind3}\"status\": {:?},\n", u.resource.status.as_str()));
-    s.push_str(&format!("{ind3}\"resources\": [\n"));
-    for (i, r) in u.resource.resources.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        let owner = match &r.owner {
-            Some(o) => format!("{o:?}"),
-            None => "null".into(),
-        };
-        let states: Vec<String> = r.states.iter().map(|s| format!("{s:?}")).collect();
-        s.push_str(&format!(
-            "{ind3}  {{ \"id\": {}, \"kind\": {:?}, \"name\": {:?}, \"owner\": {owner}, \"states\": [{}], \"cancelable\": {}, \"generation\": {} }}",
-            r.id,
-            r.kind,
-            r.name,
-            states.join(", "),
-            r.cancelable,
-            r.generation
-        ));
-    }
-    s.push_str(&format!("\n{ind3}]\n"));
-    s.push_str(&format!("{ind2}}},\n"));
-
-    s.push_str(&format!("{ind2}\"lifetime\": {{\n"));
-    s.push_str(&format!("{ind3}\"status\": {:?},\n", u.lifetime.status.as_str()));
-    s.push_str(&format!("{ind3}\"regions\": [\n"));
-    for (i, r) in u.lifetime.regions.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        s.push_str(&format!(
-            "{ind3}  {{ \"id\": {}, \"kind\": {:?}, \"owner_unit\": {:?} }}",
-            r.id, r.kind, r.owner_unit
-        ));
-    }
-    s.push_str(&format!("\n{ind3}]\n"));
-    s.push_str(&format!("{ind2}}},\n"));
-
-    s.push_str(&format!("{ind2}\"graph\": {{\n"));
-    s.push_str(&format!("{ind3}\"status\": {:?},\n", u.graph.status.as_str()));
-    s.push_str(&format!("{ind3}\"edges\": [\n"));
-    for (i, e) in u.graph.edges.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        s.push_str(&format!(
-            "{ind3}  {{ \"kind\": {:?}, \"from\": {:?}, \"to\": {:?} }}",
-            e.kind, e.from, e.to
-        ));
-    }
-    s.push_str(&format!("\n{ind3}],\n"));
-    s.push_str(&format!("{ind3}\"unknowns\": [\n"));
-    for (i, uq) in u.graph.unknowns.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        s.push_str(&format!(
-            "{ind3}  {{ \"field\": {:?}, \"reason\": {:?}, \"via\": {:?} }}",
-            uq.field, uq.reason, uq.via
-        ));
-    }
-    s.push_str(&format!("\n{ind3}],\n"));
-    s.push_str(&format!(
-        "{ind3}\"analysis\": {{ \"exact\": {}, \"widened\": {}, \"unknown\": {}, \"call_edges\": {} }}\n",
-        u.graph.analysis.exact,
-        u.graph.analysis.widened,
-        u.graph.analysis.unknown,
-        u.graph.analysis.call_edges
-    ));
-    s.push_str(&format!("{ind2}}},\n"));
-
-    s.push_str(&format!("{ind2}\"server\": "));
-    s.push_str(&server_json(&u.server, &ind2));
-    s.push_str(",\n");
-    s.push_str(&format!("{ind2}\"deployment\": {{\n"));
-    s.push_str(&format!("{ind3}\"status\": {:?},\n", u.deployment.status.as_str()));
-    s.push_str(&format!(
-        "{ind3}\"unitKind\": {},\n",
-        opt_json_str(u.deployment.unit_kind.as_deref())
-    ));
-    s.push_str(&format!(
-        "{ind3}\"chunkId\": {},\n",
-        opt_json_str(u.deployment.chunk_id.as_deref())
-    ));
-    s.push_str(&format!(
-        "{ind3}\"clientEntry\": {},\n",
-        opt_json_str(u.deployment.client_entry.as_deref())
-    ));
-    s.push_str(&format!(
-        "{ind3}\"programIr\": {},\n",
-        opt_json_str(u.deployment.program_ir.as_deref())
-    ));
-    let region_ids: Vec<String> = u.deployment.region_ids.iter().map(|id| id.to_string()).collect();
-    s.push_str(&format!("{ind3}\"regionIds\": [{}],\n", region_ids.join(", ")));
-    let caps: Vec<String> = u.deployment.capabilities.iter().map(|c| format!("{c:?}")).collect();
-    s.push_str(&format!("{ind3}\"capabilities\": [{}],\n", caps.join(", ")));
-    s.push_str(&format!(
-        "{ind3}\"serverModuleId\": {},\n",
-        opt_json_str(u.deployment.server_module_id.as_deref())
-    ));
-    s.push_str(&format!("{ind3}\"clientCalls\": [\n"));
-    for (i, (method, from)) in u.deployment.client_calls.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        let from_s = match from {
-            Some(f) => format!("{f:?}"),
-            None => "null".into(),
-        };
-        s.push_str(&format!(
-            "{ind3}  {{ \"method\": {method:?}, \"fromClientMethod\": {from_s} }}"
-        ));
-    }
-    s.push_str(&format!("\n{ind3}],\n"));
-    s.push_str(&format!("{ind3}\"resumeEntries\": [\n"));
-    for (i, e) in u.deployment.resume_entries.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        let sk: Vec<String> = e.state_keys.iter().map(|k| format!("{k:?}")).collect();
-        let pk: Vec<String> = e.prop_keys.iter().map(|k| format!("{k:?}")).collect();
-        let roots: Vec<String> = e.plan_root_ids.iter().map(|id| id.to_string()).collect();
-        s.push_str(&format!(
-            "{ind3}  {{ \"component\": {:?}, \"strategy\": {:?}, \"stateKeys\": [{}], \"propKeys\": [{}], \"planRootIds\": [{}] }}",
-            e.component,
-            e.strategy,
-            sk.join(", "),
-            pk.join(", "),
-            roots.join(", ")
-        ));
-    }
-    s.push_str(&format!("\n{ind3}]\n"));
-    s.push_str(&format!("{ind2}}}\n"));
-    s.push_str(&format!("{indent}}}"));
-    s
-}
-
-fn view_node_json(n: &ViewNode, indent: &str) -> String {
-    let ind2 = format!("{indent}  ");
-    match n {
-        ViewNode::Text(t) => format!("{indent}{{ \"kind\": \"text\", \"value\": {t:?} }}"),
-        ViewNode::Interp { expr, binding } => {
-            let bid = binding.map(|b| b.0.to_string()).unwrap_or_else(|| "null".into());
-            format!("{indent}{{ \"kind\": \"interp\", \"expr\": {expr:?}, \"binding\": {bid} }}")
-        }
-        ViewNode::Element { tag, attrs, children, each } => {
-            let mut s = String::new();
-            s.push_str(&format!("{indent}{{\n"));
-            s.push_str(&format!("{ind2}\"kind\": \"element\",\n"));
-            s.push_str(&format!("{ind2}\"tag\": {tag:?},\n"));
-            s.push_str(&format!("{ind2}\"attrs\": [\n"));
-            for (i, a) in attrs.iter().enumerate() {
-                if i > 0 {
-                    s.push_str(",\n");
+    fn walk(node: &ViewNode, region: Option<u32>, scan: &mut Scan) {
+        match node {
+            ViewNode::Element { attrs, children, each, .. } => {
+                let mut next_region = region;
+                if let Some(e) = each {
+                    if let Some(r) = e.region {
+                        next_region = Some(r.0);
+                    }
                 }
-                s.push_str(&view_attr_json(a, &format!("{ind2}  ")));
-            }
-            s.push_str(&format!("\n{ind2}],\n"));
-            match each {
-                Some(e) => {
-                    let list_b =
-                        e.list_binding.map(|b| b.0.to_string()).unwrap_or_else(|| "null".into());
-                    let key_b =
-                        e.key_binding.map(|b| b.0.to_string()).unwrap_or_else(|| "null".into());
-                    let key = match &e.key_expr {
-                        Some(k) => format!("{k:?}"),
-                        None => "null".into(),
-                    };
-                    let region = e.region.map(|r| r.0.to_string()).unwrap_or_else(|| "null".into());
-                    s.push_str(&format!(
-                        "{ind2}\"each\": {{ \"list\": {:?}, \"as\": {:?}, \"key\": {key}, \"listBinding\": {list_b}, \"keyBinding\": {key_b}, \"region\": {region} }},\n",
-                        e.list_expr, e.as_name
-                    ));
+                let mut overlay_here: Option<String> = None;
+                let mut motion_here: Option<String> = None;
+                let mut token_here: Option<String> = None;
+                for a in attrs {
+                    match (a.name.as_str(), &a.value) {
+                        ("data-vmz-overlay", ViewAttrValue::Static { value: v }) => {
+                            overlay_here = Some(v.clone());
+                        }
+                        ("data-vmz-motion", ViewAttrValue::Static { value: v }) => {
+                            motion_here = Some(v.clone());
+                        }
+                        ("data-vmz-motion-token", ViewAttrValue::Static { value: v }) => {
+                            token_here = Some(v.clone());
+                        }
+                        _ => {}
+                    }
                 }
-                None => s.push_str(&format!("{ind2}\"each\": null,\n")),
-            }
-            s.push_str(&format!("{ind2}\"children\": [\n"));
-            for (i, c) in children.iter().enumerate() {
-                if i > 0 {
-                    s.push_str(",\n");
+                if let Some(v) = overlay_here {
+                    scan.overlay = Some(v);
+                    scan.overlay_region = region;
+                    if let Some(tok) = &token_here {
+                        scan.overlay_token = Some(tok.clone());
+                    }
                 }
-                s.push_str(&view_node_json(c, &format!("{ind2}  ")));
+                if let Some(v) = motion_here {
+                    if !scan.motion_kinds.iter().any(|k| k == &v) {
+                        scan.motion_kinds.push(v.clone());
+                    }
+                    if v == "control" {
+                        if let Some(tok) = &token_here {
+                            scan.control_token = Some(tok.clone());
+                        }
+                    }
+                    // Overlay enter/exit markers may carry token on the motion element itself.
+                    if (v == "overlay-enter" || v == "overlay-exit") && scan.overlay_token.is_none()
+                    {
+                        if let Some(tok) = &token_here {
+                            scan.overlay_token = Some(tok.clone());
+                        }
+                    }
+                }
+                for c in children {
+                    walk(c, next_region, scan);
+                }
             }
-            s.push_str(&format!("\n{ind2}]\n"));
-            s.push_str(&format!("{indent}}}"));
-            s
+            ViewNode::If { region: r, branches, .. } => {
+                let next = r.map(|x| x.0).or(region);
+                for b in branches {
+                    walk(&b.body, next, scan);
+                }
+            }
+            ViewNode::Component { children, .. } | ViewNode::Slot { children, .. } => {
+                for c in children {
+                    walk(c, region, scan);
+                }
+            }
+            ViewNode::Text { .. } | ViewNode::Interp { .. } => {}
         }
-        ViewNode::If { region, binding, branches } => {
-            let rid = region.map(|r| r.0.to_string()).unwrap_or_else(|| "null".into());
-            let bid = binding.map(|b| b.0.to_string()).unwrap_or_else(|| "null".into());
-            let mut s = String::new();
-            s.push_str(&format!("{indent}{{\n"));
-            s.push_str(&format!("{ind2}\"kind\": \"if\",\n"));
-            s.push_str(&format!("{ind2}\"region\": {rid},\n"));
-            s.push_str(&format!("{ind2}\"binding\": {bid},\n"));
-            s.push_str(&format!("{ind2}\"branches\": [\n"));
-            for (i, br) in branches.iter().enumerate() {
-                if i > 0 {
-                    s.push_str(",\n");
-                }
-                let cond = match &br.cond {
-                    Some(c) => format!("{c:?}"),
-                    None => "null".into(),
-                };
-                s.push_str(&format!("{ind2}  {{\n"));
-                s.push_str(&format!("{ind2}    \"cond\": {cond},\n"));
-                s.push_str(&format!("{ind2}    \"body\": "));
-                s.push_str(&view_node_json(&br.body, &format!("{ind2}    ")));
-                s.push_str(&format!("\n{ind2}  }}"));
-            }
-            s.push_str(&format!("\n{ind2}]\n"));
-            s.push_str(&format!("{indent}}}"));
-            s
-        }
-        ViewNode::Component { tag, attrs, children } => {
-            let mut s = String::new();
-            s.push_str(&format!("{indent}{{\n"));
-            s.push_str(&format!("{ind2}\"kind\": \"component\",\n"));
-            s.push_str(&format!("{ind2}\"tag\": {tag:?},\n"));
-            s.push_str(&format!("{ind2}\"attrs\": [\n"));
-            for (i, a) in attrs.iter().enumerate() {
-                if i > 0 {
-                    s.push_str(",\n");
-                }
-                s.push_str(&view_attr_json(a, &format!("{ind2}  ")));
-            }
-            s.push_str(&format!("\n{ind2}],\n"));
-            s.push_str(&format!("{ind2}\"children\": [\n"));
-            for (i, c) in children.iter().enumerate() {
-                if i > 0 {
-                    s.push_str(",\n");
-                }
-                s.push_str(&view_node_json(c, &format!("{ind2}  ")));
-            }
-            s.push_str(&format!("\n{ind2}]\n"));
-            s.push_str(&format!("{indent}}}"));
-            s
-        }
-        ViewNode::Slot { name, attrs, children } => {
-            let name_s = match name {
-                Some(n) => format!("{n:?}"),
-                None => "null".into(),
-            };
-            let mut s = String::new();
-            s.push_str(&format!("{indent}{{\n"));
-            s.push_str(&format!("{ind2}\"kind\": \"slot\",\n"));
-            s.push_str(&format!("{ind2}\"name\": {name_s},\n"));
-            s.push_str(&format!("{ind2}\"attrs\": [\n"));
-            for (i, a) in attrs.iter().enumerate() {
-                if i > 0 {
-                    s.push_str(",\n");
-                }
-                s.push_str(&view_attr_json(a, &format!("{ind2}  ")));
-            }
-            s.push_str(&format!("\n{ind2}],\n"));
-            s.push_str(&format!("{ind2}\"children\": [\n"));
-            for (i, c) in children.iter().enumerate() {
-                if i > 0 {
-                    s.push_str(",\n");
-                }
-                s.push_str(&view_node_json(c, &format!("{ind2}  ")));
-            }
-            s.push_str(&format!("\n{ind2}]\n"));
-            s.push_str(&format!("{indent}}}"));
-            s
-        }
+    }
+    let mut scan = Scan::default();
+    for root in &unit.view.roots {
+        walk(root, None, &mut scan);
+    }
+
+    let cancelable = unit.semantic.methods.iter().any(|m| m.name == "_cancelExit");
+    let generation = cancelable
+        || unit.semantic.fields.iter().any(|f| f.name == "_motionGen")
+        || unit.semantic.methods.iter().any(|m| m.name == "_enterFocus");
+    let owner = unit.name.clone();
+    let mut transitions = Vec::new();
+    let mut next_id = 0u32;
+    let overlay_token = scan.overlay_token.clone().unwrap_or_else(|| "motion.overlay".into());
+    let control_token = scan.control_token.clone().unwrap_or_else(|| "motion.control".into());
+
+    if let Some(overlay) = &scan.overlay {
+        let region = scan.overlay_region;
+        transitions.push(MotionTransitionDecl {
+            id: next_id,
+            kind: "overlay-enter".into(),
+            name: format!("{overlay}.overlay-enter"),
+            owner: owner.clone(),
+            trigger: "open".into(),
+            region,
+            token: overlay_token.clone(),
+            states: vec!["enter".into(), "stable".into(), "cancelled".into(), "completed".into()],
+            cancelable,
+            generation,
+            reduced_motion: "honor".into(),
+        });
+        next_id += 1;
+        transitions.push(MotionTransitionDecl {
+            id: next_id,
+            kind: "overlay-exit".into(),
+            name: format!("{overlay}.overlay-exit"),
+            owner: owner.clone(),
+            trigger: "dismiss".into(),
+            region,
+            token: overlay_token,
+            states: vec!["exit".into(), "cancelled".into(), "completed".into()],
+            cancelable,
+            generation,
+            reduced_motion: "honor".into(),
+        });
+        next_id += 1;
+    }
+
+    if scan.motion_kinds.iter().any(|k| k == "control") {
+        transitions.push(MotionTransitionDecl {
+            id: next_id,
+            kind: "control".into(),
+            name: format!("{owner}.control"),
+            owner,
+            trigger: "control".into(),
+            region: None,
+            token: control_token,
+            states: vec!["feedback".into(), "completed".into()],
+            cancelable: false,
+            generation: false,
+            reduced_motion: "honor".into(),
+        });
+    }
+
+    MotionView {
+        status: if transitions.is_empty() { StubStatus::Empty } else { StubStatus::Partial },
+        transitions,
     }
 }
 
-fn view_attr_json(a: &ViewAttr, indent: &str) -> String {
-    let bid = a.binding.map(|b| b.0.to_string()).unwrap_or_else(|| "null".into());
-    match &a.value {
-        ViewAttrValue::Static(v) => format!(
-            "{indent}{{ \"name\": {:?}, \"value\": {{ \"kind\": \"static\", \"text\": {v:?} }}, \"binding\": {bid} }}",
-            a.name
-        ),
-        ViewAttrValue::Interp(e) => format!(
-            "{indent}{{ \"name\": {:?}, \"value\": {{ \"kind\": \"interp\", \"expr\": {e:?} }}, \"binding\": {bid} }}",
-            a.name
-        ),
-        ViewAttrValue::Bare => format!(
-            "{indent}{{ \"name\": {:?}, \"value\": {{ \"kind\": \"bare\" }}, \"binding\": {bid} }}",
-            a.name
-        ),
+fn append_motion_plan_nodes(unit: &mut ProgramUnit) {
+    // Rebuild is idempotent: drop prior motion_transition nodes then re-emit.
+    unit.plan.nodes.retain(|n| n.kind != "motion_transition");
+    if unit.motion.transitions.is_empty() {
+        return;
     }
-}
-
-fn opt_json_str(v: Option<&str>) -> String {
-    match v {
-        Some(s) => format!("{s:?}"),
-        None => "null".into(),
+    let mut next_id = unit.plan.nodes.iter().map(|n| n.id).max().map(|m| m + 1).unwrap_or(0);
+    for t in &unit.motion.transitions {
+        unit.plan.nodes.push(PlanNode {
+            id: next_id,
+            kind: "motion_transition".into(),
+            binding: None,
+            region: t.region,
+            tag: Some(t.name.clone()),
+            children: Vec::new(),
+            branches: Vec::new(),
+        });
+        next_id += 1;
     }
-}
-
-fn server_json(server: &ServerView, indent: &str) -> String {
-    let ind2 = format!("{indent}  ");
-    let mut s = String::new();
-    s.push_str("{\n");
-    s.push_str(&format!("{ind2}\"status\": {:?},\n", server.status.as_str()));
-    match &server.module_id {
-        Some(id) => s.push_str(&format!("{ind2}\"module_id\": {:?},\n", id)),
-        None => s.push_str(&format!("{ind2}\"module_id\": null,\n")),
+    if unit.plan.status == PlanStatus::Empty {
+        unit.plan.status = PlanStatus::Partial;
     }
-    match &server.class_name {
-        Some(name) => s.push_str(&format!("{ind2}\"class_name\": {:?},\n", name)),
-        None => s.push_str(&format!("{ind2}\"class_name\": null,\n")),
-    }
-    s.push_str(&format!("{ind2}\"capabilities\": [\n"));
-    for (i, c) in server.capabilities.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        let http = match &c.http {
-            Some(h) => format!("{{ \"verb\": {:?}, \"path\": {:?} }}", h.verb, h.path),
-            None => "null".into(),
-        };
-        s.push_str(&format!(
-            "{ind2}  {{ \"id\": {}, \"method\": {:?}, \"async_boundary\": {}, \"is_private\": {}, \"callable_from_client\": {}, \"http\": {} }}",
-            c.id.0,
-            c.method,
-            c.async_boundary,
-            c.is_private,
-            c.callable_from_client,
-            http
-        ));
-    }
-    s.push_str(&format!("\n{ind2}],\n"));
-    s.push_str(&format!("{ind2}\"calls\": [\n"));
-    for (i, edge) in server.calls.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        let from = match &edge.from_client_method {
-            Some(m) => format!("{:?}", m),
-            None => "null".into(),
-        };
-        s.push_str(&format!(
-            "{ind2}  {{ \"capability\": {}, \"method\": {:?}, \"from_client_method\": {} }}",
-            edge.capability.0, edge.method, from
-        ));
-    }
-    s.push_str(&format!("\n{ind2}]\n"));
-    s.push_str(&format!("{indent}}}"));
-    s
 }

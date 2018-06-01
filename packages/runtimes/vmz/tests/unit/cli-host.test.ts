@@ -16,6 +16,8 @@ describe('vmz Node CLI host (N2)', () => {
         expect(a['out-dir']).toBe('dist-x');
         expect(a.port).toBe('4000');
         expect(a.release).toBe(true);
+        expect(Object.prototype.hasOwnProperty.call(a, 'port')).toBe(true);
+        expect(Object.prototype.hasOwnProperty.call(parseArgs(['.']), 'port')).toBe(false);
     });
 
     it('resolveWorkspaceDirs joins relative out-dir', () => {

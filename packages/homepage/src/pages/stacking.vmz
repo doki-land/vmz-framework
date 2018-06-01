@@ -1,0 +1,102 @@
+<template>
+  <div data-dogfood="stacking">
+    <AppShell brand="VMZ" homeHref="/" navLabel="Stacking" nav={navItems}>
+      <Alert
+        tone="info"
+        roleName="status"
+        title="Overlay stacking"
+        description="Drawer → Dialog → Popover with rising stackLevel; Escape closes topmost only. Parent owns the stack."
+      />
+
+      <p data-dogfood="stacking-state">
+        drawer:{drawerOpen ? 'open' : 'closed'};dialog:{dialogOpen ? 'open' : 'closed'};popover:{popoverOpen ? 'open' : 'closed'}
+      </p>
+
+      <div class="vmz-stacking-actions">
+        <Button type="button" onClick={() => this.openDrawer()}>Open drawer (stack 0)</Button>
+        <Button type="button" variant="secondary" onClick={() => this.openDialog()}>Open dialog (stack 1)</Button>
+        <Button type="button" variant="ghost" onClick={() => this.openPopover()}>Open popover (stack 2)</Button>
+      </div>
+
+      <Drawer
+        open={drawerOpen}
+        title="Base drawer"
+        titleId="home-stack-drawer-title"
+        stackLevel="0"
+        onClose={() => this.closeDrawer()}
+      >
+        <p data-dogfood="stacking-drawer-body">Base layer stackLevel=0</p>
+      </Drawer>
+
+      <Dialog
+        open={dialogOpen}
+        title="Stacked dialog"
+        titleId="home-stack-dialog-title"
+        stackLevel="1"
+        onClose={() => this.closeDialog()}
+      >
+        <p data-dogfood="stacking-dialog-body">Middle layer stackLevel=1</p>
+      </Dialog>
+
+      <Popover
+        open={popoverOpen}
+        title="Top popover"
+        titleId="home-stack-popover-title"
+        stackLevel="2"
+        onClose={() => this.closePopover()}
+      >
+        <p data-dogfood="stacking-popover-body">Top layer stackLevel=2</p>
+      </Popover>
+    </AppShell>
+  </div>
+</template>
+
+<style>
+.vmz-stacking-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.75rem;
+}
+</style>
+
+<script client>
+export default class StackingPage {
+  drawerOpen = false;
+  dialogOpen = false;
+  popoverOpen = false;
+
+  navItems = [
+    { id: 'stacking', title: 'Stacking', href: '/stacking' },
+    { id: 'structure', title: 'Structure', href: '/structure' },
+    { id: 'ui', title: 'UI lab', href: '/ui' },
+    { id: 'motion', title: 'Motion', href: '/motion' },
+  ];
+
+  openDrawer() {
+    this.drawerOpen = true;
+  }
+
+  closeDrawer() {
+    this.popoverOpen = false;
+    this.dialogOpen = false;
+    this.drawerOpen = false;
+  }
+
+  openDialog() {
+    this.dialogOpen = true;
+  }
+
+  closeDialog() {
+    this.popoverOpen = false;
+    this.dialogOpen = false;
+  }
+
+  openPopover() {
+    this.popoverOpen = true;
+  }
+
+  closePopover() {
+    this.popoverOpen = false;
+  }
+}
+</script>

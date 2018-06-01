@@ -15,9 +15,10 @@
 import http from 'node:http';
 import path from 'node:path';
 import { readdir, writeFile, readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { setServerModuleResolver, setRoutes, handleNodeRequest } from './vmz-runtime.js';
-import { registerComponents, renderToStream } from './vmz-dom.js';
+import { registerComponents, renderToStream, renderToString } from './vmz-dom.js';
 
 const distDir = process.env.VMZ_DIST ? path.resolve(process.env.VMZ_DIST) : path.dirname(fileURLToPath(import.meta.url));
 
@@ -37,13 +38,27 @@ let cssEntry = null;
 let styleTheme = null;
 /** @type {Set<import('node:http').ServerResponse>} */
 const sseClients = new Set();
+/** In-flight HTTP requests (graceful shutdown drain). */
+let inFlight = 0;
+/** When true, refuse new work except health. */
+let shuttingDown = false;
+let ready = false;
+/** @type {{ message: string, stack?: string, at: number } | null} */
+let lastDevError = null;
 
 setServerModuleResolver((moduleId) => {
     const rel = moduleId.replace(/^#server\//, '') + '.js';
     return bustUrl(pathToFileURL(path.join(distDir, '#server', rel)).href);
 });
 
-await softReload({ quiet: true });
+try {
+    await softReload({ quiet: true });
+    ready = true;
+} catch (err) {
+    lastDevError = normalizeDevError(err);
+    ready = true; // still accept HTTP — serve error page / recover on next reload
+    console.error('vmz serve: initial load failed (dev host stays up)', lastDevError.message);
+}
 
 /**
  * @param {import('node:http').IncomingMessage} req
@@ -75,11 +90,17 @@ async function renderPage(pathname, opts = {}) {
 
 /**
  * Stream shell + Direct serialize body for the matched file-route page.
+ * Runs Page.access (closed allow/redirect/not-found/deny) before load;
+ * POST may run Page.action before re-render.
  * @param {string} pathname
- * @param {{ signal?: AbortSignal, searchParams?: URLSearchParams, cookieHeader?: string }} [opts]
- * @returns {Promise<{ status: number, stream: AsyncGenerator<string, void, void> } | null>}
+ * @param {{ signal?: AbortSignal, searchParams?: URLSearchParams, cookieHeader?: string, method?: string, body?: unknown }} [opts]
+ * @returns {Promise<{ status: number, stream?: AsyncGenerator<string, void, void>, redirect?: string, headers?: Record<string, string> } | null>}
  */
 async function renderPageStream(pathname, opts = {}) {
+    if (isDev && lastDevError && pageCtors.size === 0) {
+        return { status: 500, stream: emitDevErrorHtml(lastDevError) };
+    }
+
     let match = matchFileRoute(pathname, pageCatalog);
     let status = 200;
 
@@ -94,37 +115,217 @@ async function renderPageStream(pathname, opts = {}) {
         status = 404;
     }
 
-    if (!match) return null;
+    if (!match) {
+        if (isDev && lastDevError) {
+            return { status: 500, stream: emitDevErrorHtml(lastDevError) };
+        }
+        return null;
+    }
     const Page = await loadPageCtor(match.chunkId);
-    if (!Page) return null;
+    if (!Page) {
+        if (isDev && lastDevError) {
+            return { status: 500, stream: emitDevErrorHtml(lastDevError) };
+        }
+        return null;
+    }
+    const params = extractRouteParams(match.segs, pathname);
+    const method = String(opts.method || 'GET').toUpperCase();
+
+    if (typeof Page.access === 'function') {
+        const access = await Page.access({
+            params,
+            pathname,
+            chunkId: match.chunkId,
+            signal: opts.signal,
+            searchParams: opts.searchParams,
+            method,
+        });
+        const closed = normalizeAccessResult(access);
+        if (closed.kind === 'redirect') {
+            return { status: 302, redirect: closed.location, headers: { Location: closed.location } };
+        }
+        if (closed.kind === 'deny') {
+            return { status: 403, stream: emitAccessShell('route-access-deny') };
+        }
+        if (closed.kind === 'not-found') {
+            const catchAll = findRootCatchAll(pageCatalog);
+            if (catchAll) {
+                const NotFound = await loadPageCtor(catchAll.chunkId);
+                if (NotFound) {
+                    const resumeEntries = await loadPageResumeEntries(distDir, catchAll.chunkId);
+                    const eventOnlyShell = isEventOnlyShell(resumeEntries.map((e) => e.strategy));
+                    return {
+                        status: 404,
+                        stream: emitPageHtml(NotFound, catchAll.chunkId, eventOnlyShell, { ...params }, opts),
+                    };
+                }
+            }
+            return { status: 404, stream: emitAccessShell('route-access-not-found') };
+        }
+    }
+
+    let props = { ...params };
+    if (method === 'POST' && typeof Page.action === 'function') {
+        const acted = await Page.action({
+            params,
+            pathname,
+            chunkId: match.chunkId,
+            signal: opts.signal,
+            searchParams: opts.searchParams,
+            body: opts.body,
+            method,
+        });
+        const actionClosed = normalizeActionResult(acted);
+        if (actionClosed.kind === 'redirect') {
+            return { status: 302, redirect: actionClosed.location, headers: { Location: actionClosed.location } };
+        }
+        if (actionClosed.kind === 'deny') {
+            return { status: 403, stream: emitAccessShell('route-action-deny') };
+        }
+        if (actionClosed.kind === 'not-found') {
+            return { status: 404, stream: emitAccessShell('route-action-not-found') };
+        }
+        if (actionClosed.props) {
+            props = { ...props, ...actionClosed.props };
+        }
+    }
+
+    if (typeof Page.load === 'function') {
+        const loaded = await Page.load({
+            params,
+            pathname,
+            chunkId: match.chunkId,
+            signal: opts.signal,
+            searchParams: opts.searchParams,
+        });
+        if (opts.signal?.aborted) {
+            return { status: 499, stream: emitAccessShell('route-nav-cancelled') };
+        }
+        if (loaded && typeof loaded === 'object' && !Array.isArray(loaded)) {
+            props = { ...props, ...loaded };
+        }
+    }
+    if (opts.signal?.aborted) {
+        return { status: 499, stream: emitAccessShell('route-nav-cancelled') };
+    }
     const resumeEntries = await loadPageResumeEntries(distDir, match.chunkId);
     const strategies = resumeEntries.map((e) => e.strategy);
     const eventOnlyShell = isEventOnlyShell(strategies);
+    const layoutChain = resolveLayoutChain(match.chunkId);
     return {
         status,
-        stream: emitPageHtml(Page, match.chunkId, eventOnlyShell, opts),
+        stream: emitPageHtml(Page, match.chunkId, eventOnlyShell, props, opts, layoutChain),
     };
+}
+
+/**
+ * @param {unknown} access
+ * @returns {{ kind: 'allow' } | { kind: 'redirect', location: string } | { kind: 'deny' } | { kind: 'not-found' }}
+ */
+function normalizeAccessResult(access) {
+    if (access == null || access === true) return { kind: 'allow' };
+    if (typeof access === 'string') {
+        const k = access.toLowerCase();
+        if (k === 'allow') return { kind: 'allow' };
+        if (k === 'deny') return { kind: 'deny' };
+        if (k === 'not-found' || k === 'notfound') return { kind: 'not-found' };
+    }
+    if (typeof access === 'object') {
+        const kind = String(access.kind || access.type || 'allow').toLowerCase();
+        if (kind === 'redirect') {
+            const location = String(access.location || access.to || access.href || '');
+            if (!location) return { kind: 'deny' };
+            return { kind: 'redirect', location };
+        }
+        if (kind === 'deny') return { kind: 'deny' };
+        if (kind === 'not-found' || kind === 'notfound') return { kind: 'not-found' };
+        return { kind: 'allow' };
+    }
+    return { kind: 'allow' };
+}
+
+/**
+ * @param {unknown} acted
+ * @returns {{ kind: 'allow', props?: Record<string, unknown> } | { kind: 'redirect', location: string } | { kind: 'deny' } | { kind: 'not-found' }}
+ */
+function normalizeActionResult(acted) {
+    const base = normalizeAccessResult(acted);
+    if (base.kind !== 'allow') return base;
+    if (acted && typeof acted === 'object' && acted.props && typeof acted.props === 'object') {
+        return { kind: 'allow', props: acted.props };
+    }
+    if (acted && typeof acted === 'object' && !('kind' in acted) && !('type' in acted) && !Array.isArray(acted)) {
+        return { kind: 'allow', props: acted };
+    }
+    return { kind: 'allow' };
+}
+
+/**
+ * Minimal HTML for closed access/action results when no NotFound page exists.
+ * @param {string} marker
+ */
+async function* emitAccessShell(marker) {
+    yield `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>VMZ</title></head>
+<body><p>${marker}</p></body>
+</html>`;
 }
 
 /**
  * @param {any} Page
  * @param {string} chunkId
  * @param {boolean} eventOnlyShell
+ * @param {Record<string, unknown>} props
  * @param {{ signal?: AbortSignal, searchParams?: URLSearchParams, cookieHeader?: string }} [opts]
+ * @param {string[]} [layoutChain] layout chunk ids outer→inner
  */
-async function* emitPageHtml(Page, chunkId, eventOnlyShell, opts = {}) {
+async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {}, layoutChain = []) {
     const signal = opts.signal;
     const live = isDev
         ? `\n  <script>
   (() => {
     const es = new EventSource("/__vmz/events");
+    function showOverlay(err) {
+      let el = document.getElementById("vmz-dev-overlay");
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "vmz-dev-overlay";
+        el.setAttribute("role", "alert");
+        Object.assign(el.style, {
+          position: "fixed", inset: "0", zIndex: "2147483646",
+          background: "rgba(15,17,21,0.92)", color: "#f4f4f5",
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+          padding: "2rem", overflow: "auto",
+        });
+        document.documentElement.appendChild(el);
+      }
+      const msg = (err && err.message) || String(err || "Unknown error");
+      const stack = (err && err.stack) || "";
+      const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+      el.innerHTML = "<div style=\\"max-width:56rem;margin:0 auto\\">"
+        + "<p style=\\"margin:0 0 .5rem;color:#f87171;font-weight:700\\">VMZ Dev Error</p>"
+        + "<pre style=\\"white-space:pre-wrap;margin:0 0 1rem;font-size:13px;line-height:1.45\\">" + esc(msg) + "</pre>"
+        + (stack ? "<pre style=\\"white-space:pre-wrap;opacity:.7;font-size:12px\\">" + esc(stack) + "</pre>" : "")
+        + "<p style=\\"opacity:.65;font-size:12px\\">Fix the file and save — soft reload will clear this overlay.</p>"
+        + "</div>";
+    }
+    function hideOverlay() {
+      const el = document.getElementById("vmz-dev-overlay");
+      if (el) el.remove();
+    }
     es.onmessage = async (ev) => {
       let msg = null;
       try { msg = JSON.parse(ev.data); } catch { /* plain string */ }
+      if (msg && msg.type === "error") {
+        showOverlay(msg);
+        return;
+      }
       if (!msg || msg.type !== "hmr") {
         if (ev.data === "reload") location.reload();
         return;
       }
+      hideOverlay();
       if (msg.mode === "island") {
         try {
           const { registerComponents, hydrate } = await import("/vmz-dom.js?t=" + msg.token);
@@ -148,13 +349,18 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, opts = {}) {
           const pageChunk = root && root.getAttribute("data-vmz-page");
           if (root && pageChunk) {
             const pageMod = await import("/" + pageChunk + ".client.js?t=" + msg.token);
-            await hydrate(pageMod.default, root, {}, { preserveState: true, skipOnMount: true });
+            let hmrProps = {};
+            try {
+              const raw = root.getAttribute("data-vmz-props");
+              if (raw) hmrProps = JSON.parse(raw);
+            } catch { /* ignore */ }
+            await hydrate(pageMod.default, root, hmrProps, { preserveState: true, skipOnMount: true });
           } else {
             location.reload();
           }
         } catch (err) {
           console.error("vmz island HMR failed", err);
-          location.reload();
+          showOverlay({ message: String(err && err.message || err), stack: err && err.stack });
         }
         return;
       }
@@ -163,11 +369,24 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, opts = {}) {
   })();
   </script>`
         : '';
+    const bootOverlay =
+        isDev && lastDevError
+            ? `\n  <script>window.__VMZ_DEV_ERROR__=${JSON.stringify(lastDevError)};` +
+              `(function(){var e=window.__VMZ_DEV_ERROR__;if(!e)return;` +
+              `var ev=new Event("message");ev.data=JSON.stringify({type:"error",message:e.message,stack:e.stack});` +
+              `/* paint immediately */` +
+              `var d=document.createElement("div");d.id="vmz-dev-overlay";d.setAttribute("role","alert");` +
+              `Object.assign(d.style,{position:"fixed",inset:"0",zIndex:"2147483646",background:"rgba(15,17,21,0.92)",color:"#f4f4f5",fontFamily:"ui-monospace,monospace",padding:"2rem",overflow:"auto"});` +
+              `d.innerHTML="<div style='max-width:56rem;margin:0 auto'><p style='color:#f87171;font-weight:700'>VMZ Dev Error</p><pre style='white-space:pre-wrap'>"+String(e.message||e).replace(/[<>&]/g,function(c){return {"<":"&lt;",">":"&gt;","&":"&amp;"}[c]})+"</pre></div>";` +
+              `document.documentElement.appendChild(d);})();</script>`
+            : '';
     if (signal?.aborted) return;
     const themeId = resolveThemeId(opts.searchParams, opts.cookieHeader);
     const htmlTheme = htmlThemeAttributeForId(themeId);
     const themeBoot = themeBootstrapScript();
     const cssLink = cssEntry ? `  <link rel="stylesheet" href="/${String(cssEntry).replace(/^\/+/, '')}?t=${reloadToken}" />\n` : '';
+    const propsJson = JSON.stringify(props ?? {});
+    const layoutAttr = layoutChain.length ? ` data-vmz-layout="${escapeAttr(layoutChain.join(','))}"` : '';
     yield `<!DOCTYPE html>
 <html lang="en"${htmlTheme}>
 <head>
@@ -176,20 +395,63 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, opts = {}) {
   <title>VMZ</title>
 ${themeBoot}${cssLink}</head>
 <body>
-  <div id="app" data-vmz-page="${escapeAttr(chunkId)}">`;
-    for await (const chunk of renderToStream(Page, {}, { signal })) {
+  <div id="app" data-vmz-page="${escapeAttr(chunkId)}"${layoutAttr} data-vmz-props="${escapeAttr(propsJson)}">`;
+    let bodyHtml = '';
+    for await (const chunk of renderToStream(Page, props, { signal })) {
         if (signal?.aborted) return;
-        yield chunk;
+        bodyHtml += chunk;
     }
     if (signal?.aborted) return;
+    // Wrap page HTML in layout chain (outer → inner) via default slot injection.
+    for (let i = layoutChain.length - 1; i >= 0; i--) {
+        const Layout = await loadPageCtor(layoutChain[i]);
+        if (!Layout) continue;
+        bodyHtml = await renderToString(Layout, {}, { signal, slotHtml: bodyHtml });
+        if (signal?.aborted) return;
+    }
+    yield bodyHtml;
+    if (signal?.aborted) return;
     yield `</div>
-  <script type="module" src="/${eventOnlyShell ? 'entry-event.js' : 'entry-client.js'}?t=${reloadToken}"></script>${live}
+  <script type="module" src="/${eventOnlyShell ? 'entry-event.js' : 'entry-client.js'}?t=${reloadToken}"></script>${live}${bootOverlay}
 </body>
 </html>`;
 }
 
 const server = http.createServer((req, res) => {
     const url = new URL(req.url || '/', `http://${host}:${port}`);
+
+    if (url.pathname === '/__vmz/health' && req.method === 'GET') {
+        res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+        res.end(JSON.stringify({ status: 'ok', shuttingDown, inFlight }));
+        return;
+    }
+    if (url.pathname === '/__vmz/ready' && req.method === 'GET') {
+        if (!ready || shuttingDown) {
+            res.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+            res.end(JSON.stringify({ status: 'not-ready', ready, shuttingDown }));
+            return;
+        }
+        res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+        res.end(JSON.stringify({ status: 'ready', ready: true, inFlight }));
+        return;
+    }
+
+    if (shuttingDown) {
+        res.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+        res.end(JSON.stringify({ status: 'shutting-down' }));
+        return;
+    }
+
+    inFlight += 1;
+    let settled = false;
+    const done = () => {
+        if (settled) return;
+        settled = true;
+        inFlight = Math.max(0, inFlight - 1);
+    };
+    res.on('finish', done);
+    res.on('close', done);
+
     if (url.pathname === '/__vmz/reload' && req.method === 'POST') {
         readRequestBody(req)
             .then((raw) => {
@@ -207,8 +469,17 @@ const server = http.createServer((req, res) => {
             })
             .catch((err) => {
                 console.error('vmz serve: soft reload failed', err);
+                lastDevError = normalizeDevError(err);
+                notifySse(
+                    JSON.stringify({
+                        type: 'error',
+                        message: lastDevError.message,
+                        stack: lastDevError.stack,
+                        at: lastDevError.at,
+                    }),
+                );
                 res.writeHead(500, { 'content-type': 'application/json' });
-                res.end(JSON.stringify({ ok: false, error: String(err) }));
+                res.end(JSON.stringify({ ok: false, error: lastDevError.message }));
             });
         return;
     }
@@ -232,110 +503,161 @@ server.listen(port, host, () => {
     console.log(`vmz serve http://${host}:${port} (dist=${distDir}${isDev ? ', dev' : ''})`);
 });
 
+const SHUTDOWN_TIMEOUT_MS = Number(process.env.VMZ_SHUTDOWN_TIMEOUT_MS || 10000);
+
+async function gracefulShutdown(signal) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    ready = false;
+    console.log(`vmz serve: ${signal} — draining in-flight=${inFlight} timeout=${SHUTDOWN_TIMEOUT_MS}ms`);
+    server.close();
+    const start = Date.now();
+    while (inFlight > 0 && Date.now() - start < SHUTDOWN_TIMEOUT_MS) {
+        await new Promise((r) => setTimeout(r, 25));
+    }
+    for (const client of sseClients) {
+        try {
+            client.end();
+        } catch {
+            /* ignore */
+        }
+    }
+    sseClients.clear();
+    process.exit(inFlight > 0 ? 1 : 0);
+}
+
+process.on('SIGTERM', () => {
+    void gracefulShutdown('SIGTERM');
+});
+process.on('SIGINT', () => {
+    void gracefulShutdown('SIGINT');
+});
+
 /**
  * Re-import routes / pages / components with a new cache-bust token.
  * Keeps the HTTP server process alive (no Node restart).
+ * Failed reloads keep the previous in-memory modules (Vite-like resilience).
  * @param {{ quiet?: boolean, payload?: { affectedChunks?: string[], seedChunks?: string[], full?: boolean, islandHmr?: boolean } }} [opts]
  */
 async function softReload(opts = {}) {
-    reloadToken = Date.now();
+    const prevToken = reloadToken;
+    const prevCatalog = pageCatalog;
+    const nextToken = Date.now();
+    reloadToken = nextToken;
     const affected = opts.payload?.affectedChunks ?? [];
     const seeds = opts.payload?.seedChunks ?? [];
     const full = opts.payload?.full;
     const islandHmr = Boolean(opts.payload?.islandHmr);
 
     try {
-        const routes = JSON.parse(await readFile(path.join(distDir, 'vmz-routes.json'), 'utf8'));
-        setRoutes(routes);
-    } catch {
-        setRoutes([]);
-    }
-
-    const componentEntries = await listClientComponents(distDir);
-    const componentNames = componentEntries.map((e) => e.name);
-    pageCatalog = await listPageClientFiles(distDir);
-    if (!pageCatalog.length) {
-        throw new Error(`vmz serve: no pages/**/*.client.js in ${distDir}`);
-    }
-    pageCtors.clear();
-
-    /** @type {Record<string, any>} */
-    const components = {};
-    const affectedNames = new Set(
-        affected
-            .map((c) => String(c))
-            .filter((c) => c.startsWith('components/') || !c.includes('/'))
-            .map((c) => c.split('/').pop())
-            .filter(Boolean),
-    );
-    for (const entry of componentEntries) {
-        if (islandHmr && affectedNames.size > 0 && !affectedNames.has(entry.name)) {
-            continue;
+        try {
+            const routes = JSON.parse(await readFile(path.join(distDir, 'vmz-routes.json'), 'utf8'));
+            setRoutes(routes);
+        } catch {
+            setRoutes([]);
         }
-        const href = bustUrl(pathToFileURL(path.join(distDir, entry.entry)).href);
-        const mod = await import(href);
-        components[entry.name] = mod.default;
-    }
-    if (Object.keys(components).length) {
-        registerComponents(components);
-    }
 
-    if (!islandHmr) {
-        for (const p of pageCatalog) {
-            await loadPageCtor(p.chunkId);
+        const componentEntries = await listClientComponents(distDir);
+        const nextCatalog = await listPageClientFiles(distDir);
+        if (!nextCatalog.length) {
+            throw new Error(`vmz serve: no pages/**/*.client.js in ${distDir}`);
         }
-    }
 
-    const indexChunk = pageCatalog.find((p) => p.chunkId === 'pages/index')?.chunkId || pageCatalog[0].chunkId;
-    const resumeEntries = await loadPageResumeEntries(distDir, indexChunk);
-    const styleMeta = await loadDeploymentStyle(distDir);
-    cssEntry = styleMeta.cssEntry;
-    styleTheme = styleMeta.styleTheme;
-    const lazyEventNames = resumeEntries
-        .filter((e) => isEventStrategy(e.strategy))
-        .map((e) => e.component)
-        .filter(Boolean);
-    const lazySet = new Set(lazyEventNames);
+        /** @type {Record<string, any>} */
+        const components = {};
+        /** @type {Map<string, any>} */
+        const nextCtors = new Map();
+        const affectedNames = new Set(
+            affected
+                .map((c) => String(c))
+                .filter((c) => c.startsWith('components/') || !c.includes('/'))
+                .map((c) => c.split('/').pop())
+                .filter(Boolean),
+        );
+        for (const entry of componentEntries) {
+            if (islandHmr && affectedNames.size > 0 && !affectedNames.has(entry.name)) {
+                continue;
+            }
+            const href = bustUrl(pathToFileURL(path.join(distDir, entry.entry)).href);
+            const mod = await import(href);
+            components[entry.name] = mod.default;
+        }
 
-    await writeFile(
-        path.join(distDir, 'entry-client.js'),
-        emitEntryClient(
-            componentEntries.filter((e) => !lazySet.has(e.name)),
-            componentEntries.filter((e) => lazySet.has(e.name)),
-            reloadToken,
-        ),
-        'utf8',
-    );
+        if (!islandHmr) {
+            for (const p of nextCatalog) {
+                const pageRel = `${p.chunkId}.client.js`;
+                const href = bustUrl(pathToFileURL(path.join(distDir, pageRel)).href);
+                const mod = await import(href);
+                nextCtors.set(p.chunkId, mod.default);
+            }
+        }
 
-    const strategies = resumeEntries.map((e) => e.strategy);
-    const eventOnlyShell = isEventOnlyShell(strategies);
-    await writeFile(path.join(distDir, 'entry-event.js'), emitEntryEvent(reloadToken), 'utf8');
+        pageCatalog = nextCatalog;
+        if (!islandHmr) {
+            pageCtors.clear();
+            for (const [k, v] of nextCtors) pageCtors.set(k, v);
+        }
+        if (Object.keys(components).length) {
+            registerComponents(components);
+        }
 
-    const mode = islandHmr ? 'island' : eventOnlyShell ? 'event-shell' : 'full';
-    notifySse(
-        JSON.stringify({
-            type: 'hmr',
-            mode,
+        const indexChunk = pageCatalog.find((p) => p.chunkId === 'pages/index')?.chunkId || pageCatalog[0].chunkId;
+        const resumeEntries = await loadPageResumeEntries(distDir, indexChunk);
+        const styleMeta = await loadDeploymentStyle(distDir);
+        cssEntry = styleMeta.cssEntry;
+        styleTheme = styleMeta.styleTheme;
+        const lazyEventNames = resumeEntries
+            .filter((e) => isEventStrategy(e.strategy))
+            .map((e) => e.component)
+            .filter(Boolean);
+        const lazySet = new Set(lazyEventNames);
+
+        await writeFile(
+            path.join(distDir, 'entry-client.js'),
+            emitEntryClient(
+                componentEntries.filter((e) => !lazySet.has(e.name)),
+                componentEntries.filter((e) => lazySet.has(e.name)),
+                reloadToken,
+            ),
+            'utf8',
+        );
+
+        const strategies = resumeEntries.map((e) => e.strategy);
+        const eventOnlyShell = isEventOnlyShell(strategies);
+        await writeFile(path.join(distDir, 'entry-event.js'), emitEntryEvent(reloadToken), 'utf8');
+
+        lastDevError = null;
+        const mode = islandHmr ? 'island' : eventOnlyShell ? 'event-shell' : 'full';
+        notifySse(
+            JSON.stringify({
+                type: 'hmr',
+                mode,
+                affectedChunks: affected,
+                seedChunks: seeds,
+                token: reloadToken,
+                full: Boolean(full),
+                eventOnlyShell,
+            }),
+        );
+        if (!opts.quiet) {
+            const aff = affected.length > 0 ? ` affected=[${affected.join(', ')}]` : full === false ? ' affected=[]' : '';
+            console.log(`vmz serve: soft reload ok (mode=${mode}; pages=${pageCatalog.length}; t=${reloadToken}${aff})`);
+        }
+        return {
             affectedChunks: affected,
             seedChunks: seeds,
-            token: reloadToken,
             full: Boolean(full),
+            islandHmr,
+            mode,
             eventOnlyShell,
-        }),
-    );
-    if (!opts.quiet) {
-        const aff = affected.length > 0 ? ` affected=[${affected.join(', ')}]` : full === false ? ' affected=[]' : '';
-        console.log(`vmz serve: soft reload ok (mode=${mode}; pages=${pageCatalog.length}; t=${reloadToken}${aff})`);
+            pageCount: pageCatalog.length,
+        };
+    } catch (err) {
+        reloadToken = prevToken;
+        pageCatalog = prevCatalog;
+        lastDevError = normalizeDevError(err);
+        throw err;
     }
-    return {
-        affectedChunks: affected,
-        seedChunks: seeds,
-        full: Boolean(full),
-        islandHmr,
-        mode,
-        eventOnlyShell,
-        pageCount: pageCatalog.length,
-    };
 }
 
 /** @param {string} event */
@@ -347,6 +669,63 @@ function notifySse(event) {
             sseClients.delete(client);
         }
     }
+}
+
+/** @param {unknown} err */
+function normalizeDevError(err) {
+    if (err && typeof err === 'object') {
+        const e = /** @type {{ message?: string, stack?: string }} */ (err);
+        return {
+            message: e.message ? String(e.message) : String(err),
+            stack: e.stack ? String(e.stack) : undefined,
+            at: Date.now(),
+        };
+    }
+    return { message: String(err), at: Date.now() };
+}
+
+/** @param {{ message: string, stack?: string }} err */
+async function* emitDevErrorHtml(err) {
+    const msg = escapeHtml(err.message || 'Unknown error');
+    const stack = err.stack ? escapeHtml(err.stack) : '';
+    yield `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VMZ Dev Error</title>
+  <style>
+    body{margin:0;background:#0f1115;color:#f4f4f5;font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    main{max-width:56rem;margin:0 auto;padding:2rem 1.25rem}
+    h1{margin:0 0 .75rem;color:#f87171;font-size:1.1rem}
+    pre{white-space:pre-wrap;margin:0 0 1rem}
+    .hint{opacity:.65;font-size:12px}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>VMZ Dev Error</h1>
+    <pre>${msg}</pre>
+    ${stack ? `<pre style="opacity:.7;font-size:12px">${stack}</pre>` : ''}
+    <p class="hint">Dev host stayed up. Fix the source and save — soft reload will recover.</p>
+  </main>
+  <script>
+  (() => {
+    const es = new EventSource("/__vmz/events");
+    es.onmessage = (ev) => {
+      let msg = null;
+      try { msg = JSON.parse(ev.data); } catch {}
+      if (msg && msg.type === "hmr") location.reload();
+    };
+  })();
+  </script>
+</body>
+</html>`;
+}
+
+/** @param {string} s */
+function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /** @param {string} href */
@@ -422,6 +801,7 @@ async function listPageClientFiles(dir) {
                 await walk(path.join(abs, e.name), [...relParts, e.name]);
             } else if (e.isFile() && e.name.endsWith('.client.js')) {
                 const stem = e.name.replace(/\.client\.js$/, '');
+                if (isRouteBoundaryStem(stem)) continue;
                 const chunkId = ['pages', ...relParts, stem].join('/');
                 out.push({
                     chunkId,
@@ -437,6 +817,7 @@ async function listPageClientFiles(dir) {
 
 /**
  * File-route segments from chunk id (`pages/Install` → `/install`).
+ * Skips URL-invisible `(group)` dirs; boundary stems never reach here.
  * @param {string} chunkId
  */
 function parseChunkSegments(chunkId) {
@@ -446,6 +827,7 @@ function parseChunkSegments(chunkId) {
     const segs = [];
     for (let i = 0; i < parts.length; i++) {
         const p = parts[i];
+        if (isRouteGroupDir(p)) continue;
         if (p === 'index' && i === parts.length - 1) continue;
         const catchAll = /^\[\.\.\.([^\]]+)\]$/.exec(p);
         const param = /^\[([^\]]+)\]$/.exec(p);
@@ -454,6 +836,39 @@ function parseChunkSegments(chunkId) {
         else segs.push({ kind: 'static', value: p.toLowerCase() });
     }
     return segs;
+}
+
+function isRouteGroupDir(seg) {
+    return typeof seg === 'string' && seg.startsWith('(') && seg.endsWith(')') && seg.length > 2;
+}
+
+function isRouteBoundaryStem(stem) {
+    return stem === 'Layout' || stem === 'Loading' || stem === 'Error' || stem === 'NotFound';
+}
+
+/**
+ * Nearest `Layout.client.js` walking up from the page chunk (outer→inner).
+ * @param {string} pageChunkId
+ * @returns {string[]}
+ */
+function resolveLayoutChain(pageChunkId) {
+    const rel = pageChunkId.replace(/^pages\//, '');
+    const parts = rel.split('/').filter(Boolean);
+    parts.pop(); // page stem
+    /** @type {string[]} */
+    const chain = [];
+    for (let i = parts.length; i >= 0; i--) {
+        const dirParts = parts.slice(0, i);
+        const layoutChunk = ['pages', ...dirParts, 'Layout'].join('/');
+        const abs = path.join(distDir, `${layoutChunk}.client.js`);
+        try {
+            // sync existence — layouts are compile artifacts next to pages
+            if (existsSync(abs)) chain.unshift(layoutChunk);
+        } catch {
+            /* ignore */
+        }
+    }
+    return chain;
 }
 
 /**
@@ -478,6 +893,34 @@ function matchFileRoute(pathname, catalog) {
         }
     }
     return best;
+}
+
+/**
+ * @param {ReturnType<typeof parseChunkSegments>} segs
+ * @param {string} pathname
+ * @returns {Record<string, string>}
+ */
+function extractRouteParams(segs, pathname) {
+    const pathParts = decodeURIComponent(pathname.split('?')[0] || '/')
+        .replace(/\/+$/, '')
+        .split('/')
+        .filter(Boolean);
+    /** @type {Record<string, string>} */
+    const params = {};
+    let j = 0;
+    for (let i = 0; i < segs.length; i++) {
+        const s = segs[i];
+        if (s.kind === 'catch') {
+            if (s.name) params[s.name] = pathParts.slice(j).join('/');
+            return params;
+        }
+        if (j >= pathParts.length) break;
+        if (s.kind === 'param' && s.name) {
+            params[s.name] = pathParts[j];
+        }
+        j++;
+    }
+    return params;
 }
 
 /**
@@ -554,9 +997,10 @@ globalThis.__vmzLoadComponent = async (name) => {
 };`
         : '';
     return `/**
- * Generated by vmz serve — hydrate matched file-route page (data-vmz-page).
+ * Generated by vmz serve — hydrate matched file-route page (data-vmz-page) + layout chain + client Link takeover.
  */
-import { registerComponents, hydrate } from ${JSON.stringify(`./vmz-dom.js${q}`)};
+import { registerComponents, hydrate, hydrateRoute, destroy } from ${JSON.stringify(`./vmz-dom.js${q}`)};
+import { installClientNavigation } from ${JSON.stringify(`./vmz-client-nav.js${q}`)};
 ${imports}
 
 ${map}
@@ -566,8 +1010,24 @@ const root = document.getElementById("app");
 if (!root) throw new Error("vmz: missing #app");
 const chunkId = root.getAttribute("data-vmz-page");
 if (!chunkId) throw new Error("vmz: missing data-vmz-page");
+let props = {};
+try {
+  const raw = root.getAttribute("data-vmz-props");
+  if (raw) props = JSON.parse(raw);
+} catch { /* ignore */ }
+const layoutChain = (root.getAttribute("data-vmz-layout") || "").split(",").map((s) => s.trim()).filter(Boolean);
+const layoutCtors = [];
+for (const id of layoutChain) {
+  layoutCtors.push((await import("./" + id + ".client.js${q}")).default);
+}
 const Page = (await import("./" + chunkId + ".client.js${q}")).default;
-await hydrate(Page, root);
+await hydrateRoute(Page, root, props, layoutCtors);
+installClientNavigation({
+  hydrate,
+  hydrateRoute,
+  destroy,
+  importPage: async (id) => (await import("./" + id + ".client.js${q}")).default,
+});
 `;
 }
 

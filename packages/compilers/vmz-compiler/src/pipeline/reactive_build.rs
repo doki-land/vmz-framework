@@ -6,7 +6,8 @@
 
 use vmz_types::{
     BindingId, BindingKind, ComponentDecl, ControlBranch, FieldId, FieldKind, IrDepPath,
-    ListItemFrame, ProgramModule, ReactiveComponentBuilder, ReactiveModule, RegionId, WritePath,
+    ListItemFrame, ProgramModule, REACTIVE_SCHEMA, ReactiveComponentBuilder, ReactiveModule,
+    RegionId, WritePath,
 };
 
 use crate::field_rw::{collect_each_alias_prop_paths, collect_template_dep_keys};
@@ -27,7 +28,7 @@ pub fn build_reactive_module(
     template: &TemplateIr,
 ) -> ReactiveModule {
     let mut b = ReactiveComponentBuilder::new(decl.name.clone());
-    for f in &decl.props {
+    for f in &decl.properties {
         b.add_field(f.name.clone(), FieldKind::Prop);
     }
     for f in &decl.fields {
@@ -35,7 +36,7 @@ pub fn build_reactive_module(
     }
 
     let fields: Vec<String> =
-        decl.props.iter().chain(decl.fields.iter()).map(|f| f.name.clone()).collect();
+        decl.properties.iter().chain(decl.fields.iter()).map(|f| f.name.clone()).collect();
 
     walk_nodes(&template.roots, &fields, &[], &[], &mut b, None);
 
@@ -64,7 +65,11 @@ pub fn build_reactive_module(
         );
     }
 
-    ReactiveModule { source: source.to_string(), components: vec![b.finish()] }
+    ReactiveModule {
+        schema: REACTIVE_SCHEMA.into(),
+        source: source.to_string(),
+        components: vec![b.finish()],
+    }
 }
 
 /// Build the Program IR shell with Reactive as the populated view.
@@ -73,7 +78,7 @@ pub fn build_program_module(
     decl: &ComponentDecl,
     template: &TemplateIr,
 ) -> ProgramModule {
-    build_program_module_with_server(source, decl, template, None)
+    build_program_module_with_server(source, decl, template, None, None)
 }
 
 /// Build Program IR and attach co-located server capabilities when present.
@@ -82,6 +87,7 @@ pub fn build_program_module_with_server(
     decl: &ComponentDecl,
     template: &TemplateIr,
     server: Option<&vmz_types::ServerAttach>,
+    routes: Option<&crate::pipeline::link::RouteTable>,
 ) -> ProgramModule {
     let mut program = ProgramModule::from_reactive(build_reactive_module(source, decl, template));
     if let Some(unit) = program.units.first_mut() {
@@ -89,7 +95,7 @@ pub fn build_program_module_with_server(
             unit.attach_server(attach);
         }
         // structural tree on ViewView (sole structure source for emit_direct).
-        unit.view = crate::structural_build::build_native_view(template, &unit.reactive);
+        unit.view = crate::structural_build::build_native_view(template, &unit.reactive, routes);
         // shared Execution Plan derived from Native View.
         unit.plan = crate::plan_build::build_execution_plan(&unit.view);
         // lifetime / owns / disposes need Native View region kinds.
@@ -554,7 +560,7 @@ fn has_bare_attr(attrs: &[TemplateAttr], name: &str) -> bool {
 }
 
 fn is_event_attr(name: &str) -> bool {
-    name.starts_with("on")
+    name.starts_with('@') || (name.starts_with("on") && name.len() > 2)
 }
 
 fn is_component_tag(tag: &str) -> bool {

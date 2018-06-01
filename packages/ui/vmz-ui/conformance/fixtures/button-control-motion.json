@@ -1,0 +1,22 @@
+{
+    "schema": "vmz.ui.conformance.fixture.v0",
+    "id": "ui7.button.control-motion",
+    "title": "Button control Motion IR — Style Theme token family",
+    "artifact": {
+        "kind": "program.json",
+        "component": "Button"
+    },
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "motion",
+            "expect": {
+                "status": "partial",
+                "kinds": ["control"],
+                "token": "motion.control",
+                "reducedMotion": "honor",
+                "planMotionTransition": true
+            }
+        }
+    ]
+}

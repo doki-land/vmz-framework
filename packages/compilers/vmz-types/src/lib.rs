@@ -9,18 +9,19 @@ mod component;
 mod dep_key;
 mod program_ir;
 mod reactive_ir;
+pub mod schema_export;
 
 pub use component::{
     ComponentDecl, FieldDecl, FieldKind, HttpRoute, InternalClassDecl, MethodDecl, Visibility,
 };
-pub use dep_key::{DepKey, DepPath, PathSeg, WriteNotice};
+pub use dep_key::{DepKey, DepPath, PathSegment, WriteNotice};
 pub use program_ir::{
-    AnalysisStats, CapabilityId, ClientServerCall, DeploymentView, ExecutionPlan, GraphView,
-    LifetimeRegionDecl, LifetimeView, PlanNode, PlanStatus, ProgramEdge, ProgramModule,
-    ProgramUnit, ProgramUnitKind, ResourceDecl, ResourceView, ResumeEntryDecl, SemanticField,
-    SemanticMethod, SemanticView, ServerAttach, ServerCallEdge, ServerCapability, ServerView,
-    StubStatus, UnitId, UnknownRecord, ViewAttr, ViewAttrValue, ViewEach, ViewIfBranch, ViewNode,
-    ViewStatus, ViewView,
+    AnalysisStats, CapabilityId, ClientServerCall, DeploymentClientCall, DeploymentView,
+    ExecutionPlan, GraphView, LifetimeRegionDecl, LifetimeView, MotionTransitionDecl, MotionView,
+    PlanNode, PlanStatus, ProgramEdge, ProgramModule, ProgramUnit, ProgramUnitKind, ResourceDecl,
+    ResourceView, ResumeEntryDecl, SecretRequirement, SemanticField, SemanticMethod, SemanticView,
+    ServerAttach, ServerCallEdge, ServerCapability, ServerView, StubStatus, UnitId, UnknownRecord,
+    ViewAttr, ViewAttrValue, ViewEach, ViewIfBranch, ViewNode, ViewStatus, ViewView,
 };
 pub use reactive_ir::{
     Binding, BindingId, BindingKind, ControlBranch, ControlRegion, DynamicStep, Effect, EffectId,
@@ -28,9 +29,15 @@ pub use reactive_ir::{
     ReactiveComponent, ReactiveComponentBuilder, ReactiveModule, RegionId, StateSlot, WritePath,
     reactive_component_json,
 };
+pub use schema_export::{
+    program_module_schema, program_module_schema_json, reactive_module_schema,
+    reactive_module_schema_json,
+};
 
-/// Re-export schema ids used when emitting Program / Plan JSON.
-pub use vmz_protocol::{PLAN_SCHEMA, PROGRAM_SCHEMA};
+/// Re-export schema ids used when emitting Program / Plan / Reactive JSON.
+pub use vmz_protocol::{
+    MOTION_SCHEMA, MOTION_TRANSITION_SCHEMA, PLAN_SCHEMA, PROGRAM_SCHEMA, REACTIVE_SCHEMA,
+};
 
 /// Re-export the oxc span primitives we standardize on.
 pub mod span {

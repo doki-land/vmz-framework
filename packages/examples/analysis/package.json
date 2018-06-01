@@ -7,6 +7,9 @@
         "check": "vmz check .",
         "build": "vmz build ."
     },
+    "dependencies": {
+        "@vmz/core": "workspace:*"
+    },
     "devDependencies": {
         "vmz": "workspace:*"
     }

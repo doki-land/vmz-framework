@@ -9,11 +9,11 @@ That is more than cosmetic. VMZ source deliberately places template structure, n
 boundaries, and page metadata near each other. An editor should make those boundaries legible before a developer needs
 to understand the compiler internals.
 
-## What makes it different from a framework compatibility extension
+## Native VMZ in the editor
 
-This extension is for native VMZ source. It does not pretend that VMZ is a Vue dialect, nor does it attempt to make a
-React or Vue language service interpret a different component model. The goal is a clean experience for VMZ's own
-language and application semantics.
+This extension highlights and navigates VMZ-native source — `.vmz` components and VMZ fenced examples — with VMZ's own
+language surface. Vue or React language services stay with their own ecosystems; here the goal is a clean experience for
+VMZ templates, TypeScript, and client/server boundaries.
 
 The extension shares its language definition with VMZ documentation, so examples on the public site and files in the
 editor describe the same source language. As VMZ's semantic tooling grows, the editor is also the natural place for

@@ -28,7 +28,7 @@
             "kind": "graph",
             "expect": {
                 "ownsUnitToRegion": true,
-                "includesAll": ["api.ifBlock(this,", "__vmzPlan =", "dispose_region"]
+                "includesAll": ["api.ifBlock(this,"]
             }
         }
     ]

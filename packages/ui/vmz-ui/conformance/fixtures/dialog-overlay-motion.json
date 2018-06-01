@@ -1,0 +1,27 @@
+{
+    "schema": "vmz.ui.conformance.fixture.v0",
+    "id": "ui7.dialog.overlay-motion",
+    "title": "Dialog overlay Motion IR — token + region affects + cancel edges",
+    "artifact": {
+        "kind": "program.json",
+        "component": "Dialog"
+    },
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "motion",
+            "expect": {
+                "status": "partial",
+                "kinds": ["overlay-enter", "overlay-exit"],
+                "token": "motion.overlay",
+                "cancelable": true,
+                "generation": true,
+                "reducedMotion": "honor",
+                "hasRegion": true,
+                "affectsRegion": true,
+                "cancelsFrom": ["motion:reverse", "effect:_cancelExit", "lifecycle:destroy"],
+                "planMotionTransition": true
+            }
+        }
+    ]
+}

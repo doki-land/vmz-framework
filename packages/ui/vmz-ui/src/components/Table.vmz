@@ -1,0 +1,134 @@
+<template>
+  <div class="vmz-ui-table-wrap" data-vmz-ui="table" data-sort-key={sortKey} data-sort-dir={sortDir}>
+    <table class="vmz-ui-table">
+      <thead onClick={onHeadClick}>
+        <tr>
+          <th each={columns} as="col" key={col.id} scope="col" data-vmz-col={col.id}>
+            <button type="button" class="vmz-ui-table__sort" data-vmz-sort={col.id}>
+              {col.title}
+            </button>
+          </th>
+          <th if={hasRowAction} scope="col">{actionTitle}</th>
+        </tr>
+      </thead>
+      <tbody onClick={onBodyClick}>
+        <tr each={rows} as="row" key={row.id} data-vmz-row={row.id}>
+          <td each={row.cells} as="cell">{cell}</td>
+          <td if={hasRowAction}>
+            <button
+              type="button"
+              class="vmz-ui-table__row-action"
+              data-vmz-row-action={row.id}
+              disabled={rowActionDisabled}
+            >
+              {actionLabel}
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</template>
+
+<style>
+.vmz-ui-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--vmz-action-primary-background);
+  border-radius: 2px;
+}
+
+.vmz-ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: inherit;
+}
+
+.vmz-ui-table th,
+.vmz-ui-table td {
+  padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+  text-align: left;
+  border-bottom: 1px solid var(--vmz-action-primary-background);
+  vertical-align: middle;
+}
+
+.vmz-ui-table th {
+  font-weight: 700;
+  color: var(--vmz-action-primary-active);
+  background: transparent;
+}
+
+.vmz-ui-table__sort {
+  font: inherit;
+  font-weight: 700;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  outline: none;
+}
+
+.vmz-ui-table__sort:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-table__row-action {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--vmz-action-primary-background);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--vmz-action-primary-active);
+  cursor: pointer;
+  outline: none;
+}
+
+.vmz-ui-table__row-action:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-table__row-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — Table (UI5 Console Surface).
+ * Column header click → onSort; row action → onRowAction; permission via rowActionDisabled.
+ */
+export default class Table {
+  /** @type {{ id: string, title: string }[]} */
+  public columns: { id: string; title: string }[] = [];
+  /** @type {{ id: string, cells: string[] }[]} */
+  public rows: { id: string; cells: string[] }[] = [];
+  public hasRowAction: boolean = false;
+  public rowActionDisabled: boolean = false;
+  public actionTitle: string = 'Action';
+  public actionLabel: string = 'Open';
+  public sortKey: string = '';
+  public sortDir: string = 'asc';
+  public onRowAction: ((rowId: string) => void) | null = null;
+  public onSort: ((columnId: string) => void) | null = null;
+
+  onBodyClick(ev) {
+    const t = ev && ev.target;
+    const el =
+      t && typeof t.closest === 'function' ? t.closest('[data-vmz-row-action]') : null;
+    if (!el || el.disabled) return;
+    const id = el.getAttribute('data-vmz-row-action');
+    if (id && typeof this.onRowAction === 'function') this.onRowAction(id);
+  }
+
+  onHeadClick(ev) {
+    const t = ev && ev.target;
+    const el =
+      t && typeof t.closest === 'function' ? t.closest('[data-vmz-sort]') : null;
+    if (!el) return;
+    const id = el.getAttribute('data-vmz-sort');
+    if (id && typeof this.onSort === 'function') this.onSort(id);
+  }
+}
+</script>

@@ -12,4 +12,5 @@ publish = false
 oxc_span.workspace = true
 serde = { workspace = true }
 serde_json = { workspace = true }
+schemars = { workspace = true }
 vmz-protocol.workspace = true

@@ -14,8 +14,8 @@ export default class Card {
 "#;
     let analyzed = analyze_script(ScriptKind::Client, src);
     assert_eq!(analyzed.decl.name, "Card");
-    assert_eq!(analyzed.decl.props.len(), 1);
-    assert_eq!(analyzed.decl.props[0].name, "title");
+    assert_eq!(analyzed.decl.properties.len(), 1);
+    assert_eq!(analyzed.decl.properties[0].name, "title");
     assert_eq!(analyzed.decl.fields.len(), 1);
     assert_eq!(analyzed.decl.fields[0].name, "count");
     assert_eq!(analyzed.decl.fields[0].init_text.as_deref(), Some("0"));
@@ -30,7 +30,7 @@ export default class CounterButton {
 }
 "#;
     let analyzed = analyze_script(ScriptKind::Client, src);
-    assert_eq!(analyzed.decl.props[0].init_text.as_deref(), Some("0"));
+    assert_eq!(analyzed.decl.properties[0].init_text.as_deref(), Some("0"));
     assert_eq!(analyzed.decl.fields[0].init_text.as_deref(), Some("this.initial"));
 }
 

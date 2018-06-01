@@ -97,6 +97,45 @@ export interface VmzEngines {
 export interface VmzUserConfig {
     plugins?: Array<string | VmzPlugin | Promise<VmzPlugin>>;
     engines?: VmzEngines;
+    /** Application identity (optional authoring). */
+    application?: { id?: string; [key: string]: unknown };
+    /**
+     * Site delivery (SiteDeliveryContract authoring). Pure data only.
+     * Prefer `defineSite(...)` helper; never a parallel `vmz.site.ts` entry.
+     */
+    delivery?: SiteDeliveryAuthoring;
+}
+
+/** Authoring shape for `defineConfig({ delivery })` — normalized at build to SiteDeliveryContract. */
+export interface SiteDeliveryAuthoring {
+    artifact: string;
+    siteId?: string;
+    sources: Array<{
+        id: string;
+        kind: 'embedded' | 'filesystem' | 'remote';
+        directory?: string;
+        baseUrl?: string;
+        artifact?: string;
+        trust?: string;
+        timeoutMs?: number;
+        priority?: number;
+        integrity?: unknown;
+        signaturePolicy?: string;
+    }>;
+    resolution?: {
+        mode?: 'release';
+        fallback?: string[];
+    };
+    activation?: 'atomic';
+    expectedCompatibility?: unknown;
+    failure?: unknown;
+    failurePolicy?: unknown;
+    update?: unknown;
+    updatePolicy?: unknown;
+    rollback?: unknown;
+    rollbackPolicy?: unknown;
+    security?: unknown;
+    securityPolicy?: unknown;
 }
 
 export type DefinePluginInput = PluginManifest & {

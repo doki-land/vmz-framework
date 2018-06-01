@@ -42,7 +42,7 @@ const targets = [
     ['counter', 'packages/examples/counter/package.json'],
     ['island', 'packages/examples/island/package.json'],
     ['fullstack', 'packages/examples/fullstack/package.json'],
-    ['vmz', 'packages/runtimes/vmz/package.json'],
+    ['@vmz/vmz', 'packages/runtimes/vmz/package.json'],
     ['vmz-textmate', 'packages/editors/vmz-textmate/package.json'],
     ['root', 'package.json'],
 ];
@@ -65,8 +65,8 @@ for (const rel of [
 console.log(': vmz-textmate node:test…');
 pnpmFilter('vmz-textmate', 'test');
 
-console.log(': vmz package node:test…');
-pnpmFilter('vmz', 'test');
+console.log(': @vmz/vmz package node:test…');
+pnpmFilter('@vmz/vmz', 'test');
 
 console.log(': counter + island vmz test…');
 pnpmFilter('@vmz-examples/counter', 'test');
@@ -75,4 +75,4 @@ pnpmFilter('@vmz-examples/island', 'test');
 console.log(': fullstack vmz test + node host/SSR…');
 pnpmFilter('@vmz-examples/fullstack', 'test');
 
-console.log(' GATE OK: Vitest unloaded from counter/island/fullstack/vmz/textmate + root');
+console.log(' GATE OK: Vitest unloaded from counter/island/fullstack/@vmz/vmz/textmate + root');

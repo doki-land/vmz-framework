@@ -18,6 +18,8 @@ coverage/
 *.log
 *.tsbuildinfo
 *.node
+.vmz-releases/
+.vmz-releases-*/
 
 # Generated
 **/src/auto-imports.d.ts
@@ -32,7 +34,9 @@ compilers/*/dist/
 
 # Placeholder npm status / trust list cache (OTP window)
 .placeholder-npm-cache.json
+scripts/.placeholder-npm-cache.json
+.env.placeholder.local
 
-# N-API local build artifacts (copied by scripts/build-napi.mjs)
-runtimes/vmz/*.node
-runtimes/vmz-*/vmz*.node
+# N-API / publish staging (under dist/; never commit)
+# Intermediate verify/build outputs stay in dist/ (already ignored above).
+artifacts/

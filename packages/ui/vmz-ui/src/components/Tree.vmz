@@ -1,0 +1,215 @@
+<template>
+  <div class="vmz-ui-tree" data-vmz-ui="tree">
+    <p if={label} class="vmz-ui-tree__label" id={labelId}>{label}</p>
+    <ul
+      class="vmz-ui-tree__items"
+      role="tree"
+      aria-labelledby={labelId}
+      aria-label={label}
+      onClick={onTreeClick}
+      onKeyDown={onTreeKeyDown}
+    >
+      <li
+        each={items}
+        as="item"
+        key={item.id}
+        class="vmz-ui-tree__item"
+        role="treeitem"
+        id={item.id}
+        data-vmz-tree-item={item.id}
+        data-depth={item.depth}
+        aria-selected={selected === item.id ? 'true' : 'false'}
+        aria-expanded={item.expandedAttr}
+        tabindex={selected === item.id ? 0 : -1}
+        style={item.padStyle}
+      >
+        <button
+          if={item.expandable}
+          type="button"
+          class="vmz-ui-tree__twist"
+          data-vmz-tree-twist={item.id}
+          aria-label={item.twistLabel}
+          tabindex="-1"
+        >
+          {item.expanded ? '−' : '+'}
+        </button>
+        <span if={!item.expandable} class="vmz-ui-tree__twist-spacer" aria-hidden="true"></span>
+        <span class="vmz-ui-tree__title" data-vmz-tree-title={item.id}>{item.title}</span>
+      </li>
+    </ul>
+  </div>
+</template>
+
+<style>
+.vmz-ui-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 28rem;
+}
+
+.vmz-ui-tree__label {
+  margin: 0;
+  font-weight: 600;
+  color: var(--vmz-text-ink);
+}
+
+.vmz-ui-tree__items {
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  border: 1px solid var(--vmz-line-default);
+  border-radius: 2px;
+  background: var(--vmz-surface-paper);
+  color: var(--vmz-text-ink);
+}
+
+.vmz-ui-tree__item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+  border-radius: 2px;
+  cursor: pointer;
+  outline: none;
+}
+
+.vmz-ui-tree__item[aria-selected='true'] {
+  background: var(--vmz-action-primary-background);
+  color: var(--vmz-action-primary-foreground);
+}
+
+.vmz-ui-tree__item:hover {
+  background: color-mix(in srgb, var(--vmz-action-primary-background) 14%, transparent);
+}
+
+.vmz-ui-tree__item[aria-selected='true']:hover {
+  background: var(--vmz-action-primary-hover);
+}
+
+.vmz-ui-tree__item:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-tree__twist {
+  flex: 0 0 auto;
+  width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  border: 1px solid var(--vmz-line-default);
+  border-radius: 2px;
+  background: var(--vmz-surface-mist);
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  outline: none;
+}
+
+.vmz-ui-tree__twist:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-tree__twist-spacer {
+  flex: 0 0 auto;
+  width: 1.35rem;
+}
+
+.vmz-ui-tree__title {
+  flex: 1 1 auto;
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — Tree (ordinary hierarchy).
+ * Parent owns visible flat rows + selected + expand state.
+ * Not virtualized / not DataGrid tree mode.
+ */
+export default class Tree {
+  public label: string = 'Tree';
+  public labelId: string = 'vmz-tree-label';
+  public selected: string = '';
+  /**
+   * @type {{
+   *   id: string,
+   *   title: string,
+   *   depth: string,
+   *   expandable: boolean,
+   *   expanded: boolean,
+   *   expandedAttr: string,
+   *   twistLabel: string,
+   *   padStyle: string
+   * }[]}
+   */
+  public items: {
+    id: string;
+    title: string;
+    depth: string;
+    expandable: boolean;
+    expanded: boolean;
+    expandedAttr: string;
+    twistLabel: string;
+    padStyle: string;
+  }[] = [];
+  public onSelect: ((id: string) => void) | null = null;
+  public onToggle: ((id: string) => void) | null = null;
+
+  select(id) {
+    if (typeof this.onSelect === 'function') this.onSelect(id);
+  }
+
+  toggle(id) {
+    if (typeof this.onToggle === 'function') this.onToggle(id);
+  }
+
+  onTreeClick(ev) {
+    const t = ev && ev.target;
+    const twist =
+      t && typeof t.closest === 'function' ? t.closest('[data-vmz-tree-twist]') : null;
+    if (twist) {
+      const id =
+        typeof twist.getAttribute === 'function' ? twist.getAttribute('data-vmz-tree-twist') : null;
+      if (id) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        this.toggle(id);
+      }
+      return;
+    }
+    const el = t && typeof t.closest === 'function' ? t.closest('[data-vmz-tree-item]') : null;
+    const id = el && typeof el.getAttribute === 'function' ? el.getAttribute('data-vmz-tree-item') : null;
+    if (id) this.select(id);
+  }
+
+  onTreeKeyDown(ev) {
+    if (!ev || !this.items?.length) return;
+    const ids = this.items.map((it) => it.id);
+    const idx = Math.max(0, ids.indexOf(this.selected));
+    const cur = this.items[idx];
+    if (ev.key === 'ArrowRight' && cur?.expandable && !cur.expanded) {
+      ev.preventDefault();
+      this.toggle(cur.id);
+      return;
+    }
+    if (ev.key === 'ArrowLeft' && cur?.expandable && cur.expanded) {
+      ev.preventDefault();
+      this.toggle(cur.id);
+      return;
+    }
+    let next = idx;
+    if (ev.key === 'ArrowDown') next = (idx + 1) % ids.length;
+    else if (ev.key === 'ArrowUp') next = (idx - 1 + ids.length) % ids.length;
+    else if (ev.key === 'Home') next = 0;
+    else if (ev.key === 'End') next = ids.length - 1;
+    else if (ev.key === 'Enter' || ev.key === ' ') {
+      ev.preventDefault();
+      if (cur) this.select(cur.id);
+      return;
+    } else return;
+    ev.preventDefault();
+    this.select(ids[next]);
+  }
+}
+</script>

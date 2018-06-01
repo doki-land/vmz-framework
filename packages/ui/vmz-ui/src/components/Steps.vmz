@@ -1,0 +1,107 @@
+<template>
+  <ol class="vmz-ui-steps" data-vmz-ui="steps" aria-label={label}>
+    <li
+      each={items}
+      as="item"
+      key={item.id}
+      class="vmz-ui-steps__item"
+      data-vmz-step={item.id}
+      data-status={item.status}
+      aria-current={current === item.id ? 'step' : 'false'}
+    >
+      <span class="vmz-ui-steps__index" data-vmz-step-index={item.id}>{item.index}</span>
+      <span class="vmz-ui-steps__body">
+        <span class="vmz-ui-steps__title">{item.title}</span>
+        <span if={item.description} class="vmz-ui-steps__description">{item.description}</span>
+      </span>
+    </li>
+  </ol>
+</template>
+
+<style>
+.vmz-ui-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vmz-density-control-gap);
+  max-width: 36rem;
+}
+
+.vmz-ui-steps__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  color: var(--vmz-text-steel);
+}
+
+.vmz-ui-steps__item[data-status='done'] {
+  color: var(--vmz-status-success-foreground);
+}
+
+.vmz-ui-steps__item[data-status='current'] {
+  color: var(--vmz-action-primary-active);
+}
+
+.vmz-ui-steps__index {
+  flex: 0 0 auto;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--vmz-line-default);
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: inherit;
+}
+
+.vmz-ui-steps__item[data-status='current'] .vmz-ui-steps__index {
+  border-color: var(--vmz-action-primary-background);
+  background: var(--vmz-action-primary-background);
+  color: var(--vmz-action-primary-foreground);
+}
+
+.vmz-ui-steps__item[data-status='done'] .vmz-ui-steps__index {
+  border-color: var(--vmz-status-success-accent);
+  background: color-mix(in srgb, var(--vmz-status-success-accent) 18%, transparent);
+}
+
+.vmz-ui-steps__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding-top: 0.15rem;
+}
+
+.vmz-ui-steps__title {
+  font-weight: 700;
+}
+
+.vmz-ui-steps__description {
+  font-size: 0.9em;
+  opacity: 0.9;
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — Steps.
+ * Parent owns `current` id and item `status` (upcoming|current|done).
+ * Navigation actions stay on the page (no private wizard store).
+ */
+export default class Steps {
+  public label: string = 'Steps';
+  public current: string = '';
+  /** @type {{ id: string, index: string, title: string, description?: string, status: string }[]} */
+  public items: {
+    id: string;
+    index: string;
+    title: string;
+    description?: string;
+    status: string;
+  }[] = [];
+}
+</script>

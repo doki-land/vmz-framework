@@ -1,0 +1,64 @@
+{
+    "entries": [
+        {
+            "key": { "path": ["action", "primary", "background"] },
+            "value": "#003DB8"
+        },
+        {
+            "key": { "path": ["action", "primary", "foreground"] },
+            "value": "#FFFFFF"
+        },
+        {
+            "key": { "path": ["action", "primary", "hover"] },
+            "value": "#002A80"
+        },
+        {
+            "key": { "path": ["action", "primary", "active"] },
+            "value": "#001F5C"
+        },
+        {
+            "key": { "path": ["focus", "ring"] },
+            "value": "#FFB000"
+        },
+        {
+            "key": { "path": ["surface", "paper"] },
+            "value": "#FFFFFF"
+        },
+        {
+            "key": { "path": ["surface", "mist"] },
+            "value": "#FFFFFF"
+        },
+        {
+            "key": { "path": ["surface", "ink"] },
+            "value": "#000000"
+        },
+        {
+            "key": { "path": ["surface", "graphite"] },
+            "value": "#000000"
+        },
+        {
+            "key": { "path": ["text", "ink"] },
+            "value": "#000000"
+        },
+        {
+            "key": { "path": ["text", "steel"] },
+            "value": "#000000"
+        },
+        {
+            "key": { "path": ["text", "on-brand"] },
+            "value": "#FFFFFF"
+        },
+        {
+            "key": { "path": ["text", "on-ink"] },
+            "value": "#FFFFFF"
+        },
+        {
+            "key": { "path": ["line", "default"] },
+            "value": "#000000"
+        },
+        {
+            "key": { "path": ["line", "strong"] },
+            "value": "#000000"
+        }
+    ]
+}

@@ -1,0 +1,9 @@
+<template>
+  <span class="row">{title}</span>
+</template>
+
+<script client>
+export default class ProductRow {
+  public title: string = '';
+}
+</script>

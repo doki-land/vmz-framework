@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { repoRoot } from '../_lib/repo-root.ts';
-import { extractMessageParams } from '../packages/runtimes/vmz/dist/locale-check.js';
+import { extractMessageParams } from '../../../dist/locale-check.js';
 
 const root = repoRoot(import.meta.url);
 const fixture = path.join(root, 'packages', 'examples', 'locales-fixture');
@@ -83,5 +83,25 @@ const plan = JSON.parse(rename.stdout);
 if (plan.schema !== 'vmz.locale.rename.v0' || plan.status !== 'ready') fail(`rename plan ${JSON.stringify(plan)}`);
 if (!(plan.edits || []).length) fail('rename edits empty');
 
+console.log(': dogfood thin slice — build emits dist/locales runtime…');
+const built = runVmz(['build', fixture], fixture);
+if (built.status !== 0) fail(`fixture build failed\n${built.stdout}\n${built.stderr}`);
+const runtimeJs = path.join(fixture, 'dist', 'locales', 'common.js');
+const accountJs = path.join(fixture, 'dist', 'locales', 'account.js');
+if (!fs.existsSync(runtimeJs)) fail('missing dist/locales/common.js after build');
+if (!fs.existsSync(accountJs)) fail('missing dist/locales/account.js after build');
+if (fs.existsSync(path.join(fixture, 'dist', '#locales'))) {
+    fail('dist/#locales must not exist (ESM file URL fragment hazard)');
+}
+const clientJs = fs.readFileSync(path.join(fixture, 'dist', 'pages', 'index.client.js'), 'utf8');
+if (clientJs.includes('#locales/')) fail('client still imports bare #locales/ after rewrite');
+if (!clientJs.includes('locales/common.js') || !clientJs.includes('locales/account.js')) {
+    fail(`client missing relative locales imports:\n${clientJs.slice(0, 400)}`);
+}
+const commonSrc = fs.readFileSync(runtimeJs, 'utf8');
+if (!commonSrc.includes('export function brand') || !commonSrc.includes('__vmzLocaleId')) {
+    fail('common.js missing LocalizedText exports / locale picker');
+}
+
 console.log(' GATE PASS');
-console.log(' ICU params · #locales typed modules · mismatch · rename');
+console.log(' ICU params · #locales typed modules · mismatch · rename · runtime emit thin slice');

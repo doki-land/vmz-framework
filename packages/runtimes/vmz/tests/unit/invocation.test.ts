@@ -39,11 +39,11 @@ describe('vmz invocation gate', () => {
         expect(ctx.isGlobalLike).toBe(false);
     });
 
-    it('node_modules install matching nearest is project mode', () => {
+    it('node_modules/@vmz/vmz matching nearest is project mode', () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-inv-project-'));
-        const linked = path.join(dir, 'node_modules', 'vmz');
+        const linked = path.join(dir, 'node_modules', '@vmz', 'vmz');
         fs.mkdirSync(linked, { recursive: true });
-        fs.writeFileSync(path.join(linked, 'package.json'), '{"name":"vmz","version":"0.0.0"}');
+        fs.writeFileSync(path.join(linked, 'package.json'), JSON.stringify({ name: '@vmz/vmz', version: '0.0.0' }));
         const ctx = getInvocationContext({
             cwd: dir,
             thisPackageRoot: linked,
@@ -55,11 +55,11 @@ describe('vmz invocation gate', () => {
         fs.rmSync(dir, { recursive: true, force: true });
     });
 
-    it('scoped @vmz/vmz matching nearest is project mode', () => {
-        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-inv-project-scope-'));
-        const linked = path.join(dir, 'node_modules', '@vmz', 'vmz');
+    it('legacy bare vmz matching nearest is still project mode', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-inv-project-legacy-'));
+        const linked = path.join(dir, 'node_modules', 'vmz');
         fs.mkdirSync(linked, { recursive: true });
-        fs.writeFileSync(path.join(linked, 'package.json'), JSON.stringify({ name: '@vmz/vmz', version: '0.0.0' }));
+        fs.writeFileSync(path.join(linked, 'package.json'), '{"name":"vmz","version":"0.0.0"}');
         const ctx = getInvocationContext({
             cwd: dir,
             thisPackageRoot: linked,
@@ -70,9 +70,9 @@ describe('vmz invocation gate', () => {
 
     it('unrelated node_modules install is global mode', () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-inv-global-'));
-        const fakeGlobal = path.join(dir, 'npm-global', 'node_modules', 'vmz');
+        const fakeGlobal = path.join(dir, 'npm-global', 'node_modules', '@vmz', 'vmz');
         fs.mkdirSync(fakeGlobal, { recursive: true });
-        fs.writeFileSync(path.join(fakeGlobal, 'package.json'), '{"name":"vmz","version":"0.0.0"}');
+        fs.writeFileSync(path.join(fakeGlobal, 'package.json'), JSON.stringify({ name: '@vmz/vmz', version: '0.0.0' }));
         const app = path.join(dir, 'app');
         fs.mkdirSync(app);
         const ctx = getInvocationContext({
@@ -89,9 +89,9 @@ describe('vmz invocation gate', () => {
     it('global + no local refuses check', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-inv-refuse-'));
         // Global prefix must not sit on the cwd walk path, or it looks project-local.
-        const fakeGlobal = path.join(dir, 'npm-global', 'node_modules', 'vmz');
+        const fakeGlobal = path.join(dir, 'npm-global', 'node_modules', '@vmz', 'vmz');
         fs.mkdirSync(fakeGlobal, { recursive: true });
-        fs.writeFileSync(path.join(fakeGlobal, 'package.json'), '{"name":"vmz","version":"0.0.0"}');
+        fs.writeFileSync(path.join(fakeGlobal, 'package.json'), JSON.stringify({ name: '@vmz/vmz', version: '0.0.0' }));
 
         const app = path.join(dir, 'app');
         fs.mkdirSync(app);
@@ -106,13 +106,13 @@ describe('vmz invocation gate', () => {
 
     it('global + local present re-execs project bin', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-inv-reexec-'));
-        const fakeGlobal = path.join(dir, 'global', 'node_modules', 'vmz');
+        const fakeGlobal = path.join(dir, 'global', 'node_modules', '@vmz', 'vmz');
         fs.mkdirSync(fakeGlobal, { recursive: true });
-        fs.writeFileSync(path.join(fakeGlobal, 'package.json'), '{"name":"vmz","version":"0.0.0-global"}');
+        fs.writeFileSync(path.join(fakeGlobal, 'package.json'), JSON.stringify({ name: '@vmz/vmz', version: '0.0.0-global' }));
 
-        const localPkg = path.join(dir, 'app', 'node_modules', 'vmz');
+        const localPkg = path.join(dir, 'app', 'node_modules', '@vmz', 'vmz');
         fs.mkdirSync(path.join(localPkg, 'bin'), { recursive: true });
-        fs.writeFileSync(path.join(localPkg, 'package.json'), '{"name":"vmz","version":"0.0.0-local"}');
+        fs.writeFileSync(path.join(localPkg, 'package.json'), JSON.stringify({ name: '@vmz/vmz', version: '0.0.0-local' }));
         fs.writeFileSync(path.join(localPkg, 'bin', 'vmz.js'), '#!/usr/bin/env node\n');
 
         /** @type {{ bin: string, argv: string[] }[]} */
@@ -141,8 +141,8 @@ describe('vmz invocation gate', () => {
             `<template><p>hi</p></template>\n<script client>\nexport default class Application {}\n</script>\n`,
         );
 
-        // Pretend cwd resolved this workspace package as node_modules/vmz
-        const linked = path.join(dir, 'node_modules', 'vmz');
+        // Pretend cwd resolved this workspace package as node_modules/@vmz/vmz
+        const linked = path.join(dir, 'node_modules', '@vmz', 'vmz');
         fs.mkdirSync(path.dirname(linked), { recursive: true });
         fs.symlinkSync(packageRoot, linked, process.platform === 'win32' ? 'junction' : 'dir');
 
@@ -157,7 +157,21 @@ describe('vmz invocation gate', () => {
         fs.rmSync(dir, { recursive: true, force: true });
     });
 
-    it('findNearestProjectVmz accepts @vmz/vmz scoped install', () => {
+    it('findNearestProjectVmz prefers @vmz/vmz', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-inv-prefer-'));
+        const scoped = path.join(dir, 'node_modules', '@vmz', 'vmz');
+        const legacy = path.join(dir, 'node_modules', 'vmz');
+        fs.mkdirSync(scoped, { recursive: true });
+        fs.mkdirSync(legacy, { recursive: true });
+        fs.writeFileSync(path.join(scoped, 'package.json'), JSON.stringify({ name: '@vmz/vmz', version: '0.0.0' }));
+        fs.writeFileSync(path.join(legacy, 'package.json'), JSON.stringify({ name: 'vmz', version: '0.0.0' }));
+        const nearest = findNearestProjectVmz(dir);
+        expect(nearest).toBeTruthy();
+        expect(path.normalize(nearest)).toBe(path.normalize(tryReal(scoped)));
+        fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('findNearestProjectVmz accepts scoped @vmz/vmz install', () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-inv-scope-'));
         const linked = path.join(dir, 'node_modules', '@vmz', 'vmz');
         fs.mkdirSync(linked, { recursive: true });
@@ -177,7 +191,7 @@ describe('vmz invocation gate', () => {
     it('vmz new forwards to native CLI when binary is present', async () => {
         const native = resolveNativeVmzCli();
         if (!native) {
-            // Scaffold logic lives in Rust; skip smoke when vmz-tools is not built.
+            // Scaffold logic lives in Rust; skip smoke when native CLI is not built.
             return;
         }
         const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-new-parent-'));
@@ -190,7 +204,8 @@ describe('vmz invocation gate', () => {
             });
             expect(code).toBe(0);
             const pkg = JSON.parse(fs.readFileSync(path.join(parent, 'demo-app', 'package.json'), 'utf8'));
-            expect(pkg.devDependencies.vmz || pkg.devDependencies['@vmz/vmz']).toBeTruthy();
+            expect(pkg.dependencies?.['@vmz/core']).toBeTruthy();
+            expect(pkg.devDependencies?.['@vmz/vmz']).toBeTruthy();
             expect(fs.existsSync(path.join(parent, 'demo-app', 'src', 'Application.vmz'))).toBe(true);
             expect(fs.existsSync(path.join(parent, 'demo-app', 'src', 'pages', 'index.vmz'))).toBe(true);
         } finally {
@@ -201,9 +216,9 @@ describe('vmz invocation gate', () => {
 
     it('global help mentions three modes and scaffold', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-inv-help-'));
-        const fakeGlobal = path.join(dir, 'npm-global', 'node_modules', 'vmz');
+        const fakeGlobal = path.join(dir, 'npm-global', 'node_modules', '@vmz', 'vmz');
         fs.mkdirSync(fakeGlobal, { recursive: true });
-        fs.writeFileSync(path.join(fakeGlobal, 'package.json'), '{"name":"vmz"}');
+        fs.writeFileSync(path.join(fakeGlobal, 'package.json'), JSON.stringify({ name: '@vmz/vmz' }));
         const cwd = path.join(dir, 'empty-cwd');
         fs.mkdirSync(cwd);
 

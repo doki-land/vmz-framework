@@ -9,6 +9,9 @@
         "build": "vmz document build",
         "serve": "vmz document serve"
     },
+    "dependencies": {
+        "@vmz/core": "workspace:*"
+    },
     "devDependencies": {
         "vmz": "workspace:*"
     }

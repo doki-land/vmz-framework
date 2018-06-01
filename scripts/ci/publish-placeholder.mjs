@@ -8,14 +8,24 @@
  * - Prefer npm view; on miss, treat matching cache as published
  * - --refresh: ignore cache and re-check registry / reconfigure trust
  * - --otp <code>: npm OTP for trust write; refreshes list and updates cache
+ * - Also reads uncommitted `.env.placeholder.local` (repo root) or env:
+ *     NPM_TOTP_SECRET / TOTP_SECRET  → RFC6238 TOTP (recomputed each npm call)
+ *     NPM_OTP / OTP                  → 6-digit code, OR raw base32 secret if not 6 digits
+ *     NPM_TOKEN / TOKEN              → access token for auth
+ *   CLI flags win over env file / process.env.
  *
  * Usage:
  *   node scripts/ci/publish-placeholder.mjs
  *   node scripts/ci/publish-placeholder.mjs --refresh
  *   node scripts/ci/publish-placeholder.mjs --otp 123456
+ *   # or in .env.placeholder.local:
+ *   #   NPM_TOTP_SECRET=<authenticator base32>
+ *   #   NPM_TOKEN=npm_xxx
+ *   pnpm placeholder:trust
  */
 
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -27,9 +37,36 @@ import { fileURLToPath } from 'node:url';
 /** @typedef {{ version: number, trustExpect: typeof TRUST, packages: Record<string, PkgCache> }} CacheFile */
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const REPO_ROOT = path.resolve(ROOT, '..');
 const CACHE_PATH = path.join(ROOT, '.placeholder-npm-cache.json');
+const ENV_PATH = path.join(REPO_ROOT, '.env.placeholder.local');
 
-/** Keep in sync with scripts/ci/release-npm.mjs (and real publish package set). */
+/** Load KEY=VALUE from gitignored local env (no export, no quotes required). */
+function loadLocalEnv(filePath) {
+    /** @type {Record<string, string>} */
+    const out = {};
+    try {
+        const text = fs.readFileSync(filePath, 'utf8');
+        for (const raw of text.split(/\r?\n/)) {
+            const line = raw.trim();
+            if (!line || line.startsWith('#')) continue;
+            const m = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+            if (!m) continue;
+            let v = m[2].trim();
+            if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+                v = v.slice(1, -1);
+            }
+            out[m[1]] = v;
+        }
+    } catch {
+        /* optional */
+    }
+    return out;
+}
+
+const localEnv = loadLocalEnv(ENV_PATH);
+
+/** Keep in sync with scripts/ci/publish-npm.mjs (real publish package set). */
 const JS_STUBS = [
     '@vmz/vmz',
     '@vmz/core',
@@ -61,7 +98,7 @@ const VERSION = '0.0.0';
 
 const TRUST = {
     repo: 'doki-land/vmz-framework',
-    file: 'release-npm.yml',
+    file: 'publish-npm.yml',
     env: 'NPM_PUBLISH',
 };
 
@@ -86,8 +123,55 @@ function takeFlag(args, flag) {
 
 const dryRun = rest.includes('--dry-run');
 const refresh = rest.includes('--refresh');
-const token = takeFlag(rest, '--token') ?? process.env.NPM_TOKEN;
-const otp = takeFlag(rest, '--otp');
+const token = takeFlag(rest, '--token') ?? process.env.NPM_TOKEN ?? localEnv.NPM_TOKEN ?? localEnv.TOKEN;
+
+const otpFlag = takeFlag(rest, '--otp') ?? process.env.NPM_OTP ?? localEnv.NPM_OTP ?? localEnv.OTP;
+const totpSecretRaw =
+    takeFlag(rest, '--totp-secret') ??
+    process.env.NPM_TOTP_SECRET ??
+    localEnv.NPM_TOTP_SECRET ??
+    localEnv.TOTP_SECRET ??
+    // Convenience: if NPM_OTP holds a base32 secret (not a 6-digit code), treat as secret.
+    (otpFlag && !/^\d{6}$/.test(otpFlag.trim()) ? otpFlag : undefined);
+const otpStatic = otpFlag && /^\d{6}$/.test(otpFlag.trim()) ? otpFlag.trim() : undefined;
+
+/** @param {string} secret */
+function decodeBase32(secret) {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    const cleaned = secret.replace(/[\s=-]/g, '').toUpperCase();
+    let bits = '';
+    for (const ch of cleaned) {
+        const v = alphabet.indexOf(ch);
+        if (v < 0) fail(`invalid base32 in TOTP secret (bad char)`);
+        bits += v.toString(2).padStart(5, '0');
+    }
+    const bytes = [];
+    for (let i = 0; i + 8 <= bits.length; i += 8) {
+        bytes.push(Number.parseInt(bits.slice(i, i + 8), 2));
+    }
+    if (!bytes.length) fail('TOTP secret decoded empty');
+    return Buffer.from(bytes);
+}
+
+/** RFC 6238 TOTP (SHA-1, 30s, 6 digits). Fresh each call — trust loop spans many windows. */
+function totpCode(secret, atMs = Date.now()) {
+    const key = decodeBase32(secret);
+    const counter = Math.floor(atMs / 1000 / 30);
+    const buf = Buffer.alloc(8);
+    buf.writeUInt32BE(Math.floor(counter / 0x100000000), 0);
+    buf.writeUInt32BE(counter & 0xffffffff, 4);
+    const hmac = crypto.createHmac('sha1', key).update(buf).digest();
+    const offset = hmac[hmac.length - 1] & 0x0f;
+    const code =
+        ((hmac[offset] & 0x7f) << 24) | ((hmac[offset + 1] & 0xff) << 16) | ((hmac[offset + 2] & 0xff) << 8) | (hmac[offset + 3] & 0xff);
+    return String(code % 1_000_000).padStart(6, '0');
+}
+
+/** @returns {string | undefined} */
+function currentOtp() {
+    if (totpSecretRaw) return totpCode(totpSecretRaw);
+    return otpStatic;
+}
 
 if (rest.includes('--opt') || rest.some((a) => a.startsWith('--opt='))) {
     fail('--opt removed. Use --token for Access Token; --otp for 2FA code.');
@@ -101,7 +185,7 @@ const STUBS = [
     ...JS_STUBS.map((name) => ({ name })),
     ...NATIVE_STUBS.map((s) => ({
         ...s,
-        description: `Optional native binary for @vmz/vmz (${s.name.replace(/^@vmz\/vmz-/, '')}). Placeholder only.`,
+        description: `Optional native binary for @vmz/vmz (${s.name.replace(/^@vmz\/tools-/, '')}). Placeholder only.`,
     })),
 ];
 
@@ -138,19 +222,39 @@ function saveCache(cache) {
  * @param {{ cwd?: string, silent?: boolean, inherit?: boolean }} [opts]
  */
 function runNpm(args, opts = {}) {
-    const r = spawnSync('npm', args, {
-        cwd: opts.cwd,
-        encoding: 'utf8',
-        shell: process.platform === 'win32',
-        stdio: opts.inherit ? 'inherit' : 'pipe',
-        env: process.env,
-    });
-    if (r.error && !opts.silent) fail(r.error.message);
-    return {
-        status: r.status ?? 1,
-        stdout: opts.inherit ? '' : String(r.stdout ?? '').trim(),
-        stderr: opts.inherit ? '' : String(r.stderr ?? '').trim(),
-    };
+    /** @type {NodeJS.ProcessEnv} */
+    const env = { ...process.env };
+    let userConfig;
+    if (token) {
+        userConfig = path.join(os.tmpdir(), `vmz-placeholder-npmrc-${process.pid}`);
+        fs.writeFileSync(userConfig, `//registry.npmjs.org/:_authToken=${token}\n`, 'utf8');
+        env.NPM_CONFIG_USERCONFIG = userConfig;
+        // Avoid empty NODE_AUTH_TOKEN clobbering OIDC elsewhere; only for local trust/publish stubs.
+        env.NODE_AUTH_TOKEN = token;
+    }
+    try {
+        const r = spawnSync('npm', args, {
+            cwd: opts.cwd,
+            encoding: 'utf8',
+            shell: process.platform === 'win32',
+            stdio: opts.inherit ? 'inherit' : 'pipe',
+            env,
+        });
+        if (r.error && !opts.silent) fail(r.error.message);
+        return {
+            status: r.status ?? 1,
+            stdout: opts.inherit ? '' : String(r.stdout ?? '').trim(),
+            stderr: opts.inherit ? '' : String(r.stderr ?? '').trim(),
+        };
+    } finally {
+        if (userConfig) {
+            try {
+                fs.unlinkSync(userConfig);
+            } catch {
+                /* ignore */
+            }
+        }
+    }
 }
 
 function sleep(ms) {
@@ -250,7 +354,8 @@ function classifyConfigs(configs) {
  */
 function listTrustLive(name) {
     const args = ['trust', 'list', name, '--json'];
-    if (otp) args.push(`--otp=${otp}`);
+    const code = currentOtp();
+    if (code) args.push(`--otp=${code}`);
     const r = runNpm(args, { silent: true });
     const blob = `${r.stdout}\n${r.stderr}`;
     if (/EOTP|one-time password|auth\/cli/i.test(blob)) {
@@ -307,17 +412,18 @@ function resolveTrust(cache, name, opts = {}) {
         cached.matches = recl.matches;
         cached.matchKind = recl.matchKind;
     }
-    const wantLive = opts.preferLive || refresh || Boolean(otp);
+    const hasOtp = Boolean(totpSecretRaw || otpStatic);
+    const wantLive = opts.preferLive || refresh || hasOtp;
 
     if (wantLive) {
-        if (!otp && refresh) {
+        if (!hasOtp && refresh) {
             return {
                 source: cached ? 'cache' : 'none',
                 trust: cached,
-                error: '--refresh needs --otp to re-list',
+                error: '--refresh needs NPM_TOTP_SECRET or --otp to re-list',
             };
         }
-        if (!otp) {
+        if (!hasOtp) {
             return { source: cached ? 'cache' : 'none', trust: cached };
         }
         const live = listTrustLive(name);
@@ -340,8 +446,8 @@ function checkStatus() {
     console.log('placeholder: status\n');
     console.log(`  Trusted Publisher expect: ${TRUST.repo}  ${TRUST.file}  env=${TRUST.env}  [publish + stage]`);
     console.log(`  cache: ${CACHE_PATH}`);
-    if (!otp) {
-        console.log('  tip: trust 列优先读缓存；带 `--otp` 可刷?list 并写回缓存\n');
+    if (!totpSecretRaw && !otpStatic) {
+        console.log('  tip: put NPM_TOTP_SECRET=<base32> in .env.placeholder.local (gitignored), then pnpm placeholder:trust\n');
     } else {
         console.log('  mode: live trust list + write cache\n');
     }
@@ -367,15 +473,17 @@ function checkStatus() {
         }
         const verMark = ver === VERSION ? VERSION : `${ver} (!= ${VERSION})`;
         const verSrc = resolvedVer.source === 'cache' ? 'cache; live miss' : resolvedVer.source;
-        const resolved = resolveTrust(cache, spec.name, { preferLive: Boolean(otp) });
+        const resolved = resolveTrust(cache, spec.name, {
+            preferLive: Boolean(totpSecretRaw || otpStatic),
+        });
 
         if (resolved.authRequired && !resolved.trust) {
-            console.log(`  ? ${spec.name}@${verMark}  trust unknown (EOTP; use cache or fresh --otp) [${verSrc}]`);
+            console.log(`  ? ${spec.name}@${verMark}  trust unknown (EOTP; set NPM_TOTP_SECRET) [${verSrc}]`);
             unknownTrust += 1;
             continue;
         }
         if (!resolved.trust) {
-            console.log(`  ? ${spec.name}@${verMark}  trust unknown (no cache; run trust --otp) [${verSrc}]`);
+            console.log(`  ? ${spec.name}@${verMark}  trust unknown (no cache; run trust with NPM_TOTP_SECRET) [${verSrc}]`);
             unknownTrust += 1;
             continue;
         }
@@ -396,7 +504,7 @@ function checkStatus() {
 
     saveCache(cache);
     console.log(`\nplaceholder: ${ok} ok, ${missingPkg} package missing, ${badTrust} trust missing/mismatch, ${unknownTrust} trust unknown`);
-    console.log('  next: pnpm placeholder:publish   or   pnpm placeholder:trust -- --otp <code>');
+    console.log('  next: pnpm placeholder:publish   or   put NPM_TOTP_SECRET in .env.placeholder.local && pnpm placeholder:trust');
     process.exit(missingPkg + badTrust > 0 ? 1 : 0);
 }
 
@@ -485,7 +593,8 @@ function cmdPublish() {
         const args = ['publish'];
         if (spec.name.startsWith('@')) args.push('--access', 'public');
         if (dryRun) args.push('--dry-run');
-        if (otp) args.push(`--otp=${otp}`);
+        const code = currentOtp();
+        if (code) args.push(`--otp=${code}`);
 
         console.log(`\n=== ${spec.name}  npm ${args.join(' ')} ===`);
         const r = runNpm(args, { cwd: dir, silent: true });
@@ -527,6 +636,9 @@ function cmdTrust() {
     console.log(`  env=${TRUST.env}`);
     console.log('  permissions: npm publish + npm stage publish');
     console.log(`  cache: ${CACHE_PATH}`);
+    console.log(
+        `  secrets: totp=${totpSecretRaw ? 'yes' : 'no'} otp6=${otpStatic ? 'yes' : 'no'} token=${token ? 'yes' : 'no'} (flag/env/.env.placeholder.local)`,
+    );
     console.log('  rule: skip only when trust list (or cache from a prior list) says already matches\n');
 
     let configured = 0;
@@ -562,9 +674,12 @@ function cmdTrust() {
         }
 
         // Need a live list (OTP window). Cache miss / non-match / --refresh.
-        if (!otp) {
+        // Need a live list. Cache miss / non-match / --refresh.
+        if (!totpSecretRaw && !otpStatic) {
             saveCache(cache);
-            fail(`need --otp to list ${spec.name} (no matching cache). Progress saved. Re-run: pnpm placeholder:trust -- --otp <code>`);
+            fail(
+                `need NPM_TOTP_SECRET (or 6-digit NPM_OTP) to list ${spec.name}. Put secret in .env.placeholder.local then: pnpm placeholder:trust`,
+            );
         }
 
         const live = listTrustLive(spec.name);
@@ -590,10 +705,52 @@ function cmdTrust() {
         if (entry.matchKind === 'mismatch') {
             console.log(`  ! ${spec.name}  has trusted publisher that does not match expect:`);
             console.log(`    ${JSON.stringify(live.configs, null, 2).split('\n').join('\n    ')}`);
-            fail(`${spec.name}: refuse to create over existing trust. Fix expect or revoke manually, then --refresh.`);
+
+            // Same-repo stale workflow (e.g. deleted release-npm.yml) → revoke then recreate.
+            const stale = live.configs.filter((cfg) => {
+                if (trustExact(cfg) || trustMatches(cfg)) return false;
+                const { repo } = trustFields(cfg);
+                const type = String(cfg?.type ?? 'github').toLowerCase();
+                return type === 'github' && repo === TRUST.repo && cfg?.id;
+            });
+            const foreign = live.configs.filter((cfg) => {
+                const { repo } = trustFields(cfg);
+                return repo && repo !== TRUST.repo;
+            });
+            if (foreign.length) {
+                fail(`${spec.name}: refuse to touch foreign trust (${foreign.map((c) => trustFields(c).repo).join(', ')}). Revoke manually.`);
+            }
+            if (!stale.length) {
+                fail(`${spec.name}: mismatch with no revocable same-repo ids. Fix manually, then --refresh.`);
+            }
+
+            for (const cfg of stale) {
+                const revCode = currentOtp();
+                if (!revCode) fail('TOTP/OTP missing at revoke time');
+                const revArgs = ['trust', 'revoke', spec.name, `--id=${cfg.id}`, `--otp=${revCode}`];
+                console.log(`\n=== ${spec.name}  npm trust revoke --id=${cfg.id} (stale ${trustFields(cfg).file || '?'}) ===`);
+                if (dryRun) {
+                    console.log(`  dry-run would: npm ${revArgs.join(' ')}`);
+                    continue;
+                }
+                const rr = runNpm(revArgs, { silent: true });
+                if (rr.stdout) process.stdout.write(rr.stdout + (rr.stdout.endsWith('\n') ? '' : '\n'));
+                if (rr.stderr) process.stderr.write(rr.stderr + (rr.stderr.endsWith('\n') ? '' : '\n'));
+                if (rr.status !== 0) {
+                    saveCache(cache);
+                    fail(`trust revoke failed: ${spec.name} id=${cfg.id}`);
+                }
+                console.log(`  revoked ${cfg.id}`);
+                sleep(1000);
+            }
+
+            if (dryRun) continue;
+            // Fall through to create after revoke.
         }
 
-        // matchKind === 'none' ?create
+        // matchKind === 'none' (or revoked mismatch) → create
+        const code = currentOtp();
+        if (!code) fail('TOTP/OTP missing at create time');
         const args = [
             'trust',
             'github',
@@ -604,7 +761,7 @@ function cmdTrust() {
             '--allow-publish',
             '--allow-stage-publish',
             '--yes',
-            `--otp=${otp}`,
+            `--otp=${code}`,
         ];
         if (dryRun) {
             console.log(`  dry-run would: npm ${args.join(' ')}`);
@@ -618,7 +775,7 @@ function cmdTrust() {
 
         if (r.status !== 0) {
             saveCache(cache);
-            fail(`trust create failed: ${spec.name} (cache kept; fix and retry ?do not assume E409 means ok)`);
+            fail(`trust create failed: ${spec.name} (cache kept; fix and retry — do not assume E409 means ok)`);
         }
 
         // Confirm via list and cache.
@@ -641,7 +798,7 @@ function cmdTrust() {
         }
 
         configured += 1;
-        console.log(`  ?${spec.name}  configured + cached`);
+        console.log(`  ok ${spec.name}  configured + cached`);
         sleep(2000);
     }
 

@@ -725,6 +725,129 @@ export function emitLocaleTypedModules(report, outDir) {
 }
 
 /**
+ * Emit runtime `#locales/<catalog>.js` into application `dist/` and rewrite
+ * client imports from `#locales/...` to relative ESM paths.
+ *
+ * Variant pick reads `html[data-locale]` (else defaultLocale). Thin bridge until
+ * host LocaleTransition reloads locale-scoped chunks (I2/I4).
+ *
+ * @param {string} projectRoot
+ * @param {string} distDir
+ * @returns {{ ok: boolean, written: string[], diagnostics: any[] }}
+ */
+export function emitLocaleRuntimeModules(projectRoot, distDir) {
+    const localesRoot = path.join(projectRoot, 'locales');
+    if (!fs.existsSync(localesRoot)) {
+        return { ok: true, written: [], diagnostics: [] };
+    }
+    const report = checkLocales({ projectRoot, checkUnused: false });
+    if (localeHasErrors(report)) {
+        return { ok: false, written: [], diagnostics: report.diagnostics || [] };
+    }
+    const defaultLocale = report.manifest?.defaultLocale || 'zh-hans';
+    const byId = new Map((report.messageCatalog?.messages || []).map((m) => [m.messageId, m]));
+    /** @type {string[]} */
+    const written = [];
+    const localesOut = path.join(distDir, 'locales');
+    fs.mkdirSync(localesOut, { recursive: true });
+
+    for (const mod of report.typedModules || []) {
+        const lines = [
+            `/** Generated ${mod.module} — runtime LocalizedText (defaultLocale=${defaultLocale}) */`,
+            `const __vmzDefaultLocale = ${JSON.stringify(defaultLocale)};`,
+            `function __vmzLocaleId() {`,
+            `  try {`,
+            `    const stored = localStorage.getItem("vmz.locale");`,
+            `    if (stored) return stored;`,
+            `  } catch {}`,
+            `  if (typeof document !== "undefined") {`,
+            `    const d = document.documentElement?.getAttribute("data-locale");`,
+            `    if (d) return d;`,
+            `    const lang = document.documentElement?.lang;`,
+            `    if (lang === "en" || lang === "en-US" || lang === "en-us") return "en-us";`,
+            `    if (lang === "zh" || lang === "zh-CN" || lang === "zh-Hans" || lang === "zh-hans") return "zh-hans";`,
+            `  }`,
+            `  return __vmzDefaultLocale;`,
+            `}`,
+            `function __vmzFormat(template, args) {`,
+            `  if (!args) return String(template ?? "");`,
+            `  return String(template ?? "").replace(/\\{(\\w+)(?:,\\s*\\w+)?\\}/g, (m, name) =>`,
+            `    Object.prototype.hasOwnProperty.call(args, name) ? String(args[name]) : m`,
+            `  );`,
+            `}`,
+            `function __vmzPick(variants, args) {`,
+            `  const id = __vmzLocaleId();`,
+            `  const template = variants[id] ?? variants[__vmzDefaultLocale] ?? "";`,
+            `  return __vmzFormat(template, args);`,
+            `}`,
+            '',
+        ];
+        for (const exp of mod.exports || []) {
+            const node = byId.get(exp.messageId);
+            const variants = {};
+            if (node?.variants) {
+                for (const [loc, v] of Object.entries(node.variants)) {
+                    variants[loc] = v.template;
+                }
+            }
+            const lit = JSON.stringify(variants);
+            if ((exp.params || []).length) {
+                lines.push(`export function ${exp.exportName}(args) { return __vmzPick(${lit}, args); }`);
+            } else {
+                lines.push(`export function ${exp.exportName}() { return __vmzPick(${lit}); }`);
+            }
+        }
+        lines.push('');
+        const file = path.join(localesOut, `${mod.catalogId}.js`);
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, lines.join('\n'), 'utf8');
+        written.push(file);
+    }
+
+    rewriteLocaleImportsInDist(distDir);
+    return { ok: true, written, diagnostics: report.diagnostics || [] };
+}
+
+/**
+ * @param {string} distDir
+ */
+function rewriteLocaleImportsInDist(distDir) {
+    /** @type {string[]} */
+    const files = [];
+    walkDistJs(distDir, (file) => files.push(file));
+    for (const file of files) {
+        let text = fs.readFileSync(file, 'utf8');
+        if (!text.includes('#locales/')) continue;
+        const fromDir = path.dirname(file);
+        // Emit path is dist/locales/*.js — `#` cannot appear in ESM file URLs (fragment).
+        const next = text.replace(/from\s*(["'])#locales\/([^"']+)\1/g, (_m, quote, id) => {
+            const target = path.join(distDir, 'locales', `${id}.js`);
+            let rel = path.relative(fromDir, target).replace(/\\/g, '/');
+            if (!rel.startsWith('.')) rel = `./${rel}`;
+            return `from ${quote}${rel}${quote}`;
+        });
+        if (next !== text) fs.writeFileSync(file, next, 'utf8');
+    }
+}
+
+/**
+ * @param {string} dir
+ * @param {(file: string) => void} fn
+ */
+function walkDistJs(dir, fn) {
+    if (!fs.existsSync(dir)) return;
+    for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, ent.name);
+        if (ent.isDirectory()) {
+            if (ent.name === 'node_modules') continue;
+            walkDistJs(full, fn);
+        } else if (ent.name.endsWith('.js') || ent.name.endsWith('.mjs')) {
+            fn(full);
+        }
+    }
+}
+
+/**
  * MessageId rename plan — WorkspaceEdit-shaped, no parallel rename IR.
  * @param {ReturnType<typeof checkLocales>} report
  * @param {string} fromId

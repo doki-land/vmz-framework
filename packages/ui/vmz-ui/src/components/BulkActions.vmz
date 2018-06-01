@@ -1,0 +1,52 @@
+<template>
+  <div
+    if={selectedCount}
+    class="vmz-ui-bulk-actions"
+    data-vmz-ui="bulk-actions"
+    role="region"
+    aria-label={label}
+  >
+    <p class="vmz-ui-bulk-actions__count" data-dogfood="bulk-count">{countLabel}</p>
+    <div class="vmz-ui-bulk-actions__actions">
+      <slot />
+    </div>
+  </div>
+</template>
+
+<style>
+.vmz-ui-bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--vmz-action-primary-background);
+  border-radius: 2px;
+  background: transparent;
+}
+
+.vmz-ui-bulk-actions__count {
+  margin: 0;
+  font-weight: 700;
+  color: var(--vmz-action-primary-active);
+}
+
+.vmz-ui-bulk-actions__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — BulkActions (Console composition).
+ * Renders when selectedCount is truthy; parent owns selection count + label.
+ */
+export default class BulkActions {
+  public label: string = 'Bulk actions';
+  public selectedCount: number = 0;
+  public countLabel: string = '';
+}
+</script>

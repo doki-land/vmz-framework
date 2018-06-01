@@ -132,11 +132,11 @@ fn compile_source(
 /// Remove `@tailwind { … }` / bare `@tailwind` so SCSS does not see TW directives.
 fn strip_at_tailwind(style: &str) -> String {
     let mut out = String::with_capacity(style.len());
-    let bytes = style.as_bytes();
     let mut i = 0;
-    while i < bytes.len() {
-        if let Some(rest) = style[i..].strip_prefix("@tailwind") {
+    while i < style.len() {
+        if style[i..].starts_with("@tailwind") {
             let after = i + "@tailwind".len();
+            let rest = &style[after..];
             let trimmed = rest.trim_start();
             let ws = rest.len() - trimmed.len();
             let body_start = after + ws;
@@ -146,15 +146,20 @@ fn strip_at_tailwind(style: &str) -> String {
                     continue;
                 }
             }
-            // Bare `@tailwind` marker — skip the keyword and following spaces.
+            // Bare `@tailwind` marker - skip the keyword and following spaces.
             i = body_start;
-            while i < bytes.len() && bytes[i].is_ascii_whitespace() && bytes[i] != b'\n' {
-                i += 1;
+            while i < style.len() {
+                let ch = style[i..].chars().next().unwrap();
+                if ch == '\n' || !ch.is_whitespace() {
+                    break;
+                }
+                i += ch.len_utf8();
             }
             continue;
         }
-        out.push(bytes[i] as char);
-        i += 1;
+        let ch = style[i..].chars().next().unwrap();
+        out.push(ch);
+        i += ch.len_utf8();
     }
     out
 }

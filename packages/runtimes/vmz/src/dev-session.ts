@@ -11,6 +11,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { buildIntegratedDocuments, projectHasDocuments } from './document-integrate.js';
 import { createWorkspace } from './index.js';
+import { emitLocaleRuntimeModules, localeHasErrors } from './locale-check.js';
 import { log } from './log.js';
 import { diffFingerprints, fileFingerprintMap } from './watch-diff.js';
 
@@ -53,12 +54,23 @@ export function createDevSession(options) {
         return ws.build();
     }
 
+    function emitLocales() {
+        const localeEmit = emitLocaleRuntimeModules(project, outDir);
+        if (!localeEmit.ok || localeHasErrors({ diagnostics: localeEmit.diagnostics })) {
+            log.diagnostics(localeEmit.diagnostics ?? []);
+            log.error('locale runtime emit failed');
+            return false;
+        }
+        return true;
+    }
+
     function printReport(report, label) {
         const errors = log.diagnostics(report.diagnostics ?? []);
         if (errors) {
             log.error(`${label} failed (${errors} error(s))`);
             return false;
         }
+        if (!emitLocales()) return false;
         const mode = report.full ? 'full' : 'affected';
         const chunks = (report.affectedChunks || []).join(', ') || '(none)';
         log.info(`${label} ok (${mode}; chunks=[${chunks}]; ${(report.emitted ?? []).length} emitted)`);
@@ -92,7 +104,8 @@ export function createDevSession(options) {
 
         child = spawnHost({ project, outDir, host, port });
         const docsRoot = path.join(project, 'documents');
-        const watchRoots = [src].concat(existsSync(docsRoot) ? [docsRoot] : []);
+        const localesRoot = path.join(project, 'locales');
+        const watchRoots = [src].concat(existsSync(docsRoot) ? [docsRoot] : []).concat(existsSync(localesRoot) ? [localesRoot] : []);
         log.info(`dev → http://${host}:${port} (watching ${watchRoots.join(', ')})`);
 
         /** @type {Map<string, Map<string, string>>} */
@@ -113,11 +126,13 @@ export function createDevSession(options) {
                 if (stopped || signal?.aborted) break;
 
                 if (child && child.exitCode != null) {
-                    throw new Error(`vmz serve-host exited: ${child.exitCode}`);
+                    log.warn(`serve-host exited (${child.exitCode}) — respawning…`);
+                    child = spawnHost({ project, outDir, host, port });
+                    continue;
                 }
 
-                /** @type {{ srcChanged: string[], srcDeleted: string[], docsDirty: boolean }} */
-                let batch = { srcChanged: [], srcDeleted: [], docsDirty: false };
+                /** @type {{ srcChanged: string[], srcDeleted: string[], docsDirty: boolean, localesDirty: boolean }} */
+                let batch = { srcChanged: [], srcDeleted: [], docsDirty: false, localesDirty: false };
                 try {
                     // Probe only — keep prior fingerprints until debounce resample
                     // (same contract as pre-docs watcher: empty second pass would miss soft reload).
@@ -128,6 +143,8 @@ export function createDevSession(options) {
                         if (root === src) {
                             batch.srcChanged = diff.changed;
                             batch.srcDeleted = diff.deleted;
+                        } else if (root === localesRoot) {
+                            if (diff.changed.length || diff.deleted.length) batch.localesDirty = true;
                         } else if (diff.changed.length || diff.deleted.length) {
                             batch.docsDirty = true;
                         }
@@ -136,11 +153,11 @@ export function createDevSession(options) {
                     log.warn('watch error:', err);
                     continue;
                 }
-                if (!batch.srcChanged.length && !batch.srcDeleted.length && !batch.docsDirty) continue;
+                if (!batch.srcChanged.length && !batch.srcDeleted.length && !batch.docsDirty && !batch.localesDirty) continue;
 
                 await sleep(200);
                 // Resample against the same prior fingerprints, then commit.
-                batch = { srcChanged: [], srcDeleted: [], docsDirty: false };
+                batch = { srcChanged: [], srcDeleted: [], docsDirty: false, localesDirty: false };
                 for (const root of watchRoots) {
                     const prev = fingerprints.get(root) || new Map();
                     const next = fileFingerprintMap(root);
@@ -149,11 +166,13 @@ export function createDevSession(options) {
                     if (root === src) {
                         batch.srcChanged = diff.changed;
                         batch.srcDeleted = diff.deleted;
+                    } else if (root === localesRoot) {
+                        if (diff.changed.length || diff.deleted.length) batch.localesDirty = true;
                     } else if (diff.changed.length || diff.deleted.length) {
                         batch.docsDirty = true;
                     }
                 }
-                if (!batch.srcChanged.length && !batch.srcDeleted.length && !batch.docsDirty) continue;
+                if (!batch.srcChanged.length && !batch.srcDeleted.length && !batch.docsDirty && !batch.localesDirty) continue;
 
                 let needFullReload = batch.docsDirty;
                 if (batch.srcChanged.length || batch.srcDeleted.length) {
@@ -191,11 +210,24 @@ export function createDevSession(options) {
                                   : 'soft reload ok (full page)',
                         );
                     } catch (err) {
-                        log.warn(`soft reload failed (${err}) — restarting serve-host…`);
-                        killChild(child);
-                        child = spawnHost({ project, outDir, host, port });
+                        log.warn(`soft reload failed (${err}) — keeping previous serve-host (fix and save)`);
                     }
                     continue;
+                }
+
+                if (batch.localesDirty) {
+                    log.info('locales change detected — re-emitting #locales runtime…');
+                    if (!emitLocales()) {
+                        log.warn('locale runtime emit failed — keeping previous modules');
+                        continue;
+                    }
+                    try {
+                        await softReload(host, port, { full: true, islandHmr: false });
+                        log.info('soft reload ok (full page; locales)');
+                    } catch (err) {
+                        log.warn(`soft reload failed (${err}) — keeping previous serve-host (fix and save)`);
+                    }
+                    if (!batch.docsDirty) continue;
                 }
 
                 if (batch.docsDirty) {
@@ -209,9 +241,7 @@ export function createDevSession(options) {
                         await softReload(host, port, { full: true, islandHmr: false });
                         log.info('soft reload ok (full page; docs)');
                     } catch (err) {
-                        log.warn(`soft reload failed (${err}) — restarting serve-host…`);
-                        killChild(child);
-                        child = spawnHost({ project, outDir, host, port });
+                        log.warn(`soft reload failed (${err}) — keeping previous serve-host (fix and save)`);
                     }
                 }
             }

@@ -4,6 +4,7 @@
     <main>
       <section class="landing-hero" aria-labelledby="landing-brand">
         <div class="landing-hero__copy">
+          <p class="landing-slogan">约定大于配置</p>
           <p class="landing-kicker">Vue-Familiar · Multi-Platform · Zero-Cost</p>
           <h1 id="landing-brand" class="landing-brand">
             <span>VMZ</span>
@@ -14,7 +15,8 @@
           </p>
           <div class="landing-cta">
             <a class="vmz-btn vmz-btn--primary" href="/d/">阅读文档</a>
-            <a class="vmz-btn vmz-btn--ghost" href="/d/zh-hans/guide/">入门指南</a>
+            <a class="vmz-btn vmz-btn--ghost" href="/d/zh-hans/guide/zero-cost/">Zero-Cost</a>
+            <a class="vmz-btn vmz-btn--ghost" href="/d/zh-hans/guide/optimizations/">优化</a>
           </div>
         </div>
         <div class="landing-hero__viz" aria-hidden="true">
@@ -35,7 +37,7 @@
           <p class="landing-eyebrow">01 · Program Graph</p>
           <h2 id="sec-facts">同一份事实，整条链路共用</h2>
           <p class="landing-band__lede">
-            编辑器、编译器、测试、路由、服务端与部署不再各猜一套语义。能证明就精确更新；不能证明就诊断，禁止静默漏更新。
+            编辑器、编译器、测试、路由、服务端与部署不再各猜一套语义。能证明则精确更新；不能证明则诊断或走保守路径。
           </p>
           <ul class="fact-rail">
             <li>
@@ -59,7 +61,7 @@
           <p class="landing-eyebrow">02 · Host Profile</p>
           <h2 id="sec-host">一个语义核心，多种 Surface</h2>
           <p class="landing-band__lede">
-            Browser、SSR、小程序、WebView 是 Host Profile 的组合结果，不是四套框架。禁止第二语义 IR。
+            Browser、SSR、小程序、WebView 是 Host Profile 的组合结果，共享同一份语义核心。
           </p>
           <div class="host-strip" role="list">
             <div class="host-strip__item" role="listitem">
@@ -78,10 +80,47 @@
         </div>
       </section>
 
-      <section class="landing-band" aria-labelledby="sec-proof">
+      <section class="landing-band" aria-labelledby="sec-zero">
+        <div class="landing-band__inner">
+          <p class="landing-eyebrow">03 · Zero-Cost</p>
+          <h2 id="sec-zero">编译期证明，精确更新</h2>
+          <p class="landing-band__lede">
+            说明见 <a href="/d/zh-hans/guide/zero-cost/">Zero-Cost</a>；手段与源码见
+            <a href="/d/zh-hans/guide/optimizations/">优化</a>。
+          </p>
+          <ul class="opt-rail">
+            <li>
+              <strong><a href="/d/zh-hans/guide/optimizations/dep-graph/">依赖路径进图</a></strong>
+              <span>可证明则路径级更新；不可证明则诊断</span>
+            </li>
+            <li>
+              <strong><a href="/d/zh-hans/guide/optimizations/row-kernel/">行内核</a></strong>
+              <span>静态 each 项 → HTML + hydrate / apply / create</span>
+            </li>
+            <li>
+              <strong><a href="/d/zh-hans/guide/optimizations/keyed-list/">keyed 手术式 move</a></strong>
+              <span>Map 身份；互换 / 重排只动涉及节点</span>
+            </li>
+            <li>
+              <strong><a href="/d/zh-hans/guide/optimizations/event-delegate/">事件委托</a></strong>
+              <span>行上 <code>data-vmz-act</code>，块级冒泡</span>
+            </li>
+            <li>
+              <strong><a href="/d/zh-hans/guide/optimizations/host-class/">host 精确刷新</a></strong>
+              <span>class 三元式分析 host / item 字段</span>
+            </li>
+            <li>
+              <strong><a href="/d/zh-hans/guide/optimizations/client-plan/">懒句柄 · 去 Plan</a></strong>
+              <span>压 run-memory；client 默认不带 <code>__vmzPlan</code></span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="landing-band landing-band--ink" aria-labelledby="sec-proof">
         <div class="landing-band__inner landing-band__inner--split">
           <div>
-            <p class="landing-eyebrow">03 · Evidence</p>
+            <p class="landing-eyebrow">04 · Evidence</p>
             <h2 id="sec-proof">官网就是普通 VMZ 应用</h2>
             <p class="landing-band__lede">
               文档挂在 <a href="/d/">/d/</a>，与本站同一 application、同一 <code>/designs</code>。无 VitePress 双写，无 homepage 特判。

@@ -71,6 +71,15 @@ export const CHECKS: Record<string, CheckEntry> = {
     'shared-plan': { file: 'runtime/shared-plan.ts', pre: ['build:vmz-test'] },
     lifetime: { file: 'runtime/lifetime.ts', pre: ['build:vmz-test'] },
     'async-graph': { file: 'runtime/async-graph.ts', pre: ['build:vmz-test'] },
+    'motion-ir': {
+        file: 'runtime/motion-ir.ts',
+        description: 'Motion Program IR — overlay/control transitions + cancel edges',
+    },
+    ui7: {
+        file: 'ui/ui7.ts',
+        description: 'UI7 conformance pack — Motion IR depth fixtures (token/affects/cancel)',
+        pre: ['build:vmz-test'],
+    },
     'write-barrier': { file: 'runtime/write-barrier.ts' },
     'write-barrier-array': { file: 'runtime/write-barrier-array.ts' },
     'write-barrier-shared': { file: 'runtime/write-barrier-shared.ts' },
@@ -128,6 +137,88 @@ export const CHECKS: Record<string, CheckEntry> = {
         composite: ['event-flow-core', 'zero-js', 'mixed-pack'],
     },
     'event-flow-core': { file: 'runtime/event-flow.ts' },
+
+    // production/ — Browser Production Profile (not in default verify-all until green)
+    'browser-core': {
+        file: 'production/browser-core.ts',
+        description: 'A1 catalog: compile+logic+ssr+resume+browser+async + no-render',
+        pre: ['build:vmz-test'],
+    },
+    'router-production': {
+        file: 'production/router-production.ts',
+        description: 'A2 SSR + Link + SPA takeover + load/access/action + nav-cancel + layout',
+    },
+    'release-artifact': {
+        file: 'production/release-artifact.ts',
+        description: 'A3 filesystem pack / atomic publish / rollback / artifact diff',
+    },
+    'static-delivery': {
+        file: 'production/static-delivery.ts',
+        description: 'A3-static web-static HTML + 404 + SEO + StaticDeliveryManifest',
+    },
+    'cdn-policy': {
+        file: 'production/cdn-policy.ts',
+        description: 'A3-cdn: routing + cache-policy + static-resume + static-rollback',
+    },
+    'cdn-routing': {
+        file: 'production/cdn-policy.ts',
+        description: 'A3-cdn redirects / deep links / no SPA fallback (same driver as cdn-policy)',
+    },
+    'cdn-cache-policy': {
+        file: 'production/cdn-policy.ts',
+        description: 'A3-cdn Cache-Control contract (same driver as cdn-policy)',
+    },
+    'static-resume': {
+        file: 'production/cdn-policy.ts',
+        description: 'A3-cdn static HTML resume assets (same driver as cdn-policy)',
+    },
+    'static-rollback': {
+        file: 'production/cdn-policy.ts',
+        description: 'A3-cdn static artifact rollback (same driver as cdn-policy)',
+    },
+    'content-addressed-assets': {
+        file: 'production/content-addressed-assets.ts',
+        description: 'A3 assets/<hash> content-addressed immutable layout',
+    },
+    'site-delivery': {
+        file: 'production/site-delivery.ts',
+        description: 'A3-site SiteDeliveryContract embedded + fallback',
+    },
+    'embedded-site': {
+        file: 'production/site-delivery.ts',
+        description: 'A3-site embedded-only activate (same driver as site-delivery)',
+    },
+    'site-fallback': {
+        file: 'production/site-delivery.ts',
+        description: 'A3-site release fallback + anti-mix (same driver as site-delivery)',
+    },
+    'production-test': {
+        file: 'production/production-test.ts',
+        description: 'A4 production scenario pack + deterministic CI profile',
+    },
+    'production-observability': {
+        file: 'production/production-observability.ts',
+        description: 'A5 trace / redaction / CSP / budget / health',
+    },
+    'official-dogfood': {
+        file: 'production/official-dogfood.ts',
+        description: 'Official homepage/documents/inspector dogfood + @vmz/ui Field/Dialog',
+    },
+    'browser-production': {
+        description: 'Browser Production Profile v1 aggregate',
+        composite: [
+            'browser-core',
+            'router-production',
+            'release-artifact',
+            'static-delivery',
+            'cdn-policy',
+            'content-addressed-assets',
+            'site-delivery',
+            'production-test',
+            'production-observability',
+            'official-dogfood',
+        ],
+    },
 };
 
 /** Default suite for `pnpm verify` (no args) / `pnpm verify --all`. */
@@ -160,6 +251,7 @@ export const CHECK_ALL = [
     'lifetime',
     'write-barrier-suite',
     'async-graph',
+    'motion-ir',
     'resume',
     'event-flow',
     'test-protocol',
@@ -185,4 +277,5 @@ export const CHECK_ALL = [
     'application-dev',
     'style-theme',
     'ui-automation',
+    'ui7',
 ];

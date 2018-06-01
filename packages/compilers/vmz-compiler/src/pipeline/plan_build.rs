@@ -2,7 +2,7 @@
 //!
 //! Plan nodes share BindingId / RegionId with ViewView — not a competing IR.
 
-use vmz_types::{ExecutionPlan, PlanNode, PlanStatus, ViewNode, ViewStatus, ViewView};
+use vmz_types::{ExecutionPlan, PLAN_SCHEMA, PlanNode, PlanStatus, ViewNode, ViewStatus, ViewView};
 
 /// Derive a shared Execution Plan from Native View roots.
 pub fn build_execution_plan(view: &ViewView) -> ExecutionPlan {
@@ -17,7 +17,7 @@ pub fn build_execution_plan(view: &ViewView) -> ExecutionPlan {
         root_ids.push(id);
     }
     append_dispose_nodes(view, &mut nodes, &mut next_id);
-    ExecutionPlan { status: PlanStatus::Partial, root_ids, nodes }
+    ExecutionPlan { schema: PLAN_SCHEMA.into(), status: PlanStatus::Partial, root_ids, nodes }
 }
 
 /// one `dispose_region` plan node per if/each LifetimeRegion (same RegionId).
@@ -49,7 +49,7 @@ fn append_dispose_nodes(view: &ViewView, out: &mut Vec<PlanNode>, next_id: &mut 
                     collect(c, seen);
                 }
             }
-            ViewNode::Text(_) | ViewNode::Interp { .. } => {}
+            ViewNode::Text { .. } | ViewNode::Interp { .. } => {}
         }
     }
     for root in &view.roots {
@@ -85,7 +85,7 @@ fn push_node(node: &ViewNode, out: &mut Vec<PlanNode>, next_id: &mut u32) -> u32
     });
 
     let built = match node {
-        ViewNode::Text(_) => PlanNode {
+        ViewNode::Text { .. } => PlanNode {
             id,
             kind: "text".into(),
             binding: None,

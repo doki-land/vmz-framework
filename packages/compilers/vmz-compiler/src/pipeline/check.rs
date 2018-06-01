@@ -5,7 +5,9 @@ use crate::analyze::analyze_script;
 use crate::diagnostic::{ReportedDiagnostic, Severity};
 use crate::project::discover_vmz_files;
 use crate::reactive_build::build_program_module_with_server;
+use crate::secrets::{collect_client_boundary_findings, collect_secret_requirements};
 use crate::server_calls::collect_server_class_calls;
+use crate::server_slice::ServerSliceProof;
 use crate::sfc::{ScriptKind, parse_vmz};
 use crate::template::{AttrValue, TemplateIr, TemplateNode, parse_template};
 use crate::virtual_server;
@@ -14,6 +16,9 @@ use vmz_types::ServerAttach;
 #[derive(Debug, Default, Clone)]
 pub struct CheckOptions {
     pub deny_warnings: bool,
+    /// When true, units whose server slice is not browser-safe fail check
+    /// (Delivery Profile requested browser sink of server capabilities).
+    pub require_browser_safe_server_slices: bool,
 }
 
 #[derive(Debug, Default)]
@@ -39,8 +44,7 @@ pub fn check_path(path: impl AsRef<Path>, options: &CheckOptions) -> crate::Resu
     let path = path.as_ref();
     if path.is_file() {
         let mut report = CheckReport::default();
-        check_file(path, &mut report);
-        let _ = options;
+        check_file(path, &mut report, options);
         return Ok(report);
     }
     check_project(path, options)
@@ -49,8 +53,37 @@ pub fn check_path(path: impl AsRef<Path>, options: &CheckOptions) -> crate::Resu
 pub fn check_project(root: impl AsRef<Path>, options: &CheckOptions) -> crate::Result<CheckReport> {
     let root = root.as_ref();
     let mut report = CheckReport::default();
-    for (path, _) in discover_vmz_files(root) {
-        check_file(&path, &mut report);
+    let mut page_units: Vec<(std::path::PathBuf, crate::sfc::ParsedVmz, String, String)> =
+        Vec::new();
+    let src_root = if root.join("src").is_dir() { root.join("src") } else { root.to_path_buf() };
+    for (path, kind) in discover_vmz_files(root) {
+        check_file(&path, &mut report, options);
+        if kind == crate::project::VmzModuleKind::Page {
+            if let Ok(source) = fs::read_to_string(&path) {
+                if let Ok(parsed) = parse_vmz(&path, source) {
+                    let client = analyze_script(ScriptKind::Client, &parsed.client.content);
+                    let chunk_id = crate::affected::chunk_id_for(&src_root, &path);
+                    page_units.push((path, parsed, client.decl.name, chunk_id));
+                }
+            }
+        }
+    }
+    match crate::pipeline::link::collect_route_table(&page_units) {
+        Ok(table) => {
+            for (path, parsed, _, _) in &page_units {
+                let ir = parse_template(&parsed.template.content);
+                for err in crate::pipeline::link::check_template_links(&ir, &table) {
+                    report
+                        .diagnostics
+                        .push(ReportedDiagnostic::error(path, format!("<Link>: {err}")));
+                }
+            }
+        }
+        Err(errs) => {
+            for e in errs {
+                report.diagnostics.push(ReportedDiagnostic::error(root, e));
+            }
+        }
     }
     let designs = crate::designs::load_designs(root);
     report.diagnostics.extend(designs.diagnostics.clone());
@@ -61,7 +94,7 @@ pub fn check_project(root: impl AsRef<Path>, options: &CheckOptions) -> crate::R
     Ok(report)
 }
 
-fn check_file(path: &Path, report: &mut CheckReport) {
+fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
     report.files_checked += 1;
     let source = match fs::read_to_string(path) {
         Ok(s) => s,
@@ -110,6 +143,14 @@ fn check_file(path: &Path, report: &mut CheckReport) {
         }
     }
 
+    for finding in collect_client_boundary_findings(&parsed.client.content) {
+        report.diagnostics.push(ReportedDiagnostic::error_at(
+            path,
+            format!("{}: {}", finding.code, finding.message),
+            finding.span,
+        ));
+    }
+
     let ir = parse_template(&parsed.template.content);
     check_each_keys(path, &ir, report);
 
@@ -125,11 +166,16 @@ fn check_file(path: &Path, report: &mut CheckReport) {
         let server = analyze_script(ScriptKind::Server, &server_block.content);
         let module_id = virtual_server::id_from_src_path(&src_root, path);
         let client_calls = collect_server_class_calls(&parsed.client.content, &server.decl.name);
+        let mut secret_requirements = collect_secret_requirements(&server_block.content);
+        for s in &mut secret_requirements {
+            s.module_id = Some(module_id.clone());
+        }
         ServerAttach {
             module_id,
             class_name: server.decl.name.clone(),
             methods: server.decl.methods.clone(),
             client_calls,
+            secret_requirements,
         }
     });
     let program = build_program_module_with_server(
@@ -137,6 +183,7 @@ fn check_file(path: &Path, report: &mut CheckReport) {
         &client.decl,
         &ir,
         server_attach.as_ref(),
+        None,
     );
     for unit in &program.units {
         for u in &unit.graph.unknowns {
@@ -147,6 +194,12 @@ fn check_file(path: &Path, report: &mut CheckReport) {
                     u.field, u.via, u.reason
                 ),
             ));
+        }
+        if options.require_browser_safe_server_slices {
+            let proof = ServerSliceProof::prove(&unit.server);
+            if let Some(msg) = proof.sink_refusal_message(unit.server.class_name.as_deref()) {
+                report.diagnostics.push(ReportedDiagnostic::error(path, msg));
+            }
         }
     }
 }

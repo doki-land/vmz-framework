@@ -1,0 +1,40 @@
+{
+    "entries": [
+        {
+            "key": { "path": ["density", "control", "padding-y"] },
+            "value": "0.55rem"
+        },
+        {
+            "key": { "path": ["density", "control", "padding-x"] },
+            "value": "0.95rem"
+        },
+        {
+            "key": { "path": ["density", "control", "gap"] },
+            "value": "0.75rem"
+        },
+        {
+            "key": { "path": ["density", "compact", "padding-y"] },
+            "value": "0.35rem"
+        },
+        {
+            "key": { "path": ["density", "compact", "padding-x"] },
+            "value": "0.65rem"
+        },
+        {
+            "key": { "path": ["density", "compact", "gap"] },
+            "value": "0.45rem"
+        },
+        {
+            "key": { "path": ["density", "dense", "padding-y"] },
+            "value": "0.2rem"
+        },
+        {
+            "key": { "path": ["density", "dense", "padding-x"] },
+            "value": "0.45rem"
+        },
+        {
+            "key": { "path": ["density", "dense", "gap"] },
+            "value": "0.3rem"
+        }
+    ]
+}

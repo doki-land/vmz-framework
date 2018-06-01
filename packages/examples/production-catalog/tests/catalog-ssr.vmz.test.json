@@ -1,0 +1,50 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "production.catalog.ssr.list",
+    "title": "production catalog: CatalogList SSR hydrate + write patch (nested ProductRow)",
+    "modes": ["ssr"],
+    "program": {
+        "chunkId": "components/CatalogList",
+        "unitName": "CatalogList",
+        "components": {
+            "ProductRow": "components/ProductRow"
+        }
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "hydrate",
+            "props": {}
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "write",
+            "field": "selected",
+            "value": "Alpha"
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "flush"
+        }
+    ],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "html",
+            "expect": {
+                "contains": "Alpha"
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "text",
+            "expect": {
+                "contains": "selected: Alpha"
+            }
+        }
+    ]
+}

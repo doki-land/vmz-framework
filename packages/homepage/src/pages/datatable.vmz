@@ -1,0 +1,162 @@
+<template>
+  <div data-dogfood="datatable" data-density="compact">
+    <ConsoleShell
+      brand="VMZ"
+      homeHref="/"
+      title="DataTable"
+      navLabel="Console"
+      nav={navItems}
+    >
+      <Alert
+        tone="info"
+        roleName="status"
+        title="DataTable thin gate"
+        description="Ordinary HTML table with parent-owned selection + sticky header. Large-grid package is separate."
+      />
+
+      <p data-dogfood="datatable-state">
+        selected:{selectedAttr || 'none'};count:{selectedCount};sort:{sortKey}:{sortDir};detail:{detailId || 'none'}
+      </p>
+
+      <BulkActions label="Bulk actions" selectedCount={selectedCount} countLabel={bulkLabel}>
+        <Button type="button" variant="secondary" onClick={() => this.clearSelection()}>Clear</Button>
+      </BulkActions>
+
+      <DataTable
+        columns={columns}
+        rows={rows}
+        hasRowAction={rowAction}
+        actionTitle="Detail"
+        actionLabel="Open"
+        sortKey={sortKey}
+        sortDir={sortDir}
+        selectedCount={selectedCountLabel}
+        allSelected={allSelected}
+        selectAllLabel="Select all visible rows"
+        onSort={(id) => this.sortBy(id)}
+        onToggleRow={(id) => this.toggleRow(id)}
+        onToggleAll={() => this.toggleAll()}
+        onRowAction={(id) => this.openDetail(id)}
+      />
+
+      <Drawer
+        open={drawerOpen}
+        title="Row detail"
+        titleId="home-datatable-drawer-title"
+        onClose={() => (drawerOpen = false)}
+      >
+        <p data-dogfood="datatable-drawer-body">detail:{detailId}</p>
+      </Drawer>
+    </ConsoleShell>
+  </div>
+</template>
+
+<script client>
+export default class DatatablePage {
+  selectedAttr = '';
+  selectedCount = 0;
+  selectedCountLabel = '0';
+  bulkLabel = '';
+  allSelected = false;
+  sortKey = 'name';
+  sortDir = 'asc';
+  rowAction = true;
+  drawerOpen = false;
+  detailId = '';
+  columns = [
+    { id: 'name', title: 'Name' },
+    { id: 'status', title: 'Status' },
+    { id: 'owner', title: 'Owner' },
+  ];
+  baseRows = [
+    { id: 'r1', cells: ['Alpha', 'Active', 'Ops'] },
+    { id: 'r2', cells: ['Beta', 'Paused', 'Docs'] },
+    { id: 'r3', cells: ['Gamma', 'Active', 'Runtime'] },
+    { id: 'r4', cells: ['Delta', 'Draft', 'Design'] },
+    { id: 'r5', cells: ['Epsilon', 'Active', 'QA'] },
+  ];
+  rows = [
+    { id: 'r1', cells: ['Alpha', 'Active', 'Ops'], selected: false, selectedAttr: 'false', selectLabel: 'Select Alpha' },
+    { id: 'r2', cells: ['Beta', 'Paused', 'Docs'], selected: false, selectedAttr: 'false', selectLabel: 'Select Beta' },
+    { id: 'r3', cells: ['Gamma', 'Active', 'Runtime'], selected: false, selectedAttr: 'false', selectLabel: 'Select Gamma' },
+    { id: 'r4', cells: ['Delta', 'Draft', 'Design'], selected: false, selectedAttr: 'false', selectLabel: 'Select Delta' },
+    { id: 'r5', cells: ['Epsilon', 'Active', 'QA'], selected: false, selectedAttr: 'false', selectLabel: 'Select Epsilon' },
+  ];
+  navItems = [
+    { id: 'datatable', title: 'DataTable', href: '/datatable' },
+    { id: 'console', title: 'Console', href: '/console' },
+    { id: 'ui5', title: 'UI5', href: '/ui5' },
+  ];
+
+  selectedSet() {
+    return new Set(
+      String(this.selectedAttr || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+  }
+
+  refreshRows() {
+    const selected = this.selectedSet();
+    const sorted = this.baseRows.slice().sort((a, b) => {
+      const idx = this.columns.findIndex((c) => c.id === this.sortKey);
+      const ai = idx >= 0 ? String(a.cells[idx] || '') : a.id;
+      const bi = idx >= 0 ? String(b.cells[idx] || '') : b.id;
+      const cmp = ai.localeCompare(bi);
+      return this.sortDir === 'desc' ? -cmp : cmp;
+    });
+    this.rows = sorted.map((row) => {
+      const isOn = selected.has(row.id);
+      return {
+        id: row.id,
+        cells: row.cells.slice(),
+        selected: isOn,
+        selectedAttr: isOn ? 'true' : 'false',
+        selectLabel: `Select ${row.cells[0]}`,
+      };
+    });
+    this.selectedCount = selected.size;
+    this.selectedCountLabel = String(selected.size);
+    this.allSelected = this.rows.length > 0 && this.rows.every((r) => r.selected);
+    this.bulkLabel = selected.size ? `${selected.size} selected` : '';
+  }
+
+  toggleRow(id) {
+    const set = this.selectedSet();
+    if (set.has(id)) set.delete(id);
+    else set.add(id);
+    this.selectedAttr = [...set].sort().join(',');
+    this.refreshRows();
+  }
+
+  toggleAll() {
+    if (this.allSelected) {
+      this.selectedAttr = '';
+    } else {
+      this.selectedAttr = this.rows.map((r) => r.id).sort().join(',');
+    }
+    this.refreshRows();
+  }
+
+  clearSelection() {
+    this.selectedAttr = '';
+    this.refreshRows();
+  }
+
+  sortBy(id) {
+    if (this.sortKey === id) {
+      this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortKey = id;
+      this.sortDir = 'asc';
+    }
+    this.refreshRows();
+  }
+
+  openDetail(id) {
+    this.detailId = id;
+    this.drawerOpen = true;
+  }
+}
+</script>

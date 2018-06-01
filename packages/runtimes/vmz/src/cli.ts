@@ -10,15 +10,21 @@ import { HOST_PROTOCOL, createWorkspace, getProtocolVersions, resolveCoreRuntime
 import { createDevSession } from './dev-session.js';
 import { gateGlobalProjectCommand, getInvocationContext, isGlobalAllowedCommand } from './invocation.js';
 import { log } from './log.js';
+import { findAvailablePort } from './port.js';
 import { readPackageMeta, resolveWorkspaceDirs } from './resolve.js';
 import { cmdTest } from './test-cmd.js';
 import { cmdDocument } from './document-cmd.js';
 import { buildIntegratedDocuments, projectHasDocuments } from './document-integrate.js';
 import { cmdLocale } from './locale-cmd.js';
+import { emitLocaleRuntimeModules, localeHasErrors } from './locale-check.js';
 import { cmdApplication } from './application-cmd.js';
+import { cmdArtifact } from './release-cmd.js';
 import { cmdRefactor } from './refactor-cmd.js';
 import { cmdExplain } from './explain-cmd.js';
 import { resolveNativeVmzCli } from './resolve-native-cli.js';
+import { emitWebStatic } from './static-emit.js';
+import { emitSiteDelivery } from './site-delivery.js';
+import { loadVmzConfig } from './plugin-host.js';
 
 /**
  * @param {string[]} argv
@@ -67,9 +73,11 @@ export function parseArgs(argv) {
 export function printGlobalHelp() {
     console.log(`vmz — global mode (scaffold only)
 
+Install faces: @vmz/core (runtime) · @vmz/vmz (this CLI) · optional @vmz/ui / @vmz/plugin-*
+
 Three install modes:
   developer  monorepo source (packages/runtimes/vmz) — full CLI
-  project    app node_modules/@vmz/vmz (or vmz) — full CLI
+  project    app node_modules/@vmz/vmz — full CLI
   global     npm/pnpm -g — only new/init/help/version
 
 You are in global mode. Pin \`@vmz/vmz\` in the app so check/build/lsp
@@ -81,11 +89,11 @@ Usage:
   vmz help                      Show this help
 
 Project commands:
-  pnpm add -D @vmz/vmz
+  pnpm add @vmz/core && pnpm add -D @vmz/vmz
   pnpm exec vmz check
   # or: vmz new my-app && cd my-app && pnpm install
 
-If a project \`node_modules/@vmz/vmz\` (or \`vmz\`) exists, a global
+If a project \`node_modules/@vmz/vmz\` exists, a global
 \`vmz <cmd>\` re-execs that bin.
 `);
 }
@@ -104,6 +112,7 @@ Usage:
   vmz test [path] [options]     Native test discover / report
   vmz document|docs <cmd>       Project /documents domain 
   vmz application <cmd>         Application Collection / Mount 
+  vmz artifact <cmd>            Release pack / publish / rollback / diff (A3)
   vmz refactor <cmd>            DX rename plans / apply 
   vmz explain [style] <target>  DX causal explain (style Theme chain)
   vmz lsp [root] [--out-dir]    Language server (stdio; native CLI)
@@ -114,8 +123,10 @@ Usage:
 Options:
   --out-dir, -o <dir>   Output directory (default: dist)
   --release             Release build (build only)
+  --profile <name>      Delivery profile after build (web-static)
+  --origin <url>        Site origin for web-static canonical/sitemap
   --host <host>         Listen host (default: 127.0.0.1)
-  --port <port>         Listen port (default: 5173)
+  --port <port>         Listen port (dev: omit = auto from 5173; set = lock)
   --poll-ms <ms>        Dev watch poll interval (default: 300)
   --build               Build before serve
   --check               Format check-only (format)
@@ -202,6 +213,10 @@ export async function runCli(argv, opts = {}) {
         case 'applications':
         case 'app':
             return cmdApplication(rest);
+        case 'artifact':
+        case 'artifacts':
+        case 'release':
+            return cmdArtifact(rest);
         case 'refactor':
             return cmdRefactor(rest);
         case 'explain':
@@ -318,9 +333,38 @@ async function cmdBuild(args) {
             return 0;
         });
         if (code !== 0) return code;
+        const localeEmit = emitLocaleRuntimeModules(project, outDir);
+        if (!localeEmit.ok || localeHasErrors({ diagnostics: localeEmit.diagnostics })) {
+            log.diagnostics(localeEmit.diagnostics ?? []);
+            log.error('locale runtime emit failed');
+            return 1;
+        }
+        if (localeEmit.written.length) {
+            log.info(`locale runtime emit (${localeEmit.written.length} module(s))`);
+        }
         if (projectHasDocuments(project)) {
             const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
             if (!docs.ok) return 1;
+        }
+        const cfg = await loadVmzConfig(project);
+        if (cfg.delivery) {
+            log.info(`site-delivery emit ${outDir}`);
+            const site = emitSiteDelivery(outDir, cfg.delivery, {
+                siteId: cfg.application?.id || undefined,
+            });
+            log.info(`site-delivery ok (digest=${String(site.contract.contractDigest).slice(0, 12)}…)`);
+        }
+        const profile = typeof args.profile === 'string' ? args.profile : '';
+        if (profile === 'web-static') {
+            const origin = typeof args.origin === 'string' ? args.origin : undefined;
+            log.info(`web-static emit ${outDir}`);
+            const result = await emitWebStatic(outDir, { origin });
+            log.info(
+                `web-static ok (${result.htmlFiles.length} html, ${result.skipped.length} skipped, digest=${result.digest.slice(0, 12)}…)`,
+            );
+        } else if (profile) {
+            log.error(`unknown build --profile ${profile} (supported: web-static)`);
+            return 1;
         }
         return 0;
     } finally {
@@ -393,7 +437,21 @@ async function cmdDev(args) {
         outDir: typeof args['out-dir'] === 'string' ? args['out-dir'] : undefined,
     });
     const host = typeof args.host === 'string' ? args.host : '127.0.0.1';
-    const port = Number(args.port ?? 5173);
+    const portLocked = Object.prototype.hasOwnProperty.call(args, 'port');
+    let port;
+    if (portLocked) {
+        port = Number(args.port);
+        if (!Number.isFinite(port) || port <= 0) {
+            log.error(`invalid --port ${String(args.port)}`);
+            return 1;
+        }
+    } else {
+        const preferred = 5173;
+        port = await findAvailablePort(host, preferred);
+        if (port !== preferred) {
+            log.info(`port ${preferred} busy → using ${port}`);
+        }
+    }
     const pollMs = Number(args['poll-ms'] ?? 300);
 
     const ac = new AbortController();

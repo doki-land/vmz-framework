@@ -1,0 +1,132 @@
+<template>
+  <div class="vmz-ui-tabs" data-vmz-ui="tabs">
+    <div
+      class="vmz-ui-tabs__list"
+      role="tablist"
+      aria-label={label}
+      onKeyDown={onListKeyDown}
+      onClick={onListClick}
+    >
+      <button
+        each={items}
+        as="item"
+        key={item.id}
+        type="button"
+        class="vmz-ui-tabs__tab"
+        role="tab"
+        id={item.id}
+        data-vmz-tab={item.id}
+        aria-selected={selected === item.id ? 'true' : 'false'}
+        aria-controls={item.controls}
+        tabindex={selected === item.id ? 0 : -1}
+      >
+        {item.title}
+      </button>
+    </div>
+    <div
+      class="vmz-ui-tabs__panel"
+      role="tabpanel"
+      id={panelId}
+      data-vmz-tab-panel={selected}
+      aria-labelledby={selected}
+      tabindex="0"
+    >
+      <slot />
+    </div>
+  </div>
+</template>
+
+<style>
+.vmz-ui-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-width: 36rem;
+}
+
+.vmz-ui-tabs__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--vmz-action-primary-background);
+}
+
+.vmz-ui-tabs__tab {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 2px 2px 0 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  outline: none;
+}
+
+.vmz-ui-tabs__tab[aria-selected='true'] {
+  background: var(--vmz-action-primary-background);
+  color: var(--vmz-action-primary-foreground);
+}
+
+.vmz-ui-tabs__tab:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-tabs__panel {
+  min-height: 2.5rem;
+  outline: none;
+}
+
+.vmz-ui-tabs__panel:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — Tabs (UI2).
+ * Parent owns `selected` id; keyboard Left/Right/Home/End on the tablist.
+ * Panel content is the default slot (page chooses which body to show).
+ */
+export default class Tabs {
+  public label: string = 'Tabs';
+  public selected: string = '';
+  public panelId: string = '';
+  /** @type {{ id: string, title: string, controls?: string }[]} */
+  public items: { id: string; title: string; controls?: string }[] = [];
+  public onSelect: ((id: string) => void) | null = null;
+
+  select(id) {
+    if (typeof this.onSelect === 'function') this.onSelect(id);
+  }
+
+  onListClick(ev) {
+    const t = ev && ev.target;
+    const el =
+      t && typeof t.closest === 'function' ? t.closest('[data-vmz-tab]') : null;
+    const id = el && typeof el.getAttribute === 'function' ? el.getAttribute('data-vmz-tab') : null;
+    if (id) this.select(id);
+  }
+
+  onListKeyDown(ev) {
+    if (!ev || !this.items?.length) return;
+    const ids = this.items.map((it) => it.id);
+    const idx = Math.max(0, ids.indexOf(this.selected));
+    let next = idx;
+    if (ev.key === 'ArrowRight') next = (idx + 1) % ids.length;
+    else if (ev.key === 'ArrowLeft') next = (idx - 1 + ids.length) % ids.length;
+    else if (ev.key === 'Home') next = 0;
+    else if (ev.key === 'End') next = ids.length - 1;
+    else return;
+    ev.preventDefault();
+    this.select(ids[next]);
+    const root = this.__vmzDomRoot;
+    const btn =
+      root && typeof root.querySelector === 'function'
+        ? root.querySelector(`[data-vmz-tab="${ids[next]}"]`)
+        : null;
+    if (btn && typeof btn.focus === 'function') btn.focus();
+  }
+}
+</script>

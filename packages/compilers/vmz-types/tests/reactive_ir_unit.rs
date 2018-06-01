@@ -21,10 +21,15 @@ fn module_json_contains_stable_paths() {
     let reads = vec![b.from_dep_key(&DepKey::path(DepPath::prop("user", "name"))).unwrap()];
     let expr = b.intern_expr("user.name");
     b.add_binding(BindingKind::Text, reads, None, Some(expr), None);
-    let module = ReactiveModule { source: "src/Card.vmz".into(), components: vec![b.finish()] };
+    let module = ReactiveModule {
+        schema: REACTIVE_SCHEMA.into(),
+        source: "src/Card.vmz".into(),
+        components: vec![b.finish()],
+    };
     let json = module.to_json();
     assert!(json.contains("user.name"), "{json}");
-    assert!(json.contains("\"kind\": \"static_path\""), "{json}");
+    assert!(json.contains("\"static_path\""), "{json}");
+    assert!(json.contains(REACTIVE_SCHEMA), "{json}");
 }
 
 #[test]
@@ -44,10 +49,14 @@ fn list_item_stable_and_json() {
         path.to_stable_string(&c.state_slots, &c.properties, &c.exprs),
         "tags[key=tag.id].label"
     );
-    let module = ReactiveModule { source: "TagList.vmz".into(), components: vec![c] };
+    let module = ReactiveModule {
+        schema: REACTIVE_SCHEMA.into(),
+        source: "TagList.vmz".into(),
+        components: vec![c],
+    };
     let json = module.to_json();
-    assert!(json.contains("\"kind\": \"list_item\""), "{json}");
-    assert!(json.contains("tags[key=tag.id].label"), "{json}");
+    assert!(json.contains("\"list_item\""), "{json}");
+    assert!(json.contains("\"text\": \"tag.id\""), "{json}");
 }
 
 #[test]
@@ -57,7 +66,10 @@ fn dynamic_path_from_index_and_leaf() {
     b.add_field("selected", FieldKind::State);
     let key = DepKey::path(DepPath {
         root: "items".into(),
-        segs: vec![PathSeg::DynIndex("selected".into()), PathSeg::Ident("label".into())],
+        segments: vec![
+            PathSegment::DynamicIndex("selected".into()),
+            PathSegment::Ident("label".into()),
+        ],
     });
     let path = b.from_dep_key(&key).unwrap();
     let c = b.finish();
@@ -89,11 +101,11 @@ fn multi_segment_dynamic_path_from_dep_key() {
     b.add_field("ci", FieldKind::State);
     let key = DepKey::path(DepPath {
         root: "rows".into(),
-        segs: vec![
-            PathSeg::DynIndex("ri".into()),
-            PathSeg::Ident("cells".into()),
-            PathSeg::DynIndex("ci".into()),
-            PathSeg::Ident("value".into()),
+        segments: vec![
+            PathSegment::DynamicIndex("ri".into()),
+            PathSegment::Ident("cells".into()),
+            PathSegment::DynamicIndex("ci".into()),
+            PathSegment::Ident("value".into()),
         ],
     });
     let path = b.from_dep_key(&key).unwrap();

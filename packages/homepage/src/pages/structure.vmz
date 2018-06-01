@@ -1,0 +1,258 @@
+<template>
+  <div data-dogfood="structure">
+    <AppShell brand="VMZ" homeHref="/" navLabel="Structure" nav={navItems}>
+      <Alert
+        tone="info"
+        roleName="status"
+        title="Structure composition"
+        description="Accordion / Steps / List / Tree — parent owns open, current, selection, and expand state."
+      />
+
+      <p data-dogfood="structure-state">
+        faq:{faqOpen || 'none'};step:{stepCurrent};list:{listSelected || 'none'};tree:{treeSelected || 'none'};expanded:{treeExpandedAttr}
+      </p>
+
+      <Card title="Accordion" description="Exclusive open; toggle same id closes.">
+        <Accordion
+          label="FAQ"
+          openId={faqOpen}
+          items={faqItems}
+          onToggle={(id) => this.onFaqToggle(id)}
+        />
+      </Card>
+
+      <Card title="Steps" description="Parent owns current id and status flags.">
+        <Steps label="Onboarding" current={stepCurrent} items={stepItems} />
+        <div class="vmz-structure-actions">
+          <Button type="button" variant="secondary" onClick={() => this.stepBack()}>Back</Button>
+          <Button type="button" onClick={() => this.stepNext()}>Next</Button>
+        </div>
+      </Card>
+
+      <Card title="List" description="Selectable listbox; Arrow/Home/End.">
+        <List
+          label="Teams"
+          labelId="home-structure-list-label"
+          selected={listSelected}
+          items={listItems}
+          onSelect={(id) => this.onListSelect(id)}
+        />
+      </Card>
+
+      <Card title="Tree" description="Flat visible rows; parent expands/collapses.">
+        <Tree
+          label="Repos"
+          labelId="home-structure-tree-label"
+          selected={treeSelected}
+          items={treeItems}
+          onSelect={(id) => this.onTreeSelect(id)}
+          onToggle={(id) => this.onTreeToggle(id)}
+        />
+      </Card>
+    </AppShell>
+  </div>
+</template>
+
+<style>
+.vmz-structure-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.75rem;
+  margin-top: 0.75rem;
+}
+</style>
+
+<script client>
+export default class StructurePage {
+  faqOpen = 'billing';
+  stepCurrent = 'account';
+  listSelected = 'alpha';
+  treeSelected = 'platform';
+  treeExpandedAttr = 'platform';
+
+  navItems = [
+    { id: 'structure', title: 'Structure', href: '/structure' },
+    { id: 'ui6', title: 'UI6', href: '/ui6' },
+    { id: 'form', title: 'Form', href: '/form' },
+    { id: 'console', title: 'Console', href: '/console' },
+  ];
+
+  faqItems = [
+    {
+      id: 'billing',
+      title: 'Billing',
+      body: 'Invoices land on the first of each month.',
+      triggerId: 'home-faq-billing-trigger',
+      panelId: 'home-faq-billing-panel',
+    },
+    {
+      id: 'access',
+      title: 'Access',
+      body: 'Invite teammates from the workspace settings page.',
+      triggerId: 'home-faq-access-trigger',
+      panelId: 'home-faq-access-panel',
+    },
+    {
+      id: 'support',
+      title: 'Support',
+      body: 'Open a ticket from the console help drawer.',
+      triggerId: 'home-faq-support-trigger',
+      panelId: 'home-faq-support-panel',
+    },
+  ];
+
+  listItems = [
+    { id: 'alpha', title: 'Alpha Platform' },
+    { id: 'beta', title: 'Beta Ops' },
+    { id: 'gamma', title: 'Gamma Docs' },
+  ];
+
+  stepItems = [
+    { id: 'account', index: '1', title: 'Account', description: 'Verify work email', status: 'current' },
+    { id: 'workspace', index: '2', title: 'Workspace', description: 'Name the project', status: 'upcoming' },
+    { id: 'invite', index: '3', title: 'Invite', description: 'Add teammates', status: 'upcoming' },
+  ];
+
+  treeItems = [
+    {
+      id: 'platform',
+      title: 'Platform',
+      depth: '0',
+      expandable: true,
+      expanded: true,
+      expandedAttr: 'true',
+      twistLabel: 'Collapse Platform',
+      padStyle: 'padding-inline-start: 0.35rem',
+    },
+    {
+      id: 'runtime',
+      title: 'Runtime',
+      depth: '1',
+      expandable: true,
+      expanded: false,
+      expandedAttr: 'false',
+      twistLabel: 'Expand Runtime',
+      padStyle: 'padding-inline-start: 1.25rem',
+    },
+    {
+      id: 'ui',
+      title: 'UI kit',
+      depth: '1',
+      expandable: false,
+      expanded: false,
+      expandedAttr: '',
+      twistLabel: '',
+      padStyle: 'padding-inline-start: 1.25rem',
+    },
+    {
+      id: 'docs',
+      title: 'Documents',
+      depth: '0',
+      expandable: true,
+      expanded: false,
+      expandedAttr: 'false',
+      twistLabel: 'Expand Documents',
+      padStyle: 'padding-inline-start: 0.35rem',
+    },
+  ];
+
+  onFaqToggle(id) {
+    this.faqOpen = this.faqOpen === id ? '' : id;
+  }
+
+  refreshSteps() {
+    const ids = ['account', 'workspace', 'invite'];
+    const cur = ids.indexOf(this.stepCurrent);
+    this.stepItems = [
+      {
+        id: 'account',
+        index: '1',
+        title: 'Account',
+        description: 'Verify work email',
+        status: cur > 0 ? 'done' : cur === 0 ? 'current' : 'upcoming',
+      },
+      {
+        id: 'workspace',
+        index: '2',
+        title: 'Workspace',
+        description: 'Name the project',
+        status: cur > 1 ? 'done' : cur === 1 ? 'current' : 'upcoming',
+      },
+      {
+        id: 'invite',
+        index: '3',
+        title: 'Invite',
+        description: 'Add teammates',
+        status: cur > 2 ? 'done' : cur === 2 ? 'current' : 'upcoming',
+      },
+    ];
+  }
+
+  stepBack() {
+    const ids = ['account', 'workspace', 'invite'];
+    const idx = Math.max(0, ids.indexOf(this.stepCurrent) - 1);
+    this.stepCurrent = ids[idx];
+    this.refreshSteps();
+  }
+
+  stepNext() {
+    const ids = ['account', 'workspace', 'invite'];
+    const idx = Math.min(ids.length - 1, ids.indexOf(this.stepCurrent) + 1);
+    this.stepCurrent = ids[idx];
+    this.refreshSteps();
+  }
+
+  onListSelect(id) {
+    this.listSelected = id;
+  }
+
+  onTreeSelect(id) {
+    this.treeSelected = id;
+  }
+
+  expandedSet() {
+    return new Set(
+      String(this.treeExpandedAttr || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+  }
+
+  refreshTree() {
+    const expanded = this.expandedSet();
+    const rows = [];
+    const push = (id, title, depth, children) => {
+      const expandable = !!(children && children.length);
+      const isOpen = expanded.has(id);
+      rows.push({
+        id,
+        title,
+        depth: String(depth),
+        expandable,
+        expanded: isOpen,
+        expandedAttr: expandable ? (isOpen ? 'true' : 'false') : '',
+        twistLabel: isOpen ? `Collapse ${title}` : `Expand ${title}`,
+        padStyle: `padding-inline-start: ${0.35 + depth * 0.9}rem`,
+      });
+      if (expandable && isOpen) {
+        for (const child of children) push(child.id, child.title, depth + 1, child.children || []);
+      }
+    };
+    push('platform', 'Platform', 0, [
+      { id: 'runtime', title: 'Runtime', children: [{ id: 'browser', title: 'Browser' }] },
+      { id: 'ui', title: 'UI kit' },
+    ]);
+    push('docs', 'Documents', 0, [{ id: 'guide', title: 'Guide' }]);
+    this.treeItems = rows;
+  }
+
+  onTreeToggle(id) {
+    const set = this.expandedSet();
+    if (set.has(id)) set.delete(id);
+    else set.add(id);
+    this.treeExpandedAttr = [...set].sort().join(',');
+    this.refreshTree();
+  }
+}
+</script>

@@ -1,0 +1,114 @@
+<template>
+  <div data-dogfood="motion">
+    <h1>Motion lab</h1>
+    <p>Ordinary homepage route dogfooding Motion continuity + exit + interrupt/cancel + SSR resume adopt.</p>
+
+    <section data-dogfood="motion-feedback">
+      <Button type="button" onClick={() => (clicks += 1)}>Pulse</Button>
+      <p data-dogfood="motion-clicks">clicks:{clicks}</p>
+    </section>
+
+    <section data-dogfood="motion-overlay">
+      <Button type="button" onClick={() => (dialogOpen = true)}>Open dialog</Button>
+      <Dialog
+        open={dialogOpen}
+        title="Motion dialog"
+        titleId="home-motion-dialog-title"
+        onClose={() => (dialogOpen = false)}
+      >
+        <p data-dogfood="motion-dialog-body">Overlay enter/exit uses motion.overlay tokens.</p>
+      </Dialog>
+      <Button type="button" onClick={() => (drawerOpen = true)}>Open drawer</Button>
+      <Drawer
+        open={drawerOpen}
+        title="Motion drawer"
+        titleId="home-motion-drawer-title"
+        onClose={() => (drawerOpen = false)}
+      >
+        <p data-dogfood="motion-drawer-body">Drawer enter/exit uses motion.overlay tokens.</p>
+      </Drawer>
+    </section>
+
+    <section data-dogfood="motion-interrupt">
+      <p data-dogfood="motion-interrupt-state">
+        interrupt-dialog:{interruptDialogOpen ? 'open' : 'closed'}
+      </p>
+      <Button type="button" onClick={() => this.openInterruptDialog()}>Open interrupt dialog</Button>
+      <Dialog
+        open={interruptDialogOpen}
+        title="Interrupt dialog"
+        titleId="home-motion-interrupt-dialog-title"
+        onClose={() => this.onInterruptDialogClose()}
+      >
+        <p data-dogfood="motion-interrupt-body">
+          Escape starts exit; Escape again cancels exit (motion generation / cancel edge).
+        </p>
+      </Dialog>
+    </section>
+
+    <section data-dogfood="motion-resume">
+      <p data-dogfood="motion-resume-state">ssr-dialog:{ssrDialogOpen ? 'open' : 'closed'}</p>
+      <Button type="button" onClick={() => (ssrDialogOpen = true)}>Reopen SSR dialog</Button>
+      <Dialog
+        open={ssrDialogOpen}
+        title="SSR resume dialog"
+        titleId="home-motion-ssr-dialog-title"
+        onClose={() => (ssrDialogOpen = false)}
+      >
+        <p data-dogfood="motion-resume-body">SSR-stable overlay — resume keeps enter from replaying.</p>
+      </Dialog>
+    </section>
+
+    <section data-dogfood="motion-list">
+      <Button type="button" onClick={() => this.filterAlpha()}>Filter Alpha</Button>
+      <Button type="button" onClick={() => this.resetRows()}>Reset rows</Button>
+      <Table columns={columns} rows={rows} hasRowAction={rowAction} />
+      <p data-dogfood="motion-row-count">rows:{rowCount}</p>
+    </section>
+  </div>
+</template>
+
+<script client>
+export default class MotionPage {
+  clicks = 0;
+  dialogOpen = false;
+  drawerOpen = false;
+  interruptDialogOpen = false;
+  /** Open on first paint so SSR HTML includes the overlay for resume-adopt proof. */
+  ssrDialogOpen = true;
+  rowCount = 3;
+  rowAction = false;
+  columns = [
+    { id: 'name', title: 'Name' },
+    { id: 'status', title: 'Status' },
+  ];
+  allRows = [
+    { id: 'r1', cells: ['Alpha', 'Active'] },
+    { id: 'r2', cells: ['Beta', 'Paused'] },
+    { id: 'r3', cells: ['Gamma', 'Active'] },
+  ];
+  rows = [
+    { id: 'r1', cells: ['Alpha', 'Active'] },
+    { id: 'r2', cells: ['Beta', 'Paused'] },
+    { id: 'r3', cells: ['Gamma', 'Active'] },
+  ];
+
+  openInterruptDialog() {
+    this.interruptDialogOpen = true;
+  }
+
+  onInterruptDialogClose() {
+    this.interruptDialogOpen = false;
+  }
+
+  filterAlpha() {
+    this.rows = this.allRows.filter((row) => row.id === 'r1');
+    this.rowCount = this.rows.length;
+  }
+
+  resetRows() {
+    this.rows = this.allRows.slice();
+    this.rowCount = this.rows.length;
+  }
+}
+</script>

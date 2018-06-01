@@ -1,4 +1,7 @@
-# VMZ CLI
+# `@vmz/vmz` (bin: `vmz`)
+
+CLI / N-API toolchain host. Runtime mental entry is **`@vmz/core`**; optional official UI is **`@vmz/ui`**; plugins are
+**`@vmz/plugin-*`**. Shelved umbrella name: `@vmz/vmz`.
 
 When a project reaches the point where it has a browser surface, SSR, server work, documents, tests, and several
 deployment concerns, the usual workflow becomes a chain of tools that each see a different version of the application. A
@@ -22,9 +25,8 @@ With VMZ, a normal workflow is expected to answer all of these from the same sou
 - **Test:** what did a user interaction actually cause?
 - **Explain:** why did the compiler make that decision?
 
-Use it when you are adopting VMZ as the application model. It is intentionally not a compatibility compiler for
-arbitrary Vue components, React hooks, or legacy VDOM applications; those ecosystems are better served by their native
-toolchains.
+Use it when you are adopting VMZ as the application model. The CLI targets VMZ-native source and semantics; Vue, React,
+and legacy VDOM ecosystems keep their own toolchains.
 
 ## One tool, several views of the same program
 

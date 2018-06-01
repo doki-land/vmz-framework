@@ -7,6 +7,8 @@
     <nav class="site-footer__nav" aria-label="Footer">
       <a href="/d/">文档</a>
       <a href="/d/zh-hans/guide/">入门指南</a>
+      <a href="/d/zh-hans/guide/zero-cost/">Zero-Cost</a>
+      <a href="/d/zh-hans/guide/optimizations/">优化</a>
       <a href="/welcome">Welcome</a>
       <a href="/d/zh-hans/plugins/">官方插件</a>
     </nav>

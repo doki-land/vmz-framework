@@ -1,0 +1,38 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "production.catalog.compile.list",
+    "title": "production catalog: CatalogList Direct plan (no render)",
+    "modes": ["compile"],
+    "program": {
+        "chunkId": "components/CatalogList",
+        "unitName": "CatalogList"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "plan",
+            "expect": {
+                "schema": "vmz.plan.v0",
+                "status": "partial",
+                "nonEmpty": true,
+                "anyStructuralKind": true
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "graph",
+            "expect": {
+                "direct": true,
+                "create": true,
+                "plan": true,
+                "serialize": true,
+                "noRender": true
+            }
+        }
+    ]
+}

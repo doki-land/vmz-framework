@@ -83,8 +83,11 @@ pub fn run(args: Args) -> Result<()> {
         "build": "vmz build .",
         "dev": "vmz dev ."
     }},
+    "dependencies": {{
+        "@vmz/core": "{vmz_version}"
+    }},
     "devDependencies": {{
-        "vmz": "{vmz_version}"
+        "@vmz/vmz": "{vmz_version}"
     }}
 }}
 "#

@@ -1,0 +1,45 @@
+<template>
+  <div data-dogfood="ui4" data-density={density}>
+    <AppShell brand="VMZ" homeHref="/" navLabel="UI4" nav={navItems}>
+      <p data-dogfood="ui4-density">density:{density}</p>
+      <Button type="button" onClick={() => this.toggleDensity()}>Toggle density</Button>
+
+      <Card title="Status tones">
+        <Alert tone="info" roleName="status" title="Info" description="status.info tokens" />
+        <Alert tone="success" roleName="status" title="Success" description="status.success tokens" />
+        <Alert tone="warning" roleName="status" title="Warning" description="status.warning tokens" />
+        <Alert tone="danger" roleName="alert" title="Danger" description="status.danger tokens" />
+      </Card>
+
+      <Notification
+        tone="warning"
+        roleName="status"
+        title="Deploy pending"
+        description="Notification shares the status tone matrix."
+      />
+
+      <Result status="success" title="Payment complete" description="Result outcome uses status.success tokens.">
+        <Button type="button" onClick={() => (done = true)}>Continue</Button>
+      </Result>
+      <p data-dogfood="ui4-done">done:{done ? 'yes' : 'no'}</p>
+
+      <Empty title="No extras" description="UI4 still includes Empty on the Commercial Surface." />
+    </AppShell>
+  </div>
+</template>
+
+<script client>
+export default class Ui4Page {
+  density = 'comfortable';
+  done = false;
+  navItems = [
+    { id: 'ui4', title: 'UI4', href: '/ui4' },
+    { id: 'commercial', title: 'Commercial', href: '/commercial' },
+    { id: 'motion', title: 'Motion', href: '/motion' },
+  ];
+
+  toggleDensity() {
+    this.density = this.density === 'compact' ? 'comfortable' : 'compact';
+  }
+}
+</script>

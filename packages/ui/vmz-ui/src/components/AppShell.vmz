@@ -1,0 +1,97 @@
+<template>
+  <div class="vmz-ui-app-shell" data-vmz-ui="app-shell">
+    <header class="vmz-ui-app-shell__header" data-vmz-shell="header">
+      <a class="vmz-ui-app-shell__brand" href={homeHref}>{brand}</a>
+      <nav class="vmz-ui-app-shell__nav" aria-label={navLabel}>
+        <a each={nav} as="item" key={item.id} href={item.href} data-vmz-nav={item.id}>
+          {item.title}
+        </a>
+      </nav>
+    </header>
+    <main class="vmz-ui-app-shell__main" data-vmz-shell="main">
+      <slot />
+    </main>
+  </div>
+</template>
+
+<style>
+.vmz-ui-app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  color: var(--vmz-text-ink);
+  background: transparent;
+}
+
+.vmz-ui-app-shell__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  padding: 0.9rem clamp(1rem, 3vw, 1.75rem);
+  border-bottom: 1px solid var(--vmz-line-default);
+  box-shadow: inset 0 -2px 0 var(--vmz-action-primary-background);
+  background: color-mix(in srgb, var(--vmz-surface-paper) 92%, transparent);
+}
+
+.vmz-ui-app-shell__brand {
+  font-family: var(--vmz-font-display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  letter-spacing: 0.03em;
+  text-decoration: none;
+  color: var(--vmz-action-primary-background);
+}
+
+.vmz-ui-app-shell__brand:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-app-shell__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1rem;
+}
+
+.vmz-ui-app-shell__nav a {
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--vmz-text-steel);
+}
+
+.vmz-ui-app-shell__nav a:hover {
+  color: var(--vmz-action-primary-active);
+}
+
+.vmz-ui-app-shell__nav a:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-app-shell__main {
+  flex: 1;
+  width: min(68rem, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 1.5rem 1rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — AppShell (Commercial composition).
+ * Landmark header/nav + main slot. Parent supplies nav items; no private theme.
+ */
+export default class AppShell {
+  public brand: string = 'VMZ';
+  public homeHref: string = '/';
+  public navLabel: string = 'Primary';
+  /** @type {{ id: string, title: string, href: string }[]} */
+  public nav: { id: string; title: string; href: string }[] = [];
+}
+</script>

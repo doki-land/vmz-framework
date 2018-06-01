@@ -1,4 +1,4 @@
-﻿/**
+/**
  * gate: fixture contributions validated by Rust; no VPG mutation;
  * Program IR still emitted by core.
  *

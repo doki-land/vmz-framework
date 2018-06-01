@@ -10,6 +10,9 @@
         "build": "vmz build .",
         "test": "vmz test ."
     },
+    "dependencies": {
+        "@vmz/core": "workspace:*"
+    },
     "devDependencies": {
         "vmz": "workspace:*"
     }

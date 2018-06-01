@@ -1,0 +1,158 @@
+<template>
+  <div data-dogfood="console">
+    <ConsoleShell
+      brand="VMZ"
+      homeHref="/"
+      title="Operations"
+      navLabel="Console"
+      nav={navItems}
+    >
+      <FilterBar label="Query">
+        <Field
+          label="Name contains"
+          controlId="home-console-query"
+          descriptionId="home-console-query-desc"
+          errorId="home-console-query-err"
+          describedBy="home-console-query-desc"
+          value={query}
+          onInput={(e) => (query = e.target.value)}
+        />
+        <Button type="button" onClick={() => this.applyFilter()}>Apply</Button>
+        <Button type="button" onClick={() => this.selectVisible()}>Select visible</Button>
+      </FilterBar>
+
+      <p data-dogfood="console-query">query:{query}</p>
+
+      <BulkActions
+        label="Bulk actions"
+        selectedCount={selectedCount}
+        countLabel={bulkLabel}
+      />
+      <Button type="button" onClick={() => (selectedCount = 0)}>Clear selection</Button>
+
+      <Table
+        columns={columns}
+        rows={rows}
+        hasRowAction={rowAction}
+        actionTitle="Detail"
+        actionLabel="Open"
+        onRowAction={(id) => this.openDetail(id)}
+      />
+
+      <Pagination
+        label="Rows"
+        status={pageStatus}
+        prevDisabled={prevDisabled}
+        nextDisabled={nextDisabled}
+        onPrev={() => this.goPrev()}
+        onNext={() => this.goNext()}
+      />
+
+      <Drawer
+        open={drawerOpen}
+        title="Row detail"
+        titleId="home-console-drawer-title"
+        onClose={() => (drawerOpen = false)}
+      >
+        <p data-dogfood="console-drawer-body">detail:{detailId}</p>
+      </Drawer>
+    </ConsoleShell>
+  </div>
+</template>
+
+<script client>
+export default class ConsolePage {
+  query = '';
+  appliedQuery = '';
+  selectedCount = 0;
+  bulkLabel = '';
+  drawerOpen = false;
+  detailId = '';
+  page = 1;
+  pageCount = 2;
+  pageStatus = 'Page 1 / 2';
+  prevDisabled = true;
+  nextDisabled = false;
+  rowAction = true;
+  columns = [
+    { id: 'name', title: 'Name' },
+    { id: 'status', title: 'Status' },
+  ];
+  allRows = [
+    { id: 'r1', cells: ['Alpha', 'Active'] },
+    { id: 'r2', cells: ['Beta', 'Paused'] },
+    { id: 'r3', cells: ['Gamma', 'Active'] },
+    { id: 'r4', cells: ['Delta', 'Draft'] },
+  ];
+  rows = [
+    { id: 'r1', cells: ['Alpha', 'Active'] },
+    { id: 'r2', cells: ['Beta', 'Paused'] },
+  ];
+  navItems = [
+    { id: 'console', title: 'Console', href: '/console' },
+    { id: 'commercial', title: 'Commercial', href: '/commercial' },
+    { id: 'ui', title: 'UI lab', href: '/ui' },
+  ];
+
+  applyFilter() {
+    this.appliedQuery = this.query;
+    const q = (this.query || '').trim().toLowerCase();
+    const filtered = !q
+      ? this.allRows.slice()
+      : this.allRows.filter((row) =>
+          row.cells.some((cell) => String(cell).toLowerCase().includes(q)),
+        );
+    this.pageCount = Math.max(1, Math.ceil(filtered.length / 2) || 1);
+    this.page = 1;
+    this.refreshPage(filtered);
+    this.clearSelection();
+  }
+
+  filteredRows() {
+    const q = (this.appliedQuery || '').trim().toLowerCase();
+    if (!q) return this.allRows.slice();
+    return this.allRows.filter((row) =>
+      row.cells.some((cell) => String(cell).toLowerCase().includes(q)),
+    );
+  }
+
+  refreshPage(source) {
+    const list = source || this.filteredRows();
+    this.pageCount = Math.max(1, Math.ceil(list.length / 2) || 1);
+    if (this.page > this.pageCount) this.page = this.pageCount;
+    if (this.page < 1) this.page = 1;
+    const start = (this.page - 1) * 2;
+    this.rows = list.slice(start, start + 2);
+    this.pageStatus = `Page ${this.page} / ${this.pageCount}`;
+    this.prevDisabled = this.page <= 1;
+    this.nextDisabled = this.page >= this.pageCount;
+  }
+
+  goPrev() {
+    if (this.page <= 1) return;
+    this.page -= 1;
+    this.refreshPage();
+  }
+
+  goNext() {
+    if (this.page >= this.pageCount) return;
+    this.page += 1;
+    this.refreshPage();
+  }
+
+  selectVisible() {
+    this.selectedCount = this.rows.length;
+    this.bulkLabel = `${this.selectedCount} selected`;
+  }
+
+  clearSelection() {
+    this.selectedCount = 0;
+    this.bulkLabel = '';
+  }
+
+  openDetail(id) {
+    this.detailId = id;
+    this.drawerOpen = true;
+  }
+}
+</script>

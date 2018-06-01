@@ -1,0 +1,17 @@
+{
+    "name": "@vmz-examples/production-router",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "check": "vmz check .",
+        "build": "vmz build .",
+        "test": "vmz test ."
+    },
+    "dependencies": {
+        "@vmz/core": "workspace:*"
+    },
+    "devDependencies": {
+        "vmz": "workspace:*"
+    }
+}

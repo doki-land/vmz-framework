@@ -9,12 +9,17 @@ use vmz_types::{
 
 use crate::emit::{attr_interp, attr_static, has_bare_attr, is_component_tag, is_event_attr};
 use crate::emit_ir::IrDepCursor;
+use crate::pipeline::link::RouteTable;
 use crate::template::{AttrValue, TemplateAttr, TemplateIr, TemplateNode};
 
 /// Lift template structure onto the Program Graph view, correlating Reactive binding ids.
-pub fn build_native_view(template: &TemplateIr, reactive: &ReactiveComponent) -> ViewView {
+pub fn build_native_view(
+    template: &TemplateIr,
+    reactive: &ReactiveComponent,
+    routes: Option<&RouteTable>,
+) -> ViewView {
     let mut cursor = IrDepCursor::new(reactive);
-    let roots = build_nodes(&template.roots, &mut cursor);
+    let roots = build_nodes(&template.roots, &mut cursor, routes);
     ViewView {
         status: ViewStatus::Native,
         binding_ids: reactive.bindings.iter().map(|b| b.id).collect(),
@@ -23,7 +28,11 @@ pub fn build_native_view(template: &TemplateIr, reactive: &ReactiveComponent) ->
     }
 }
 
-fn build_nodes(nodes: &[TemplateNode], ir: &mut IrDepCursor<'_>) -> Vec<ViewNode> {
+fn build_nodes(
+    nodes: &[TemplateNode],
+    ir: &mut IrDepCursor<'_>,
+    routes: Option<&RouteTable>,
+) -> Vec<ViewNode> {
     let mut out = Vec::new();
     let mut i = 0;
     while i < nodes.len() {
@@ -73,9 +82,11 @@ fn build_nodes(nodes: &[TemplateNode], ir: &mut IrDepCursor<'_>) -> Vec<ViewNode
                     } else {
                         &["else"]
                     };
+                    // Branch bodies may be PascalCase components (Alert / DaVinciChart) —
+                    // must not force build_element, or emit falls back to api.el("Foo").
                     view_branches.push(ViewIfBranch {
                         cond: c.clone().map(|s| sanitize(&s)),
-                        body: Box::new(build_element(node, strip, true, ir)),
+                        body: Box::new(build_branch_body(node, strip, ir, routes)),
                     });
                 }
                 out.push(ViewNode::If { region, binding, branches: view_branches });
@@ -83,48 +94,166 @@ fn build_nodes(nodes: &[TemplateNode], ir: &mut IrDepCursor<'_>) -> Vec<ViewNode
                 continue;
             }
         }
-        out.push(build_node(&nodes[i], ir));
+        out.push(build_node(&nodes[i], ir, routes));
         i += 1;
     }
     out
 }
 
-fn build_node(node: &TemplateNode, ir: &mut IrDepCursor<'_>) -> ViewNode {
+fn build_node(
+    node: &TemplateNode,
+    ir: &mut IrDepCursor<'_>,
+    routes: Option<&RouteTable>,
+) -> ViewNode {
     match node {
-        TemplateNode::Text(t) => ViewNode::Text(t.clone()),
+        TemplateNode::Text(t) => ViewNode::Text { value: t.clone() },
         TemplateNode::Interp(expr) => {
             let e = sanitize(expr);
             let binding = ir.take_binding(&[BindingKind::Text], &e).map(|t| BindingId(t.id));
             ViewNode::Interp { expr: e, binding }
         }
         TemplateNode::Element { tag, .. } => {
-            if is_component_tag(tag) {
-                build_component(node, ir)
+            if tag == "Link" {
+                build_link(node, ir, routes)
+            } else if is_component_tag(tag) {
+                build_component(node, ir, routes)
             } else if tag.eq_ignore_ascii_case("slot") {
-                build_slot(node, ir)
+                build_slot(node, ir, routes)
             } else {
-                build_element(node, &[], true, ir)
+                build_element(node, &[], true, ir, routes)
             }
         }
     }
 }
 
-fn build_component(node: &TemplateNode, ir: &mut IrDepCursor<'_>) -> ViewNode {
+/// Same-app `<Link>` lowers to `<a href>` via RouteTable. Cross-app (`application=`) stays Component.
+fn build_link(
+    node: &TemplateNode,
+    ir: &mut IrDepCursor<'_>,
+    routes: Option<&RouteTable>,
+) -> ViewNode {
     let TemplateNode::Element { tag, attrs, children } = node else {
-        return ViewNode::Text(String::new());
+        return ViewNode::Text { value: String::new() };
     };
-    let view_attrs = build_attrs(tag, attrs, &[], false, ir);
-    let kids = build_nodes(children, ir);
+    if attr_static(attrs, "application").is_some() || attr_interp(attrs, "application").is_some() {
+        return build_component(node, ir, routes);
+    }
+
+    let to = attr_static(attrs, "to");
+    let params_expr = attr_interp(attrs, "params");
+    let href = match (to.as_deref(), routes) {
+        (Some(route_id), Some(table)) => {
+            let params = match params_expr.as_deref() {
+                None => Some(std::collections::BTreeMap::new()),
+                Some(expr) => crate::pipeline::link::parse_static_link_params(expr),
+            };
+            match params {
+                Some(map) => crate::pipeline::link::resolve_link_href(route_id, &map, table).ok(),
+                None => None,
+            }
+        }
+        _ => None,
+    };
+
+    if let Some(href) = href {
+        let route_id = to.clone().unwrap_or_default();
+        let strip = ["to", "params", "search", "hash", "replace", "prefetch", "state"];
+        let mut view_attrs = build_attrs("a", attrs, &strip, false, ir);
+        view_attrs.insert(
+            0,
+            ViewAttr {
+                name: "href".into(),
+                value: ViewAttrValue::Static { value: href },
+                binding: None,
+            },
+        );
+        // Client SPA takeover: same-app Link carries stable RouteId for intercept.
+        if !route_id.is_empty() {
+            view_attrs.insert(
+                1,
+                ViewAttr {
+                    name: "data-vmz-route".into(),
+                    value: ViewAttrValue::Static { value: route_id },
+                    binding: None,
+                },
+            );
+        }
+        let kids = build_nodes(children, ir, routes);
+        return ViewNode::Element {
+            tag: "a".into(),
+            attrs: view_attrs,
+            children: kids,
+            each: None,
+        };
+    }
+
+    // Unresolved / dynamic Link — keep as Component until Route Graph covers it.
+    let _ = tag;
+    build_component(node, ir, routes)
+}
+
+fn build_branch_body(
+    node: &TemplateNode,
+    strip: &[&str],
+    ir: &mut IrDepCursor<'_>,
+    routes: Option<&RouteTable>,
+) -> ViewNode {
+    match node {
+        TemplateNode::Element { tag, .. } if tag == "Link" => {
+            // Link with if/else: strip control attrs then reuse Link lowering.
+            build_link_stripped(node, strip, ir, routes)
+        }
+        TemplateNode::Element { tag, .. } if is_component_tag(tag) => {
+            build_component_stripped(node, strip, ir, routes)
+        }
+        TemplateNode::Element { .. } => build_element(node, strip, true, ir, routes),
+        _ => build_node(node, ir, routes),
+    }
+}
+
+fn build_component(
+    node: &TemplateNode,
+    ir: &mut IrDepCursor<'_>,
+    routes: Option<&RouteTable>,
+) -> ViewNode {
+    build_component_stripped(node, &[], ir, routes)
+}
+
+fn build_component_stripped(
+    node: &TemplateNode,
+    strip: &[&str],
+    ir: &mut IrDepCursor<'_>,
+    routes: Option<&RouteTable>,
+) -> ViewNode {
+    let TemplateNode::Element { tag, attrs, children } = node else {
+        return ViewNode::Text { value: String::new() };
+    };
+    let view_attrs = build_attrs(tag, attrs, strip, false, ir);
+    let kids = build_nodes(children, ir, routes);
     ViewNode::Component { tag: tag.clone(), attrs: view_attrs, children: kids }
 }
 
-fn build_slot(node: &TemplateNode, ir: &mut IrDepCursor<'_>) -> ViewNode {
+fn build_link_stripped(
+    node: &TemplateNode,
+    strip: &[&str],
+    ir: &mut IrDepCursor<'_>,
+    routes: Option<&RouteTable>,
+) -> ViewNode {
+    let _ = strip;
+    build_link(node, ir, routes)
+}
+
+fn build_slot(
+    node: &TemplateNode,
+    ir: &mut IrDepCursor<'_>,
+    routes: Option<&RouteTable>,
+) -> ViewNode {
     let TemplateNode::Element { tag: _, attrs, children } = node else {
-        return ViewNode::Text(String::new());
+        return ViewNode::Text { value: String::new() };
     };
     let name = attr_static(attrs, "name");
     let view_attrs = build_attrs("slot", attrs, &["name"], false, ir);
-    let kids = build_nodes(children, ir);
+    let kids = build_nodes(children, ir, routes);
     ViewNode::Slot { name, attrs: view_attrs, children: kids }
 }
 
@@ -133,9 +262,10 @@ fn build_element(
     strip: &[&str],
     allow_each: bool,
     ir: &mut IrDepCursor<'_>,
+    routes: Option<&RouteTable>,
 ) -> ViewNode {
     let TemplateNode::Element { tag, attrs, children } = node else {
-        return ViewNode::Text(String::new());
+        return ViewNode::Text { value: String::new() };
     };
 
     let each_expr = if allow_each { attr_interp(attrs, "each") } else { None };
@@ -163,7 +293,7 @@ fn build_element(
     };
 
     let view_attrs = build_attrs(tag, attrs, strip, allow_each, ir);
-    let kids = build_nodes(children, ir);
+    let kids = build_nodes(children, ir, routes);
     ViewNode::Element { tag: tag.clone(), attrs: view_attrs, children: kids, each }
 }
 
@@ -218,7 +348,7 @@ fn build_attrs(
                 } else if value_text.is_empty() {
                     ViewAttrValue::Bare
                 } else {
-                    ViewAttrValue::Static(value_text)
+                    ViewAttrValue::Static { value: value_text }
                 };
                 out.push(ViewAttr { name: a.name.clone(), value, binding: None });
             }
@@ -235,7 +365,7 @@ fn build_attrs(
                 };
                 out.push(ViewAttr {
                     name: a.name.clone(),
-                    value: ViewAttrValue::Interp(se),
+                    value: ViewAttrValue::Interp { expr: se },
                     binding,
                 });
             }
@@ -244,7 +374,7 @@ fn build_attrs(
     if !tw_tokens.is_empty() && !class_seen {
         out.push(ViewAttr {
             name: "class".into(),
-            value: ViewAttrValue::Static(tw_tokens.join(" ")),
+            value: ViewAttrValue::Static { value: tw_tokens.join(" ") },
             binding: None,
         });
     }

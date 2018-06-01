@@ -9,7 +9,7 @@ replay causality against emitted program graphs, and expose the same core as **L
 | **Kind**               | **library only** (no `[[bin]]`)                                                     |
 | **Publish**            | `false` (workspace-internal)                                                        |
 | **Depends on**         | [`vmz-protocol`](../vmz-protocol/)                                                  |
-| **Must not depend on** | `vmz-compiler` (no parse / emit)                                                    |
+| **Does not depend on** | `vmz-compiler` (no parse / emit)                                                    |
 | **Process host**       | the single native binary [`vmz`](../vmz-tools/) — subcommands `vmz lsp` / `vmz mcp` |
 
 > **Not** [`vmz-inspector`](../vmz-inspector/). Inspector answers “is this legal?” Debugger answers “why did the graph

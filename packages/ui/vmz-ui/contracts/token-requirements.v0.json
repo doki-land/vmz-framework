@@ -10,8 +10,610 @@
         "Button": {
             "source": "src/components/Button.vmz",
             "stableHint": "ui.Button",
-            "tokens": ["action.primary.background", "action.primary.foreground", "action.primary.hover", "action.primary.active", "focus.ring"],
-            "surfaces": ["WebSurface"]
+            "tokens": [
+                "action.primary.background",
+                "action.primary.foreground",
+                "action.primary.hover",
+                "action.primary.active",
+                "action.secondary.background",
+                "action.secondary.foreground",
+                "action.secondary.border",
+                "action.secondary.hover",
+                "status.danger.accent",
+                "status.danger.foreground",
+                "surface.mist",
+                "text.ink",
+                "focus.ring",
+                "motion.control.duration",
+                "motion.control.easing",
+                "density.control.padding-y",
+                "density.control.padding-x",
+                "density.compact.padding-y",
+                "density.compact.padding-x",
+                "density.dense.padding-y",
+                "density.dense.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["immediate-feedback", "reduced-motion", "density-control", "variants"]
+        },
+        "Link": {
+            "source": "src/components/Link.vmz",
+            "stableHint": "ui.Link",
+            "tokens": ["action.primary.background", "action.primary.hover", "action.primary.active", "focus.ring"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["inline-navigation", "focus-visible"]
+        },
+        "Badge": {
+            "source": "src/components/Badge.vmz",
+            "stableHint": "ui.Badge",
+            "tokens": [
+                "action.primary.background",
+                "action.primary.active",
+                "surface.paper",
+                "surface.mist",
+                "text.ink",
+                "line.default",
+                "status.info.accent",
+                "status.info.foreground",
+                "status.success.accent",
+                "status.success.foreground",
+                "status.warning.accent",
+                "status.warning.foreground",
+                "status.danger.accent",
+                "status.danger.foreground"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["status-chip", "tone-matrix"]
+        },
+        "Spinner": {
+            "source": "src/components/Spinner.vmz",
+            "stableHint": "ui.Spinner",
+            "tokens": ["action.primary.background", "motion.overlay.duration", "motion.overlay.easing"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["loading-indicator", "reduced-motion"]
+        },
+        "Tooltip": {
+            "source": "src/components/Tooltip.vmz",
+            "stableHint": "ui.Tooltip",
+            "tokens": ["surface.paper", "text.ink", "line.default", "focus.ring"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["parent-owned-open", "tooltip-content"]
+        },
+        "Autocomplete": {
+            "source": "src/components/Autocomplete.vmz",
+            "stableHint": "ui.Autocomplete",
+            "tokens": [
+                "action.primary.background",
+                "status.danger.accent",
+                "status.danger.foreground",
+                "surface.paper",
+                "surface.mist",
+                "text.ink",
+                "text.steel",
+                "line.default",
+                "focus.ring",
+                "density.control.padding-y",
+                "density.control.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": [
+                "label",
+                "description",
+                "error",
+                "parent-owned-value",
+                "parent-owned-options",
+                "listbox",
+                "escape-close",
+                "no-parallel-query-store"
+            ]
+        },
+        "DatePicker": {
+            "source": "src/components/DatePicker.vmz",
+            "stableHint": "ui.DatePicker",
+            "tokens": [
+                "action.primary.background",
+                "status.danger.accent",
+                "status.danger.foreground",
+                "focus.ring",
+                "density.control.padding-y",
+                "density.control.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["label", "description", "error", "native-date", "parent-owned-value"]
+        },
+        "Upload": {
+            "source": "src/components/Upload.vmz",
+            "stableHint": "ui.Upload",
+            "tokens": ["status.danger.foreground", "text.ink", "text.steel", "font.mono", "focus.ring", "density.control.padding-y"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["label", "description", "error", "native-file", "parent-owned-filename", "no-upload-runtime"]
+        },
+        "Field": {
+            "source": "src/components/Field.vmz",
+            "stableHint": "ui.Field",
+            "tokens": [
+                "action.primary.background",
+                "status.danger.accent",
+                "status.danger.foreground",
+                "focus.ring",
+                "density.control.padding-y",
+                "density.control.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["label", "description", "error", "focus-visible", "validation-presentation"]
+        },
+        "Form": {
+            "source": "src/components/Form.vmz",
+            "stableHint": "ui.Form",
+            "tokens": [
+                "status.danger.accent",
+                "status.danger.foreground",
+                "density.control.gap",
+                "density.control.padding-y",
+                "density.control.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["submit-reset", "error-summary", "no-parallel-form-store", "novalidate"]
+        },
+        "FormItem": {
+            "source": "src/components/FormItem.vmz",
+            "stableHint": "ui.FormItem",
+            "tokens": ["status.danger.accent", "status.danger.foreground"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["label", "description", "error", "required-marker"]
+        },
+        "TextArea": {
+            "source": "src/components/TextArea.vmz",
+            "stableHint": "ui.TextArea",
+            "tokens": [
+                "action.primary.background",
+                "status.danger.accent",
+                "status.danger.foreground",
+                "focus.ring",
+                "density.control.padding-y",
+                "density.control.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["label", "description", "error", "focus-visible"]
+        },
+        "Select": {
+            "source": "src/components/Select.vmz",
+            "stableHint": "ui.Select",
+            "tokens": [
+                "action.primary.background",
+                "status.danger.accent",
+                "status.danger.foreground",
+                "focus.ring",
+                "density.control.padding-y",
+                "density.control.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["label", "description", "error", "options", "focus-visible"]
+        },
+        "RadioGroup": {
+            "source": "src/components/RadioGroup.vmz",
+            "stableHint": "ui.RadioGroup",
+            "tokens": ["action.primary.background", "status.danger.foreground", "focus.ring"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["legend", "live-value-prop", "no-parallel-form-store", "focus-visible"]
+        },
+        "Dialog": {
+            "source": "src/components/Dialog.vmz",
+            "stableHint": "ui.Dialog",
+            "tokens": [
+                "action.primary.background",
+                "action.primary.foreground",
+                "action.primary.active",
+                "focus.ring",
+                "motion.overlay.duration",
+                "motion.overlay.easing"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": [
+                "overlay-ownership",
+                "outside-dismiss",
+                "focus-enter",
+                "focus-loop",
+                "focus-restore",
+                "escape-dismiss",
+                "live-open-prop",
+                "overlay-enter-motion",
+                "overlay-exit-motion",
+                "resume-adopt-stable",
+                "reduced-motion",
+                "overlay-stacking"
+            ]
+        },
+        "Checkbox": {
+            "source": "src/components/Checkbox.vmz",
+            "stableHint": "ui.Checkbox",
+            "tokens": ["action.primary.background", "focus.ring"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["label", "live-checked-prop", "no-parallel-form-store"]
+        },
+        "Switch": {
+            "source": "src/components/Switch.vmz",
+            "stableHint": "ui.Switch",
+            "tokens": [
+                "action.primary.background",
+                "action.primary.foreground",
+                "focus.ring",
+                "motion.control.duration",
+                "motion.control.easing"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["role-switch", "live-checked-prop", "keyboard-toggle", "no-parallel-form-store", "reduced-motion"]
+        },
+        "Tabs": {
+            "source": "src/components/Tabs.vmz",
+            "stableHint": "ui.Tabs",
+            "tokens": ["action.primary.background", "action.primary.foreground", "focus.ring"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["tablist", "keyboard-roving", "live-selected-prop"]
+        },
+        "Menu": {
+            "source": "src/components/Menu.vmz",
+            "stableHint": "ui.Menu",
+            "tokens": ["action.primary.background", "action.primary.foreground", "action.primary.active", "focus.ring"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["overlay-ownership", "escape-dismiss", "focus-restore", "outside-dismiss", "live-open-prop"]
+        },
+        "Drawer": {
+            "source": "src/components/Drawer.vmz",
+            "stableHint": "ui.Drawer",
+            "tokens": [
+                "action.primary.background",
+                "action.primary.foreground",
+                "action.primary.active",
+                "focus.ring",
+                "motion.overlay.duration",
+                "motion.overlay.easing"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": [
+                "overlay-ownership",
+                "outside-dismiss",
+                "focus-enter",
+                "focus-loop",
+                "focus-restore",
+                "escape-dismiss",
+                "live-open-prop",
+                "overlay-enter-motion",
+                "overlay-exit-motion",
+                "resume-adopt-stable",
+                "reduced-motion",
+                "overlay-stacking"
+            ]
+        },
+        "Popover": {
+            "source": "src/components/Popover.vmz",
+            "stableHint": "ui.Popover",
+            "tokens": ["action.primary.background", "action.primary.foreground", "action.primary.active", "focus.ring"],
+            "surfaces": ["WebSurface"],
+            "contracts": [
+                "overlay-ownership",
+                "outside-dismiss",
+                "focus-enter",
+                "focus-restore",
+                "escape-dismiss",
+                "non-modal",
+                "live-open-prop",
+                "overlay-stacking"
+            ]
+        },
+        "AppShell": {
+            "source": "src/components/AppShell.vmz",
+            "stableHint": "ui.AppShell",
+            "tokens": [
+                "action.primary.background",
+                "action.primary.active",
+                "surface.paper",
+                "text.ink",
+                "text.steel",
+                "line.default",
+                "font.display",
+                "focus.ring"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["landmark-header", "landmark-main", "nav-items"]
+        },
+        "Card": {
+            "source": "src/components/Card.vmz",
+            "stableHint": "ui.Card",
+            "tokens": [
+                "surface.paper",
+                "text.ink",
+                "text.steel",
+                "line.default",
+                "font.display",
+                "density.control.gap",
+                "density.control.padding-y",
+                "density.control.padding-x",
+                "density.compact.gap",
+                "density.compact.padding-y",
+                "density.compact.padding-x",
+                "density.dense.gap",
+                "density.dense.padding-y",
+                "density.dense.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["surface-container", "density-control"]
+        },
+        "Alert": {
+            "source": "src/components/Alert.vmz",
+            "stableHint": "ui.Alert",
+            "tokens": [
+                "status.info.accent",
+                "status.info.foreground",
+                "status.success.accent",
+                "status.success.foreground",
+                "status.warning.accent",
+                "status.warning.foreground",
+                "status.danger.accent",
+                "status.danger.foreground",
+                "density.control.gap",
+                "density.control.padding-y",
+                "density.control.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["inline-feedback", "tone-matrix", "status-tokens"]
+        },
+        "Empty": {
+            "source": "src/components/Empty.vmz",
+            "stableHint": "ui.Empty",
+            "tokens": ["surface.paper", "surface.mist", "text.ink", "text.steel", "line.default", "font.display"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["zero-state", "action-slot"]
+        },
+        "Notification": {
+            "source": "src/components/Notification.vmz",
+            "stableHint": "ui.Notification",
+            "tokens": [
+                "status.info.accent",
+                "status.info.foreground",
+                "status.success.accent",
+                "status.success.foreground",
+                "status.warning.accent",
+                "status.warning.foreground",
+                "status.danger.accent",
+                "status.danger.foreground",
+                "density.control.gap",
+                "density.control.padding-y",
+                "density.control.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["ephemeral-feedback", "tone-matrix", "status-tokens"]
+        },
+        "Result": {
+            "source": "src/components/Result.vmz",
+            "stableHint": "ui.Result",
+            "tokens": [
+                "status.info.accent",
+                "status.info.foreground",
+                "status.success.accent",
+                "status.success.foreground",
+                "status.warning.accent",
+                "status.warning.foreground",
+                "status.danger.accent",
+                "status.danger.foreground",
+                "density.control.gap",
+                "density.control.padding-y",
+                "density.control.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["outcome-block", "status-tokens"]
+        },
+        "Prose": {
+            "source": "src/components/Prose.vmz",
+            "stableHint": "ui.Prose",
+            "tokens": [
+                "text.ink",
+                "text.steel",
+                "font.sans",
+                "font.display",
+                "line.default",
+                "action.primary.background",
+                "action.primary.hover"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["document-measure", "zero-js-readable"]
+        },
+        "Toc": {
+            "source": "src/components/Toc.vmz",
+            "stableHint": "ui.Toc",
+            "tokens": [
+                "surface.mist",
+                "text.ink",
+                "text.steel",
+                "line.default",
+                "font.display",
+                "action.primary.background",
+                "action.primary.active",
+                "focus.ring"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["document-outline", "zero-js-readable"]
+        },
+        "Callout": {
+            "source": "src/components/Callout.vmz",
+            "stableHint": "ui.Callout",
+            "tokens": [
+                "surface.paper",
+                "font.display",
+                "status.info.accent",
+                "status.info.foreground",
+                "status.success.accent",
+                "status.success.foreground",
+                "status.warning.accent",
+                "status.warning.foreground",
+                "status.danger.accent",
+                "status.danger.foreground",
+                "density.control.padding-y",
+                "density.control.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["document-callout", "tone-matrix", "status-tokens"]
+        },
+        "CodeBlock": {
+            "source": "src/components/CodeBlock.vmz",
+            "stableHint": "ui.CodeBlock",
+            "tokens": ["surface.paper", "surface.mist", "text.ink", "text.steel", "line.default", "font.mono"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["source-readable", "copy-action", "zero-js-readable"]
+        },
+        "ConsoleShell": {
+            "source": "src/components/ConsoleShell.vmz",
+            "stableHint": "ui.ConsoleShell",
+            "tokens": ["action.primary.background", "action.primary.active", "focus.ring"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["landmark-sidebar", "landmark-header", "landmark-main", "nav-items"]
+        },
+        "FilterBar": {
+            "source": "src/components/FilterBar.vmz",
+            "stableHint": "ui.FilterBar",
+            "tokens": ["action.primary.background"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["dense-filter-landmark"]
+        },
+        "Table": {
+            "source": "src/components/Table.vmz",
+            "stableHint": "ui.Table",
+            "tokens": [
+                "action.primary.background",
+                "action.primary.active",
+                "focus.ring",
+                "density.compact.padding-y",
+                "density.compact.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["column-header", "row-action", "column-sort", "permission-disabled"]
+        },
+        "BulkActions": {
+            "source": "src/components/BulkActions.vmz",
+            "stableHint": "ui.BulkActions",
+            "tokens": ["action.primary.background", "action.primary.active"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["selection-toolbar"]
+        },
+        "Pagination": {
+            "source": "src/components/Pagination.vmz",
+            "stableHint": "ui.Pagination",
+            "tokens": ["action.primary.background", "action.primary.active", "focus.ring"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["page-nav"]
+        },
+        "Breadcrumb": {
+            "source": "src/components/Breadcrumb.vmz",
+            "stableHint": "ui.Breadcrumb",
+            "tokens": ["action.primary.background", "action.primary.active", "focus.ring"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["console-path"]
+        },
+        "QueryForm": {
+            "source": "src/components/QueryForm.vmz",
+            "stableHint": "ui.QueryForm",
+            "tokens": ["action.primary.background", "density.compact.gap", "density.compact.padding-y", "density.compact.padding-x"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["dense-query", "submit-guard"]
+        },
+        "Skeleton": {
+            "source": "src/components/Skeleton.vmz",
+            "stableHint": "ui.Skeleton",
+            "tokens": ["action.primary.background", "density.compact.gap", "motion.overlay.duration", "motion.overlay.easing"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["loading-placeholder", "layout-stability", "reduced-motion"]
+        },
+        "Timeline": {
+            "source": "src/components/Timeline.vmz",
+            "stableHint": "ui.Timeline",
+            "tokens": ["action.primary.background", "action.primary.active", "density.compact.gap"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["audit-trail"]
+        },
+        "DataTable": {
+            "source": "src/components/DataTable.vmz",
+            "stableHint": "ui.DataTable",
+            "tokens": [
+                "surface.paper",
+                "surface.mist",
+                "text.ink",
+                "line.default",
+                "action.primary.background",
+                "action.primary.active",
+                "focus.ring",
+                "density.compact.padding-y",
+                "density.compact.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["parent-owned-selection", "column-sort", "row-action", "sticky-header", "ordinary-html-table", "not-data-grid"]
+        },
+        "Accordion": {
+            "source": "src/components/Accordion.vmz",
+            "stableHint": "ui.Accordion",
+            "tokens": [
+                "surface.paper",
+                "surface.mist",
+                "text.ink",
+                "text.steel",
+                "line.default",
+                "action.primary.active",
+                "focus.ring",
+                "density.control.padding-y",
+                "density.control.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["exclusive-disclosure", "parent-owned-open"]
+        },
+        "Steps": {
+            "source": "src/components/Steps.vmz",
+            "stableHint": "ui.Steps",
+            "tokens": [
+                "text.steel",
+                "line.default",
+                "action.primary.background",
+                "action.primary.foreground",
+                "action.primary.active",
+                "status.success.accent",
+                "status.success.foreground",
+                "density.control.gap"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["wizard-status", "parent-owned-current"]
+        },
+        "List": {
+            "source": "src/components/List.vmz",
+            "stableHint": "ui.List",
+            "tokens": [
+                "surface.paper",
+                "text.ink",
+                "line.default",
+                "action.primary.background",
+                "action.primary.foreground",
+                "action.primary.hover",
+                "focus.ring",
+                "density.control.padding-y",
+                "density.control.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["selectable-listbox", "parent-owned-selection", "keyboard-nav"]
+        },
+        "Tree": {
+            "source": "src/components/Tree.vmz",
+            "stableHint": "ui.Tree",
+            "tokens": [
+                "surface.paper",
+                "surface.mist",
+                "text.ink",
+                "line.default",
+                "action.primary.background",
+                "action.primary.foreground",
+                "action.primary.hover",
+                "focus.ring",
+                "density.compact.padding-y",
+                "density.compact.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["hierarchy-rows", "parent-owned-expand", "parent-owned-selection", "keyboard-nav"]
         }
     }
 }

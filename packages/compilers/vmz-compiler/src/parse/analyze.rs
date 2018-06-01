@@ -153,7 +153,7 @@ fn fill_members(
                     FieldDecl { name, type_text, init_text, kind, visibility, span: prop.span };
 
                 match kind {
-                    FieldKind::Prop => decl.props.push(field),
+                    FieldKind::Prop => decl.properties.push(field),
                     FieldKind::State => decl.fields.push(field),
                 }
             }

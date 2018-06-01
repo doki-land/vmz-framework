@@ -8,8 +8,8 @@
 use vmz_types::{BindingId, ViewAttr, ViewAttrValue, ViewEach, ViewNode, ViewStatus, ViewView};
 
 use crate::emit::{
-    bind_field_idents, collect_deps_oxc, is_event_attr, is_html_attr, looks_like_ternary,
-    sanitize_interp, split_ternary_parts,
+    bind_field_idents, collect_deps_oxc, event_dom_type, is_event_attr, is_html_attr,
+    looks_like_ternary, sanitize_interp, split_ternary_parts,
 };
 use crate::emit_ir::IrDepCursor;
 
@@ -24,10 +24,10 @@ fn nodes_eligible(nodes: &[ViewNode]) -> bool {
 
 fn node_eligible(node: &ViewNode) -> bool {
     match node {
-        ViewNode::Text(_) | ViewNode::Interp { .. } => true,
+        ViewNode::Text { .. } | ViewNode::Interp { .. } => true,
         ViewNode::Element { attrs, children, .. } => {
             for a in attrs {
-                if let ViewAttrValue::Interp(e) = &a.value {
+                if let ViewAttrValue::Interp { expr: e } = &a.value {
                     if !is_event_attr(&a.name) {
                         let _ = e; // ternary attrs allowed (CF bind)
                     }
@@ -175,7 +175,7 @@ fn emit_node(
     next_id: &mut u32,
 ) -> String {
     match node {
-        ViewNode::Text(t) => {
+        ViewNode::Text { value: t } => {
             let v = fresh("t", next_id);
             stmts.push(format!("var {v} = api.text({:?});", t));
             v
@@ -200,7 +200,7 @@ fn emit_node(
                         0,
                         ViewAttr {
                             name: "name".into(),
-                            value: ViewAttrValue::Static(n.clone()),
+                            value: ViewAttrValue::Static { value: n.clone() },
                             binding: None,
                         },
                     );
@@ -313,10 +313,10 @@ fn emit_plain_element(
             continue;
         }
         match &a.value {
-            ViewAttrValue::Static(s) if is_html_attr(&a.name) => {
+            ViewAttrValue::Static { value: s } if is_html_attr(&a.name) => {
                 stmts.push(format!("api.setHtml({el}, {:?});", s));
             }
-            ViewAttrValue::Static(s) => {
+            ViewAttrValue::Static { value: s } => {
                 if a.name == "className" {
                     stmts.push(format!("api.attr({el}, \"class\", {:?});", s));
                 } else {
@@ -324,15 +324,22 @@ fn emit_plain_element(
                 }
             }
             ViewAttrValue::Bare => {}
-            ViewAttrValue::Interp(e) if is_event_attr(&a.name) => {
+            ViewAttrValue::Interp { expr: e } if is_event_attr(&a.name) => {
                 let body = bind_field_idents(e, fields, scope, aliases);
-                let type_name = a.name[2..].to_ascii_lowercase();
-                stmts.push(format!("api.on({el}, {:?}, {body});", type_name));
+                let type_name = event_dom_type(&a.name);
+                let bare = body.strip_prefix("this.").unwrap_or(body.as_str());
+                let is_method_ref = !bare.is_empty()
+                    && bare.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
+                    && !bare.contains('(');
+                // Arrow captures `this` from __vmzCreate (same as onClick={() => ...}).
+                // Pass the DOM event through so handlers can read key/button/etc.
+                let handler = if is_method_ref { format!("(ev) => this.{bare}(ev)") } else { body };
+                stmts.push(format!("api.on({el}, {:?}, {handler});", type_name));
             }
-            ViewAttrValue::Interp(e) if is_html_attr(&a.name) => {
+            ViewAttrValue::Interp { expr: e } if is_html_attr(&a.name) => {
                 emit_bind_html(e, a.binding, &el, fields, scope, aliases, ir, stmts);
             }
-            ViewAttrValue::Interp(e) => {
+            ViewAttrValue::Interp { expr: e } => {
                 emit_bind_attr(e, a.binding, &a.name, &el, fields, scope, aliases, ir, stmts);
             }
         }
@@ -346,12 +353,12 @@ fn emit_plain_element(
 fn emit_component(
     tag: &str,
     attrs: &[ViewAttr],
-    _children: &[ViewNode],
+    children: &[ViewNode],
     fields: &[String],
     scope: &[String],
     aliases: &[(String, String)],
-    _each_depth: u32,
-    _ir: &mut IrDepCursor<'_>,
+    each_depth: u32,
+    ir: &mut IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
 ) -> String {
@@ -366,12 +373,12 @@ fn emit_component(
             continue;
         }
         let val = match &a.value {
-            ViewAttrValue::Static(s) => format!("{:?}", s),
+            ViewAttrValue::Static { value: s } => format!("{:?}", s),
             ViewAttrValue::Bare => "true".to_string(),
-            ViewAttrValue::Interp(e) if is_event_attr(&a.name) => {
+            ViewAttrValue::Interp { expr: e } if is_event_attr(&a.name) => {
                 bind_field_idents(e, fields, scope, aliases)
             }
-            ViewAttrValue::Interp(e) => {
+            ViewAttrValue::Interp { expr: e } => {
                 let rewritten = bind_field_idents(e, fields, scope, aliases);
                 if !aliases.is_empty() {
                     rewritten
@@ -394,6 +401,35 @@ fn emit_component(
     };
     let v = fresh("c", next_id);
     stmts.push(format!("var {v} = api.component(this, {:?}, {props}, {client_arg});", tag));
+    // Live prop binders: field-rooted interps stay in sync after create (UI1 Dialog open, Field value, …).
+    if client.is_none() && aliases.is_empty() {
+        for a in attrs {
+            if a.name == "style:tw" || a.name.starts_with("client:") || is_event_attr(&a.name) {
+                continue;
+            }
+            let ViewAttrValue::Interp { expr: e } = &a.value else {
+                continue;
+            };
+            let root = e.split('.').next().unwrap_or("");
+            if root.is_empty() || !fields.iter().any(|f| f == root) {
+                continue;
+            }
+            let deps = collect_deps_oxc(e, fields, scope);
+            let deps_js = deps.iter().map(|d| format!("{:?}", d)).collect::<Vec<_>>().join(", ");
+            let body = bind_field_idents(e, fields, scope, aliases);
+            stmts.push(format!(
+                "api.bindComponentProp(this, {v}, {:?}, [{deps_js}], function() {{ return {body}; }});",
+                a.name
+            ));
+        }
+    }
+    // Default slot: project parent children into the child's first unnamed <slot>.
+    if !children.is_empty() {
+        let kids = emit_nodes(children, fields, scope, aliases, each_depth, ir, stmts, next_id);
+        for kid in kids {
+            stmts.push(format!("api.projectDefaultSlot({v}, {kid});"));
+        }
+    }
     v
 }
 
@@ -506,6 +542,25 @@ fn emit_each_block(
         &mut item_stmts,
         next_id,
     );
+
+    let key_bound =
+        each.key_expr.as_ref().map(|k| bind_field_idents(k, fields, &child_scope, &child_aliases));
+    let row_kernel = crate::pipeline::row_kernel::try_emit_row_kernel_js(
+        tag,
+        attrs,
+        children,
+        &each.as_name,
+        &box_id,
+        fields,
+        &child_scope,
+        &child_aliases,
+        key_bound.as_deref(),
+    )
+    .unwrap_or_default();
+
+    // Always emit createItem: SSR serializeApi.eachBlock has no DOM and must call it.
+    // Client eachBlock prefers rowKernel (html clone + hydrate) when present and never
+    // hits this path on the hot create loop.
     let create_item = format!(
         "function(api, {box_id}) {{\n{}  return {item_root};\n}}",
         indent_block(&item_stmts.join("\n"))
@@ -514,7 +569,7 @@ fn emit_each_block(
     let v = fresh("k", next_id);
     let region_arg = each.region.map(|r| r.0.to_string()).unwrap_or_else(|| "null".into());
     stmts.push(format!(
-        "var {v} = api.eachBlock(this, {id_arg}, [{deps_js}], {{ list: function() {{ return ({list_body}); }}, {key_field}createItem: {create_item} }}, {region_arg});"
+        "var {v} = api.eachBlock(this, {id_arg}, [{deps_js}], {{ list: function() {{ return ({list_body}); }}, {key_field}{row_kernel}createItem: {create_item} }}, {region_arg});"
     ));
     v
 }

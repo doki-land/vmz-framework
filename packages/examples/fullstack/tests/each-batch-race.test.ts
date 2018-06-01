@@ -8,7 +8,7 @@ const dist = exampleDist('fullstack');
 describe('fullstack each / batch / race', () => {
     it('each item label patches via Direct mount (no render blueprint)', async () => {
         const runtime = await loadRuntime(dist);
-        const { flushPending, mount } = await loadDom(dist);
+        const { flushPending, mount, __vmzWritePath } = await loadDom(dist);
         installServerResolver(runtime.setServerModuleResolver, dist);
         const { default: UserCard } = await importDist<{ default: any }>(dist, 'components/UserCard.client.js');
 
@@ -24,8 +24,9 @@ describe('fullstack each / batch / race', () => {
         ];
         await flushPending(inst);
         expect(app!.textContent).toContain('vmz');
-        const tag = inst.tags.find((t: any) => t.id === 'vmz');
-        tag.label = 'VMZ';
+        // Array elements stay plain — leaf writes notify via __vmzWritePath (not bare assign).
+        const idx = inst.tags.findIndex((t: any) => t.id === 'vmz');
+        __vmzWritePath(inst, 'tags', [String(idx), 'label'], 'VMZ');
         await flushPending(inst);
         expect(app!.textContent).toContain('VMZ');
     });
@@ -40,18 +41,21 @@ describe('fullstack each / batch / race', () => {
         expect(html).toContain('data-vmz-key="vmz"');
         const { app } = installDocument(`<!DOCTYPE html><html><body><div id="app">${html}</div></body></html>`);
         const inst = await hydrate(UserCard, app!);
-        const liVmz = app!.querySelector('[data-vmz-key="vmz"]')!;
+        const liVmz = [...app!.querySelectorAll('li')].find((el: any) => el.__vmzKey === 'vmz')!;
+        expect(liVmz).toBeTruthy();
 
-        inst.tags[0].label = 'VMZ!';
+        const { __vmzWritePath } = await loadDom(dist);
+        __vmzWritePath(inst, 'tags', ['0', 'label'], 'VMZ!');
         await flushPending(inst);
         expect(liVmz.textContent).toBe('VMZ!');
-        expect(app!.querySelector('[data-vmz-key="vmz"]')).toBe(liVmz);
+        expect([...app!.querySelectorAll('li')].find((el: any) => el.__vmzKey === 'vmz')).toBe(liVmz);
 
-        const beforeCount = app!.querySelectorAll('[data-vmz-key]').length;
+        const beforeCount = [...app!.querySelectorAll('li')].filter((el: any) => el.__vmzKey != null).length;
         inst.tags.push({ id: 'rust', label: 'rust' });
         await flushPending(inst);
-        expect(app!.querySelector('[data-vmz-key="rust"]')?.textContent).toBe('rust');
-        expect(app!.querySelectorAll('[data-vmz-key]').length).toBe(beforeCount + 1);
+        const liRust = [...app!.querySelectorAll('li')].find((el: any) => el.__vmzKey === 'rust');
+        expect(liRust?.textContent).toBe('rust');
+        expect([...app!.querySelectorAll('li')].filter((el: any) => el.__vmzKey != null).length).toBe(beforeCount + 1);
 
         inst.user.name = 'Ada Lovelace';
         await flushPending(inst);
@@ -99,7 +103,7 @@ describe('fullstack each / batch / race', () => {
         await flushPending(inst);
         expect(patchRuns).toBeGreaterThanOrEqual(2);
         expect(app!.querySelector('h2')?.textContent).toBe('Bob');
-        expect(app!.querySelector('[data-vmz-key="a"]')?.textContent).toBe('alpha');
+        expect([...app!.querySelectorAll('li')].find((el: any) => el.__vmzKey === 'a')?.textContent).toBe('alpha');
 
         const meta = readJson<{
             methodRw?: { onMount?: { writes?: string[] } };

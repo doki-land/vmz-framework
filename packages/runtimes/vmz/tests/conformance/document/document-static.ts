@@ -12,7 +12,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { repoRoot } from '../_lib/repo-root.ts';
-import { importMaybeTs } from '../packages/runtimes/vmz/dist/plugin-host.js';
+import { importMaybeTs } from '../../../dist/plugin-host.js';
 
 const root = repoRoot(import.meta.url);
 const fixture = path.join(root, 'packages', 'examples', 'documents-fixture');

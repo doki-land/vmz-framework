@@ -1,5 +1,6 @@
 //! Moved from `src/style/designs.rs` (cargo-cry: tests next to Cargo.toml).
 
+use std::collections::BTreeMap;
 use vmz_compiler::style::designs::*;
 
 #[test]

@@ -6,38 +6,48 @@
 //! String `deps` in blueprints remain a transitional adapter.
 
 use crate::FieldKind;
-use crate::dep_key::{DepKey, PathSeg};
+use crate::dep_key::{DepKey, PathSegment};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 
 /// Stable numeric ids within one [`ReactiveComponent`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(transparent)]
 pub struct FieldId(pub u32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(transparent)]
 pub struct PropertyId(pub u32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(transparent)]
 pub struct BindingId(pub u32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(transparent)]
 pub struct EffectId(pub u32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(transparent)]
 pub struct RegionId(pub u32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(transparent)]
 pub struct ExprId(pub u32);
 
 /// One `.vmz` file's reactive analysis snapshot.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ReactiveModule {
+    /// Wire schema id ([`vmz_protocol::REACTIVE_SCHEMA`]).
+    pub schema: String,
     pub source: String,
     pub components: Vec<ReactiveComponent>,
 }
 
 /// Component-level reactive graph.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ReactiveComponent {
     pub name: String,
     pub state_slots: Vec<StateSlot>,
@@ -160,20 +170,20 @@ impl ReactiveComponent {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct StateSlot {
     pub id: FieldId,
     pub name: String,
     pub kind: FieldKind,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct PropertySlot {
     pub id: PropertyId,
     pub name: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ExprSlot {
     pub id: ExprId,
     /// Source text (template or script fragment) for debugging / MCP.
@@ -184,7 +194,7 @@ pub struct ExprSlot {
 ///
 /// Root `each={tags}` → `{ via: [], key }`.
 /// Nested `each={g.items}` → `{ via: [items], key }` after the outer frame.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct ListItemFrame {
     /// Props from the parent item to this nested list (empty for the root list).
     pub via: Vec<PropertyId>,
@@ -195,7 +205,7 @@ pub struct ListItemFrame {
 ///
 /// `items[i].label` → one step `{ via: [], key: i }` then path `[label]`.
 /// `rows[r].cells[c].v` → steps `[{via:[]},{via:[cells]}]` then path `[v]`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct DynamicStep {
     /// Static props after the previous index (or after root) before this index.
     pub via: Vec<PropertyId>,
@@ -204,7 +214,8 @@ pub struct DynamicStep {
 }
 
 /// Structured dependency path (IR form; string roots via FieldId table).
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum IrDepPath {
     Field(FieldId),
     StaticPath {
@@ -296,7 +307,8 @@ impl IrDepPath {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum BindingKind {
     Text,
     Attr,
@@ -321,7 +333,7 @@ impl BindingKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Binding {
     pub id: BindingId,
     pub kind: BindingKind,
@@ -332,12 +344,14 @@ pub struct Binding {
     pub attr: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Write target path (transparent on the wire: just the path object).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(transparent)]
 pub struct WritePath {
     pub path: IrDepPath,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Effect {
     pub id: EffectId,
     pub name: String,
@@ -351,7 +365,7 @@ pub struct Effect {
     pub star_reasons: Vec<(String, String)>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ControlBranch {
     /// Condition expression when present (`if` / `else-if` / ternary test); `None` = else / alt.
     pub cond: Option<ExprId>,
@@ -361,7 +375,7 @@ pub struct ControlBranch {
     pub body_reads: Vec<IrDepPath>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ControlRegion {
     pub id: RegionId,
     pub stable: Vec<IrDepPath>,
@@ -445,11 +459,11 @@ impl ReactiveComponentBuilder {
                 let mut steps: Vec<DynamicStep> = Vec::new();
                 let mut via: Vec<PropertyId> = Vec::new();
                 let mut saw_dyn = false;
-                for seg in &p.segs {
+                for seg in &p.segments {
                     match seg {
-                        PathSeg::Ident(n) => via.push(self.intern_prop(n.clone())),
-                        PathSeg::StaticIndex(n) => via.push(self.intern_prop(n.to_string())),
-                        PathSeg::DynIndex(sym) => {
+                        PathSegment::Ident(n) => via.push(self.intern_prop(n.clone())),
+                        PathSegment::StaticIndex(n) => via.push(self.intern_prop(n.to_string())),
+                        PathSegment::DynamicIndex(sym) => {
                             saw_dyn = true;
                             let key = self.intern_expr(sym.clone());
                             let mut key_deps = Vec::new();
@@ -473,10 +487,10 @@ impl ReactiveComponentBuilder {
                     Some(IrDepPath::StaticPath { root, props: via })
                 }
             }
-            DepKey::IndexPath { root, index, segs } => {
+            DepKey::IndexPath { root, index, segments: segs } => {
                 let id = self.field_id(root)?;
                 match index {
-                    PathSeg::DynIndex(sym) => {
+                    PathSegment::DynamicIndex(sym) => {
                         let key = self.intern_expr(sym.clone());
                         let mut key_deps = Vec::new();
                         if let Some(fid) = self.field_id(sym) {
@@ -486,11 +500,11 @@ impl ReactiveComponentBuilder {
                         let mut via: Vec<PropertyId> = Vec::new();
                         for seg in segs {
                             match seg {
-                                PathSeg::Ident(n) => via.push(self.intern_prop(n.clone())),
-                                PathSeg::StaticIndex(n) => {
+                                PathSegment::Ident(n) => via.push(self.intern_prop(n.clone())),
+                                PathSegment::StaticIndex(n) => {
                                     via.push(self.intern_prop(n.to_string()))
                                 }
-                                PathSeg::DynIndex(sym2) => {
+                                PathSegment::DynamicIndex(sym2) => {
                                     let key2 = self.intern_expr(sym2.clone());
                                     let mut kd2 = Vec::new();
                                     if let Some(fid) = self.field_id(sym2) {
@@ -506,20 +520,20 @@ impl ReactiveComponentBuilder {
                         }
                         Some(IrDepPath::DynamicPath { root: id, steps, path: via })
                     }
-                    PathSeg::StaticIndex(n) => {
+                    PathSegment::StaticIndex(n) => {
                         let mut props = vec![self.intern_prop(n.to_string())];
                         let mut steps: Vec<DynamicStep> = Vec::new();
                         let mut via: Vec<PropertyId> = Vec::new();
                         let mut building_static = true;
                         for seg in segs {
                             match seg {
-                                PathSeg::Ident(name) if building_static => {
+                                PathSegment::Ident(name) if building_static => {
                                     props.push(self.intern_prop(name.clone()))
                                 }
-                                PathSeg::StaticIndex(i) if building_static => {
+                                PathSegment::StaticIndex(i) if building_static => {
                                     props.push(self.intern_prop(i.to_string()))
                                 }
-                                PathSeg::DynIndex(sym) => {
+                                PathSegment::DynamicIndex(sym) => {
                                     building_static = false;
                                     let key = self.intern_expr(sym.clone());
                                     let mut key_deps = Vec::new();
@@ -533,8 +547,10 @@ impl ReactiveComponentBuilder {
                                     };
                                     steps.push(DynamicStep { via: step_via, key, key_deps });
                                 }
-                                PathSeg::Ident(name) => via.push(self.intern_prop(name.clone())),
-                                PathSeg::StaticIndex(i) => {
+                                PathSegment::Ident(name) => {
+                                    via.push(self.intern_prop(name.clone()))
+                                }
+                                PathSegment::StaticIndex(i) => {
                                     via.push(self.intern_prop(i.to_string()))
                                 }
                             }
@@ -545,7 +561,7 @@ impl ReactiveComponentBuilder {
                             Some(IrDepPath::DynamicPath { root: id, steps, path: via })
                         }
                     }
-                    PathSeg::Ident(_) => Some(IrDepPath::Unknown(id)),
+                    PathSegment::Ident(_) => Some(IrDepPath::Unknown(id)),
                 }
             }
         }
@@ -633,220 +649,16 @@ impl ReactiveComponentBuilder {
 }
 
 impl ReactiveModule {
-    /// Stable, sorted-enough JSON for `*.reactive.json` (no serde).
+    /// Pretty JSON for `*.reactive.json`.
     pub fn to_json(&self) -> String {
-        let mut out = String::new();
-        out.push_str("{\n");
-        out.push_str(&format!("  \"source\": {:?},\n", self.source));
-        out.push_str("  \"components\": [\n");
-        for (ci, c) in self.components.iter().enumerate() {
-            if ci > 0 {
-                out.push_str(",\n");
-            }
-            out.push_str(&reactive_component_json(c, "    "));
-        }
-        out.push_str("\n  ]\n}\n");
-        out
+        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
-/// JSON object for one reactive component (also embedded under Program IR `reactive`).
-pub fn reactive_component_json(c: &ReactiveComponent, indent: &str) -> String {
-    let ind2 = format!("{indent}  ");
-    let ind3 = format!("{indent}    ");
-    let mut s = String::new();
-    s.push_str(&format!("{indent}{{\n"));
-    s.push_str(&format!("{ind2}\"name\": {:?},\n", c.name));
-
-    s.push_str(&format!("{ind2}\"state_slots\": [\n"));
-    for (i, slot) in c.state_slots.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        let kind = match slot.kind {
-            FieldKind::Prop => "prop",
-            FieldKind::State => "state",
-        };
-        s.push_str(&format!(
-            "{ind3}{{ \"id\": {}, \"name\": {:?}, \"kind\": {:?} }}",
-            slot.id.0, slot.name, kind
-        ));
-    }
-    s.push_str(&format!("\n{ind2}],\n"));
-
-    s.push_str(&format!("{ind2}\"properties\": [\n"));
-    for (i, p) in c.properties.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        s.push_str(&format!("{ind3}{{ \"id\": {}, \"name\": {:?} }}", p.id.0, p.name));
-    }
-    s.push_str(&format!("\n{ind2}],\n"));
-
-    s.push_str(&format!("{ind2}\"exprs\": [\n"));
-    for (i, e) in c.exprs.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        s.push_str(&format!("{ind3}{{ \"id\": {}, \"text\": {:?} }}", e.id.0, e.text));
-    }
-    s.push_str(&format!("\n{ind2}],\n"));
-
-    s.push_str(&format!("{ind2}\"bindings\": [\n"));
-    for (i, b) in c.bindings.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        s.push_str(&binding_json(b, c, &ind3));
-    }
-    s.push_str(&format!("\n{ind2}],\n"));
-
-    s.push_str(&format!("{ind2}\"effects\": [\n"));
-    for (i, e) in c.effects.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        s.push_str(&effect_json(e, c, &ind3));
-    }
-    s.push_str(&format!("\n{ind2}],\n"));
-
-    s.push_str(&format!("{ind2}\"control_regions\": [\n"));
-    for (i, r) in c.control_regions.iter().enumerate() {
-        if i > 0 {
-            s.push_str(",\n");
-        }
-        s.push_str(&region_json(r, c, &ind3));
-    }
-    s.push_str(&format!("\n{ind2}]\n"));
-    s.push_str(&format!("{indent}}}"));
-    s
-}
-
-fn path_json(path: &IrDepPath, c: &ReactiveComponent) -> String {
-    let stable = path.to_stable_string(&c.state_slots, &c.properties, &c.exprs);
-    match path {
-        IrDepPath::Field(id) => {
-            format!("{{ \"kind\": \"field\", \"field\": {}, \"stable\": {:?} }}", id.0, stable)
-        }
-        IrDepPath::StaticPath { root, props } => {
-            let props_js: Vec<String> = props.iter().map(|p| p.0.to_string()).collect();
-            format!(
-                "{{ \"kind\": \"static_path\", \"root\": {}, \"props\": [{}], \"stable\": {:?} }}",
-                root.0,
-                props_js.join(", "),
-                stable
-            )
-        }
-        IrDepPath::DynamicPath { root, steps, path } => {
-            let steps_js: Vec<String> = steps
-                .iter()
-                .map(|st| {
-                    let via_js: Vec<String> = st.via.iter().map(|p| p.0.to_string()).collect();
-                    let deps: Vec<String> = st.key_deps.iter().map(|d| path_json(d, c)).collect();
-                    format!(
-                        "{{ \"via\": [{}], \"key\": {}, \"key_deps\": [{}] }}",
-                        via_js.join(", "),
-                        st.key.0,
-                        deps.join(", ")
-                    )
-                })
-                .collect();
-            let props_js: Vec<String> = path.iter().map(|p| p.0.to_string()).collect();
-            format!(
-                "{{ \"kind\": \"dynamic_path\", \"root\": {}, \"steps\": [{}], \"path\": [{}], \"stable\": {:?} }}",
-                root.0,
-                steps_js.join(", "),
-                props_js.join(", "),
-                stable
-            )
-        }
-        IrDepPath::ListItem { list, frames, path } => {
-            let frames_js: Vec<String> = frames
-                .iter()
-                .map(|fr| {
-                    let via_js: Vec<String> = fr.via.iter().map(|p| p.0.to_string()).collect();
-                    let key_js = fr.key.map(|k| k.0.to_string()).unwrap_or_else(|| "null".into());
-                    format!("{{ \"via\": [{}], \"key\": {} }}", via_js.join(", "), key_js)
-                })
-                .collect();
-            let props_js: Vec<String> = path.iter().map(|p| p.0.to_string()).collect();
-            format!(
-                "{{ \"kind\": \"list_item\", \"list\": {}, \"frames\": [{}], \"path\": [{}], \"stable\": {:?} }}",
-                list.0,
-                frames_js.join(", "),
-                props_js.join(", "),
-                stable
-            )
-        }
-        IrDepPath::Unknown(id) => {
-            format!("{{ \"kind\": \"unknown\", \"field\": {}, \"stable\": {:?} }}", id.0, stable)
-        }
-    }
-}
-
-fn binding_json(b: &Binding, c: &ReactiveComponent, indent: &str) -> String {
-    let reads: Vec<String> = b.reads.iter().map(|r| path_json(r, c)).collect();
-    let region = b.region.map(|r| r.0.to_string()).unwrap_or_else(|| "null".into());
-    let expr = b.expr.map(|e| e.0.to_string()).unwrap_or_else(|| "null".into());
-    let attr = b.attr.as_ref().map(|a| format!("{a:?}")).unwrap_or_else(|| "null".into());
-    format!(
-        "{indent}{{ \"id\": {}, \"kind\": {:?}, \"reads\": [{}], \"region\": {}, \"expr\": {}, \"attr\": {} }}",
-        b.id.0,
-        b.kind.as_str(),
-        reads.join(", "),
-        region,
-        expr,
-        attr
-    )
-}
-
-fn effect_json(e: &Effect, c: &ReactiveComponent, indent: &str) -> String {
-    let reads: Vec<String> = e.reads.iter().map(|r| path_json(r, c)).collect();
-    let writes: Vec<String> = e.writes.iter().map(|w| path_json(&w.path, c)).collect();
-    let calls: Vec<String> = e.calls.iter().map(|c| format!("{c:?}")).collect();
-    let reasons: Vec<String> = e
-        .star_reasons
-        .iter()
-        .map(|(f, r)| format!("{{ \"field\": {f:?}, \"reason\": {r:?} }}"))
-        .collect();
-    format!(
-        "{indent}{{ \"id\": {}, \"name\": {:?}, \"reads\": [{}], \"writes\": [{}], \"async_boundary\": {}, \"calls\": [{}], \"opaque_callee\": {}, \"star_reasons\": [{}] }}",
-        e.id.0,
-        e.name,
-        reads.join(", "),
-        writes.join(", "),
-        e.async_boundary,
-        calls.join(", "),
-        e.opaque_callee,
-        reasons.join(", ")
-    )
-}
-
-fn region_json(r: &ControlRegion, c: &ReactiveComponent, indent: &str) -> String {
-    let ind2 = format!("{indent}  ");
-    let stable: Vec<String> = r.stable.iter().map(|p| path_json(p, c)).collect();
-    let mut branches = String::new();
-    for (i, b) in r.branches.iter().enumerate() {
-        if i > 0 {
-            branches.push_str(",\n");
-        }
-        let cond = b.cond.map(|e| e.0.to_string()).unwrap_or_else(|| "null".into());
-        let cond_reads: Vec<String> = b.cond_reads.iter().map(|p| path_json(p, c)).collect();
-        let body: Vec<String> = b.body_bindings.iter().map(|id| id.0.to_string()).collect();
-        let body_reads: Vec<String> = b.body_reads.iter().map(|p| path_json(p, c)).collect();
-        branches.push_str(&format!(
-            "{ind2}{{ \"cond\": {}, \"cond_reads\": [{}], \"body_bindings\": [{}], \"body_reads\": [{}] }}",
-            cond,
-            cond_reads.join(", "),
-            body.join(", "),
-            body_reads.join(", ")
-        ));
-    }
-    format!(
-        "{indent}{{\n{indent}  \"id\": {},\n{indent}  \"stable\": [{}],\n{indent}  \"branches\": [\n{branches}\n{indent}  ]\n{indent}}}",
-        r.id.0,
-        stable.join(", ")
-    )
+/// JSON for one reactive component (also embedded under Program IR `reactive`).
+/// `indent` is ignored; prefer nesting via serde on [`ReactiveComponent`].
+pub fn reactive_component_json(c: &ReactiveComponent, _indent: &str) -> String {
+    serde_json::to_string_pretty(c).unwrap_or_else(|_| "{}".into())
 }
 
 impl fmt::Display for IrDepPath {

@@ -241,8 +241,18 @@ function runOneAssertion(a: Record<string, unknown>, host: LogicHost, fail: (mes
     }
 
     if (kind === 'domKeys') {
-        const attr = String(expect.attr || 'data-vmz-key');
-        const keys = [...host.app.querySelectorAll(`[${attr}]`)].map((el) => el.getAttribute(attr));
+        // Client Direct: `__vmzKey` expando. SSR HTML: `data-vmz-key` attr (expect.attr).
+        const attr = expect.attr != null ? String(expect.attr) : null;
+        const expando = expect.expando != null ? String(expect.expando) : attr ? null : '__vmzKey';
+        let keys: string[] = [];
+        if (attr) {
+            keys = [...host.app.querySelectorAll(`[${attr}]`)].map((el) => String(el.getAttribute(attr)));
+        } else if (expando) {
+            keys = [...host.app.querySelectorAll('*')]
+                .map((el) => (el as unknown as Record<string, unknown>)[expando])
+                .filter((k) => k != null)
+                .map((k) => String(k));
+        }
         if (Array.isArray(expect.includes)) {
             for (const k of expect.includes) {
                 if (!keys.includes(String(k))) fail(`domKeys missing ${k}: ${JSON.stringify(keys)}`);
@@ -269,7 +279,7 @@ function runOneAssertion(a: Record<string, unknown>, host: LogicHost, fail: (mes
         return;
     }
 
-    if (kind === 'graph' || kind === 'plan' || kind === 'diagnostic' || kind === 'view') {
+    if (kind === 'graph' || kind === 'plan' || kind === 'diagnostic' || kind === 'view' || kind === 'motion') {
         return;
     }
 

@@ -1,4 +1,7 @@
-/* documents-fixture /designs → static document CSS */
+/* documents-fixture /designs → static document CSS
+ * Density tokens materialize from Style Theme entries → --vmz-density-*.
+ * Activation mirrors application: data-density=compact|dense on a root.
+ */
 :root {
     --color-fg: #1a1a1a;
     --color-bg: #ffffff;
@@ -16,8 +19,21 @@ body {
 }
 
 nav[aria-label="Documents"] {
-    padding: 0.75rem 1.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--vmz-density-control-gap, 0.75rem);
+    padding: var(--vmz-density-control-padding-y, 0.55rem) var(--vmz-density-control-padding-x, 0.95rem);
     border-bottom: 1px solid var(--color-border);
+}
+
+:where([data-density="compact"]) nav[aria-label="Documents"] {
+    gap: var(--vmz-density-compact-gap, 0.45rem);
+    padding: var(--vmz-density-compact-padding-y, 0.35rem) var(--vmz-density-compact-padding-x, 0.65rem);
+}
+
+:where([data-density="dense"]) nav[aria-label="Documents"] {
+    gap: var(--vmz-density-dense-gap, 0.3rem);
+    padding: var(--vmz-density-dense-padding-y, 0.2rem) var(--vmz-density-dense-padding-x, 0.45rem);
 }
 
 nav[aria-label="Documents"] a {

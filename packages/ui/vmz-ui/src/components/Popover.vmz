@@ -1,0 +1,253 @@
+<template>
+  <div
+    class="vmz-ui-popover-root"
+    data-vmz-ui="popover"
+    data-vmz-overlay-open={open}
+  >
+    <div
+      if={open}
+      class="vmz-ui-popover"
+      data-vmz-overlay="popover"
+      data-vmz-overlay-owner="popover"
+      data-vmz-overlay-stack={stackLevel}
+    >
+      <button
+        type="button"
+        class="vmz-ui-popover__backdrop"
+        data-vmz-overlay-layer="backdrop"
+        aria-label="Dismiss popover"
+        onClick={dismiss}
+      ></button>
+      <div
+        class="vmz-ui-popover__panel"
+        role="dialog"
+        aria-modal="false"
+        aria-labelledby={titleId}
+        tabindex="-1"
+        data-vmz-overlay-layer="panel"
+        data-vmz-focus="enter"
+        onKeyDown={onPanelKeyDown}
+      >
+        <h2 id={titleId} class="vmz-ui-popover__title">{title}</h2>
+        <div class="vmz-ui-popover__body">
+          <slot />
+        </div>
+        <div class="vmz-ui-popover__actions">
+          <button type="button" class="vmz-ui-popover__close" data-vmz-focus="close" onClick={dismiss}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style>
+.vmz-ui-popover-root {
+  display: block;
+}
+
+.vmz-ui-popover {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  pointer-events: none;
+}
+
+.vmz-ui-popover[data-vmz-overlay-stack='1'] {
+  z-index: 50;
+}
+
+.vmz-ui-popover[data-vmz-overlay-stack='2'] {
+  z-index: 60;
+}
+
+.vmz-ui-popover[data-vmz-overlay-stack='3'] {
+  z-index: 70;
+}
+
+.vmz-ui-popover__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: default;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.vmz-ui-popover__panel {
+  position: absolute;
+  z-index: 1;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  width: min(20rem, calc(100vw - 2rem));
+  min-height: 8rem;
+  padding: 0.85rem 1rem 1rem;
+  border: 1px solid var(--vmz-action-primary-background);
+  border-radius: 2px;
+  background: var(--vmz-action-primary-foreground);
+  color: var(--vmz-action-primary-active);
+  outline: none;
+  pointer-events: auto;
+}
+
+.vmz-ui-popover__panel:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-popover__title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.vmz-ui-popover__body {
+  margin-bottom: 0.75rem;
+}
+
+.vmz-ui-popover__close {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  background: var(--vmz-action-primary-background);
+  color: var(--vmz-action-primary-foreground);
+}
+
+.vmz-ui-popover__close:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI — Popover (UI2).
+ * Non-modal disclosure: Escape + outside dismiss + focus enter/restore.
+ * Parent owns live `open`. Fixed min size for layout stability.
+ * `stackLevel` raises z-index; Escape dismisses only the topmost stacked overlay.
+ */
+export default class Popover {
+  public open: boolean = false;
+  public title: string = 'Popover';
+  public titleId: string = 'vmz-popover-title';
+  public stackLevel: string = '0';
+  public onClose: (() => void) | null = null;
+
+  _restoreFocus = null;
+  _panel = null;
+  _docKeyHandler = null;
+  _observer = null;
+
+  async onMount() {
+    if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return;
+    const root = this.__vmzDomRoot;
+    if (!root || typeof root.querySelector !== 'function') return;
+    this._observer = new MutationObserver(() => this._syncFromDom());
+    this._observer.observe(root, { childList: true, subtree: true });
+    this._syncFromDom();
+  }
+
+  onDestroy() {
+    if (this._observer) {
+      this._observer.disconnect();
+      this._observer = null;
+    }
+    this._teardownDocKey();
+    this._panel = null;
+    this._restoreFocus = null;
+  }
+
+  dismiss() {
+    if (typeof this.onClose === 'function') this.onClose();
+  }
+
+  _stackValue() {
+    const n = Number(this.stackLevel);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  _isTopmostStack() {
+    if (typeof document === 'undefined') return true;
+    const root = this.__vmzDomRoot;
+    const mine =
+      root && typeof root.querySelector === 'function'
+        ? root.querySelector('[data-vmz-overlay][data-vmz-overlay-stack]')
+        : null;
+    const myStack = Number(mine?.getAttribute('data-vmz-overlay-stack') || this.stackLevel || '0');
+    const open = document.querySelectorAll('[data-vmz-overlay][data-vmz-overlay-stack]');
+    let max = -Infinity;
+    for (const el of open) {
+      const n = Number(el.getAttribute('data-vmz-overlay-stack') || '0');
+      if (Number.isFinite(n) && n > max) max = n;
+    }
+    if (!Number.isFinite(max)) return true;
+    return (Number.isFinite(myStack) ? myStack : 0) >= max;
+  }
+
+  onPanelKeyDown(ev) {
+    if (!ev || ev.key !== 'Escape') return;
+    if (!this._isTopmostStack()) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    this.dismiss();
+  }
+
+  _syncFromDom() {
+    const root = this.__vmzDomRoot;
+    const panel =
+      root && typeof root.querySelector === 'function'
+        ? root.querySelector('[data-vmz-overlay="popover"] [data-vmz-focus="enter"]')
+        : null;
+    if (panel && !this._panel) this._enterFocus(panel);
+    else if (!panel && this._panel) this._exitFocus();
+  }
+
+  _enterFocus(panel) {
+    if (typeof document === 'undefined') return;
+    const active = document.activeElement;
+    if (!this._restoreFocus) {
+      const root = this.__vmzDomRoot;
+      const outside =
+        active instanceof HTMLElement &&
+        active !== document.body &&
+        !(root && typeof root.contains === 'function' && root.contains(active));
+      if (outside) this._restoreFocus = active;
+    }
+    this._panel = panel instanceof HTMLElement ? panel : null;
+    if (this._panel && typeof this._panel.focus === 'function') this._panel.focus();
+    if (!this._docKeyHandler) {
+      this._docKeyHandler = (ev) => {
+        if (ev.key !== 'Escape') return;
+        if (ev.defaultPrevented) return;
+        if (!this._isTopmostStack()) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        this.dismiss();
+      };
+      document.addEventListener('keydown', this._docKeyHandler);
+    }
+  }
+
+  _exitFocus() {
+    this._teardownDocKey();
+    this._panel = null;
+    const restore = this._restoreFocus;
+    this._restoreFocus = null;
+    if (restore && typeof restore.focus === 'function' && document.contains(restore)) {
+      restore.focus();
+    }
+  }
+
+  _teardownDocKey() {
+    if (typeof document !== 'undefined' && this._docKeyHandler) {
+      document.removeEventListener('keydown', this._docKeyHandler);
+    }
+    this._docKeyHandler = null;
+  }
+}
+</script>

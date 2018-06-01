@@ -1,98 +1,148 @@
-//! NativeAppHost / WebView deployment contracts .
+//! NativeAppHost / WebView deployment contracts.
 //!
 //! Freezes WebViewDeploymentProfile, NativeCapability, bridge protocol,
 //! application identity, and security/version fields.
-//! WebView reuses Browser lowering — no new View IR / no arbitrary JS bridge.
+//! WebView reuses Browser lowering - no new View IR / no arbitrary JS bridge.
 
 use serde::{Deserialize, Serialize};
 
-/// Umbrella native-host protocol.
+/// Umbrella native-host protocol id for handshake / catalog.
 pub const NATIVE_HOST_PROTOCOL: &str = "vmz.native_host.protocol.v0";
 
+/// Schema id for WebViewDeploymentProfile (WebSurface delivery inside NativeAppHost).
 pub const WEBVIEW_DEPLOYMENT_SCHEMA: &str = "vmz.native_host.webview_deployment.v0";
+/// Schema id for a versioned NativeCapability declaration.
 pub const NATIVE_CAPABILITY_SCHEMA: &str = "vmz.native_host.capability.v0";
+/// Schema id for the typed WebSurface <-> NativeAppHost bridge manifest.
 pub const BRIDGE_PROTOCOL_SCHEMA: &str = "vmz.native_host.bridge.v0";
+/// Schema id for ApplicationIdentity (package id / origin / version).
 pub const APPLICATION_IDENTITY_SCHEMA: &str = "vmz.native_host.application_identity.v0";
+/// Schema id for the umbrella native-host check report.
 pub const NATIVE_HOST_CHECK_SCHEMA: &str = "vmz.native_host.check.v0";
 
-/// minimal WebView shell + local bundled entry contract.
+/// Schema id for the minimal WebView shell + local bundled entry contract.
 pub const SHELL_SCHEMA: &str = "vmz.native_host.shell.v0";
+/// Schema id for shell-contract check reports.
 pub const SHELL_CHECK_SCHEMA: &str = "vmz.native_host.shell_check.v0";
+/// Schema id for deep-link / universal-link map entries.
 pub const DEEP_LINK_SCHEMA: &str = "vmz.native_host.deep_link.v0";
+/// Schema id for local-bundled WebSurface entry artifacts.
 pub const LOCAL_BUNDLE_SCHEMA: &str = "vmz.native_host.local_bundle.v0";
 
-/// typed capability call + permission / nonce / cancel / trace.
+/// Schema id for a typed capability call envelope (nonce / permission / cancel / trace).
 pub const CAPABILITY_CALL_SCHEMA: &str = "vmz.native_host.capability_call.v0";
+/// Schema id for bridge call trace context (correlation + redaction).
 pub const BRIDGE_TRACE_SCHEMA: &str = "vmz.native_host.bridge_trace.v0";
+/// Schema id for the first-batch NativeBacked stub catalog + allowlist.
 pub const BRIDGE_STUB_CATALOG_SCHEMA: &str = "vmz.native_host.bridge_stub_catalog.v0";
+/// Schema id for bridge-contract check reports.
 pub const BRIDGE_CHECK_SCHEMA: &str = "vmz.native_host.bridge_check.v0";
 
-/// app lifecycle + persistence + update/offline policies.
+/// Schema id for NativeAppHost lifecycle policy (events + hard restore rules).
 pub const LIFECYCLE_SCHEMA: &str = "vmz.native_host.lifecycle.v0";
+/// Schema id for crash/restore persistence policy (not JS heap).
 pub const PERSISTENCE_SCHEMA: &str = "vmz.native_host.persistence.v0";
+/// Schema id for update / rollback channel policy.
 pub const UPDATE_POLICY_SCHEMA: &str = "vmz.native_host.update_policy.v0";
+/// Schema id for offline resource policy for local/hybrid delivery.
 pub const OFFLINE_POLICY_SCHEMA: &str = "vmz.native_host.offline_policy.v0";
+/// Schema id for lifecycle-contract check reports.
 pub const LIFECYCLE_CHECK_SCHEMA: &str = "vmz.native_host.lifecycle_check.v0";
 
-/// SSR first-paint + #server transport + auth/session + network/delivery.
+/// Schema id for the NativeAppHost full-stack profile umbrella.
 pub const FULLSTACK_SCHEMA: &str = "vmz.native_host.fullstack.v0";
+/// Schema id for SSR first-paint policy inside the WebView host.
 pub const SSR_FIRST_PAINT_SCHEMA: &str = "vmz.native_host.ssr_first_paint.v0";
+/// Schema id for `#server` transport binding (bridge must not bypass).
 pub const SERVER_TRANSPORT_SCHEMA: &str = "vmz.native_host.server_transport.v0";
+/// Schema id for auth / session isolation for the WebView host.
 pub const AUTH_SESSION_SCHEMA: &str = "vmz.native_host.auth_session.v0";
+/// Schema id for push capability declaration (stub allowed).
 pub const PUSH_POLICY_SCHEMA: &str = "vmz.native_host.push_policy.v0";
+/// Schema id for NativeAppHost network / cleartext policy.
 pub const NETWORK_POLICY_SCHEMA: &str = "vmz.native_host.network_policy.v0";
+/// Schema id for full-stack contract check reports.
 pub const FULLSTACK_CHECK_SCHEMA: &str = "vmz.native_host.fullstack_check.v0";
 
-/// NativeSurfaceId + ownership / lifetime contract.
+/// Schema id for NativeSurfaceManifest (local surface driver ownership / lifetime).
 pub const NATIVE_SURFACE_SCHEMA: &str = "vmz.native_host.native_surface.v0";
+/// Schema id for NativeSurfaceId identity documents.
 pub const NATIVE_SURFACE_ID_SCHEMA: &str = "vmz.native_host.native_surface_id.v0";
+/// Schema id for WebSurface <-> NativeSurface cross-boundary data contract.
 pub const NATIVE_SURFACE_BOUNDARY_SCHEMA: &str = "vmz.native_host.native_surface_boundary.v0";
+/// Schema id for native-surface check reports.
 pub const NATIVE_SURFACE_CHECK_SCHEMA: &str = "vmz.native_host.native_surface_check.v0";
 
+/// Hard: NativeSurfaceManifest omits a stable `surfaceId`.
 pub const DIAG_MISSING_SURFACE_ID: &str = "vmz::native_host::missing_surface_id";
+/// Hard: NativeSurface has no owning region id for dispose / lifetime binding.
 pub const DIAG_MISSING_OWNER_REGION: &str = "vmz::native_host::missing_owner_region";
+/// Hard: NativeSurface omits an explicit lifetime (e.g. `bound_to_region`).
 pub const DIAG_MISSING_SURFACE_LIFETIME: &str = "vmz::native_host::missing_surface_lifetime";
+/// Hard: surface shares implicit WebView / JS state across the boundary.
 pub const DIAG_IMPLICIT_STATE_SHARE: &str = "vmz::native_host::implicit_state_share";
+/// Hard: preview / map / video surface is confused with a NativeBacked capability.
 pub const DIAG_SURFACE_IS_CAPABILITY: &str = "vmz::native_host::surface_is_capability";
+/// Hard: NativeSurface claims to be a semantic truth source (VPG/Plan must remain sole IR).
 pub const DIAG_SURFACE_IS_SEMANTIC_TRUTH: &str = "vmz::native_host::surface_is_semantic_truth";
 
-/// first high-value surface kinds .
+/// First high-value NativeSurface kind names (`camera` / `map` / `video`).
 pub const HIGH_VALUE_SURFACE_KINDS: &[&str] = &["camera", "map", "video"];
 
-/// iOS/Android share one Host Profile contract set (algebraic — no real Xcode/Gradle).
+/// Schema id for multi-platform Host Profile freeze (shared schemas across adapters).
 pub const MULTI_PLATFORM_SCHEMA: &str = "vmz.native_host.multi_platform.v0";
+/// Schema id for shared Host Profile schema pointers identical for every adapter.
 pub const MULTI_PLATFORM_SHARED_SCHEMA: &str = "vmz.native_host.multi_platform_shared.v0";
+/// Schema id for platform packaging adapter (packaging stub only).
 pub const MULTI_PLATFORM_ADAPTER_SCHEMA: &str = "vmz.native_host.multi_platform_adapter.v0";
+/// Schema id for multi-platform shared test-contract documents.
 pub const MULTI_PLATFORM_TEST_SCHEMA: &str = "vmz.native_host.multi_platform_test.v0";
+/// Schema id for multi-platform check reports.
 pub const MULTI_PLATFORM_CHECK_SCHEMA: &str = "vmz.native_host.multi_platform_check.v0";
 
+/// Hard: required platform lacks a packaging adapter entry.
 pub const DIAG_MISSING_PLATFORM_ADAPTER: &str = "vmz::native_host::missing_platform_adapter";
+/// Hard: adapter invents a platform-private Host Profile schema fork.
 pub const DIAG_PLATFORM_PRIVATE_SCHEMA: &str = "vmz::native_host::platform_private_schema";
+/// Hard: packaging adapter claims to be a second semantic core.
 pub const DIAG_ADAPTER_IS_SEMANTIC_CORE: &str = "vmz::native_host::adapter_is_semantic_core";
 
-/// Platforms that must share one bridge/surface/deployment/test contract .
+/// Platforms that must share one bridge / surface / deployment / test contract.
 pub const REQUIRED_MULTI_PLATFORMS: &[&str] = &["ios", "android"];
 
-/// adapter kind — packaging stub only; real Xcode/Gradle are later packaging/conformance.
+/// Adapter `kind` value for packaging stubs (not real Xcode/Gradle projects).
 pub const MULTI_PLATFORM_ADAPTER_KIND: &str = "packaging_stub";
 
+/// Hard: full-stack profile omits SSR first-paint policy.
 pub const DIAG_MISSING_SSR_FIRST_PAINT: &str = "vmz::native_host::missing_ssr_first_paint";
+/// Hard: full-stack profile omits `#server` transport binding.
 pub const DIAG_MISSING_SERVER_TRANSPORT: &str = "vmz::native_host::missing_server_transport";
+/// Hard: native bridge is allowed to bypass `#server` transport.
 pub const DIAG_BRIDGE_BYPASSES_SERVER: &str = "vmz::native_host::bridge_bypasses_server";
+/// Hard: full-stack profile omits auth / session isolation policy.
 pub const DIAG_MISSING_AUTH_SESSION: &str = "vmz::native_host::missing_auth_session";
+/// Hard: full-stack profile omits network / cleartext policy.
 pub const DIAG_MISSING_NETWORK_POLICY: &str = "vmz::native_host::missing_network_policy";
+/// Hard: remote/hybrid delivery or SSR lacks integrity evidence.
 pub const DIAG_REMOTE_WITHOUT_INTEGRITY: &str = "vmz::native_host::remote_without_integrity";
+/// Hard: bundled and remote SSR share cookie / origin assumptions.
 pub const DIAG_MIXED_SSR_COOKIE_ASSUMPTIONS: &str =
     "vmz::native_host::mixed_ssr_cookie_assumptions";
 
+/// Hard: lifecycle policy is missing a required event name.
 pub const DIAG_MISSING_LIFECYCLE_EVENT: &str = "vmz::native_host::missing_lifecycle_event";
+/// Hard: lifecycle treats background as destroy (must stay distinct).
 pub const DIAG_BACKGROUND_IS_DESTROY: &str = "vmz::native_host::background_is_destroy";
+/// Hard: crash restore assumes surviving JS heap / in-memory WebView state.
 pub const DIAG_CRASH_ASSUMES_JS_HEAP: &str = "vmz::native_host::crash_assumes_js_heap";
+/// Hard: lifecycle omits an explicit persistence policy.
 pub const DIAG_MISSING_PERSISTENCE: &str = "vmz::native_host::missing_persistence";
+/// Hard: lifecycle omits update / rollback channel policy.
 pub const DIAG_MISSING_UPDATE_POLICY: &str = "vmz::native_host::missing_update_policy";
+/// Hard: lifecycle omits offline resource policy.
 pub const DIAG_MISSING_OFFLINE_POLICY: &str = "vmz::native_host::missing_offline_policy";
 
-/// Required lifecycle events .
+/// Required NativeAppHost lifecycle event names (launch through destroy).
 pub const REQUIRED_LIFECYCLE_EVENTS: &[&str] = &[
     "launch",
     "create",
@@ -105,72 +155,101 @@ pub const REQUIRED_LIFECYCLE_EVENTS: &[&str] = &[
     "destroy",
 ];
 
+/// Hard: capability call envelope is missing a nonce.
 pub const DIAG_MISSING_NONCE: &str = "vmz::native_host::missing_nonce";
+/// Hard: capability call envelope is missing a verified origin.
 pub const DIAG_MISSING_ORIGIN: &str = "vmz::native_host::missing_origin";
+/// Hard: capability call omits required permission declarations.
 pub const DIAG_MISSING_PERMISSION: &str = "vmz::native_host::missing_permission";
+/// Hard: async capability call omits cancellation support.
 pub const DIAG_MISSING_CANCEL: &str = "vmz::native_host::missing_cancel";
+/// Hard: capability call omits trace / correlation context.
 pub const DIAG_MISSING_TRACE: &str = "vmz::native_host::missing_trace";
+/// Hard: capability call omits a timeout bound.
 pub const DIAG_MISSING_TIMEOUT: &str = "vmz::native_host::missing_timeout";
+/// Hard: call targets a stub id outside the published catalog.
 pub const DIAG_UNKNOWN_STUB: &str = "vmz::native_host::unknown_stub";
+/// Hard: call targets a capability id not on the bridge allowlist.
 pub const DIAG_CALL_NOT_ALLOWLISTED: &str = "vmz::native_host::call_not_allowlisted";
 
-/// First-batch NativeBacked stubs .
+/// First-batch NativeBacked stub capability ids for bridge catalog checks.
 pub const FIRST_BATCH_STUB_IDS: &[&str] =
     &["camera.capture", "file.pick", "share.send", "storage.get", "storage.set"];
 
+/// Hard: shell entry artifacts (client JS / dom host / entry URL) are incomplete.
 pub const DIAG_MISSING_ENTRY_ARTIFACT: &str = "vmz::native_host::missing_entry_artifact";
+/// Hard: shell omits a required host hook (`load` / `error` / `exit` / ...).
 pub const DIAG_MISSING_SHELL_HOOK: &str = "vmz::native_host::missing_shell_hook";
+/// Hard: platforms fork Host Profile / shell semantics instead of sharing schemas.
 pub const DIAG_PLATFORM_SEMANTIC_FORK: &str = "vmz::native_host::platform_semantic_fork";
+/// Hard: remote entry is the silent default (local bundled must be explicit default).
 pub const DIAG_REMOTE_ENTRY_DEFAULT: &str = "vmz::native_host::remote_entry_default";
+/// Hard: shell omits deep-link / universal-link mapping.
 pub const DIAG_MISSING_DEEP_LINK: &str = "vmz::native_host::missing_deep_link";
+/// Hard: shell omits logging / redaction policy.
 pub const DIAG_MISSING_LOG_POLICY: &str = "vmz::native_host::missing_log_policy";
 
-/// Required shell host hooks for .
+/// Required WebView shell host hook names for load / error / exit / deepLink / log.
 pub const REQUIRED_SHELL_HOOKS: &[&str] = &["load", "error", "exit", "deepLink", "log"];
 
 /// Platforms that must share one shell schema (no semantic fork).
 pub const REQUIRED_SHELL_PLATFORMS: &[&str] = &["ios", "android"];
 
+/// Hard: bridge uses arbitrary JS injection / object postMessage instead of typed calls.
 pub const DIAG_ARBITRARY_BRIDGE: &str = "vmz::native_host::arbitrary_bridge";
+/// Hard: deployment / shell is missing ApplicationIdentity.
 pub const DIAG_MISSING_IDENTITY: &str = "vmz::native_host::missing_identity";
+/// Hard: bridge / stub catalog is missing a capability allowlist.
 pub const DIAG_MISSING_ALLOWLIST: &str = "vmz::native_host::missing_allowlist";
+/// Hard: declared capability class is Unsupported on the target platform.
 pub const DIAG_UNSUPPORTED_CAPABILITY: &str = "vmz::native_host::unsupported_capability";
+/// Hard: WebViewDeploymentProfile failed structural / schema validation.
 pub const DIAG_INVALID_PROFILE: &str = "vmz::native_host::invalid_profile";
+/// Hard: remote URL is the silent default asset mode (must not be implicit).
 pub const DIAG_REMOTE_URL_DEFAULT: &str = "vmz::native_host::remote_url_default";
 
+/// One document kind entry inside [`NativeHostProtocolCatalog`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeHostDocumentKind {
+    /// Kind id (`webview_deployment`, `shell`, `lifecycle`, `native_surface`, ...).
     pub kind: String,
+    /// Schema id for that kind.
     pub schema: String,
 }
 
+/// Handshake catalog for the NativeAppHost protocol domain.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeHostProtocolCatalog {
+    /// Always [`NATIVE_HOST_PROTOCOL`].
     pub schema: String,
+    /// Same as `schema` (parity with other domain catalogs).
     pub protocol: String,
+    /// Document kinds this generation publishes.
     pub documents: Vec<NativeHostDocumentKind>,
+    /// Stable diagnostic codes callers may see.
     pub diagnostics: Vec<String>,
-    /// Capability classes .
+    /// Capability class names (`PureWeb` / `NativeBacked` / `NativeSurface` / ...).
     #[serde(rename = "capabilityClasses")]
     pub capability_classes: Vec<String>,
-    /// Forbidden arbitrary-bridge patterns (must fail check).
+    /// Forbidden arbitrary-bridge patterns that must fail check.
     #[serde(rename = "forbiddenBridgePatterns")]
     pub forbidden_bridge_patterns: Vec<String>,
-    /// first-batch capability stub ids.
+    /// First-batch NativeBacked stub capability ids.
     #[serde(rename = "firstBatchStubIds", default)]
     pub first_batch_stub_ids: Vec<String>,
-    /// required lifecycle events.
+    /// Required lifecycle event names from [`REQUIRED_LIFECYCLE_EVENTS`].
     #[serde(rename = "requiredLifecycleEvents", default)]
     pub required_lifecycle_events: Vec<String>,
-    /// high-value NativeSurface kinds.
+    /// High-value NativeSurface kinds from [`HIGH_VALUE_SURFACE_KINDS`].
     #[serde(rename = "highValueSurfaceKinds", default)]
     pub high_value_surface_kinds: Vec<String>,
-    /// platforms that must share one Host Profile contract set.
+    /// Platforms that must share one Host Profile contract set.
     #[serde(rename = "requiredMultiPlatforms", default)]
     pub required_multi_platforms: Vec<String>,
 }
 
 impl NativeHostProtocolCatalog {
+    /// Frozen catalog for the current native-host protocol generation.
     pub fn v0() -> Self {
         Self {
             schema: NATIVE_HOST_PROTOCOL.into(),
@@ -381,12 +460,13 @@ impl NativeHostProtocolCatalog {
         }
     }
 
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
-/// Patterns that must never be the bridge contract .
+/// Patterns that must never appear as the WebSurface <-> NativeAppHost bridge contract.
 pub const FORBIDDEN_BRIDGE_PATTERNS: &[&str] = &[
     "window.native",
     "window.webkit.messageHandlers",
@@ -395,20 +475,26 @@ pub const FORBIDDEN_BRIDGE_PATTERNS: &[&str] = &[
     "eval(",
 ];
 
-/// Application identity for a native host package.
+/// Application identity for a native host package (id / origin / optional store metadata).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApplicationIdentity {
+    /// Always [`APPLICATION_IDENTITY_SCHEMA`].
     pub schema: String,
+    /// Stable application id used by the host and deep links.
     #[serde(rename = "applicationId")]
     pub application_id: String,
+    /// Verified origin string (e.g. `app://demo.app`) for bridge checks.
     pub origin: String,
+    /// Optional store / OS bundle identifier.
     #[serde(rename = "bundleId", default, skip_serializing_if = "Option::is_none")]
     pub bundle_id: Option<String>,
+    /// Optional human/package version string.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
 }
 
 impl ApplicationIdentity {
+    /// Demo identity for fixtures and local shell examples.
     pub fn example() -> Self {
         Self {
             schema: APPLICATION_IDENTITY_SCHEMA.into(),
@@ -419,43 +505,58 @@ impl ApplicationIdentity {
         }
     }
 
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
-/// Native capability declaration (versioned, schema'd — not arbitrary injection).
+/// Native capability declaration (versioned and schema'd; not arbitrary injection).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeCapability {
+    /// Always [`NATIVE_CAPABILITY_SCHEMA`].
     pub schema: String,
+    /// Stable capability id (e.g. `camera.capture`).
     pub id: String,
+    /// Capability contract version string.
     pub version: String,
-    /// `PureWeb` | `NativeBacked` | `NativeSurface` | `ServerBacked` | `Unsupported`
+    /// Capability class: `PureWeb` | `NativeBacked` | `NativeSurface` | `ServerBacked` | `Unsupported`.
     #[serde(rename = "capabilityClass")]
     pub capability_class: String,
+    /// Platforms this capability targets (`ios` / `android` / ...).
     #[serde(rename = "targetPlatforms", default)]
     pub target_platforms: Vec<String>,
+    /// Permission names the host must grant before the call.
     #[serde(default)]
     pub permissions: Vec<String>,
+    /// Optional input payload schema id.
     #[serde(rename = "inputSchema", default, skip_serializing_if = "Option::is_none")]
     pub input_schema: Option<String>,
+    /// Optional output payload schema id.
     #[serde(rename = "outputSchema", default, skip_serializing_if = "Option::is_none")]
     pub output_schema: Option<String>,
+    /// Declared error codes the call may return.
     #[serde(default)]
     pub errors: Vec<String>,
+    /// Optional lifecycle binding hint (`bound_to_region` / `app` / ...).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lifecycle: Option<String>,
+    /// Whether the call is asynchronous.
     #[serde(rename = "async", default)]
     pub async_: bool,
+    /// Whether the host must support cancellation for this call.
     #[serde(default)]
     pub cancellation: bool,
+    /// Optional security posture string (e.g. `allowlist+origin+nonce`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub security: Option<String>,
+    /// Whether bridge trace / correlation is required.
     #[serde(default)]
     pub trace: bool,
 }
 
 impl NativeCapability {
+    /// Example `camera.capture` NativeBacked capability for fixtures.
     pub fn camera_capture_example() -> Self {
         Self {
             schema: NATIVE_CAPABILITY_SCHEMA.into(),
@@ -475,6 +576,7 @@ impl NativeCapability {
         }
     }
 
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
@@ -483,23 +585,31 @@ impl NativeCapability {
 /// Versioned bridge protocol between WebSurface and NativeAppHost.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BridgeProtocolManifest {
+    /// Always [`BRIDGE_PROTOCOL_SCHEMA`].
     pub schema: String,
+    /// Bridge protocol version string.
     pub version: String,
-    /// Must be typed capability calls — never arbitrary object injection.
+    /// Must be typed capability calls - never arbitrary object injection.
     pub mode: String,
+    /// Whether every call must carry a verified origin.
     #[serde(rename = "requireOrigin")]
     pub require_origin: bool,
+    /// Whether every call must carry a nonce.
     #[serde(rename = "requireNonce")]
     pub require_nonce: bool,
+    /// Whether calls must be on the published allowlist.
     #[serde(rename = "requireAllowlist")]
     pub require_allowlist: bool,
+    /// Whether `eval` / dynamic script injection is forbidden.
     #[serde(rename = "forbidEval")]
     pub forbid_eval: bool,
+    /// Capability ids this bridge instance exposes.
     #[serde(rename = "capabilityIds", default)]
     pub capability_ids: Vec<String>,
 }
 
 impl BridgeProtocolManifest {
+    /// Strict typed-capability bridge defaults for the current generation.
     pub fn v0(capability_ids: Vec<String>) -> Self {
         Self {
             schema: BRIDGE_PROTOCOL_SCHEMA.into(),
@@ -513,40 +623,50 @@ impl BridgeProtocolManifest {
         }
     }
 
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
-/// WebView deployment profile — Delivery for WebSurface inside NativeAppHost.
+/// WebView deployment profile - Delivery for WebSurface inside NativeAppHost.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct WebViewDeploymentProfile {
+    /// Always [`WEBVIEW_DEPLOYMENT_SCHEMA`].
     pub schema: String,
-    /// `local` | `remote` | `hybrid` — remote must not be silent default.
+    /// Asset delivery mode: `local` | `remote` | `hybrid` - remote must not be silent default.
     #[serde(rename = "assetMode")]
     pub asset_mode: String,
+    /// Application identity for this host package.
     pub identity: ApplicationIdentity,
+    /// Optional Content-Security-Policy string for the WebView.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csp: Option<String>,
+    /// Typed bridge protocol this deployment exposes.
     #[serde(rename = "bridge")]
     pub bridge: BridgeProtocolManifest,
+    /// Declared native capabilities for this deployment.
     #[serde(rename = "capabilities", default)]
     pub capabilities: Vec<NativeCapability>,
     /// Provenance: Browser/Web plan schema this WebSurface artifact lowers from.
     #[serde(rename = "planSchema")]
     pub plan_schema: String,
-    /// Browser artifact reuse — WebView does not invent a second View lowering.
+    /// Browser artifact reuse - WebView does not invent a second View lowering.
     #[serde(rename = "reusesBrowserLowering")]
     pub reuses_browser_lowering: bool,
+    /// Optional update channel name (e.g. `store`).
     #[serde(rename = "updateChannel", default, skip_serializing_if = "Option::is_none")]
     pub update_channel: Option<String>,
+    /// Optional rollback policy name (e.g. `previous_bundle`).
     #[serde(rename = "rollbackPolicy", default, skip_serializing_if = "Option::is_none")]
     pub rollback_policy: Option<String>,
+    /// Optional offline policy name (e.g. `bundled_only`).
     #[serde(rename = "offlinePolicy", default, skip_serializing_if = "Option::is_none")]
     pub offline_policy: Option<String>,
 }
 
 impl WebViewDeploymentProfile {
+    /// Local-bundled deployment example with the given capabilities.
     pub fn local_bundled_example(caps: Vec<NativeCapability>) -> Self {
         let ids: Vec<String> = caps.iter().map(|c| c.id.clone()).collect();
         Self {
@@ -564,34 +684,45 @@ impl WebViewDeploymentProfile {
         }
     }
 
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
+/// One diagnostic finding from a native-host check.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeHostDiagnostic {
+    /// JSON-pointer / logical path of the offending field.
     pub path: String,
+    /// Severity label (`error` / `warning` / ...).
     pub severity: String,
+    /// Human-readable finding message.
     pub message: String,
+    /// Optional stable diagnostic code (`vmz::native_host::...`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub code: Option<String>,
 }
 
-/// check report.
+/// Umbrella native-host check report (deployment + catalog + diagnostics).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeHostCheckReport {
+    /// Always [`NATIVE_HOST_CHECK_SCHEMA`].
     pub schema: String,
+    /// Protocol catalog snapshot used for this check.
     pub catalog: NativeHostProtocolCatalog,
+    /// WebView deployment under test.
     #[serde(rename = "webviewDeployment")]
     pub webview_deployment: WebViewDeploymentProfile,
+    /// Findings produced by the check.
     #[serde(default)]
     pub diagnostics: Vec<NativeHostDiagnostic>,
-    /// `ready` | `incomplete` | `failed`
+    /// Overall status: `ready` | `incomplete` | `failed`.
     pub status: String,
 }
 
 impl NativeHostCheckReport {
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
@@ -600,18 +731,24 @@ impl NativeHostCheckReport {
 /// Local bundled WebSurface entry artifacts (Browser Direct reuse).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LocalBundledEntry {
+    /// Always [`LOCAL_BUNDLE_SCHEMA`].
     pub schema: String,
+    /// Relative path to the client JS entry.
     #[serde(rename = "clientJs")]
     pub client_js: String,
+    /// Relative path to the DOM host bootstrap script.
     #[serde(rename = "domHost")]
     pub dom_host: String,
+    /// Optional HTML shell path when the host does not synthesize one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub html: Option<String>,
+    /// App-scheme entry URL loaded by the WebView.
     #[serde(rename = "entryUrl")]
     pub entry_url: String,
 }
 
 impl LocalBundledEntry {
+    /// Demo local-bundle entry for fixtures and shell examples.
     pub fn example() -> Self {
         Self {
             schema: LOCAL_BUNDLE_SCHEMA.into(),
@@ -623,19 +760,25 @@ impl LocalBundledEntry {
     }
 }
 
-/// Deep link / universal link map entry.
+/// Deep link / universal link map entry into a route id.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DeepLinkEntry {
+    /// Always [`DEEP_LINK_SCHEMA`].
     pub schema: String,
+    /// URL scheme (e.g. `app`).
     pub scheme: String,
+    /// Optional host for universal links.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub host: Option<String>,
+    /// Path matched by the deep link.
     pub path: String,
+    /// Target RouteId realized by the router.
     #[serde(rename = "routeId")]
     pub route_id: String,
 }
 
 impl DeepLinkEntry {
+    /// Demo deep-link entry for fixtures and shell examples.
     pub fn example() -> Self {
         Self {
             schema: DEEP_LINK_SCHEMA.into(),
@@ -647,42 +790,59 @@ impl DeepLinkEntry {
     }
 }
 
-/// Platform adapter stub — shared schema, platform-specific packaging only.
+/// Platform adapter stub - shared shell schema with platform-specific packaging only.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ShellPlatformAdapter {
+    /// Platform id (`ios` / `android`).
     pub platform: String,
+    /// Adapter kind (e.g. `webview_shell`).
     pub kind: String,
+    /// Shared shell schema id this adapter must honor.
     #[serde(rename = "shellSchema")]
     pub shell_schema: String,
 }
 
-/// Native WebView shell manifest (algebraic — not Xcode/Gradle projects).
+/// Native WebView shell manifest (algebraic contract; not Xcode/Gradle projects).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeWebViewShellManifest {
+    /// Always [`SHELL_SCHEMA`].
     pub schema: String,
+    /// Application identity for this shell.
     pub identity: ApplicationIdentity,
+    /// Asset delivery mode (`local` / `remote` / `hybrid`).
     #[serde(rename = "assetMode")]
     pub asset_mode: String,
+    /// Whether this shell reuses Browser View lowering (must stay true).
     #[serde(rename = "reusesBrowserLowering")]
     pub reuses_browser_lowering: bool,
+    /// Plan schema provenance for the bundled WebSurface.
     #[serde(rename = "planSchema")]
     pub plan_schema: String,
+    /// Local bundled entry artifacts.
     pub entry: LocalBundledEntry,
+    /// Declared host hooks (must cover [`REQUIRED_SHELL_HOOKS`]).
     pub hooks: Vec<String>,
+    /// Deep-link / universal-link map.
     #[serde(rename = "deepLinks", default)]
     pub deep_links: Vec<DeepLinkEntry>,
+    /// Shell logging / redaction policy.
     pub logging: ShellLoggingPolicy,
+    /// Per-platform packaging adapters sharing this shell schema.
     pub adapters: Vec<ShellPlatformAdapter>,
 }
 
+/// Logging policy for the native WebView shell.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ShellLoggingPolicy {
+    /// Log level name (`info` / `warn` / ...).
     pub level: String,
+    /// Whether sensitive fields must be redacted in host logs.
     #[serde(rename = "redactSensitive")]
     pub redact_sensitive: bool,
 }
 
 impl NativeWebViewShellManifest {
+    /// Local-bundled shell example with required hooks and iOS/Android adapters.
     pub fn local_bundled_example() -> Self {
         Self {
             schema: SHELL_SCHEMA.into(),
@@ -705,23 +865,30 @@ impl NativeWebViewShellManifest {
         }
     }
 
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
-/// shell check report.
+/// Shell-contract check report (manifest + catalog + diagnostics).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeShellCheckReport {
+    /// Always [`SHELL_CHECK_SCHEMA`].
     pub schema: String,
+    /// Protocol catalog snapshot used for this check.
     pub catalog: NativeHostProtocolCatalog,
+    /// Shell manifest under test.
     pub shell: NativeWebViewShellManifest,
+    /// Findings produced by the check.
     #[serde(default)]
     pub diagnostics: Vec<NativeHostDiagnostic>,
+    /// Overall status: `ready` | `incomplete` | `failed`.
     pub status: String,
 }
 
 impl NativeShellCheckReport {
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
@@ -730,16 +897,21 @@ impl NativeShellCheckReport {
 /// Bridge call trace context (must redact sensitive data).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BridgeTraceContext {
+    /// Always [`BRIDGE_TRACE_SCHEMA`].
     pub schema: String,
+    /// Correlation id joining request / response / host logs.
     #[serde(rename = "correlationId")]
     pub correlation_id: String,
+    /// Optional RouteId active when the call was issued.
     #[serde(rename = "routeId", default, skip_serializing_if = "Option::is_none")]
     pub route_id: Option<String>,
+    /// Whether sensitive payload fields must be redacted in traces.
     #[serde(rename = "redactSensitive")]
     pub redact_sensitive: bool,
 }
 
 impl BridgeTraceContext {
+    /// Example trace context with the given correlation id.
     pub fn example(correlation_id: &str) -> Self {
         Self {
             schema: BRIDGE_TRACE_SCHEMA.into(),
@@ -753,28 +925,42 @@ impl BridgeTraceContext {
 /// Versioned typed capability call envelope (not arbitrary JS injection).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeCapabilityCall {
+    /// Always [`CAPABILITY_CALL_SCHEMA`].
     pub schema: String,
+    /// Unique id for this call instance.
     #[serde(rename = "callId")]
     pub call_id: String,
+    /// Target capability id (must be allowlisted).
     #[serde(rename = "capabilityId")]
     pub capability_id: String,
+    /// Capability contract version expected by the caller.
     #[serde(rename = "capabilityVersion")]
     pub capability_version: String,
+    /// Verified origin of the WebSurface issuer.
     pub origin: String,
+    /// One-time nonce for replay protection.
     pub nonce: String,
+    /// Monotonic sequence number within the bridge session.
     pub sequence: u64,
+    /// Optional input payload schema id.
     #[serde(rename = "inputSchema", default, skip_serializing_if = "Option::is_none")]
     pub input_schema: Option<String>,
+    /// Optional output payload schema id.
     #[serde(rename = "outputSchema", default, skip_serializing_if = "Option::is_none")]
     pub output_schema: Option<String>,
+    /// Permissions asserted for this call.
     pub permissions: Vec<String>,
+    /// Timeout bound in milliseconds.
     #[serde(rename = "timeoutMs")]
     pub timeout_ms: u64,
+    /// Whether the caller may cancel this call.
     pub cancellation: bool,
+    /// Trace / correlation context for the call.
     pub trace: BridgeTraceContext,
 }
 
 impl NativeCapabilityCall {
+    /// Example `camera.capture` call envelope for fixtures.
     pub fn camera_capture_example() -> Self {
         Self {
             schema: CAPABILITY_CALL_SCHEMA.into(),
@@ -793,21 +979,26 @@ impl NativeCapabilityCall {
         }
     }
 
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
-/// First-batch stub catalog (algebraic — not real-device adapters yet).
+/// First-batch stub catalog (algebraic stubs; not real-device adapters yet).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BridgeStubCatalog {
+    /// Always [`BRIDGE_STUB_CATALOG_SCHEMA`].
     pub schema: String,
+    /// Declared NativeBacked stub capabilities.
     pub stubs: Vec<NativeCapability>,
+    /// Allowlisted capability ids derived from `stubs`.
     #[serde(rename = "allowlist")]
     pub allowlist: Vec<String>,
 }
 
 impl BridgeStubCatalog {
+    /// Frozen first-batch stub set (camera / file / share / storage).
     pub fn first_batch() -> Self {
         let stubs = vec![
             NativeCapability::camera_capture_example(),
@@ -880,26 +1071,34 @@ impl BridgeStubCatalog {
         Self { schema: BRIDGE_STUB_CATALOG_SCHEMA.into(), stubs, allowlist }
     }
 
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
-/// bridge check report.
+/// Bridge-contract check report (stub catalog + sample calls + diagnostics).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeBridgeCheckReport {
+    /// Always [`BRIDGE_CHECK_SCHEMA`].
     pub schema: String,
+    /// Protocol catalog snapshot used for this check.
     pub catalog: NativeHostProtocolCatalog,
+    /// Stub catalog under test.
     #[serde(rename = "stubCatalog")]
     pub stub_catalog: BridgeStubCatalog,
+    /// Sample typed capability calls exercised by the check.
     #[serde(rename = "sampleCalls", default)]
     pub sample_calls: Vec<NativeCapabilityCall>,
+    /// Findings produced by the check.
     #[serde(default)]
     pub diagnostics: Vec<NativeHostDiagnostic>,
+    /// Overall status: `ready` | `incomplete` | `failed`.
     pub status: String,
 }
 
 impl NativeBridgeCheckReport {
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
@@ -908,49 +1107,63 @@ impl NativeBridgeCheckReport {
 /// Persistence policy for WebView state across crash/restore (explicit, not JS heap).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PersistencePolicy {
+    /// Always [`PERSISTENCE_SCHEMA`].
     pub schema: String,
+    /// Whether persistence is enabled for this host.
     pub enabled: bool,
-    /// e.g. `capability_backed` | `bundled_snapshot` — never implicit JS memory.
+    /// Persistence mode (e.g. `capability_backed` | `bundled_snapshot`) - never implicit JS memory.
     pub mode: String,
+    /// Whether restore must force re-authentication.
     #[serde(rename = "reauthOnRestore")]
     pub reauth_on_restore: bool,
 }
 
-/// Update / rollback channel policy.
+/// Update / rollback channel policy for host package delivery.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UpdatePolicy {
+    /// Always [`UPDATE_POLICY_SCHEMA`].
     pub schema: String,
+    /// Update channel name (e.g. `store`).
     pub channel: String,
+    /// Rollback strategy name (e.g. `previous_bundle`).
     pub rollback: String,
 }
 
-/// Offline resource policy for local/hybrid delivery.
+/// Offline resource policy for local/hybrid WebSurface delivery.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct OfflinePolicy {
+    /// Always [`OFFLINE_POLICY_SCHEMA`].
     pub schema: String,
-    /// e.g. `bundled_only` | `hybrid_cache` — not `none` for .
+    /// Offline mode (e.g. `bundled_only` | `hybrid_cache`) - not `none` for production hosts.
     pub mode: String,
 }
 
-/// NativeAppHost lifecycle policy.
+/// NativeAppHost lifecycle policy (events, restore rules, nested policies).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeAppLifecyclePolicy {
+    /// Always [`LIFECYCLE_SCHEMA`].
     pub schema: String,
+    /// Declared lifecycle event names (must cover [`REQUIRED_LIFECYCLE_EVENTS`]).
     pub events: Vec<String>,
-    /// Hard rule: background ≠ destroy.
+    /// Hard rule: background must not equal destroy.
     #[serde(rename = "backgroundEqualsDestroy")]
     pub background_equals_destroy: bool,
-    /// Hard rule: crash restore must not assume JS heap.
+    /// Hard rule: crash restore must not assume surviving JS heap.
     #[serde(rename = "crashRestoreAssumesJsHeap")]
     pub crash_restore_assumes_js_heap: bool,
+    /// Whether regions dispose when the host reaches destroy.
     #[serde(rename = "disposeRegionsOnDestroy")]
     pub dispose_regions_on_destroy: bool,
+    /// Crash/restore persistence policy.
     pub persistence: PersistencePolicy,
+    /// Update / rollback channel policy.
     pub update: UpdatePolicy,
+    /// Offline resource policy.
     pub offline: OfflinePolicy,
 }
 
 impl NativeAppLifecyclePolicy {
+    /// Example lifecycle policy with required events and safe restore defaults.
     pub fn example() -> Self {
         Self {
             schema: LIFECYCLE_SCHEMA.into(),
@@ -976,23 +1189,30 @@ impl NativeAppLifecyclePolicy {
         }
     }
 
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
-/// lifecycle check report.
+/// Lifecycle-contract check report (policy + catalog + diagnostics).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeLifecycleCheckReport {
+    /// Always [`LIFECYCLE_CHECK_SCHEMA`].
     pub schema: String,
+    /// Protocol catalog snapshot used for this check.
     pub catalog: NativeHostProtocolCatalog,
+    /// Lifecycle policy under test.
     pub lifecycle: NativeAppLifecyclePolicy,
+    /// Findings produced by the check.
     #[serde(default)]
     pub diagnostics: Vec<NativeHostDiagnostic>,
+    /// Overall status: `ready` | `incomplete` | `failed`.
     pub status: String,
 }
 
 impl NativeLifecycleCheckReport {
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
@@ -1001,78 +1221,102 @@ impl NativeLifecycleCheckReport {
 /// SSR first-paint policy for WebSurface inside NativeAppHost.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SsrFirstPaintPolicy {
+    /// Always [`SSR_FIRST_PAINT_SCHEMA`].
     pub schema: String,
+    /// Whether SSR first-paint is enabled for this host.
     pub enabled: bool,
-    /// `bundled` | `remote` | `hybrid`
+    /// SSR delivery mode: `bundled` | `remote` | `hybrid`.
     pub mode: String,
+    /// Plan schema provenance for the SSR artifact.
     #[serde(rename = "planSchema")]
     pub plan_schema: String,
     /// Integrity evidence required for remote/hybrid SSR.
     #[serde(default)]
     pub integrity: String,
-    /// Must stay false — bundled and remote SSR cannot share cookie/origin assumptions.
+    /// Must stay false - bundled and remote SSR cannot share cookie/origin assumptions.
     #[serde(rename = "allowMixedCookieAssumptions", default)]
     pub allow_mixed_cookie_assumptions: bool,
 }
 
-/// `#server` transport binding — Native bridge must not bypass this.
+/// `#server` transport binding - Native bridge must not bypass this.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ServerTransportPolicy {
+    /// Always [`SERVER_TRANSPORT_SCHEMA`].
     pub schema: String,
-    /// Must be `#server`.
+    /// Transport scheme; must be `#server`.
     pub scheme: String,
+    /// Server endpoint path / binding string.
     pub endpoint: String,
+    /// Whether the native bridge is allowed to bypass `#server` (must stay false).
     #[serde(rename = "bridgeBypassesServer", default)]
     pub bridge_bypasses_server: bool,
 }
 
-/// Auth / session isolation for WebView host.
+/// Auth / session isolation for the WebView host.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AuthSessionPolicy {
+    /// Always [`AUTH_SESSION_SCHEMA`].
     pub schema: String,
+    /// Auth mode string (e.g. `cookie+token`).
     pub mode: String,
+    /// Session namespace isolating WebView cookies / tokens.
     #[serde(rename = "sessionNamespace")]
     pub session_namespace: String,
+    /// Whether WebView crash forces re-authentication.
     #[serde(rename = "reauthOnWebViewCrash")]
     pub reauth_on_webview_crash: bool,
 }
 
-/// Push capability declaration (stub ok for ).
+/// Push capability declaration (stub allowed for algebraic hosts).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PushPolicy {
+    /// Always [`PUSH_POLICY_SCHEMA`].
     pub schema: String,
+    /// Capability id for push subscribe / receive.
     #[serde(rename = "capabilityId")]
     pub capability_id: String,
+    /// Whether this entry is an algebraic stub (not a real device push adapter).
     pub stub: bool,
 }
 
-/// Network policy for NativeAppHost.
+/// Network policy for NativeAppHost (HTTPS / cleartext).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NetworkPolicy {
+    /// Always [`NETWORK_POLICY_SCHEMA`].
     pub schema: String,
+    /// Network mode string (e.g. `https_only`).
     pub mode: String,
+    /// Whether cleartext HTTP is allowed (must stay false for production hosts).
     #[serde(rename = "allowCleartext", default)]
     pub allow_cleartext: bool,
 }
 
-/// NativeAppHost full-stack profile.
+/// NativeAppHost full-stack profile (SSR, `#server`, auth, push, network, delivery).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeFullstackProfile {
+    /// Always [`FULLSTACK_SCHEMA`].
     pub schema: String,
+    /// SSR first-paint policy.
     pub ssr: SsrFirstPaintPolicy,
+    /// `#server` transport binding.
     #[serde(rename = "serverTransport")]
     pub server_transport: ServerTransportPolicy,
+    /// Auth / session isolation policy.
     pub auth: AuthSessionPolicy,
+    /// Push capability declaration.
     pub push: PushPolicy,
+    /// Network / cleartext policy.
     pub network: NetworkPolicy,
-    /// `local` | `remote` | `hybrid` delivery of WebSurface assets.
+    /// Delivery asset mode: `local` | `remote` | `hybrid`.
     #[serde(rename = "deliveryAssetMode")]
     pub delivery_asset_mode: String,
+    /// Integrity evidence for remote/hybrid delivery assets.
     #[serde(rename = "deliveryIntegrity", default)]
     pub delivery_integrity: String,
 }
 
 impl NativeFullstackProfile {
+    /// Example full-stack profile with bundled SSR and `#server` transport.
     pub fn example() -> Self {
         Self {
             schema: FULLSTACK_SCHEMA.into(),
@@ -1111,23 +1355,30 @@ impl NativeFullstackProfile {
         }
     }
 
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
-/// fullstack check report.
+/// Full-stack contract check report (profile + catalog + diagnostics).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeFullstackCheckReport {
+    /// Always [`FULLSTACK_CHECK_SCHEMA`].
     pub schema: String,
+    /// Protocol catalog snapshot used for this check.
     pub catalog: NativeHostProtocolCatalog,
+    /// Full-stack profile under test.
     pub fullstack: NativeFullstackProfile,
+    /// Findings produced by the check.
     #[serde(default)]
     pub diagnostics: Vec<NativeHostDiagnostic>,
+    /// Overall status: `ready` | `incomplete` | `failed`.
     pub status: String,
 }
 
 impl NativeFullstackCheckReport {
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
@@ -1136,39 +1387,52 @@ impl NativeFullstackCheckReport {
 /// Cross-boundary data contract between WebSurface and NativeSurface.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeSurfaceBoundary {
+    /// Always [`NATIVE_SURFACE_BOUNDARY_SCHEMA`].
     pub schema: String,
+    /// Whether boundary payloads must be serializable (no shared JS heap).
     pub serializable: bool,
+    /// Boundary payload schema version string.
     #[serde(rename = "schemaVersion")]
     pub schema_version: String,
+    /// Whether every crossing must carry bridge / host trace context.
     #[serde(rename = "traceRequired")]
     pub trace_required: bool,
 }
 
-/// NativeSurface manifest (local Surface driver — not a second semantic core).
+/// NativeSurface manifest (local surface driver - not a second semantic core).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeSurfaceManifest {
+    /// Always [`NATIVE_SURFACE_SCHEMA`].
     pub schema: String,
+    /// Stable NativeSurfaceId for this surface instance.
     #[serde(rename = "surfaceId")]
     pub surface_id: String,
-    /// `camera` | `map` | `video` for first high-value surface.
+    /// Surface kind: `camera` | `map` | `video` for first high-value surfaces.
     pub kind: String,
+    /// Owning region id that controls dispose / lifetime.
     #[serde(rename = "ownerRegionId")]
     pub owner_region_id: String,
+    /// Lifetime binding (e.g. `bound_to_region`).
     pub lifetime: String,
+    /// Whether the surface disposes when the owner region destroys.
     #[serde(rename = "disposeOnOwnerDestroy")]
     pub dispose_on_owner_destroy: bool,
+    /// Whether the surface shares implicit WebView / JS state (must stay false).
     #[serde(rename = "sharesImplicitWebViewState", default)]
     pub shares_implicit_webview_state: bool,
-    /// Must stay false — preview surface ≠ capture capability.
+    /// Must stay false - preview surface is not a capture capability.
     #[serde(rename = "confusedWithCapability", default)]
     pub confused_with_capability: bool,
-    /// Must stay false — VPG/Plan remain sole semantic IR.
+    /// Must stay false - VPG/Plan remain the sole semantic IR.
     #[serde(rename = "isSemanticTruthSource", default)]
     pub is_semantic_truth_source: bool,
+    /// Plan schema provenance for view operations reused by this surface.
     #[serde(rename = "planSchema")]
     pub plan_schema: String,
+    /// Whether this surface reuses target-neutral View Operations.
     #[serde(rename = "reusesViewOperations")]
     pub reuses_view_operations: bool,
+    /// WebSurface <-> NativeSurface boundary contract.
     pub boundary: NativeSurfaceBoundary,
     /// Related NativeBacked capability id (distinct from this surface).
     #[serde(rename = "relatedCapabilityId", default, skip_serializing_if = "Option::is_none")]
@@ -1176,6 +1440,7 @@ pub struct NativeSurfaceManifest {
 }
 
 impl NativeSurfaceManifest {
+    /// Example camera preview surface bound to a page region.
     pub fn camera_preview_example() -> Self {
         Self {
             schema: NATIVE_SURFACE_SCHEMA.into(),
@@ -1199,49 +1464,65 @@ impl NativeSurfaceManifest {
         }
     }
 
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
-/// native surface check report.
+/// Native-surface check report (manifest + catalog + diagnostics).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeSurfaceCheckReport {
+    /// Always [`NATIVE_SURFACE_CHECK_SCHEMA`].
     pub schema: String,
+    /// Protocol catalog snapshot used for this check.
     pub catalog: NativeHostProtocolCatalog,
+    /// NativeSurface manifest under test.
     pub surface: NativeSurfaceManifest,
+    /// Findings produced by the check.
     #[serde(default)]
     pub diagnostics: Vec<NativeHostDiagnostic>,
+    /// Overall status: `ready` | `incomplete` | `failed`.
     pub status: String,
 }
 
 impl NativeSurfaceCheckReport {
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
-/// shared Host Profile schemas — identical for every platform adapter.
+/// Shared Host Profile schema pointers - identical for every platform adapter.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MultiPlatformSharedContracts {
+    /// Always [`MULTI_PLATFORM_SHARED_SCHEMA`].
     pub schema: String,
+    /// Shared bridge protocol schema id.
     #[serde(rename = "bridgeSchema")]
     pub bridge_schema: String,
+    /// Shared capability-call schema id.
     #[serde(rename = "capabilityCallSchema")]
     pub capability_call_schema: String,
+    /// Shared NativeSurface schema id.
     #[serde(rename = "surfaceSchema")]
     pub surface_schema: String,
+    /// Shared shell schema id.
     #[serde(rename = "shellSchema")]
     pub shell_schema: String,
+    /// Shared WebView deployment schema id.
     #[serde(rename = "deploymentSchema")]
     pub deployment_schema: String,
+    /// Shared full-stack profile schema id.
     #[serde(rename = "fullstackSchema")]
     pub fullstack_schema: String,
+    /// Shared multi-platform test-contract schema id.
     #[serde(rename = "testContractSchema")]
     pub test_contract_schema: String,
 }
 
 impl MultiPlatformSharedContracts {
+    /// Canonical shared schema pointers for the current generation.
     pub fn canonical() -> Self {
         Self {
             schema: MULTI_PLATFORM_SHARED_SCHEMA.into(),
@@ -1256,36 +1537,46 @@ impl MultiPlatformSharedContracts {
     }
 }
 
-/// platform packaging adapter (stub only — not Xcode/Gradle semantics).
+/// Platform packaging adapter (stub only - not Xcode/Gradle semantics).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MultiPlatformAdapter {
+    /// Always [`MULTI_PLATFORM_ADAPTER_SCHEMA`].
     pub schema: String,
+    /// Platform id (`ios` / `android`).
     pub platform: String,
-    /// Must be `packaging_stub` for first version.
+    /// Must be [`MULTI_PLATFORM_ADAPTER_KIND`] (`packaging_stub`) for this generation.
     pub kind: String,
+    /// Bridge schema id this adapter must honor (from shared contracts).
     #[serde(rename = "bridgeSchema")]
     pub bridge_schema: String,
+    /// Capability-call schema id this adapter must honor.
     #[serde(rename = "capabilityCallSchema")]
     pub capability_call_schema: String,
+    /// NativeSurface schema id this adapter must honor.
     #[serde(rename = "surfaceSchema")]
     pub surface_schema: String,
+    /// Shell schema id this adapter must honor.
     #[serde(rename = "shellSchema")]
     pub shell_schema: String,
+    /// Deployment schema id this adapter must honor.
     #[serde(rename = "deploymentSchema")]
     pub deployment_schema: String,
+    /// Full-stack schema id this adapter must honor.
     #[serde(rename = "fullstackSchema")]
     pub fullstack_schema: String,
+    /// Test-contract schema id this adapter must honor.
     #[serde(rename = "testContractSchema")]
     pub test_contract_schema: String,
-    /// Packaging only — must not carry Host Profile / Program Graph semantics.
+    /// Packaging only - must not carry Host Profile / Program Graph semantics.
     #[serde(rename = "packagingOnly")]
     pub packaging_only: bool,
-    /// Must stay false — adapters are not a second semantic core.
+    /// Must stay false - adapters are not a second semantic core.
     #[serde(rename = "isSemanticTruthSource", default)]
     pub is_semantic_truth_source: bool,
 }
 
 impl MultiPlatformAdapter {
+    /// Packaging-stub adapter for `platform` that mirrors `shared` schema pointers.
     pub fn packaging_stub(platform: &str, shared: &MultiPlatformSharedContracts) -> Self {
         Self {
             schema: MULTI_PLATFORM_ADAPTER_SCHEMA.into(),
@@ -1304,19 +1595,24 @@ impl MultiPlatformAdapter {
     }
 }
 
-/// multi-platform Host Profile freeze (iOS + Android, shared schemas).
+/// Multi-platform Host Profile freeze (iOS + Android, shared schemas).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeMultiPlatformManifest {
+    /// Always [`MULTI_PLATFORM_SCHEMA`].
     pub schema: String,
+    /// Shared Host Profile schema pointers.
     pub shared: MultiPlatformSharedContracts,
+    /// Platform ids covered by this freeze.
     pub platforms: Vec<String>,
+    /// Per-platform packaging adapters.
     pub adapters: Vec<MultiPlatformAdapter>,
-    /// Must stay false — no platform-private Host Profile fork.
+    /// Must stay false - no platform-private Host Profile fork.
     #[serde(rename = "allowsPlatformSemanticFork", default)]
     pub allows_platform_semantic_fork: bool,
 }
 
 impl NativeMultiPlatformManifest {
+    /// Example iOS + Android freeze with packaging-stub adapters.
     pub fn ios_android_example() -> Self {
         let shared = MultiPlatformSharedContracts::canonical();
         Self {
@@ -1331,23 +1627,30 @@ impl NativeMultiPlatformManifest {
         }
     }
 
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
-/// multi-platform check report.
+/// Multi-platform check report (manifest + catalog + diagnostics).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NativeMultiPlatformCheckReport {
+    /// Always [`MULTI_PLATFORM_CHECK_SCHEMA`].
     pub schema: String,
+    /// Protocol catalog snapshot used for this check.
     pub catalog: NativeHostProtocolCatalog,
+    /// Multi-platform manifest under test.
     pub multi_platform: NativeMultiPlatformManifest,
+    /// Findings produced by the check.
     #[serde(default)]
     pub diagnostics: Vec<NativeHostDiagnostic>,
+    /// Overall status: `ready` | `incomplete` | `failed`.
     pub status: String,
 }
 
 impl NativeMultiPlatformCheckReport {
+    /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }

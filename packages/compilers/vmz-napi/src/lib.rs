@@ -516,7 +516,10 @@ impl JsWorkspace {
     pub fn check(&self, deny_warnings: Option<bool>) -> Result<JsCheckReport> {
         let mut ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         let report = ws
-            .check(&CheckOptions { deny_warnings: deny_warnings.unwrap_or(false) })
+            .check(&CheckOptions {
+                deny_warnings: deny_warnings.unwrap_or(false),
+                require_browser_safe_server_slices: false,
+            })
             .map_err(|e| Error::from_reason(e.to_string()))?;
         let dirty_count = ws.dirty_paths().count() as u32;
         Ok(JsCheckReport {
@@ -531,7 +534,10 @@ impl JsWorkspace {
     pub fn lint(&self, deny_warnings: Option<bool>) -> Result<JsCheckReport> {
         let mut ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         let mut report = ws
-            .check(&CheckOptions { deny_warnings: deny_warnings.unwrap_or(false) })
+            .check(&CheckOptions {
+                deny_warnings: deny_warnings.unwrap_or(false),
+                require_browser_safe_server_slices: false,
+            })
             .map_err(|e| Error::from_reason(e.to_string()))?;
         append_convention_lints(ws.root(), &mut report);
         let dirty_count = ws.dirty_paths().count() as u32;

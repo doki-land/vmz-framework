@@ -259,7 +259,7 @@ export async function runResumeManifest(
             }
             continue;
         }
-        if (kind === 'graph' || kind === 'plan' || kind === 'deployment' || kind === 'diagnostic') {
+        if (kind === 'graph' || kind === 'plan' || kind === 'deployment' || kind === 'diagnostic' || kind === 'motion') {
             continue;
         }
         fail(`unknown resume assertion ${JSON.stringify(kind)}`);

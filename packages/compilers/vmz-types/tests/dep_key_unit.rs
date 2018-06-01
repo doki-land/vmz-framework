@@ -13,8 +13,10 @@ fn stable_strings() {
 fn path_write_does_not_wake_sibling() {
     let name = DepKey::path(DepPath::prop("user", "name"));
     let id = DepKey::path(DepPath::prop("user", "id"));
-    let notice =
-        WriteNotice::Path { root: "user".into(), segs: vec![PathSeg::Ident("name".into())] };
+    let notice = WriteNotice::Path {
+        root: "user".into(),
+        segments: vec![PathSegment::Ident("name".into())],
+    };
     assert!(notice.matches(&name));
     assert!(!notice.matches(&id));
 }
@@ -25,7 +27,7 @@ fn path_write_does_not_wake_field_root() {
     let star = DepKey::FieldStar("tags".into());
     let notice = WriteNotice::Path {
         root: "tags".into(),
-        segs: vec![PathSeg::Ident("0".into()), PathSeg::Ident("label".into())],
+        segments: vec![PathSegment::Ident("0".into()), PathSegment::Ident("label".into())],
     };
     assert!(!notice.matches(&field));
     assert!(notice.matches(&star));

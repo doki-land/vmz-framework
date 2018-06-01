@@ -53,14 +53,15 @@ pub fn emit_client_js_with_ir(
         .or_else(|| owned.as_ref().and_then(|m| m.components.first()))
         .expect("reactive component");
 
-    let owned_view = if view.is_none() { Some(build_native_view(template, comp)) } else { None };
+    let owned_view =
+        if view.is_none() { Some(build_native_view(template, comp, None)) } else { None };
     let view = view.or_else(|| owned_view.as_ref()).expect("native view");
 
     let owned_fields: std::collections::HashSet<String> = client
         .decl
         .fields
         .iter()
-        .chain(client.decl.props.iter())
+        .chain(client.decl.properties.iter())
         .filter(|f| !f.name.starts_with('#'))
         .map(|f| f.name.clone())
         .collect();
@@ -74,8 +75,13 @@ pub fn emit_client_js_with_ir(
         js = format!("{stub}\n{js}");
     }
 
-    let mut field_names: Vec<String> =
-        client.decl.props.iter().chain(client.decl.fields.iter()).map(|f| f.name.clone()).collect();
+    let mut field_names: Vec<String> = client
+        .decl
+        .properties
+        .iter()
+        .chain(client.decl.fields.iter())
+        .map(|f| f.name.clone())
+        .collect();
     field_names.sort();
     field_names.dedup();
 
@@ -98,7 +104,13 @@ pub fn emit_client_js_with_ir(
             }
         };
         if plan_ref.status != vmz_types::PlanStatus::Empty {
-            js.push_str(&emit_vmz_plan(&client.decl.name, plan_ref));
+            // Production client omit by default (size). Set VMZ_EMIT_PLAN=1 for debug/gates.
+            let emit_plan = std::env::var("VMZ_EMIT_PLAN")
+                .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                .unwrap_or(false);
+            if emit_plan {
+                js.push_str(&emit_vmz_plan(&client.decl.name, plan_ref));
+            }
         }
     }
     js.push_str(&emit_props_runtime(&client.decl));
@@ -110,8 +122,11 @@ pub fn emit_client_js_with_ir(
         }
         js.push_str(&async_wraps);
     }
-    if barrier.rewritten > 0 {
-        // WriteBarrier first slice: nested static path writes notify without Proxy.
+    // Barrier when we rewrote nested writes, or author already used __vmzWritePath*
+    // (e.g. jfb Main) — skip Proxy wrap of large list assigns.
+    let already_barrier =
+        barrier.source.contains("__vmzWritePath") || barrier.source.contains("__vmzArrayMutate");
+    if barrier.rewritten > 0 || already_barrier {
         js.push_str(&format!("\n{}.__vmzWriteBarrier = true;\n", client.decl.name));
     }
     if !js.contains("export default") {
@@ -172,7 +187,7 @@ fn emit_async_task_wraps(decl: &vmz_types::ComponentDecl) -> String {
 
 /// Apply props after `new` (field inits run before constructor body; props must win + re-init state).
 fn emit_props_runtime(decl: &vmz_types::ComponentDecl) -> String {
-    let prop_names: Vec<_> = decl.props.iter().map(|p| format!("{:?}", p.name)).collect();
+    let prop_names: Vec<_> = decl.properties.iter().map(|p| format!("{:?}", p.name)).collect();
     let state_names: Vec<_> = decl
         .fields
         .iter()
@@ -181,7 +196,7 @@ fn emit_props_runtime(decl: &vmz_types::ComponentDecl) -> String {
         .collect();
 
     let mut body = String::new();
-    for p in &decl.props {
+    for p in &decl.properties {
         if let Some(init) = &p.init_text {
             body.push_str(&format!(
                 "  this.{name} = props.{name} !== undefined ? props.{name} : {init};\n",
@@ -227,7 +242,8 @@ fn inject_props_constructor(js: &str, class_name: &str) -> String {
         return js.to_string();
     };
     let body_start = after_name + rel + 1;
-    let peek_end = (body_start + 240).min(js.len());
+    // Peek window must land on a UTF-8 char boundary (CJK / emoji in class bodies).
+    let peek_end = js.floor_char_boundary((body_start + 240).min(js.len()));
     if js[body_start..peek_end].contains("constructor(") {
         return js.to_string();
     }
@@ -313,6 +329,27 @@ pub fn rewrite_virtual_import(
 /// Convenience: rewrite `vmz:runtime` only.
 pub fn rewrite_runtime_import(js: &str, from_file: &Path, runtime_file: &Path) -> String {
     rewrite_virtual_import(js, from_file, "vmz:runtime", runtime_file)
+}
+
+/// Author may write `from './foo.ts'`; Node ESM under `dist/` needs `.js`.
+pub fn rewrite_ts_spec_imports(js: &str) -> String {
+    let mut out = String::new();
+    for line in js.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("import ") || trimmed.starts_with("export ") {
+            out.push_str(
+                &line
+                    .replace(".tsx\"", ".js\"")
+                    .replace(".tsx'", ".js'")
+                    .replace(".ts\"", ".js\"")
+                    .replace(".ts'", ".js'"),
+            );
+        } else {
+            out.push_str(line);
+        }
+        out.push('\n');
+    }
+    out
 }
 
 fn pathdiff_string(from_dir: &Path, target: &Path) -> String {
@@ -438,8 +475,25 @@ pub(crate) fn is_component_tag(tag: &str) -> bool {
 }
 
 pub(crate) fn is_event_attr(name: &str) -> bool {
+    if name.starts_with('@') {
+        return name.len() > 1;
+    }
     let bytes = name.as_bytes();
     bytes.len() >= 3 && bytes[..2].eq_ignore_ascii_case(b"on") && bytes[2].is_ascii_uppercase()
+}
+
+/// DOM event type from `onClick` / `@click` / `@click.stop` / `on:click`.
+pub(crate) fn event_dom_type(name: &str) -> String {
+    let raw = if let Some(rest) = name.strip_prefix('@') {
+        rest
+    } else if let Some(rest) = name.strip_prefix("on:") {
+        rest
+    } else if name.len() >= 3 && name.as_bytes()[..2].eq_ignore_ascii_case(b"on") {
+        &name[2..]
+    } else {
+        name
+    };
+    raw.split('.').next().unwrap_or(raw).to_ascii_lowercase()
 }
 
 /// Trusted raw HTML binding (`html={expr}`) — not a DOM attribute.
@@ -453,6 +507,7 @@ pub(crate) fn sanitize_interp(expr: &str) -> String {
 }
 
 /// Rewrite bare field idents to `this.field`.
+/// Skips string / template literal contents so `'is-open'` is not rewritten to `'is-this.open'`.
 pub(crate) fn bind_field_idents(
     expr: &str,
     fields: &[String],
@@ -467,6 +522,26 @@ pub(crate) fn bind_field_idents(
     let mut i = 0;
     while i < chars.len() {
         let c = chars[i];
+        // Preserve string / template literal spans verbatim (incl. escapes).
+        if c == '\'' || c == '"' || c == '`' {
+            let quote = c;
+            out.push(c);
+            i += 1;
+            while i < chars.len() {
+                let ch = chars[i];
+                out.push(ch);
+                i += 1;
+                if ch == '\\' && i < chars.len() {
+                    out.push(chars[i]);
+                    i += 1;
+                    continue;
+                }
+                if ch == quote {
+                    break;
+                }
+            }
+            continue;
+        }
         if c.is_ascii_alphabetic() || c == '_' || c == '$' {
             let start = i;
             i += 1;
@@ -480,9 +555,13 @@ pub(crate) fn bind_field_idents(
                 let prev: String = chars[start.saturating_sub(5)..start].iter().collect();
                 prev.ends_with("this.")
             };
+            // Member access (`opt.value`, `item.label`) must not rewrite the property
+            // name through `this.` just because the component also has a same-named field.
+            let preceded_by_dot = start > 0 && chars[start - 1] == '.';
             if let Some((_, to)) = aliases.iter().find(|(from, _)| from == &ident) {
                 out.push_str(to);
             } else if !preceded_by_this
+                && !preceded_by_dot
                 && !scope.iter().any(|s| s == &ident)
                 && fields.iter().any(|f| f == &ident)
             {
@@ -497,4 +576,36 @@ pub(crate) fn bind_field_idents(
         }
     }
     out
+}
+
+#[cfg(test)]
+mod bind_field_idents_tests {
+    use super::bind_field_idents;
+
+    #[test]
+    fn each_alias_member_keeps_property_name() {
+        let fields = vec!["value".into(), "label".into(), "options".into()];
+        let scope = vec!["opt".into()];
+        let aliases = vec![("opt".into(), "box1.item".into())];
+        assert_eq!(bind_field_idents("opt.value", &fields, &scope, &aliases), "box1.item.value");
+        assert_eq!(bind_field_idents("opt.label", &fields, &scope, &aliases), "box1.item.label");
+        assert_eq!(
+            bind_field_idents("value === opt.value", &fields, &scope, &aliases),
+            "this.value === box1.item.value"
+        );
+    }
+
+    #[test]
+    fn string_literals_keep_field_name_substrings() {
+        let fields = vec!["open".into(), "mono".into()];
+        assert_eq!(
+            bind_field_idents(
+                "'chrome-select' + (open ? ' is-open' : '') + (mono ? ' is-mono' : '')",
+                &fields,
+                &[],
+                &[]
+            ),
+            "'chrome-select' + (this.open ? ' is-open' : '') + (this.mono ? ' is-mono' : '')"
+        );
+    }
 }

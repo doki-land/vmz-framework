@@ -68,12 +68,17 @@ function emitMinimalDesignsCss(designsDir) {
     const vars = {};
     const tokenDir = path.join(designsDir, 'tokens');
     if (fs.existsSync(tokenDir)) {
-        walkJson(tokenDir, (obj, prefix) => flattenTokens(obj, prefix, vars));
+        walkJson(tokenDir, (obj, prefix) => {
+            collectStyleThemeEntries(obj, vars);
+            flattenTokens(obj, prefix, vars);
+        });
     }
     const themeJson = path.join(designsDir, 'theme.json');
     if (fs.existsSync(themeJson)) {
         try {
-            flattenTokens(JSON.parse(fs.readFileSync(themeJson, 'utf8')), '', vars);
+            const theme = JSON.parse(fs.readFileSync(themeJson, 'utf8'));
+            collectStyleThemeEntries(theme, vars);
+            flattenTokens(theme, '', vars);
         } catch {
             /* ignore */
         }
@@ -92,9 +97,27 @@ function cssVar(key) {
         .replace(/^-|-$/g, '');
     return `--${name}`;
 }
+/**
+ * Style Theme entries (`key.path` + `value`) → `vmz-*` CSS vars (same naming as application compile).
+ * @param {unknown} obj
+ * @param {Record<string, string>} out
+ */
+function collectStyleThemeEntries(obj, out) {
+    if (obj == null || typeof obj !== 'object' || Array.isArray(obj)) return;
+    const entries = /** @type {{ key?: { path?: unknown }, value?: unknown }[]} */ (/** @type {{ entries?: unknown }} */ (obj).entries);
+    if (!Array.isArray(entries)) return;
+    for (const e of entries) {
+        const pathParts = e?.key?.path;
+        if (!Array.isArray(pathParts) || pathParts.length === 0) continue;
+        if (typeof e.value !== 'string' && typeof e.value !== 'number') continue;
+        const dotted = pathParts.map(String).join('-');
+        out[`vmz-${dotted}`] = String(e.value);
+    }
+}
 function flattenTokens(obj, prefix, out) {
     if (obj == null || typeof obj !== 'object' || Array.isArray(obj)) return;
     for (const [k, v] of Object.entries(obj)) {
+        if (k === 'entries') continue;
         const key = prefix ? `${prefix}-${k}` : k;
         if (v != null && typeof v === 'object' && !Array.isArray(v)) {
             if ('value' in v && (typeof v.value === 'string' || typeof v.value === 'number')) {

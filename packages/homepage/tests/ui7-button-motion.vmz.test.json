@@ -1,0 +1,28 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "ui7.button.motion.compile",
+    "title": "Button Motion IR — control token via vmz test compile",
+    "modes": ["compile"],
+    "program": {
+        "chunkId": "components/Button",
+        "unitName": "Button"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "motion",
+            "expect": {
+                "status": "partial",
+                "kinds": ["control"],
+                "token": "motion.control",
+                "reducedMotion": "honor",
+                "planMotionTransition": true
+            }
+        }
+    ]
+}

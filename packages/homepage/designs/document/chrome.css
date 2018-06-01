@@ -63,12 +63,23 @@ a:hover {
     margin-top: auto;
 }
 
-/* Document collection nav — secondary under host header (not a second site chrome). */
+/* Document collection nav — secondary under host header (not a second site chrome).
+ * Density from shared /designs (UI6 preset); same activation as application surfaces. */
 nav[aria-label="Documents"],
 .doc-subnav {
-    padding: 0.65rem clamp(1.25rem, 4vw, 2.75rem);
+    padding: var(--vmz-density-control-padding-y, 0.55rem) clamp(1.25rem, 4vw, 2.75rem);
     border-bottom: 1px solid var(--vmz-line-default, #d9dee3);
     background: var(--vmz-surface-mist, #f4f6f8);
+}
+
+:where([data-density="compact"]) nav[aria-label="Documents"],
+:where([data-density="compact"]) .doc-subnav {
+    padding: var(--vmz-density-compact-padding-y, 0.35rem) clamp(1.25rem, 4vw, 2.75rem);
+}
+
+:where([data-density="dense"]) nav[aria-label="Documents"],
+:where([data-density="dense"]) .doc-subnav {
+    padding: var(--vmz-density-dense-padding-y, 0.2rem) clamp(1.25rem, 4vw, 2.75rem);
 }
 
 nav[aria-label="Documents"] ul,
@@ -78,7 +89,17 @@ nav[aria-label="Documents"] ul,
     padding: 0;
     display: flex;
     flex-wrap: wrap;
-    gap: 0.55rem 1.1rem;
+    gap: var(--vmz-density-control-gap, 0.75rem) 1.1rem;
+}
+
+:where([data-density="compact"]) nav[aria-label="Documents"] ul,
+:where([data-density="compact"]) .doc-subnav ul {
+    gap: var(--vmz-density-compact-gap, 0.45rem) 0.85rem;
+}
+
+:where([data-density="dense"]) nav[aria-label="Documents"] ul,
+:where([data-density="dense"]) .doc-subnav ul {
+    gap: var(--vmz-density-dense-gap, 0.3rem) 0.65rem;
 }
 
 nav[aria-label="Documents"] a,

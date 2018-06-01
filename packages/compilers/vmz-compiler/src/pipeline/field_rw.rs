@@ -13,7 +13,7 @@ use oxc_ast::ast::{
 };
 use oxc_ast_visit::{Visit, walk};
 use oxc_span::Span;
-use vmz_types::{DepKey, DepPath, PathSeg};
+use vmz_types::{DepKey, DepPath, PathSegment};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ForbiddenFactory {
@@ -361,15 +361,15 @@ fn extend_key(base: &DepKey, prop: &str) -> DepKey {
     match base {
         DepKey::Field(root) => DepKey::path(DepPath::prop(root.clone(), prop)),
         DepKey::Path(p) => {
-            let mut segs = p.segs.clone();
-            segs.push(PathSeg::Ident(prop.to_string()));
-            DepKey::path(DepPath { root: p.root.clone(), segs })
+            let mut segs = p.segments.clone();
+            segs.push(PathSegment::Ident(prop.to_string()));
+            DepKey::path(DepPath { root: p.root.clone(), segments: segs })
         }
         DepKey::FieldStar(root) => DepKey::FieldStar(root.clone()),
-        DepKey::IndexPath { root, index, segs } => {
+        DepKey::IndexPath { root, index, segments: segs } => {
             let mut segs = segs.clone();
-            segs.push(PathSeg::Ident(prop.to_string()));
-            DepKey::IndexPath { root: root.clone(), index: index.clone(), segs }
+            segs.push(PathSegment::Ident(prop.to_string()));
+            DepKey::IndexPath { root: root.clone(), index: index.clone(), segments: segs }
         }
     }
 }
@@ -562,7 +562,7 @@ fn simple_assignment_this_path(it: &SimpleAssignmentTarget<'_>) -> Option<DepKey
 
 /// `this.user.name` ?Path(user, [name]); `this.count` ?Field(count).
 fn static_this_path(m: &StaticMemberExpression<'_>) -> Option<DepKey> {
-    let mut segs: Vec<PathSeg> = Vec::new();
+    let mut segs: Vec<PathSegment> = Vec::new();
     let mut cur = m;
     loop {
         match &cur.object {
@@ -572,11 +572,11 @@ fn static_this_path(m: &StaticMemberExpression<'_>) -> Option<DepKey> {
                 return Some(if segs.is_empty() {
                     DepKey::field(root)
                 } else {
-                    DepKey::path(DepPath { root, segs })
+                    DepKey::path(DepPath { root, segments: segs })
                 });
             }
             Expression::StaticMemberExpression(inner) => {
-                segs.push(PathSeg::Ident(cur.property.name.to_string()));
+                segs.push(PathSegment::Ident(cur.property.name.to_string()));
                 cur = inner;
             }
             Expression::ComputedMemberExpression(_) => {
@@ -621,27 +621,44 @@ fn callee_factory_name(callee: &Expression<'_>) -> Option<String> {
     }
 }
 
-/// `useX` / `createX` state-factory names (not `user`; DOM helpers allowlisted).
+/// `useX` / a closed set of `createX` state-factory names (Vue/React-ish state APIs).
+/// Domain constructors like `createAnimator` / `createElement` are not state factories.
 pub fn is_forbidden_factory(name: &str) -> bool {
-    const ALLOW: &[&str] = &[
+    const ALLOW_CREATE: &[&str] = &[
         "createElement",
         "createDocumentFragment",
         "createTextNode",
         "createComment",
         "createRange",
     ];
-    if ALLOW.iter().any(|a| *a == name) {
+    if ALLOW_CREATE.iter().any(|a| *a == name) {
         return false;
     }
-    for prefix in ["use", "create"] {
-        if let Some(rest) = name.strip_prefix(prefix)
-            && let Some(c) = rest.chars().next()
-            && c.is_ascii_uppercase()
-        {
-            return true;
-        }
+    // `useX` — always forbidden as a state API surface.
+    if let Some(rest) = name.strip_prefix("use")
+        && let Some(c) = rest.chars().next()
+        && c.is_ascii_uppercase()
+    {
+        return true;
     }
-    false
+    // `createX` — only known state/store factories (not domain constructors).
+    const FORBIDDEN_CREATE: &[&str] = &[
+        "createStore",
+        "createSignal",
+        "createReactive",
+        "createState",
+        "createApp",
+        "createRoot",
+        "createContext",
+        "createMemo",
+        "createEffect",
+        "createReducer",
+        "createSlice",
+        "createModel",
+        "createSharedState",
+        "createGlobalState",
+    ];
+    FORBIDDEN_CREATE.iter().any(|a| *a == name)
 }
 
 /// Collect reads of `this.<field>` from an expression (e.g. field initializer).
@@ -758,7 +775,7 @@ impl<'a> Visit<'a> for EachAliasPathVisitor {
     fn visit_member_expression(&mut self, it: &MemberExpression<'a>) {
         if let Some((root, segs)) = path_from_member(it) {
             if root == self.as_name {
-                if segs.iter().any(|s| matches!(s, PathSeg::DynIndex(_))) {
+                if segs.iter().any(|s| matches!(s, PathSegment::DynamicIndex(_))) {
                     // Dynamic item sub-path ?keep whole-item ListItem, not a false static leaf.
                     self.push_path(Vec::new());
                     return;
@@ -766,9 +783,9 @@ impl<'a> Visit<'a> for EachAliasPathVisitor {
                 let props: Vec<String> = segs
                     .into_iter()
                     .filter_map(|s| match s {
-                        PathSeg::Ident(n) => Some(n),
-                        PathSeg::StaticIndex(n) => Some(n.to_string()),
-                        PathSeg::DynIndex(_) => None,
+                        PathSegment::Ident(n) => Some(n),
+                        PathSegment::StaticIndex(n) => Some(n.to_string()),
+                        PathSegment::DynamicIndex(_) => None,
                     })
                     .collect();
                 self.push_path(props);
@@ -830,7 +847,7 @@ impl TemplateDepVisitor {
         if self.in_scope(&root) || !self.is_field(&root) {
             return None;
         }
-        Some(DepKey::path(DepPath { root, segs }))
+        Some(DepKey::path(DepPath { root, segments: segs }))
     }
 }
 
@@ -856,11 +873,11 @@ impl<'a> Visit<'a> for TemplateDepVisitor {
     }
 }
 
-fn path_from_member(me: &MemberExpression<'_>) -> Option<(String, Vec<PathSeg>)> {
+fn path_from_member(me: &MemberExpression<'_>) -> Option<(String, Vec<PathSegment>)> {
     match me {
         MemberExpression::StaticMemberExpression(m) => {
             let (root, mut segs) = path_from_object(&m.object)?;
-            segs.push(PathSeg::Ident(m.property.name.to_string()));
+            segs.push(PathSegment::Ident(m.property.name.to_string()));
             Some((root, segs))
         }
         MemberExpression::ComputedMemberExpression(m) => {
@@ -872,13 +889,13 @@ fn path_from_member(me: &MemberExpression<'_>) -> Option<(String, Vec<PathSeg>)>
     }
 }
 
-fn path_from_object(expr: &Expression<'_>) -> Option<(String, Vec<PathSeg>)> {
+fn path_from_object(expr: &Expression<'_>) -> Option<(String, Vec<PathSegment>)> {
     match expr {
         Expression::Identifier(id) => Some((id.name.to_string(), Vec::new())),
         Expression::ParenthesizedExpression(p) => path_from_object(&p.expression),
         Expression::StaticMemberExpression(m) => {
             let (root, mut segs) = path_from_object(&m.object)?;
-            segs.push(PathSeg::Ident(m.property.name.to_string()));
+            segs.push(PathSegment::Ident(m.property.name.to_string()));
             Some((root, segs))
         }
         Expression::ComputedMemberExpression(m) => {
@@ -891,11 +908,13 @@ fn path_from_object(expr: &Expression<'_>) -> Option<(String, Vec<PathSeg>)> {
     }
 }
 
-fn path_from_chain_element(el: &oxc_ast::ast::ChainElement<'_>) -> Option<(String, Vec<PathSeg>)> {
+fn path_from_chain_element(
+    el: &oxc_ast::ast::ChainElement<'_>,
+) -> Option<(String, Vec<PathSegment>)> {
     match el {
         oxc_ast::ast::ChainElement::StaticMemberExpression(m) => {
             let (root, mut segs) = path_from_object(&m.object)?;
-            segs.push(PathSeg::Ident(m.property.name.to_string()));
+            segs.push(PathSegment::Ident(m.property.name.to_string()));
             Some((root, segs))
         }
         oxc_ast::ast::ChainElement::ComputedMemberExpression(m) => {
@@ -907,13 +926,13 @@ fn path_from_chain_element(el: &oxc_ast::ast::ChainElement<'_>) -> Option<(Strin
     }
 }
 
-fn path_seg_from_index_expr(expr: &Expression<'_>) -> Option<PathSeg> {
+fn path_seg_from_index_expr(expr: &Expression<'_>) -> Option<PathSegment> {
     match expr {
         Expression::NumericLiteral(n) if n.value.fract() == 0.0 && n.value >= 0.0 => {
-            Some(PathSeg::StaticIndex(n.value as usize))
+            Some(PathSegment::StaticIndex(n.value as usize))
         }
-        Expression::StringLiteral(s) => Some(PathSeg::Ident(s.value.as_str().to_string())),
-        Expression::Identifier(id) => Some(PathSeg::DynIndex(id.name.to_string())),
+        Expression::StringLiteral(s) => Some(PathSegment::Ident(s.value.as_str().to_string())),
+        Expression::Identifier(id) => Some(PathSegment::DynamicIndex(id.name.to_string())),
         Expression::ParenthesizedExpression(p) => path_seg_from_index_expr(&p.expression),
         _ => None,
     }
@@ -975,13 +994,13 @@ fn collect_template_deps_scan(expr: &str, fields: &[String], scope: &[String]) -
                     j += 1;
                 }
                 let prop: String = chars[ps..j].iter().collect();
-                segs.push(PathSeg::Ident(prop));
+                segs.push(PathSegment::Ident(prop));
                 i = j;
             }
             let key = if segs.is_empty() {
                 DepKey::field(ident)
             } else {
-                DepKey::path(DepPath { root: ident, segs })
+                DepKey::path(DepPath { root: ident, segments: segs })
             };
             let s = key.to_stable_string();
             if !deps.iter().any(|d| d.to_stable_string() == s) {

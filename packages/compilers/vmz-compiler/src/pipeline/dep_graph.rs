@@ -119,5 +119,9 @@ fn walk(node: &TemplateNode, out: &mut Vec<String>, seen: &mut HashSet<String>) 
 }
 
 fn is_component_tag(tag: &str) -> bool {
+    // Built-in `<Link>` lowers to `<a>`; never a component chunk edge.
+    if tag == "Link" {
+        return false;
+    }
     tag.chars().next().is_some_and(|c| c.is_uppercase())
 }
