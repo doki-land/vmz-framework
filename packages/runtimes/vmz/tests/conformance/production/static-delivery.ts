@@ -89,6 +89,22 @@ if (!home.includes('<title>Home · Production Router</title>')) {
     errors.push(`home missing SEO title: ${home.slice(0, 400)}`);
 }
 if (!home.includes('name="robots" content="index,follow"')) errors.push('home missing robots meta');
+if (!home.includes('hreflang="zh-hans"') || !home.includes('hreflang="x-default"') || !home.includes('hreflang="en-us"')) {
+    errors.push(`home missing hreflang seed: ${home.slice(0, 800)}`);
+}
+if (!home.includes('lang="en-us"') || !home.includes('data-vmz-locale="en-us"')) {
+    errors.push('home missing defaultLocale lang/data-vmz-locale');
+}
+const zhAbout = path.join(dist, 'zh-hans', 'about', 'index.html');
+if (!fs.existsSync(zhAbout)) {
+    errors.push('missing locale-prefixed static HTML zh-hans/about/index.html');
+} else {
+    const zhHtml = fs.readFileSync(zhAbout, 'utf8');
+    if (!zhHtml.includes('lang="zh-hans"') || !zhHtml.includes('route-about')) {
+        errors.push('zh-hans/about HTML missing locale/body');
+    }
+    if (!zhHtml.includes('hreflang="en-us"')) errors.push('zh-hans/about missing hreflang alternates');
+}
 if (!about.includes('route-about') || !about.includes('About · Production Router')) {
     errors.push('about HTML missing body/SEO');
 }
@@ -102,7 +118,14 @@ if (notFound.includes('route-home')) errors.push('404.html must not be SPA index
 if (!sitemap.includes(`${ORIGIN}/`) || !sitemap.includes(`${ORIGIN}/about`)) {
     errors.push(`sitemap missing public urls: ${sitemap.slice(0, 400)}`);
 }
+if (!sitemap.includes(`${ORIGIN}/zh-hans/about`)) {
+    errors.push(`sitemap missing locale-prefixed url: ${sitemap.slice(0, 600)}`);
+}
 if (sitemap.includes('/products/')) errors.push('sitemap must not include ServerRequired product routes');
+const manifestLocales = (manifest.routes || []).filter((r: { localeId?: string }) => r.localeId === 'zh-hans');
+if (manifestLocales.length < 1) {
+    errors.push(`manifest missing zh-hans locale generations, got ${JSON.stringify((manifest.routes || []).slice(0, 8))}`);
+}
 if (!robots.includes('Sitemap:') || !robots.includes('Allow: /')) {
     errors.push(`robots.txt incomplete: ${robots}`);
 }
@@ -178,10 +201,10 @@ upsertCheck(proof, {
 });
 upsertCheck(proof, {
     id: 'static-delivery.seo',
-    status: errors.some((e) => e.includes('canonical') || e.includes('SEO') || e.includes('sitemap') || e.includes('robots'))
+    status: errors.some((e) => e.includes('canonical') || e.includes('SEO') || e.includes('sitemap') || e.includes('robots') || e.includes('hreflang') || e.includes('locale'))
         ? 'failed'
         : 'passed',
-    detail: 'title/description/canonical/robots + sitemap/robots.txt',
+    detail: 'title/description/canonical/robots/hreflang + locale-prefixed HTML seed + sitemap/robots.txt',
 });
 upsertCheck(proof, {
     id: 'static-delivery.no-spa-fallback',
@@ -195,7 +218,7 @@ upsertCheck(proof, {
 });
 
 proof.deliveryProfile = 'web-static';
-const gaps = ['A3: StaticParameterized enumeration not covered', 'A3: locale-prefixed static HTML / hreflang matrix not covered'];
+const gaps = ['A3: StaticParameterized enumeration not covered'];
 for (const g of gaps) addLimitation(proof, g);
 proof.knownLimitations = proof.knownLimitations.filter(
     (l) =>
@@ -204,11 +227,12 @@ proof.knownLimitations = proof.knownLimitations.filter(
         !l.includes('A3: web-static / SEO') &&
         !l.includes('A3: web-static build failed') &&
         !l.includes('A3: content-addressed assets/<hash> immutable CDN layout not covered') &&
+        !l.includes('A3: locale-prefixed static HTML / hreflang matrix not covered') &&
         !l.includes('SiteDeliveryContract resolver not covered'),
 );
 
 writeProof(proof, root);
 if (errors.length) fail(errors.join('\n'));
 
-console.log('static-delivery PASS: web-static HTML + 404 + SEO + manifest (no SPA fallback)');
-console.log('static-delivery NOTE: locale static matrix / StaticParameterized still open');
+console.log('static-delivery PASS: web-static HTML + 404 + SEO/hreflang + locale-prefixed seed + manifest (no SPA fallback)');
+console.log('static-delivery NOTE: StaticParameterized still open');

@@ -1,5 +1,5 @@
 <template>
-  <main>
+  <main data-vmz-focus="about-main">
     <h1>About</h1>
     <p>route-about</p>
     <Link to="IndexPage">Home</Link>

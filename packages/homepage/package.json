@@ -8,11 +8,13 @@
         "check": "vmz check .",
         "build": "vmz build .",
         "dev": "vmz dev .",
+        "test:deploy-planner": "node --experimental-strip-types ./tests/deploy-planner.selftest.ts",
         "document:check": "vmz document check . --strict",
         "document:dev": "vmz document dev"
     },
     "dependencies": {
         "@vmz/ui": "workspace:*",
+        "@vmz/ui-data-grid": "workspace:*",
         "@vmz/core": "workspace:*"
     },
     "devDependencies": {

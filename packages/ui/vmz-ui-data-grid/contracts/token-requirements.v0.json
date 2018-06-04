@@ -1,0 +1,47 @@
+{
+    "schema": "vmz.ui.token_requirements.v0",
+    "package": "@vmz/ui-data-grid",
+    "cssVar": {
+        "prefix": "--vmz-",
+        "fromDotted": "split on '.' then join with '-'"
+    },
+    "forbiddenBrandHex": ["#176BFF", "#0D57DB", "#FFB000", "#00C878", "#121416"],
+    "components": {
+        "DataGrid": {
+            "source": "src/components/DataGrid.vmz",
+            "stableHint": "ui-data-grid.DataGrid",
+            "tokens": [
+                "surface.paper",
+                "surface.mist",
+                "text.ink",
+                "text.steel",
+                "line.default",
+                "action.primary.background",
+                "action.primary.active",
+                "focus.ring",
+                "font.mono",
+                "density.compact.padding-y",
+                "density.compact.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": [
+                "parent-owned-selection",
+                "row-virtualization",
+                "pinned-column",
+                "sticky-header",
+                "column-sort",
+                "row-grouping",
+                "group-aggregation",
+                "tree-rows",
+                "cell-editing",
+                "pivot-matrix",
+                "not-ordinary-datatable"
+            ]
+        }
+    },
+    "composition": {
+        "reuseFrom": "@vmz/ui",
+        "mustNotShip": ["Button", "Field", "Dialog", "Form", "Empty", "Skeleton"],
+        "dogfoodWith": ["BulkActions", "FilterBar", "Pagination", "ConsoleShell", "Field"]
+    }
+}

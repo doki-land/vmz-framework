@@ -13,8 +13,8 @@ fn example_camera_preview_ready() {
     ));
     let _ = fs::create_dir_all(&dir);
     let report = check_native_surface_contract(&dir);
-    assert_eq!(report.status, "ready", "{:?}", report.diagnostics);
-    assert_eq!(report.surface.kind, "camera");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Ready, "{:?}", report.diagnostics);
+    assert_eq!(report.surface.kind, NativeSurfaceKind::Camera);
     assert!(!report.surface.confused_with_capability);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -30,9 +30,12 @@ fn rejects_implicit_state_share() {
     s.shares_implicit_webview_state = true;
     fs::write(dir.join("native-surface.json"), s.to_json()).unwrap();
     let report = check_native_surface_contract(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
-        report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_IMPLICIT_STATE_SHARE))
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_IMPLICIT_STATE_SHARE))
     );
     let _ = fs::remove_dir_all(&dir);
 }
@@ -48,9 +51,12 @@ fn rejects_surface_as_capability() {
     s.confused_with_capability = true;
     fs::write(dir.join("native-surface.json"), s.to_json()).unwrap();
     let report = check_native_surface_contract(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
-        report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_SURFACE_IS_CAPABILITY))
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_SURFACE_IS_CAPABILITY))
     );
     let _ = fs::remove_dir_all(&dir);
 }

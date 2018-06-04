@@ -82,7 +82,6 @@ fn keyed_static_row_emits_row_kernel() {
     let js = js.unwrap();
     assert!(js.contains("rowKernel:"), "{js}");
     assert!(js.contains("hydrate:"), "{js}");
-    assert!(js.contains("data-vmz-act"), "{js}");
     assert!(js.contains("create:"), "{js}");
     assert!(js.contains("insertBefore"), "{js}");
     assert!(js.contains("cloneNode"), "{js}");
@@ -96,6 +95,35 @@ fn keyed_static_row_emits_row_kernel() {
     assert!(js.contains("item.id") || js.contains("item.label"), "{js}");
     // Create must not go through hydrate.call (inlined path locals).
     assert!(!js.contains("hydrate.call"), "{js}");
+    // Sole-text children use nodeValue on cached Text; monomorphic applyByField for leaf/host slots.
+    assert!(js.contains("nodeValue"), "{js}");
+    assert!(js.contains("applyByField"), "{js}");
+    assert!(js.contains("\"label\": function(root, item)"), "{js}");
+    assert!(js.contains("\"id\": function(root, item)"), "{js}");
+    assert!(js.contains("\"selected\": function(root, item)"), "{js}");
+    // Full apply has no slot parameter (dispatch is applyByField[slot]).
+    assert!(js.contains("function(root, item) {\n"), "{js}");
+    assert!(!js.contains("slot ==="), "{js}");
+    assert!(js.contains("classItemField"), "{js}");
+    // Create seeds __vmzT*; applyByField trusts the Text handle (no cold path walk).
+    assert!(js.contains("root.__vmzT0 ="), "{js}");
+    assert!(js.contains("root.__vmzT1 ="), "{js}");
+    assert!(
+        js.contains("root.__vmzT1.nodeValue = item.label")
+            || js.contains("t1.nodeValue = item.label"),
+        "{js}"
+    );
+    // Fresh-create hoists host field read outside the loop.
+    assert!(js.contains("var hv = this.selected"), "{js}");
+    // Acts baked into html — cloneNode carries them; no per-row __vmzAct assign.
+    assert!(js.contains("data-vmz-act"), "{js}");
+    assert!(!js.contains(".__vmzAct ="), "{js}");
+    // Create fills entryByIndex to skip post-pass Map.get rebuild.
+    assert!(js.contains("entryByIndex[i] = root"), "{js}");
+    assert!(js.contains("textSlots"), "{js}");
+    assert!(js.contains("\"label\": 1") || js.contains("label: 1"), "{js}");
+    // No parallel __vmzTexts array — stride/apply use __vmzT* expandos.
+    assert!(!js.contains("__vmzTexts"), "{js}");
 }
 
 /// Same structural pattern with different host/item names — proves no selected/id hardcoding.
@@ -132,4 +160,7 @@ fn row_kernel_uses_analyzed_host_and_item_fields() {
     assert!(js.contains("item.title"), "{js}");
     assert!(js.contains("this.activeKey"), "{js}");
     assert!(!js.contains("selected"), "{js}");
+    assert!(js.contains("applyByField"), "{js}");
+    assert!(js.contains("\"title\": function(root, item)"), "{js}");
+    assert!(js.contains("\"activeKey\": function(root, item)"), "{js}");
 }

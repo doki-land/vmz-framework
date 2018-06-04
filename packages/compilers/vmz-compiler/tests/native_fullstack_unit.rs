@@ -13,7 +13,7 @@ fn example_fullstack_ready() {
     ));
     let _ = fs::create_dir_all(&dir);
     let report = check_native_fullstack_contract(&dir);
-    assert_eq!(report.status, "ready", "{:?}", report.diagnostics);
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Ready, "{:?}", report.diagnostics);
     assert_eq!(report.fullstack.server_transport.scheme, "#server");
     let _ = fs::remove_dir_all(&dir);
 }
@@ -29,9 +29,12 @@ fn rejects_bridge_bypasses_server() {
     p.server_transport.bridge_bypasses_server = true;
     fs::write(dir.join("native-fullstack.json"), p.to_json()).unwrap();
     let report = check_native_fullstack_contract(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
-        report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_BRIDGE_BYPASSES_SERVER))
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_BRIDGE_BYPASSES_SERVER))
     );
     let _ = fs::remove_dir_all(&dir);
 }
@@ -44,13 +47,16 @@ fn rejects_remote_ssr_without_integrity() {
     ));
     let _ = fs::create_dir_all(&dir);
     let mut p = NativeFullstackProfile::example();
-    p.ssr.mode = "remote".into();
+    p.ssr.mode = ContentDeliveryMode::Remote;
     p.ssr.integrity.clear();
     fs::write(dir.join("native-fullstack.json"), p.to_json()).unwrap();
     let report = check_native_fullstack_contract(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
-        report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_REMOTE_WITHOUT_INTEGRITY))
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_REMOTE_WITHOUT_INTEGRITY))
     );
     let _ = fs::remove_dir_all(&dir);
 }

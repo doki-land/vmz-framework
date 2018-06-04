@@ -17,6 +17,7 @@ use crate::collect::TwCollection;
 use crate::designs::{load_theme_from_designs, scan_designs_dir};
 use crate::engine_bridge::{compile_registrations, map_engine_diagnostics};
 
+/// Production TW compiler linked into the `vmz` binary.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ProductionTwCompiler;
 
@@ -26,6 +27,7 @@ impl TwCompiler for ProductionTwCompiler {
     }
 }
 
+/// Default TW compiler handle for linking into the `vmz` binary.
 pub fn default_tw_compiler() -> TwCompilerHandle {
     Arc::new(ProductionTwCompiler)
 }

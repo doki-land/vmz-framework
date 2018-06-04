@@ -195,10 +195,11 @@ function renderStaticHtml({
     /** @type {string[]} */
     const cssHrefs = [];
     if (hostChrome) {
-        // Same application stylesheet as landing pages (header/footer chrome).
-        cssHrefs.push(`${prefix}vmz.css`);
+        // Integrated documents are served with pretty directory URLs. Root
+        // absolute assets remain correct for both emitted files and rewrites.
+        cssHrefs.push('/vmz.css');
     }
-    if (designsHref) cssHrefs.push(prefix + designsHref);
+    if (designsHref) cssHrefs.push(hostChrome ? `/${designsHref}` : prefix + designsHref);
     const cssLink = cssHrefs.map((href) => `  <link rel="stylesheet" href="${esc(href)}" />`).join('\n') + (cssHrefs.length ? '\n' : '');
     const navItems = nav
         .map((n) => {
@@ -232,13 +233,17 @@ ${cssLink}</head>
   <div class="site site--docs">
   <a class="skip-link" href="#main">Skip to content</a>
 ${header}
+  <div class="doc-body">
+    <aside class="doc-sidebar">
 ${docsNav}
 ${searchShellHtml}
-  <div class="doc-body">
+    </aside>
+    <div class="doc-content">
   ${toc}<main id="main">
 ${bodyHtml}
 ${playgroundShellHtml}
   </main>
+    </div>
   </div>
 ${hostChrome.footer}
   </div>

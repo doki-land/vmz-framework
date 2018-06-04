@@ -1,0 +1,611 @@
+<template>
+  <div class="site planner-page">
+    <SiteHeader />
+    <main class="planner">
+      <header class="planner__hero">
+        <p class="planner__kicker"><span></span> Deploy planner</p>
+        <h1 id="planner-title">部署计划器</h1>
+        <p class="planner__lede">
+          回答拓扑与托管意向，生成一份可交给编码 agent 的落地提示词。
+          提示词说明怎么装；能不能行仍交给
+          <code>vmz check</code> / <code>vmz build</code>。不要手抄 JSON。
+        </p>
+      </header>
+
+      <div class="planner__grid">
+        <section class="planner__quiz" aria-labelledby="quiz-title">
+          <h2 id="quiz-title">拓扑问卷</h2>
+
+          <fieldset class="planner__field">
+            <legend>T.secrets · 密钥 / 会话是否必须留在可信服务器？</legend>
+            <div class="planner__chips" role="group">
+              <button type="button" class={secretsNoneClass} onClick={() => this.setSecrets('none')}>无（公开内容）</button>
+              <button type="button" class={secretsYesClass} onClick={() => this.setSecrets('yes')}>是（需可信 server）</button>
+            </div>
+          </fieldset>
+
+          <fieldset class="planner__field">
+            <legend>T.html · 首屏 HTML 从哪来？</legend>
+            <div class="planner__chips" role="group">
+              <button type="button" class={htmlCdnClass} onClick={() => this.setHtml('cdn-prebuild')}>CDN 预生成</button>
+              <button type="button" class={htmlSsrClass} onClick={() => this.setHtml('request-ssr')}>请求时 SSR</button>
+              <button type="button" class={htmlBrowserClass} onClick={() => this.setHtml('browser-only')}>纯浏览器</button>
+            </div>
+          </fieldset>
+
+          <fieldset class="planner__field">
+            <legend>T.assets · 静态资源放哪？</legend>
+            <div class="planner__chips" role="group">
+              <button type="button" class={assetsSameClass} onClick={() => this.setAssets('same-host')}>同机</button>
+              <button type="button" class={assetsCdnClass} onClick={() => this.setAssets('cdn')}>CDN</button>
+              <button type="button" class={assetsEmbedClass} onClick={() => this.setAssets('embedded-binary')}>嵌进二进制</button>
+            </div>
+          </fieldset>
+
+          <fieldset class="planner__field">
+            <legend>T.server · 服务端进程？</legend>
+            <div class="planner__chips" role="group">
+              <button type="button" class={serverNoneClass} onClick={() => this.setServer('none')}>无</button>
+              <button type="button" class={serverNodeClass} onClick={() => this.setServer('node')}>Node</button>
+              <button type="button" class={serverWorkerClass} onClick={() => this.setServer('worker')}>Worker</button>
+              <button type="button" class={serverRustClass} onClick={() => this.setServer('rust-host')}>Rust</button>
+            </div>
+          </fieldset>
+
+          <fieldset class="planner__field">
+            <legend>T.update · 嵌入基线 + 远程整包更新？</legend>
+            <div class="planner__chips" role="group">
+              <button type="button" class={updateNoClass} onClick={() => this.setUpdate('no')}>否</button>
+              <button type="button" class={updateYesClass} onClick={() => this.setUpdate('release-fallback')}>是（release-fallback）</button>
+            </div>
+          </fieldset>
+
+          <fieldset class="planner__field">
+            <legend>T.ship · 怎么发布？（与平台正交）</legend>
+            <div class="planner__chips" role="group">
+              <button type="button" class={shipCiClass} onClick={() => this.setShip('git-ci')}>Git CI（配流水线 + push）</button>
+              <button type="button" class={shipUploadClass} onClick={() => this.setShip('direct-upload')}>本机直传</button>
+            </div>
+          </fieldset>
+
+          <fieldset class="planner__field">
+            <legend>T.vendor · 外部托管平台（可多选）</legend>
+            <div class="planner__chips planner__chips--wrap" role="group">
+              <button type="button" class={vendorPagesClass} onClick={() => this.toggleVendor('cloudflare-pages')}>Cloudflare Pages</button>
+              <button type="button" class={vendorGhPagesClass} onClick={() => this.toggleVendor('github-pages')}>GitHub Pages</button>
+              <button type="button" class={vendorVercelClass} onClick={() => this.toggleVendor('vercel')}>Vercel</button>
+              <button type="button" class={vendorNetlifyClass} onClick={() => this.toggleVendor('netlify')}>Netlify</button>
+              <button type="button" class={vendorEdgeoneClass} onClick={() => this.toggleVendor('tencent-edgeone')}>腾讯 EdgeOne</button>
+              <button type="button" class={vendorWorkersClass} onClick={() => this.toggleVendor('cloudflare-workers')}>CF Workers</button>
+              <button type="button" class={vendorS3Class} onClick={() => this.toggleVendor('s3-cloudfront')}>S3 + CloudFront</button>
+              <button type="button" class={vendorNodeClass} onClick={() => this.toggleVendor('node-vps')}>自建 Node</button>
+              <button type="button" class={vendorRustClass} onClick={() => this.toggleVendor('rust-bin')}>Rust 二进制</button>
+            </div>
+          </fieldset>
+        </section>
+
+        <section class="planner__result" aria-labelledby="plan-title">
+          <div class="planner__result-head">
+            <h2 id="plan-title">Agent 提示词</h2>
+            <div class="planner__copy-row">
+              <Button type="button" variant="secondary" onClick={() => this.copyPrompt()}>{copyLabel}</Button>
+            </div>
+          </div>
+
+          <p class="planner__disclaimer" role="note">{disclaimer}</p>
+          <p if={promptCopyFailed} class="planner__copy-error" role="alert">复制失败：请手动选中下方提示词，或检查剪贴板权限。</p>
+
+          <dl class="planner__meta">
+            <div><dt>profile</dt><dd><code>{profileId}</code></dd></div>
+            <div><dt>assembly</dt><dd><code>{assembly}</code></dd></div>
+            <div><dt>ship</dt><dd><code>{ship}</code></dd></div>
+            <div if={hasServerRuntime}><dt>serverRuntime</dt><dd><code>{serverRuntime}</code></dd></div>
+            <div><dt>requiredEnv</dt><dd><code>{requiredEnvLabel}</code></dd></div>
+          </dl>
+
+          <div if={hasCautions} class="planner__cautions" role="status">
+            <h3>选型警告</h3>
+            <ul>
+              <li each={cautionItems} as="item" key={item.id}>{item.text}</li>
+            </ul>
+          </div>
+
+          <h3>完整提示词</h3>
+          <pre class="planner__code planner__code--prompt"><code>{agentPrompt}</code></pre>
+
+          <details class="planner__summary">
+            <summary>扫一眼摘要（命令 · 外部清单 · delivery 意图）</summary>
+            <h4>建议命令</h4>
+            <ul class="planner__commands">
+              <li each={commandItems} as="item" key={item.id}><code>{item.text}</code></li>
+            </ul>
+            <h4>外部填写清单</h4>
+            <div class="planner__steps">
+              <article each={stepItems} as="step" key={step.id} class="planner__step">
+                <h5>{step.title}</h5>
+                <p class="planner__axis-label">控制台</p>
+                <ul>
+                  <li each={step.console} as="field">{field}</li>
+                </ul>
+                <p class="planner__axis-label">Git CI</p>
+                <ul>
+                  <li each={step.ci} as="field">{field}</li>
+                </ul>
+                <p class="planner__axis-label">本机直传</p>
+                <ul>
+                  <li each={step.localPush} as="field">{field}</li>
+                </ul>
+              </article>
+            </div>
+            <h4>delivery 意图</h4>
+            <pre class="planner__code"><code>{vmzConfigSnippet}</code></pre>
+          </details>
+
+          <h3>深链</h3>
+          <ul class="planner__links">
+            <li each={deepLinkItems} as="link" key={link.href}>
+              <a href={link.href}>{link.label}</a>
+            </li>
+          </ul>
+        </section>
+      </div>
+    </main>
+    <SiteFooter />
+  </div>
+</template>
+
+<style>
+.planner-page {
+  background: #fff;
+}
+.planner {
+  width: min(calc(100% - 2rem), 80rem);
+  margin: 0 auto;
+  padding: 2.5rem 0 4rem;
+}
+.planner__hero {
+  max-width: 40rem;
+  margin-bottom: 2.5rem;
+}
+.planner__kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 0.85rem;
+  color: #4d535b;
+  font: 500 0.73rem/1.2 var(--vmz-font-mono);
+  text-transform: uppercase;
+}
+.planner__kicker span {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 2px;
+  background: #faad14;
+  box-shadow: 0 0 0 5px rgb(250 173 20 / 14%);
+}
+.planner__hero h1 {
+  margin: 0 0 0.75rem;
+  font-family: var(--vmz-font-display);
+  font-size: clamp(2.2rem, 4vw, 3.2rem);
+  letter-spacing: -0.03em;
+  color: #15171a;
+}
+.planner__lede {
+  margin: 0;
+  color: #62676f;
+  font-size: 1.05rem;
+  line-height: 1.65;
+}
+.planner__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+}
+.planner__quiz,
+.planner__result {
+  border: 1px solid #dfe2e6;
+  border-radius: 8px;
+  background: #f7faff;
+  padding: 1.25rem 1.35rem 1.5rem;
+}
+.planner__result {
+  background: #fff;
+}
+.planner__quiz h2,
+.planner__result h2 {
+  margin: 0 0 1rem;
+  font-family: var(--vmz-font-display);
+  font-size: 1.25rem;
+}
+.planner__result h3 {
+  margin: 1.35rem 0 0.55rem;
+  font-size: 0.85rem;
+  font-family: var(--vmz-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #62676f;
+}
+.planner__field {
+  margin: 0 0 1.15rem;
+  padding: 0;
+  border: 0;
+}
+.planner__field legend {
+  margin-bottom: 0.55rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #15171a;
+}
+.planner__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.planner__chips button {
+  appearance: none;
+  border: 1px solid #dfe2e6;
+  border-radius: 6px;
+  background: #fff;
+  color: #454a51;
+  padding: 0.5rem 0.75rem;
+  font: 500 0.86rem/1.2 var(--vmz-font-sans);
+  cursor: pointer;
+}
+.planner__chips button:hover {
+  border-color: #91caff;
+  color: #0958d9;
+}
+.planner__chips button.is-active {
+  border-color: #1677ff;
+  background: #e6f4ff;
+  color: #0958d9;
+}
+.planner__result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.planner__copy-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.planner__disclaimer {
+  margin: 0.85rem 0 1rem;
+  padding: 0.75rem 0.9rem;
+  border-left: 3px solid #faad14;
+  background: #fffbe6;
+  color: #614700;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.planner__meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem 1rem;
+  margin: 0;
+}
+.planner__meta div {
+  margin: 0;
+}
+.planner__meta dt {
+  margin: 0;
+  font: 500 0.7rem/1.2 var(--vmz-font-mono);
+  text-transform: uppercase;
+  color: #8b929c;
+}
+.planner__meta dd {
+  margin: 0.2rem 0 0;
+  font-size: 0.95rem;
+}
+.planner__cautions {
+  margin-top: 1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #ffd591;
+  border-radius: 6px;
+  background: #fff7e6;
+}
+.planner__cautions h3 {
+  margin: 0 0 0.4rem;
+  color: #ad6800;
+}
+.planner__cautions ul,
+.planner__commands,
+.planner__links,
+.planner__step ul {
+  margin: 0;
+  padding-left: 1.15rem;
+}
+.planner__cautions li,
+.planner__commands li,
+.planner__links li,
+.planner__step li {
+  margin: 0.25rem 0;
+  line-height: 1.45;
+}
+.planner__code {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  overflow: auto;
+  border: 1px solid #e1e6ed;
+  border-radius: 6px;
+  background: #15171a;
+  color: #e8ecf1;
+  font: 0.82rem/1.5 var(--vmz-font-mono);
+  white-space: pre-wrap;
+}
+.planner__code--prompt {
+  max-height: min(70vh, 42rem);
+}
+.planner__copy-error {
+  margin: 0 0 1rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 6px;
+  background: #fff1f0;
+  color: #a8071a;
+  font-size: 0.88rem;
+}
+.planner__summary {
+  margin: 1.25rem 0 0;
+  padding: 0.75rem 1rem 1rem;
+  border: 1px solid #e1e6ed;
+  border-radius: 6px;
+  background: #f7faff;
+}
+.planner__summary summary {
+  cursor: pointer;
+  font: 600 0.85rem/1.4 var(--vmz-font-mono);
+  color: #4d535b;
+}
+.planner__summary h4 {
+  margin: 1rem 0 0.45rem;
+  font-size: 0.8rem;
+  font-family: var(--vmz-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #62676f;
+}
+.planner__summary h5 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+}
+.planner__steps {
+  display: grid;
+  gap: 0.75rem;
+}
+.planner__step {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #e1e6ed;
+  border-radius: 6px;
+  background: #fff;
+}
+.planner__axis-label {
+  margin: 0.55rem 0 0.2rem;
+  font: 600 0.7rem/1.2 var(--vmz-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8b929c;
+}
+.planner__commands {
+  margin: 0;
+  padding-left: 1.15rem;
+}
+@media (max-width: 900px) {
+  .planner__grid {
+    grid-template-columns: 1fr;
+  }
+  .planner__meta {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+
+<script client>
+import { buildDeployPlan, DEFAULT_ANSWERS } from '../lib/deploy-planner.ts';
+
+export default class DeployPlannerPage {
+  secrets = DEFAULT_ANSWERS.secrets;
+  html = DEFAULT_ANSWERS.html;
+  assets = DEFAULT_ANSWERS.assets;
+  server = DEFAULT_ANSWERS.server;
+  update = DEFAULT_ANSWERS.update;
+  ship = DEFAULT_ANSWERS.ship;
+
+  vendorPages = false;
+  vendorGhPages = false;
+  vendorVercel = false;
+  vendorNetlify = false;
+  vendorEdgeone = false;
+  vendorCfWorkers = false;
+  vendorS3 = false;
+  vendorNode = false;
+  vendorRust = false;
+
+  profileId = '';
+  assembly = '';
+  serverRuntime = '';
+  hasServerRuntime = false;
+  requiredEnvLabel = '（无）';
+  agentPrompt = '';
+  vmzConfigSnippet = '';
+  disclaimer = '';
+  hasCautions = false;
+  cautionItems = [];
+  commandItems = [];
+  stepItems = [];
+  deepLinkItems = [];
+  promptCopied = false;
+  promptCopyFailed = false;
+  copyLabel = '复制提示词';
+
+  secretsNoneClass = 'is-active';
+  secretsYesClass = '';
+  htmlCdnClass = 'is-active';
+  htmlSsrClass = '';
+  htmlBrowserClass = '';
+  assetsSameClass = '';
+  assetsCdnClass = 'is-active';
+  assetsEmbedClass = '';
+  serverNoneClass = 'is-active';
+  serverNodeClass = '';
+  serverWorkerClass = '';
+  serverRustClass = '';
+  updateNoClass = 'is-active';
+  updateYesClass = '';
+  shipCiClass = 'is-active';
+  shipUploadClass = '';
+  vendorPagesClass = '';
+  vendorGhPagesClass = '';
+  vendorVercelClass = '';
+  vendorNetlifyClass = '';
+  vendorEdgeoneClass = '';
+  vendorWorkersClass = '';
+  vendorS3Class = '';
+  vendorNodeClass = '';
+  vendorRustClass = '';
+
+  constructor(props = {}) {
+    if (typeof this.__vmzApplyProps === 'function') this.__vmzApplyProps(props);
+    this.refresh();
+  }
+
+  vendors() {
+    const list = [];
+    if (this.vendorPages) list.push('cloudflare-pages');
+    if (this.vendorGhPages) list.push('github-pages');
+    if (this.vendorVercel) list.push('vercel');
+    if (this.vendorNetlify) list.push('netlify');
+    if (this.vendorEdgeone) list.push('tencent-edgeone');
+    if (this.vendorCfWorkers) list.push('cloudflare-workers');
+    if (this.vendorS3) list.push('s3-cloudfront');
+    if (this.vendorNode) list.push('node-vps');
+    if (this.vendorRust) list.push('rust-bin');
+    return list;
+  }
+
+  refreshChipClasses() {
+    this.secretsNoneClass = this.secrets === 'none' ? 'is-active' : '';
+    this.secretsYesClass = this.secrets === 'yes' ? 'is-active' : '';
+    this.htmlCdnClass = this.html === 'cdn-prebuild' ? 'is-active' : '';
+    this.htmlSsrClass = this.html === 'request-ssr' ? 'is-active' : '';
+    this.htmlBrowserClass = this.html === 'browser-only' ? 'is-active' : '';
+    this.assetsSameClass = this.assets === 'same-host' ? 'is-active' : '';
+    this.assetsCdnClass = this.assets === 'cdn' ? 'is-active' : '';
+    this.assetsEmbedClass = this.assets === 'embedded-binary' ? 'is-active' : '';
+    this.serverNoneClass = this.server === 'none' ? 'is-active' : '';
+    this.serverNodeClass = this.server === 'node' ? 'is-active' : '';
+    this.serverWorkerClass = this.server === 'worker' ? 'is-active' : '';
+    this.serverRustClass = this.server === 'rust-host' ? 'is-active' : '';
+    this.updateNoClass = this.update === 'no' ? 'is-active' : '';
+    this.updateYesClass = this.update === 'release-fallback' ? 'is-active' : '';
+    this.shipCiClass = this.ship === 'git-ci' ? 'is-active' : '';
+    this.shipUploadClass = this.ship === 'direct-upload' ? 'is-active' : '';
+    this.vendorPagesClass = this.vendorPages ? 'is-active' : '';
+    this.vendorGhPagesClass = this.vendorGhPages ? 'is-active' : '';
+    this.vendorVercelClass = this.vendorVercel ? 'is-active' : '';
+    this.vendorNetlifyClass = this.vendorNetlify ? 'is-active' : '';
+    this.vendorEdgeoneClass = this.vendorEdgeone ? 'is-active' : '';
+    this.vendorWorkersClass = this.vendorCfWorkers ? 'is-active' : '';
+    this.vendorS3Class = this.vendorS3 ? 'is-active' : '';
+    this.vendorNodeClass = this.vendorNode ? 'is-active' : '';
+    this.vendorRustClass = this.vendorRust ? 'is-active' : '';
+  }
+
+  refresh() {
+    this.refreshChipClasses();
+    const plan = buildDeployPlan({
+      secrets: this.secrets,
+      html: this.html,
+      assets: this.assets,
+      server: this.server,
+      update: this.update,
+      ship: this.ship,
+      vendors: this.vendors(),
+    });
+    this.profileId = plan.profileId;
+    this.assembly = plan.assembly;
+    this.ship = plan.ship;
+    this.serverRuntime = plan.serverRuntime || '';
+    this.hasServerRuntime = !!plan.serverRuntime;
+    this.requiredEnvLabel =
+      plan.requiredEnv.length > 0 ? plan.requiredEnv.join(', ') : '（无）';
+    this.agentPrompt = plan.agentPrompt;
+    this.vmzConfigSnippet = plan.vmzConfigSnippet;
+    this.disclaimer = plan.disclaimer;
+    this.hasCautions = plan.cautions.length > 0;
+    this.cautionItems = plan.cautions.map((text, i) => ({ id: `c${i}`, text }));
+    this.commandItems = plan.commandsSuggested.map((text, i) => ({ id: `cmd${i}`, text }));
+    this.stepItems = plan.externalSteps.map((step) => ({
+      id: step.id,
+      title: step.title,
+      console: step.console,
+      ci: step.ci,
+      localPush: step.localPush,
+    }));
+    this.deepLinkItems = plan.deepLinks;
+    this.promptCopied = false;
+    this.promptCopyFailed = false;
+    this.copyLabel = '复制提示词';
+  }
+
+  setSecrets(v) {
+    this.secrets = v;
+    this.refresh();
+  }
+  setHtml(v) {
+    this.html = v;
+    this.refresh();
+  }
+  setAssets(v) {
+    this.assets = v;
+    this.refresh();
+  }
+  setServer(v) {
+    this.server = v;
+    this.refresh();
+  }
+  setUpdate(v) {
+    this.update = v;
+    this.refresh();
+  }
+  setShip(v) {
+    this.ship = v;
+    this.refresh();
+  }
+
+  toggleVendor(id) {
+    if (id === 'cloudflare-pages') this.vendorPages = !this.vendorPages;
+    if (id === 'github-pages') this.vendorGhPages = !this.vendorGhPages;
+    if (id === 'vercel') this.vendorVercel = !this.vendorVercel;
+    if (id === 'netlify') this.vendorNetlify = !this.vendorNetlify;
+    if (id === 'tencent-edgeone') this.vendorEdgeone = !this.vendorEdgeone;
+    if (id === 'cloudflare-workers') this.vendorCfWorkers = !this.vendorCfWorkers;
+    if (id === 's3-cloudfront') this.vendorS3 = !this.vendorS3;
+    if (id === 'node-vps') this.vendorNode = !this.vendorNode;
+    if (id === 'rust-bin') this.vendorRust = !this.vendorRust;
+    this.refresh();
+  }
+
+  copyPrompt() {
+    const text = this.agentPrompt;
+    const ok = () => {
+      this.promptCopied = true;
+      this.promptCopyFailed = false;
+      this.copyLabel = '已复制提示词';
+    };
+    const fail = () => {
+      this.promptCopied = false;
+      this.promptCopyFailed = true;
+      this.copyLabel = '复制失败，请手动选中';
+    };
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(ok, fail);
+      return;
+    }
+    fail();
+  }
+}
+</script>

@@ -528,7 +528,7 @@ upsertCheck(proof, {
 
 const gaps = [
     'Dogfood: sibling vmz-panel product app not gated in this driver (production-inspector stands in as ordinary panel-shaped app)',
-    'Dogfood: I2 LocaleTransition / I3 hreflang / homepage locale switch matrix not covered (I1 runtime emit thin slice only)',
+    'Dogfood: homepage locale switch matrix still open (production-router LocaleTransition covered; homepage dogfood matrix deferred)',
     'Dogfood: documents search UX not covered',
 ];
 for (const g of gaps) addLimitation(proof, g);
@@ -537,16 +537,17 @@ proof.knownLimitations = proof.knownLimitations.filter(
         !l.includes('Dogfood: homepage/documents/panel') &&
         !l.includes('Dogfood: VMZ UI Field/Dialog') &&
         !l.includes('Dogfood: Field/Dialog focus-loop') &&
-        !l.includes('Dogfood: homepage locale switch matrix + documents search UX'),
+        !l.includes('Dogfood: homepage locale switch matrix + documents search UX') &&
+        !l.includes('Dogfood: I2 LocaleTransition / I3 hreflang / homepage locale switch matrix'),
 );
 
 writeProof(proof, root);
 if (errors.length) fail(errors.join('\n'));
 
 console.log('official-dogfood PASS: homepage SSR + documents + inspector + @vmz/ui Field/Dialog');
-console.log('official-dogfood NOTE: sibling vmz-panel / @vmz/ui-data-grid deep / UI7 browser-timing still open');
+console.log('official-dogfood NOTE: sibling vmz-panel / @vmz/ui-data-grid deep / network upload / UI7 browser-timing still open');
 console.log(
-    'official-dogfood NOTE: UI1–UI6 + Form depth + Structure + Stacking + DataTable + documents/panel density + Commercial/Console/Motion browser proof lives in `pnpm verify -- ui-automation`; Motion IR depth + UI7 pack in `pnpm verify -- ui7`',
+    'official-dogfood NOTE: UI1–UI6 + Form depth + Structure + Stacking + DataTable + documents/panel density + Commercial/Console/Motion browser proof lives in `pnpm verify -- ui-automation`; Motion IR depth + UI7 pack in `pnpm verify -- ui7`; DataGrid thin gate in `pnpm verify -- ui-data-grid`',
 );
 
 function walkFind(dir: string, fileName: string): string | null {

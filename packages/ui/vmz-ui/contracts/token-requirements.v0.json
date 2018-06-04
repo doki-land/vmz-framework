@@ -116,17 +116,56 @@
                 "status.danger.foreground",
                 "focus.ring",
                 "density.control.padding-y",
-                "density.control.padding-x"
+                "density.control.padding-x",
+                "surface.paper"
             ],
             "surfaces": ["WebSurface"],
-            "contracts": ["label", "description", "error", "native-date", "parent-owned-value"]
+            "contracts": [
+                "label",
+                "description",
+                "error",
+                "calendar-overlay",
+                "no-native-date-popup",
+                "parent-owned-value",
+                "overlay-escape-outside"
+            ]
         },
         "Upload": {
             "source": "src/components/Upload.vmz",
             "stableHint": "ui.Upload",
-            "tokens": ["status.danger.foreground", "text.ink", "text.steel", "font.mono", "focus.ring", "density.control.padding-y"],
+            "tokens": [
+                "status.danger.foreground",
+                "status.success.foreground",
+                "action.primary.background",
+                "surface.paper",
+                "line.default",
+                "text.ink",
+                "text.steel",
+                "font.mono",
+                "focus.ring",
+                "density.control.padding-y",
+                "density.compact.padding-y",
+                "density.compact.padding-x",
+                "motion.control.duration",
+                "motion.control.easing"
+            ],
             "surfaces": ["WebSurface"],
-            "contracts": ["label", "description", "error", "native-file", "parent-owned-filename", "no-upload-runtime"]
+            "contracts": [
+                "label",
+                "description",
+                "error",
+                "drop-zone",
+                "selection-constraints",
+                "queue",
+                "progress",
+                "cancel",
+                "destination-client",
+                "destination-server",
+                "destination-object",
+                "all-in-one-transport",
+                "parent-owned-result-value",
+                "no-useUpload"
+            ]
         },
         "Field": {
             "source": "src/components/Field.vmz",

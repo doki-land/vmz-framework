@@ -1,0 +1,17 @@
+{
+  schemaVersion: 1,
+  defaultLocale: 'en-us',
+  locales: [
+    { id: 'en-us', label: 'English', direction: 'ltr' },
+    { id: 'zh-hans', label: '简体中文', direction: 'ltr' },
+  ],
+  fallback: {
+    'zh-hans': ['en-us'],
+  },
+  routing: {
+    strategy: 'prefix',
+    // Keep unprefixed paths as defaultLocale so existing Router proofs stay stable.
+    defaultPrefix: 'omit',
+  },
+  missing: 'error',
+}

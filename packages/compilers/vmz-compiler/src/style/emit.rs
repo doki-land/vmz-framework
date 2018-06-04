@@ -1,4 +1,4 @@
-//! Style emitter: ordered style layers → discrete assets + `@import` entry.
+//! Style emitter: ordered style layers -> discrete assets + `@import` entry.
 //!
 //! Plugins contribute CSS bodies; this module owns composition and disk layout.
 //! No ad-hoc string fusion of stylesheet bodies into a mega-file.
@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum StyleLayer {
-    /// `/designs` tokens + themes → CSS custom properties.
+    /// `/designs` tokens + themes -> CSS custom properties.
     Designs = 0,
     /// `designs/styles` + SFC `<style>` (SCSS/CSS).
     Scss = 1,
@@ -18,16 +18,23 @@ pub enum StyleLayer {
     Tw = 2,
 }
 
+/// One CSS body contributed by a style layer for [`emit_style_bundle`].
 #[derive(Debug, Clone)]
 pub struct StyleContribution {
+    /// Layer that owns this contribution (controls sort order).
     pub layer: StyleLayer,
+    /// File name written under `out_dir` (e.g. `vmz-tw.css`).
     pub asset_name: String,
+    /// CSS body to write (skipped when empty/whitespace).
     pub css: String,
 }
 
+/// Disk layout produced by [`emit_style_bundle`].
 #[derive(Debug, Default)]
 pub struct StyleEmitReport {
+    /// Relative entry name (`vmz.css`) when at least one layer wrote CSS.
     pub css_entry: Option<String>,
+    /// Absolute paths of assets written this call (layers + entry).
     pub written: Vec<PathBuf>,
 }
 

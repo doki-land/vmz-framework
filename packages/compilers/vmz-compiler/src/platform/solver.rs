@@ -12,19 +12,20 @@ use vmz_protocol::{
     CapabilityRequirement, CapabilityResolution, CapabilityResolutionTable,
     DIAG_CAPABILITY_PERMISSION_UNDECLARED, DIAG_CAPABILITY_UNRESOLVED, DIAG_ROUTE_UNREALIZABLE,
     DIAG_SURFACE_AMBIGUOUS, DIAG_SURFACE_NO_MATCH, DeliveryProfile,
-    HOST_RESOLUTION_MANIFEST_SCHEMA, HostProfile, HostResolutionManifest, ProfileDiagnostic,
-    ProfileProtocolCatalog, ProfileSolverCheckReport, ProfileSolverInput, RouteRealization,
-    RouteRealizationTable, SOLVER_CHECK_SCHEMA, SurfaceAssignment, SurfaceAssignmentTable,
-    SurfaceBinding, SurfaceReject, SurfaceRequirements,
+    HOST_RESOLUTION_MANIFEST_SCHEMA, HostProfile, HostResolutionManifest, NavigationStackModel,
+    ProfileDiagnostic, ProfileProtocolCatalog, ProfileSolverCheckReport, ProfileSolverInput,
+    RouteRealization, RouteRealizationTable, SOLVER_CHECK_SCHEMA, SurfaceAssignment,
+    SurfaceAssignmentReason, SurfaceAssignmentTable, SurfaceBinding, SurfaceReject,
+    SurfaceRejectReason, SurfaceRequirements,
 };
 
-fn diag(path: &str, severity: &str, message: impl Into<String>, code: &str) -> ProfileDiagnostic {
-    ProfileDiagnostic {
-        path: path.into(),
-        severity: severity.into(),
-        message: message.into(),
-        code: Some(code.into()),
-    }
+fn diag(
+    path: &str,
+    severity: vmz_protocol::Severity,
+    message: impl Into<String>,
+    code: &str,
+) -> ProfileDiagnostic {
+    ProfileDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
 fn missing_subset(required: &[String], supported: &[String]) -> Vec<String> {
@@ -94,15 +95,15 @@ fn reason_for(
     prefers: Option<&str>,
     requires: Option<&str>,
     surface_id: &str,
-) -> String {
+) -> SurfaceAssignmentReason {
     if requires == Some(surface_id) {
-        "requires_surface".into()
+        SurfaceAssignmentReason::RequiresSurface
     } else if prefers == Some(surface_id) {
-        "prefers_surface".into()
+        SurfaceAssignmentReason::PrefersSurface
     } else if score >= 50 {
-        "default_surface".into()
+        SurfaceAssignmentReason::DefaultSurface
     } else {
-        "unique".into()
+        SurfaceAssignmentReason::Unique
     }
 }
 
@@ -124,7 +125,7 @@ pub fn solve_surface_region(
             Ok(()) => candidates.push(binding),
             Err(unsatisfied) => rejected.push(SurfaceReject {
                 surface_id: binding.surface_id.clone(),
-                reason: "requirements_unsatisfied".into(),
+                reason: SurfaceRejectReason::RequirementsUnsatisfied,
                 unsatisfied,
             }),
         }
@@ -136,7 +137,7 @@ pub fn solve_surface_region(
         if before > 0 && candidates.is_empty() {
             out.push(diag(
                 &format!("regions.{region_id}"),
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("requiresSurface `{req_id}` is not among capability-matching candidates"),
                 DIAG_SURFACE_NO_MATCH,
             ));
@@ -151,7 +152,7 @@ pub fn solve_surface_region(
         unsatisfied.dedup();
         out.push(diag(
             &format!("regions.{region_id}"),
-            "error",
+            vmz_protocol::Severity::Error,
             format!(
                 "SURFACE_NO_MATCH: no SurfaceBinding satisfies region; unsatisfied={unsatisfied:?}"
             ),
@@ -203,7 +204,7 @@ pub fn solve_surface_region(
             region_id: region_id.into(),
             surface_id: chosen.surface_id.clone(),
             driver_id: chosen.driver_id.clone(),
-            reason: "deterministic_tiebreak".into(),
+            reason: SurfaceAssignmentReason::DeterministicTiebreak,
             rejected,
         });
     }
@@ -211,7 +212,7 @@ pub fn solve_surface_region(
     let ids: Vec<&str> = top.iter().map(|c| c.surface_id.as_str()).collect();
     out.push(diag(
         &format!("regions.{region_id}"),
-        "error",
+        vmz_protocol::Severity::Error,
         format!(
             "SURFACE_AMBIGUOUS: multiple non-equivalent candidates {ids:?}; require explicit surfacePolicies / prefersSurface / requiresSurface"
         ),
@@ -220,6 +221,10 @@ pub fn solve_surface_region(
     None
 }
 
+/// Resolve capability requirements against a host profile into a resolution table.
+///
+/// Emits `CAPABILITY_UNRESOLVED` diagnostics for requirements with no matching
+/// host binding; successful rows carry execution domain and transport ids.
 pub fn solve_capabilities(
     host: &HostProfile,
     reqs: &[CapabilityRequirement],
@@ -231,7 +236,7 @@ pub fn solve_capabilities(
         else {
             out.push(diag(
                 &format!("capabilities.{}", req.capability_id),
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("CAPABILITY_UNRESOLVED: `{}`", req.capability_id),
                 DIAG_CAPABILITY_UNRESOLVED,
             ));
@@ -241,7 +246,7 @@ pub fn solve_capabilities(
             if !binding.permissions.iter().any(|p| p == perm) {
                 out.push(diag(
                     &format!("capabilities.{}.permissions", req.capability_id),
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!(
                         "CAPABILITY_PERMISSION_UNDECLARED: `{perm}` not declared on provider `{}`",
                         binding.provider_id
@@ -251,9 +256,9 @@ pub fn solve_capabilities(
             }
         }
         if out.iter().any(|d| {
-            d.severity == "error"
-                && d.path.contains(&req.capability_id)
-                && d.code.as_deref() == Some(DIAG_CAPABILITY_PERMISSION_UNDECLARED)
+            d.is_error()
+                && d.path().to_string_lossy().contains(&req.capability_id)
+                && d.code_string().as_deref() == Some(DIAG_CAPABILITY_PERMISSION_UNDECLARED)
         }) {
             // still record nothing for failed permission — keep table clean
             continue;
@@ -272,6 +277,10 @@ pub fn solve_capabilities(
     }
 }
 
+/// Realize routes from host navigation + delivery entry routes into a table.
+///
+/// Requires a `routeRealizerId` on the host navigation binding and a realization
+/// for every delivery entry route; failures append `ROUTE_UNREALIZABLE` diagnostics.
 pub fn solve_routes(
     host: &HostProfile,
     delivery: &DeliveryProfile,
@@ -282,11 +291,11 @@ pub fn solve_routes(
     let mut realizations = Vec::new();
     let nav = &host.navigation;
 
-    if nav.route_realizer_id.trim().is_empty() || nav.stack_model.trim().is_empty() {
+    if nav.route_realizer_id.trim().is_empty() {
         out.push(diag(
             "navigation",
-            "error",
-            "ROUTE_UNREALIZABLE: NavigationBinding missing routeRealizerId/stackModel",
+            vmz_protocol::Severity::Error,
+            "ROUTE_UNREALIZABLE: NavigationBinding missing routeRealizerId",
             DIAG_ROUTE_UNREALIZABLE,
         ));
         return RouteRealizationTable {
@@ -294,10 +303,11 @@ pub fn solve_routes(
             realizations,
         };
     }
-    if nav.stack_model == "none" && !input.routes.is_empty() {
+    // Closed [`NavigationStackModel`] validates at deserialize.
+    if nav.stack_model == NavigationStackModel::None && !input.routes.is_empty() {
         out.push(diag(
             "navigation.stackModel",
-            "error",
+            vmz_protocol::Severity::Error,
             "ROUTE_UNREALIZABLE: stackModel=none cannot realize routes",
             DIAG_ROUTE_UNREALIZABLE,
         ));
@@ -307,7 +317,7 @@ pub fn solve_routes(
         if route.route_id.trim().is_empty() {
             out.push(diag(
                 "routes",
-                "error",
+                vmz_protocol::Severity::Error,
                 "ROUTE_UNREALIZABLE: empty routeId",
                 DIAG_ROUTE_UNREALIZABLE,
             ));
@@ -341,7 +351,7 @@ pub fn solve_routes(
         if !realizations.iter().any(|r| &r.route_id == entry) {
             out.push(diag(
                 "delivery.entryRoutes",
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("ROUTE_UNREALIZABLE: entry route `{entry}` has no RouteRealization"),
                 DIAG_ROUTE_UNREALIZABLE,
             ));
@@ -354,6 +364,10 @@ pub fn solve_routes(
     }
 }
 
+/// Solve surfaces, capabilities, and routes into a full [`HostResolutionManifest`].
+///
+/// Walks each solver-input region for surface assignment, then runs capability
+/// and route solves, collecting all diagnostics into `out`.
 pub fn solve_profile(
     host: &HostProfile,
     delivery: &DeliveryProfile,
@@ -403,7 +417,7 @@ fn load_json<T: serde::de::DeserializeOwned>(
             Err(e) => {
                 diags.push(diag(
                     label,
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!("invalid JSON: {e}"),
                     DIAG_SURFACE_NO_MATCH,
                 ));
@@ -411,13 +425,21 @@ fn load_json<T: serde::de::DeserializeOwned>(
             }
         },
         Err(e) => {
-            diags.push(diag(label, "error", format!("cannot read: {e}"), DIAG_SURFACE_NO_MATCH));
+            diags.push(diag(
+                label,
+                vmz_protocol::Severity::Error,
+                format!("cannot read: {e}"),
+                DIAG_SURFACE_NO_MATCH,
+            ));
             None
         }
     }
 }
 
-// check for a workspace root (optional host/delivery/solver-input JSON).
+/// Run the profile solver against optional host/delivery/solver-input JSON in a root.
+///
+/// Missing files fall back to built-in browser examples; returns a check report
+/// with the solved manifest and accumulated diagnostics.
 pub fn check_profile_solver(root: &Path) -> ProfileSolverCheckReport {
     let mut diagnostics = Vec::new();
     let catalog = ProfileProtocolCatalog::v0();
@@ -442,7 +464,7 @@ pub fn check_profile_solver(root: &Path) -> ProfileSolverCheckReport {
 
     let manifest = solve_profile(&host, &delivery, &solver_input, &mut diagnostics);
 
-    let failed = diagnostics.iter().any(|d| d.severity == "error");
+    let failed = diagnostics.iter().any(|d| d.is_error());
     ProfileSolverCheckReport {
         schema: SOLVER_CHECK_SCHEMA.into(),
         catalog,
@@ -451,6 +473,6 @@ pub fn check_profile_solver(root: &Path) -> ProfileSolverCheckReport {
         solver_input,
         manifest,
         diagnostics,
-        status: if failed { "failed".into() } else { "ready".into() },
+        status: vmz_protocol::CheckReportStatus::from_failed(failed),
     }
 }

@@ -189,8 +189,8 @@ fn plugin_target_emitted_on_build() {
             id: "edge".into(),
             kind: ContributionKind::Target {
                 target_id: "edge-preview".into(),
-                kind: "edge".into(),
-                manifest_json: r#"{"runtime":"edge","routes":["/"]}"#.into(),
+                target_kind: "edge".into(),
+                manifest: serde_json::json!({"runtime":"edge","routes":["/"]}),
             },
         }],
     });
@@ -251,7 +251,7 @@ export default class Card {
     assert!(edge.contains("\"kind\": \"binding\""), "{edge}");
 
     let rename = ws.plan_rename(
-        r#"{"schema":"vmz.dx.rename.v0","kind":"route_id","from":"home","to":"landing"}"#,
+        r#"{"schema":"vmz.dx.rename.v0","kind":"route-id","from":"home","to":"landing"}"#,
     );
     assert!(rename.contains("vmz.dx.workspace_edit.v0"), "{rename}");
     // No RouteId refs in Card.vmz fixture ->rejected (no_references).

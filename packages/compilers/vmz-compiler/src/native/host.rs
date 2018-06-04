@@ -10,24 +10,20 @@ use std::path::Path;
 use serde_json::Value;
 
 use vmz_protocol::{
-    DIAG_ARBITRARY_BRIDGE, DIAG_INVALID_PROFILE, DIAG_MISSING_ALLOWLIST, DIAG_MISSING_IDENTITY,
-    DIAG_REMOTE_URL_DEFAULT, DIAG_UNSUPPORTED_CAPABILITY, FORBIDDEN_BRIDGE_PATTERNS,
-    NATIVE_HOST_CHECK_SCHEMA, NativeCapability, NativeHostCheckReport, NativeHostDiagnostic,
-    NativeHostProtocolCatalog, WebViewDeploymentProfile,
+    AssetMode, BridgeMode, CapabilityClass, DIAG_ARBITRARY_BRIDGE, DIAG_INVALID_PROFILE,
+    DIAG_MISSING_ALLOWLIST, DIAG_MISSING_IDENTITY, DIAG_REMOTE_URL_DEFAULT,
+    DIAG_UNSUPPORTED_CAPABILITY, FORBIDDEN_BRIDGE_PATTERNS, NATIVE_HOST_CHECK_SCHEMA,
+    NativeCapability, NativeHostCheckReport, NativeHostDiagnostic, NativeHostProtocolCatalog,
+    WebViewDeploymentProfile,
 };
 
 fn diag(
     path: &str,
-    severity: &str,
+    severity: vmz_protocol::Severity,
     message: impl Into<String>,
     code: &str,
 ) -> NativeHostDiagnostic {
-    NativeHostDiagnostic {
-        path: path.into(),
-        severity: severity.into(),
-        message: message.into(),
-        code: Some(code.into()),
-    }
+    NativeHostDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
 /// Scan bridge / profile JSON text for forbidden arbitrary-injection patterns.
@@ -36,7 +32,7 @@ pub fn scan_bridge_text_for_arbitrary(path: &str, text: &str, out: &mut Vec<Nati
         if text.contains(pat) {
             out.push(diag(
                 path,
-                "error",
+                vmz_protocol::Severity::Error,
                 format!(
                     "forbidden arbitrary bridge pattern `{pat}` — use versioned NativeCapability calls only"
                 ),
@@ -52,7 +48,7 @@ fn validate_profile(profile: &WebViewDeploymentProfile, out: &mut Vec<NativeHost
     {
         out.push(diag(
             "identity",
-            "error",
+            vmz_protocol::Severity::Error,
             "WebViewDeploymentProfile requires applicationId + origin",
             DIAG_MISSING_IDENTITY,
         ));
@@ -60,59 +56,40 @@ fn validate_profile(profile: &WebViewDeploymentProfile, out: &mut Vec<NativeHost
     if !profile.reuses_browser_lowering {
         out.push(diag(
             "reusesBrowserLowering",
-            "error",
+            vmz_protocol::Severity::Error,
             "WebView must reuse Browser lowering (no second View IR)",
             DIAG_INVALID_PROFILE,
         ));
     }
-    if profile.asset_mode == "remote" {
+    if profile.asset_mode == AssetMode::Remote {
         out.push(diag(
             "assetMode",
-            "error",
+            vmz_protocol::Severity::Error,
             "assetMode=remote must not be the silent default for native; use local/hybrid with integrity",
             DIAG_REMOTE_URL_DEFAULT,
-        ));
-    }
-    if !matches!(profile.asset_mode.as_str(), "local" | "hybrid" | "remote") {
-        out.push(diag(
-            "assetMode",
-            "error",
-            format!("unknown assetMode `{}`", profile.asset_mode),
-            DIAG_INVALID_PROFILE,
         ));
     }
     if !profile.bridge.require_allowlist || profile.bridge.capability_ids.is_empty() {
         out.push(diag(
             "bridge",
-            "error",
+            vmz_protocol::Severity::Error,
             "typed bridge requires non-empty capability allowlist",
             DIAG_MISSING_ALLOWLIST,
         ));
     }
-    if profile.bridge.mode != "typed_capability" {
+    if profile.bridge.mode != BridgeMode::TypedCapability {
         out.push(diag(
             "bridge.mode",
-            "error",
-            "bridge.mode must be typed_capability",
+            vmz_protocol::Severity::Error,
+            "bridge.mode must be typed-capability",
             DIAG_ARBITRARY_BRIDGE,
         ));
     }
     for cap in &profile.capabilities {
-        if !matches!(
-            cap.capability_class.as_str(),
-            "PureWeb" | "NativeBacked" | "NativeSurface" | "ServerBacked" | "Unsupported"
-        ) {
+        if cap.capability_class == CapabilityClass::Unsupported {
             out.push(diag(
                 &cap.id,
-                "error",
-                format!("unknown capabilityClass `{}`", cap.capability_class),
-                DIAG_UNSUPPORTED_CAPABILITY,
-            ));
-        }
-        if cap.capability_class == "Unsupported" {
-            out.push(diag(
-                &cap.id,
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("capability `{}` is Unsupported on this profile", cap.id),
                 DIAG_UNSUPPORTED_CAPABILITY,
             ));
@@ -120,7 +97,7 @@ fn validate_profile(profile: &WebViewDeploymentProfile, out: &mut Vec<NativeHost
         if !profile.bridge.capability_ids.iter().any(|id| id == &cap.id) {
             out.push(diag(
                 &cap.id,
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("capability `{}` not in bridge allowlist", cap.id),
                 DIAG_MISSING_ALLOWLIST,
             ));
@@ -148,15 +125,15 @@ pub fn check_native_host_contract(root: &Path) -> NativeHostCheckReport {
         }
     }
 
-    let failed = diagnostics.iter().any(|d| d.severity == "error");
-    let status = if failed { "failed" } else { "ready" };
+    let failed = diagnostics.iter().any(|d| d.is_error());
+    let status = vmz_protocol::CheckReportStatus::from_failed(failed);
 
     NativeHostCheckReport {
         schema: NATIVE_HOST_CHECK_SCHEMA.into(),
         catalog,
         webview_deployment: profile,
         diagnostics,
-        status: status.into(),
+        status,
     }
 }
 
@@ -171,14 +148,14 @@ fn load_or_example_profile(
                 Ok(p) => return p,
                 Err(e) => diags.push(diag(
                     "native-host.json",
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!("invalid WebViewDeploymentProfile JSON: {e}"),
                     DIAG_INVALID_PROFILE,
                 )),
             },
             Err(e) => diags.push(diag(
                 "native-host.json",
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("cannot read native-host.json: {e}"),
                 DIAG_INVALID_PROFILE,
             )),
@@ -199,7 +176,7 @@ pub fn check_bridge_candidate_json(text: &str) -> Vec<NativeHostDiagnostic> {
         {
             out.push(diag(
                 "bridge_candidate",
-                "error",
+                vmz_protocol::Severity::Error,
                 "bridge candidate uses arbitrary injection mode",
                 DIAG_ARBITRARY_BRIDGE,
             ));

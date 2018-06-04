@@ -19,24 +19,32 @@ use crate::template::{AttrValue, TemplateIr, TemplateNode};
 /// One RouteNode projection used for Link href realization.
 #[derive(Debug, Clone)]
 pub struct RouteEntry {
+    /// Stable RouteId referenced by `<Link to={...}>`.
     pub route_id: String,
+    /// URL path pattern with optional `:param` segments.
     pub path_pattern: String,
+    /// Deployment chunk id for the page module.
     pub chunk_id: String,
+    /// Absolute path of the `.vmz` that owns this route.
     pub source: PathBuf,
+    /// Optional load strategy hint from `<router>`.
     pub load: Option<String>,
 }
 
 /// Workspace RouteId → path pattern table (compile-time Link resolver input).
 #[derive(Debug, Clone, Default)]
 pub struct RouteTable {
+    /// RouteId → entry map (insertion rejects duplicates).
     pub by_id: BTreeMap<String, RouteEntry>,
 }
 
 impl RouteTable {
+    /// Look up a route by stable RouteId.
     pub fn get(&self, route_id: &str) -> Option<&RouteEntry> {
         self.by_id.get(route_id)
     }
 
+    /// Insert a route; errors if the RouteId already exists.
     pub fn insert(&mut self, entry: RouteEntry) -> Result<(), String> {
         if let Some(prev) = self.by_id.get(&entry.route_id) {
             return Err(format!(
@@ -54,8 +62,11 @@ impl RouteTable {
 /// Minimal RouteContract fields from `<router>` JSON5 (safe data only).
 #[derive(Debug, Clone, Default)]
 pub struct RouteContractData {
+    /// Explicit RouteId override when present.
     pub id: Option<String>,
+    /// Explicit path pattern override when present.
     pub path: Option<String>,
+    /// Optional load strategy (`eager`, `lazy`, …).
     pub load: Option<String>,
 }
 

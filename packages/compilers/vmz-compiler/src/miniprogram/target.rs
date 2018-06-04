@@ -17,8 +17,19 @@ use vmz_protocol::{
 };
 
 /// Thin PlanNode kinds allowed in target-neutral Execution Plan (map to View Ops).
-pub const ALLOWED_PLAN_KINDS: &[&str] =
-    &["text", "interp", "element", "if", "each", "component", "slot", "dispose_region"];
+///
+/// Labels match [`vmz_types::PlanNodeKind::VIEW_OPS`] (`kebab-case`).
+pub const ALLOWED_PLAN_KINDS: &[&str] = &[
+    vmz_types::PlanNodeKind::Text.as_str(),
+    vmz_types::PlanNodeKind::Interp.as_str(),
+    vmz_types::PlanNodeKind::Element.as_str(),
+    vmz_types::PlanNodeKind::If.as_str(),
+    vmz_types::PlanNodeKind::Each.as_str(),
+    vmz_types::PlanNodeKind::Component.as_str(),
+    vmz_types::PlanNodeKind::Slot.as_str(),
+    vmz_types::PlanNodeKind::DisposeRegion.as_str(),
+    vmz_types::PlanNodeKind::MotionTransition.as_str(),
+];
 
 /// Substrings that must never appear in Execution Plan JSON .
 pub const FORBIDDEN_PLAN_TOKENS: &[&str] = &[
@@ -37,13 +48,13 @@ pub const FORBIDDEN_PLAN_TOKENS: &[&str] = &[
     "window.",
 ];
 
-fn diag(path: &str, severity: &str, message: impl Into<String>, code: &str) -> TargetDiagnostic {
-    TargetDiagnostic {
-        path: path.into(),
-        severity: severity.into(),
-        message: message.into(),
-        code: Some(code.into()),
-    }
+fn diag(
+    path: &str,
+    severity: vmz_protocol::Severity,
+    message: impl Into<String>,
+    code: &str,
+) -> TargetDiagnostic {
+    TargetDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
 /// Scan a JSON value (Execution Plan or program.plan) for DOM / platform leaks.
@@ -69,7 +80,7 @@ pub fn scan_plan_value_for_dom_leaks(path: &str, value: &Value, out: &mut Vec<Ta
             if text.contains(tok) {
                 out.push(diag(
                     path,
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!(
                         "Execution Plan must not contain `{tok}` (target-neutral View Ops only; DOM belongs in Browser lowering)"
                     ),
@@ -86,7 +97,7 @@ pub fn scan_plan_value_for_dom_leaks(path: &str, value: &Value, out: &mut Vec<Ta
                 if !ALLOWED_PLAN_KINDS.contains(&kind) {
                     out.push(diag(
                         path,
-                        "error",
+                        vmz_protocol::Severity::Error,
                         format!(
                             "unknown PlanNode kind `{kind}` at nodes[{i}] (not in View Op mapping)"
                         ),
@@ -126,11 +137,11 @@ pub fn check_miniprogram_target_contract(root: &Path) -> TargetCheckReport {
     let mini_program_artifact = MiniProgramArtifact::empty_skeleton("mini-program");
 
     if mini_program_profile.platform_id.to_ascii_lowercase().contains("wechat")
-        || mini_program_profile.family.to_ascii_lowercase().contains("wechat")
+        || mini_program_profile.family.as_str().to_ascii_lowercase().contains("wechat")
     {
         diagnostics.push(diag(
             "",
-            "error",
+            vmz_protocol::Severity::Error,
             "mini-program profile must stay vendor-neutral (wechat belongs in adapter only)",
             DIAG_DOM_LEAK_IN_PLAN,
         ));
@@ -149,19 +160,19 @@ pub fn check_miniprogram_target_contract(root: &Path) -> TargetCheckReport {
     if programs.is_empty() {
         diagnostics.push(diag(
             "",
-            "info",
+            vmz_protocol::Severity::Advice,
             "no *.program.json scanned — build workspace first for plan leak proof; View Ops + profiles still frozen",
             "vmz::target::miniprogram_catalog_only",
         ));
     }
 
-    let failed = diagnostics.iter().any(|d| d.severity == "error");
+    let failed = diagnostics.iter().any(|d| d.is_error());
     let status = if failed {
-        "failed"
+        vmz_protocol::CheckReportStatus::Failed
     } else if !programs.is_empty() {
-        "ready"
+        vmz_protocol::CheckReportStatus::Ready
     } else {
-        "incomplete"
+        vmz_protocol::CheckReportStatus::Incomplete
     };
 
     TargetCheckReport {
@@ -172,6 +183,6 @@ pub fn check_miniprogram_target_contract(root: &Path) -> TargetCheckReport {
         mini_program_artifact,
         allowed_plan_kinds: ALLOWED_PLAN_KINDS.iter().map(|s| (*s).into()).collect(),
         diagnostics,
-        status: status.into(),
+        status,
     }
 }

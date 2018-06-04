@@ -17,6 +17,7 @@ use vmz_protocol::{
     DIAG_INVALID_ROUTE_BASE, DIAG_INVALID_SCHEMA, DIAG_MOUNT_COLLISION, DIAG_UNKNOWN_REFERENCE,
 };
 
+/// Host config filename for application collections and mounts (`applications.config.json5`).
 pub const CONFIG_NAME: &str = "applications.config.json5";
 
 /// Check host application composition against workspace package descriptors.
@@ -598,17 +599,12 @@ fn error(
     span: Option<(u32, u32)>,
 ) -> ApplicationDiagnostic {
     let path = path.as_ref();
-    ApplicationDiagnostic {
-        code: code.into(),
-        severity: "error".into(),
-        path: path.display().to_string(),
-        message: message.into(),
-        span: span.map(|(start, end)| ApplicationSourceSpan {
-            path: path.display().to_string(),
-            start,
-            end,
-        }),
+    let path_s = path.display().to_string();
+    let mut d = ApplicationDiagnostic::coded_error(path_s.clone(), message, code);
+    if let Some((start, end)) = span {
+        d = d.with_source_span(ApplicationSourceSpan { path: path_s, start, end });
     }
+    d
 }
 
 /// Best-effort byte span for a needle inside source (JSON5 labels).

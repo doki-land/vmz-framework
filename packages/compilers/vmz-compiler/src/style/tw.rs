@@ -1,6 +1,6 @@
 //! Compiler-side TW style plugin hook (`vmz-plugin-tailwind`).
 //!
-//! Tokens are **registered during compile** from already-parsed SFC — not by
+//! Tokens are registered during compile from already-parsed SFC -- not by
 //! re-scanning the project tree.
 
 use std::path::{Path, PathBuf};
@@ -10,40 +10,59 @@ use crate::diagnostic::ReportedDiagnostic;
 use crate::sfc::ParsedVmz;
 use crate::template::{AttrValue, TemplateNode, parse_template};
 
+/// How a TW utility token was discovered in source.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TwRegKind {
+    /// From a static `style:tw="..."` attribute on a template element.
     StyleTw,
+    /// From `@apply` inside an `@tailwind { ... }` style block.
     AtTailwind,
 }
 
+/// One registered utility token plus the `.vmz` path that contributed it.
 #[derive(Debug, Clone)]
 pub struct TwRegistration {
+    /// Utility class token (e.g. `bg-action`, `px-4`).
     pub token: String,
+    /// Source file that registered this token.
     pub path: PathBuf,
+    /// Discovery site (`style:tw` vs `@tailwind` / `@apply`).
     pub kind: TwRegKind,
 }
 
+/// Inputs handed to a [`TwCompiler`] for one project emit.
 #[derive(Debug, Clone)]
 pub struct TwEmitRequest {
+    /// Project root used to resolve plugin config / content roots.
     pub project_root: PathBuf,
+    /// Directory where the plugin should write CSS assets.
     pub out_dir: PathBuf,
+    /// Tokens collected from parsed units this round.
     pub registrations: Vec<TwRegistration>,
     /// Unified Style Theme from compiler core; plugin projects to engine theme.
     pub style_theme: crate::designs::StyleTheme,
 }
 
+/// CSS body and diagnostics returned by a [`TwCompiler`].
 #[derive(Debug, Default)]
 pub struct TwEmitResult {
+    /// Generated utility CSS body (may be empty).
     pub css: String,
+    /// Path relative to `out_dir` for the written asset (when emitted).
     pub css_relative: String,
+    /// Plugin diagnostics to fold into the compile report.
     pub diagnostics: Vec<ReportedDiagnostic>,
+    /// Static tokens the engine actually emitted (for fingerprints / explain).
     pub static_tokens: Vec<String>,
 }
 
+/// Trait implemented by the Tailwind style plugin production compiler.
 pub trait TwCompiler: Send + Sync {
+    /// Compile registered tokens into a CSS contribution for this project.
     fn emit_project(&self, req: &TwEmitRequest) -> TwEmitResult;
 }
 
+/// Shared handle to a [`TwCompiler`] installed on the compile session.
 pub type TwCompilerHandle = Arc<dyn TwCompiler>;
 
 /// Register TW tokens from an already-parsed `.vmz`.

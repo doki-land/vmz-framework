@@ -30,6 +30,14 @@ export {
     type BrowserResult,
 } from './browser.js';
 export {
+    BROWSER_LOCATOR_KINDS,
+    defaultClickLocator,
+    parseActionLocator,
+    type BrowserActionOptions,
+    type BrowserLocator,
+    type LocatorResolveResult,
+} from './browser-protocol.js';
+export {
     runManifest,
     resultsToReport,
     type ManifestRunResult,

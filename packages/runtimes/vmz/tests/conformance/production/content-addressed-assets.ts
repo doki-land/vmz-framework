@@ -132,20 +132,18 @@ upsertCheck(proof, {
     detail: CACHE_ASSET_IMMUTABLE,
 });
 
-const gaps = [
-    'A3: second real CDN provider adapter beyond netlify projection not covered',
-    'A3: locale-prefixed CDN cache keys / hreflang not covered',
-];
+const gaps = ['A3: second real CDN provider adapter beyond netlify projection not covered'];
 for (const g of gaps) addLimitation(proof, g);
 proof.knownLimitations = proof.knownLimitations.filter(
     (l) =>
         !l.includes('A3: content-addressed assets/<hash>') &&
         !l.includes('content-addressed assets/<hash> immutable') &&
-        !l.includes('content-addressed assets/<hash> cross-source'),
+        !l.includes('content-addressed assets/<hash> cross-source') &&
+        !l.includes('A3: locale-prefixed CDN cache keys / hreflang not covered'),
 );
 
 writeProof(proof, root);
 if (errors.length) fail(errors.join('\n'));
 
 console.log(`content-addressed-assets PASS: objects=${assetsManifest.objectCount} entry=${String(entry?.digest || '').slice(0, 12)}`);
-console.log('content-addressed-assets NOTE: second CDN provider / locale cache-key matrix still open');
+console.log('content-addressed-assets NOTE: second CDN provider adapter still open');

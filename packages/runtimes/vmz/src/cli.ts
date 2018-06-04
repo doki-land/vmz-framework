@@ -17,14 +17,16 @@ import { cmdDocument } from './document-cmd.js';
 import { buildIntegratedDocuments, projectHasDocuments } from './document-integrate.js';
 import { cmdLocale } from './locale-cmd.js';
 import { emitLocaleRuntimeModules, localeHasErrors } from './locale-check.js';
+import { emitLocaleRouteRealization } from './locale-route-emit.js';
 import { cmdApplication } from './application-cmd.js';
 import { cmdArtifact } from './release-cmd.js';
 import { cmdRefactor } from './refactor-cmd.js';
 import { cmdExplain } from './explain-cmd.js';
 import { resolveNativeVmzCli } from './resolve-native-cli.js';
-import { emitWebStatic } from './static-emit.js';
-import { emitSiteDelivery } from './site-delivery.js';
 import { loadVmzConfig } from './plugin-host.js';
+import { normalizeDeliveryAuthoring, selectBuildProfile } from './delivery-profile.js';
+import { packFromDeploymentIr } from './pack.js';
+import { assembleDelivery, emitBuildProof } from './build-assemble.js';
 
 /**
  * @param {string[]} argv
@@ -122,9 +124,9 @@ Usage:
 
 Options:
   --out-dir, -o <dir>   Output directory (default: dist)
-  --release             Release build (build only)
-  --profile <name>      Delivery profile after build (web-static)
-  --origin <url>        Site origin for web-static canonical/sitemap
+  --release             Release build (omit serve-host; pack minify slot; proof)
+  --profile <name>      Delivery profile (default from config; builtins: web-ssr|web-static|web-client|web-hybrid)
+  --origin <url>        Site origin for static-cdn canonical/sitemap
   --host <host>         Listen host (default: 127.0.0.1)
   --port <port>         Listen port (dev: omit = auto from 5173; set = lock)
   --poll-ms <ms>        Dev watch poll interval (default: 300)
@@ -286,13 +288,35 @@ function cmdCheck(args) {
     try {
         return runWithPlugins(ws, project, outDir, async () => {
             const report = ws.check();
-            const errors = log.diagnostics(report.diagnostics ?? []);
+            const { checkLocales, localeHasErrors } = await import('./locale-check.js');
+            const localeReport = checkLocales({ projectRoot: project, checkUnused: false });
+            // Locale policy is first-class: missing /locales is warning (not silent), hard errors still fail.
+            const errors =
+                log.diagnostics([...(report.diagnostics ?? []), ...(localeReport.diagnostics ?? [])]) ||
+                (localeHasErrors(localeReport) ? 1 : 0);
             log.info(`checked ${report.filesChecked} file(s)`);
             return errors ? 1 : 0;
         });
     } finally {
         ws.dispose();
     }
+}
+
+/**
+ * Dedupe locale/build diagnostics by code+path+message (runtime + route emit both report missing manifest).
+ * @param {Array<{ code?: string, path?: string, message?: string, severity?: string }>} list
+ */
+function dedupeDiagnostics(list) {
+    const seen = new Set();
+    /** @type {typeof list} */
+    const out = [];
+    for (const d of list || []) {
+        const key = `${d.code || ''}\0${d.path || ''}\0${d.message || ''}\0${d.severity || ''}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(d);
+    }
+    return out;
 }
 
 /**
@@ -322,6 +346,22 @@ async function cmdBuild(args) {
     log.info(`build ${project} → ${outDir}`);
     const ws = createWorkspace({ root: project, outDir });
     try {
+        const cfg = await loadVmzConfig(project);
+        const cliProfile = typeof args.profile === 'string' ? args.profile : '';
+        const norm = normalizeDeliveryAuthoring(cfg.delivery ?? null);
+        if (!norm.ok) {
+            log.diagnostics(norm.diagnostics ?? []);
+            log.error('delivery authoring invalid');
+            return 1;
+        }
+        const selected = selectBuildProfile(norm.table, cliProfile);
+        if (!selected.ok) {
+            log.diagnostics(selected.diagnostics ?? []);
+            log.error(`unknown build --profile ${cliProfile || norm.table.default}`);
+            return 1;
+        }
+        log.info(`delivery profile ${selected.selection.profileId} (assembly=${selected.selection.assembly})`);
+
         const code = await runWithPlugins(ws, project, outDir, () => {
             const report = ws.build(Boolean(args.release));
             const errors = log.diagnostics(report.diagnostics ?? []);
@@ -334,47 +374,90 @@ async function cmdBuild(args) {
         });
         if (code !== 0) return code;
         const localeEmit = emitLocaleRuntimeModules(project, outDir);
+        const localeRoutes = emitLocaleRouteRealization(project, outDir, {
+            origin: typeof args.origin === 'string' ? args.origin : undefined,
+        });
+        // Always surface locale diagnostics (warnings included) — missing /locales must not be silent.
+        // Dedupe: runtime emit + route realization both report the same missing-manifest warning.
+        const localeDiags = dedupeDiagnostics([
+            ...(localeEmit.diagnostics ?? []),
+            ...(localeRoutes.diagnostics ?? []),
+        ]);
+        log.diagnostics(localeDiags);
         if (!localeEmit.ok || localeHasErrors({ diagnostics: localeEmit.diagnostics })) {
-            log.diagnostics(localeEmit.diagnostics ?? []);
             log.error('locale runtime emit failed');
             return 1;
         }
         if (localeEmit.written.length) {
             log.info(`locale runtime emit (${localeEmit.written.length} module(s))`);
         }
+        if (!localeRoutes.ok) {
+            log.error('locale route realization emit failed');
+            return 1;
+        }
+        if (localeRoutes.written.length) {
+            log.info(`locale route realization (${localeRoutes.written.length} artifact(s))`);
+        }
         if (projectHasDocuments(project)) {
             const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
             if (!docs.ok) return 1;
         }
-        const cfg = await loadVmzConfig(project);
-        if (cfg.delivery) {
-            log.info(`site-delivery emit ${outDir}`);
-            const site = emitSiteDelivery(outDir, cfg.delivery, {
-                siteId: cfg.application?.id || undefined,
+
+        let pack = null;
+        try {
+            pack = packFromDeploymentIr(outDir, {
+                release: Boolean(args.release),
+                profileId: selected.selection.profileId,
+                assembly: selected.selection.assembly,
+                coreDist: resolveCoreRuntimeDist(),
             });
-            log.info(`site-delivery ok (digest=${String(site.contract.contractDigest).slice(0, 12)}…)`);
-        }
-        const profile = typeof args.profile === 'string' ? args.profile : '';
-        if (profile === 'web-static') {
-            const origin = typeof args.origin === 'string' ? args.origin : undefined;
-            log.info(`web-static emit ${outDir}`);
-            const result = await emitWebStatic(outDir, { origin });
-            log.info(
-                `web-static ok (${result.htmlFiles.length} html, ${result.skipped.length} skipped, digest=${result.digest.slice(0, 12)}…)`,
-            );
-        } else if (profile) {
-            log.error(`unknown build --profile ${profile} (supported: web-static)`);
+            log.info(`pack ok (units=${pack.manifest.unitCount}, digest=${String(pack.manifest.packDigest).slice(0, 12)}…)`);
+        } catch (err) {
+            log.error(`pack failed: ${err instanceof Error ? err.message : String(err)}`);
             return 1;
         }
+
+        const origin = typeof args.origin === 'string' ? args.origin : undefined;
+        let assemble = null;
+        try {
+            if (selected.selection.assembly === 'static-cdn') {
+                log.info(`web-static emit ${outDir}`);
+            }
+            assemble = await assembleDelivery(outDir, {
+                selection: selected.selection,
+                profile: {
+                    ...selected.profile,
+                    sources: selected.profile.sources || (norm.table.sugar ? norm.table.profiles[norm.table.default]?.sources : null),
+                },
+                siteId: cfg.application?.id || undefined,
+                origin,
+                pack: pack.manifest,
+            });
+            for (const step of assemble.manifest.steps || []) {
+                if (step.kind === 'static-cdn') {
+                    log.info(`web-static ok (${step.htmlFiles} html, ${step.skipped} skipped, digest=${String(step.digest).slice(0, 12)}…)`);
+                } else if (step.kind === 'site-delivery' && step.digest) {
+                    log.info(`site-delivery ok (digest=${String(step.digest).slice(0, 12)}…)`);
+                }
+            }
+        } catch (err) {
+            log.error(`assemble failed: ${err instanceof Error ? err.message : String(err)}`);
+            return 1;
+        }
+
+        const proof = emitBuildProof(outDir, {
+            selection: selected.selection,
+            pack: pack.manifest,
+            assemble: assemble.manifest,
+            release: Boolean(args.release),
+        });
+        log.info(`build-proof ok (profile=${proof.proof.profileId}, slots=${proof.proof.semanticIds.join(',')})`);
         return 0;
     } finally {
         ws.dispose();
     }
 }
 
-/**
- * @param {Record<string, string | boolean> & { _: string[] }} args
- */
 async function cmdServe(args) {
     const pathArg = args._[0] ?? '.';
     if (args.build) {

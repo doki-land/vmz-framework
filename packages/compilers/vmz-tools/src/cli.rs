@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 
 use crate::commands::{build, check, dev, format, lint, lsp, mcp, new, serve};
 
+/// Top-level `vmz` CLI parser (clap root).
 #[derive(Debug, Parser)]
 #[command(
     name = "vmz",
@@ -11,13 +12,15 @@ use crate::commands::{build, check, dev, format, lint, lsp, mcp, new, serve};
     about = "VMZ toolchain: new, format, check, lint, build, serve, dev, lsp, mcp",
     propagate_version = true
 )]
-pub struct Cli {
+pub struct VmzTools {
+    /// Selected subcommand and its arguments.
     #[command(subcommand)]
-    pub command: Command,
+    pub commands: VmzCommand,
 }
 
+/// `vmz` subcommands dispatched from [`VmzTools`].
 #[derive(Debug, Subcommand)]
-pub enum Command {
+pub enum VmzCommand {
     /// Scaffold a minimal app with a local `vmz` dependency
     #[command(alias = "init")]
     New(new::Args),

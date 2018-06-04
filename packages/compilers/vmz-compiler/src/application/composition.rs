@@ -20,7 +20,11 @@ use crate::application_reloc::join_application_base;
 
 const FORBIDDEN_PRODUCT_KINDS: &[&str] = &["homepage", "examples", "gallery", "docs", "admin"];
 
-// Prove host catalog consumption + cross-application Link resolution .
+/// Verify a host can consume its ApplicationCatalog and resolve cross-app Links.
+///
+/// Scans the host root for link declarations, validates mount/route reachability,
+/// and rejects forbidden core product kinds. Returns a composition report with
+/// diagnostics for unknown references and unreachable mounts.
 pub fn check_application_host_composition(
     host_root: impl AsRef<Path>,
     package_roots: &[PathBuf],
@@ -162,26 +166,22 @@ fn load_declared_links(
     let text = match fs::read_to_string(&path) {
         Ok(t) => t,
         Err(e) => {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_UNKNOWN_REFERENCE.into(),
-                severity: "error".into(),
-                path: path.display().to_string(),
-                message: format!("read cross-links.json failed: {e}"),
-                span: None,
-            });
+            diagnostics.push(ApplicationDiagnostic::coded_error(
+                path.display().to_string(),
+                format!("read cross-links.json failed: {e}"),
+                DIAG_UNKNOWN_REFERENCE,
+            ));
             return Vec::new();
         }
     };
     let value: serde_json::Value = match serde_json::from_str(&text) {
         Ok(v) => v,
         Err(e) => {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_UNKNOWN_REFERENCE.into(),
-                severity: "error".into(),
-                path: path.display().to_string(),
-                message: format!("cross-links.json is not JSON: {e}"),
-                span: None,
-            });
+            diagnostics.push(ApplicationDiagnostic::coded_error(
+                path.display().to_string(),
+                format!("cross-links.json is not JSON: {e}"),
+                DIAG_UNKNOWN_REFERENCE,
+            ));
             return Vec::new();
         }
     };
@@ -226,39 +226,29 @@ fn resolve_links(
         let path = link.path.clone().unwrap_or_else(|| "<host>".into());
 
         let Some(artifact) = artifact_by_id.get(app) else {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_UNKNOWN_REFERENCE.into(),
-                severity: "error".into(),
-                path: path.clone(),
-                message: format!("cross-application Link references unknown ApplicationId `{app}`"),
-                span: None,
-            });
+            diagnostics.push(ApplicationDiagnostic::coded_error(
+                path.clone(),
+                format!("cross-application Link references unknown ApplicationId `{app}`"),
+                DIAG_UNKNOWN_REFERENCE,
+            ));
             continue;
         };
 
         if !artifact.public_route_contracts.iter().any(|r| r == route_id) {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_ROUTE_NOT_PUBLIC.into(),
-                severity: "error".into(),
-                path: path.clone(),
-                message: format!(
+            diagnostics.push(ApplicationDiagnostic::coded_error(
+                path.clone(),
+                format!(
                     "RouteId `{route_id}` is not a public route contract of ApplicationId `{app}`"
                 ),
-                span: None,
-            });
+                DIAG_ROUTE_NOT_PUBLIC,
+            ));
             continue;
         }
 
         let Some(route_base) = mount_by_id.get(app).copied() else {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_MOUNT_UNREACHABLE.into(),
-                severity: "error".into(),
-                path: path.clone(),
-                message: format!(
+            diagnostics.push(ApplicationDiagnostic::coded_error(path.clone(), format!(
                     "ApplicationId `{app}` has no mount in this deployment profile; cross-app Link href cannot be resolved"
-                ),
-                span: None,
-            });
+                ), DIAG_MOUNT_UNREACHABLE));
             continue;
         };
 
@@ -266,15 +256,13 @@ fn resolve_links(
         {
             Some(p) => p,
             None => {
-                diagnostics.push(ApplicationDiagnostic {
-                    code: DIAG_ROUTE_NOT_PUBLIC.into(),
-                    severity: "error".into(),
-                    path: path.clone(),
-                    message: format!(
+                diagnostics.push(ApplicationDiagnostic::coded_error(
+                    path.clone(),
+                    format!(
                         "cannot derive logical path for public RouteId `{route_id}` on `{app}`"
                     ),
-                    span: None,
-                });
+                    DIAG_ROUTE_NOT_PUBLIC,
+                ));
                 continue;
             }
         };
@@ -282,13 +270,11 @@ fn resolve_links(
         let href = match join_application_base(route_base, &logical) {
             Ok(h) => h,
             Err(msg) => {
-                diagnostics.push(ApplicationDiagnostic {
-                    code: DIAG_MOUNT_UNREACHABLE.into(),
-                    severity: "error".into(),
-                    path: path.clone(),
-                    message: format!("Link href join failed for `{app}`: {msg}"),
-                    span: None,
-                });
+                diagnostics.push(ApplicationDiagnostic::coded_error(
+                    path.clone(),
+                    format!("Link href join failed for `{app}`: {msg}"),
+                    DIAG_MOUNT_UNREACHABLE,
+                ));
                 continue;
             }
         };

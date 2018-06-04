@@ -22,7 +22,7 @@ pub fn build_native_view(
     let roots = build_nodes(&template.roots, &mut cursor, routes);
     ViewView {
         status: ViewStatus::Native,
-        binding_ids: reactive.bindings.iter().map(|b| b.id).collect(),
+        binding_ids: reactive.bindings.iter().map(|b| b.id()).collect(),
         region_ids: reactive.control_regions.iter().map(|r| r.id).collect(),
         roots,
     }

@@ -10,6 +10,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { emitCdnPolicy } from './cdn-policy.js';
 import { emitContentAddressedAssets } from './content-addressed-assets.js';
+import { absoluteUrl, buildLocalePageMeta, localizeBodyLinks } from './locale-router.js';
 
 export const STATIC_DELIVERY_MANIFEST_SCHEMA = 'vmz.static.delivery_manifest.v0';
 
@@ -114,30 +115,48 @@ export async function emitWebStatic(distDir, opts = {}) {
             bodyHtml = await renderToString(Layout, {}, { slotHtml: bodyHtml });
         }
 
-        const htmlPath = htmlPathForRoute(pattern);
-        const absHtml = path.join(distDir, htmlPath);
-        fs.mkdirSync(path.dirname(absHtml), { recursive: true });
-        const html = wrapDocument({
-            bodyHtml,
+        const localeArt = loadLocaleArtifact(distDir);
+        // Locale artifact routeId is chunkId (`pages/about`), not the page class name.
+        const localeWrites = expandLocaleStaticGenerations({
+            localeArt,
+            routeId: page.chunkId,
             chunkId: page.chunkId,
-            layoutChain,
-            props,
-            meta,
-            cssEntry: readCssEntry(distDir),
+            pattern,
+            origin,
+            baseMeta: meta,
         });
-        fs.writeFileSync(absHtml, html, 'utf8');
 
-        generations.push({
-            routeId,
-            path: pattern,
-            chunkId: page.chunkId,
-            htmlPath: htmlPath.replaceAll('\\', '/'),
-            classification: 'Static',
-            title: meta.title,
-            description: meta.description,
-            canonical: meta.canonical,
-            robots: meta.robots,
-        });
+        for (const gen of localeWrites) {
+            const absHtml = path.join(distDir, gen.htmlPath);
+            fs.mkdirSync(path.dirname(absHtml), { recursive: true });
+            // Each LocaleId HTML must retain locale on same-app Links (realization authority).
+            const localizedBody =
+                gen.localeId && localeArt
+                    ? localizeBodyLinks(bodyHtml, gen.localeId, localeArt)
+                    : bodyHtml;
+            const html = wrapDocument({
+                bodyHtml: localizedBody,
+                chunkId: page.chunkId,
+                layoutChain,
+                props,
+                meta: gen.meta,
+                cssEntry: readCssEntry(distDir),
+            });
+            fs.writeFileSync(absHtml, html, 'utf8');
+            generations.push({
+                routeId,
+                path: gen.path,
+                chunkId: page.chunkId,
+                htmlPath: gen.htmlPath.replaceAll('\\', '/'),
+                classification: 'Static',
+                title: gen.meta.title,
+                description: meta.description,
+                canonical: gen.meta.canonical,
+                robots: gen.meta.robots,
+                localeId: gen.localeId || null,
+                alternates: Array.isArray(gen.meta.alternates) ? gen.meta.alternates : [],
+            });
+        }
     }
 
     const notFoundHtml = wrapDocument({
@@ -189,11 +208,13 @@ export async function emitWebStatic(distDir, opts = {}) {
             chunkId: g.chunkId,
             htmlPath: g.htmlPath,
             classification: g.classification,
+            localeId: g.localeId || null,
             seo: {
                 title: g.title,
                 description: g.description,
                 canonical: g.canonical,
                 robots: g.robots,
+                alternates: g.alternates || [],
             },
         })),
         skipped,
@@ -387,7 +408,98 @@ async function resolvePageMeta(Page, ctx) {
     const canonical = String(raw.canonical || `${ctx.origin}${ctx.pathname === '/' ? '/' : ctx.pathname}`);
     const robots = String(raw.robots || 'index,follow');
     const lang = String(raw.lang || 'en');
-    return { title, description, canonical, robots, lang };
+    return { title, description, canonical, robots, lang, alternates: [] };
+}
+
+/**
+ * @param {string} distDir
+ */
+function loadLocaleArtifact(distDir) {
+    const p = path.join(distDir, '_vmz', 'locale-route-realization.json');
+    if (!fs.existsSync(p)) return null;
+    try {
+        return JSON.parse(fs.readFileSync(p, 'utf8'));
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Expand one Static route across LocaleId realizations (hreflang seed + prefixed HTML).
+ * @param {{
+ *   localeArt: any,
+ *   routeId: string,
+ *   chunkId: string,
+ *   pattern: string,
+ *   origin: string,
+ *   baseMeta: { title: string, description: string, canonical: string, robots: string, lang: string, alternates?: any[] },
+ * }} input
+ */
+function expandLocaleStaticGenerations(input) {
+    const { localeArt, routeId, pattern, origin, baseMeta } = input;
+    if (!localeArt?.realizations?.length) {
+        return [
+            {
+                path: pattern,
+                htmlPath: htmlPathForRoute(pattern),
+                localeId: null,
+                meta: baseMeta,
+            },
+        ];
+    }
+
+    const locales = (localeArt.locales || []).map((l) => l.id);
+    const directions = Object.fromEntries((localeArt.locales || []).map((l) => [l.id, l.direction || 'ltr']));
+    const defaultLocale = localeArt.defaultLocale || locales[0];
+    const forRoute = (localeArt.realizations || []).filter(
+        (r) =>
+            r.routeId === routeId ||
+            r.routeId === input.chunkId ||
+            r.pathPattern === pattern ||
+            (r.path === pattern && !r.prefixed),
+    );
+    /** @type {any[]} */
+    const out = [];
+
+    for (const loc of locales) {
+        const hit = forRoute.find((r) => r.localeId === loc);
+        if (!hit) continue;
+        const built = buildLocalePageMeta({
+            routeId,
+            localeId: loc,
+            direction: directions[loc],
+            title: baseMeta.title,
+            description: baseMeta.description,
+            origin,
+            realizations: localeArt.realizations,
+            locales,
+            defaultLocale,
+        });
+        out.push({
+            path: hit.path,
+            htmlPath: htmlPathForRoute(hit.path),
+            localeId: loc,
+            meta: {
+                title: baseMeta.title,
+                description: baseMeta.description,
+                canonical: built.canonical || absoluteUrl(origin, hit.path),
+                robots: baseMeta.robots,
+                lang: loc,
+                dir: directions[loc] || 'ltr',
+                alternates: built.alternates || [],
+            },
+        });
+    }
+    return out.length
+        ? out
+        : [
+              {
+                  path: pattern,
+                  htmlPath: htmlPathForRoute(pattern),
+                  localeId: null,
+                  meta: baseMeta,
+              },
+          ];
 }
 
 function guessTitle(pathname) {
@@ -417,7 +529,7 @@ function readCssEntry(distDir) {
  *   chunkId: string,
  *   layoutChain: string[],
  *   props: Record<string, unknown>,
- *   meta: { title: string, description: string, canonical: string, robots: string, lang: string },
+ *   meta: { title: string, description: string, canonical: string, robots: string, lang: string, dir?: string, alternates?: Array<{ hreflang: string, href: string }> },
  *   cssEntry: string | null,
  *   isErrorDocument?: boolean,
  * }} input
@@ -426,10 +538,17 @@ function wrapDocument(input) {
     const propsJson = JSON.stringify(input.props ?? {});
     const layoutAttr = input.layoutChain.length ? ` data-vmz-layout="${escapeAttr(input.layoutChain.join(','))}"` : '';
     const pageAttr = input.chunkId ? ` data-vmz-page="${escapeAttr(input.chunkId)}"` : '';
+    const localeId = input.meta.lang || 'en';
+    const dir = input.meta.dir || 'ltr';
+    const localeAttr = ` data-vmz-locale="${escapeAttr(localeId)}" data-vmz-dir="${escapeAttr(dir)}"`;
     const cssLink = input.cssEntry ? `  <link rel="stylesheet" href="/${String(input.cssEntry).replace(/^\/+/, '')}" />\n` : '';
     const entry = input.isErrorDocument ? '' : `  <script type="module" src="/entry-client.js"></script>\n`;
+    const hreflang = (input.meta.alternates || [])
+        .map((a) => `  <link rel="alternate" hreflang="${escapeAttr(a.hreflang)}" href="${escapeAttr(a.href)}" />`)
+        .join('\n');
+    const hreflangBlock = hreflang ? `${hreflang}\n` : '';
     return `<!DOCTYPE html>
-<html lang="${escapeAttr(input.meta.lang)}">
+<html lang="${escapeAttr(localeId)}" data-locale="${escapeAttr(localeId)}" dir="${escapeAttr(dir)}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -437,12 +556,12 @@ function wrapDocument(input) {
   <meta name="description" content="${escapeAttr(input.meta.description)}" />
   <meta name="robots" content="${escapeAttr(input.meta.robots)}" />
   <link rel="canonical" href="${escapeAttr(input.meta.canonical)}" />
-  <meta property="og:title" content="${escapeAttr(input.meta.title)}" />
+${hreflangBlock}  <meta property="og:title" content="${escapeAttr(input.meta.title)}" />
   <meta property="og:description" content="${escapeAttr(input.meta.description)}" />
   <meta property="og:url" content="${escapeAttr(input.meta.canonical)}" />
 ${cssLink}</head>
 <body>
-  <div id="app"${pageAttr}${layoutAttr} data-vmz-props="${escapeAttr(propsJson)}">${input.bodyHtml}</div>
+  <div id="app"${pageAttr}${layoutAttr}${localeAttr} data-vmz-props="${escapeAttr(propsJson)}">${input.bodyHtml}</div>
 ${entry}</body>
 </html>
 `;

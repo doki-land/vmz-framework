@@ -9,25 +9,34 @@ use std::path::{Path, PathBuf};
 use crate::dep_graph::ComponentGraph;
 use crate::project::{VmzModuleKind, discover_vmz_files};
 
+/// One deployable unit selected by an affected plan.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AffectedUnit {
+    /// Absolute path to the `.vmz` source.
     pub source: PathBuf,
+    /// Module kind (page, component, app, …).
     pub kind: VmzModuleKind,
+    /// Deployment chunk id (e.g. `components/Button`).
     pub chunk_id: String,
 }
 
+/// Minimal rebuild set derived from dirty sources.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AffectedPlan {
     /// True when this is a full project rebuild.
     pub full: bool,
+    /// Whether shared runtime chunks must be rebuilt.
     pub rebuild_runtime: bool,
+    /// Whether `src/server` tree must be rebuilt.
     pub rebuild_server_tree: bool,
+    /// Units to re-emit after reverse-edge expansion.
     pub units: Vec<AffectedUnit>,
     /// Seed chunks before reverse-edge expansion (for HMR diagnostics).
     pub seed_chunks: Vec<String>,
 }
 
 impl AffectedPlan {
+    /// Iterate source paths of affected units.
     pub fn sources(&self) -> impl Iterator<Item = &Path> {
         self.units.iter().map(|u| u.source.as_path())
     }
@@ -41,9 +50,8 @@ impl AffectedPlan {
             })
     }
 
-    // DX document (`vmz.dx.affected.v0`).
+    /// DX document (`vmz.dx.affected.v0`).
     pub fn to_dx_document(&self) -> vmz_protocol::AffectedDocument {
-        use crate::project::VmzModuleKind;
         vmz_protocol::AffectedDocument {
             schema: vmz_protocol::AFFECTED_SCHEMA.into(),
             full: self.full,
@@ -54,13 +62,7 @@ impl AffectedPlan {
                 .iter()
                 .map(|u| vmz_protocol::AffectedUnitDoc {
                     source: u.source.to_string_lossy().replace('\\', "/"),
-                    kind: match u.kind {
-                        VmzModuleKind::Page => "page",
-                        VmzModuleKind::Component => "component",
-                        VmzModuleKind::App => "app",
-                        VmzModuleKind::Other => "other",
-                    }
-                    .into(),
+                    kind: u.kind,
                     chunk_id: u.chunk_id.clone(),
                 })
                 .collect(),
@@ -190,6 +192,7 @@ fn full_plan_from_catalog(
     }
 }
 
+/// Stable chunk id for a `.vmz` path relative to `src_root` (or package `src/`).
 pub fn chunk_id_for(src_root: &Path, source: &Path) -> String {
     let stem = source.file_stem().and_then(|s| s.to_str()).unwrap_or("component");
     if let Ok(parent) = source.parent().unwrap_or(source).strip_prefix(src_root) {
@@ -229,6 +232,7 @@ fn is_under(path: &Path, root: &Path) -> bool {
     path.strip_prefix(root).is_ok()
 }
 
+/// Compare paths with `/`-normalized, ASCII-case-insensitive equality.
 pub fn paths_eq(a: &Path, b: &Path) -> bool {
     if a == b {
         return true;

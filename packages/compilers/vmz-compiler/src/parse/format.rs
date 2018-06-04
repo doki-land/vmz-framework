@@ -3,29 +3,42 @@
 use std::fs;
 use std::path::Path;
 
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
 use crate::diagnostic::ReportedDiagnostic;
 use crate::project::discover_vmz_files;
 use crate::sfc::parse_vmz;
 
-#[derive(Debug, Clone, Default)]
+/// Options for [`format_path`].
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FormatOptions {
+    /// When true, report files that would change instead of writing them.
     pub check: bool,
 }
 
+/// Aggregated result of formatting one file or a project tree.
 #[derive(Debug, Default)]
 pub struct FormatReport {
+    /// Parse / format / check diagnostics collected during the run.
     pub diagnostics: Vec<ReportedDiagnostic>,
+    /// Number of `.vmz` files visited.
     pub files_checked: usize,
+    /// Number of files rewritten on disk (zero when `check` is set).
     pub files_written: usize,
+    /// Number of files whose formatted text differs from the input.
     pub files_need_write: usize,
 }
 
 impl FormatReport {
+    /// True when any diagnostic is error severity.
     pub fn has_errors(&self) -> bool {
         self.diagnostics.iter().any(|d| d.is_error())
     }
 }
 
+/// Format a single `.vmz` file or every `.vmz` under a directory.
 pub fn format_path(path: impl AsRef<Path>, options: &FormatOptions) -> crate::Result<FormatReport> {
     let path = path.as_ref();
     let mut report = FormatReport::default();
@@ -103,6 +116,7 @@ fn format_file(
     Ok(())
 }
 
+/// Pretty-print a TypeScript script body with oxc parser + codegen.
 pub fn format_script(source: &str) -> Result<String, String> {
     // Pretty-print via oxc subcrates (parser + codegen). Prefer these over the `oxc` umbrella
     // so new surfaces (formatter/codegen options) can be adopted crate-by-crate.

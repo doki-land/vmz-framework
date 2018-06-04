@@ -1,0 +1,470 @@
+<template>
+  <div
+    class="vmz-ui-datagrid"
+    data-vmz-ui="data-grid"
+    data-vmz-grid="virtual-pinned"
+    data-vmz-grid-group={groupByAttr}
+    data-vmz-grid-tree={treeAttr}
+    data-vmz-grid-pivot={pivotAttr}
+    data-vmz-grid-edit={editingAttr}
+    data-total-rows={totalRows}
+    data-visible-count={visibleCount}
+    data-pinned-cols={pinnedCols}
+    data-sort-key={sortKey}
+    data-sort-dir={sortDir}
+    data-selected-count={selectedCount}
+    data-group-count={groupCount}
+    data-pivot-cols={pivotColsAttr}
+  >
+    <div
+      class="vmz-ui-datagrid__viewport"
+      data-vmz-grid-viewport="true"
+      onScroll={onViewportScroll}
+    >
+      <div class="vmz-ui-datagrid__canvas" style={canvasStyle}>
+        <div class="vmz-ui-datagrid__head" data-vmz-grid-head="true" style={rowLayoutStyle} onClick={onHeadClick}>
+          <div class="vmz-ui-datagrid__cell vmz-ui-datagrid__cell--check vmz-ui-datagrid__cell--pinned" data-pinned="true">
+            <input
+              type="checkbox"
+              class="vmz-ui-datagrid__box"
+              data-vmz-select-all="true"
+              aria-label={selectAllLabel}
+              checked={allSelected}
+            />
+          </div>
+          <div
+            each={columns}
+            as="col"
+            key={col.id}
+            class={col.cellClass}
+            data-vmz-col={col.id}
+            data-pinned={col.pinnedAttr}
+            data-pivot-col={col.pivotColAttr}
+          >
+            <button type="button" class="vmz-ui-datagrid__sort" data-vmz-sort={col.id}>
+              {col.title}
+            </button>
+          </div>
+        </div>
+
+        <div
+          class="vmz-ui-datagrid__spacer"
+          data-vmz-grid-spacer="top"
+          style={padTopStyle}
+          aria-hidden="true"
+        ></div>
+
+        <div
+          each={rows}
+          as="row"
+          key={row.id}
+          class={row.rowClass}
+          style={rowLayoutStyle}
+          data-vmz-row={row.id}
+          data-row-kind={row.kindAttr}
+          data-group-key={row.groupKey}
+          data-depth={row.depthAttr}
+          data-expanded={row.expandedAttr}
+          data-selected={row.selectedAttr}
+          data-pivot-row={row.pivotRowAttr}
+          onClick={onBodyClick}
+        >
+          <div if={row.isGroup} class="vmz-ui-datagrid__cell vmz-ui-datagrid__cell--check vmz-ui-datagrid__cell--pinned" data-pinned="true">
+            <button
+              type="button"
+              class="vmz-ui-datagrid__twist"
+              data-vmz-group-toggle={row.groupKey}
+              aria-expanded={row.expandedAttr}
+              aria-label={row.twistLabel}
+            >
+              {row.twist}
+            </button>
+          </div>
+          <div if={row.isTreeExpandable} class="vmz-ui-datagrid__cell vmz-ui-datagrid__cell--check vmz-ui-datagrid__cell--pinned" data-pinned="true">
+            <button
+              type="button"
+              class="vmz-ui-datagrid__twist"
+              data-vmz-tree-toggle={row.id}
+              aria-expanded={row.expandedAttr}
+              aria-label={row.twistLabel}
+            >
+              {row.twist}
+            </button>
+          </div>
+          <div if={row.isLeaf} class="vmz-ui-datagrid__cell vmz-ui-datagrid__cell--check vmz-ui-datagrid__cell--pinned" data-pinned="true">
+            <input
+              type="checkbox"
+              class="vmz-ui-datagrid__box"
+              data-vmz-select={row.id}
+              aria-label={row.selectLabel}
+              checked={row.selected}
+            />
+          </div>
+          <div
+            each={row.cells}
+            as="cell"
+            key={cell.id}
+            class={cell.cellClass}
+            data-pinned={cell.pinnedAttr}
+            data-agg={cell.aggAttr}
+            data-editable={cell.editableAttr}
+            data-editing={cell.editingAttr}
+            style={cell.cellStyle}
+          >
+            <span if={cell.showText} data-vmz-cell-start-edit={cell.startEditKey}>{cell.text}</span>
+            <input
+              if={cell.editing}
+              class="vmz-ui-datagrid__editor"
+              data-vmz-cell-editor={cell.cellKey}
+              value={cell.editValue}
+              aria-label={cell.editLabel}
+              onInput={onEditorInput}
+              onKeyDown={onEditorKeyDown}
+              onBlur={onEditorBlur}
+              onClick={onEditorClick}
+            />
+          </div>
+        </div>
+
+        <div
+          class="vmz-ui-datagrid__spacer"
+          data-vmz-grid-spacer="bottom"
+          style={padBottomStyle}
+          aria-hidden="true"
+        ></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style>
+.vmz-ui-datagrid {
+  border: 1px solid var(--vmz-line-default);
+  border-radius: 2px;
+  background: var(--vmz-surface-paper);
+  color: var(--vmz-text-ink);
+}
+
+.vmz-ui-datagrid__viewport {
+  max-height: 18rem;
+  overflow: auto;
+  position: relative;
+}
+
+.vmz-ui-datagrid__canvas {
+  position: relative;
+  min-width: 44rem;
+}
+
+.vmz-ui-datagrid__head,
+.vmz-ui-datagrid__row {
+  display: grid;
+  /* Default long-form layout; pivot overrides via rowLayoutStyle. */
+  grid-template-columns: 2.5rem 10rem 8rem 10rem 12rem 10rem;
+  align-items: stretch;
+}
+
+.vmz-ui-datagrid__cell--pivot-measure {
+  font-family: var(--vmz-font-mono);
+  text-align: right;
+}
+
+.vmz-ui-datagrid__head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--vmz-surface-mist);
+  box-shadow: 0 1px 0 var(--vmz-line-default);
+  font-weight: 700;
+  color: var(--vmz-action-primary-active);
+}
+
+.vmz-ui-datagrid__cell {
+  padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+  border-bottom: 1px solid var(--vmz-line-default);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--vmz-surface-paper);
+}
+
+.vmz-ui-datagrid__head .vmz-ui-datagrid__cell {
+  background: var(--vmz-surface-mist);
+}
+
+.vmz-ui-datagrid__cell--pinned {
+  position: sticky;
+  z-index: 2;
+  box-shadow: 1px 0 0 var(--vmz-line-default);
+}
+
+.vmz-ui-datagrid__cell--check {
+  left: 0;
+  width: 2.5rem;
+  z-index: 4;
+}
+
+.vmz-ui-datagrid__head .vmz-ui-datagrid__cell--check,
+.vmz-ui-datagrid__head .vmz-ui-datagrid__cell--pinned {
+  z-index: 5;
+  background: var(--vmz-surface-mist);
+}
+
+.vmz-ui-datagrid__cell--pinned-data {
+  left: 2.5rem;
+  min-width: 10rem;
+}
+
+.vmz-ui-datagrid__row[data-selected='true'] .vmz-ui-datagrid__cell {
+  background: color-mix(in srgb, var(--vmz-action-primary-background) 12%, transparent);
+}
+
+.vmz-ui-datagrid__row[data-selected='true'] .vmz-ui-datagrid__cell--pinned {
+  background: color-mix(in srgb, var(--vmz-action-primary-background) 12%, var(--vmz-surface-paper));
+}
+
+.vmz-ui-datagrid__row--group .vmz-ui-datagrid__cell {
+  background: var(--vmz-surface-mist);
+  font-weight: 600;
+}
+
+.vmz-ui-datagrid__row--group .vmz-ui-datagrid__cell--pinned {
+  background: var(--vmz-surface-mist);
+  z-index: 3;
+}
+
+.vmz-ui-datagrid__row--tree-branch .vmz-ui-datagrid__cell {
+  font-weight: 600;
+}
+
+.vmz-ui-datagrid__cell--agg {
+  font-family: var(--vmz-font-mono);
+  color: var(--vmz-text-steel);
+  font-weight: 500;
+}
+
+.vmz-ui-datagrid__editor {
+  font: inherit;
+  font-family: var(--vmz-font-mono);
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0.1rem 0.25rem;
+  border: 1px solid var(--vmz-action-primary-background);
+  border-radius: 2px;
+  background: var(--vmz-surface-paper);
+  color: var(--vmz-text-ink);
+  outline: none;
+}
+
+.vmz-ui-datagrid__editor:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-datagrid__box {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--vmz-action-primary-background);
+  outline: none;
+}
+
+.vmz-ui-datagrid__box:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-datagrid__twist {
+  font: inherit;
+  font-family: var(--vmz-font-mono);
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--vmz-line-default);
+  border-radius: 2px;
+  background: var(--vmz-surface-paper);
+  color: var(--vmz-text-ink);
+  cursor: pointer;
+  outline: none;
+  line-height: 1;
+}
+
+.vmz-ui-datagrid__twist:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-datagrid__sort {
+  font: inherit;
+  font-weight: 700;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  outline: none;
+}
+
+.vmz-ui-datagrid__sort:focus-visible {
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-datagrid__spacer {
+  width: 100%;
+  pointer-events: none;
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI DataGrid — virtualized body + pinned column + group/tree/pivot + cell editing chrome.
+ * Parent owns dataset, flatten/pivot projection, selection, sort, expand, and edit draft/commit.
+ * Inline editor is grid chrome (tokens); page may mirror draft with @vmz/ui Field.
+ * Not ordinary @vmz/ui DataTable.
+ */
+export default class DataGrid {
+  /** @type {{ id: string, title: string, pinnedAttr: string, cellClass: string, pivotColAttr?: string }[]} */
+  public columns: { id: string; title: string; pinnedAttr: string; cellClass: string; pivotColAttr: string }[] = [];
+  /**
+   * Visible window only — parent virtualizes over a flattened list (group / tree / pivot / leaves).
+   */
+  public rows: {
+    id: string;
+    kindAttr: string;
+    isGroup: boolean;
+    isTreeExpandable: boolean;
+    isLeaf: boolean;
+    rowClass: string;
+    groupKey: string;
+    depthAttr: string;
+    expandedAttr: string;
+    twist: string;
+    twistLabel: string;
+    selected: boolean;
+    selectedAttr: string;
+    selectLabel: string;
+    pivotRowAttr: string;
+    cells: {
+      id: string;
+      text: string;
+      pinnedAttr: string;
+      cellClass: string;
+      aggAttr: string;
+      cellStyle: string;
+      editableAttr: string;
+      editingAttr: string;
+      editing: boolean;
+      showText: boolean;
+      startEditKey: string;
+      cellKey: string;
+      editValue: string;
+      editLabel: string;
+    }[];
+  }[] = [];
+  public totalRows: string = '0';
+  public visibleCount: string = '0';
+  public pinnedCols: string = '1';
+  public sortKey: string = '';
+  public sortDir: string = 'asc';
+  public selectedCount: string = '0';
+  public allSelected: boolean = false;
+  public selectAllLabel: string = 'Select all rows';
+  public groupByAttr: string = '';
+  public groupCount: string = '0';
+  public treeAttr: string = 'false';
+  /** "true" when parent feeds pivot matrix rows/cols. */
+  public pivotAttr: string = 'false';
+  /** Comma-separated measure column ids (region keys). */
+  public pivotColsAttr: string = '';
+  /** Active edit cell key (rowId:colId) or empty. */
+  public editingAttr: string = '';
+  /** Optional grid-template-columns override (pivot layouts). */
+  public rowLayoutStyle: string = '';
+  public canvasStyle: string = '';
+  public padTopStyle: string = 'height:0px';
+  public padBottomStyle: string = 'height:0px';
+  public onScroll: ((scrollTop: number) => void) | null = null;
+  public onSort: ((columnId: string) => void) | null = null;
+  public onToggleRow: ((rowId: string) => void) | null = null;
+  public onToggleAll: (() => void) | null = null;
+  public onToggleGroup: ((groupKey: string) => void) | null = null;
+  public onToggleTree: ((nodeId: string) => void) | null = null;
+  public onStartEdit: ((cellKey: string) => void) | null = null;
+  public onEditInput: ((value: string) => void) | null = null;
+  public onCommitEdit: (() => void) | null = null;
+  public onCancelEdit: (() => void) | null = null;
+
+  onViewportScroll(ev) {
+    const t = ev && ev.target;
+    if (!t || typeof this.onScroll !== 'function') return;
+    this.onScroll(Number(t.scrollTop) || 0);
+  }
+
+  onHeadClick(ev) {
+    const t = ev && ev.target;
+    if (!t || typeof t.closest !== 'function') return;
+    if (t.closest('[data-vmz-select-all]')) {
+      if (typeof this.onToggleAll === 'function') this.onToggleAll();
+      return;
+    }
+    const sort = t.closest('[data-vmz-sort]');
+    if (sort) {
+      const id = sort.getAttribute('data-vmz-sort');
+      if (id && typeof this.onSort === 'function') this.onSort(id);
+    }
+  }
+
+  onBodyClick(ev) {
+    const t = ev && ev.target;
+    if (!t || typeof t.closest !== 'function') return;
+    if (t.closest('[data-vmz-cell-editor]')) return;
+    const group = t.closest('[data-vmz-group-toggle]');
+    if (group) {
+      const key = group.getAttribute('data-vmz-group-toggle');
+      if (key && typeof this.onToggleGroup === 'function') this.onToggleGroup(key);
+      return;
+    }
+    const tree = t.closest('[data-vmz-tree-toggle]');
+    if (tree) {
+      const id = tree.getAttribute('data-vmz-tree-toggle');
+      if (id && typeof this.onToggleTree === 'function') this.onToggleTree(id);
+      return;
+    }
+    const start = t.closest('[data-vmz-cell-start-edit]');
+    if (start) {
+      const key = start.getAttribute('data-vmz-cell-start-edit');
+      if (key && typeof this.onStartEdit === 'function') this.onStartEdit(key);
+      return;
+    }
+    const select = t.closest('[data-vmz-select]');
+    if (select) {
+      const id = select.getAttribute('data-vmz-select');
+      if (id && typeof this.onToggleRow === 'function') this.onToggleRow(id);
+    }
+  }
+
+  onEditorClick(ev) {
+    if (ev && typeof ev.stopPropagation === 'function') ev.stopPropagation();
+  }
+
+  onEditorInput(ev) {
+    const t = ev && ev.target;
+    if (!t || typeof this.onEditInput !== 'function') return;
+    this.onEditInput(String(t.value ?? ''));
+  }
+
+  onEditorKeyDown(ev) {
+    if (!ev) return;
+    if (ev.key === 'Enter') {
+      if (typeof ev.preventDefault === 'function') ev.preventDefault();
+      if (typeof this.onCommitEdit === 'function') this.onCommitEdit();
+      return;
+    }
+    if (ev.key === 'Escape') {
+      if (typeof ev.preventDefault === 'function') ev.preventDefault();
+      if (typeof this.onCancelEdit === 'function') this.onCancelEdit();
+    }
+  }
+
+  onEditorBlur() {
+    if (typeof this.onCommitEdit === 'function') this.onCommitEdit();
+  }
+}
+</script>

@@ -1,7 +1,23 @@
 <template>
-  <button type="button" onClick={() => count++}>
-    count: {count}
-  </button>
+  <div data-testid="counter-root">
+    <label>
+      Note
+      <input
+        type="text"
+        data-testid="counter-note"
+        value={note}
+        onInput={(e) => (note = e.target.value)}
+      />
+    </label>
+    <button
+      type="button"
+      aria-label="Increment counter"
+      data-testid="counter-inc"
+      onClick={() => count++}
+    >
+      count: {count}
+    </button>
+  </div>
 </template>
 
 <script client>
@@ -9,6 +25,7 @@ export default class CounterButton {
   public initial: number = 0;
 
   count = this.initial;
+  note = '';
 
   // AsyncTask fixture for gate:l4-async-graph (compiler lifts to RunTask).
   async softLoad() {

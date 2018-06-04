@@ -14,14 +14,13 @@
 .vmz-ui-card {
   display: flex;
   flex-direction: column;
-  gap: var(--vmz-density-control-gap);
-  padding: calc(var(--vmz-density-control-padding-y) + 0.35rem)
-    calc(var(--vmz-density-control-padding-x) + 0.25rem);
+  gap: 1rem;
+  padding: 1.25rem;
   border: 1px solid var(--vmz-line-default);
-  border-radius: 2px;
+  border-radius: 10px;
   background: var(--vmz-surface-paper);
   color: var(--vmz-text-ink);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--vmz-line-default) 65%, transparent);
+  box-shadow: 0 1px 3px rgba(16,24,40,.06);
 }
 
 :where([data-density='compact']) .vmz-ui-card {

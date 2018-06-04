@@ -251,16 +251,29 @@ export function publishRelease(releasesRoot, distDir, envelope) {
     const digest = envelope.artifactDigest;
     if (!digest) throw new Error('publishRelease: envelope missing artifactDigest');
     const root = path.resolve(releasesRoot);
+    const srcDist = path.resolve(distDir);
+    // Node fs.cpSync refuses copying a directory into any subdirectory of itself.
+    // Releases root must sit beside dist (e.g. .vmz-releases), never under dist/.
     const dest = path.join(root, digest);
+    const destDist = path.join(dest, 'dist');
+    if (root === srcDist || root.startsWith(srcDist + path.sep) || destDist.startsWith(srcDist + path.sep)) {
+        throw new Error(
+            `publishRelease: releasesRoot must not be under distDir (got releasesRoot=${root}, distDir=${srcDist})`,
+        );
+    }
     fs.mkdirSync(dest, { recursive: true });
     // Immutable snapshot of packed dist (exclude prior releases nesting).
-    const destDist = path.join(dest, 'dist');
     fs.rmSync(destDist, { recursive: true, force: true });
-    fs.cpSync(path.resolve(distDir), destDist, {
+    fs.cpSync(srcDist, destDist, {
         recursive: true,
         filter: (src) => {
             const n = src.replace(/\\/g, '/');
-            return !n.includes('/.vmz-releases/') && !n.includes('/dist/releases');
+            return (
+                !n.includes('/.vmz-releases/') &&
+                !n.includes('/.vmz-cdn-releases/') &&
+                !n.includes('/releases-cdn/') &&
+                !/\/dist\/releases(\/|$)/.test(n)
+            );
         },
     });
     writeJson(path.join(dest, 'envelope.json'), envelope);

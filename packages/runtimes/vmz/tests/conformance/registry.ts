@@ -131,6 +131,10 @@ export const CHECKS: Record<string, CheckEntry> = {
     // style/ + ui/
     'style-theme': { file: 'style/style-theme.ts' },
     'ui-automation': { file: 'ui/ui-automation.ts' },
+    'ui-data-grid': {
+        file: 'ui/ui-data-grid.ts',
+        description: '@vmz/ui-data-grid thin gate — virtualization + pinned column + homepage /datagrid',
+    },
     'event-flow': {
         description: 'EventEntry + async cancel + HTTP stream (+ zero-js / mixed-pack)',
         pre: ['build:vmz-test'],
@@ -147,6 +151,10 @@ export const CHECKS: Record<string, CheckEntry> = {
     'router-production': {
         file: 'production/router-production.ts',
         description: 'A2 SSR + Link + SPA takeover + load/access/action + nav-cancel + layout',
+    },
+    'server-host': {
+        file: 'production/server-host.ts',
+        description: 'ServerArtifact emit + Node/Fetch parity + public/internal isolation',
     },
     'release-artifact': {
         file: 'production/release-artifact.ts',
@@ -204,11 +212,33 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'production/official-dogfood.ts',
         description: 'Official homepage/documents/inspector dogfood + @vmz/ui Field/Dialog',
     },
+    // M-PR0: public semantic ids as composites over existing evidence (no parallel fake gates).
+    'resume-lazy': {
+        description: 'P3 Resume/lazy — resume + event-flow + browser-core (lazy/EventEntry seed)',
+        composite: ['resume', 'event-flow', 'browser-core'],
+    },
+    'asset-graph': {
+        description: 'P5 Asset Graph v0 — content-addressed assets + static SEO seed (image variants still open)',
+        composite: ['content-addressed-assets', 'static-delivery'],
+    },
+    'ui-commercial': {
+        description: 'Commercial surface — ui-automation + official-dogfood',
+        composite: ['ui-automation', 'official-dogfood'],
+    },
+    'ui-console': {
+        description: 'Console surface — ui-automation + official-dogfood',
+        composite: ['ui-automation', 'official-dogfood'],
+    },
+    'motion-continuity': {
+        description: 'Motion continuity — motion-ir + ui7 + official-dogfood',
+        composite: ['motion-ir', 'ui7', 'official-dogfood'],
+    },
     'browser-production': {
         description: 'Browser Production Profile v1 aggregate',
         composite: [
             'browser-core',
             'router-production',
+            'server-host',
             'release-artifact',
             'static-delivery',
             'cdn-policy',
@@ -277,5 +307,6 @@ export const CHECK_ALL = [
     'application-dev',
     'style-theme',
     'ui-automation',
+    'ui-data-grid',
     'ui7',
 ];

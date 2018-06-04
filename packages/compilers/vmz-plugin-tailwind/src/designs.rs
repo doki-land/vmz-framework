@@ -9,22 +9,47 @@ use tailwind::{ColorValue, LengthValue, ThemeEntry, ThemeInput, ThemeKey, ThemeV
 /// What the experimental adapter saw under a project's `designs/` directory.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesignsStub {
+    /// Absolute `designs/` directory path.
     pub root: PathBuf,
+    /// Files under `designs/tokens/`.
     pub token_files: Vec<PathBuf>,
+    /// Files under `designs/themes/`.
     pub theme_files: Vec<PathBuf>,
+    /// Files under `designs/styles/`.
     pub style_files: Vec<PathBuf>,
+    /// Markdown files directly under `designs/`.
     pub markdown_files: Vec<PathBuf>,
+    /// True when `designs/` is absent.
     pub missing: bool,
 }
 
+/// Errors while loading ThemeInput from designs JSON.
 #[derive(Debug, thiserror::Error)]
 pub enum ThemeLoadError {
+    /// Filesystem read failed.
     #[error("read {path}: {source}")]
-    Io { path: PathBuf, source: std::io::Error },
+    Io {
+        /// Path that failed to read.
+        path: PathBuf,
+        /// Underlying IO error.
+        source: std::io::Error,
+    },
+    /// JSON parse failed.
     #[error("parse {path}: {source}")]
-    Json { path: PathBuf, source: serde_json::Error },
+    Json {
+        /// Path that failed to parse.
+        path: PathBuf,
+        /// Underlying JSON error.
+        source: serde_json::Error,
+    },
+    /// JSON shape is present but not a supported ThemeInput fragment.
     #[error("{path}: {message}")]
-    Invalid { path: PathBuf, message: String },
+    Invalid {
+        /// Path with the invalid document.
+        path: PathBuf,
+        /// Human-readable reason.
+        message: String,
+    },
 }
 
 /// Scan `<project>/designs/{tokens,themes,styles}` if present.

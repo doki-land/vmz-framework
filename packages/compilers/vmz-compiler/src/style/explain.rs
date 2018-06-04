@@ -8,7 +8,9 @@
 
 use std::path::{Path, PathBuf};
 
-use vmz_protocol::{EXPLAIN_SCHEMA, ExplainDocument, ExplainEdge, StableId};
+use vmz_protocol::{
+    EXPLAIN_SCHEMA, ExplainDocument, ExplainEdge, ExplainKind, StableId, StableIdKind,
+};
 
 use crate::designs::{DesignsBundle, StyleTheme, css_var_name, load_designs};
 use crate::style_token_diag::{
@@ -30,7 +32,7 @@ pub fn explain_style(root: &Path, session_generation: u64, spec: &str) -> Explai
     ExplainDocument {
         schema: EXPLAIN_SCHEMA.into(),
         target: format!("style:{spec}"),
-        kind: "style".into(),
+        kind: ExplainKind::Style,
         chunk_id: None,
         deployment_unit: None,
         program: None,
@@ -60,11 +62,11 @@ fn explain_global_style(
     let path = resolve_global_style_path(root, designs, spec)?;
     let rel = rel_display(root, &path);
     let is_entry = designs.style_entry.as_ref().is_some_and(|e| paths_equal(e, &path));
-    let file_id = StableId { kind: "style_file".into(), id: rel.clone() };
+    let file_id = StableId::new(StableIdKind::StyleFile, rel.clone());
     let entry_rel =
         designs.style_entry.as_ref().map(|e| rel_display(root, e)).unwrap_or_else(|| rel.clone());
-    let entry_id = StableId { kind: "style_entry".into(), id: entry_rel };
-    let asset_id = StableId { kind: "css_asset".into(), id: "vmz-style.css".into() };
+    let entry_id = StableId::new(StableIdKind::StyleEntry, entry_rel);
+    let asset_id = StableId::new(StableIdKind::CssAsset, "vmz-style.css");
     let mut chain = Vec::new();
     chain.push(ExplainEdge {
         from: file_id,
@@ -87,7 +89,7 @@ fn explain_global_style(
     Some(ExplainDocument {
         schema: EXPLAIN_SCHEMA.into(),
         target: format!("style:{spec}"),
-        kind: "style".into(),
+        kind: ExplainKind::Style,
         chunk_id: Some("vmz-style.css".into()),
         deployment_unit: None,
         program: None,
@@ -143,11 +145,11 @@ fn explain_token_or_utility(
     let in_theme = designs.theme.has_ns_key(&resolved.ns, &resolved.key);
 
     let util_id =
-        resolved.utility.as_ref().map(|u| StableId { kind: "style_tw".into(), id: u.clone() });
-    let token_id = StableId { kind: "design_token".into(), id: leaf.clone() };
-    let var_id = StableId { kind: "css_var".into(), id: var.clone() };
-    let designs_asset = StableId { kind: "css_asset".into(), id: "vmz-designs.css".into() };
-    let tw_asset = StableId { kind: "css_asset".into(), id: "vmz-tw.css".into() };
+        resolved.utility.as_ref().map(|u| StableId::new(StableIdKind::StyleTw, u.clone()));
+    let token_id = StableId::new(StableIdKind::DesignToken, leaf.clone());
+    let var_id = StableId::new(StableIdKind::CssVar, var.clone());
+    let designs_asset = StableId::new(StableIdKind::CssAsset, "vmz-designs.css");
+    let tw_asset = StableId::new(StableIdKind::CssAsset, "vmz-tw.css");
 
     let mut chain = Vec::new();
     if let Some(uid) = &util_id {
@@ -167,7 +169,7 @@ fn explain_token_or_utility(
         span: None,
     });
     chain.push(ExplainEdge {
-        from: StableId { kind: "css_var".into(), id: var.clone() },
+        from: StableId::new(StableIdKind::CssVar, var.clone()),
         to: designs_asset,
         reason: "StyleEmitter Designs layer (vmz-designs.css)".into(),
         precision: Some("exact".into()),
@@ -194,7 +196,7 @@ fn explain_token_or_utility(
     Some(ExplainDocument {
         schema: EXPLAIN_SCHEMA.into(),
         target: format!("style:{spec}"),
-        kind: "style".into(),
+        kind: ExplainKind::Style,
         chunk_id: Some(if resolved.utility.is_some() {
             "vmz-tw.css".into()
         } else {
@@ -210,12 +212,20 @@ fn explain_token_or_utility(
     })
 }
 
+/// A theme leaf resolved from a utility class, dotted path, or CSS variable name.
 pub struct ResolvedLeaf {
+    /// Theme table namespace (for example `colors`).
     pub ns: String,
+    /// Leaf key within the namespace (for example `action`).
     pub key: String,
+    /// Original bare utility when resolution came from a class token.
     pub utility: Option<String>,
 }
 
+/// Resolve a style spec into a theme namespace/key leaf, if it matches the theme.
+///
+/// Accepts utility classes (`bg-action`), dotted leaves (`colors.action`), and
+/// CSS variable / dotted forms that appear in theme tables.
 pub fn resolve_ns_key(spec: &str, theme: &StyleTheme) -> Option<ResolvedLeaf> {
     if let Some((ns, key)) =
         theme_leaf_ref_from_utility(spec).or_else(|| design_token_ref_from_utility(spec))

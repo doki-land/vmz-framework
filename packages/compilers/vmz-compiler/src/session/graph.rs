@@ -1,39 +1,100 @@
-//! In-memory session graph index (session).
+//! In-memory session graph index.
 //!
 //! Long-lived Workspace keeps a coarse VPG/Deployment index across rebuilds.
-//! Full incremental semantic VPG remains later — this closes the
-//! N-API “session owns the graph” requirement for HMR / explain / query.
+//! Full incremental semantic VPG remains later; this closes the
+//! N-API "session owns the graph" requirement for HMR / explain / query.
 
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-use serde_json::Value;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default)]
+/// Schema id for [`SessionGraphDocument`].
+pub const SESSION_GRAPH_SCHEMA: &str = "vmz.session.v0";
+
+/// One client->server call edge on a session unit.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionClientCall {
+    /// Server method name.
+    pub method: String,
+    /// Optional client method that issued the call.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_client_method: Option<String>,
+}
+
+/// One unit row in the session graph index / wire document.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct SessionUnit {
+    /// Chunk id (also the HashMap key in [`SessionGraph::units`]).
     pub chunk_id: String,
-    pub kind: String,
+    /// Unit kind (closed unit enum).
+    pub kind: crate::project::VmzModuleKind,
+    /// Workspace-relative source path.
     pub source: String,
+    /// Outbound chunk dependencies.
+    #[serde(default)]
     pub depends_on: Vec<String>,
+    /// Inbound reverse dependents.
+    #[serde(default)]
     pub depended_by: Vec<String>,
+    /// Server capability method names.
+    #[serde(default)]
     pub capabilities: Vec<String>,
+    /// Lifetime / control region ids.
+    #[serde(default)]
     pub region_ids: Vec<u32>,
+    /// Co-located server module id when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub server_module_id: Option<String>,
-    pub client_calls: Vec<(String, Option<String>)>,
+    /// Proven client->server calls.
+    #[serde(default)]
+    pub client_calls: Vec<SessionClientCall>,
+    /// Relative path of the unit's `*.program.json`.
+    #[serde(default)]
     pub program_ir: String,
 }
 
+/// Wire document for [`SessionGraph::to_json`].
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionGraphDocument {
+    /// Always [`SESSION_GRAPH_SCHEMA`].
+    pub schema: String,
+    /// Session generation counter.
+    pub generation: u64,
+    /// Whether the last rebuild was full-program.
+    pub full: bool,
+    /// Whether only island regions need HMR refresh.
+    pub island_hmr: bool,
+    /// Chunk ids in the current affected set.
+    #[serde(default)]
+    pub affected_chunks: Vec<String>,
+    /// All indexed units (sorted by chunk id on emit).
+    #[serde(default)]
+    pub units: Vec<SessionUnit>,
+}
+
+/// In-memory session graph keyed by chunk id.
 #[derive(Debug, Clone, Default)]
 pub struct SessionGraph {
+    /// Monotonic generation bumped on refresh.
     pub generation: u64,
+    /// Last rebuild was full-program.
     pub full: bool,
+    /// Island-only HMR flag from deployment.
     pub island_hmr: bool,
+    /// Affected chunk ids from the last build.
     pub affected_chunks: Vec<String>,
+    /// Units keyed by chunk id.
     pub units: HashMap<String, SessionUnit>,
 }
 
 impl SessionGraph {
+    /// Clear units and affected set (generation unchanged).
     pub fn clear(&mut self) {
         self.units.clear();
         self.affected_chunks.clear();
@@ -47,124 +108,58 @@ impl SessionGraph {
         let Ok(text) = fs::read_to_string(&path) else {
             return false;
         };
-        let Ok(root) = serde_json::from_str::<Value>(&text) else {
+        let Ok(doc) = serde_json::from_str::<DeploymentIndexDocument>(&text) else {
             return false;
         };
         self.generation = self.generation.saturating_add(1);
         self.units.clear();
-        self.full = root.get("full").and_then(|v| v.as_bool()).unwrap_or(false);
-        self.island_hmr = root.get("islandHmr").and_then(|v| v.as_bool()).unwrap_or(false);
-        self.affected_chunks = string_array(root.get("affectedChunks"));
-
-        let Some(units) = root.get("units").and_then(|v| v.as_array()) else {
-            return true;
-        };
-        for item in units {
-            let Some(obj) = item.as_object() else {
-                continue;
-            };
-            let Some(chunk_id) = obj.get("chunkId").and_then(|v| v.as_str()).map(str::to_string)
-            else {
-                continue;
-            };
+        self.full = doc.full;
+        self.island_hmr = doc.island_hmr;
+        self.affected_chunks = doc.affected_chunks;
+        for u in doc.units {
             let unit = SessionUnit {
-                chunk_id: chunk_id.clone(),
-                kind: obj.get("kind").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                source: obj.get("source").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                depends_on: string_array(obj.get("dependsOn")),
-                depended_by: string_array(obj.get("dependedBy")),
-                capabilities: string_array(obj.get("capabilities")),
-                region_ids: number_array(obj.get("regionIds")),
-                server_module_id: obj
-                    .get("serverModuleId")
-                    .and_then(|v| v.as_str())
-                    .map(str::to_string),
-                client_calls: client_calls(obj.get("clientCalls")),
-                program_ir: obj
-                    .get("programIr")
-                    .and_then(|v| v.as_str())
-                    .map(str::to_string)
-                    .unwrap_or_else(|| format!("{chunk_id}.program.json")),
+                chunk_id: u.chunk_id.clone(),
+                kind: u.kind,
+                source: u.source,
+                depends_on: u.depends_on,
+                depended_by: u.depended_by,
+                capabilities: u.capabilities,
+                region_ids: u.region_ids,
+                server_module_id: u.server_module_id,
+                client_calls: u.client_calls,
+                program_ir: u.program_ir,
             };
-            self.units.insert(chunk_id, unit);
+            self.units.insert(unit.chunk_id.clone(), unit);
         }
         true
     }
 
-    pub fn invalidate_chunks(&mut self, chunks: impl IntoIterator<Item = String>) {
-        for c in chunks {
-            self.units.remove(&c);
-        }
-        self.generation = self.generation.saturating_add(1);
-    }
-
+    /// Pretty JSON document for explain / verify.
     pub fn to_json(&self) -> String {
-        let mut units: Vec<&SessionUnit> = self.units.values().collect();
+        let mut units: Vec<SessionUnit> = self.units.values().cloned().collect();
         units.sort_by(|a, b| a.chunk_id.cmp(&b.chunk_id));
-        let units_json: Vec<Value> = units
-            .iter()
-            .map(|u| {
-                let calls: Vec<Value> = u
-                    .client_calls
-                    .iter()
-                    .map(|(m, from)| {
-                        serde_json::json!({
-                            "method": m,
-                            "fromClientMethod": from,
-                        })
-                    })
-                    .collect();
-                serde_json::json!({
-                    "chunkId": u.chunk_id,
-                    "kind": u.kind,
-                    "source": u.source,
-                    "dependsOn": u.depends_on,
-                    "dependedBy": u.depended_by,
-                    "capabilities": u.capabilities,
-                    "regionIds": u.region_ids,
-                    "serverModuleId": u.server_module_id,
-                    "clientCalls": calls,
-                    "programIr": u.program_ir,
-                })
-            })
-            .collect();
-        let root = serde_json::json!({
-            "schema": "vmz.session.v0",
-            "generation": self.generation,
-            "full": self.full,
-            "islandHmr": self.island_hmr,
-            "affectedChunks": self.affected_chunks,
-            "units": units_json,
-        });
-        // Pretty enough for verify that substring-match; keep stable key order via json! macro.
-        format!("{}\n", serde_json::to_string_pretty(&root).unwrap_or_else(|_| "{}".into()))
+        let doc = SessionGraphDocument {
+            schema: SESSION_GRAPH_SCHEMA.into(),
+            generation: self.generation,
+            full: self.full,
+            island_hmr: self.island_hmr,
+            affected_chunks: self.affected_chunks.clone(),
+            units,
+        };
+        format!("{}\n", serde_json::to_string_pretty(&doc).unwrap_or_else(|_| "{}".into()))
     }
 }
 
-fn string_array(v: Option<&Value>) -> Vec<String> {
-    v.and_then(|x| x.as_array())
-        .map(|arr| arr.iter().filter_map(|item| item.as_str().map(str::to_string)).collect())
-        .unwrap_or_default()
-}
-
-fn number_array(v: Option<&Value>) -> Vec<u32> {
-    v.and_then(|x| x.as_array())
-        .map(|arr| arr.iter().filter_map(|item| item.as_u64().map(|n| n as u32)).collect())
-        .unwrap_or_default()
-}
-
-fn client_calls(v: Option<&Value>) -> Vec<(String, Option<String>)> {
-    v.and_then(|x| x.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|item| {
-                    let method = item.get("method")?.as_str()?.to_string();
-                    let from = item.get("fromClientMethod").and_then(|f| {
-                        if f.is_null() { None } else { f.as_str().map(str::to_string) }
-                    });
-                    Some((method, from))
-                })
-                .collect()
-        })
-        .unwrap_or_default()
+/// Subset of `vmz-deployment.json` needed to refresh the session index.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DeploymentIndexDocument {
+    #[serde(default)]
+    full: bool,
+    #[serde(default)]
+    island_hmr: bool,
+    #[serde(default)]
+    affected_chunks: Vec<String>,
+    #[serde(default)]
+    units: Vec<SessionUnit>,
 }

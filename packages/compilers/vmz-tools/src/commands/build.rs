@@ -7,6 +7,7 @@ use vmz_plugin_tailwind::default_tw_compiler;
 
 use crate::commands::serve::resolve_dirs;
 
+/// Arguments for `vmz build`.
 #[derive(Debug, ClapArgs)]
 pub struct Args {
     /// Project root (defaults to current directory)
@@ -22,6 +23,7 @@ pub struct Args {
     pub release: bool,
 }
 
+/// Run a workspace build with the production TW + SCSS compilers linked in.
 pub fn run(args: Args) -> Result<()> {
     let (project, dist) = resolve_dirs(&args.path, &args.out_dir)?;
     // Style plugins (compiler-side) are linked into this single `vmz` binary.

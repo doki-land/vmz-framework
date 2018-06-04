@@ -444,16 +444,17 @@ export function runCompileManifest(manifest: Record<string, unknown>, ctx: { out
                 }
             }
             if (expect.hasDisposeRegion === true) {
-                const nodes = ((plan?.nodes as Array<Record<string, unknown>>) || []).filter((n) => n.kind === 'dispose_region');
-                if (!nodes.length) fail('plan missing dispose_region nodes');
+                const nodes = ((plan?.nodes as Array<Record<string, unknown>>) || []).filter((n) => n.kind === 'dispose-region');
+                if (!nodes.length) fail('plan missing dispose-region nodes');
                 for (const d of nodes) {
-                    if (d.region == null) fail(`dispose_region missing region: ${JSON.stringify(d)}`);
+                    if (d.region == null) fail(`dispose-region missing region: ${JSON.stringify(d)}`);
                 }
             }
             if (expect.disposeTag != null) {
-                const nodes = ((plan?.nodes as Array<Record<string, unknown>>) || []).filter((n) => n.kind === 'dispose_region');
-                if (!nodes.some((n) => n.tag === expect.disposeTag)) {
-                    fail(`dispose_region missing tag=${expect.disposeTag}: ${JSON.stringify(nodes)}`);
+                const nodes = ((plan?.nodes as Array<Record<string, unknown>>) || []).filter((n) => n.kind === 'dispose-region');
+                // Wire field is `source` (`if` | `each`); accept legacy `tag` if present.
+                if (!nodes.some((n) => n.source === expect.disposeTag || n.tag === expect.disposeTag)) {
+                    fail(`dispose-region missing source=${expect.disposeTag}: ${JSON.stringify(nodes)}`);
                 }
             }
             continue;

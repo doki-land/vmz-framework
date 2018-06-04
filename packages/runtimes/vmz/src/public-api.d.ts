@@ -512,13 +512,19 @@ export const CACHE_META: string;
 
 export function buildCdnPolicyManifest(
     staticManifest: Record<string, unknown>,
-    opts?: { redirects?: Array<{ from: string; to: string; status?: number; reason?: string }> },
+    opts?: {
+        redirects?: Array<{ from: string; to: string; status?: number; reason?: string }>;
+        localeArtifact?: Record<string, unknown> | null;
+    },
 ): Record<string, unknown>;
 
 export function emitCdnPolicy(
     distDir: string,
     staticManifest: Record<string, unknown>,
-    opts?: { redirects?: Array<{ from: string; to: string; status?: number; reason?: string }> },
+    opts?: {
+        redirects?: Array<{ from: string; to: string; status?: number; reason?: string }>;
+        localeArtifact?: Record<string, unknown> | null;
+    },
 ): { policy: Record<string, unknown>; adapters: Record<string, unknown> };
 
 export function projectCdnAdapter(policy: Record<string, unknown>, adapterId: 'local-static' | 'netlify'): Record<string, unknown>;
@@ -560,6 +566,59 @@ export function emitSiteDelivery(
     deliveryRaw: unknown,
     opts?: { siteId?: string; probes?: Record<string, unknown> },
 ): { contract: Record<string, unknown>; resolution: Record<string, unknown> | null };
+
+export const DELIVERY_PROFILE_AUTHORING_SCHEMA: string;
+export const BUILD_PROFILE_SELECTION_SCHEMA: string;
+export const ASSEMBLIES: readonly string[];
+export const SERVER_RUNTIMES: readonly string[];
+export const BUILTIN_PROFILES: Record<string, { host: string; assembly: string; serverRuntime?: string }>;
+
+export function pickSiteAuthoring(raw: Record<string, unknown>): Record<string, unknown> | null;
+export function normalizeDeliveryAuthoring(
+    raw: unknown,
+): { ok: true; table: Record<string, unknown> } | { ok: false; diagnostics: Array<{ code: string; message: string }> };
+export function selectBuildProfile(
+    table: Record<string, unknown>,
+    cliProfile?: string,
+):
+    | { ok: true; selection: Record<string, unknown>; profile: Record<string, unknown> }
+    | { ok: false; diagnostics: Array<{ code: string; message: string }> };
+export function semanticIdsForAssembly(assembly: string): string[];
+
+export const PACK_MANIFEST_SCHEMA: string;
+export function ensureRuntimeCompanions(outDir: string, coreDist?: string | null): string[];
+export function packFromDeploymentIr(
+    outDir: string,
+    opts?: {
+        release?: boolean;
+        profileId?: string;
+        assembly?: string;
+        preferredClientFace?: string;
+        coreDist?: string | null;
+    },
+): { manifest: Record<string, unknown>; path: string };
+
+export const SERVER_ARTIFACT_SCHEMA: string;
+export const HTTP_CONTRACT_SCHEMA: string;
+export const SERVER_RUNTIME_ADAPTER_SCHEMA: string;
+export function emitServerArtifact(
+    outDir: string,
+    opts?: {
+        profileId?: string | null;
+        assembly?: string | null;
+        serverRuntime?: string | null;
+        packDigest?: string | null;
+    },
+): { artifact: Record<string, unknown>; path: string; httpContractDigest: string };
+export function projectServerRuntimeAdapter(
+    artifact: Record<string, unknown>,
+    adapterId: string,
+): Record<string, unknown>;
+
+export const BUILD_PROOF_SCHEMA: string;
+export const ASSEMBLE_MANIFEST_SCHEMA: string;
+export function assembleDelivery(outDir: string, ctx: Record<string, unknown>): Promise<{ manifest: Record<string, unknown>; path: string }>;
+export function emitBuildProof(outDir: string, ctx: Record<string, unknown>): { proof: Record<string, unknown>; path: string };
 
 export const PRODUCTION_SCENARIO_PACK_SCHEMA: string;
 export const PRODUCTION_CI_PROFILE_SCHEMA: string;
@@ -804,6 +863,25 @@ export function formatMessageTemplate(template: string, args?: Record<string, un
 export function resolveMessageVariant(input: Record<string, unknown>): Record<string, unknown>;
 export function checkLocaleRuntime(input: Record<string, unknown>): Record<string, unknown>;
 export function realizeRoutePath(localeId: string, pathPattern: string, routing?: Record<string, unknown>): Record<string, unknown>;
+export function localizeSameAppHref(
+    href: string,
+    localeId: string,
+    artifact: {
+        locales?: Array<{ id: string } | string>;
+        defaultLocale?: string;
+        routing?: { strategy?: string; defaultPrefix?: string; defaultLocale?: string };
+    },
+): string;
+export function localizeBodyLinks(
+    html: string,
+    localeId: string,
+    artifact: {
+        locales?: Array<{ id: string } | string>;
+        defaultLocale?: string;
+        routing?: { strategy?: string; defaultPrefix?: string; defaultLocale?: string };
+    },
+    escapeAttr?: (s: string) => string,
+): string;
 export function buildLocaleRouteRealizationTable(input: Record<string, unknown>): Record<string, unknown>;
 export function buildLocalePageMeta(input: Record<string, unknown>): Record<string, unknown>;
 export function resolveLinkHref(input: Record<string, unknown>): Record<string, unknown>;

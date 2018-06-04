@@ -19,7 +19,7 @@ fn tmp(prefix: &str) -> std::path::PathBuf {
 fn browser_host_delivery_ready() {
     let dir = tmp("vmz-p0-");
     let report = check_host_profile_protocol(&dir);
-    assert_eq!(report.status, "ready");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Ready);
     assert_eq!(report.host_profile.host_id, "vmz.host.browser");
     assert!(report.delivery_profile.resolution_digest.is_some());
     let _ = fs::remove_dir_all(&dir);
@@ -35,9 +35,12 @@ fn rejects_runtime_driver_select() {
     fs::write(dir.join("delivery-profile.json"), serde_json::to_string_pretty(&delivery).unwrap())
         .unwrap();
     let report = check_host_profile_protocol(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
-        report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_HOST_PROFILE_INVALID))
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_HOST_PROFILE_INVALID))
     );
     let _ = fs::remove_dir_all(&dir);
 }
@@ -54,12 +57,12 @@ fn rejects_digest_mismatch() {
     fs::write(dir.join("delivery-profile.json"), serde_json::to_string_pretty(&delivery).unwrap())
         .unwrap();
     let report = check_host_profile_protocol(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
         report
             .diagnostics
             .iter()
-            .any(|d| d.code.as_deref() == Some(DIAG_RESOLUTION_DIGEST_MISMATCH))
+            .any(|d| d.code_string().as_deref() == Some(DIAG_RESOLUTION_DIGEST_MISMATCH))
     );
     let _ = fs::remove_dir_all(&dir);
 }
@@ -77,8 +80,13 @@ fn rejects_core_id_override() {
     fs::write(dir.join("profile-contribution.json"), serde_json::to_string_pretty(&foul).unwrap())
         .unwrap();
     let report = check_host_profile_protocol(&dir);
-    assert_eq!(report.status, "failed");
-    assert!(report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_CORE_ID_OVERRIDE)));
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_CORE_ID_OVERRIDE))
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -92,12 +100,12 @@ fn rejects_unresolved_host_ref() {
     fs::write(dir.join("delivery-profile.json"), serde_json::to_string_pretty(&delivery).unwrap())
         .unwrap();
     let report = check_host_profile_protocol(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
         report
             .diagnostics
             .iter()
-            .any(|d| d.code.as_deref() == Some(DIAG_HOST_PROFILE_REF_UNRESOLVED))
+            .any(|d| d.code_string().as_deref() == Some(DIAG_HOST_PROFILE_REF_UNRESOLVED))
     );
     let _ = fs::remove_dir_all(&dir);
 }

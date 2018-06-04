@@ -57,7 +57,7 @@ describe('compiled control-flow precision', () => {
                 }>;
             }>;
         }>(path.join(dist, 'components', 'BranchDemo.reactive.json'));
-        const ifBinding = ir.components[0]?.bindings.find((b) => b.kind === 'if_cond');
+        const ifBinding = ir.components[0]?.bindings.find((b) => b.kind === 'if-cond');
         expect(ifBinding?.id).toEqual(expect.any(Number));
         expect(inst.__vmzBindings[ifBinding!.id]?.patches.length).toBeGreaterThan(0);
 

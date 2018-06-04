@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use clap::Args as ClapArgs;
 use vmz_compiler::{Result, ResultExt, bail};
 
+/// Arguments for `vmz new` / `vmz init`.
 #[derive(Debug, ClapArgs)]
 pub struct Args {
     /// Directory name for the new app (single path segment)
@@ -47,6 +48,7 @@ fn write_file(path: &Path, contents: &str) -> Result<()> {
     fs::write(path, contents).with_context(|| format!("write {}", path.display()))
 }
 
+/// Scaffold a minimal app directory with `package.json`, `Application.vmz`, and `pages/`.
 pub fn run(args: Args) -> Result<()> {
     let name = args.dir.file_name().and_then(|s| s.to_str()).unwrap_or("");
     // Require a single segment relative name (not `foo/bar` or absolute).

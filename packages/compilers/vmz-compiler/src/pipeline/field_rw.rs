@@ -15,16 +15,23 @@ use oxc_ast_visit::{Visit, walk};
 use oxc_span::Span;
 use vmz_types::{DepKey, DepPath, PathSegment};
 
+/// A call to a forbidden `useX` / `createX`-style factory in component script.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ForbiddenFactory {
+    /// Callee identifier as written (e.g. `useState`).
     pub name: String,
+    /// Source span of the call for diagnostics.
     pub span: Span,
 }
 
+/// Accumulated field reads/writes, calls, and forbidden factories from a visit.
 #[derive(Debug, Default)]
 pub struct FieldRw {
+    /// Known component field names used to filter `this.*` accesses.
     pub field_names: Vec<String>,
+    /// Stable dep path strings read during the visit.
     pub reads: Vec<String>,
+    /// Stable dep path strings written during the visit.
     pub writes: Vec<String>,
     /// Direct `this.method` / `this.#method` callees (not yet filtered to known methods).
     pub calls: Vec<String>,
@@ -32,6 +39,7 @@ pub struct FieldRw {
     pub opaque_callee: bool,
     /// Provenance for FieldStar widenings: `(field, reason)`.
     pub star_reasons: Vec<(String, String)>,
+    /// Forbidden factory calls found in this visit.
     pub forbidden: Vec<ForbiddenFactory>,
     /// Local binding → DepKey it aliases (`u` → `user`, `name` → `user.name`).
     pub aliases: HashMap<String, DepKey>,
@@ -39,6 +47,7 @@ pub struct FieldRw {
 }
 
 impl FieldRw {
+    /// Start a visitor scoped to the given component field names.
     pub fn new(field_names: impl IntoIterator<Item = String>) -> Self {
         Self { field_names: field_names.into_iter().collect(), ..Default::default() }
     }

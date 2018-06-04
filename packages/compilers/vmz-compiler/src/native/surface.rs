@@ -16,50 +16,38 @@ use vmz_protocol::{
 
 fn diag(
     path: &str,
-    severity: &str,
+    severity: vmz_protocol::Severity,
     message: impl Into<String>,
     code: &str,
 ) -> NativeHostDiagnostic {
-    NativeHostDiagnostic {
-        path: path.into(),
-        severity: severity.into(),
-        message: message.into(),
-        code: Some(code.into()),
-    }
+    NativeHostDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
 fn validate_surface(surface: &NativeSurfaceManifest, out: &mut Vec<NativeHostDiagnostic>) {
     if surface.schema != vmz_protocol::NATIVE_SURFACE_SCHEMA {
         out.push(diag(
             "schema",
-            "error",
+            vmz_protocol::Severity::Error,
             format!("native surface schema must be `{}`", vmz_protocol::NATIVE_SURFACE_SCHEMA),
             DIAG_INVALID_PROFILE,
         ));
     }
 
     if surface.surface_id.trim().is_empty() {
-        out.push(diag("surfaceId", "error", "NativeSurfaceId required", DIAG_MISSING_SURFACE_ID));
-    }
-
-    if surface.kind.trim().is_empty()
-        || !matches!(surface.kind.as_str(), "camera" | "map" | "video")
-    {
         out.push(diag(
-            "kind",
-            "error",
-            format!(
-                "native high-value surface kind must be camera|map|video, got `{}`",
-                surface.kind
-            ),
-            DIAG_INVALID_PROFILE,
+            "surfaceId",
+            vmz_protocol::Severity::Error,
+            "NativeSurfaceId required",
+            DIAG_MISSING_SURFACE_ID,
         ));
     }
+
+    // Closed [`NativeSurfaceKind`] validates at deserialize; no open-string kind check.
 
     if surface.owner_region_id.trim().is_empty() {
         out.push(diag(
             "ownerRegionId",
-            "error",
+            vmz_protocol::Severity::Error,
             "NativeSurface must declare owner RegionId",
             DIAG_MISSING_OWNER_REGION,
         ));
@@ -68,7 +56,7 @@ fn validate_surface(surface: &NativeSurfaceManifest, out: &mut Vec<NativeHostDia
     if surface.lifetime.trim().is_empty() {
         out.push(diag(
             "lifetime",
-            "error",
+            vmz_protocol::Severity::Error,
             "NativeSurface lifetime required (e.g. bound_to_region)",
             DIAG_MISSING_SURFACE_LIFETIME,
         ));
@@ -77,7 +65,7 @@ fn validate_surface(surface: &NativeSurfaceManifest, out: &mut Vec<NativeHostDia
     if !surface.dispose_on_owner_destroy {
         out.push(diag(
             "disposeOnOwnerDestroy",
-            "error",
+            vmz_protocol::Severity::Error,
             "NativeSurface must dispose when owner region destroys",
             DIAG_MISSING_SURFACE_LIFETIME,
         ));
@@ -86,7 +74,7 @@ fn validate_surface(surface: &NativeSurfaceManifest, out: &mut Vec<NativeHostDia
     if surface.shares_implicit_webview_state {
         out.push(diag(
             "sharesImplicitWebViewState",
-            "error",
+            vmz_protocol::Severity::Error,
             "WebView and NativeSurface must not share implicit state objects",
             DIAG_IMPLICIT_STATE_SHARE,
         ));
@@ -95,7 +83,7 @@ fn validate_surface(surface: &NativeSurfaceManifest, out: &mut Vec<NativeHostDia
     if surface.confused_with_capability {
         out.push(diag(
             "confusedWithCapability",
-            "error",
+            vmz_protocol::Severity::Error,
             "NativeSurface ≠ NativeBacked capability (e.g. camera.preview ≠ camera.capture)",
             DIAG_SURFACE_IS_CAPABILITY,
         ));
@@ -104,7 +92,7 @@ fn validate_surface(surface: &NativeSurfaceManifest, out: &mut Vec<NativeHostDia
     if surface.is_semantic_truth_source {
         out.push(diag(
             "isSemanticTruthSource",
-            "error",
+            vmz_protocol::Severity::Error,
             "NativeSurface must not become semantic truth — VPG/Plan remain sole semantic IR",
             DIAG_SURFACE_IS_SEMANTIC_TRUTH,
         ));
@@ -113,7 +101,7 @@ fn validate_surface(surface: &NativeSurfaceManifest, out: &mut Vec<NativeHostDia
     if surface.plan_schema != "vmz.plan.v0" {
         out.push(diag(
             "planSchema",
-            "error",
+            vmz_protocol::Severity::Error,
             "NativeSurface must lower from same Execution Plan (vmz.plan.v0)",
             DIAG_SURFACE_IS_SEMANTIC_TRUTH,
         ));
@@ -122,7 +110,7 @@ fn validate_surface(surface: &NativeSurfaceManifest, out: &mut Vec<NativeHostDia
     if !surface.reuses_view_operations {
         out.push(diag(
             "reusesViewOperations",
-            "error",
+            vmz_protocol::Severity::Error,
             "NativeSurface driver must consume target-neutral View Operations only",
             DIAG_SURFACE_IS_SEMANTIC_TRUTH,
         ));
@@ -132,7 +120,7 @@ fn validate_surface(surface: &NativeSurfaceManifest, out: &mut Vec<NativeHostDia
     if !surface.boundary.serializable || surface.boundary.schema_version.trim().is_empty() {
         out.push(diag(
             "boundary",
-            "error",
+            vmz_protocol::Severity::Error,
             "cross-boundary data must be serializable + versioned",
             DIAG_IMPLICIT_STATE_SHARE,
         ));
@@ -147,14 +135,14 @@ fn load_or_example(root: &Path, diags: &mut Vec<NativeHostDiagnostic>) -> Native
                 Ok(s) => return s,
                 Err(e) => diags.push(diag(
                     "native-surface.json",
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!("invalid NativeSurfaceManifest JSON: {e}"),
                     DIAG_INVALID_PROFILE,
                 )),
             },
             Err(e) => diags.push(diag(
                 "native-surface.json",
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("cannot read native-surface.json: {e}"),
                 DIAG_INVALID_PROFILE,
             )),
@@ -180,7 +168,7 @@ pub fn check_native_surface_contract(root: &Path) -> NativeSurfaceCheckReport {
             {
                 diagnostics.push(diag(
                     "native-surface.foul.json",
-                    "error",
+                    vmz_protocol::Severity::Error,
                     "forbidden NativeSurface assumptions in foul fixture",
                     DIAG_IMPLICIT_STATE_SHARE,
                 ));
@@ -188,12 +176,12 @@ pub fn check_native_surface_contract(root: &Path) -> NativeSurfaceCheckReport {
         }
     }
 
-    let failed = diagnostics.iter().any(|d| d.severity == "error");
+    let failed = diagnostics.iter().any(|d| d.is_error());
     NativeSurfaceCheckReport {
         schema: NATIVE_SURFACE_CHECK_SCHEMA.into(),
         catalog,
         surface,
         diagnostics,
-        status: if failed { "failed".into() } else { "ready".into() },
+        status: vmz_protocol::CheckReportStatus::from_failed(failed),
     }
 }

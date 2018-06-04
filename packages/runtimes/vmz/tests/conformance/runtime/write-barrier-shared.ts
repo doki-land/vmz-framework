@@ -4,7 +4,7 @@
  * Claim (narrow):
  * - Same plain object on two fields: write via one notifies both (no Proxy)
  * - `this.tags[this.selected].label` / `this.tags[i].label` rewrite with String(index)
- * - `+=` / `++` expand via __vmzReadPath + __vmzWritePath
+ * - `+=` / `++` expand via __vmzWritePathCompound
  *
  */
 
@@ -41,8 +41,8 @@ if (!dynJs.includes('String(this.selected)')) {
     fail(`missing dynamic selected index rewrite:\n${dynJs}`);
 }
 if (!dynJs.includes('String(i)')) fail('missing String(i) dynamic index');
-if (!dynJs.includes('__vmzReadPath(this, "user", ["count"])')) {
-    fail('missing compound/update ReadPath');
+if (!dynJs.includes('__vmzWritePathCompound(this, "user", ["count"], "+", 1)')) {
+    fail('missing compound/update WritePathCompound');
 }
 if (/this\.user\.count\s*\+=/.test(dynJs)) fail('bare += still present');
 if (/this\.user\.count\+\+/.test(dynJs)) fail('bare ++ still present');

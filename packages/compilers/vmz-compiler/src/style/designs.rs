@@ -1,26 +1,32 @@
-//! Style Theme — first-class, language-agnostic design model under `/designs`.
+//! Style Theme - first-class, language-agnostic design model under `/designs`.
 //!
-//! `tokens/` + `themes/` are **one** Theme: default table + named overlays.
-//! SCSS / TW / CSS vars are projections of the same model — not parallel truths.
+//! `tokens/` + `themes/` are one Theme: default table + named overlays.
+//! SCSS / TW / CSS vars are projections of the same model, not parallel truths.
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::diagnostic::ReportedDiagnostic;
 
-/// Stable theme identity (`default`, `dark`, …).
+/// Stable theme identity (`default`, `dark`, ...).
 pub type ThemeId = String;
 
+/// Built-in default [`ThemeId`] when `theme.json` omits `default`.
 pub const DEFAULT_THEME_ID: &str = "default";
+/// Built-in HTML activation attribute when `theme.json` omits `activationAttr`.
 pub const DEFAULT_ACTIVATION_ATTR: &str = "data-theme";
 
-/// One leaf in the theme key space: `["colors","action"]` → concrete CSS value.
+/// One leaf in the theme key space: `["colors","action"]` -> concrete CSS value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StyleTokenLeaf {
+    /// Nested key path segments under the theme namespace.
     pub path: Vec<String>,
+    /// Concrete CSS value for this leaf (color, length, ...).
     pub value: String,
 }
 
@@ -30,17 +36,20 @@ pub type DesignTokenEntry = StyleTokenLeaf;
 /// One named table (default or overlay).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StyleThemeTable {
+    /// Theme id for this table (`default`, `dark`, ...).
     pub id: ThemeId,
+    /// Flat leaf entries belonging to this table.
     pub entries: Vec<StyleTokenLeaf>,
 }
 
 /// Unified Style Theme owned by style core.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StyleTheme {
+    /// Theme id used as the base table when no overlay wins.
     pub default_id: ThemeId,
     /// Document/host activation attribute (first slice: `data-theme`).
     pub activation_attr: String,
-    /// OS preference → ThemeId (e.g. `dark` → `dark`).
+    /// OS preference -> ThemeId (e.g. `dark` -> `dark`).
     pub prefers_color_scheme: BTreeMap<String, ThemeId>,
     /// Always includes the default table when tokens exist; overlays follow.
     pub tables: Vec<StyleThemeTable>,
@@ -58,10 +67,12 @@ impl Default for StyleTheme {
 }
 
 impl StyleTheme {
+    /// True when every table has an empty leaf list.
     pub fn is_empty(&self) -> bool {
         self.tables.iter().all(|t| t.entries.is_empty())
     }
 
+    /// Sorted unique theme ids; falls back to [`Self::default_id`] when empty.
     pub fn theme_ids(&self) -> Vec<ThemeId> {
         let mut ids: Vec<_> = self.tables.iter().map(|t| t.id.clone()).collect();
         ids.sort();
@@ -72,6 +83,7 @@ impl StyleTheme {
         ids
     }
 
+    /// Borrow the table with the given id, if present.
     pub fn table(&self, id: &str) -> Option<&StyleThemeTable> {
         self.tables.iter().find(|t| t.id == id)
     }
@@ -94,7 +106,7 @@ impl StyleTheme {
         map.into_values().collect()
     }
 
-    /// Engine projection: same keys, values rewritten to `var(--vmz-…)` so runtime
+    /// Engine projection: same keys, values rewritten to `var(--vmz-...)` so runtime
     /// theme activation (CSS) applies to TW utilities and SCSS alike.
     pub fn project_var_refs(&self, id: &str) -> Vec<StyleTokenLeaf> {
         self.resolve(id)
@@ -106,7 +118,7 @@ impl StyleTheme {
             .collect()
     }
 
-    /// Exact CSS custom-property names owned by this theme (`--vmz-…`).
+    /// Exact CSS custom-property names owned by this theme (`--vmz-...`).
     pub fn known_css_vars(&self) -> BTreeSet<String> {
         let mut set = BTreeSet::new();
         for table in &self.tables {
@@ -117,12 +129,13 @@ impl StyleTheme {
         set
     }
 
+    /// True when `name` is a CSS custom property owned by any table leaf.
     pub fn has_css_var(&self, name: &str) -> bool {
         let name = name.trim();
         self.tables.iter().flat_map(|t| t.entries.iter()).any(|e| css_var_name(&e.path) == name)
     }
 
-    /// Leaf keys under a namespace (e.g. `colors` → `action`, `action-hover`).
+    /// Leaf keys under a namespace (e.g. `colors` -> `action`, `action-hover`).
     pub fn known_ns_keys(&self, ns: &str) -> BTreeSet<String> {
         let mut set = BTreeSet::new();
         for table in &self.tables {
@@ -136,10 +149,12 @@ impl StyleTheme {
         set
     }
 
+    /// True when namespace `ns` owns leaf key `key` in any table.
     pub fn has_ns_key(&self, ns: &str, key: &str) -> bool {
         self.known_ns_keys(ns).contains(key)
     }
 
+    /// Deployment / report slice without leaf values.
     pub fn summary(&self) -> StyleThemeSummary {
         StyleThemeSummary {
             default_theme_id: self.default_id.clone(),
@@ -182,28 +197,41 @@ impl StyleTheme {
 }
 
 /// Deployment / report slice (no leaf values).
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct StyleThemeSummary {
+    /// Default ThemeId when no explicit activation wins.
     pub default_theme_id: ThemeId,
+    /// Declared ThemeIds in activation order.
     pub theme_ids: Vec<ThemeId>,
+    /// HTML attribute used to activate a ThemeId (default `data-theme`).
     pub activation_attr: String,
+    /// OS `prefers-color-scheme` -> ThemeId map.
     pub prefers_color_scheme: BTreeMap<String, ThemeId>,
+    /// Content hash of the Style Theme tables.
     pub content_hash: String,
 }
 
 /// `/designs` inventory: Style Theme + styles entry contract.
 #[derive(Debug, Clone, Default)]
 pub struct DesignsBundle {
+    /// Absolute path to the project's `designs/` directory.
     pub root: PathBuf,
+    /// True when `designs/` is absent (callers treat theme as empty).
     pub missing: bool,
+    /// Unified Style Theme loaded from tokens + theme overlays.
     pub theme: StyleTheme,
+    /// Preferred global style entry under `designs/styles` (`index.scss` / ...).
     pub style_entry: Option<PathBuf>,
+    /// All `.scss` / `.sass` / `.css` files under `designs/styles`.
     pub style_files: Vec<PathBuf>,
+    /// Load-time diagnostics (invalid JSON, colliding theme ids, ...).
     pub diagnostics: Vec<ReportedDiagnostic>,
 }
 
 /// Legacy accessor used by older call sites.
 impl DesignsBundle {
+    /// Leaves of the default theme table (empty slice when missing).
     pub fn tokens(&self) -> &[StyleTokenLeaf] {
         self.theme.table(&self.theme.default_id).map(|t| t.entries.as_slice()).unwrap_or(&[])
     }
@@ -269,6 +297,18 @@ pub fn load_designs(project_root: &Path) -> DesignsBundle {
 }
 
 /// Optional `designs/theme.json`:
+/// Author `theme.json` shape under `/designs`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ThemeMetaFile {
+    #[serde(default)]
+    default: Option<String>,
+    #[serde(default)]
+    activation_attr: Option<String>,
+    #[serde(default)]
+    prefers_color_scheme: BTreeMap<String, String>,
+}
+
 /// `{ "default": "default", "activationAttr": "data-theme", "prefersColorScheme": { "dark": "dark" } }`.
 fn load_theme_meta(
     path: &Path,
@@ -284,27 +324,24 @@ fn load_theme_meta(
         diagnostics.push(ReportedDiagnostic::warning(path, "cannot read theme.json"));
         return (default_id, activation, prefers);
     };
-    let Ok(value) = serde_json::from_str::<Value>(&text) else {
+    let Ok(meta) = serde_json::from_str::<ThemeMetaFile>(&text) else {
         diagnostics.push(ReportedDiagnostic::error(path, "invalid theme.json"));
         return (default_id, activation, prefers);
     };
-    let id = value.get("default").and_then(|v| v.as_str()).unwrap_or(DEFAULT_THEME_ID).to_string();
-    let attr = value
-        .get("activationAttr")
-        .and_then(|v| v.as_str())
-        .unwrap_or(DEFAULT_ACTIVATION_ATTR)
-        .to_string();
+    let id = meta.default.filter(|s| !s.is_empty()).unwrap_or_else(|| DEFAULT_THEME_ID.to_string());
+    let attr = meta
+        .activation_attr
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| DEFAULT_ACTIVATION_ATTR.to_string());
     let mut prefers_map = BTreeMap::new();
-    if let Some(obj) = value.get("prefersColorScheme").and_then(|v| v.as_object()) {
-        for (scheme, target) in obj {
-            if let Some(tid) = target.as_str() {
-                prefers_map.insert(scheme.to_string(), tid.to_string());
-            } else {
-                diagnostics.push(ReportedDiagnostic::warning(
-                    path,
-                    format!("prefersColorScheme.{scheme} must be a theme id string"),
-                ));
-            }
+    for (scheme, tid) in meta.prefers_color_scheme {
+        if tid.trim().is_empty() {
+            diagnostics.push(ReportedDiagnostic::warning(
+                path,
+                format!("prefersColorScheme.{scheme} must be a non-empty theme id string"),
+            ));
+        } else {
+            prefers_map.insert(scheme, tid);
         }
     }
     (id, attr, prefers_map)
@@ -312,8 +349,8 @@ fn load_theme_meta(
 
 /// Emit CSS custom properties for the whole Style Theme.
 ///
-/// Order: `:root` default → `@media (prefers-color-scheme: …)` → `[activationAttr]`
-/// (explicit attribute wins over OS preference).
+/// Order: `:root` default, then `@media (prefers-color-scheme: ...)`, then
+/// `[activationAttr]` (explicit attribute wins over OS preference).
 pub fn emit_style_theme_css(theme: &StyleTheme) -> String {
     if theme.is_empty() {
         return String::new();
@@ -364,11 +401,12 @@ pub fn emit_style_theme_css(theme: &StyleTheme) -> String {
     out
 }
 
-/// Back-compat wrapper.
+/// Back-compat wrapper around [`emit_style_theme_css`] for a loaded bundle.
 pub fn emit_designs_css(bundle: &DesignsBundle) -> String {
     emit_style_theme_css(&bundle.theme)
 }
 
+/// Map a theme leaf path to its `--vmz-...` CSS custom-property name.
 pub fn css_var_name(path: &[String]) -> String {
     let mut s = String::from("--vmz");
     for p in path {

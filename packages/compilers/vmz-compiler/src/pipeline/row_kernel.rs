@@ -100,12 +100,12 @@ pub fn try_emit_row_kernel_js(
         Some(f0)
     };
 
-    let hydrate = emit_hydrate_js(&text_slots, class_slot.as_ref());
-    let apply = emit_apply_js(&text_slots, class_slot.as_ref());
+    let hydrate = emit_hydrate_js(&text_slots, class_slot.as_ref(), &acts);
+    let (apply, apply_by_field) = emit_apply_js(&text_slots, class_slot.as_ref());
     let key_field = key_bound.and_then(|k| parse_item_field(k.trim(), &item_prefix));
     // Create is inlined (local path vars + parent.insertBefore) — does not call hydrate
     // (vanillajs-style; Fragment mid-hop is slower than live insertBefore on this bench).
-    let create = emit_create_js(&text_slots, class_slot.as_ref(), key_field.as_deref());
+    let create = emit_create_js(&text_slots, class_slot.as_ref(), &acts, key_field.as_deref());
     let events: Vec<String> = {
         let mut e = acts.iter().map(|(_, _, ev, _)| format!("{:?}", ev)).collect::<Vec<_>>();
         e.sort();
@@ -140,9 +140,29 @@ pub fn try_emit_row_kernel_js(
         format!(", itemFields: [{inner}]")
     };
 
-    // IIFE keeps hydrate/apply/create as one rowKernel object (shape-agnostic).
+    // Class item field → when that item field is slotted, also refresh class (same Map entry).
+    let class_item_js = if let Some((_, _, _, _, item_f)) = &class_slot {
+        format!(", classItemField: {:?}", item_f)
+    } else {
+        String::new()
+    };
+
+    // Text field → slot index (stride / leaf DOM can write nodeValue without applyByField call).
+    let text_slots_js = if text_slots.is_empty() {
+        String::new()
+    } else {
+        let inner = text_slots
+            .iter()
+            .enumerate()
+            .map(|(i, (_, f))| format!("{f:?}: {i}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!(", textSlots: {{{inner}}}")
+    };
+
+    // IIFE: monomorphic applyByField[slot] for leaf/host; apply = full row (no slot chain).
     Some(format!(
-        "rowKernel: (function(){{ var hydrate = {hydrate}; var apply = {apply}; var create = {create}; return {{ html: {:?}, hydrate: hydrate, apply: apply, create: create, events: [{events_js}]{key_field_js}{host_fields_js}{act_arg_js}{item_fields_js} }}; }})(), ",
+        "rowKernel: (function(){{ var hydrate = {hydrate}; var applyByField = {apply_by_field}; var apply = {apply}; var create = {create}; return {{ html: {:?}, hydrate: hydrate, apply: apply, applyByField: applyByField, create: create, events: [{events_js}]{key_field_js}{host_fields_js}{act_arg_js}{item_fields_js}{class_item_js}{text_slots_js} }}; }})(), ",
         html
     ))
 }
@@ -181,7 +201,11 @@ fn emit_html_element(
                 let body = bind_field_idents(e, fields, scope, aliases);
                 let (method, arg_field) = parse_item_field_action(&body, item_prefix)?;
                 let event = event_dom_type(&a.name);
-                open.push_str(&format!(" data-vmz-act=\"{}\"", escape_attr(&method)));
+                // Client: bake data-vmz-act into HTML so cloneNode carries it (no per-row JS assign).
+                // Delegate caches attr → `__vmzAct` expando on first click.
+                open.push_str(" data-vmz-act=\"");
+                open.push_str(&escape_attr(&method));
+                open.push('"');
                 slots.push(Slot::Act {
                     path: path.to_vec(),
                     method,
@@ -197,7 +221,12 @@ fn emit_html_element(
                 let body = bind_field_idents(&sanitize_interp(e), fields, scope, aliases);
                 let (on_val, off_val, host_field, item_field) =
                     parse_host_item_class_ternary(&body, item_prefix)?;
-                open.push_str(" class=\"\"");
+                // Empty off class: omit attr (create sets className only when selected).
+                if !off_val.is_empty() {
+                    open.push_str(" class=\"");
+                    open.push_str(&escape_attr(&off_val));
+                    open.push('"');
+                }
                 slots.push(Slot::Class {
                     path: path.to_vec(),
                     on_val,
@@ -264,14 +293,18 @@ fn emit_html_element(
 fn emit_hydrate_js(
     texts: &[(Vec<u32>, String)],
     class: Option<&(Vec<u32>, String, String, String, String)>,
+    _acts: &[(Vec<u32>, String, String, String)],
 ) -> String {
     // Single-row path (append one / reconcile miss). Create loop inlines its own writes.
-    // No __vmzBp: Element entry is identified by nodeType === 1.
+    // Seed __vmzT* (Text node) so applyByField / stride can use nodeValue.
     let mut body = String::from("root.__vmzBox = item;\n");
-    for (path, field) in texts {
-        let get = path_expr("root", path);
-        body.push_str(&format!("{get}.nodeValue = item.{field};\n"));
+    for (i, (path, field)) in texts.iter().enumerate() {
+        let parent = text_parent_expr("root", path);
+        body.push_str(&format!("root.__vmzE{i} = {parent};\n"));
+        body.push_str(&format!("root.__vmzT{i} = root.__vmzE{i}.firstChild;\n"));
+        body.push_str(&format!("root.__vmzT{i}.nodeValue = item.{field};\n"));
     }
+    // Acts come from cloned data-vmz-act; no per-row __vmzAct seed.
     if let Some((path, on_val, off_val, host, item_f)) = class {
         let get = path_expr("root", path);
         body.push_str(&format!(
@@ -287,21 +320,34 @@ fn emit_hydrate_js(
 fn emit_create_js(
     texts: &[(Vec<u32>, String)],
     class: Option<&(Vec<u32>, String, String, String, String)>,
+    _acts: &[(Vec<u32>, String, String, String)],
     key_field: Option<&str>,
 ) -> String {
-    let mut body = String::from(
-        "for (var i = startIdx; i < list.length; i++) {\n  var item = list[i];\n  var root = tpl.cloneNode(true);\n  root.__vmzBox = item;\n",
+    let hv_init = if let Some((_, _, _, host, _)) = class {
+        format!("var hv = this.{host};\n")
+    } else {
+        String::new()
+    };
+    let mut body = format!(
+        "{hv_init}for (var i = startIdx; i < list.length; i++) {{\n  var item = list[i];\n  var root = tpl.cloneNode(true);\n  root.__vmzBox = item;\n"
     );
-    // Hoist shared firstChild / nextSibling walks into locals (generic for any path set).
-    let locals = emit_path_locals("root", texts, class.map(|c| c.0.as_slice()));
+    // Text writes target the sole Text child via nodeValue (vanillajs-style).
+    // Acts are baked into html (`data-vmz-act`) and copied by cloneNode.
+    let text_parents: Vec<(Vec<u32>, String)> =
+        texts.iter().map(|(path, field)| (text_parent_path(path), field.clone())).collect();
+    let locals = emit_path_locals("root", &text_parents, class.map(|c| c.0.as_slice()), &[]);
     body.push_str(&locals.code);
-    for (i, (_path, field)) in texts.iter().enumerate() {
-        body.push_str(&format!("  {0}.nodeValue = item.{field};\n", locals.text_names[i]));
+    for (i, (_path, field)) in text_parents.iter().enumerate() {
+        body.push_str(&format!("  var t{i} = {}.firstChild;\n", locals.text_names[i]));
+        body.push_str(&format!("  t{i}.nodeValue = item.{field};\n"));
+        // Hot path only needs Text handles; `__vmzE*` rebuilt lazily in full apply.
+        body.push_str(&format!("  root.__vmzT{i} = t{i};\n"));
     }
-    if let Some((_path, on_val, off_val, host, item_f)) = class {
+    if let Some((_path, on_val, off_val, _host, item_f)) = class {
         let class_target = locals.class_name.as_deref().unwrap_or("root");
+        // `hv` hoisted above the loop (host field rarely changes during fresh create).
         body.push_str(&format!(
-            "  var hv = this.{host};\n  if (hv != null) {{ {class_target}.className = hv === item.{item_f} ? {:?} : {:?}; }}\n",
+            "  if (hv != null) {{ {class_target}.className = hv === item.{item_f} ? {:?} : {:?}; }}\n",
             on_val, off_val
         ));
     }
@@ -312,8 +358,12 @@ fn emit_create_js(
         None => body
             .push_str("  var k = keyOf(item, i);\n  root.__vmzKey = k;\n  keyed.set(k, root);\n"),
     }
-    body.push_str("  parent.insertBefore(root, end);\n}\n");
-    format!("function(list, startIdx, tpl, keyed, parent, end, keyOf) {{\n{} }}", indent(&body))
+    body.push_str("  parent.insertBefore(root, end);\n");
+    body.push_str("  if (entryByIndex) entryByIndex[i] = root;\n}\n");
+    format!(
+        "function(list, startIdx, tpl, keyed, parent, end, keyOf, entryByIndex) {{\n{} }}",
+        indent(&body)
+    )
 }
 
 struct PathLocals {
@@ -322,11 +372,12 @@ struct PathLocals {
     class_name: Option<String>,
 }
 
-/// Emit `var pN = …` with common-subexpression reuse across text/class paths.
+/// Emit `var pN = …` with common-subexpression reuse across text/class/act paths.
 fn emit_path_locals(
     root: &str,
     texts: &[(Vec<u32>, String)],
     class_path: Option<&[u32]>,
+    act_paths: &[Vec<u32>],
 ) -> PathLocals {
     use std::collections::HashMap;
     let mut temps: HashMap<Vec<u32>, String> = HashMap::new();
@@ -334,10 +385,10 @@ fn emit_path_locals(
     let mut code = String::new();
     let mut next_tmp = 0u32;
 
-    let mut ensure = |path: &[u32],
-                      code: &mut String,
-                      temps: &mut HashMap<Vec<u32>, String>,
-                      next_tmp: &mut u32|
+    let ensure = |path: &[u32],
+                  code: &mut String,
+                  temps: &mut HashMap<Vec<u32>, String>,
+                  next_tmp: &mut u32|
      -> String {
         if let Some(n) = temps.get(path) {
             return n.clone();
@@ -358,7 +409,24 @@ fn emit_path_locals(
             }
             let name = format!("p{next_tmp}");
             *next_tmp += 1;
-            let step = if idx <= 4 {
+            // Sibling CSE: path[…, k] via previous sibling path[…, k-1].nextSibling
+            // (avoids re-walking `root.firstChild` for consecutive children).
+            let step = if idx > 0 {
+                let mut prev_path = cur.clone();
+                prev_path.pop();
+                prev_path.push(idx - 1);
+                if let Some(prev_name) = temps.get(&prev_path) {
+                    format!("{prev_name}.nextSibling")
+                } else if idx <= 4 {
+                    let mut e = format!("{cur_name}.firstChild");
+                    for _ in 0..idx {
+                        e.push_str(".nextSibling");
+                    }
+                    e
+                } else {
+                    format!("{cur_name}.childNodes[{idx}]")
+                }
+            } else if idx <= 4 {
                 let mut e = format!("{cur_name}.firstChild");
                 for _ in 0..idx {
                     e.push_str(".nextSibling");
@@ -378,6 +446,10 @@ fn emit_path_locals(
     for (path, _) in texts {
         text_names.push(ensure(path, &mut code, &mut temps, &mut next_tmp));
     }
+    // Walk act paths for CSE into `code` only (bind sites use event paths later).
+    for path in act_paths {
+        let _ = ensure(path, &mut code, &mut temps, &mut next_tmp);
+    }
     let class_name = class_path.map(|p| {
         if p.is_empty() {
             root.to_string()
@@ -389,29 +461,75 @@ fn emit_path_locals(
     PathLocals { code, text_names, class_name }
 }
 
+/// Returns `(apply_full, applyByField_object)`.
+/// `applyByField` entries are monomorphic `(root, item) => …` — no slot branching —
+/// so leaf updates (`rows.i.label`) stay one IC type in V8.
+/// Create/hydrate seed `root.__vmzT{i}` (Text); applyByField uses `nodeValue`.
 fn emit_apply_js(
     texts: &[(Vec<u32>, String)],
     class: Option<&(Vec<u32>, String, String, String, String)>,
-) -> String {
-    let mut body = String::new();
+) -> (String, String) {
+    let mut by_field_entries = Vec::new();
+
+    for (i, (_path, field)) in texts.iter().enumerate() {
+        let mut body = format!("root.__vmzT{i}.nodeValue = item.{field};\n");
+        if let Some((_, on_val, off_val, host, item_f)) = class {
+            if item_f == field {
+                body.push_str(&format!(
+                    "root.className = this.{host} === item.{item_f} ? {:?} : {:?};\n",
+                    on_val, off_val
+                ));
+            }
+        }
+        by_field_entries.push(format!(
+            "{:?}: function(root, item) {{\n{} }}",
+            field,
+            indent(&body)
+        ));
+    }
+
+    if let Some((_path, on_val, off_val, host, item_f)) = class {
+        let body = format!(
+            "root.className = this.{host} === item.{item_f} ? {:?} : {:?};\n",
+            on_val, off_val
+        );
+        by_field_entries.push(format!("{:?}: function(root, item) {{\n{} }}", host, indent(&body)));
+    }
+
+    let apply_by_field = format!("{{ {} }}", by_field_entries.join(", "));
+
+    // Full apply: no slot chain (unknown slot / identity change → call this).
+    let mut full = String::new();
     if !texts.is_empty() {
-        body.push_str("if (!root.__vmzT0) {\n");
+        full.push_str("if (!root.__vmzT0) {\n");
         for (i, (path, _)) in texts.iter().enumerate() {
-            let get = path_expr("root", path);
-            body.push_str(&format!("  root.__vmzT{i} = {get};\n"));
+            full.push_str(&format!("  root.__vmzE{i} = {};\n", text_parent_expr("root", path)));
+            full.push_str(&format!("  root.__vmzT{i} = root.__vmzE{i}.firstChild;\n"));
         }
-        body.push_str("}\n");
-        for (i, (_path, field)) in texts.iter().enumerate() {
-            body.push_str(&format!("root.__vmzT{i}.nodeValue = item.{field};\n"));
-        }
+        full.push_str("}\n");
+    }
+    for (i, (_path, field)) in texts.iter().enumerate() {
+        full.push_str(&format!("root.__vmzT{i}.nodeValue = item.{field};\n"));
     }
     if let Some((_path, on_val, off_val, host, item_f)) = class {
-        body.push_str(&format!(
+        full.push_str(&format!(
             "root.className = this.{host} === item.{item_f} ? {:?} : {:?};\n",
             on_val, off_val
         ));
     }
-    format!("function(root, item) {{\n{} }}", indent(&body))
+    let apply = format!("function(root, item) {{\n{} }}", indent(&full));
+    (apply, apply_by_field)
+}
+
+fn text_parent_path(path: &[u32]) -> Vec<u32> {
+    if path.is_empty() {
+        return vec![];
+    }
+    path[..path.len() - 1].to_vec()
+}
+
+fn text_parent_expr(root: &str, path: &[u32]) -> String {
+    path_expr(root, &text_parent_path(path))
 }
 
 fn path_expr(root: &str, path: &[u32]) -> String {

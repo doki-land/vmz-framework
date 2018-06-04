@@ -100,13 +100,13 @@ export interface VmzUserConfig {
     /** Application identity (optional authoring). */
     application?: { id?: string; [key: string]: unknown };
     /**
-     * Site delivery (SiteDeliveryContract authoring). Pure data only.
-     * Prefer `defineSite(...)` helper; never a parallel `vmz.site.ts` entry.
+     * Delivery: named profiles (`default` + `profiles`) or legacy site sugar.
+     * Pure data only; never a parallel `vmz.site.ts` entry.
      */
-    delivery?: SiteDeliveryAuthoring;
+    delivery?: DeliveryAuthoring;
 }
 
-/** Authoring shape for `defineConfig({ delivery })` — normalized at build to SiteDeliveryContract. */
+/** Site resource sources (embedded | filesystem | remote) — orthogonal to assembly. */
 export interface SiteDeliveryAuthoring {
     artifact: string;
     siteId?: string;
@@ -137,6 +137,34 @@ export interface SiteDeliveryAuthoring {
     security?: unknown;
     securityPolicy?: unknown;
 }
+
+export type DeliveryAssembly = 'local-static' | 'static-cdn' | 'server-host' | 'cdn+server' | 'rust-embedded';
+
+export type DeliveryServerRuntime = 'node' | 'worker' | 'deno' | 'bun' | 'rust-host';
+
+export interface DeliveryProfileAuthoring {
+    host?: 'browser';
+    assembly: DeliveryAssembly;
+    serverRuntime?: DeliveryServerRuntime;
+    /** Inline site sources or `defineSite({...})`. */
+    sources?: SiteDeliveryAuthoring | SiteDeliveryAuthoring['sources'];
+    artifact?: string;
+    resolution?: SiteDeliveryAuthoring['resolution'];
+    activation?: SiteDeliveryAuthoring['activation'];
+}
+
+/** Named profiles (preferred) or legacy site-only sugar. */
+export type DeliveryAuthoring =
+    | {
+          default?: string;
+          profiles: Record<string, DeliveryProfileAuthoring>;
+      }
+    | (SiteDeliveryAuthoring & {
+          default?: string;
+          assembly?: DeliveryAssembly;
+          host?: 'browser';
+          serverRuntime?: DeliveryServerRuntime;
+      });
 
 export type DefinePluginInput = PluginManifest & {
     contribute?: VmzPlugin['contribute'];

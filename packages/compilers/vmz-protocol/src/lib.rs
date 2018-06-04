@@ -1,10 +1,20 @@
 //! VMZ versioned wire protocols - shared by CLI / N-API / LSP / MCP / `@vmz/test`.
 //!
 //! Semantic IR stays in `vmz-types`. This crate owns schema ids and document shapes only.
+//!
+//! Serde naming (Rust field names are source of truth):
+//!
+//! - **Struct fields** → container `#[serde(rename_all = "camelCase")]`
+//! - **Enum kind / tag values** → container `#[serde(rename_all = "kebab-case")]`
+//! - **Tagged-union variant fields** → `rename_all_fields = "camelCase"` when the
+//!   variant carries a struct payload
+//! - Do **not** mark every field with `#[serde(rename = "…")]`; that is reserved for
+//!   intentional exceptions (legacy keys, host `snake_case` stages, `WebView` casing)
 
 #![deny(missing_docs)]
 mod application;
 mod catalog;
+mod check_status;
 mod dx;
 mod host;
 mod locale;
@@ -12,7 +22,9 @@ mod native_host;
 mod plugin;
 mod profile;
 mod program;
+mod reported_diagnostic;
 mod server;
+mod severity;
 mod target;
 mod test;
 
@@ -25,38 +37,44 @@ pub use application::{
     APPLICATION_ISOLATION_SCHEMA, APPLICATION_MOUNT_TABLE_SCHEMA, APPLICATION_MOUNTED_TEST_SCHEMA,
     APPLICATION_PROTOCOL, APPLICATION_PROXY_DISPATCH_SCHEMA, APPLICATION_RELOCATABLE_CHECK_SCHEMA,
     APPLICATION_RELOCATED_SCHEMA, APPLICATION_RELOCATION_SCHEMA, APPLICATIONS_CONFIG_SCHEMA,
-    ApplicationAffectedPlan, ApplicationAffectedUnit, ApplicationArtifact,
-    ApplicationArtifactBoundaryReport, ApplicationBase, ApplicationCatalog,
+    ApplicationAffectedPlan, ApplicationAffectedReason, ApplicationAffectedUnit,
+    ApplicationArtifact, ApplicationArtifactBoundaryReport, ApplicationBase, ApplicationCatalog,
     ApplicationCatalogEntry, ApplicationCheckReport, ApplicationCollection,
     ApplicationDeployAdapterProof, ApplicationDescriptor, ApplicationDevCheckReport,
-    ApplicationDevSession, ApplicationDevSessions, ApplicationDiagnostic, ApplicationDocumentKind,
-    ApplicationGroup, ApplicationHostCompositionReport, ApplicationId,
+    ApplicationDevRole, ApplicationDevSession, ApplicationDevSessions, ApplicationDiagnostic,
+    ApplicationDocumentKind, ApplicationGroup, ApplicationHostCompositionReport, ApplicationId,
     ApplicationIsolationCheckReport, ApplicationIsolationNamespace, ApplicationMount,
     ApplicationMountTable, ApplicationMountTableEntry, ApplicationMountedTestSelection,
     ApplicationProtocolCatalog, ApplicationProxyCase, ApplicationProxyDispatch,
     ApplicationRelocatableReport, ApplicationRelocationManifest, ApplicationSourceSpan,
-    ApplicationTestModeSelection, ApplicationsConfig, ArtifactRef, CrossApplicationLink,
-    DIAG_AFFECTED_LEAK, DIAG_ARTIFACT_INTEGRITY, DIAG_CROSS_RUNTIME_REFERENCE, DIAG_DUPLICATE_ID,
-    DIAG_DUPLICATE_MOUNT, DIAG_FAILURE_CONTAINMENT, DIAG_INVALID_BASE, DIAG_INVALID_CONFIG,
-    DIAG_INVALID_DESCRIPTOR, DIAG_INVALID_ROUTE_BASE, DIAG_INVALID_SCHEMA, DIAG_ISOLATION_UNPROVEN,
-    DIAG_MOUNT_COLLISION, DIAG_MOUNT_UNREACHABLE, DIAG_NON_RELOCATABLE_URL, DIAG_PROXY_MISROUTE,
-    DIAG_ROUTE_NOT_PUBLIC, DIAG_SESSION_SHARED, DIAG_UNKNOWN_REFERENCE, FailureContainmentProof,
-    LogicalUrlEntry, MountUnavailablePolicy, RelocatedApplicationUrls, RelocatedUrlEntry,
+    ApplicationTestModeSelection, ApplicationsConfig, ArtifactRef, ArtifactSliceKind,
+    CrossApplicationLink, DIAG_AFFECTED_LEAK, DIAG_ARTIFACT_INTEGRITY,
+    DIAG_CROSS_RUNTIME_REFERENCE, DIAG_DUPLICATE_ID, DIAG_DUPLICATE_MOUNT,
+    DIAG_FAILURE_CONTAINMENT, DIAG_INVALID_BASE, DIAG_INVALID_CONFIG, DIAG_INVALID_DESCRIPTOR,
+    DIAG_INVALID_ROUTE_BASE, DIAG_INVALID_SCHEMA, DIAG_ISOLATION_UNPROVEN, DIAG_MOUNT_COLLISION,
+    DIAG_MOUNT_UNREACHABLE, DIAG_NON_RELOCATABLE_URL, DIAG_PROXY_MISROUTE, DIAG_ROUTE_NOT_PUBLIC,
+    DIAG_SESSION_SHARED, DIAG_UNKNOWN_REFERENCE, FailureContainmentProof, LogicalUrlEntry,
+    LogicalUrlKind, MountUnavailablePolicy, RelocatedApplicationUrls, RelocatedUrlEntry,
 };
 pub use catalog::{PROTOCOL_CATALOG_SCHEMA, ProtocolCatalog, ProtocolDomain};
+pub use check_status::CheckReportStatus;
 pub use dx::{
     AFFECTED_PREVIEW_SCHEMA, AFFECTED_SCHEMA, AffectedDocument, AffectedPreviewDocument,
-    AffectedUnitDoc, BOUNDARY_VALIDATOR_SCHEMA, BUDGET_SCHEMA, BudgetChunkEntry, BudgetDocument,
-    BudgetRouteEntry, CANCEL_SCHEMA, CAPABILITY_TARGET_SCHEMA, CAUSAL_REPLAY_CHECK_SCHEMA,
-    CAUSAL_REPLAY_SCHEMA, CODE_ACTION_SCHEMA, CROSS_SFC_CHECK_SCHEMA, CancelDocument,
-    CausalReplayCheckReport, CausalReplayDocument, CausalReplayMatch, CodeAction,
-    DEAD_GRAPH_SCHEMA, DEPLOYMENT_PROOF_CHECK_SCHEMA, DX_PROTOCOL, DxCatalog, DxDiagnostic,
-    DxDocumentKind, EXPLAIN_SCHEMA, EXPLAIN_SCHEMA_LEGACY, ExplainDocument, ExplainEdge,
-    HMR_PLAN_SCHEMA, HmrPlanDocument, LEAKAGE_SCHEMA, REFERENCE_SCHEMA, RENAME_SCHEMA, Reference,
-    RenameIntent, SEMANTIC_TRANSACTION_SCHEMA, SOURCE_MAP_SCHEMA, SYMBOL_INDEX_SCHEMA,
-    SYMBOL_SCHEMA, SemanticTransactionDocument, SourceSpan, StableId, Symbol,
-    TEST_SELECTION_SCHEMA, TRACE_SCHEMA, TRANSACTION_CHECK_SCHEMA, TestSelectionDocument, TextEdit,
-    TraceDocument, TraceEvent, TransactionCheckReport, WORKSPACE_EDIT_SCHEMA, WorkspaceEditPlan,
+    AffectedPreviewStatus, AffectedUnitDoc, BOUNDARY_VALIDATOR_SCHEMA, BUDGET_SCHEMA,
+    BudgetChunkEntry, BudgetDocument, BudgetRouteEntry, CANCEL_SCHEMA, CAPABILITY_TARGET_SCHEMA,
+    CAUSAL_REPLAY_CHECK_SCHEMA, CAUSAL_REPLAY_SCHEMA, CODE_ACTION_SCHEMA, CROSS_SFC_CHECK_SCHEMA,
+    CancelDocument, CancelStatus, CausalReplayCheckReport, CausalReplayCheckStatus,
+    CausalReplayDocument, CausalReplayMatch, CausalReplayStatus, CodeAction, CodeActionKind,
+    DEAD_GRAPH_SCHEMA, DEPLOYMENT_PROOF_CHECK_SCHEMA, DX_PROTOCOL, DxCatalog, DxCatalogKind,
+    DxDocumentKind, DxPreviewStatus, EXPLAIN_SCHEMA, EXPLAIN_SCHEMA_LEGACY, ExplainContribution,
+    ExplainDeploymentUnit, ExplainDocument, ExplainEdge, ExplainEdgeRef, ExplainKind,
+    ExplainProgramRef, HMR_PLAN_SCHEMA, HmrMode, HmrPlanDocument, HmrPlanStatus, LEAKAGE_SCHEMA,
+    REFERENCE_SCHEMA, RENAME_SCHEMA, Reference, RenameIntent, SEMANTIC_TRANSACTION_SCHEMA,
+    SOURCE_MAP_SCHEMA, SYMBOL_INDEX_SCHEMA, SYMBOL_SCHEMA, SemanticTransactionDocument,
+    SemanticTransactionStatus, SourceSpan, StableId, StableIdKind, Symbol, TEST_SELECTION_SCHEMA,
+    TRACE_SCHEMA, TRANSACTION_CHECK_SCHEMA, TestSelectionDocument, TextEdit, TraceDocument,
+    TraceEvent, TraceEventKind, TraceStatus, TransactionCheckReport, TransactionCheckStatus,
+    WORKSPACE_EDIT_SCHEMA, WorkspaceEditPlan, WorkspaceEditStatus, is_rename_kind,
     normalize_rename_kind,
 };
 pub use host::{COMPILER_PROTOCOL, HOST_PROTOCOL};
@@ -94,10 +112,11 @@ pub use locale::{
     MESSAGE_CATALOG_SCHEMA, MESSAGE_NODE_SCHEMA, RESERVED_TOP,
 };
 pub use native_host::{
-    APPLICATION_IDENTITY_SCHEMA, AUTH_SESSION_SCHEMA, ApplicationIdentity, AuthSessionPolicy,
-    BRIDGE_CHECK_SCHEMA, BRIDGE_PROTOCOL_SCHEMA, BRIDGE_STUB_CATALOG_SCHEMA, BRIDGE_TRACE_SCHEMA,
-    BridgeProtocolManifest, BridgeStubCatalog, BridgeTraceContext, CAPABILITY_CALL_SCHEMA,
-    DEEP_LINK_SCHEMA, DIAG_ADAPTER_IS_SEMANTIC_CORE, DIAG_ARBITRARY_BRIDGE,
+    APPLICATION_IDENTITY_SCHEMA, AUTH_SESSION_SCHEMA, ApplicationIdentity, AssetMode,
+    AuthSessionMode, AuthSessionPolicy, BRIDGE_CHECK_SCHEMA, BRIDGE_PROTOCOL_SCHEMA,
+    BRIDGE_STUB_CATALOG_SCHEMA, BRIDGE_TRACE_SCHEMA, BridgeMode, BridgeProtocolManifest,
+    BridgeStubCatalog, BridgeTraceContext, CAPABILITY_CALL_SCHEMA, CapabilityClass,
+    ContentDeliveryMode, DEEP_LINK_SCHEMA, DIAG_ADAPTER_IS_SEMANTIC_CORE, DIAG_ARBITRARY_BRIDGE,
     DIAG_BACKGROUND_IS_DESTROY, DIAG_BRIDGE_BYPASSES_SERVER, DIAG_CALL_NOT_ALLOWLISTED,
     DIAG_CRASH_ASSUMES_JS_HEAP, DIAG_IMPLICIT_STATE_SHARE, DIAG_INVALID_PROFILE,
     DIAG_MISSING_ALLOWLIST, DIAG_MISSING_AUTH_SESSION, DIAG_MISSING_CANCEL, DIAG_MISSING_DEEP_LINK,
@@ -115,34 +134,37 @@ pub use native_host::{
     HIGH_VALUE_SURFACE_KINDS, LIFECYCLE_CHECK_SCHEMA, LIFECYCLE_SCHEMA, LOCAL_BUNDLE_SCHEMA,
     LocalBundledEntry, MULTI_PLATFORM_ADAPTER_KIND, MULTI_PLATFORM_ADAPTER_SCHEMA,
     MULTI_PLATFORM_CHECK_SCHEMA, MULTI_PLATFORM_SCHEMA, MULTI_PLATFORM_SHARED_SCHEMA,
-    MULTI_PLATFORM_TEST_SCHEMA, MultiPlatformAdapter, MultiPlatformSharedContracts,
-    NATIVE_CAPABILITY_SCHEMA, NATIVE_HOST_CHECK_SCHEMA, NATIVE_HOST_PROTOCOL,
-    NATIVE_SURFACE_BOUNDARY_SCHEMA, NATIVE_SURFACE_CHECK_SCHEMA, NATIVE_SURFACE_ID_SCHEMA,
-    NATIVE_SURFACE_SCHEMA, NETWORK_POLICY_SCHEMA, NativeAppLifecyclePolicy,
-    NativeBridgeCheckReport, NativeCapability, NativeCapabilityCall, NativeFullstackCheckReport,
-    NativeFullstackProfile, NativeHostCheckReport, NativeHostDiagnostic, NativeHostDocumentKind,
-    NativeHostProtocolCatalog, NativeLifecycleCheckReport, NativeMultiPlatformCheckReport,
-    NativeMultiPlatformManifest, NativeShellCheckReport, NativeSurfaceBoundary,
-    NativeSurfaceCheckReport, NativeSurfaceManifest, NativeWebViewShellManifest, NetworkPolicy,
-    OFFLINE_POLICY_SCHEMA, OfflinePolicy, PERSISTENCE_SCHEMA, PUSH_POLICY_SCHEMA,
-    PersistencePolicy, PushPolicy, REQUIRED_LIFECYCLE_EVENTS, REQUIRED_MULTI_PLATFORMS,
-    REQUIRED_SHELL_HOOKS, REQUIRED_SHELL_PLATFORMS, SERVER_TRANSPORT_SCHEMA, SHELL_CHECK_SCHEMA,
-    SHELL_SCHEMA, SSR_FIRST_PAINT_SCHEMA, ServerTransportPolicy, ShellLoggingPolicy,
-    ShellPlatformAdapter, SsrFirstPaintPolicy, UPDATE_POLICY_SCHEMA, UpdatePolicy,
-    WEBVIEW_DEPLOYMENT_SCHEMA, WebViewDeploymentProfile,
+    MULTI_PLATFORM_TEST_SCHEMA, MultiPlatformAdapter, MultiPlatformAdapterKind,
+    MultiPlatformSharedContracts, NATIVE_CAPABILITY_SCHEMA, NATIVE_HOST_CHECK_SCHEMA,
+    NATIVE_HOST_PROTOCOL, NATIVE_SURFACE_BOUNDARY_SCHEMA, NATIVE_SURFACE_CHECK_SCHEMA,
+    NATIVE_SURFACE_ID_SCHEMA, NATIVE_SURFACE_SCHEMA, NETWORK_POLICY_SCHEMA,
+    NativeAppLifecyclePolicy, NativeBridgeCheckReport, NativeCapability, NativeCapabilityCall,
+    NativeFullstackCheckReport, NativeFullstackProfile, NativeHostCheckReport,
+    NativeHostDiagnostic, NativeHostDocumentKind, NativeHostProtocolCatalog,
+    NativeLifecycleCheckReport, NativeLifecycleEvent, NativeMultiPlatformCheckReport,
+    NativeMultiPlatformManifest, NativePlatformId, NativeShellCheckReport, NativeSurfaceBoundary,
+    NativeSurfaceCheckReport, NativeSurfaceKind, NativeSurfaceManifest, NativeWebViewShellManifest,
+    NetworkMode, NetworkPolicy, OFFLINE_POLICY_SCHEMA, OfflineMode, OfflinePolicy,
+    PERSISTENCE_SCHEMA, PUSH_POLICY_SCHEMA, PersistenceMode, PersistencePolicy, PushPolicy,
+    REQUIRED_LIFECYCLE_EVENTS, REQUIRED_MULTI_PLATFORMS, REQUIRED_SHELL_HOOKS,
+    REQUIRED_SHELL_PLATFORMS, SERVER_TRANSPORT_SCHEMA, SHELL_CHECK_SCHEMA, SHELL_SCHEMA,
+    SSR_FIRST_PAINT_SCHEMA, ServerTransportPolicy, ShellAdapterKind, ShellHook, ShellLogLevel,
+    ShellLoggingPolicy, ShellPlatformAdapter, SsrFirstPaintPolicy, UPDATE_POLICY_SCHEMA,
+    UpdateChannel, UpdatePolicy, UpdateRollback, WEBVIEW_DEPLOYMENT_SCHEMA,
+    WebViewDeploymentProfile,
 };
-pub use plugin::PLUGIN_PROTOCOL;
+pub use plugin::{ExplainContributionSurface, PLUGIN_PROTOCOL, PluginStage, VmzModuleKind};
 pub use profile::{
-    CANCEL_REQUEST_SCHEMA, CAPABILITY_BINDING_SCHEMA, CAPABILITY_REQUIREMENT_SCHEMA,
-    CAPABILITY_RESOLUTION_TABLE_SCHEMA, CONFORMANCE_CHECK_SCHEMA, CONFORMANCE_FIXTURE_SCHEMA,
-    CONFORMANCE_HOST_RUN_SCHEMA, CONFORMANCE_SCENARIO_SCHEMA, CONFORMANCE_STATE_SNAPSHOT_SCHEMA,
-    CONFORMANCE_SURFACE_ROLES, CONFORMANCE_TRACE_SCHEMA, CORE_ID_PREFIX, CancelRequest,
-    CapabilityBinding, CapabilityRequirement, CapabilityResolution, CapabilityResolutionTable,
-    ConformanceCheckReport, ConformanceFixture, ConformanceHostRun, ConformanceScenario,
-    ConformanceSlotValue, ConformanceStateSnapshot, ConformanceTrace, ConformanceTraceEvent,
-    DELIVERY_ARTIFACT_MANIFEST_SCHEMA, DELIVERY_ASSET_STRATEGIES,
-    DELIVERY_PACKAGE_CONSTRAINTS_SCHEMA, DELIVERY_PROFILE_SCHEMA, DELIVERY_PROOF_CHECK_SCHEMA,
-    DELIVERY_PROOF_MANIFEST_SCHEMA, DELIVERY_PROOF_SCENARIO_SCHEMA,
+    BackNavigationPolicy, CANCEL_REQUEST_SCHEMA, CAPABILITY_BINDING_SCHEMA,
+    CAPABILITY_REQUIREMENT_SCHEMA, CAPABILITY_RESOLUTION_TABLE_SCHEMA, CONFORMANCE_CHECK_SCHEMA,
+    CONFORMANCE_FIXTURE_SCHEMA, CONFORMANCE_HOST_RUN_SCHEMA, CONFORMANCE_SCENARIO_SCHEMA,
+    CONFORMANCE_STATE_SNAPSHOT_SCHEMA, CONFORMANCE_SURFACE_ROLES, CONFORMANCE_TRACE_SCHEMA,
+    CORE_ID_PREFIX, CancelRequest, CapabilityBinding, CapabilityRequirement, CapabilityResolution,
+    CapabilityResolutionTable, ConformanceCheckReport, ConformanceFixture, ConformanceHostRun,
+    ConformanceScenario, ConformanceSlotValue, ConformanceStateSnapshot, ConformanceSurfaceRole,
+    ConformanceTrace, ConformanceTraceEvent, CspProfile, DELIVERY_ARTIFACT_MANIFEST_SCHEMA,
+    DELIVERY_ASSET_STRATEGIES, DELIVERY_PACKAGE_CONSTRAINTS_SCHEMA, DELIVERY_PROFILE_SCHEMA,
+    DELIVERY_PROOF_CHECK_SCHEMA, DELIVERY_PROOF_MANIFEST_SCHEMA, DELIVERY_PROOF_SCENARIO_SCHEMA,
     DELIVERY_SECURITY_POLICY_SCHEMA, DELIVERY_UPDATE_CHANNELS, DELIVERY_UPDATE_POLICY_SCHEMA,
     DIAG_CANCEL_NOT_PROPAGATED, DIAG_CAPABILITY_PERMISSION_UNDECLARED, DIAG_CAPABILITY_UNRESOLVED,
     DIAG_CONFORMANCE_HOST_INCOMPLETE, DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH,
@@ -156,43 +178,50 @@ pub use profile::{
     DIAG_SECURITY_POLICY_INSECURE, DIAG_SPLIT_TRANSACTION, DIAG_STABLE_ID_DIVERGENCE,
     DIAG_STALE_GENERATION, DIAG_STATE_RESULT_DIVERGENCE, DIAG_SURFACE_AMBIGUOUS,
     DIAG_SURFACE_NO_MATCH, DIAG_SURFACE_OWNS_STATE, DIAG_TRACE_INVARIANT_BROKEN,
-    DIAG_UPDATE_WITHOUT_REPROOF, DISPOSE_REGION_SCHEMA, DeliveryArtifactManifest,
+    DIAG_UPDATE_WITHOUT_REPROOF, DISPOSE_REGION_SCHEMA, DeepLinkPolicy, DeliveryArtifactManifest,
     DeliveryPackageConstraints, DeliveryProfile, DeliveryProofCheckReport, DeliveryProofManifest,
-    DeliveryProofScenario, DeliveryProofUnit, DeliverySecurityPolicy, DeliveryUpdatePolicy,
-    DisposeRegion, EVENT_ENVELOPE_SCHEMA, EXECUTOR_CHECK_SCHEMA, EXECUTOR_ENVELOPE_HEADER_SCHEMA,
-    EXECUTOR_SCENARIO_SCHEMA, EXECUTOR_TRANSACTION_SCHEMA, EventEnvelope, ExecutorCheckReport,
+    DeliveryProofScenario, DeliveryProofUnit, DeliverySecurityPolicy, DeliverySecurityToken,
+    DeliveryUpdatePolicy, DigestAlgorithm, DisposeRegion, EVENT_ENVELOPE_SCHEMA,
+    EXECUTOR_CHECK_SCHEMA, EXECUTOR_ENVELOPE_HEADER_SCHEMA, EXECUTOR_SCENARIO_SCHEMA,
+    EXECUTOR_TRANSACTION_SCHEMA, EventEnvelope, ExecutionDomain, ExecutorCheckReport,
     ExecutorEnvelopeHeader, ExecutorScenario, ExecutorTransaction, HOST_CONSTRAINTS_SCHEMA,
     HOST_PROFILE_SCHEMA, HOST_RESOLUTION_MANIFEST_SCHEMA, HostConstraints, HostLifecycleSlice,
     HostProfile, HostResolutionManifest, LIFECYCLE_BINDING_SCHEMA, LIFECYCLE_HOST_KINDS,
     LIFECYCLE_MAPPING_ENTRY_SCHEMA, LIFECYCLE_MAPPING_TABLE_SCHEMA,
     LIFECYCLE_RECOVERY_CHECK_SCHEMA, LIFECYCLE_SCENARIO_SCHEMA, LifecycleBinding,
-    LifecycleMappingEntry, LifecycleMappingTable, LifecycleRecoveryCheckReport, LifecycleScenario,
-    NAVIGATION_BINDING_SCHEMA, NavigationBinding, PATCH_BATCH_SCHEMA, PERSISTENCE_WINDOWS,
-    PROFILE_CHECK_SCHEMA, PROFILE_CONTRIBUTION_SCHEMA, PROFILE_PROTOCOL, PatchBatch,
-    ProfileCheckReport, ProfileContribution, ProfileDiagnostic, ProfileDocumentKind,
-    ProfileProtocolCatalog, ProfileSolverCheckReport, ProfileSolverInput, RECOVERY_POLICY_SCHEMA,
-    RESOLUTION_DIGEST_SCHEMA, ROUTE_REALIZATION_TABLE_SCHEMA, RecoveryPolicy, RegionSolveRequest,
-    ResolutionDigest, RouteRealization, RouteRealizationTable, RouteSolveRequest,
-    SOLVER_CHECK_SCHEMA, SOLVER_INPUT_SCHEMA, SURFACE_ASSIGNMENT_TABLE_SCHEMA,
-    SURFACE_BINDING_SCHEMA, SURFACE_KINDS, SURFACE_REQUIREMENTS_SCHEMA, StateSlotFact,
-    SurfaceAssignment, SurfaceAssignmentTable, SurfaceBinding, SurfaceReject, SurfaceRequirements,
-    TRANSPORT_BINDING_SCHEMA, TransportBinding, UNIFIED_LIFECYCLE_EVENTS, canonical_digest_value,
+    LifecycleHostKind, LifecycleMappingEntry, LifecycleMappingTable, LifecycleRecoveryCheckReport,
+    LifecycleScenario, NAVIGATION_BINDING_SCHEMA, NavigationBinding, NavigationStackModel,
+    PATCH_BATCH_SCHEMA, PERSISTENCE_WINDOWS, PROFILE_CHECK_SCHEMA, PROFILE_CONTRIBUTION_SCHEMA,
+    PROFILE_PROTOCOL, PatchBatch, PersistenceWindow, ProfileCheckReport, ProfileContribution,
+    ProfileDiagnostic, ProfileDocumentKind, ProfileProtocolCatalog, ProfileSolverCheckReport,
+    ProfileSolverInput, RECOVERY_POLICY_SCHEMA, RESOLUTION_DIGEST_SCHEMA,
+    ROUTE_REALIZATION_TABLE_SCHEMA, RecoveryPolicy, RegionSolveRequest, ResolutionDigest,
+    RouteRealization, RouteRealizationTable, RouteSolveRequest, SOLVER_CHECK_SCHEMA,
+    SOLVER_INPUT_SCHEMA, SURFACE_ASSIGNMENT_TABLE_SCHEMA, SURFACE_BINDING_SCHEMA, SURFACE_KINDS,
+    SURFACE_REQUIREMENTS_SCHEMA, StateRestorationPolicy, StateSlotFact, SurfaceAssignment,
+    SurfaceAssignmentReason, SurfaceAssignmentTable, SurfaceBinding, SurfaceKind, SurfaceReject,
+    SurfaceRejectReason, SurfaceRequirements, TRANSPORT_BINDING_SCHEMA, TransportBinding,
+    TransportKind, UNIFIED_LIFECYCLE_EVENTS, UnifiedLifecycleEvent, canonical_digest_value,
 };
 pub use program::{
-    MOTION_SCHEMA, MOTION_TRANSITION_SCHEMA, PLAN_SCHEMA, PROGRAM_SCHEMA, REACTIVE_SCHEMA,
+    MOTION_SCHEMA, MOTION_TRANSITION_SCHEMA, PLAN_SCHEMA, PROGRAM_SCHEMA, ProgramEdgeKind,
+    ProgramGraphEdge, REACTIVE_SCHEMA,
 };
+pub use reported_diagnostic::ReportedDiagnostic;
 pub use server::{
     DIAG_CLIENT_DATA_MAY_DUPLICATE_CAPABILITY, DIAG_CLIENT_MOCK_PROVIDER_FORBIDDEN,
     DIAG_SECRET_BINDING_MISSING, DIAG_SECRET_CLIENT_LEAK, DIAG_SERVER_SLICE_NOT_BROWSER_SAFE,
     SECRET_REQUIREMENT_SCHEMA, SERVER_PROTOCOL, SERVER_SLICE_PROOF_SCHEMA, ServerDocumentKind,
     ServerProtocolCatalog,
 };
+pub use severity::{Severity, parse_severity, severity_wire};
 pub use target::{
-    DIAG_ARTIFACT_INVALID, DIAG_DOM_LEAK_IN_PLAN, DIAG_PLATFORM_UNSUPPORTED, DIAG_PROFILE_INVALID,
-    DIAG_UNKNOWN_VIEW_OP, MINI_PROGRAM_ARTIFACT_SCHEMA, MiniProgramArtifact,
-    PLATFORM_PROFILE_SCHEMA, PlatformCapabilityProfile, TARGET_CHECK_SCHEMA, TARGET_PROTOCOL,
-    TargetCheckReport, TargetDiagnostic, TargetDocumentKind, TargetProtocolCatalog,
-    VIEW_OPERATION_KINDS, VIEW_OPS_SCHEMA, ViewOpEntry, ViewOpsDocument,
+    CapabilityVerdict, DIAG_ARTIFACT_INVALID, DIAG_DOM_LEAK_IN_PLAN, DIAG_PLATFORM_UNSUPPORTED,
+    DIAG_PROFILE_INVALID, DIAG_UNKNOWN_VIEW_OP, MINI_PROGRAM_ARTIFACT_SCHEMA, MiniProgramArtifact,
+    PLATFORM_PROFILE_SCHEMA, PlatformCapabilityProfile, PlatformFamily, PlatformFeatureVerdict,
+    TARGET_CHECK_SCHEMA, TARGET_PROTOCOL, TargetCheckReport, TargetDiagnostic, TargetDocumentKind,
+    TargetProtocolCatalog, VIEW_OPERATION_KINDS, VIEW_OPS_SCHEMA, ViewOpEntry, ViewOperationKind,
+    ViewOpsDocument,
 };
 pub use test::{
     EXECUTION_PLAN_REF_SCHEMA, TEST_ACTION_SCHEMA, TEST_ASSERTION_SCHEMA, TEST_MANIFEST_SCHEMA,

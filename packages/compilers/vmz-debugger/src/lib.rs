@@ -1,9 +1,9 @@
 //! VMZ debugger: Program Graph explain, runtime trace, causal replay,
-//! plus **LSP / MCP protocol libraries** (no process binary — use `vmz lsp` / `vmz mcp`).
+//! plus LSP / MCP protocol libraries (no process binary; use `vmz lsp` / `vmz mcp`).
 //!
-//! crate map in `05`. The only native CLI binary is `vmz` (`vmz-tools`).
+//! The only native CLI binary is `vmz` (`vmz-tools`).
 
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 pub mod causal_replay;
 pub mod lsp;
 pub mod mcp;

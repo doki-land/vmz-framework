@@ -1,5 +1,10 @@
+//! Compile `.vmz` paths or projects into JS, routes, and deployment artifacts.
+
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use crate::affected::{AffectedPlan, chunk_id_for, plan_affected};
 use crate::analyze::analyze_script;
@@ -14,12 +19,18 @@ use crate::template::parse_template;
 use crate::transpile::transpile_ts;
 use crate::tw::{TwCompilerHandle, TwEmitRequest, register_tw_from_parsed};
 use crate::virtual_server;
-use vmz_types::{DeploymentClientCall, DeploymentView, StubStatus};
+use vmz_types::{DeploymentClientCall, DeploymentView, ProgramModule, StubStatus};
 use walkdir::WalkDir;
 
+/// Schema id written into `vmz-deployment.json`.
+pub const DEPLOYMENT_SCHEMA: &str = "vmz.deployment.v0";
+
+/// Compile session options (out dir, release, style plugins, runtime dist).
 #[derive(Clone)]
 pub struct CompileOptions {
+    /// Output directory for JS / JSON artifacts.
     pub out_dir: PathBuf,
+    /// Production emit (omits local serve-host from copied runtime).
     pub release: bool,
     /// TW style plugin. `None` skips TW emit.
     pub tw: Option<TwCompilerHandle>,
@@ -54,19 +65,159 @@ impl std::fmt::Debug for CompileOptions {
     }
 }
 
-#[derive(Debug, Clone)]
+/// One HTTP route row written to `vmz-routes.json`.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct EmittedRoute {
+    /// Uppercase HTTP verb.
     pub verb: String,
+    /// Route path template.
     pub path: String,
+    /// Virtual `#server/...` module id.
     pub module_id: String,
+    /// Server method name.
     pub method: String,
+    /// Server class name.
     pub class_name: String,
 }
 
+/// One client->server call listed on a deployment unit.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DeploymentCallWire {
+    /// Server method name.
+    pub method: String,
+    /// Optional client method that issued the call.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_client_method: Option<String>,
+}
+
+/// One Island resume entry listed on a deployment unit.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DeploymentResumeWire {
+    /// Component tag / name.
+    pub component: String,
+    /// Resume strategy (`load`, `idle`, ...).
+    pub strategy: String,
+}
+
+/// One unit row inside [`DeploymentDocument`].
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DeploymentUnitWire {
+    /// Stable chunk id.
+    pub chunk_id: String,
+    /// Module kind (closed unit enum).
+    pub kind: crate::project::VmzModuleKind,
+    /// Workspace-relative source path.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub source: String,
+    /// Client JS entry relative to out_dir.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub client_entry: String,
+    /// Program IR path relative to out_dir.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub program_ir: String,
+    /// Forward dependency chunk ids.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub depends_on: Vec<String>,
+    /// Reverse dependency chunk ids.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub depended_by: Vec<String>,
+    /// Control region ids.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub region_ids: Vec<u32>,
+    /// Server capability method names.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub capabilities: Vec<String>,
+    /// Virtual `#server/...` module id when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_module_id: Option<String>,
+    /// Client->server call edges.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub client_calls: Vec<DeploymentCallWire>,
+    /// Island resume entries.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub resume_entries: Vec<DeploymentResumeWire>,
+    /// True when this unit was rebuilt in the current plan.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub rebuilt: bool,
+}
+
+/// Wire document for `vmz-deployment.json`.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DeploymentDocument {
+    /// Always [`DEPLOYMENT_SCHEMA`].
+    pub schema: String,
+    /// All known units in the project catalog.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub units: Vec<DeploymentUnitWire>,
+    /// Chunk ids rebuilt this round.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub affected_chunks: Vec<String>,
+    /// Dirty seed chunks before reverse expansion.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub seed_chunks: Vec<String>,
+    /// Island-only HMR eligibility for this plan.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub island_hmr: bool,
+    /// Project stylesheet relative to out_dir.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub css_entry: Option<String>,
+    /// Style Theme summary when designs are present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub style_theme: Option<crate::designs::StyleThemeSummary>,
+    /// Style bundle fingerprint.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub style_bundle_hash: Option<String>,
+    /// Whether this emit covered the full project.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub full: bool,
+}
+
+/// Per-method read/write summary inside [`VmzMetaDocument`].
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct MethodRwWire {
+    /// Field / path reads.
+    pub reads: Vec<String>,
+    /// Field / path writes.
+    pub writes: Vec<String>,
+    /// True when the method is `async` (event flush must not assume sync drain).
+    #[serde(rename = "async", default, skip_serializing_if = "std::ops::Not::not")]
+    pub async_: bool,
+}
+
+/// Per-file meta document (`*.vmz.json`) for tooling.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct VmzMetaDocument {
+    /// Source `.vmz` path.
+    pub file: String,
+    /// Default-exported client class name.
+    pub client: String,
+    /// Co-located server class name when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server: Option<String>,
+    /// Virtual `#server/...` module id when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_module: Option<String>,
+    /// Template root count.
+    pub template_roots: usize,
+    /// Method name -> read/write summary.
+    #[serde(default)]
+    pub method_rw: std::collections::BTreeMap<String, MethodRwWire>,
+}
+
+/// Outcome of a compile session (diagnostics, outputs, and incremental metadata).
 #[derive(Debug, Default)]
 pub struct CompileReport {
+    /// Diagnostics produced during check / emit (may include errors and warnings).
     pub diagnostics: Vec<ReportedDiagnostic>,
+    /// Absolute paths of files written this round (JS, JSON, CSS, etc.).
     pub emitted: Vec<PathBuf>,
+    /// Routes realized into `routes.json` / deployment metadata.
     pub routes: Vec<EmittedRoute>,
     /// session: whether this was a full project emit.
     pub full: bool,
@@ -90,6 +241,7 @@ pub struct CompileReport {
     pub tw_registrations: Vec<crate::tw::TwRegistration>,
 }
 
+/// Compile a single `.vmz` file or a project root directory.
 pub fn compile_path(
     path: impl AsRef<Path>,
     options: &CompileOptions,
@@ -136,6 +288,7 @@ pub fn compile_path(
     compile_project(path, options)
 }
 
+/// Full-project compile: discover all units, emit outputs, no dirty-set filtering.
 pub fn compile_project(
     root: impl AsRef<Path>,
     options: &CompileOptions,
@@ -371,46 +524,14 @@ fn read_prev_style_deployment(out_dir: &Path) -> PrevStyleDeployment {
     let Ok(text) = fs::read_to_string(path) else {
         return PrevStyleDeployment::default();
     };
-    let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) else {
+    let Ok(doc) = serde_json::from_str::<DeploymentDocument>(&text) else {
         return PrevStyleDeployment::default();
     };
-    let mut prev = PrevStyleDeployment::default();
-    if let Some(s) = v.get("cssEntry").and_then(|x| x.as_str()) {
-        prev.css_entry = Some(s.to_string());
+    PrevStyleDeployment {
+        css_entry: doc.css_entry,
+        style_theme: doc.style_theme,
+        style_bundle_hash: doc.style_bundle_hash,
     }
-    if let Some(h) = v.get("styleBundleHash").and_then(|x| x.as_str()) {
-        prev.style_bundle_hash = Some(h.to_string());
-    }
-    if let Some(st) = v.get("styleTheme").and_then(|x| x.as_object()) {
-        let mut prefers = std::collections::BTreeMap::new();
-        if let Some(obj) = st.get("prefersColorScheme").and_then(|x| x.as_object()) {
-            for (k, val) in obj {
-                if let Some(id) = val.as_str() {
-                    prefers.insert(k.clone(), id.to_string());
-                }
-            }
-        }
-        prev.style_theme = Some(crate::designs::StyleThemeSummary {
-            default_theme_id: st
-                .get("defaultThemeId")
-                .and_then(|x| x.as_str())
-                .unwrap_or("default")
-                .to_string(),
-            theme_ids: st
-                .get("themeIds")
-                .and_then(|x| x.as_array())
-                .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
-                .unwrap_or_default(),
-            activation_attr: st
-                .get("activationAttr")
-                .and_then(|x| x.as_str())
-                .unwrap_or("data-theme")
-                .to_string(),
-            prefers_color_scheme: prefers,
-            content_hash: st.get("contentHash").and_then(|x| x.as_str()).unwrap_or("").to_string(),
-        });
-    }
-    prev
 }
 
 /// Theme + designs/styles + every SFC `<style>` / `style:tw` → stable input hash + full TW regs.
@@ -425,11 +546,16 @@ fn style_input_fingerprint(
     buf.push_str(&designs.theme.content_hash());
     buf.push('\n');
 
-    let style_paths: Vec<PathBuf> = if let Some(entry) = &designs.style_entry {
-        vec![entry.clone()]
-    } else {
-        designs.style_files.clone()
-    };
+    // The SCSS entry can import any sibling under designs/styles. Hashing only
+    // index.scss leaves incremental builds stale when an imported partial changes.
+    // The inventory is already bounded to style files, so include it in full.
+    let mut style_paths = designs.style_files.clone();
+    if let Some(entry) = &designs.style_entry {
+        if !style_paths.contains(entry) {
+            style_paths.push(entry.clone());
+        }
+    }
+    style_paths.sort();
     for p in style_paths {
         buf.push_str(&p.to_string_lossy());
         buf.push('\n');
@@ -463,19 +589,9 @@ fn style_input_fingerprint(
     (sha256_hex_bytes(buf.as_bytes()), regs)
 }
 fn emit_routes_json(options: &CompileOptions, report: &mut CompileReport) -> crate::Result<()> {
-    let mut json = String::from("[\n");
-    for (i, r) in report.routes.iter().enumerate() {
-        if i > 0 {
-            json.push_str(",\n");
-        }
-        json.push_str(&format!(
-            "  {{\"verb\":{:?},\"path\":{:?},\"moduleId\":{:?},\"method\":{:?},\"className\":{:?}}}",
-            r.verb, r.path, r.module_id, r.method, r.class_name
-        ));
-    }
-    json.push_str("\n]\n");
+    let json = serde_json::to_string_pretty(&report.routes).unwrap_or_else(|_| "[]".into());
     let out = options.out_dir.join("vmz-routes.json");
-    fs::write(&out, &json)?;
+    fs::write(&out, format!("{json}\n"))?;
     report.emitted.push(out);
     Ok(())
 }
@@ -485,33 +601,8 @@ fn merge_routes_json(options: &CompileOptions, report: &mut CompileReport) -> cr
     let mut existing: Vec<EmittedRoute> = Vec::new();
     if out.is_file() {
         let text = fs::read_to_string(&out)?;
-        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
-            if let Some(arr) = value.as_array() {
-                for item in arr {
-                    let Some(obj) = item.as_object() else { continue };
-                    let verb = obj.get("verb").and_then(|v| v.as_str());
-                    let path = obj.get("path").and_then(|v| v.as_str());
-                    let module_id = obj.get("moduleId").and_then(|v| v.as_str());
-                    let method = obj.get("method").and_then(|v| v.as_str());
-                    let class_name = obj.get("className").and_then(|v| v.as_str());
-                    if let (
-                        Some(verb),
-                        Some(path),
-                        Some(module_id),
-                        Some(method),
-                        Some(class_name),
-                    ) = (verb, path, module_id, method, class_name)
-                    {
-                        existing.push(EmittedRoute {
-                            verb: verb.to_string(),
-                            path: path.to_string(),
-                            module_id: module_id.to_string(),
-                            method: method.to_string(),
-                            class_name: class_name.to_string(),
-                        });
-                    }
-                }
-            }
+        if let Ok(arr) = serde_json::from_str::<Vec<EmittedRoute>>(&text) {
+            existing = arr;
         }
     }
     let touched: std::collections::HashSet<String> =
@@ -529,6 +620,9 @@ fn emit_runtime_js(options: &CompileOptions, report: &mut CompileReport) -> crat
     let mut copies = vec![
         ("server.js", "vmz-runtime.js"),
         ("dom.js", "vmz-dom.js"),
+        // Companions required by `dom.js` / `dom.client.js` re-exports (same out dir names).
+        ("dom-core.js", "dom-core.js"),
+        ("dom-ssr.js", "dom-ssr.js"),
         ("http.js", "vmz-http.js"),
         ("client-nav.js", "vmz-client-nav.js"),
     ];
@@ -740,15 +834,7 @@ fn emit_file(
         let resume_entries = unit.collect_resume_entries_from_view();
         unit.deployment = DeploymentView {
             status: StubStatus::Partial,
-            unit_kind: Some(
-                match kind {
-                    VmzModuleKind::App => "app",
-                    VmzModuleKind::Page => "page",
-                    VmzModuleKind::Component => "component",
-                    VmzModuleKind::Other => "other",
-                }
-                .into(),
-            ),
+            unit_kind: Some(kind),
             chunk_id: Some(chunk_id.to_string()),
             client_entry: Some(client_rel),
             program_ir: Some(program_rel),
@@ -823,32 +909,26 @@ fn emit_file(
         report.emitted.push(server_out);
     }
 
-    let method_rw = client
-        .decl
-        .methods
-        .iter()
-        .filter(|m| !m.reads.is_empty() || !m.writes.is_empty())
-        .map(|m| {
-            let reads = m.reads.iter().map(|r| format!("{r:?}")).collect::<Vec<_>>().join(", ");
-            let writes = m.writes.iter().map(|w| format!("{w:?}")).collect::<Vec<_>>().join(", ");
-            format!("    {:?}: {{ \"reads\": [{reads}], \"writes\": [{writes}] }}", m.name)
-        })
-        .collect::<Vec<_>>()
-        .join(",\n");
-    let server_name = server
-        .as_ref()
-        .map(|s| format!("{:?}", s.decl.name.as_str()))
-        .unwrap_or_else(|| "null".into());
-    let server_mod =
-        server_id.as_ref().map(|id| format!("{id:?}")).unwrap_or_else(|| "null".into());
-    let meta = format!(
-        "{{\n  \"file\": {:?},\n  \"client\": {:?},\n  \"server\": {server_name},\n  \"serverModule\": {server_mod},\n  \"templateRoots\": {},\n  \"methodRw\": {{\n{method_rw}\n  }}\n}}\n",
-        path.display().to_string(),
-        client.decl.name,
-        template_ir.roots.len(),
-    );
+    let mut method_rw = std::collections::BTreeMap::new();
+    for m in client.decl.methods.iter().filter(|m| !m.reads.is_empty() || !m.writes.is_empty()) {
+        method_rw.insert(
+            m.name.clone(),
+            MethodRwWire { reads: m.reads.clone(), writes: m.writes.clone(), async_: m.is_async },
+        );
+    }
+    let meta = VmzMetaDocument {
+        file: path.display().to_string(),
+        client: client.decl.name.clone(),
+        server: server.as_ref().map(|s| s.decl.name.clone()),
+        server_module: server_id.clone(),
+        template_roots: template_ir.roots.len(),
+        method_rw,
+    };
     let meta_path = out_dir.join(format!("{stem}.vmz.json"));
-    fs::write(&meta_path, meta)?;
+    fs::write(
+        &meta_path,
+        format!("{}\n", serde_json::to_string_pretty(&meta).unwrap_or_else(|_| "{}".into())),
+    )?;
     report.emitted.push(meta_path);
 
     // Routes from Program IR Server view (single fact source for HTTP surface).
@@ -883,107 +963,65 @@ fn emit_file(
 
 fn emit_deployment_json(
     root: &Path,
-    src_root: &Path,
+    _src_root: &Path,
     options: &CompileOptions,
     plan: &AffectedPlan,
     report: &mut CompileReport,
 ) -> crate::Result<()> {
     let (_src, graph, catalog) = crate::affected::component_graph_for(root);
-    let _ = src_root;
 
-    let mut json = String::from("{\n  \"schema\": \"vmz.deployment.v0\",\n  \"units\": [\n");
-    for (i, (source, kind, chunk_id)) in catalog.iter().enumerate() {
-        if i > 0 {
-            json.push_str(",\n");
-        }
-        let kind_s = match kind {
-            VmzModuleKind::App => "app",
-            VmzModuleKind::Page => "page",
-            VmzModuleKind::Component => "component",
-            VmzModuleKind::Other => "other",
-        };
-        let client = format!("{chunk_id}.client.js");
-        let program = format!("{chunk_id}.program.json");
+    let mut units = Vec::with_capacity(catalog.len());
+    for (source, kind, chunk_id) in &catalog {
+        let client_entry = format!("{chunk_id}.client.js");
+        let program_ir = format!("{chunk_id}.program.json");
         let rebuilt = plan.units.iter().any(|p| p.chunk_id == *chunk_id);
-        let depends = graph
-            .deps
-            .get(chunk_id)
-            .map(|v| v.iter().map(|c| format!("{c:?}")).collect::<Vec<_>>().join(", "))
-            .unwrap_or_default();
-        let depended = graph
-            .reverse
-            .get(chunk_id)
-            .map(|v| v.iter().map(|c| format!("{c:?}")).collect::<Vec<_>>().join(", "))
-            .unwrap_or_default();
-        let extras = read_program_deployment_extras(&options.out_dir.join(&program));
-        let caps =
-            extras.capabilities.iter().map(|c| format!("{c:?}")).collect::<Vec<_>>().join(", ");
-        let regions =
-            extras.region_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(", ");
-        let calls = extras
-            .client_calls
-            .iter()
-            .map(|(m, from)| {
-                let from_s = match from {
-                    Some(f) => format!("{f:?}"),
-                    None => "null".into(),
-                };
-                format!("{{\"method\":{m:?},\"fromClientMethod\":{from_s}}}")
-            })
-            .collect::<Vec<_>>()
-            .join(", ");
-        let server_mod = match &extras.server_module_id {
-            Some(id) => format!("{id:?}"),
-            None => "null".into(),
-        };
-        let resumes = extras
-            .resume_entries
-            .iter()
-            .map(|(comp, strat)| format!("{{\"component\":{comp:?},\"strategy\":{strat:?}}}"))
-            .collect::<Vec<_>>()
-            .join(", ");
-        json.push_str(&format!(
-            "    {{\"chunkId\":{chunk_id:?},\"kind\":{kind_s:?},\"source\":{:?},\"clientEntry\":{client:?},\"programIr\":{program:?},\"dependsOn\":[{depends}],\"dependedBy\":[{depended}],\"regionIds\":[{regions}],\"capabilities\":[{caps}],\"serverModuleId\":{server_mod},\"clientCalls\":[{calls}],\"resumeEntries\":[{resumes}],\"rebuilt\":{rebuilt}}}",
-            source.display().to_string(),
-        ));
+        let depends_on = graph.deps.get(chunk_id).cloned().unwrap_or_default();
+        let depended_by = graph.reverse.get(chunk_id).cloned().unwrap_or_default();
+        let extras = read_program_deployment_extras(&options.out_dir.join(&program_ir));
+        units.push(DeploymentUnitWire {
+            chunk_id: chunk_id.clone(),
+            kind: *kind,
+            source: source.display().to_string(),
+            client_entry,
+            program_ir,
+            depends_on,
+            depended_by,
+            region_ids: extras.region_ids,
+            capabilities: extras.capabilities,
+            server_module_id: extras.server_module_id,
+            client_calls: extras
+                .client_calls
+                .into_iter()
+                .map(|(method, from_client_method)| DeploymentCallWire {
+                    method,
+                    from_client_method,
+                })
+                .collect(),
+            resume_entries: extras
+                .resume_entries
+                .into_iter()
+                .map(|(component, strategy)| DeploymentResumeWire { component, strategy })
+                .collect(),
+            rebuilt,
+        });
     }
-    json.push_str("\n  ],\n");
-    json.push_str(&format!(
-        "  \"affectedChunks\": [{}],\n",
-        plan.units.iter().map(|u| format!("{:?}", u.chunk_id)).collect::<Vec<_>>().join(", ")
-    ));
-    json.push_str(&format!(
-        "  \"seedChunks\": [{}],\n",
-        plan.seed_chunks.iter().map(|c| format!("{c:?}")).collect::<Vec<_>>().join(", ")
-    ));
-    json.push_str(&format!("  \"islandHmr\": {},\n", plan.island_only()));
-    match &report.css_entry {
-        Some(css) => json.push_str(&format!("  \"cssEntry\": {css:?},\n")),
-        None => json.push_str("  \"cssEntry\": null,\n"),
-    }
-    match &report.style_theme {
-        Some(t) => {
-            let ids = t.theme_ids.iter().map(|id| format!("{id:?}")).collect::<Vec<_>>().join(", ");
-            let prefers = t
-                .prefers_color_scheme
-                .iter()
-                .map(|(k, v)| format!("{k:?}:{v:?}"))
-                .collect::<Vec<_>>()
-                .join(", ");
-            json.push_str(&format!(
-                "  \"styleTheme\": {{\"defaultThemeId\":{:?},\"themeIds\":[{ids}],\"activationAttr\":{:?},\"prefersColorScheme\":{{{prefers}}},\"contentHash\":{:?}}},\n",
-                t.default_theme_id, t.activation_attr, t.content_hash
-            ));
-        }
-        None => json.push_str("  \"styleTheme\": null,\n"),
-    }
-    match &report.style_bundle_hash {
-        Some(h) => json.push_str(&format!("  \"styleBundleHash\": {h:?},\n")),
-        None => json.push_str("  \"styleBundleHash\": null,\n"),
-    }
-    json.push_str(&format!("  \"full\": {}\n}}\n", plan.full));
+
+    let doc = DeploymentDocument {
+        schema: DEPLOYMENT_SCHEMA.to_string(),
+        units,
+        affected_chunks: plan.units.iter().map(|u| u.chunk_id.clone()).collect(),
+        seed_chunks: plan.seed_chunks.clone(),
+        island_hmr: plan.island_only(),
+        css_entry: report.css_entry.clone(),
+        style_theme: report.style_theme.clone(),
+        style_bundle_hash: report.style_bundle_hash.clone(),
+        full: plan.full,
+    };
     let out = options.out_dir.join("vmz-deployment.json");
-    fs::write(&out, json)?;
+    fs::write(
+        &out,
+        format!("{}\n", serde_json::to_string_pretty(&doc).unwrap_or_else(|_| "{}".into())),
+    )?;
     report.emitted.push(out);
     Ok(())
 }
@@ -998,77 +1036,47 @@ struct ProgramDeploymentExtras {
     resume_entries: Vec<(String, String)>,
 }
 
-/// Load deployment extras from emitted `*.program.json` via JSON parse (not string scrape).
+/// Load deployment extras from emitted `*.program.json` via typed Program IR parse.
 /// Source `.vmz` still goes through oxc; this only re-reads our own Program IR artifact
 /// for incremental deployment aggregation.
 fn read_program_deployment_extras(path: &Path) -> ProgramDeploymentExtras {
     let Ok(text) = fs::read_to_string(path) else {
         return ProgramDeploymentExtras::default();
     };
-    let Ok(root) = serde_json::from_str::<serde_json::Value>(&text) else {
+    let Ok(module) = serde_json::from_str::<ProgramModule>(&text) else {
         return ProgramDeploymentExtras::default();
     };
-    let unit = root
-        .get("units")
-        .and_then(|u| u.as_array())
-        .and_then(|arr| arr.first())
-        .cloned()
-        .unwrap_or(serde_json::Value::Null);
+    let Some(unit) = module.units.first() else {
+        return ProgramDeploymentExtras::default();
+    };
 
-    let mut extras = ProgramDeploymentExtras::default();
-    if let Some(dep) = unit.get("deployment") {
-        if let Some(arr) = dep.get("regionIds").and_then(|v| v.as_array()) {
-            extras.region_ids = arr.iter().filter_map(|v| v.as_u64().map(|n| n as u32)).collect();
-        }
-        if let Some(arr) = dep.get("capabilities").and_then(|v| v.as_array()) {
-            extras.capabilities =
-                arr.iter().filter_map(|v| v.as_str().map(str::to_string)).collect();
-        }
-        extras.server_module_id =
-            dep.get("serverModuleId").and_then(|v| v.as_str()).map(str::to_string);
-        if let Some(arr) = dep.get("clientCalls").and_then(|v| v.as_array()) {
-            for item in arr {
-                let method = item.get("method").and_then(|v| v.as_str());
-                let from = item
-                    .get("fromClientMethod")
-                    .and_then(|v| if v.is_null() { None } else { v.as_str().map(str::to_string) });
-                if let Some(method) = method {
-                    extras.client_calls.push((method.to_string(), from));
-                }
-            }
-        }
-        if let Some(arr) = dep.get("resumeEntries").and_then(|v| v.as_array()) {
-            for item in arr {
-                let component = item.get("component").and_then(|v| v.as_str());
-                let strategy = item.get("strategy").and_then(|v| v.as_str());
-                if let (Some(component), Some(strategy)) = (component, strategy) {
-                    extras.resume_entries.push((component.to_string(), strategy.to_string()));
-                }
-            }
-        }
-    }
+    let mut extras = ProgramDeploymentExtras {
+        region_ids: unit.deployment.region_ids.clone(),
+        capabilities: unit.deployment.capabilities.clone(),
+        server_module_id: unit.deployment.server_module_id.clone(),
+        client_calls: unit
+            .deployment
+            .client_calls
+            .iter()
+            .map(|c| (c.method.clone(), c.from_client_method.clone()))
+            .collect(),
+        resume_entries: unit
+            .deployment
+            .resume_entries
+            .iter()
+            .map(|r| (r.component.clone(), r.strategy.as_str().to_string()))
+            .collect(),
+    };
 
     if extras.capabilities.is_empty() {
-        if let Some(server) = unit.get("server") {
-            if let Some(arr) = server.get("capabilities").and_then(|v| v.as_array()) {
-                for cap in arr {
-                    if let Some(m) = cap.get("method").and_then(|v| v.as_str()) {
-                        extras.capabilities.push(m.to_string());
-                    }
-                }
-            }
-            extras.server_module_id = extras
-                .server_module_id
-                .or_else(|| server.get("module_id").and_then(|v| v.as_str()).map(str::to_string));
+        for cap in &unit.server.capabilities {
+            extras.capabilities.push(cap.method.clone());
         }
+        extras.server_module_id = extras.server_module_id.or_else(|| unit.server.module_id.clone());
     }
 
     if extras.region_ids.is_empty() {
-        if let Some(arr) =
-            unit.get("view").and_then(|v| v.get("region_ids")).and_then(|v| v.as_array())
-        {
-            extras.region_ids = arr.iter().filter_map(|v| v.as_u64().map(|n| n as u32)).collect();
-        }
+        extras.region_ids = unit.view.region_ids.iter().map(|id| id.0).collect();
     }
 
     extras

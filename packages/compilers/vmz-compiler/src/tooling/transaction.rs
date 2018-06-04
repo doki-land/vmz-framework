@@ -2,24 +2,23 @@
 //!
 //! Algebraic first version — not live mid-oxc cancel or byte-budget enforcement.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde_json::Value;
-
 use vmz_protocol::{
     AFFECTED_PREVIEW_SCHEMA, AffectedPreviewDocument, BUDGET_SCHEMA, BudgetChunkEntry,
-    BudgetDocument, BudgetRouteEntry, CANCEL_SCHEMA, CancelDocument, DxDiagnostic, HMR_PLAN_SCHEMA,
-    HmrPlanDocument, SEMANTIC_TRANSACTION_SCHEMA, SemanticTransactionDocument,
+    BudgetDocument, BudgetRouteEntry, CANCEL_SCHEMA, CancelDocument, HMR_PLAN_SCHEMA,
+    HmrPlanDocument, ReportedDiagnostic, SEMANTIC_TRANSACTION_SCHEMA, SemanticTransactionDocument,
     TRANSACTION_CHECK_SCHEMA, TextEdit, TransactionCheckReport,
 };
 
 use crate::affected::plan_affected;
+use crate::compile::DeploymentDocument;
 use crate::rename::select_tests_for_chunks;
 use crate::session_graph::SessionGraph;
 
-// Apply a batch of TextEdits atomically (no rename precondition).
+/// Apply a batch of [`TextEdit`]s atomically (no rename precondition).
 pub fn apply_semantic_transaction(
     root: &Path,
     id: u64,
@@ -89,19 +88,18 @@ pub fn apply_semantic_transaction(
     SemanticTransactionDocument {
         schema: SEMANTIC_TRANSACTION_SCHEMA.into(),
         id,
-        status: "committed".into(),
+        status: vmz_protocol::SemanticTransactionStatus::Committed,
         edits: edits.to_vec(),
-        diagnostics: vec![DxDiagnostic {
-            path: String::new(),
-            severity: "info".into(),
-            message: format!("committed {} TextEdit(s) in semantic transaction", edits.len()),
-            code: Some("dx.x3.transaction.committed".into()),
-            span: None,
-        }],
+        diagnostics: vec![ReportedDiagnostic::coded_advice(
+            "",
+            format!("committed {} TextEdit(s) in semantic transaction", edits.len()),
+            "dx.x3.transaction.committed",
+        )],
         dirty_paths,
     }
 }
 
+/// Preview affected units, tests, routes, and session regions for dirty paths.
 pub fn plan_affected_preview(
     root: &Path,
     dirty: &[PathBuf],
@@ -137,20 +135,21 @@ pub fn plan_affected_preview(
         test_selection: tests,
         route_ids,
         region_ids: region_ids.into_iter().collect(),
-        status: "preview".into(),
+        status: vmz_protocol::AffectedPreviewStatus::Preview,
     }
 }
 
+/// Plan HMR mode, disposed/preserved regions, and loader reruns from dirty paths.
 pub fn plan_hmr(root: &Path, dirty: &[PathBuf], session: &SessionGraph) -> HmrPlanDocument {
     let plan = plan_affected(root, dirty);
     let affected_chunks: Vec<String> = plan.units.iter().map(|u| u.chunk_id.clone()).collect();
     let island_only = plan.island_only();
     let mode = if plan.full {
-        "full"
+        vmz_protocol::HmrMode::Full
     } else if island_only {
-        "island"
+        vmz_protocol::HmrMode::Island
     } else {
-        "partial"
+        vmz_protocol::HmrMode::Partial
     };
 
     let affected_set: BTreeSet<String> = affected_chunks.iter().cloned().collect();
@@ -163,7 +162,7 @@ pub fn plan_hmr(root: &Path, dirty: &[PathBuf], session: &SessionGraph) -> HmrPl
             for r in &unit.region_ids {
                 disposed.insert(*r);
             }
-            if unit.kind == "page" || chunk_id.starts_with("pages/") {
+            if unit.kind == crate::project::VmzModuleKind::Page || chunk_id.starts_with("pages/") {
                 rerun.push(chunk_id.clone());
             }
         } else {
@@ -188,64 +187,63 @@ pub fn plan_hmr(root: &Path, dirty: &[PathBuf], session: &SessionGraph) -> HmrPl
 
     HmrPlanDocument {
         schema: HMR_PLAN_SCHEMA.into(),
-        mode: mode.into(),
+        mode,
         island_only,
         seed_chunks: plan.seed_chunks.clone(),
         affected_chunks,
         preserved_regions: preserved.into_iter().collect(),
         disposed_regions: disposed.into_iter().collect(),
         rerun_loaders: rerun,
-        status: "preview".into(),
+        status: vmz_protocol::HmrPlanStatus::Preview,
     }
 }
 
+/// Derive route/chunk unit-cost budget from typed [`DeploymentDocument`].
 pub fn plan_budget(out_dir: &Path) -> BudgetDocument {
     let path = out_dir.join("vmz-deployment.json");
     let Ok(text) = fs::read_to_string(&path) else {
         return BudgetDocument::empty();
     };
-    let Ok(root) = serde_json::from_str::<Value>(&text) else {
-        return BudgetDocument::empty();
-    };
-    let Some(units) = root.get("units").and_then(|v| v.as_array()) else {
+    let Ok(doc) = serde_json::from_str::<DeploymentDocument>(&text) else {
         return BudgetDocument::empty();
     };
 
     let mut chunks = Vec::new();
     let mut routes = Vec::new();
-    let mut by_id: HashMap<String, Vec<String>> = HashMap::new();
 
-    for item in units {
-        let Some(obj) = item.as_object() else { continue };
-        let Some(chunk_id) = obj.get("chunkId").and_then(|v| v.as_str()).map(str::to_string) else {
-            continue;
-        };
-        let kind = obj.get("kind").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let depends_on: Vec<String> = obj
-            .get("dependsOn")
-            .and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
-            .unwrap_or_default();
-        let unit_cost = 1 + depends_on.len() as u32;
-        by_id.insert(chunk_id.clone(), depends_on.clone());
-        if kind == "page" || chunk_id.starts_with("pages/") {
-            let mut ids = vec![chunk_id.clone()];
-            ids.extend(depends_on.iter().cloned());
+    for u in &doc.units {
+        let unit_cost = 1 + u.depends_on.len() as u32;
+        if u.kind == crate::project::VmzModuleKind::Page || u.chunk_id.starts_with("pages/") {
+            let mut ids = vec![u.chunk_id.clone()];
+            ids.extend(u.depends_on.iter().cloned());
             ids.sort();
             ids.dedup();
-            routes.push(BudgetRouteEntry { route_id: chunk_id.clone(), chunk_ids: ids, unit_cost });
+            routes.push(BudgetRouteEntry {
+                route_id: u.chunk_id.clone(),
+                chunk_ids: ids,
+                unit_cost,
+            });
         }
-        chunks.push(BudgetChunkEntry { chunk_id, kind, depends_on, unit_cost });
+        chunks.push(BudgetChunkEntry {
+            chunk_id: u.chunk_id.clone(),
+            kind: u.kind,
+            depends_on: u.depends_on.clone(),
+            unit_cost,
+        });
     }
 
     chunks.sort_by(|a, b| a.chunk_id.cmp(&b.chunk_id));
     routes.sort_by(|a, b| a.route_id.cmp(&b.route_id));
 
-    let status = if chunks.is_empty() { "empty" } else { "ready" };
-    let _ = by_id;
-    BudgetDocument { schema: BUDGET_SCHEMA.into(), routes, chunks, status: status.into() }
+    let status = if chunks.is_empty() {
+        vmz_protocol::DxPreviewStatus::Empty
+    } else {
+        vmz_protocol::DxPreviewStatus::Ready
+    };
+    BudgetDocument { schema: BUDGET_SCHEMA.into(), routes, chunks, status }
 }
 
+/// Aggregate affected preview, HMR plan, and budget into one transaction check.
 pub fn check_transaction(
     root: &Path,
     out_dir: &Path,
@@ -256,36 +254,39 @@ pub fn check_transaction(
     let hmr = plan_hmr(root, dirty, session);
     let budget = plan_budget(out_dir);
     let mut diagnostics = Vec::new();
-    if budget.status == "empty" {
-        diagnostics.push(DxDiagnostic {
-            path: String::new(),
-            severity: "info".into(),
-            message: "budget empty — build workspace to materialize deployment units".into(),
-            code: Some("dx.x3.budget.empty".into()),
-            span: None,
-        });
+    if budget.status == vmz_protocol::DxPreviewStatus::Empty {
+        diagnostics.push(ReportedDiagnostic::coded_advice(
+            "",
+            "budget empty — build workspace to materialize deployment units",
+            "dx.x3.budget.empty",
+        ));
     }
-    let status = if budget.status == "ready" { "ready" } else { "preview" };
+    let status = if budget.status == vmz_protocol::DxPreviewStatus::Ready {
+        vmz_protocol::TransactionCheckStatus::Ready
+    } else {
+        vmz_protocol::TransactionCheckStatus::Preview
+    };
     TransactionCheckReport {
         schema: TRANSACTION_CHECK_SCHEMA.into(),
         affected_preview: Some(preview),
         hmr_plan: Some(hmr),
         budget: Some(budget),
         diagnostics,
-        status: status.into(),
+        status,
     }
 }
 
+/// Build a cancel document for a transaction ticket at a given session generation.
 pub fn cancel_document(
     ticket_id: u64,
-    status: &str,
+    status: vmz_protocol::CancelStatus,
     generation: u64,
     notes: impl Into<String>,
 ) -> CancelDocument {
     CancelDocument {
         schema: CANCEL_SCHEMA.into(),
         ticket_id,
-        status: status.into(),
+        status,
         session_generation: generation,
         notes: Some(notes.into()),
     }

@@ -11,8 +11,8 @@ use vmz_protocol::{
     APPLICATION_ARTIFACT_BOUNDARY_SCHEMA, APPLICATION_ARTIFACT_SCHEMA,
     APPLICATION_MOUNT_TABLE_SCHEMA, ApplicationArtifact, ApplicationArtifactBoundaryReport,
     ApplicationCatalog, ApplicationCheckReport, ApplicationDescriptor, ApplicationDiagnostic,
-    ApplicationMountTable, ApplicationMountTableEntry, ArtifactRef, DIAG_ARTIFACT_INTEGRITY,
-    DIAG_CROSS_RUNTIME_REFERENCE, DIAG_INVALID_CONFIG,
+    ApplicationMountTable, ApplicationMountTableEntry, ArtifactRef, ArtifactSliceKind,
+    DIAG_ARTIFACT_INTEGRITY, DIAG_CROSS_RUNTIME_REFERENCE, DIAG_INVALID_CONFIG,
 };
 
 use crate::application::check_applications;
@@ -71,19 +71,25 @@ fn build_artifact(
     );
     let descriptor_hash = sha256_hex_bytes(descriptor_body.as_bytes());
     let program_graph_ref = artifact_ref(
-        "program-graph",
+        ArtifactSliceKind::ProgramGraph,
         &format!("program:{}:{descriptor_hash}:{package_root}", d.id.as_str()),
     );
     let execution_plan_ref = artifact_ref(
-        "execution-plan",
+        ArtifactSliceKind::ExecutionPlan,
         &format!("plan:{}:{descriptor_hash}:{package_root}", d.id.as_str()),
     );
-    let route_manifest_ref =
-        artifact_ref("route-manifest", &format!("routes:{}:{}", d.id.as_str(), d.entry_route));
-    let asset_manifest_ref =
-        artifact_ref("asset-manifest", &format!("assets:{}:{descriptor_hash}", d.id.as_str()));
-    let server_deployment_ref =
-        artifact_ref("server-deployment", &format!("server:{}:{descriptor_hash}", d.id.as_str()));
+    let route_manifest_ref = artifact_ref(
+        ArtifactSliceKind::RouteManifest,
+        &format!("routes:{}:{}", d.id.as_str(), d.entry_route),
+    );
+    let asset_manifest_ref = artifact_ref(
+        ArtifactSliceKind::AssetManifest,
+        &format!("assets:{}:{descriptor_hash}", d.id.as_str()),
+    );
+    let server_deployment_ref = artifact_ref(
+        ArtifactSliceKind::ServerDeployment,
+        &format!("server:{}:{descriptor_hash}", d.id.as_str()),
+    );
     let public_route_contracts = vec![d.entry_route.clone()];
     let n = descriptor_hash.len().min(16);
     let executable_module_id = format!("exec:{}:{}", d.id.as_str(), &descriptor_hash[..n]);
@@ -99,17 +105,14 @@ fn build_artifact(
         &executable_module_id,
     );
     if package_root.is_empty() {
-        diagnostics.push(ApplicationDiagnostic {
-            code: DIAG_ARTIFACT_INTEGRITY.into(),
-            severity: "error".into(),
-            path: d
-                .package_root
+        diagnostics.push(ApplicationDiagnostic::coded_error(
+            d.package_root
                 .as_ref()
                 .map(|r| Path::new(r).join("package.json").display().to_string())
                 .unwrap_or_else(|| "package.json".into()),
-            message: format!("ApplicationId `{}` artifact missing packageRoot", d.id.as_str()),
-            span: None,
-        });
+            format!("ApplicationId `{}` artifact missing packageRoot", d.id.as_str()),
+            DIAG_ARTIFACT_INTEGRITY,
+        ));
     }
     ApplicationArtifact {
         schema: APPLICATION_ARTIFACT_SCHEMA.into(),
@@ -127,8 +130,8 @@ fn build_artifact(
     }
 }
 
-fn artifact_ref(kind: &str, material: &str) -> ArtifactRef {
-    ArtifactRef { kind: kind.into(), hash: sha256_hex_bytes(material.as_bytes()) }
+fn artifact_ref(kind: ArtifactSliceKind, material: &str) -> ArtifactRef {
+    ArtifactRef { kind, hash: sha256_hex_bytes(material.as_bytes()) }
 }
 
 fn compute_artifact_integrity(
@@ -177,8 +180,10 @@ fn build_mount_table(
         let Some(art) = by_id.get(m.application.as_str()) else {
             continue;
         };
-        let artifact_ref =
-            ArtifactRef { kind: "application-artifact".into(), hash: art.integrity.clone() };
+        let artifact_ref = ArtifactRef {
+            kind: ArtifactSliceKind::ApplicationArtifact,
+            hash: art.integrity.clone(),
+        };
         let public_route_summary = art.public_route_contracts.clone();
         let integrity = sha256_hex_bytes(
             format!(
@@ -205,13 +210,11 @@ fn build_mount_table(
         mounts.iter().map(|m| m.integrity.as_str()).collect::<Vec<_>>().join("|").as_bytes(),
     );
     if !mounts.is_empty() && !config_path.is_file() {
-        diagnostics.push(ApplicationDiagnostic {
-            code: DIAG_INVALID_CONFIG.into(),
-            severity: "error".into(),
-            path: config_path.display().to_string(),
-            message: "mount table entries present but applications.config.json5 missing".into(),
-            span: None,
-        });
+        diagnostics.push(ApplicationDiagnostic::coded_error(
+            config_path.display().to_string(),
+            "mount table entries present but applications.config.json5 missing",
+            DIAG_INVALID_CONFIG,
+        ));
     }
     ApplicationMountTable {
         schema: APPLICATION_MOUNT_TABLE_SCHEMA.into(),
@@ -232,34 +235,28 @@ fn validate_unique_executable_ownership(
         let exec = a.executable_module_id.as_str();
         let gid = a.application_id.as_str();
         if let Some(prev) = seen.insert(exec, gid) {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_CROSS_RUNTIME_REFERENCE.into(),
-                severity: "error".into(),
-                path: a.package_root.clone().unwrap_or_default(),
-                message: format!("executableModuleId `{exec}` owned by both `{prev}` and `{gid}`"),
-                span: None,
-            });
+            diagnostics.push(ApplicationDiagnostic::coded_error(
+                a.package_root.clone().unwrap_or_default(),
+                format!("executableModuleId `{exec}` owned by both `{prev}` and `{gid}`"),
+                DIAG_CROSS_RUNTIME_REFERENCE,
+            ));
         }
         if let Some(prev) = graph_hashes.insert(a.program_graph_ref.hash.as_str(), gid) {
             if prev != gid {
-                diagnostics.push(ApplicationDiagnostic {
-                    code: DIAG_CROSS_RUNTIME_REFERENCE.into(),
-                    severity: "error".into(),
-                    path: a.package_root.clone().unwrap_or_default(),
-                    message: format!("programGraphRef hash shared by `{prev}` and `{gid}`"),
-                    span: None,
-                });
+                diagnostics.push(ApplicationDiagnostic::coded_error(
+                    a.package_root.clone().unwrap_or_default(),
+                    format!("programGraphRef hash shared by `{prev}` and `{gid}`"),
+                    DIAG_CROSS_RUNTIME_REFERENCE,
+                ));
             }
         }
         if let Some(prev) = plan_hashes.insert(a.execution_plan_ref.hash.as_str(), gid) {
             if prev != gid {
-                diagnostics.push(ApplicationDiagnostic {
-                    code: DIAG_CROSS_RUNTIME_REFERENCE.into(),
-                    severity: "error".into(),
-                    path: a.package_root.clone().unwrap_or_default(),
-                    message: format!("executionPlanRef hash shared by `{prev}` and `{gid}`"),
-                    span: None,
-                });
+                diagnostics.push(ApplicationDiagnostic::coded_error(
+                    a.package_root.clone().unwrap_or_default(),
+                    format!("executionPlanRef hash shared by `{prev}` and `{gid}`"),
+                    DIAG_CROSS_RUNTIME_REFERENCE,
+                ));
             }
         }
     }
@@ -274,13 +271,11 @@ fn validate_mount_table_is_refs_only(
         ["\"programGraph\"", "\"executionPlan\"", "\"executableModule\"", "\"modules\""]
     {
         if json.contains(forbidden) {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_CROSS_RUNTIME_REFERENCE.into(),
-                severity: "error".into(),
-                path: "ApplicationMountTable".into(),
-                message: format!("MountTable must not embed child bodies (found {forbidden})"),
-                span: None,
-            });
+            diagnostics.push(ApplicationDiagnostic::coded_error(
+                "ApplicationMountTable",
+                format!("MountTable must not embed child bodies (found {forbidden})"),
+                DIAG_CROSS_RUNTIME_REFERENCE,
+            ));
         }
     }
 }
@@ -292,13 +287,11 @@ fn validate_catalog_has_no_executables(
     let json = serde_json::to_string(catalog).unwrap_or_default();
     for forbidden in ["\"programGraph\"", "\"executionPlan\"", "\"executableModuleId\""] {
         if json.contains(forbidden) {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_CROSS_RUNTIME_REFERENCE.into(),
-                severity: "error".into(),
-                path: "ApplicationCatalog".into(),
-                message: format!("ApplicationCatalog must not embed {forbidden}"),
-                span: None,
-            });
+            diagnostics.push(ApplicationDiagnostic::coded_error(
+                "ApplicationCatalog",
+                format!("ApplicationCatalog must not embed {forbidden}"),
+                DIAG_CROSS_RUNTIME_REFERENCE,
+            ));
         }
     }
 }
@@ -320,16 +313,11 @@ fn validate_artifact_integrities(
             &a.executable_module_id,
         );
         if expected != a.integrity {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_ARTIFACT_INTEGRITY.into(),
-                severity: "error".into(),
-                path: a.package_root.clone().unwrap_or_default(),
-                message: format!(
-                    "ApplicationArtifact `{}` integrity mismatch",
-                    a.application_id.as_str()
-                ),
-                span: None,
-            });
+            diagnostics.push(ApplicationDiagnostic::coded_error(
+                a.package_root.clone().unwrap_or_default(),
+                format!("ApplicationArtifact `{}` integrity mismatch", a.application_id.as_str()),
+                DIAG_ARTIFACT_INTEGRITY,
+            ));
         }
     }
 }
@@ -342,16 +330,14 @@ fn validate_mount_refs(
     let known: HashSet<&str> = artifacts.iter().map(|a| a.integrity.as_str()).collect();
     for m in &table.mounts {
         if !known.contains(m.artifact_ref.hash.as_str()) {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_ARTIFACT_INTEGRITY.into(),
-                severity: "error".into(),
-                path: "ApplicationMountTable".into(),
-                message: format!(
+            diagnostics.push(ApplicationDiagnostic::coded_error(
+                "ApplicationMountTable",
+                format!(
                     "mount `{}` artifactRef.hash does not match any ApplicationArtifact integrity",
                     m.application_id.as_str()
                 ),
-                span: None,
-            });
+                DIAG_ARTIFACT_INTEGRITY,
+            ));
         }
     }
 }

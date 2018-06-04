@@ -1,11 +1,13 @@
 /**
- * Browser Host for `vmz test --mode browser` ( close slice).
+ * Browser Host for `vmz test --mode browser` (U0 protocol + U1 core interaction).
  *
  * Real Chromium/Chrome via CDP. Transport may use puppeteer-core as a CDP
  * client — that is NOT the Playwright/Puppeteer *test model*. Manifest actions
  * and assertions remain the VMZ Browser Host protocol; same Direct schedule as
  * production (`__vmzCreate` in a real document).
  *
+ * U0: Locator / Action / Expectation dispatcher (browser-protocol.ts).
+ * U1: role/label/text/testId locators; click/fill/press; actionability + auto-wait.
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -15,6 +17,14 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { resolveChunkArtifacts } from './compile.js';
+import {
+    defaultClickLocator,
+    parseActionLocator,
+    resolveLocatorInPage,
+    sleep,
+    type BrowserLocator,
+    type LocatorResolveResult,
+} from './browser-protocol.js';
 
 type Diag = { severity: string; message: string; [k: string]: unknown };
 
@@ -375,17 +385,23 @@ export async function runBrowserManifest(
                     if (r.createHits !== 1) fail(`mount must call __vmzCreate once, got ${r.createHits}`);
                     continue;
                 }
-                if (kind === 'click') {
-                    const selector = typeof a.selector === 'string' ? a.selector : 'button';
-                    // Real browser input path: Element.click in page (not linkedom).
-                    const ok = await page.evaluate((sel: string) => {
-                        const ctx = (window as any).__vmzBrowser;
-                        const el = ctx.app.querySelector(sel) as HTMLElement | null;
-                        if (!el) return false;
-                        el.click();
-                        return true;
-                    }, selector);
-                    if (!ok) fail(`click: no element for ${JSON.stringify(selector)}`);
+                if (kind === 'click' || kind === 'fill' || kind === 'press') {
+                    const parsed = parseActionLocator(a);
+                    for (const w of parsed.warnings) {
+                        diagnostics.push({ severity: 'warning', message: w });
+                    }
+                    let locator = parsed.locator;
+                    if (!locator && kind === 'click') locator = defaultClickLocator();
+                    if (!locator) {
+                        fail(`${kind}: locator or legacy selector required`);
+                        continue;
+                    }
+                    const timeoutMs = Number(a.timeoutMs) > 0 ? Number(a.timeoutMs) : 8000;
+                    const force = a.force === true;
+                    await waitForLocator(page, locator, { timeoutMs, force });
+                    if (kind === 'click') await clickTarget(page);
+                    else if (kind === 'fill') await fillTarget(page, a.value);
+                    else await pressTarget(page, a.key ?? a.value ?? 'Enter');
                     continue;
                 }
                 if (kind === 'write') {
@@ -458,6 +474,71 @@ export async function runBrowserManifest(
                 }
                 if (expect.contains != null && !text.includes(String(expect.contains))) {
                     fail(`text contains want ${JSON.stringify(expect.contains)}, got ${JSON.stringify(text)}`);
+                }
+                continue;
+            }
+            if (kind === 'visible' || kind === 'count' || kind === 'value') {
+                const fromAssert = parseActionLocator({
+                    locator: a.locator ?? expect.locator,
+                    selector: a.selector ?? expect.selector,
+                } as Record<string, unknown>);
+                for (const w of fromAssert.warnings) {
+                    diagnostics.push({ severity: 'warning', message: w });
+                }
+                if (!fromAssert.locator) {
+                    fail(`${kind}: locator or legacy selector required`);
+                    continue;
+                }
+                const timeoutMs = Number(a.timeoutMs ?? expect.timeoutMs) > 0 ? Number(a.timeoutMs ?? expect.timeoutMs) : 8000;
+                const deadline = Date.now() + timeoutMs;
+                let last: { ok?: boolean; count?: number; reason?: string; value?: string | null } = {};
+                while (Date.now() <= deadline) {
+                    last = await page.evaluate(resolveLocatorInPage, fromAssert.locator, { force: true });
+                    if (kind === 'visible') {
+                        if (Number(last?.count) >= 1) break;
+                    } else if (kind === 'count') {
+                        const want = Number(expect.equals ?? expect.count);
+                        if (Number.isFinite(want) && Number(last?.count) === want) break;
+                    } else if (kind === 'value') {
+                        if (last?.ok && last.count === 1) {
+                            const val = await page.evaluate(() => {
+                                const el = document.querySelector('[data-vmz-bh-target="1"]') as
+                                    | HTMLInputElement
+                                    | HTMLTextAreaElement
+                                    | HTMLSelectElement
+                                    | null;
+                                return el ? String(el.value) : null;
+                            });
+                            last.value = val;
+                            if (expect.equals != null && val === String(expect.equals)) break;
+                            if (expect.contains != null && val != null && val.includes(String(expect.contains))) break;
+                            if (expect.equals == null && expect.contains == null) break;
+                        }
+                    } else break;
+                    await sleep(40);
+                }
+                if (kind === 'visible') {
+                    if (!(Number(last?.count) >= 1)) {
+                        fail(`visible: ${last?.reason || 'not found'} ${JSON.stringify(fromAssert.locator)}`);
+                    }
+                } else if (kind === 'count') {
+                    const want = Number(expect.equals ?? expect.count);
+                    if (!Number.isFinite(want) || Number(last?.count) !== want) {
+                        fail(`count want ${want}, got ${last?.count} (${last?.reason || ''})`);
+                    }
+                } else if (kind === 'value') {
+                    const val =
+                        last.value ??
+                        (await page.evaluate(() => {
+                            const el = document.querySelector('[data-vmz-bh-target="1"]') as HTMLInputElement | null;
+                            return el ? String(el.value) : null;
+                        }));
+                    if (expect.equals != null && val !== String(expect.equals)) {
+                        fail(`value equals want ${JSON.stringify(expect.equals)}, got ${JSON.stringify(val)}`);
+                    }
+                    if (expect.contains != null && (val == null || !String(val).includes(String(expect.contains)))) {
+                        fail(`value contains want ${JSON.stringify(expect.contains)}, got ${JSON.stringify(val)}`);
+                    }
                 }
                 continue;
             }
@@ -598,4 +679,78 @@ export async function runBrowserManifest(
 /** Resolve chrome path (for gates / diagnostics). */
 export function resolveBrowserExecutable(): string | null {
     return findChromeExecutable();
+}
+
+/**
+ * Auto-wait until locator resolves to exactly one actionable element.
+ */
+async function waitForLocator(
+    page: { evaluate: (...args: unknown[]) => Promise<unknown> },
+    locator: BrowserLocator,
+    opts: { timeoutMs?: number; force?: boolean } = {},
+): Promise<LocatorResolveResult> {
+    const timeoutMs = Number(opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : 8000;
+    const force = opts.force === true;
+    const deadline = Date.now() + timeoutMs;
+    let last: LocatorResolveResult = {
+        ok: false,
+        count: 0,
+        actionable: false,
+        reason: 'not attempted',
+        index: -1,
+    };
+    while (Date.now() <= deadline) {
+        last = (await page.evaluate(resolveLocatorInPage, locator, { force })) as LocatorResolveResult;
+        if (last && last.ok && last.actionable && last.count === 1) return last;
+        await sleep(40);
+    }
+    throw new Error(
+        `locator timeout (${timeoutMs}ms): ${last?.reason || 'unknown'} count=${last?.count ?? 0} ${JSON.stringify(locator)}`,
+    );
+}
+
+async function clickTarget(page: { evaluate: (...args: unknown[]) => Promise<unknown> }): Promise<void> {
+    const ok = await page.evaluate(() => {
+        const el = document.querySelector('[data-vmz-bh-target="1"]') as HTMLElement | null;
+        if (!el) return false;
+        el.focus();
+        el.click();
+        return true;
+    });
+    if (!ok) throw new Error('click: resolved target missing in document');
+}
+
+async function fillTarget(
+    page: { evaluate: (...args: unknown[]) => Promise<unknown> },
+    value: unknown,
+): Promise<void> {
+    const ok = await page.evaluate((v: unknown) => {
+        const el = document.querySelector('[data-vmz-bh-target="1"]') as HTMLInputElement | HTMLTextAreaElement | null;
+        if (!el) return false;
+        el.focus();
+        const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+        if (setter) setter.call(el, String(v));
+        else el.value = String(v);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+    }, value);
+    if (!ok) throw new Error('fill: resolved target missing or not an input');
+}
+
+async function pressTarget(
+    page: { evaluate: (...args: unknown[]) => Promise<unknown> },
+    key: unknown,
+): Promise<void> {
+    const ok = await page.evaluate((k: unknown) => {
+        const el =
+            (document.querySelector('[data-vmz-bh-target="1"]') as HTMLElement | null) ||
+            (document.activeElement as HTMLElement | null);
+        if (!el) return false;
+        el.dispatchEvent(new KeyboardEvent('keydown', { key: String(k), bubbles: true }));
+        el.dispatchEvent(new KeyboardEvent('keyup', { key: String(k), bubbles: true }));
+        return true;
+    }, key);
+    if (!ok) throw new Error('press: no target/focused element');
 }

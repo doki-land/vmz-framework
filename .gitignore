@@ -20,6 +20,7 @@ coverage/
 *.node
 .vmz-releases/
 .vmz-releases-*/
+.vmz-cdn-releases/
 
 # Generated
 **/src/auto-imports.d.ts

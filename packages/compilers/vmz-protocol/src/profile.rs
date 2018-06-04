@@ -6,7 +6,12 @@
 //! delivery package/security/update proofs, and cross-host conformance
 //! (Web / Template / mixed) check documents exchanged by CLI and N-API.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use crate::check_status::CheckReportStatus;
+use crate::native_host::{ContentDeliveryMode, UpdateChannel, UpdateRollback};
+use crate::reported_diagnostic::ReportedDiagnostic;
 
 /// Umbrella profile protocol id for handshake / catalog (Browser / Mini / Native).
 pub const PROFILE_PROTOCOL: &str = "vmz.profile.protocol.v0";
@@ -147,19 +152,51 @@ pub const CONFORMANCE_SCENARIO_SCHEMA: &str = "vmz.profile.conformance_scenario.
 pub const CONFORMANCE_CHECK_SCHEMA: &str = "vmz.profile.conformance_check.v0";
 
 /// Required surface roles for web, template, and web+native mixed conformance runs.
-pub const CONFORMANCE_SURFACE_ROLES: &[&str] = &["web", "template", "mixed"];
+///
+/// Mirrors [`ConformanceSurfaceRole::ALL`] wire labels.
+pub const CONFORMANCE_SURFACE_ROLES: &[&str] = &[
+    ConformanceSurfaceRole::Web.as_str(),
+    ConformanceSurfaceRole::Template.as_str(),
+    ConformanceSurfaceRole::Mixed.as_str(),
+];
 
 /// Allowed [`DeliveryUpdatePolicy`] `channel` values.
-pub const DELIVERY_UPDATE_CHANNELS: &[&str] = &["rebuild", "store", "hot", "hybrid"];
+///
+/// Mirrors [`UpdateChannel::ALL`] wire labels.
+pub const DELIVERY_UPDATE_CHANNELS: &[&str] = &[
+    UpdateChannel::Rebuild.as_str(),
+    UpdateChannel::Store.as_str(),
+    UpdateChannel::Hot.as_str(),
+    UpdateChannel::Hybrid.as_str(),
+];
 
 /// Allowed [`DeliveryProfile`] `assetStrategy` values used in delivery proof.
-pub const DELIVERY_ASSET_STRATEGIES: &[&str] = &["bundled", "remote", "hybrid"];
+///
+/// Mirrors [`ContentDeliveryMode::ALL`] wire labels.
+pub const DELIVERY_ASSET_STRATEGIES: &[&str] = &[
+    ContentDeliveryMode::Bundled.as_str(),
+    ContentDeliveryMode::Remote.as_str(),
+    ContentDeliveryMode::Hybrid.as_str(),
+];
 
 /// Host kinds covered by cross-host lifecycle proof fixtures.
-pub const LIFECYCLE_HOST_KINDS: &[&str] = &["browser", "mini", "native"];
+///
+/// Mirrors [`LifecycleHostKind::ALL`] wire labels.
+pub const LIFECYCLE_HOST_KINDS: &[&str] = &[
+    LifecycleHostKind::Browser.as_str(),
+    LifecycleHostKind::Mini.as_str(),
+    LifecycleHostKind::Native.as_str(),
+];
 
 /// Allowed `persistenceWindow` values on [`LifecycleBinding`].
-pub const PERSISTENCE_WINDOWS: &[&str] = &["none", "suspend", "crash", "owner"];
+///
+/// Mirrors [`PersistenceWindow::ALL`] wire labels.
+pub const PERSISTENCE_WINDOWS: &[&str] = &[
+    PersistenceWindow::None.as_str(),
+    PersistenceWindow::Suspend.as_str(),
+    PersistenceWindow::Crash.as_str(),
+    PersistenceWindow::Owner.as_str(),
+];
 
 /// Hard: HostProfile failed structural or invariant validation.
 pub const DIAG_HOST_PROFILE_INVALID: &str = "vmz::profile::host_profile_invalid";
@@ -274,12 +311,655 @@ pub const DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH: &str =
 /// Reserved core id prefix; plugin contributions must not override ids under it.
 pub const CORE_ID_PREFIX: &str = "vmz.";
 
-/// Allowed SurfaceBinding.kind values (`web` / `template` / `native` / `headless`).
-pub const SURFACE_KINDS: &[&str] = &["web", "template", "native", "headless"];
+/// Allowed [`SurfaceBinding::kind`] values (closed).
+///
+/// Mirrors [`SurfaceKind::ALL`] wire labels for catalog handshake.
+pub const SURFACE_KINDS: &[&str] = &[
+    SurfaceKind::Web.as_str(),
+    SurfaceKind::Template.as_str(),
+    SurfaceKind::Native.as_str(),
+    SurfaceKind::Headless.as_str(),
+];
+
+/// Closed SurfaceBinding kind (`web` | `template` | `native` | `headless`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum SurfaceKind {
+    /// DOM / Browser Direct surface.
+    Web,
+    /// Template / Mini Program surface.
+    Template,
+    /// Native view surface.
+    Native,
+    /// Headless / test surface (no pixels).
+    Headless,
+}
+
+impl SurfaceKind {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[Self::Web, Self::Template, Self::Native, Self::Headless];
+
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Web => "web",
+            Self::Template => "template",
+            Self::Native => "native",
+            Self::Headless => "headless",
+        }
+    }
+
+    /// Parse a kebab-case surface kind label.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "web" => Some(Self::Web),
+            "template" => Some(Self::Template),
+            "native" => Some(Self::Native),
+            "headless" => Some(Self::Headless),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for SurfaceKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
 
 /// Unified lifecycle events every HostProfile must map from host-native events.
-pub const UNIFIED_LIFECYCLE_EVENTS: &[&str] =
-    &["activate", "visible", "hidden", "suspend", "resume", "recover", "dispose"];
+///
+/// **Closed** unit enum. Catalog handshake still mirrors labels via
+/// [`UNIFIED_LIFECYCLE_EVENTS`]; wire payloads use this type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum UnifiedLifecycleEvent {
+    /// Owner becomes active / attached.
+    Activate,
+    /// Owner becomes visible.
+    Visible,
+    /// Owner becomes hidden (may repeat).
+    Hidden,
+    /// Owner suspended (persistence window often `suspend`).
+    Suspend,
+    /// Owner resumed after suspend.
+    Resume,
+    /// Crash / rematerialization recovery.
+    Recover,
+    /// Owner disposed (must cancel in-flight capabilities).
+    Dispose,
+}
+
+impl UnifiedLifecycleEvent {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[
+        Self::Activate,
+        Self::Visible,
+        Self::Hidden,
+        Self::Suspend,
+        Self::Resume,
+        Self::Recover,
+        Self::Dispose,
+    ];
+
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Activate => "activate",
+            Self::Visible => "visible",
+            Self::Hidden => "hidden",
+            Self::Suspend => "suspend",
+            Self::Resume => "resume",
+            Self::Recover => "recover",
+            Self::Dispose => "dispose",
+        }
+    }
+
+    /// Parse a kebab-case lifecycle label.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "activate" => Some(Self::Activate),
+            "visible" => Some(Self::Visible),
+            "hidden" => Some(Self::Hidden),
+            "suspend" => Some(Self::Suspend),
+            "resume" => Some(Self::Resume),
+            "recover" => Some(Self::Recover),
+            "dispose" => Some(Self::Dispose),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for UnifiedLifecycleEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Resource persistence window for a lifecycle edge.
+///
+/// **Closed** unit enum (`none` | `suspend` | `crash` | `owner`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum PersistenceWindow {
+    /// No persistence across the edge.
+    #[default]
+    None,
+    /// Survives suspend / resume.
+    Suspend,
+    /// Survives crash rematerialization.
+    Crash,
+    /// Bound to owner lifetime only.
+    Owner,
+}
+
+impl PersistenceWindow {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[Self::None, Self::Suspend, Self::Crash, Self::Owner];
+
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Suspend => "suspend",
+            Self::Crash => "crash",
+            Self::Owner => "owner",
+        }
+    }
+
+    /// Parse a kebab-case persistence window label.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "none" => Some(Self::None),
+            "suspend" => Some(Self::Suspend),
+            "crash" => Some(Self::Crash),
+            "owner" => Some(Self::Owner),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for PersistenceWindow {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Host family for lifecycle / delivery / conformance slices.
+///
+/// **Closed** unit enum (`browser` | `mini` | `native`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum LifecycleHostKind {
+    /// Browser / WebSurface host.
+    Browser,
+    /// Mini Program host.
+    Mini,
+    /// Native app host.
+    Native,
+}
+
+impl LifecycleHostKind {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[Self::Browser, Self::Mini, Self::Native];
+
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Browser => "browser",
+            Self::Mini => "mini",
+            Self::Native => "native",
+        }
+    }
+
+    /// Parse a kebab-case host kind label.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "browser" => Some(Self::Browser),
+            "mini" => Some(Self::Mini),
+            "native" => Some(Self::Native),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for LifecycleHostKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed deep-link acceptance policy for [`NavigationBinding`].
+///
+/// Wire labels keep host vocabulary (`url`, `mini-path`, `app-url`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub enum DeepLinkPolicy {
+    /// Browser / history URL deep links.
+    #[serde(rename = "url")]
+    Url,
+    /// Mini Program path deep links.
+    #[serde(rename = "mini-path")]
+    MiniPath,
+    /// Native app-url / universal-link style.
+    #[serde(rename = "app-url")]
+    AppUrl,
+}
+
+impl DeepLinkPolicy {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[Self::Url, Self::MiniPath, Self::AppUrl];
+
+    /// Wire / JSON label.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Url => "url",
+            Self::MiniPath => "mini-path",
+            Self::AppUrl => "app-url",
+        }
+    }
+}
+
+impl Default for DeepLinkPolicy {
+    fn default() -> Self {
+        Self::Url
+    }
+}
+
+impl std::fmt::Display for DeepLinkPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed back-navigation policy for [`NavigationBinding`].
+///
+/// Compound / host-API labels use explicit renames (`history.back`,
+/// `navigateBack`, `native.back`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub enum BackNavigationPolicy {
+    /// Browser `history.back`.
+    #[serde(rename = "history.back")]
+    HistoryBack,
+    /// Mini Program `navigateBack`.
+    #[serde(rename = "navigateBack")]
+    NavigateBack,
+    /// Native host back gesture / button.
+    #[serde(rename = "native.back")]
+    NativeBack,
+}
+
+impl BackNavigationPolicy {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[Self::HistoryBack, Self::NavigateBack, Self::NativeBack];
+
+    /// Wire / JSON label.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::HistoryBack => "history.back",
+            Self::NavigateBack => "navigateBack",
+            Self::NativeBack => "native.back",
+        }
+    }
+}
+
+impl Default for BackNavigationPolicy {
+    fn default() -> Self {
+        Self::HistoryBack
+    }
+}
+
+impl std::fmt::Display for BackNavigationPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed state-restoration policy for [`NavigationBinding`].
+///
+/// Compound labels keep `+` (`bfcache+resume`, `page-data+resume`,
+/// `snapshot+reattach`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub enum StateRestorationPolicy {
+    /// Browser bfcache plus resume entries.
+    #[serde(rename = "bfcache+resume")]
+    BfcacheResume,
+    /// Mini page-data plus resume entries.
+    #[serde(rename = "page-data+resume")]
+    PageDataResume,
+    /// Native snapshot plus reattach.
+    #[serde(rename = "snapshot+reattach")]
+    SnapshotReattach,
+}
+
+impl StateRestorationPolicy {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[Self::BfcacheResume, Self::PageDataResume, Self::SnapshotReattach];
+
+    /// Wire / JSON label.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::BfcacheResume => "bfcache+resume",
+            Self::PageDataResume => "page-data+resume",
+            Self::SnapshotReattach => "snapshot+reattach",
+        }
+    }
+}
+
+impl Default for StateRestorationPolicy {
+    fn default() -> Self {
+        Self::BfcacheResume
+    }
+}
+
+impl std::fmt::Display for StateRestorationPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed navigation stack model for [`NavigationBinding`] / route realization.
+///
+/// **Closed** unit enum (`kebab-case`): `history` | `page-stack` | `native-stack` |
+/// `none`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum NavigationStackModel {
+    /// Browser history stack.
+    History,
+    /// Mini Program page stack.
+    PageStack,
+    /// Native navigation stack.
+    NativeStack,
+    /// No stack (routes must be empty).
+    None,
+}
+
+impl NavigationStackModel {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[Self::History, Self::PageStack, Self::NativeStack, Self::None];
+
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::History => "history",
+            Self::PageStack => "page-stack",
+            Self::NativeStack => "native-stack",
+            Self::None => "none",
+        }
+    }
+}
+
+impl std::fmt::Display for NavigationStackModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed capability execution domain for bindings / resolutions.
+///
+/// **Closed** unit enum (`kebab-case`): `server` | `native` | `client`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ExecutionDomain {
+    /// Runs on the server / `#server` side.
+    Server,
+    /// Runs in the native host process.
+    Native,
+    /// Runs in the client / WebSurface.
+    Client,
+}
+
+impl ExecutionDomain {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[Self::Server, Self::Native, Self::Client];
+
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Server => "server",
+            Self::Native => "native",
+            Self::Client => "client",
+        }
+    }
+}
+
+impl std::fmt::Display for ExecutionDomain {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed reason token for a surface assignment row.
+///
+/// **Closed** unit enum (`kebab-case`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum SurfaceAssignmentReason {
+    /// Exactly one surface survived hard filters.
+    Unique,
+    /// Deterministic tie-break among remaining candidates.
+    DeterministicTiebreak,
+    /// Region `requiresSurface` won.
+    RequiresSurface,
+    /// Delivery / region `prefersSurface` won.
+    PrefersSurface,
+    /// Delivery default surface won.
+    DefaultSurface,
+}
+
+impl SurfaceAssignmentReason {
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Unique => "unique",
+            Self::DeterministicTiebreak => "deterministic-tiebreak",
+            Self::RequiresSurface => "requires-surface",
+            Self::PrefersSurface => "prefers-surface",
+            Self::DefaultSurface => "default-surface",
+        }
+    }
+}
+
+impl std::fmt::Display for SurfaceAssignmentReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed transport kind for [`TransportBinding`].
+///
+/// **Closed** unit enum (`kebab-case`). Host examples freeze `http` /
+/// `mini-request` / `native-bridge`; new kinds require a protocol bump.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum TransportKind {
+    /// Browser / HTTP fetch transport.
+    Http,
+    /// Mini Program request transport.
+    MiniRequest,
+    /// Native typed-capability bridge transport.
+    NativeBridge,
+}
+
+impl TransportKind {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[Self::Http, Self::MiniRequest, Self::NativeBridge];
+
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Http => "http",
+            Self::MiniRequest => "mini-request",
+            Self::NativeBridge => "native-bridge",
+        }
+    }
+}
+
+impl std::fmt::Display for TransportKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed surface-role token for conformance host runs.
+///
+/// **Closed** unit enum (`kebab-case`): `web` | `template` | `mixed`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ConformanceSurfaceRole {
+    /// WebSurface-only run.
+    Web,
+    /// TemplateSurface-only run.
+    Template,
+    /// Web + Native mixed run.
+    Mixed,
+}
+
+impl ConformanceSurfaceRole {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[Self::Web, Self::Template, Self::Mixed];
+
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Web => "web",
+            Self::Template => "template",
+            Self::Mixed => "mixed",
+        }
+    }
+
+    /// Parse wire label; unknown → `None`.
+    pub fn from_str_label(s: &str) -> Option<Self> {
+        match s {
+            "web" => Some(Self::Web),
+            "template" => Some(Self::Template),
+            "mixed" => Some(Self::Mixed),
+            _ => None,
+        }
+    }
+}
+
+impl From<&str> for ConformanceSurfaceRole {
+    fn from(s: &str) -> Self {
+        Self::from_str_label(s).unwrap_or(Self::Web)
+    }
+}
+
+impl std::fmt::Display for ConformanceSurfaceRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed reject reason for [`SurfaceReject`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum SurfaceRejectReason {
+    /// Surface failed hard requirement filters.
+    RequirementsUnsatisfied,
+}
+
+impl SurfaceRejectReason {
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::RequirementsUnsatisfied => "requirements-unsatisfied",
+        }
+    }
+}
+
+impl std::fmt::Display for SurfaceRejectReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed DeliveryProfile security-policy token.
+///
+/// Wire keeps `+` in compound labels (`origin+csp`, `app-sandbox+integrity`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub enum DeliverySecurityToken {
+    /// Browser origin + CSP policy.
+    #[serde(rename = "origin+csp")]
+    OriginCsp,
+    /// Mini Program sandbox policy.
+    #[serde(rename = "mini-sandbox")]
+    MiniSandbox,
+    /// Native app sandbox with integrity.
+    #[serde(rename = "app-sandbox+integrity")]
+    AppSandboxIntegrity,
+}
+
+impl DeliverySecurityToken {
+    /// Wire / JSON label.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::OriginCsp => "origin+csp",
+            Self::MiniSandbox => "mini-sandbox",
+            Self::AppSandboxIntegrity => "app-sandbox+integrity",
+        }
+    }
+}
+
+impl Default for DeliverySecurityToken {
+    fn default() -> Self {
+        Self::OriginCsp
+    }
+}
+
+impl std::fmt::Display for DeliverySecurityToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed CSP / sandbox profile for [`DeliverySecurityPolicy`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum CspProfile {
+    /// Strict browser CSP.
+    Strict,
+    /// Mini Program sandbox profile.
+    Mini,
+    /// Native app sandbox profile.
+    App,
+}
+
+impl CspProfile {
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Strict => "strict",
+            Self::Mini => "mini",
+            Self::App => "app",
+        }
+    }
+}
+
+impl Default for CspProfile {
+    fn default() -> Self {
+        Self::Strict
+    }
+}
+
+impl std::fmt::Display for CspProfile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Unified lifecycle events every HostProfile must map from host-native events.
+///
+/// Mirrors [`UnifiedLifecycleEvent::ALL`] wire labels.
+pub const UNIFIED_LIFECYCLE_EVENTS: &[&str] = &[
+    UnifiedLifecycleEvent::Activate.as_str(),
+    UnifiedLifecycleEvent::Visible.as_str(),
+    UnifiedLifecycleEvent::Hidden.as_str(),
+    UnifiedLifecycleEvent::Suspend.as_str(),
+    UnifiedLifecycleEvent::Resume.as_str(),
+    UnifiedLifecycleEvent::Recover.as_str(),
+    UnifiedLifecycleEvent::Dispose.as_str(),
+];
 
 /// One document kind entry inside [`ProfileProtocolCatalog`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -292,6 +972,7 @@ pub struct ProfileDocumentKind {
 
 /// Handshake catalog of frozen profile schemas, diagnostics, and surface/lifecycle vocab.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ProfileProtocolCatalog {
     /// Always [`PROFILE_PROTOCOL`].
     pub schema: String,
@@ -302,13 +983,10 @@ pub struct ProfileProtocolCatalog {
     /// Stable diagnostic codes callers may see.
     pub diagnostics: Vec<String>,
     /// Allowed surface kinds (copy of [`SURFACE_KINDS`]).
-    #[serde(rename = "surfaceKinds")]
     pub surface_kinds: Vec<String>,
     /// Unified lifecycle event vocabulary (copy of [`UNIFIED_LIFECYCLE_EVENTS`]).
-    #[serde(rename = "unifiedLifecycleEvents")]
     pub unified_lifecycle_events: Vec<String>,
     /// Reserved core id prefix (copy of [`CORE_ID_PREFIX`]).
-    #[serde(rename = "coreIdPrefix")]
     pub core_id_prefix: String,
 }
 
@@ -551,68 +1229,55 @@ impl ProfileProtocolCatalog {
 }
 
 /// One diagnostic finding inside a profile / solver / executor / proof check report.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ProfileDiagnostic {
-    /// JSON-pointer or logical path to the offending node.
-    pub path: String,
-    /// Severity token (`error` / `warning` / `advice`).
-    pub severity: String,
-    /// Human-readable explanation for CLI / LSP presentation.
-    pub message: String,
-    /// Optional stable `vmz::profile::*` diagnostic code.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub code: Option<String>,
-}
+///
+/// Alias of [`ReportedDiagnostic`] — no parallel severity algebra.
+pub type ProfileDiagnostic = ReportedDiagnostic;
 
 /// Host-declared surface: driver + operation/element/event/style/a11y capabilities.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct SurfaceBinding {
     /// Always [`SURFACE_BINDING_SCHEMA`].
     pub schema: String,
     /// Stable SurfaceId used by Delivery defaultSurface and solver assignments.
-    #[serde(rename = "surfaceId")]
     pub surface_id: String,
-    /// `web` | `template` | `native` | `headless` (see [`SURFACE_KINDS`]).
-    pub kind: String,
+    /// Closed surface kind (`web` | `template` | `native` | `headless`).
+    pub kind: SurfaceKind,
     /// Driver implementation id that realizes this surface on the host.
-    #[serde(rename = "driverId")]
     pub driver_id: String,
     /// Patch / create / dispose operations this driver supports.
-    #[serde(rename = "supportedOperations", default)]
+    #[serde(default)]
     pub supported_operations: Vec<String>,
     /// Element kinds the driver can host (`element`, `text`, `native-view`, ...).
-    #[serde(rename = "supportedElementKinds", default)]
+    #[serde(default)]
     pub supported_element_kinds: Vec<String>,
     /// Event kinds the driver can emit (`click`, `tap`, `capture`, ...).
-    #[serde(rename = "supportedEventKinds", default)]
+    #[serde(default)]
     pub supported_event_kinds: Vec<String>,
     /// Style feature tokens (`css`, `wxss`, ...).
-    #[serde(rename = "supportedStyleFeatures", default)]
+    #[serde(default)]
     pub supported_style_features: Vec<String>,
     /// Accessibility feature tokens (`aria`, ...).
-    #[serde(rename = "supportedAccessibility", default)]
+    #[serde(default)]
     pub supported_accessibility: Vec<String>,
 }
 
 /// Host-declared capability: provider, domain, optional transport, permissions.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct CapabilityBinding {
     /// Always [`CAPABILITY_BINDING_SCHEMA`].
     pub schema: String,
     /// Stable CapabilityId required by regions / Delivery overrides.
-    #[serde(rename = "capabilityId")]
     pub capability_id: String,
     /// Semver range this binding satisfies (e.g. `^0`).
-    #[serde(rename = "versionRange")]
     pub version_range: String,
-    /// Where the provider runs (`server`, `native`, `client`, ...).
-    #[serde(rename = "executionDomain")]
-    pub execution_domain: String,
+    /// Where the provider runs (closed [`ExecutionDomain`]).
+    pub execution_domain: ExecutionDomain,
     /// Provider implementation id that fulfills the capability.
-    #[serde(rename = "providerId")]
     pub provider_id: String,
     /// Optional TransportId from [`HostProfile::transports`].
-    #[serde(rename = "transportId", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transport_id: Option<String>,
     /// Host-declared permission tokens the provider may request.
     #[serde(default)]
@@ -620,99 +1285,98 @@ pub struct CapabilityBinding {
 }
 
 /// Maps one host-native event onto a unified VMZ lifecycle event.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct LifecycleBinding {
     /// Always [`LIFECYCLE_BINDING_SCHEMA`].
     pub schema: String,
     /// Host-native event name (e.g. `page.onShow`, `document.attach`).
-    #[serde(rename = "hostEvent")]
+    ///
+    /// **Open** host vocabulary — plugins invent native event labels.
     pub host_event: String,
-    /// Unified lifecycle token from [`UNIFIED_LIFECYCLE_EVENTS`].
-    #[serde(rename = "vmzLifecycle")]
-    pub vmz_lifecycle: String,
+    /// Closed unified lifecycle token.
+    pub vmz_lifecycle: UnifiedLifecycleEvent,
     /// True when the host may emit this mapping more than once per owner lifetime.
-    #[serde(rename = "mayRepeat", default)]
+    #[serde(default)]
     pub may_repeat: bool,
     /// True when the host guarantees delivery of this event under normal operation.
-    #[serde(rename = "guaranteed", default)]
+    #[serde(default)]
     pub guaranteed: bool,
     /// True when crash recovery may skip this event before rematerialization.
-    #[serde(rename = "mayBeMissingAfterCrash", default)]
+    #[serde(default)]
     pub may_be_missing_after_crash: bool,
-    /// Resource persistence window: `none` | `suspend` | `crash` | `owner`.
-    #[serde(rename = "persistenceWindow", default)]
-    pub persistence_window: String,
+    /// Closed resource persistence window.
+    #[serde(default)]
+    pub persistence_window: PersistenceWindow,
     /// When true, this lifecycle edge cancels in-flight capabilities for the owner.
-    #[serde(rename = "cancelsCapabilities", default)]
+    #[serde(default)]
     pub cancels_capabilities: bool,
 }
 
 /// How the host realizes RouteIds (stack model, deep link, back, restoration).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct NavigationBinding {
     /// Always [`NAVIGATION_BINDING_SCHEMA`].
     pub schema: String,
     /// Route realizer implementation id (`vmz.nav.history`, mini page-stack, ...).
-    #[serde(rename = "routeRealizerId")]
     pub route_realizer_id: String,
-    /// `history` | `page-stack` | `native-stack` | `none`.
-    #[serde(rename = "stackModel")]
-    pub stack_model: String,
-    /// Deep-link acceptance policy token (`url`, `mini-path`, `app-url`, ...).
-    #[serde(rename = "deepLinkPolicy", default)]
-    pub deep_link_policy: String,
-    /// Back-navigation policy token (`history.back`, `navigateBack`, ...).
-    #[serde(rename = "backPolicy", default)]
-    pub back_policy: String,
-    /// State restoration policy token (`bfcache+resume`, `snapshot+reattach`, ...).
-    #[serde(rename = "stateRestorationPolicy", default)]
-    pub state_restoration_policy: String,
+    /// Stack model (closed [`NavigationStackModel`]).
+    pub stack_model: NavigationStackModel,
+    /// Deep-link acceptance policy (closed [`DeepLinkPolicy`]).
+    #[serde(default)]
+    pub deep_link_policy: DeepLinkPolicy,
+    /// Back-navigation policy (closed [`BackNavigationPolicy`]).
+    #[serde(default)]
+    pub back_policy: BackNavigationPolicy,
+    /// State restoration policy (closed [`StateRestorationPolicy`]).
+    #[serde(default)]
+    pub state_restoration_policy: StateRestorationPolicy,
 }
 
 /// Named transport used by capability providers (http, mini-request, native-bridge).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct TransportBinding {
     /// Always [`TRANSPORT_BINDING_SCHEMA`].
     pub schema: String,
     /// Stable TransportId referenced by CapabilityBinding.transportId.
-    #[serde(rename = "transportId")]
     pub transport_id: String,
-    /// Transport kind token (`http`, `mini-request`, `native-bridge`, ...).
-    pub kind: String,
+    /// Transport kind (closed [`TransportKind`]).
+    pub kind: TransportKind,
     /// Endpoint scheme (`#server`, `vmz-native`, ...).
-    #[serde(rename = "endpointScheme", default)]
+    #[serde(default)]
     pub endpoint_scheme: String,
 }
 
 /// Hard limits and digest requirements imposed by the host.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct HostConstraints {
     /// Always [`HOST_CONSTRAINTS_SCHEMA`].
     pub schema: String,
     /// Optional upper bound on concurrently assigned surfaces.
-    #[serde(rename = "maxSurfaces", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_surfaces: Option<u32>,
     /// When false, driver selection is compile-time only (no runtime switch).
-    #[serde(rename = "allowsRuntimeDriverSelect", default)]
+    #[serde(default)]
     pub allows_runtime_driver_select: bool,
     /// When true, Delivery / proof assembly must carry a ResolutionDigest.
-    #[serde(rename = "requiresResolutionDigest", default)]
+    #[serde(default)]
     pub requires_resolution_digest: bool,
 }
 
 /// Complete host contract: surfaces, capabilities, lifecycle, navigation, transports.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct HostProfile {
     /// Always [`HOST_PROFILE_SCHEMA`].
     pub schema: String,
     /// Profile document generation (`0` for this freeze).
-    #[serde(rename = "schemaVersion")]
     pub schema_version: String,
     /// Stable HostId referenced by DeliveryProfile.hostProfileRef.
-    #[serde(rename = "hostId")]
     pub host_id: String,
     /// Host implementation version included in ResolutionDigest.
-    #[serde(rename = "hostVersion")]
     pub host_version: String,
     /// Surfaces this host can assign to regions.
     #[serde(default)]
@@ -734,23 +1398,41 @@ pub struct HostProfile {
 
 impl HostProfile {
     /// Build LifecycleBinding rows from host-event to unified-lifecycle pairs.
+    ///
+    /// Unknown lifecycle labels are skipped (closed vocabulary).
     pub fn lifecycle_from_pairs(pairs: &[(&str, &str)]) -> Vec<LifecycleBinding> {
         pairs
             .iter()
-            .map(|(host_event, vmz)| LifecycleBinding {
-                schema: LIFECYCLE_BINDING_SCHEMA.into(),
-                host_event: (*host_event).into(),
-                vmz_lifecycle: (*vmz).into(),
-                may_repeat: matches!(*vmz, "visible" | "hidden" | "suspend" | "resume"),
-                guaranteed: *vmz != "recover",
-                may_be_missing_after_crash: matches!(*vmz, "recover" | "suspend" | "resume"),
-                persistence_window: match *vmz {
-                    "suspend" | "resume" => "suspend".into(),
-                    "recover" => "crash".into(),
-                    "dispose" => "none".into(),
-                    _ => "owner".into(),
-                },
-                cancels_capabilities: *vmz == "dispose",
+            .filter_map(|(host_event, vmz)| {
+                let ev = UnifiedLifecycleEvent::parse(vmz)?;
+                Some(LifecycleBinding {
+                    schema: LIFECYCLE_BINDING_SCHEMA.into(),
+                    host_event: (*host_event).into(),
+                    vmz_lifecycle: ev,
+                    may_repeat: matches!(
+                        ev,
+                        UnifiedLifecycleEvent::Visible
+                            | UnifiedLifecycleEvent::Hidden
+                            | UnifiedLifecycleEvent::Suspend
+                            | UnifiedLifecycleEvent::Resume
+                    ),
+                    guaranteed: ev != UnifiedLifecycleEvent::Recover,
+                    may_be_missing_after_crash: matches!(
+                        ev,
+                        UnifiedLifecycleEvent::Recover
+                            | UnifiedLifecycleEvent::Suspend
+                            | UnifiedLifecycleEvent::Resume
+                    ),
+                    persistence_window: match ev {
+                        UnifiedLifecycleEvent::Suspend | UnifiedLifecycleEvent::Resume => {
+                            PersistenceWindow::Suspend
+                        }
+                        UnifiedLifecycleEvent::Recover => PersistenceWindow::Crash,
+                        UnifiedLifecycleEvent::Dispose => PersistenceWindow::None,
+                        _ => PersistenceWindow::Owner,
+                    },
+                    cancels_capabilities: ev == UnifiedLifecycleEvent::Dispose,
+                })
             })
             .collect()
     }
@@ -765,7 +1447,7 @@ impl HostProfile {
             surfaces: vec![SurfaceBinding {
                 schema: SURFACE_BINDING_SCHEMA.into(),
                 surface_id: "vmz.surface.web.main".into(),
-                kind: "web".into(),
+                kind: SurfaceKind::Web,
                 driver_id: "vmz.driver.web-dom".into(),
                 supported_operations: vec![
                     "CreateNode".into(),
@@ -782,7 +1464,7 @@ impl HostProfile {
                 schema: CAPABILITY_BINDING_SCHEMA.into(),
                 capability_id: "vmz.capability.server.rpc".into(),
                 version_range: "^0".into(),
-                execution_domain: "server".into(),
+                execution_domain: ExecutionDomain::Server,
                 provider_id: "vmz.provider.browser.fetch".into(),
                 transport_id: Some("vmz.transport.http".into()),
                 permissions: vec![],
@@ -799,15 +1481,15 @@ impl HostProfile {
             navigation: NavigationBinding {
                 schema: NAVIGATION_BINDING_SCHEMA.into(),
                 route_realizer_id: "vmz.nav.history".into(),
-                stack_model: "history".into(),
-                deep_link_policy: "url".into(),
-                back_policy: "history.back".into(),
-                state_restoration_policy: "bfcache+resume".into(),
+                stack_model: NavigationStackModel::History,
+                deep_link_policy: DeepLinkPolicy::Url,
+                back_policy: BackNavigationPolicy::HistoryBack,
+                state_restoration_policy: StateRestorationPolicy::BfcacheResume,
             },
             transports: vec![TransportBinding {
                 schema: TRANSPORT_BINDING_SCHEMA.into(),
                 transport_id: "vmz.transport.http".into(),
-                kind: "http".into(),
+                kind: TransportKind::Http,
                 endpoint_scheme: "#server".into(),
             }],
             constraints: HostConstraints {
@@ -829,7 +1511,7 @@ impl HostProfile {
             surfaces: vec![SurfaceBinding {
                 schema: SURFACE_BINDING_SCHEMA.into(),
                 surface_id: "vmz.surface.template.page".into(),
-                kind: "template".into(),
+                kind: SurfaceKind::Template,
                 driver_id: "vmz.driver.mini-template".into(),
                 supported_operations: vec![
                     "CreateNode".into(),
@@ -846,7 +1528,7 @@ impl HostProfile {
                 schema: CAPABILITY_BINDING_SCHEMA.into(),
                 capability_id: "vmz.capability.server.rpc".into(),
                 version_range: "^0".into(),
-                execution_domain: "server".into(),
+                execution_domain: ExecutionDomain::Server,
                 provider_id: "vmz.provider.mini.request".into(),
                 transport_id: Some("vmz.transport.mini-request".into()),
                 permissions: vec![],
@@ -863,15 +1545,15 @@ impl HostProfile {
             navigation: NavigationBinding {
                 schema: NAVIGATION_BINDING_SCHEMA.into(),
                 route_realizer_id: "vmz.nav.mini-page-stack".into(),
-                stack_model: "page-stack".into(),
-                deep_link_policy: "mini-path".into(),
-                back_policy: "navigateBack".into(),
-                state_restoration_policy: "page-data+resume".into(),
+                stack_model: NavigationStackModel::PageStack,
+                deep_link_policy: DeepLinkPolicy::MiniPath,
+                back_policy: BackNavigationPolicy::NavigateBack,
+                state_restoration_policy: StateRestorationPolicy::PageDataResume,
             },
             transports: vec![TransportBinding {
                 schema: TRANSPORT_BINDING_SCHEMA.into(),
                 transport_id: "vmz.transport.mini-request".into(),
-                kind: "mini-request".into(),
+                kind: TransportKind::MiniRequest,
                 endpoint_scheme: "#server".into(),
             }],
             constraints: HostConstraints {
@@ -894,7 +1576,7 @@ impl HostProfile {
                 SurfaceBinding {
                     schema: SURFACE_BINDING_SCHEMA.into(),
                     surface_id: "vmz.surface.web.form".into(),
-                    kind: "web".into(),
+                    kind: SurfaceKind::Web,
                     driver_id: "vmz.driver.webview".into(),
                     supported_operations: vec![
                         "CreateNode".into(),
@@ -909,7 +1591,7 @@ impl HostProfile {
                 SurfaceBinding {
                     schema: SURFACE_BINDING_SCHEMA.into(),
                     surface_id: "vmz.surface.native.camera".into(),
-                    kind: "native".into(),
+                    kind: SurfaceKind::Native,
                     driver_id: "vmz.driver.native-camera".into(),
                     supported_operations: vec!["MountSurface".into(), "DisposeRegion".into()],
                     supported_element_kinds: vec!["native-view".into()],
@@ -920,7 +1602,7 @@ impl HostProfile {
                 SurfaceBinding {
                     schema: SURFACE_BINDING_SCHEMA.into(),
                     surface_id: "vmz.surface.headless.upload".into(),
-                    kind: "headless".into(),
+                    kind: SurfaceKind::Headless,
                     driver_id: "vmz.driver.headless-task".into(),
                     supported_operations: vec!["ActivateTask".into(), "DisposeRegion".into()],
                     supported_element_kinds: vec![],
@@ -933,7 +1615,7 @@ impl HostProfile {
                 schema: CAPABILITY_BINDING_SCHEMA.into(),
                 capability_id: "vmz.capability.camera.capture".into(),
                 version_range: "^0".into(),
-                execution_domain: "native".into(),
+                execution_domain: ExecutionDomain::Native,
                 provider_id: "vmz.provider.native.camera".into(),
                 transport_id: Some("vmz.transport.native-bridge".into()),
                 permissions: vec!["camera".into()],
@@ -950,15 +1632,15 @@ impl HostProfile {
             navigation: NavigationBinding {
                 schema: NAVIGATION_BINDING_SCHEMA.into(),
                 route_realizer_id: "vmz.nav.native-stack".into(),
-                stack_model: "native-stack".into(),
-                deep_link_policy: "app-url".into(),
-                back_policy: "native.back".into(),
-                state_restoration_policy: "snapshot+reattach".into(),
+                stack_model: NavigationStackModel::NativeStack,
+                deep_link_policy: DeepLinkPolicy::AppUrl,
+                back_policy: BackNavigationPolicy::NativeBack,
+                state_restoration_policy: StateRestorationPolicy::SnapshotReattach,
             },
             transports: vec![TransportBinding {
                 schema: TRANSPORT_BINDING_SCHEMA.into(),
                 transport_id: "vmz.transport.native-bridge".into(),
-                kind: "native-bridge".into(),
+                kind: TransportKind::NativeBridge,
                 endpoint_scheme: "vmz-native".into(),
             }],
             constraints: HostConstraints {
@@ -976,23 +1658,55 @@ impl HostProfile {
     }
 }
 
+/// Closed digest algorithm for [`ResolutionDigest`].
+///
+/// Algebraic fixtures currently freeze a single wire label `sha256`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum DigestAlgorithm {
+    /// SHA-256 hex digest (algebraic; not packaging crypto).
+    Sha256,
+}
+
+impl DigestAlgorithm {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[Self::Sha256];
+
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Sha256 => "sha256",
+        }
+    }
+}
+
+impl Default for DigestAlgorithm {
+    fn default() -> Self {
+        Self::Sha256
+    }
+}
+
+impl std::fmt::Display for DigestAlgorithm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// Digest binding a HostProfile identity to a DeliveryId (algebraic, not packaging crypto).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ResolutionDigest {
     /// Always [`RESOLUTION_DIGEST_SCHEMA`].
     pub schema: String,
-    /// Digest algorithm token (fixtures use `sha256`).
-    pub algorithm: String,
+    /// Digest algorithm (closed [`DigestAlgorithm`]).
+    pub algorithm: DigestAlgorithm,
     /// Canonical digest string for the Host+Delivery pair.
     pub value: String,
     /// HostId copied from the bound HostProfile.
-    #[serde(rename = "hostProfileId")]
     pub host_profile_id: String,
     /// HostVersion copied from the bound HostProfile.
-    #[serde(rename = "hostVersion")]
     pub host_version: String,
     /// DeliveryId this digest seals.
-    #[serde(rename = "deliveryId")]
     pub delivery_id: String,
 }
 
@@ -1001,7 +1715,7 @@ impl ResolutionDigest {
     pub fn for_pair(host: &HostProfile, delivery_id: &str, value: impl Into<String>) -> Self {
         Self {
             schema: RESOLUTION_DIGEST_SCHEMA.into(),
-            algorithm: "sha256".into(),
+            algorithm: DigestAlgorithm::Sha256,
             value: value.into(),
             host_profile_id: host.host_id.clone(),
             host_version: host.host_version.clone(),
@@ -1012,44 +1726,41 @@ impl ResolutionDigest {
 
 /// Delivery assembly bound to one HostProfile: routes, surfaces, assets, policies, digest.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct DeliveryProfile {
     /// Always [`DELIVERY_PROFILE_SCHEMA`].
     pub schema: String,
     /// Delivery document generation (`0` for this freeze).
-    #[serde(rename = "schemaVersion")]
     pub schema_version: String,
     /// Stable DeliveryId unique within the workspace / catalog.
-    #[serde(rename = "deliveryId")]
     pub delivery_id: String,
     /// HostId of the HostProfile this delivery must resolve against.
-    #[serde(rename = "hostProfileRef")]
     pub host_profile_ref: String,
     /// Entry RouteIds included in this delivery package.
-    #[serde(rename = "entryRoutes", default)]
+    #[serde(default)]
     pub entry_routes: Vec<String>,
     /// Default SurfaceId when the solver has no requires/prefers edge.
-    #[serde(rename = "defaultSurface")]
     pub default_surface: String,
     /// Soft surface selection policy tokens (prefer-default, web-default;native-camera, ...).
-    #[serde(rename = "surfacePolicies", default)]
+    #[serde(default)]
     pub surface_policies: Vec<String>,
     /// Capability override tokens applied after HostProfile bindings.
-    #[serde(rename = "capabilityOverrides", default)]
+    #[serde(default)]
     pub capability_overrides: Vec<String>,
-    /// Asset strategy: `bundled` | `remote` | `hybrid` (see [`DELIVERY_ASSET_STRATEGIES`]).
-    #[serde(rename = "assetStrategy", default)]
-    pub asset_strategy: String,
-    /// Update channel token (`rebuild`, `store`, `hot`, `hybrid`).
-    #[serde(rename = "updatePolicy", default)]
-    pub update_policy: String,
-    /// Security policy token (`origin+csp`, `mini-sandbox`, ...).
-    #[serde(rename = "securityPolicy", default)]
-    pub security_policy: String,
+    /// Asset strategy (closed [`ContentDeliveryMode`]).
+    #[serde(default)]
+    pub asset_strategy: ContentDeliveryMode,
+    /// Update channel (closed [`UpdateChannel`]).
+    #[serde(default)]
+    pub update_policy: UpdateChannel,
+    /// Security policy token (closed [`DeliverySecurityToken`]).
+    #[serde(default)]
+    pub security_policy: DeliverySecurityToken,
     /// Free-form package constraint labels (main-package, store-bundle, ...).
-    #[serde(rename = "packageConstraints", default)]
+    #[serde(default)]
     pub package_constraints: Vec<String>,
     /// Optional sealed Host+Delivery digest (required when host asks for it).
-    #[serde(rename = "resolutionDigest", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resolution_digest: Option<ResolutionDigest>,
 }
 
@@ -1067,9 +1778,9 @@ impl DeliveryProfile {
             default_surface: "vmz.surface.web.main".into(),
             surface_policies: vec!["prefer-default".into()],
             capability_overrides: vec![],
-            asset_strategy: "bundled".into(),
-            update_policy: "rebuild".into(),
-            security_policy: "origin+csp".into(),
+            asset_strategy: ContentDeliveryMode::Bundled,
+            update_policy: UpdateChannel::Rebuild,
+            security_policy: DeliverySecurityToken::OriginCsp,
             package_constraints: vec![],
             resolution_digest: Some(ResolutionDigest::for_pair(host, delivery_id, digest_value)),
         }
@@ -1088,9 +1799,9 @@ impl DeliveryProfile {
             default_surface: "vmz.surface.template.page".into(),
             surface_policies: vec!["prefer-default".into()],
             capability_overrides: vec![],
-            asset_strategy: "bundled".into(),
-            update_policy: "store".into(),
-            security_policy: "mini-sandbox".into(),
+            asset_strategy: ContentDeliveryMode::Bundled,
+            update_policy: UpdateChannel::Store,
+            security_policy: DeliverySecurityToken::MiniSandbox,
             package_constraints: vec!["main-package".into()],
             resolution_digest: Some(ResolutionDigest::for_pair(host, delivery_id, digest_value)),
         }
@@ -1109,9 +1820,9 @@ impl DeliveryProfile {
             default_surface: "vmz.surface.web.form".into(),
             surface_policies: vec!["web-default;native-camera".into()],
             capability_overrides: vec![],
-            asset_strategy: "hybrid".into(),
-            update_policy: "store".into(),
-            security_policy: "app-sandbox+integrity".into(),
+            asset_strategy: ContentDeliveryMode::Hybrid,
+            update_policy: UpdateChannel::Store,
+            security_policy: DeliverySecurityToken::AppSandboxIntegrity,
             package_constraints: vec!["store-bundle".into()],
             resolution_digest: Some(ResolutionDigest::for_pair(host, delivery_id, digest_value)),
         }
@@ -1125,20 +1836,20 @@ impl DeliveryProfile {
 
 /// Namespaced profile contribution (plugin may only add ids under its namespace).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ProfileContribution {
     /// Always [`PROFILE_CONTRIBUTION_SCHEMA`].
     pub schema: String,
     /// Plugin namespace prefix required on all contributed ids.
-    #[serde(rename = "pluginNamespace")]
     pub plugin_namespace: String,
     /// SurfaceIds added by the plugin (must be namespaced).
-    #[serde(rename = "surfaceIds", default)]
+    #[serde(default)]
     pub surface_ids: Vec<String>,
     /// CapabilityIds added by the plugin (must be namespaced).
-    #[serde(rename = "capabilityIds", default)]
+    #[serde(default)]
     pub capability_ids: Vec<String>,
     /// ProviderIds added by the plugin (must be namespaced).
-    #[serde(rename = "providerIds", default)]
+    #[serde(default)]
     pub provider_ids: Vec<String>,
 }
 
@@ -1168,16 +1879,15 @@ pub fn canonical_digest_value(host: &HostProfile, delivery_id: &str) -> String {
 
 /// Structured profile check result: host + delivery (+ optional contribution) + diagnostics.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ProfileCheckReport {
     /// Always [`PROFILE_CHECK_SCHEMA`].
     pub schema: String,
     /// Frozen protocol catalog echoed for consumers.
     pub catalog: ProfileProtocolCatalog,
     /// Host under check.
-    #[serde(rename = "hostProfile")]
     pub host_profile: HostProfile,
     /// Delivery under check (must ref the host).
-    #[serde(rename = "deliveryProfile")]
     pub delivery_profile: DeliveryProfile,
     /// Optional plugin contribution validated for namespace rules.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1185,8 +1895,8 @@ pub struct ProfileCheckReport {
     /// Findings from structural / digest / contribution validation.
     #[serde(default)]
     pub diagnostics: Vec<ProfileDiagnostic>,
-    /// Aggregate status (`pass` / `fail`).
-    pub status: String,
+    /// Aggregate status ([`CheckReportStatus`]).
+    pub status: CheckReportStatus,
 }
 
 impl ProfileCheckReport {
@@ -1198,29 +1908,30 @@ impl ProfileCheckReport {
 
 /// Region surface requirements inferred from VPG (operations, kinds, events, co-location).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct SurfaceRequirements {
     /// Always [`SURFACE_REQUIREMENTS_SCHEMA`].
     pub schema: String,
     /// Operations the assigned surface driver must support.
-    #[serde(rename = "requiredOperations", default)]
+    #[serde(default)]
     pub required_operations: Vec<String>,
     /// Element kinds the surface must host.
-    #[serde(rename = "requiredElementKinds", default)]
+    #[serde(default)]
     pub required_element_kinds: Vec<String>,
     /// Event kinds the surface must emit.
-    #[serde(rename = "requiredEvents", default)]
+    #[serde(default)]
     pub required_events: Vec<String>,
     /// Style feature tokens required of the surface.
-    #[serde(rename = "requiredStyleFeatures", default)]
+    #[serde(default)]
     pub required_style_features: Vec<String>,
     /// Accessibility feature tokens required of the surface.
-    #[serde(rename = "requiredAccessibility", default)]
+    #[serde(default)]
     pub required_accessibility: Vec<String>,
     /// CapabilityIds that must resolve alongside this surface assignment.
-    #[serde(rename = "requiredCapabilities", default)]
+    #[serde(default)]
     pub required_capabilities: Vec<String>,
     /// Co-location constraint tokens (same-surface / split-forbidden, ...).
-    #[serde(rename = "coLocationConstraints", default)]
+    #[serde(default)]
     pub co_location_constraints: Vec<String>,
 }
 
@@ -1246,50 +1957,50 @@ impl SurfaceRequirements {
 
 /// One capability demand the solver must resolve to a Host CapabilityBinding.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct CapabilityRequirement {
     /// Always [`CAPABILITY_REQUIREMENT_SCHEMA`].
     pub schema: String,
     /// CapabilityId that must match a host binding.
-    #[serde(rename = "capabilityId")]
     pub capability_id: String,
     /// Required semver range (empty means any).
-    #[serde(rename = "versionRange", default)]
+    #[serde(default)]
     pub version_range: String,
     /// Permissions that must be declared on the resolved binding.
     #[serde(default)]
     pub permissions: Vec<String>,
     /// Optional owning RegionId for placement / co-location.
-    #[serde(rename = "regionId", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub region_id: Option<String>,
 }
 
 /// One region solve unit: requirements plus optional requires/prefers surface edges.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct RegionSolveRequest {
     /// RegionId whose surface assignment is requested.
-    #[serde(rename = "regionId")]
     pub region_id: String,
     /// Optional RouteId this region belongs to.
-    #[serde(rename = "routeId", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub route_id: Option<String>,
     /// Hard surface capability requirements for this region.
     pub requirements: SurfaceRequirements,
     /// Graph edge `requiresSurface` - hard constraint SurfaceId.
-    #[serde(rename = "requiresSurface", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requires_surface: Option<String>,
     /// Graph edge `prefersSurface` - soft ranking SurfaceId.
-    #[serde(rename = "prefersSurface", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prefers_surface: Option<String>,
 }
 
 /// One route the solver must realize under the host navigation binding.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct RouteSolveRequest {
     /// RouteId to realize.
-    #[serde(rename = "routeId")]
     pub route_id: String,
     /// True when this route is a Delivery entry route.
-    #[serde(rename = "isEntry", default)]
+    #[serde(default)]
     pub is_entry: bool,
 }
 
@@ -1333,31 +2044,29 @@ impl ProfileSolverInput {
 
 /// One surface rejected while assigning a region (with unsatisfied requirement tokens).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct SurfaceReject {
     /// SurfaceId that failed the filter.
-    #[serde(rename = "surfaceId")]
     pub surface_id: String,
-    /// Short reject reason token.
-    pub reason: String,
+    /// Short reject reason (closed [`SurfaceRejectReason`]).
+    pub reason: SurfaceRejectReason,
     /// Requirement tokens that remained unsatisfied.
-    #[serde(rename = "unsatisfied", default)]
+    #[serde(default)]
     pub unsatisfied: Vec<String>,
 }
 
 /// Final surface assignment for one region, including reject audit trail.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct SurfaceAssignment {
     /// RegionId that received the assignment.
-    #[serde(rename = "regionId")]
     pub region_id: String,
     /// Chosen SurfaceId.
-    #[serde(rename = "surfaceId")]
     pub surface_id: String,
     /// DriverId from the chosen SurfaceBinding.
-    #[serde(rename = "driverId")]
     pub driver_id: String,
-    /// `unique` | `deterministic_tiebreak` | `requires_surface` | `prefers_surface` | `default_surface`
-    pub reason: String,
+    /// Assignment reason (closed [`SurfaceAssignmentReason`]).
+    pub reason: SurfaceAssignmentReason,
     /// Surfaces considered and rejected for this region.
     #[serde(default)]
     pub rejected: Vec<SurfaceReject>,
@@ -1374,21 +2083,19 @@ pub struct SurfaceAssignmentTable {
 
 /// Resolved capability placement: provider, domain, optional transport and region.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct CapabilityResolution {
     /// CapabilityId that was resolved.
-    #[serde(rename = "capabilityId")]
     pub capability_id: String,
     /// ProviderId chosen from HostProfile bindings.
-    #[serde(rename = "providerId")]
     pub provider_id: String,
-    /// Execution domain of the chosen provider.
-    #[serde(rename = "executionDomain")]
-    pub execution_domain: String,
+    /// Execution domain of the chosen provider (closed [`ExecutionDomain`]).
+    pub execution_domain: ExecutionDomain,
     /// Optional TransportId used by the provider.
-    #[serde(rename = "transportId", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transport_id: Option<String>,
     /// Optional RegionId this resolution is scoped to.
-    #[serde(rename = "regionId", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub region_id: Option<String>,
 }
 
@@ -1403,21 +2110,19 @@ pub struct CapabilityResolutionTable {
 
 /// How one RouteId is realized under the host navigation binding.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct RouteRealization {
     /// RouteId realized.
-    #[serde(rename = "routeId")]
     pub route_id: String,
     /// Route realizer id from NavigationBinding.
-    #[serde(rename = "routeRealizerId")]
     pub route_realizer_id: String,
-    /// Stack model copied from NavigationBinding.
-    #[serde(rename = "stackModel")]
-    pub stack_model: String,
+    /// Stack model copied from NavigationBinding (closed [`NavigationStackModel`]).
+    pub stack_model: NavigationStackModel,
     /// Optional RegionId that owns the route lifetime.
-    #[serde(rename = "owningLifetimeRegion", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub owning_lifetime_region: Option<String>,
     /// SurfaceIds attached while the route is active.
-    #[serde(rename = "surfaceIds", default)]
+    #[serde(default)]
     pub surface_ids: Vec<String>,
 }
 
@@ -1432,49 +2137,43 @@ pub struct RouteRealizationTable {
 
 /// Resolution / assembly result - refs stable ids only (not a second IR).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct HostResolutionManifest {
     /// Always [`HOST_RESOLUTION_MANIFEST_SCHEMA`].
     pub schema: String,
     /// HostId that was solved against.
-    #[serde(rename = "hostProfileId")]
     pub host_profile_id: String,
     /// DeliveryId that was solved against.
-    #[serde(rename = "deliveryId")]
     pub delivery_id: String,
     /// Region to surface assignments.
-    #[serde(rename = "surfaceAssignments")]
     pub surface_assignments: SurfaceAssignmentTable,
     /// Capability to provider resolutions.
-    #[serde(rename = "capabilityResolutions")]
     pub capability_resolutions: CapabilityResolutionTable,
     /// Route realizations under host navigation.
-    #[serde(rename = "routeRealizations")]
     pub route_realizations: RouteRealizationTable,
 }
 
 /// Solver check result: host + delivery + input + manifest + diagnostics.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ProfileSolverCheckReport {
     /// Always [`SOLVER_CHECK_SCHEMA`].
     pub schema: String,
     /// Frozen protocol catalog echoed for consumers.
     pub catalog: ProfileProtocolCatalog,
     /// Host used for the solve.
-    #[serde(rename = "hostProfile")]
     pub host_profile: HostProfile,
     /// Delivery used for the solve.
-    #[serde(rename = "deliveryProfile")]
     pub delivery_profile: DeliveryProfile,
     /// Algebraic solver input (stable ids only).
-    #[serde(rename = "solverInput")]
     pub solver_input: ProfileSolverInput,
     /// Assembled resolution manifest.
     pub manifest: HostResolutionManifest,
     /// Solver findings (no-match, ambiguous, unrealizable, ...).
     #[serde(default)]
     pub diagnostics: Vec<ProfileDiagnostic>,
-    /// Aggregate status (`pass` / `fail`).
-    pub status: String,
+    /// Aggregate status ([`CheckReportStatus`]).
+    pub status: CheckReportStatus,
 }
 
 impl ProfileSolverCheckReport {
@@ -1486,22 +2185,19 @@ impl ProfileSolverCheckReport {
 
 /// Envelope header shared by Event / Patch / Capability / lifecycle envelopes.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ExecutorEnvelopeHeader {
     /// Always [`EXECUTOR_ENVELOPE_HEADER_SCHEMA`].
     pub schema: String,
     /// ApplicationId owning this envelope.
-    #[serde(rename = "applicationId")]
     pub application_id: String,
     /// Plan version the executor must match.
-    #[serde(rename = "planVersion")]
     pub plan_version: String,
     /// Monotonic generation; stale envelopes must be discarded.
     pub generation: u64,
     /// TransactionId tying event / patches / dispose together.
-    #[serde(rename = "transactionId")]
     pub transaction_id: String,
     /// RegionId this envelope applies to.
-    #[serde(rename = "regionId")]
     pub region_id: String,
 }
 
@@ -1517,136 +2213,137 @@ impl ExecutorEnvelopeHeader {
 
 /// Surface-sourced event entering the unified executor.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct EventEnvelope {
     /// Always [`EVENT_ENVELOPE_SCHEMA`].
     pub schema: String,
     /// Shared identity / generation header.
     pub header: ExecutorEnvelopeHeader,
     /// Stable EventId for causal replay.
-    #[serde(rename = "eventId")]
     pub event_id: String,
     /// Event kind token (`click`, `camera`, ...).
-    #[serde(rename = "eventKind", default)]
+    #[serde(default)]
     pub event_kind: String,
     /// SurfaceId that emitted the event.
-    #[serde(rename = "sourceSurfaceId", default)]
+    #[serde(default)]
     pub source_surface_id: String,
 }
 
 /// One logical write transaction spanning bindings across surfaces.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ExecutorTransaction {
     /// Always [`EXECUTOR_TRANSACTION_SCHEMA`].
     pub schema: String,
     /// TransactionId shared with envelopes / patches.
-    #[serde(rename = "transactionId")]
     pub transaction_id: String,
     /// Generation at which this transaction was opened.
     pub generation: u64,
     /// BindingIds affected by this write.
-    #[serde(rename = "affectedBindings", default)]
+    #[serde(default)]
     pub affected_bindings: Vec<String>,
     /// Foul when true: one logical write split into per-surface transactions.
-    #[serde(rename = "splitPerSurface", default)]
+    #[serde(default)]
     pub split_per_surface: bool,
 }
 
 /// Per-surface patch batch under one transaction / generation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct PatchBatch {
     /// Always [`PATCH_BATCH_SCHEMA`].
     pub schema: String,
     /// Shared identity / generation header.
     pub header: ExecutorEnvelopeHeader,
     /// Target SurfaceId for these patches.
-    #[serde(rename = "surfaceId")]
     pub surface_id: String,
     /// BindingIds patched in this batch.
-    #[serde(rename = "bindingIds", default)]
+    #[serde(default)]
     pub binding_ids: Vec<String>,
     /// Foul when true: private runtime objects crossed the surface boundary.
-    #[serde(rename = "carriesPrivateRuntimeObject", default)]
+    #[serde(default)]
     pub carries_private_runtime_object: bool,
 }
 
 /// Algebraic fact about who owns a state slot (surface drivers must not own business state).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct StateSlotFact {
     /// SlotId under check.
-    #[serde(rename = "slotId")]
     pub slot_id: String,
     /// RegionId that owns the business state.
-    #[serde(rename = "ownerRegionId")]
     pub owner_region_id: String,
     /// Foul when true: surface driver claims business-state ownership (cache only).
-    #[serde(rename = "surfaceDriverOwnsBusinessState", default)]
+    #[serde(default)]
     pub surface_driver_owns_business_state: bool,
 }
 
 /// Authoritative region terminate; only DisposeRegion may cancel foreign-surface tasks.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct DisposeRegion {
     /// Always [`DISPOSE_REGION_SCHEMA`].
     pub schema: String,
     /// Shared identity / generation header.
     pub header: ExecutorEnvelopeHeader,
     /// When true, dispose cancels in-flight capabilities for the owner.
-    #[serde(rename = "cancelsCapabilities", default)]
+    #[serde(default)]
     pub cancels_capabilities: bool,
     /// Must be true for terminate to be authoritative across surfaces.
-    #[serde(rename = "isAuthoritativeTerminate", default)]
+    #[serde(default)]
     pub is_authoritative_terminate: bool,
 }
 
 /// Cancel request that must propagate to listed capability providers.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct CancelRequest {
     /// Always [`CANCEL_REQUEST_SCHEMA`].
     pub schema: String,
     /// Shared identity / generation header.
     pub header: ExecutorEnvelopeHeader,
     /// CapabilityIds that must receive cancel.
-    #[serde(rename = "capabilityIds", default)]
+    #[serde(default)]
     pub capability_ids: Vec<String>,
     /// True when cancel was observed at each listed provider.
-    #[serde(rename = "propagated", default)]
+    #[serde(default)]
     pub propagated: bool,
 }
 
 /// Algebraic Unified Executor scenario fixture (no real Surface adapters).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ExecutorScenario {
     /// Always [`EXECUTOR_SCENARIO_SCHEMA`].
     pub schema: String,
     /// Executor currentGeneration used for stale checks.
-    #[serde(rename = "currentGeneration")]
     pub current_generation: u64,
     /// Ownership facts for slots under the scenario.
-    #[serde(rename = "stateSlots", default)]
+    #[serde(default)]
     pub state_slots: Vec<StateSlotFact>,
     /// Optional incoming event that opens the transaction.
-    #[serde(rename = "incomingEvent", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub incoming_event: Option<EventEnvelope>,
     /// Optional transaction opened for the event.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transaction: Option<ExecutorTransaction>,
     /// Patch batches emitted under the transaction.
-    #[serde(rename = "patchBatches", default)]
+    #[serde(default)]
     pub patch_batches: Vec<PatchBatch>,
     /// Optional authoritative dispose for the owner region.
-    #[serde(rename = "disposeRegion", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dispose_region: Option<DisposeRegion>,
     /// Cancel requests that must propagate.
-    #[serde(rename = "cancelRequests", default)]
+    #[serde(default)]
     pub cancel_requests: Vec<CancelRequest>,
     /// Foul: driver unload cancels tasks owned by other surfaces without DisposeRegion.
-    #[serde(rename = "driverUnloadCancelsForeignTasks", default)]
+    #[serde(default)]
     pub driver_unload_cancels_foreign_tasks: bool,
     /// When envelope generation < currentGeneration, patches must not be produced.
-    #[serde(rename = "mustDiscardStale", default)]
+    #[serde(default)]
     pub must_discard_stale: bool,
     /// Foul: scenario claims patches were emitted from a stale envelope.
-    #[serde(rename = "producedPatchesFromStale", default)]
+    #[serde(default)]
     pub produced_patches_from_stale: bool,
 }
 
@@ -1748,8 +2445,8 @@ pub struct ExecutorCheckReport {
     /// Executor findings (stale, split tx, private object, ...).
     #[serde(default)]
     pub diagnostics: Vec<ProfileDiagnostic>,
-    /// Aggregate status (`pass` / `fail`).
-    pub status: String,
+    /// Aggregate status ([`CheckReportStatus`]).
+    pub status: CheckReportStatus,
 }
 
 impl ExecutorCheckReport {
@@ -1760,47 +2457,44 @@ impl ExecutorCheckReport {
 }
 
 /// One host's lifecycle slice in a cross-host scenario.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct HostLifecycleSlice {
     /// HostId for this slice.
-    #[serde(rename = "hostId")]
     pub host_id: String,
-    /// `browser` | `mini` | `native` (see [`LIFECYCLE_HOST_KINDS`]).
-    #[serde(rename = "hostKind")]
-    pub host_kind: String,
+    /// Closed host family (`browser` | `mini` | `native`).
+    pub host_kind: LifecycleHostKind,
     /// LifecycleBinding rows for this host.
     #[serde(default)]
     pub lifecycle: Vec<LifecycleBinding>,
 }
 
 /// LifecycleMappingTable entry - refs host + unified event only.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct LifecycleMappingEntry {
     /// Always [`LIFECYCLE_MAPPING_ENTRY_SCHEMA`].
     pub schema: String,
     /// HostId that owns this mapping row.
-    #[serde(rename = "hostId")]
     pub host_id: String,
-    /// Host-native event name.
-    #[serde(rename = "hostEvent")]
+    /// Host-native event name (**open** host vocabulary).
     pub host_event: String,
-    /// Unified lifecycle token from [`UNIFIED_LIFECYCLE_EVENTS`].
-    #[serde(rename = "vmzLifecycle")]
-    pub vmz_lifecycle: String,
+    /// Closed unified lifecycle token.
+    pub vmz_lifecycle: UnifiedLifecycleEvent,
     /// True when the host may emit this mapping more than once.
-    #[serde(rename = "mayRepeat", default)]
+    #[serde(default)]
     pub may_repeat: bool,
     /// True when the host guarantees delivery under normal operation.
-    #[serde(rename = "guaranteed", default)]
+    #[serde(default)]
     pub guaranteed: bool,
     /// True when crash recovery may skip this event.
-    #[serde(rename = "mayBeMissingAfterCrash", default)]
+    #[serde(default)]
     pub may_be_missing_after_crash: bool,
-    /// Persistence window token from [`PERSISTENCE_WINDOWS`].
-    #[serde(rename = "persistenceWindow", default)]
-    pub persistence_window: String,
+    /// Closed persistence window.
+    #[serde(default)]
+    pub persistence_window: PersistenceWindow,
     /// When true, this edge cancels in-flight capabilities.
-    #[serde(rename = "cancelsCapabilities", default)]
+    #[serde(default)]
     pub cancels_capabilities: bool,
 }
 
@@ -1838,37 +2532,37 @@ impl LifecycleMappingTable {
 
 /// Crash recovery must reattach surfaces to the same owner - never duplicate.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct RecoveryPolicy {
     /// Always [`RECOVERY_POLICY_SCHEMA`].
     pub schema: String,
     /// Stable policy id for explain / catalog.
-    #[serde(rename = "policyId")]
     pub policy_id: String,
     /// RegionId that remains the sole owner across recover.
-    #[serde(rename = "ownerRegionId")]
     pub owner_region_id: String,
     /// Rematerialize UI / plan from a durable snapshot.
-    #[serde(rename = "rematerializeFromSnapshot", default)]
+    #[serde(default)]
     pub rematerialize_from_snapshot: bool,
     /// Rematerialize using the recorded plan generation.
-    #[serde(rename = "rematerializePlanGeneration", default)]
+    #[serde(default)]
     pub rematerialize_plan_generation: bool,
     /// Foul: crash restore must not assume JS heap survived.
-    #[serde(rename = "assumesJsHeapSurvived", default)]
+    #[serde(default)]
     pub assumes_js_heap_survived: bool,
     /// Foul: recover must not create a second owner for the same region.
-    #[serde(rename = "createsNewOwnerOnRecover", default)]
+    #[serde(default)]
     pub creates_new_owner_on_recover: bool,
     /// SurfaceIds that must reattach to the same owner after recover.
-    #[serde(rename = "surfaceIdsToReattach", default)]
+    #[serde(default)]
     pub surface_ids_to_reattach: Vec<String>,
     /// Capabilities cancel only on owner DisposeRegion, not on surface unload.
-    #[serde(rename = "cancelsCapabilitiesOnlyOnOwnerDispose", default)]
+    #[serde(default)]
     pub cancels_capabilities_only_on_owner_dispose: bool,
 }
 
 /// Algebraic fixture: Browser + Mini + Native map to unified lifecycle + recovery.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct LifecycleScenario {
     /// Always [`LIFECYCLE_SCENARIO_SCHEMA`].
     pub schema: String,
@@ -1876,7 +2570,6 @@ pub struct LifecycleScenario {
     #[serde(default)]
     pub hosts: Vec<HostLifecycleSlice>,
     /// Flattened cross-host mapping table.
-    #[serde(rename = "mappingTable")]
     pub mapping_table: LifecycleMappingTable,
     /// Crash recovery policy under check.
     pub recovery: RecoveryPolicy,
@@ -1891,17 +2584,17 @@ impl LifecycleScenario {
         let hosts = vec![
             HostLifecycleSlice {
                 host_id: browser.host_id.clone(),
-                host_kind: "browser".into(),
+                host_kind: LifecycleHostKind::Browser,
                 lifecycle: browser.lifecycle.clone(),
             },
             HostLifecycleSlice {
                 host_id: mini.host_id.clone(),
-                host_kind: "mini".into(),
+                host_kind: LifecycleHostKind::Mini,
                 lifecycle: mini.lifecycle.clone(),
             },
             HostLifecycleSlice {
                 host_id: native.host_id.clone(),
-                host_kind: "native".into(),
+                host_kind: LifecycleHostKind::Native,
                 lifecycle: native.lifecycle.clone(),
             },
         ];
@@ -1941,8 +2634,8 @@ pub struct LifecycleRecoveryCheckReport {
     /// Lifecycle / recovery findings.
     #[serde(default)]
     pub diagnostics: Vec<ProfileDiagnostic>,
-    /// Aggregate status (`pass` / `fail`).
-    pub status: String,
+    /// Aggregate status ([`CheckReportStatus`]).
+    pub status: CheckReportStatus,
 }
 
 impl LifecycleRecoveryCheckReport {
@@ -1954,136 +2647,129 @@ impl LifecycleRecoveryCheckReport {
 
 /// Structured package constraints proved at Delivery assembly time.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct DeliveryPackageConstraints {
     /// Always [`DELIVERY_PACKAGE_CONSTRAINTS_SCHEMA`].
     pub schema: String,
     /// Optional max surfaces allowed in the package.
-    #[serde(rename = "maxSurfaces", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_surfaces: Option<u32>,
     /// Optional max packaged byte budget.
-    #[serde(rename = "maxPackageBytes", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_package_bytes: Option<u64>,
     /// Allow-list of SurfaceIds that may be included.
-    #[serde(rename = "allowedSurfaceIds", default)]
+    #[serde(default)]
     pub allowed_surface_ids: Vec<String>,
     /// When true, artifact must carry a ResolutionDigest.
-    #[serde(rename = "requiresResolutionDigest", default)]
+    #[serde(default)]
     pub requires_resolution_digest: bool,
 }
 
 /// Security policy for a Delivery (not a free-form string).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct DeliverySecurityPolicy {
     /// Always [`DELIVERY_SECURITY_POLICY_SCHEMA`].
     pub schema: String,
     /// Stable policy id (`vmz.security.origin+csp`, ...).
-    #[serde(rename = "policyId")]
     pub policy_id: String,
     /// Require origin isolation between deliveries / frames.
-    #[serde(rename = "requiresOriginIsolation", default)]
+    #[serde(default)]
     pub requires_origin_isolation: bool,
     /// Require integrity checks for remote assets.
-    #[serde(rename = "requiresIntegrityForRemote", default)]
+    #[serde(default)]
     pub requires_integrity_for_remote: bool,
     /// Foul when true without requiresIntegrityForRemote.
-    #[serde(rename = "allowsArbitraryRemote", default)]
+    #[serde(default)]
     pub allows_arbitrary_remote: bool,
-    /// CSP / sandbox profile token (`strict`, `mini`, `app`, ...).
-    #[serde(rename = "cspProfile", default)]
-    pub csp_profile: String,
+    /// CSP / sandbox profile (closed [`CspProfile`]).
+    #[serde(default)]
+    pub csp_profile: CspProfile,
 }
 
 /// Update / rollback policy - semantic changes must invalidate and re-prove.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct DeliveryUpdatePolicy {
     /// Always [`DELIVERY_UPDATE_POLICY_SCHEMA`].
     pub schema: String,
     /// Stable policy id.
-    #[serde(rename = "policyId")]
     pub policy_id: String,
-    /// `rebuild` | `store` | `hot` | `hybrid` (see [`DELIVERY_UPDATE_CHANNELS`]).
-    pub channel: String,
+    /// Update channel (closed [`UpdateChannel`]).
+    pub channel: UpdateChannel,
     /// When true, semantic change requires a fresh DeliveryProofManifest.
-    #[serde(rename = "requiresReproofOnSemanticChange", default)]
-    pub requires_reproof_on_semantic_change: bool,
-    /// Rollback strategy token (`previous_bundle`, ...).
     #[serde(default)]
-    pub rollback: String,
+    pub requires_reproof_on_semantic_change: bool,
+    /// Rollback strategy (closed [`UpdateRollback`]).
+    #[serde(default)]
+    pub rollback: UpdateRollback,
 }
 
 /// DeliveryArtifactManifest - refs stable ids only (no VPG / Plan IR copy).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct DeliveryArtifactManifest {
     /// Always [`DELIVERY_ARTIFACT_MANIFEST_SCHEMA`].
     pub schema: String,
     /// DeliveryId this artifact belongs to.
-    #[serde(rename = "deliveryId")]
     pub delivery_id: String,
     /// HostId this artifact was assembled for.
-    #[serde(rename = "hostProfileId")]
     pub host_profile_id: String,
     /// Plan version sealed into the artifact.
-    #[serde(rename = "planVersion")]
     pub plan_version: String,
     /// SurfaceIds included in the package.
-    #[serde(rename = "includedSurfaceIds", default)]
+    #[serde(default)]
     pub included_surface_ids: Vec<String>,
     /// CapabilityIds included in the package.
-    #[serde(rename = "includedCapabilityIds", default)]
+    #[serde(default)]
     pub included_capability_ids: Vec<String>,
     /// Entry RouteIds included in the package.
-    #[serde(rename = "entryRouteIds", default)]
+    #[serde(default)]
     pub entry_route_ids: Vec<String>,
     /// Host+Delivery resolution digest.
-    #[serde(rename = "resolutionDigest")]
     pub resolution_digest: ResolutionDigest,
     /// Estimated packaged size in bytes.
-    #[serde(rename = "estimatedPackageBytes", default)]
+    #[serde(default)]
     pub estimated_package_bytes: u64,
     /// Foul: proof/artifact must not copy VPG/Plan semantic IR.
-    #[serde(rename = "copiesSemanticIr", default)]
+    #[serde(default)]
     pub copies_semantic_ir: bool,
 }
 
 /// Proof that package / security / update constraints hold for a Delivery.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct DeliveryProofManifest {
     /// Always [`DELIVERY_PROOF_MANIFEST_SCHEMA`].
     pub schema: String,
     /// DeliveryId under proof.
-    #[serde(rename = "deliveryId")]
     pub delivery_id: String,
     /// HostId under proof.
-    #[serde(rename = "hostProfileId")]
     pub host_profile_id: String,
     /// Plan version that must match host expectations.
-    #[serde(rename = "planVersion")]
     pub plan_version: String,
     /// Package size / surface allow-list constraints.
-    #[serde(rename = "packageConstraints")]
     pub package_constraints: DeliveryPackageConstraints,
     /// Origin / integrity / CSP policy.
-    #[serde(rename = "securityPolicy")]
     pub security_policy: DeliverySecurityPolicy,
     /// Update channel + reproof requirements.
-    #[serde(rename = "updatePolicy")]
     pub update_policy: DeliveryUpdatePolicy,
     /// Artifact manifest sealed by this proof.
     pub artifact: DeliveryArtifactManifest,
     /// Constraint proof tokens that held (`surfaces-within-budget`, ...).
-    #[serde(rename = "constraintProofs", default)]
+    #[serde(default)]
     pub constraint_proofs: Vec<String>,
     /// Explain-index refs for entry routes (`route:...`).
-    #[serde(rename = "explainIndexRefs", default)]
+    #[serde(default)]
     pub explain_index_refs: Vec<String>,
 }
 
 /// One host + delivery + proof unit inside a scenario.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct DeliveryProofUnit {
-    /// Host kind token (`browser` / `mini` / `native`).
-    #[serde(rename = "hostKind")]
-    pub host_kind: String,
+    /// Closed host family (`browser` | `mini` | `native`).
+    pub host_kind: LifecycleHostKind,
     /// HostProfile under proof.
     pub host: HostProfile,
     /// DeliveryProfile under proof.
@@ -2094,6 +2780,7 @@ pub struct DeliveryProofUnit {
 
 /// Algebraic fixture: Browser / Mini / Native delivery proofs.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct DeliveryProofScenario {
     /// Always [`DELIVERY_PROOF_SCENARIO_SCHEMA`].
     pub schema: String,
@@ -2101,19 +2788,18 @@ pub struct DeliveryProofScenario {
     #[serde(default)]
     pub units: Vec<DeliveryProofUnit>,
     /// Host-side expected plan version (must match each proof/artifact).
-    #[serde(rename = "expectedPlanVersion")]
     pub expected_plan_version: String,
 }
 
 impl DeliveryProofScenario {
     fn unit_for(
-        host_kind: &str,
+        host_kind: LifecycleHostKind,
         host: HostProfile,
         delivery: DeliveryProfile,
         max_bytes: u64,
         estimated_bytes: u64,
         security: DeliverySecurityPolicy,
-        update_channel: &str,
+        update_channel: UpdateChannel,
     ) -> DeliveryProofUnit {
         let surface_ids: Vec<String> = host.surfaces.iter().map(|s| s.surface_id.clone()).collect();
         let capability_ids: Vec<String> =
@@ -2142,9 +2828,9 @@ impl DeliveryProofScenario {
             update_policy: DeliveryUpdatePolicy {
                 schema: DELIVERY_UPDATE_POLICY_SCHEMA.into(),
                 policy_id: format!("vmz.update.{}", delivery.delivery_id),
-                channel: update_channel.into(),
+                channel: update_channel,
                 requires_reproof_on_semantic_change: true,
-                rollback: "previous_bundle".into(),
+                rollback: UpdateRollback::PreviousBundle,
             },
             artifact: DeliveryArtifactManifest {
                 schema: DELIVERY_ARTIFACT_MANIFEST_SCHEMA.into(),
@@ -2171,7 +2857,7 @@ impl DeliveryProofScenario {
                 .map(|r| format!("route:{r}"))
                 .collect(),
         };
-        DeliveryProofUnit { host_kind: host_kind.into(), host, delivery, proof }
+        DeliveryProofUnit { host_kind, host, delivery, proof }
     }
 
     /// Cross-delivery proof: Browser bundled + Mini main + Native hybrid.
@@ -2184,7 +2870,7 @@ impl DeliveryProofScenario {
         let native_delivery = DeliveryProfile::native_app_hybrid_example(&native_host);
         let units = vec![
             Self::unit_for(
-                "browser",
+                LifecycleHostKind::Browser,
                 browser_host,
                 browser_delivery,
                 2_000_000,
@@ -2195,12 +2881,12 @@ impl DeliveryProofScenario {
                     requires_origin_isolation: true,
                     requires_integrity_for_remote: true,
                     allows_arbitrary_remote: false,
-                    csp_profile: "strict".into(),
+                    csp_profile: CspProfile::Strict,
                 },
-                "rebuild",
+                UpdateChannel::Rebuild,
             ),
             Self::unit_for(
-                "mini",
+                LifecycleHostKind::Mini,
                 mini_host,
                 mini_delivery,
                 2_000_000,
@@ -2211,12 +2897,12 @@ impl DeliveryProofScenario {
                     requires_origin_isolation: true,
                     requires_integrity_for_remote: true,
                     allows_arbitrary_remote: false,
-                    csp_profile: "mini".into(),
+                    csp_profile: CspProfile::Mini,
                 },
-                "store",
+                UpdateChannel::Store,
             ),
             Self::unit_for(
-                "native",
+                LifecycleHostKind::Native,
                 native_host,
                 native_delivery,
                 8_000_000,
@@ -2227,9 +2913,9 @@ impl DeliveryProofScenario {
                     requires_origin_isolation: true,
                     requires_integrity_for_remote: true,
                     allows_arbitrary_remote: false,
-                    csp_profile: "app".into(),
+                    csp_profile: CspProfile::App,
                 },
-                "store",
+                UpdateChannel::Store,
             ),
         ];
         Self {
@@ -2252,8 +2938,8 @@ pub struct DeliveryProofCheckReport {
     /// Delivery proof findings (budget, integrity, reproof, ...).
     #[serde(default)]
     pub diagnostics: Vec<ProfileDiagnostic>,
-    /// Aggregate status (`pass` / `fail`).
-    pub status: String,
+    /// Aggregate status ([`CheckReportStatus`]).
+    pub status: CheckReportStatus,
 }
 
 impl DeliveryProofCheckReport {
@@ -2265,29 +2951,27 @@ impl DeliveryProofCheckReport {
 
 /// Shared conformance fixture - stable ids only (no host-private objects).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ConformanceFixture {
     /// Always [`CONFORMANCE_FIXTURE_SCHEMA`].
     pub schema: String,
     /// Stable fixture id shared across host runs.
-    #[serde(rename = "fixtureId")]
     pub fixture_id: String,
     /// ApplicationId exercised by the fixture.
-    #[serde(rename = "applicationId")]
     pub application_id: String,
     /// Plan version the fixture assumes.
-    #[serde(rename = "planVersion")]
     pub plan_version: String,
     /// RegionIds present in the fixture graph.
-    #[serde(rename = "regionIds", default)]
+    #[serde(default)]
     pub region_ids: Vec<String>,
     /// BindingIds present in the fixture graph.
-    #[serde(rename = "bindingIds", default)]
+    #[serde(default)]
     pub binding_ids: Vec<String>,
     /// RouteIds present in the fixture graph.
-    #[serde(rename = "routeIds", default)]
+    #[serde(default)]
     pub route_ids: Vec<String>,
     /// SlotIds present in the fixture graph.
-    #[serde(rename = "slotIds", default)]
+    #[serde(default)]
     pub slot_ids: Vec<String>,
 }
 
@@ -2307,9 +2991,9 @@ impl ConformanceFixture {
 
 /// One slot value observed after the shared fixture script.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ConformanceSlotValue {
     /// SlotId whose value was observed.
-    #[serde(rename = "slotId")]
     pub slot_id: String,
     /// Algebraic string value for cross-host comparison.
     pub value: String,
@@ -2317,11 +3001,12 @@ pub struct ConformanceSlotValue {
 
 /// Algebraic state result after the shared fixture script.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ConformanceStateSnapshot {
     /// Always [`CONFORMANCE_STATE_SNAPSHOT_SCHEMA`].
     pub schema: String,
     /// Slot values after the fixture script.
-    #[serde(rename = "slotValues", default)]
+    #[serde(default)]
     pub slot_values: Vec<ConformanceSlotValue>,
 }
 
@@ -2337,17 +3022,17 @@ impl ConformanceStateSnapshot {
 
 /// One trace event carrying stable ids and transaction / generation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ConformanceTraceEvent {
     /// EventId within the host run.
-    #[serde(rename = "eventId")]
     pub event_id: String,
     /// Event kind (`lifecycle`, `write`, `patch`, ...).
     pub kind: String,
     /// Stable ids touched by this event.
-    #[serde(rename = "stableIds", default)]
+    #[serde(default)]
     pub stable_ids: Vec<String>,
     /// TransactionId when applicable.
-    #[serde(rename = "transactionId", default)]
+    #[serde(default)]
     pub transaction_id: String,
     /// Generation at which the event was recorded.
     pub generation: u64,
@@ -2355,6 +3040,7 @@ pub struct ConformanceTraceEvent {
 
 /// Trace with sorted invariant keys shared across hosts.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ConformanceTrace {
     /// Always [`CONFORMANCE_TRACE_SCHEMA`].
     pub schema: String,
@@ -2362,51 +3048,50 @@ pub struct ConformanceTrace {
     #[serde(default)]
     pub events: Vec<ConformanceTraceEvent>,
     /// Invariant key strings that must match expectedTraceInvariantKeys.
-    #[serde(rename = "invariantKeys", default)]
+    #[serde(default)]
     pub invariant_keys: Vec<String>,
 }
 
 /// One host's algebraic run of the shared fixture.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ConformanceHostRun {
     /// Always [`CONFORMANCE_HOST_RUN_SCHEMA`].
     pub schema: String,
-    /// Host kind token (`browser` / `mini` / `native`).
-    #[serde(rename = "hostKind")]
-    pub host_kind: String,
-    /// `web` | `template` | `mixed` (see [`CONFORMANCE_SURFACE_ROLES`]).
-    #[serde(rename = "surfaceRole")]
-    pub surface_role: String,
-    /// Surface kinds exercised in this run.
-    #[serde(rename = "surfaceKinds", default)]
-    pub surface_kinds: Vec<String>,
+    /// Closed host family (`browser` | `mini` | `native`).
+    pub host_kind: LifecycleHostKind,
+    /// Surface role (closed [`ConformanceSurfaceRole`]).
+    pub surface_role: ConformanceSurfaceRole,
+    /// Surface kinds exercised in this run (closed [`SurfaceKind`] labels).
+    #[serde(default)]
+    pub surface_kinds: Vec<SurfaceKind>,
     /// SurfaceIds exercised in this run.
-    #[serde(rename = "surfaceIds", default)]
+    #[serde(default)]
     pub surface_ids: Vec<String>,
     /// Stable ids observed (must match fixture union across hosts).
-    #[serde(rename = "observedStableIds", default)]
+    #[serde(default)]
     pub observed_stable_ids: Vec<String>,
     /// Algebraic state after the script.
     pub state: ConformanceStateSnapshot,
     /// Trace + invariant keys for this run.
     pub trace: ConformanceTrace,
     /// Foul: host-private objects must not enter cross-host evidence.
-    #[serde(rename = "usesPrivateRuntimeObjects", default)]
+    #[serde(default)]
     pub uses_private_runtime_objects: bool,
 }
 
 /// Scenario: same fixture on WebSurface, TemplateSurface, and Web+Native mixed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ConformanceScenario {
     /// Always [`CONFORMANCE_SCENARIO_SCHEMA`].
     pub schema: String,
     /// Shared fixture (stable ids only).
     pub fixture: ConformanceFixture,
     /// Expected algebraic state after the script.
-    #[serde(rename = "expectedState")]
     pub expected_state: ConformanceStateSnapshot,
     /// Expected trace invariant keys shared by all runs.
-    #[serde(rename = "expectedTraceInvariantKeys", default)]
+    #[serde(default)]
     pub expected_trace_invariant_keys: Vec<String>,
     /// Per-host runs (web / template / mixed).
     #[serde(default)]
@@ -2415,9 +3100,9 @@ pub struct ConformanceScenario {
 
 impl ConformanceScenario {
     fn run_for(
-        host_kind: &str,
-        surface_role: &str,
-        surface_kinds: &[&str],
+        host_kind: LifecycleHostKind,
+        surface_role: ConformanceSurfaceRole,
+        surface_kinds: &[SurfaceKind],
         surface_ids: &[&str],
         fixture: &ConformanceFixture,
         state: &ConformanceStateSnapshot,
@@ -2426,9 +3111,9 @@ impl ConformanceScenario {
     ) -> ConformanceHostRun {
         ConformanceHostRun {
             schema: CONFORMANCE_HOST_RUN_SCHEMA.into(),
-            host_kind: host_kind.into(),
-            surface_role: surface_role.into(),
-            surface_kinds: surface_kinds.iter().map(|s| (*s).into()).collect(),
+            host_kind,
+            surface_role,
+            surface_kinds: surface_kinds.to_vec(),
             surface_ids: surface_ids.iter().map(|s| (*s).into()).collect(),
             observed_stable_ids: fixture.all_stable_ids(),
             state: state.clone(),
@@ -2490,9 +3175,9 @@ impl ConformanceScenario {
         ];
         let runs = vec![
             Self::run_for(
-                "browser",
-                "web",
-                &["web"],
+                LifecycleHostKind::Browser,
+                ConformanceSurfaceRole::Web,
+                &[SurfaceKind::Web],
                 &["vmz.surface.web.main"],
                 &fixture,
                 &expected_state,
@@ -2500,9 +3185,9 @@ impl ConformanceScenario {
                 events.clone(),
             ),
             Self::run_for(
-                "mini",
-                "template",
-                &["template"],
+                LifecycleHostKind::Mini,
+                ConformanceSurfaceRole::Template,
+                &[SurfaceKind::Template],
                 &["vmz.surface.template.page"],
                 &fixture,
                 &expected_state,
@@ -2510,9 +3195,9 @@ impl ConformanceScenario {
                 events.clone(),
             ),
             Self::run_for(
-                "native",
-                "mixed",
-                &["web", "native"],
+                LifecycleHostKind::Native,
+                ConformanceSurfaceRole::Mixed,
+                &[SurfaceKind::Web, SurfaceKind::Native],
                 &["vmz.surface.web.form", "vmz.surface.native.camera"],
                 &fixture,
                 &expected_state,
@@ -2542,8 +3227,8 @@ pub struct ConformanceCheckReport {
     /// Conformance findings (stable-id / state / trace divergence, ...).
     #[serde(default)]
     pub diagnostics: Vec<ProfileDiagnostic>,
-    /// Aggregate status (`pass` / `fail`).
-    pub status: String,
+    /// Aggregate status ([`CheckReportStatus`]).
+    pub status: CheckReportStatus,
 }
 
 impl ConformanceCheckReport {

@@ -9,6 +9,10 @@ use oxc_semantic::SemanticBuilder;
 use oxc_span::SourceType;
 use oxc_transformer::{TransformOptions, Transformer};
 
+/// Transpile a TypeScript source string to JavaScript via oxc parse/transform/codegen.
+///
+/// `filename` is used only for transform diagnostics paths. Returns an error when
+/// the parser panics; non-fatal parse diagnostics are ignored and codegen still runs.
 pub fn transpile_ts(source: &str, filename: &str) -> Result<String, String> {
     let allocator = Allocator::default();
     let source_type = SourceType::ts();

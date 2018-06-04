@@ -22,7 +22,7 @@ TypeScript drivers under **domain folders** — not a flat dump:
     - `pnpm verify -- browser-core` — **A1** catalog：compile/logic/ssr/resume/browser + async cancel + no-render +
       ProductRow reverse-edge incremental（region/route/locale/style 切片仍开）
     - `pnpm verify -- router-production` — **A2**：多页 SSR + Link/`data-vmz-route` + load/access/action + nav-cancel +
-      Layout + **SPA takeover**（scroll/focus / SPA layout ticks 仍开）
+      Layout + **SPA takeover** + **SPA layout retention**（scroll/focus / locale realization 仍开）
     - `pnpm verify -- release-artifact` — **A3** filesystem：pack + CURRENT/PREVIOUS + rollback + diff（CDN adapters /
       assets hash 仍开）
     - `pnpm verify -- static-delivery` — **A3-static**：`web-static` 逐路由 HTML + `404.html` + SEO head/sitemap/robots +

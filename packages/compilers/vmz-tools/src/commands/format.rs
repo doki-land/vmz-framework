@@ -5,8 +5,10 @@ use vmz_compiler::{FormatOptions, Result, bail, format_path};
 
 use crate::cli::PathArgs;
 
+/// Arguments for `vmz format`.
 #[derive(Debug, ClapArgs)]
 pub struct Args {
+    /// Files or project roots to format.
     #[command(flatten)]
     pub paths: PathArgs,
 
@@ -15,6 +17,7 @@ pub struct Args {
     pub check: bool,
 }
 
+/// Format (or `--check`) each path via the compiler format pipeline.
 pub fn run(args: Args) -> Result<()> {
     let options = FormatOptions { check: args.check };
     for path in &args.paths.paths {

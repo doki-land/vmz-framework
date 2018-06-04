@@ -11,6 +11,7 @@ use crate::project::VmzModuleKind;
 use crate::sfc::parse_vmz;
 use crate::template::{TemplateIr, TemplateNode};
 
+/// Directed graph of component chunk dependencies inferred from template tags.
 #[derive(Debug, Clone, Default)]
 pub struct ComponentGraph {
     /// chunk_id → child component chunk_ids referenced in its template.
@@ -22,6 +23,7 @@ pub struct ComponentGraph {
 }
 
 impl ComponentGraph {
+    /// Build the graph from discovered units under `src_root`.
     pub fn build(src_root: &Path, units: &[(PathBuf, VmzModuleKind, String)]) -> Self {
         let mut by_tag: HashMap<String, String> = HashMap::new();
         for (path, _kind, chunk_id) in units {

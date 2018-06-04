@@ -1,17 +1,15 @@
+//! Discover and classify `.vmz` modules under a project root.
+
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use walkdir::WalkDir;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VmzModuleKind {
-    App,
-    Page,
-    Component,
-    Other,
-}
+/// Closed `.vmz` module kind — owned by `vmz-protocol` (wire / DX shared).
+pub use vmz_protocol::VmzModuleKind;
 
+/// Walk `root` (and convention component deps) for `.vmz` files with module kinds.
 pub fn discover_vmz_files(root: impl AsRef<Path>) -> Vec<(PathBuf, VmzModuleKind)> {
     let root = root.as_ref();
     let mut out = Vec::new();

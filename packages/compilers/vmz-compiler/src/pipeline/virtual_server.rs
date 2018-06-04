@@ -6,6 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
+/// Virtual module id prefix for server modules (`#server/...`).
 pub const PREFIX: &str = "#server";
 
 /// Map a filesystem path under a project `src/` (or project root) to a `#server/...` id.

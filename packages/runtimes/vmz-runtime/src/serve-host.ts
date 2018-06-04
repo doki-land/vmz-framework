@@ -12,13 +12,14 @@
  * - island HMR → re-import `entry-client.js` (no full document reload)
  * - otherwise → `location.reload`
  */
+
+import { existsSync } from 'node:fs';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
-import { readdir, writeFile, readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { setServerModuleResolver, setRoutes, handleNodeRequest } from './vmz-runtime.js';
 import { registerComponents, renderToStream, renderToString } from './vmz-dom.js';
+import { handleNodeRequest, setRoutes, setServerModuleResolver } from './vmz-runtime.js';
 
 const distDir = process.env.VMZ_DIST ? path.resolve(process.env.VMZ_DIST) : path.dirname(fileURLToPath(import.meta.url));
 
@@ -36,6 +37,8 @@ const pageCtors = new Map();
 let cssEntry = null;
 /** @type {{ defaultThemeId: string, themeIds: string[], activationAttr: string, contentHash: string|null } | null} */
 let styleTheme = null;
+/** Locale route realization artifact from `_vmz/locale-route-realization.json` (optional). */
+let localeArtifact = null;
 /** @type {Set<import('node:http').ServerResponse>} */
 const sseClients = new Set();
 /** In-flight HTTP requests (graceful shutdown drain). */
@@ -101,10 +104,16 @@ async function renderPageStream(pathname, opts = {}) {
         return { status: 500, stream: emitDevErrorHtml(lastDevError) };
     }
 
-    let match = matchFileRoute(pathname, pageCatalog);
+    const localePlan = resolveLocalePath(pathname);
+    if (localePlan.redirectTo) {
+        return { status: 302, redirect: localePlan.redirectTo, headers: { Location: localePlan.redirectTo } };
+    }
+    const routePath = localePlan.restPath || pathname;
+
+    let match = matchFileRoute(routePath, pageCatalog);
     let status = 200;
 
-    const gated = await runRouteGate(pathname, match?.chunkId);
+    const gated = await runRouteGate(routePath, match?.chunkId);
     if (gated === 'not_found') {
         match = findRootCatchAll(pageCatalog);
         status = 404;
@@ -128,17 +137,25 @@ async function renderPageStream(pathname, opts = {}) {
         }
         return null;
     }
-    const params = extractRouteParams(match.segs, pathname);
+    const params = extractRouteParams(match.segs, routePath);
     const method = String(opts.method || 'GET').toUpperCase();
+    const localeCtx = {
+        localeId: localePlan.localeId,
+        dir: localePlan.dir,
+        pathname,
+        routePath,
+        alternates: pageMetaAlternates(match.chunkId, localePlan.localeId),
+    };
 
     if (typeof Page.access === 'function') {
         const access = await Page.access({
             params,
-            pathname,
+            pathname: routePath,
             chunkId: match.chunkId,
             signal: opts.signal,
             searchParams: opts.searchParams,
             method,
+            localeId: localeCtx.localeId,
         });
         const closed = normalizeAccessResult(access);
         if (closed.kind === 'redirect') {
@@ -156,7 +173,7 @@ async function renderPageStream(pathname, opts = {}) {
                     const eventOnlyShell = isEventOnlyShell(resumeEntries.map((e) => e.strategy));
                     return {
                         status: 404,
-                        stream: emitPageHtml(NotFound, catchAll.chunkId, eventOnlyShell, { ...params }, opts),
+                        stream: emitPageHtml(NotFound, catchAll.chunkId, eventOnlyShell, { ...params }, opts, [], localeCtx),
                     };
                 }
             }
@@ -168,12 +185,13 @@ async function renderPageStream(pathname, opts = {}) {
     if (method === 'POST' && typeof Page.action === 'function') {
         const acted = await Page.action({
             params,
-            pathname,
+            pathname: routePath,
             chunkId: match.chunkId,
             signal: opts.signal,
             searchParams: opts.searchParams,
             body: opts.body,
             method,
+            localeId: localeCtx.localeId,
         });
         const actionClosed = normalizeActionResult(acted);
         if (actionClosed.kind === 'redirect') {
@@ -193,10 +211,11 @@ async function renderPageStream(pathname, opts = {}) {
     if (typeof Page.load === 'function') {
         const loaded = await Page.load({
             params,
-            pathname,
+            pathname: routePath,
             chunkId: match.chunkId,
             signal: opts.signal,
             searchParams: opts.searchParams,
+            localeId: localeCtx.localeId,
         });
         if (opts.signal?.aborted) {
             return { status: 499, stream: emitAccessShell('route-nav-cancelled') };
@@ -214,7 +233,7 @@ async function renderPageStream(pathname, opts = {}) {
     const layoutChain = resolveLayoutChain(match.chunkId);
     return {
         status,
-        stream: emitPageHtml(Page, match.chunkId, eventOnlyShell, props, opts, layoutChain),
+        stream: emitPageHtml(Page, match.chunkId, eventOnlyShell, props, opts, layoutChain, localeCtx),
     };
 }
 
@@ -280,7 +299,7 @@ async function* emitAccessShell(marker) {
  * @param {{ signal?: AbortSignal, searchParams?: URLSearchParams, cookieHeader?: string }} [opts]
  * @param {string[]} [layoutChain] layout chunk ids outer→inner
  */
-async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {}, layoutChain = []) {
+async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {}, layoutChain = [], localeCtx = {}) {
     const signal = opts.signal;
     const live = isDev
         ? `\n  <script>
@@ -387,15 +406,33 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
     const cssLink = cssEntry ? `  <link rel="stylesheet" href="/${String(cssEntry).replace(/^\/+/, '')}?t=${reloadToken}" />\n` : '';
     const propsJson = JSON.stringify(props ?? {});
     const layoutAttr = layoutChain.length ? ` data-vmz-layout="${escapeAttr(layoutChain.join(','))}"` : '';
+    const localeId = localeCtx.localeId || localeArtifact?.defaultLocale || 'en';
+    const dir = localeCtx.dir || 'ltr';
+    const localeAttr = ` data-vmz-locale="${escapeAttr(localeId)}" data-vmz-dir="${escapeAttr(dir)}"`;
+    const routingJson = localeArtifact?.routing
+        ? escapeAttr(
+              JSON.stringify({
+                  strategy: localeArtifact.routing.strategy || 'prefix',
+                  defaultPrefix: localeArtifact.routing.defaultPrefix || 'include',
+                  defaultLocale: localeArtifact.defaultLocale,
+                  locales: (localeArtifact.locales || []).map((l) => l.id),
+              }),
+          )
+        : '';
+    const routingAttr = routingJson ? ` data-vmz-locale-routing="${routingJson}"` : '';
+    const hreflangLinks = (localeCtx.alternates || [])
+        .map((a) => `  <link rel="alternate" hreflang="${escapeAttr(a.hreflang)}" href="${escapeAttr(a.href)}" />`)
+        .join('\n');
+    const hreflangBlock = hreflangLinks ? `${hreflangLinks}\n` : '';
     yield `<!DOCTYPE html>
-<html lang="en"${htmlTheme}>
+<html lang="${escapeAttr(localeId)}" data-locale="${escapeAttr(localeId)}" dir="${escapeAttr(dir)}"${routingAttr}${htmlTheme}>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VMZ</title>
-${themeBoot}${cssLink}</head>
+${hreflangBlock}${themeBoot}${cssLink}</head>
 <body>
-  <div id="app" data-vmz-page="${escapeAttr(chunkId)}"${layoutAttr} data-vmz-props="${escapeAttr(propsJson)}">`;
+  <div id="app" data-vmz-page="${escapeAttr(chunkId)}"${layoutAttr}${localeAttr} data-vmz-props="${escapeAttr(propsJson)}">`;
     let bodyHtml = '';
     for await (const chunk of renderToStream(Page, props, { signal })) {
         if (signal?.aborted) return;
@@ -408,6 +445,10 @@ ${themeBoot}${cssLink}</head>
         if (!Layout) continue;
         bodyHtml = await renderToString(Layout, {}, { signal, slotHtml: bodyHtml });
         if (signal?.aborted) return;
+    }
+    // Locale discipline: same-app Links retain current LocaleId (realization authority).
+    if (localeArtifact && localeId) {
+        bodyHtml = localizeBodyLinksInHost(bodyHtml, localeId, localeArtifact);
     }
     yield bodyHtml;
     if (signal?.aborted) return;
@@ -555,6 +596,11 @@ async function softReload(opts = {}) {
             setRoutes(routes);
         } catch {
             setRoutes([]);
+        }
+        try {
+            localeArtifact = JSON.parse(await readFile(path.join(distDir, '_vmz', 'locale-route-realization.json'), 'utf8'));
+        } catch {
+            localeArtifact = null;
         }
 
         const componentEntries = await listClientComponents(distDir);
@@ -726,6 +772,122 @@ async function* emitDevErrorHtml(err) {
 /** @param {string} s */
 function escapeHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Resolve LocaleId from pathname using `_vmz/locale-route-realization.json`.
+ * LocaleId is a realization dimension — matching still uses stable route path.
+ * @param {string} pathname
+ */
+function resolveLocalePath(pathname) {
+    const raw = String(pathname || '/');
+    const normalized = raw.length > 1 && raw.endsWith('/') ? raw.slice(0, -1) : raw || '/';
+    if (!localeArtifact) {
+        return { localeId: 'en', dir: 'ltr', restPath: normalized, redirectTo: null };
+    }
+    const supported = (localeArtifact.locales || []).map((l) => l.id);
+    const defaultLocale = localeArtifact.defaultLocale || supported[0] || 'en';
+    const directions = Object.fromEntries((localeArtifact.locales || []).map((l) => [l.id, l.direction || 'ltr']));
+    const routing = localeArtifact.routing || {};
+    const parts = normalized.split('/').filter(Boolean);
+    let localeId = null;
+    let restPath = normalized;
+    if (parts.length && supported.includes(parts[0])) {
+        localeId = parts[0];
+        const rest = parts.slice(1);
+        restPath = rest.length ? `/${rest.join('/')}` : '/';
+    }
+    // omit defaultPrefix: prefixed defaultLocale URL redirects to unprefixed canonical.
+    if (routing.defaultPrefix === 'omit' && localeId === defaultLocale) {
+        return {
+            localeId: defaultLocale,
+            dir: directions[defaultLocale] || 'ltr',
+            restPath,
+            redirectTo: restPath,
+        };
+    }
+    const contentLocale = localeId || defaultLocale;
+    return {
+        localeId: contentLocale,
+        dir: directions[contentLocale] || 'ltr',
+        restPath,
+        redirectTo: null,
+    };
+}
+
+/**
+ * Realize href for current LocaleId (prefix strategy). Kept local so serve-host
+ * stays free of CLI package imports.
+ * @param {string} href
+ * @param {string} localeId
+ * @param {any} artifact
+ */
+function localizeSameAppHrefHost(href, localeId, artifact) {
+    if (!href || !localeId || !artifact) return href;
+    if (href.startsWith('#') || /^(mailto|tel|javascript):/i.test(href)) return href;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(href) && !href.startsWith('/')) return href;
+    let pathname = String(href);
+    let search = '';
+    let hash = '';
+    const hashIdx = pathname.indexOf('#');
+    if (hashIdx >= 0) {
+        hash = pathname.slice(hashIdx);
+        pathname = pathname.slice(0, hashIdx);
+    }
+    const qIdx = pathname.indexOf('?');
+    if (qIdx >= 0) {
+        search = pathname.slice(qIdx);
+        pathname = pathname.slice(0, qIdx);
+    }
+    if (!pathname) pathname = '/';
+    const supported = (artifact.locales || []).map((l) => l.id).filter(Boolean);
+    const defaultLocale = artifact.defaultLocale || artifact.routing?.defaultLocale;
+    const routing = artifact.routing || {};
+    const strategy = routing.strategy || 'prefix';
+    const defaultPrefix = routing.defaultPrefix || 'include';
+    const parts = pathname.split('/').filter(Boolean);
+    let rest = pathname;
+    if (parts.length && supported.includes(parts[0])) {
+        const r = parts.slice(1);
+        rest = r.length ? `/${r.join('/')}` : '/';
+    }
+    if (rest.length > 1 && rest.endsWith('/')) rest = rest.slice(0, -1);
+    if (!rest.startsWith('/')) rest = `/${rest}`;
+    if (strategy === 'none' || strategy === 'domain') return `${rest}${search}${hash}`;
+    const omitDefault = defaultPrefix === 'omit' && localeId === defaultLocale;
+    if (omitDefault) return `${rest}${search}${hash}`;
+    const pathOut = rest === '/' ? `/${localeId}` : `/${localeId}${rest}`;
+    return `${pathOut}${search}${hash}`;
+}
+
+/**
+ * @param {string} html
+ * @param {string} localeId
+ * @param {any} artifact
+ */
+function localizeBodyLinksInHost(html, localeId, artifact) {
+    if (!html || !localeId || !artifact) return html;
+    return String(html).replace(/<a\b([^>]*)>/gi, (full, attrs) => {
+        if (!/\bdata-vmz-route\s*=/.test(attrs)) return full;
+        const hm = attrs.match(/\bhref\s*=\s*"([^"]*)"/i);
+        if (!hm) return full;
+        const next = localizeSameAppHrefHost(hm[1], localeId, artifact);
+        if (next === hm[1]) return full;
+        const newAttrs = attrs.replace(/\bhref\s*=\s*"[^"]*"/i, `href="${escapeAttr(next)}"`);
+        return `<a${newAttrs}>`;
+    });
+}
+
+/**
+ * @param {string} chunkId
+ * @param {string} localeId
+ */
+function pageMetaAlternates(chunkId, localeId) {
+    if (!localeArtifact?.pageMetas) return [];
+    const meta =
+        localeArtifact.pageMetas.find((m) => m.routeId === chunkId && m.locale === localeId) ||
+        localeArtifact.pageMetas.find((m) => m.routeId === chunkId && m.locale === localeArtifact.defaultLocale);
+    return Array.isArray(meta?.alternates) ? meta.alternates : [];
 }
 
 /** @param {string} href */
@@ -999,7 +1161,7 @@ globalThis.__vmzLoadComponent = async (name) => {
     return `/**
  * Generated by vmz serve — hydrate matched file-route page (data-vmz-page) + layout chain + client Link takeover.
  */
-import { registerComponents, hydrate, hydrateRoute, destroy } from ${JSON.stringify(`./vmz-dom.js${q}`)};
+import { registerComponents, hydrate, hydrateRoute, hydrateRoutePage, destroy } from ${JSON.stringify(`./vmz-dom.js${q}`)};
 import { installClientNavigation } from ${JSON.stringify(`./vmz-client-nav.js${q}`)};
 ${imports}
 
@@ -1025,6 +1187,7 @@ await hydrateRoute(Page, root, props, layoutCtors);
 installClientNavigation({
   hydrate,
   hydrateRoute,
+  hydrateRoutePage,
   destroy,
   importPage: async (id) => (await import("./" + id + ".client.js${q}")).default,
 });

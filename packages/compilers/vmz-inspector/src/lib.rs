@@ -4,7 +4,7 @@
 //! Crate name aligns with vmz-compiler as vmz-inspector; CLI surface remains
 //! vmz check / vmz lint.
 
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 mod convention;
 
 use std::path::Path;
@@ -22,9 +22,12 @@ pub enum InspectProfile {
     Lint,
 }
 
+/// Options for [`inspect_path`] / [`inspect_project`].
 #[derive(Debug, Clone)]
 pub struct InspectOptions {
+    /// Check-only vs check+convention lint profile.
     pub profile: InspectProfile,
+    /// When true, warnings also fail the report (CLI `--deny-warnings`).
     pub deny_warnings: bool,
 }
 
@@ -34,8 +37,10 @@ impl Default for InspectOptions {
     }
 }
 
+/// Alias of the compiler [`CheckReport`] returned by inspect entry points.
 pub type InspectReport = CheckReport;
 
+/// Run check (and optional convention lints) on a file or project root.
 pub fn inspect_path(
     path: impl AsRef<Path>,
     options: &InspectOptions,
@@ -64,6 +69,7 @@ pub fn append_convention_lints(path: impl AsRef<Path>, report: &mut CheckReport)
     }
 }
 
+/// Inspect a project root (same as [`inspect_path`] on a directory).
 pub fn inspect_project(
     root: impl AsRef<Path>,
     options: &InspectOptions,
@@ -71,6 +77,7 @@ pub fn inspect_project(
     inspect_path(root, options)
 }
 
+/// Whether the inspect report should fail the CLI / N-API caller.
 pub fn failed(report: &InspectReport, options: &InspectOptions) -> bool {
     report.failed(&CheckOptions {
         deny_warnings: options.deny_warnings,

@@ -25,4 +25,11 @@ export default defineConfig({
 
 - [Zero-Cost](./zero-cost.md)
 - [Optimizations](./optimizations/index.md)
+- [Deploy](./deploy/index.md)
+  - [Recipes](./deploy/recipes.md)
+  - [Static hosts](./deploy/static-hosts.md)
+  - [Planner](./deploy/planner.md)
+  - [`vmz deploy`](./deploy/cli.md)
+  - [Secrets & env](./deploy/secrets-env.md)
+  - [Config reference](./deploy/config-reference.md)
 - More guides and plugin docs live under `/d/`

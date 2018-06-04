@@ -1,25 +1,38 @@
 //! Split a `.vmz` file into template / style / script client / script server.
 //!
-//! Required order: template ?style? ?client ?server?
+//! Required order: optional `<router>` / `<meta>`, then `<template>`, optional
+//! `<style>`, required `<script client>`, optional `<script server>`.
 
 use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
+/// Failure while splitting a `.vmz` into ordered SFC blocks.
 #[derive(Debug, Error)]
 pub enum SfcError {
+    /// Source failed structural or ordering rules for this path.
     #[error("{path}: {message}")]
-    Invalid { path: PathBuf, message: String },
+    Invalid {
+        /// File path used in the error message.
+        path: PathBuf,
+        /// Human-readable rule violation.
+        message: String,
+    },
 }
 
+/// Which `<script>` slice a block belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScriptKind {
+    /// `<script client>` — browser / island logic.
     Client,
+    /// `<script server>` — server-only slice.
     Server,
 }
 
+/// Raw `<template>` body plus its byte offset in the original source.
 #[derive(Debug, Clone)]
 pub struct TemplateBlock {
+    /// Markup between the opening and closing `<template>` tags.
     pub content: String,
     /// Byte offset of content start in the original source.
     pub content_start: usize,
@@ -28,12 +41,16 @@ pub struct TemplateBlock {
 /// `<style>` dialect. Default is SCSS (no `lang` attribute).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StyleLanguage {
+    /// SCSS (default when `lang` is omitted).
     Scss,
+    /// Plain CSS.
     Css,
+    /// Indented Sass.
     Sass,
 }
 
 impl StyleLanguage {
+    /// Parse a `<style lang="...">` attribute value (`None` => SCSS).
     pub fn parse_attr(raw: Option<&str>) -> Result<Self, String> {
         match raw.map(str::trim).filter(|s| !s.is_empty()) {
             None => Ok(Self::Scss),
@@ -47,44 +64,118 @@ impl StyleLanguage {
     }
 }
 
+/// Raw `<style>` body, offset, and dialect.
 #[derive(Debug, Clone)]
 pub struct StyleBlock {
+    /// Stylesheet text between the style tags.
     pub content: String,
+    /// Byte offset of content start in the original source.
     pub content_start: usize,
+    /// Dialect selected by `lang` (defaults to SCSS).
     pub lang: StyleLanguage,
 }
 
+/// Server/Client Language DSL flavor (`lang` on `<script …>`).
+///
+/// This is a VMZ DSL surface, not “full target language source”.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ScriptLanguage {
+    /// TS-flavor DSL (default; also `lang="ts"` / `lang="typescript"`).
+    #[default]
+    Ts,
+    /// Rust-flavor Server DSL (subset).
+    Rust,
+    /// Python-flavor Server DSL (registered; not implemented yet).
+    Python,
+    /// Java-flavor Server DSL (registered; not implemented yet).
+    Java,
+}
+
+impl ScriptLanguage {
+    /// Resolve `lang` attribute. `None` => TS. Unknown => `Err`.
+    pub fn parse_attr(raw: Option<&str>) -> Result<Self, String> {
+        match raw.map(str::trim).filter(|s| !s.is_empty()) {
+            None => Ok(Self::Ts),
+            Some("ts") | Some("typescript") => Ok(Self::Ts),
+            Some("rust") => Ok(Self::Rust),
+            Some("python") => Ok(Self::Python),
+            Some("java") => Ok(Self::Java),
+            Some(other) => Err(format!(
+                "unknown script language `{other}` (vmz::server::unknown_language); \
+                 use ts|typescript|rust|python|java"
+            )),
+        }
+    }
+
+    /// Canonical lang id string.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Ts => "ts",
+            Self::Rust => "rust",
+            Self::Python => "python",
+            Self::Java => "java",
+        }
+    }
+
+    /// Client blocks may only use TS flavor for now.
+    pub fn allowed_on_client(self) -> bool {
+        matches!(self, Self::Ts)
+    }
+
+    /// Whether the backend can lower this flavor today.
+    pub fn implemented(self) -> bool {
+        matches!(self, Self::Ts | Self::Rust)
+    }
+}
+
+/// One `<script client>` or `<script server>` body.
 #[derive(Debug, Clone)]
 pub struct ScriptBlock {
+    /// Client vs server role for this block.
     pub kind: ScriptKind,
+    /// DSL flavor selected by `lang` (defaults to TS).
+    pub lang: ScriptLanguage,
+    /// Source between the script tags (DSL text for the selected flavor).
     pub content: String,
+    /// Byte offset of content start in the original source.
     pub content_start: usize,
 }
 
+/// Optional JSON5 (or reserved YAML) data block such as `<router>` / `<meta>`.
 #[derive(Debug, Clone)]
 pub struct DataBlock {
+    /// Block body (empty when the tag was self-closing).
     pub content: String,
+    /// Byte offset of content start in the original source.
     pub content_start: usize,
     /// `None` or `json5` (default); `yaml` reserved.
     pub lang: Option<String>,
-    /// Opening-tag attributes (e.g. `<router path="/x" />` sugar → same RouteContract).
+    /// Opening-tag attributes (e.g. `<router path="/x" />` sugar -> same RouteContract).
     pub attrs: String,
 }
 
+/// Fully ordered SFC parse of one `.vmz` file.
 #[derive(Debug, Clone)]
 pub struct ParsedVmz {
+    /// Source file path (for diagnostics and downstream tooling).
     pub path: PathBuf,
+    /// Complete original source text.
     pub source: String,
+    /// Required view markup block.
     pub template: TemplateBlock,
+    /// Optional stylesheet block after the template.
     pub style: Option<StyleBlock>,
+    /// Required client script block.
     pub client: ScriptBlock,
+    /// Optional server script block after the client script.
     pub server: Option<ScriptBlock>,
-    /// Optional RouteContract data block (≤1).
+    /// Optional RouteContract data block (<=1).
     pub router: Option<DataBlock>,
-    /// Optional PageMeta data block (≤1).
+    /// Optional PageMeta data block (<=1).
     pub meta: Option<DataBlock>,
 }
 
+/// Parse `source` as a `.vmz` SFC, enforcing block order and uniqueness.
 pub fn parse_vmz(path: impl AsRef<Path>, source: impl Into<String>) -> Result<ParsedVmz, SfcError> {
     let path = path.as_ref().to_path_buf();
     let source = source.into();
@@ -172,14 +263,26 @@ pub fn parse_vmz(path: impl AsRef<Path>, source: impl Into<String>) -> Result<Pa
                 if !matches!(last_role, BlockRole::Template | BlockRole::Style) {
                     return Err(err(
                         &path,
-                        "`<script client>` must follow template/style (view ?client ?server)",
+                        "`<script client>` must follow template/style (view then client then optional server)",
                     ));
                 }
                 if client.is_some() {
                     return Err(err(&path, "duplicate `<script client>`"));
                 }
+                let lang = ScriptLanguage::parse_attr(block.lang.as_deref())
+                    .map_err(|message| err(&path, message))?;
+                if !lang.allowed_on_client() {
+                    return Err(err(
+                        &path,
+                        format!(
+                            "`<script client lang=\"{}\">` is not allowed; client scripts use ts",
+                            lang.as_str()
+                        ),
+                    ));
+                }
                 client = Some(ScriptBlock {
                     kind: ScriptKind::Client,
+                    lang,
                     content: block.content,
                     content_start: block.content_start,
                 });
@@ -189,14 +292,26 @@ pub fn parse_vmz(path: impl AsRef<Path>, source: impl Into<String>) -> Result<Pa
                 if !matches!(last_role, BlockRole::Client) {
                     return Err(err(
                         &path,
-                        "`<script server>` must follow `<script client>` (view ?client ?server)",
+                        "`<script server>` must follow `<script client>` (view then client then server)",
                     ));
                 }
                 if server.is_some() {
                     return Err(err(&path, "duplicate `<script server>`"));
                 }
+                let lang = ScriptLanguage::parse_attr(block.lang.as_deref())
+                    .map_err(|message| err(&path, message))?;
+                if !lang.implemented() {
+                    return Err(err(
+                        &path,
+                        format!(
+                            "`<script server lang=\"{}\">` is registered but not implemented yet",
+                            lang.as_str()
+                        ),
+                    ));
+                }
                 server = Some(ScriptBlock {
                     kind: ScriptKind::Server,
+                    lang,
                     content: block.content,
                     content_start: block.content_start,
                 });

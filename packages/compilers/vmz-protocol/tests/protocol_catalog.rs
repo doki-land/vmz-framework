@@ -224,15 +224,21 @@ fn dx_catalog_lists_x0_plus_x1_documents() {
 
 #[test]
 fn rename_intent_and_test_selection_roundtrip() {
-    let intent = RenameIntent::new("route_id", "home", "landing");
+    let intent = RenameIntent::new(StableIdKind::RouteId, "home", "landing");
     let back: RenameIntent = serde_json::from_str(&intent.to_json()).unwrap();
     assert_eq!(back.schema, RENAME_SCHEMA);
-    assert_eq!(back.kind, "route_id");
-    assert_eq!(normalize_rename_kind("route"), Some("route_id"));
+    assert_eq!(back.kind, StableIdKind::RouteId);
+    assert_eq!(back.kind.as_str(), "route-id");
+    assert_eq!(StableIdKind::parse("route-id"), Some(StableIdKind::RouteId));
+    assert_eq!(StableIdKind::parse("route"), Some(StableIdKind::RouteId));
+    assert_eq!(StableIdKind::parse("route_id"), None);
+    assert_eq!(normalize_rename_kind("route-id"), Some(StableIdKind::RouteId));
+    assert_eq!(normalize_rename_kind("route"), Some(StableIdKind::RouteId));
+    assert_eq!(normalize_rename_kind("binding"), None); // not a rename-planning kind
     let sel = TestSelectionDocument::empty("no dirty units");
     let sel_back: TestSelectionDocument = serde_json::from_str(&sel.to_json()).unwrap();
     assert_eq!(sel_back.schema, TEST_SELECTION_SCHEMA);
-    assert_eq!(sel_back.status, "empty");
+    assert_eq!(sel_back.status, DxPreviewStatus::Empty);
 }
 
 #[test]
@@ -241,7 +247,7 @@ fn workspace_edit_roundtrip() {
     let json = plan.to_json();
     let back: WorkspaceEditPlan = serde_json::from_str(&json).unwrap();
     assert_eq!(back.schema, WORKSPACE_EDIT_SCHEMA);
-    assert_eq!(back.status, "preview");
+    assert_eq!(back.status, WorkspaceEditStatus::Preview);
 }
 
 #[test]
@@ -249,7 +255,7 @@ fn explain_document_uses_dx_schema() {
     let doc = ExplainDocument {
         schema: EXPLAIN_SCHEMA.into(),
         target: "components/Card".into(),
-        kind: "chunk".into(),
+        kind: ExplainKind::Chunk,
         chunk_id: Some("components/Card".into()),
         deployment_unit: None,
         program: None,
@@ -322,7 +328,7 @@ fn native_host_catalog_freezes_native_host_schemas() {
     let dep = WebViewDeploymentProfile::local_bundled_example(vec![cap]);
     assert!(dep.reuses_browser_lowering);
     assert_eq!(dep.plan_schema, PLAN_SCHEMA);
-    assert_eq!(dep.asset_mode, "local");
+    assert_eq!(dep.asset_mode, AssetMode::Local);
     assert!(c.documents.iter().any(|d| d.kind == "shell" && d.schema == SHELL_SCHEMA));
     assert!(c.documents.iter().any(|d| d.kind == "shell_check" && d.schema == SHELL_CHECK_SCHEMA));
     assert!(c.diagnostics.iter().any(|d| d == DIAG_MISSING_SHELL_HOOK));
@@ -379,7 +385,7 @@ fn native_host_catalog_freezes_native_host_schemas() {
     assert!(c.diagnostics.iter().any(|d| d == DIAG_SURFACE_IS_CAPABILITY));
     let surf = NativeSurfaceManifest::camera_preview_example();
     assert_eq!(surf.schema, NATIVE_SURFACE_SCHEMA);
-    assert_eq!(surf.kind, "camera");
+    assert_eq!(surf.kind, NativeSurfaceKind::Camera);
     assert!(!surf.confused_with_capability);
     assert!(
         c.documents.iter().any(|d| d.kind == "multi_platform" && d.schema == MULTI_PLATFORM_SCHEMA)

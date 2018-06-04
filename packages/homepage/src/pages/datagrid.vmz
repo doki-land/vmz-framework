@@ -1,0 +1,838 @@
+<template>
+  <div data-dogfood="datagrid" data-density="compact" data-grid-mode={viewMode}>
+    <ConsoleShell
+      brand="VMZ"
+      homeHref="/"
+      title="DataGrid"
+      navLabel="Console"
+      nav={navItems}
+    >
+      <Alert
+        tone="info"
+        roleName="status"
+        title="DataGrid group + tree + edit + pivot"
+        description="@vmz/ui-data-grid — virtualized + pinned + group/tree/edit + parent-owned pivot matrix (row×col→sum). Not a second spreadsheet runtime."
+      />
+
+      <p data-dogfood="datagrid-state">
+        mode:{viewMode};total:{totalRows};flat:{flatCount};visible:{visibleCount};window:{windowStart}-{windowEnd};selected:{selectedAttr || 'none'};count:{selectedCount};sort:{sortKey}:{sortDir};group:{groupBy};groups:{groupCount};expanded:{expandedAttr};agg:{aggSample};tree:{treeAttr};depthMax:{depthMax};treeExpanded:{treeExpandedAttr};editing:{editingKey || 'none'};draft:{editDraft || '-'};scoreSample:{scoreSample};pivot:{pivotAttr};pivotRows:{pivotRowCount};pivotCols:{pivotColsLabel};pivotMeasure:{pivotMeasure};pivotSample:{pivotSample}
+      </p>
+
+      <div data-dogfood="datagrid-modes">
+        <span data-dogfood="mode-group">
+          <Button type="button" variant="secondary" onClick={() => this.setMode('group')}>Group mode</Button>
+        </span>
+        <span data-dogfood="mode-tree">
+          <Button type="button" variant="secondary" onClick={() => this.setMode('tree')}>Tree mode</Button>
+        </span>
+        <span data-dogfood="mode-pivot">
+          <Button type="button" variant="secondary" onClick={() => this.setMode('pivot')}>Pivot mode</Button>
+        </span>
+      </div>
+
+      <div if={showEditField} data-dogfood="datagrid-edit-field">
+        <Field
+          label="Cell draft (Field mirror)"
+          controlId="datagrid-edit-draft"
+          descriptionId="datagrid-edit-draft-desc"
+          errorId="datagrid-edit-draft-err"
+          description="Parent-owned draft mirrored via @vmz/ui Field — DataGrid does not ship Field."
+          value={editDraft}
+          onInput={(e) => this.onFieldDraft(e)}
+        />
+      </div>
+
+      <BulkActions label="Bulk actions" selectedCount={selectedCount} countLabel={bulkLabel}>
+        <Button type="button" variant="secondary" onClick={() => this.clearSelection()}>Clear</Button>
+      </BulkActions>
+
+      <DataGrid
+        columns={columns}
+        rows={rows}
+        totalRows={totalRowsLabel}
+        visibleCount={visibleCountLabel}
+        pinnedCols="1"
+        sortKey={sortKey}
+        sortDir={sortDir}
+        selectedCount={selectedCountLabel}
+        allSelected={allSelected}
+        selectAllLabel="Select all leaf rows in dataset"
+        groupByAttr={groupBy}
+        groupCount={groupCountLabel}
+        treeAttr={treeAttr}
+        pivotAttr={pivotAttr}
+        pivotColsAttr={pivotColsLabel}
+        editingAttr={editingKey}
+        rowLayoutStyle={rowLayoutStyle}
+        canvasStyle={canvasStyle}
+        padTopStyle={padTopStyle}
+        padBottomStyle={padBottomStyle}
+        onScroll={(top) => this.onScroll(top)}
+        onSort={(id) => this.sortBy(id)}
+        onToggleRow={(id) => this.toggleRow(id)}
+        onToggleAll={() => this.toggleAll()}
+        onToggleGroup={(key) => this.toggleGroup(key)}
+        onToggleTree={(id) => this.toggleTree(id)}
+        onStartEdit={(key) => this.startEdit(key)}
+        onEditInput={(v) => this.onEditInput(v)}
+        onCommitEdit={() => this.commitEdit()}
+        onCancelEdit={() => this.cancelEdit()}
+      />
+    </ConsoleShell>
+  </div>
+</template>
+
+<script client>
+const ROW_H = 36;
+const OVERSCAN = 4;
+const VIEWPORT_H = 288;
+const COL_IDS = ['name', 'status', 'owner', 'region', 'score'];
+const REGIONS = ['APAC', 'EMEA', 'AMER', 'LATAM'];
+
+export default class DatagridPage {
+  viewMode = 'group';
+  totalRows = 200;
+  totalRowsLabel = '200';
+  flatCount = 0;
+  selectedAttr = '';
+  selectedCount = 0;
+  selectedCountLabel = '0';
+  bulkLabel = '';
+  allSelected = false;
+  sortKey = 'name';
+  sortDir = 'asc';
+  scrollTop = 0;
+  windowStart = 0;
+  windowEnd = 0;
+  visibleCount = 0;
+  visibleCountLabel = '0';
+  canvasStyle = 'min-height:7200px';
+  padTopStyle = 'height:0px';
+  padBottomStyle = 'height:0px';
+  groupBy = 'region';
+  groupCount = 0;
+  groupCountLabel = '0';
+  expandedAttr = 'AMER,APAC,EMEA,LATAM';
+  aggSample = '';
+  treeAttr = 'false';
+  pivotAttr = 'false';
+  pivotRowCount = '0';
+  pivotColsLabel = '';
+  pivotMeasure = '';
+  pivotSample = '';
+  rowLayoutStyle = '';
+  depthMax = '0';
+  treeExpandedAttr = '';
+  editingKey = '';
+  editDraft = '';
+  showEditField = false;
+  scoreSample = '';
+  leafIds = [];
+  longFormColumns = [
+    {
+      id: 'name',
+      title: 'Name',
+      pinnedAttr: 'true',
+      cellClass: 'vmz-ui-datagrid__cell vmz-ui-datagrid__cell--pinned vmz-ui-datagrid__cell--pinned-data',
+      pivotColAttr: 'false',
+    },
+    { id: 'status', title: 'Status', pinnedAttr: 'false', cellClass: 'vmz-ui-datagrid__cell', pivotColAttr: 'false' },
+    { id: 'owner', title: 'Owner', pinnedAttr: 'false', cellClass: 'vmz-ui-datagrid__cell', pivotColAttr: 'false' },
+    { id: 'region', title: 'Region', pinnedAttr: 'false', cellClass: 'vmz-ui-datagrid__cell', pivotColAttr: 'false' },
+    { id: 'score', title: 'Score', pinnedAttr: 'false', cellClass: 'vmz-ui-datagrid__cell', pivotColAttr: 'false' },
+  ];
+  columns = [];
+  baseRows = [];
+  /** @type {{ id: string, parentId: string, depth: number, expandable: boolean, name: string, status: string, owner: string, region: string, score: string }[]} */
+  treeNodes = [];
+  /** @type {{ id: string, owner: string, measures: Record<string, number>, total: number }[]} */
+  pivotRows = [];
+  rows = [];
+  navItems = [
+    { id: 'datagrid', title: 'DataGrid', href: '/datagrid' },
+    { id: 'datatable', title: 'DataTable', href: '/datatable' },
+    { id: 'console', title: 'Console', href: '/console' },
+  ];
+
+  onMount() {
+    this.columns = this.longFormColumns.slice();
+    this.ensureDataset();
+    this.refreshWindow();
+  }
+
+  ensureDataset() {
+    if (!this.baseRows || this.baseRows.length !== this.totalRows) {
+      const statuses = ['Active', 'Paused', 'Draft', 'Archived'];
+      const owners = ['Ops', 'Docs', 'Runtime', 'Design', 'QA'];
+      this.baseRows = Array.from({ length: this.totalRows }, (_, i) => {
+        const n = i + 1;
+        return {
+          id: `r${n}`,
+          name: `Row ${String(n).padStart(3, '0')}`,
+          status: statuses[i % statuses.length],
+          owner: owners[i % owners.length],
+          region: REGIONS[i % REGIONS.length],
+          score: String((i * 7) % 100),
+        };
+      });
+      if (!String(this.expandedAttr || '').trim()) {
+        this.expandedAttr = REGIONS.slice().sort().join(',');
+      }
+    }
+    if (!this.treeNodes || this.treeNodes.length === 0) {
+      this.buildTreeNodes();
+    }
+  }
+
+  /**
+   * 3-level hierarchy: 10 roots → 4 mids each → 4 leaves each (10+40+160=210 nodes).
+   * Distinct from groupBy: every node is a row with parentId/depth.
+   */
+  buildTreeNodes() {
+    const statuses = ['Active', 'Paused', 'Draft', 'Archived'];
+    const owners = ['Ops', 'Docs', 'Runtime', 'Design', 'QA'];
+    const nodes = [];
+    const leafIds = [];
+    for (let r = 1; r <= 10; r++) {
+      const rootId = `t${r}`;
+      const region = REGIONS[(r - 1) % REGIONS.length];
+      nodes.push({
+        id: rootId,
+        parentId: '',
+        depth: 0,
+        expandable: true,
+        name: `Org ${String(r).padStart(2, '0')}`,
+        status: 'Folder',
+        owner: owners[(r - 1) % owners.length],
+        region,
+        score: '',
+      });
+      for (let m = 1; m <= 4; m++) {
+        const midId = `${rootId}-m${m}`;
+        nodes.push({
+          id: midId,
+          parentId: rootId,
+          depth: 1,
+          expandable: true,
+          name: `Team ${r}.${m}`,
+          status: 'Team',
+          owner: owners[(r + m) % owners.length],
+          region,
+          score: '',
+        });
+        for (let L = 1; L <= 4; L++) {
+          const leafId = `${midId}-l${L}`;
+          leafIds.push(leafId);
+          nodes.push({
+            id: leafId,
+            parentId: midId,
+            depth: 2,
+            expandable: false,
+            name: `Leaf ${r}.${m}.${L}`,
+            status: statuses[(r + m + L) % statuses.length],
+            owner: owners[(r + m + L) % owners.length],
+            region,
+            score: String((r * 11 + m * 5 + L * 3) % 100),
+          });
+        }
+      }
+    }
+    this.treeNodes = nodes;
+    this.leafIds = leafIds;
+    // Default: expand all roots + first root's mids so depth-2 leaves appear near top.
+    const roots = nodes.filter((n) => n.depth === 0).map((n) => n.id);
+    const firstMids = nodes.filter((n) => n.parentId === 't1').map((n) => n.id);
+    this.treeExpandedAttr = [...roots, ...firstMids].sort().join(',');
+    this.depthMax = '2';
+  }
+
+  selectedSet() {
+    return new Set(
+      String(this.selectedAttr || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+  }
+
+  expandedSet() {
+    return new Set(
+      String(this.expandedAttr || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+  }
+
+  treeExpandedSet() {
+    return new Set(
+      String(this.treeExpandedAttr || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+  }
+
+  sortedBase() {
+    const key = this.sortKey;
+    const dir = this.sortDir === 'desc' ? -1 : 1;
+    return this.baseRows.slice().sort((a, b) => {
+      const av = String(a[key] ?? a.id);
+      const bv = String(b[key] ?? b.id);
+      return av.localeCompare(bv, undefined, { numeric: true }) * dir;
+    });
+  }
+
+  setMode(mode) {
+    const next = mode === 'tree' ? 'tree' : mode === 'pivot' ? 'pivot' : 'group';
+    if (this.viewMode === next) return;
+    this.cancelEdit();
+    this.viewMode = next;
+    this.selectedAttr = '';
+    this.scrollTop = 0;
+    this.sortKey = next === 'pivot' ? 'owner' : 'name';
+    this.sortDir = 'asc';
+    if (next === 'tree') {
+      this.groupBy = '';
+      this.treeAttr = 'true';
+      this.pivotAttr = 'false';
+      this.pivotColsLabel = '';
+      this.pivotMeasure = '';
+      this.pivotSample = '';
+      this.rowLayoutStyle = '';
+      this.columns = this.longFormColumns.slice();
+      this.groupCount = 0;
+      this.groupCountLabel = '0';
+      this.aggSample = '';
+      if (!String(this.treeExpandedAttr || '').trim()) this.buildTreeNodes();
+    } else if (next === 'pivot') {
+      this.groupBy = '';
+      this.treeAttr = 'false';
+      this.pivotAttr = 'true';
+      this.groupCount = 0;
+      this.groupCountLabel = '0';
+      this.aggSample = '';
+      this.applyPivotColumns();
+      this.buildPivotRows();
+    } else {
+      this.groupBy = 'region';
+      this.treeAttr = 'false';
+      this.pivotAttr = 'false';
+      this.pivotColsLabel = '';
+      this.pivotMeasure = '';
+      this.pivotSample = '';
+      this.rowLayoutStyle = '';
+      this.columns = this.longFormColumns.slice();
+      this.expandedAttr = REGIONS.slice().sort().join(',');
+    }
+    this.refreshWindow();
+  }
+
+  applyPivotColumns() {
+    const regions = REGIONS.slice().sort();
+    this.pivotColsLabel = regions.join(',');
+    this.pivotMeasure = 'sum(score)';
+    this.rowLayoutStyle = `grid-template-columns: 2.5rem 10rem ${regions.map(() => 'minmax(5.5rem, 1fr)').join(' ')} 6rem`;
+    this.columns = [
+      {
+        id: 'owner',
+        title: 'Owner',
+        pinnedAttr: 'true',
+        cellClass: 'vmz-ui-datagrid__cell vmz-ui-datagrid__cell--pinned vmz-ui-datagrid__cell--pinned-data',
+        pivotColAttr: 'false',
+      },
+      ...regions.map((r) => ({
+        id: r,
+        title: r,
+        pinnedAttr: 'false',
+        cellClass: 'vmz-ui-datagrid__cell vmz-ui-datagrid__cell--pivot-measure',
+        pivotColAttr: 'true',
+      })),
+      {
+        id: 'total',
+        title: 'Total',
+        pinnedAttr: 'false',
+        cellClass: 'vmz-ui-datagrid__cell vmz-ui-datagrid__cell--pivot-measure vmz-ui-datagrid__cell--agg',
+        pivotColAttr: 'false',
+      },
+    ];
+  }
+
+  /**
+   * Parent-owned pivot: rows=owner, cols=region, measure=sum(score).
+   */
+  buildPivotRows() {
+    const regions = REGIONS.slice().sort();
+    /** @type {Map<string, Record<string, number>>} */
+    const byOwner = new Map();
+    for (const leaf of this.baseRows) {
+      const owner = String(leaf.owner || '(blank)');
+      if (!byOwner.has(owner)) {
+        const measures = {};
+        for (const r of regions) measures[r] = 0;
+        byOwner.set(owner, measures);
+      }
+      const bucket = byOwner.get(owner);
+      const region = String(leaf.region || '');
+      if (region in bucket) bucket[region] += Number(leaf.score) || 0;
+    }
+    const owners = [...byOwner.keys()].sort((a, b) => a.localeCompare(b));
+    this.pivotRows = owners.map((owner) => {
+      const measures = byOwner.get(owner) || {};
+      let total = 0;
+      for (const r of regions) total += Number(measures[r]) || 0;
+      return { id: `p:${owner}`, owner, measures, total };
+    });
+    this.pivotRowCount = String(this.pivotRows.length);
+    const first = this.pivotRows[0];
+    this.pivotSample = first
+      ? `${first.owner}:${regions[0]}=${first.measures[regions[0]]};total=${first.total}`
+      : '';
+  }
+
+  flattenGroupRows() {
+    const sorted = this.sortedBase();
+    const groupBy = String(this.groupBy || '').trim();
+    if (!groupBy) {
+      return sorted.map((leaf) => ({ kind: 'leaf', id: leaf.id, groupKey: '', leaf }));
+    }
+
+    const buckets = new Map();
+    for (const leaf of sorted) {
+      const key = String(leaf[groupBy] ?? '(blank)');
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push(leaf);
+    }
+
+    const expanded = this.expandedSet();
+    const flat = [];
+    const keys = [...buckets.keys()].sort((a, b) => a.localeCompare(b));
+    this.groupCount = keys.length;
+    this.groupCountLabel = String(keys.length);
+
+    for (const key of keys) {
+      const leaves = buckets.get(key) || [];
+      let sumScore = 0;
+      for (const leaf of leaves) sumScore += Number(leaf.score) || 0;
+      const isOpen = expanded.has(key);
+      flat.push({
+        kind: 'group',
+        id: `g:${key}`,
+        groupKey: key,
+        expanded: isOpen,
+        count: leaves.length,
+        sumScore,
+      });
+      if (isOpen) {
+        for (const leaf of leaves) {
+          flat.push({ kind: 'leaf', id: leaf.id, groupKey: key, leaf });
+        }
+      }
+    }
+
+    const first = flat.find((r) => r.kind === 'group');
+    this.aggSample = first ? `${first.groupKey}:count=${first.count};sum=${first.sumScore}` : '';
+    return flat;
+  }
+
+  flattenTreeRows() {
+    const byParent = new Map();
+    for (const node of this.treeNodes) {
+      const p = node.parentId || '';
+      if (!byParent.has(p)) byParent.set(p, []);
+      byParent.get(p).push(node);
+    }
+    for (const list of byParent.values()) {
+      list.sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
+    }
+
+    const expanded = this.treeExpandedSet();
+    const flat = [];
+    const walk = (parentId) => {
+      const kids = byParent.get(parentId) || [];
+      for (const node of kids) {
+        flat.push({ kind: 'tree', node });
+        if (node.expandable && expanded.has(node.id)) walk(node.id);
+      }
+    };
+    walk('');
+    this.groupCount = 0;
+    this.groupCountLabel = '0';
+    this.aggSample = '';
+    this.depthMax = '2';
+    return flat;
+  }
+
+  flattenRows() {
+    if (this.viewMode === 'tree') return this.flattenTreeRows();
+    if (this.viewMode === 'pivot') return this.flattenPivotRows();
+    return this.flattenGroupRows();
+  }
+
+  flattenPivotRows() {
+    if (!this.pivotRows.length) this.buildPivotRows();
+    const dir = this.sortDir === 'desc' ? -1 : 1;
+    const key = this.sortKey;
+    const sorted = this.pivotRows.slice().sort((a, b) => {
+      let av;
+      let bv;
+      if (key === 'owner' || key === 'name') {
+        av = a.owner;
+        bv = b.owner;
+      } else if (key === 'total') {
+        av = a.total;
+        bv = b.total;
+      } else {
+        av = Number(a.measures[key]) || 0;
+        bv = Number(b.measures[key]) || 0;
+      }
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+      return String(av).localeCompare(String(bv), undefined, { numeric: true }) * dir;
+    });
+    this.groupCount = 0;
+    this.groupCountLabel = '0';
+    this.aggSample = '';
+    return sorted.map((row) => ({ kind: 'pivot', row }));
+  }
+
+  mapCell(rowId, colId, text, opts = {}) {
+    const pinned = opts.pinned != null ? !!opts.pinned : colId === 'name';
+    const editable = !!opts.editable;
+    const cellKey = `${rowId}:${colId}`;
+    const editing = editable && this.editingKey === cellKey;
+    const agg = !!opts.agg;
+    const measure = !!opts.measure;
+    return {
+      id: cellKey,
+      text: String(text ?? ''),
+      pinnedAttr: pinned ? 'true' : 'false',
+      aggAttr: agg ? 'true' : 'false',
+      cellStyle: opts.cellStyle || '',
+      editableAttr: editable ? 'true' : 'false',
+      editingAttr: editing ? 'true' : 'false',
+      editing,
+      showText: !editing,
+      startEditKey: editable && !editing ? cellKey : '',
+      cellKey,
+      editValue: editing ? this.editDraft : String(text ?? ''),
+      editLabel: `Edit ${colId} for ${rowId}`,
+      cellClass: pinned
+        ? 'vmz-ui-datagrid__cell vmz-ui-datagrid__cell--pinned vmz-ui-datagrid__cell--pinned-data'
+        : measure
+          ? 'vmz-ui-datagrid__cell vmz-ui-datagrid__cell--pivot-measure'
+          : agg
+            ? 'vmz-ui-datagrid__cell vmz-ui-datagrid__cell--agg'
+            : 'vmz-ui-datagrid__cell',
+    };
+  }
+
+  mapFlatToView(entry, selected) {
+    if (entry.kind === 'pivot') {
+      const prow = entry.row;
+      const isOn = selected.has(prow.id);
+      const regions = REGIONS.slice().sort();
+      const cells = [
+        this.mapCell(prow.id, 'owner', prow.owner, { pinned: true }),
+        ...regions.map((r) => this.mapCell(prow.id, r, String(prow.measures[r] || 0), { measure: true, agg: true })),
+        this.mapCell(prow.id, 'total', String(prow.total), { agg: true, measure: true }),
+      ];
+      return {
+        id: prow.id,
+        kindAttr: 'pivot',
+        isGroup: false,
+        isTreeExpandable: false,
+        isLeaf: true,
+        rowClass: 'vmz-ui-datagrid__row',
+        groupKey: '',
+        depthAttr: '',
+        expandedAttr: '',
+        twist: '',
+        twistLabel: '',
+        selected: isOn,
+        selectedAttr: isOn ? 'true' : 'false',
+        selectLabel: `Select pivot ${prow.owner}`,
+        pivotRowAttr: prow.owner,
+        cells,
+      };
+    }
+
+    if (entry.kind === 'group') {
+      const twist = entry.expanded ? '−' : '+';
+      return {
+        id: entry.id,
+        kindAttr: 'group',
+        isGroup: true,
+        isTreeExpandable: false,
+        isLeaf: false,
+        rowClass: 'vmz-ui-datagrid__row vmz-ui-datagrid__row--group',
+        groupKey: entry.groupKey,
+        depthAttr: '',
+        expandedAttr: entry.expanded ? 'true' : 'false',
+        twist,
+        twistLabel: entry.expanded ? `Collapse ${entry.groupKey}` : `Expand ${entry.groupKey}`,
+        selected: false,
+        selectedAttr: 'false',
+        selectLabel: '',
+        pivotRowAttr: '',
+        cells: COL_IDS.map((id) => {
+          let text = '';
+          let agg = false;
+          if (id === 'name') text = String(entry.groupKey);
+          else if (id === 'status') {
+            text = `n=${entry.count}`;
+            agg = true;
+          } else if (id === 'score') {
+            text = `Σ=${entry.sumScore}`;
+            agg = true;
+          } else if (id === 'region') text = this.groupBy === 'region' ? entry.groupKey : '';
+          return this.mapCell(entry.id, id, text, { agg });
+        }),
+      };
+    }
+
+    if (entry.kind === 'tree') {
+      const node = entry.node;
+      const expandable = !!node.expandable;
+      const isOpen = expandable && this.treeExpandedSet().has(node.id);
+      const twist = isOpen ? '−' : '+';
+      const depth = Number(node.depth) || 0;
+      const isOn = !expandable && selected.has(node.id);
+      return {
+        id: node.id,
+        kindAttr: 'tree',
+        isGroup: false,
+        isTreeExpandable: expandable,
+        isLeaf: !expandable,
+        rowClass: expandable
+          ? 'vmz-ui-datagrid__row vmz-ui-datagrid__row--tree-branch'
+          : 'vmz-ui-datagrid__row',
+        groupKey: '',
+        depthAttr: String(depth),
+        expandedAttr: expandable ? (isOpen ? 'true' : 'false') : '',
+        twist: expandable ? twist : '',
+        twistLabel: expandable
+          ? isOpen
+            ? `Collapse ${node.name}`
+            : `Expand ${node.name}`
+          : '',
+        selected: isOn,
+        selectedAttr: isOn ? 'true' : 'false',
+        selectLabel: expandable ? '' : `Select ${node.name}`,
+        pivotRowAttr: '',
+        cells: COL_IDS.map((id) => {
+          const indent = id === 'name' ? `padding-left:${0.45 + depth * 0.9}rem` : '';
+          const editable = !expandable && id === 'score';
+          return this.mapCell(node.id, id, node[id], { cellStyle: indent, editable });
+        }),
+      };
+    }
+
+    const row = entry.leaf;
+    const isOn = selected.has(row.id);
+    return {
+      id: row.id,
+      kindAttr: 'row',
+      isGroup: false,
+      isTreeExpandable: false,
+      isLeaf: true,
+      rowClass: 'vmz-ui-datagrid__row',
+      groupKey: entry.groupKey || '',
+      depthAttr: '',
+      expandedAttr: '',
+      twist: '',
+      twistLabel: '',
+      selected: isOn,
+      selectedAttr: isOn ? 'true' : 'false',
+      selectLabel: `Select ${row.name}`,
+      pivotRowAttr: '',
+      cells: COL_IDS.map((id) => {
+        const editable = this.viewMode === 'group' && id === 'score';
+        return this.mapCell(row.id, id, row[id], { editable });
+      }),
+    };
+  }
+
+  refreshWindow() {
+    this.ensureDataset();
+    if (!this.columns.length) this.columns = this.longFormColumns.slice();
+    const selected = this.selectedSet();
+    const flat = this.flattenRows();
+    const total = flat.length;
+    this.flatCount = total;
+    const start = Math.max(0, Math.min(total, Math.floor(this.scrollTop / ROW_H) - OVERSCAN));
+    const capacity = Math.ceil(VIEWPORT_H / ROW_H) + OVERSCAN * 2;
+    const end = Math.min(total, start + capacity);
+    const padTop = start * ROW_H;
+    const padBottom = Math.max(0, (total - end) * ROW_H);
+
+    this.windowStart = start;
+    this.windowEnd = Math.max(start, end - 1);
+    this.visibleCount = end - start;
+    this.visibleCountLabel = String(this.visibleCount);
+    const leafTotal =
+      this.viewMode === 'tree'
+        ? this.leafIds.length
+        : this.viewMode === 'pivot'
+          ? this.pivotRows.length
+          : this.totalRows;
+    this.totalRowsLabel = String(leafTotal);
+    this.canvasStyle = `min-height:${total * ROW_H}px`;
+    this.padTopStyle = `height:${padTop}px`;
+    this.padBottomStyle = `height:${padBottom}px`;
+
+    this.rows = flat.slice(start, end).map((entry) => this.mapFlatToView(entry, selected));
+
+    this.selectedCount = selected.size;
+    this.selectedCountLabel = String(selected.size);
+    this.allSelected = leafTotal > 0 && selected.size === leafTotal;
+    this.bulkLabel = selected.size ? `${selected.size} selected` : '';
+    this.showEditField = !!this.editingKey;
+    const sample = this.baseRows.find((r) => r.id === 'r1') || this.baseRows[0];
+    this.scoreSample = sample ? `${sample.id}=${sample.score}` : '';
+    if (this.viewMode === 'pivot' && this.pivotRows[0]) {
+      const first = this.pivotRows[0];
+      const regions = REGIONS.slice().sort();
+      this.pivotSample = `${first.owner}:${regions[0]}=${first.measures[regions[0]]};total=${first.total}`;
+      this.pivotRowCount = String(this.pivotRows.length);
+    }
+  }
+
+  startEdit(cellKey) {
+    if (this.viewMode === 'pivot') return;
+    const key = String(cellKey || '');
+    if (!key.includes(':')) return;
+    const [rowId, colId] = key.split(':');
+    if (colId !== 'score') return;
+    let current = '';
+    if (this.viewMode === 'tree') {
+      const node = this.treeNodes.find((n) => n.id === rowId);
+      if (!node || node.expandable) return;
+      current = String(node.score ?? '');
+    } else {
+      const row = this.baseRows.find((r) => r.id === rowId);
+      if (!row) return;
+      current = String(row.score ?? '');
+    }
+    this.editingKey = key;
+    this.editDraft = current;
+    this.showEditField = true;
+    this.refreshWindow();
+  }
+
+  onEditInput(value) {
+    this.editDraft = String(value ?? '');
+  }
+
+  onFieldDraft(e) {
+    const v = e && e.target ? e.target.value : '';
+    this.editDraft = String(v ?? '');
+    this.refreshWindow();
+  }
+
+  commitEdit() {
+    const key = String(this.editingKey || '');
+    if (!key) return;
+    const [rowId, colId] = key.split(':');
+    if (colId !== 'score') {
+      this.cancelEdit();
+      return;
+    }
+    const next = String(this.editDraft ?? '');
+    if (this.viewMode === 'tree') {
+      const node = this.treeNodes.find((n) => n.id === rowId);
+      if (node && !node.expandable) node.score = next;
+    } else {
+      const row = this.baseRows.find((r) => r.id === rowId);
+      if (row) row.score = next;
+    }
+    this.editingKey = '';
+    this.editDraft = '';
+    this.showEditField = false;
+    this.refreshWindow();
+  }
+
+  cancelEdit() {
+    if (!this.editingKey && !this.editDraft) {
+      this.showEditField = false;
+      return;
+    }
+    this.editingKey = '';
+    this.editDraft = '';
+    this.showEditField = false;
+    this.refreshWindow();
+  }
+
+  onScroll(top) {
+    this.scrollTop = Number(top) || 0;
+    this.refreshWindow();
+  }
+
+  toggleRow(id) {
+    const sid = String(id || '');
+    if (this.viewMode === 'tree') {
+      if (!/-l\d+$/.test(sid)) return;
+    } else if (this.viewMode === 'pivot') {
+      if (!sid.startsWith('p:')) return;
+    } else if (sid.startsWith('g:')) {
+      return;
+    }
+    const set = this.selectedSet();
+    if (set.has(sid)) set.delete(sid);
+    else set.add(sid);
+    this.selectedAttr = [...set].sort().join(',');
+    this.refreshWindow();
+  }
+
+  toggleAll() {
+    if (this.allSelected) {
+      this.selectedAttr = '';
+    } else if (this.viewMode === 'tree') {
+      this.selectedAttr = this.leafIds.slice().sort().join(',');
+    } else if (this.viewMode === 'pivot') {
+      this.selectedAttr = this.pivotRows
+        .map((r) => r.id)
+        .sort()
+        .join(',');
+    } else {
+      this.selectedAttr = this.baseRows
+        .map((r) => r.id)
+        .sort()
+        .join(',');
+    }
+    this.refreshWindow();
+  }
+
+  toggleGroup(key) {
+    const set = this.expandedSet();
+    if (set.has(key)) set.delete(key);
+    else set.add(key);
+    this.expandedAttr = [...set].sort().join(',');
+    this.refreshWindow();
+  }
+
+  toggleTree(id) {
+    const set = this.treeExpandedSet();
+    if (set.has(id)) set.delete(id);
+    else set.add(id);
+    this.treeExpandedAttr = [...set].sort().join(',');
+    this.refreshWindow();
+  }
+
+  clearSelection() {
+    this.selectedAttr = '';
+    this.refreshWindow();
+  }
+
+  sortBy(id) {
+    if (this.viewMode === 'tree') return;
+    if (this.sortKey === id) {
+      this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortKey = id;
+      this.sortDir = 'asc';
+    }
+    this.scrollTop = 0;
+    this.refreshWindow();
+  }
+}
+</script>

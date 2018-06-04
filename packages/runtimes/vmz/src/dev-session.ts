@@ -56,8 +56,9 @@ export function createDevSession(options) {
 
     function emitLocales() {
         const localeEmit = emitLocaleRuntimeModules(project, outDir);
+        // Always surface locale diagnostics (warnings included) — missing /locales must not be silent.
+        log.diagnostics(localeEmit.diagnostics ?? []);
         if (!localeEmit.ok || localeHasErrors({ diagnostics: localeEmit.diagnostics })) {
-            log.diagnostics(localeEmit.diagnostics ?? []);
             log.error('locale runtime emit failed');
             return false;
         }

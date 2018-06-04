@@ -1,5 +1,5 @@
 <template>
-  <main>
+  <main data-vmz-focus="offer-main">
     <h1>Shop offer</h1>
     <p>route-shop-offer</p>
     <Link to="ShopIndexPage">Shop</Link>

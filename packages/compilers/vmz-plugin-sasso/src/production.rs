@@ -19,6 +19,7 @@ impl ScssCompiler for ProductionScssCompiler {
     }
 }
 
+/// Default SCSS compiler handle for linking into the `vmz` binary.
 pub fn default_scss_compiler() -> ScssCompilerHandle {
     Arc::new(ProductionScssCompiler)
 }

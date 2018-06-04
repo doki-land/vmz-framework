@@ -32,7 +32,8 @@ if (build.status !== 0) {
 }
 
 const dist = build.dist;
-const releasesRoot = path.join(dist, 'releases');
+// Beside dist — never nest releases under dist (Node cpSync self-subdir ban).
+const releasesRoot = path.join(path.dirname(dist), '.vmz-releases');
 fs.rmSync(releasesRoot, { recursive: true, force: true });
 
 console.log('release-artifact: pack + publish A…');

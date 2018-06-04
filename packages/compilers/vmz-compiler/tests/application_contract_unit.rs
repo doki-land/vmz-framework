@@ -82,7 +82,7 @@ fn unknown_reference_and_mount_collision() {
 
     let report = check_applications(&host, &[a, b]);
     assert!(report.has_errors());
-    let codes: HashSet<_> = report.diagnostics.iter().map(|d| d.code.as_str()).collect();
+    let codes: HashSet<_> = report.diagnostics.iter().filter_map(|d| d.code_string()).collect();
     assert!(codes.contains(DIAG_UNKNOWN_REFERENCE));
     assert!(codes.contains(DIAG_MOUNT_COLLISION));
 }
@@ -95,7 +95,9 @@ fn duplicate_application_id() {
     write_pkg(&a, "@p/a", "counter");
     write_pkg(&b, "@p/b", "counter");
     let report = check_applications(&host, &[a, b]);
-    assert!(report.diagnostics.iter().any(|d| d.code == DIAG_DUPLICATE_ID));
+    assert!(
+        report.diagnostics.iter().any(|d| d.code_string().as_deref() == Some(DIAG_DUPLICATE_ID))
+    );
 }
 
 #[test]

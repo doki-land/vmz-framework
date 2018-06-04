@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import { assertLocaleCacheKey, localeAwareCacheKey } from './locale-router.js';
 
 export const CDN_POLICY_MANIFEST_SCHEMA = 'vmz.cdn.policy_manifest.v0';
 export const CDN_ADAPTER_PROJECTION_SCHEMA = 'vmz.cdn.adapter_projection.v0';
@@ -18,13 +19,23 @@ export const CACHE_ASSET_IMMUTABLE = 'public, max-age=31536000, immutable';
 export const CACHE_META = 'public, max-age=3600';
 
 /**
- * Build CDNPolicyManifest from StaticDeliveryManifest (+ optional redirects).
+ * Build CDNPolicyManifest from StaticDeliveryManifest (+ optional redirects / locale artifact).
+ * Locale-prefixed HTML gets LocaleId-encoded cache keys; Accept-Language must not steal body.
  * @param {Record<string, any>} staticManifest
- * @param {{ redirects?: Array<{ from: string, to: string, status?: number, reason?: string }> }} [opts]
+ * @param {{
+ *   redirects?: Array<{ from: string, to: string, status?: number, reason?: string }>,
+ *   localeArtifact?: Record<string, any> | null,
+ * }} [opts]
  */
 export function buildCdnPolicyManifest(staticManifest, opts = {}) {
     const origin = String(staticManifest.origin || '');
-    const redirects = [{ from: '/home', to: '/', status: 301, reason: 'canonical-alias' }, ...(opts.redirects || [])];
+    const localeArt = opts.localeArtifact || null;
+    const localeRedirects = buildOmitPrefixRedirects(staticManifest, localeArt);
+    const redirects = [
+        { from: '/home', to: '/', status: 301, reason: 'canonical-alias' },
+        ...localeRedirects,
+        ...(opts.redirects || []),
+    ];
     const headers = [
         { match: '**/*.html', headers: { 'cache-control': CACHE_HTML } },
         {
@@ -39,6 +50,48 @@ export function buildCdnPolicyManifest(staticManifest, opts = {}) {
     ];
     const errorDocuments = Array.isArray(staticManifest.errorDocuments) ? staticManifest.errorDocuments : [{ status: 404, path: '404.html' }];
 
+    /** @type {any[]} */
+    const routes = [];
+    /** @type {any[]} */
+    const cacheKeyDiagnostics = [];
+    for (const r of staticManifest.routes || []) {
+        const localeId = r.localeId || null;
+        const alternates = Array.isArray(r.seo?.alternates) ? r.seo.alternates : [];
+        const cacheKey = localeId
+            ? localeAwareCacheKey({ routeId: String(r.routeId), localeId: String(localeId), path: String(r.path) })
+            : `route=${r.routeId}|path=${r.path}`;
+        // When LocaleId is bound, prove the key would still be safe even if Vary: Accept-Language were set.
+        if (localeId) {
+            const assert = assertLocaleCacheKey({
+                cacheKey,
+                varyAcceptLanguage: true,
+                localeId: String(localeId),
+            });
+            if (!assert.ok) {
+                cacheKeyDiagnostics.push(...(assert.diagnostics || []));
+            }
+        }
+        routes.push({
+            routeId: r.routeId,
+            path: r.path,
+            htmlPath: r.htmlPath,
+            canonical: r.seo?.canonical || null,
+            localeId,
+            cacheKey,
+            varyAcceptLanguage: false,
+            hreflang: alternates.map((a) => ({
+                hreflang: a.hreflang,
+                href: a.href,
+                localeId: a.localeId || null,
+            })),
+        });
+    }
+    if (cacheKeyDiagnostics.length) {
+        const msg = cacheKeyDiagnostics.map((d) => d.message || d.code).join('; ');
+        throw new Error(`buildCdnPolicyManifest: locale cache key contract failed: ${msg}`);
+    }
+
+    const localeRoutes = routes.filter((r) => r.localeId);
     const body = {
         schema: CDN_POLICY_MANIFEST_SCHEMA,
         applicationId: staticManifest.applicationId || null,
@@ -49,15 +102,46 @@ export function buildCdnPolicyManifest(staticManifest, opts = {}) {
         redirects,
         headers,
         errorDocuments,
-        routes: (staticManifest.routes || []).map((r) => ({
-            routeId: r.routeId,
-            path: r.path,
-            htmlPath: r.htmlPath,
-            canonical: r.seo?.canonical || null,
-        })),
+        routes,
+        localeCache: {
+            strategy: 'path-locale',
+            varyAcceptLanguage: false,
+            defaultLocale: localeArt?.defaultLocale || null,
+            routeCount: localeRoutes.length,
+            locales: [...new Set(localeRoutes.map((r) => r.localeId))],
+        },
     };
     body.policyDigest = sha256Hex(canonicalJson(body));
     return body;
+}
+
+/**
+ * Omit-prefix: /{defaultLocale}/… → canonical unprefixed path (CDN redirect, not Accept-Language).
+ * @param {Record<string, any>} staticManifest
+ * @param {Record<string, any> | null} localeArt
+ */
+function buildOmitPrefixRedirects(staticManifest, localeArt) {
+    const routing = localeArt?.routing || {};
+    const defaultLocale = localeArt?.defaultLocale || routing.defaultLocale;
+    if (!defaultLocale || routing.defaultPrefix !== 'omit') return [];
+    /** @type {Array<{ from: string, to: string, status: number, reason: string }>} */
+    const out = [];
+    const seen = new Set();
+    for (const r of staticManifest.routes || []) {
+        if (r.localeId !== defaultLocale) continue;
+        const canonical = String(r.path || '/');
+        const from =
+            canonical === '/' ? `/${defaultLocale}` : `/${defaultLocale}${canonical.startsWith('/') ? canonical : `/${canonical}`}`;
+        if (seen.has(from)) continue;
+        seen.add(from);
+        out.push({
+            from,
+            to: canonical,
+            status: 301,
+            reason: 'locale-omit-prefix-default',
+        });
+    }
+    return out;
 }
 
 /**
@@ -67,7 +151,8 @@ export function buildCdnPolicyManifest(staticManifest, opts = {}) {
  * @param {{ redirects?: Array<{ from: string, to: string, status?: number, reason?: string }> }} [opts]
  */
 export function emitCdnPolicy(distDir, staticManifest, opts = {}) {
-    const policy = buildCdnPolicyManifest(staticManifest, opts);
+    const localeArtifact = loadLocaleArtifact(distDir);
+    const policy = buildCdnPolicyManifest(staticManifest, { ...opts, localeArtifact });
     const vmzDir = path.join(distDir, '_vmz');
     fs.mkdirSync(vmzDir, { recursive: true });
     fs.writeFileSync(path.join(vmzDir, 'cdn-policy-manifest.json'), `${JSON.stringify(policy, null, 2)}\n`, 'utf8');
@@ -83,6 +168,19 @@ export function emitCdnPolicy(distDir, staticManifest, opts = {}) {
     fs.writeFileSync(path.join(adaptersDir, 'netlify', '_redirects'), String(netlify.files['_redirects'] || ''), 'utf8');
 
     return { policy, adapters: { 'local-static': local, netlify } };
+}
+
+/**
+ * @param {string} distDir
+ */
+function loadLocaleArtifact(distDir) {
+    const p = path.join(distDir, '_vmz', 'locale-route-realization.json');
+    if (!fs.existsSync(p)) return null;
+    try {
+        return JSON.parse(fs.readFileSync(p, 'utf8'));
+    } catch {
+        return null;
+    }
 }
 
 /**

@@ -9,64 +9,93 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 use vmz_protocol::{
-    CODE_ACTION_SCHEMA, CodeAction, DxDiagnostic, REFERENCE_SCHEMA, Reference, RenameIntent,
-    SYMBOL_SCHEMA, SourceSpan, StableId, Symbol, TextEdit, WORKSPACE_EDIT_SCHEMA,
-    WorkspaceEditPlan,
+    CODE_ACTION_SCHEMA, CodeAction, CodeActionKind, REFERENCE_SCHEMA, Reference, RenameIntent,
+    ReportedDiagnostic, SYMBOL_SCHEMA, SourceSpan, StableId, StableIdKind, Symbol, TextEdit,
+    WORKSPACE_EDIT_SCHEMA, WorkspaceEditPlan,
 };
 
 use crate::analyze::analyze_script;
 use crate::sfc::{ScriptKind, parse_vmz};
 use crate::template::{AttrValue, TemplateNode, parse_template};
 
+/// Schema id for template↔script source-map documents.
 pub const SOURCE_MAP_SCHEMA: &str = "vmz.dx.source_map.v0";
+/// Schema id for workspace symbol/reference index documents.
 pub const SYMBOL_INDEX_SCHEMA: &str = "vmz.dx.symbol_index.v0";
+/// Schema id for cross-SFC check reports.
 pub const CROSS_SFC_CHECK_SCHEMA: &str = "vmz.dx.cross_sfc_check.v0";
 
+/// Diagnostic code when a component class name does not match its `.vmz` file stem.
 pub const DIAG_CLASS_NAME_MISMATCH: &str = "vmz::dx::class_name_mismatch";
 
 /// One template↔script source-map edge (absolute file byte offsets).
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema, PartialEq, Eq,
+)]
 pub struct TemplateScriptMapEntry {
+    /// Always [`SOURCE_MAP_SCHEMA`].
     pub schema: String,
+    /// Workspace-relative `.vmz` path.
     pub path: String,
+    /// Closed symbol surface (`field` / `method` / …).
     #[serde(rename = "symbolKind")]
-    pub symbol_kind: String,
+    pub symbol_kind: StableIdKind,
+    /// Author-facing symbol name.
     pub name: String,
+    /// Use-site span inside `<template>`.
     #[serde(rename = "templateSpan")]
     pub template_span: SourceSpan,
+    /// Definition span inside `<script>`.
     #[serde(rename = "scriptSpan")]
     pub script_span: SourceSpan,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+/// Workspace-wide Symbol/Reference index plus template↔script source map.
+#[derive(
+    Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema, PartialEq, Eq,
+)]
 pub struct SymbolIndexDocument {
+    /// Always [`SYMBOL_INDEX_SCHEMA`].
     pub schema: String,
+    /// Indexed symbols (component / field / method / capability).
     pub symbols: Vec<Symbol>,
+    /// Reference edges (template→field, client→capability, …).
     pub references: Vec<Reference>,
+    /// Template↔script map rows for DX hosts.
     #[serde(rename = "sourceMap")]
     pub source_map: Vec<TemplateScriptMapEntry>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+/// Cross-SFC check report: index + safe-fix CodeActions + diagnostics.
+#[derive(
+    Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema, PartialEq, Eq,
+)]
 pub struct CrossSfcCheckReport {
+    /// Always [`CROSS_SFC_CHECK_SCHEMA`].
     pub schema: String,
+    /// Built symbol index for the workspace root.
     pub index: SymbolIndexDocument,
+    /// Proposed safe fixes (class/stem mismatch, …).
     #[serde(rename = "codeActions")]
     pub code_actions: Vec<CodeAction>,
-    pub diagnostics: Vec<DxDiagnostic>,
+    /// Check diagnostics (warnings/errors).
+    pub diagnostics: Vec<ReportedDiagnostic>,
 }
 
 impl CrossSfcCheckReport {
+    /// Serialize this report as pretty-printed JSON (`"{}"` on serialize failure).
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
 
+    /// True when any diagnostic in the report is an error.
     pub fn has_errors(&self) -> bool {
-        self.diagnostics.iter().any(|d| d.severity == "error")
+        self.diagnostics.iter().any(|d| d.is_error())
     }
 }
 
 impl SymbolIndexDocument {
+    /// Serialize this index as pretty-printed JSON (`"{}"` on serialize failure).
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
@@ -80,6 +109,7 @@ pub fn check_cross_sfc(root: &Path) -> CrossSfcCheckReport {
     CrossSfcCheckReport { schema: CROSS_SFC_CHECK_SCHEMA.into(), index, code_actions, diagnostics }
 }
 
+/// Walk `.vmz` files under `root` and build a symbol/reference/source-map index.
 pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
     let mut symbols = Vec::new();
     let mut references = Vec::new();
@@ -105,11 +135,10 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
             });
         symbols.push(Symbol {
             schema: SYMBOL_SCHEMA.into(),
-            stable_id: StableId { kind: "component".into(), id: class_name.clone() },
+            stable_id: StableId::new(StableIdKind::Component, class_name.clone()),
             name: class_name.clone(),
-            kind: "component".into(),
             span: class_span.clone(),
-            owners: vec![StableId { kind: "file".into(), id: rel.clone() }],
+            owners: vec![StableId::new(StableIdKind::File, rel.clone())],
             tags: vec!["x2".into(), format!("stem:{file_stem}")],
         });
 
@@ -124,11 +153,10 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
             });
             symbols.push(Symbol {
                 schema: SYMBOL_SCHEMA.into(),
-                stable_id: StableId { kind: "field".into(), id: format!("{class_name}.{name}") },
+                stable_id: StableId::new(StableIdKind::Field, format!("{class_name}.{name}")),
                 name: name.clone(),
-                kind: "field".into(),
                 span: script_span.clone(),
-                owners: vec![StableId { kind: "component".into(), id: class_name.clone() }],
+                owners: vec![StableId::new(StableIdKind::Component, class_name.clone())],
                 tags: vec!["x2".into()],
             });
             let ir = parse_template(&parsed.template.content);
@@ -141,16 +169,15 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
                     };
                     references.push(Reference {
                         schema: REFERENCE_SCHEMA.into(),
-                        from: StableId { kind: "template".into(), id: rel.clone() },
-                        to: StableId { kind: "field".into(), id: format!("{class_name}.{name}") },
-                        kind: "field".into(),
+                        from: StableId::new(StableIdKind::Template, rel.clone()),
+                        to: StableId::new(StableIdKind::Field, format!("{class_name}.{name}")),
                         span: Some(tspan.clone()),
                     });
                     if let Some(ss) = &script_span {
                         source_map.push(TemplateScriptMapEntry {
                             schema: SOURCE_MAP_SCHEMA.into(),
                             path: rel.clone(),
-                            symbol_kind: "field".into(),
+                            symbol_kind: StableIdKind::Field,
                             name: name.clone(),
                             template_span: tspan,
                             script_span: ss.clone(),
@@ -171,11 +198,10 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
             });
             symbols.push(Symbol {
                 schema: SYMBOL_SCHEMA.into(),
-                stable_id: StableId { kind: "method".into(), id: format!("{class_name}.{name}") },
+                stable_id: StableId::new(StableIdKind::Method, format!("{class_name}.{name}")),
                 name: name.clone(),
-                kind: "method".into(),
                 span: script_span.clone(),
-                owners: vec![StableId { kind: "component".into(), id: class_name.clone() }],
+                owners: vec![StableId::new(StableIdKind::Component, class_name.clone())],
                 tags: vec!["x2".into()],
             });
             let ir = parse_template(&parsed.template.content);
@@ -188,16 +214,15 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
                     };
                     references.push(Reference {
                         schema: REFERENCE_SCHEMA.into(),
-                        from: StableId { kind: "template".into(), id: rel.clone() },
-                        to: StableId { kind: "method".into(), id: format!("{class_name}.{name}") },
-                        kind: "method".into(),
+                        from: StableId::new(StableIdKind::Template, rel.clone()),
+                        to: StableId::new(StableIdKind::Method, format!("{class_name}.{name}")),
                         span: Some(tspan.clone()),
                     });
                     if let Some(ss) = &script_span {
                         source_map.push(TemplateScriptMapEntry {
                             schema: SOURCE_MAP_SCHEMA.into(),
                             path: rel.clone(),
-                            symbol_kind: "method".into(),
+                            symbol_kind: StableIdKind::Method,
                             name: name.clone(),
                             template_span: tspan,
                             script_span: ss.clone(),
@@ -222,11 +247,10 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
                 });
                 symbols.push(Symbol {
                     schema: SYMBOL_SCHEMA.into(),
-                    stable_id: StableId { kind: "capability".into(), id: cap_id.clone() },
+                    stable_id: StableId::new(StableIdKind::Capability, cap_id.clone()),
                     name: name.clone(),
-                    kind: "capability".into(),
                     span: script_span,
-                    owners: vec![StableId { kind: "server".into(), id: server_id.clone() }],
+                    owners: vec![StableId::new(StableIdKind::Server, server_id.clone())],
                     tags: vec!["x2".into()],
                 });
                 // Client references: ClassName.method(
@@ -238,9 +262,8 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
                     let end = abs_i + name.len();
                     references.push(Reference {
                         schema: REFERENCE_SCHEMA.into(),
-                        from: StableId { kind: "client".into(), id: rel.clone() },
-                        to: StableId { kind: "capability".into(), id: cap_id.clone() },
-                        kind: "capability".into(),
+                        from: StableId::new(StableIdKind::Client, rel.clone()),
+                        to: StableId::new(StableIdKind::Capability, cap_id.clone()),
                         span: Some(SourceSpan {
                             path: rel.clone(),
                             start: (parsed.client.content_start + abs_i) as u32,
@@ -278,9 +301,8 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
                 for (ts, te) in tag_spans_in_template(&parsed.template.content, &tag) {
                     references.push(Reference {
                         schema: REFERENCE_SCHEMA.into(),
-                        from: StableId { kind: "file".into(), id: rel.clone() },
-                        to: StableId { kind: "component".into(), id: tag.clone() },
-                        kind: "component".into(),
+                        from: StableId::new(StableIdKind::File, rel.clone()),
+                        to: StableId::new(StableIdKind::Component, tag.clone()),
                         span: Some(SourceSpan {
                             path: rel.clone(),
                             start: (parsed.template.content_start + ts) as u32,
@@ -293,21 +315,21 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
     }
 
     symbols.sort_by(|a, b| {
-        (a.stable_id.kind.as_str(), a.stable_id.id.as_str())
-            .cmp(&(b.stable_id.kind.as_str(), b.stable_id.id.as_str()))
+        (a.stable_id.kind().as_str(), a.stable_id.id())
+            .cmp(&(b.stable_id.kind().as_str(), b.stable_id.id()))
     });
     SymbolIndexDocument { schema: SYMBOL_INDEX_SCHEMA.into(), symbols, references, source_map }
 }
 
 /// Plan method/component/capability rename with proven TextEdits.
-pub fn plan_x2_rename(root: &Path, intent: &RenameIntent, kind: &str) -> WorkspaceEditPlan {
+pub fn plan_x2_rename(root: &Path, intent: &RenameIntent, kind: StableIdKind) -> WorkspaceEditPlan {
     let from = intent.from.trim();
     let to = intent.to.trim();
     let scope = intent.scope.as_deref().filter(|s| !s.is_empty());
     let (edits, refs_n) = match kind {
-        "method" => collect_method_edits(root, from, to, scope),
-        "component" => collect_component_edits(root, from, to, scope),
-        "capability" => collect_capability_edits(root, from, to, scope),
+        StableIdKind::Method => collect_method_edits(root, from, to, scope),
+        StableIdKind::Component => collect_component_edits(root, from, to, scope),
+        StableIdKind::Capability => collect_capability_edits(root, from, to, scope),
         _ => (Vec::new(), 0),
     };
     let causal = format!("rename:{kind}:{from}->{to}");
@@ -322,39 +344,35 @@ pub fn plan_x2_rename(root: &Path, intent: &RenameIntent, kind: &str) -> Workspa
             "x2.cross_sfc_index".into(),
         ],
         edits,
-        affected_program_ids: vec![StableId { kind: kind.into(), id: from.into() }],
+        affected_program_ids: vec![StableId::new(kind, from)],
         diagnostics: Vec::new(),
-        status: "preview".into(),
+        status: vmz_protocol::WorkspaceEditStatus::Preview,
     };
     if let Some(scope) = scope {
         plan.preconditions.push(format!("rename.scope={scope}"));
     }
     if plan.edits.is_empty() {
-        plan.status = "rejected".into();
-        plan.diagnostics.push(DxDiagnostic {
-            path: String::new(),
-            severity: "error".into(),
-            message: format!("no proven references for {kind} `{from}`"),
-            code: Some("dx.x2.rename.no_references".into()),
-            span: None,
-        });
+        plan.status = vmz_protocol::WorkspaceEditStatus::Rejected;
+        plan.diagnostics.push(ReportedDiagnostic::coded_error(
+            "",
+            format!("no proven references for {kind} `{from}`"),
+            "dx.x2.rename.no_references",
+        ));
         return plan;
     }
-    plan.status = "ready".into();
-    plan.diagnostics.push(DxDiagnostic {
-        path: String::new(),
-        severity: "info".into(),
-        message: format!(
+    plan.status = vmz_protocol::WorkspaceEditStatus::Ready;
+    plan.diagnostics.push(ReportedDiagnostic::coded_advice(
+        "",
+        format!(
             "rename ready: {kind} `{from}` -> `{to}` ({} edit(s), {refs_n} ref(s))",
             plan.edits.len()
         ),
-        code: Some("dx.x2.rename.ready".into()),
-        span: None,
-    });
+        "dx.x2.rename.ready",
+    ));
     plan
 }
 
-fn collect_safe_fixes(root: &Path, diagnostics: &mut Vec<DxDiagnostic>) -> Vec<CodeAction> {
+fn collect_safe_fixes(root: &Path, diagnostics: &mut Vec<ReportedDiagnostic>) -> Vec<CodeAction> {
     let mut actions = Vec::new();
     for (rel, abs) in list_vmz_files(root) {
         let Ok(source) = fs::read_to_string(&abs) else {
@@ -374,27 +392,28 @@ fn collect_safe_fixes(root: &Path, diagnostics: &mut Vec<DxDiagnostic>) -> Vec<C
         };
         let start = (parsed.client.content_start + s) as u32;
         let end = (parsed.client.content_start + e) as u32;
-        diagnostics.push(DxDiagnostic {
-            path: rel.clone(),
-            severity: "warning".into(),
-            message: format!(
-                "export default class `{}` does not match file stem `{stem}`",
-                analyzed.decl.name
-            ),
-            code: Some(DIAG_CLASS_NAME_MISMATCH.into()),
-            span: Some(SourceSpan { path: rel.clone(), start, end }),
-        });
+        diagnostics.push(
+            ReportedDiagnostic::coded_warning(
+                rel.clone(),
+                format!(
+                    "export default class `{}` does not match file stem `{stem}`",
+                    analyzed.decl.name
+                ),
+                DIAG_CLASS_NAME_MISMATCH,
+            )
+            .with_source_span(SourceSpan { path: rel.clone(), start, end }),
+        );
         let mut edit = WorkspaceEditPlan::empty_preview();
-        edit.status = "ready".into();
+        edit.status = vmz_protocol::WorkspaceEditStatus::Ready;
         edit.preconditions =
             vec!["x1.symbol_reference_proven".into(), "x2.safe_fix.class_name_mismatch".into()];
         edit.edits.push(TextEdit { path: rel.clone(), start, end, new_text: stem.clone() });
         edit.affected_program_ids
-            .push(StableId { kind: "component".into(), id: analyzed.decl.name.clone() });
+            .push(StableId::new(StableIdKind::Component, analyzed.decl.name.clone()));
         actions.push(CodeAction {
             schema: CODE_ACTION_SCHEMA.into(),
             title: format!("Rename class to `{stem}` (match file stem)"),
-            kind: "safe_fix".into(),
+            kind: CodeActionKind::SafeFix,
             diagnostic_code: Some(DIAG_CLASS_NAME_MISMATCH.into()),
             edit: Some(edit),
         });
@@ -722,7 +741,7 @@ fn template_handler_spans(
                             } else {
                                 name.to_string()
                             };
-                            if let Some(i) = template.find(&needle) {
+                            if template.contains(&needle) {
                                 // Prefer occurrence after attr name --take all for rename accuracy with dedup.
                                 let mut from = 0;
                                 while let Some(j) = template[from..].find(&needle) {

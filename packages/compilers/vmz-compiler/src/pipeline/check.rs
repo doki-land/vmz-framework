@@ -1,37 +1,52 @@
+//! Typecheck / analyze `.vmz` units and collect diagnostics before emit.
+
 use std::fs;
 use std::path::Path;
 
-use crate::analyze::analyze_script;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+use crate::analyze::{AnalyzedScript, analyze_script};
 use crate::diagnostic::{ReportedDiagnostic, Severity};
+use crate::parse::rust_dsl::analyze_rust_server_dsl;
 use crate::project::discover_vmz_files;
 use crate::reactive_build::build_program_module_with_server;
 use crate::secrets::{collect_client_boundary_findings, collect_secret_requirements};
 use crate::server_calls::collect_server_class_calls;
 use crate::server_slice::ServerSliceProof;
-use crate::sfc::{ScriptKind, parse_vmz};
+use crate::sfc::{ScriptKind, ScriptLanguage, parse_vmz};
 use crate::template::{AttrValue, TemplateIr, TemplateNode, parse_template};
 use crate::virtual_server;
-use vmz_types::ServerAttach;
+use oxc_span::Span;
+use vmz_types::{ComponentDecl, ServerAttach};
 
-#[derive(Debug, Default, Clone)]
+/// Options for [`check_path`] / [`check_project`].
+#[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct CheckOptions {
+    /// When true, warnings fail the check the same as errors.
     pub deny_warnings: bool,
     /// When true, units whose server slice is not browser-safe fail check
-    /// (Delivery Profile requested browser sink of server capabilities).
+    /// (Delivery asked to place server capabilities into the browser sink).
     pub require_browser_safe_server_slices: bool,
 }
 
+/// Aggregated diagnostics from one check run.
 #[derive(Debug, Default)]
 pub struct CheckReport {
+    /// Collected path-scoped diagnostics.
     pub diagnostics: Vec<ReportedDiagnostic>,
+    /// Number of `.vmz` files visited.
     pub files_checked: usize,
 }
 
 impl CheckReport {
+    /// True when any diagnostic is error severity.
     pub fn has_errors(&self) -> bool {
         self.diagnostics.iter().any(|d| d.severity() == Severity::Error)
     }
 
+    /// True when the run should fail under `options` (errors, or warnings if denied).
     pub fn failed(&self, options: &CheckOptions) -> bool {
         if self.has_errors() {
             return true;
@@ -40,6 +55,7 @@ impl CheckReport {
     }
 }
 
+/// Check a single `.vmz` file or an entire project root.
 pub fn check_path(path: impl AsRef<Path>, options: &CheckOptions) -> crate::Result<CheckReport> {
     let path = path.as_ref();
     if path.is_file() {
@@ -50,6 +66,7 @@ pub fn check_path(path: impl AsRef<Path>, options: &CheckOptions) -> crate::Resu
     check_project(path, options)
 }
 
+/// Discover and check every `.vmz` under `root`, plus cross-page `<Link>` validation.
 pub fn check_project(root: impl AsRef<Path>, options: &CheckOptions) -> crate::Result<CheckReport> {
     let root = root.as_ref();
     let mut report = CheckReport::default();
@@ -129,17 +146,32 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
     }
 
     if let Some(server) = &parsed.server {
-        let analyzed = analyze_script(ScriptKind::Server, &server.content);
+        let analyzed = match server.lang {
+            ScriptLanguage::Ts => analyze_script(ScriptKind::Server, &server.content),
+            ScriptLanguage::Rust => analyze_rust_server_dsl(&server.content),
+            other => AnalyzedScript {
+                kind: ScriptKind::Server,
+                decl: ComponentDecl::new("Anonymous", oxc_span::Span::default()),
+                parse_errors: vec![format!(
+                    "`<script server lang=\"{}\">` is registered but not implemented yet",
+                    other.as_str()
+                )],
+                forbidden_factories: Vec::new(),
+            },
+        };
         for err in &analyzed.parse_errors {
             report
                 .diagnostics
                 .push(ReportedDiagnostic::error(path, format!("server script: {err}")));
         }
         if analyzed.decl.name == "Anonymous" && analyzed.parse_errors.is_empty() {
-            report.diagnostics.push(ReportedDiagnostic::error(
-                path,
-                "`<script server>` must `export default class`",
-            ));
+            let msg = match server.lang {
+                ScriptLanguage::Rust => {
+                    "rust `<script server>` must declare `pub struct TypeName;`"
+                }
+                _ => "`<script server>` must `export default class`",
+            };
+            report.diagnostics.push(ReportedDiagnostic::error(path, msg));
         }
     }
 

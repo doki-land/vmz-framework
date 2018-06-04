@@ -2,7 +2,8 @@
 
 use std::fs;
 
-use vmz_compiler::pipeline::check::*;
+use vmz_compiler::Severity;
+use vmz_compiler::pipeline::check::{CheckOptions, CheckReport, check_path};
 
 fn check_template_snippet(template: &str) -> CheckReport {
     let dir = std::env::temp_dir().join(format!(
@@ -16,8 +17,7 @@ fn check_template_snippet(template: &str) -> CheckReport {
         "<template>\n{template}\n</template>\n\n<script client>\nexport default class T {{}}\n</script>\n"
     );
     fs::write(&path, &src).unwrap();
-    let mut report = CheckReport::default();
-    check_file(&path, &mut report);
+    let report = check_path(&path, &CheckOptions::default()).unwrap();
     let _ = fs::remove_dir_all(&dir);
     report
 }

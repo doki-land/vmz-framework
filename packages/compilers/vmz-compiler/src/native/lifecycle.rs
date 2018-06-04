@@ -9,32 +9,26 @@ use std::path::Path;
 
 use vmz_protocol::{
     DIAG_BACKGROUND_IS_DESTROY, DIAG_CRASH_ASSUMES_JS_HEAP, DIAG_INVALID_PROFILE,
-    DIAG_MISSING_LIFECYCLE_EVENT, DIAG_MISSING_OFFLINE_POLICY, DIAG_MISSING_PERSISTENCE,
-    DIAG_MISSING_UPDATE_POLICY, LIFECYCLE_CHECK_SCHEMA, NativeAppLifecyclePolicy,
-    NativeHostDiagnostic, NativeHostProtocolCatalog, NativeLifecycleCheckReport,
-    REQUIRED_LIFECYCLE_EVENTS,
+    DIAG_MISSING_LIFECYCLE_EVENT, DIAG_MISSING_PERSISTENCE, LIFECYCLE_CHECK_SCHEMA,
+    NativeAppLifecyclePolicy, NativeHostDiagnostic, NativeHostProtocolCatalog,
+    NativeLifecycleCheckReport, NativeLifecycleEvent,
 };
 
 fn diag(
     path: &str,
-    severity: &str,
+    severity: vmz_protocol::Severity,
     message: impl Into<String>,
     code: &str,
 ) -> NativeHostDiagnostic {
-    NativeHostDiagnostic {
-        path: path.into(),
-        severity: severity.into(),
-        message: message.into(),
-        code: Some(code.into()),
-    }
+    NativeHostDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
 fn validate_lifecycle(policy: &NativeAppLifecyclePolicy, out: &mut Vec<NativeHostDiagnostic>) {
-    for ev in REQUIRED_LIFECYCLE_EVENTS {
-        if !policy.events.iter().any(|e| e == *ev) {
+    for ev in NativeLifecycleEvent::ALL {
+        if !policy.events.iter().any(|e| e == ev) {
             out.push(diag(
                 "events",
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("missing required lifecycle event `{ev}`"),
                 DIAG_MISSING_LIFECYCLE_EVENT,
             ));
@@ -44,7 +38,7 @@ fn validate_lifecycle(policy: &NativeAppLifecyclePolicy, out: &mut Vec<NativeHos
     if policy.background_equals_destroy {
         out.push(diag(
             "backgroundEqualsDestroy",
-            "error",
+            vmz_protocol::Severity::Error,
             "background must not equal destroy — host must keep owned regions until destroy",
             DIAG_BACKGROUND_IS_DESTROY,
         ));
@@ -53,75 +47,36 @@ fn validate_lifecycle(policy: &NativeAppLifecyclePolicy, out: &mut Vec<NativeHos
     if policy.crash_restore_assumes_js_heap {
         out.push(diag(
             "crashRestoreAssumesJsHeap",
-            "error",
+            vmz_protocol::Severity::Error,
             "crash restore must not assume JS heap survives — require explicit persistence/reauth",
             DIAG_CRASH_ASSUMES_JS_HEAP,
         ));
     }
 
+    // Closed [`PersistenceMode`] / [`OfflineMode`] validate at deserialize.
     if !policy.persistence.enabled {
         out.push(diag(
             "persistence",
-            "error",
+            vmz_protocol::Severity::Error,
             "native requires explicit persistence policy (enabled)",
-            DIAG_MISSING_PERSISTENCE,
-        ));
-    }
-    if policy.persistence.mode.trim().is_empty() {
-        out.push(diag(
-            "persistence.mode",
-            "error",
-            "persistence.mode required (e.g. capability_backed)",
             DIAG_MISSING_PERSISTENCE,
         ));
     }
     if !policy.persistence.reauth_on_restore {
         out.push(diag(
             "persistence.reauthOnRestore",
-            "error",
+            vmz_protocol::Severity::Error,
             "crash/restore path must declare reauthOnRestore=true when credentials may be lost",
             DIAG_MISSING_PERSISTENCE,
         ));
     }
 
-    if policy.update.channel.trim().is_empty() {
-        out.push(diag(
-            "update.channel",
-            "error",
-            "update channel required",
-            DIAG_MISSING_UPDATE_POLICY,
-        ));
-    }
-    if policy.update.rollback.trim().is_empty() {
-        out.push(diag(
-            "update.rollback",
-            "error",
-            "update rollback policy required",
-            DIAG_MISSING_UPDATE_POLICY,
-        ));
-    }
-
-    if policy.offline.mode.trim().is_empty() {
-        out.push(diag(
-            "offline.mode",
-            "error",
-            "offline policy mode required",
-            DIAG_MISSING_OFFLINE_POLICY,
-        ));
-    }
-    if policy.offline.mode == "none" {
-        out.push(diag(
-            "offline.mode",
-            "error",
-            "offline.mode=none is not acceptable for native local bundled host",
-            DIAG_MISSING_OFFLINE_POLICY,
-        ));
-    }
+    // Closed [`UpdateChannel`] / [`UpdateRollback`] validate at deserialize.
 
     if !policy.dispose_regions_on_destroy {
         out.push(diag(
             "disposeRegionsOnDestroy",
-            "error",
+            vmz_protocol::Severity::Error,
             "destroy must dispose all owned regions",
             DIAG_MISSING_LIFECYCLE_EVENT,
         ));
@@ -130,7 +85,7 @@ fn validate_lifecycle(policy: &NativeAppLifecyclePolicy, out: &mut Vec<NativeHos
     if policy.schema != vmz_protocol::LIFECYCLE_SCHEMA {
         out.push(diag(
             "schema",
-            "error",
+            vmz_protocol::Severity::Error,
             format!("lifecycle schema must be `{}`", vmz_protocol::LIFECYCLE_SCHEMA),
             DIAG_INVALID_PROFILE,
         ));
@@ -145,14 +100,14 @@ fn load_or_example(root: &Path, diags: &mut Vec<NativeHostDiagnostic>) -> Native
                 Ok(p) => return p,
                 Err(e) => diags.push(diag(
                     "native-lifecycle.json",
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!("invalid NativeAppLifecyclePolicy JSON: {e}"),
                     DIAG_INVALID_PROFILE,
                 )),
             },
             Err(e) => diags.push(diag(
                 "native-lifecycle.json",
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("cannot read native-lifecycle.json: {e}"),
                 DIAG_INVALID_PROFILE,
             )),
@@ -178,7 +133,7 @@ pub fn check_native_lifecycle_contract(root: &Path) -> NativeLifecycleCheckRepor
             {
                 diagnostics.push(diag(
                     "native-lifecycle.foul.json",
-                    "error",
+                    vmz_protocol::Severity::Error,
                     "forbidden lifecycle assumptions in foul fixture",
                     DIAG_BACKGROUND_IS_DESTROY,
                 ));
@@ -186,12 +141,12 @@ pub fn check_native_lifecycle_contract(root: &Path) -> NativeLifecycleCheckRepor
         }
     }
 
-    let failed = diagnostics.iter().any(|d| d.severity == "error");
+    let failed = diagnostics.iter().any(|d| d.is_error());
     NativeLifecycleCheckReport {
         schema: LIFECYCLE_CHECK_SCHEMA.into(),
         catalog,
         lifecycle: policy,
         diagnostics,
-        status: if failed { "failed".into() } else { "ready".into() },
+        status: vmz_protocol::CheckReportStatus::from_failed(failed),
     }
 }

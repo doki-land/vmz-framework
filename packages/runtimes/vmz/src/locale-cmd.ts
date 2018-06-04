@@ -126,8 +126,8 @@ function cmdLocaleList(args) {
     const projectRoot = resolveProject(args);
     const report = checkLocales({ projectRoot, checkUnused: false });
     if (!report.manifest) {
-        log.error('locales.json5 missing');
-        return 1;
+        console.warn('vmz warn vmz::locale::manifest_missing: locales/locales.json5 missing');
+        return localeHasErrors(report) ? 1 : 0;
     }
     for (const loc of report.manifest.locales) {
         const mark = loc.id === report.manifest.defaultLocale ? ' (default)' : '';

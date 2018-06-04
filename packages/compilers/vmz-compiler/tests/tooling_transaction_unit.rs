@@ -1,6 +1,6 @@
 //! Moved from `src/tooling/transaction.rs` (cargo-cry: tests next to Cargo.toml).
 
-use vmz_protocol::TextEdit;
+use vmz_protocol::{SemanticTransactionStatus, TextEdit};
 
 use std::fs;
 
@@ -26,7 +26,7 @@ fn transaction_rejects_bad_span_without_write() {
     let before = fs::read_to_string(&path).unwrap();
     let edits = vec![TextEdit { path: rel.into(), start: 0, end: 9999, new_text: "nope".into() }];
     let doc = apply_semantic_transaction(&root, 1, &edits);
-    assert_eq!(doc.status, "rejected");
+    assert_eq!(doc.status, SemanticTransactionStatus::Rejected);
     assert_eq!(fs::read_to_string(&path).unwrap(), before);
     let _ = fs::remove_dir_all(&root);
 }
@@ -43,7 +43,7 @@ fn transaction_commits_two_files() {
         TextEdit { path: b.into(), start: 0, end: 4, new_text: "bbbb".into() },
     ];
     let doc = apply_semantic_transaction(&root, 2, &edits);
-    assert_eq!(doc.status, "committed");
+    assert_eq!(doc.status, SemanticTransactionStatus::Committed);
     assert_eq!(fs::read_to_string(root.join(a)).unwrap(), "aaaa");
     assert_eq!(fs::read_to_string(root.join(b)).unwrap(), "bbbb");
     let _ = fs::remove_dir_all(&root);

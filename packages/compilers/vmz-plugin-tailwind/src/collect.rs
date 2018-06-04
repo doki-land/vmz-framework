@@ -10,7 +10,7 @@ use vmz_compiler::{
 
 /// Kind of TW entry found in source.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum TwTokenKind {
     /// Element attribute `style:tw="…"`.
     StyleTw,
@@ -21,6 +21,7 @@ pub enum TwTokenKind {
 /// One utility / class token after whitespace split (static only).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TwTokenHit {
+    /// Utility class text (e.g. `px-4`).
     pub token: String,
     /// Byte span in the original `.vmz` file (oxc `Span`).
     #[serde(with = "span_serde")]
@@ -44,8 +45,11 @@ mod span_serde {
 /// One TW site (attribute or at-rule block).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TwSite {
+    /// Whether this site is `style:tw` or `@tailwind`.
     pub kind: TwTokenKind,
+    /// Source `.vmz` path.
     pub path: PathBuf,
+    /// Byte span covering the site in the source file.
     #[serde(with = "span_serde")]
     pub span: Span,
     /// Static tokens when the value is a string literal / block body.
@@ -59,13 +63,16 @@ pub struct TwSite {
 /// Collection result for one `.vmz` file (or in-memory source).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TwCollection {
+    /// Source path (or synthetic path for registration-only compiles).
     pub path: PathBuf,
+    /// Every TW site discovered in the file.
     pub sites: Vec<TwSite>,
     /// Flattened static tokens (deduped, stable order).
     pub static_tokens: Vec<String>,
 }
 
 impl TwCollection {
+    /// True when any site uses dynamic interpolation.
     pub fn has_dynamic(&self) -> bool {
         self.sites.iter().any(|s| s.dynamic)
     }

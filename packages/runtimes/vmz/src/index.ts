@@ -905,6 +905,42 @@ export {
     emitSiteDelivery,
 } from './site-delivery.js';
 export {
+    EMBEDDED_RESOURCE_INDEX_SCHEMA,
+    emitEmbeddedPackaging,
+} from './embedded-packaging.js';
+export {
+    SERVER_LANG_IDS,
+    SERVER_LANG_ALIASES,
+    SERVER_LANGUAGE_BACKENDS,
+    resolveServerLanguage,
+    assertLangRuntimePair,
+} from './server-language-backend.js';
+export {
+    DELIVERY_PROFILE_AUTHORING_SCHEMA,
+    BUILD_PROFILE_SELECTION_SCHEMA,
+    ASSEMBLIES,
+    SERVER_RUNTIMES,
+    BUILTIN_PROFILES,
+    pickSiteAuthoring,
+    normalizeDeliveryAuthoring,
+    selectBuildProfile,
+    semanticIdsForAssembly,
+} from './delivery-profile.js';
+export { PACK_MANIFEST_SCHEMA, packFromDeploymentIr, ensureRuntimeCompanions } from './pack.js';
+export {
+    SERVER_ARTIFACT_SCHEMA,
+    HTTP_CONTRACT_SCHEMA,
+    SERVER_RUNTIME_ADAPTER_SCHEMA,
+    emitServerArtifact,
+    projectServerRuntimeAdapter,
+} from './server-artifact.js';
+export {
+    BUILD_PROOF_SCHEMA,
+    ASSEMBLE_MANIFEST_SCHEMA,
+    assembleDelivery,
+    emitBuildProof,
+} from './build-assemble.js';
+export {
     PRODUCTION_SCENARIO_PACK_SCHEMA,
     PRODUCTION_CI_PROFILE_SCHEMA,
     PRODUCTION_TEST_REPORT_SCHEMA,
@@ -955,11 +991,17 @@ export {
     checkLocaleRouter,
     commitLocaleRouteMetaTransition,
     localeAwareCacheKey,
+    localizeBodyLinks,
+    localizeSameAppHref,
     parseLocaleFromPath,
     planLocalePathNavigation,
     realizeRoutePath,
     resolveLinkHref,
 } from './locale-router.js';
+export {
+    LOCALE_ROUTE_REALIZATION_ARTIFACT_SCHEMA,
+    emitLocaleRouteRealization,
+} from './locale-route-emit.js';
 export {
     assertHostMessageInvariant,
     assertServerErrorEnvelope,

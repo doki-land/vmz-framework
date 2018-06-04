@@ -8,25 +8,20 @@ use std::fs;
 use std::path::Path;
 
 use vmz_protocol::{
-    DIAG_INVALID_PROFILE, DIAG_MISSING_DEEP_LINK, DIAG_MISSING_ENTRY_ARTIFACT,
+    AssetMode, DIAG_INVALID_PROFILE, DIAG_MISSING_DEEP_LINK, DIAG_MISSING_ENTRY_ARTIFACT,
     DIAG_MISSING_IDENTITY, DIAG_MISSING_LOG_POLICY, DIAG_MISSING_SHELL_HOOK,
     DIAG_PLATFORM_SEMANTIC_FORK, DIAG_REMOTE_ENTRY_DEFAULT, NativeHostDiagnostic,
-    NativeHostProtocolCatalog, NativeShellCheckReport, NativeWebViewShellManifest,
-    REQUIRED_SHELL_HOOKS, REQUIRED_SHELL_PLATFORMS, SHELL_CHECK_SCHEMA, SHELL_SCHEMA,
+    NativeHostProtocolCatalog, NativePlatformId, NativeShellCheckReport,
+    NativeWebViewShellManifest, SHELL_CHECK_SCHEMA, SHELL_SCHEMA, ShellAdapterKind, ShellHook,
 };
 
 fn diag(
     path: &str,
-    severity: &str,
+    severity: vmz_protocol::Severity,
     message: impl Into<String>,
     code: &str,
 ) -> NativeHostDiagnostic {
-    NativeHostDiagnostic {
-        path: path.into(),
-        severity: severity.into(),
-        message: message.into(),
-        code: Some(code.into()),
-    }
+    NativeHostDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
 fn validate_shell(
@@ -37,7 +32,7 @@ fn validate_shell(
     if shell.schema != SHELL_SCHEMA {
         out.push(diag(
             "schema",
-            "error",
+            vmz_protocol::Severity::Error,
             format!("shell schema must be `{SHELL_SCHEMA}`"),
             DIAG_INVALID_PROFILE,
         ));
@@ -45,7 +40,7 @@ fn validate_shell(
     if shell.identity.application_id.trim().is_empty() || shell.identity.origin.trim().is_empty() {
         out.push(diag(
             "identity",
-            "error",
+            vmz_protocol::Severity::Error,
             "shell requires applicationId + origin",
             DIAG_MISSING_IDENTITY,
         ));
@@ -53,15 +48,15 @@ fn validate_shell(
     if !shell.reuses_browser_lowering {
         out.push(diag(
             "reusesBrowserLowering",
-            "error",
+            vmz_protocol::Severity::Error,
             "WebView shell must reuse Browser lowering",
             DIAG_INVALID_PROFILE,
         ));
     }
-    if shell.asset_mode != "local" {
+    if shell.asset_mode != AssetMode::Local {
         out.push(diag(
             "assetMode",
-            "error",
+            vmz_protocol::Severity::Error,
             "native shell requires assetMode=local (bundled)",
             DIAG_REMOTE_ENTRY_DEFAULT,
         ));
@@ -70,7 +65,7 @@ fn validate_shell(
     if entry_url.starts_with("http://") || entry_url.starts_with("https://") {
         out.push(diag(
             "entry.entryUrl",
-            "error",
+            vmz_protocol::Severity::Error,
             "remote http(s) entry must not be native default; use app:// or file:// local bundle",
             DIAG_REMOTE_ENTRY_DEFAULT,
         ));
@@ -78,17 +73,17 @@ fn validate_shell(
     if !(entry_url.starts_with("app://") || entry_url.starts_with("file://")) {
         out.push(diag(
             "entry.entryUrl",
-            "error",
+            vmz_protocol::Severity::Error,
             format!("unsupported entryUrl `{}`", shell.entry.entry_url),
             DIAG_REMOTE_ENTRY_DEFAULT,
         ));
     }
 
-    for hook in REQUIRED_SHELL_HOOKS {
-        if !shell.hooks.iter().any(|h| h == *hook) {
+    for hook in ShellHook::ALL {
+        if !shell.hooks.iter().any(|h| h == hook) {
             out.push(diag(
                 "hooks",
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("missing required shell hook `{hook}`"),
                 DIAG_MISSING_SHELL_HOOK,
             ));
@@ -98,7 +93,7 @@ fn validate_shell(
     if shell.deep_links.is_empty() {
         out.push(diag(
             "deepLinks",
-            "error",
+            vmz_protocol::Severity::Error,
             "native shell requires at least one deep link map entry",
             DIAG_MISSING_DEEP_LINK,
         ));
@@ -107,42 +102,35 @@ fn validate_shell(
     if !shell.logging.redact_sensitive {
         out.push(diag(
             "logging",
-            "error",
+            vmz_protocol::Severity::Error,
             "shell logging must redactSensitive=true",
             DIAG_MISSING_LOG_POLICY,
         ));
     }
-    if shell.logging.level.trim().is_empty() {
-        out.push(diag(
-            "logging.level",
-            "error",
-            "shell logging level required",
-            DIAG_MISSING_LOG_POLICY,
-        ));
-    }
+    // Closed [`ShellLogLevel`] validates at deserialize.
 
-    for plat in REQUIRED_SHELL_PLATFORMS {
+    for plat in NativePlatformId::ALL {
         let row = shell.adapters.iter().find(|a| a.platform == *plat);
         match row {
             None => out.push(diag(
                 "adapters",
-                "error",
-                format!("missing `{plat}` webview_shell adapter"),
+                vmz_protocol::Severity::Error,
+                format!("missing `{plat}` webview-shell adapter"),
                 DIAG_PLATFORM_SEMANTIC_FORK,
             )),
             Some(a) => {
-                if a.kind != "webview_shell" {
+                if a.kind != ShellAdapterKind::WebviewShell {
                     out.push(diag(
                         &format!("adapters.{plat}"),
-                        "error",
-                        format!("adapter kind must be webview_shell, got `{}`", a.kind),
+                        vmz_protocol::Severity::Error,
+                        format!("adapter kind must be webview-shell, got `{}`", a.kind),
                         DIAG_PLATFORM_SEMANTIC_FORK,
                     ));
                 }
                 if a.shell_schema != SHELL_SCHEMA {
                     out.push(diag(
                         &format!("adapters.{plat}"),
-                        "error",
+                        vmz_protocol::Severity::Error,
                         format!(
                             "platform `{plat}` must share shell schema `{SHELL_SCHEMA}`, got `{}`",
                             a.shell_schema
@@ -157,7 +145,7 @@ fn validate_shell(
         if a.shell_schema != SHELL_SCHEMA {
             out.push(diag(
                 &format!("adapters.{}", a.platform),
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("platform semantic fork: shellSchema `{}`", a.shell_schema),
                 DIAG_PLATFORM_SEMANTIC_FORK,
             ));
@@ -188,14 +176,14 @@ fn validate_shell(
         if !found_client {
             out.push(diag(
                 &shell.entry.client_js,
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("missing local bundled client artifact `{}`", shell.entry.client_js),
                 DIAG_MISSING_ENTRY_ARTIFACT,
             ));
         } else if !client_has_marker {
             out.push(diag(
                 &shell.entry.client_js,
-                "error",
+                vmz_protocol::Severity::Error,
                 "client artifact missing __vmzDirect — shell must reuse Browser Direct emit",
                 DIAG_MISSING_ENTRY_ARTIFACT,
             ));
@@ -203,7 +191,7 @@ fn validate_shell(
         if !found_dom {
             out.push(diag(
                 &shell.entry.dom_host,
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("missing DOM host artifact `{}`", shell.entry.dom_host),
                 DIAG_MISSING_ENTRY_ARTIFACT,
             ));
@@ -222,14 +210,14 @@ fn load_or_example_shell(
                 Ok(s) => return s,
                 Err(e) => diags.push(diag(
                     "native-shell.json",
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!("invalid NativeWebViewShellManifest JSON: {e}"),
                     DIAG_INVALID_PROFILE,
                 )),
             },
             Err(e) => diags.push(diag(
                 "native-shell.json",
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("cannot read native-shell.json: {e}"),
                 DIAG_INVALID_PROFILE,
             )),
@@ -253,7 +241,7 @@ pub fn check_native_shell_contract(root: &Path) -> NativeShellCheckReport {
             } else if text.contains("ios.private") || text.contains("androidOnlySemantics") {
                 diagnostics.push(diag(
                     "native-shell.fork.foul.json",
-                    "error",
+                    vmz_protocol::Severity::Error,
                     "platform-private shell semantics are forbidden",
                     DIAG_PLATFORM_SEMANTIC_FORK,
                 ));
@@ -261,12 +249,12 @@ pub fn check_native_shell_contract(root: &Path) -> NativeShellCheckReport {
         }
     }
 
-    let failed = diagnostics.iter().any(|d| d.severity == "error");
+    let failed = diagnostics.iter().any(|d| d.is_error());
     NativeShellCheckReport {
         schema: SHELL_CHECK_SCHEMA.into(),
         catalog,
         shell,
         diagnostics,
-        status: if failed { "failed".into() } else { "ready".into() },
+        status: vmz_protocol::CheckReportStatus::from_failed(failed),
     }
 }

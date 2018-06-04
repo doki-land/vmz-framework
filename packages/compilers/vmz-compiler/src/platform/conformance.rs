@@ -8,20 +8,20 @@ use std::path::Path;
 
 use vmz_protocol::{
     CONFORMANCE_CHECK_SCHEMA, CONFORMANCE_FIXTURE_SCHEMA, CONFORMANCE_HOST_RUN_SCHEMA,
-    CONFORMANCE_SCENARIO_SCHEMA, CONFORMANCE_STATE_SNAPSHOT_SCHEMA, CONFORMANCE_SURFACE_ROLES,
-    CONFORMANCE_TRACE_SCHEMA, ConformanceCheckReport, ConformanceHostRun, ConformanceScenario,
+    CONFORMANCE_SCENARIO_SCHEMA, CONFORMANCE_STATE_SNAPSHOT_SCHEMA, CONFORMANCE_TRACE_SCHEMA,
+    ConformanceCheckReport, ConformanceHostRun, ConformanceScenario, ConformanceSurfaceRole,
     DIAG_CONFORMANCE_HOST_INCOMPLETE, DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH,
     DIAG_PRIVATE_OBJECT_CROSSING, DIAG_STABLE_ID_DIVERGENCE, DIAG_STATE_RESULT_DIVERGENCE,
-    DIAG_TRACE_INVARIANT_BROKEN, ProfileDiagnostic, ProfileProtocolCatalog,
+    DIAG_TRACE_INVARIANT_BROKEN, ProfileDiagnostic, ProfileProtocolCatalog, SurfaceKind,
 };
 
-fn diag(path: &str, severity: &str, message: impl Into<String>, code: &str) -> ProfileDiagnostic {
-    ProfileDiagnostic {
-        path: path.into(),
-        severity: severity.into(),
-        message: message.into(),
-        code: Some(code.into()),
-    }
+fn diag(
+    path: &str,
+    severity: vmz_protocol::Severity,
+    message: impl Into<String>,
+    code: &str,
+) -> ProfileDiagnostic {
+    ProfileDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
 fn sorted(ids: &[String]) -> Vec<String> {
@@ -41,62 +41,50 @@ fn validate_run(
     if run.schema != CONFORMANCE_HOST_RUN_SCHEMA {
         out.push(diag(
             &format!("{prefix}.schema"),
-            "error",
+            vmz_protocol::Severity::Error,
             format!("ConformanceHostRun schema must be `{CONFORMANCE_HOST_RUN_SCHEMA}`"),
             DIAG_CONFORMANCE_HOST_INCOMPLETE,
         ));
     }
-    if !CONFORMANCE_SURFACE_ROLES.contains(&run.surface_role.as_str()) {
-        out.push(diag(
-            &format!("{prefix}.surfaceRole"),
-            "error",
-            format!(
-                "surfaceRole must be one of {}; got `{}`",
-                CONFORMANCE_SURFACE_ROLES.join("|"),
-                run.surface_role
-            ),
-            DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH,
-        ));
-    }
-    match run.surface_role.as_str() {
-        "web" => {
-            if run.surface_kinds != ["web".to_string()] {
+    // Closed [`ConformanceSurfaceRole`] validates at deserialize.
+    match run.surface_role {
+        ConformanceSurfaceRole::Web => {
+            if run.surface_kinds != [SurfaceKind::Web] {
                 out.push(diag(
                     &format!("{prefix}.surfaceKinds"),
-                    "error",
+                    vmz_protocol::Severity::Error,
                     "web role requires surfaceKinds=[web] only",
                     DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH,
                 ));
             }
         }
-        "template" => {
-            if run.surface_kinds != ["template".to_string()] {
+        ConformanceSurfaceRole::Template => {
+            if run.surface_kinds != [SurfaceKind::Template] {
                 out.push(diag(
                     &format!("{prefix}.surfaceKinds"),
-                    "error",
+                    vmz_protocol::Severity::Error,
                     "template role requires surfaceKinds=[template] only",
                     DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH,
                 ));
             }
         }
-        "mixed" => {
-            let has_web = run.surface_kinds.iter().any(|k| k == "web");
-            let has_native = run.surface_kinds.iter().any(|k| k == "native");
+        ConformanceSurfaceRole::Mixed => {
+            let has_web = run.surface_kinds.contains(&SurfaceKind::Web);
+            let has_native = run.surface_kinds.contains(&SurfaceKind::Native);
             if !has_web || !has_native {
                 out.push(diag(
                     &format!("{prefix}.surfaceKinds"),
-                    "error",
+                    vmz_protocol::Severity::Error,
                     "mixed role requires both web and native surfaceKinds",
                     DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH,
                 ));
             }
         }
-        _ => {}
     }
     if run.surface_ids.is_empty() {
         out.push(diag(
             &format!("{prefix}.surfaceIds"),
-            "error",
+            vmz_protocol::Severity::Error,
             "host run must list surfaceIds",
             DIAG_CONFORMANCE_HOST_INCOMPLETE,
         ));
@@ -104,7 +92,7 @@ fn validate_run(
     if run.uses_private_runtime_objects {
         out.push(diag(
             &format!("{prefix}.usesPrivateRuntimeObjects"),
-            "error",
+            vmz_protocol::Severity::Error,
             "cross-host conformance must not rely on private runtime objects",
             DIAG_PRIVATE_OBJECT_CROSSING,
         ));
@@ -115,7 +103,7 @@ fn validate_run(
     if observed != expected_ids {
         out.push(diag(
             &format!("{prefix}.observedStableIds"),
-            "error",
+            vmz_protocol::Severity::Error,
             format!("stable IDs diverge from fixture: expected {expected_ids:?}, got {observed:?}"),
             DIAG_STABLE_ID_DIVERGENCE,
         ));
@@ -124,7 +112,7 @@ fn validate_run(
     if run.state.schema != CONFORMANCE_STATE_SNAPSHOT_SCHEMA {
         out.push(diag(
             &format!("{prefix}.state.schema"),
-            "error",
+            vmz_protocol::Severity::Error,
             format!("state schema must be `{CONFORMANCE_STATE_SNAPSHOT_SCHEMA}`"),
             DIAG_STATE_RESULT_DIVERGENCE,
         ));
@@ -132,7 +120,7 @@ fn validate_run(
     if run.state.normalized_pairs() != scenario.expected_state.normalized_pairs() {
         out.push(diag(
             &format!("{prefix}.state"),
-            "error",
+            vmz_protocol::Severity::Error,
             "state result diverges from expected fixture state",
             DIAG_STATE_RESULT_DIVERGENCE,
         ));
@@ -141,7 +129,7 @@ fn validate_run(
     if run.trace.schema != CONFORMANCE_TRACE_SCHEMA {
         out.push(diag(
             &format!("{prefix}.trace.schema"),
-            "error",
+            vmz_protocol::Severity::Error,
             format!("trace schema must be `{CONFORMANCE_TRACE_SCHEMA}`"),
             DIAG_TRACE_INVARIANT_BROKEN,
         ));
@@ -151,7 +139,7 @@ fn validate_run(
     if got_keys != expected_keys {
         out.push(diag(
             &format!("{prefix}.trace.invariantKeys"),
-            "error",
+            vmz_protocol::Severity::Error,
             format!("trace invariant keys diverge: expected {expected_keys:?}, got {got_keys:?}"),
             DIAG_TRACE_INVARIANT_BROKEN,
         ));
@@ -160,7 +148,7 @@ fn validate_run(
         if ev.transaction_id.trim().is_empty() || ev.kind.trim().is_empty() {
             out.push(diag(
                 &format!("{prefix}.trace.events[{ei}]"),
-                "error",
+                vmz_protocol::Severity::Error,
                 "trace event requires kind + transactionId",
                 DIAG_TRACE_INVARIANT_BROKEN,
             ));
@@ -169,7 +157,7 @@ fn validate_run(
             if !expected_ids.iter().any(|e| e == sid) {
                 out.push(diag(
                     &format!("{prefix}.trace.events[{ei}].stableIds"),
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!("trace references unknown stable id `{sid}`"),
                     DIAG_STABLE_ID_DIVERGENCE,
                 ));
@@ -178,7 +166,10 @@ fn validate_run(
     }
 }
 
-// Validate a ConformanceScenario against hard contracts.
+/// Validate a [`ConformanceScenario`] against schema and stable-id contracts.
+///
+/// Appends diagnostics for bad schemas, incomplete host fixtures, and trace
+/// references that do not resolve to known stable ids.
 pub fn validate_conformance_scenario(
     scenario: &ConformanceScenario,
     out: &mut Vec<ProfileDiagnostic>,
@@ -186,7 +177,7 @@ pub fn validate_conformance_scenario(
     if scenario.schema != CONFORMANCE_SCENARIO_SCHEMA {
         out.push(diag(
             "scenario.schema",
-            "error",
+            vmz_protocol::Severity::Error,
             format!("ConformanceScenario schema must be `{CONFORMANCE_SCENARIO_SCHEMA}`"),
             DIAG_CONFORMANCE_HOST_INCOMPLETE,
         ));
@@ -194,7 +185,7 @@ pub fn validate_conformance_scenario(
     if scenario.fixture.schema != CONFORMANCE_FIXTURE_SCHEMA {
         out.push(diag(
             "scenario.fixture.schema",
-            "error",
+            vmz_protocol::Severity::Error,
             format!("ConformanceFixture schema must be `{CONFORMANCE_FIXTURE_SCHEMA}`"),
             DIAG_CONFORMANCE_HOST_INCOMPLETE,
         ));
@@ -205,7 +196,7 @@ pub fn validate_conformance_scenario(
     {
         out.push(diag(
             "scenario.fixture",
-            "error",
+            vmz_protocol::Severity::Error,
             "fixture requires applicationId, planVersion, and stable IDs",
             DIAG_CONFORMANCE_HOST_INCOMPLETE,
         ));
@@ -215,17 +206,17 @@ pub fn validate_conformance_scenario(
     {
         out.push(diag(
             "scenario",
-            "error",
+            vmz_protocol::Severity::Error,
             "expectedState + expectedTraceInvariantKeys required",
             DIAG_CONFORMANCE_HOST_INCOMPLETE,
         ));
     }
-    for role in CONFORMANCE_SURFACE_ROLES {
+    for role in ConformanceSurfaceRole::ALL {
         if !scenario.runs.iter().any(|r| r.surface_role == *role) {
             out.push(diag(
                 "scenario.runs",
-                "error",
-                format!("P5 requires host run with surfaceRole `{role}`"),
+                vmz_protocol::Severity::Error,
+                format!("conformance requires host run with surfaceRole `{role}`"),
                 DIAG_CONFORMANCE_HOST_INCOMPLETE,
             ));
         }
@@ -249,7 +240,7 @@ fn load_json<T: serde::de::DeserializeOwned>(
             Err(e) => {
                 diags.push(diag(
                     label,
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!("invalid JSON: {e}"),
                     DIAG_CONFORMANCE_HOST_INCOMPLETE,
                 ));
@@ -259,7 +250,7 @@ fn load_json<T: serde::de::DeserializeOwned>(
         Err(e) => {
             diags.push(diag(
                 label,
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("cannot read: {e}"),
                 DIAG_CONFORMANCE_HOST_INCOMPLETE,
             ));
@@ -268,7 +259,10 @@ fn load_json<T: serde::de::DeserializeOwned>(
     }
 }
 
-// check for a workspace root (optional conformance-scenario.json).
+/// Run cross-host conformance checks for a workspace root.
+///
+/// Loads optional `conformance-scenario.json` (and foul twin); falls back to the
+/// built-in counter example when the primary file is absent.
 pub fn check_cross_host_conformance(root: &Path) -> ConformanceCheckReport {
     let mut diagnostics = Vec::new();
     let catalog = ProfileProtocolCatalog::v0();
@@ -289,12 +283,12 @@ pub fn check_cross_host_conformance(root: &Path) -> ConformanceCheckReport {
         validate_conformance_scenario(&foul, &mut diagnostics);
     }
 
-    let failed = diagnostics.iter().any(|d| d.severity == "error");
+    let failed = diagnostics.iter().any(|d| d.is_error());
     ConformanceCheckReport {
         schema: CONFORMANCE_CHECK_SCHEMA.into(),
         catalog,
         scenario,
         diagnostics,
-        status: if failed { "failed".into() } else { "ready".into() },
+        status: vmz_protocol::CheckReportStatus::from_failed(failed),
     }
 }

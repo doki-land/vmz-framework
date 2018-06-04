@@ -1,9 +1,11 @@
 //! Moved from `src/tooling/cross_sfc.rs` (cargo-cry: tests next to Cargo.toml).
 
+use std::fs;
 use std::path::PathBuf;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 use vmz_compiler::tooling::cross_sfc::*;
+use vmz_protocol::{CodeActionKind, RenameIntent, StableIdKind, WorkspaceEditStatus};
 
 fn tmp(label: &str) -> PathBuf {
     let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
@@ -43,17 +45,25 @@ export default class IndexPage {}
     )
     .unwrap();
 
-    let method = plan_x2_rename(&root, &RenameIntent::new("method", "increment", "bump"), "method");
-    assert_eq!(method.status, "ready", "{:?}", method.diagnostics);
+    let method = plan_x2_rename(
+        &root,
+        &RenameIntent::new(StableIdKind::Method, "increment", "bump"),
+        StableIdKind::Method,
+    );
+    assert_eq!(method.status, WorkspaceEditStatus::Ready, "{:?}", method.diagnostics);
     assert!(method.edits.len() >= 2, "{:?}", method.edits);
 
-    let comp = plan_x2_rename(&root, &RenameIntent::new("component", "Card", "Tile"), "component");
-    assert_eq!(comp.status, "ready", "{:?}", comp.diagnostics);
+    let comp = plan_x2_rename(
+        &root,
+        &RenameIntent::new(StableIdKind::Component, "Card", "Tile"),
+        StableIdKind::Component,
+    );
+    assert_eq!(comp.status, WorkspaceEditStatus::Ready, "{:?}", comp.diagnostics);
     assert!(comp.edits.iter().any(|e| e.path.contains("pages/index")), "{:?}", comp.edits);
 
     let report = check_cross_sfc(&root);
-    assert!(report.index.symbols.iter().any(|s| s.kind == "method"));
-    assert!(report.index.source_map.iter().any(|m| m.symbol_kind == "method"));
+    assert!(report.index.symbols.iter().any(|s| s.kind() == StableIdKind::Method));
+    assert!(report.index.source_map.iter().any(|m| m.symbol_kind == StableIdKind::Method));
     let _ = fs::remove_dir_all(&root);
 }
 
@@ -71,7 +81,16 @@ export default class WrongName {}
     )
     .unwrap();
     let report = check_cross_sfc(&root);
-    assert!(report.code_actions.iter().any(|a| a.kind == "safe_fix"), "{:?}", report.code_actions);
-    assert!(report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_CLASS_NAME_MISMATCH)));
+    assert!(
+        report.code_actions.iter().any(|a| a.kind == CodeActionKind::SafeFix),
+        "{:?}",
+        report.code_actions
+    );
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|d| { d.code_string().as_deref() == Some(DIAG_CLASS_NAME_MISMATCH) })
+    );
     let _ = fs::remove_dir_all(&root);
 }

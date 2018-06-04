@@ -1,6 +1,6 @@
 //! Moved from `src/tooling/rename.rs` (cargo-cry: tests next to Cargo.toml).
 
-use vmz_protocol::{RenameIntent, TextEdit};
+use vmz_protocol::{DxPreviewStatus, RenameIntent, StableIdKind, TextEdit, WorkspaceEditStatus};
 
 use std::fs;
 
@@ -31,12 +31,12 @@ fn route_id_rename_emits_edits_and_applies() {
 "#,
     )
     .unwrap();
-    let intent = RenameIntent::new("route_id", "home", "landing");
-    let plan = plan_rename_edits(&root, &intent, "route_id");
-    assert_eq!(plan.status, "ready", "{:?}", plan.diagnostics);
+    let intent = RenameIntent::new(StableIdKind::RouteId, "home", "landing");
+    let plan = plan_rename_edits(&root, &intent, StableIdKind::RouteId);
+    assert_eq!(plan.status, WorkspaceEditStatus::Ready, "{:?}", plan.diagnostics);
     assert!(plan.edits.len() >= 2, "{:?}", plan.edits);
     let applied = apply_workspace_edits(&root, &plan);
-    assert_eq!(applied.status, "applied", "{:?}", applied.diagnostics);
+    assert_eq!(applied.status, WorkspaceEditStatus::Applied, "{:?}", applied.diagnostics);
     let text = fs::read_to_string(root.join("src/Index.vmz")).unwrap();
     assert!(text.contains("landing"), "{text}");
     assert!(!text.contains("to=\"home\""), "{text}");
@@ -59,6 +59,6 @@ fn test_edges_select_by_chunk() {
     .unwrap();
     let sel = select_tests_for_chunks(&root, &["pages/index".into()], false);
     assert_eq!(sel.test_ids, vec!["a.test".to_string()]);
-    assert_eq!(sel.status, "ready");
+    assert_eq!(sel.status, DxPreviewStatus::Ready);
     let _ = fs::remove_dir_all(&root);
 }

@@ -195,6 +195,14 @@ function resolveDocHref(href, fromPageKey, locale, routeBase, pageKeySet) {
     pk = normalizePageKey(pk);
     const keys = pageKeySet.get(locale) || new Set();
     if (!keys.has(pk)) {
+        // A directory index and a leaf page share the same normalized PageKey shape.
+        // Prefer the regular sibling resolution above, then retry relative to the
+        // PageKey itself so `guide/optimizations/index.md` keeps its directory.
+        const indexJoined = path.posix.normalize(path.posix.join(fromPageKey || '.', pathPart));
+        const indexPk = normalizePageKey(indexJoined.replace(/^\.\//, ''));
+        if (keys.has(indexPk)) {
+            return { ok: true, locale, pageKey: indexPk, anchor, anchors: [] };
+        }
         return { ok: false, reason: `no PageKey ${pk} in ${locale}` };
     }
     return { ok: true, locale, pageKey: pk, anchor, anchors: [] };

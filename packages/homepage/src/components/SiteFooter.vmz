@@ -2,17 +2,23 @@
   <footer class="site-footer">
     <div class="site-footer__brand">
       <span class="site-footer__mark">VMZ</span>
-      <p class="site-footer__tag">Vue-Familiar · Multi-Platform · Zero-Cost</p>
+      <p class="site-footer__tag">让编译器理解整套应用，并为 Web、SSR、Native 与 Edge 生成精确的交付结果。</p>
     </div>
-    <nav class="site-footer__nav" aria-label="Footer">
+    <nav class="site-footer__group" aria-label="产品">
+      <b>Product</b>
       <a href="/d/">文档</a>
       <a href="/d/zh-hans/guide/">入门指南</a>
-      <a href="/d/zh-hans/guide/zero-cost/">Zero-Cost</a>
-      <a href="/d/zh-hans/guide/optimizations/">优化</a>
+      <a href="/d/zh-hans/guide/deploy/">部署指南</a>
+      <a href="/deploy-planner">部署计划器</a>
+      <a href="/#showcase">UI 组件</a>
+    </nav>
+    <nav class="site-footer__group" aria-label="资源">
+      <b>Resources</b>
       <a href="/welcome">Welcome</a>
       <a href="/d/zh-hans/plugins/">官方插件</a>
+      <a href="https://github.com/doki-land/vmz-framework">GitHub</a>
     </nav>
-    <p class="site-footer__note">普通 VMZ application · 无 homepage 特判</p>
+    <p class="site-footer__note">VMZ · Full-stack application compiler</p>
   </footer>
 </template>
 

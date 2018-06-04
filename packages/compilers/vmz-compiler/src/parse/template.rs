@@ -1,29 +1,49 @@
 //! Minimal template IR: elements, text, `{expr}` interpolations.
 
+/// One node in the template tree produced by [`parse_template`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TemplateNode {
-    Element { tag: String, attrs: Vec<TemplateAttr>, children: Vec<TemplateNode> },
+    /// Element with tag name, attributes, and child nodes.
+    Element {
+        /// Tag name as written (`div`, `MyComp`, ...).
+        tag: String,
+        /// Attributes in source order.
+        attrs: Vec<TemplateAttr>,
+        /// Nested children (empty for self-closing tags).
+        children: Vec<TemplateNode>,
+    },
+    /// Decoded text run between tags / interpolations.
     Text(String),
+    /// `{expr}` mustache body (trimmed), without the braces.
     Interp(String),
 }
 
+/// One attribute on a [`TemplateNode::Element`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateAttr {
+    /// Attribute name, including Vue-familiar shorthands (`@click`, `#header`).
     pub name: String,
+    /// Static string or `{expr}` binding.
     pub value: AttrValue,
 }
 
+/// Attribute value form after template parse.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttrValue {
+    /// Quoted or bare static text (HTML entities decoded).
     Static(String),
+    /// `{expr}` binding body (trimmed), without the braces.
     Interp(String),
 }
 
+/// Forest of template roots for one `<template>` body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateIr {
+    /// Top-level nodes in document order (comments skipped).
     pub roots: Vec<TemplateNode>,
 }
 
+/// Parse a `<template>` body into a lightweight element / text / interp IR.
 pub fn parse_template(input: &str) -> TemplateIr {
     let mut parser = Parser { input, pos: 0 };
     let mut roots = Vec::new();
@@ -171,7 +191,7 @@ impl<'a> Parser<'a> {
             if let Some(child) = self.parse_node() {
                 children.push(child);
             } else if self.starts_with("</") {
-                // mismatched close ?stop
+                // mismatched close: stop
                 break;
             } else {
                 break;
@@ -217,7 +237,7 @@ impl<'a> Parser<'a> {
 
 /// Decode HTML character references in template text / static attrs.
 /// Authors write `&gt;` / `&amp;` like HTML; IR stores the decoded Unicode so SSR
-/// `escapeHtml` does not double-encode (`&amp;gt;` → visible `&gt;`).
+/// `escapeHtml` does not double-encode (`&amp;gt;` -> visible `&gt;`).
 pub fn decode_html_entities(input: &str) -> String {
     if !input.contains('&') {
         return input.to_string();
@@ -282,33 +302,4 @@ fn match_entity(s: &str) -> Option<(char, usize)> {
         return Some((ch, consumed));
     }
     None
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn decodes_named_entities_in_text() {
-        let ir = parse_template("<li>CV &gt; 5% &amp; ok</li>");
-        match &ir.roots[0] {
-            TemplateNode::Element { children, .. } => match &children[0] {
-                TemplateNode::Text(t) => assert_eq!(t, "CV > 5% & ok"),
-                other => panic!("expected text, got {other:?}"),
-            },
-            other => panic!("expected element, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn decodes_numeric_and_attr() {
-        assert_eq!(decode_html_entities("a&#62;b&#x3c;c"), "a>b<c");
-        let ir = parse_template(r#"<a title="A &quot;B&quot;">x</a>"#);
-        match &ir.roots[0] {
-            TemplateNode::Element { attrs, .. } => {
-                assert_eq!(attrs[0].value, AttrValue::Static("A \"B\"".into()));
-            }
-            other => panic!("expected element, got {other:?}"),
-        }
-    }
 }

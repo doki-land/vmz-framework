@@ -273,10 +273,13 @@ export function checkLocales(opts) {
     const manifestPath = fs.existsSync(manifestPathJson5) ? manifestPathJson5 : fs.existsSync(manifestPathJson) ? manifestPathJson : null;
 
     if (!fs.existsSync(localesRoot) || !manifestPath) {
+        // Discipline nudge: i18n is first-class — missing policy is never silent.
+        // Soft for now (warning); production profiles may elevate to error later.
         diagnostics.push({
             code: DIAG_MANIFEST_MISSING,
-            severity: 'error',
-            message: 'locales/locales.json5 missing (LocaleId policy truth source)',
+            severity: 'warning',
+            message:
+                'locales/locales.json5 missing — declare LocaleId policy under /locales (native i18n, not an afterthought)',
             path: 'locales/locales.json5',
         });
         return emptyReport(projectRoot, diagnostics);
@@ -618,9 +621,10 @@ function paramSignature(params) {
 }
 
 function emptyReport(projectRoot, diagnostics) {
+    const hasErrors = (diagnostics || []).some((d) => d.severity === 'error');
     return {
         schema: LOCALE_CHECK_SCHEMA,
-        status: 'failed',
+        status: hasErrors ? 'failed' : 'ready',
         root: projectRoot,
         localesRoot: 'locales',
         manifest: null,
@@ -736,15 +740,15 @@ export function emitLocaleTypedModules(report, outDir) {
  * @returns {{ ok: boolean, written: string[], diagnostics: any[] }}
  */
 export function emitLocaleRuntimeModules(projectRoot, distDir) {
-    const localesRoot = path.join(projectRoot, 'locales');
-    if (!fs.existsSync(localesRoot)) {
-        return { ok: true, written: [], diagnostics: [] };
-    }
     const report = checkLocales({ projectRoot, checkUnused: false });
     if (localeHasErrors(report)) {
         return { ok: false, written: [], diagnostics: report.diagnostics || [] };
     }
-    const defaultLocale = report.manifest?.defaultLocale || 'zh-hans';
+    // Missing locales.json5 is warning-only for now — surface diagnostics, skip emit.
+    if (!report.manifest) {
+        return { ok: true, written: [], diagnostics: report.diagnostics || [] };
+    }
+    const defaultLocale = report.manifest.defaultLocale || 'zh-hans';
     const byId = new Map((report.messageCatalog?.messages || []).map((m) => [m.messageId, m]));
     /** @type {string[]} */
     const written = [];

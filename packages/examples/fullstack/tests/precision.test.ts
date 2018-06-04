@@ -25,16 +25,19 @@ function exprText(c: ReactiveComp, id: number): string {
     return c.exprs.find((e) => e.id === id)?.text ?? '';
 }
 
-/** Reconstruct wire-stable strings from serde IrDepPath (external tag, no embedded `stable`). */
+/** Reconstruct wire-stable strings from serde IrDepPath (`tag=kind` + `content=value`). */
 function pathStable(c: ReactiveComp, path: unknown): string | null {
     if (!path || typeof path !== 'object') return null;
     const p = path as Record<string, unknown>;
-    if ('static_path' in p) {
-        const sp = p.static_path as { root: number; props?: number[] };
-        return [fieldName(c, sp.root), ...(sp.props ?? []).map((id) => propName(c, id))].join('.');
+    const kind = typeof p.kind === 'string' ? p.kind : null;
+    const value = p.value;
+
+    if (kind === 'static-path' && value && typeof value === 'object') {
+        const sp = value as { root: number; properties?: number[] };
+        return [fieldName(c, sp.root), ...(sp.properties ?? []).map((id) => propName(c, id))].join('.');
     }
-    if ('list_item' in p) {
-        const li = p.list_item as {
+    if (kind === 'list-item' && value && typeof value === 'object') {
+        const li = value as {
             list: number;
             frames?: Array<{ via?: number[]; key?: number | null }>;
             path?: number[];
@@ -47,11 +50,14 @@ function pathStable(c: ReactiveComp, path: unknown): string | null {
         for (const id of li.path ?? []) s += `.${propName(c, id)}`;
         return s;
     }
-    if ('field' in p && typeof p.field === 'number') {
-        return fieldName(c, p.field);
+    if (kind === 'field' && typeof value === 'number') {
+        return fieldName(c, value);
     }
-    if ('dynamic_path' in p) {
-        const dp = p.dynamic_path as {
+    if (kind === 'unknown' && typeof value === 'number') {
+        return fieldName(c, value);
+    }
+    if (kind === 'dynamic-path' && value && typeof value === 'object') {
+        const dp = value as {
             root: number;
             steps?: Array<{ via?: number[]; key: number }>;
             path?: number[];
@@ -83,8 +89,8 @@ function pathKinds(c: ReactiveComp): Set<string> {
     for (const b of c.bindings) {
         for (const r of b.reads) {
             if (!r || typeof r !== 'object') continue;
-            const key = Object.keys(r as object)[0];
-            if (key) kinds.add(key);
+            const kind = (r as { kind?: string }).kind;
+            if (kind) kinds.add(kind);
         }
     }
     return kinds;
@@ -98,7 +104,7 @@ describe('precision', () => {
         const kinds = pathKinds(c);
         expect(stables.has('user.name')).toBe(true);
         expect(stables.has('user.bio')).toBe(true);
-        expect(kinds.has('list_item')).toBe(true);
+        expect(kinds.has('list-item')).toBe(true);
         expect(stables.has('tags[key=tag.id].label')).toBe(true);
     });
 
@@ -196,7 +202,7 @@ describe('precision', () => {
         const ir = readJson<{ components: ReactiveComp[] }>(path.join(dist, 'components', 'UserCard.reactive.json'));
         const c = ir.components[0]!;
         const labelBinding = c.bindings.find((b) => b.kind === 'text' && b.reads.some((r) => pathStable(c, r) === 'tags[key=tag.id].label'));
-        const eachBinding = c.bindings.find((b) => b.kind === 'each_list');
+        const eachBinding = c.bindings.find((b) => b.kind === 'each-list');
         expect(labelBinding?.id).toEqual(expect.any(Number));
         expect(eachBinding?.id).toEqual(expect.any(Number));
 

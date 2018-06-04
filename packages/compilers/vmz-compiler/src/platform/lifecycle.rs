@@ -8,38 +8,41 @@ use std::path::Path;
 
 use vmz_protocol::{
     DIAG_LIFECYCLE_MAPPING_INCOMPLETE, DIAG_LIFECYCLE_UNPROVEN, DIAG_PERSISTENCE_WINDOW_INVALID,
-    DIAG_RECOVERY_ASSUMES_HEAP, DIAG_RECOVERY_DUPLICATES_OWNER, LIFECYCLE_HOST_KINDS,
-    LIFECYCLE_RECOVERY_CHECK_SCHEMA, LIFECYCLE_SCENARIO_SCHEMA, LifecycleRecoveryCheckReport,
-    LifecycleScenario, PERSISTENCE_WINDOWS, ProfileDiagnostic, ProfileProtocolCatalog,
-    RECOVERY_POLICY_SCHEMA, UNIFIED_LIFECYCLE_EVENTS,
+    DIAG_RECOVERY_ASSUMES_HEAP, DIAG_RECOVERY_DUPLICATES_OWNER, LIFECYCLE_RECOVERY_CHECK_SCHEMA,
+    LIFECYCLE_SCENARIO_SCHEMA, LifecycleHostKind, LifecycleRecoveryCheckReport, LifecycleScenario,
+    PersistenceWindow, ProfileDiagnostic, ProfileProtocolCatalog, RECOVERY_POLICY_SCHEMA,
+    UnifiedLifecycleEvent,
 };
 
-fn diag(path: &str, severity: &str, message: impl Into<String>, code: &str) -> ProfileDiagnostic {
-    ProfileDiagnostic {
-        path: path.into(),
-        severity: severity.into(),
-        message: message.into(),
-        code: Some(code.into()),
-    }
+fn diag(
+    path: &str,
+    severity: vmz_protocol::Severity,
+    message: impl Into<String>,
+    code: &str,
+) -> ProfileDiagnostic {
+    ProfileDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
-// Validate a LifecycleScenario against hard contracts.
+/// Validate a [`LifecycleScenario`] against unified lifecycle mapping contracts.
+///
+/// Requires browser/mini/native hosts and a binding for every unified lifecycle
+/// event; appends diagnostics into `out`.
 pub fn validate_lifecycle_scenario(scenario: &LifecycleScenario, out: &mut Vec<ProfileDiagnostic>) {
     if scenario.schema != LIFECYCLE_SCENARIO_SCHEMA {
         out.push(diag(
             "scenario.schema",
-            "error",
+            vmz_protocol::Severity::Error,
             format!("LifecycleScenario schema must be `{LIFECYCLE_SCENARIO_SCHEMA}`"),
             DIAG_LIFECYCLE_UNPROVEN,
         ));
     }
 
-    for kind in LIFECYCLE_HOST_KINDS {
+    for kind in LifecycleHostKind::ALL {
         if !scenario.hosts.iter().any(|h| h.host_kind == *kind) {
             out.push(diag(
                 "scenario.hosts",
-                "error",
-                format!("P3 requires hostKind `{kind}` (browser/mini/native)"),
+                vmz_protocol::Severity::Error,
+                format!("P3 requires hostKind `{}` (browser/mini/native)", kind.as_str()),
                 DIAG_LIFECYCLE_MAPPING_INCOMPLETE,
             ));
         }
@@ -49,76 +52,60 @@ pub fn validate_lifecycle_scenario(scenario: &LifecycleScenario, out: &mut Vec<P
         if host.host_id.trim().is_empty() {
             out.push(diag(
                 &format!("scenario.hosts[{i}].hostId"),
-                "error",
+                vmz_protocol::Severity::Error,
                 "hostId required",
                 DIAG_LIFECYCLE_UNPROVEN,
             ));
         }
-        if !LIFECYCLE_HOST_KINDS.contains(&host.host_kind.as_str()) {
-            out.push(diag(
-                &format!("scenario.hosts[{i}].hostKind"),
-                "error",
-                format!("unknown hostKind `{}`", host.host_kind),
-                DIAG_LIFECYCLE_UNPROVEN,
-            ));
-        }
-        for ev in UNIFIED_LIFECYCLE_EVENTS {
+        for ev in UnifiedLifecycleEvent::ALL {
             let binding = host.lifecycle.iter().find(|b| b.vmz_lifecycle == *ev);
             match binding {
                 None => out.push(diag(
                     &format!("scenario.hosts[{i}].lifecycle"),
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!(
-                        "host `{}` missing LifecycleBinding for unified event `{ev}`",
-                        host.host_id
+                        "host `{}` missing LifecycleBinding for unified event `{}`",
+                        host.host_id,
+                        ev.as_str()
                     ),
                     DIAG_LIFECYCLE_MAPPING_INCOMPLETE,
                 )),
                 Some(b) => {
                     if b.host_event.trim().is_empty() {
                         out.push(diag(
-                            &format!("scenario.hosts[{i}].lifecycle.{ev}.hostEvent"),
-                            "error",
+                            &format!("scenario.hosts[{i}].lifecycle.{}.hostEvent", ev.as_str()),
+                            vmz_protocol::Severity::Error,
                             "hostEvent required (mapping is not rename-only)",
                             DIAG_LIFECYCLE_UNPROVEN,
                         ));
                     }
-                    let window = b.persistence_window.trim();
-                    if window.is_empty() || !PERSISTENCE_WINDOWS.contains(&window) {
-                        out.push(diag(
-                            &format!("scenario.hosts[{i}].lifecycle.{ev}.persistenceWindow"),
-                            "error",
-                            format!(
-                                "persistenceWindow must be one of {}; got `{window}`",
-                                PERSISTENCE_WINDOWS.join("|")
-                            ),
-                            DIAG_PERSISTENCE_WINDOW_INVALID,
-                        ));
-                    }
-                    if *ev == "recover" {
+                    if *ev == UnifiedLifecycleEvent::Recover {
                         if !b.may_be_missing_after_crash {
                             out.push(diag(
                                 &format!(
                                     "scenario.hosts[{i}].lifecycle.recover.mayBeMissingAfterCrash"
                                 ),
-                                "error",
+                                vmz_protocol::Severity::Error,
                                 "recover must declare mayBeMissingAfterCrash=true",
                                 DIAG_LIFECYCLE_UNPROVEN,
                             ));
                         }
-                        if window != "crash" && window != "owner" {
+                        if !matches!(
+                            b.persistence_window,
+                            PersistenceWindow::Crash | PersistenceWindow::Owner
+                        ) {
                             out.push(diag(
                                 &format!("scenario.hosts[{i}].lifecycle.recover.persistenceWindow"),
-                                "error",
+                                vmz_protocol::Severity::Error,
                                 "recover persistenceWindow must be crash|owner",
                                 DIAG_PERSISTENCE_WINDOW_INVALID,
                             ));
                         }
                     }
-                    if *ev == "dispose" && !b.cancels_capabilities {
+                    if *ev == UnifiedLifecycleEvent::Dispose && !b.cancels_capabilities {
                         out.push(diag(
                             &format!("scenario.hosts[{i}].lifecycle.dispose.cancelsCapabilities"),
-                            "error",
+                            vmz_protocol::Severity::Error,
                             "dispose must cancel in-flight capabilities",
                             DIAG_LIFECYCLE_UNPROVEN,
                         ));
@@ -130,7 +117,7 @@ pub fn validate_lifecycle_scenario(scenario: &LifecycleScenario, out: &mut Vec<P
 
     // Mapping table must cover every host × unified event (artifact refs only).
     for host in &scenario.hosts {
-        for ev in UNIFIED_LIFECYCLE_EVENTS {
+        for ev in UnifiedLifecycleEvent::ALL {
             let hit = scenario.mapping_table.entries.iter().any(|e| {
                 e.host_id == host.host_id
                     && e.vmz_lifecycle == *ev
@@ -139,8 +126,12 @@ pub fn validate_lifecycle_scenario(scenario: &LifecycleScenario, out: &mut Vec<P
             if !hit {
                 out.push(diag(
                     "scenario.mappingTable",
-                    "error",
-                    format!("LifecycleMappingTable missing `{}/{}` mapping", host.host_id, ev),
+                    vmz_protocol::Severity::Error,
+                    format!(
+                        "LifecycleMappingTable missing `{}/{}` mapping",
+                        host.host_id,
+                        ev.as_str()
+                    ),
                     DIAG_LIFECYCLE_MAPPING_INCOMPLETE,
                 ));
             }
@@ -151,7 +142,7 @@ pub fn validate_lifecycle_scenario(scenario: &LifecycleScenario, out: &mut Vec<P
     if recovery.schema != RECOVERY_POLICY_SCHEMA {
         out.push(diag(
             "scenario.recovery.schema",
-            "error",
+            vmz_protocol::Severity::Error,
             format!("RecoveryPolicy schema must be `{RECOVERY_POLICY_SCHEMA}`"),
             DIAG_LIFECYCLE_UNPROVEN,
         ));
@@ -159,7 +150,7 @@ pub fn validate_lifecycle_scenario(scenario: &LifecycleScenario, out: &mut Vec<P
     if recovery.owner_region_id.trim().is_empty() {
         out.push(diag(
             "scenario.recovery.ownerRegionId",
-            "error",
+            vmz_protocol::Severity::Error,
             "recovery requires single ownerRegionId",
             DIAG_LIFECYCLE_UNPROVEN,
         ));
@@ -167,7 +158,7 @@ pub fn validate_lifecycle_scenario(scenario: &LifecycleScenario, out: &mut Vec<P
     if !recovery.rematerialize_from_snapshot || !recovery.rematerialize_plan_generation {
         out.push(diag(
             "scenario.recovery",
-            "error",
+            vmz_protocol::Severity::Error,
             "crash recovery must rematerialize from Core Executor snapshot + plan generation",
             DIAG_LIFECYCLE_UNPROVEN,
         ));
@@ -175,7 +166,7 @@ pub fn validate_lifecycle_scenario(scenario: &LifecycleScenario, out: &mut Vec<P
     if recovery.assumes_js_heap_survived {
         out.push(diag(
             "scenario.recovery.assumesJsHeapSurvived",
-            "error",
+            vmz_protocol::Severity::Error,
             "crash restore must not assume JS heap survived",
             DIAG_RECOVERY_ASSUMES_HEAP,
         ));
@@ -183,7 +174,7 @@ pub fn validate_lifecycle_scenario(scenario: &LifecycleScenario, out: &mut Vec<P
     if recovery.creates_new_owner_on_recover {
         out.push(diag(
             "scenario.recovery.createsNewOwnerOnRecover",
-            "error",
+            vmz_protocol::Severity::Error,
             "crash recovery must not duplicate owner — reattach to existing RegionId",
             DIAG_RECOVERY_DUPLICATES_OWNER,
         ));
@@ -191,7 +182,7 @@ pub fn validate_lifecycle_scenario(scenario: &LifecycleScenario, out: &mut Vec<P
     if recovery.surface_ids_to_reattach.is_empty() {
         out.push(diag(
             "scenario.recovery.surfaceIdsToReattach",
-            "error",
+            vmz_protocol::Severity::Error,
             "recovery must list surfaces to reattach",
             DIAG_LIFECYCLE_UNPROVEN,
         ));
@@ -199,7 +190,7 @@ pub fn validate_lifecycle_scenario(scenario: &LifecycleScenario, out: &mut Vec<P
     if !recovery.cancels_capabilities_only_on_owner_dispose {
         out.push(diag(
             "scenario.recovery.cancelsCapabilitiesOnlyOnOwnerDispose",
-            "error",
+            vmz_protocol::Severity::Error,
             "surface crash must not cancel capabilities owned by the page owner",
             DIAG_LIFECYCLE_UNPROVEN,
         ));
@@ -220,7 +211,7 @@ fn load_json<T: serde::de::DeserializeOwned>(
             Err(e) => {
                 diags.push(diag(
                     label,
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!("invalid JSON: {e}"),
                     DIAG_LIFECYCLE_UNPROVEN,
                 ));
@@ -228,13 +219,21 @@ fn load_json<T: serde::de::DeserializeOwned>(
             }
         },
         Err(e) => {
-            diags.push(diag(label, "error", format!("cannot read: {e}"), DIAG_LIFECYCLE_UNPROVEN));
+            diags.push(diag(
+                label,
+                vmz_protocol::Severity::Error,
+                format!("cannot read: {e}"),
+                DIAG_LIFECYCLE_UNPROVEN,
+            ));
             None
         }
     }
 }
 
-// check for a workspace root (optional lifecycle-scenario.json).
+/// Run lifecycle recovery checks for a workspace root.
+///
+/// Loads optional `lifecycle-scenario.json` (and foul twin); falls back to the
+/// built-in cross-host recovery example when the primary file is absent.
 pub fn check_lifecycle_recovery(root: &Path) -> LifecycleRecoveryCheckReport {
     let mut diagnostics = Vec::new();
     let catalog = ProfileProtocolCatalog::v0();
@@ -255,12 +254,12 @@ pub fn check_lifecycle_recovery(root: &Path) -> LifecycleRecoveryCheckReport {
         validate_lifecycle_scenario(&foul, &mut diagnostics);
     }
 
-    let failed = diagnostics.iter().any(|d| d.severity == "error");
+    let failed = diagnostics.iter().any(|d| d.is_error());
     LifecycleRecoveryCheckReport {
         schema: LIFECYCLE_RECOVERY_CHECK_SCHEMA.into(),
         catalog,
         scenario,
         diagnostics,
-        status: if failed { "failed".into() } else { "ready".into() },
+        status: vmz_protocol::CheckReportStatus::from_failed(failed),
     }
 }

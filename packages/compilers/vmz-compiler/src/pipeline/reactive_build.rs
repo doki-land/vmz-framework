@@ -22,6 +22,7 @@ struct EachFrame {
     as_name: String,
 }
 
+/// Build a [`ReactiveModule`] from component decl + template (bindings, regions, effects).
 pub fn build_reactive_module(
     source: &str,
     decl: &ComponentDecl,
@@ -526,7 +527,7 @@ fn stable_to_ir(b: &mut ReactiveComponentBuilder, s: &str) -> Option<IrDepPath> 
     if props.is_empty() {
         Some(IrDepPath::Field(root))
     } else {
-        Some(IrDepPath::StaticPath { root, props })
+        Some(IrDepPath::StaticPath { root, properties: props })
     }
 }
 

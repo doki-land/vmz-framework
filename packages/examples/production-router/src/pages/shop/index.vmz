@@ -1,7 +1,8 @@
 <template>
-  <main>
+  <main data-vmz-focus="shop-main">
     <h1>Shop home</h1>
     <p>route-shop</p>
+    <div data-vmz-scroll-pad="1" style="height: 2200px">scroll-pad</div>
     <Link to="ShopOfferPage">Offer</Link>
   </main>
 </template>

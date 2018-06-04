@@ -76,3 +76,52 @@ fn accepts_source_target_and_diffs() {
     assert!(r2.diff.removed.iter().any(|k| k.contains("virtual")));
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn emit_targets_writes_typed_json_not_hand_built_strings() {
+    let dir = std::env::temp_dir().join(format!("vmz-plug-emit-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let mut store = ContributionStore::default();
+    let batch = ContributionBatch {
+        plugin: PluginIdentity { name: "edge".into(), version: "1.2.3".into() },
+        protocol: PLUGIN_PROTOCOL_V1.into(),
+        stage: PluginStage::Target,
+        cache_key: "t".into(),
+        deterministic: true,
+        items: vec![ContributionItem {
+            id: "preview".into(),
+            kind: ContributionKind::Target {
+                target_id: "edge-preview".into(),
+                target_kind: "edge".into(),
+                manifest: serde_json::json!({"runtime":"edge","routes":["/"]}),
+            },
+        }],
+    };
+    assert_eq!(store.apply_batch(&batch, &dir).accepted, 1);
+    let out = dir.join("dist");
+    let emitted = store.emit_targets(&out).unwrap();
+    assert!(emitted.iter().any(|p| p.ends_with("edge-preview.json")));
+    assert!(emitted.iter().any(|p| p.ends_with("vmz-plugin-targets.json")));
+
+    let doc: PluginTargetDocument = serde_json::from_str(
+        &fs::read_to_string(out.join("vmz-targets/edge-preview.json")).unwrap(),
+    )
+    .expect("typed PluginTargetDocument");
+    assert_eq!(doc.schema, PLUGIN_TARGET_SCHEMA);
+    assert_eq!(doc.target_id, "edge-preview");
+    assert_eq!(doc.kind, "edge");
+    assert_eq!(doc.plugin, "edge");
+    assert_eq!(doc.plugin_version, "1.2.3");
+    assert_eq!(doc.contribution_id, "preview");
+    assert_eq!(doc.manifest["runtime"], "edge");
+
+    let summary: PluginTargetsSummary =
+        serde_json::from_str(&fs::read_to_string(out.join("vmz-plugin-targets.json")).unwrap())
+            .expect("typed PluginTargetsSummary");
+    assert_eq!(summary.schema, PLUGIN_TARGETS_SUMMARY_SCHEMA);
+    assert_eq!(summary.targets.len(), 1);
+    assert_eq!(summary.targets[0].file, "vmz-targets/edge-preview.json");
+
+    let _ = fs::remove_dir_all(&dir);
+}

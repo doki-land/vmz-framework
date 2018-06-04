@@ -17,11 +17,15 @@ use crate::transpile::transpile_ts;
 /// Options when co-located `<script server>` is compiled into a client-facing stub.
 #[derive(Debug, Clone)]
 pub struct ServerBridge {
+    /// Virtual `#server/...` module id for the stub import.
     pub module_id: String,
+    /// Server class name exported by the stub.
     pub class_name: String,
+    /// Server methods exposed to the client bridge.
     pub methods: Vec<MethodDecl>,
 }
 
+/// Emit client JS from analyzed script + template (no Reactive / View / Plan IR).
 pub fn emit_client_js(
     client_source: &str,
     client: &AnalyzedScript,
@@ -67,7 +71,9 @@ pub fn emit_client_js_with_ir(
         .collect();
     let barrier = crate::write_barrier::rewrite_static_path_writes(client_source, &owned_fields);
     let mut js = transpile_ts(&barrier.source, &format!("{}.client.ts", client.decl.name))?;
-    js = inject_props_constructor(&js, &client.decl.name);
+    let has_source_constructor =
+        client.decl.methods.iter().any(|method| method.name == "constructor");
+    js = inject_props_constructor(&js, &client.decl.name, has_source_constructor);
 
     if let Some(bridge) = server {
         js = strip_imports_from_module(&js, &bridge.module_id);
@@ -113,7 +119,7 @@ pub fn emit_client_js_with_ir(
             }
         }
     }
-    js.push_str(&emit_props_runtime(&client.decl));
+    js.push_str(&emit_props_runtime(&client.decl, !has_source_constructor));
     js.push_str(&emit_method_rw(&client.decl));
     let async_wraps = emit_async_task_wraps(&client.decl);
     if !async_wraps.is_empty() {
@@ -148,9 +154,10 @@ fn emit_method_rw(decl: &vmz_types::ComponentDecl) -> String {
         let writes = m.writes.iter().map(|w| format!("{w:?}")).collect::<Vec<_>>().join(", ");
         let calls = m.calls.iter().map(|c| format!("{c:?}")).collect::<Vec<_>>().join(", ");
         entries.push(format!(
-            "  {name:?}: {{ reads: [{reads}], writes: [{writes}], calls: [{calls}], opaque: {opaque} }}",
+            "  {name:?}: {{ reads: [{reads}], writes: [{writes}], calls: [{calls}], opaque: {opaque}, async: {async_} }}",
             name = m.name,
             opaque = if m.opaque_callee { "true" } else { "false" },
+            async_ = if m.is_async { "true" } else { "false" },
         ));
     }
     if entries.is_empty() {
@@ -186,7 +193,7 @@ fn emit_async_task_wraps(decl: &vmz_types::ComponentDecl) -> String {
 }
 
 /// Apply props after `new` (field inits run before constructor body; props must win + re-init state).
-fn emit_props_runtime(decl: &vmz_types::ComponentDecl) -> String {
+fn emit_props_runtime(decl: &vmz_types::ComponentDecl, ctor_applies_props: bool) -> String {
     let prop_names: Vec<_> = decl.properties.iter().map(|p| format!("{:?}", p.name)).collect();
     let state_names: Vec<_> = decl
         .fields
@@ -222,7 +229,7 @@ fn emit_props_runtime(decl: &vmz_types::ComponentDecl) -> String {
     }
 
     format!(
-        "\n{name}.__vmzProps = [{props}];\n{name}.__vmzState = [{state}];\n{name}.__vmzCtorAppliesProps = true;\n{name}.prototype.__vmzApplyProps = function __vmzApplyProps(props = {{}}) {{\n{body}}};\n",
+        "\n{name}.__vmzProps = [{props}];\n{name}.__vmzState = [{state}];\n{name}.__vmzCtorAppliesProps = {ctor_applies_props};\n{name}.prototype.__vmzApplyProps = function __vmzApplyProps(props = {{}}) {{\n{body}}};\n",
         name = decl.name,
         props = prop_names.join(", "),
         state = state_names.join(", "),
@@ -231,7 +238,10 @@ fn emit_props_runtime(decl: &vmz_types::ComponentDecl) -> String {
 }
 
 /// Insert `constructor(props)` that calls `__vmzApplyProps` (fields run before body).
-fn inject_props_constructor(js: &str, class_name: &str) -> String {
+fn inject_props_constructor(js: &str, class_name: &str, has_source_constructor: bool) -> String {
+    if has_source_constructor {
+        return js.to_string();
+    }
     let needle = format!("class {class_name}");
     let Some(idx) = js.find(&needle) else {
         return js.to_string();
@@ -242,11 +252,6 @@ fn inject_props_constructor(js: &str, class_name: &str) -> String {
         return js.to_string();
     };
     let body_start = after_name + rel + 1;
-    // Peek window must land on a UTF-8 char boundary (CJK / emoji in class bodies).
-    let peek_end = js.floor_char_boundary((body_start + 240).min(js.len()));
-    if js[body_start..peek_end].contains("constructor(") {
-        return js.to_string();
-    }
     let ctor = "\n\tconstructor(props = {}) {\n\t\tif (typeof this.__vmzApplyProps === \"function\") this.__vmzApplyProps(props);\n\t}\n";
     let mut out = String::with_capacity(js.len() + ctor.len());
     out.push_str(&js[..body_start]);
@@ -255,6 +260,7 @@ fn inject_props_constructor(js: &str, class_name: &str) -> String {
     out
 }
 
+/// Emit server JS: strip HTTP surface, transpile, rewrite `#server` imports.
 pub fn emit_server_js(
     server_source: &str,
     server: &AnalyzedScript,
@@ -508,7 +514,7 @@ pub(crate) fn sanitize_interp(expr: &str) -> String {
 
 /// Rewrite bare field idents to `this.field`.
 /// Skips string / template literal contents so `'is-open'` is not rewritten to `'is-this.open'`.
-pub(crate) fn bind_field_idents(
+pub fn bind_field_idents(
     expr: &str,
     fields: &[String],
     scope: &[String],
@@ -576,36 +582,4 @@ pub(crate) fn bind_field_idents(
         }
     }
     out
-}
-
-#[cfg(test)]
-mod bind_field_idents_tests {
-    use super::bind_field_idents;
-
-    #[test]
-    fn each_alias_member_keeps_property_name() {
-        let fields = vec!["value".into(), "label".into(), "options".into()];
-        let scope = vec!["opt".into()];
-        let aliases = vec![("opt".into(), "box1.item".into())];
-        assert_eq!(bind_field_idents("opt.value", &fields, &scope, &aliases), "box1.item.value");
-        assert_eq!(bind_field_idents("opt.label", &fields, &scope, &aliases), "box1.item.label");
-        assert_eq!(
-            bind_field_idents("value === opt.value", &fields, &scope, &aliases),
-            "this.value === box1.item.value"
-        );
-    }
-
-    #[test]
-    fn string_literals_keep_field_name_substrings() {
-        let fields = vec!["open".into(), "mono".into()];
-        assert_eq!(
-            bind_field_idents(
-                "'chrome-select' + (open ? ' is-open' : '') + (mono ? ' is-mono' : '')",
-                &fields,
-                &[],
-                &[]
-            ),
-            "'chrome-select' + (this.open ? ' is-open' : '') + (this.mono ? ' is-mono' : '')"
-        );
-    }
 }

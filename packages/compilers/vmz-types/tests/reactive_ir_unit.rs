@@ -28,7 +28,7 @@ fn module_json_contains_stable_paths() {
     };
     let json = module.to_json();
     assert!(json.contains("user.name"), "{json}");
-    assert!(json.contains("\"static_path\""), "{json}");
+    assert!(json.contains("\"static-path\""), "{json}");
     assert!(json.contains(REACTIVE_SCHEMA), "{json}");
 }
 
@@ -55,7 +55,7 @@ fn list_item_stable_and_json() {
         components: vec![c],
     };
     let json = module.to_json();
-    assert!(json.contains("\"list_item\""), "{json}");
+    assert!(json.contains("\"list-item\""), "{json}");
     assert!(json.contains("\"text\": \"tag.id\""), "{json}");
 }
 

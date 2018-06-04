@@ -99,5 +99,10 @@ export default class X {
     .unwrap();
     let report = check_application_relocatable(&dir, None);
     assert!(report.has_errors());
-    assert!(report.diagnostics.iter().any(|d| d.code == DIAG_NON_RELOCATABLE_URL));
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_NON_RELOCATABLE_URL))
+    );
 }

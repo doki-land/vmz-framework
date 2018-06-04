@@ -1,8 +1,8 @@
-//! Node N-API bindings for the VMZ workspace session (–).
+//! Node N-API bindings for the VMZ workspace session.
 //!
-//! Coarse-grained only — no per-AST JS callbacks.
+//! Coarse-grained only; no per-AST JS callbacks.
 
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -13,134 +13,210 @@ use vmz_compiler::{
     FileChange, PROTOCOL, PluginIdentity, PluginStage, ProtocolVersionsOwned, Workspace,
     WorkspaceOptions, check_application_artifact_boundary, check_application_dev_test_deploy,
     check_application_host_composition, check_application_isolation, check_application_relocatable,
-    check_applications, handshake, relocate_manifest_json,
+    check_applications, handshake, parse_severity, relocate_manifest_json,
 };
 use vmz_inspector::append_convention_lints;
 use vmz_protocol::ApplicationProtocolCatalog;
 
+/// Protocol version strings claimed by host and compiler (handshake payload).
 #[napi(object)]
 pub struct JsProtocolVersions {
+    /// Host-side protocol id (e.g. Node CLI / IDE host).
     pub host_protocol: String,
+    /// Compiler protocol id expected by this native addon.
     pub compiler_protocol: String,
+    /// Program IR schema version string.
     pub program_ir_schema: String,
+    /// Plugin contribution protocol version string.
     pub plugin_protocol: String,
 }
 
+/// One file change to apply to the workspace dirty set.
 #[napi(object)]
 pub struct JsFileChange {
+    /// Absolute or workspace-relative path of the changed file.
     pub path: String,
     /// `"update"` | `"delete"`
     pub kind: String,
 }
 
+/// Single diagnostic surfaced to JS (path + severity + message).
 #[napi(object)]
 pub struct JsDiagnostic {
+    /// Source path associated with the diagnostic (may be synthetic).
     pub path: String,
+    /// `"error"` | `"warning"` | `"advice"`.
     pub severity: String,
+    /// Human-readable diagnostic text.
     pub message: String,
 }
 
+/// Result of [`JsWorkspace::check`] / [`JsWorkspace::lint`].
 #[napi(object)]
 pub struct JsCheckReport {
+    /// Number of files visited by the check pass.
     pub files_checked: u32,
+    /// Collected diagnostics for this pass.
     pub diagnostics: Vec<JsDiagnostic>,
+    /// Remaining dirty paths after the pass.
     pub dirty_count: u32,
 }
 
+/// Result of [`JsWorkspace::build`].
 #[napi(object)]
 pub struct JsBuildReport {
+    /// Absolute paths of emitted artifacts.
     pub emitted: Vec<String>,
+    /// Diagnostics produced during the build.
     pub diagnostics: Vec<JsDiagnostic>,
+    /// Dirty path count after the build (cleared when no errors).
     pub dirty_count: u32,
+    /// True when the build rebuilt the full graph (not incremental).
     pub full: bool,
+    /// Source paths included in the affected set.
     pub affected_sources: Vec<String>,
+    /// Chunk ids included in the affected set.
     pub affected_chunks: Vec<String>,
+    /// Seed chunk ids that drove incremental selection.
     pub seed_chunks: Vec<String>,
+    /// True when only island HMR units were selected.
     pub island_hmr: bool,
 }
 
+/// One deployment unit from [`JsWorkspace::query_affected`].
 #[napi(object)]
 pub struct JsAffectedUnit {
+    /// Source path for this unit.
     pub source: String,
+    /// Unit kind label (compiler `as_str`).
     pub kind: String,
+    /// Chunk id owning this unit.
     pub chunk_id: String,
 }
 
+/// Incremental rebuild plan for the current dirty set.
 #[napi(object)]
 pub struct JsAffectedPlan {
+    /// True when a full rebuild is required.
     pub full: bool,
+    /// Whether the shared runtime bundle must rebuild.
     pub rebuild_runtime: bool,
+    /// Whether the server tree must rebuild.
     pub rebuild_server_tree: bool,
+    /// Affected units selected for rebuild.
     pub units: Vec<JsAffectedUnit>,
+    /// Seed chunk ids for the plan.
     pub seed_chunks: Vec<String>,
+    /// True when only island units are affected.
     pub island_only: bool,
 }
 
+/// Result of [`JsWorkspace::format`].
 #[napi(object)]
 pub struct JsFormatReport {
+    /// Files examined by the formatter.
     pub files_checked: u32,
+    /// Files written when not in check-only mode.
     pub files_written: u32,
+    /// Files that would need a write under `--check`.
     pub files_need_write: u32,
+    /// Formatter diagnostics.
     pub diagnostics: Vec<JsDiagnostic>,
 }
 
+/// Options for [`JsWorkspace::create`].
 #[napi(object)]
 pub struct JsWorkspaceOptions {
+    /// Workspace / project root directory.
     pub root: String,
+    /// Emit directory (defaults to `<root>/dist`).
     pub out_dir: Option<String>,
+    /// Optional protocol claim; defaults to this addon's [`get_protocol_versions`].
     pub protocol: Option<JsProtocolVersions>,
     /// Absolute path to `@vmz/core` dist/ (Node resolves via npm).
     pub runtime_dist: Option<String>,
 }
 
+/// One structured plugin contribution item (source / analyzer / target / graph_mutation).
 #[napi(object)]
 pub struct JsContributionItem {
+    /// Stable item id within the batch.
     pub id: String,
     /// `source` | `analyzer` | `target` | `graph_mutation`
     pub kind: String,
+    /// Path for source/analyzer items.
     pub path: Option<String>,
+    /// Source file contents when `kind` is `source`.
     pub content: Option<String>,
+    /// Content hash for source materialization / cache keys.
     pub content_hash: Option<String>,
+    /// Whether to materialize source onto disk (default true).
     pub materialize: Option<bool>,
+    /// Analyzer severity string (`error` | `warning` | `advice`).
     pub severity: Option<String>,
+    /// Analyzer message text.
     pub message: Option<String>,
+    /// Optional analyzer diagnostic code.
     pub code: Option<String>,
+    /// Target contribution id.
     pub target_id: Option<String>,
+    /// Target contribution kind label.
     pub target_kind: Option<String>,
+    /// Target manifest as a JSON object string.
     pub manifest_json: Option<String>,
+    /// Detail string for graph_mutation items.
     pub detail: Option<String>,
 }
 
+/// Plugin contribution batch applied via [`JsWorkspace::apply_plugin_contributions`].
 #[napi(object)]
 pub struct JsContributionBatch {
+    /// Plugin package / identity name.
     pub plugin_name: String,
+    /// Plugin semver string.
     pub plugin_version: String,
+    /// Plugin protocol version claimed by the batch.
     pub protocol: String,
     /// `workspace_resolve` | `source_adapter` | `analyzer` | `target`
     pub stage: String,
+    /// Deterministic cache key for this batch.
     pub cache_key: String,
+    /// Whether the batch is marked deterministic (default true).
     pub deterministic: Option<bool>,
+    /// Contribution items in this batch.
     pub items: Vec<JsContributionItem>,
 }
 
+/// One rejected contribution item from apply.
 #[napi(object)]
 pub struct JsRejection {
+    /// Plugin name that produced the item.
     pub plugin: String,
+    /// Rejected item id.
     pub item_id: String,
+    /// Human-readable rejection reason.
     pub reason: String,
 }
 
+/// Diff of contribution ids after a successful apply merge.
 #[napi(object)]
 pub struct JsContributionDiff {
+    /// Newly accepted contribution ids.
     pub added: Vec<String>,
+    /// Contribution ids removed by this apply.
     pub removed: Vec<String>,
+    /// Contribution ids unchanged across the apply.
     pub unchanged: Vec<String>,
 }
 
+/// Report from [`JsWorkspace::apply_plugin_contributions`].
 #[napi(object)]
 pub struct JsApplyContributionsReport {
+    /// Number of items accepted into the workspace.
     pub accepted: u32,
+    /// Items rejected with reasons.
     pub rejected: Vec<JsRejection>,
+    /// Id-level diff against the prior contribution set.
     pub diff: JsContributionDiff,
 }
 
@@ -186,25 +262,41 @@ fn map_batch(batch: JsContributionBatch) -> Result<ContributionBatch> {
                     .ok_or_else(|| Error::from_reason("source.contentHash required"))?,
                 materialize: it.materialize.unwrap_or(true),
             },
-            "analyzer" => ContributionKind::Analyzer {
-                path: PathBuf::from(it.path.unwrap_or_else(|| "<plugin>".into())),
-                severity: it.severity.unwrap_or_else(|| "warning".into()),
-                message: it
-                    .message
-                    .ok_or_else(|| Error::from_reason("analyzer.message required"))?,
-                code: it.code,
-            },
-            "target" => ContributionKind::Target {
-                target_id: it
-                    .target_id
-                    .ok_or_else(|| Error::from_reason("target.targetId required"))?,
-                kind: it
-                    .target_kind
-                    .ok_or_else(|| Error::from_reason("target.targetKind required"))?,
-                manifest_json: it
+            "analyzer" => {
+                let raw = it.severity.unwrap_or_else(|| "warning".into());
+                let severity = parse_severity(&raw).ok_or_else(|| {
+                    Error::from_reason(format!(
+                        "unknown analyzer severity `{raw}` (error|warning|advice)"
+                    ))
+                })?;
+                ContributionKind::Analyzer {
+                    path: PathBuf::from(it.path.unwrap_or_else(|| "<plugin>".into())),
+                    severity,
+                    message: it
+                        .message
+                        .ok_or_else(|| Error::from_reason("analyzer.message required"))?,
+                    code: it.code,
+                }
+            }
+            "target" => {
+                let manifest_raw = it
                     .manifest_json
-                    .ok_or_else(|| Error::from_reason("target.manifestJson required"))?,
-            },
+                    .ok_or_else(|| Error::from_reason("target.manifestJson required"))?;
+                let manifest: serde_json::Value = serde_json::from_str(&manifest_raw)
+                    .map_err(|e| Error::from_reason(format!("target.manifestJson: {e}")))?;
+                if !manifest.is_object() {
+                    return Err(Error::from_reason("target.manifestJson must be a JSON object"));
+                }
+                ContributionKind::Target {
+                    target_id: it
+                        .target_id
+                        .ok_or_else(|| Error::from_reason("target.targetId required"))?,
+                    target_kind: it
+                        .target_kind
+                        .ok_or_else(|| Error::from_reason("target.targetKind required"))?,
+                    manifest,
+                }
+            }
             "graph_mutation" => ContributionKind::GraphMutation {
                 detail: it.detail.unwrap_or_else(|| "unspecified".into()),
             },
@@ -224,6 +316,7 @@ fn map_batch(batch: JsContributionBatch) -> Result<ContributionBatch> {
     })
 }
 
+/// Return the protocol versions this native addon was built against.
 #[napi]
 pub fn get_protocol_versions() -> JsProtocolVersions {
     JsProtocolVersions {
@@ -234,6 +327,7 @@ pub fn get_protocol_versions() -> JsProtocolVersions {
     }
 }
 
+/// Fail if the host-claimed protocol versions are incompatible with this addon.
 #[napi]
 pub fn handshake_protocols(host: JsProtocolVersions) -> Result<()> {
     handshake(&owned_protocol(&host)).map_err(|e| Error::from_reason(e.to_string()))
@@ -416,6 +510,7 @@ pub fn check_application_dev_test_deploy_json(
     check_application_dev_test_deploy(PathBuf::from(host_root), &roots, &dirty).to_json()
 }
 
+/// Mutex-backed workspace session exposed to Node (check / build / DX queries).
 #[napi]
 pub struct JsWorkspace {
     inner: Mutex<Workspace>,
@@ -423,6 +518,7 @@ pub struct JsWorkspace {
 
 #[napi]
 impl JsWorkspace {
+    /// Create a workspace after protocol handshake; links production TW + SCSS compilers.
     #[napi(factory)]
     pub fn create(options: JsWorkspaceOptions) -> Result<Self> {
         let claimed = options.protocol.unwrap_or_else(get_protocol_versions);
@@ -442,24 +538,28 @@ impl JsWorkspace {
         })
     }
 
+    /// Absolute project root path for this session.
     #[napi]
     pub fn root(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.root().display().to_string())
     }
 
+    /// Absolute emit / artifact directory for this session.
     #[napi]
     pub fn out_dir(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.out_dir().display().to_string())
     }
 
+    /// Number of accepted plugin contributions currently held by the session.
     #[napi]
     pub fn contribution_count(&self) -> Result<u32> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.contribution_count() as u32)
     }
 
+    /// Apply file update/delete notifications to the dirty set.
     #[napi]
     pub fn update_files(&self, changes: Vec<JsFileChange>) -> Result<()> {
         let mut ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
@@ -482,6 +582,7 @@ impl JsWorkspace {
         Ok(())
     }
 
+    /// List currently dirty paths as display strings.
     #[napi]
     pub fn dirty_paths(&self) -> Result<Vec<String>> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
@@ -512,6 +613,7 @@ impl JsWorkspace {
         })
     }
 
+    /// Run semantic check on the workspace (hard errors; optional deny-warnings).
     #[napi]
     pub fn check(&self, deny_warnings: Option<bool>) -> Result<JsCheckReport> {
         let mut ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
@@ -563,6 +665,7 @@ impl JsWorkspace {
         })
     }
 
+    /// Emit project artifacts; clears dirty when the build has no errors.
     #[napi]
     pub fn build(
         &self,
@@ -612,18 +715,14 @@ impl JsWorkspace {
                 .iter()
                 .map(|u| JsAffectedUnit {
                     source: u.source.display().to_string(),
-                    kind: match u.kind {
-                        vmz_compiler::VmzModuleKind::App => "app".into(),
-                        vmz_compiler::VmzModuleKind::Page => "page".into(),
-                        vmz_compiler::VmzModuleKind::Component => "component".into(),
-                        vmz_compiler::VmzModuleKind::Other => "other".into(),
-                    },
+                    kind: u.kind.as_str().into(),
                     chunk_id: u.chunk_id.clone(),
                 })
                 .collect(),
         })
     }
 
+    /// Serialize the program graph for one source path as JSON.
     #[napi]
     pub fn query_program_graph(&self, source: String) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
@@ -637,12 +736,14 @@ impl JsWorkspace {
         Ok(ws.query_session_graph())
     }
 
+    /// Monotonic session generation counter (increments on structural session changes).
     #[napi]
     pub fn session_generation(&self) -> Result<u32> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.session_generation() as u32)
     }
 
+    /// Explain a StableId / target string using the session explain pipeline.
     #[napi]
     pub fn explain(&self, target: String) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
@@ -950,6 +1051,7 @@ impl JsWorkspace {
         Ok(ws.query_native_host_catalog())
     }
 
+    /// Release session bookkeeping (clears the dirty set; does not drop the handle).
     #[napi]
     pub fn dispose(&self) -> Result<()> {
         let mut ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;

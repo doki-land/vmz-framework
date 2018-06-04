@@ -120,7 +120,99 @@ export function matchRoute(verb, pathname) {
 }
 
 /**
+ * Build `callServerLocal` args from a Fetch Request for REST routes.
+ * GET/HEAD → `[]`. JSON POST/PUT/PATCH → `[body]`. form-urlencoded → `[record]`.
+ * Multipart → `[record]` where File/Blob parts stay as File/Blob (tool-site binary upload).
+ * Octet-stream PUT also forwards Upload resumable chunk headers (upload-id / chunk-index / chunk-total).
+ * Extra args are ignored by zero-parameter server methods (JS).
+ * @param {Request} request
+ * @param {string} verb
+ * @returns {Promise<unknown[]>}
+ */
+async function routeArgsFromRequest(request, verb) {
+    const v = String(verb || 'GET').toUpperCase();
+    if (v === 'GET' || v === 'HEAD' || v === 'OPTIONS') return [];
+    const ctype = String(request.headers.get('content-type') || '');
+    if (ctype.includes('application/json')) {
+        const text = await request.text();
+        if (!text || !String(text).trim()) return [{}];
+        try {
+            return [JSON.parse(text)];
+        } catch (err) {
+            throw new Error(`invalid JSON body: ${err instanceof Error ? err.message : String(err)}`);
+        }
+    }
+    if (ctype.includes('multipart/form-data')) {
+        // Parse from raw bytes — undici Request.formData() can UTF-8-mangle high bytes in file parts
+        // (0xFF/0xFE → U+FFFD), which breaks Upload binary / tool-site intakes.
+        const buf = Buffer.from(await request.arrayBuffer());
+        return [parseMultipartBuffer(buf, ctype)];
+    }
+    // Object-store PUT / resumable chunk PUT — keep bytes (never request.text()).
+    if (
+        ctype.includes('application/octet-stream') ||
+        ((v === 'PUT' || v === 'PATCH') && !ctype.includes('json') && !ctype.includes('x-www-form-urlencoded'))
+    ) {
+        const buf = Buffer.from(await request.arrayBuffer());
+        const key = String(request.headers.get('x-vmz-object-key') || '');
+        const uploadId = String(request.headers.get('x-vmz-upload-id') || '');
+        const chunkIndexRaw = request.headers.get('x-vmz-chunk-index');
+        const chunkTotalRaw = request.headers.get('x-vmz-chunk-total');
+        const chunkIndex = chunkIndexRaw != null && String(chunkIndexRaw).trim() !== '' ? Number(chunkIndexRaw) : undefined;
+        const chunkTotal = chunkTotalRaw != null && String(chunkTotalRaw).trim() !== '' ? Number(chunkTotalRaw) : undefined;
+        return [
+            {
+                bytes: buf,
+                size: buf.byteLength,
+                key,
+                uploadId,
+                chunkIndex: Number.isFinite(chunkIndex) ? chunkIndex : undefined,
+                chunkTotal: Number.isFinite(chunkTotal) ? chunkTotal : undefined,
+                contentType: ctype || 'application/octet-stream',
+            },
+        ];
+    }
+    const raw = await request.text();
+    return [parseFormBody(raw, ctype)];
+}
+
+/**
+ * Web Standards Fetch entry for ServerArtifact hosts (Node adapter, worker/edge parity).
+ * Handles RPC + public ServerRoute only; static/SSR stay on Node host options.
+ * @param {Request} request
+ * @returns {Promise<Response>}
+ */
+export async function handleFetchRequest(request) {
+    const url = new URL(request.url);
+    const verb = (request.method || 'GET').toUpperCase();
+    try {
+        if (verb === 'POST' && url.pathname === DEFAULT_RPC_PATH) {
+            const body = await request.json();
+            const result = await handleRpc(body);
+            return Response.json(result);
+        }
+
+        const route = matchRoute(verb, url.pathname);
+        if (route) {
+            const args = await routeArgsFromRequest(request, verb);
+            const result = await callServerLocal(route.moduleId, route.method, args);
+            return Response.json(result);
+        }
+
+        return Response.json({ error: 'not found', path: url.pathname }, { status: 404 });
+    } catch (err) {
+        return Response.json(
+            {
+                error: err instanceof Error ? err.message : String(err),
+            },
+            { status: 500 },
+        );
+    }
+}
+
+/**
  * Node `http.createServer` listener: RPC + REST + optional static / SSR index.
+ * RPC/REST go through {@link handleFetchRequest} so Node and Fetch hosts share one core.
  * @param {import('node:http').IncomingMessage} req
  * @param {import('node:http').ServerResponse} res
  * @param {NodeRequestOptions} [opts]
@@ -131,16 +223,12 @@ export async function handleNodeRequest(req, res, opts = {}) {
     const verb = (req.method || 'GET').toUpperCase();
 
     try {
-        if (verb === 'POST' && url.pathname === DEFAULT_RPC_PATH) {
-            const body = await readJson(req);
-            const result = await handleRpc(body);
-            return sendJson(res, 200, result);
-        }
-
+        const isRpc = verb === 'POST' && url.pathname === DEFAULT_RPC_PATH;
         const route = matchRoute(verb, url.pathname);
-        if (route) {
-            const result = await callServerLocal(route.moduleId, route.method, []);
-            return sendJson(res, 200, result);
+        if (isRpc || route) {
+            const request = await incomingToRequest(req, url);
+            const response = await handleFetchRequest(request);
+            return await writeFetchResponse(res, response);
         }
 
         // Static first for assets + DocumentMount (`/d/…`) so docs aren't swallowed by SSR 404 shells.
@@ -255,6 +343,44 @@ export async function handleNodeRequest(req, res, opts = {}) {
             error: err instanceof Error ? err.message : String(err),
         });
     }
+}
+
+/**
+ * @param {import('node:http').IncomingMessage} req
+ * @param {URL} url
+ * @returns {Promise<Request>}
+ */
+async function incomingToRequest(req, url) {
+    const method = (req.method || 'GET').toUpperCase();
+    /** @type {HeadersInit} */
+    const headers = {};
+    for (const [k, v] of Object.entries(req.headers)) {
+        if (v == null) continue;
+        headers[k] = Array.isArray(v) ? v.join(', ') : String(v);
+    }
+    if (method === 'GET' || method === 'HEAD') {
+        return new Request(url, { method, headers });
+    }
+    const raw = await readRawBody(req);
+    // Node undici requires duplex when constructing Request with a body.
+    return new Request(url, { method, headers, body: raw, duplex: 'half' });
+}
+
+/**
+ * @param {import('node:http').ServerResponse} res
+ * @param {Response} response
+ */
+async function writeFetchResponse(res, response) {
+    const headers = {};
+    response.headers.forEach((value, key) => {
+        headers[key] = value;
+    });
+    const buf = Buffer.from(await response.arrayBuffer());
+    if (!headers['content-length'] && !headers['Content-Length']) {
+        headers['content-length'] = String(buf.byteLength);
+    }
+    res.writeHead(response.status, headers);
+    res.end(buf);
 }
 
 /**
@@ -404,15 +530,95 @@ function readJson(req) {
 
 /**
  * @param {import('node:http').IncomingMessage} req
- * @returns {Promise<string>}
+ * @returns {Promise<Buffer>}
  */
 function readRawBody(req) {
     return new Promise((resolve, reject) => {
         const chunks = [];
         req.on('data', (c) => chunks.push(c));
-        req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+        // Buffer — never utf8-string: multipart File bytes must survive (Upload binary gate).
+        req.on('end', () => resolve(Buffer.concat(chunks)));
         req.on('error', reject);
     });
+}
+
+/**
+ * Buffer-safe multipart/form-data parser (file parts stay binary).
+ * @param {Buffer} buf
+ * @param {string} contentType
+ * @returns {Record<string, unknown>}
+ */
+function parseMultipartBuffer(buf, contentType) {
+    const bm = /boundary=(?:"([^"]+)"|([^;\s]+))/i.exec(String(contentType || ''));
+    const boundary = bm ? bm[1] || bm[2] : '';
+    if (!boundary) {
+        throw new Error('multipart: missing boundary');
+    }
+    const sep = Buffer.from(`--${boundary}`);
+    /** @type {Record<string, unknown>} */
+    const out = {};
+    let start = indexOfBuffer(buf, sep, 0);
+    if (start < 0) return out;
+    start += sep.length;
+    // Optional leading CRLF after first boundary is handled per-part.
+    while (start < buf.length) {
+        if (buf[start] === 0x2d && buf[start + 1] === 0x2d) break; // trailing --
+        if (buf[start] === 0x0d && buf[start + 1] === 0x0a) start += 2;
+        const next = indexOfBuffer(buf, sep, start);
+        const end = next < 0 ? buf.length : next;
+        let part = buf.subarray(start, end);
+        // Trim trailing CRLF before boundary.
+        if (part.length >= 2 && part[part.length - 2] === 0x0d && part[part.length - 1] === 0x0a) {
+            part = part.subarray(0, part.length - 2);
+        }
+        const splitAt = indexOfBuffer(part, Buffer.from('\r\n\r\n'), 0);
+        if (splitAt >= 0) {
+            const headerText = part.subarray(0, splitAt).toString('utf8');
+            let body = part.subarray(splitAt + 4);
+            const nameM = /content-disposition:[^\r\n]*;\s*name="([^"]*)"/i.exec(headerText);
+            const fileM = /content-disposition:[^\r\n]*;\s*filename="([^"]*)"/i.exec(headerText);
+            const typeM = /content-type:\s*([^\r\n]+)/i.exec(headerText);
+            const key = nameM ? nameM[1] : '';
+            if (key) {
+                if (fileM) {
+                    const filename = fileM[1] || 'upload.bin';
+                    const type = typeM ? String(typeM[1]).trim() : 'application/octet-stream';
+                    // Copy body — File may outlive the request buffer.
+                    const copy = Buffer.from(body);
+                    const file = new File([copy], filename, { type });
+                    const prev = out[key];
+                    if (prev == null) {
+                        out[key] = file;
+                    } else if (Array.isArray(prev)) {
+                        prev.push(file);
+                    } else {
+                        out[key] = [prev, file];
+                    }
+                } else {
+                    out[key] = body.toString('utf8');
+                }
+            }
+        }
+        if (next < 0) break;
+        start = next + sep.length;
+    }
+    return out;
+}
+
+/**
+ * @param {Buffer} hay
+ * @param {Buffer} needle
+ * @param {number} from
+ */
+function indexOfBuffer(hay, needle, from) {
+    if (!needle.length) return from;
+    outer: for (let i = Math.max(0, from); i <= hay.length - needle.length; i++) {
+        for (let j = 0; j < needle.length; j++) {
+            if (hay[i + j] !== needle[j]) continue outer;
+        }
+        return i;
+    }
+    return -1;
 }
 
 /**

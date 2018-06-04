@@ -103,5 +103,24 @@ if (!(cycleReport.diagnostics || []).some((d) => d.code === 'vmz::locale::fallba
     fail(`want fallback_cycle: ${JSON.stringify(cycleReport.diagnostics).slice(0, 600)}`);
 }
 
+console.log(': missing locales.json5 is warning (not silent, not error yet)…');
+const noLocale = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-i0-nolocale-'));
+fs.mkdirSync(path.join(noLocale, 'src'), { recursive: true });
+const missing = runVmz(['locale', 'check', noLocale, '--json']);
+if (missing.status !== 0) {
+    fail(`missing locales must be warning-only (exit 0), got ${missing.status}\n${missing.stdout}\n${missing.stderr}`);
+}
+const missingReport = JSON.parse(missing.stdout);
+const missDiag = (missingReport.diagnostics || []).find((d) => d.code === 'vmz::locale::manifest_missing');
+if (!missDiag) {
+    fail(`want manifest_missing warning: ${JSON.stringify(missingReport.diagnostics).slice(0, 600)}`);
+}
+if (missDiag.severity !== 'warning') {
+    fail(`manifest_missing severity want warning, got ${missDiag.severity}`);
+}
+if (missingReport.status !== 'ready') {
+    fail(`missing locales status want ready, got ${missingReport.status}`);
+}
+
 console.log(' GATE PASS');
-console.log(' locales.json5 · LocaleId · MessageId · fallback DAG');
+console.log(' locales.json5 · LocaleId · MessageId · fallback DAG · missing→warning');

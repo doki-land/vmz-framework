@@ -1,11 +1,9 @@
 //! Moved from `src/pipeline/reactive_build.rs` (cargo-cry: tests next to Cargo.toml).
 
-use vmz_protocol::*;
-
 use oxc_span::Span;
 use vmz_compiler::pipeline::reactive_build::*;
 use vmz_compiler::template::parse_template;
-use vmz_types::{FieldDecl, Visibility};
+use vmz_types::{BindingKind, ComponentDecl, FieldDecl, FieldKind, Visibility};
 
 #[test]
 fn ternary_builds_control_region_with_body_reads() {
@@ -30,8 +28,8 @@ fn ternary_builds_control_region_with_body_reads() {
     let alt = c.transitional_deps(&r.branches[1].body_reads);
     assert!(cons.iter().any(|d| d == "user.name"), "{cons:?}");
     assert!(alt.iter().any(|d| d == "account.name"), "{alt:?}");
-    let text = c.bindings.iter().find(|b| b.kind == BindingKind::Text).expect("text");
-    assert_eq!(text.region, Some(r.id));
+    let text = c.bindings.iter().find(|b| b.kind() == BindingKind::Text).expect("text");
+    assert_eq!(text.region(), Some(r.id));
 }
 
 #[test]
@@ -60,16 +58,16 @@ fn distinguishes_user_name_and_bio() {
     let json = module.to_json();
     assert!(json.contains("user.name"), "{json}");
     assert!(json.contains("user.bio"), "{json}");
-    assert!(json.contains("\"kind\": \"static_path\""), "{json}");
-    assert!(json.contains("each_list"), "{json}");
-    assert!(json.contains("\"kind\": \"list_item\""), "{json}");
+    assert!(json.contains("\"kind\": \"static-path\""), "{json}");
+    assert!(json.contains("each-list"), "{json}");
+    assert!(json.contains("\"kind\": \"list-item\""), "{json}");
     let c = &module.components[0];
     assert!(!c.control_regions.is_empty());
     let stables: Vec<String> = c
         .bindings
         .iter()
         .flat_map(|b| {
-            b.reads.iter().map(|r| r.to_stable_string(&c.state_slots, &c.properties, &c.exprs))
+            b.reads().iter().map(|r| r.to_stable_string(&c.state_slots, &c.properties, &c.exprs))
         })
         .collect();
     assert!(stables.iter().any(|s| s == "user.name"));
@@ -98,7 +96,7 @@ fn keyed_each_item_prop_is_list_item() {
         .bindings
         .iter()
         .flat_map(|b| {
-            b.reads.iter().map(|r| r.to_stable_string(&c.state_slots, &c.properties, &c.exprs))
+            b.reads().iter().map(|r| r.to_stable_string(&c.state_slots, &c.properties, &c.exprs))
         })
         .collect();
     assert!(
@@ -110,11 +108,10 @@ fn keyed_each_item_prop_is_list_item() {
         "key expr tag.id must be ListItem: {stables:?}"
     );
     let json = module.to_json();
-    assert!(json.contains("\"kind\": \"list_item\""), "{json}");
-    assert!(json.contains("tags[key=tag.id].label"), "{json}");
-    // Path channel: ListItem leaf props ?tags.*.label (not bare tags.*).
-    let text = c.bindings.iter().find(|b| b.kind == BindingKind::Text).expect("text binding");
-    let transitional = c.transitional_deps(&text.reads);
+    assert!(json.contains("\"kind\": \"list-item\""), "{json}");
+    // Path channel: ListItem leaf props → tags.*.label (not bare tags.*).
+    let text = c.bindings.iter().find(|b| b.kind() == BindingKind::Text).expect("text binding");
+    let transitional = c.transitional_deps(text.reads());
     assert_eq!(transitional, vec!["tags.*.label".to_string()]);
 }
 
@@ -138,7 +135,7 @@ fn dynamic_index_path_is_dynamic_path() {
         .bindings
         .iter()
         .flat_map(|b| {
-            b.reads.iter().map(|r| r.to_stable_string(&c.state_slots, &c.properties, &c.exprs))
+            b.reads().iter().map(|r| r.to_stable_string(&c.state_slots, &c.properties, &c.exprs))
         })
         .collect();
     assert!(
@@ -146,9 +143,9 @@ fn dynamic_index_path_is_dynamic_path() {
         "must be DynamicPath: {stables:?}"
     );
     let json = module.to_json();
-    assert!(json.contains("\"kind\": \"dynamic_path\""), "{json}");
-    let text = c.bindings.iter().find(|b| b.kind == BindingKind::Text).expect("text");
-    let transitional = c.transitional_deps(&text.reads);
+    assert!(json.contains("\"kind\": \"dynamic-path\""), "{json}");
+    let text = c.bindings.iter().find(|b| b.kind() == BindingKind::Text).expect("text");
+    let transitional = c.transitional_deps(text.reads());
     assert!(transitional.iter().any(|d| d == "items.*.label"), "{transitional:?}");
     assert!(transitional.iter().any(|d| d == "selected"), "{transitional:?}");
 }
@@ -173,7 +170,7 @@ fn nested_each_alias_list_is_nested_list_item() {
         .bindings
         .iter()
         .flat_map(|b| {
-            b.reads.iter().map(|r| r.to_stable_string(&c.state_slots, &c.properties, &c.exprs))
+            b.reads().iter().map(|r| r.to_stable_string(&c.state_slots, &c.properties, &c.exprs))
         })
         .collect();
     assert!(
@@ -184,8 +181,8 @@ fn nested_each_alias_list_is_nested_list_item() {
         stables.iter().any(|s| s == "groups[key=g.id].items"),
         "nested each list expr should be ListItem path: {stables:?}"
     );
-    let text = c.bindings.iter().find(|b| b.kind == BindingKind::Text).expect("text");
-    let transitional = c.transitional_deps(&text.reads);
+    let text = c.bindings.iter().find(|b| b.kind() == BindingKind::Text).expect("text");
+    let transitional = c.transitional_deps(text.reads());
     assert_eq!(transitional, vec!["groups.*.items.*.label".to_string()], "{transitional:?}");
 }
 
@@ -209,15 +206,15 @@ fn multi_segment_dynamic_index_path() {
         .bindings
         .iter()
         .flat_map(|b| {
-            b.reads.iter().map(|r| r.to_stable_string(&c.state_slots, &c.properties, &c.exprs))
+            b.reads().iter().map(|r| r.to_stable_string(&c.state_slots, &c.properties, &c.exprs))
         })
         .collect();
     assert!(
         stables.iter().any(|s| s == "rows[ri].cells[ci].value"),
         "multi-segment DynamicPath required: {stables:?}"
     );
-    let text = c.bindings.iter().find(|b| b.kind == BindingKind::Text).expect("text");
-    let transitional = c.transitional_deps(&text.reads);
+    let text = c.bindings.iter().find(|b| b.kind() == BindingKind::Text).expect("text");
+    let transitional = c.transitional_deps(text.reads());
     assert!(transitional.iter().any(|d| d == "rows.*.cells.*.value"), "{transitional:?}");
     assert!(transitional.iter().any(|d| d == "ri"), "{transitional:?}");
     assert!(transitional.iter().any(|d| d == "ci"), "{transitional:?}");
@@ -247,7 +244,7 @@ fn each_without_proveable_list_field_skips_list_item() {
     let module = build_reactive_module("Mixed.vmz", &decl, &tpl);
     let json = module.to_json();
     assert!(
-        !json.contains("\"kind\": \"list_item\""),
+        !json.contains("\"kind\": \"list-item\""),
         "unproveable list root must not invent ListItem: {json}"
     );
 }

@@ -13,32 +13,35 @@ use vmz_protocol::{
     ExecutorEnvelopeHeader, ExecutorScenario, ProfileDiagnostic, ProfileProtocolCatalog,
 };
 
-fn diag(path: &str, severity: &str, message: impl Into<String>, code: &str) -> ProfileDiagnostic {
-    ProfileDiagnostic {
-        path: path.into(),
-        severity: severity.into(),
-        message: message.into(),
-        code: Some(code.into()),
-    }
+fn diag(
+    path: &str,
+    severity: vmz_protocol::Severity,
+    message: impl Into<String>,
+    code: &str,
+) -> ProfileDiagnostic {
+    ProfileDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
 fn check_header(path: &str, h: &ExecutorEnvelopeHeader, out: &mut Vec<ProfileDiagnostic>) {
     if h.schema.trim().is_empty() || !h.is_complete() {
         out.push(diag(
             path,
-            "error",
+            vmz_protocol::Severity::Error,
             "envelope header requires applicationId/planVersion/generation/transactionId/regionId",
             DIAG_MISSING_ENVELOPE_IDS,
         ));
     }
 }
 
-// Validate an ExecutorScenario against hard contracts.
+/// Validate an [`ExecutorScenario`] against executor envelope and state contracts.
+///
+/// Enforces complete envelope headers, single StateSlot ownership, no surface-driver
+/// business state, and stale-generation discard rules; diagnostics go into `out`.
 pub fn validate_executor_scenario(scenario: &ExecutorScenario, out: &mut Vec<ProfileDiagnostic>) {
     if scenario.schema != EXECUTOR_SCENARIO_SCHEMA {
         out.push(diag(
             "scenario.schema",
-            "error",
+            vmz_protocol::Severity::Error,
             format!("ExecutorScenario schema must be `{EXECUTOR_SCENARIO_SCHEMA}`"),
             DIAG_MISSING_ENVELOPE_IDS,
         ));
@@ -49,7 +52,7 @@ pub fn validate_executor_scenario(scenario: &ExecutorScenario, out: &mut Vec<Pro
         if slot.owner_region_id.trim().is_empty() {
             out.push(diag(
                 &format!("scenario.stateSlots[{i}].ownerRegionId"),
-                "error",
+                vmz_protocol::Severity::Error,
                 "StateSlot requires single ownerRegionId",
                 DIAG_SURFACE_OWNS_STATE,
             ));
@@ -57,7 +60,7 @@ pub fn validate_executor_scenario(scenario: &ExecutorScenario, out: &mut Vec<Pro
         if slot.surface_driver_owns_business_state {
             out.push(diag(
                 &format!("scenario.stateSlots[{i}].surfaceDriverOwnsBusinessState"),
-                "error",
+                vmz_protocol::Severity::Error,
                 "Surface driver must not own business state (projection cache only)",
                 DIAG_SURFACE_OWNS_STATE,
             ));
@@ -75,7 +78,7 @@ pub fn validate_executor_scenario(scenario: &ExecutorScenario, out: &mut Vec<Pro
             if !scenario.must_discard_stale {
                 out.push(diag(
                     "scenario.mustDiscardStale",
-                    "error",
+                    vmz_protocol::Severity::Error,
                     "stale envelope generation must be discarded (mustDiscardStale=true)",
                     DIAG_STALE_GENERATION,
                 ));
@@ -83,7 +86,7 @@ pub fn validate_executor_scenario(scenario: &ExecutorScenario, out: &mut Vec<Pro
             if scenario.produced_patches_from_stale || !scenario.patch_batches.is_empty() {
                 out.push(diag(
                     "scenario.patchBatches",
-                    "error",
+                    vmz_protocol::Severity::Error,
                     "producing patches from stale generation is forbidden",
                     DIAG_STALE_GENERATION,
                 ));
@@ -96,7 +99,7 @@ pub fn validate_executor_scenario(scenario: &ExecutorScenario, out: &mut Vec<Pro
         if tx.split_per_surface {
             out.push(diag(
                 "scenario.transaction.splitPerSurface",
-                "error",
+                vmz_protocol::Severity::Error,
                 "one write must be one Core Executor transaction — per-surface split forbidden",
                 DIAG_SPLIT_TRANSACTION,
             ));
@@ -104,7 +107,7 @@ pub fn validate_executor_scenario(scenario: &ExecutorScenario, out: &mut Vec<Pro
         if tx.transaction_id.trim().is_empty() {
             out.push(diag(
                 "scenario.transaction.transactionId",
-                "error",
+                vmz_protocol::Severity::Error,
                 "transactionId required",
                 DIAG_MISSING_ENVELOPE_IDS,
             ));
@@ -118,7 +121,7 @@ pub fn validate_executor_scenario(scenario: &ExecutorScenario, out: &mut Vec<Pro
             if batch.header.transaction_id != tx.transaction_id {
                 out.push(diag(
                     &format!("scenario.patchBatches[{i}].header.transactionId"),
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!(
                         "patch batch transactionId `{}` != transaction `{}` (split transaction)",
                         batch.header.transaction_id, tx.transaction_id
@@ -129,7 +132,7 @@ pub fn validate_executor_scenario(scenario: &ExecutorScenario, out: &mut Vec<Pro
             if batch.surface_id.trim().is_empty() {
                 out.push(diag(
                     &format!("scenario.patchBatches[{i}].surfaceId"),
-                    "error",
+                    vmz_protocol::Severity::Error,
                     "PatchBatch.surfaceId required",
                     DIAG_SPLIT_TRANSACTION,
                 ));
@@ -143,7 +146,7 @@ pub fn validate_executor_scenario(scenario: &ExecutorScenario, out: &mut Vec<Pro
             if batch.carries_private_runtime_object {
                 out.push(diag(
                     &format!("scenario.patchBatches[{i}].carriesPrivateRuntimeObject"),
-                    "error",
+                    vmz_protocol::Severity::Error,
                     "cross-surface envelopes must not carry private runtime object references",
                     DIAG_PRIVATE_OBJECT_CROSSING,
                 ));
@@ -161,7 +164,7 @@ pub fn validate_executor_scenario(scenario: &ExecutorScenario, out: &mut Vec<Pro
                     if !covered.iter().any(|c| c == binding) {
                         out.push(diag(
                             "scenario.transaction.affectedBindings",
-                            "error",
+                            vmz_protocol::Severity::Error,
                             format!(
                                 "affected binding `{binding}` not covered by any PatchBatch (split/incomplete dispatch)"
                             ),
@@ -174,7 +177,7 @@ pub fn validate_executor_scenario(scenario: &ExecutorScenario, out: &mut Vec<Pro
     } else if !scenario.patch_batches.is_empty() {
         out.push(diag(
             "scenario.transaction",
-            "error",
+            vmz_protocol::Severity::Error,
             "patch batches without a single Core Executor transaction",
             DIAG_SPLIT_TRANSACTION,
         ));
@@ -184,7 +187,7 @@ pub fn validate_executor_scenario(scenario: &ExecutorScenario, out: &mut Vec<Pro
     if scenario.driver_unload_cancels_foreign_tasks && scenario.dispose_region.is_none() {
         out.push(diag(
             "scenario.driverUnloadCancelsForeignTasks",
-            "error",
+            vmz_protocol::Severity::Error,
             "driver unload cannot cancel foreign-surface tasks without DisposeRegion",
             DIAG_DISPOSE_NOT_AUTHORITATIVE,
         ));
@@ -194,7 +197,7 @@ pub fn validate_executor_scenario(scenario: &ExecutorScenario, out: &mut Vec<Pro
         if !dispose.is_authoritative_terminate {
             out.push(diag(
                 "scenario.disposeRegion.isAuthoritativeTerminate",
-                "error",
+                vmz_protocol::Severity::Error,
                 "DisposeRegion must be the authoritative terminate",
                 DIAG_DISPOSE_NOT_AUTHORITATIVE,
             ));
@@ -203,7 +206,7 @@ pub fn validate_executor_scenario(scenario: &ExecutorScenario, out: &mut Vec<Pro
         if !dispose.cancels_capabilities {
             out.push(diag(
                 "scenario.disposeRegion.cancelsCapabilities",
-                "error",
+                vmz_protocol::Severity::Error,
                 "DisposeRegion must cancel in-flight capabilities",
                 DIAG_CANCEL_NOT_PROPAGATED,
             ));
@@ -214,7 +217,7 @@ pub fn validate_executor_scenario(scenario: &ExecutorScenario, out: &mut Vec<Pro
                 if !c.propagated {
                     out.push(diag(
                         &format!("scenario.cancelRequests[{i}].propagated"),
-                        "error",
+                        vmz_protocol::Severity::Error,
                         "cancel must propagate across surfaces",
                         DIAG_CANCEL_NOT_PROPAGATED,
                     ));
@@ -226,7 +229,7 @@ pub fn validate_executor_scenario(scenario: &ExecutorScenario, out: &mut Vec<Pro
             if !c.propagated {
                 out.push(diag(
                     &format!("scenario.cancelRequests[{i}].propagated"),
-                    "error",
+                    vmz_protocol::Severity::Error,
                     "cancel must propagate across surfaces",
                     DIAG_CANCEL_NOT_PROPAGATED,
                 ));
@@ -249,7 +252,7 @@ fn load_json<T: serde::de::DeserializeOwned>(
             Err(e) => {
                 diags.push(diag(
                     label,
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!("invalid JSON: {e}"),
                     DIAG_MISSING_ENVELOPE_IDS,
                 ));
@@ -259,7 +262,7 @@ fn load_json<T: serde::de::DeserializeOwned>(
         Err(e) => {
             diags.push(diag(
                 label,
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("cannot read: {e}"),
                 DIAG_MISSING_ENVELOPE_IDS,
             ));
@@ -268,7 +271,10 @@ fn load_json<T: serde::de::DeserializeOwned>(
     }
 }
 
-// check for a workspace root (optional executor-scenario.json).
+/// Run unified-executor checks for a workspace root.
+///
+/// Loads optional `executor-scenario.json` (and foul twin); falls back to the
+/// built-in mixed-camera example when the primary file is absent.
 pub fn check_unified_executor(root: &Path) -> ExecutorCheckReport {
     let mut diagnostics = Vec::new();
     let catalog = ProfileProtocolCatalog::v0();
@@ -290,12 +296,12 @@ pub fn check_unified_executor(root: &Path) -> ExecutorCheckReport {
         validate_executor_scenario(&foul, &mut diagnostics);
     }
 
-    let failed = diagnostics.iter().any(|d| d.severity == "error");
+    let failed = diagnostics.iter().any(|d| d.is_error());
     ExecutorCheckReport {
         schema: EXECUTOR_CHECK_SCHEMA.into(),
         catalog,
         scenario,
         diagnostics,
-        status: if failed { "failed".into() } else { "ready".into() },
+        status: vmz_protocol::CheckReportStatus::from_failed(failed),
     }
 }

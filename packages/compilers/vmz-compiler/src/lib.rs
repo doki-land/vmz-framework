@@ -1,17 +1,17 @@
 //! VMZ compiler: `.vmz` SFC + oxc analysis + check/build.
 //!
 //! Source layout (subsystems, not dump folders):
-//! - [`parse`] — SFC / template / analyze / format
-//! - [`pipeline`] — check / compile / graph / emit
-//! - [`style`] — designs / TW / SCSS / emit / explain
-//! - [`application`] — collection / mount
-//! - [`session`] — Workspace / affected / plugin contributions
-//! - [`tooling`] — rename / index / transaction / deployment proof
-//! - [`native`] / [`miniprogram`] / [`platform`] — host contracts
+//! - [`parse`] - SFC / template / analyze / format
+//! - [`pipeline`] - check / compile / graph / emit
+//! - [`style`] - designs / TW / SCSS / emit / explain
+//! - [`application`] - collection / mount
+//! - [`session`] - Workspace / affected / plugin contributions
+//! - [`tooling`] - rename / index / transaction / deployment proof
+//! - [`native`] / [`miniprogram`] / [`platform`] - host contracts
 //!
 //! Explain / trace / causal replay: crate **`vmz-debugger`**.
 
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 mod diagnostic;
 pub mod error;
 
@@ -93,29 +93,31 @@ pub use application_reloc::{
 };
 pub use check::{CheckOptions, CheckReport, check_path, check_project};
 pub use compile::{
-    CompileOptions, CompileReport, EmittedRoute, compile_path, compile_project,
-    compile_project_with_dirty,
+    CompileOptions, CompileReport, DEPLOYMENT_SCHEMA, DeploymentDocument, EmittedRoute,
+    VmzMetaDocument, compile_path, compile_project, compile_project_with_dirty,
 };
 pub use designs::{
     DEFAULT_ACTIVATION_ATTR, DEFAULT_THEME_ID, DesignTokenEntry, DesignsBundle, StyleTheme,
     StyleThemeSummary, StyleThemeTable, StyleTokenLeaf, ThemeId, css_var_name, emit_designs_css,
     emit_style_theme_css, load_designs,
 };
-pub use diagnostic::{ReportedDiagnostic, Severity};
-pub use emit::{ServerBridge, emit_client_js, emit_client_js_with_ir};
+pub use diagnostic::{ReportedDiagnostic, Severity, parse_severity};
+pub use emit::{ServerBridge, bind_field_idents, emit_client_js, emit_client_js_with_ir};
 pub use format::{FormatOptions, FormatReport, format_path};
 pub use plugin::{
     ApplyContributionsReport, ContributionBatch, ContributionDiff, ContributionItem,
-    ContributionKind, ContributionStore, PLUGIN_PROTOCOL_V1, PluginIdentity, PluginStage,
-    Provenance, Rejection, sha256_hex_bytes,
+    ContributionKind, ContributionStore, ExplainContributionRow, ExplainContributionSurface,
+    PLUGIN_PROTOCOL_V1, PLUGIN_TARGET_SCHEMA, PLUGIN_TARGETS_SUMMARY_SCHEMA, PluginIdentity,
+    PluginStage, PluginTargetDocument, PluginTargetSummaryEntry, PluginTargetsSummary, Provenance,
+    Rejection, sha256_hex_bytes,
 };
 pub use project::{VmzModuleKind, discover_vmz_files};
 pub use reactive_build::{build_program_module, build_program_module_with_server};
 pub use scss::{ScssCompiler, ScssCompilerHandle, ScssEmitRequest, ScssEmitResult};
-pub use session_graph::{SessionGraph, SessionUnit};
+pub use session_graph::{SessionClientCall, SessionGraph, SessionGraphDocument, SessionUnit};
 pub use sfc::{
-    DataBlock, ParsedVmz, ScriptBlock, ScriptKind, SfcError, StyleBlock, StyleLanguage,
-    TemplateBlock, parse_vmz,
+    DataBlock, ParsedVmz, ScriptBlock, ScriptKind, ScriptLanguage, SfcError, StyleBlock,
+    StyleLanguage, TemplateBlock, parse_vmz,
 };
 pub use style_emit::{StyleContribution, StyleEmitReport, StyleLayer, emit_style_bundle};
 pub use style_explain::explain_style;

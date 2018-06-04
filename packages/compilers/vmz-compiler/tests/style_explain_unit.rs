@@ -2,7 +2,7 @@
 
 use std::path::Path;
 use vmz_compiler::StyleTheme;
-use vmz_protocol::EXPLAIN_SCHEMA;
+use vmz_protocol::{EXPLAIN_SCHEMA, ExplainKind};
 
 use std::collections::BTreeMap;
 use vmz_compiler::designs::{StyleThemeTable, StyleTokenLeaf};
@@ -38,7 +38,7 @@ fn resolve_utility_and_leaf() {
 #[test]
 fn explain_document_kind_style() {
     let doc = explain_style(Path::new("."), 0, "bg-action");
-    assert_eq!(doc.kind, "style");
+    assert_eq!(doc.kind, ExplainKind::Style);
     assert_eq!(doc.schema, EXPLAIN_SCHEMA);
     assert!(!doc.chain.is_empty(), "{doc:?}");
 }

@@ -7,8 +7,12 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 use vmz_compiler::platform::solver::*;
 use vmz_protocol::{
-    CAPABILITY_BINDING_SCHEMA, CapabilityBinding, RegionSolveRequest, RouteSolveRequest,
-    SOLVER_INPUT_SCHEMA, SURFACE_BINDING_SCHEMA, SURFACE_REQUIREMENTS_SCHEMA,
+    CAPABILITY_BINDING_SCHEMA, CapabilityBinding, CapabilityRequirement,
+    DIAG_CAPABILITY_PERMISSION_UNDECLARED, DIAG_CAPABILITY_UNRESOLVED, DIAG_SURFACE_AMBIGUOUS,
+    DIAG_SURFACE_NO_MATCH, DeliveryProfile, ExecutionDomain, HostProfile, ProfileSolverInput,
+    RegionSolveRequest, RouteSolveRequest, SOLVER_INPUT_SCHEMA, SURFACE_BINDING_SCHEMA,
+    SURFACE_REQUIREMENTS_SCHEMA, SurfaceAssignmentReason, SurfaceBinding, SurfaceKind,
+    SurfaceRequirements,
 };
 
 fn tmp(prefix: &str) -> std::path::PathBuf {
@@ -22,7 +26,7 @@ fn tmp(prefix: &str) -> std::path::PathBuf {
 fn browser_counter_ready() {
     let dir = tmp("vmz-p1-");
     let report = check_profile_solver(&dir);
-    assert_eq!(report.status, "ready");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Ready);
     assert_eq!(report.manifest.surface_assignments.assignments.len(), 1);
     assert_eq!(
         report.manifest.surface_assignments.assignments[0].surface_id,
@@ -46,8 +50,13 @@ fn rejects_surface_no_match() {
     fs::write(dir.join("solver-input.json"), serde_json::to_string_pretty(&input).unwrap())
         .unwrap();
     let report = check_profile_solver(&dir);
-    assert_eq!(report.status, "failed");
-    assert!(report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_SURFACE_NO_MATCH)));
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_SURFACE_NO_MATCH))
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -59,7 +68,7 @@ fn rejects_surface_ambiguous() {
     host.surfaces.push(SurfaceBinding {
         schema: SURFACE_BINDING_SCHEMA.into(),
         surface_id: "vmz.surface.native.alt".into(),
-        kind: "native".into(),
+        kind: SurfaceKind::Native,
         driver_id: "vmz.driver.native-view".into(),
         supported_operations: host.surfaces[0].supported_operations.clone(),
         supported_element_kinds: host.surfaces[0].supported_element_kinds.clone(),
@@ -80,8 +89,13 @@ fn rejects_surface_ambiguous() {
     fs::write(dir.join("solver-input.json"), serde_json::to_string_pretty(&input).unwrap())
         .unwrap();
     let report = check_profile_solver(&dir);
-    assert_eq!(report.status, "failed");
-    assert!(report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_SURFACE_AMBIGUOUS)));
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_SURFACE_AMBIGUOUS))
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -98,9 +112,12 @@ fn rejects_capability_unresolved() {
     fs::write(dir.join("solver-input.json"), serde_json::to_string_pretty(&input).unwrap())
         .unwrap();
     let report = check_profile_solver(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
-        report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_CAPABILITY_UNRESOLVED))
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_CAPABILITY_UNRESOLVED))
     );
     let _ = fs::remove_dir_all(&dir);
 }
@@ -113,7 +130,7 @@ fn rejects_permission_undeclared() {
         schema: CAPABILITY_BINDING_SCHEMA.into(),
         capability_id: "vmz.capability.camera.capture".into(),
         version_range: "^0".into(),
-        execution_domain: "native".into(),
+        execution_domain: ExecutionDomain::Native,
         provider_id: "vmz.provider.camera".into(),
         transport_id: None,
         permissions: vec![],
@@ -133,12 +150,12 @@ fn rejects_permission_undeclared() {
     fs::write(dir.join("solver-input.json"), serde_json::to_string_pretty(&input).unwrap())
         .unwrap();
     let report = check_profile_solver(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
         report
             .diagnostics
             .iter()
-            .any(|d| d.code.as_deref() == Some(DIAG_CAPABILITY_PERMISSION_UNDECLARED))
+            .any(|d| d.code_string().as_deref() == Some(DIAG_CAPABILITY_PERMISSION_UNDECLARED))
     );
     let _ = fs::remove_dir_all(&dir);
 }
@@ -149,7 +166,7 @@ fn prefers_surface_breaks_ambiguity() {
     host.surfaces.push(SurfaceBinding {
         schema: SURFACE_BINDING_SCHEMA.into(),
         surface_id: "vmz.surface.native.alt".into(),
-        kind: "native".into(),
+        kind: SurfaceKind::Native,
         driver_id: "vmz.driver.native-view".into(),
         supported_operations: host.surfaces[0].supported_operations.clone(),
         supported_element_kinds: host.surfaces[0].supported_element_kinds.clone(),
@@ -182,8 +199,11 @@ fn prefers_surface_breaks_ambiguity() {
     };
     let mut diags = Vec::new();
     let manifest = solve_profile(&host, &delivery, &input, &mut diags);
-    assert!(diags.iter().all(|d| d.severity != "error"));
+    assert!(diags.iter().all(|d| d.is_error() == false));
     assert_eq!(manifest.surface_assignments.assignments[0].surface_id, "vmz.surface.native.alt");
-    assert_eq!(manifest.surface_assignments.assignments[0].reason, "prefers_surface");
+    assert_eq!(
+        manifest.surface_assignments.assignments[0].reason,
+        SurfaceAssignmentReason::PrefersSurface
+    );
     let _ = input;
 }

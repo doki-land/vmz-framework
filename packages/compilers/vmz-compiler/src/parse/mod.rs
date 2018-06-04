@@ -2,6 +2,7 @@
 
 pub mod analyze;
 pub mod format;
+pub mod rust_dsl;
 pub mod sfc;
 pub mod template;
 pub mod transpile;

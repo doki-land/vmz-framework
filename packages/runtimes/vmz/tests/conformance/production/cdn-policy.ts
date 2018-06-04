@@ -105,6 +105,55 @@ try {
     if (alias.status !== 301 || String(alias.headers.location || '') !== '/') {
         errors.push(`cdn-routing /home want 301 Location=/, got ${alias.status} ${alias.headers.location}`);
     }
+
+    // P5 prep: locale-prefixed CDN HTML + LocaleId cache keys + hreflang (no Accept-Language steal).
+    console.log('cdn-policy: locale cache-key / hreflang matrix…');
+    if (policy.localeCache?.varyAcceptLanguage !== false) {
+        errors.push('localeCache.varyAcceptLanguage must be false');
+    }
+    if (!Array.isArray(policy.localeCache?.locales) || !policy.localeCache.locales.includes('zh-hans')) {
+        errors.push(`localeCache.locales missing zh-hans: ${JSON.stringify(policy.localeCache)}`);
+    }
+    const aboutEn = (policy.routes || []).find(
+        (r: { path?: string; localeId?: string }) => r.path === '/about' && r.localeId === 'en-us',
+    );
+    const aboutZh = (policy.routes || []).find(
+        (r: { path?: string; localeId?: string }) => r.path === '/zh-hans/about' && r.localeId === 'zh-hans',
+    );
+    if (!aboutEn?.cacheKey || !String(aboutEn.cacheKey).includes('locale=en-us')) {
+        errors.push(`CDN about en-us cacheKey missing locale=: ${JSON.stringify(aboutEn)}`);
+    }
+    if (!aboutZh?.cacheKey || !String(aboutZh.cacheKey).includes('locale=zh-hans')) {
+        errors.push(`CDN about zh-hans cacheKey missing locale=: ${JSON.stringify(aboutZh)}`);
+    }
+    if (aboutEn?.varyAcceptLanguage !== false || aboutZh?.varyAcceptLanguage !== false) {
+        errors.push('locale HTML routes must set varyAcceptLanguage=false');
+    }
+    if (!aboutEn?.hreflang?.some((a: { hreflang?: string }) => a.hreflang === 'zh-hans')) {
+        errors.push(`CDN about en-us missing hreflang zh-hans: ${JSON.stringify(aboutEn?.hreflang)}`);
+    }
+    if (!aboutZh?.hreflang?.some((a: { hreflang?: string }) => a.hreflang === 'x-default')) {
+        errors.push(`CDN about zh-hans missing hreflang x-default: ${JSON.stringify(aboutZh?.hreflang)}`);
+    }
+    const zhAbout = await get(`${host.baseUrl}/zh-hans/about/`);
+    if (zhAbout.status !== 200 || !zhAbout.body.includes('route-about')) {
+        errors.push(`locale CDN /zh-hans/about/ failed: ${zhAbout.status}`);
+    }
+    if (!zhAbout.body.includes('lang="zh-hans"') || !zhAbout.body.includes('hreflang="en-us"')) {
+        errors.push(`locale CDN HTML missing lang/hreflang: ${zhAbout.body.slice(0, 500)}`);
+    }
+    if (String(zhAbout.headers['cache-control'] || '') !== CACHE_HTML) {
+        errors.push(`locale HTML cache-control want ${CACHE_HTML}, got ${zhAbout.headers['cache-control']}`);
+    }
+    const omitDefault = await get(`${host.baseUrl}/en-us/about`);
+    if (omitDefault.status !== 301 || String(omitDefault.headers.location || '') !== '/about') {
+        errors.push(
+            `omit-prefix CDN redirect want 301 /about, got ${omitDefault.status} ${omitDefault.headers.location}`,
+        );
+    }
+    if (!redirectsText.includes('/en-us/about') || !redirectsText.includes('/about')) {
+        errors.push(`netlify _redirects missing omit-prefix /en-us/about → /about: ${redirectsText}`);
+    }
     if (missing.status !== 404 || !missing.body.includes('route-static-404')) {
         errors.push(`error document want 404, got ${missing.status}`);
     }
@@ -114,8 +163,13 @@ try {
     }
 
     if (asset.status !== 200 || !asset.body) errors.push('hashed entry-client missing (static-resume)');
-    if (dom.status !== 200 || !dom.body.includes('renderToStream')) {
-        errors.push('vmz-dom.js missing/corrupt (static-resume)');
+    // Split DOM runtime: barrel vmz-dom.js + companions (dom-ssr.js carries renderToStream).
+    const domSsr = await get(`${host.baseUrl}/dom-ssr.js`);
+    if (dom.status !== 200 || !/dom-ssr\.js/.test(dom.body)) {
+        errors.push('vmz-dom.js missing/corrupt barrel (static-resume)');
+    }
+    if (domSsr.status !== 200 || !domSsr.body.includes('renderToStream')) {
+        errors.push('dom-ssr.js missing/corrupt (static-resume)');
     }
     if (String(asset.headers['cache-control'] || '') !== CACHE_ASSET_IMMUTABLE) {
         errors.push(`asset cache want immutable, got ${asset.headers['cache-control']}`);
@@ -132,7 +186,8 @@ try {
     }
 
     console.log('cdn-policy: static-rollback via release pointers…');
-    const releasesRoot = path.join(dist, 'releases-cdn');
+    // Must sit beside dist — fs.cpSync cannot snapshot dist into a child of itself.
+    const releasesRoot = path.join(path.dirname(dist), '.vmz-cdn-releases');
     fs.rmSync(releasesRoot, { recursive: true, force: true });
     const envA = packRelease(dist, { applicationId: 'production-router-cdn' });
     publishRelease(releasesRoot, dist, envA);
@@ -167,8 +222,22 @@ upsertCheck(proof, {
 });
 upsertCheck(proof, {
     id: 'cdn-cache-policy',
-    status: errors.some((e) => e.includes('cache')) ? 'failed' : 'passed',
+    status: errors.some((e) => e.includes('cache') && !e.includes('locale')) ? 'failed' : 'passed',
     detail: `HTML=${CACHE_HTML}; assets=${CACHE_ASSET_IMMUTABLE}`,
+});
+upsertCheck(proof, {
+    id: 'cdn-locale-hreflang',
+    status: errors.some(
+        (e) =>
+            e.includes('locale') ||
+            e.includes('hreflang') ||
+            e.includes('omit-prefix') ||
+            e.includes('cacheKey') ||
+            e.includes('varyAcceptLanguage'),
+    )
+        ? 'failed'
+        : 'passed',
+    detail: 'locale-prefixed HTML + LocaleId cacheKey + hreflang + omit-prefix CDN redirect',
 });
 upsertCheck(proof, {
     id: 'static-resume',
@@ -183,21 +252,19 @@ upsertCheck(proof, {
     detail: 'web-static artifact pack + CURRENT/PREVIOUS rollback',
 });
 
-const gaps = [
-    'A3: second real CDN provider adapter beyond netlify projection not covered',
-    'A3: locale-prefixed CDN cache keys / hreflang not covered',
-];
+const gaps = ['A3: second real CDN provider adapter beyond netlify projection not covered'];
 for (const g of gaps) addLimitation(proof, g);
 proof.knownLimitations = proof.knownLimitations.filter(
     (l) =>
         !l.includes('A3: CDN provider adapters / cache-policy manifests not covered') &&
         !l.includes('A3: CDN / provider adapters / cache-policy manifests not covered') &&
         !l.includes('A3: SiteDeliveryContract embedded/filesystem/remote not covered') &&
-        !l.includes('A3: content-addressed assets/<hash> layout not covered'),
+        !l.includes('A3: content-addressed assets/<hash> layout not covered') &&
+        !l.includes('A3: locale-prefixed CDN cache keys / hreflang not covered'),
 );
 
 writeProof(proof, root);
 if (errors.length) fail(errors.join('\n'));
 
-console.log('cdn-policy PASS: routing + cache + resume assets + rollback');
-console.log('cdn-policy NOTE: second CDN provider / locale cache-key matrix still open');
+console.log('cdn-policy PASS: routing + cache + locale/hreflang + resume assets + rollback');
+console.log('cdn-policy NOTE: second CDN provider adapter still open');

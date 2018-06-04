@@ -3,74 +3,182 @@
 </template>
 
 <style>
+/*
+  Isolate Monaco glyph metrics from page CSS.
+  Inherited letter-spacing / proportional fonts desync caret + selection overlays.
+*/
 .monaco-host {
   display: block;
   width: 100%;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
+  position: relative;
+  box-sizing: border-box;
+  font: 14px/21px Consolas, "Courier New", Menlo, Monaco, monospace !important;
+  letter-spacing: 0 !important;
+  word-spacing: 0 !important;
+  font-variant-ligatures: none !important;
+  text-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+}
+.monaco-host .monaco-editor {
+  width: 100% !important;
+  height: 100% !important;
+  outline: none;
+  font-family: Consolas, "Courier New", Menlo, Monaco, monospace !important;
+  font-size: 14px !important;
+  line-height: 21px !important;
+  letter-spacing: 0 !important;
+}
+.monaco-host .monaco-editor .view-lines,
+.monaco-host .monaco-editor .view-line,
+.monaco-host .monaco-editor .view-line span,
+.monaco-host .monaco-editor .margin-view-overlays,
+.monaco-host .monaco-editor .lines-content {
+  font-family: Consolas, "Courier New", Menlo, Monaco, monospace !important;
+  font-size: 14px !important;
+  line-height: 21px !important;
+  letter-spacing: 0 !important;
+  word-spacing: 0 !important;
+}
+/*
+  Keep the hidden textarea from painting native OS selection
+  (shows up as yellow boxes / black bands when metrics desync).
+*/
+.monaco-host .monaco-editor .inputarea,
+.monaco-host .monaco-editor textarea.inputarea,
+.monaco-host .monaco-editor .native-edit-context {
+  opacity: 0 !important;
+  color: transparent !important;
+  background: transparent !important;
+  caret-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.monaco-host .monaco-editor .inputarea::selection,
+.monaco-host .monaco-editor textarea.inputarea::selection,
+.monaco-host .monaco-editor .native-edit-context::selection {
+  background: transparent !important;
+  color: transparent !important;
+}
+.monaco-host .monaco-editor .inputarea::-moz-selection,
+.monaco-host .monaco-editor textarea.inputarea::-moz-selection,
+.monaco-host .monaco-editor .native-edit-context::-moz-selection {
+  background: transparent !important;
+  color: transparent !important;
 }
 </style>
 
 <script client>
-import { mountMonaco } from '@vmz/plugin-monaco/runtime';
-
 export default class Monaco {
-  public value: string = '';
-  public language: string = 'typescript';
-  public theme: string = 'vs-dark';
-  public readOnly: boolean = false;
-  /** Parent callback — keeps page state authoritative (same pattern as Switch.onChange). */
-  public onChange: ((v: string) => void) | null = null;
+  public value: string = ""
+  public language: string = "typescript"
+  public theme: string = "vs"
+  public readOnly: boolean = false
+  /** Optional JSON Schema URL (IR — completion + diagnostics). */
+  public jsonSchemaUrl: string = ""
+  public onChange: ((v: string) => void) | null = null
 
   #api: {
-    getValue: () => string;
-    setValue: (v: string) => void;
-    dispose: () => void;
-  } | null = null;
-  #applyingExternal = false;
-  #valueWatch: (() => void) | null = null;
+    getValue: () => string
+    setValue: (v: string) => void
+    dispose: () => void
+    monaco?: { editor?: { setTheme?: (t: string) => void } }
+  } | null = null
+  #applyingExternal = false
+  #valueWatch: (() => void) | null = null
+  #mountGen = 0
+  #onScheme: ((e: Event) => void) | null = null
+
+  #resolveTheme() {
+    if (typeof document === "undefined") return this.theme || "vs"
+    const dark =
+      document.documentElement.getAttribute("data-theme") === "dark" ||
+      document.documentElement.dataset.theme === "dark"
+    return dark ? "vs-dark" : "vs"
+  }
 
   async onMount() {
-    if (typeof window === 'undefined') return;
-    const root = this.__vmzDomRoot;
+    if (typeof window === "undefined") return
+    const gen = ++this.#mountGen
+    const root = this.__vmzDomRoot
     const el =
-      (root && root.nodeType === 1 && root.matches?.('[data-vmz-monaco]') && root) ||
-      root?.querySelector?.('[data-vmz-monaco]') ||
-      root;
-    if (!el || el.nodeType !== 1) return;
-    this.#api = await mountMonaco(el, {
+      (root && root.nodeType === 1 && root.matches?.("[data-vmz-monaco]") && root) ||
+      root?.querySelector?.("[data-vmz-monaco]") ||
+      root
+    if (!el || el.nodeType !== 1) return
+
+    this.#api?.dispose()
+    this.#api = null
+
+    // Dynamic import — never evaluate monaco on the Node/SSR route path.
+    const { mountMonaco } = await import("@vmz/plugin-monaco/runtime")
+    if (gen !== this.#mountGen || this.__vmzDestroyed) return
+
+    const theme = this.#resolveTheme()
+    this.theme = theme
+
+    const api = await mountMonaco(el, {
       value: this.value,
       language: this.language,
-      theme: this.theme,
+      theme,
       readOnly: this.readOnly,
+      jsonSchemaUrl: this.jsonSchemaUrl || undefined,
       onChange: (v) => {
-        this.#applyingExternal = true;
-        this.value = v;
-        this.#applyingExternal = false;
-        if (typeof this.onChange === 'function') this.onChange(v);
+        this.#applyingExternal = true
+        this.value = v
+        this.#applyingExternal = false
+        if (typeof this.onChange === "function") this.onChange(v)
       },
-    });
-    // Parent may push a new `value` after mount (loadSpec). Sync into the editor.
-    let last = this.value;
+    })
+    if (gen !== this.#mountGen || this.__vmzDestroyed) {
+      api.dispose()
+      return
+    }
+    this.#api = api
+
+    this.#onScheme = () => {
+      const next = this.#resolveTheme()
+      this.theme = next
+      try {
+        this.#api?.monaco?.editor?.setTheme?.(next)
+      } catch {
+        /* ignore */
+      }
+    }
+    window.addEventListener("davinci-theme", this.#onScheme)
+    window.addEventListener("storage", this.#onScheme)
+
+    let last = this.value
     const tick = () => {
-      if (!this.#api || this.__vmzDestroyed) return;
-      if (this.#applyingExternal) return;
+      if (!this.#api || this.__vmzDestroyed) return
+      if (this.#applyingExternal) return
       if (this.value !== last) {
-        last = this.value;
+        last = this.value
         if (this.#api.getValue() !== this.value) {
-          this.#api.setValue(this.value ?? '');
+          this.#api.setValue(this.value ?? "")
         }
       }
-    };
-    const id = window.setInterval(tick, 50);
-    this.#valueWatch = () => window.clearInterval(id);
+    }
+    const id = window.setInterval(tick, 50)
+    this.#valueWatch = () => window.clearInterval(id)
   }
 
   onDestroy() {
-    this.#valueWatch?.();
-    this.#valueWatch = null;
-    this.#api?.dispose();
-    this.#api = null;
+    this.#mountGen++
+    if (this.#onScheme && typeof window !== "undefined") {
+      window.removeEventListener("davinci-theme", this.#onScheme)
+      window.removeEventListener("storage", this.#onScheme)
+    }
+    this.#onScheme = null
+    this.#valueWatch?.()
+    this.#valueWatch = null
+    this.#api?.dispose()
+    this.#api = null
   }
 }
 </script>

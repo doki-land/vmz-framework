@@ -3,7 +3,11 @@
 //! Freezes descriptor + host `applications.config.json5` schemas and diagnostic codes.
 //! No Mount IR: mounts are application/deployment edges; catalog/mount-table are artifacts.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use crate::dx::SourceSpan;
+use crate::reported_diagnostic::ReportedDiagnostic;
 
 /// Schema id for a child `package.json#vmz.application` descriptor.
 pub const APPLICATION_DESCRIPTOR_SCHEMA: &str = "vmz.application.v0";
@@ -300,13 +304,13 @@ impl From<&str> for ApplicationId {
 
 /// Child identity from `package.json#vmz.application` ("who I am"), not mount location.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationDescriptor {
     /// Always [`APPLICATION_DESCRIPTOR_SCHEMA`].
     pub schema: String,
     /// Stable explicit ApplicationId for this package.
     pub id: ApplicationId,
     /// Stable RouteId of the child entry (not a URL string).
-    #[serde(rename = "entryRoute")]
     pub entry_route: String,
     /// Optional human title for catalog / host UI.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -318,23 +322,23 @@ pub struct ApplicationDescriptor {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
     /// Absolute package root that declared this descriptor (filled by resolver).
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "packageRoot")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub package_root: Option<String>,
     /// npm `package.json` name when known (informational only).
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "packageName")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub package_name: Option<String>,
 }
 
 /// Host mount edge: ApplicationId -> routeBase (+ optional deploymentRef).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationMount {
     /// Child ApplicationId this edge mounts.
     pub application: ApplicationId,
     /// Absolute URL prefix under the host where the child is reachable.
-    #[serde(rename = "routeBase")]
     pub route_base: String,
     /// Optional deployment identity when the child ships as a separate unit.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "deploymentRef")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub deployment_ref: Option<String>,
 }
 
@@ -374,11 +378,11 @@ pub struct ApplicationsConfig {
 
 /// One catalog row for host UI queries (no executable modules).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationCatalogEntry {
     /// ApplicationId this row describes.
     pub id: ApplicationId,
     /// Child entry RouteId copied from the descriptor.
-    #[serde(rename = "entryRoute")]
     pub entry_route: String,
     /// Optional title from the descriptor.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -393,7 +397,7 @@ pub struct ApplicationCatalogEntry {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub collections: Vec<String>,
     /// Mounted routeBase when this ApplicationId appears in mounts.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "routeBase")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub route_base: Option<String>,
 }
 
@@ -408,32 +412,14 @@ pub struct ApplicationCatalog {
     pub collections: Vec<ApplicationCollection>,
 }
 
-/// Source span for an application diagnostic (byte offsets in `path`).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ApplicationSourceSpan {
-    /// Absolute or workspace-relative path of the offending source.
-    pub path: String,
-    /// Inclusive start byte offset.
-    pub start: u32,
-    /// Exclusive end byte offset.
-    pub end: u32,
-}
+/// Application source span — same shape as DX [`SourceSpan`].
+pub type ApplicationSourceSpan = SourceSpan;
 
-/// One diagnostic emitted by application composition / isolation / reloc checks.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ApplicationDiagnostic {
-    /// Stable `vmz::application::*` code.
-    pub code: String,
-    /// `error` for hard failures; other severities reserved for tooling.
-    pub severity: String,
-    /// Path most relevant to the finding.
-    pub path: String,
-    /// Human-readable explanation.
-    pub message: String,
-    /// Optional byte span when the finding maps to a source file.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub span: Option<ApplicationSourceSpan>,
-}
+/// One diagnostic from application composition / isolation / reloc checks.
+///
+/// Alias of [`ReportedDiagnostic`] — no parallel severity algebra. Wire shape
+/// is `{ path, severity, message, code?, span? }` (oxc severity kebab-case).
+pub type ApplicationDiagnostic = ReportedDiagnostic;
 
 /// Aggregate result of `vmz application check` / N-API composition validation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -455,7 +441,7 @@ pub struct ApplicationCheckReport {
 impl ApplicationCheckReport {
     /// True when any diagnostic has severity `error`.
     pub fn has_errors(&self) -> bool {
-        self.diagnostics.iter().any(|d| d.severity == "error")
+        self.diagnostics.iter().any(|d| d.is_error())
     }
 
     /// Pretty-printed JSON for N-API / CLI dump.
@@ -466,13 +452,14 @@ impl ApplicationCheckReport {
 
 /// Deployment parameter applied after independent `/` compile.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationBase {
     /// Always [`APPLICATION_BASE_SCHEMA`].
     pub schema: String,
     /// Normalized mount/deployment base (`/` or `/prefix` without trailing slash).
     pub base: String,
     /// Optional ApplicationId this base relocates (host may omit for shared proofs).
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "applicationId")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub application_id: Option<ApplicationId>,
 }
 
@@ -483,28 +470,200 @@ impl ApplicationBase {
     }
 }
 
+/// Closed logical URL surface kind used by relocation manifests.
+///
+/// **Closed** unit enum (`kebab-case`). Covers route / asset / module / deploy
+/// surfaces compiled at logical base `/`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum LogicalUrlKind {
+    /// Public route surface.
+    Route,
+    /// Static or emitted asset URL.
+    Asset,
+    /// JS / module entry URL.
+    Module,
+    /// Preload script URL.
+    Preload,
+    /// Form / action endpoint.
+    Form,
+    /// Redirect target.
+    Redirect,
+    /// Canonical URL declaration.
+    Canonical,
+    /// Sitemap document.
+    Sitemap,
+    /// `#server` / RPC surface.
+    Server,
+    /// SSR document URL.
+    Ssr,
+    /// Resume / hydration script.
+    Resume,
+    /// Service worker URL.
+    Sw,
+    /// Source map URL.
+    Sourcemap,
+    /// Trace / observability URL.
+    Trace,
+    /// Error document URL.
+    Error,
+}
+
+impl LogicalUrlKind {
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Route => "route",
+            Self::Asset => "asset",
+            Self::Module => "module",
+            Self::Preload => "preload",
+            Self::Form => "form",
+            Self::Redirect => "redirect",
+            Self::Canonical => "canonical",
+            Self::Sitemap => "sitemap",
+            Self::Server => "server",
+            Self::Ssr => "ssr",
+            Self::Resume => "resume",
+            Self::Sw => "sw",
+            Self::Sourcemap => "sourcemap",
+            Self::Trace => "trace",
+            Self::Error => "error",
+        }
+    }
+}
+
+impl std::fmt::Display for LogicalUrlKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed artifact slice kind referenced by [`ArtifactRef`].
+///
+/// **Closed** unit enum (`kebab-case`). Mount tables hold refs only — never
+/// inline these slices.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ArtifactSliceKind {
+    /// Program Graph slice.
+    ProgramGraph,
+    /// Execution Plan slice.
+    ExecutionPlan,
+    /// Route manifest slice.
+    RouteManifest,
+    /// Asset manifest slice.
+    AssetManifest,
+    /// Server deployment slice.
+    ServerDeployment,
+    /// Whole application artifact envelope (mount table refs).
+    ApplicationArtifact,
+}
+
+impl ArtifactSliceKind {
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ProgramGraph => "program-graph",
+            Self::ExecutionPlan => "execution-plan",
+            Self::RouteManifest => "route-manifest",
+            Self::AssetManifest => "asset-manifest",
+            Self::ServerDeployment => "server-deployment",
+            Self::ApplicationArtifact => "application-artifact",
+        }
+    }
+}
+
+impl std::fmt::Display for ArtifactSliceKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed role for an independent N-API / dev session row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ApplicationDevRole {
+    /// Host composition package session.
+    Host,
+    /// Mounted child application session.
+    Child,
+}
+
+impl ApplicationDevRole {
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Host => "host",
+            Self::Child => "child",
+        }
+    }
+}
+
+impl std::fmt::Display for ApplicationDevRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed dirty-path rebuild reason for [`ApplicationAffectedUnit`].
+///
+/// **Closed** unit enum (`kebab-case`). Wire labels are kebab (not legacy
+/// `snake_case` tokens such as `mount_config`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ApplicationAffectedReason {
+    /// Source under a child package root changed.
+    ChildSource,
+    /// Child or host `package.json` / descriptor changed.
+    Descriptor,
+    /// Host collection / UI surface outside child packages.
+    CollectionUi,
+    /// Host `applications.config.json5` mount table changed.
+    MountConfig,
+    /// Shared package outside host/children forces dependent rebuilds.
+    SharedPackage,
+}
+
+impl ApplicationAffectedReason {
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ChildSource => "child-source",
+            Self::Descriptor => "descriptor",
+            Self::CollectionUi => "collection-ui",
+            Self::MountConfig => "mount-config",
+            Self::SharedPackage => "shared-package",
+        }
+    }
+}
+
+impl std::fmt::Display for ApplicationAffectedReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// One logical URL surface compiled at base `/`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct LogicalUrlEntry {
     /// Stable id (RouteId / AssetId / CapabilityId / ...).
     pub id: String,
-    /// Kind of surface this URL feeds.
-    pub kind: String,
+    /// Kind of surface this URL feeds (closed [`LogicalUrlKind`]).
+    pub kind: LogicalUrlKind,
     /// Logical absolute path as if application base were `/`.
-    #[serde(rename = "logicalPath")]
     pub logical_path: String,
 }
 
 /// Independent-compile relocation manifest (no host mount prefix baked in).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationRelocationManifest {
     /// Always [`APPLICATION_RELOCATION_SCHEMA`].
     pub schema: String,
     /// ApplicationId whose logical surfaces are listed.
-    #[serde(rename = "applicationId")]
     pub application_id: ApplicationId,
     /// Always `/` for the logical compile view.
-    #[serde(rename = "logicalBase")]
     pub logical_base: String,
     /// Logical URL surfaces owned by this application.
     pub entries: Vec<LogicalUrlEntry>,
@@ -512,13 +671,13 @@ pub struct ApplicationRelocationManifest {
 
 /// One URL after applying [`ApplicationBase`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct RelocatedUrlEntry {
     /// Same stable id as the logical entry.
     pub id: String,
-    /// Same kind as the logical entry.
-    pub kind: String,
+    /// Same kind as the logical entry (closed [`LogicalUrlKind`]).
+    pub kind: LogicalUrlKind,
     /// Original logical path under `/`.
-    #[serde(rename = "logicalPath")]
     pub logical_path: String,
     /// Public href after joining with the deployment base.
     pub href: String,
@@ -526,11 +685,11 @@ pub struct RelocatedUrlEntry {
 
 /// Relocated surfaces for a single ApplicationBase.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct RelocatedApplicationUrls {
     /// Always [`APPLICATION_RELOCATED_SCHEMA`].
     pub schema: String,
     /// ApplicationId these hrefs belong to.
-    #[serde(rename = "applicationId")]
     pub application_id: ApplicationId,
     /// Deployment base used for the join.
     pub base: String,
@@ -540,22 +699,20 @@ pub struct RelocatedApplicationUrls {
 
 /// Relocatable check report: prove `/` and a non-root base both round-trip.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationRelocatableReport {
     /// Always [`APPLICATION_RELOCATABLE_CHECK_SCHEMA`].
     pub schema: String,
     /// ApplicationId under test when known.
-    #[serde(rename = "applicationId", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub application_id: Option<ApplicationId>,
     /// Absolute package root scanned for relocatable sources.
-    #[serde(rename = "packageRoot")]
     pub package_root: String,
     /// Logical manifest used for `/` and non-root proofs (may be synthetic in checks).
     pub manifest: ApplicationRelocationManifest,
     /// Proof under logical `/`.
-    #[serde(rename = "atRoot")]
     pub at_root: RelocatedApplicationUrls,
     /// Proof under a non-root base.
-    #[serde(rename = "atRelocated")]
     pub at_relocated: RelocatedApplicationUrls,
     /// Hard findings (non-relocatable URLs, invalid bases, ...).
     pub diagnostics: Vec<ApplicationDiagnostic>,
@@ -564,7 +721,7 @@ pub struct ApplicationRelocatableReport {
 impl ApplicationRelocatableReport {
     /// True when any diagnostic has severity `error`.
     pub fn has_errors(&self) -> bool {
-        self.diagnostics.iter().any(|d| d.severity == "error")
+        self.diagnostics.iter().any(|d| d.is_error())
     }
 
     /// Pretty-printed JSON for N-API / CLI dump.
@@ -576,8 +733,8 @@ impl ApplicationRelocatableReport {
 /// Content-addressed ref to an owned artifact slice (never inlines the slice).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ArtifactRef {
-    /// Slice kind (`programGraph`, `executionPlan`, `routeManifest`, ...).
-    pub kind: String,
+    /// Slice kind (closed [`ArtifactSliceKind`]).
+    pub kind: ArtifactSliceKind,
     /// Content hash of the referenced slice.
     pub hash: String,
 }
@@ -587,57 +744,48 @@ pub struct ArtifactRef {
 /// Owns Program Graph / Execution Plan / routes / assets by **reference**.
 /// Host MountTable must not embed these bodies.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationArtifact {
     /// Always [`APPLICATION_ARTIFACT_SCHEMA`].
     pub schema: String,
     /// ApplicationId that owns this artifact envelope.
-    #[serde(rename = "applicationId")]
     pub application_id: ApplicationId,
     /// Hash of the resolved descriptor used to produce this artifact.
-    #[serde(rename = "descriptorHash")]
     pub descriptor_hash: String,
     /// Ref to the owned Program Graph slice.
-    #[serde(rename = "programGraphRef")]
     pub program_graph_ref: ArtifactRef,
     /// Ref to the owned Execution Plan slice.
-    #[serde(rename = "executionPlanRef")]
     pub execution_plan_ref: ArtifactRef,
     /// Ref to the owned route manifest slice.
-    #[serde(rename = "routeManifestRef")]
     pub route_manifest_ref: ArtifactRef,
     /// Ref to the owned asset manifest slice.
-    #[serde(rename = "assetManifestRef")]
     pub asset_manifest_ref: ArtifactRef,
     /// Ref to the owned server deployment slice.
-    #[serde(rename = "serverDeploymentRef")]
     pub server_deployment_ref: ArtifactRef,
     /// Public RouteId contracts this application exposes to cross-app Links.
-    #[serde(rename = "publicRouteContracts", default)]
+    #[serde(default)]
     pub public_route_contracts: Vec<String>,
     /// Content hash over the artifact ownership envelope (refs + contracts).
     pub integrity: String,
     /// Absolute package root that produced this artifact.
-    #[serde(rename = "packageRoot", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub package_root: Option<String>,
     /// Executable module ownership id - must not appear in foreign artifacts.
-    #[serde(rename = "executableModuleId")]
     pub executable_module_id: String,
 }
 
 /// One host mount boundary row (refs only).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationMountTableEntry {
     /// Absolute host routeBase for this mount.
-    #[serde(rename = "routeBase")]
     pub route_base: String,
     /// Mounted ApplicationId.
-    #[serde(rename = "applicationId")]
     pub application_id: ApplicationId,
     /// Content-addressed ref to the child ApplicationArtifact.
-    #[serde(rename = "artifactRef")]
     pub artifact_ref: ArtifactRef,
     /// Summary of public RouteIds advertised at this mount.
-    #[serde(rename = "publicRouteSummary", default)]
+    #[serde(default)]
     pub public_route_summary: Vec<String>,
     /// Optional health probe label for deploy adapters.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -653,11 +801,12 @@ pub struct ApplicationMountTableEntry {
 ///
 /// Forbidden fields (must never appear): programGraph, executionPlan, executable modules.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationMountTable {
     /// Always [`APPLICATION_MOUNT_TABLE_SCHEMA`].
     pub schema: String,
     /// Optional host ApplicationId that owns this table.
-    #[serde(rename = "hostApplicationId", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub host_application_id: Option<ApplicationId>,
     /// Mount rows in host config order.
     pub mounts: Vec<ApplicationMountTableEntry>,
@@ -667,13 +816,13 @@ pub struct ApplicationMountTable {
 
 /// Artifact-boundary ownership report for host + children.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationArtifactBoundaryReport {
     /// Always [`APPLICATION_ARTIFACT_BOUNDARY_SCHEMA`].
     pub schema: String,
     /// Independent child artifacts under check.
     pub artifacts: Vec<ApplicationArtifact>,
     /// Host MountTable that must remain refs-only.
-    #[serde(rename = "mountTable")]
     pub mount_table: ApplicationMountTable,
     /// Read-only catalog used by host composition (must not embed executables).
     pub catalog: ApplicationCatalog,
@@ -684,7 +833,7 @@ pub struct ApplicationArtifactBoundaryReport {
 impl ApplicationArtifactBoundaryReport {
     /// True when any diagnostic has severity `error`.
     pub fn has_errors(&self) -> bool {
-        self.diagnostics.iter().any(|d| d.severity == "error")
+        self.diagnostics.iter().any(|d| d.is_error())
     }
 
     /// Pretty-printed JSON for N-API / CLI dump.
@@ -695,11 +844,11 @@ impl ApplicationArtifactBoundaryReport {
 
 /// Namespaced isolation surfaces for one ApplicationId.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationIsolationNamespace {
     /// Always [`APPLICATION_ISOLATION_SCHEMA`].
     pub schema: String,
     /// ApplicationId these namespaces isolate.
-    #[serde(rename = "applicationId")]
     pub application_id: ApplicationId,
     /// Runtime namespace key (must be unique across mounted apps).
     pub runtime: String,
@@ -716,18 +865,16 @@ pub struct ApplicationIsolationNamespace {
     /// Trace / observability namespace key.
     pub trace: String,
     /// Inspector region namespace key.
-    #[serde(rename = "inspectorRegions")]
     pub inspector_regions: String,
 }
 
 /// Policy applied when a mounted application is unavailable.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct MountUnavailablePolicy {
     /// Failed or unavailable ApplicationId.
-    #[serde(rename = "applicationId")]
     pub application_id: ApplicationId,
     /// routeBase that becomes unavailable.
-    #[serde(rename = "routeBase")]
     pub route_base: String,
     /// HTTP-style status the host should surface for that mount.
     pub status: u16,
@@ -737,15 +884,13 @@ pub struct MountUnavailablePolicy {
 
 /// Proof that one child's failure does not take down host or siblings.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct FailureContainmentProof {
     /// ApplicationId whose failure is simulated.
-    #[serde(rename = "failedApplicationId")]
     pub failed_application_id: ApplicationId,
     /// Host process / document must remain alive.
-    #[serde(rename = "hostSurvives")]
     pub host_survives: bool,
     /// Sibling ApplicationIds that must keep serving.
-    #[serde(rename = "siblingsSurvive")]
     pub siblings_survive: Vec<ApplicationId>,
     /// Unavailable policy applied to the failed mount only.
     pub unavailable: MountUnavailablePolicy,
@@ -753,13 +898,13 @@ pub struct FailureContainmentProof {
 
 /// Host+children isolation conformance report.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationIsolationCheckReport {
     /// Always [`APPLICATION_ISOLATION_CHECK_SCHEMA`].
     pub schema: String,
     /// Proven namespaces per ApplicationId.
     pub namespaces: Vec<ApplicationIsolationNamespace>,
     /// Failure-containment proofs for each mounted child.
-    #[serde(rename = "failureContainment")]
     pub failure_containment: Vec<FailureContainmentProof>,
     /// Isolation surface names covered by this check.
     pub surfaces: Vec<String>,
@@ -770,7 +915,7 @@ pub struct ApplicationIsolationCheckReport {
 impl ApplicationIsolationCheckReport {
     /// True when any diagnostic has severity `error`.
     pub fn has_errors(&self) -> bool {
-        self.diagnostics.iter().any(|d| d.severity == "error")
+        self.diagnostics.iter().any(|d| d.is_error())
     }
 
     /// Pretty-printed JSON for N-API / CLI dump.
@@ -781,23 +926,21 @@ impl ApplicationIsolationCheckReport {
 
 /// Declared or scanned cross-application `<Link application to>`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct CrossApplicationLink {
     /// Always [`APPLICATION_CROSS_LINK_SCHEMA`].
     pub schema: String,
     /// Target ApplicationId named by the Link.
-    #[serde(rename = "applicationId")]
     pub application_id: ApplicationId,
     /// Target public RouteId in the child application.
-    #[serde(rename = "routeId")]
     pub route_id: String,
     /// Resolved document href under the host mount base (when reachable).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub href: Option<String>,
     /// Mount routeBase used for href join when known.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "routeBase")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub route_base: Option<String>,
     /// Cross-app Links always perform full document navigation.
-    #[serde(rename = "documentNavigation")]
     pub document_navigation: bool,
     /// Source path of the Link (host page / fixture).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -809,19 +952,17 @@ pub struct CrossApplicationLink {
 /// Catalog is read-only data for ordinary host pages - VMZ does not emit gallery UI.
 /// Cross-app Links resolve to real `<a href>` document navigation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationHostCompositionReport {
     /// Always [`APPLICATION_HOST_COMPOSITION_SCHEMA`].
     pub schema: String,
     /// Consumable ApplicationCatalog (config-array order; no directory scan).
     pub catalog: ApplicationCatalog,
     /// Provenance of catalog order (always `config-array` when valid).
-    #[serde(rename = "catalogOrderSource")]
     pub catalog_order_source: String,
     /// Framework product kinds that must never appear as core types.
-    #[serde(rename = "forbiddenProductKinds")]
     pub forbidden_product_kinds: Vec<String>,
     /// Resolved cross-application Links from the host.
-    #[serde(rename = "crossApplicationLinks")]
     pub cross_application_links: Vec<CrossApplicationLink>,
     /// Hard findings (unknown ApplicationId / non-public route / unreachable mount).
     pub diagnostics: Vec<ApplicationDiagnostic>,
@@ -830,7 +971,7 @@ pub struct ApplicationHostCompositionReport {
 impl ApplicationHostCompositionReport {
     /// True when any diagnostic has severity `error`.
     pub fn has_errors(&self) -> bool {
-        self.diagnostics.iter().any(|d| d.severity == "error")
+        self.diagnostics.iter().any(|d| d.is_error())
     }
 
     /// Pretty-printed JSON for N-API / CLI dump.
@@ -841,17 +982,16 @@ impl ApplicationHostCompositionReport {
 
 /// One independent N-API/dev session keyed by ApplicationId.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationDevSession {
     /// ApplicationId that owns this session.
-    #[serde(rename = "applicationId")]
     pub application_id: ApplicationId,
     /// Absolute package root bound to the session.
-    #[serde(rename = "packageRoot")]
     pub package_root: String,
     /// Sessions never share Program Graph / runtime - always true when proven.
     pub independent: bool,
-    /// `host` | `child`
-    pub role: String,
+    /// Session role (closed [`ApplicationDevRole`]).
+    pub role: ApplicationDevRole,
 }
 
 /// Table of independent dev sessions (one row per ApplicationId).
@@ -865,16 +1005,17 @@ pub struct ApplicationDevSessions {
 
 /// One dirty-path to ApplicationId rebuild unit.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationAffectedUnit {
     /// ApplicationId that must rebuild for the dirty set.
-    #[serde(rename = "applicationId")]
     pub application_id: ApplicationId,
-    /// `child_source` | `descriptor` | `collection_ui` | `mount_config` | `shared_package`
-    pub reason: String,
+    /// Why this ApplicationId is dirty (closed [`ApplicationAffectedReason`]).
+    pub reason: ApplicationAffectedReason,
 }
 
 /// Dirty paths mapped to the minimal set of ApplicationIds that must rebuild.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationAffectedPlan {
     /// Always [`APPLICATION_AFFECTED_SCHEMA`].
     pub schema: String,
@@ -883,20 +1024,20 @@ pub struct ApplicationAffectedPlan {
     /// Rebuild units for affected ApplicationIds only.
     pub units: Vec<ApplicationAffectedUnit>,
     /// ApplicationIds proven unaffected (must not rebuild).
-    #[serde(rename = "notRebuilt")]
     pub not_rebuilt: Vec<ApplicationId>,
 }
 
 /// One reverse-proxy dispatch case against the MountTable.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationProxyCase {
     /// Incoming public URL under the host.
     pub url: String,
     /// ApplicationId selected by longest routeBase match (if any).
-    #[serde(rename = "applicationId", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub application_id: Option<ApplicationId>,
     /// Prefix stripped before forwarding into the child.
-    #[serde(rename = "stripBase", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub strip_base: Option<String>,
     /// Expected dispatch status (200 for hit, 404 for miss, ...).
     pub status: u16,
@@ -916,17 +1057,17 @@ pub struct ApplicationProxyDispatch {
 
 /// One `vmz test` selection mode and the ApplicationIds it selects.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationTestModeSelection {
     /// Mode id (`application`, `mounted`, `affected`, ...).
     pub id: String,
     /// Optional test scope label for the mode.
-    #[serde(rename = "testScope", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub test_scope: Option<String>,
     /// Contract names exercised under this selection.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub contracts: Vec<String>,
     /// ApplicationIds selected by this mode.
-    #[serde(rename = "selectedApplicationIds")]
     pub selected_application_ids: Vec<ApplicationId>,
 }
 
@@ -945,16 +1086,15 @@ pub struct ApplicationMountedTestSelection {
 
 /// Proof that deploy adapters consume MountTable refs only (no embedded child bodies).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationDeployAdapterProof {
     /// Always [`APPLICATION_DEPLOY_ADAPTER_SCHEMA`].
     pub schema: String,
     /// True when every MountTable entry is refs-only.
-    #[serde(rename = "mountTableRefsOnly")]
     pub mount_table_refs_only: bool,
     /// Adapter ids that consumed the MountTable in this proof.
     pub adapters: Vec<String>,
     /// True when each ApplicationId keeps its own deployment ref.
-    #[serde(rename = "perApplicationDeploymentRefs")]
     pub per_application_deployment_refs: bool,
 }
 
@@ -980,7 +1120,7 @@ pub struct ApplicationDevCheckReport {
 impl ApplicationDevCheckReport {
     /// True when any diagnostic has severity `error`.
     pub fn has_errors(&self) -> bool {
-        self.diagnostics.iter().any(|d| d.severity == "error")
+        self.diagnostics.iter().any(|d| d.is_error())
     }
 
     /// Pretty-printed JSON for N-API / CLI dump.

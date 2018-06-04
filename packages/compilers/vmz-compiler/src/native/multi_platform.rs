@@ -10,25 +10,20 @@ use std::path::Path;
 use vmz_protocol::{
     BRIDGE_PROTOCOL_SCHEMA, CAPABILITY_CALL_SCHEMA, DIAG_ADAPTER_IS_SEMANTIC_CORE,
     DIAG_INVALID_PROFILE, DIAG_MISSING_PLATFORM_ADAPTER, DIAG_PLATFORM_PRIVATE_SCHEMA,
-    DIAG_PLATFORM_SEMANTIC_FORK, FULLSTACK_SCHEMA, MULTI_PLATFORM_ADAPTER_KIND,
-    MULTI_PLATFORM_CHECK_SCHEMA, MULTI_PLATFORM_SCHEMA, MULTI_PLATFORM_SHARED_SCHEMA,
-    MULTI_PLATFORM_TEST_SCHEMA, MultiPlatformSharedContracts, NATIVE_SURFACE_SCHEMA,
+    DIAG_PLATFORM_SEMANTIC_FORK, FULLSTACK_SCHEMA, MULTI_PLATFORM_CHECK_SCHEMA,
+    MULTI_PLATFORM_SCHEMA, MULTI_PLATFORM_SHARED_SCHEMA, MULTI_PLATFORM_TEST_SCHEMA,
+    MultiPlatformAdapterKind, MultiPlatformSharedContracts, NATIVE_SURFACE_SCHEMA,
     NativeHostDiagnostic, NativeHostProtocolCatalog, NativeMultiPlatformCheckReport,
-    NativeMultiPlatformManifest, REQUIRED_MULTI_PLATFORMS, SHELL_SCHEMA, WEBVIEW_DEPLOYMENT_SCHEMA,
+    NativeMultiPlatformManifest, NativePlatformId, SHELL_SCHEMA, WEBVIEW_DEPLOYMENT_SCHEMA,
 };
 
 fn diag(
     path: &str,
-    severity: &str,
+    severity: vmz_protocol::Severity,
     message: impl Into<String>,
     code: &str,
 ) -> NativeHostDiagnostic {
-    NativeHostDiagnostic {
-        path: path.into(),
-        severity: severity.into(),
-        message: message.into(),
-        code: Some(code.into()),
-    }
+    NativeHostDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
 fn looks_platform_private(schema: &str) -> bool {
@@ -46,7 +41,7 @@ fn validate_shared(shared: &MultiPlatformSharedContracts, out: &mut Vec<NativeHo
     if shared.schema != MULTI_PLATFORM_SHARED_SCHEMA {
         out.push(diag(
             "shared.schema",
-            "error",
+            vmz_protocol::Severity::Error,
             format!("shared schema must be `{MULTI_PLATFORM_SHARED_SCHEMA}`"),
             DIAG_INVALID_PROFILE,
         ));
@@ -77,7 +72,7 @@ fn validate_shared(shared: &MultiPlatformSharedContracts, out: &mut Vec<NativeHo
         if got != want {
             out.push(diag(
                 &format!("shared.{field}"),
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("shared {field} must be `{want}`, got `{got}`"),
                 DIAG_PLATFORM_SEMANTIC_FORK,
             ));
@@ -85,7 +80,7 @@ fn validate_shared(shared: &MultiPlatformSharedContracts, out: &mut Vec<NativeHo
         if looks_platform_private(got) {
             out.push(diag(
                 &format!("shared.{field}"),
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("platform-private schema forbidden: `{got}`"),
                 DIAG_PLATFORM_PRIVATE_SCHEMA,
             ));
@@ -97,7 +92,7 @@ fn validate_manifest(mp: &NativeMultiPlatformManifest, out: &mut Vec<NativeHostD
     if mp.schema != MULTI_PLATFORM_SCHEMA {
         out.push(diag(
             "schema",
-            "error",
+            vmz_protocol::Severity::Error,
             format!("multi_platform schema must be `{MULTI_PLATFORM_SCHEMA}`"),
             DIAG_INVALID_PROFILE,
         ));
@@ -106,7 +101,7 @@ fn validate_manifest(mp: &NativeMultiPlatformManifest, out: &mut Vec<NativeHostD
     if mp.allows_platform_semantic_fork {
         out.push(diag(
             "allowsPlatformSemanticFork",
-            "error",
+            vmz_protocol::Severity::Error,
             "platform semantic fork is forbidden — iOS/Android must share one Host Profile contract",
             DIAG_PLATFORM_SEMANTIC_FORK,
         ));
@@ -114,11 +109,11 @@ fn validate_manifest(mp: &NativeMultiPlatformManifest, out: &mut Vec<NativeHostD
 
     validate_shared(&mp.shared, out);
 
-    for plat in REQUIRED_MULTI_PLATFORMS {
-        if !mp.platforms.iter().any(|p| p == *plat) {
+    for plat in NativePlatformId::ALL {
+        if !mp.platforms.iter().any(|p| p == plat) {
             out.push(diag(
                 "platforms",
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("required platform `{plat}` missing from platforms list"),
                 DIAG_MISSING_PLATFORM_ADAPTER,
             ));
@@ -126,19 +121,20 @@ fn validate_manifest(mp: &NativeMultiPlatformManifest, out: &mut Vec<NativeHostD
         let Some(adapter) = mp.adapters.iter().find(|a| a.platform == *plat) else {
             out.push(diag(
                 "adapters",
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("missing `{plat}` packaging adapter"),
                 DIAG_MISSING_PLATFORM_ADAPTER,
             ));
             continue;
         };
 
-        if adapter.kind != MULTI_PLATFORM_ADAPTER_KIND {
+        if adapter.kind != MultiPlatformAdapterKind::PackagingStub {
             out.push(diag(
                 &format!("adapters.{plat}.kind"),
-                "error",
+                vmz_protocol::Severity::Error,
                 format!(
-                    "native adapter kind must be `{MULTI_PLATFORM_ADAPTER_KIND}` (real Xcode/Gradle later); got `{}`",
+                    "native adapter kind must be `{}` (real Xcode/Gradle later); got `{}`",
+                    MultiPlatformAdapterKind::PackagingStub,
                     adapter.kind
                 ),
                 DIAG_ADAPTER_IS_SEMANTIC_CORE,
@@ -148,7 +144,7 @@ fn validate_manifest(mp: &NativeMultiPlatformManifest, out: &mut Vec<NativeHostD
         if !adapter.packaging_only {
             out.push(diag(
                 &format!("adapters.{plat}.packagingOnly"),
-                "error",
+                vmz_protocol::Severity::Error,
                 "platform adapter must be packaging-only — Host Profile semantics stay shared",
                 DIAG_ADAPTER_IS_SEMANTIC_CORE,
             ));
@@ -157,7 +153,7 @@ fn validate_manifest(mp: &NativeMultiPlatformManifest, out: &mut Vec<NativeHostD
         if adapter.is_semantic_truth_source {
             out.push(diag(
                 &format!("adapters.{plat}.isSemanticTruthSource"),
-                "error",
+                vmz_protocol::Severity::Error,
                 "platform adapter must not become semantic truth — VPG/Plan remain sole semantic IR",
                 DIAG_ADAPTER_IS_SEMANTIC_CORE,
             ));
@@ -193,7 +189,7 @@ fn validate_manifest(mp: &NativeMultiPlatformManifest, out: &mut Vec<NativeHostD
             if got != want {
                 out.push(diag(
                     &format!("adapters.{plat}.{field}"),
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!("platform semantic fork: {field} `{got}` ≠ shared `{want}`"),
                     DIAG_PLATFORM_SEMANTIC_FORK,
                 ));
@@ -201,7 +197,7 @@ fn validate_manifest(mp: &NativeMultiPlatformManifest, out: &mut Vec<NativeHostD
             if looks_platform_private(got) {
                 out.push(diag(
                     &format!("adapters.{plat}.{field}"),
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!("platform-private schema forbidden: `{got}`"),
                     DIAG_PLATFORM_PRIVATE_SCHEMA,
                 ));
@@ -210,10 +206,10 @@ fn validate_manifest(mp: &NativeMultiPlatformManifest, out: &mut Vec<NativeHostD
     }
 
     for adapter in &mp.adapters {
-        if !REQUIRED_MULTI_PLATFORMS.contains(&adapter.platform.as_str()) {
+        if !NativePlatformId::ALL.contains(&adapter.platform) {
             out.push(diag(
                 &format!("adapters.{}", adapter.platform),
-                "error",
+                vmz_protocol::Severity::Error,
                 format!(
                     "unknown platform `{}` — native first version is ios|android only",
                     adapter.platform
@@ -245,14 +241,14 @@ fn load_or_example(
                 Ok(m) => return m,
                 Err(e) => diags.push(diag(
                     "native-multi-platform.json",
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!("invalid NativeMultiPlatformManifest JSON: {e}"),
                     DIAG_INVALID_PROFILE,
                 )),
             },
             Err(e) => diags.push(diag(
                 "native-multi-platform.json",
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("cannot read native-multi-platform.json: {e}"),
                 DIAG_INVALID_PROFILE,
             )),
@@ -279,7 +275,7 @@ pub fn check_multi_platform_contract(root: &Path) -> NativeMultiPlatformCheckRep
             {
                 diagnostics.push(diag(
                     "native-multi-platform.foul.json",
-                    "error",
+                    vmz_protocol::Severity::Error,
                     "forbidden multi-platform fork assumptions in foul fixture",
                     DIAG_PLATFORM_SEMANTIC_FORK,
                 ));
@@ -287,12 +283,12 @@ pub fn check_multi_platform_contract(root: &Path) -> NativeMultiPlatformCheckRep
         }
     }
 
-    let failed = diagnostics.iter().any(|d| d.severity == "error");
+    let failed = diagnostics.iter().any(|d| d.is_error());
     NativeMultiPlatformCheckReport {
         schema: MULTI_PLATFORM_CHECK_SCHEMA.into(),
         catalog,
         multi_platform,
         diagnostics,
-        status: if failed { "failed".into() } else { "ready".into() },
+        status: vmz_protocol::CheckReportStatus::from_failed(failed),
     }
 }

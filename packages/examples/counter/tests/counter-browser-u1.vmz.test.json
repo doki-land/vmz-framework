@@ -1,0 +1,86 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "counter.browser.u1",
+    "title": "Browser Host U1: semantic locators + fill/press + UI asserts",
+    "modes": ["browser"],
+    "program": {
+        "chunkId": "components/CounterButton",
+        "unitName": "CounterButton"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "mount",
+            "props": {
+                "initial": 0
+            }
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "fill",
+            "locator": { "kind": "testId", "testId": "counter-note" },
+            "value": "hello"
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "press",
+            "locator": { "kind": "label", "text": "Note" },
+            "key": "Tab"
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "click",
+            "locator": { "kind": "role", "role": "button", "name": "Increment counter" }
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "flush"
+        }
+    ],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "host",
+            "expect": {
+                "kind": "browser",
+                "realDocument": true
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "visible",
+            "locator": { "kind": "testId", "testId": "counter-inc" }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "count",
+            "locator": { "kind": "role", "role": "button" },
+            "expect": { "equals": 1 }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "value",
+            "locator": { "kind": "testId", "testId": "counter-note" },
+            "expect": { "equals": "hello" }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "text",
+            "expect": {
+                "contains": "count: 1"
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "state",
+            "expect": {
+                "count": 1,
+                "note": "hello"
+            }
+        }
+    ]
+}

@@ -244,7 +244,11 @@ export default class Select {
   }
 
   onOptionClick(ev: Event) {
-    const el = ev?.currentTarget as HTMLElement | null;
+    const t = ev?.target as Element | null;
+    const el =
+      (t && typeof (t as HTMLElement).closest === 'function'
+        ? ((t as HTMLElement).closest('[data-vmz-option]') as HTMLElement | null)
+        : null) || (ev?.currentTarget as HTMLElement | null);
     const id = el && typeof el.getAttribute === 'function' ? el.getAttribute('data-vmz-option') : null;
     if (id) this.choose(id);
   }

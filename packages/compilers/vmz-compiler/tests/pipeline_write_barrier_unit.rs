@@ -83,7 +83,12 @@ export default class Demo {
 "#;
     let out = rewrite_static_path_writes(src, &owned(&["tags"]));
     assert_eq!(out.rewritten, 1);
-    assert!(out.source.contains("__vmzWritePath(this, \"tags\", [\"0\", \"label\"]"));
+    assert!(
+        out.source.contains("__vmzWritePathItem(this, \"tags\", 0, \"label\"")
+            || out.source.contains("__vmzWritePath(this, \"tags\", [\"0\", \"label\"]"),
+        "{}",
+        out.source
+    );
 }
 
 #[test]
@@ -99,8 +104,12 @@ export default class Demo {
 "#;
     let out = rewrite_static_path_writes(src, &owned(&["tags", "selected"]));
     assert_eq!(out.rewritten, 1);
-    assert!(out.source.contains("String(this.selected)"));
-    assert!(out.source.contains("__vmzWritePath(this, \"tags\""));
+    assert!(
+        out.source.contains("__vmzWritePathItem(this, \"tags\", this.selected, \"label\"")
+            || out.source.contains("__vmzWritePath(this, \"tags\""),
+        "{}",
+        out.source
+    );
     assert!(!out.source.contains("this.tags[this.selected].label ="));
 }
 
@@ -116,8 +125,11 @@ export default class Demo {
 "#;
     let out = rewrite_static_path_writes(src, &owned(&["tags"]));
     assert_eq!(out.rewritten, 1);
-    assert!(out.source.contains("String(i)"));
-    assert!(out.source.contains("\"label\""));
+    assert!(
+        out.source.contains("__vmzWritePathItem(this, \"tags\", i, \"label\""),
+        "{}",
+        out.source
+    );
 }
 
 #[test]
@@ -132,9 +144,12 @@ export default class Demo {
 "#;
     let out = rewrite_static_path_writes(src, &owned(&["user"]));
     assert_eq!(out.rewritten, 1);
-    assert!(out.source.contains("__vmzReadPath(this, \"user\", [\"count\"])"));
-    assert!(out.source.contains("+ 1"));
+    assert!(
+        out.source.contains("__vmzWritePathCompound(this, \"user\", [\"count\"], \"+\", 1)")
+            || out.source.contains("__vmzWritePathCompoundItem")
+    );
     assert!(!out.source.contains("this.user.count +="));
+    assert!(!out.source.contains("__vmzReadPath"));
 }
 
 #[test]
@@ -149,8 +164,9 @@ export default class Demo {
 "#;
     let out = rewrite_static_path_writes(src, &owned(&["user"]));
     assert_eq!(out.rewritten, 1);
-    assert!(out.source.contains("__vmzReadPath(this, \"user\", [\"count\"]) + 1"));
+    assert!(out.source.contains("__vmzWritePathCompound(this, \"user\", [\"count\"], \"+\", 1)"));
     assert!(!out.source.contains("this.user.count++"));
+    assert!(!out.source.contains("__vmzReadPath"));
 }
 
 #[test]
@@ -182,4 +198,86 @@ export default class Demo {
     let out = rewrite_static_path_writes(src, &owned(&["user"]));
     assert_eq!(out.rewritten, 1);
     assert!(out.source.contains("__vmzWritePathLogical(this, \"user\", [\"name\"], \"??\""));
+}
+
+#[test]
+fn rewrites_jfb_swap_rows_to_list_transpose() {
+    let src = r#"
+export default class Demo {
+  rows = [];
+  swapRows() {
+    const rows = this.rows.slice();
+    if (rows.length > 998) {
+      const tmp = rows[1];
+      rows[1] = rows[998];
+      rows[998] = tmp;
+      this.rows = rows;
+    }
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["rows"]));
+    assert!(out.rewritten >= 1, "expected transpose rewrite, got {}", out.rewritten);
+    assert!(
+        out.source.contains("__vmzListTranspose(this, \"rows\", 1, 998)"),
+        "emit:\n{}",
+        out.source
+    );
+    assert!(!out.source.contains(".slice()"));
+    assert!(!out.source.contains("this.rows = rows"));
+}
+
+#[test]
+fn rewrites_alias_compound_array_item() {
+    let src = r#"
+export default class Demo {
+  rows = [{ id: 1, label: "a" }];
+  update() {
+    const rows = this.rows;
+    for (let i = 0; i < rows.length; i += 10) {
+      rows[i].label += " !!!";
+    }
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["rows"]));
+    assert!(out.rewritten >= 1, "expected stride rewrite, got {}", out.rewritten);
+    assert!(
+        out.source.contains(
+            "__vmzArrayItemCompoundStride(this, \"rows\", \"label\", \"+\", \" !!!\", 0, 10)"
+        ),
+        "emit:\n{}",
+        out.source
+    );
+    assert!(!out.source.contains("__vmzReadPath"));
+    assert!(!out.source.contains("rows[i].label +="));
+    assert!(!out.source.contains("for ("));
+    assert!(
+        !out.source.contains("const rows = this.rows"),
+        "dead alias should be absorbed:\n{}",
+        out.source
+    );
+}
+
+#[test]
+fn rewrites_single_alias_compound_item() {
+    let src = r#"
+export default class Demo {
+  rows = [{ id: 1, label: "a" }];
+  bump(i: number) {
+    const rows = this.rows;
+    rows[i].label += " !!!";
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["rows"]));
+    assert!(out.rewritten >= 1, "expected compound item rewrite, got {}", out.rewritten);
+    assert!(
+        out.source
+            .contains("__vmzWritePathCompoundItem(this, \"rows\", i, \"label\", \"+\", \" !!!\")"),
+        "emit:\n{}",
+        out.source
+    );
+    assert!(!out.source.contains("__vmzReadPath"));
+    assert!(!out.source.contains("rows[i].label +="));
 }

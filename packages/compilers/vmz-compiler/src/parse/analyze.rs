@@ -1,4 +1,4 @@
-//! Analyze `<script client|server>` with oxc: default export class ?fields + methods.
+//! Analyze `<script client|server>` with oxc: default-export class, fields, and methods.
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
@@ -16,15 +16,20 @@ use vmz_types::{
 use crate::field_rw::{FieldRw, ForbiddenFactory};
 use crate::sfc::ScriptKind;
 
+/// Oxc analysis result for one client or server script body.
 #[derive(Debug, Clone)]
 pub struct AnalyzedScript {
+    /// Whether this body was analyzed as client or server.
     pub kind: ScriptKind,
+    /// Default-exported component declaration (Anonymous when missing).
     pub decl: ComponentDecl,
+    /// Oxc parse diagnostics as plain strings.
     pub parse_errors: Vec<String>,
     /// `useX` / `createX` calls found in this script (oxc).
     pub forbidden_factories: Vec<ForbiddenFactory>,
 }
 
+/// Parse `source` as TypeScript and lower the default-export class into [`ComponentDecl`].
 pub fn analyze_script(kind: ScriptKind, source: &str) -> AnalyzedScript {
     let allocator = Allocator::default();
     let source_type = SourceType::ts();
@@ -209,7 +214,7 @@ fn fill_members(
         }
         m.calls = known;
     }
-    // Compose callee reads/writes into callers (transitive; opaque ?field.* widen).
+    // Compose callee reads/writes into callers (transitive; opaque widens to field.*).
     crate::method_compose::compose_cross_method_rw(&mut decl.methods, &field_names);
 
     forbidden

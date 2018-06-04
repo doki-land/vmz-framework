@@ -4,9 +4,7 @@
 //! No isolation-level switch (shared/sandboxed/external) — one strong contract.
 
 use std::collections::{HashMap, HashSet};
-use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use vmz_protocol::{
     APPLICATION_ISOLATION_CHECK_SCHEMA, APPLICATION_ISOLATION_SCHEMA, ApplicationArtifact,
@@ -21,7 +19,10 @@ use crate::application_artifact::check_application_artifact_boundary;
 const ISOLATION_SURFACES: &[&str] =
     &["runtime", "style", "state", "server", "session", "storage", "trace", "failure"];
 
-// Prove absolute isolation for host + mounted children .
+/// Check isolation namespaces and failure containment for host + mounted children.
+///
+/// Ensures runtime/style/state/server/session/storage/trace prefixes are unique
+/// and that failure containment keeps one application's fault from taking over another.
 pub fn check_application_isolation(
     host_root: impl AsRef<Path>,
     package_roots: &[PathBuf],
@@ -54,13 +55,11 @@ fn build_namespaces(
     for a in artifacts {
         let id = a.application_id.as_str();
         if id.is_empty() || id == "unknown" {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_ISOLATION_UNPROVEN.into(),
-                severity: "error".into(),
-                path: a.package_root.clone().unwrap_or_default(),
-                message: "isolation requires an explicit ApplicationId".into(),
-                span: None,
-            });
+            diagnostics.push(ApplicationDiagnostic::coded_error(
+                a.package_root.clone().unwrap_or_default(),
+                "isolation requires an explicit ApplicationId",
+                DIAG_ISOLATION_UNPROVEN,
+            ));
             continue;
         }
         out.push(ApplicationIsolationNamespace {
@@ -100,15 +99,9 @@ fn validate_namespace_uniqueness(
             let map = buckets.entry(surface).or_default();
             if let Some(prev) = map.insert(value, id) {
                 if prev != id {
-                    diagnostics.push(ApplicationDiagnostic {
-                        code: DIAG_ISOLATION_UNPROVEN.into(),
-                        severity: "error".into(),
-                        path: id.into(),
-                        message: format!(
+                    diagnostics.push(ApplicationDiagnostic::coded_error(id, format!(
                             "{surface} namespace `{value}` shared by `{prev}` and `{id}` (runtime semantics must not be shared)"
-                        ),
-                        span: None,
-                    });
+                        ), DIAG_ISOLATION_UNPROVEN));
                 }
             }
         }
@@ -135,15 +128,9 @@ fn validate_namespace_prefixes(
             let ok =
                 if surface == "runtime" { value.starts_with(&prefix) } else { value == prefix };
             if !ok {
-                diagnostics.push(ApplicationDiagnostic {
-                    code: DIAG_ISOLATION_UNPROVEN.into(),
-                    severity: "error".into(),
-                    path: id.into(),
-                    message: format!(
+                diagnostics.push(ApplicationDiagnostic::coded_error(id, format!(
                         "{surface} namespace `{value}` is not ApplicationId-scoped (want `{prefix}`)"
-                    ),
-                    span: None,
-                });
+                    ), DIAG_ISOLATION_UNPROVEN));
             }
         }
     }
@@ -159,13 +146,11 @@ fn validate_no_cross_executable(
         let id = a.application_id.as_str();
         if let Some(prev) = by_exec.insert(exec, id) {
             if prev != id {
-                diagnostics.push(ApplicationDiagnostic {
-                    code: DIAG_CROSS_RUNTIME_REFERENCE.into(),
-                    severity: "error".into(),
-                    path: a.package_root.clone().unwrap_or_default(),
-                    message: format!("executable `{exec}` appears in both `{prev}` and `{id}`"),
-                    span: None,
-                });
+                diagnostics.push(ApplicationDiagnostic::coded_error(
+                    a.package_root.clone().unwrap_or_default(),
+                    format!("executable `{exec}` appears in both `{prev}` and `{id}`"),
+                    DIAG_CROSS_RUNTIME_REFERENCE,
+                ));
             }
         }
     }
@@ -188,14 +173,11 @@ fn build_failure_containment(
         artifacts.iter().filter(|a| mount_by_id.contains_key(a.application_id.as_str())).collect();
 
     if mounted.is_empty() && !mount_table.mounts.is_empty() {
-        diagnostics.push(ApplicationDiagnostic {
-            code: DIAG_FAILURE_CONTAINMENT.into(),
-            severity: "error".into(),
-            path: "ApplicationMountTable".into(),
-            message: "mounts present but no matching ApplicationArtifacts for failure containment"
-                .into(),
-            span: None,
-        });
+        diagnostics.push(ApplicationDiagnostic::coded_error(
+            "ApplicationMountTable",
+            "mounts present but no matching ApplicationArtifacts for failure containment",
+            DIAG_FAILURE_CONTAINMENT,
+        ));
     }
 
     for a in &mounted {
@@ -227,47 +209,37 @@ fn validate_failure_containment(
     for p in proofs {
         let failed = p.failed_application_id.as_str();
         if !p.host_survives {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_FAILURE_CONTAINMENT.into(),
-                severity: "error".into(),
-                path: failed.into(),
-                message: format!("host must survive failure of `{failed}`"),
-                span: None,
-            });
+            diagnostics.push(ApplicationDiagnostic::coded_error(
+                failed,
+                format!("host must survive failure of `{failed}`"),
+                DIAG_FAILURE_CONTAINMENT,
+            ));
         }
         if p.unavailable.status != 503 || p.unavailable.reason != "application_unavailable" {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_FAILURE_CONTAINMENT.into(),
-                severity: "error".into(),
-                path: failed.into(),
-                message:
-                    "failed mount must return structured unavailable (503 application_unavailable)"
-                        .into(),
-                span: None,
-            });
+            diagnostics.push(ApplicationDiagnostic::coded_error(
+                failed,
+                "failed mount must return structured unavailable (503 application_unavailable)",
+                DIAG_FAILURE_CONTAINMENT,
+            ));
         }
         let sibling_set: HashSet<&str> = p.siblings_survive.iter().map(|id| id.as_str()).collect();
         if sibling_set.contains(failed) {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_FAILURE_CONTAINMENT.into(),
-                severity: "error".into(),
-                path: failed.into(),
-                message: "failed application listed as surviving sibling".into(),
-                span: None,
-            });
+            diagnostics.push(ApplicationDiagnostic::coded_error(
+                failed,
+                "failed application listed as surviving sibling",
+                DIAG_FAILURE_CONTAINMENT,
+            ));
         }
         for id in &all {
             if *id == failed {
                 continue;
             }
             if !sibling_set.contains(id) {
-                diagnostics.push(ApplicationDiagnostic {
-                    code: DIAG_FAILURE_CONTAINMENT.into(),
-                    severity: "error".into(),
-                    path: failed.into(),
-                    message: format!("sibling `{id}` must survive failure of `{failed}`"),
-                    span: None,
-                });
+                diagnostics.push(ApplicationDiagnostic::coded_error(
+                    failed,
+                    format!("sibling `{id}` must survive failure of `{failed}`"),
+                    DIAG_FAILURE_CONTAINMENT,
+                ));
             }
         }
     }

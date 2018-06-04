@@ -20,9 +20,13 @@ pub struct PipelineOptions {
 /// Full experimental result: collection + designs + engine module/CSS + oxc diagnostics.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PipelineResult {
+    /// Static TW sites collected from the `.vmz` source.
     pub collection: TwCollection,
+    /// Designs directory scan used for ThemeInput.
     pub designs: DesignsStub,
+    /// Number of theme entries fed into the engine.
     pub theme_entry_count: usize,
+    /// Engine compile response + reference CSS.
     pub lowering: EngineLowering,
     /// Collect advice/errors + mapped engine diagnostics (oxc).
     #[serde(skip)]

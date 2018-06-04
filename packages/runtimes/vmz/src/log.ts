@@ -21,12 +21,20 @@ export const log = {
     error(...args) {
         console.error(stamp('error'), ...args);
     },
-    /** @param {{ severity: string, path: string, message: string }} d */
+    /** @param {{ severity: string, path?: string, message: string, code?: string }} d */
     diagnostic(d) {
-        console.error(`${d.severity}: ${d.path}: ${d.message}`);
+        const sev = d.severity || 'error';
+        const code = d.code ? `${d.code}: ` : '';
+        const loc = d.path ? ` (${d.path})` : '';
+        // Prefer `vmz warn|error CODE: message (path)` so locale warnings are visible, not silent.
+        if (sev === 'warning') {
+            console.error(`${stamp('warn')} ${code}${d.message}${loc}`);
+            return;
+        }
+        console.error(`${stamp(sev === 'error' ? 'error' : sev)} ${code}${d.path ? `${d.path}: ` : ''}${d.message}`);
     },
     /**
-     * @param {Array<{ severity: string, path: string, message: string }>} diagnostics
+     * @param {Array<{ severity: string, path?: string, message: string, code?: string }>} diagnostics
      * @param {{ denyWarnings?: boolean }} [opts]
      * @returns {number} failing count (errors, and warnings if denyWarnings)
      */

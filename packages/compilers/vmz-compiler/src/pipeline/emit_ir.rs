@@ -11,23 +11,31 @@ use vmz_types::{BindingKind, ControlRegion, ReactiveComponent};
 /// One Reactive binding consumed for emit (id + transitional dep strings).
 #[derive(Debug, Clone)]
 pub struct TakenBinding {
+    /// BindingId numeric value for runtime / blueprint indexing.
     pub id: u32,
+    /// Transitional dep path strings derived from the binding's reads.
     pub deps: Vec<String>,
 }
 
 /// Control-flow slice taken from IR (no oxc re-scan).
 #[derive(Debug, Clone)]
 pub struct TakenControlFlow {
+    /// Owning IfCond (or similar) binding when the slice was taken via a binding.
     pub binding_id: Option<u32>,
+    /// Deps stable across all branches of the region.
     pub stable: Vec<String>,
+    /// Per-branch condition / body dep slices.
     pub branches: Vec<TakenCfBranch>,
 }
 
+/// One branch of a control-flow region (`if` / `else-if` / `else`).
 #[derive(Debug, Clone)]
 pub struct TakenCfBranch {
     /// Condition expression text when present.
     pub cond: Option<String>,
+    /// Deps of the condition expression.
     pub cond_deps: Vec<String>,
+    /// Deps of the branch body.
     pub body_deps: Vec<String>,
 }
 
@@ -39,19 +47,20 @@ pub struct IrDepCursor<'a> {
 }
 
 impl<'a> IrDepCursor<'a> {
+    /// Create a cursor over `comp` with no bindings/regions marked used.
     pub fn new(comp: &'a ReactiveComponent) -> Self {
         Self { comp, used_bindings: HashSet::new(), used_regions: HashSet::new() }
     }
 
     /// Look up a binding's linked control region (Native View / direct emit).
     pub fn binding_region(&self, id: u32) -> Option<vmz_types::RegionId> {
-        self.comp.bindings.iter().find(|b| b.id.0 == id).and_then(|b| b.region)
+        self.comp.bindings.iter().find(|b| b.id().0 == id).and_then(|b| b.region())
     }
 
     /// Dep strings for a known BindingId (no consume).
     pub fn deps_for_binding(&self, id: u32) -> Option<Vec<String>> {
-        let b = self.comp.bindings.iter().find(|b| b.id.0 == id)?;
-        Some(self.comp.transitional_deps(&b.reads))
+        let b = self.comp.bindings.iter().find(|b| b.id().0 == id)?;
+        Some(self.comp.transitional_deps(b.reads()))
     }
 
     /// Control-flow slice for a binding's linked region (no consume). Used by Native View emit.
@@ -70,22 +79,26 @@ impl<'a> IrDepCursor<'a> {
         self.comp.expr_text(cid)
     }
 
+    /// Take the next unused binding matching `kinds` whose expr text equals `expr`.
     pub fn take_binding(&mut self, kinds: &[BindingKind], expr: &str) -> Option<TakenBinding> {
         for b in &self.comp.bindings {
-            if self.used_bindings.contains(&b.id.0) {
+            if self.used_bindings.contains(&b.id().0) {
                 continue;
             }
-            if !kinds.contains(&b.kind) {
+            if !kinds.contains(&b.kind()) {
                 continue;
             }
-            let Some(eid) = b.expr else {
+            let Some(eid) = b.expr() else {
                 continue;
             };
             if self.comp.expr_text(eid)? != expr {
                 continue;
             }
-            self.used_bindings.insert(b.id.0);
-            return Some(TakenBinding { id: b.id.0, deps: self.comp.transitional_deps(&b.reads) });
+            self.used_bindings.insert(b.id().0);
+            return Some(TakenBinding {
+                id: b.id().0,
+                deps: self.comp.transitional_deps(b.reads()),
+            });
         }
         None
     }
@@ -98,8 +111,8 @@ impl<'a> IrDepCursor<'a> {
                 .comp
                 .bindings
                 .iter()
-                .find(|b| b.id.0 == taken.id)
-                .and_then(|b| b.region)
+                .find(|b| b.id().0 == taken.id)
+                .and_then(|b| b.region())
                 .and_then(|rid| self.comp.control_regions.iter().find(|r| r.id == rid));
             if let Some(r) = region {
                 self.used_regions.insert(r.id.0);
@@ -138,8 +151,8 @@ impl<'a> IrDepCursor<'a> {
             .comp
             .bindings
             .iter()
-            .find(|b| b.id.0 == taken.id)
-            .and_then(|b| b.region)
+            .find(|b| b.id().0 == taken.id)
+            .and_then(|b| b.region())
             .and_then(|rid| self.comp.control_regions.iter().find(|r| r.id == rid))?;
         if self.used_regions.contains(&region.id.0) {
             // Region already consumed — still return binding-level CF from reads.
@@ -172,8 +185,8 @@ impl<'a> IrDepCursor<'a> {
                     // Template if: union reads of body bindings.
                     let mut paths = Vec::new();
                     for id in &br.body_bindings {
-                        if let Some(b) = self.comp.bindings.iter().find(|x| x.id == *id) {
-                            for p in &b.reads {
+                        if let Some(b) = self.comp.bindings.iter().find(|x| x.id() == *id) {
+                            for p in b.reads() {
                                 if !paths.iter().any(|x| x == p) {
                                     paths.push(p.clone());
                                 }

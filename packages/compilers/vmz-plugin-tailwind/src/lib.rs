@@ -3,7 +3,7 @@
 //! Compiler-side style plugin (not an ecosystem `@vmz/plugin-*`). Linked into the
 //! single `vmz` binary via [`default_tw_compiler`].
 
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 #![forbid(unsafe_code)]
 
 mod collect;

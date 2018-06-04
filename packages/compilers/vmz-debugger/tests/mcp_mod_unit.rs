@@ -1,6 +1,6 @@
 //! Moved from `src/mcp/mod.rs` (cargo-cry: tests next to Cargo.toml).
 
-use serde_json::json;
+use serde_json::{Map, Value};
 
 use vmz_debugger::mcp::*;
 
@@ -14,6 +14,6 @@ fn lists_debugger_tools() {
 #[test]
 fn call_unknown_is_error() {
     let session = McpSession::new(".", ".");
-    let out = call_tool(&session, "nope", json!({}));
+    let out = call_tool(&session, "nope", Value::Object(Map::new()));
     assert_eq!(out["isError"], true);
 }

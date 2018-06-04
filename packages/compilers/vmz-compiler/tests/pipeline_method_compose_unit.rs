@@ -2,6 +2,7 @@
 
 use oxc_span::Span;
 use vmz_compiler::pipeline::method_compose::*;
+use vmz_types::MethodDecl;
 
 fn method(name: &str, reads: &[&str], writes: &[&str], calls: &[&str]) -> MethodDecl {
     method_opaque(name, reads, writes, calls, false)

@@ -30,31 +30,30 @@ vmz-inspector = { path = "packages/compilers/vmz-inspector" }
 vmz-plugin-tailwind = { path = "packages/compilers/vmz-plugin-tailwind" }
 vmz-plugin-sasso = { path = "packages/compilers/vmz-plugin-sasso" }
 
-oxc = { version = "0.143", features = ["full"] }
-oxc_allocator = "0.143"
-oxc_ast = "0.143"
-oxc_ast_visit = "0.143"
-oxc_codegen = "0.143"
-oxc_diagnostics = "0.143"
-oxc_parser = "0.143"
-oxc_semantic = "0.143"
-oxc_span = "0.143"
-oxc_syntax = "0.143"
-oxc_transformer = "0.143"
+oxc_allocator = "0.144.0"
+oxc_ast = "0.144.0"
+oxc_ast_visit = "0.144.0"
+oxc_codegen = "0.144.0"
+oxc_diagnostics = "0.144.0"
+oxc_parser = "0.144.0"
+oxc_semantic = "0.144.0"
+oxc_span = "0.144.0"
+oxc_syntax = "0.144.0"
+oxc_transformer = "0.144.0"
 
-clap = { version = "4", features = ["derive"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-schemars = { version = "0.8", features = ["derive"] }
+clap = { version = "4.6.6", features = ["derive"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+schemars = { version = "1.2.2", features = ["derive"] }
 
-json5 = "1"
-sha2 = "0.10"
-thiserror = "2"
-walkdir = "2"
+json5 = "1.3.1"
+sha2 = "0.11.0"
+thiserror = "2.0.20"
+walkdir = "2.5.0"
 
-napi = { version = "3", default-features = true, features = ["napi4"] }
-napi-derive = "3"
-sasso = "0.8"
+napi = { version = "3.12.1", default-features = true, features = ["napi4"] }
+napi-derive = "3.6.3"
+sasso = "0.8.1"
 tailwind = { git = "https://github.com/oovm/tailwind-rs.git", branch = "dev" }
 tailwind-css = { git = "https://github.com/oovm/tailwind-rs.git", branch = "dev" }
 

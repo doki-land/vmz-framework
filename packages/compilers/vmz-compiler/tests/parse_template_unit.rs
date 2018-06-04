@@ -42,3 +42,27 @@ fn parses_if_attr() {
         _ => panic!("expected element"),
     }
 }
+
+#[test]
+fn decodes_named_entities_in_text() {
+    let ir = parse_template("<li>CV &gt; 5% &amp; ok</li>");
+    match &ir.roots[0] {
+        TemplateNode::Element { children, .. } => match &children[0] {
+            TemplateNode::Text(t) => assert_eq!(t, "CV > 5% & ok"),
+            other => panic!("expected text, got {other:?}"),
+        },
+        other => panic!("expected element, got {other:?}"),
+    }
+}
+
+#[test]
+fn decodes_numeric_and_attr() {
+    assert_eq!(decode_html_entities("a&#62;b&#x3c;c"), "a>b<c");
+    let ir = parse_template(r#"<a title="A &quot;B&quot;">x</a>"#);
+    match &ir.roots[0] {
+        TemplateNode::Element { attrs, .. } => {
+            assert_eq!(attrs[0].value, AttrValue::Static("A \"B\"".into()));
+        }
+        other => panic!("expected element, got {other:?}"),
+    }
+}

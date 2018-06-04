@@ -4,6 +4,7 @@ use std::process::{Child, Command, Stdio};
 use clap::Args as ClapArgs;
 use vmz_compiler::{Result, ResultExt, bail};
 
+/// Arguments for `vmz serve`.
 #[derive(Debug, ClapArgs)]
 pub struct Args {
     /// Project root (defaults to current directory)
@@ -27,6 +28,7 @@ pub struct Args {
     pub build: bool,
 }
 
+/// Optionally build, then spawn `vmz-serve-host.mjs` and wait for exit.
 pub fn run(args: Args) -> Result<()> {
     let (project, dist) = resolve_dirs(&args.path, &args.out_dir)?;
 

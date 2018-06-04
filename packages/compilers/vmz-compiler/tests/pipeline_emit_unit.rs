@@ -55,9 +55,26 @@ this.user = await UserCardServer.fetchUser();
     assert!(js.contains("__vmzMethodRw"));
     assert!(js.contains("\"onMount\""));
     assert!(js.contains("writes:"));
+    assert!(js.contains("async: true"), "{js}");
     assert!(js.contains("__vmzRunTask"), "{js}");
     assert!(js.contains("vmz:dom"), "{js}");
     assert_eq!(js.matches("export default").count(), 1);
+}
+
+#[test]
+fn preserves_source_constructor_without_injecting_a_duplicate() {
+    let fields =
+        (0..48).map(|index| format!("  field{index} = {index};")).collect::<Vec<_>>().join("\n");
+    let src = format!(
+        "export default class LargeComponent {{\n{fields}\n  constructor() {{ this.field0 = 99; }}\n}}"
+    );
+    let client = analyze_script(ScriptKind::Client, &src);
+    let template = parse_template("<p>{field0}</p>");
+    let js = emit_client_js(&src, &client, &template, None).unwrap();
+
+    assert_eq!(js.matches("constructor(").count(), 1, "{js}");
+    assert!(js.contains("__vmzCtorAppliesProps = false"), "{js}");
+    assert!(js.contains("this.field0 = 99"), "{js}");
 }
 
 #[test]
@@ -77,21 +94,21 @@ fn emit_consumes_shared_reactive_view_deps() {
         .bindings
         .iter()
         .find(|b| {
-            b.reads.iter().any(|r| {
+            b.reads().iter().any(|r| {
                 r.to_stable_string(&comp.state_slots, &comp.properties, &comp.exprs) == "user.name"
             })
         })
-        .map(|b| b.id.0)
+        .map(|b| b.id().0)
         .expect("user.name binding");
     let bio_id = comp
         .bindings
         .iter()
         .find(|b| {
-            b.reads.iter().any(|r| {
+            b.reads().iter().any(|r| {
                 r.to_stable_string(&comp.state_slots, &comp.properties, &comp.exprs) == "user.bio"
             })
         })
-        .map(|b| b.id.0)
+        .map(|b| b.id().0)
         .expect("user.bio binding");
     assert!(
         js.contains(&format!("api.bindText(this, {name_id},")),

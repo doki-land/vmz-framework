@@ -1,0 +1,26 @@
+{
+    "name": "@vmz/ui-data-grid",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "description": "VMZ UI DataGrid — virtualized + pinned-column large table suite. Reuses @vmz/ui tokens/composition; not a second theme or Button/Field shell.",
+    "license": "MIT",
+    "exports": {
+        "./contracts/token-requirements": "./contracts/token-requirements.v0.json",
+        "./DataGrid": "./src/components/DataGrid.vmz"
+    },
+    "files": [
+        "src",
+        "contracts",
+        "README.md"
+    ],
+    "peerDependencies": {
+        "@vmz/ui": "workspace:*"
+    },
+    "keywords": [
+        "vmz",
+        "ui",
+        "data-grid",
+        "virtualization"
+    ]
+}

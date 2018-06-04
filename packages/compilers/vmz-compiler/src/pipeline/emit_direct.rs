@@ -65,18 +65,18 @@ pub fn emit_vmz_plan(name: &str, plan: &vmz_types::ExecutionPlan) -> String {
         if i > 0 {
             nodes.push(',');
         }
-        let binding = n.binding.map(|b| b.to_string()).unwrap_or_else(|| "null".into());
-        let region = n.region.map(|r| r.to_string()).unwrap_or_else(|| "null".into());
-        let tag = match &n.tag {
+        let binding = n.binding().map(|b| b.to_string()).unwrap_or_else(|| "null".into());
+        let region = n.region().map(|r| r.to_string()).unwrap_or_else(|| "null".into());
+        let tag = match n.tag() {
             Some(t) => format!("{:?}", t),
             None => "null".into(),
         };
-        let kids: Vec<String> = n.children.iter().map(|c| c.to_string()).collect();
-        let brs: Vec<String> = n.branches.iter().map(|c| c.to_string()).collect();
+        let kids: Vec<String> = n.children().iter().map(|c| c.to_string()).collect();
+        let brs: Vec<String> = n.branches().iter().map(|c| c.to_string()).collect();
         nodes.push_str(&format!(
             "{{id:{},kind:{:?},binding:{},region:{},tag:{},children:[{}],branches:[{}]}}",
-            n.id,
-            n.kind,
+            n.id(),
+            n.kind().as_str(),
             binding,
             region,
             tag,
@@ -327,14 +327,18 @@ fn emit_plain_element(
             ViewAttrValue::Interp { expr: e } if is_event_attr(&a.name) => {
                 let body = bind_field_idents(e, fields, scope, aliases);
                 let type_name = event_dom_type(&a.name);
-                let bare = body.strip_prefix("this.").unwrap_or(body.as_str());
-                let is_method_ref = !bare.is_empty()
-                    && bare.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
-                    && !bare.contains('(');
-                // Arrow captures `this` from __vmzCreate (same as onClick={() => ...}).
-                // Pass the DOM event through so handlers can read key/button/etc.
-                let handler = if is_method_ref { format!("(ev) => this.{bare}(ev)") } else { body };
-                stmts.push(format!("api.on({el}, {:?}, {handler});", type_name));
+                if let Some(method) = parse_this_method_call_arrow(&body) {
+                    // `() => this.foo()` / `(ev) => this.foo(ev)` → onMethod (no arrow IC).
+                    stmts.push(format!("api.onMethod({el}, {:?}, {:?});", type_name, method));
+                } else {
+                    let bare = body.strip_prefix("this.").unwrap_or(body.as_str());
+                    let is_method_ref = !bare.is_empty()
+                        && bare.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
+                        && !bare.contains('(');
+                    let handler =
+                        if is_method_ref { format!("(ev) => this.{bare}(ev)") } else { body };
+                    stmts.push(format!("api.on({el}, {:?}, {handler});", type_name));
+                }
             }
             ViewAttrValue::Interp { expr: e } if is_html_attr(&a.name) => {
                 emit_bind_html(e, a.binding, &el, fields, scope, aliases, ir, stmts);
@@ -529,20 +533,6 @@ fn emit_each_block(
         String::new()
     };
 
-    let mut item_stmts = Vec::new();
-    let item_root = emit_plain_element(
-        tag,
-        attrs,
-        children,
-        fields,
-        &child_scope,
-        &child_aliases,
-        depth,
-        ir,
-        &mut item_stmts,
-        next_id,
-    );
-
     let key_bound =
         each.key_expr.as_ref().map(|k| bind_field_idents(k, fields, &child_scope, &child_aliases));
     let row_kernel = crate::pipeline::row_kernel::try_emit_row_kernel_js(
@@ -558,13 +548,29 @@ fn emit_each_block(
     )
     .unwrap_or_default();
 
-    // Always emit createItem: SSR serializeApi.eachBlock has no DOM and must call it.
-    // Client eachBlock prefers rowKernel (html clone + hydrate) when present and never
-    // hits this path on the hot create loop.
-    let create_item = format!(
-        "function(api, {box_id}) {{\n{}  return {item_root};\n}}",
-        indent_block(&item_stmts.join("\n"))
-    );
+    // With rowKernel.create the client hot path never calls createItem — omit the fat
+    // Direct body (bindText/on) to shrink client bundles. SSR materializes via rowKernel html.
+    let create_item = if row_kernel.is_empty() {
+        let mut item_stmts = Vec::new();
+        let item_root = emit_plain_element(
+            tag,
+            attrs,
+            children,
+            fields,
+            &child_scope,
+            &child_aliases,
+            depth,
+            ir,
+            &mut item_stmts,
+            next_id,
+        );
+        format!(
+            "function(api, {box_id}) {{\n{}  return {item_root};\n}}",
+            indent_block(&item_stmts.join("\n"))
+        )
+    } else {
+        "null".to_string()
+    };
 
     let v = fresh("k", next_id);
     let region_arg = each.region.map(|r| r.0.to_string()).unwrap_or_else(|| "null".into());
@@ -648,4 +654,44 @@ fn bind_payload(
     }
     let (id, deps) = binding_deps(ir, binding, expr, fields, scope);
     (id, deps, None)
+}
+
+/// `() => this.foo()` / `(ev) => this.foo()` / `(ev) => this.foo(ev)` → `Some("foo")`.
+fn parse_this_method_call_arrow(body: &str) -> Option<String> {
+    let b = body.trim();
+    // Strip optional arrow params: () => | (ev) => | (_event) =>
+    let after_arrow = if let Some(rest) = b.strip_prefix("()") {
+        rest
+    } else if let Some(i) = b.find("=>") {
+        // (ev) => ...
+        if b.as_bytes().first() == Some(&b'(') {
+            &b[i..]
+        } else {
+            return None;
+        }
+    } else {
+        return None;
+    };
+    let after_arrow = after_arrow.trim().strip_prefix("=>")?.trim();
+    // this.foo() or this.foo(ev) or this.foo(ev, …) — single call expression
+    let rest = after_arrow.strip_prefix("this.")?;
+    let (name, after_name) = rest.split_once('(')?;
+    if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$') {
+        return None;
+    }
+    // Must be a call that closes; allow optional single arg (the event).
+    let after_name = after_name.trim();
+    let close = after_name.find(')')?;
+    let args = after_name[..close].trim();
+    let trail = after_name[close + 1..].trim();
+    if !trail.is_empty() && trail != ";" {
+        return None;
+    }
+    if !args.is_empty() {
+        // Only allow a simple identifier arg (ev).
+        if !args.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$') {
+            return None;
+        }
+    }
+    Some(name.to_string())
 }

@@ -40,7 +40,7 @@ export async function importMaybeTs(full) {
  * @returns {Promise<{
  *   plugins: import('@vmz/plugin').VmzPlugin[],
  *   engines: import('@vmz/plugin').VmzEngines,
- *   delivery: import('@vmz/plugin').SiteDeliveryAuthoring | null,
+ *   delivery: import('@vmz/plugin').DeliveryAuthoring | null,
  *   application: { id?: string } | null,
  *   path: string | null,
  *   pluginPath: string | null,
@@ -51,7 +51,7 @@ export async function loadVmzConfig(project) {
     const plugins = [];
     /** @type {import('@vmz/plugin').VmzEngines} */
     let engines = {};
-    /** @type {import('@vmz/plugin').SiteDeliveryAuthoring | null} */
+    /** @type {import('@vmz/plugin').DeliveryAuthoring | null} */
     let delivery = null;
     /** @type {{ id?: string } | null} */
     let application = null;

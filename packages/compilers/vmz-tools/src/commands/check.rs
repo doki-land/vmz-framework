@@ -4,12 +4,15 @@ use vmz_inspector::{InspectOptions, InspectProfile, failed, inspect_path};
 
 use crate::cli::PathArgs;
 
+/// Arguments for `vmz check`.
 #[derive(Debug, ClapArgs)]
 pub struct Args {
+    /// Files or project roots to validate.
     #[command(flatten)]
     pub paths: PathArgs,
 }
 
+/// Run hard inspect (check profile) on each path; fail if any report fails.
 pub fn run(args: Args) -> Result<()> {
     let mut failed_any = false;
     let options = InspectOptions { profile: InspectProfile::Check, deny_warnings: false };

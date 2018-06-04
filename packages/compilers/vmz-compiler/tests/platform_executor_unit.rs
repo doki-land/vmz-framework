@@ -23,7 +23,7 @@ fn tmp(prefix: &str) -> std::path::PathBuf {
 fn mixed_camera_t42_ready() {
     let dir = tmp("vmz-p2-");
     let report = check_unified_executor(&dir);
-    assert_eq!(report.status, "ready");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Ready);
     assert_eq!(report.scenario.patch_batches.len(), 3);
     assert_eq!(report.scenario.transaction.as_ref().unwrap().transaction_id, "T42");
     let surfaces: Vec<_> =
@@ -44,9 +44,12 @@ fn rejects_missing_envelope_ids() {
     fs::write(dir.join("executor-scenario.json"), serde_json::to_string_pretty(&sc).unwrap())
         .unwrap();
     let report = check_unified_executor(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
-        report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_MISSING_ENVELOPE_IDS))
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_MISSING_ENVELOPE_IDS))
     );
     let _ = fs::remove_dir_all(&dir);
 }
@@ -62,8 +65,13 @@ fn rejects_stale_generation_patches() {
     fs::write(dir.join("executor-scenario.json"), serde_json::to_string_pretty(&sc).unwrap())
         .unwrap();
     let report = check_unified_executor(&dir);
-    assert_eq!(report.status, "failed");
-    assert!(report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_STALE_GENERATION)));
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_STALE_GENERATION))
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -75,8 +83,13 @@ fn rejects_surface_owns_state() {
     fs::write(dir.join("executor-scenario.json"), serde_json::to_string_pretty(&sc).unwrap())
         .unwrap();
     let report = check_unified_executor(&dir);
-    assert_eq!(report.status, "failed");
-    assert!(report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_SURFACE_OWNS_STATE)));
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_SURFACE_OWNS_STATE))
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -88,9 +101,12 @@ fn rejects_private_object_crossing() {
     fs::write(dir.join("executor-scenario.json"), serde_json::to_string_pretty(&sc).unwrap())
         .unwrap();
     let report = check_unified_executor(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
-        report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_PRIVATE_OBJECT_CROSSING))
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_PRIVATE_OBJECT_CROSSING))
     );
     let _ = fs::remove_dir_all(&dir);
 }
@@ -103,8 +119,13 @@ fn rejects_split_transaction() {
     fs::write(dir.join("executor-scenario.json"), serde_json::to_string_pretty(&sc).unwrap())
         .unwrap();
     let report = check_unified_executor(&dir);
-    assert_eq!(report.status, "failed");
-    assert!(report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_SPLIT_TRANSACTION)));
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_SPLIT_TRANSACTION))
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -117,12 +138,12 @@ fn rejects_dispose_not_authoritative() {
     fs::write(dir.join("executor-scenario.json"), serde_json::to_string_pretty(&sc).unwrap())
         .unwrap();
     let report = check_unified_executor(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
         report
             .diagnostics
             .iter()
-            .any(|d| d.code.as_deref() == Some(DIAG_DISPOSE_NOT_AUTHORITATIVE))
+            .any(|d| d.code_string().as_deref() == Some(DIAG_DISPOSE_NOT_AUTHORITATIVE))
     );
     let _ = fs::remove_dir_all(&dir);
 }
@@ -148,9 +169,12 @@ fn rejects_cancel_not_propagated() {
     fs::write(dir.join("executor-scenario.json"), serde_json::to_string_pretty(&sc).unwrap())
         .unwrap();
     let report = check_unified_executor(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
-        report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_CANCEL_NOT_PROPAGATED))
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_CANCEL_NOT_PROPAGATED))
     );
     let _ = fs::remove_dir_all(&dir);
     let _ = (

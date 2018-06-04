@@ -4,7 +4,11 @@
 //! application identity, and security/version fields.
 //! WebView reuses Browser lowering - no new View IR / no arbitrary JS bridge.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use crate::check_status::CheckReportStatus;
+use crate::reported_diagnostic::ReportedDiagnostic;
 
 /// Umbrella native-host protocol id for handshake / catalog.
 pub const NATIVE_HOST_PROTOCOL: &str = "vmz.native_host.protocol.v0";
@@ -87,7 +91,372 @@ pub const DIAG_SURFACE_IS_CAPABILITY: &str = "vmz::native_host::surface_is_capab
 pub const DIAG_SURFACE_IS_SEMANTIC_TRUTH: &str = "vmz::native_host::surface_is_semantic_truth";
 
 /// First high-value NativeSurface kind names (`camera` / `map` / `video`).
-pub const HIGH_VALUE_SURFACE_KINDS: &[&str] = &["camera", "map", "video"];
+///
+/// Mirrors [`NativeSurfaceKind::ALL`] wire labels for catalog handshake.
+pub const HIGH_VALUE_SURFACE_KINDS: &[&str] = &[
+    NativeSurfaceKind::Camera.as_str(),
+    NativeSurfaceKind::Map.as_str(),
+    NativeSurfaceKind::Video.as_str(),
+];
+
+/// Closed high-value NativeSurface kind.
+///
+/// **Closed** unit enum. Catalog handshake still mirrors labels via
+/// [`HIGH_VALUE_SURFACE_KINDS`]; wire payloads use this type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum NativeSurfaceKind {
+    /// Camera preview / capture surface.
+    Camera,
+    /// Map surface.
+    Map,
+    /// Video surface.
+    Video,
+}
+
+impl NativeSurfaceKind {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[Self::Camera, Self::Map, Self::Video];
+
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Camera => "camera",
+            Self::Map => "map",
+            Self::Video => "video",
+        }
+    }
+}
+
+impl std::fmt::Display for NativeSurfaceKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// WebView / shell asset delivery mode.
+///
+/// **Closed** unit enum (`local` | `hybrid` | `remote`). Remote must not be a
+/// silent default for production shells.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum AssetMode {
+    /// Assets bundled with the host package.
+    Local,
+    /// Mix of bundled + remote assets.
+    Hybrid,
+    /// Assets loaded remotely (requires integrity).
+    Remote,
+}
+
+impl AssetMode {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[Self::Local, Self::Hybrid, Self::Remote];
+
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Local => "local",
+            Self::Hybrid => "hybrid",
+            Self::Remote => "remote",
+        }
+    }
+}
+
+impl std::fmt::Display for AssetMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed capability class for NativeCapability / stub catalog rows.
+///
+/// **Closed** unit enum. Wire labels stay **PascalCase** (frozen catalog
+/// exception; not kebab-case): `PureWeb` | `NativeBacked` | `NativeSurface` |
+/// `ServerBacked` | `Unsupported`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "PascalCase")]
+pub enum CapabilityClass {
+    /// Pure Web / Browser capability (no native host call).
+    PureWeb,
+    /// Native-backed host capability (typed bridge).
+    NativeBacked,
+    /// NativeSurface preview / embed (not a capture capability).
+    NativeSurface,
+    /// Server-backed capability (`#server` / remote).
+    ServerBacked,
+    /// Explicitly unsupported on this profile.
+    Unsupported,
+}
+
+impl CapabilityClass {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[
+        Self::PureWeb,
+        Self::NativeBacked,
+        Self::NativeSurface,
+        Self::ServerBacked,
+        Self::Unsupported,
+    ];
+
+    /// Wire / JSON label (`PascalCase`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::PureWeb => "PureWeb",
+            Self::NativeBacked => "NativeBacked",
+            Self::NativeSurface => "NativeSurface",
+            Self::ServerBacked => "ServerBacked",
+            Self::Unsupported => "Unsupported",
+        }
+    }
+}
+
+impl std::fmt::Display for CapabilityClass {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed bridge protocol mode.
+///
+/// **Closed** unit enum (`kebab-case`). Only typed capability calls are legal;
+/// arbitrary object / eval bridges are rejected elsewhere.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum BridgeMode {
+    /// Typed capability allowlist calls only.
+    TypedCapability,
+}
+
+impl BridgeMode {
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::TypedCapability => "typed-capability",
+        }
+    }
+}
+
+impl std::fmt::Display for BridgeMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Required WebView shell host hooks.
+///
+/// **Closed** unit enum. Wire uses **camelCase** so `DeepLink` stays `deepLink`
+/// (frozen shell catalog exception).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum ShellHook {
+    /// Shell finished loading the WebSurface.
+    Load,
+    /// Shell reported a load / runtime error.
+    Error,
+    /// Shell / process exit.
+    Exit,
+    /// Deep-link / universal-link delivery.
+    DeepLink,
+    /// Host log sink.
+    Log,
+}
+
+impl ShellHook {
+    /// All closed variants in required-hook order.
+    pub const ALL: &[Self] = &[Self::Load, Self::Error, Self::Exit, Self::DeepLink, Self::Log];
+
+    /// Wire / JSON label (`camelCase`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Load => "load",
+            Self::Error => "error",
+            Self::Exit => "exit",
+            Self::DeepLink => "deepLink",
+            Self::Log => "log",
+        }
+    }
+}
+
+impl std::fmt::Display for ShellHook {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Shell log level for [`ShellLoggingPolicy`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ShellLogLevel {
+    /// Debug verbosity.
+    Debug,
+    /// Informational (default for algebraic shells).
+    Info,
+    /// Warnings.
+    Warn,
+    /// Errors only.
+    Error,
+}
+
+impl ShellLogLevel {
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Debug => "debug",
+            Self::Info => "info",
+            Self::Warn => "warn",
+            Self::Error => "error",
+        }
+    }
+}
+
+impl std::fmt::Display for ShellLogLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Bundled / remote / hybrid content delivery mode (SSR + delivery profiles).
+///
+/// **Closed** unit enum (`kebab-case`). Distinct from [`AssetMode`] (`local` |
+/// `hybrid` | `remote`) which names WebView shell packaging, not SSR/CDN.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ContentDeliveryMode {
+    /// Content shipped inside the host / package.
+    Bundled,
+    /// Content fetched remotely (requires integrity).
+    Remote,
+    /// Mix of bundled + remote.
+    Hybrid,
+}
+
+impl ContentDeliveryMode {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[Self::Bundled, Self::Remote, Self::Hybrid];
+
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Bundled => "bundled",
+            Self::Remote => "remote",
+            Self::Hybrid => "hybrid",
+        }
+    }
+}
+
+impl Default for ContentDeliveryMode {
+    fn default() -> Self {
+        Self::Bundled
+    }
+}
+
+impl std::fmt::Display for ContentDeliveryMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Crash/restore persistence mode (never implicit JS heap).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum PersistenceMode {
+    /// Persist via typed native capabilities.
+    CapabilityBacked,
+    /// Persist via a bundled snapshot blob.
+    BundledSnapshot,
+}
+
+impl PersistenceMode {
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::CapabilityBacked => "capability-backed",
+            Self::BundledSnapshot => "bundled-snapshot",
+        }
+    }
+}
+
+impl std::fmt::Display for PersistenceMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Offline resource policy mode for local/hybrid hosts.
+///
+/// **Closed** — `none` is not a legal variant (production hosts must stay
+/// offline-capable).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum OfflineMode {
+    /// Serve only from the local bundle.
+    BundledOnly,
+    /// Bundle plus a hybrid cache.
+    HybridCache,
+}
+
+impl OfflineMode {
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::BundledOnly => "bundled-only",
+            Self::HybridCache => "hybrid-cache",
+        }
+    }
+}
+
+impl std::fmt::Display for OfflineMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Auth / session mode for NativeAppHost WebView isolation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub enum AuthSessionMode {
+    /// Cookie + token session pair (frozen wire label `cookie+token`).
+    #[serde(rename = "cookie+token")]
+    CookieToken,
+}
+
+impl AuthSessionMode {
+    /// Wire / JSON label.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::CookieToken => "cookie+token",
+        }
+    }
+}
+
+impl std::fmt::Display for AuthSessionMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Network policy mode for NativeAppHost.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum NetworkMode {
+    /// HTTPS only (cleartext must stay disabled).
+    HttpsOnly,
+}
+
+impl NetworkMode {
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::HttpsOnly => "https-only",
+        }
+    }
+}
+
+impl std::fmt::Display for NetworkMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
 
 /// Schema id for multi-platform Host Profile freeze (shared schemas across adapters).
 pub const MULTI_PLATFORM_SCHEMA: &str = "vmz.native_host.multi_platform.v0";
@@ -108,10 +477,67 @@ pub const DIAG_PLATFORM_PRIVATE_SCHEMA: &str = "vmz::native_host::platform_priva
 pub const DIAG_ADAPTER_IS_SEMANTIC_CORE: &str = "vmz::native_host::adapter_is_semantic_core";
 
 /// Platforms that must share one bridge / surface / deployment / test contract.
-pub const REQUIRED_MULTI_PLATFORMS: &[&str] = &["ios", "android"];
+///
+/// Mirrors [`NativePlatformId::ALL`] wire labels.
+pub const REQUIRED_MULTI_PLATFORMS: &[&str] =
+    &[NativePlatformId::Ios.as_str(), NativePlatformId::Android.as_str()];
+
+/// Closed packaging-adapter kind for multi-platform freeze.
+///
+/// **Closed** unit enum (`kebab-case`). Wire is `packaging-stub`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum MultiPlatformAdapterKind {
+    /// Packaging stub only — not a second semantic core.
+    PackagingStub,
+}
+
+impl MultiPlatformAdapterKind {
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::PackagingStub => "packaging-stub",
+        }
+    }
+}
+
+impl std::fmt::Display for MultiPlatformAdapterKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
 
 /// Adapter `kind` value for packaging stubs (not real Xcode/Gradle projects).
-pub const MULTI_PLATFORM_ADAPTER_KIND: &str = "packaging_stub";
+pub const MULTI_PLATFORM_ADAPTER_KIND: &str = MultiPlatformAdapterKind::PackagingStub.as_str();
+
+/// Closed native platform id for shell / multi-platform adapters (`ios` | `android`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum NativePlatformId {
+    /// Apple iOS packaging surface.
+    Ios,
+    /// Google Android packaging surface.
+    Android,
+}
+
+impl NativePlatformId {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[Self::Ios, Self::Android];
+
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Ios => "ios",
+            Self::Android => "android",
+        }
+    }
+}
+
+impl std::fmt::Display for NativePlatformId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
 
 /// Hard: full-stack profile omits SSR first-paint policy.
 pub const DIAG_MISSING_SSR_FIRST_PAINT: &str = "vmz::native_host::missing_ssr_first_paint";
@@ -143,17 +569,82 @@ pub const DIAG_MISSING_UPDATE_POLICY: &str = "vmz::native_host::missing_update_p
 pub const DIAG_MISSING_OFFLINE_POLICY: &str = "vmz::native_host::missing_offline_policy";
 
 /// Required NativeAppHost lifecycle event names (launch through destroy).
+///
+/// Mirrors [`NativeLifecycleEvent::ALL`] wire labels for catalog handshake.
 pub const REQUIRED_LIFECYCLE_EVENTS: &[&str] = &[
-    "launch",
-    "create",
-    "load",
-    "ready",
-    "background",
-    "foreground",
-    "crash",
-    "restore",
-    "destroy",
+    NativeLifecycleEvent::Launch.as_str(),
+    NativeLifecycleEvent::Create.as_str(),
+    NativeLifecycleEvent::Load.as_str(),
+    NativeLifecycleEvent::Ready.as_str(),
+    NativeLifecycleEvent::Background.as_str(),
+    NativeLifecycleEvent::Foreground.as_str(),
+    NativeLifecycleEvent::Crash.as_str(),
+    NativeLifecycleEvent::Restore.as_str(),
+    NativeLifecycleEvent::Destroy.as_str(),
 ];
+
+/// Closed NativeAppHost lifecycle event vocabulary.
+///
+/// **Closed** unit enum (`kebab-case`). Distinct from profile
+/// [`crate::profile::UnifiedLifecycleEvent`] (activate/visible/...).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum NativeLifecycleEvent {
+    /// Process / shell launch.
+    Launch,
+    /// Host create.
+    Create,
+    /// WebSurface load start.
+    Load,
+    /// First interactive ready.
+    Ready,
+    /// Enter background (must not equal destroy).
+    Background,
+    /// Return to foreground.
+    Foreground,
+    /// Crash observed.
+    Crash,
+    /// Restore after crash.
+    Restore,
+    /// Final destroy / teardown.
+    Destroy,
+}
+
+impl NativeLifecycleEvent {
+    /// All closed variants in required-event order.
+    pub const ALL: &[Self] = &[
+        Self::Launch,
+        Self::Create,
+        Self::Load,
+        Self::Ready,
+        Self::Background,
+        Self::Foreground,
+        Self::Crash,
+        Self::Restore,
+        Self::Destroy,
+    ];
+
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Launch => "launch",
+            Self::Create => "create",
+            Self::Load => "load",
+            Self::Ready => "ready",
+            Self::Background => "background",
+            Self::Foreground => "foreground",
+            Self::Crash => "crash",
+            Self::Restore => "restore",
+            Self::Destroy => "destroy",
+        }
+    }
+}
+
+impl std::fmt::Display for NativeLifecycleEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
 
 /// Hard: capability call envelope is missing a nonce.
 pub const DIAG_MISSING_NONCE: &str = "vmz::native_host::missing_nonce";
@@ -190,10 +681,118 @@ pub const DIAG_MISSING_DEEP_LINK: &str = "vmz::native_host::missing_deep_link";
 pub const DIAG_MISSING_LOG_POLICY: &str = "vmz::native_host::missing_log_policy";
 
 /// Required WebView shell host hook names for load / error / exit / deepLink / log.
-pub const REQUIRED_SHELL_HOOKS: &[&str] = &["load", "error", "exit", "deepLink", "log"];
+///
+/// Mirrors [`ShellHook::ALL`] wire labels for catalog / handshake.
+pub const REQUIRED_SHELL_HOOKS: &[&str] = &[
+    ShellHook::Load.as_str(),
+    ShellHook::Error.as_str(),
+    ShellHook::Exit.as_str(),
+    ShellHook::DeepLink.as_str(),
+    ShellHook::Log.as_str(),
+];
 
 /// Platforms that must share one shell schema (no semantic fork).
-pub const REQUIRED_SHELL_PLATFORMS: &[&str] = &["ios", "android"];
+///
+/// Mirrors [`NativePlatformId::ALL`] wire labels.
+pub const REQUIRED_SHELL_PLATFORMS: &[&str] =
+    &[NativePlatformId::Ios.as_str(), NativePlatformId::Android.as_str()];
+
+/// Closed WebView shell packaging-adapter kind.
+///
+/// **Closed** unit enum (`kebab-case`). Wire is `webview-shell`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ShellAdapterKind {
+    /// WebView shell packaging adapter (shared shell schema).
+    WebviewShell,
+}
+
+impl ShellAdapterKind {
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::WebviewShell => "webview-shell",
+        }
+    }
+}
+
+impl std::fmt::Display for ShellAdapterKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed host package update channel (shared by Delivery + Native update policy).
+///
+/// **Closed** unit enum (`kebab-case`): `rebuild` | `store` | `hot` | `hybrid`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum UpdateChannel {
+    /// Full rebuild delivery channel.
+    Rebuild,
+    /// Store / package-manager channel.
+    Store,
+    /// Hot update channel.
+    Hot,
+    /// Hybrid update channel.
+    Hybrid,
+}
+
+impl UpdateChannel {
+    /// All closed variants in catalog order.
+    pub const ALL: &[Self] = &[Self::Rebuild, Self::Store, Self::Hot, Self::Hybrid];
+
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Rebuild => "rebuild",
+            Self::Store => "store",
+            Self::Hot => "hot",
+            Self::Hybrid => "hybrid",
+        }
+    }
+}
+
+impl Default for UpdateChannel {
+    fn default() -> Self {
+        Self::Rebuild
+    }
+}
+
+impl std::fmt::Display for UpdateChannel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Closed rollback strategy token for update policies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum UpdateRollback {
+    /// Roll back to the previous signed bundle.
+    PreviousBundle,
+}
+
+impl UpdateRollback {
+    /// Wire / JSON label (`kebab-case`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::PreviousBundle => "previous-bundle",
+        }
+    }
+}
+
+impl Default for UpdateRollback {
+    fn default() -> Self {
+        Self::PreviousBundle
+    }
+}
+
+impl std::fmt::Display for UpdateRollback {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
 
 /// Hard: bridge uses arbitrary JS injection / object postMessage instead of typed calls.
 pub const DIAG_ARBITRARY_BRIDGE: &str = "vmz::native_host::arbitrary_bridge";
@@ -219,6 +818,7 @@ pub struct NativeHostDocumentKind {
 
 /// Handshake catalog for the NativeAppHost protocol domain.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct NativeHostProtocolCatalog {
     /// Always [`NATIVE_HOST_PROTOCOL`].
     pub schema: String,
@@ -229,22 +829,20 @@ pub struct NativeHostProtocolCatalog {
     /// Stable diagnostic codes callers may see.
     pub diagnostics: Vec<String>,
     /// Capability class names (`PureWeb` / `NativeBacked` / `NativeSurface` / ...).
-    #[serde(rename = "capabilityClasses")]
     pub capability_classes: Vec<String>,
     /// Forbidden arbitrary-bridge patterns that must fail check.
-    #[serde(rename = "forbiddenBridgePatterns")]
     pub forbidden_bridge_patterns: Vec<String>,
     /// First-batch NativeBacked stub capability ids.
-    #[serde(rename = "firstBatchStubIds", default)]
+    #[serde(default)]
     pub first_batch_stub_ids: Vec<String>,
     /// Required lifecycle event names from [`REQUIRED_LIFECYCLE_EVENTS`].
-    #[serde(rename = "requiredLifecycleEvents", default)]
+    #[serde(default)]
     pub required_lifecycle_events: Vec<String>,
     /// High-value NativeSurface kinds from [`HIGH_VALUE_SURFACE_KINDS`].
-    #[serde(rename = "highValueSurfaceKinds", default)]
+    #[serde(default)]
     pub high_value_surface_kinds: Vec<String>,
     /// Platforms that must share one Host Profile contract set.
-    #[serde(rename = "requiredMultiPlatforms", default)]
+    #[serde(default)]
     pub required_multi_platforms: Vec<String>,
 }
 
@@ -433,13 +1031,7 @@ impl NativeHostProtocolCatalog {
                 DIAG_PLATFORM_PRIVATE_SCHEMA.into(),
                 DIAG_ADAPTER_IS_SEMANTIC_CORE.into(),
             ],
-            capability_classes: vec![
-                "PureWeb".into(),
-                "NativeBacked".into(),
-                "NativeSurface".into(),
-                "ServerBacked".into(),
-                "Unsupported".into(),
-            ],
+            capability_classes: CapabilityClass::ALL.iter().map(|c| c.as_str().into()).collect(),
             forbidden_bridge_patterns: FORBIDDEN_BRIDGE_PATTERNS
                 .iter()
                 .map(|s| (*s).into())
@@ -477,16 +1069,16 @@ pub const FORBIDDEN_BRIDGE_PATTERNS: &[&str] = &[
 
 /// Application identity for a native host package (id / origin / optional store metadata).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplicationIdentity {
     /// Always [`APPLICATION_IDENTITY_SCHEMA`].
     pub schema: String,
     /// Stable application id used by the host and deep links.
-    #[serde(rename = "applicationId")]
     pub application_id: String,
     /// Verified origin string (e.g. `app://demo.app`) for bridge checks.
     pub origin: String,
     /// Optional store / OS bundle identifier.
-    #[serde(rename = "bundleId", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bundle_id: Option<String>,
     /// Optional human/package version string.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -513,6 +1105,7 @@ impl ApplicationIdentity {
 
 /// Native capability declaration (versioned and schema'd; not arbitrary injection).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct NativeCapability {
     /// Always [`NATIVE_CAPABILITY_SCHEMA`].
     pub schema: String,
@@ -520,20 +1113,19 @@ pub struct NativeCapability {
     pub id: String,
     /// Capability contract version string.
     pub version: String,
-    /// Capability class: `PureWeb` | `NativeBacked` | `NativeSurface` | `ServerBacked` | `Unsupported`.
-    #[serde(rename = "capabilityClass")]
-    pub capability_class: String,
+    /// Capability class (closed [`CapabilityClass`]).
+    pub capability_class: CapabilityClass,
     /// Platforms this capability targets (`ios` / `android` / ...).
-    #[serde(rename = "targetPlatforms", default)]
+    #[serde(default)]
     pub target_platforms: Vec<String>,
     /// Permission names the host must grant before the call.
     #[serde(default)]
     pub permissions: Vec<String>,
     /// Optional input payload schema id.
-    #[serde(rename = "inputSchema", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_schema: Option<String>,
     /// Optional output payload schema id.
-    #[serde(rename = "outputSchema", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_schema: Option<String>,
     /// Declared error codes the call may return.
     #[serde(default)]
@@ -542,7 +1134,7 @@ pub struct NativeCapability {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lifecycle: Option<String>,
     /// Whether the call is asynchronous.
-    #[serde(rename = "async", default)]
+    #[serde(default)]
     pub async_: bool,
     /// Whether the host must support cancellation for this call.
     #[serde(default)]
@@ -562,7 +1154,7 @@ impl NativeCapability {
             schema: NATIVE_CAPABILITY_SCHEMA.into(),
             id: "camera.capture".into(),
             version: "1".into(),
-            capability_class: "NativeBacked".into(),
+            capability_class: CapabilityClass::NativeBacked,
             target_platforms: vec!["ios".into(), "android".into()],
             permissions: vec!["camera".into()],
             input_schema: Some("vmz.native.camera.capture.in.v1".into()),
@@ -584,27 +1176,24 @@ impl NativeCapability {
 
 /// Versioned bridge protocol between WebSurface and NativeAppHost.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct BridgeProtocolManifest {
     /// Always [`BRIDGE_PROTOCOL_SCHEMA`].
     pub schema: String,
     /// Bridge protocol version string.
     pub version: String,
-    /// Must be typed capability calls - never arbitrary object injection.
-    pub mode: String,
+    /// Bridge mode (closed [`BridgeMode`]; typed capability only).
+    pub mode: BridgeMode,
     /// Whether every call must carry a verified origin.
-    #[serde(rename = "requireOrigin")]
     pub require_origin: bool,
     /// Whether every call must carry a nonce.
-    #[serde(rename = "requireNonce")]
     pub require_nonce: bool,
     /// Whether calls must be on the published allowlist.
-    #[serde(rename = "requireAllowlist")]
     pub require_allowlist: bool,
     /// Whether `eval` / dynamic script injection is forbidden.
-    #[serde(rename = "forbidEval")]
     pub forbid_eval: bool,
     /// Capability ids this bridge instance exposes.
-    #[serde(rename = "capabilityIds", default)]
+    #[serde(default)]
     pub capability_ids: Vec<String>,
 }
 
@@ -614,7 +1203,7 @@ impl BridgeProtocolManifest {
         Self {
             schema: BRIDGE_PROTOCOL_SCHEMA.into(),
             version: "0".into(),
-            mode: "typed_capability".into(),
+            mode: BridgeMode::TypedCapability,
             require_origin: true,
             require_nonce: true,
             require_allowlist: true,
@@ -631,38 +1220,35 @@ impl BridgeProtocolManifest {
 
 /// WebView deployment profile - Delivery for WebSurface inside NativeAppHost.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct WebViewDeploymentProfile {
     /// Always [`WEBVIEW_DEPLOYMENT_SCHEMA`].
     pub schema: String,
-    /// Asset delivery mode: `local` | `remote` | `hybrid` - remote must not be silent default.
-    #[serde(rename = "assetMode")]
-    pub asset_mode: String,
+    /// Asset delivery mode (closed [`AssetMode`]).
+    pub asset_mode: AssetMode,
     /// Application identity for this host package.
     pub identity: ApplicationIdentity,
     /// Optional Content-Security-Policy string for the WebView.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub csp: Option<String>,
     /// Typed bridge protocol this deployment exposes.
-    #[serde(rename = "bridge")]
     pub bridge: BridgeProtocolManifest,
     /// Declared native capabilities for this deployment.
-    #[serde(rename = "capabilities", default)]
+    #[serde(default)]
     pub capabilities: Vec<NativeCapability>,
     /// Provenance: Browser/Web plan schema this WebSurface artifact lowers from.
-    #[serde(rename = "planSchema")]
     pub plan_schema: String,
     /// Browser artifact reuse - WebView does not invent a second View lowering.
-    #[serde(rename = "reusesBrowserLowering")]
     pub reuses_browser_lowering: bool,
-    /// Optional update channel name (e.g. `store`).
-    #[serde(rename = "updateChannel", default, skip_serializing_if = "Option::is_none")]
-    pub update_channel: Option<String>,
-    /// Optional rollback policy name (e.g. `previous_bundle`).
-    #[serde(rename = "rollbackPolicy", default, skip_serializing_if = "Option::is_none")]
-    pub rollback_policy: Option<String>,
-    /// Optional offline policy name (e.g. `bundled_only`).
-    #[serde(rename = "offlinePolicy", default, skip_serializing_if = "Option::is_none")]
-    pub offline_policy: Option<String>,
+    /// Optional update channel (closed [`UpdateChannel`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub update_channel: Option<UpdateChannel>,
+    /// Optional rollback policy (closed [`UpdateRollback`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rollback_policy: Option<UpdateRollback>,
+    /// Optional offline policy (closed [`OfflineMode`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offline_policy: Option<OfflineMode>,
 }
 
 impl WebViewDeploymentProfile {
@@ -671,16 +1257,16 @@ impl WebViewDeploymentProfile {
         let ids: Vec<String> = caps.iter().map(|c| c.id.clone()).collect();
         Self {
             schema: WEBVIEW_DEPLOYMENT_SCHEMA.into(),
-            asset_mode: "local".into(),
+            asset_mode: AssetMode::Local,
             identity: ApplicationIdentity::example(),
             csp: Some("default-src 'self'; bridge-src 'self'".into()),
             bridge: BridgeProtocolManifest::v0(ids),
             capabilities: caps,
             plan_schema: crate::program::PLAN_SCHEMA.into(),
             reuses_browser_lowering: true,
-            update_channel: Some("store".into()),
-            rollback_policy: Some("previous_bundle".into()),
-            offline_policy: Some("bundled_only".into()),
+            update_channel: Some(UpdateChannel::Store),
+            rollback_policy: Some(UpdateRollback::PreviousBundle),
+            offline_policy: Some(OfflineMode::BundledOnly),
         }
     }
 
@@ -690,35 +1276,24 @@ impl WebViewDeploymentProfile {
     }
 }
 
-/// One diagnostic finding from a native-host check.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct NativeHostDiagnostic {
-    /// JSON-pointer / logical path of the offending field.
-    pub path: String,
-    /// Severity label (`error` / `warning` / ...).
-    pub severity: String,
-    /// Human-readable finding message.
-    pub message: String,
-    /// Optional stable diagnostic code (`vmz::native_host::...`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub code: Option<String>,
-}
+/// Native-host check diagnostic — alias of [`ReportedDiagnostic`].
+pub type NativeHostDiagnostic = ReportedDiagnostic;
 
 /// Umbrella native-host check report (deployment + catalog + diagnostics).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct NativeHostCheckReport {
     /// Always [`NATIVE_HOST_CHECK_SCHEMA`].
     pub schema: String,
     /// Protocol catalog snapshot used for this check.
     pub catalog: NativeHostProtocolCatalog,
     /// WebView deployment under test.
-    #[serde(rename = "webviewDeployment")]
     pub webview_deployment: WebViewDeploymentProfile,
     /// Findings produced by the check.
     #[serde(default)]
     pub diagnostics: Vec<NativeHostDiagnostic>,
-    /// Overall status: `ready` | `incomplete` | `failed`.
-    pub status: String,
+    /// Aggregate status ([`CheckReportStatus`]).
+    pub status: CheckReportStatus,
 }
 
 impl NativeHostCheckReport {
@@ -730,20 +1305,18 @@ impl NativeHostCheckReport {
 
 /// Local bundled WebSurface entry artifacts (Browser Direct reuse).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct LocalBundledEntry {
     /// Always [`LOCAL_BUNDLE_SCHEMA`].
     pub schema: String,
     /// Relative path to the client JS entry.
-    #[serde(rename = "clientJs")]
     pub client_js: String,
     /// Relative path to the DOM host bootstrap script.
-    #[serde(rename = "domHost")]
     pub dom_host: String,
     /// Optional HTML shell path when the host does not synthesize one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub html: Option<String>,
     /// App-scheme entry URL loaded by the WebView.
-    #[serde(rename = "entryUrl")]
     pub entry_url: String,
 }
 
@@ -762,6 +1335,7 @@ impl LocalBundledEntry {
 
 /// Deep link / universal link map entry into a route id.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct DeepLinkEntry {
     /// Always [`DEEP_LINK_SCHEMA`].
     pub schema: String,
@@ -773,7 +1347,6 @@ pub struct DeepLinkEntry {
     /// Path matched by the deep link.
     pub path: String,
     /// Target RouteId realized by the router.
-    #[serde(rename = "routeId")]
     pub route_id: String,
 }
 
@@ -792,38 +1365,36 @@ impl DeepLinkEntry {
 
 /// Platform adapter stub - shared shell schema with platform-specific packaging only.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ShellPlatformAdapter {
-    /// Platform id (`ios` / `android`).
-    pub platform: String,
-    /// Adapter kind (e.g. `webview_shell`).
-    pub kind: String,
+    /// Platform id (closed [`NativePlatformId`]).
+    pub platform: NativePlatformId,
+    /// Adapter kind (closed [`ShellAdapterKind`]).
+    pub kind: ShellAdapterKind,
     /// Shared shell schema id this adapter must honor.
-    #[serde(rename = "shellSchema")]
     pub shell_schema: String,
 }
 
 /// Native WebView shell manifest (algebraic contract; not Xcode/Gradle projects).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct NativeWebViewShellManifest {
     /// Always [`SHELL_SCHEMA`].
     pub schema: String,
     /// Application identity for this shell.
     pub identity: ApplicationIdentity,
-    /// Asset delivery mode (`local` / `remote` / `hybrid`).
-    #[serde(rename = "assetMode")]
-    pub asset_mode: String,
+    /// Asset delivery mode (closed [`AssetMode`]).
+    pub asset_mode: AssetMode,
     /// Whether this shell reuses Browser View lowering (must stay true).
-    #[serde(rename = "reusesBrowserLowering")]
     pub reuses_browser_lowering: bool,
     /// Plan schema provenance for the bundled WebSurface.
-    #[serde(rename = "planSchema")]
     pub plan_schema: String,
     /// Local bundled entry artifacts.
     pub entry: LocalBundledEntry,
-    /// Declared host hooks (must cover [`REQUIRED_SHELL_HOOKS`]).
-    pub hooks: Vec<String>,
+    /// Declared host hooks (must cover [`ShellHook::ALL`] / [`REQUIRED_SHELL_HOOKS`]).
+    pub hooks: Vec<ShellHook>,
     /// Deep-link / universal-link map.
-    #[serde(rename = "deepLinks", default)]
+    #[serde(default)]
     pub deep_links: Vec<DeepLinkEntry>,
     /// Shell logging / redaction policy.
     pub logging: ShellLoggingPolicy,
@@ -833,11 +1404,11 @@ pub struct NativeWebViewShellManifest {
 
 /// Logging policy for the native WebView shell.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ShellLoggingPolicy {
-    /// Log level name (`info` / `warn` / ...).
-    pub level: String,
+    /// Log level (closed [`ShellLogLevel`]).
+    pub level: ShellLogLevel,
     /// Whether sensitive fields must be redacted in host logs.
-    #[serde(rename = "redactSensitive")]
     pub redact_sensitive: bool,
 }
 
@@ -847,18 +1418,19 @@ impl NativeWebViewShellManifest {
         Self {
             schema: SHELL_SCHEMA.into(),
             identity: ApplicationIdentity::example(),
-            asset_mode: "local".into(),
+            asset_mode: AssetMode::Local,
             reuses_browser_lowering: true,
             plan_schema: crate::program::PLAN_SCHEMA.into(),
             entry: LocalBundledEntry::example(),
-            hooks: REQUIRED_SHELL_HOOKS.iter().map(|s| (*s).into()).collect(),
+            hooks: ShellHook::ALL.to_vec(),
             deep_links: vec![DeepLinkEntry::example()],
-            logging: ShellLoggingPolicy { level: "info".into(), redact_sensitive: true },
-            adapters: REQUIRED_SHELL_PLATFORMS
+            logging: ShellLoggingPolicy { level: ShellLogLevel::Info, redact_sensitive: true },
+            adapters: NativePlatformId::ALL
                 .iter()
+                .copied()
                 .map(|p| ShellPlatformAdapter {
-                    platform: (*p).into(),
-                    kind: "webview_shell".into(),
+                    platform: p,
+                    kind: ShellAdapterKind::WebviewShell,
                     shell_schema: SHELL_SCHEMA.into(),
                 })
                 .collect(),
@@ -883,8 +1455,8 @@ pub struct NativeShellCheckReport {
     /// Findings produced by the check.
     #[serde(default)]
     pub diagnostics: Vec<NativeHostDiagnostic>,
-    /// Overall status: `ready` | `incomplete` | `failed`.
-    pub status: String,
+    /// Aggregate status ([`CheckReportStatus`]).
+    pub status: CheckReportStatus,
 }
 
 impl NativeShellCheckReport {
@@ -896,17 +1468,16 @@ impl NativeShellCheckReport {
 
 /// Bridge call trace context (must redact sensitive data).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct BridgeTraceContext {
     /// Always [`BRIDGE_TRACE_SCHEMA`].
     pub schema: String,
     /// Correlation id joining request / response / host logs.
-    #[serde(rename = "correlationId")]
     pub correlation_id: String,
     /// Optional RouteId active when the call was issued.
-    #[serde(rename = "routeId", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub route_id: Option<String>,
     /// Whether sensitive payload fields must be redacted in traces.
-    #[serde(rename = "redactSensitive")]
     pub redact_sensitive: bool,
 }
 
@@ -924,17 +1495,15 @@ impl BridgeTraceContext {
 
 /// Versioned typed capability call envelope (not arbitrary JS injection).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct NativeCapabilityCall {
     /// Always [`CAPABILITY_CALL_SCHEMA`].
     pub schema: String,
     /// Unique id for this call instance.
-    #[serde(rename = "callId")]
     pub call_id: String,
     /// Target capability id (must be allowlisted).
-    #[serde(rename = "capabilityId")]
     pub capability_id: String,
     /// Capability contract version expected by the caller.
-    #[serde(rename = "capabilityVersion")]
     pub capability_version: String,
     /// Verified origin of the WebSurface issuer.
     pub origin: String,
@@ -943,15 +1512,14 @@ pub struct NativeCapabilityCall {
     /// Monotonic sequence number within the bridge session.
     pub sequence: u64,
     /// Optional input payload schema id.
-    #[serde(rename = "inputSchema", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_schema: Option<String>,
     /// Optional output payload schema id.
-    #[serde(rename = "outputSchema", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_schema: Option<String>,
     /// Permissions asserted for this call.
     pub permissions: Vec<String>,
     /// Timeout bound in milliseconds.
-    #[serde(rename = "timeoutMs")]
     pub timeout_ms: u64,
     /// Whether the caller may cancel this call.
     pub cancellation: bool,
@@ -987,13 +1555,13 @@ impl NativeCapabilityCall {
 
 /// First-batch stub catalog (algebraic stubs; not real-device adapters yet).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct BridgeStubCatalog {
     /// Always [`BRIDGE_STUB_CATALOG_SCHEMA`].
     pub schema: String,
     /// Declared NativeBacked stub capabilities.
     pub stubs: Vec<NativeCapability>,
     /// Allowlisted capability ids derived from `stubs`.
-    #[serde(rename = "allowlist")]
     pub allowlist: Vec<String>,
 }
 
@@ -1006,7 +1574,7 @@ impl BridgeStubCatalog {
                 schema: NATIVE_CAPABILITY_SCHEMA.into(),
                 id: "file.pick".into(),
                 version: "1".into(),
-                capability_class: "NativeBacked".into(),
+                capability_class: CapabilityClass::NativeBacked,
                 target_platforms: vec!["ios".into(), "android".into()],
                 permissions: vec!["files".into()],
                 input_schema: Some("vmz.native.file.pick.in.v1".into()),
@@ -1022,7 +1590,7 @@ impl BridgeStubCatalog {
                 schema: NATIVE_CAPABILITY_SCHEMA.into(),
                 id: "share.send".into(),
                 version: "1".into(),
-                capability_class: "NativeBacked".into(),
+                capability_class: CapabilityClass::NativeBacked,
                 target_platforms: vec!["ios".into(), "android".into()],
                 permissions: vec!["share".into()],
                 input_schema: Some("vmz.native.share.send.in.v1".into()),
@@ -1038,7 +1606,7 @@ impl BridgeStubCatalog {
                 schema: NATIVE_CAPABILITY_SCHEMA.into(),
                 id: "storage.get".into(),
                 version: "1".into(),
-                capability_class: "NativeBacked".into(),
+                capability_class: CapabilityClass::NativeBacked,
                 target_platforms: vec!["ios".into(), "android".into()],
                 permissions: vec!["storage".into()],
                 input_schema: Some("vmz.native.storage.get.in.v1".into()),
@@ -1054,7 +1622,7 @@ impl BridgeStubCatalog {
                 schema: NATIVE_CAPABILITY_SCHEMA.into(),
                 id: "storage.set".into(),
                 version: "1".into(),
-                capability_class: "NativeBacked".into(),
+                capability_class: CapabilityClass::NativeBacked,
                 target_platforms: vec!["ios".into(), "android".into()],
                 permissions: vec!["storage".into()],
                 input_schema: Some("vmz.native.storage.set.in.v1".into()),
@@ -1079,22 +1647,22 @@ impl BridgeStubCatalog {
 
 /// Bridge-contract check report (stub catalog + sample calls + diagnostics).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct NativeBridgeCheckReport {
     /// Always [`BRIDGE_CHECK_SCHEMA`].
     pub schema: String,
     /// Protocol catalog snapshot used for this check.
     pub catalog: NativeHostProtocolCatalog,
     /// Stub catalog under test.
-    #[serde(rename = "stubCatalog")]
     pub stub_catalog: BridgeStubCatalog,
     /// Sample typed capability calls exercised by the check.
-    #[serde(rename = "sampleCalls", default)]
+    #[serde(default)]
     pub sample_calls: Vec<NativeCapabilityCall>,
     /// Findings produced by the check.
     #[serde(default)]
     pub diagnostics: Vec<NativeHostDiagnostic>,
-    /// Overall status: `ready` | `incomplete` | `failed`.
-    pub status: String,
+    /// Aggregate status ([`CheckReportStatus`]).
+    pub status: CheckReportStatus,
 }
 
 impl NativeBridgeCheckReport {
@@ -1106,15 +1674,15 @@ impl NativeBridgeCheckReport {
 
 /// Persistence policy for WebView state across crash/restore (explicit, not JS heap).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct PersistencePolicy {
     /// Always [`PERSISTENCE_SCHEMA`].
     pub schema: String,
     /// Whether persistence is enabled for this host.
     pub enabled: bool,
-    /// Persistence mode (e.g. `capability_backed` | `bundled_snapshot`) - never implicit JS memory.
-    pub mode: String,
+    /// Persistence mode (closed [`PersistenceMode`]; never implicit JS memory).
+    pub mode: PersistenceMode,
     /// Whether restore must force re-authentication.
-    #[serde(rename = "reauthOnRestore")]
     pub reauth_on_restore: bool,
 }
 
@@ -1123,10 +1691,10 @@ pub struct PersistencePolicy {
 pub struct UpdatePolicy {
     /// Always [`UPDATE_POLICY_SCHEMA`].
     pub schema: String,
-    /// Update channel name (e.g. `store`).
-    pub channel: String,
-    /// Rollback strategy name (e.g. `previous_bundle`).
-    pub rollback: String,
+    /// Update channel (closed [`UpdateChannel`]).
+    pub channel: UpdateChannel,
+    /// Rollback strategy (closed [`UpdateRollback`]).
+    pub rollback: UpdateRollback,
 }
 
 /// Offline resource policy for local/hybrid WebSurface delivery.
@@ -1134,25 +1702,23 @@ pub struct UpdatePolicy {
 pub struct OfflinePolicy {
     /// Always [`OFFLINE_POLICY_SCHEMA`].
     pub schema: String,
-    /// Offline mode (e.g. `bundled_only` | `hybrid_cache`) - not `none` for production hosts.
-    pub mode: String,
+    /// Offline mode (closed [`OfflineMode`]; `none` is not legal).
+    pub mode: OfflineMode,
 }
 
 /// NativeAppHost lifecycle policy (events, restore rules, nested policies).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct NativeAppLifecyclePolicy {
     /// Always [`LIFECYCLE_SCHEMA`].
     pub schema: String,
-    /// Declared lifecycle event names (must cover [`REQUIRED_LIFECYCLE_EVENTS`]).
-    pub events: Vec<String>,
+    /// Declared lifecycle event names (must cover [`NativeLifecycleEvent::ALL`]).
+    pub events: Vec<NativeLifecycleEvent>,
     /// Hard rule: background must not equal destroy.
-    #[serde(rename = "backgroundEqualsDestroy")]
     pub background_equals_destroy: bool,
     /// Hard rule: crash restore must not assume surviving JS heap.
-    #[serde(rename = "crashRestoreAssumesJsHeap")]
     pub crash_restore_assumes_js_heap: bool,
     /// Whether regions dispose when the host reaches destroy.
-    #[serde(rename = "disposeRegionsOnDestroy")]
     pub dispose_regions_on_destroy: bool,
     /// Crash/restore persistence policy.
     pub persistence: PersistencePolicy,
@@ -1167,24 +1733,24 @@ impl NativeAppLifecyclePolicy {
     pub fn example() -> Self {
         Self {
             schema: LIFECYCLE_SCHEMA.into(),
-            events: REQUIRED_LIFECYCLE_EVENTS.iter().map(|s| (*s).into()).collect(),
+            events: NativeLifecycleEvent::ALL.to_vec(),
             background_equals_destroy: false,
             crash_restore_assumes_js_heap: false,
             dispose_regions_on_destroy: true,
             persistence: PersistencePolicy {
                 schema: PERSISTENCE_SCHEMA.into(),
                 enabled: true,
-                mode: "capability_backed".into(),
+                mode: PersistenceMode::CapabilityBacked,
                 reauth_on_restore: true,
             },
             update: UpdatePolicy {
                 schema: UPDATE_POLICY_SCHEMA.into(),
-                channel: "store".into(),
-                rollback: "previous_bundle".into(),
+                channel: UpdateChannel::Store,
+                rollback: UpdateRollback::PreviousBundle,
             },
             offline: OfflinePolicy {
                 schema: OFFLINE_POLICY_SCHEMA.into(),
-                mode: "bundled_only".into(),
+                mode: OfflineMode::BundledOnly,
             },
         }
     }
@@ -1207,8 +1773,8 @@ pub struct NativeLifecycleCheckReport {
     /// Findings produced by the check.
     #[serde(default)]
     pub diagnostics: Vec<NativeHostDiagnostic>,
-    /// Overall status: `ready` | `incomplete` | `failed`.
-    pub status: String,
+    /// Aggregate status ([`CheckReportStatus`]).
+    pub status: CheckReportStatus,
 }
 
 impl NativeLifecycleCheckReport {
@@ -1220,26 +1786,27 @@ impl NativeLifecycleCheckReport {
 
 /// SSR first-paint policy for WebSurface inside NativeAppHost.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct SsrFirstPaintPolicy {
     /// Always [`SSR_FIRST_PAINT_SCHEMA`].
     pub schema: String,
     /// Whether SSR first-paint is enabled for this host.
     pub enabled: bool,
-    /// SSR delivery mode: `bundled` | `remote` | `hybrid`.
-    pub mode: String,
+    /// SSR delivery mode (closed [`ContentDeliveryMode`]).
+    pub mode: ContentDeliveryMode,
     /// Plan schema provenance for the SSR artifact.
-    #[serde(rename = "planSchema")]
     pub plan_schema: String,
     /// Integrity evidence required for remote/hybrid SSR.
     #[serde(default)]
     pub integrity: String,
     /// Must stay false - bundled and remote SSR cannot share cookie/origin assumptions.
-    #[serde(rename = "allowMixedCookieAssumptions", default)]
+    #[serde(default)]
     pub allow_mixed_cookie_assumptions: bool,
 }
 
 /// `#server` transport binding - Native bridge must not bypass this.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ServerTransportPolicy {
     /// Always [`SERVER_TRANSPORT_SCHEMA`].
     pub schema: String,
@@ -1248,19 +1815,19 @@ pub struct ServerTransportPolicy {
     /// Server endpoint path / binding string.
     pub endpoint: String,
     /// Whether the native bridge is allowed to bypass `#server` (must stay false).
-    #[serde(rename = "bridgeBypassesServer", default)]
+    #[serde(default)]
     pub bridge_bypasses_server: bool,
 }
 
 /// Auth / session isolation for the WebView host.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct AuthSessionPolicy {
     /// Always [`AUTH_SESSION_SCHEMA`].
     pub schema: String,
-    /// Auth mode string (e.g. `cookie+token`).
-    pub mode: String,
+    /// Auth mode (closed [`AuthSessionMode`]).
+    pub mode: AuthSessionMode,
     /// Session namespace isolating WebView cookies / tokens.
-    #[serde(rename = "sessionNamespace")]
     pub session_namespace: String,
     /// Whether WebView crash forces re-authentication.
     #[serde(rename = "reauthOnWebViewCrash")]
@@ -1269,11 +1836,11 @@ pub struct AuthSessionPolicy {
 
 /// Push capability declaration (stub allowed for algebraic hosts).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct PushPolicy {
     /// Always [`PUSH_POLICY_SCHEMA`].
     pub schema: String,
     /// Capability id for push subscribe / receive.
-    #[serde(rename = "capabilityId")]
     pub capability_id: String,
     /// Whether this entry is an algebraic stub (not a real device push adapter).
     pub stub: bool,
@@ -1281,25 +1848,26 @@ pub struct PushPolicy {
 
 /// Network policy for NativeAppHost (HTTPS / cleartext).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct NetworkPolicy {
     /// Always [`NETWORK_POLICY_SCHEMA`].
     pub schema: String,
-    /// Network mode string (e.g. `https_only`).
-    pub mode: String,
+    /// Network mode (closed [`NetworkMode`]).
+    pub mode: NetworkMode,
     /// Whether cleartext HTTP is allowed (must stay false for production hosts).
-    #[serde(rename = "allowCleartext", default)]
+    #[serde(default)]
     pub allow_cleartext: bool,
 }
 
 /// NativeAppHost full-stack profile (SSR, `#server`, auth, push, network, delivery).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct NativeFullstackProfile {
     /// Always [`FULLSTACK_SCHEMA`].
     pub schema: String,
     /// SSR first-paint policy.
     pub ssr: SsrFirstPaintPolicy,
     /// `#server` transport binding.
-    #[serde(rename = "serverTransport")]
     pub server_transport: ServerTransportPolicy,
     /// Auth / session isolation policy.
     pub auth: AuthSessionPolicy,
@@ -1307,11 +1875,10 @@ pub struct NativeFullstackProfile {
     pub push: PushPolicy,
     /// Network / cleartext policy.
     pub network: NetworkPolicy,
-    /// Delivery asset mode: `local` | `remote` | `hybrid`.
-    #[serde(rename = "deliveryAssetMode")]
-    pub delivery_asset_mode: String,
+    /// Delivery asset mode (closed [`AssetMode`]).
+    pub delivery_asset_mode: AssetMode,
     /// Integrity evidence for remote/hybrid delivery assets.
-    #[serde(rename = "deliveryIntegrity", default)]
+    #[serde(default)]
     pub delivery_integrity: String,
 }
 
@@ -1323,7 +1890,7 @@ impl NativeFullstackProfile {
             ssr: SsrFirstPaintPolicy {
                 schema: SSR_FIRST_PAINT_SCHEMA.into(),
                 enabled: true,
-                mode: "bundled".into(),
+                mode: ContentDeliveryMode::Bundled,
                 plan_schema: crate::program::PLAN_SCHEMA.into(),
                 integrity: String::new(),
                 allow_mixed_cookie_assumptions: false,
@@ -1336,7 +1903,7 @@ impl NativeFullstackProfile {
             },
             auth: AuthSessionPolicy {
                 schema: AUTH_SESSION_SCHEMA.into(),
-                mode: "cookie+token".into(),
+                mode: AuthSessionMode::CookieToken,
                 session_namespace: "app://demo.app/session".into(),
                 reauth_on_webview_crash: true,
             },
@@ -1347,10 +1914,10 @@ impl NativeFullstackProfile {
             },
             network: NetworkPolicy {
                 schema: NETWORK_POLICY_SCHEMA.into(),
-                mode: "https_only".into(),
+                mode: NetworkMode::HttpsOnly,
                 allow_cleartext: false,
             },
-            delivery_asset_mode: "local".into(),
+            delivery_asset_mode: AssetMode::Local,
             delivery_integrity: String::new(),
         }
     }
@@ -1373,8 +1940,8 @@ pub struct NativeFullstackCheckReport {
     /// Findings produced by the check.
     #[serde(default)]
     pub diagnostics: Vec<NativeHostDiagnostic>,
-    /// Overall status: `ready` | `incomplete` | `failed`.
-    pub status: String,
+    /// Aggregate status ([`CheckReportStatus`]).
+    pub status: CheckReportStatus,
 }
 
 impl NativeFullstackCheckReport {
@@ -1386,56 +1953,51 @@ impl NativeFullstackCheckReport {
 
 /// Cross-boundary data contract between WebSurface and NativeSurface.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct NativeSurfaceBoundary {
     /// Always [`NATIVE_SURFACE_BOUNDARY_SCHEMA`].
     pub schema: String,
     /// Whether boundary payloads must be serializable (no shared JS heap).
     pub serializable: bool,
     /// Boundary payload schema version string.
-    #[serde(rename = "schemaVersion")]
     pub schema_version: String,
     /// Whether every crossing must carry bridge / host trace context.
-    #[serde(rename = "traceRequired")]
     pub trace_required: bool,
 }
 
 /// NativeSurface manifest (local surface driver - not a second semantic core).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct NativeSurfaceManifest {
     /// Always [`NATIVE_SURFACE_SCHEMA`].
     pub schema: String,
     /// Stable NativeSurfaceId for this surface instance.
-    #[serde(rename = "surfaceId")]
     pub surface_id: String,
-    /// Surface kind: `camera` | `map` | `video` for first high-value surfaces.
-    pub kind: String,
+    /// Surface kind (closed high-value set: camera / map / video).
+    pub kind: NativeSurfaceKind,
     /// Owning region id that controls dispose / lifetime.
-    #[serde(rename = "ownerRegionId")]
     pub owner_region_id: String,
     /// Lifetime binding (e.g. `bound_to_region`).
     pub lifetime: String,
     /// Whether the surface disposes when the owner region destroys.
-    #[serde(rename = "disposeOnOwnerDestroy")]
     pub dispose_on_owner_destroy: bool,
     /// Whether the surface shares implicit WebView / JS state (must stay false).
     #[serde(rename = "sharesImplicitWebViewState", default)]
     pub shares_implicit_webview_state: bool,
     /// Must stay false - preview surface is not a capture capability.
-    #[serde(rename = "confusedWithCapability", default)]
+    #[serde(default)]
     pub confused_with_capability: bool,
     /// Must stay false - VPG/Plan remain the sole semantic IR.
-    #[serde(rename = "isSemanticTruthSource", default)]
+    #[serde(default)]
     pub is_semantic_truth_source: bool,
     /// Plan schema provenance for view operations reused by this surface.
-    #[serde(rename = "planSchema")]
     pub plan_schema: String,
     /// Whether this surface reuses target-neutral View Operations.
-    #[serde(rename = "reusesViewOperations")]
     pub reuses_view_operations: bool,
     /// WebSurface <-> NativeSurface boundary contract.
     pub boundary: NativeSurfaceBoundary,
     /// Related NativeBacked capability id (distinct from this surface).
-    #[serde(rename = "relatedCapabilityId", default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub related_capability_id: Option<String>,
 }
 
@@ -1445,7 +2007,7 @@ impl NativeSurfaceManifest {
         Self {
             schema: NATIVE_SURFACE_SCHEMA.into(),
             surface_id: "surface:camera.preview:page.index".into(),
-            kind: "camera".into(),
+            kind: NativeSurfaceKind::Camera,
             owner_region_id: "region:pages/index:camera".into(),
             lifetime: "bound_to_region".into(),
             dispose_on_owner_destroy: true,
@@ -1482,8 +2044,8 @@ pub struct NativeSurfaceCheckReport {
     /// Findings produced by the check.
     #[serde(default)]
     pub diagnostics: Vec<NativeHostDiagnostic>,
-    /// Overall status: `ready` | `incomplete` | `failed`.
-    pub status: String,
+    /// Aggregate status ([`CheckReportStatus`]).
+    pub status: CheckReportStatus,
 }
 
 impl NativeSurfaceCheckReport {
@@ -1495,29 +2057,23 @@ impl NativeSurfaceCheckReport {
 
 /// Shared Host Profile schema pointers - identical for every platform adapter.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct MultiPlatformSharedContracts {
     /// Always [`MULTI_PLATFORM_SHARED_SCHEMA`].
     pub schema: String,
     /// Shared bridge protocol schema id.
-    #[serde(rename = "bridgeSchema")]
     pub bridge_schema: String,
     /// Shared capability-call schema id.
-    #[serde(rename = "capabilityCallSchema")]
     pub capability_call_schema: String,
     /// Shared NativeSurface schema id.
-    #[serde(rename = "surfaceSchema")]
     pub surface_schema: String,
     /// Shared shell schema id.
-    #[serde(rename = "shellSchema")]
     pub shell_schema: String,
     /// Shared WebView deployment schema id.
-    #[serde(rename = "deploymentSchema")]
     pub deployment_schema: String,
     /// Shared full-stack profile schema id.
-    #[serde(rename = "fullstackSchema")]
     pub fullstack_schema: String,
     /// Shared multi-platform test-contract schema id.
-    #[serde(rename = "testContractSchema")]
     pub test_contract_schema: String,
 }
 
@@ -1539,49 +2095,45 @@ impl MultiPlatformSharedContracts {
 
 /// Platform packaging adapter (stub only - not Xcode/Gradle semantics).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct MultiPlatformAdapter {
     /// Always [`MULTI_PLATFORM_ADAPTER_SCHEMA`].
     pub schema: String,
-    /// Platform id (`ios` / `android`).
-    pub platform: String,
-    /// Must be [`MULTI_PLATFORM_ADAPTER_KIND`] (`packaging_stub`) for this generation.
-    pub kind: String,
+    /// Platform id (closed [`NativePlatformId`]).
+    pub platform: NativePlatformId,
+    /// Adapter kind (closed [`MultiPlatformAdapterKind`]).
+    pub kind: MultiPlatformAdapterKind,
     /// Bridge schema id this adapter must honor (from shared contracts).
-    #[serde(rename = "bridgeSchema")]
     pub bridge_schema: String,
     /// Capability-call schema id this adapter must honor.
-    #[serde(rename = "capabilityCallSchema")]
     pub capability_call_schema: String,
     /// NativeSurface schema id this adapter must honor.
-    #[serde(rename = "surfaceSchema")]
     pub surface_schema: String,
     /// Shell schema id this adapter must honor.
-    #[serde(rename = "shellSchema")]
     pub shell_schema: String,
     /// Deployment schema id this adapter must honor.
-    #[serde(rename = "deploymentSchema")]
     pub deployment_schema: String,
     /// Full-stack schema id this adapter must honor.
-    #[serde(rename = "fullstackSchema")]
     pub fullstack_schema: String,
     /// Test-contract schema id this adapter must honor.
-    #[serde(rename = "testContractSchema")]
     pub test_contract_schema: String,
     /// Packaging only - must not carry Host Profile / Program Graph semantics.
-    #[serde(rename = "packagingOnly")]
     pub packaging_only: bool,
     /// Must stay false - adapters are not a second semantic core.
-    #[serde(rename = "isSemanticTruthSource", default)]
+    #[serde(default)]
     pub is_semantic_truth_source: bool,
 }
 
 impl MultiPlatformAdapter {
     /// Packaging-stub adapter for `platform` that mirrors `shared` schema pointers.
-    pub fn packaging_stub(platform: &str, shared: &MultiPlatformSharedContracts) -> Self {
+    pub fn packaging_stub(
+        platform: NativePlatformId,
+        shared: &MultiPlatformSharedContracts,
+    ) -> Self {
         Self {
             schema: MULTI_PLATFORM_ADAPTER_SCHEMA.into(),
-            platform: platform.into(),
-            kind: MULTI_PLATFORM_ADAPTER_KIND.into(),
+            platform,
+            kind: MultiPlatformAdapterKind::PackagingStub,
             bridge_schema: shared.bridge_schema.clone(),
             capability_call_schema: shared.capability_call_schema.clone(),
             surface_schema: shared.surface_schema.clone(),
@@ -1597,17 +2149,18 @@ impl MultiPlatformAdapter {
 
 /// Multi-platform Host Profile freeze (iOS + Android, shared schemas).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct NativeMultiPlatformManifest {
     /// Always [`MULTI_PLATFORM_SCHEMA`].
     pub schema: String,
     /// Shared Host Profile schema pointers.
     pub shared: MultiPlatformSharedContracts,
-    /// Platform ids covered by this freeze.
-    pub platforms: Vec<String>,
+    /// Platform ids covered by this freeze (closed [`NativePlatformId`]).
+    pub platforms: Vec<NativePlatformId>,
     /// Per-platform packaging adapters.
     pub adapters: Vec<MultiPlatformAdapter>,
     /// Must stay false - no platform-private Host Profile fork.
-    #[serde(rename = "allowsPlatformSemanticFork", default)]
+    #[serde(default)]
     pub allows_platform_semantic_fork: bool,
 }
 
@@ -1617,11 +2170,12 @@ impl NativeMultiPlatformManifest {
         let shared = MultiPlatformSharedContracts::canonical();
         Self {
             schema: MULTI_PLATFORM_SCHEMA.into(),
-            adapters: REQUIRED_MULTI_PLATFORMS
+            adapters: NativePlatformId::ALL
                 .iter()
+                .copied()
                 .map(|p| MultiPlatformAdapter::packaging_stub(p, &shared))
                 .collect(),
-            platforms: REQUIRED_MULTI_PLATFORMS.iter().map(|s| (*s).into()).collect(),
+            platforms: NativePlatformId::ALL.to_vec(),
             shared,
             allows_platform_semantic_fork: false,
         }
@@ -1645,8 +2199,8 @@ pub struct NativeMultiPlatformCheckReport {
     /// Findings produced by the check.
     #[serde(default)]
     pub diagnostics: Vec<NativeHostDiagnostic>,
-    /// Overall status: `ready` | `incomplete` | `failed`.
-    pub status: String,
+    /// Aggregate status ([`CheckReportStatus`]).
+    pub status: CheckReportStatus,
 }
 
 impl NativeMultiPlatformCheckReport {

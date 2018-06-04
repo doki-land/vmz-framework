@@ -9,10 +9,13 @@ use vmz_types::ServerView;
 /// Structured sink proof (binding names only — never values).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServerSliceProof {
+    /// Schema id for this proof document.
     pub schema: &'static str,
+    /// True when the slice may be compiled into a browser provider.
     pub browser_safe: bool,
     /// Rejected effect labels, e.g. `SecretRequirement(PAYMENTS_API_KEY)`.
     pub rejected_effects: Vec<String>,
+    /// Secret binding names that blocked browser sink (never values).
     pub binding_names: Vec<String>,
 }
 
@@ -41,37 +44,5 @@ impl ServerSliceProof {
         Some(format!(
             "{DIAG_SERVER_SLICE_NOT_BROWSER_SAFE}: capability `{cap}` cannot be emitted into WebArtifact; rejected: {effects}"
         ))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use vmz_types::{SecretRequirement, StubStatus};
-
-    #[test]
-    fn empty_secrets_are_browser_safe() {
-        let proof = ServerSliceProof::prove(&ServerView::default());
-        assert!(proof.browser_safe);
-        assert!(proof.sink_refusal_message(None).is_none());
-    }
-
-    #[test]
-    fn secret_requirement_rejects_browser_sink() {
-        let server = ServerView {
-            status: StubStatus::Partial,
-            secret_requirements: vec![SecretRequirement {
-                binding_name: "PAYMENTS_API_KEY".into(),
-                owner_capability: Some("quote".into()),
-                module_id: Some("#server/pages/checkout".into()),
-            }],
-            ..Default::default()
-        };
-        let proof = ServerSliceProof::prove(&server);
-        assert!(!proof.browser_safe);
-        let msg = proof.sink_refusal_message(Some("CheckoutServer.quote")).unwrap();
-        assert!(msg.contains(DIAG_SERVER_SLICE_NOT_BROWSER_SAFE));
-        assert!(msg.contains("PAYMENTS_API_KEY"));
-        assert!(!msg.contains("sk_")); // never a value
     }
 }

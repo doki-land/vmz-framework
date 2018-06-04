@@ -3,7 +3,7 @@
 //! Compiler-side style plugin (not an ecosystem `@vmz/plugin-*`). Linked into the
 //! single `vmz` binary; never ships a second CLI.
 
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 #![forbid(unsafe_code)]
 
 mod production;

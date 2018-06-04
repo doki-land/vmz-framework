@@ -8,25 +8,20 @@ use std::fs;
 use std::path::Path;
 
 use vmz_protocol::{
-    BRIDGE_CHECK_SCHEMA, BridgeStubCatalog, DIAG_ARBITRARY_BRIDGE, DIAG_CALL_NOT_ALLOWLISTED,
-    DIAG_INVALID_PROFILE, DIAG_MISSING_CANCEL, DIAG_MISSING_NONCE, DIAG_MISSING_ORIGIN,
-    DIAG_MISSING_PERMISSION, DIAG_MISSING_TIMEOUT, DIAG_MISSING_TRACE, DIAG_UNKNOWN_STUB,
-    FIRST_BATCH_STUB_IDS, FORBIDDEN_BRIDGE_PATTERNS, NativeBridgeCheckReport, NativeCapabilityCall,
-    NativeHostDiagnostic, NativeHostProtocolCatalog,
+    BRIDGE_CHECK_SCHEMA, BridgeStubCatalog, CapabilityClass, DIAG_ARBITRARY_BRIDGE,
+    DIAG_CALL_NOT_ALLOWLISTED, DIAG_INVALID_PROFILE, DIAG_MISSING_CANCEL, DIAG_MISSING_NONCE,
+    DIAG_MISSING_ORIGIN, DIAG_MISSING_PERMISSION, DIAG_MISSING_TIMEOUT, DIAG_MISSING_TRACE,
+    DIAG_UNKNOWN_STUB, FIRST_BATCH_STUB_IDS, FORBIDDEN_BRIDGE_PATTERNS, NativeBridgeCheckReport,
+    NativeCapabilityCall, NativeHostDiagnostic, NativeHostProtocolCatalog,
 };
 
 fn diag(
     path: &str,
-    severity: &str,
+    severity: vmz_protocol::Severity,
     message: impl Into<String>,
     code: &str,
 ) -> NativeHostDiagnostic {
-    NativeHostDiagnostic {
-        path: path.into(),
-        severity: severity.into(),
-        message: message.into(),
-        code: Some(code.into()),
-    }
+    NativeHostDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
 fn scan_forbidden(path: &str, text: &str, out: &mut Vec<NativeHostDiagnostic>) {
@@ -34,7 +29,7 @@ fn scan_forbidden(path: &str, text: &str, out: &mut Vec<NativeHostDiagnostic>) {
         if text.contains(pat) {
             out.push(diag(
                 path,
-                "error",
+                vmz_protocol::Severity::Error,
                 format!(
                     "forbidden arbitrary bridge pattern `{pat}` — use typed NativeCapabilityCall only"
                 ),
@@ -49,7 +44,7 @@ fn validate_stub_catalog(catalog: &BridgeStubCatalog, out: &mut Vec<NativeHostDi
         if !catalog.stubs.iter().any(|s| s.id == *id) {
             out.push(diag(
                 "stubCatalog",
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("missing first-batch stub `{id}`"),
                 DIAG_UNKNOWN_STUB,
             ));
@@ -57,17 +52,17 @@ fn validate_stub_catalog(catalog: &BridgeStubCatalog, out: &mut Vec<NativeHostDi
         if !catalog.allowlist.iter().any(|a| a == id) {
             out.push(diag(
                 "stubCatalog.allowlist",
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("first-batch stub `{id}` not allowlisted"),
                 DIAG_CALL_NOT_ALLOWLISTED,
             ));
         }
     }
     for stub in &catalog.stubs {
-        if stub.capability_class != "NativeBacked" {
+        if stub.capability_class != CapabilityClass::NativeBacked {
             out.push(diag(
                 &stub.id,
-                "error",
+                vmz_protocol::Severity::Error,
                 format!(
                     "native first-batch stub `{}` must be NativeBacked, got `{}`",
                     stub.id, stub.capability_class
@@ -78,7 +73,7 @@ fn validate_stub_catalog(catalog: &BridgeStubCatalog, out: &mut Vec<NativeHostDi
         if stub.async_ && !stub.cancellation {
             out.push(diag(
                 &stub.id,
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("async stub `{}` requires cancellation=true", stub.id),
                 DIAG_MISSING_CANCEL,
             ));
@@ -86,7 +81,7 @@ fn validate_stub_catalog(catalog: &BridgeStubCatalog, out: &mut Vec<NativeHostDi
         if !stub.trace {
             out.push(diag(
                 &stub.id,
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("stub `{}` requires trace=true", stub.id),
                 DIAG_MISSING_TRACE,
             ));
@@ -94,7 +89,7 @@ fn validate_stub_catalog(catalog: &BridgeStubCatalog, out: &mut Vec<NativeHostDi
         if stub.permissions.is_empty() {
             out.push(diag(
                 &stub.id,
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("stub `{}` requires declared permissions", stub.id),
                 DIAG_MISSING_PERMISSION,
             ));
@@ -109,15 +104,25 @@ fn validate_call(
 ) {
     let path = format!("call:{}", call.call_id);
     if call.origin.trim().is_empty() {
-        out.push(diag(&path, "error", "capability call requires origin", DIAG_MISSING_ORIGIN));
+        out.push(diag(
+            &path,
+            vmz_protocol::Severity::Error,
+            "capability call requires origin",
+            DIAG_MISSING_ORIGIN,
+        ));
     }
     if call.nonce.trim().is_empty() {
-        out.push(diag(&path, "error", "capability call requires nonce", DIAG_MISSING_NONCE));
+        out.push(diag(
+            &path,
+            vmz_protocol::Severity::Error,
+            "capability call requires nonce",
+            DIAG_MISSING_NONCE,
+        ));
     }
     if call.timeout_ms == 0 {
         out.push(diag(
             &path,
-            "error",
+            vmz_protocol::Severity::Error,
             "capability call requires timeoutMs > 0",
             DIAG_MISSING_TIMEOUT,
         ));
@@ -125,7 +130,7 @@ fn validate_call(
     if !call.cancellation {
         out.push(diag(
             &path,
-            "error",
+            vmz_protocol::Severity::Error,
             "capability call requires cancellation=true",
             DIAG_MISSING_CANCEL,
         ));
@@ -133,7 +138,7 @@ fn validate_call(
     if call.trace.correlation_id.trim().is_empty() || !call.trace.redact_sensitive {
         out.push(diag(
             &path,
-            "error",
+            vmz_protocol::Severity::Error,
             "capability call requires trace.correlationId + redactSensitive=true",
             DIAG_MISSING_TRACE,
         ));
@@ -141,7 +146,7 @@ fn validate_call(
     if call.permissions.is_empty() {
         out.push(diag(
             &path,
-            "error",
+            vmz_protocol::Severity::Error,
             "capability call requires permissions",
             DIAG_MISSING_PERMISSION,
         ));
@@ -149,7 +154,7 @@ fn validate_call(
     if !allowlist.iter().any(|id| id == &call.capability_id) {
         out.push(diag(
             &path,
-            "error",
+            vmz_protocol::Severity::Error,
             format!("capability `{}` is not in bridge allowlist", call.capability_id),
             DIAG_CALL_NOT_ALLOWLISTED,
         ));
@@ -165,14 +170,14 @@ fn load_calls(root: &Path, diags: &mut Vec<NativeHostDiagnostic>) -> Vec<NativeC
                 Ok(calls) => return calls,
                 Err(e) => diags.push(diag(
                     "native-bridge.calls.json",
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!("invalid NativeCapabilityCall[] JSON: {e}"),
                     DIAG_INVALID_PROFILE,
                 )),
             },
             Err(e) => diags.push(diag(
                 "native-bridge.calls.json",
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("cannot read native-bridge.calls.json: {e}"),
                 DIAG_INVALID_PROFILE,
             )),
@@ -189,14 +194,14 @@ fn load_stub_catalog(root: &Path, diags: &mut Vec<NativeHostDiagnostic>) -> Brid
                 Ok(c) => return c,
                 Err(e) => diags.push(diag(
                     "native-bridge.stubs.json",
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!("invalid BridgeStubCatalog JSON: {e}"),
                     DIAG_INVALID_PROFILE,
                 )),
             },
             Err(e) => diags.push(diag(
                 "native-bridge.stubs.json",
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("cannot read native-bridge.stubs.json: {e}"),
                 DIAG_INVALID_PROFILE,
             )),
@@ -225,13 +230,13 @@ pub fn check_native_bridge_contract(root: &Path) -> NativeBridgeCheckReport {
         }
     }
 
-    let failed = diagnostics.iter().any(|d| d.severity == "error");
+    let failed = diagnostics.iter().any(|d| d.is_error());
     NativeBridgeCheckReport {
         schema: BRIDGE_CHECK_SCHEMA.into(),
         catalog,
         stub_catalog,
         sample_calls,
         diagnostics,
-        status: if failed { "failed".into() } else { "ready".into() },
+        status: vmz_protocol::CheckReportStatus::from_failed(failed),
     }
 }

@@ -14,13 +14,30 @@ use crate::plugin::{
     ApplyContributionsReport, ContributionBatch, ContributionStore, PLUGIN_PROTOCOL_V1,
 };
 use crate::session_graph::SessionGraph;
+use serde::Deserialize;
+
+/// Typed slice of a deployment-unit JSON row for explain (avoids `serde_json::Value`).
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ExplainDeploymentUnitSlice {
+    #[serde(default)]
+    chunk_id: Option<String>,
+    #[serde(default)]
+    kind: Option<vmz_protocol::VmzModuleKind>,
+    #[serde(default)]
+    source: Option<String>,
+}
 
 /// Version handshake between JS host and native core.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProtocolVersions {
+    /// Host-facing protocol id the JS layer must match.
     pub host_protocol: &'static str,
+    /// Compiler core protocol id for native/JS wire compatibility.
     pub compiler_protocol: &'static str,
+    /// Program IR JSON schema id (`PROGRAM_SCHEMA`).
     pub program_ir_schema: &'static str,
+    /// Plugin contribution protocol id.
     pub plugin_protocol: &'static str,
 }
 
@@ -34,21 +51,30 @@ pub const PROTOCOL: ProtocolVersions = ProtocolVersions {
     plugin_protocol: PLUGIN_PROTOCOL_V1,
 };
 
+/// Kind of filesystem change reported to the workspace.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChangeKind {
+    /// File created or contents changed.
     Update,
+    /// File removed.
     Delete,
 }
 
+/// One dirty path plus how it changed.
 #[derive(Debug, Clone)]
 pub struct FileChange {
+    /// Absolute or workspace-relative path that changed.
     pub path: PathBuf,
+    /// Whether the path was updated or deleted.
     pub kind: ChangeKind,
 }
 
+/// Inputs that open a long-lived compile workspace.
 #[derive(Clone)]
 pub struct WorkspaceOptions {
+    /// Project root (file or directory).
     pub root: PathBuf,
+    /// Emit directory for deployment / Program IR / assets.
     pub out_dir: PathBuf,
     /// TW style plugin. `None` skips TW stylesheet emit.
     pub tw: Option<crate::TwCompilerHandle>,
@@ -70,24 +96,36 @@ impl std::fmt::Debug for WorkspaceOptions {
     }
 }
 
+/// Options for a single workspace build.
 #[derive(Debug, Clone, Default)]
 pub struct BuildRequest {
+    /// Emit release artifacts when true.
     pub release: bool,
     /// optional analysis ticket; cancelled tickets are rejected at build entry.
     pub analysis_ticket: Option<u64>,
 }
 
+/// Host/core protocol handshake failure.
 #[derive(Debug, thiserror::Error)]
 pub enum HandshakeError {
+    /// Host versions differ from the locked [`PROTOCOL`] constants.
     #[error("protocol mismatch: host={host:?}")]
-    Mismatch { host: ProtocolVersionsOwned },
+    Mismatch {
+        /// Versions the host offered.
+        host: ProtocolVersionsOwned,
+    },
 }
 
+/// Owned copy of protocol version strings (e.g. from N-API / JSON).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProtocolVersionsOwned {
+    /// Host-facing protocol id.
     pub host_protocol: String,
+    /// Compiler core protocol id.
     pub compiler_protocol: String,
+    /// Program IR JSON schema id.
     pub program_ir_schema: String,
+    /// Plugin contribution protocol id.
     pub plugin_protocol: String,
 }
 
@@ -122,14 +160,15 @@ pub struct Workspace {
     contributions: ContributionStore,
     /// coarse session index refreshed after successful builds.
     session: SessionGraph,
-    /// analysis/build cancel tickets (`running` | `cancelled` | `completed`).
+    /// analysis/build cancel tickets (closed [`vmz_protocol::CancelStatus`]).
     analysis_ticket_seq: u64,
-    analysis_tickets: HashMap<u64, String>,
+    analysis_tickets: HashMap<u64, vmz_protocol::CancelStatus>,
     /// semantic transaction id sequence.
     transaction_seq: u64,
 }
 
 impl Workspace {
+    /// Open a workspace with empty dirty set and contribution store.
     pub fn create(options: WorkspaceOptions) -> Self {
         Self {
             options,
@@ -142,22 +181,27 @@ impl Workspace {
         }
     }
 
+    /// Project root path.
     pub fn root(&self) -> &Path {
         &self.options.root
     }
 
+    /// Emit / out directory path.
     pub fn out_dir(&self) -> &Path {
         &self.options.out_dir
     }
 
+    /// Number of accepted plugin contributions currently stored.
     pub fn contribution_count(&self) -> usize {
         self.contributions.len()
     }
 
+    /// Iterate paths marked dirty since the last successful clear/build.
     pub fn dirty_paths(&self) -> impl Iterator<Item = &Path> {
         self.dirty.iter().map(|p| p.as_path())
     }
 
+    /// Record filesystem changes and bump session generation.
     pub fn update_files(&mut self, changes: impl IntoIterator<Item = FileChange>) {
         for c in changes {
             match c.kind {
@@ -188,6 +232,7 @@ impl Workspace {
         report
     }
 
+    /// Materialize plugin sources then run project/path check.
     pub fn check(&mut self, options: &CheckOptions) -> crate::Result<CheckReport> {
         let written = self.contributions.materialize_sources(&self.options.root)?;
         for p in written {
@@ -205,25 +250,30 @@ impl Workspace {
         format_path(&self.options.root, options)
     }
 
+    /// Compile with default [`BuildRequest`] (debug, no analysis ticket).
     pub fn build(&mut self) -> crate::Result<CompileReport> {
         self.build_with(&BuildRequest::default())
     }
 
+    /// Compile using dirty set when possible; honors release and cancel tickets.
     pub fn build_with(&mut self, request: &BuildRequest) -> crate::Result<CompileReport> {
         if let Some(ticket) = request.analysis_ticket {
-            match self.analysis_tickets.get(&ticket).map(String::as_str) {
-                Some("cancelled") => {
+            match self.analysis_tickets.get(&ticket).copied() {
+                Some(vmz_protocol::CancelStatus::Cancelled) => {
                     crate::bail!("analysis ticket {ticket} was cancelled (dx.x3.cancel)");
                 }
-                Some("completed") => {
+                Some(vmz_protocol::CancelStatus::Completed) => {
                     crate::bail!("analysis ticket {ticket} already completed (dx.x3.cancel)");
                 }
                 None => {
                     crate::bail!("unknown analysis ticket {ticket} (dx.x3.cancel)");
                 }
-                Some("running") => {}
+                Some(vmz_protocol::CancelStatus::Running) => {}
                 Some(other) => {
-                    crate::bail!("analysis ticket {ticket} status `{other}` rejects build");
+                    crate::bail!(
+                        "analysis ticket {ticket} status `{}` rejects build",
+                        other.as_str()
+                    );
                 }
             }
         }
@@ -256,7 +306,7 @@ impl Workspace {
             report.emitted.extend(targets);
             self.session.refresh_from_deployment(&self.options.out_dir);
             if let Some(ticket) = request.analysis_ticket {
-                self.analysis_tickets.insert(ticket, "completed".into());
+                self.analysis_tickets.insert(ticket, vmz_protocol::CancelStatus::Completed);
             }
         }
         Ok(report)
@@ -279,10 +329,12 @@ impl Workspace {
         self.session.to_json()
     }
 
+    /// Monotonic session graph generation (bumps on dirty / successful rebuild).
     pub fn session_generation(&self) -> u64 {
         self.session.generation
     }
 
+    /// Resolve on-disk Program IR path for a `.vmz` source under `out_dir`.
     pub fn program_ir_path(&self, source: impl AsRef<Path>) -> PathBuf {
         let source = source.as_ref();
         let root = &self.options.root;
@@ -297,6 +349,7 @@ impl Workspace {
         self.options.out_dir.join(rel_dir).join(format!("{stem}.program.json"))
     }
 
+    /// Read Program IR JSON for `source` (requires a prior successful build).
     pub fn query_program_graph(&self, source: impl AsRef<Path>) -> crate::Result<String> {
         let path = self.program_ir_path(source);
         fs::read_to_string(&path).map_err(|e| {
@@ -347,7 +400,7 @@ impl Workspace {
             .to_json();
         }
         if let Some(spec) = target.strip_prefix("rename:") {
-            // `rename:route_id:home->landing` or intent JSON after `rename:json:`
+            // `rename:route-id:home->landing` or intent JSON after `rename:json:`
             if let Some(json) = spec.strip_prefix("json:") {
                 return self.explain_rename_chain(json);
             }
@@ -355,8 +408,10 @@ impl Workspace {
                 let (kind, from) = if let Some((k, f)) = kind_from.split_once(':') {
                     (k, f)
                 } else {
-                    ("route_id", kind_from)
+                    ("route-id", kind_from)
                 };
+                let kind = vmz_protocol::StableIdKind::parse(kind)
+                    .unwrap_or(vmz_protocol::StableIdKind::RouteId);
                 let intent = vmz_protocol::RenameIntent::new(kind, from, to);
                 return self.explain_rename_chain(&intent.to_json());
             }
@@ -381,10 +436,10 @@ impl Workspace {
 
         let contribs = self.contributions.explain_rows();
         let contrib_query = target.strip_prefix("contribution:").unwrap_or(target);
-        let matched_contribs: Vec<&crate::plugin::ExplainContribution> = contribs
+        let matched_contribs: Vec<&crate::plugin::ExplainContributionRow> = contribs
             .iter()
             .filter(|c| {
-                if kind == "contribution" {
+                if kind == vmz_protocol::ExplainKind::Contribution {
                     return c.id.contains(contrib_query) || c.item_id == contrib_query;
                 }
                 let Some(path) = &c.path else {
@@ -404,39 +459,40 @@ impl Workspace {
             })
             .collect();
 
-        let unit_value = matched_unit.and_then(|u| serde_json::from_str(&u).ok());
+        let unit_value = matched_unit.and_then(|u| {
+            let slice: ExplainDeploymentUnitSlice = serde_json::from_str(&u).ok()?;
+            Some(vmz_protocol::ExplainDeploymentUnit {
+                chunk_id: slice.chunk_id.or_else(|| chunk_id.clone()),
+                kind: slice.kind,
+                source: slice.source,
+            })
+        });
         let program_value = program_summary
             .as_str()
             .ne("null")
-            .then(|| serde_json::from_str(&program_summary).ok())
+            .then(|| serde_json::from_str::<vmz_protocol::ExplainProgramRef>(&program_summary).ok())
             .flatten();
-        let edge_value =
-            (edge_json.as_str() != "null").then(|| serde_json::from_str(&edge_json).ok()).flatten();
-        let contrib_values: Vec<serde_json::Value> = matched_contribs
+        let edge_value = (edge_json.as_str() != "null")
+            .then(|| serde_json::from_str::<vmz_protocol::ExplainEdgeRef>(&edge_json).ok())
+            .flatten();
+        let contrib_values: Vec<vmz_protocol::ExplainContribution> = matched_contribs
             .iter()
-            .map(|c| {
-                let path = c
-                    .path
-                    .as_ref()
-                    .map(|p| serde_json::Value::String(p.clone()))
-                    .unwrap_or(serde_json::Value::Null);
-                serde_json::json!({
-                    "id": c.id,
-                    "plugin": c.plugin,
-                    "version": c.version,
-                    "stage": c.stage,
-                    "kind": c.kind,
-                    "itemId": c.item_id,
-                    "path": path,
-                    "cacheKey": c.cache_key,
-                })
+            .map(|c| vmz_protocol::ExplainContribution {
+                id: c.id.clone(),
+                plugin: c.plugin.clone(),
+                version: c.version.clone(),
+                stage: c.stage,
+                kind: c.kind,
+                item_id: c.item_id.clone(),
+                path: c.path.clone(),
+                cache_key: c.cache_key.clone(),
             })
             .collect();
 
         let doc = vmz_protocol::ExplainDocument {
             schema: vmz_protocol::EXPLAIN_SCHEMA.into(),
             target: target.to_string(),
-            kind: kind.clone(),
+            kind,
             chunk_id: chunk_id.clone(),
             deployment_unit: unit_value,
             program: program_value,
@@ -445,14 +501,14 @@ impl Workspace {
             contributions: contrib_values,
             chain: vec![],
             notes: Some(
-                "Deployment + Program IR + session index + plugin store; doc 13 F full causal graph remains later (protocol schema)."
+                "Deployment + Program IR + session index + plugin store; full causal graph remains later."
                     .into(),
             ),
         };
         doc.to_json()
     }
 
-    // DX protocol catalog (schema ids for CLI/LSP/MCP handshake).
+    /// DX protocol catalog (schema ids for CLI/LSP/MCP handshake).
     pub fn query_dx_catalog(&self) -> String {
         let _ = self;
         vmz_protocol::DxCatalog::v0().to_json()
@@ -464,7 +520,7 @@ impl Workspace {
         vmz_protocol::ProtocolCatalog::v0().to_json()
     }
 
-    // Affected document (`vmz.dx.affected.v0`).
+    /// Affected document (`vmz.dx.affected.v0`).
     pub fn query_affected_dx(&self) -> String {
         self.query_affected().to_dx_document().to_json()
     }
@@ -481,11 +537,11 @@ impl Workspace {
                 .to_json();
             }
         };
-        let Some(kind) = vmz_protocol::normalize_rename_kind(&intent.kind) else {
+        let Some(kind) = vmz_protocol::is_rename_kind(intent.kind) else {
             return vmz_protocol::WorkspaceEditPlan::rejected(
                 format!(
-                    "unsupported rename kind `{}` (expected route_id|field|method|component|capability)",
-                    intent.kind
+                    "unsupported rename kind `{}` (expected route-id|field|method|component|capability)",
+                    intent.kind.as_str()
                 ),
                 "dx.rename.kind",
             )
@@ -523,9 +579,12 @@ impl Workspace {
             .unwrap_or_else(|_| {
                 vmz_protocol::WorkspaceEditPlan::rejected("parse", "dx.rename.invalid_json")
             });
-        let intent: vmz_protocol::RenameIntent = serde_json::from_str(intent_json)
-            .unwrap_or_else(|_| vmz_protocol::RenameIntent::new("route_id", "?", "?"));
-        let kind = vmz_protocol::normalize_rename_kind(&intent.kind).unwrap_or("route_id");
+        let intent: vmz_protocol::RenameIntent =
+            serde_json::from_str(intent_json).unwrap_or_else(|_| {
+                vmz_protocol::RenameIntent::new(vmz_protocol::StableIdKind::RouteId, "?", "?")
+            });
+        let kind = vmz_protocol::is_rename_kind(intent.kind)
+            .unwrap_or(vmz_protocol::StableIdKind::RouteId);
         let mut chunks = crate::rename::chunks_from_edits(&plan.edits);
         let affected = self.query_affected();
         for u in &affected.units {
@@ -548,7 +607,7 @@ impl Workspace {
         let doc = vmz_protocol::ExplainDocument {
             schema: vmz_protocol::EXPLAIN_SCHEMA.into(),
             target: causal.clone(),
-            kind: "rename".into(),
+            kind: vmz_protocol::ExplainKind::Rename,
             chunk_id: chunks.first().cloned(),
             deployment_unit: None,
             program: None,
@@ -579,7 +638,7 @@ impl Workspace {
             }
         };
         let applied = crate::rename::apply_workspace_edits(&self.options.root, &plan);
-        if applied.status == "applied" {
+        if applied.status == vmz_protocol::WorkspaceEditStatus::Applied {
             for e in &plan.edits {
                 self.dirty.insert(self.options.root.join(&e.path));
             }
@@ -601,8 +660,13 @@ impl Workspace {
     pub fn query_references(&self, target: &str) -> String {
         let index = crate::cross_sfc::build_symbol_index(&self.options.root);
         let (kind, id) = target.split_once(':').unwrap_or(("component", target));
-        let refs: Vec<_> =
-            index.references.into_iter().filter(|r| r.to.kind == kind && r.to.id == id).collect();
+        let kind = vmz_protocol::StableIdKind::parse(kind)
+            .unwrap_or(vmz_protocol::StableIdKind::Component);
+        let refs: Vec<_> = index
+            .references
+            .into_iter()
+            .filter(|r| r.to.kind() == kind && r.to.id() == id)
+            .collect();
         serde_json::to_string_pretty(&refs).unwrap_or_else(|_| "[]".into())
     }
 
@@ -628,7 +692,7 @@ impl Workspace {
         self.transaction_seq = self.transaction_seq.saturating_add(1);
         let id = self.transaction_seq;
         let doc = crate::transaction::apply_semantic_transaction(&self.options.root, id, &edits);
-        if doc.status == "committed" {
+        if doc.status == vmz_protocol::SemanticTransactionStatus::Committed {
             for rel in &doc.dirty_paths {
                 self.dirty.insert(self.options.root.join(rel));
             }
@@ -641,10 +705,10 @@ impl Workspace {
     pub fn begin_analysis(&mut self) -> String {
         self.analysis_ticket_seq = self.analysis_ticket_seq.saturating_add(1);
         let ticket = self.analysis_ticket_seq;
-        self.analysis_tickets.insert(ticket, "running".into());
+        self.analysis_tickets.insert(ticket, vmz_protocol::CancelStatus::Running);
         crate::transaction::cancel_document(
             ticket,
-            "running",
+            vmz_protocol::CancelStatus::Running,
             self.session.generation,
             "analysis ticket opened",
         )
@@ -653,12 +717,12 @@ impl Workspace {
 
     /// cancel an open analysis ticket; subsequent build with that ticket fails.
     pub fn cancel_analysis(&mut self, ticket_id: u64) -> String {
-        match self.analysis_tickets.get(&ticket_id).map(String::as_str) {
-            Some("running") => {
-                self.analysis_tickets.insert(ticket_id, "cancelled".into());
+        match self.analysis_tickets.get(&ticket_id).copied() {
+            Some(vmz_protocol::CancelStatus::Running) => {
+                self.analysis_tickets.insert(ticket_id, vmz_protocol::CancelStatus::Cancelled);
                 crate::transaction::cancel_document(
                     ticket_id,
-                    "cancelled",
+                    vmz_protocol::CancelStatus::Cancelled,
                     self.session.generation,
                     "analysis ticket cancelled",
                 )
@@ -668,12 +732,12 @@ impl Workspace {
                 ticket_id,
                 status,
                 self.session.generation,
-                format!("ticket already `{status}`"),
+                format!("ticket already `{}`", status.as_str()),
             )
             .to_json(),
             None => crate::transaction::cancel_document(
                 ticket_id,
-                "cancelled",
+                vmz_protocol::CancelStatus::Cancelled,
                 self.session.generation,
                 "unknown ticket treated as cancelled",
             )
@@ -787,6 +851,7 @@ impl Workspace {
         crate::cross_host_conformance::check_cross_host_conformance(&self.options.root).to_json()
     }
 
+    /// Host/delivery profile protocol catalog JSON.
     pub fn query_profile_catalog(&self) -> String {
         vmz_protocol::ProfileProtocolCatalog::v0().to_json()
     }
@@ -836,6 +901,7 @@ impl Workspace {
         vmz_protocol::NativeHostProtocolCatalog::v0().to_json()
     }
 
+    /// Clear the dirty path set without rebuilding.
     pub fn clear_dirty(&mut self) {
         self.dirty.clear();
     }
@@ -845,24 +911,24 @@ fn resolve_explain_target(
     target: &str,
     deployment: Option<&str>,
     root: &Path,
-) -> (String, Option<String>, Option<String>, Option<String>) {
+) -> (vmz_protocol::ExplainKind, Option<String>, Option<String>, Option<String>) {
     if target.starts_with("contribution:") {
-        return ("contribution".into(), None, None, None);
+        return (vmz_protocol::ExplainKind::Contribution, None, None, None);
     }
 
     // `chunk#binding:0` | `chunk#effect:name` | `chunk#call:method`
     if let Some((head, edge)) = target.split_once('#') {
         let (_kind, chunk, unit, _) = resolve_explain_target(head, deployment, root);
         let edge_kind = if edge.starts_with("binding:") {
-            "binding"
+            vmz_protocol::ExplainKind::Binding
         } else if edge.starts_with("effect:") {
-            "effect"
+            vmz_protocol::ExplainKind::Effect
         } else if edge.starts_with("call:") {
-            "call"
+            vmz_protocol::ExplainKind::Call
         } else {
-            "edge"
+            vmz_protocol::ExplainKind::Edge
         };
-        return (edge_kind.into(), chunk, unit, Some(edge.to_string()));
+        return (edge_kind, chunk, unit, Some(edge.to_string()));
     }
 
     if let Some(method) = target.strip_prefix("capability:") {
@@ -871,7 +937,7 @@ fn resolve_explain_target(
                 if line.contains("\"capabilities\"") && line.contains(method) {
                     if let Some(chunk) = extract_json_str_line(line, "chunkId") {
                         return (
-                            "capability".into(),
+                            vmz_protocol::ExplainKind::Capability,
                             Some(chunk),
                             Some(line.trim().trim_end_matches(',').to_string()),
                             None,
@@ -880,7 +946,7 @@ fn resolve_explain_target(
                 }
             }
         }
-        return ("capability".into(), None, None, None);
+        return (vmz_protocol::ExplainKind::Capability, None, None, None);
     }
 
     if let Some(dep) = deployment {
@@ -888,7 +954,7 @@ fn resolve_explain_target(
             if let Some(chunk) = extract_json_str_line(line, "chunkId") {
                 if chunk == target {
                     return (
-                        "chunk".into(),
+                        vmz_protocol::ExplainKind::Chunk,
                         Some(chunk),
                         Some(line.trim().trim_end_matches(',').to_string()),
                         None,
@@ -912,7 +978,7 @@ fn resolve_explain_target(
                 {
                     let chunk = extract_json_str_line(line, "chunkId");
                     return (
-                        "source".into(),
+                        vmz_protocol::ExplainKind::Source,
                         chunk,
                         Some(line.trim().trim_end_matches(',').to_string()),
                         None,
@@ -923,82 +989,14 @@ fn resolve_explain_target(
     }
 
     if target.contains('/') && target.ends_with(".vmz") {
-        return ("source".into(), None, None, None);
+        return (vmz_protocol::ExplainKind::Source, None, None, None);
     }
-    ("chunk".into(), Some(target.to_string()), None, None)
+    (vmz_protocol::ExplainKind::Chunk, Some(target.to_string()), None, None)
 }
 
-fn explain_edge(program_json: &str, sel: &str) -> String {
-    if let Some(id_s) = sel.strip_prefix("binding:") {
-        let Ok(want) = id_s.parse::<u32>() else {
-            return format!("{{\"error\":\"bad binding id\", \"sel\":{sel:?}}}");
-        };
-        // Scan binding objects: "id": N
-        let mut found = None;
-        for line in program_json.lines() {
-            let t = line.trim();
-            if !t.contains("\"id\":") || !t.contains("\"kind\":") {
-                continue;
-            }
-            if let Some(id) = extract_json_number(t, "id") {
-                if id == want {
-                    found = Some(t.trim_end_matches(',').to_string());
-                    break;
-                }
-            }
-        }
-        return match found {
-            Some(raw) => format!("{{\"selector\":{sel:?},\"binding\":{raw}}}"),
-            None => format!("{{\"selector\":{sel:?},\"binding\":null}}"),
-        };
-    }
-    if let Some(name) = sel.strip_prefix("effect:") {
-        for line in program_json.lines() {
-            let t = line.trim();
-            if t.contains("\"name\":") && t.contains("\"writes\":") {
-                if extract_json_str_line(t, "name").as_deref() == Some(name) {
-                    return format!(
-                        "{{\"selector\":{sel:?},\"effect\":{}}}",
-                        t.trim_end_matches(',')
-                    );
-                }
-            }
-        }
-        return format!("{{\"selector\":{sel:?},\"effect\":null}}");
-    }
-    if let Some(method) = sel.strip_prefix("call:") {
-        for line in program_json.lines() {
-            let t = line.trim();
-            if t.contains("\"method\":")
-                && (t.contains("fromClientMethod") || t.contains("from_client_method"))
-            {
-                if extract_json_str_line(t, "method").as_deref() == Some(method) {
-                    return format!(
-                        "{{\"selector\":{sel:?},\"call\":{}}}",
-                        t.trim_end_matches(',')
-                    );
-                }
-            }
-        }
-        // Also match deployment clientCalls / server capabilities surface.
-        if program_json.contains(&format!("\"method\": \"{method}\""))
-            || program_json.contains(&format!("\"method\":{method:?}"))
-        {
-            return format!(
-                "{{\"selector\":{sel:?},\"call\":{{\"method\":{method:?},\"present\":true}}}}"
-            );
-        }
-        return format!("{{\"selector\":{sel:?},\"call\":null}}");
-    }
-    format!("{{\"selector\":{sel:?},\"error\":\"unknown edge selector\"}}")
-}
-
-fn extract_json_number(line: &str, key: &str) -> Option<u32> {
-    let pat = format!("\"{key}\":");
-    let i = line.find(&pat)?;
-    let rest = line[i + pat.len()..].trim_start();
-    let end = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
-    rest[..end].parse().ok()
+fn explain_edge(_program_json: &str, sel: &str) -> String {
+    serde_json::to_string(&vmz_protocol::ExplainEdgeRef { selector: sel.to_string() })
+        .unwrap_or_else(|_| "{}".into())
 }
 
 fn extract_json_str_line(line: &str, key: &str) -> Option<String> {
@@ -1019,57 +1017,14 @@ fn extract_json_str_line(line: &str, key: &str) -> Option<String> {
 fn summarize_program_json(text: &str) -> String {
     let name =
         text.lines().find_map(|l| extract_json_str_line(l, "name")).unwrap_or_else(|| "?".into());
-    let mut caps = Vec::new();
-    for line in text.lines() {
-        if line.contains("\"method\":")
-            && (line.contains("async_boundary")
-                || line.contains("callable_from_client")
-                || line.contains("fromClientMethod")
-                || line.contains("from_client_method"))
-        {
-            if let Some(m) = extract_json_str_line(line, "method") {
-                if !caps.contains(&m) {
-                    caps.push(m);
-                }
-            }
-        }
-    }
-    let mut regions = Vec::new();
-    for key in ["\"regionIds\"", "\"region_ids\""] {
-        if let Some(i) = text.find(key) {
-            let rest = &text[i..];
-            if let Some(lb) = rest.find('[') {
-                if let Some(rb) = rest[lb..].find(']') {
-                    for part in rest[lb + 1..lb + rb].split(',') {
-                        let t = part.trim();
-                        if !t.is_empty() {
-                            regions.push(t.to_string());
-                        }
-                    }
-                }
-            }
-            break;
-        }
-    }
-    let edge_count = text.matches("\"kind\": \"reads\"").count()
+    let edge_count = (text.matches("\"kind\": \"reads\"").count()
         + text.matches("\"kind\": \"writes\"").count()
         + text.matches("\"kind\": \"calls\"").count()
-        + text.matches("\"kind\": \"region_stable\"").count();
-    let unknown_count = text.matches("\"reason\": \"opaque_callee\"").count()
-        + text.matches("\"reason\": \"unresolved_method\"").count()
-        + text.matches("\"reason\": \"array_destructure\"").count()
-        + text.matches("\"reason\": \"computed_member\"").count()
-        + text.matches("\"reason\": \"rest_destructure\"").count()
-        + text.matches("\"reason\": \"closure_boundary\"").count()
-        + text.matches("\"reason\": \"field_star\"").count()
-        + text.matches("\"reason\": \"ir_unknown\"").count();
-    let resource_partial = text.contains("\"resources\"")
-        && (text.contains("async_effect")
-            || text.contains("server_capability")
-            || text.contains("\"kind\": \"http\""));
-    let cap_s = caps.iter().map(|c| format!("{c:?}")).collect::<Vec<_>>().join(", ");
-    format!(
-        "{{\"unitName\":{name:?},\"capabilities\":[{cap_s}],\"regionIds\":[{}],\"edgeCount\":{edge_count},\"unknownCount\":{unknown_count},\"hasResources\":{resource_partial}}}",
-        regions.join(", ")
-    )
+        + text.matches("\"kind\": \"region_stable\"").count()) as u64;
+    serde_json::to_string(&vmz_protocol::ExplainProgramRef {
+        path: name,
+        edge_count: Some(edge_count),
+        binding_id: None,
+    })
+    .unwrap_or_else(|_| "{}".into())
 }

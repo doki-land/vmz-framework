@@ -1,125 +1,164 @@
-//! Plugin contribution protocol v1 .
+//! Plugin contribution protocol v1.
 //!
-//! Plugins submit **versioned batches**; Rust validates and merges. No JS AST
+//! Plugins submit versioned batches; Rust validates and merges. No JS AST
 //! callbacks and no direct VPG mutation handles.
+//!
+//! Wire shape rules match `vmz-types`: closed payloads are tagged unions or
+//! unit enums; intentionally open host labels stay `String` and are documented.
+//! Emit paths use typed `Serialize` — never hand-built JSON strings.
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 
-use crate::diagnostic::ReportedDiagnostic;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
+
+use crate::diagnostic::{ReportedDiagnostic, Severity, severity_wire};
 
 /// Locked plugin protocol id (must match Node `PLUGIN_PROTOCOL`).
 pub const PLUGIN_PROTOCOL_V1: &str = vmz_protocol::PLUGIN_PROTOCOL;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PluginStage {
-    /// Virtual files / resolve maps → [`ContributionKind::Source`].
-    WorkspaceResolve,
-    /// External format → VMZ source (still a source contribution).
-    SourceAdapter,
-    /// Read-only diagnostics / advice.
-    Analyzer,
-    /// Deployment target manifests (how to deploy, not what the program means).
-    Target,
-}
+/// Schema id for [`PluginTargetsSummary`].
+pub const PLUGIN_TARGETS_SUMMARY_SCHEMA: &str = "vmz.plugin.targets.v1";
+/// Schema id for [`PluginTargetDocument`].
+pub const PLUGIN_TARGET_SCHEMA: &str = "vmz.plugin.target.v1";
 
-impl PluginStage {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::WorkspaceResolve => "workspace_resolve",
-            Self::SourceAdapter => "source_adapter",
-            Self::Analyzer => "analyzer",
-            Self::Target => "target",
-        }
-    }
+pub use vmz_protocol::{ExplainContributionSurface, PluginStage};
 
-    pub fn parse(s: &str) -> Option<Self> {
-        match s {
-            "workspace_resolve" | "WorkspaceResolve" => Some(Self::WorkspaceResolve),
-            "source_adapter" | "SourceAdapter" => Some(Self::SourceAdapter),
-            "analyzer" | "Analyzer" => Some(Self::Analyzer),
-            "target" | "Target" => Some(Self::Target),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Plugin name + semver-ish version string.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct PluginIdentity {
+    /// Plugin package / id.
     pub name: String,
+    /// Plugin version string.
     pub version: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Free-form provenance note attached by hosts (optional tooling).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Provenance {
+    /// Human-readable note.
     pub note: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One contribution payload inside a batch.
+///
+/// **Tagged union** (`tag = "kind"`). Call sites should `match` the variant,
+/// not compare a parallel `kind` field.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "kebab-case", rename_all_fields = "camelCase")]
 pub enum ContributionKind {
+    /// Virtual or adapted source file.
     Source {
         /// Path relative to workspace root (must stay inside root).
         path: PathBuf,
+        /// Full UTF-8 file contents.
         content: String,
         /// Hex sha256 of UTF-8 content (lowercase).
         content_hash: String,
         /// When true, materialize onto disk under the workspace root before build/check.
+        #[serde(default)]
         materialize: bool,
     },
+    /// Analyzer diagnostic contribution.
     Analyzer {
+        /// Workspace-relative path the diagnostic applies to.
         path: PathBuf,
-        severity: String,
+        /// oxc [`Severity`] on the wire as kebab-case (`error` | `warning` | `advice`).
+        #[serde(with = "severity_wire")]
+        #[schemars(with = "String")]
+        severity: Severity,
+        /// Diagnostic message body.
         message: String,
+        /// Optional machine-readable code.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         code: Option<String>,
     },
+    /// Deployment target manifest contribution.
     Target {
+        /// Stable target id (file stem under `vmz-targets/`).
         target_id: String,
-        kind: String,
-        /// Opaque JSON object text (validated as object-ish: starts with `{`).
-        manifest_json: String,
+        /// **Open** host-defined target kind label (plugins invent deploy flavors).
+        ///
+        /// Named `target_kind` so it does not collide with the serde `tag = "kind"`.
+        target_kind: String,
+        /// Opaque JSON **object** (validated as `JsonValue::Object` on apply).
+        ///
+        /// Prefer this over a pre-serialized `manifestJson` string.
+        manifest: JsonValue,
     },
-    /// Explicitly rejected — plugins must not send VPG mutation.
+    /// Explicitly rejected: plugins must not send VPG mutation.
     GraphMutation {
+        /// Why the mutation was attempted / rejected.
         detail: String,
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One item inside a [`ContributionBatch`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ContributionItem {
     /// Stable id within the plugin (used for diff / cache).
     pub id: String,
+    /// Contribution payload.
+    #[serde(flatten)]
     pub kind: ContributionKind,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Versioned batch submitted by a plugin host.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ContributionBatch {
+    /// Submitting plugin identity.
     pub plugin: PluginIdentity,
+    /// Must equal [`PLUGIN_PROTOCOL_V1`].
     pub protocol: String,
+    /// Stage that owns this batch.
     pub stage: PluginStage,
     /// Host-declared cache key (deterministic plugins should hash inputs).
     pub cache_key: String,
+    /// Whether the host claims deterministic output for this cache key.
     pub deterministic: bool,
+    /// Contribution items.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub items: Vec<ContributionItem>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One rejected contribution item.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Rejection {
+    /// Plugin name that submitted the item.
     pub plugin: String,
+    /// Item id (or `*` for batch-level rejection).
     pub item_id: String,
+    /// Human-readable rejection reason.
     pub reason: String,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+/// Diff of store keys after applying a batch.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ContributionDiff {
+    /// Newly accepted keys.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub added: Vec<String>,
+    /// Keys removed because they were absent from the new batch (same stage).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub removed: Vec<String>,
+    /// Keys that already existed and were replaced in place.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub unchanged: Vec<String>,
 }
 
-#[derive(Debug, Clone, Default)]
+/// Result of [`ContributionStore::apply_batch`].
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct ApplyContributionsReport {
+    /// Number of items accepted into the store.
     pub accepted: usize,
+    /// Rejected items (store kept prior successful entries).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rejected: Vec<Rejection>,
+    /// Key-level diff for this apply.
     pub diff: ContributionDiff,
 }
 
@@ -140,40 +179,45 @@ struct StoredContribution {
 }
 
 impl ContributionStore {
+    /// Number of accepted contribution keys currently stored.
     pub fn len(&self) -> usize {
         self.items.len()
     }
 
+    /// True when no contributions are stored.
     pub fn is_empty(&self) -> bool {
         self.items.is_empty()
     }
 
+    /// Iterate stored keys (`plugin@version::item_id`).
     pub fn keys(&self) -> impl Iterator<Item = &String> {
         self.items.keys()
     }
 
     /// Coarse provenance rows for `Workspace::explain` (plugin contributions).
-    pub fn explain_rows(&self) -> Vec<ExplainContribution> {
+    pub fn explain_rows(&self) -> Vec<ExplainContributionRow> {
         let mut rows: Vec<_> = self
             .items
             .iter()
             .map(|(key, stored)| {
                 let (kind, path) = match &stored.item.kind {
                     ContributionKind::Source { path, .. } => {
-                        ("source", Some(path.display().to_string()))
+                        (ExplainContributionSurface::Source, Some(path.display().to_string()))
                     }
                     ContributionKind::Analyzer { path, .. } => {
-                        ("analyzer", Some(path.display().to_string()))
+                        (ExplainContributionSurface::Analyzer, Some(path.display().to_string()))
                     }
-                    ContributionKind::Target { .. } => ("target", None),
-                    ContributionKind::GraphMutation { .. } => ("graph_mutation", None),
+                    ContributionKind::Target { .. } => (ExplainContributionSurface::Target, None),
+                    ContributionKind::GraphMutation { .. } => {
+                        (ExplainContributionSurface::GraphMutation, None)
+                    }
                 };
-                ExplainContribution {
+                ExplainContributionRow {
                     id: key.clone(),
                     plugin: stored.plugin.name.clone(),
                     version: stored.plugin.version.clone(),
-                    stage: stored.stage.as_str().to_string(),
-                    kind: kind.into(),
+                    stage: stored.stage,
+                    kind,
                     item_id: stored.item.id.clone(),
                     path,
                     cache_key: stored.cache_key.clone(),
@@ -278,68 +322,131 @@ impl ContributionStore {
         Ok(written)
     }
 
+    /// Collect analyzer diagnostics from accepted contributions.
     pub fn analyzer_diagnostics(&self) -> Vec<ReportedDiagnostic> {
         let mut out = Vec::new();
         for stored in self.items.values() {
             if let ContributionKind::Analyzer { path, severity, message, .. } = &stored.item.kind {
                 let msg = format!("[plugin {}:{}] {message}", stored.plugin.name, stored.item.id);
-                out.push(match severity.as_str() {
-                    "warning" | "warn" => ReportedDiagnostic::warning(path, msg),
-                    "advice" | "info" => ReportedDiagnostic::warning(path, msg),
-                    _ => ReportedDiagnostic::error(path, msg),
-                });
+                out.push(ReportedDiagnostic::with_severity(path, *severity, msg));
             }
         }
         out
     }
 
     /// Emit target manifests into `out_dir/vmz-targets/` and a summary JSON.
+    ///
+    /// Bodies are typed [`PluginTargetDocument`] / [`PluginTargetsSummary`] —
+    /// never hand-built JSON strings.
     pub fn emit_targets(&self, out_dir: &Path) -> crate::Result<Vec<PathBuf>> {
         let mut emitted = Vec::new();
         let targets_dir = out_dir.join("vmz-targets");
         std::fs::create_dir_all(&targets_dir)?;
-        let mut summary =
-            String::from("{\n  \"schema\": \"vmz.plugin.targets.v1\",\n  \"targets\": [\n");
-        let mut first = true;
+
+        let mut summary = PluginTargetsSummary {
+            schema: PLUGIN_TARGETS_SUMMARY_SCHEMA.into(),
+            targets: Vec::new(),
+        };
+
         for stored in self.items.values() {
-            if let ContributionKind::Target { target_id, kind, manifest_json } = &stored.item.kind {
+            if let ContributionKind::Target { target_id, target_kind, manifest } = &stored.item.kind
+            {
+                let rel_file = format!("vmz-targets/{target_id}.json");
                 let file = targets_dir.join(format!("{target_id}.json"));
-                let body = format!(
-                    "{{\n  \"schema\": \"vmz.plugin.target.v1\",\n  \"targetId\": {:?},\n  \"kind\": {:?},\n  \"plugin\": {:?},\n  \"pluginVersion\": {:?},\n  \"contributionId\": {:?},\n  \"manifest\": {manifest_json}\n}}\n",
-                    target_id, kind, stored.plugin.name, stored.plugin.version, stored.item.id,
-                );
-                std::fs::write(&file, body)?;
+                let doc = PluginTargetDocument {
+                    schema: PLUGIN_TARGET_SCHEMA.into(),
+                    target_id: target_id.clone(),
+                    kind: target_kind.clone(),
+                    plugin: stored.plugin.name.clone(),
+                    plugin_version: stored.plugin.version.clone(),
+                    contribution_id: stored.item.id.clone(),
+                    manifest: manifest.clone(),
+                };
+                let body = serde_json::to_string_pretty(&doc)
+                    .map_err(|e| format!("serialize plugin target `{target_id}`: {e}"))?;
+                std::fs::write(&file, format!("{body}\n"))?;
                 emitted.push(file);
-                if !first {
-                    summary.push_str(",\n");
-                }
-                first = false;
-                summary.push_str(&format!(
-                    "    {{ \"id\": {:?}, \"kind\": {:?}, \"plugin\": {:?}, \"file\": {:?} }}",
-                    target_id,
-                    kind,
-                    stored.plugin.name,
-                    format!("vmz-targets/{target_id}.json"),
-                ));
+                summary.targets.push(PluginTargetSummaryEntry {
+                    id: target_id.clone(),
+                    kind: target_kind.clone(),
+                    plugin: stored.plugin.name.clone(),
+                    file: rel_file,
+                });
             }
         }
-        summary.push_str("\n  ]\n}\n");
+
+        summary.targets.sort_by(|a, b| a.id.cmp(&b.id));
         let summary_path = out_dir.join("vmz-plugin-targets.json");
-        std::fs::write(&summary_path, summary)?;
+        let summary_body = serde_json::to_string_pretty(&summary)
+            .map_err(|e| format!("serialize plugin targets summary: {e}"))?;
+        std::fs::write(&summary_path, format!("{summary_body}\n"))?;
         emitted.push(summary_path);
         Ok(emitted)
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ExplainContribution {
-    pub id: String,
-    pub plugin: String,
-    pub version: String,
-    pub stage: String,
+/// One accepted target document written under `vmz-targets/`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginTargetDocument {
+    /// Always [`PLUGIN_TARGET_SCHEMA`].
+    pub schema: String,
+    /// Stable target id (file stem).
+    pub target_id: String,
+    /// **Open** host-defined kind label (same as contribution `targetKind`).
     pub kind: String,
+    /// Plugin package / id.
+    pub plugin: String,
+    /// Plugin version string.
+    pub plugin_version: String,
+    /// Contribution item id within the plugin.
+    pub contribution_id: String,
+    /// Opaque JSON object from the contribution.
+    pub manifest: JsonValue,
+}
+
+/// One row in [`PluginTargetsSummary`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct PluginTargetSummaryEntry {
+    /// Target id.
+    pub id: String,
+    /// **Open** host-defined kind label.
+    pub kind: String,
+    /// Plugin package / id.
+    pub plugin: String,
+    /// Workspace-relative path (`vmz-targets/{id}.json`).
+    pub file: String,
+}
+
+/// Summary index of all emitted plugin targets for a build.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct PluginTargetsSummary {
+    /// Always [`PLUGIN_TARGETS_SUMMARY_SCHEMA`].
+    pub schema: String,
+    /// Target rows (sorted by id on emit).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub targets: Vec<PluginTargetSummaryEntry>,
+}
+
+/// Session-side explain row before mapping into `vmz_protocol::ExplainContribution`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ExplainContributionRow {
+    /// Store key (`plugin@version::item_id`).
+    pub id: String,
+    /// Plugin package / id.
+    pub plugin: String,
+    /// Plugin version string.
+    pub version: String,
+    /// Closed stage that accepted the item.
+    pub stage: PluginStage,
+    /// Closed contribution surface.
+    pub kind: ExplainContributionSurface,
+    /// Item id within the plugin.
     pub item_id: String,
+    /// Optional workspace-relative path (source / analyzer).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    /// Host-declared cache key for the batch.
     pub cache_key: String,
 }
 
@@ -372,7 +479,7 @@ fn validate_item(
             }
             Ok(())
         }
-        ContributionKind::Analyzer { severity, message, .. } => {
+        ContributionKind::Analyzer { message, .. } => {
             if batch.stage != PluginStage::Analyzer {
                 return Err(format!(
                     "analyzer contribution not allowed in stage `{}`",
@@ -382,24 +489,20 @@ fn validate_item(
             if message.is_empty() {
                 return Err("analyzer message must be non-empty".into());
             }
-            match severity.as_str() {
-                "error" | "warning" | "warn" | "advice" | "info" => Ok(()),
-                other => Err(format!("unknown analyzer severity `{other}`")),
-            }
+            Ok(())
         }
-        ContributionKind::Target { target_id, kind, manifest_json } => {
+        ContributionKind::Target { target_id, target_kind, manifest } => {
             if batch.stage != PluginStage::Target {
                 return Err(format!(
                     "target contribution not allowed in stage `{}`",
                     batch.stage.as_str()
                 ));
             }
-            if target_id.is_empty() || kind.is_empty() {
-                return Err("target_id and kind must be non-empty".into());
+            if target_id.is_empty() || target_kind.is_empty() {
+                return Err("target_id and target_kind must be non-empty".into());
             }
-            let trimmed = manifest_json.trim();
-            if !(trimmed.starts_with('{') && trimmed.ends_with('}')) {
-                return Err("target manifest_json must be a JSON object".into());
+            if !manifest.is_object() {
+                return Err("target manifest must be a JSON object".into());
             }
             Ok(())
         }

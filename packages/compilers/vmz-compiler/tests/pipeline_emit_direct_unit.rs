@@ -1,13 +1,12 @@
 //! Moved from `src/pipeline/emit_direct.rs` (cargo-cry: tests next to Cargo.toml).
 
-use vmz_protocol::*;
-
 use vmz_compiler::analyze::analyze_script;
 use vmz_compiler::emit::emit_client_js;
 use vmz_compiler::pipeline::emit_direct::*;
 use vmz_compiler::reactive_build::build_program_module;
 use vmz_compiler::sfc::ScriptKind;
 use vmz_compiler::template::parse_template;
+use vmz_types::{ViewNode, ViewStatus};
 
 #[test]
 fn leaf_button_emits_vmz_create() {

@@ -21,7 +21,7 @@ fn program_wraps_reactive_as_one_view() {
     assert!(json.contains(PROGRAM_SCHEMA), "{json}");
     assert!(json.contains("\"semantic\""), "{json}");
     assert!(json.contains("\"reactive\""), "{json}");
-    assert!(json.contains("derived_from_reactive"), "{json}");
+    assert!(json.contains("derived-from-reactive"), "{json}");
     assert!(json.contains("user.name"), "{json}");
     assert!(json.contains("\"graph\""), "{json}");
     assert!(json.contains("\"edges\""), "{json}");
@@ -32,9 +32,9 @@ fn program_wraps_reactive_as_one_view() {
     let u = &program.units[0];
     assert_eq!(u.semantic.fields[0].name, "user");
     assert_eq!(u.view.binding_ids.len(), 1);
-    assert_eq!(u.reactive.bindings[0].id, u.view.binding_ids[0]);
+    assert_eq!(u.reactive.bindings[0].id(), u.view.binding_ids[0]);
     assert!(!u.graph.edges.is_empty());
-    assert_eq!(u.graph.edges[0].kind, "reads");
+    assert_eq!(u.graph.edges[0].kind, ProgramEdgeKind::Reads);
     assert_eq!(u.graph.edges[0].to, "user.name");
 }
 
@@ -69,25 +69,32 @@ fn resource_and_call_edges_from_server_attach() {
         secret_requirements: vec![],
     });
     assert_eq!(unit.resource.status, StubStatus::Partial);
-    assert!(unit.resource.resources.iter().any(|r| r.kind == "async_task"
-        && r.name == "onMount"
-        && r.cancelable
-        && r.generation
-        && r.states.iter().any(|s| s == "cancelled")));
-    assert!(
-        unit.resource
-            .resources
-            .iter()
-            .any(|r| r.kind == "server_capability" && r.name == "fetchUser")
-    );
+    assert!(unit.resource.resources.iter().any(|r| matches!(
+        r,
+        ResourceDecl::AsyncTask {
+            name,
+            cancelable: true,
+            generation: true,
+            states,
+            ..
+        } if name == "onMount" && states.iter().any(|s| s == "cancelled")
+    )));
+    assert!(unit.resource.resources.iter().any(|r| matches!(
+        r,
+        ResourceDecl::ServerCapability { name, .. } if name == "fetchUser"
+    )));
     assert!(unit.graph.edges.iter().any(|e| {
-        e.kind == "calls" && e.from == "effect:onMount" && e.to == "capability:fetchUser"
+        e.kind == ProgramEdgeKind::Calls
+            && e.from == "effect:onMount"
+            && e.to == "capability:fetchUser"
     }));
     assert!(unit.graph.edges.iter().any(|e| {
-        e.kind == "spawns" && e.from == "effect:onMount" && e.to.starts_with("task:")
+        e.kind == ProgramEdgeKind::Spawns && e.from == "effect:onMount" && e.to.starts_with("task:")
     }));
     assert!(unit.graph.edges.iter().any(|e| {
-        e.kind == "cancels" && e.from == "lifecycle:destroy" && e.to.starts_with("task:")
+        e.kind == ProgramEdgeKind::Cancels
+            && e.from == "lifecycle:destroy"
+            && e.to.starts_with("task:")
     }));
 }
 
@@ -133,7 +140,7 @@ fn motion_view_from_overlay_markers_and_cancel_method() {
 
     assert_eq!(unit.motion.status, StubStatus::Partial);
     assert!(unit.motion.transitions.iter().any(|t| {
-        t.kind == "overlay-enter"
+        t.kind == MotionTransitionKind::OverlayEnter
             && t.trigger == "open"
             && t.cancelable
             && t.generation
@@ -141,20 +148,25 @@ fn motion_view_from_overlay_markers_and_cancel_method() {
             && t.token == "motion.overlay"
     }));
     assert!(unit.motion.transitions.iter().any(|t| {
-        t.kind == "overlay-exit" && t.trigger == "dismiss" && t.cancelable && t.generation
+        t.kind == MotionTransitionKind::OverlayExit
+            && t.trigger == "dismiss"
+            && t.cancelable
+            && t.generation
     }));
     assert!(unit.graph.edges.iter().any(|e| {
-        e.kind == "cancels" && e.from == "effect:_cancelExit" && e.to.starts_with("motion:")
+        e.kind == ProgramEdgeKind::Cancels
+            && e.from == "effect:_cancelExit"
+            && e.to.starts_with("motion:")
     }));
     assert!(unit.graph.edges.iter().any(|e| {
-        e.kind == "cancels" && e.from == "motion:reverse" && e.to.starts_with("motion:")
+        e.kind == ProgramEdgeKind::Cancels
+            && e.from == "motion:reverse"
+            && e.to.starts_with("motion:")
     }));
-    assert!(
-        unit.graph.edges.iter().any(|e| {
-            e.kind == "affects" && e.from.starts_with("motion:") && e.to == "region:0"
-        })
-    );
-    assert!(unit.plan.nodes.iter().any(|n| n.kind == "motion_transition"));
+    assert!(unit.graph.edges.iter().any(|e| {
+        e.kind == ProgramEdgeKind::Affects && e.from.starts_with("motion:") && e.to == "region:0"
+    }));
+    assert!(unit.plan.nodes.iter().any(|n| n.kind() == PlanNodeKind::MotionTransition));
     let json = ProgramModule {
         schema: PROGRAM_SCHEMA.into(),
         source: "Dialog.vmz".into(),
@@ -210,16 +222,10 @@ fn motion_author_token_override_from_view_attr() {
     };
     unit.plan = ExecutionPlan::default();
     unit.rebuild_projected_views();
-    assert!(
-        unit.motion
-            .transitions
-            .iter()
-            .any(|t| { t.kind == "overlay-enter" && t.token == "motion.custom-panel" })
-    );
-    assert!(
-        unit.motion
-            .transitions
-            .iter()
-            .any(|t| { t.kind == "overlay-exit" && t.token == "motion.custom-panel" })
-    );
+    assert!(unit.motion.transitions.iter().any(|t| {
+        t.kind == MotionTransitionKind::OverlayEnter && t.token == "motion.custom-panel"
+    }));
+    assert!(unit.motion.transitions.iter().any(|t| {
+        t.kind == MotionTransitionKind::OverlayExit && t.token == "motion.custom-panel"
+    }));
 }

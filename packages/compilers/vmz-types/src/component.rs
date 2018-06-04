@@ -32,7 +32,7 @@ pub enum Visibility {
 
 /// How a field participates in the component contract.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum FieldKind {
     /// `public` field on the default-exported class -> component prop.
     Prop,

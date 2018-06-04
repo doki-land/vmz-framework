@@ -8,6 +8,7 @@ use walkdir::WalkDir;
 
 use crate::commands::serve::{resolve_dirs, soft_reload_host, spawn_host_with, stop_host};
 
+/// Arguments for `vmz dev` (build + serve + poll rebuild).
 #[derive(Debug, ClapArgs)]
 pub struct Args {
     /// Project root (defaults to current directory)
@@ -31,6 +32,7 @@ pub struct Args {
     pub poll_ms: u64,
 }
 
+/// Build once, spawn serve-host, then rebuild on `src/` fingerprint changes.
 pub fn run(args: Args) -> Result<()> {
     let (project, dist) = resolve_dirs(&args.path, &args.out_dir)?;
     let src = project.join("src");

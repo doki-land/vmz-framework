@@ -1,9 +1,9 @@
 //! Style Theme / global style diagnostics.
 //!
-//! - unknown `var(--vmz-…)` / semantic `style:tw` → `vmz::style::unknown_design_token`
-//! - unused Style Theme leaves → `vmz::style::unused_design_token` (warning)
-//! - unreferenced `designs/styles` siblings when `index.*` entry exists →
-//! `vmz::style::unreferenced_global_style` (warning)
+//! - unknown `var(--vmz-...)` / semantic `style:tw` -> `vmz::style::unknown_design_token`
+//! - unused Style Theme leaves -> `vmz::style::unused_design_token` (warning)
+//! - unreferenced `designs/styles` siblings when `index.*` entry exists ->
+//!   `vmz::style::unreferenced_global_style` (warning)
 
 use std::collections::{BTreeSet, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
@@ -16,8 +16,11 @@ use crate::project::discover_vmz_files;
 use crate::sfc::parse_vmz;
 use crate::tw::{TwRegistration, register_tw_from_parsed};
 
+/// Diagnostic code for unknown `--vmz-...` / semantic `style:tw` theme refs.
 pub const DIAG_UNKNOWN_DESIGN_TOKEN: &str = "vmz::style::unknown_design_token";
+/// Diagnostic code for Style Theme leaves never referenced by CSS or `style:tw`.
 pub const DIAG_UNUSED_DESIGN_TOKEN: &str = "vmz::style::unused_design_token";
+/// Diagnostic code for `designs/styles` siblings not reachable from the entry.
 pub const DIAG_UNREFERENCED_GLOBAL_STYLE: &str = "vmz::style::unreferenced_global_style";
 
 /// Project-wide Style Theme + global style reference diagnostics.
@@ -68,6 +71,9 @@ pub fn validate_project_design_token_refs(
     out
 }
 
+/// Diagnose unknown `--vmz-*` CSS variable references against a known theme var set.
+///
+/// Scans `text` for `var(--vmz-...)` uses and emits one error per unseen name.
 pub fn validate_vmz_css_var_refs(
     theme: &StyleTheme,
     known: &BTreeSet<String>,
@@ -91,6 +97,9 @@ pub fn validate_vmz_css_var_refs(
     out
 }
 
+/// Diagnose Tailwind-style utility tokens in a parsed SFC that lack theme leaves.
+///
+/// Registers utilities from the parsed document and validates each against `theme`.
 pub fn validate_style_tw_design_token_refs(
     theme: &StyleTheme,
     parsed: &crate::sfc::ParsedVmz,
@@ -284,6 +293,10 @@ fn resolve_style_import(styles_dir: &Path, from_dir: &Path, spec: &str) -> Optio
     candidates.into_iter().find(|p| p.is_file())
 }
 
+/// Warn about design-token CSS variables defined in the theme but unused in the project.
+///
+/// Skips when designs are missing or the theme has no known vars; otherwise scans
+/// project sources for `--vmz-*` and utility references.
 pub fn validate_unused_design_tokens(
     root: &Path,
     designs: &DesignsBundle,
@@ -367,6 +380,9 @@ fn mark_css_var_uses(text: &str, known: &BTreeSet<String>, used: &mut BTreeSet<S
     }
 }
 
+/// Map a utility class to a semantic design-token `(namespace, key)` when the key is semantic.
+///
+/// Returns `None` for empty tokens or keys that fail the semantic design-key check.
 pub fn design_token_ref_from_utility(token: &str) -> Option<(&'static str, &str)> {
     let bare = bare_utility(token);
     if bare.is_empty() {
@@ -383,6 +399,10 @@ pub fn design_token_ref_from_utility(token: &str) -> Option<(&'static str, &str)
     None
 }
 
+/// Map a utility class to a theme-table `(namespace, key)` when the key is a theme leaf.
+///
+/// Like [`design_token_ref_from_utility`], but accepts theme leaf keys rather than
+/// semantic design keys only.
 pub fn theme_leaf_ref_from_utility(token: &str) -> Option<(&'static str, &str)> {
     let bare = bare_utility(token);
     if bare.is_empty() {
@@ -399,6 +419,9 @@ pub fn theme_leaf_ref_from_utility(token: &str) -> Option<(&'static str, &str)> 
     None
 }
 
+/// Strip important/`:` variants and opacity suffixes, leaving the bare utility name.
+///
+/// Example: `!hover:bg-action/50` becomes `bg-action`.
 pub fn bare_utility(token: &str) -> &str {
     let t = token.trim();
     let t = t.strip_prefix('!').unwrap_or(t);
@@ -503,6 +526,7 @@ const UTILITY_THEME_PREFIXES: &[(&str, &str)] = &[
     ("to-", "colors"),
 ];
 
+/// Collect unique-looking `--vmz-*` names referenced via `var(...)` in CSS/source text.
 pub fn collect_vmz_css_var_refs(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     let bytes = text.as_bytes();

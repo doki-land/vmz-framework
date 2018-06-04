@@ -9,7 +9,7 @@ use vmz_compiler::native::host::*;
 fn rejects_window_native_pattern() {
     let mut diags = Vec::new();
     scan_bridge_text_for_arbitrary("x", "window.native = {}", &mut diags);
-    assert!(diags.iter().any(|d| d.code.as_deref() == Some(DIAG_ARBITRARY_BRIDGE)));
+    assert!(diags.iter().any(|d| d.code_string().as_deref() == Some(DIAG_ARBITRARY_BRIDGE)));
 }
 
 #[test]
@@ -20,7 +20,7 @@ fn example_profile_is_ready() {
     ));
     let _ = fs::create_dir_all(&dir);
     let report = check_native_host_contract(&dir);
-    assert_eq!(report.status, "ready", "{:?}", report.diagnostics);
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Ready, "{:?}", report.diagnostics);
     assert!(report.webview_deployment.reuses_browser_lowering);
     let _ = fs::remove_dir_all(&dir);
 }

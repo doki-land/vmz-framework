@@ -24,4 +24,11 @@ export default defineConfig({
 
 - [Zero-Cost](./zero-cost.md)
 - [优化](./optimizations/index.md)
+- [部署](./deploy/index.md)
+  - [常见配方](./deploy/recipes.md)
+  - [纯静态平台填写清单](./deploy/static-hosts.md)
+  - [计划器](./deploy/planner.md)
+  - [`vmz deploy`](./deploy/cli.md)
+  - [密钥与环境变量](./deploy/secrets-env.md)
+  - [配置参考](./deploy/config-reference.md)
 - 更多用法见本站 `/d/` 下的指南与插件文档

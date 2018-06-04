@@ -19,7 +19,7 @@ fn tmp(prefix: &str) -> std::path::PathBuf {
 fn cross_host_recovery_ready() {
     let dir = tmp("vmz-p3-");
     let report = check_lifecycle_recovery(&dir);
-    assert_eq!(report.status, "ready");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Ready);
     assert_eq!(report.scenario.hosts.len(), 3);
     assert!(!report.scenario.recovery.creates_new_owner_on_recover);
     assert!(!report.scenario.recovery.assumes_js_heap_survived);
@@ -34,12 +34,12 @@ fn reject_duplicate_owner() {
     fs::write(dir.join("lifecycle-scenario.json"), serde_json::to_string_pretty(&s).unwrap())
         .unwrap();
     let report = check_lifecycle_recovery(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
         report
             .diagnostics
             .iter()
-            .any(|d| d.code.as_deref() == Some(DIAG_RECOVERY_DUPLICATES_OWNER))
+            .any(|d| d.code_string().as_deref() == Some(DIAG_RECOVERY_DUPLICATES_OWNER))
     );
     let _ = fs::remove_dir_all(dir);
 }
@@ -52,9 +52,12 @@ fn reject_assumes_heap() {
     fs::write(dir.join("lifecycle-scenario.json"), serde_json::to_string_pretty(&s).unwrap())
         .unwrap();
     let report = check_lifecycle_recovery(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
-        report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_RECOVERY_ASSUMES_HEAP))
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_RECOVERY_ASSUMES_HEAP))
     );
     let _ = fs::remove_dir_all(dir);
 }
@@ -63,17 +66,17 @@ fn reject_assumes_heap() {
 fn reject_missing_host_kind() {
     let dir = tmp("vmz-p3-host-");
     let mut s = LifecycleScenario::cross_host_recovery_example();
-    s.hosts.retain(|h| h.host_kind != "mini");
+    s.hosts.retain(|h| h.host_kind != LifecycleHostKind::Mini);
     s.mapping_table = vmz_protocol::LifecycleMappingTable::from_hosts(&s.hosts);
     fs::write(dir.join("lifecycle-scenario.json"), serde_json::to_string_pretty(&s).unwrap())
         .unwrap();
     let report = check_lifecycle_recovery(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
         report
             .diagnostics
             .iter()
-            .any(|d| d.code.as_deref() == Some(DIAG_LIFECYCLE_MAPPING_INCOMPLETE))
+            .any(|d| d.code_string().as_deref() == Some(DIAG_LIFECYCLE_MAPPING_INCOMPLETE))
     );
     let _ = fs::remove_dir_all(dir);
 }
@@ -82,17 +85,23 @@ fn reject_missing_host_kind() {
 fn reject_invalid_persistence() {
     let dir = tmp("vmz-p3-persist-");
     let mut s = LifecycleScenario::cross_host_recovery_example();
-    s.hosts[0].lifecycle[0].persistence_window = "heap".into();
+    // Closed enum cannot carry `"heap"`; foul recover with an illegal window instead.
+    let recover = s.hosts[0]
+        .lifecycle
+        .iter_mut()
+        .find(|b| b.vmz_lifecycle == UnifiedLifecycleEvent::Recover)
+        .expect("recover binding");
+    recover.persistence_window = PersistenceWindow::None;
     s.mapping_table = vmz_protocol::LifecycleMappingTable::from_hosts(&s.hosts);
     fs::write(dir.join("lifecycle-scenario.json"), serde_json::to_string_pretty(&s).unwrap())
         .unwrap();
     let report = check_lifecycle_recovery(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
         report
             .diagnostics
             .iter()
-            .any(|d| d.code.as_deref() == Some(DIAG_PERSISTENCE_WINDOW_INVALID))
+            .any(|d| d.code_string().as_deref() == Some(DIAG_PERSISTENCE_WINDOW_INVALID))
     );
     let _ = fs::remove_dir_all(dir);
 }

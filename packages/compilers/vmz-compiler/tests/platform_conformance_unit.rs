@@ -19,7 +19,7 @@ fn tmp(prefix: &str) -> std::path::PathBuf {
 fn counter_cross_host_ready() {
     let dir = tmp("vmz-p5-");
     let report = check_cross_host_conformance(&dir);
-    assert_eq!(report.status, "ready");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Ready);
     assert_eq!(report.scenario.runs.len(), 3);
     let _ = fs::remove_dir_all(dir);
 }
@@ -32,9 +32,12 @@ fn reject_stable_id_divergence() {
     fs::write(dir.join("conformance-scenario.json"), serde_json::to_string_pretty(&s).unwrap())
         .unwrap();
     let report = check_cross_host_conformance(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
-        report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_STABLE_ID_DIVERGENCE))
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_STABLE_ID_DIVERGENCE))
     );
     let _ = fs::remove_dir_all(dir);
 }
@@ -47,9 +50,12 @@ fn reject_state_divergence() {
     fs::write(dir.join("conformance-scenario.json"), serde_json::to_string_pretty(&s).unwrap())
         .unwrap();
     let report = check_cross_host_conformance(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
-        report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_STATE_RESULT_DIVERGENCE))
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_STATE_RESULT_DIVERGENCE))
     );
     let _ = fs::remove_dir_all(dir);
 }
@@ -62,9 +68,12 @@ fn reject_trace_invariant_broken() {
     fs::write(dir.join("conformance-scenario.json"), serde_json::to_string_pretty(&s).unwrap())
         .unwrap();
     let report = check_cross_host_conformance(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
-        report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_TRACE_INVARIANT_BROKEN))
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_TRACE_INVARIANT_BROKEN))
     );
     let _ = fs::remove_dir_all(dir);
 }
@@ -73,16 +82,16 @@ fn reject_trace_invariant_broken() {
 fn reject_missing_surface_role() {
     let dir = tmp("vmz-p5-role-");
     let mut s = ConformanceScenario::counter_cross_host_example();
-    s.runs.retain(|r| r.surface_role != "template");
+    s.runs.retain(|r| r.surface_role != ConformanceSurfaceRole::Template);
     fs::write(dir.join("conformance-scenario.json"), serde_json::to_string_pretty(&s).unwrap())
         .unwrap();
     let report = check_cross_host_conformance(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
         report
             .diagnostics
             .iter()
-            .any(|d| d.code.as_deref() == Some(DIAG_CONFORMANCE_HOST_INCOMPLETE))
+            .any(|d| d.code_string().as_deref() == Some(DIAG_CONFORMANCE_HOST_INCOMPLETE))
     );
     let _ = fs::remove_dir_all(dir);
 }
@@ -91,17 +100,18 @@ fn reject_missing_surface_role() {
 fn reject_mixed_without_native() {
     let dir = tmp("vmz-p5-mixed-");
     let mut s = ConformanceScenario::counter_cross_host_example();
-    let mixed = s.runs.iter_mut().find(|r| r.surface_role == "mixed").unwrap();
-    mixed.surface_kinds = vec!["web".into()];
+    let mixed =
+        s.runs.iter_mut().find(|r| r.surface_role == ConformanceSurfaceRole::Mixed).unwrap();
+    mixed.surface_kinds = vec![SurfaceKind::Web];
     fs::write(dir.join("conformance-scenario.json"), serde_json::to_string_pretty(&s).unwrap())
         .unwrap();
     let report = check_cross_host_conformance(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
         report
             .diagnostics
             .iter()
-            .any(|d| d.code.as_deref() == Some(DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH))
+            .any(|d| d.code_string().as_deref() == Some(DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH))
     );
     let _ = fs::remove_dir_all(dir);
 }

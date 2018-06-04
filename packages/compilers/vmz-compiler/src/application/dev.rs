@@ -11,12 +11,12 @@ use std::path::{Path, PathBuf};
 use vmz_protocol::{
     APPLICATION_AFFECTED_SCHEMA, APPLICATION_DEPLOY_ADAPTER_SCHEMA, APPLICATION_DEV_CHECK_SCHEMA,
     APPLICATION_DEV_SESSIONS_SCHEMA, APPLICATION_MOUNTED_TEST_SCHEMA,
-    APPLICATION_PROXY_DISPATCH_SCHEMA, ApplicationAffectedPlan, ApplicationAffectedUnit,
-    ApplicationArtifact, ApplicationDeployAdapterProof, ApplicationDevCheckReport,
-    ApplicationDevSession, ApplicationDevSessions, ApplicationDiagnostic, ApplicationId,
-    ApplicationMountTable, ApplicationMountedTestSelection, ApplicationProxyCase,
-    ApplicationProxyDispatch, ApplicationTestModeSelection, DIAG_AFFECTED_LEAK,
-    DIAG_PROXY_MISROUTE, DIAG_SESSION_SHARED, FailureContainmentProof,
+    APPLICATION_PROXY_DISPATCH_SCHEMA, ApplicationAffectedPlan, ApplicationAffectedReason,
+    ApplicationAffectedUnit, ApplicationArtifact, ApplicationDeployAdapterProof,
+    ApplicationDevCheckReport, ApplicationDevRole, ApplicationDevSession, ApplicationDevSessions,
+    ApplicationDiagnostic, ApplicationId, ApplicationMountTable, ApplicationMountedTestSelection,
+    ApplicationProxyCase, ApplicationProxyDispatch, ApplicationTestModeSelection,
+    DIAG_AFFECTED_LEAK, DIAG_PROXY_MISROUTE, DIAG_SESSION_SHARED, FailureContainmentProof,
 };
 
 use crate::application_artifact::check_application_artifact_boundary;
@@ -24,7 +24,11 @@ use crate::application_isolation::check_application_isolation;
 
 const OFFICIAL_ADAPTERS: &[&str] = &["vmz-deployment-adapter", "vmz-deployment-adapter-rolldown"];
 
-// Prove Dev/Test/Deploy contracts for a host workspace.
+/// Check Dev/Test/Deploy contracts for a host workspace.
+///
+/// Builds per-ApplicationId sessions, dirty-path affected plans, mount proxy
+/// dispatch (including unavailable mounts), and deploy-adapter boundary proofs.
+/// `dirty_paths` selects which units enter the affected plan.
 pub fn check_application_dev_test_deploy(
     host_root: impl AsRef<Path>,
     package_roots: &[PathBuf],
@@ -82,7 +86,7 @@ fn build_sessions(
         application_id: host_id.clone(),
         package_root: host_root.display().to_string(),
         independent: true,
-        role: "host".into(),
+        role: ApplicationDevRole::Host,
     });
     for a in artifacts {
         let id = a.application_id.as_str();
@@ -94,7 +98,7 @@ fn build_sessions(
             application_id: a.application_id.clone(),
             package_root: root,
             independent: true,
-            role: "child".into(),
+            role: ApplicationDevRole::Child,
         });
     }
     sessions.sort_by(|a, b| a.application_id.as_str().cmp(b.application_id.as_str()));
@@ -105,26 +109,22 @@ fn build_sessions(
         let key = format!("{}::{}", s.role, s.package_root);
         if let Some(prev) = seen.insert(key.clone(), s.application_id.as_str().into()) {
             if prev != s.application_id.as_str() {
-                diagnostics.push(ApplicationDiagnostic {
-                    code: DIAG_SESSION_SHARED.into(),
-                    severity: "error".into(),
-                    path: s.package_root.clone(),
-                    message: format!(
+                diagnostics.push(ApplicationDiagnostic::coded_error(
+                    s.package_root.clone(),
+                    format!(
                         "dev session package root shared by `{prev}` and `{}`",
                         s.application_id.as_str()
                     ),
-                    span: None,
-                });
+                    DIAG_SESSION_SHARED,
+                ));
             }
         }
         if !s.independent {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_SESSION_SHARED.into(),
-                severity: "error".into(),
-                path: s.application_id.as_str().into(),
-                message: "dev session must be independent (no shared Program Graph/runtime)".into(),
-                span: None,
-            });
+            diagnostics.push(ApplicationDiagnostic::coded_error(
+                s.application_id.as_str(),
+                "dev session must be independent (no shared Program Graph/runtime)",
+                DIAG_SESSION_SHARED,
+            ));
         }
     }
 
@@ -175,7 +175,12 @@ fn plan_affected(
         if dirty_s == normalize_path(&config_path.display().to_string())
             || dirty_name == "applications.config.json5"
         {
-            push_unit(&mut units, &mut rebuilt, host_id.clone(), "mount_config");
+            push_unit(
+                &mut units,
+                &mut rebuilt,
+                host_id.clone(),
+                ApplicationAffectedReason::MountConfig,
+            );
             continue;
         }
 
@@ -195,25 +200,49 @@ fn plan_affected(
         }
 
         if let Some((_, id)) = matched {
-            let reason = if dirty_name == "package.json" { "descriptor" } else { "child_source" };
+            let reason = if dirty_name == "package.json" {
+                ApplicationAffectedReason::Descriptor
+            } else {
+                ApplicationAffectedReason::ChildSource
+            };
             push_unit(&mut units, &mut rebuilt, id.clone(), reason);
-            if reason == "descriptor" {
+            if reason == ApplicationAffectedReason::Descriptor {
                 // Descriptor metadata also refreshes host catalogs.
-                push_unit(&mut units, &mut rebuilt, host_id.clone(), "descriptor");
+                push_unit(
+                    &mut units,
+                    &mut rebuilt,
+                    host_id.clone(),
+                    ApplicationAffectedReason::Descriptor,
+                );
             }
             continue;
         }
 
         if dirty_s.starts_with(&host_norm) {
-            push_unit(&mut units, &mut rebuilt, host_id.clone(), "collection_ui");
+            push_unit(
+                &mut units,
+                &mut rebuilt,
+                host_id.clone(),
+                ApplicationAffectedReason::CollectionUi,
+            );
             continue;
         }
 
         // Shared package outside host/children — rebuild declared dependents (all apps for v1).
         for a in artifacts {
-            push_unit(&mut units, &mut rebuilt, a.application_id.clone(), "shared_package");
+            push_unit(
+                &mut units,
+                &mut rebuilt,
+                a.application_id.clone(),
+                ApplicationAffectedReason::SharedPackage,
+            );
         }
-        push_unit(&mut units, &mut rebuilt, host_id.clone(), "shared_package");
+        push_unit(
+            &mut units,
+            &mut rebuilt,
+            host_id.clone(),
+            ApplicationAffectedReason::SharedPackage,
+        );
     }
 
     units.sort_by(|a, b| {
@@ -242,19 +271,17 @@ fn plan_affected(
                 && units.iter().any(|u| {
                     u.application_id.as_str() != id.as_str()
                         && u.application_id.as_str() != host_id.as_str()
-                        && u.reason == "child_source"
+                        && u.reason == ApplicationAffectedReason::ChildSource
                 })
             {
-                diagnostics.push(ApplicationDiagnostic {
-                    code: DIAG_AFFECTED_LEAK.into(),
-                    severity: "error".into(),
-                    path: dirty_paths[0].display().to_string(),
-                    message: format!(
+                diagnostics.push(ApplicationDiagnostic::coded_error(
+                    dirty_paths[0].display().to_string(),
+                    format!(
                         "child_source change under `{}` leaked rebuild to sibling applications",
                         id.as_str()
                     ),
-                    span: None,
-                });
+                    DIAG_AFFECTED_LEAK,
+                ));
             }
         }
     }
@@ -271,10 +298,10 @@ fn push_unit(
     units: &mut Vec<ApplicationAffectedUnit>,
     rebuilt: &mut BTreeSet<String>,
     id: ApplicationId,
-    reason: &str,
+    reason: ApplicationAffectedReason,
 ) {
     rebuilt.insert(id.as_str().to_string());
-    units.push(ApplicationAffectedUnit { application_id: id, reason: reason.into() });
+    units.push(ApplicationAffectedUnit { application_id: id, reason });
 }
 
 fn build_proxy_dispatch(
@@ -340,15 +367,9 @@ fn build_proxy_dispatch(
                 && f.host_survives
         });
         if !ok && !failure_containment.is_empty() {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_PROXY_MISROUTE.into(),
-                severity: "error".into(),
-                path: id.clone(),
-                message: format!(
+            diagnostics.push(ApplicationDiagnostic::coded_error(id.clone(), format!(
                     "unavailable ApplicationId `{id}` lacks failure-containment 503 application_unavailable proof"
-                ),
-                span: None,
-            });
+                ), DIAG_PROXY_MISROUTE));
         }
     }
 
@@ -359,20 +380,14 @@ fn build_proxy_dispatch(
             || expected.application_id.as_ref().map(|a| a.as_str())
                 != case.application_id.as_ref().map(|a| a.as_str())
         {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_PROXY_MISROUTE.into(),
-                severity: "error".into(),
-                path: case.url.clone(),
-                message: format!(
+            diagnostics.push(ApplicationDiagnostic::coded_error(case.url.clone(), format!(
                     "proxy case mismatch for `{}`: expected status={} app={:?}, got status={} app={:?}",
                     case.url,
                     expected.status,
                     expected.application_id.as_ref().map(|a| a.as_str()),
                     case.status,
                     case.application_id.as_ref().map(|a| a.as_str())
-                ),
-                span: None,
-            });
+                ), DIAG_PROXY_MISROUTE));
         }
     }
 
@@ -491,18 +506,14 @@ fn build_deploy_proof(
         && !table_json.contains("\"program\"")
         && !table_json.contains("executableModule");
     if !refs_only {
-        diagnostics.push(ApplicationDiagnostic {
-            code: DIAG_PROXY_MISROUTE.into(),
-            severity: "error".into(),
-            path: "ApplicationMountTable".into(),
-            message: "deploy adapter proof: MountTable must remain refs-only".into(),
-            span: None,
-        });
+        diagnostics.push(ApplicationDiagnostic::coded_error(
+            "ApplicationMountTable",
+            "deploy adapter proof: MountTable must remain refs-only",
+            DIAG_PROXY_MISROUTE,
+        ));
     }
 
-    let per_app = artifacts.iter().all(|a| {
-        !a.server_deployment_ref.kind.is_empty() || !a.server_deployment_ref.hash.is_empty()
-    });
+    let per_app = artifacts.iter().all(|a| !a.server_deployment_ref.hash.is_empty());
 
     ApplicationDeployAdapterProof {
         schema: APPLICATION_DEPLOY_ADAPTER_SCHEMA.into(),

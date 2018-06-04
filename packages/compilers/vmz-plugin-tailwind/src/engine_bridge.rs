@@ -14,6 +14,7 @@ use crate::TwCollection;
 /// Result of lowering a collection through the neutral TW engine.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EngineLowering {
+    /// Raw engine compile response (candidates → module).
     pub response: CompileResponse,
     /// Reference CSS only — not a VMZ deployment artifact.
     pub reference_css: String,

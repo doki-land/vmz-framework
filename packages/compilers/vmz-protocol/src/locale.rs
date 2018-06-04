@@ -91,7 +91,8 @@ pub const LOCALE_CONFORMANCE_SCHEMA: &str = "vmz.locale.conformance.v0";
 /// Shared formatter data version recorded in Delivery / Resume digests.
 pub const FORMATTER_DATA_VERSION: &str = "vmz.formatter.cldr.v0";
 
-/// Hard: `/locales` manifest file is missing or unreadable.
+/// Soft (warning for now): `/locales` manifest file is missing — LocaleId policy undeclared.
+/// Still never silent; production profiles may elevate to error later.
 pub const DIAG_LOCALE_MANIFEST_MISSING: &str = "vmz::locale::manifest_missing";
 
 /// Hard: LocaleId failed ASCII BCP-47 normalization (case / separators / shape).
@@ -253,6 +254,7 @@ pub struct LocaleDocumentKind {
 
 /// Handshake catalog for the locale protocol domain.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct LocaleProtocolCatalog {
     /// Always [`LOCALE_PROTOCOL`].
     pub schema: String,
@@ -263,7 +265,6 @@ pub struct LocaleProtocolCatalog {
     /// Stable diagnostic codes callers may see.
     pub diagnostics: Vec<String>,
     /// Virtual module prefix authors must use (`#locales/`).
-    #[serde(rename = "virtualModulePrefix")]
     pub virtual_module_prefix: String,
 }
 
@@ -439,11 +440,12 @@ fn default_ltr() -> String {
 
 /// How LocaleId appears in public URLs.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct LocaleRoutingPolicy {
     /// Strategy id (`prefix`, ...).
     pub strategy: String,
     /// Whether the default locale keeps its prefix: `include` | `omit`.
-    #[serde(rename = "defaultPrefix", default = "default_include")]
+    #[serde(default = "default_include")]
     pub default_prefix: String,
 }
 
@@ -453,12 +455,11 @@ fn default_include() -> String {
 
 /// Author-facing manifest shape (`locales/locales.json5`).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct LocaleManifestFile {
     /// Author schema version integer.
-    #[serde(rename = "schemaVersion")]
     pub schema_version: u32,
     /// Default LocaleId for negotiation and optional prefix omit.
-    #[serde(rename = "defaultLocale")]
     pub default_locale: String,
     /// Declared locales for this application.
     pub locales: Vec<LocaleEntry>,
@@ -515,26 +516,23 @@ impl LocaleManifestFile {
 
 /// Application Execution Context locale slice carried across SSR and client.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct LocaleApplicationContext {
     /// Always [`LOCALE_APPLICATION_CONTEXT_SCHEMA`].
     pub schema: String,
     /// Owning ApplicationId.
-    #[serde(rename = "applicationId")]
     pub application_id: String,
     /// Delivery id that produced this context.
-    #[serde(rename = "deliveryId")]
     pub delivery_id: String,
     /// Active LocaleId.
-    #[serde(rename = "localeId")]
     pub locale_id: String,
     /// IANA time zone id for formatting.
-    #[serde(rename = "timeZone")]
     pub time_zone: String,
     /// Optional calendar id (`gregory`, ...).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub calendar: Option<String>,
     /// Optional numbering system (`latn`, ...).
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "numberingSystem")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub numbering_system: Option<String>,
     /// Text direction: `ltr` or `rtl`.
     pub direction: String,
@@ -561,25 +559,22 @@ impl LocaleApplicationContext {
 
 /// Deterministic formatter context shared by SSR and client.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct LocaleFormatterContext {
     /// Always [`LOCALE_FORMATTER_CONTEXT_SCHEMA`].
     pub schema: String,
     /// LocaleId used for CLDR lookup.
-    #[serde(rename = "localeId")]
     pub locale_id: String,
     /// IANA time zone id.
-    #[serde(rename = "timeZone")]
     pub time_zone: String,
     /// Calendar id (defaults to `gregory` when derived from application context).
     pub calendar: String,
     /// Numbering system id (defaults to `latn` when derived).
-    #[serde(rename = "numberingSystem")]
     pub numbering_system: String,
     /// Optional ISO currency code for currency formatting.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub currency: Option<String>,
     /// Formatter data version pin ([`FORMATTER_DATA_VERSION`]).
-    #[serde(rename = "formatterDataVersion")]
     pub formatter_data_version: String,
 }
 

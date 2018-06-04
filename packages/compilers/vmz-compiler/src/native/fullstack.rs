@@ -9,32 +9,27 @@ use std::fs;
 use std::path::Path;
 
 use vmz_protocol::{
-    DIAG_BRIDGE_BYPASSES_SERVER, DIAG_INVALID_PROFILE, DIAG_MISSING_AUTH_SESSION,
-    DIAG_MISSING_NETWORK_POLICY, DIAG_MISSING_SERVER_TRANSPORT, DIAG_MISSING_SSR_FIRST_PAINT,
-    DIAG_MIXED_SSR_COOKIE_ASSUMPTIONS, DIAG_REMOTE_WITHOUT_INTEGRITY, FULLSTACK_CHECK_SCHEMA,
-    NativeFullstackCheckReport, NativeFullstackProfile, NativeHostDiagnostic,
-    NativeHostProtocolCatalog,
+    AssetMode, ContentDeliveryMode, DIAG_BRIDGE_BYPASSES_SERVER, DIAG_INVALID_PROFILE,
+    DIAG_MISSING_AUTH_SESSION, DIAG_MISSING_NETWORK_POLICY, DIAG_MISSING_SERVER_TRANSPORT,
+    DIAG_MISSING_SSR_FIRST_PAINT, DIAG_MIXED_SSR_COOKIE_ASSUMPTIONS, DIAG_REMOTE_WITHOUT_INTEGRITY,
+    FULLSTACK_CHECK_SCHEMA, NativeFullstackCheckReport, NativeFullstackProfile,
+    NativeHostDiagnostic, NativeHostProtocolCatalog,
 };
 
 fn diag(
     path: &str,
-    severity: &str,
+    severity: vmz_protocol::Severity,
     message: impl Into<String>,
     code: &str,
 ) -> NativeHostDiagnostic {
-    NativeHostDiagnostic {
-        path: path.into(),
-        severity: severity.into(),
-        message: message.into(),
-        code: Some(code.into()),
-    }
+    NativeHostDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
 fn validate_fullstack(profile: &NativeFullstackProfile, out: &mut Vec<NativeHostDiagnostic>) {
     if profile.schema != vmz_protocol::FULLSTACK_SCHEMA {
         out.push(diag(
             "schema",
-            "error",
+            vmz_protocol::Severity::Error,
             format!("fullstack schema must be `{}`", vmz_protocol::FULLSTACK_SCHEMA),
             DIAG_INVALID_PROFILE,
         ));
@@ -42,42 +37,31 @@ fn validate_fullstack(profile: &NativeFullstackProfile, out: &mut Vec<NativeHost
 
     // SSR first paint
     if profile.ssr.enabled {
-        if profile.ssr.mode.trim().is_empty() {
-            out.push(diag(
-                "ssr.mode",
-                "error",
-                "SSR first-paint mode required when enabled",
-                DIAG_MISSING_SSR_FIRST_PAINT,
-            ));
-        }
-        if !matches!(profile.ssr.mode.as_str(), "bundled" | "remote" | "hybrid") {
-            out.push(diag(
-                "ssr.mode",
-                "error",
-                format!("unknown ssr.mode `{}`", profile.ssr.mode),
-                DIAG_MISSING_SSR_FIRST_PAINT,
-            ));
-        }
+        // Closed [`ContentDeliveryMode`] validates at deserialize.
         if profile.ssr.plan_schema != "vmz.plan.v0" {
             out.push(diag(
                 "ssr.planSchema",
-                "error",
+                vmz_protocol::Severity::Error,
                 "SSR first-paint must reference vmz.plan.v0 (same Execution Plan)",
                 DIAG_MISSING_SSR_FIRST_PAINT,
             ));
         }
-        if profile.ssr.mode == "remote" && profile.ssr.integrity.trim().is_empty() {
+        if profile.ssr.mode == ContentDeliveryMode::Remote
+            && profile.ssr.integrity.trim().is_empty()
+        {
             out.push(diag(
                 "ssr.integrity",
-                "error",
+                vmz_protocol::Severity::Error,
                 "remote SSR requires explicit integrity (not silent default)",
                 DIAG_REMOTE_WITHOUT_INTEGRITY,
             ));
         }
-        if profile.ssr.mode == "hybrid" && profile.ssr.allow_mixed_cookie_assumptions {
+        if profile.ssr.mode == ContentDeliveryMode::Hybrid
+            && profile.ssr.allow_mixed_cookie_assumptions
+        {
             out.push(diag(
                 "ssr.allowMixedCookieAssumptions",
-                "error",
+                vmz_protocol::Severity::Error,
                 "bundled SSR and remote SSR must not share cookie/origin assumptions",
                 DIAG_MIXED_SSR_COOKIE_ASSUMPTIONS,
             ));
@@ -85,7 +69,7 @@ fn validate_fullstack(profile: &NativeFullstackProfile, out: &mut Vec<NativeHost
     } else {
         out.push(diag(
             "ssr.enabled",
-            "error",
+            vmz_protocol::Severity::Error,
             "native requires SSR first-paint policy enabled for NativeAppHost WebSurface",
             DIAG_MISSING_SSR_FIRST_PAINT,
         ));
@@ -95,7 +79,7 @@ fn validate_fullstack(profile: &NativeFullstackProfile, out: &mut Vec<NativeHost
     if profile.server_transport.scheme != "#server" {
         out.push(diag(
             "serverTransport.scheme",
-            "error",
+            vmz_protocol::Severity::Error,
             "server transport scheme must be `#server`",
             DIAG_MISSING_SERVER_TRANSPORT,
         ));
@@ -103,7 +87,7 @@ fn validate_fullstack(profile: &NativeFullstackProfile, out: &mut Vec<NativeHost
     if profile.server_transport.endpoint.trim().is_empty() {
         out.push(diag(
             "serverTransport.endpoint",
-            "error",
+            vmz_protocol::Severity::Error,
             "server transport endpoint required",
             DIAG_MISSING_SERVER_TRANSPORT,
         ));
@@ -111,25 +95,17 @@ fn validate_fullstack(profile: &NativeFullstackProfile, out: &mut Vec<NativeHost
     if profile.server_transport.bridge_bypasses_server {
         out.push(diag(
             "serverTransport.bridgeBypassesServer",
-            "error",
+            vmz_protocol::Severity::Error,
             "Native bridge must not bypass `#server` security boundary",
             DIAG_BRIDGE_BYPASSES_SERVER,
         ));
     }
 
-    // auth / session
-    if profile.auth.mode.trim().is_empty() {
-        out.push(diag(
-            "auth.mode",
-            "error",
-            "auth/session mode required",
-            DIAG_MISSING_AUTH_SESSION,
-        ));
-    }
+    // auth / session — closed [`AuthSessionMode`] validates at deserialize.
     if profile.auth.session_namespace.trim().is_empty() {
         out.push(diag(
             "auth.sessionNamespace",
-            "error",
+            vmz_protocol::Severity::Error,
             "auth sessionNamespace required (isolate WebView storage)",
             DIAG_MISSING_AUTH_SESSION,
         ));
@@ -137,7 +113,7 @@ fn validate_fullstack(profile: &NativeFullstackProfile, out: &mut Vec<NativeHost
     if !profile.auth.reauth_on_webview_crash {
         out.push(diag(
             "auth.reauthOnWebViewCrash",
-            "error",
+            vmz_protocol::Severity::Error,
             "auth must require reauthOnWebViewCrash=true",
             DIAG_MISSING_AUTH_SESSION,
         ));
@@ -147,47 +123,31 @@ fn validate_fullstack(profile: &NativeFullstackProfile, out: &mut Vec<NativeHost
     if profile.push.capability_id.trim().is_empty() {
         out.push(diag(
             "push.capabilityId",
-            "error",
+            vmz_protocol::Severity::Error,
             "push capability id required (stub ok)",
             DIAG_INVALID_PROFILE,
         ));
     }
 
-    // network policy
-    if profile.network.mode.trim().is_empty() {
-        out.push(diag(
-            "network.mode",
-            "error",
-            "network policy mode required",
-            DIAG_MISSING_NETWORK_POLICY,
-        ));
-    }
+    // network policy — closed [`NetworkMode`] validates at deserialize.
     if profile.network.allow_cleartext {
         out.push(diag(
             "network.allowCleartext",
-            "error",
+            vmz_protocol::Severity::Error,
             "cleartext network must not be enabled for native default profile",
             DIAG_MISSING_NETWORK_POLICY,
         ));
     }
 
     // delivery asset mode for remote/hybrid
-    if matches!(profile.delivery_asset_mode.as_str(), "remote" | "hybrid")
+    if matches!(profile.delivery_asset_mode, AssetMode::Remote | AssetMode::Hybrid)
         && profile.delivery_integrity.trim().is_empty()
     {
         out.push(diag(
             "deliveryIntegrity",
-            "error",
+            vmz_protocol::Severity::Error,
             "remote/hybrid delivery requires integrity/signing evidence",
             DIAG_REMOTE_WITHOUT_INTEGRITY,
-        ));
-    }
-    if !matches!(profile.delivery_asset_mode.as_str(), "local" | "remote" | "hybrid") {
-        out.push(diag(
-            "deliveryAssetMode",
-            "error",
-            format!("unknown deliveryAssetMode `{}`", profile.delivery_asset_mode),
-            DIAG_INVALID_PROFILE,
         ));
     }
 }
@@ -200,14 +160,14 @@ fn load_or_example(root: &Path, diags: &mut Vec<NativeHostDiagnostic>) -> Native
                 Ok(p) => return p,
                 Err(e) => diags.push(diag(
                     "native-fullstack.json",
-                    "error",
+                    vmz_protocol::Severity::Error,
                     format!("invalid NativeFullstackProfile JSON: {e}"),
                     DIAG_INVALID_PROFILE,
                 )),
             },
             Err(e) => diags.push(diag(
                 "native-fullstack.json",
-                "error",
+                vmz_protocol::Severity::Error,
                 format!("cannot read native-fullstack.json: {e}"),
                 DIAG_INVALID_PROFILE,
             )),
@@ -231,7 +191,7 @@ pub fn check_native_fullstack_contract(root: &Path) -> NativeFullstackCheckRepor
             } else if text.contains("bridgeBypassesServer") || text.contains("allowCleartext") {
                 diagnostics.push(diag(
                     "native-fullstack.foul.json",
-                    "error",
+                    vmz_protocol::Severity::Error,
                     "forbidden fullstack assumptions in foul fixture",
                     DIAG_BRIDGE_BYPASSES_SERVER,
                 ));
@@ -239,12 +199,12 @@ pub fn check_native_fullstack_contract(root: &Path) -> NativeFullstackCheckRepor
         }
     }
 
-    let failed = diagnostics.iter().any(|d| d.severity == "error");
+    let failed = diagnostics.iter().any(|d| d.is_error());
     NativeFullstackCheckReport {
         schema: FULLSTACK_CHECK_SCHEMA.into(),
         catalog,
         fullstack: profile,
         diagnostics,
-        status: if failed { "failed".into() } else { "ready".into() },
+        status: vmz_protocol::CheckReportStatus::from_failed(failed),
     }
 }

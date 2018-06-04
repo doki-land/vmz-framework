@@ -5,7 +5,7 @@
         tone="info"
         roleName="status"
         title="Form depth"
-        description="Form / FormItem / Field / Select / TextArea / RadioGroup / Autocomplete / Tooltip / DatePicker / Upload — parent owns values and validation."
+        description="Form / FormItem / Field / Select / TextArea / RadioGroup / Autocomplete / Tooltip / DatePicker (calendar overlay) / Upload all-in-one (destination=server transport owned by @vmz/ui) — parent owns field values and validation only."
       />
 
       <Card title="Contact request">
@@ -84,7 +84,7 @@
 
           <DatePicker
             label="Preferred date"
-            description="ISO date from native picker"
+            description="ISO date from owned calendar overlay"
             controlId="home-form-date"
             descriptionId="home-form-date-desc"
             errorId="home-form-date-err"
@@ -92,23 +92,28 @@
             error={dateError}
             invalidAttr={dateInvalid}
             value={preferredDate}
-            onInput={(e) => this.onDate(e)}
+            onChange={(e) => this.onDate(e)}
           />
 
           <Upload
             label="Attachment"
-            description="Pick a file — no upload runtime"
+            description="All-in-one server upload — component owns multipart + progress + cancel"
+            destination="server"
+            action="/api/form/attachment"
+            accept=".txt,.md,.pdf"
+            maxBytes={262144}
+            maxCount={1}
             controlId="home-form-file"
             descriptionId="home-form-file-desc"
             errorId="home-form-file-err"
             describedBy={fileDescribedBy}
             error={fileError}
             invalidAttr={fileInvalid}
-            fileName={fileName}
-            emptyHint={fileEmpty}
             emptyText="No file selected"
-            accept=".txt,.md,.pdf"
-            onChange={(e) => this.onFile(e)}
+            cancelLabel="Cancel upload"
+            clearToken={uploadClearToken}
+            onValue={(items) => this.onUploadValue(items)}
+            onStatus={(s) => this.onUploadStatus(s)}
           />
 
           <TextArea
@@ -150,10 +155,113 @@
           </div>
         </Form>
 
-        <p data-dogfood="form-state">email:{email};role:{role};team:{team};date:{preferredDate};file:{fileName};plan:{plan};agree:{agree ? 'yes' : 'no'};submitted:{submitted}</p>
+        <p data-dogfood="form-state">email:{email};role:{role};team:{team};date:{preferredDate};file:{fileName};upload:{uploadStatus};attachment:{attachmentId};plan:{plan};agree:{agree ? 'yes' : 'no'};submitted:{submitted}</p>
         <div if={submitted} data-dogfood="form-success">
           <Result status="success" title="Request accepted" description="Validation cleared — form depth dogfood complete." />
         </div>
+      </Card>
+
+      <Card title="Upload destinations">
+        <Alert
+          tone="info"
+          roleName="status"
+          title="client · object · multiple · directory · resumable"
+          description="Tool-site client, object presign PUT, multi-file server, directory (webkitdirectory), chunkSize pause/resume. Transport owned by @vmz/ui."
+        />
+        <Upload
+          label="Client (tool-site)"
+          description="destination=client — no network; parent gets local file descriptors"
+          destination="client"
+          accept="image/*,.txt,.md,.pdf"
+          maxBytes={262144}
+          maxCount={1}
+          controlId="home-upload-client"
+          descriptionId="home-upload-client-desc"
+          errorId="home-upload-client-err"
+          emptyText="No local file"
+          clearToken={clientClearToken}
+          onValue={(items) => this.onClientValue(items)}
+          onStatus={(s) => this.onClientStatus(s)}
+        />
+        <p data-dogfood="upload-client-state">client:{clientStatus};id:{clientId};name:{clientName};bytes:{clientBytes}</p>
+
+        <Upload
+          label="Object (presign PUT)"
+          description="destination=object — #server presign, component PUT; no cloud SDK in UI"
+          destination="object"
+          accept=".txt,.md,.pdf"
+          maxBytes={262144}
+          maxCount={1}
+          controlId="home-upload-object"
+          descriptionId="home-upload-object-desc"
+          errorId="home-upload-object-err"
+          emptyText="No object file"
+          cancelLabel="Cancel object upload"
+          clearToken={objectClearToken}
+          onPresign={(file) => this.presignObject(file)}
+          onValue={(items) => this.onObjectValue(items)}
+          onStatus={(s) => this.onObjectStatus(s)}
+        />
+        <p data-dogfood="upload-object-state">object:{objectStatus};key:{objectKey};bytes:{objectBytes}</p>
+
+        <Upload
+          label="Multiple (server)"
+          description="multiple=true — one multipart request, server returns items[]"
+          destination="server"
+          action="/api/form/attachment"
+          accept=".txt,.md,.pdf"
+          multiple={true}
+          maxCount={3}
+          maxBytes={262144}
+          controlId="home-upload-multi"
+          descriptionId="home-upload-multi-desc"
+          errorId="home-upload-multi-err"
+          emptyText="No files selected"
+          cancelLabel="Cancel multi upload"
+          clearToken={multiClearToken}
+          onValue={(items) => this.onMultiValue(items)}
+          onStatus={(s) => this.onMultiStatus(s)}
+        />
+        <p data-dogfood="upload-multi-state">multi:{multiStatus};count:{multiCount};ids:{multiIds}</p>
+
+        <Upload
+          label="Directory (client)"
+          description="directory=true (webkitdirectory; UA-specific) — FileList treated as multi on client"
+          destination="client"
+          accept=".txt,.md,.pdf"
+          directory={true}
+          maxCount={8}
+          maxBytes={262144}
+          controlId="home-upload-dir"
+          descriptionId="home-upload-dir-desc"
+          errorId="home-upload-dir-err"
+          emptyText="No folder files"
+          clearToken={dirClearToken}
+          onValue={(items) => this.onDirValue(items)}
+          onStatus={(s) => this.onDirStatus(s)}
+        />
+        <p data-dogfood="upload-dir-state">dir:{dirStatus};mode:{dirMode};count:{dirCount};names:{dirNames}</p>
+
+        <Upload
+          label="Resumable (server chunks)"
+          description="chunkSize>0 — init/chunk/complete; cancel→paused→Resume (same File session)"
+          destination="server"
+          action="/api/form/resumable"
+          chunkSize={8}
+          accept=".txt,.md,.pdf"
+          maxBytes={262144}
+          maxCount={1}
+          controlId="home-upload-resume"
+          descriptionId="home-upload-resume-desc"
+          errorId="home-upload-resume-err"
+          emptyText="No resumable file"
+          cancelLabel="Pause upload"
+          resumeLabel="Resume upload"
+          clearToken={resumeClearToken}
+          onValue={(items) => this.onResumeValue(items)}
+          onStatus={(s) => this.onResumeStatus(s)}
+        />
+        <p data-dogfood="upload-resume-state">resume:{resumeStatus};id:{resumeId};bytes:{resumeBytes};chunks:{resumeChunks};head:{resumeHead}</p>
       </Card>
     </AppShell>
   </div>
@@ -175,7 +283,6 @@ export default class FormPage {
   team = '';
   preferredDate = '';
   fileName = '';
-  fileEmpty = true;
   message = '';
   plan = '';
   agree = false;
@@ -209,6 +316,34 @@ export default class FormPage {
   planDescribedBy = 'home-form-plan-desc';
   agreeError = '';
   roleRequired = true;
+  /** Mirrored from Upload.onStatus — submit gate + form-state dogfood. */
+  uploadStatus = 'idle';
+  attachmentId = '';
+  uploadClearToken = 0;
+  clientStatus = 'idle';
+  clientId = '';
+  clientName = '';
+  clientBytes = '0';
+  clientClearToken = 0;
+  objectStatus = 'idle';
+  objectKey = '';
+  objectBytes = '0';
+  objectClearToken = 0;
+  multiStatus = 'idle';
+  multiCount = '0';
+  multiIds = '';
+  multiClearToken = 0;
+  dirStatus = 'idle';
+  dirMode = 'directory';
+  dirCount = '0';
+  dirNames = '';
+  dirClearToken = 0;
+  resumeStatus = 'idle';
+  resumeId = '';
+  resumeBytes = '0';
+  resumeChunks = '0';
+  resumeHead = '';
+  resumeClearToken = 0;
   roleOptions = [
     { value: '', label: 'Select a role' },
     { value: 'ops', label: 'Operations' },
@@ -302,12 +437,183 @@ export default class FormPage {
     if (this.dateError) this.clearDateError();
   }
 
-  onFile(e) {
-    const input = e && e.target;
-    const file = input && input.files && input.files[0] ? input.files[0] : null;
-    this.fileName = file && file.name ? String(file.name) : '';
-    this.fileEmpty = !this.fileName;
-    if (this.fileError) this.clearFileError();
+  /**
+   * Result value only — Upload owns multipart transport.
+   * @param {{ name?: string, id?: string, destination?: string }[]} items
+   */
+  onUploadValue(items) {
+    const list = Array.isArray(items) ? items : [];
+    const first = list[0];
+    this.fileName = first && first.name ? String(first.name) : '';
+    this.attachmentId =
+      first && first.destination === 'server' && first.id ? String(first.id) : '';
+    if (this.fileError && this.attachmentId) this.clearFileError();
+  }
+
+  /**
+   * @param {string} status
+   */
+  onUploadStatus(status) {
+    this.uploadStatus = status || 'idle';
+    if (status === 'error' || status === 'cancelled') {
+      this.attachmentId = '';
+    }
+    if (status === 'idle') {
+      this.fileName = '';
+      this.attachmentId = '';
+    }
+  }
+
+  /**
+   * @param {{ name?: string, id?: string, destination?: string, bytes?: number }[]} items
+   */
+  onClientValue(items) {
+    const list = Array.isArray(items) ? items : [];
+    const first = list[0];
+    this.clientName = first && first.name ? String(first.name) : '';
+    this.clientId = first && first.id ? String(first.id) : '';
+    this.clientBytes = first ? String(Number(first.bytes) || 0) : '0';
+  }
+
+  /**
+   * @param {string} status
+   */
+  onClientStatus(status) {
+    this.clientStatus = status || 'idle';
+    if (status === 'idle' || status === 'error' || status === 'cancelled') {
+      if (status !== 'error') {
+        /* keep last error name optional */
+      }
+      if (status === 'idle' || status === 'cancelled') {
+        this.clientId = '';
+        this.clientName = '';
+        this.clientBytes = '0';
+      }
+    }
+  }
+
+  /**
+   * Parent configures object destination only — Upload owns PUT transport.
+   * Browser-only; SSR/prop probes without a File must no-op (relative fetch has no origin in Node).
+   * @param {File} file
+   */
+  async presignObject(file) {
+    if (!file || typeof file.name !== 'string') {
+      return { uploadUrl: '', objectKey: '', headers: {} };
+    }
+    if (typeof window === 'undefined' || typeof fetch !== 'function') {
+      throw new Error('presign only available in browser');
+    }
+    const name = String(file.name || 'upload.bin');
+    const type = file.type ? String(file.type) : 'application/octet-stream';
+    const size = typeof file.size === 'number' ? Number(file.size) : 0;
+    const res = await fetch(new URL('/api/form/presign', window.location.origin).href, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name, type, size }),
+    });
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
+    if (!res.ok || !data || !data.ok || !data.uploadUrl) {
+      throw new Error((data && data.error) || `presign failed (${res.status})`);
+    }
+    return {
+      uploadUrl: String(data.uploadUrl),
+      objectKey: String(data.objectKey || ''),
+      headers: data.headers && typeof data.headers === 'object' ? data.headers : {},
+    };
+  }
+
+  /**
+   * @param {{ name?: string, id?: string, objectKey?: string, bytes?: number, destination?: string }[]} items
+   */
+  onObjectValue(items) {
+    const list = Array.isArray(items) ? items : [];
+    const first = list[0];
+    this.objectKey = first && (first.objectKey || first.id) ? String(first.objectKey || first.id) : '';
+    this.objectBytes = first ? String(Number(first.bytes) || 0) : '0';
+  }
+
+  /**
+   * @param {string} status
+   */
+  onObjectStatus(status) {
+    this.objectStatus = status || 'idle';
+    if (status === 'idle' || status === 'cancelled') {
+      this.objectKey = '';
+      this.objectBytes = '0';
+    }
+  }
+
+  /**
+   * @param {{ id?: string, name?: string }[]} items
+   */
+  onMultiValue(items) {
+    const list = Array.isArray(items) ? items : [];
+    this.multiCount = String(list.length);
+    this.multiIds = list.map((it) => String(it && it.id ? it.id : '')).filter(Boolean).join(',');
+  }
+
+  /**
+   * @param {string} status
+   */
+  onMultiStatus(status) {
+    this.multiStatus = status || 'idle';
+    if (status === 'idle' || status === 'cancelled') {
+      this.multiCount = '0';
+      this.multiIds = '';
+    }
+  }
+
+  /**
+   * @param {{ name?: string }[]} items
+   */
+  onDirValue(items) {
+    const list = Array.isArray(items) ? items : [];
+    this.dirCount = String(list.length);
+    this.dirNames = list.map((it) => String(it && it.name ? it.name : '')).filter(Boolean).join(',');
+  }
+
+  /**
+   * @param {string} status
+   */
+  onDirStatus(status) {
+    this.dirStatus = status || 'idle';
+    if (status === 'idle' || status === 'cancelled') {
+      this.dirCount = '0';
+      this.dirNames = '';
+    }
+  }
+
+  /**
+   * @param {{ id?: string, bytes?: number, chunks?: number, headHex?: string }[]} items
+   */
+  onResumeValue(items) {
+    const list = Array.isArray(items) ? items : [];
+    const first = list[0];
+    this.resumeId = first && first.id ? String(first.id) : '';
+    this.resumeBytes = first ? String(Number(first.bytes) || 0) : '0';
+    this.resumeChunks = first ? String(Number(first.chunks) || 0) : '0';
+    this.resumeHead = first && first.headHex ? String(first.headHex) : '';
+  }
+
+  /**
+   * @param {string} status
+   */
+  onResumeStatus(status) {
+    this.resumeStatus = status || 'idle';
+    if (status === 'idle' || status === 'cancelled' || status === 'error') {
+      if (status === 'idle' || status === 'cancelled') {
+        this.resumeId = '';
+        this.resumeBytes = '0';
+        this.resumeChunks = '0';
+        this.resumeHead = '';
+      }
+    }
   }
 
   onAgree(e) {
@@ -356,7 +662,7 @@ export default class FormPage {
     const roleOk = !!this.role;
     const teamOk = !!String(this.team || '').trim();
     const dateOk = !!String(this.preferredDate || '').trim();
-    const fileOk = !!String(this.fileName || '').trim();
+    const fileOk = !!String(this.fileName || '').trim() && this.uploadStatus === 'done' && !!this.attachmentId;
     const planOk = !!this.plan;
     const agreeOk = !!this.agree;
 
@@ -376,7 +682,13 @@ export default class FormPage {
     this.dateInvalid = dateOk ? 'false' : 'true';
     this.dateDescribedBy = dateOk ? 'home-form-date-desc' : 'home-form-date-desc home-form-date-err';
 
-    this.fileError = fileOk ? '' : 'Attach a file';
+    this.fileError = fileOk
+      ? ''
+      : this.uploadStatus === 'uploading'
+        ? 'Wait for upload to finish'
+        : this.uploadStatus === 'error'
+          ? this.fileError || 'Upload failed'
+          : 'Attach and upload a file';
     this.fileInvalid = fileOk ? 'false' : 'true';
     this.fileDescribedBy = fileOk ? 'home-form-file-desc' : 'home-form-file-desc home-form-file-err';
 
@@ -401,7 +713,6 @@ export default class FormPage {
     this.team = '';
     this.preferredDate = '';
     this.fileName = '';
-    this.fileEmpty = true;
     this.message = '';
     this.plan = '';
     this.agree = false;
@@ -414,6 +725,32 @@ export default class FormPage {
     this.closeTeamList();
     this.tipOpen = false;
     this.tipOpenAttr = 'false';
+    this.attachmentId = '';
+    this.uploadStatus = 'idle';
+    this.uploadClearToken = (Number(this.uploadClearToken) || 0) + 1;
+    this.clientStatus = 'idle';
+    this.clientId = '';
+    this.clientName = '';
+    this.clientBytes = '0';
+    this.clientClearToken = (Number(this.clientClearToken) || 0) + 1;
+    this.objectStatus = 'idle';
+    this.objectKey = '';
+    this.objectBytes = '0';
+    this.objectClearToken = (Number(this.objectClearToken) || 0) + 1;
+    this.multiStatus = 'idle';
+    this.multiCount = '0';
+    this.multiIds = '';
+    this.multiClearToken = (Number(this.multiClearToken) || 0) + 1;
+    this.dirStatus = 'idle';
+    this.dirCount = '0';
+    this.dirNames = '';
+    this.dirClearToken = (Number(this.dirClearToken) || 0) + 1;
+    this.resumeStatus = 'idle';
+    this.resumeId = '';
+    this.resumeBytes = '0';
+    this.resumeChunks = '0';
+    this.resumeHead = '';
+    this.resumeClearToken = (Number(this.resumeClearToken) || 0) + 1;
     this.clearEmailError();
     this.clearRoleError();
     this.clearTeamError();
@@ -421,5 +758,284 @@ export default class FormPage {
     this.clearFileError();
     this.clearPlanError();
   }
+}
+</script>
+
+<script server>
+import { Post, Put } from 'vmz:http';
+
+/** @type {Map<string, { name: string, size: number, type: string, chunkSize: number, chunkTotal: number, chunks: Map<number, Buffer> }>} */
+const resumableSessions = new Map();
+
+/**
+ * Form page server — Upload all-in-one dogfood:
+ * - multipart attachment (destination=server)
+ * - presign + raw PUT object store mock (destination=object; no cloud SDK)
+ * - resumable chunk sessions (init / chunk / status / complete)
+ */
+export default class FormPageServer {
+  @Post('/api/form/attachment')
+  async receiveAttachment(body) {
+    const payload = body && typeof body === 'object' ? body : {};
+    const raw = payload.file;
+    const parts = Array.isArray(raw) ? raw : raw != null ? [raw] : [];
+    if (!parts.length) {
+      return { ok: false, error: 'Missing multipart file' };
+    }
+    const items = [];
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const hasBlob =
+        part &&
+        typeof part === 'object' &&
+        typeof part.arrayBuffer === 'function' &&
+        typeof part.size === 'number';
+      if (!hasBlob) {
+        return { ok: false, error: `Missing multipart file at index ${i}` };
+      }
+      const name = String(part.name || (i === 0 ? payload.name : '') || '').trim();
+      if (!name) {
+        return { ok: false, error: `Missing file name at index ${i}` };
+      }
+      if (!/\.(txt|md|pdf)$/i.test(name)) {
+        return { ok: false, error: 'Only .txt, .md, or .pdf attachments' };
+      }
+      const size = Number(part.size);
+      if (!Number.isFinite(size) || size < 0) {
+        return { ok: false, error: 'Invalid file size' };
+      }
+      if (size > 256 * 1024) {
+        return { ok: false, error: 'Attachment too large' };
+      }
+      const bytes = new Uint8Array(await part.arrayBuffer());
+      if (bytes.byteLength !== size) {
+        return { ok: false, error: 'Truncated upload body' };
+      }
+      let headHex = '';
+      for (let h = 0; h < Math.min(16, bytes.byteLength); h++) {
+        headHex += bytes[h].toString(16).padStart(2, '0');
+      }
+      const id = `att-${Date.now().toString(36)}-${Math.abs(hashString(name + ':' + size + ':' + bytes[0] + ':' + i)).toString(36)}`;
+      items.push({
+        id,
+        name,
+        bytes: bytes.byteLength,
+        reportedSize: size,
+        contentType: String(part.type || ''),
+        headHex,
+      });
+    }
+    // Artificial latency so browser progress / cancel proofs can observe uploading.
+    await new Promise((r) => setTimeout(r, 350));
+    if (items.length === 1) {
+      return { ok: true, ...items[0] };
+    }
+    return {
+      ok: true,
+      items,
+      count: items.length,
+      bytes: items.reduce((n, it) => n + Number(it.bytes || 0), 0),
+    };
+  }
+
+  @Post('/api/form/resumable/init')
+  async resumableInit(body) {
+    const payload = body && typeof body === 'object' ? body : {};
+    const name = String(payload.name || '').trim();
+    if (!name) return { ok: false, error: 'Missing file name' };
+    if (!/\.(txt|md|pdf)$/i.test(name)) {
+      return { ok: false, error: 'Only .txt, .md, or .pdf attachments' };
+    }
+    const size = Number(payload.size);
+    if (!Number.isFinite(size) || size < 0) return { ok: false, error: 'Invalid file size' };
+    if (size > 256 * 1024) return { ok: false, error: 'Attachment too large' };
+    const chunkSize = Math.max(1, Number(payload.chunkSize) || 0);
+    if (!Number.isFinite(chunkSize) || chunkSize < 1) return { ok: false, error: 'Invalid chunkSize' };
+    const chunkTotal = Math.max(1, Math.ceil(size / chunkSize) || 1);
+    const uploadId = `up-${Date.now().toString(36)}-${Math.abs(hashString(name + ':' + size + ':' + chunkSize)).toString(36)}`;
+    resumableSessions.set(uploadId, {
+      name,
+      size,
+      type: String(payload.type || ''),
+      chunkSize,
+      chunkTotal,
+      chunks: new Map(),
+    });
+    return { ok: true, uploadId, chunkSize, chunkTotal, size, name };
+  }
+
+  @Put('/api/form/resumable/chunk')
+  async resumableChunk(body) {
+    const payload = body && typeof body === 'object' ? body : {};
+    const uploadId = String(payload.uploadId || '').trim();
+    if (!uploadId || !resumableSessions.has(uploadId)) {
+      return { ok: false, error: 'Unknown upload session' };
+    }
+    const session = resumableSessions.get(uploadId);
+    const index = Number(payload.chunkIndex);
+    const total = Number(payload.chunkTotal);
+    if (!Number.isFinite(index) || index < 0 || index >= session.chunkTotal) {
+      return { ok: false, error: 'Invalid chunk index' };
+    }
+    if (Number.isFinite(total) && total !== session.chunkTotal) {
+      return { ok: false, error: 'Chunk total mismatch' };
+    }
+    const raw = payload.bytes;
+    const hasBuf =
+      raw &&
+      typeof raw === 'object' &&
+      typeof raw.byteLength === 'number' &&
+      (ArrayBuffer.isView(raw) || raw instanceof ArrayBuffer || Buffer.isBuffer?.(raw));
+    if (!hasBuf) return { ok: false, error: 'Missing chunk body' };
+    const bytes = Buffer.isBuffer(raw)
+      ? raw
+      : raw instanceof ArrayBuffer
+        ? Buffer.from(raw)
+        : Buffer.from(raw.buffer || raw, raw.byteOffset || 0, raw.byteLength);
+    const expected =
+      index === session.chunkTotal - 1
+        ? session.size - session.chunkSize * (session.chunkTotal - 1)
+        : session.chunkSize;
+    if (bytes.byteLength !== expected) {
+      return { ok: false, error: `Chunk size mismatch want ${expected} got ${bytes.byteLength}` };
+    }
+    session.chunks.set(index, bytes);
+    // Latency so pause/resume automation can land between chunks.
+    await new Promise((r) => setTimeout(r, 280));
+    const received = [...session.chunks.keys()].sort((a, b) => a - b);
+    return { ok: true, uploadId, received, chunkTotal: session.chunkTotal, nextIndex: received.length < session.chunkTotal ? received.length : null };
+  }
+
+  @Post('/api/form/resumable/status')
+  async resumableStatus(body) {
+    const payload = body && typeof body === 'object' ? body : {};
+    const uploadId = String(payload.uploadId || '').trim();
+    if (!uploadId || !resumableSessions.has(uploadId)) {
+      return { ok: false, error: 'Unknown upload session' };
+    }
+    const session = resumableSessions.get(uploadId);
+    const received = [...session.chunks.keys()].sort((a, b) => a - b);
+    return {
+      ok: true,
+      uploadId,
+      received,
+      chunkTotal: session.chunkTotal,
+      size: session.size,
+      name: session.name,
+    };
+  }
+
+  @Post('/api/form/resumable/complete')
+  async resumableComplete(body) {
+    const payload = body && typeof body === 'object' ? body : {};
+    const uploadId = String(payload.uploadId || '').trim();
+    if (!uploadId || !resumableSessions.has(uploadId)) {
+      return { ok: false, error: 'Unknown upload session' };
+    }
+    const session = resumableSessions.get(uploadId);
+    if (session.chunks.size !== session.chunkTotal) {
+      return {
+        ok: false,
+        error: `Incomplete upload ${session.chunks.size}/${session.chunkTotal}`,
+        received: [...session.chunks.keys()].sort((a, b) => a - b),
+      };
+    }
+    const parts = [];
+    for (let i = 0; i < session.chunkTotal; i++) {
+      const part = session.chunks.get(i);
+      if (!part) return { ok: false, error: `Missing chunk ${i}` };
+      parts.push(part);
+    }
+    const bytes = Buffer.concat(parts);
+    if (bytes.byteLength !== session.size) {
+      return { ok: false, error: 'Assembled size mismatch' };
+    }
+    let headHex = '';
+    for (let h = 0; h < Math.min(16, bytes.byteLength); h++) {
+      headHex += bytes[h].toString(16).padStart(2, '0');
+    }
+    const id = `att-${Date.now().toString(36)}-${Math.abs(hashString(session.name + ':' + session.size + ':' + bytes[0])).toString(36)}`;
+    resumableSessions.delete(uploadId);
+    await new Promise((r) => setTimeout(r, 80));
+    return {
+      ok: true,
+      id,
+      name: session.name,
+      bytes: bytes.byteLength,
+      contentType: session.type,
+      headHex,
+      chunks: session.chunkTotal,
+      uploadId,
+    };
+  }
+
+  @Post('/api/form/presign')
+  async presign(body) {
+    const payload = body && typeof body === 'object' ? body : {};
+    const name = String(payload.name || '').trim() || 'upload.bin';
+    if (!/\.(txt|md|pdf)$/i.test(name)) {
+      return { ok: false, error: 'Only .txt, .md, or .pdf for object store' };
+    }
+    const size = Number(payload.size);
+    if (Number.isFinite(size) && size > 256 * 1024) {
+      return { ok: false, error: 'Object too large to presign' };
+    }
+    const type = String(payload.type || 'application/octet-stream');
+    const objectKey = `obj-${Date.now().toString(36)}-${Math.abs(hashString(name)).toString(36)}`;
+    // Short-lived mock URL on same host — never return cloud permanent credentials.
+    return {
+      ok: true,
+      objectKey,
+      uploadUrl: '/api/form/object-put',
+      headers: {
+        'content-type': type || 'application/octet-stream',
+        'x-vmz-object-key': objectKey,
+      },
+    };
+  }
+
+  @Put('/api/form/object-put')
+  async receiveObject(body) {
+    const payload = body && typeof body === 'object' ? body : {};
+    const key = String(payload.key || '').trim();
+    if (!key || !key.startsWith('obj-')) {
+      return { ok: false, error: 'Missing object key' };
+    }
+    const raw = payload.bytes;
+    const size = Number(payload.size);
+    const hasBuf =
+      raw &&
+      typeof raw === 'object' &&
+      typeof raw.byteLength === 'number' &&
+      (ArrayBuffer.isView(raw) || raw instanceof ArrayBuffer || Buffer.isBuffer?.(raw));
+    if (!hasBuf) {
+      return { ok: false, error: 'Missing object body' };
+    }
+    const bytes = raw instanceof ArrayBuffer ? new Uint8Array(raw) : new Uint8Array(raw.buffer || raw, raw.byteOffset || 0, raw.byteLength);
+    if (Number.isFinite(size) && size >= 0 && bytes.byteLength !== size) {
+      return { ok: false, error: 'Truncated object body' };
+    }
+    if (bytes.byteLength > 256 * 1024) {
+      return { ok: false, error: 'Object too large' };
+    }
+    await new Promise((r) => setTimeout(r, 200));
+    let headHex = '';
+    for (let i = 0; i < Math.min(16, bytes.byteLength); i++) {
+      headHex += bytes[i].toString(16).padStart(2, '0');
+    }
+    return {
+      ok: true,
+      objectKey: key,
+      bytes: bytes.byteLength,
+      contentType: String(payload.contentType || ''),
+      headHex,
+    };
+  }
+}
+
+function hashString(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  return h || 1;
 }
 </script>

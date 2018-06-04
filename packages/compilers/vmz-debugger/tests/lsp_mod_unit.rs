@@ -1,9 +1,17 @@
 //! Moved from `src/lsp/mod.rs` (cargo-cry: tests next to Cargo.toml).
 
-use serde_json::json;
+use serde::Serialize;
 
 use std::fs;
 use vmz_debugger::lsp::*;
+
+#[derive(Serialize)]
+struct ExplainRequest<'a> {
+    jsonrpc: &'static str,
+    id: i64,
+    method: &'a str,
+    params: ExplainParams,
+}
 
 #[test]
 fn initialize_advertises_vmz_methods() {
@@ -17,12 +25,13 @@ fn dispatch_explain_write_missing_graph() {
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let session = LspSession::new(&dir, &dir);
-    let req = json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": METHOD_EXPLAIN,
-        "params": { "target": "write:n" }
-    });
+    let req = serde_json::to_value(ExplainRequest {
+        jsonrpc: "2.0",
+        id: 1,
+        method: METHOD_EXPLAIN,
+        params: ExplainParams { target: "write:n".into() },
+    })
+    .expect("request value");
     let resp = dispatch(&session, &req).expect("response");
     assert!(resp.error.is_none());
     let result = resp.result.expect("result");

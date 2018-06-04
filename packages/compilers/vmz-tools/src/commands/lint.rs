@@ -4,8 +4,10 @@ use vmz_inspector::{InspectOptions, InspectProfile, failed, inspect_path};
 
 use crate::cli::PathArgs;
 
+/// Arguments for `vmz lint`.
 #[derive(Debug, ClapArgs)]
 pub struct Args {
+    /// Files or project roots to lint.
     #[command(flatten)]
     pub paths: PathArgs,
 
@@ -14,6 +16,7 @@ pub struct Args {
     pub deny_warnings: bool,
 }
 
+/// Run inspect with the lint profile (check + soft convention advice).
 pub fn run(args: Args) -> Result<()> {
     let options =
         InspectOptions { profile: InspectProfile::Lint, deny_warnings: args.deny_warnings };

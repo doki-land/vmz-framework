@@ -6,6 +6,7 @@ use serde_json::Value;
 use vmz_compiler::{Result, ResultExt};
 use vmz_debugger::mcp::{self, McpSession};
 
+/// Arguments for `vmz mcp`.
 #[derive(Debug, ClapArgs)]
 pub struct Args {
     /// Project root (defaults to current directory)
@@ -17,6 +18,7 @@ pub struct Args {
     pub out_dir: Option<PathBuf>,
 }
 
+/// Serve the debugger MCP session over newline-delimited JSON-RPC on stdio.
 pub fn run(args: Args) -> Result<()> {
     let root = args.root.canonicalize().unwrap_or(args.root);
     let out_dir = args.out_dir.unwrap_or_else(|| mcp::default_out_dir(&root));

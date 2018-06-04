@@ -13,7 +13,7 @@ fn example_lifecycle_ready() {
     ));
     let _ = fs::create_dir_all(&dir);
     let report = check_native_lifecycle_contract(&dir);
-    assert_eq!(report.status, "ready", "{:?}", report.diagnostics);
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Ready, "{:?}", report.diagnostics);
     assert!(!report.lifecycle.background_equals_destroy);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -29,9 +29,12 @@ fn rejects_background_equals_destroy() {
     p.background_equals_destroy = true;
     fs::write(dir.join("native-lifecycle.json"), p.to_json()).unwrap();
     let report = check_native_lifecycle_contract(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
-        report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_BACKGROUND_IS_DESTROY))
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_BACKGROUND_IS_DESTROY))
     );
     let _ = fs::remove_dir_all(&dir);
 }
@@ -47,9 +50,12 @@ fn rejects_crash_assumes_js_heap() {
     p.crash_restore_assumes_js_heap = true;
     fs::write(dir.join("native-lifecycle.json"), p.to_json()).unwrap();
     let report = check_native_lifecycle_contract(&dir);
-    assert_eq!(report.status, "failed");
+    assert_eq!(report.status, vmz_protocol::CheckReportStatus::Failed);
     assert!(
-        report.diagnostics.iter().any(|d| d.code.as_deref() == Some(DIAG_CRASH_ASSUMES_JS_HEAP))
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code_string().as_deref() == Some(DIAG_CRASH_ASSUMES_JS_HEAP))
     );
     let _ = fs::remove_dir_all(&dir);
 }

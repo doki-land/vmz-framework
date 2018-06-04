@@ -1,8 +1,6 @@
 //! Moved from `src/pipeline/plan_build.rs` (cargo-cry: tests next to Cargo.toml).
 
-use vmz_protocol::*;
-
-use vmz_types::PlanStatus;
+use vmz_types::{PlanNodeKind, PlanStatus};
 
 use vmz_compiler::pipeline::plan_build::*;
 use vmz_types::{ViewIfBranch, ViewNode, ViewStatus, ViewView};
@@ -30,14 +28,14 @@ fn builds_if_and_dispose_region() {
     let plan = build_execution_plan(&view);
     assert_eq!(plan.status, PlanStatus::Partial);
     assert_eq!(plan.root_ids, vec![0]);
-    assert!(plan.nodes.iter().any(|n| n.kind == "if" && n.region == Some(0)));
-    assert!(plan.nodes.iter().any(|n| n.kind == "element" && n.tag.as_deref() == Some("p")));
-    assert!(plan.nodes.iter().any(|n| n.kind == "text"));
+    assert!(plan.nodes.iter().any(|n| n.kind() == PlanNodeKind::If && n.region() == Some(0)));
+    assert!(plan.nodes.iter().any(|n| n.kind() == PlanNodeKind::Element && n.tag() == Some("p")));
+    assert!(plan.nodes.iter().any(|n| n.kind() == PlanNodeKind::Text));
     assert!(
-        plan.nodes.iter().any(|n| n.kind == "dispose_region"
-            && n.region == Some(0)
-            && n.tag.as_deref() == Some("if")),
-        "missing dispose_region: {:?}",
+        plan.nodes.iter().any(|n| n.kind() == PlanNodeKind::DisposeRegion
+            && n.region() == Some(0)
+            && n.tag() == Some("if")),
+        "missing dispose-region: {:?}",
         plan.nodes
     );
 }

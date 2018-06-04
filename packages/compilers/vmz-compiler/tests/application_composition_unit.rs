@@ -105,7 +105,7 @@ fn non_public_route_and_unknown_app_fail() {
     let report = check_application_host_composition(&host, &[a]);
     assert!(report.has_errors());
     let codes: std::collections::HashSet<_> =
-        report.diagnostics.iter().map(|d| d.code.as_str()).collect();
+        report.diagnostics.iter().filter_map(|d| d.code_string()).collect();
     assert!(codes.contains(DIAG_ROUTE_NOT_PUBLIC));
     assert!(codes.contains(DIAG_UNKNOWN_REFERENCE));
 }

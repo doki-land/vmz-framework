@@ -1,7 +1,8 @@
 /**
  * A2 Router production — multi-page file routes on real vmz-serve-host.
  * Proves SSR routes, Link hrefs, load/access/action, navigation cancel,
- * and Layout SSR chain + layout retention (page dispose/create).
+ * Layout SSR chain + in-process page dispose/create retention, and
+ * Browser SPA same-layout retention (shared Layout ticks across client nav).
  */
 
 import { spawn } from 'node:child_process';
@@ -280,6 +281,34 @@ try {
         spaDetail = e instanceof Error ? e.message : String(e);
     }
 
+    // 浏览器侧：同一 Layout 链下 client 换页不得重建 Layout（ticks 必须保留）
+    console.log('router-production: Browser SPA layout retention…');
+    let spaLayoutDetail = '';
+    try {
+        spaLayoutDetail = await proveSpaLayoutRetention(`http://127.0.0.1:${PORT}/shop`);
+    } catch (e) {
+        errors.push(`SPA layout retention: ${e instanceof Error ? e.message : String(e)}`);
+        spaLayoutDetail = e instanceof Error ? e.message : String(e);
+    }
+
+    console.log('router-production: scroll/focus restoration…');
+    let scrollFocusDetail = '';
+    try {
+        scrollFocusDetail = await proveScrollFocus(`http://127.0.0.1:${PORT}/shop`);
+    } catch (e) {
+        errors.push(`scroll/focus: ${e instanceof Error ? e.message : String(e)}`);
+        scrollFocusDetail = e instanceof Error ? e.message : String(e);
+    }
+
+    console.log('router-production: locale realization…');
+    let localeDetail = '';
+    try {
+        localeDetail = await proveLocaleRealization(dist, `http://127.0.0.1:${PORT}`);
+    } catch (e) {
+        errors.push(`locale realization: ${e instanceof Error ? e.message : String(e)}`);
+        localeDetail = e instanceof Error ? e.message : String(e);
+    }
+
     upsertCheck(proof, {
         id: 'router-production.build',
         status: 'passed',
@@ -317,20 +346,32 @@ try {
     });
     upsertCheck(proof, {
         id: 'router-production.layout',
-        status: errors.some((e) => e.includes('/shop') || e.includes('layout')) ? 'failed' : 'passed',
+        // SSR /shop markers only — do not conflate with SPA layout retention errors.
+        status: errors.some((e) => e.includes('GET /shop') || e.includes('shop and offer')) ? 'failed' : 'passed',
         detail: layoutDetail,
     });
     upsertCheck(proof, {
         id: 'router-production.client-transition',
-        status: errors.some((e) => e.startsWith('SPA ')) ? 'failed' : 'passed',
+        status: errors.some((e) => e.startsWith('SPA takeover:')) ? 'failed' : 'passed',
         detail: spaDetail,
     });
+    upsertCheck(proof, {
+        id: 'router-production.spa-layout-retention',
+        status: errors.some((e) => e.startsWith('SPA layout retention:')) ? 'failed' : 'passed',
+        detail: spaLayoutDetail,
+    });
+    upsertCheck(proof, {
+        id: 'router-production.scroll-focus',
+        status: errors.some((e) => e.startsWith('scroll/focus:')) ? 'failed' : 'passed',
+        detail: scrollFocusDetail,
+    });
+    upsertCheck(proof, {
+        id: 'router-production.locale',
+        status: errors.some((e) => e.startsWith('locale realization:')) ? 'failed' : 'passed',
+        detail: localeDetail,
+    });
 
-    const gaps = [
-        'A2: scroll/focus restoration + locale realization not yet covered',
-        'A2: SPA layout retention (shared Layout ticks across client transition) not yet covered',
-    ];
-    for (const g of gaps) addLimitation(proof, g);
+    // P2 scroll/focus + locale realization closed on this driver.
     proof.knownLimitations = proof.knownLimitations.filter(
         (l) =>
             !l.includes('A2: real multi-page Router on vmz serve') &&
@@ -338,6 +379,8 @@ try {
             !l.includes('A2: access/action/navigation cancellation not yet in this driver') &&
             !l.includes('A2: navigation cancellation not yet in this driver') &&
             !l.includes('A2: layout retention / scroll-focus / locale realization not yet covered') &&
+            !l.includes('A2: scroll/focus restoration + locale realization not yet covered') &&
+            !l.includes('A2: SPA layout retention (shared Layout ticks across client transition) not yet covered') &&
             !l.includes('A2: Browser Host client transition + RouteId Link not yet covered') &&
             !l.includes('A2: Browser Host client transition (SPA takeover) not yet covered'),
     );
@@ -348,9 +391,9 @@ try {
     killChild();
 }
 
-console.log('router-production PASS: routes + Link + load/access/action + nav-cancel + layout + SPA takeover');
-console.log('router-production NOTE: scroll/focus / locale / SPA layout retention still open');
-
+console.log(
+    'router-production PASS: routes + Link + load/access/action + nav-cancel + layout + SPA takeover + SPA layout retention + scroll/focus + locale',
+);
 async function loadPuppeteerCore(): Promise<any> {
     // Resolve via @vmz/test (owns puppeteer-core as CDP transport). Bare import fails from this package.
     const requireFromTest = createRequire(path.join(root, 'packages', 'runtimes', 'vmz-test', 'package.json'));
@@ -414,6 +457,355 @@ async function proveClientTransition(homeUrl: string): Promise<string> {
     } finally {
         await browser.close();
     }
+}
+
+/**
+ * 证明共享 Layout 在 client 换页时被保留：bump ticks 后点 Link，ticks 与 layout 实例不得重置。
+ * @param shopUrl 已部署的 /shop URL
+ */
+async function proveSpaLayoutRetention(shopUrl: string): Promise<string> {
+    const { resolveBrowserExecutable } = await import(
+        pathToFileURL(path.join(root, 'packages', 'runtimes', 'vmz-test', 'dist', 'browser.js')).href
+    );
+    const chrome = resolveBrowserExecutable();
+    if (!chrome) throw new Error('Chrome/Edge not found for SPA layout retention proof (set VMZ_BROWSER)');
+
+    const puppeteer = await loadPuppeteerCore();
+    const browser = await puppeteer.launch({
+        executablePath: chrome,
+        headless: true,
+        args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+    });
+    try {
+        const page = await browser.newPage();
+        page.setDefaultTimeout(20000);
+        await page.goto(shopUrl, { waitUntil: 'networkidle0', timeout: 20000 });
+        await page.waitForFunction('window.__vmzClientNavInstalled === true', { timeout: 10000 });
+
+        // 先 bump Layout.ticks，建立「实例存活」证据
+        const bumped = await page.evaluate(() => {
+            const root = document.getElementById('app') as any;
+            const layouts = root && root.__vmzLayoutInsts;
+            if (!Array.isArray(layouts) || layouts.length < 1) {
+                return { ok: false, reason: 'missing __vmzLayoutInsts after hydrateRoute' };
+            }
+            const layout = layouts[0];
+            if (typeof layout.bump !== 'function') {
+                return { ok: false, reason: 'ShopLayout.bump missing' };
+            }
+            layout.bump();
+            return {
+                ok: true,
+                ticks: layout.ticks,
+                text: document.body.innerText,
+            };
+        });
+        if (!bumped.ok) throw new Error(String((bumped as { reason?: string }).reason || 'bump failed'));
+        if (bumped.ticks !== 1) throw new Error(`layout ticks want 1 after bump, got ${bumped.ticks}`);
+        await page.waitForFunction(() => document.body.innerText.includes('layout-ticks:1'), { timeout: 5000 });
+
+        const bootBefore = await page.evaluate(() => (window as any).__vmzBootId);
+        const offerLink = await page.$('a[data-vmz-route="ShopOfferPage"]');
+        if (!offerLink) throw new Error('shop DOM missing a[data-vmz-route=ShopOfferPage]');
+        await offerLink.click();
+        await page.waitForFunction(
+            () =>
+                location.pathname === '/shop/offer' &&
+                document.body.innerText.includes('route-shop-offer') &&
+                document.body.innerText.includes('layout-shop'),
+            { timeout: 10000 },
+        );
+
+        const after = await page.evaluate(() => {
+            const root = document.getElementById('app') as any;
+            const layouts = root && root.__vmzLayoutInsts;
+            const last = (window as any).__vmzLastClientNav || {};
+            return {
+                path: location.pathname,
+                boot: (window as any).__vmzBootId,
+                retained: !!last.retainedLayout,
+                ticks: Array.isArray(layouts) && layouts[0] ? layouts[0].ticks : null,
+                text: document.body.innerText,
+                layoutAttr: root ? root.getAttribute('data-vmz-layout') : null,
+            };
+        });
+        if (after.path !== '/shop/offer') throw new Error(`pathname want /shop/offer got ${after.path}`);
+        if (after.boot !== bootBefore) throw new Error('full reload during layout-retained SPA nav');
+        if (!after.retained) throw new Error('__vmzLastClientNav.retainedLayout must be true');
+        if (after.ticks !== 1) {
+            throw new Error(`shared Layout ticks must stay 1 across SPA page swap, got ${after.ticks}`);
+        }
+        if (!after.text.includes('layout-ticks:1')) {
+            throw new Error('DOM layout-ticks binding reset (layout remounted)');
+        }
+        if (after.text.includes('route-shop') && !after.text.includes('route-shop-offer')) {
+            throw new Error('page region not swapped to offer');
+        }
+        if (!String(after.layoutAttr || '').includes('shop/Layout')) {
+            throw new Error(`data-vmz-layout missing after retention: ${after.layoutAttr}`);
+        }
+
+        return 'SPA same-layout nav retains Layout ticks (shop→offer, retainedLayout=true)';
+    } finally {
+        await browser.close();
+    }
+}
+
+/**
+ * Route Transition Plan: forward nav scrolls to top + focuses main; popstate restores scrollY.
+ */
+async function proveScrollFocus(shopUrl: string): Promise<string> {
+    const { resolveBrowserExecutable } = await import(
+        pathToFileURL(path.join(root, 'packages', 'runtimes', 'vmz-test', 'dist', 'browser.js')).href
+    );
+    const chrome = resolveBrowserExecutable();
+    if (!chrome) throw new Error('Chrome/Edge not found for scroll/focus proof (set VMZ_BROWSER)');
+
+    const puppeteer = await loadPuppeteerCore();
+    const browser = await puppeteer.launch({
+        executablePath: chrome,
+        headless: true,
+        args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+    });
+    try {
+        const page = await browser.newPage();
+        page.setDefaultTimeout(20000);
+        await page.setViewport({ width: 900, height: 700 });
+        await page.goto(shopUrl, { waitUntil: 'networkidle0', timeout: 20000 });
+        await page.waitForFunction('window.__vmzClientNavInstalled === true', { timeout: 10000 });
+
+        await page.evaluate(() => window.scrollTo(0, 1400));
+        await page.waitForFunction(() => window.scrollY > 1000, { timeout: 5000 });
+        const beforeY = await page.evaluate(() => window.scrollY);
+        if (beforeY < 1000) throw new Error(`expected scrolled shop, scrollY=${beforeY}`);
+
+        // Click via DOM (no scroll-into-view) so saveScroll captures depth — Puppeteer's
+        // ElementHandle.click() scrolls the target into view and would wipe scrollY first.
+        const clicked = await page.evaluate(() => {
+            const a = document.querySelector('a[data-vmz-route="ShopOfferPage"]') as HTMLAnchorElement | null;
+            if (!a) return false;
+            a.click();
+            return true;
+        });
+        if (!clicked) throw new Error('missing ShopOfferPage link');
+        await page.waitForFunction(
+            () => {
+                const last = (window as any).__vmzLastClientNav || {};
+                return (
+                    location.pathname === '/shop/offer' &&
+                    document.body.innerText.includes('route-shop-offer') &&
+                    last.scrollMode === 'top' &&
+                    (last.focusTarget === 'offer-main' ||
+                        document.activeElement?.getAttribute?.('data-vmz-focus') === 'offer-main')
+                );
+            },
+            { timeout: 10000 },
+        );
+
+        const afterFwd = await page.evaluate(() => {
+            const last = (window as any).__vmzLastClientNav || {};
+            const active = document.activeElement as HTMLElement | null;
+            return {
+                scrollY: window.scrollY,
+                scrollMode: last.scrollMode,
+                focusTarget: last.focusTarget,
+                activeFocus: active?.getAttribute?.('data-vmz-focus') || active?.tagName?.toLowerCase() || null,
+            };
+        });
+        if (afterFwd.scrollY > 40) throw new Error(`forward nav must scroll to top, got scrollY=${afterFwd.scrollY}`);
+        if (afterFwd.scrollMode !== 'top') throw new Error(`scrollMode want top, got ${afterFwd.scrollMode}`);
+        if (afterFwd.focusTarget !== 'offer-main' && afterFwd.activeFocus !== 'offer-main') {
+            throw new Error(`focus want offer-main, got focus=${afterFwd.focusTarget} active=${afterFwd.activeFocus}`);
+        }
+
+        await page.goBack({ waitUntil: 'networkidle0' });
+        try {
+            await page.waitForFunction(
+                () => {
+                    const last = (window as any).__vmzLastClientNav || {};
+                    return (
+                        location.pathname === '/shop' &&
+                        document.body.innerText.includes('route-shop') &&
+                        last.scrollMode === 'restored' &&
+                        typeof last.scrollY === 'number' &&
+                        window.scrollY > 1000 &&
+                        !!document.querySelector('[data-vmz-scroll-pad]')
+                    );
+                },
+                { timeout: 15000 },
+            );
+        } catch (err) {
+            const dump = await page.evaluate(() => {
+                const last = (window as any).__vmzLastClientNav || {};
+                return {
+                    path: location.pathname,
+                    textHasShop: document.body.innerText.includes('route-shop'),
+                    scrollY: window.scrollY,
+                    scrollMode: last.scrollMode,
+                    lastScrollY: last.scrollY,
+                    href: last.href,
+                    hasPad: !!document.querySelector('[data-vmz-scroll-pad]'),
+                    padHeight: (document.querySelector('[data-vmz-scroll-pad]') as HTMLElement | null)?.offsetHeight || 0,
+                    bodyHeight: document.body.scrollHeight,
+                    retained: !!last.retainedLayout,
+                };
+            });
+            throw new Error(`popstate scroll restore wait failed: ${JSON.stringify(dump)} (${err instanceof Error ? err.message : err})`);
+        }
+        const afterBack = await page.evaluate(() => {
+            const last = (window as any).__vmzLastClientNav || {};
+            return {
+                scrollY: window.scrollY,
+                scrollMode: last.scrollMode,
+                path: location.pathname,
+                hasPad: !!document.querySelector('[data-vmz-scroll-pad]'),
+                padHeight: (document.querySelector('[data-vmz-scroll-pad]') as HTMLElement | null)?.offsetHeight || 0,
+                bodyHeight: document.body.scrollHeight,
+                href: last.href,
+                retained: !!last.retainedLayout,
+            };
+        });
+        if (afterBack.scrollMode !== 'restored') {
+            throw new Error(`popstate scrollMode want restored, got ${JSON.stringify(afterBack)}`);
+        }
+        if (afterBack.scrollY < 1000) {
+            throw new Error(`popstate must restore shop scrollY (~${beforeY}), got ${JSON.stringify(afterBack)}`);
+        }
+        if (!afterBack.hasPad || afterBack.padHeight < 2000) {
+            throw new Error(`shop scroll-pad missing after popstate: ${JSON.stringify(afterBack)}`);
+        }
+
+        return `forward top+focus(offer-main); popstate restored scrollY=${Math.round(afterBack.scrollY)}`;
+    } finally {
+        await browser.close();
+    }
+}
+
+/**
+ * Locale realization: artifact + SSR lang/hreflang + prefixed path + SPA locale commit.
+ */
+async function proveLocaleRealization(distDir: string, baseUrl: string): Promise<string> {
+    const artPath = path.join(distDir, '_vmz', 'locale-route-realization.json');
+    if (!fs.existsSync(artPath)) throw new Error('missing _vmz/locale-route-realization.json');
+    const art = JSON.parse(fs.readFileSync(artPath, 'utf8'));
+    if (art.schema !== 'vmz.locale.route_realization.v0') throw new Error(`bad locale artifact schema ${art.schema}`);
+    if (art.defaultLocale !== 'en-us') throw new Error(`defaultLocale want en-us, got ${art.defaultLocale}`);
+    const aboutEn = (art.realizations || []).find((r: any) => r.routeId === 'pages/about' && r.localeId === 'en-us');
+    const aboutZh = (art.realizations || []).find((r: any) => r.routeId === 'pages/about' && r.localeId === 'zh-hans');
+    if (!aboutEn || aboutEn.path !== '/about') throw new Error('en-us about realization path want /about');
+    if (!aboutZh || aboutZh.path !== '/zh-hans/about') throw new Error('zh-hans about realization path want /zh-hans/about');
+
+    const home = await get(`${baseUrl}/`);
+    if (home.status !== 200) throw new Error(`GET / locale home status ${home.status}`);
+    if (!home.body.includes('lang="en-us"') || !home.body.includes('data-locale="en-us"')) {
+        throw new Error(`home missing en-us lang/data-locale: ${home.body.slice(0, 300)}`);
+    }
+    if (!home.body.includes('data-vmz-locale="en-us"')) throw new Error('home missing data-vmz-locale');
+    if (!home.body.includes('hreflang="zh-hans"') || !home.body.includes('hreflang="x-default"')) {
+        throw new Error(`home missing hreflang seed: ${home.body.slice(home.body.indexOf('<head>'), home.body.indexOf('</head>') + 7)}`);
+    }
+
+    const zh = await get(`${baseUrl}/zh-hans/about`);
+    if (zh.status !== 200 || !zh.body.includes('route-about')) {
+        throw new Error(`GET /zh-hans/about want about page, got ${zh.status} ${zh.body.slice(0, 200)}`);
+    }
+    if (!zh.body.includes('lang="zh-hans"') || !zh.body.includes('data-vmz-locale="zh-hans"')) {
+        throw new Error(`zh-hans about missing locale attrs: ${zh.body.slice(0, 300)}`);
+    }
+    // Link retains current LocaleId — IndexPage on zh page must be /zh-hans, not bare /.
+    if (!zh.body.includes('data-vmz-route="IndexPage"') || !zh.body.includes('href="/zh-hans"')) {
+        throw new Error(
+            `zh-hans about Link must retain locale (IndexPage → /zh-hans): ${zh.body.slice(zh.body.indexOf('<main'), zh.body.indexOf('</main>') + 7)}`,
+        );
+    }
+
+    const prefixedDefault = await get(`${baseUrl}/en-us/about`);
+    if (prefixedDefault.status !== 302 || String(prefixedDefault.headers.location || '') !== '/about') {
+        throw new Error(
+            `omit-prefix default redirect want 302 /about, got ${prefixedDefault.status} ${prefixedDefault.headers.location}`,
+        );
+    }
+
+    const { resolveBrowserExecutable } = await import(
+        pathToFileURL(path.join(root, 'packages', 'runtimes', 'vmz-test', 'dist', 'browser.js')).href
+    );
+    const chrome = resolveBrowserExecutable();
+    if (!chrome) throw new Error('Chrome/Edge not found for locale SPA proof (set VMZ_BROWSER)');
+    const puppeteer = await loadPuppeteerCore();
+    const browser = await puppeteer.launch({
+        executablePath: chrome,
+        headless: true,
+        args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+    });
+    try {
+        const page = await browser.newPage();
+        page.setDefaultTimeout(20000);
+        await page.goto(`${baseUrl}/about`, { waitUntil: 'networkidle0', timeout: 20000 });
+        await page.waitForFunction('window.__vmzClientNavInstalled === true', { timeout: 10000 });
+        await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 5000 });
+
+        // Atomic LocaleTransition: en-us → zh-hans via host API (not hand-written path).
+        const committed = await page.evaluate(async () => {
+            const r = await (window as any).__vmzTransitionLocale('zh-hans');
+            return {
+                ...r,
+                path: location.pathname,
+                htmlLang: document.documentElement.lang,
+                dataLocale: document.documentElement.getAttribute('data-locale'),
+                appLocale: document.getElementById('app')?.getAttribute('data-vmz-locale'),
+            };
+        });
+        if (committed.status !== 'committed' || committed.toLocale !== 'zh-hans') {
+            throw new Error(`LocaleTransition commit failed: ${JSON.stringify(committed)}`);
+        }
+        if (committed.path !== '/zh-hans/about') {
+            throw new Error(`LocaleTransition path want /zh-hans/about, got ${committed.path}`);
+        }
+        if (committed.htmlLang !== 'zh-hans' || committed.dataLocale !== 'zh-hans' || committed.appLocale !== 'zh-hans') {
+            throw new Error(`LocaleTransition DOM commit incomplete: ${JSON.stringify(committed)}`);
+        }
+
+        // Unsupported locale must reject and keep zh-hans surface.
+        const rejected = await page.evaluate(async () => {
+            const before = document.documentElement.getAttribute('data-locale');
+            const r = await (window as any).__vmzTransitionLocale('ja-jp');
+            return {
+                ...r,
+                before,
+                after: document.documentElement.getAttribute('data-locale'),
+                path: location.pathname,
+            };
+        });
+        if (rejected.status !== 'rejected' || rejected.after !== 'zh-hans' || rejected.path !== '/zh-hans/about') {
+            throw new Error(`unsupported LocaleTransition must reject+retain: ${JSON.stringify(rejected)}`);
+        }
+
+        // Nav failure must soft-fail / roll back — keep zh-hans surface (no half commit, no full assign).
+        const rolled = await page.evaluate(async () => {
+            const before = document.documentElement.getAttribute('data-locale');
+            const pathBefore = location.pathname;
+            (window as any).__vmzClientNavSetFetch(async () => new Response('nope', { status: 503 }));
+            const r = await (window as any).__vmzTransitionLocale('en-us');
+            (window as any).__vmzClientNavSetFetch(null);
+            return {
+                ...r,
+                before,
+                after: document.documentElement.getAttribute('data-locale'),
+                path: location.pathname,
+                pathBefore,
+            };
+        });
+        if (rolled.status !== 'rolled_back' || rolled.after !== 'zh-hans') {
+            throw new Error(`LocaleTransition nav fail must roll back: ${JSON.stringify(rolled)}`);
+        }
+        if (rolled.path !== rolled.pathBefore || rolled.pathBefore !== '/zh-hans/about') {
+            throw new Error(`rolled_back must not change pathname: ${JSON.stringify(rolled)}`);
+        }
+    } finally {
+        await browser.close();
+    }
+
+    return 'artifact + SSR + Link retains locale + LocaleTransition commit/reject/rollback';
 }
 
 async function proveNavCancel(distDir: string): Promise<string> {

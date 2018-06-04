@@ -1,4 +1,4 @@
-//! Runtime trace ↔ Program Graph StableId causal replay.
+//! Runtime trace <-> Program Graph StableId causal replay.
 //!
 //! `explain write|update` from `*.program.json` edges; ingest/replay traces;
 //! umbrella `check_causal_replay`.
@@ -6,47 +6,87 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde_json::Value;
+use serde::Deserialize;
 
 use vmz_protocol::{
     CAUSAL_REPLAY_CHECK_SCHEMA, CAUSAL_REPLAY_SCHEMA, CausalReplayCheckReport,
-    CausalReplayDocument, CausalReplayMatch, DxDiagnostic, EXPLAIN_SCHEMA, ExplainDocument,
-    ExplainEdge, StableId, TRACE_SCHEMA, TraceDocument, TraceEvent,
+    CausalReplayCheckStatus, CausalReplayDocument, CausalReplayMatch, CausalReplayStatus,
+    EXPLAIN_SCHEMA, ExplainDocument, ExplainEdge, ExplainEdgeRef, ExplainKind, ExplainProgramRef,
+    ProgramEdgeKind, ProgramGraphEdge, ReportedDiagnostic, StableId, StableIdKind, TRACE_SCHEMA,
+    TraceDocument, TraceEvent, TraceEventKind, TraceStatus,
 };
 
+/// One Program Graph edge loaded from `*.program.json`.
 #[derive(Debug, Clone)]
 pub struct GraphEdge {
-    pub kind: String,
+    /// Closed edge kind (`reads` / `writes` / …).
+    pub kind: ProgramEdgeKind,
+    /// Source node token (e.g. `effect:increment`, `binding:0`, or a field path).
     pub from: String,
+    /// Destination node token (often a field path such as `n`).
     pub to: String,
 }
 
+/// One deployment unit slice: chunk id, program path, and its graph edges.
 #[derive(Debug, Clone)]
 pub struct ProgramUnitView {
+    /// Deployment chunk id (from `deployment.chunkId` or unit `name`).
     pub chunk_id: String,
+    /// Path of the owning `*.program.json` file.
     pub path: PathBuf,
+    /// Graph edges under this unit (`graph.edges`).
     pub edges: Vec<GraphEdge>,
 }
 
-fn sid(kind: &str, id: impl Into<String>) -> StableId {
-    StableId { kind: kind.into(), id: id.into() }
+/// Typed `*.program.json` loader slice (avoids `serde_json::Value` walks).
+#[derive(Debug, Deserialize)]
+struct ProgramFileWire {
+    #[serde(default)]
+    units: Vec<ProgramUnitWire>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProgramUnitWire {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    deployment: Option<DeploymentWire>,
+    #[serde(default)]
+    graph: Option<GraphWire>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DeploymentWire {
+    #[serde(default)]
+    chunk_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GraphWire {
+    #[serde(default)]
+    edges: Vec<ProgramGraphEdge>,
+}
+
+fn sid(kind: StableIdKind, id: impl Into<String>) -> StableId {
+    StableId::new(kind, id)
 }
 
 fn parse_node(raw: &str) -> StableId {
     if let Some(rest) = raw.strip_prefix("binding:") {
-        return sid("binding", rest);
+        return sid(StableIdKind::Binding, rest);
     }
     if let Some(rest) = raw.strip_prefix("effect:") {
-        return sid("effect", rest);
+        return sid(StableIdKind::Effect, rest);
     }
     if let Some(rest) = raw.strip_prefix("capability:") {
-        return sid("capability", rest);
+        return sid(StableIdKind::Capability, rest);
     }
     if let Some(rest) = raw.strip_prefix("route:") {
-        return sid("route_id", rest);
+        return sid(StableIdKind::RouteId, rest);
     }
     // Field / dep path token (e.g. `n`, `items.*.label`).
-    sid("field", raw)
+    sid(StableIdKind::Field, raw)
 }
 
 fn load_program_units(out_dir: &Path) -> Vec<ProgramUnitView> {
@@ -73,43 +113,35 @@ fn walk_programs(dir: &Path, out: &mut Vec<ProgramUnitView>) {
         let Ok(text) = fs::read_to_string(&path) else {
             continue;
         };
-        let Ok(root) = serde_json::from_str::<Value>(&text) else {
+        let Ok(root) = serde_json::from_str::<ProgramFileWire>(&text) else {
             continue;
         };
-        let Some(units) = root.get("units").and_then(|v| v.as_array()) else {
-            continue;
-        };
-        for unit in units {
+        for unit in root.units {
             let chunk_id = unit
-                .pointer("/deployment/chunkId")
-                .and_then(|v| v.as_str())
-                .or_else(|| unit.get("name").and_then(|v| v.as_str()))
-                .unwrap_or("?")
-                .to_string();
-            let mut edges = Vec::new();
-            if let Some(arr) = unit.pointer("/graph/edges").and_then(|v| v.as_array()) {
-                for e in arr {
-                    let Some(kind) = e.get("kind").and_then(|v| v.as_str()) else {
-                        continue;
-                    };
-                    let Some(from) = e.get("from").and_then(|v| v.as_str()) else {
-                        continue;
-                    };
-                    let Some(to) = e.get("to").and_then(|v| v.as_str()) else {
-                        continue;
-                    };
-                    edges.push(GraphEdge { kind: kind.into(), from: from.into(), to: to.into() });
-                }
-            }
+                .deployment
+                .as_ref()
+                .and_then(|d| d.chunk_id.clone())
+                .or(unit.name)
+                .unwrap_or_else(|| "?".into());
+            let edges = unit
+                .graph
+                .map(|g| {
+                    g.edges
+                        .into_iter()
+                        .map(|e| GraphEdge { kind: e.kind, from: e.from, to: e.to })
+                        .collect()
+                })
+                .unwrap_or_default();
             out.push(ProgramUnitView { chunk_id, path: path.clone(), edges });
         }
     }
 }
 
+/// Build the typed explain chain for a field: `writes` edges first, then `reads`.
 pub fn chain_for_field(unit: &ProgramUnitView, field: &str) -> Vec<ExplainEdge> {
     let mut chain = Vec::new();
     for e in &unit.edges {
-        if e.kind == "writes" && e.to == field {
+        if e.kind == ProgramEdgeKind::Writes && e.to == field {
             chain.push(ExplainEdge {
                 from: parse_node(&e.from),
                 to: parse_node(&e.to),
@@ -120,7 +152,7 @@ pub fn chain_for_field(unit: &ProgramUnitView, field: &str) -> Vec<ExplainEdge> 
         }
     }
     for e in &unit.edges {
-        if e.kind == "reads" && e.to == field {
+        if e.kind == ProgramEdgeKind::Reads && e.to == field {
             chain.push(ExplainEdge {
                 from: parse_node(&e.to),
                 to: parse_node(&e.from),
@@ -138,7 +170,7 @@ fn chain_for_binding(unit: &ProgramUnitView, binding_id: &str) -> Vec<ExplainEdg
     let mut fields = Vec::new();
     let mut chain = Vec::new();
     for e in &unit.edges {
-        if e.kind == "reads" && e.from == node {
+        if e.kind == ProgramEdgeKind::Reads && e.from == node {
             fields.push(e.to.clone());
             chain.push(ExplainEdge {
                 from: parse_node(&e.to),
@@ -151,7 +183,7 @@ fn chain_for_binding(unit: &ProgramUnitView, binding_id: &str) -> Vec<ExplainEdg
     }
     for field in &fields {
         for e in &unit.edges {
-            if e.kind == "writes" && e.to == *field {
+            if e.kind == ProgramEdgeKind::Writes && e.to == *field {
                 chain.insert(
                     0,
                     ExplainEdge {
@@ -173,7 +205,9 @@ fn find_unit_for_field<'a>(
     field: &str,
 ) -> Option<&'a ProgramUnitView> {
     units.iter().find(|u| {
-        u.edges.iter().any(|e| (e.kind == "writes" || e.kind == "reads") && e.to == field)
+        u.edges.iter().any(|e| {
+            (e.kind == ProgramEdgeKind::Writes || e.kind == ProgramEdgeKind::Reads) && e.to == field
+        })
     })
 }
 
@@ -182,7 +216,9 @@ fn find_unit_for_binding<'a>(
     binding_id: &str,
 ) -> Option<&'a ProgramUnitView> {
     let node = format!("binding:{binding_id}");
-    units.iter().find(|u| u.edges.iter().any(|e| e.kind == "reads" && e.from == node))
+    units
+        .iter()
+        .find(|u| u.edges.iter().any(|e| e.kind == ProgramEdgeKind::Reads && e.from == node))
 }
 
 fn find_unit_by_chunk<'a>(
@@ -192,7 +228,7 @@ fn find_unit_by_chunk<'a>(
     units.iter().find(|u| u.chunk_id == chunk || u.chunk_id.ends_with(chunk))
 }
 
-/// `write:<field>` or `write:<chunk>:<field>` → explain chain from Program Graph.
+/// `write:<field>` or `write:<chunk>:<field>` -> explain chain from Program Graph.
 pub fn explain_write(out_dir: &Path, spec: &str, generation: u64) -> ExplainDocument {
     let units = load_program_units(out_dir);
     let (chunk_hint, field) = match spec.rsplit_once(':') {
@@ -206,7 +242,7 @@ pub fn explain_write(out_dir: &Path, spec: &str, generation: u64) -> ExplainDocu
         return ExplainDocument {
             schema: EXPLAIN_SCHEMA.into(),
             target: format!("write:{spec}"),
-            kind: "write".into(),
+            kind: ExplainKind::Write,
             chunk_id: None,
             deployment_unit: None,
             program: None,
@@ -221,18 +257,19 @@ pub fn explain_write(out_dir: &Path, spec: &str, generation: u64) -> ExplainDocu
     ExplainDocument {
         schema: EXPLAIN_SCHEMA.into(),
         target: format!("write:{spec}"),
-        kind: "write".into(),
+        kind: ExplainKind::Write,
         chunk_id: Some(unit.chunk_id.clone()),
         deployment_unit: None,
-        program: Some(serde_json::json!({
-            "path": unit.path.display().to_string().replace('\\', "/"),
-            "edgeCount": unit.edges.len(),
-        })),
+        program: Some(ExplainProgramRef {
+            path: unit.path.display().to_string().replace('\\', "/"),
+            edge_count: Some(unit.edges.len() as u64),
+            binding_id: None,
+        }),
         edge: None,
         session_generation: generation,
         contributions: vec![],
         chain,
-        notes: Some(" write → effect → field → binding (Program Graph)".into()),
+        notes: Some("write -> effect -> field -> binding (Program Graph)".into()),
     }
 }
 
@@ -250,10 +287,10 @@ pub fn explain_update(out_dir: &Path, spec: &str, generation: u64) -> ExplainDoc
         let unit = find_unit_for_binding(&units, id);
         return explain_binding_doc(unit, id, format!("update:{spec}"), generation);
     }
-    // Field alias → same as write chain, kind=update.
+    // Field alias -> same as write chain, kind=update.
     let mut doc = explain_write(out_dir, spec, generation);
     doc.target = format!("update:{spec}");
-    doc.kind = "update".into();
+    doc.kind = ExplainKind::Update;
     doc
 }
 
@@ -267,7 +304,7 @@ fn explain_binding_doc(
         return ExplainDocument {
             schema: EXPLAIN_SCHEMA.into(),
             target,
-            kind: "update".into(),
+            kind: ExplainKind::Update,
             chunk_id: None,
             deployment_unit: None,
             program: None,
@@ -282,77 +319,79 @@ fn explain_binding_doc(
     ExplainDocument {
         schema: EXPLAIN_SCHEMA.into(),
         target,
-        kind: "update".into(),
+        kind: ExplainKind::Update,
         chunk_id: Some(unit.chunk_id.clone()),
         deployment_unit: None,
-        program: Some(serde_json::json!({
-            "path": unit.path.display().to_string().replace('\\', "/"),
-            "bindingId": binding_id,
-        })),
-        edge: Some(serde_json::json!({ "selector": format!("binding:{binding_id}") })),
+        program: Some(ExplainProgramRef {
+            path: unit.path.display().to_string().replace('\\', "/"),
+            edge_count: None,
+            binding_id: Some(binding_id.to_string()),
+        }),
+        edge: Some(ExplainEdgeRef { selector: format!("binding:{binding_id}") }),
         session_generation: generation,
         contributions: vec![],
         chain,
-        notes: Some(" update BindingId ← field ← effect (Program Graph)".into()),
+        notes: Some("update BindingId <- field <- effect (Program Graph)".into()),
     }
 }
 
-fn allowed_stable_kind(kind: &str) -> bool {
-    matches!(kind, "binding" | "effect" | "field" | "route_id" | "capability" | "chunk" | "patch")
+fn allowed_stable_kind(kind: StableIdKind) -> bool {
+    matches!(
+        kind,
+        StableIdKind::Binding
+            | StableIdKind::Effect
+            | StableIdKind::Field
+            | StableIdKind::RouteId
+            | StableIdKind::Capability
+            | StableIdKind::Chunk
+            | StableIdKind::Patch
+    )
 }
 
 /// Validate / normalize an inbound trace JSON into `vmz.dx.trace.v0`.
 pub fn ingest_runtime_trace(trace_json: &str) -> TraceDocument {
-    let Ok(v) = serde_json::from_str::<Value>(trace_json) else {
+    // Prefer full document; fall back to bare TraceEvent[].
+    if let Ok(doc) = serde_json::from_str::<TraceDocument>(trace_json) {
+        let mut events = Vec::new();
+        for (i, ev) in doc.events.into_iter().enumerate() {
+            if !allowed_stable_kind(ev.stable_id.kind()) {
+                return TraceDocument {
+                    schema: TRACE_SCHEMA.into(),
+                    events: vec![],
+                    status: TraceStatus::Invalid,
+                    notes: Some(format!(
+                        "unsupported StableId.kind `{}` at {i}",
+                        ev.stable_id.kind()
+                    )),
+                };
+            }
+            events.push(ev);
+        }
+        let status = if events.is_empty() { TraceStatus::Empty } else { TraceStatus::Ready };
+        return TraceDocument { schema: TRACE_SCHEMA.into(), events, status, notes: doc.notes };
+    }
+    let Ok(arr) = serde_json::from_str::<Vec<TraceEvent>>(trace_json) else {
         return TraceDocument {
             schema: TRACE_SCHEMA.into(),
             events: vec![],
-            status: "invalid".into(),
-            notes: Some("invalid JSON".into()),
-        };
-    };
-    let events_val = if v.get("schema").and_then(|s| s.as_str()) == Some(TRACE_SCHEMA) {
-        v.get("events").cloned().unwrap_or(Value::Array(vec![]))
-    } else if let Some(arr) = v.as_array() {
-        Value::Array(arr.clone())
-    } else if let Some(arr) = v.get("events").and_then(|e| e.as_array()) {
-        Value::Array(arr.clone())
-    } else {
-        return TraceDocument {
-            schema: TRACE_SCHEMA.into(),
-            events: vec![],
-            status: "invalid".into(),
+            status: TraceStatus::Invalid,
             notes: Some("expected TraceDocument or TraceEvent[]".into()),
         };
     };
-    let Some(arr) = events_val.as_array() else {
-        return TraceDocument::empty("events must be array");
-    };
     let mut events = Vec::new();
-    for (i, item) in arr.iter().enumerate() {
-        let Ok(mut ev) = serde_json::from_value::<TraceEvent>(item.clone()) else {
+    for (i, ev) in arr.into_iter().enumerate() {
+        if !allowed_stable_kind(ev.stable_id.kind()) {
             return TraceDocument {
                 schema: TRACE_SCHEMA.into(),
                 events: vec![],
-                status: "invalid".into(),
-                notes: Some(format!("bad TraceEvent at {i}")),
+                status: TraceStatus::Invalid,
+                notes: Some(format!("unsupported StableId.kind `{}` at {i}", ev.stable_id.kind())),
             };
-        };
-        if !allowed_stable_kind(&ev.stable_id.kind) {
-            return TraceDocument {
-                schema: TRACE_SCHEMA.into(),
-                events: vec![],
-                status: "invalid".into(),
-                notes: Some(format!("unsupported StableId.kind `{}` at {i}", ev.stable_id.kind)),
-            };
-        }
-        if ev.kind.is_empty() {
-            ev.kind = "event".into();
         }
         events.push(ev);
     }
-    let status = if events.is_empty() { "empty" } else { "ready" };
-    TraceDocument { schema: TRACE_SCHEMA.into(), events, status: status.into(), notes: None }
+    let status = if events.is_empty() { TraceStatus::Empty } else { TraceStatus::Ready };
+    TraceDocument { schema: TRACE_SCHEMA.into(), events, status, notes: None }
 }
 
 fn chain_contains(chain: &[ExplainEdge], id: &StableId) -> bool {
@@ -360,23 +399,26 @@ fn chain_contains(chain: &[ExplainEdge], id: &StableId) -> bool {
 }
 
 fn explain_for_event(out_dir: &Path, ev: &TraceEvent, generation: u64) -> ExplainDocument {
-    match ev.stable_id.kind.as_str() {
-        "binding" => {
+    // Match the StableId tagged union — do not branch on a separate `.kind` field.
+    match &ev.stable_id {
+        StableId::Binding(id) => {
             let chunk = ev.chunk_id.as_deref().unwrap_or("");
             let spec = if chunk.is_empty() {
-                format!("binding:{}", ev.stable_id.id)
+                format!("binding:{id}")
             } else {
-                format!("{chunk}#binding:{}", ev.stable_id.id)
+                format!("{chunk}#binding:{id}")
             };
             explain_update(out_dir, &spec, generation)
         }
-        "field" => explain_write(out_dir, &ev.stable_id.id, generation),
-        "effect" => {
+        StableId::Field(id) => explain_write(out_dir, id, generation),
+        StableId::Effect(id) => {
             // Resolve via field written by this effect.
             let units = load_program_units(out_dir);
-            let node = format!("effect:{}", ev.stable_id.id);
+            let node = format!("effect:{id}");
             if let Some(unit) = units.iter().find(|u| u.edges.iter().any(|e| e.from == node)) {
-                if let Some(e) = unit.edges.iter().find(|e| e.kind == "writes" && e.from == node) {
+                if let Some(e) =
+                    unit.edges.iter().find(|e| e.kind == ProgramEdgeKind::Writes && e.from == node)
+                {
                     return explain_write(
                         out_dir,
                         &format!("{}:{}", unit.chunk_id, e.to),
@@ -386,8 +428,8 @@ fn explain_for_event(out_dir: &Path, ev: &TraceEvent, generation: u64) -> Explai
             }
             ExplainDocument {
                 schema: EXPLAIN_SCHEMA.into(),
-                target: format!("effect:{}", ev.stable_id.id),
-                kind: "update".into(),
+                target: format!("effect:{id}"),
+                kind: ExplainKind::Update,
                 chunk_id: ev.chunk_id.clone(),
                 deployment_unit: None,
                 program: None,
@@ -398,10 +440,10 @@ fn explain_for_event(out_dir: &Path, ev: &TraceEvent, generation: u64) -> Explai
                 notes: Some("effect has no writes edge".into()),
             }
         }
-        _ => ExplainDocument {
+        other => ExplainDocument {
             schema: EXPLAIN_SCHEMA.into(),
-            target: format!("{}:{}", ev.stable_id.kind, ev.stable_id.id),
-            kind: "update".into(),
+            target: format!("{}:{}", other.kind(), other.id()),
+            kind: ExplainKind::Update,
             chunk_id: ev.chunk_id.clone(),
             deployment_unit: None,
             program: None,
@@ -417,12 +459,12 @@ fn explain_for_event(out_dir: &Path, ev: &TraceEvent, generation: u64) -> Explai
 /// Join trace events to explain chains; require StableId membership.
 pub fn replay_causal(out_dir: &Path, trace_json: &str, generation: u64) -> CausalReplayDocument {
     let trace = ingest_runtime_trace(trace_json);
-    if trace.status == "invalid" {
+    if trace.status == TraceStatus::Invalid {
         return CausalReplayDocument {
             schema: CAUSAL_REPLAY_SCHEMA.into(),
             trace,
             matches: vec![],
-            status: "failed".into(),
+            status: CausalReplayStatus::Failed,
             notes: Some("trace invalid".into()),
         };
     }
@@ -431,7 +473,7 @@ pub fn replay_causal(out_dir: &Path, trace_json: &str, generation: u64) -> Causa
             schema: CAUSAL_REPLAY_SCHEMA.into(),
             trace,
             matches: vec![],
-            status: "empty".into(),
+            status: CausalReplayStatus::Empty,
             notes: Some("no events".into()),
         };
     }
@@ -454,7 +496,7 @@ pub fn replay_causal(out_dir: &Path, trace_json: &str, generation: u64) -> Causa
         schema: CAUSAL_REPLAY_SCHEMA.into(),
         trace,
         matches,
-        status: if all_ok { "ready".into() } else { "failed".into() },
+        status: if all_ok { CausalReplayStatus::Ready } else { CausalReplayStatus::Failed },
         notes: None,
     }
 }
@@ -464,19 +506,17 @@ pub fn check_causal_replay(out_dir: &Path, generation: u64) -> CausalReplayCheck
     let units = load_program_units(out_dir);
     let mut diagnostics = Vec::new();
     if units.is_empty() {
-        diagnostics.push(DxDiagnostic {
-            path: String::new(),
-            severity: "info".into(),
-            message: "no *.program.json — build workspace first".into(),
-            code: Some("dx.x5.program.empty".into()),
-            span: None,
-        });
+        diagnostics.push(ReportedDiagnostic::coded_advice(
+            "",
+            "no *.program.json - build workspace first",
+            "dx.x5.program.empty",
+        ));
         return CausalReplayCheckReport {
             schema: CAUSAL_REPLAY_CHECK_SCHEMA.into(),
             sample_explain: None,
             sample_replay: None,
             diagnostics,
-            status: "preview".into(),
+            status: CausalReplayCheckStatus::Preview,
         };
     }
 
@@ -485,10 +525,10 @@ pub fn check_causal_replay(out_dir: &Path, generation: u64) -> CausalReplayCheck
     let mut sample_binding: Option<(String, String)> = None;
     for u in &units {
         for e in &u.edges {
-            if e.kind == "writes" {
+            if e.kind == ProgramEdgeKind::Writes {
                 sample_field = Some((u.chunk_id.clone(), e.to.clone()));
             }
-            if e.kind == "reads" {
+            if e.kind == ProgramEdgeKind::Reads {
                 if let Some(id) = e.from.strip_prefix("binding:") {
                     sample_binding = Some((u.chunk_id.clone(), id.to_string()));
                 }
@@ -505,7 +545,7 @@ pub fn check_causal_replay(out_dir: &Path, generation: u64) -> CausalReplayCheck
         ExplainDocument {
             schema: EXPLAIN_SCHEMA.into(),
             target: "write:?".into(),
-            kind: "write".into(),
+            kind: ExplainKind::Write,
             chunk_id: None,
             deployment_unit: None,
             program: None,
@@ -520,8 +560,8 @@ pub fn check_causal_replay(out_dir: &Path, generation: u64) -> CausalReplayCheck
     let mut events = Vec::new();
     if let Some((chunk, field)) = &sample_field {
         events.push(TraceEvent {
-            kind: "write".into(),
-            stable_id: sid("field", field.clone()),
+            kind: TraceEventKind::Write,
+            stable_id: sid(StableIdKind::Field, field.clone()),
             dep: Some(field.clone()),
             t: Some(1),
             chunk_id: Some(chunk.clone()),
@@ -529,8 +569,8 @@ pub fn check_causal_replay(out_dir: &Path, generation: u64) -> CausalReplayCheck
     }
     if let Some((chunk, id)) = &sample_binding {
         events.push(TraceEvent {
-            kind: "patch".into(),
-            stable_id: sid("binding", id.clone()),
+            kind: TraceEventKind::Patch,
+            stable_id: sid(StableIdKind::Binding, id.clone()),
             dep: None,
             t: Some(2),
             chunk_id: Some(chunk.clone()),
@@ -539,31 +579,27 @@ pub fn check_causal_replay(out_dir: &Path, generation: u64) -> CausalReplayCheck
     let trace = TraceDocument {
         schema: TRACE_SCHEMA.into(),
         events: events.clone(),
-        status: if events.is_empty() { "empty".into() } else { "ready".into() },
+        status: if events.is_empty() { TraceStatus::Empty } else { TraceStatus::Ready },
         notes: Some("synthetic trace from Program Graph for causal_replay_check".into()),
     };
     let replay = replay_causal(out_dir, &trace.to_json(), generation);
 
-    let status = if !explain.chain.is_empty() && replay.status == "ready" {
-        "ready"
+    let status = if !explain.chain.is_empty() && replay.status == CausalReplayStatus::Ready {
+        CausalReplayCheckStatus::Ready
     } else if explain.chain.is_empty() {
-        diagnostics.push(DxDiagnostic {
-            path: String::new(),
-            severity: "warning".into(),
-            message: "sample write explain chain empty".into(),
-            code: Some("dx.x5.explain.empty".into()),
-            span: None,
-        });
-        "failed"
+        diagnostics.push(ReportedDiagnostic::coded_warning(
+            "",
+            "sample write explain chain empty",
+            "dx.x5.explain.empty",
+        ));
+        CausalReplayCheckStatus::Failed
     } else {
-        diagnostics.push(DxDiagnostic {
-            path: String::new(),
-            severity: "warning".into(),
-            message: format!("causal replay status {}", replay.status),
-            code: Some("dx.x5.replay.failed".into()),
-            span: None,
-        });
-        "failed"
+        diagnostics.push(ReportedDiagnostic::coded_warning(
+            "",
+            format!("causal replay status {}", replay.status.as_str()),
+            "dx.x5.replay.failed",
+        ));
+        CausalReplayCheckStatus::Failed
     };
 
     CausalReplayCheckReport {
@@ -571,6 +607,6 @@ pub fn check_causal_replay(out_dir: &Path, generation: u64) -> CausalReplayCheck
         sample_explain: Some(explain),
         sample_replay: Some(replay),
         diagnostics,
-        status: status.into(),
+        status,
     }
 }

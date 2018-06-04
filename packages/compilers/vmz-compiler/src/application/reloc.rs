@@ -5,14 +5,14 @@
 //! unless marked `@vmz-external` or they carry a URI scheme.
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use vmz_protocol::{
     APPLICATION_BASE_SCHEMA, APPLICATION_RELOCATABLE_CHECK_SCHEMA, APPLICATION_RELOCATED_SCHEMA,
     APPLICATION_RELOCATION_SCHEMA, ApplicationBase, ApplicationDescriptor, ApplicationDiagnostic,
     ApplicationId, ApplicationRelocatableReport, ApplicationRelocationManifest,
     ApplicationSourceSpan, DIAG_INVALID_BASE, DIAG_INVALID_DESCRIPTOR, DIAG_NON_RELOCATABLE_URL,
-    LogicalUrlEntry, RelocatedApplicationUrls, RelocatedUrlEntry,
+    LogicalUrlEntry, LogicalUrlKind, RelocatedApplicationUrls, RelocatedUrlEntry,
 };
 use walkdir::WalkDir;
 
@@ -27,13 +27,9 @@ pub fn parse_application_base(
         Ok(base) => {
             Ok(ApplicationBase { schema: APPLICATION_BASE_SCHEMA.into(), base, application_id })
         }
-        Err(msg) => Err(ApplicationDiagnostic {
-            code: DIAG_INVALID_BASE.into(),
-            severity: "error".into(),
-            path: "<application-base>".into(),
-            message: msg,
-            span: None,
-        }),
+        Err(msg) => {
+            Err(ApplicationDiagnostic::coded_error("<application-base>", msg, DIAG_INVALID_BASE))
+        }
     }
 }
 
@@ -92,27 +88,23 @@ pub fn relocate_manifest(
     base: &ApplicationBase,
 ) -> Result<RelocatedApplicationUrls, ApplicationDiagnostic> {
     if manifest.logical_base != "/" {
-        return Err(ApplicationDiagnostic {
-            code: DIAG_INVALID_BASE.into(),
-            severity: "error".into(),
-            path: "<relocation-manifest>".into(),
-            message: format!(
+        return Err(ApplicationDiagnostic::coded_error(
+            "<relocation-manifest>",
+            format!(
                 "relocation manifest logicalBase must be `/` (independent compile), got `{}`",
                 manifest.logical_base
             ),
-            span: None,
-        });
+            DIAG_INVALID_BASE,
+        ));
     }
     let mut entries = Vec::with_capacity(manifest.entries.len());
     for e in &manifest.entries {
         let href = join_application_base(&base.base, &e.logical_path).map_err(|msg| {
-            ApplicationDiagnostic {
-                code: DIAG_INVALID_BASE.into(),
-                severity: "error".into(),
-                path: "<relocation-manifest>".into(),
-                message: format!("entry `{}` ({}): {msg}", e.id, e.kind),
-                span: None,
-            }
+            ApplicationDiagnostic::coded_error(
+                "<relocation-manifest>",
+                format!("entry `{}` ({}): {msg}", e.id, e.kind),
+                DIAG_INVALID_BASE,
+            )
         })?;
         entries.push(RelocatedUrlEntry {
             id: e.id.clone(),
@@ -129,10 +121,12 @@ pub fn relocate_manifest(
     })
 }
 
-// Default non-root proof base used by checks when caller does not supply one.
+/// Default non-root URL base used by relocation checks when the caller omits one.
 pub const DEFAULT_RELOCATE_PROOF_BASE: &str = "/__vmz_relocated__/app";
 
-// Build a minimal logical manifest covering surfaces for an ApplicationId.
+/// Build a sample logical URL manifest covering all relocation surface kinds for one app.
+///
+/// Useful as a fixture input for relocation proofs; paths are relative to the app root.
 pub fn sample_relocation_manifest(application_id: &str) -> ApplicationRelocationManifest {
     let id = application_id.to_string();
     ApplicationRelocationManifest {
@@ -140,28 +134,28 @@ pub fn sample_relocation_manifest(application_id: &str) -> ApplicationRelocation
         application_id: ApplicationId(id.clone()),
         logical_base: "/".into(),
         entries: vec![
-            entry("route", &format!("{id}.home"), "/"),
-            entry("route", &format!("{id}.settings"), "/settings"),
-            entry("asset", &format!("{id}.logo"), "/assets/logo.png"),
-            entry("module", &format!("{id}.entry"), "/_vmz/entry.js"),
-            entry("preload", &format!("{id}.preload"), "/_vmz/preload.js"),
-            entry("form", &format!("{id}.save"), "/_vmz/actions/save"),
-            entry("redirect", &format!("{id}.legacy"), "/legacy"),
-            entry("canonical", &format!("{id}.canonical"), "/"),
-            entry("sitemap", &format!("{id}.sitemap"), "/sitemap.xml"),
-            entry("server", &format!("{id}.api"), "/_vmz/server/api"),
-            entry("ssr", &format!("{id}.ssr"), "/_vmz/ssr"),
-            entry("resume", &format!("{id}.resume"), "/_vmz/resume.js"),
-            entry("sw", &format!("{id}.sw"), "/"),
-            entry("sourcemap", &format!("{id}.map"), "/_vmz/entry.js.map"),
-            entry("trace", &format!("{id}.trace"), "/_vmz/trace"),
-            entry("error", &format!("{id}.error"), "/_vmz/error"),
+            entry(LogicalUrlKind::Route, &format!("{id}.home"), "/"),
+            entry(LogicalUrlKind::Route, &format!("{id}.settings"), "/settings"),
+            entry(LogicalUrlKind::Asset, &format!("{id}.logo"), "/assets/logo.png"),
+            entry(LogicalUrlKind::Module, &format!("{id}.entry"), "/_vmz/entry.js"),
+            entry(LogicalUrlKind::Preload, &format!("{id}.preload"), "/_vmz/preload.js"),
+            entry(LogicalUrlKind::Form, &format!("{id}.save"), "/_vmz/actions/save"),
+            entry(LogicalUrlKind::Redirect, &format!("{id}.legacy"), "/legacy"),
+            entry(LogicalUrlKind::Canonical, &format!("{id}.canonical"), "/"),
+            entry(LogicalUrlKind::Sitemap, &format!("{id}.sitemap"), "/sitemap.xml"),
+            entry(LogicalUrlKind::Server, &format!("{id}.api"), "/_vmz/server/api"),
+            entry(LogicalUrlKind::Ssr, &format!("{id}.ssr"), "/_vmz/ssr"),
+            entry(LogicalUrlKind::Resume, &format!("{id}.resume"), "/_vmz/resume.js"),
+            entry(LogicalUrlKind::Sw, &format!("{id}.sw"), "/"),
+            entry(LogicalUrlKind::Sourcemap, &format!("{id}.map"), "/_vmz/entry.js.map"),
+            entry(LogicalUrlKind::Trace, &format!("{id}.trace"), "/_vmz/trace"),
+            entry(LogicalUrlKind::Error, &format!("{id}.error"), "/_vmz/error"),
         ],
     }
 }
 
-fn entry(kind: &str, id: &str, logical_path: &str) -> LogicalUrlEntry {
-    LogicalUrlEntry { id: id.into(), kind: kind.into(), logical_path: logical_path.into() }
+fn entry(kind: LogicalUrlKind, id: &str, logical_path: &str) -> LogicalUrlEntry {
+    LogicalUrlEntry { id: id.into(), kind, logical_path: logical_path.into() }
 }
 
 // Prove independent `/` and non-root relocation for a package .
@@ -185,13 +179,11 @@ pub fn check_application_relocatable(
     // Ensure logical paths themselves are well-formed.
     for e in &manifest.entries {
         if let Err(msg) = normalize_logical_path(&e.logical_path) {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_INVALID_BASE.into(),
-                severity: "error".into(),
-                path: package_root.display().to_string(),
-                message: format!("manifest entry `{}`: {msg}", e.id),
-                span: None,
-            });
+            diagnostics.push(ApplicationDiagnostic::coded_error(
+                package_root.display().to_string(),
+                format!("manifest entry `{}`: {msg}", e.id),
+                DIAG_INVALID_BASE,
+            ));
         }
     }
 
@@ -264,30 +256,24 @@ fn verify_roundtrip(
     for e in &relocated.entries {
         match strip_application_base(base, &e.href) {
             Ok(Some(logical)) if logical == e.logical_path => {}
-            Ok(Some(logical)) => diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_INVALID_BASE.into(),
-                severity: "error".into(),
-                path: "<relocation-proof>".into(),
-                message: format!(
+            Ok(Some(logical)) => diagnostics.push(ApplicationDiagnostic::coded_error(
+                "<relocation-proof>",
+                format!(
                     "strip(base=`{base}`, href=`{}`) → `{logical}` but logicalPath is `{}`",
                     e.href, e.logical_path
                 ),
-                span: None,
-            }),
-            Ok(None) => diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_INVALID_BASE.into(),
-                severity: "error".into(),
-                path: "<relocation-proof>".into(),
-                message: format!("strip(base=`{base}`, href=`{}`) missed entry `{}`", e.href, e.id),
-                span: None,
-            }),
-            Err(msg) => diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_INVALID_BASE.into(),
-                severity: "error".into(),
-                path: "<relocation-proof>".into(),
-                message: msg,
-                span: None,
-            }),
+                DIAG_INVALID_BASE,
+            )),
+            Ok(None) => diagnostics.push(ApplicationDiagnostic::coded_error(
+                "<relocation-proof>",
+                format!("strip(base=`{base}`, href=`{}`) missed entry `{}`", e.href, e.id),
+                DIAG_INVALID_BASE,
+            )),
+            Err(msg) => diagnostics.push(ApplicationDiagnostic::coded_error(
+                "<relocation-proof>",
+                msg,
+                DIAG_INVALID_BASE,
+            )),
         }
     }
 }
@@ -302,28 +288,21 @@ fn verify_not_equal_to_logical_when_prefixed(
     }
     for e in &relocated.entries {
         if e.logical_path != "/" && e.href == e.logical_path {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_INVALID_BASE.into(),
-                severity: "error".into(),
-                path: "<relocation-proof>".into(),
-                message: format!(
-                    "non-root base `{base}` left entry `{}` unprefixed (`{}`)",
-                    e.id, e.href
-                ),
-                span: None,
-            });
+            diagnostics.push(ApplicationDiagnostic::coded_error(
+                "<relocation-proof>",
+                format!("non-root base `{base}` left entry `{}` unprefixed (`{}`)", e.id, e.href),
+                DIAG_INVALID_BASE,
+            ));
         }
         if !e.href.starts_with(base) {
-            diagnostics.push(ApplicationDiagnostic {
-                code: DIAG_INVALID_BASE.into(),
-                severity: "error".into(),
-                path: "<relocation-proof>".into(),
-                message: format!(
+            diagnostics.push(ApplicationDiagnostic::coded_error(
+                "<relocation-proof>",
+                format!(
                     "relocated href `{}` for `{}` does not start with base `{base}`",
                     e.href, e.id
                 ),
-                span: None,
-            });
+                DIAG_INVALID_BASE,
+            ));
         }
     }
 }
@@ -334,7 +313,9 @@ fn load_own_descriptor(
 ) -> Option<ApplicationDescriptor> {
     let report = check_applications(package_root, &[package_root.to_path_buf()]);
     for d in report.diagnostics {
-        if d.code == DIAG_INVALID_DESCRIPTOR || d.code.starts_with("vmz::application::invalid_") {
+        if d.code_string().as_deref() == Some(DIAG_INVALID_DESCRIPTOR)
+            || d.code_string().as_deref().unwrap_or("").starts_with("vmz::application::invalid_")
+        {
             diagnostics.push(d);
         }
     }
@@ -417,19 +398,13 @@ fn scan_source_text(path: &Path, text: &str, diagnostics: &mut Vec<ApplicationDi
             if !lit.is_empty() && is_non_relocatable_candidate(&lit) {
                 let marked = is_marked_external(text, start);
                 if !marked {
-                    diagnostics.push(ApplicationDiagnostic {
-                        code: DIAG_NON_RELOCATABLE_URL.into(),
-                        severity: "error".into(),
-                        path: path.display().to_string(),
-                        message: format!(
+                    diagnostics.push(ApplicationDiagnostic::coded_error(path.display().to_string(), format!(
                             "root-absolute URL `{lit}` is not relocatable; use RouteId/AssetId/Server Capability ID, or mark with `@vmz-external` / use a URI scheme"
-                        ),
-                        span: Some(ApplicationSourceSpan {
+                        ), DIAG_NON_RELOCATABLE_URL).with_source_span(ApplicationSourceSpan {
                             path: path.display().to_string(),
                             start: start as u32,
                             end: end as u32,
-                        }),
-                    });
+                        }));
                 }
             }
             i = end;
@@ -490,7 +465,7 @@ pub fn relocate_manifest_json(manifest_json: &str, base: &str) -> Result<String,
     let manifest: ApplicationRelocationManifest = serde_json::from_str(manifest_json)
         .map_err(|e| format!("invalid relocation manifest JSON: {e}"))?;
     let app_base = parse_application_base(base, Some(manifest.application_id.clone()))
-        .map_err(|d| d.message)?;
-    let relocated = relocate_manifest(&manifest, &app_base).map_err(|d| d.message)?;
+        .map_err(|d| d.message().to_owned())?;
+    let relocated = relocate_manifest(&manifest, &app_base).map_err(|d| d.message().to_owned())?;
     serde_json::to_string_pretty(&relocated).map_err(|e| e.to_string())
 }

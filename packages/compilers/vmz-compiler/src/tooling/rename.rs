@@ -8,21 +8,25 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 use vmz_protocol::{
-    DxDiagnostic, ExplainEdge, REFERENCE_SCHEMA, Reference, RenameIntent, SYMBOL_SCHEMA,
-    SourceSpan, StableId, Symbol, TestSelectionDocument, TextEdit, WORKSPACE_EDIT_SCHEMA,
-    WorkspaceEditPlan,
+    ExplainEdge, REFERENCE_SCHEMA, Reference, RenameIntent, ReportedDiagnostic, SYMBOL_SCHEMA,
+    SourceSpan, StableId, StableIdKind, Symbol, TestSelectionDocument, TextEdit,
+    WORKSPACE_EDIT_SCHEMA, WorkspaceEditPlan,
 };
 
 /// Plan rename with proven Symbol/Reference-backed TextEdits when occurrences exist.
-pub fn plan_rename_edits(root: &Path, intent: &RenameIntent, kind: &str) -> WorkspaceEditPlan {
+pub fn plan_rename_edits(
+    root: &Path,
+    intent: &RenameIntent,
+    kind: StableIdKind,
+) -> WorkspaceEditPlan {
     let from = intent.from.trim();
     let to = intent.to.trim();
     let scope = intent.scope.as_deref().filter(|s| !s.is_empty());
 
     let (symbols, references, edits) = match kind {
-        "route_id" => collect_route_id_refs(root, from, to, scope),
-        "field" => collect_field_refs(root, from, to, scope),
-        "method" | "component" | "capability" => {
+        StableIdKind::RouteId => collect_route_id_refs(root, from, to, scope),
+        StableIdKind::Field => collect_field_refs(root, from, to, scope),
+        StableIdKind::Method | StableIdKind::Component | StableIdKind::Capability => {
             return crate::cross_sfc::plan_x2_rename(root, intent, kind);
         }
         _ => unreachable!("normalize_rename_kind already validated"),
@@ -42,94 +46,62 @@ pub fn plan_rename_edits(root: &Path, intent: &RenameIntent, kind: &str) -> Work
         affected_program_ids: symbols
             .iter()
             .map(|s| s.stable_id.clone())
-            .chain(std::iter::once(StableId { kind: kind.into(), id: from.into() }))
+            .chain(std::iter::once(StableId::new(kind, from)))
             .collect(),
         diagnostics: Vec::new(),
-        status: "preview".into(),
+        status: vmz_protocol::WorkspaceEditStatus::Preview,
     };
     if let Some(scope) = scope {
         plan.preconditions.push(format!("rename.scope={scope}"));
     }
 
     if plan.edits.is_empty() {
-        plan.status = "rejected".into();
-        plan.diagnostics.push(DxDiagnostic {
-            path: String::new(),
-            severity: "error".into(),
-            message: format!(
+        plan.status = vmz_protocol::WorkspaceEditStatus::Rejected;
+        plan.diagnostics.push(ReportedDiagnostic::coded_error("", format!(
                 "no proven references for {kind} `{from}` under workspace (Symbol/Reference index empty for this rename)"
-            ),
-            code: Some("dx.rename.no_references".into()),
-            span: None,
-        });
+            ), "dx.rename.no_references"));
         return plan;
     }
 
-    plan.status = "ready".into();
-    plan.diagnostics.push(DxDiagnostic {
-        path: String::new(),
-        severity: "info".into(),
-        message: format!(
+    plan.status = vmz_protocol::WorkspaceEditStatus::Ready;
+    plan.diagnostics.push(ReportedDiagnostic::coded_advice("", format!(
             "rename ready: {kind} `{from}` -> `{to}` ({} edit(s), {} reference(s), causal={causal})",
             plan.edits.len(),
             references.len(),
             causal = causal
-        ),
-        code: Some("dx.rename.ready".into()),
-        span: None,
-    });
+        ), "dx.rename.ready"));
     // Provenance breadcrumbs for gate / explain.
     for sym in &symbols {
-        plan.diagnostics.push(DxDiagnostic {
-            path: sym.span.as_ref().map(|s| s.path.clone()).unwrap_or_default(),
-            severity: "info".into(),
-            message: format!("symbol {}::{}", sym.stable_id.kind, sym.stable_id.id),
-            code: Some(SYMBOL_SCHEMA.into()),
-            span: sym.span.clone(),
-        });
+        let mut d = ReportedDiagnostic::coded_advice(
+            sym.span.as_ref().map(|s| s.path.clone()).unwrap_or_default(),
+            format!("symbol {}::{}", sym.stable_id.kind(), sym.stable_id.id()),
+            SYMBOL_SCHEMA,
+        );
+        if let Some(span) = sym.span.clone() {
+            d = d.with_source_span(span);
+        }
+        plan.diagnostics.push(d);
     }
     for r in &references {
         let path = r.span.as_ref().map(|s| s.path.clone()).unwrap_or_default();
         let (start, end) = r.span.as_ref().map(|s| (s.start, s.end)).unwrap_or((0, 0));
-        plan.diagnostics.push(DxDiagnostic {
+        let mut d = ReportedDiagnostic::coded_advice(
             path,
-            severity: "info".into(),
-            message: format!("reference {} @{}..{}", r.kind, start, end),
-            code: Some(REFERENCE_SCHEMA.into()),
-            span: r.span.clone(),
-        });
+            format!("reference {} @{}..{}", r.kind(), start, end),
+            REFERENCE_SCHEMA,
+        );
+        if let Some(span) = r.span.clone() {
+            d = d.with_source_span(span);
+        }
+        plan.diagnostics.push(d);
     }
     let _ = symbols;
     plan
 }
 
-fn preview_unsupported(kind: &str, from: &str, to: &str, scope: Option<&str>) -> WorkspaceEditPlan {
-    let mut plan = WorkspaceEditPlan::empty_preview();
-    plan.preconditions = vec![
-        format!("rename.kind={kind}"),
-        format!("rename.from={from}"),
-        format!("rename.to={to}"),
-        "rename.kind_deferred".into(),
-    ];
-    if let Some(scope) = scope {
-        plan.preconditions.push(format!("rename.scope={scope}"));
-    }
-    plan.diagnostics.push(DxDiagnostic {
-        path: String::new(),
-        severity: "info".into(),
-        message: format!(
-            "first version proves route_id/field; `{kind}` rename remains preview without TextEdit"
-        ),
-        code: Some("dx.rename.kind_deferred".into()),
-        span: None,
-    });
-    plan.affected_program_ids.push(StableId { kind: kind.into(), id: from.into() });
-    plan
-}
-
 /// Atomically apply a ready WorkspaceEditPlan. Returns applied plan JSON status.
 pub fn apply_workspace_edits(root: &Path, plan: &WorkspaceEditPlan) -> WorkspaceEditPlan {
-    if plan.status == "rejected" {
+    if plan.status == vmz_protocol::WorkspaceEditStatus::Rejected {
         return WorkspaceEditPlan::rejected(
             "cannot apply rejected WorkspaceEditPlan",
             "dx.rename.apply_rejected",
@@ -198,14 +170,12 @@ pub fn apply_workspace_edits(root: &Path, plan: &WorkspaceEditPlan) -> Workspace
     }
 
     let mut applied = plan.clone();
-    applied.status = "applied".into();
-    applied.diagnostics.push(DxDiagnostic {
-        path: String::new(),
-        severity: "info".into(),
-        message: format!("applied {} TextEdit(s) atomically", plan.edits.len()),
-        code: Some("dx.rename.applied".into()),
-        span: None,
-    });
+    applied.status = vmz_protocol::WorkspaceEditStatus::Applied;
+    applied.diagnostics.push(ReportedDiagnostic::coded_advice(
+        "",
+        format!("applied {} TextEdit(s) atomically", plan.edits.len()),
+        "dx.rename.applied",
+    ));
     applied
 }
 
@@ -286,13 +256,13 @@ pub fn select_tests_for_chunks(
         test_ids,
         affected_chunk_ids: affected_chunks.to_vec(),
         manifest_files: manifests,
-        status: "ready".into(),
+        status: vmz_protocol::DxPreviewStatus::Ready,
     };
     if doc.test_ids.is_empty() && !full {
-        doc.status = "preview".into();
+        doc.status = vmz_protocol::DxPreviewStatus::Preview;
     }
     if affected_chunks.is_empty() && full {
-        doc.status = "ready".into();
+        doc.status = vmz_protocol::DxPreviewStatus::Ready;
         doc.reason = "full rebuild — all graph→test edges selected".into();
         // Re-select all
         let edges = index_test_chunk_edges(root);
@@ -308,7 +278,7 @@ pub fn select_tests_for_chunks(
 
 /// Build explain chain linking rename → edits → chunks → tests.
 pub fn rename_explain_chain(
-    kind: &str,
+    kind: StableIdKind,
     from: &str,
     to: &str,
     edits: &[TextEdit],
@@ -317,8 +287,8 @@ pub fn rename_explain_chain(
 ) -> Vec<ExplainEdge> {
     let causal = causal_chain_id(kind, from, to);
     let mut chain = Vec::new();
-    let rename_id = StableId { kind: "rename".into(), id: causal.clone() };
-    let symbol_id = StableId { kind: kind.into(), id: from.into() };
+    let rename_id = StableId::new(StableIdKind::Rename, causal.clone());
+    let symbol_id = StableId::new(kind, from);
     chain.push(ExplainEdge {
         from: symbol_id.clone(),
         to: rename_id.clone(),
@@ -329,10 +299,7 @@ pub fn rename_explain_chain(
     for e in edits {
         chain.push(ExplainEdge {
             from: rename_id.clone(),
-            to: StableId {
-                kind: "text_edit".into(),
-                id: format!("{}@{}..{}", e.path, e.start, e.end),
-            },
+            to: StableId::new(StableIdKind::TextEdit, format!("{}@{}..{}", e.path, e.start, e.end)),
             reason: "workspace_edit".into(),
             precision: Some("exact".into()),
             span: Some(SourceSpan { path: e.path.clone(), start: e.start, end: e.end }),
@@ -341,7 +308,7 @@ pub fn rename_explain_chain(
     for c in chunks {
         chain.push(ExplainEdge {
             from: rename_id.clone(),
-            to: StableId { kind: "chunk".into(), id: c.clone() },
+            to: StableId::new(StableIdKind::Chunk, c.clone()),
             reason: "affected_chunk".into(),
             precision: Some("exact".into()),
             span: None,
@@ -350,7 +317,7 @@ pub fn rename_explain_chain(
     for t in test_ids {
         chain.push(ExplainEdge {
             from: rename_id.clone(),
-            to: StableId { kind: "test".into(), id: t.clone() },
+            to: StableId::new(StableIdKind::Test, t.clone()),
             reason: "graph_selected_test".into(),
             precision: Some("exact".into()),
             span: None,
@@ -360,7 +327,8 @@ pub fn rename_explain_chain(
     chain
 }
 
-pub fn causal_chain_id(kind: &str, from: &str, to: &str) -> String {
+/// Stable id string for a rename causal chain edge (`rename:{kind}:{from}->{to}`).
+pub fn causal_chain_id(kind: StableIdKind, from: &str, to: &str) -> String {
     format!("rename:{kind}:{from}->{to}")
 }
 
@@ -399,8 +367,7 @@ fn collect_route_id_refs(
 
     symbols.push(Symbol {
         schema: SYMBOL_SCHEMA.into(),
-        stable_id: StableId { kind: "route_id".into(), id: from.into() },
-        kind: "route_id".into(),
+        stable_id: StableId::new(StableIdKind::RouteId, from),
         name: from.into(),
         span: None,
         owners: Vec::new(),
@@ -411,9 +378,8 @@ fn collect_route_id_refs(
         for (start, end, _matched) in find_route_id_spans(&text, from) {
             references.push(Reference {
                 schema: REFERENCE_SCHEMA.into(),
-                from: StableId { kind: "file".into(), id: rel.clone() },
-                to: StableId { kind: "route_id".into(), id: from.into() },
-                kind: "route_id".into(),
+                from: StableId::new(StableIdKind::File, rel.clone()),
+                to: StableId::new(StableIdKind::RouteId, from),
                 span: Some(SourceSpan { path: rel.clone(), start: start as u32, end: end as u32 }),
             });
             edits.push(TextEdit {
@@ -440,8 +406,7 @@ fn collect_field_refs(
 
     symbols.push(Symbol {
         schema: SYMBOL_SCHEMA.into(),
-        stable_id: StableId { kind: "field".into(), id: from.into() },
-        kind: "field".into(),
+        stable_id: StableId::new(StableIdKind::Field, from),
         name: from.into(),
         span: None,
         owners: Vec::new(),
@@ -455,9 +420,8 @@ fn collect_field_refs(
         for (start, end) in find_field_spans(&text, from) {
             references.push(Reference {
                 schema: REFERENCE_SCHEMA.into(),
-                from: StableId { kind: "file".into(), id: rel.clone() },
-                to: StableId { kind: "field".into(), id: from.into() },
-                kind: "field".into(),
+                from: StableId::new(StableIdKind::File, rel.clone()),
+                to: StableId::new(StableIdKind::Field, from),
                 span: Some(SourceSpan { path: rel.clone(), start: start as u32, end: end as u32 }),
             });
             edits.push(TextEdit {
