@@ -171,6 +171,12 @@ export function resolveLocatorInPage(
             pool = [...root.querySelectorAll('a[href], [role="link"]')];
         } else if (role === 'checkbox') {
             pool = [...root.querySelectorAll('input[type="checkbox"], [role="checkbox"]')];
+        } else if (role === 'combobox') {
+            pool = [...root.querySelectorAll('select, [role="combobox"]')];
+        } else if (role === 'listbox') {
+            pool = [...root.querySelectorAll('select, [role="listbox"]')];
+        } else if (role === 'option') {
+            pool = [...root.querySelectorAll('option, [role="option"], [data-vmz-option]')];
         } else {
             pool = [...root.querySelectorAll(`[role="${CSS.escape(role)}"]`)];
         }
@@ -178,7 +184,10 @@ export function resolveLocatorInPage(
             const want = normalize(locator.name);
             found = pool.filter((el) => {
                 const n = nameOf(el);
-                return locator.exact ? n === want : n.includes(want);
+                const optVal = el.getAttribute('data-vmz-option') || (el instanceof HTMLOptionElement ? el.value : '');
+                return locator.exact
+                    ? n === want || optVal === want
+                    : n.includes(want) || String(optVal).includes(want);
             });
         } else {
             found = pool;

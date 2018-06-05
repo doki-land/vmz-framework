@@ -1,0 +1,66 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "router.browser.u2",
+    "title": "Browser Host U2: serve-host + RouteId open + Link navigate",
+    "modes": ["browser"],
+    "host": {
+        "kind": "serve"
+    },
+    "program": {
+        "chunkId": "pages/index",
+        "kind": "application",
+        "host": "serve"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "profile": {
+        "failOnConsoleError": true,
+        "failOnRequestFailed": true
+    },
+    "actions": [
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "open",
+            "routeId": "IndexPage"
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "click",
+            "locator": { "kind": "role", "role": "link", "name": "About" }
+        }
+    ],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "host",
+            "expect": {
+                "kind": "browser",
+                "realDocument": true,
+                "serveHost": true
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "route",
+            "expect": {
+                "path": "/about"
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "text",
+            "expect": {
+                "contains": "route-about"
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "timing",
+            "expect": {
+                "minSteps": 2
+            }
+        }
+    ]
+}

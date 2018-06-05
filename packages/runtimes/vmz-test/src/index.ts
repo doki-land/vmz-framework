@@ -37,6 +37,15 @@ export {
     type BrowserLocator,
     type LocatorResolveResult,
 } from './browser-protocol.js';
+export { isServeHostManifest, resolveRoutePath, startServeHost, type ServeHostHandle } from './browser-serve.js';
+export {
+    createArtifactsDir,
+    writeFailureEvidence,
+    writeTimingOnly,
+    type BrowserTiming,
+    type EvidencePaths,
+    type StepTiming,
+} from './browser-evidence.js';
 export {
     runManifest,
     resultsToReport,

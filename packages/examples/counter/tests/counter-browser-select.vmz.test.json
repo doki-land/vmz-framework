@@ -1,14 +1,11 @@
 {
     "schema": "vmz.test.manifest.v0",
-    "id": "production.catalog.browser.select",
-    "title": "production catalog: real Chrome click select + nested ProductRow",
+    "id": "counter.browser.select",
+    "title": "Browser Host: select action (native) + timing evidence",
     "modes": ["browser"],
     "program": {
-        "chunkId": "components/CatalogList",
-        "unitName": "CatalogList",
-        "components": {
-            "ProductRow": "components/ProductRow"
-        }
+        "chunkId": "components/CounterButton",
+        "unitName": "CounterButton"
     },
     "plan": {
         "schema": "vmz.plan.v0",
@@ -18,12 +15,15 @@
         {
             "schema": "vmz.test.action.v0",
             "kind": "mount",
-            "props": {}
+            "props": {
+                "initial": 0
+            }
         },
         {
             "schema": "vmz.test.action.v0",
-            "kind": "click",
-            "locator": { "kind": "role", "role": "button", "name": "select", "exact": true }
+            "kind": "select",
+            "locator": { "kind": "testId", "testId": "counter-plan" },
+            "value": "ops"
         },
         {
             "schema": "vmz.test.action.v0",
@@ -33,24 +33,22 @@
     "assertions": [
         {
             "schema": "vmz.test.assertion.v0",
-            "kind": "host",
-            "expect": {
-                "kind": "browser",
-                "realDocument": true
-            }
-        },
-        {
-            "schema": "vmz.test.assertion.v0",
-            "kind": "text",
-            "expect": {
-                "contains": "selected: Alpha"
-            }
+            "kind": "value",
+            "locator": { "kind": "testId", "testId": "counter-plan" },
+            "expect": { "equals": "ops" }
         },
         {
             "schema": "vmz.test.assertion.v0",
             "kind": "state",
             "expect": {
-                "selected": "Alpha"
+                "plan": "ops"
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "timing",
+            "expect": {
+                "minSteps": 2
             }
         }
     ]

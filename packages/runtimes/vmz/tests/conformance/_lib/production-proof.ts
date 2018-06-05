@@ -130,7 +130,8 @@ export function runVmzTest(
 }
 
 export function runVmzBuild(exampleRel: string, root = repoRoot()): { status: number; stdout: string; stderr: string; dist: string } {
-    const example = path.join(root, ...exampleRel.split('/'));
+    // Absolute paths (temp fixtures) must not be joined onto repo root.
+    const example = path.isAbsolute(exampleRel) ? exampleRel : path.join(root, ...exampleRel.split('/'));
     const dist = path.join(example, 'dist');
     const run = spawnSync(process.execPath, [vmzBin(root), 'build', example], {
         cwd: root,

@@ -3,7 +3,7 @@
  * verify id: production-test
  *
  * Runs real vmz-test / serve-host / release-pack / browser / isolation paths.
- * Failure screenshot / network.json capture still deferred (report+trace+manifest retained).
+ * Thin failure screenshot+timing via `@vmz/test` browser-evidence; network.json still open.
  * No Vitest/Jest/Playwright.
  */
 
@@ -484,7 +484,7 @@ upsertCheck(proof, {
     detail: emitted.reportPath,
 });
 
-const gaps = ['A4: failure screenshot / network.json capture not yet wired (report+trace+manifest retained)'];
+const gaps = ['A4: network.json / accessible-tree capture not yet wired (thin failure screenshot+timing via @vmz/test browser-evidence)'];
 for (const g of gaps) addLimitation(proof, g);
 proof.knownLimitations = proof.knownLimitations.filter(
     (l) =>
@@ -493,7 +493,8 @@ proof.knownLimitations = proof.knownLimitations.filter(
         !l.includes('A4: Field / Dialog UI scenarios still quarantined') &&
         !l.includes('A4: locale switch / RTL / theme missing-token still quarantined') &&
         !l.includes('A4: theme missing-token still quarantined') &&
-        !l.includes('A4: ApplicationMount child failure still quarantined'),
+        !l.includes('A4: ApplicationMount child failure still quarantined') &&
+        !l.includes('A4: failure screenshot / network.json capture not yet wired'),
 );
 
 writeProof(proof, root);
@@ -505,7 +506,7 @@ if (report.status !== 'passed') {
 console.log(
     `production-test PASS: pack=${pack.id} required=${(pack.scenarios as Array<{ required: boolean }>).filter((s) => s.required).length} quarantined=${(pack.scenarios as Array<{ quarantine: boolean }>).filter((s) => s.quarantine).length}`,
 );
-console.log('production-test NOTE: failure screenshot / network.json capture still open');
+console.log('production-test NOTE: network.json / accessible-tree still open (screenshot+timing thin slice wired)');
 
 async function loadPuppeteerCore(): Promise<any> {
     const requireFromTest = createRequire(path.join(root, 'packages', 'runtimes', 'vmz-test', 'package.json'));
@@ -612,9 +613,23 @@ async function proveInspectorFieldDialogRtl(
             await page.goto(`http://127.0.0.1:${PORT_UI}/`, { waitUntil: 'networkidle0', timeout: 20000 });
             await page.waitForSelector('#inspector-query', { timeout: 10000 });
 
+            // Controlled Field: keystrokes so onInput binding updates page state.
             await page.click('#inspector-query');
-            await page.type('#inspector-query', 'bad id');
-            await page.waitForFunction(() => document.body.innerText.includes('No spaces'), { timeout: 8000 });
+            await page.keyboard.type('bad id', { delay: 20 });
+            try {
+                await page.waitForFunction(
+                    () => (document.body.innerText || '').includes('No spaces'),
+                    { timeout: 10000 },
+                );
+            } catch (err) {
+                const dump = await page.evaluate(() => ({
+                    hasInput: !!document.getElementById('inspector-query'),
+                    value: (document.getElementById('inspector-query') as HTMLInputElement | null)?.value || null,
+                    text: (document.body.innerText || '').slice(0, 500),
+                    invalid: document.querySelector('[data-vmz-ui="field"]')?.getAttribute('data-invalid'),
+                }));
+                throw new Error(`Field validation wait failed: ${JSON.stringify(dump)} (${err instanceof Error ? err.message : err})`);
+            }
 
             const openClicked = await page.evaluate(() => {
                 const btns = [...document.querySelectorAll('button')];
@@ -624,13 +639,33 @@ async function proveInspectorFieldDialogRtl(
                 return true;
             });
             if (!openClicked) throw new Error('Replay error button missing');
-            await page.waitForFunction(() => document.body.innerText.includes('replay:generation'), {
-                timeout: 8000,
-            });
+            try {
+                await page.waitForSelector('[data-vmz-overlay="dialog"] [data-vmz-focus="enter"]', { timeout: 10000 });
+                await page.waitForFunction(() => (document.body.innerText || '').includes('replay:generation'), {
+                    timeout: 10000,
+                });
+            } catch (err) {
+                const dump = await page.evaluate(() => (document.body.innerText || '').slice(0, 400));
+                throw new Error(`Dialog open wait failed: ${dump} (${err instanceof Error ? err.message : err})`);
+            }
+            // Match ui-automation: focus panel/close then Escape (doc key handler + topmost stack).
+            await page.focus('[data-vmz-overlay="dialog"] [data-vmz-focus="close"]');
             await page.keyboard.press('Escape');
-            await page.waitForFunction(() => !document.body.innerText.includes('replay:generation'), {
-                timeout: 8000,
-            });
+            try {
+                await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="dialog"]'), {
+                    timeout: 15000,
+                });
+            } catch (err) {
+                const dump = await page.evaluate(() => ({
+                    text: (document.body.innerText || '').slice(0, 400),
+                    overlay: !!document.querySelector('[data-vmz-overlay="dialog"]'),
+                    overlayOpen: document.querySelector('[data-vmz-ui="dialog"]')?.getAttribute('data-vmz-overlay-open'),
+                    stacks: [...document.querySelectorAll('[data-vmz-overlay][data-vmz-overlay-stack]')].map((el) =>
+                        el.getAttribute('data-vmz-overlay-stack'),
+                    ),
+                }));
+                throw new Error(`Dialog dismiss wait failed: ${JSON.stringify(dump)} (${err instanceof Error ? err.message : err})`);
+            }
 
             const rtlClicked = await page.evaluate(() => {
                 const btns = [...document.querySelectorAll('button')];
@@ -640,10 +675,18 @@ async function proveInspectorFieldDialogRtl(
                 return true;
             });
             if (!rtlClicked) throw new Error('Toggle RTL button missing');
-            await page.waitForFunction(
-                () => document.querySelector('[data-dogfood="inspector"]')?.getAttribute('dir') === 'rtl',
-                { timeout: 8000 },
-            );
+            try {
+                await page.waitForFunction(
+                    () => document.querySelector('[data-dogfood="inspector"]')?.getAttribute('dir') === 'rtl',
+                    { timeout: 10000 },
+                );
+            } catch (err) {
+                const dump = await page.evaluate(() => ({
+                    dir: document.querySelector('[data-dogfood="inspector"]')?.getAttribute('dir'),
+                    text: (document.body.innerText || '').slice(0, 300),
+                }));
+                throw new Error(`RTL toggle wait failed: ${JSON.stringify(dump)} (${err instanceof Error ? err.message : err})`);
+            }
 
             return {
                 field: 'Field input + space validation error',
