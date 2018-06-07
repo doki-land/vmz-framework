@@ -5,10 +5,12 @@
  */
 
 import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
 import { addLimitation, readProof, runVmzBuild, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 
@@ -278,8 +280,14 @@ if (homeBuild.status !== 0) {
 console.log('official-dogfood: serve homepage SSR…');
 let homeSsrOk = false;
 let homeSsrDetail = '';
+let homeLocaleOk = false;
+let homeLocaleDetail = '';
 if (homeBuild.status === 0) {
     const dist = homeBuild.dist;
+    const realization = path.join(dist, '_vmz', 'locale-route-realization.json');
+    if (!fs.existsSync(realization)) {
+        errors.push('homepage missing _vmz/locale-route-realization.json (need /locales)');
+    }
     const hostJs = path.join(dist, 'vmz-serve-host.mjs');
     if (!fs.existsSync(hostJs)) {
         homeSsrDetail = 'missing serve-host';
@@ -384,6 +392,17 @@ if (homeBuild.status === 0) {
                 homeSsrOk = true;
                 homeSsrDetail =
                     'SSR / + /ui + /commercial + /form + /console + /motion + /ui4 + /ui5 + /ui6 + /structure + /stacking + /datatable + /product';
+            }
+
+            if (homeSsrOk) {
+                console.log('official-dogfood: homepage LocaleTransition…');
+                try {
+                    homeLocaleDetail = await proveHomepageLocaleTransition(`http://127.0.0.1:${PORT}`);
+                    homeLocaleOk = true;
+                } catch (e) {
+                    homeLocaleDetail = e instanceof Error ? e.message : String(e);
+                    errors.push(`homepage LocaleTransition: ${homeLocaleDetail}`);
+                }
             }
         } catch (e) {
             homeSsrDetail = e instanceof Error ? e.message : String(e);
@@ -511,6 +530,11 @@ upsertCheck(proof, {
     detail: homeSsrDetail,
 });
 upsertCheck(proof, {
+    id: 'official-dogfood.homepage-locale',
+    status: homeLocaleOk ? 'passed' : 'failed',
+    detail: homeLocaleDetail || 'skipped (SSR failed)',
+});
+upsertCheck(proof, {
     id: 'official-dogfood.documents',
     status: docsOk ? 'passed' : 'failed',
     detail: docsDetail,
@@ -528,7 +552,7 @@ upsertCheck(proof, {
 
 const gaps = [
     'Dogfood: sibling vmz-panel product app not gated in this driver (production-inspector stands in as ordinary panel-shaped app)',
-    'Dogfood: homepage locale switch matrix still open (production-router LocaleTransition covered; homepage dogfood matrix deferred)',
+    'Dogfood: homepage message-binding / SiteHeader still uses documents hard links (/d/…); LocaleTransition API dogfood covered',
     'Dogfood: documents search UX not covered',
 ];
 for (const g of gaps) addLimitation(proof, g);
@@ -538,13 +562,14 @@ proof.knownLimitations = proof.knownLimitations.filter(
         !l.includes('Dogfood: VMZ UI Field/Dialog') &&
         !l.includes('Dogfood: Field/Dialog focus-loop') &&
         !l.includes('Dogfood: homepage locale switch matrix + documents search UX') &&
-        !l.includes('Dogfood: I2 LocaleTransition / I3 hreflang / homepage locale switch matrix'),
+        !l.includes('Dogfood: I2 LocaleTransition / I3 hreflang / homepage locale switch matrix') &&
+        !l.includes('Dogfood: homepage locale switch matrix still open'),
 );
 
 writeProof(proof, root);
 if (errors.length) fail(errors.join('\n'));
 
-console.log('official-dogfood PASS: homepage SSR + documents + inspector + @vmz/ui Field/Dialog');
+console.log('official-dogfood PASS: homepage SSR + LocaleTransition + documents + inspector + @vmz/ui Field/Dialog');
 console.log('official-dogfood NOTE: sibling vmz-panel / @vmz/ui-data-grid deep / network upload / UI7 browser-timing still open');
 console.log(
     'official-dogfood NOTE: UI1–UI6 + Form depth + Structure + Stacking + DataTable + documents/panel density + Commercial/Console/Motion browser proof lives in `pnpm verify -- ui-automation`; Motion IR depth + UI7 pack in `pnpm verify -- ui7`; DataGrid thin gate in `pnpm verify -- ui-data-grid`',
@@ -567,6 +592,77 @@ function walkFind(dir: string, fileName: string): string | null {
         }
     }
     return null;
+}
+
+async function loadPuppeteerCore(): Promise<any> {
+    const requireFromTest = createRequire(path.join(root, 'packages', 'runtimes', 'vmz-test', 'package.json'));
+    try {
+        const mod = requireFromTest('puppeteer-core');
+        return mod?.default ?? mod;
+    } catch (err) {
+        throw new Error(`puppeteer-core via @vmz/test required: ${err instanceof Error ? err.message : err}`);
+    }
+}
+
+async function proveHomepageLocaleTransition(baseUrl: string): Promise<string> {
+    const { resolveBrowserExecutable } = await import(
+        pathToFileURL(path.join(root, 'packages', 'runtimes', 'vmz-test', 'dist', 'browser.js')).href
+    );
+    const chrome = resolveBrowserExecutable();
+    if (!chrome) throw new Error('Chrome/Edge not found (set VMZ_BROWSER)');
+    const puppeteer = await loadPuppeteerCore();
+    const browser = await puppeteer.launch({
+        executablePath: chrome,
+        headless: true,
+        args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+    });
+    try {
+        const page = await browser.newPage();
+        await page.goto(`${baseUrl}/ui`, { waitUntil: 'networkidle0', timeout: 30000 });
+        await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 15000 });
+        const before = await page.evaluate(() => ({
+            path: location.pathname,
+            locale: document.documentElement.getAttribute('data-locale'),
+            routing: document.documentElement.getAttribute('data-vmz-locale-routing'),
+        }));
+        if (!before.routing) throw new Error(`missing data-vmz-locale-routing: ${JSON.stringify(before)}`);
+        if (before.locale && before.locale !== 'zh-hans') {
+            throw new Error(`default locale want zh-hans, got ${JSON.stringify(before)}`);
+        }
+
+        const committed = await page.evaluate(async () => {
+            const r = await (window as any).__vmzTransitionLocale('en-us');
+            return {
+                ...r,
+                path: location.pathname,
+                locale: document.documentElement.getAttribute('data-locale'),
+                lang: document.documentElement.lang,
+            };
+        });
+        if (committed.status !== 'committed' || committed.locale !== 'en-us') {
+            throw new Error(`LocaleTransition commit failed: ${JSON.stringify(committed)}`);
+        }
+        if (committed.path !== '/en-us/ui' && committed.path !== '/en-us/ui/') {
+            throw new Error(`LocaleTransition path want /en-us/ui, got ${committed.path}`);
+        }
+
+        const rejected = await page.evaluate(async () => {
+            const beforeLocale = document.documentElement.getAttribute('data-locale');
+            const r = await (window as any).__vmzTransitionLocale('ja-jp');
+            return {
+                ...r,
+                beforeLocale,
+                afterLocale: document.documentElement.getAttribute('data-locale'),
+                path: location.pathname,
+            };
+        });
+        if (rejected.status !== 'rejected' || rejected.afterLocale !== 'en-us') {
+            throw new Error(`unsupported locale must reject+retain: ${JSON.stringify(rejected)}`);
+        }
+        return 'LocaleTransition zh-hans→en-us commit + unsupported reject';
+    } finally {
+        await browser.close();
+    }
 }
 
 function get(url: string): Promise<{ status: number; body: string }> {

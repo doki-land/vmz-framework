@@ -1,7 +1,7 @@
 /**
- * B4 — Pack stage: consume Deployment IR (VPG-owned units), emit pack manifest.
- * Full oxc minify/chunk-split lands progressively; this stage always runs and
- * records integrity digests so Assemble/Prove never skip the pack contract.
+ * Pack stage: consume Deployment IR (VPG-owned units), emit pack manifest,
+ * and lower browser-unreachable bare package imports to `dist/vendor/**`.
+ * Full oxc minify/chunk-split lands progressively (`oxc-pending` on release minify).
  */
 // @ts-nocheck
 
@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadDeploymentIr, planBundleInputs } from './bundler-adapter.js';
+import { packClientBareImports } from './pack-client-packages.js';
 
 export const PACK_MANIFEST_SCHEMA = 'vmz.pack.manifest.v0';
 
@@ -41,10 +42,16 @@ export function ensureRuntimeCompanions(outDir, coreDist) {
  *   assembly?: string,
  *   preferredClientFace?: string,
  *   coreDist?: string | null,
+ *   projectRoot?: string | null,
  * }} [opts]
  */
 export function packFromDeploymentIr(outDir, opts = {}) {
     ensureRuntimeCompanions(outDir, opts.coreDist);
+
+    // Browser ESM cannot resolve bare npm specs — materialize reachable packages first
+    // so digests below reflect the rewritten graph.
+    const clientPackages = packClientBareImports(outDir, { projectRoot: opts.projectRoot || null });
+
     const ir = loadDeploymentIr(outDir);
     const inputs = planBundleInputs(outDir, ir);
     const units = [];
@@ -84,6 +91,15 @@ export function packFromDeploymentIr(outDir, opts = {}) {
         minify: opts.release ? 'oxc-pending' : 'dev-identity',
         treeShakeBasis: 'vpg-deployment-ir',
         bundler: 'vmz-pack',
+        clientPackageLowering: {
+            status: 'thin',
+            rewrittenFiles: clientPackages.rewrittenFiles,
+            bareSpecs: clientPackages.bareSpecs,
+            vendoredModules: clientPackages.vendoredModules,
+            unresolvedBareSpecs: clientPackages.unresolvedBareSpecs || [],
+            skippedVmzExports: clientPackages.skippedVmzExports || [],
+            remainingBareSpecs: clientPackages.remainingBareSpecs || [],
+        },
     };
     body.packDigest = sha256Hex(stableStringify({ ...body }));
 
@@ -91,7 +107,7 @@ export function packFromDeploymentIr(outDir, opts = {}) {
     mkdirSync(vmzDir, { recursive: true });
     const file = path.join(vmzDir, 'pack-manifest.json');
     writeFileSync(file, `${JSON.stringify(body, null, 2)}\n`, 'utf8');
-    return { manifest: body, path: file };
+    return { manifest: body, path: file, clientPackages };
 }
 
 function stableStringify(value) {

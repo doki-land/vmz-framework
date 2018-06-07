@@ -45,6 +45,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'tooling/deployment-proof.ts',
         description: 'Deployment boundary proof',
     },
+    'pack-client-packages': {
+        file: 'toolchain/pack-client-packages.ts',
+        description: 'Pack: bare client package → dist/vendor + relative rewrite',
+        pre: ['build:runtimes'],
+    },
     'causal-trace': { file: 'tooling/causal-trace.ts', description: 'Trace ingest / causal replay' },
 
     // profile/
@@ -308,5 +313,6 @@ export const CHECK_ALL = [
     'style-theme',
     'ui-automation',
     'ui-data-grid',
+    'ui-icons',
     'ui7',
 ];

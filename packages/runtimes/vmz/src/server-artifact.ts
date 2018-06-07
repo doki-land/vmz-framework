@@ -170,7 +170,10 @@ export function projectServerRuntimeAdapter(artifact, adapterId) {
             host: 'fetch',
             invoke: 'handleFetchRequest',
             status: id === 'worker' ? 'runtime' : 'projected',
-            note: id === 'worker' ? 'in-process Fetch parity host' : 'Fetch contract projection; live runtime not gated',
+            note:
+                id === 'worker'
+                    ? 'Fetch entry; live thin gated via worker-shaped subprocess host'
+                    : 'Fetch contract projection; live runtime not gated',
         };
     }
     // rust-host

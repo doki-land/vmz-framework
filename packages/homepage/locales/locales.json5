@@ -1,0 +1,17 @@
+{
+  schemaVersion: 1,
+  defaultLocale: 'zh-hans',
+  locales: [
+    { id: 'zh-hans', label: '简体中文', direction: 'ltr' },
+    { id: 'en-us', label: 'English', direction: 'ltr' },
+  ],
+  fallback: {
+    'en-us': ['zh-hans'],
+  },
+  routing: {
+    strategy: 'prefix',
+    // Default locale stays unprefixed so landing URLs remain `/` and `/ui`.
+    defaultPrefix: 'omit',
+  },
+  missing: 'warning',
+}

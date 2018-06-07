@@ -18,8 +18,12 @@ import {
     listenLocalStaticHost,
     measureDistBudgets,
     observabilityDigest,
+    packRelease,
+    publishRelease,
+    readPointer,
     redactSensitive,
     REQUIRED_TRACE_FACETS,
+    rollbackRelease,
     validateProductionTrace,
 } from 'vmz';
 import { repoRoot } from '../_lib/repo-root.ts';
@@ -220,6 +224,14 @@ try {
             (contract.health as { gracefulShutdown: { timeoutMs: number } }).gracefulShutdown.timeoutMs
         }`;
     }
+
+    // Fault injection thin: real 404 (no SPA fallback) while host is live.
+    if (healthOk) {
+        const miss = await get(`http://127.0.0.1:${PORT}/__vmz/fault-inject-missing-${Date.now()}`);
+        if (miss.status !== 404) {
+            errors.push(`fault-inject 404 want 404 got ${miss.status}`);
+        }
+    }
 } catch (e) {
     healthDetail = e instanceof Error ? e.message : String(e);
 } finally {
@@ -230,6 +242,55 @@ try {
     }
 }
 if (!healthOk) errors.push(`health: ${healthDetail}`);
+
+console.log('production-observability: stale-artifact fault inject (release pack)…');
+let staleOk = false;
+let staleDetail = '';
+try {
+    const releasesRoot = path.join(path.dirname(dist), '.vmz-releases-production-obs');
+    fs.rmSync(releasesRoot, { recursive: true, force: true });
+    const envA = packRelease(dist, { applicationId: 'production-router' });
+    publishRelease(releasesRoot, dist, envA);
+    const marker = path.join(dist, 'pages', 'index.client.js');
+    const original = fs.readFileSync(marker, 'utf8');
+    fs.writeFileSync(marker, `${original}\n/* obs-fault-stale */\n`, 'utf8');
+    const envB = packRelease(dist, { applicationId: 'production-router' });
+    if (envB.artifactDigest === envA.artifactDigest) {
+        throw new Error('stale inject: mutated digest must change');
+    }
+    publishRelease(releasesRoot, dist, envB);
+    if (readPointer(path.join(releasesRoot, 'CURRENT')) !== envB.artifactDigest) {
+        throw new Error('stale inject: CURRENT must point at B before rollback');
+    }
+    const rb = rollbackRelease(releasesRoot);
+    if (rb.restored !== envA.artifactDigest) {
+        throw new Error(`stale inject: rollback want A got ${rb.restored}`);
+    }
+    fs.writeFileSync(marker, original, 'utf8');
+    staleOk = true;
+    staleDetail = `404+rollback ${envB.artifactDigest.slice(0, 8)}→${envA.artifactDigest.slice(0, 8)}`;
+} catch (e) {
+    staleDetail = e instanceof Error ? e.message : String(e);
+    errors.push(`stale-artifact: ${staleDetail}`);
+}
+
+console.log('production-observability: cookie/nonce profile boundary…');
+const sec = contract.security as {
+    cookieNamespace: string;
+    sessionNamespace: string;
+    requireNonceForInline: boolean;
+};
+if (!sec.cookieNamespace || !sec.sessionNamespace) {
+    errors.push('security contract must declare cookie/session namespace');
+}
+if (sec.requireNonceForInline !== true) {
+    errors.push('security contract requireNonceForInline must be true (policy intent)');
+}
+// Profile claim: CSP is header-level only — applied CSP must not embed a runtime nonce token.
+const profileCsp = String(sec.csp || '');
+if (/nonce-/.test(profileCsp)) {
+    errors.push('Browser Production Profile v1 CSP must stay header-level (no nonce- in static CSP string)');
+}
 
 const proof = readProof(root);
 proof.performanceBudgets = {
@@ -252,6 +313,19 @@ proof.securityChecks = [
         id: 'capability-secret-closure',
         status: !capBad.ok && capOk.ok ? 'passed' : 'failed',
         detail: 'allowlist + schema + timeout + no client secrets',
+    },
+    {
+        id: 'cookie-nonce-profile',
+        status:
+            sec.cookieNamespace && sec.sessionNamespace && sec.requireNonceForInline === true && !/nonce-/.test(profileCsp)
+                ? 'passed'
+                : 'failed',
+        detail: 'namespaces declared; CSP header-level only (no runtime nonce bind in this profile)',
+    },
+    {
+        id: 'fault-inject-stale',
+        status: staleOk ? 'passed' : 'failed',
+        detail: staleDetail,
     },
 ];
 
@@ -281,26 +355,45 @@ upsertCheck(proof, {
     detail: healthDetail,
 });
 upsertCheck(proof, {
+    id: 'production-observability.fault-inject',
+    status: staleOk && !errors.some((e) => e.startsWith('fault-inject')) ? 'passed' : 'failed',
+    detail: staleDetail || '404 + release stale digest rollback',
+});
+upsertCheck(proof, {
+    id: 'production-observability.cookie-nonce-boundary',
+    status:
+        sec.cookieNamespace && sec.sessionNamespace && sec.requireNonceForInline === true && !/nonce-/.test(profileCsp)
+            ? 'passed'
+            : 'failed',
+    detail: 'profile = CSP header-level; cookie/session/nonce runtime bind deferred',
+});
+upsertCheck(proof, {
     id: 'production-observability',
     status: errors.length ? 'failed' : 'passed',
     detail: emitted.contractPath,
 });
 
 const gaps = [
-    'A5: dogfood staging fault injection (server error / slow / reload / stale artifact / locale chunk) not covered',
+    'A5: dogfood staging fault injection deep matrix (slow / reload / locale chunk) still open; thin 404 + stale-artifact rollback covered',
     'A5: live error-rate / latency dashboards + diagnostic sampling pipeline not covered',
-    'A5: browser-enforced cookie/session namespace + nonce runtime binding not covered',
+    'A5: Browser Production Profile v1 security is CSP header-level only; cookie/session namespace + inline nonce runtime binding deferred',
 ];
 for (const g of gaps) addLimitation(proof, g);
 proof.knownLimitations = proof.knownLimitations.filter(
-    (l) => !l.includes('A5: production trace schema') && !l.includes('A5: sensitive-data redaction + performance budgets not gated'),
+    (l) =>
+        !l.includes('A5: production trace schema') &&
+        !l.includes('A5: sensitive-data redaction + performance budgets not gated') &&
+        !l.includes('A5: dogfood staging fault injection (server error') &&
+        !l.includes('A5: browser-enforced cookie/session namespace + nonce runtime binding not covered'),
 );
 
 writeProof(proof, root);
 if (errors.length) fail(errors.join('\n'));
 
-console.log(`production-observability PASS: digest=${digestA.slice(0, 12)} budgets+CSP+health+redaction+trace facets`);
-console.log('production-observability NOTE: dogfood staging fault injection / sampling dashboards still open');
+console.log(
+    `production-observability PASS: digest=${digestA.slice(0, 12)} budgets+CSP+health+redaction+trace+fault-inject thin`,
+);
+console.log('production-observability NOTE: deep fault matrix / sampling dashboards still open; cookie/nonce = CSP header-level profile');
 
 function get(url: string): Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }> {
     return new Promise((resolve, reject) => {

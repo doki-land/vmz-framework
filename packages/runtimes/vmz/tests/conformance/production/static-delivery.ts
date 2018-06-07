@@ -218,7 +218,9 @@ upsertCheck(proof, {
 });
 
 proof.deliveryProfile = 'web-static';
-const gaps = ['A3: StaticParameterized enumeration not covered'];
+const gaps = [
+    'A3: Browser Production Profile / web-static v1 does not include StaticParameterized enumeration (explicit exclude; dynamic static param matrix deferred)',
+];
 for (const g of gaps) addLimitation(proof, g);
 proof.knownLimitations = proof.knownLimitations.filter(
     (l) =>
@@ -228,11 +230,12 @@ proof.knownLimitations = proof.knownLimitations.filter(
         !l.includes('A3: web-static build failed') &&
         !l.includes('A3: content-addressed assets/<hash> immutable CDN layout not covered') &&
         !l.includes('A3: locale-prefixed static HTML / hreflang matrix not covered') &&
-        !l.includes('SiteDeliveryContract resolver not covered'),
+        !l.includes('SiteDeliveryContract resolver not covered') &&
+        !l.includes('A3: StaticParameterized enumeration not covered'),
 );
 
 writeProof(proof, root);
 if (errors.length) fail(errors.join('\n'));
 
 console.log('static-delivery PASS: web-static HTML + 404 + SEO/hreflang + locale-prefixed seed + manifest (no SPA fallback)');
-console.log('static-delivery NOTE: StaticParameterized still open');
+console.log('static-delivery NOTE: StaticParameterized explicitly excluded from this profile');
