@@ -570,6 +570,8 @@ export default class Upload {
         destination: 'client',
         id: `client-${gen}-${i}`,
         bytes: Number(file.size) || 0,
+        /** Local File handle for in-tab tools (checksum, etc.). Not serialized. */
+        file,
       });
     }
     if (gen !== this._gen) return;

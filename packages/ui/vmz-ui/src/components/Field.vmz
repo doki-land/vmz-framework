@@ -6,6 +6,9 @@
       class="vmz-ui-field__control"
       type={type}
       value={value}
+      min={min}
+      max={max}
+      step={step}
       disabled={disabled}
       aria-invalid={error ? 'true' : 'false'}
       aria-describedby={describedBy}
@@ -20,31 +23,58 @@
 .vmz-ui-field {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.45rem;
   max-width: 28rem;
 }
 
 .vmz-ui-field__label {
   font: inherit;
   font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .vmz-ui-field__control {
-  font: inherit;
-  padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
-  border: 1px solid var(--vmz-action-primary-background);
-  border-radius: 2px;
-  background: transparent;
-  color: inherit;
+  box-sizing: border-box;
+  width: 100%;
+  font-family: var(--vmz-font-mono, ui-monospace, monospace);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  padding: calc(var(--vmz-density-control-padding-y, 0.55rem) + 0.05rem)
+    calc(var(--vmz-density-control-padding-x, 0.95rem) + 0.05rem);
+  border: 1px solid var(--vmz-line-default, #d9dee3);
+  border-left: 3px solid var(--vmz-action-primary-background);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--vmz-surface-mist, #f4f6f8) 55%, var(--vmz-surface-paper, #fff));
+  color: var(--vmz-text-ink, inherit);
   outline: none;
+  box-shadow: inset 0 1px 2px rgba(16, 24, 40, 0.04);
+  transition:
+    border-color var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, linear),
+    box-shadow var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, linear),
+    background-color var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, linear);
+}
+
+.vmz-ui-field__control::placeholder {
+  color: var(--vmz-text-steel, #66707a);
+  opacity: 0.85;
 }
 
 .vmz-ui-field[data-invalid='true'] .vmz-ui-field__control {
   border-color: var(--vmz-status-danger-accent);
+  border-left-color: var(--vmz-status-danger-accent);
+  background: color-mix(in srgb, var(--vmz-status-danger-accent) 8%, var(--vmz-surface-paper, #fff));
+}
+
+.vmz-ui-field__control:hover:not(:disabled):not(:focus-visible) {
+  border-color: color-mix(in srgb, var(--vmz-action-primary-background) 55%, var(--vmz-line-default, #d9dee3));
 }
 
 .vmz-ui-field__control:focus-visible {
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+  border-color: var(--vmz-action-primary-background);
+  background: var(--vmz-surface-paper, #fff);
+  box-shadow:
+    inset 0 1px 2px rgba(16, 24, 40, 0.03),
+    0 0 0 2px var(--vmz-focus-ring);
 }
 
 .vmz-ui-field__control:disabled {
@@ -54,8 +84,9 @@
 
 .vmz-ui-field__description {
   margin: 0;
-  opacity: 0.75;
+  color: var(--vmz-text-steel, #66707a);
   font-size: 0.9em;
+  line-height: 1.4;
 }
 
 .vmz-ui-field__error {
@@ -77,6 +108,9 @@ export default class Field {
   public error: string = '';
   public value: string = '';
   public type: string = 'text';
+  public min: string = '';
+  public max: string = '';
+  public step: string = '';
   public disabled: boolean = false;
   public invalidAttr: string = 'false';
   public controlId: string = 'vmz-field';

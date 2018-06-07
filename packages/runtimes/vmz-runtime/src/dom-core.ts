@@ -2513,6 +2513,19 @@ export function applyDomAttr(el, name, value) {
         }
         return;
     }
+    // <textarea value="…"> as an attribute does not update visible text; INPUT/SELECT
+    // also need the IDL `.value` property so controlled updates stay in sync after switches.
+    if (
+        key === 'value' &&
+        el &&
+        (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.tagName === 'SELECT')
+    ) {
+        const next = value == null || value === false ? '' : String(value);
+        if (el.value !== next) el.value = next;
+        if (value == null || value === false) el.removeAttribute('value');
+        else el.setAttribute('value', next);
+        return;
+    }
     if (value == null || value === false) el.removeAttribute(key);
     else el.setAttribute(key, value === true ? '' : String(value));
 }

@@ -9,6 +9,7 @@
       type="button"
       id={controlId}
       class="vmz-ui-select__control"
+      role="combobox"
       disabled={disabled}
       aria-haspopup="listbox"
       aria-expanded={open ? 'true' : 'false'}

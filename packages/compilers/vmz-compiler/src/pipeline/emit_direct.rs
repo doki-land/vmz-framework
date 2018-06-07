@@ -382,19 +382,9 @@ fn emit_component(
             ViewAttrValue::Interp { expr: e } if is_event_attr(&a.name) => {
                 bind_field_idents(e, fields, scope, aliases)
             }
-            ViewAttrValue::Interp { expr: e } => {
-                let rewritten = bind_field_idents(e, fields, scope, aliases);
-                if !aliases.is_empty() {
-                    rewritten
-                } else {
-                    let root = e.split('.').next().unwrap_or("");
-                    if !root.is_empty() && fields.iter().any(|f| f == root) {
-                        format!("this.{e}")
-                    } else {
-                        e.clone()
-                    }
-                }
-            }
+            // Always rewrite bare field idents (`active === '' ? …` → `this.active === '' ? …`).
+            // Do not use `this.{rawExpr}` / raw clone: complex interps are not a single field root.
+            ViewAttrValue::Interp { expr: e } => bind_field_idents(e, fields, scope, aliases)
         };
         prop_parts.push(format!("{:?}:{}", a.name, val));
     }
@@ -405,7 +395,7 @@ fn emit_component(
     };
     let v = fresh("c", next_id);
     stmts.push(format!("var {v} = api.component(this, {:?}, {props}, {client_arg});", tag));
-    // Live prop binders: field-rooted interps stay in sync after create (UI1 Dialog open, Field value, …).
+    // Live prop binders: any interp with field deps stays in sync (incl. `active === 'x' ? …`).
     if client.is_none() && aliases.is_empty() {
         for a in attrs {
             if a.name == "style:tw" || a.name.starts_with("client:") || is_event_attr(&a.name) {
@@ -414,11 +404,10 @@ fn emit_component(
             let ViewAttrValue::Interp { expr: e } = &a.value else {
                 continue;
             };
-            let root = e.split('.').next().unwrap_or("");
-            if root.is_empty() || !fields.iter().any(|f| f == root) {
+            let deps = collect_deps_oxc(e, fields, scope);
+            if deps.is_empty() {
                 continue;
             }
-            let deps = collect_deps_oxc(e, fields, scope);
             let deps_js = deps.iter().map(|d| format!("{:?}", d)).collect::<Vec<_>>().join(", ");
             let body = bind_field_idents(e, fields, scope, aliases);
             stmts.push(format!(
