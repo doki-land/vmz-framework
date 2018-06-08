@@ -11,11 +11,15 @@
  * GET `/__vmz/events` SSE notifies the browser:
  * - island HMR → re-import `entry-client.js` (no full document reload)
  * - otherwise → `location.reload`
+ *
+ * Dev resolve hook propagates `?t=` onto nested relative `file:` imports under
+ * dist so soft reload does not keep a stale `lib/*.js` ESM cache entry.
  */
 
 import { existsSync } from 'node:fs';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import http from 'node:http';
+import { registerHooks } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { registerComponents, renderToStream, renderToString } from './vmz-dom.js';
@@ -26,6 +30,41 @@ const distDir = process.env.VMZ_DIST ? path.resolve(process.env.VMZ_DIST) : path
 const host = process.env.VMZ_HOST || '127.0.0.1';
 const port = Number(process.env.VMZ_PORT || process.env.PORT || 5173);
 const isDev = process.env.VMZ_DEV === '1' || process.env.VMZ_DEV === 'true';
+
+/**
+ * Soft reload only busts the top-level `import(page?t=token)`. Nested relative
+ * imports (`../../lib/units.js`) keep the first-loaded ESM cache entry — so a
+ * page can demand exports that the stale dep never had (or vice versa).
+ * Propagate `t` from parentURL onto file: children under this dist.
+ */
+if (isDev) {
+    const distUrlPrefix = pathToFileURL(distDir.endsWith(path.sep) ? distDir : `${distDir}${path.sep}`).href;
+    registerHooks({
+        resolve(specifier, context, nextResolve) {
+            const result = nextResolve(specifier, context);
+            if (!specifier.startsWith('.') || !context.parentURL || !result?.url) return result;
+            let token = '';
+            try {
+                token = new URL(context.parentURL).searchParams.get('t') || '';
+            } catch {
+                return result;
+            }
+            if (!token) return result;
+            if (!result.url.startsWith('file:')) return result;
+            if (!result.url.startsWith(distUrlPrefix)) {
+                try {
+                    if (!fileURLToPath(result.url).startsWith(distDir)) return result;
+                } catch {
+                    return result;
+                }
+            }
+            const u = new URL(result.url);
+            if (u.searchParams.get('t') === token) return result;
+            u.searchParams.set('t', token);
+            return { ...result, url: u.href, shortCircuit: true };
+        },
+    });
+}
 
 /** @type {number} */
 let reloadToken = Date.now();
@@ -305,6 +344,12 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
         ? `\n  <script>
   (() => {
     const es = new EventSource("/__vmz/events");
+    let sawDisconnect = false;
+    es.onerror = () => { sawDisconnect = true; };
+    es.onopen = () => {
+      // Host respawn drops SSE — reload once the new process is up (no manual restart).
+      if (sawDisconnect) location.reload();
+    };
     function showOverlay(err) {
       let el = document.getElementById("vmz-dev-overlay");
       if (!el) {
@@ -433,22 +478,29 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
 ${hreflangBlock}${themeBoot}${cssLink}</head>
 <body>
   <div id="app" data-vmz-page="${escapeAttr(chunkId)}"${layoutAttr}${localeAttr} data-vmz-props="${escapeAttr(propsJson)}">`;
+    const prevLocaleHint = globalThis.__vmzLocaleIdHint;
+    globalThis.__vmzLocaleIdHint = localeId;
     let bodyHtml = '';
-    for await (const chunk of renderToStream(Page, props, { signal })) {
+    try {
+        for await (const chunk of renderToStream(Page, props, { signal })) {
+            if (signal?.aborted) return;
+            bodyHtml += chunk;
+        }
         if (signal?.aborted) return;
-        bodyHtml += chunk;
-    }
-    if (signal?.aborted) return;
-    // Wrap page HTML in layout chain (outer → inner) via default slot injection.
-    for (let i = layoutChain.length - 1; i >= 0; i--) {
-        const Layout = await loadPageCtor(layoutChain[i]);
-        if (!Layout) continue;
-        bodyHtml = await renderToString(Layout, {}, { signal, slotHtml: bodyHtml });
-        if (signal?.aborted) return;
-    }
-    // Locale discipline: same-app Links retain current LocaleId (realization authority).
-    if (localeArtifact && localeId) {
-        bodyHtml = localizeBodyLinksInHost(bodyHtml, localeId, localeArtifact);
+        // Wrap page HTML in layout chain (outer → inner) via default slot injection.
+        for (let i = layoutChain.length - 1; i >= 0; i--) {
+            const Layout = await loadPageCtor(layoutChain[i]);
+            if (!Layout) continue;
+            bodyHtml = await renderToString(Layout, {}, { signal, slotHtml: bodyHtml });
+            if (signal?.aborted) return;
+        }
+        // Locale discipline: same-app Links retain current LocaleId (realization authority).
+        if (localeArtifact && localeId) {
+            bodyHtml = localizeBodyLinksInHost(bodyHtml, localeId, localeArtifact);
+        }
+    } finally {
+        if (prevLocaleHint === undefined) delete globalThis.__vmzLocaleIdHint;
+        else globalThis.__vmzLocaleIdHint = prevLocaleHint;
     }
     yield bodyHtml;
     if (signal?.aborted) return;
@@ -578,17 +630,20 @@ process.on('SIGINT', () => {
  * Re-import routes / pages / components with a new cache-bust token.
  * Keeps the HTTP server process alive (no Node restart).
  * Failed reloads keep the previous in-memory modules (Vite-like resilience).
- * @param {{ quiet?: boolean, payload?: { affectedChunks?: string[], seedChunks?: string[], full?: boolean, islandHmr?: boolean } }} [opts]
+ * @param {{ quiet?: boolean, payload?: { affectedChunks?: string[], seedChunks?: string[], emitted?: string[], full?: boolean, islandHmr?: boolean } }} [opts]
  */
 async function softReload(opts = {}) {
     const prevToken = reloadToken;
     const prevCatalog = pageCatalog;
+    const prevCtors = new Map(pageCtors);
     const nextToken = Date.now();
     reloadToken = nextToken;
     const affected = opts.payload?.affectedChunks ?? [];
     const seeds = opts.payload?.seedChunks ?? [];
+    const emitted = opts.payload?.emitted ?? [];
     const full = opts.payload?.full;
     const islandHmr = Boolean(opts.payload?.islandHmr);
+    const reloadAllPages = shouldReloadAllPages({ full, affected, emitted, islandHmr });
 
     try {
         try {
@@ -630,7 +685,10 @@ async function softReload(opts = {}) {
         }
 
         if (!islandHmr) {
-            for (const p of nextCatalog) {
+            const pagesToLoad = reloadAllPages
+                ? nextCatalog
+                : nextCatalog.filter((p) => pageNeedsReload(p.chunkId, affected));
+            for (const p of pagesToLoad) {
                 const pageRel = `${p.chunkId}.client.js`;
                 const href = bustUrl(pathToFileURL(path.join(distDir, pageRel)).href);
                 const mod = await import(href);
@@ -640,8 +698,17 @@ async function softReload(opts = {}) {
 
         pageCatalog = nextCatalog;
         if (!islandHmr) {
-            pageCtors.clear();
-            for (const [k, v] of nextCtors) pageCtors.set(k, v);
+            if (reloadAllPages) {
+                pageCtors.clear();
+                for (const [k, v] of nextCtors) pageCtors.set(k, v);
+            } else {
+                // Keep unaffected page constructors; only swap what we re-imported.
+                for (const [k, v] of nextCtors) pageCtors.set(k, v);
+                // Drop ctors for pages that disappeared from catalog.
+                for (const id of [...pageCtors.keys()]) {
+                    if (!nextCatalog.some((p) => p.chunkId === id)) pageCtors.delete(id);
+                }
+            }
         }
         if (Object.keys(components).length) {
             registerComponents(components);
@@ -687,7 +754,8 @@ async function softReload(opts = {}) {
         );
         if (!opts.quiet) {
             const aff = affected.length > 0 ? ` affected=[${affected.join(', ')}]` : full === false ? ' affected=[]' : '';
-            console.log(`vmz serve: soft reload ok (mode=${mode}; pages=${pageCatalog.length}; t=${reloadToken}${aff})`);
+            const scope = islandHmr ? 'island' : reloadAllPages ? 'all-pages' : `pages=${nextCtors.size}`;
+            console.log(`vmz serve: soft reload ok (mode=${mode}; ${scope}; catalog=${pageCatalog.length}; t=${reloadToken}${aff})`);
         }
         return {
             affectedChunks: affected,
@@ -697,13 +765,48 @@ async function softReload(opts = {}) {
             mode,
             eventOnlyShell,
             pageCount: pageCatalog.length,
+            reloadedPages: islandHmr ? 0 : nextCtors.size,
+            reloadAllPages,
         };
     } catch (err) {
         reloadToken = prevToken;
         pageCatalog = prevCatalog;
+        pageCtors.clear();
+        for (const [k, v] of prevCtors) pageCtors.set(k, v);
         lastDevError = normalizeDevError(err);
         throw err;
     }
+}
+
+/**
+ * Shared lib / full rebuild / missing affected list → refresh every page ctor.
+ * Otherwise only re-import the dirty page chunks (Vite-like module graph).
+ * @param {{ full?: boolean, affected: string[], emitted: string[], islandHmr: boolean }} opts
+ */
+function shouldReloadAllPages(opts) {
+    if (opts.islandHmr) return false;
+    if (opts.full) return true;
+    if (!opts.affected.length) return true;
+    for (const f of opts.emitted) {
+        const n = String(f).replace(/\\/g, '/');
+        if (
+            n.includes('/lib/') ||
+            /\/Application\.client\.js$/.test(n) ||
+            /\/vmz-(dom|runtime|http|client-nav)\.js$/.test(n)
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/** @param {string} chunkId @param {string[]} affected */
+function pageNeedsReload(chunkId, affected) {
+    if (chunkId === 'pages/Layout' || chunkId.endsWith('/Layout')) return true;
+    return affected.some((a) => {
+        const id = String(a);
+        return id === chunkId || chunkId.startsWith(`${id}/`) || id.startsWith(`${chunkId}/`);
+    });
 }
 
 /** @param {string} event */

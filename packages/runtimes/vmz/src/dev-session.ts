@@ -4,6 +4,11 @@
  *
  * Rebuilds go through the N-API `Workspace` — never spawn `cargo` / `vmz-tools`.
  * session: only dirty leaves are marked; Workspace emits affected deployment units.
+ *
+ * Reload policy (Vite-like — author never hand-restarts):
+ * 1. Prefer in-process soft reload (`POST /__vmz/reload`) with transitive `?t=` via serve-host hook.
+ * 2. Soft reload only re-imports affected pages unless shared `lib/` / full rebuild.
+ * 3. Soft reload failure → **auto-respawn** serve-host (fresh ESM graph), not "keep broken host".
  */
 
 import { spawn } from 'node:child_process';
@@ -56,7 +61,6 @@ export function createDevSession(options) {
 
     function emitLocales() {
         const localeEmit = emitLocaleRuntimeModules(project, outDir);
-        // Always surface locale diagnostics (warnings included) — missing /locales must not be silent.
         log.diagnostics(localeEmit.diagnostics ?? []);
         if (!localeEmit.ok || localeHasErrors({ diagnostics: localeEmit.diagnostics })) {
             log.error('locale runtime emit failed');
@@ -78,6 +82,57 @@ export function createDevSession(options) {
         return true;
     }
 
+    async function waitHostReady(timeoutMs = 8000) {
+        const start = Date.now();
+        while (Date.now() - start < timeoutMs) {
+            try {
+                const res = await fetch(`http://${host}:${port}/__vmz/ready`);
+                if (res.ok) return;
+            } catch {
+                /* not up yet */
+            }
+            await sleep(50);
+        }
+        throw new Error(`serve-host not ready on ${host}:${port}`);
+    }
+
+    async function waitHostGone(timeoutMs = 3000) {
+        const start = Date.now();
+        while (Date.now() - start < timeoutMs) {
+            try {
+                await fetch(`http://${host}:${port}/__vmz/health`);
+                await sleep(40);
+            } catch {
+                return;
+            }
+        }
+    }
+
+    async function respawnHost(reason) {
+        log.warn(`respawning serve-host (${reason})…`);
+        killChild(child);
+        child = null;
+        await waitHostGone();
+        child = spawnHost({ project, outDir, host, port });
+        await waitHostReady();
+        log.info('serve-host respawned — browser SSE will reconnect and reload');
+    }
+
+    /**
+     * Soft reload first; on failure auto-respawn so authors never hand-restart.
+     * @param {object} payload
+     */
+    async function reloadAfterBuild(payload) {
+        try {
+            await softReload(host, port, payload);
+            return 'soft';
+        } catch (err) {
+            log.warn(`soft reload failed (${err}) — auto-respawning serve-host`);
+            await respawnHost('soft-reload-failed');
+            return 'respawn';
+        }
+    }
+
     async function start() {
         const src = path.join(project, 'src');
         if (!existsSync(src)) {
@@ -85,7 +140,6 @@ export function createDevSession(options) {
         }
 
         log.info('initial build (N-API workspace, full)…');
-        // Empty dirty → full project build (session).
         const initial = rebuild();
         if (!printReport(initial, 'build')) {
             throw new Error('vmz dev: initial build failed');
@@ -104,13 +158,16 @@ export function createDevSession(options) {
         }
 
         child = spawnHost({ project, outDir, host, port });
+        await waitHostReady().catch((err) => {
+            log.warn(String(err));
+        });
         const docsRoot = path.join(project, 'documents');
         const localesRoot = path.join(project, 'locales');
         const watchRoots = [src].concat(existsSync(docsRoot) ? [docsRoot] : []).concat(existsSync(localesRoot) ? [localesRoot] : []);
         log.info(`dev → http://${host}:${port} (watching ${watchRoots.join(', ')})`);
 
         /** @type {Map<string, Map<string, string>>} */
-        let fingerprints = new Map();
+        const fingerprints = new Map();
         for (const root of watchRoots) {
             fingerprints.set(root, fileFingerprintMap(root));
         }
@@ -121,6 +178,21 @@ export function createDevSession(options) {
         };
         signal?.addEventListener('abort', onAbort, { once: true });
 
+        /**
+         * Wait until src/ stops changing (multi-file agent edits).
+         */
+        async function coalesceSrcBurst() {
+            let guard = 0;
+            while (guard++ < 20) {
+                await sleep(220);
+                const prev = fingerprints.get(src) || new Map();
+                const next = fileFingerprintMap(src);
+                const diff = diffFingerprints(prev, next);
+                if (!diff.changed.length && !diff.deleted.length) break;
+                fingerprints.set(src, next);
+            }
+        }
+
         try {
             while (!stopped && !signal?.aborted) {
                 await sleep(pollMs);
@@ -129,14 +201,13 @@ export function createDevSession(options) {
                 if (child && child.exitCode != null) {
                     log.warn(`serve-host exited (${child.exitCode}) — respawning…`);
                     child = spawnHost({ project, outDir, host, port });
+                    await waitHostReady().catch(() => {});
                     continue;
                 }
 
                 /** @type {{ srcChanged: string[], srcDeleted: string[], docsDirty: boolean, localesDirty: boolean }} */
                 let batch = { srcChanged: [], srcDeleted: [], docsDirty: false, localesDirty: false };
                 try {
-                    // Probe only — keep prior fingerprints until debounce resample
-                    // (same contract as pre-docs watcher: empty second pass would miss soft reload).
                     for (const root of watchRoots) {
                         const prev = fingerprints.get(root) || new Map();
                         const next = fileFingerprintMap(root);
@@ -156,8 +227,12 @@ export function createDevSession(options) {
                 }
                 if (!batch.srcChanged.length && !batch.srcDeleted.length && !batch.docsDirty && !batch.localesDirty) continue;
 
-                await sleep(200);
-                // Resample against the same prior fingerprints, then commit.
+                if (batch.srcChanged.length + batch.srcDeleted.length > 1) {
+                    await coalesceSrcBurst();
+                } else {
+                    await sleep(200);
+                }
+
                 batch = { srcChanged: [], srcDeleted: [], docsDirty: false, localesDirty: false };
                 for (const root of watchRoots) {
                     const prev = fingerprints.get(root) || new Map();
@@ -188,7 +263,6 @@ export function createDevSession(options) {
                         continue;
                     }
                     if (batch.docsDirty || projectHasDocuments(project)) {
-                        // App rebuild may refresh designs CSS consumed by documents.
                         const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
                         if (!docs.ok) {
                             log.warn('document mount rebuild failed — keeping previous docs');
@@ -196,23 +270,22 @@ export function createDevSession(options) {
                             needFullReload = true;
                         }
                     }
-                    try {
-                        await softReload(host, port, {
-                            affectedChunks: report.affectedChunks ?? [],
-                            seedChunks: report.seedChunks ?? [],
-                            full: Boolean(report.full) || needFullReload,
-                            islandHmr: Boolean(report.islandHmr) && !needFullReload,
-                        });
-                        log.info(
-                            needFullReload
-                                ? 'soft reload ok (full page; docs)'
-                                : report.islandHmr
-                                  ? 'soft reload ok (island HMR)'
-                                  : 'soft reload ok (full page)',
-                        );
-                    } catch (err) {
-                        log.warn(`soft reload failed (${err}) — keeping previous serve-host (fix and save)`);
-                    }
+                    const kind = await reloadAfterBuild({
+                        affectedChunks: report.affectedChunks ?? [],
+                        seedChunks: report.seedChunks ?? [],
+                        emitted: report.emitted ?? [],
+                        full: Boolean(report.full) || needFullReload,
+                        islandHmr: Boolean(report.islandHmr) && !needFullReload,
+                    });
+                    log.info(
+                        kind === 'respawn'
+                            ? 'reload ok (respawned serve-host)'
+                            : needFullReload
+                              ? 'soft reload ok (full page; docs)'
+                              : report.islandHmr
+                                ? 'soft reload ok (island HMR)'
+                                : 'soft reload ok',
+                    );
                     continue;
                 }
 
@@ -222,12 +295,8 @@ export function createDevSession(options) {
                         log.warn('locale runtime emit failed — keeping previous modules');
                         continue;
                     }
-                    try {
-                        await softReload(host, port, { full: true, islandHmr: false });
-                        log.info('soft reload ok (full page; locales)');
-                    } catch (err) {
-                        log.warn(`soft reload failed (${err}) — keeping previous serve-host (fix and save)`);
-                    }
+                    const kind = await reloadAfterBuild({ full: true, islandHmr: false, emitted: [] });
+                    log.info(kind === 'respawn' ? 'reload ok (respawned; locales)' : 'soft reload ok (full page; locales)');
                     if (!batch.docsDirty) continue;
                 }
 
@@ -238,12 +307,8 @@ export function createDevSession(options) {
                         log.warn('document mount rebuild failed — keeping previous docs');
                         continue;
                     }
-                    try {
-                        await softReload(host, port, { full: true, islandHmr: false });
-                        log.info('soft reload ok (full page; docs)');
-                    } catch (err) {
-                        log.warn(`soft reload failed (${err}) — keeping previous serve-host (fix and save)`);
-                    }
+                    const kind = await reloadAfterBuild({ full: true, islandHmr: false, emitted: [] });
+                    log.info(kind === 'respawn' ? 'reload ok (respawned; docs)' : 'soft reload ok (full page; docs)');
                 }
             }
         } finally {
