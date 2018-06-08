@@ -552,7 +552,7 @@ upsertCheck(proof, {
 
 const gaps = [
     'Dogfood: sibling vmz-panel product app not gated in this driver (production-inspector stands in as ordinary panel-shaped app)',
-    'Dogfood: homepage message-binding / SiteHeader still uses documents hard links (/d/…); LocaleTransition API dogfood covered',
+    'Dogfood: homepage landing body copy still bilingual-hardcoded; SiteHeader #locales + LocaleTransition covered',
     'Dogfood: documents search UX not covered',
 ];
 for (const g of gaps) addLimitation(proof, g);
@@ -563,7 +563,8 @@ proof.knownLimitations = proof.knownLimitations.filter(
         !l.includes('Dogfood: Field/Dialog focus-loop') &&
         !l.includes('Dogfood: homepage locale switch matrix + documents search UX') &&
         !l.includes('Dogfood: I2 LocaleTransition / I3 hreflang / homepage locale switch matrix') &&
-        !l.includes('Dogfood: homepage locale switch matrix still open'),
+        !l.includes('Dogfood: homepage locale switch matrix still open') &&
+        !l.includes('Dogfood: homepage message-binding / SiteHeader still uses documents hard links'),
 );
 
 writeProof(proof, root);
@@ -646,6 +647,35 @@ async function proveHomepageLocaleTransition(baseUrl: string): Promise<string> {
             throw new Error(`LocaleTransition path want /en-us/ui, got ${committed.path}`);
         }
 
+        // SiteHeader dogfood: language menu uses LocaleTransition (not /d/ hard links).
+        await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle0', timeout: 30000 });
+        await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 15000 });
+        await page.waitForSelector('[data-dogfood="site-header"]', { timeout: 10000 });
+        const openLang = await page.evaluate(() => {
+            const details = document.querySelector('.site-language') as HTMLDetailsElement | null;
+            if (!details) return false;
+            details.open = true;
+            return true;
+        });
+        if (!openLang) throw new Error('site-language details missing');
+        await page.click('[data-dogfood="locale-en-us"]');
+        await page.waitForFunction(
+            () =>
+                location.pathname.startsWith('/en-us') &&
+                document.documentElement.getAttribute('data-locale') === 'en-us',
+            { timeout: 15000 },
+        );
+        const viaUi = await page.evaluate(() => ({
+            path: location.pathname,
+            locale: document.documentElement.getAttribute('data-locale'),
+            start: (document.querySelector('.site-nav__cta') as HTMLElement | null)?.textContent?.trim() || '',
+            hardDocLink: !!document.querySelector('.site-language__menu a[href^="/d/"]'),
+        }));
+        if (viaUi.hardDocLink) throw new Error('language menu must not hard-link /d/…');
+        if (!viaUi.start || viaUi.start === '开始使用') {
+            throw new Error(`SiteHeader #locales start label want English, got ${JSON.stringify(viaUi)}`);
+        }
+
         const rejected = await page.evaluate(async () => {
             const beforeLocale = document.documentElement.getAttribute('data-locale');
             const r = await (window as any).__vmzTransitionLocale('ja-jp');
@@ -659,7 +689,7 @@ async function proveHomepageLocaleTransition(baseUrl: string): Promise<string> {
         if (rejected.status !== 'rejected' || rejected.afterLocale !== 'en-us') {
             throw new Error(`unsupported locale must reject+retain: ${JSON.stringify(rejected)}`);
         }
-        return 'LocaleTransition zh-hans→en-us commit + unsupported reject';
+        return 'LocaleTransition API + SiteHeader button + #locales common labels';
     } finally {
         await browser.close();
     }

@@ -40,8 +40,21 @@ body { background: #fff; color: var(--v2-ink); }
 .site-language summary::after { content: "⌄"; color: #8b929c; }
 .site-language summary:hover, .site-language[open] summary { background: #f1f3f5; }
 .site-language__menu { position: absolute; top: calc(100% + .65rem); right: 0; display: grid; min-width: 9rem; padding: .35rem; border: 1px solid #e1e6ed; border-radius: 7px; background: #fff; box-shadow: 0 12px 32px rgb(31 56 88 / 14%); }
-.site-language__menu a { padding: .55rem .7rem; white-space: nowrap; }
-.site-language__menu a[aria-current="true"] { color: #1677ff; background: #e6f4ff; }
+.site-language__menu a,
+.site-language__menu button {
+  padding: .55rem .7rem;
+  white-space: nowrap;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 5px;
+}
+.site-language__menu a[aria-current="true"],
+.site-language__menu button[aria-current="true"] { color: #1677ff; background: #e6f4ff; }
+.site-language__menu button:hover { background: #f1f3f5; }
 
 .landing-v2 main { overflow: hidden; }
 .v2-hero { display: grid; justify-items: center; width: 100%; min-height: 43rem; margin: 0; padding: 7rem max(1.5rem, calc((100% - var(--v2-content)) / 2)) 4.5rem; text-align: center; background: #f7faff; border-bottom: 1px solid #e5edf8; }

@@ -1,28 +1,110 @@
 <template>
-  <header class="site-header">
-    <a class="site-brand" href="/" aria-label="VMZ home">
-      <span class="site-brand__mark">VMZ</span>
+  <header class="site-header" data-dogfood="site-header">
+    <a class="site-brand" href="/" aria-label={homeLabel}>
+      <span class="site-brand__mark">{brandLabel}</span>
       <span class="site-brand__pulse" aria-hidden="true"></span>
     </a>
     <nav class="site-nav" aria-label="Primary">
-      <a href="/d/">文档</a>
-      <a href="/d/zh-hans/guide/">指南</a>
-      <a href="/d/zh-hans/guide/deploy/">部署</a>
-      <a href="/deploy-planner">部署计划器</a>
-      <a href="/#showcase">UI 组件</a>
+      <a href={docsRootHref}>{docsLabel}</a>
+      <a href={guideHref}>{guideLabel}</a>
+      <a href={deployDocHref}>{deployLabel}</a>
+      <a href="/deploy-planner">{deployPlannerLabel}</a>
+      <a href="/#showcase">{showcaseLabel}</a>
       <a href="https://github.com/doki-land/vmz-framework">GitHub</a>
       <details class="site-language">
-        <summary aria-label="选择语言">简中</summary>
+        <summary aria-label={selectLanguageLabel}>{langSummary}</summary>
         <div class="site-language__menu">
-          <a aria-current="true" href="/d/zh-hans/">简体中文</a>
-          <a href="/d/en-us/">English</a>
+          <button
+            type="button"
+            data-dogfood="locale-zh-hans"
+            aria-current={localeId === 'zh-hans' ? 'true' : null}
+            onClick={() => this.switchLocale('zh-hans')}
+          >
+            {langZhFullLabel}
+          </button>
+          <button
+            type="button"
+            data-dogfood="locale-en-us"
+            aria-current={localeId === 'en-us' ? 'true' : null}
+            onClick={() => this.switchLocale('en-us')}
+          >
+            {langEnLabel}
+          </button>
         </div>
       </details>
-      <a class="site-nav__cta" href="/d/zh-hans/guide/">开始使用</a>
+      <a class="site-nav__cta" href={guideHref}>{startLabel}</a>
     </nav>
   </header>
 </template>
 
 <script client>
-export default class SiteHeader {}
+import {
+  brand,
+  home,
+  docs,
+  guide,
+  deploy,
+  deployPlanner,
+  showcase,
+  start,
+  selectLanguage,
+  langZh,
+  langZhFull,
+  langEn,
+} from '#locales/common';
+
+export default class SiteHeader {
+  localeId = 'zh-hans';
+  brandLabel = '';
+  homeLabel = '';
+  docsLabel = '';
+  guideLabel = '';
+  deployLabel = '';
+  deployPlannerLabel = '';
+  showcaseLabel = '';
+  startLabel = '';
+  selectLanguageLabel = '';
+  langSummary = '';
+  langZhFullLabel = '';
+  langEnLabel = '';
+  docsRootHref = '/d/zh-hans/';
+  guideHref = '/d/zh-hans/guide/';
+  deployDocHref = '/d/zh-hans/guide/deploy/';
+
+  onMount() {
+    if (typeof document !== 'undefined') {
+      this.localeId = document.documentElement.getAttribute('data-locale') || 'zh-hans';
+    }
+    this.refreshCopy();
+  }
+
+  refreshCopy() {
+    this.brandLabel = brand();
+    this.homeLabel = home();
+    this.docsLabel = docs();
+    this.guideLabel = guide();
+    this.deployLabel = deploy();
+    this.deployPlannerLabel = deployPlanner();
+    this.showcaseLabel = showcase();
+    this.startLabel = start();
+    this.selectLanguageLabel = selectLanguage();
+    this.langSummary = this.localeId === 'en-us' ? langEn() : langZh();
+    this.langZhFullLabel = langZhFull();
+    this.langEnLabel = langEn();
+    this.docsRootHref = this.localeId === 'en-us' ? '/d/en-us/' : '/d/zh-hans/';
+    this.guideHref = this.localeId === 'en-us' ? '/d/en-us/guide/' : '/d/zh-hans/guide/';
+    this.deployDocHref = this.localeId === 'en-us' ? '/d/en-us/guide/deploy/' : '/d/zh-hans/guide/deploy/';
+  }
+
+  async switchLocale(to) {
+    if (typeof window === 'undefined') return;
+    const fn = window.__vmzTransitionLocale;
+    if (typeof fn !== 'function') return;
+    const r = await fn(to);
+    if (r && r.status === 'committed') {
+      this.localeId = document.documentElement.getAttribute('data-locale') || to;
+      this.refreshCopy();
+    }
+  }
+}
 </script>
