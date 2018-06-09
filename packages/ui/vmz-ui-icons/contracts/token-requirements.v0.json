@@ -1,0 +1,36 @@
+{
+    "schema": "vmz.ui.token_requirements.v0",
+    "package": "@vmz/ui-icons",
+    "cssVar": {
+        "prefix": "--vmz-",
+        "fromDotted": "split on '.' then join with '-'"
+    },
+    "forbiddenBrandHex": ["#176BFF", "#0D57DB", "#FFB000", "#00C878", "#121416"],
+    "components": {
+        "Icon": {
+            "source": "src/components/Icon.vmz",
+            "stableHint": "ui-icons.Icon",
+            "tokens": [
+                "text.ink",
+                "text.steel",
+                "action.primary.background",
+                "action.primary.active",
+                "font.mono",
+                "density.compact.padding-y",
+                "density.compact.padding-x"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": [
+                "semantic-name",
+                "registry-not-loose-svg",
+                "decorative-or-labelled",
+                "token-color-only"
+            ]
+        }
+    },
+    "composition": {
+        "reuseFrom": "@vmz/ui",
+        "mustNotShip": ["Button", "Field", "Dialog", "Form", "Empty", "Skeleton", "Tooltip"],
+        "dogfoodWith": ["Button", "Empty", "Badge"]
+    }
+}

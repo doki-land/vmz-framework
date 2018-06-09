@@ -140,6 +140,10 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'ui/ui-data-grid.ts',
         description: '@vmz/ui-data-grid thin gate — virtualization + pinned column + homepage /datagrid',
     },
+    'ui-icons': {
+        file: 'ui/ui-icons.ts',
+        description: '@vmz/ui-icons thin gate — semantic Icon registry (not loose SVG dump)',
+    },
     'event-flow': {
         description: 'EventEntry + async cancel + HTTP stream (+ zero-js / mixed-pack)',
         pre: ['build:vmz-test'],

@@ -1,0 +1,153 @@
+<template>
+  <span
+    class="vmz-ui-icon"
+    data-vmz-ui="icon"
+    data-icon={name}
+    data-size={size}
+    role={roleAttr}
+    aria-hidden={hiddenAttr}
+    aria-label={labelAttr}
+  >
+    <span class="vmz-ui-icon__mark mono" aria-hidden="true">{mark}</span>
+  </span>
+</template>
+
+<style>
+.vmz-ui-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  color: var(--vmz-action-primary-background);
+  line-height: 1;
+  vertical-align: middle;
+  user-select: none;
+}
+
+.vmz-ui-icon__mark {
+  font-family: var(--vmz-font-mono);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: inherit;
+}
+
+.vmz-ui-icon[data-size='sm'] {
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 0.55rem;
+}
+
+.vmz-ui-icon[data-size='md'] {
+  width: 2.35rem;
+  height: 2.35rem;
+  font-size: 0.68rem;
+}
+
+.vmz-ui-icon[data-size='lg'] {
+  width: 2.85rem;
+  height: 2.85rem;
+  font-size: 0.78rem;
+}
+
+.vmz-ui-icon[data-size='sm'] .vmz-ui-icon__mark,
+.vmz-ui-icon[data-size='md'] .vmz-ui-icon__mark,
+.vmz-ui-icon[data-size='lg'] .vmz-ui-icon__mark {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+  text-align: center;
+}
+</style>
+
+<script client>
+/**
+ * VMZ UI Icons — Icon (thin gate).
+ * Consumers pass semantic `name`; marks come from the package registry (not ad-hoc SVG piles).
+ * Empty `label` ⇒ decorative (aria-hidden). Non-empty `label` ⇒ role=img + aria-label.
+ */
+
+/** @type {Record<string, string>} */
+const REGISTRY = {
+  'action.search': '⌕',
+  'action.close': '×',
+  'action.copy': '⧉',
+  'nav.home': '⌂',
+  'status.info': 'i',
+  'status.warning': '!',
+  'status.success': '✓',
+  'tool.base64': 'B64',
+  'tool.base36': '36',
+  'tool.hex': 'HEX',
+  'tool.radix': '2–36',
+  'tool.url': '%20',
+  'tool.html-entities': '</>',
+  'tool.ascii': 'Aa',
+  'tool.binary-text': '01',
+  'tool.temperature': '°C',
+  'tool.length': 'm',
+  'tool.weight': 'kg',
+  'tool.speed': 'm/s',
+  'tool.area': 'm²',
+  'tool.volume': 'L',
+  'tool.time-units': 't',
+  'tool.data-size': 'KiB',
+  'tool.color': '#',
+  'tool.rgb-hsl': 'HSL',
+  'tool.px-rem': 'rem',
+  'tool.percentage': '%',
+  'tool.ratio': 'a:b',
+  'tool.average': 'μ',
+  'tool.tip': 'tip',
+  'tool.discount': '−%',
+  'tool.aspect-ratio': '16:9',
+  'tool.nearest-tenth': '.1',
+  'tool.gpa': 'GPA',
+  'tool.bandwidth': 'Mb',
+  'tool.percent-change': 'Δ%',
+  'tool.grade-curve': 'curve',
+  'tool.ohm': 'Ω',
+};
+
+function resolveMark(name) {
+  const key = String(name || '').trim();
+  if (!key) return '?';
+  if (REGISTRY[key]) return REGISTRY[key];
+  const leaf = key.includes('.') ? key.slice(key.lastIndexOf('.') + 1) : key;
+  const compact = leaf.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4);
+  return compact ? compact.toUpperCase() : '?';
+}
+
+export default class Icon {
+  /** Semantic icon id, e.g. tool.base64 / action.search */
+  public name: string = '';
+  /** sm | md | lg */
+  public size: string = 'md';
+  /** Accessible name; empty ⇒ decorative */
+  public label: string = '';
+
+  mark = '?';
+  roleAttr = '';
+  hiddenAttr = 'true';
+  labelAttr = '';
+
+  onMount() {
+    this.sync();
+  }
+
+  sync() {
+    this.mark = resolveMark(this.name);
+    const labelled = String(this.label || '').trim();
+    if (labelled) {
+      this.roleAttr = 'img';
+      this.hiddenAttr = '';
+      this.labelAttr = labelled;
+    } else {
+      this.roleAttr = '';
+      this.hiddenAttr = 'true';
+      this.labelAttr = '';
+    }
+  }
+}
+</script>
