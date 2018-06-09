@@ -2515,13 +2515,17 @@ export function applyDomAttr(el, name, value) {
     }
     // <textarea value="…"> as an attribute does not update visible text; INPUT/SELECT
     // also need the IDL `.value` property so controlled updates stay in sync after switches.
-    if (
-        key === 'value' &&
-        el &&
-        (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.tagName === 'SELECT')
-    ) {
+    // linkedom `<select>.value` is getter-only — sync via `option.selected` instead of throwing.
+    if (key === 'value' && el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.tagName === 'SELECT')) {
         const next = value == null || value === false ? '' : String(value);
-        if (el.value !== next) el.value = next;
+        if (el.tagName === 'SELECT') {
+            const opts = el.options || el.querySelectorAll?.('option') || [];
+            for (const opt of opts) {
+                opt.selected = String(opt.value ?? '') === next;
+            }
+        } else if (el.value !== next) {
+            el.value = next;
+        }
         if (value == null || value === false) el.removeAttribute('value');
         else el.setAttribute('value', next);
         return;

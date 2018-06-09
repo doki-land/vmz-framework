@@ -821,6 +821,41 @@ impl Workspace {
         crate::miniprogram_target::check_miniprogram_target_contract(&self.options.root).to_json()
     }
 
+    /// miniprogram: TemplateSurface static slice (neutral template + logic data).
+    pub fn lower_miniprogram_static_slice(&self) -> String {
+        crate::miniprogram_static_slice::lower_miniprogram_static_slices(&self.options.root).to_json()
+    }
+
+    /// miniprogram: BindingId patch table + event table.
+    pub fn lower_miniprogram_binding_event(&self) -> String {
+        crate::miniprogram_binding_event::lower_miniprogram_binding_event_slices(&self.options.root)
+            .to_json()
+    }
+
+    /// miniprogram: structure (if/each/component/slot) + lifecycle/dispose tables.
+    pub fn lower_miniprogram_structure(&self) -> String {
+        crate::miniprogram_structure::lower_miniprogram_structure_slices(&self.options.root).to_json()
+    }
+
+    /// miniprogram: Route realization + `#server` stubs + Canonical Style.
+    pub fn lower_miniprogram_route_server_style(&self) -> String {
+        crate::miniprogram_route_server_style::lower_miniprogram_route_server_style_slices(
+            &self.options.root,
+        )
+        .to_json()
+    }
+
+    /// miniprogram: tooling deploy package + Mini Host handoff.
+    pub fn lower_miniprogram_tooling_deploy(&self) -> String {
+        crate::miniprogram_tooling_deploy::lower_miniprogram_tooling_deploy(&self.options.root)
+            .to_json()
+    }
+
+    /// miniprogram: multi-adapter (≥2 packaging stubs) conformance.
+    pub fn lower_miniprogram_multi_adapter(&self) -> String {
+        crate::miniprogram_multi_adapter::lower_miniprogram_multi_adapter(&self.options.root).to_json()
+    }
+
     /// HostProfile / DeliveryProfile protocol check.
     pub fn check_host_profile_protocol(&self) -> String {
         crate::host_profile::check_host_profile_protocol(&self.options.root).to_json()

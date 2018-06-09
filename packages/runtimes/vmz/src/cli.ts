@@ -379,10 +379,7 @@ async function cmdBuild(args) {
         });
         // Always surface locale diagnostics (warnings included) — missing /locales must not be silent.
         // Dedupe: runtime emit + route realization both report the same missing-manifest warning.
-        const localeDiags = dedupeDiagnostics([
-            ...(localeEmit.diagnostics ?? []),
-            ...(localeRoutes.diagnostics ?? []),
-        ]);
+        const localeDiags = dedupeDiagnostics([...(localeEmit.diagnostics ?? []), ...(localeRoutes.diagnostics ?? [])]);
         log.diagnostics(localeDiags);
         if (!localeEmit.ok || localeHasErrors({ diagnostics: localeEmit.diagnostics })) {
             log.error('locale runtime emit failed');
@@ -414,9 +411,7 @@ async function cmdBuild(args) {
             });
             const lower = pack.manifest?.clientPackageLowering;
             if (lower?.bareSpecs?.length) {
-                log.info(
-                    `pack client packages (${lower.bareSpecs.length} bare → vendor; rewritten=${lower.rewrittenFiles})`,
-                );
+                log.info(`pack client packages (${lower.bareSpecs.length} bare → vendor; rewritten=${lower.rewrittenFiles})`);
             }
             if (lower?.remainingBareSpecs?.length) {
                 log.warn(

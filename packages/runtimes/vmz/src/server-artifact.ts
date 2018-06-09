@@ -157,9 +157,7 @@ export function projectServerRuntimeAdapter(artifact, adapterId) {
         spaFallback: false,
         entry: artifact.entry,
         publicRouteCount: Array.isArray(artifact.publicRoutes) ? artifact.publicRoutes.length : 0,
-        internalCapabilityCount: Array.isArray(artifact.internalCapabilities)
-            ? artifact.internalCapabilities.length
-            : 0,
+        internalCapabilityCount: Array.isArray(artifact.internalCapabilities) ? artifact.internalCapabilities.length : 0,
     };
     if (id === 'node') {
         return { ...base, host: 'node:http', invoke: 'handleNodeRequest', status: 'runtime' };

@@ -105,9 +105,7 @@ function mapServerRuntime(server: ServerAnswer): string | undefined {
 function pushShipCautions(ship: ShipMode, cautions: string[]) {
     if (ship === 'git-ci') {
         cautions.push('发布方式 git-ci：vmz deploy 只配 CI；真发布靠手动 git push。');
-        cautions.push(
-            'advice：管理 key 默认可读 .env.secrets*；配 CI 更建议 --secret NAME=VALUE 一次性传入（不写盘、不进 report）。',
-        );
+        cautions.push('advice：管理 key 默认可读 .env.secrets*；配 CI 更建议 --secret NAME=VALUE 一次性传入（不写盘、不进 report）。');
     } else {
         cautions.push(
             '发布方式 direct-upload：本机直传——适合私有仓或托管方无/不用 Git 集成；token 默认可读 .env.secrets*，也可用 --secret 一次性。',
@@ -653,14 +651,14 @@ function buildAgentPrompt(input: {
 }
 
 export function buildDeployPlan(answers: PlannerAnswers): DeployPlanView {
-  const cautions: string[] = [];
-  const pick = pickRecipe(answers, cautions);
-  pushShipCautions(answers.ship, cautions);
-  const requiredEnv = collectRequiredEnv(answers, pick);
-  const adapters = buildAdapters(answers, pick);
-  const externalSteps = buildExternalSteps(answers, pick, requiredEnv);
-  const vmzConfigSnippet = buildSnippet(pick);
-  const ship = answers.ship;
+    const cautions: string[] = [];
+    const pick = pickRecipe(answers, cautions);
+    pushShipCautions(answers.ship, cautions);
+    const requiredEnv = collectRequiredEnv(answers, pick);
+    const adapters = buildAdapters(answers, pick);
+    const externalSteps = buildExternalSteps(answers, pick, requiredEnv);
+    const vmzConfigSnippet = buildSnippet(pick);
+    const ship = answers.ship;
 
     const commandsSuggested: string[] = [`vmz check`, `vmz build --release --profile ${pick.profileId}`];
     if (ship === 'git-ci') {
@@ -672,16 +670,16 @@ export function buildDeployPlan(answers: PlannerAnswers): DeployPlanView {
         commandsSuggested.push(`vmz deploy [--secret NAME=VALUE]…   # direct-upload：默认读 .env.secrets*；也可一次性传参`);
     }
 
-  const deepHref = RECIPE_DOCS[pick.recipeId] ?? `${DEPLOY_GUIDE}/recipes`;
-  const deepLinks = [
-    { label: '部署指南', href: `${DEPLOY_GUIDE}/` },
-    { label: `配方 ${pick.recipeId}`, href: deepHref },
-    { label: '密钥与环境变量', href: `${DEPLOY_GUIDE}/secrets-env` },
-    { label: 'vmz deploy', href: `${DEPLOY_GUIDE}/cli` },
-  ];
-  if (hasStaticVendor(answers.vendors) || pick.assembly === 'static-cdn') {
-    deepLinks.splice(2, 0, { label: '纯静态平台填写清单', href: STATIC_HOSTS_DOC });
-  }
+    const deepHref = RECIPE_DOCS[pick.recipeId] ?? `${DEPLOY_GUIDE}/recipes`;
+    const deepLinks = [
+        { label: '部署指南', href: `${DEPLOY_GUIDE}/` },
+        { label: `配方 ${pick.recipeId}`, href: deepHref },
+        { label: '密钥与环境变量', href: `${DEPLOY_GUIDE}/secrets-env` },
+        { label: 'vmz deploy', href: `${DEPLOY_GUIDE}/cli` },
+    ];
+    if (hasStaticVendor(answers.vendors) || pick.assembly === 'static-cdn') {
+        deepLinks.splice(2, 0, { label: '纯静态平台填写清单', href: STATIC_HOSTS_DOC });
+    }
 
     const disclaimer = DISCLAIMER;
     const agentPrompt = buildAgentPrompt({

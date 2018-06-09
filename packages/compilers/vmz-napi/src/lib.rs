@@ -404,6 +404,60 @@ pub fn check_miniprogram_target_contract_json(root: String) -> String {
         .to_json()
 }
 
+/// miniprogram: lower TemplateSurface static slice (template + logic data).
+#[napi]
+pub fn lower_miniprogram_static_slice_json(root: String) -> String {
+    vmz_compiler::miniprogram_static_slice::lower_miniprogram_static_slices(std::path::Path::new(
+        &root,
+    ))
+    .to_json()
+}
+
+/// miniprogram: lower BindingId patch + event table.
+#[napi]
+pub fn lower_miniprogram_binding_event_json(root: String) -> String {
+    vmz_compiler::miniprogram_binding_event::lower_miniprogram_binding_event_slices(
+        std::path::Path::new(&root),
+    )
+    .to_json()
+}
+
+/// miniprogram: lower structure + lifecycle/dispose tables.
+#[napi]
+pub fn lower_miniprogram_structure_json(root: String) -> String {
+    vmz_compiler::miniprogram_structure::lower_miniprogram_structure_slices(std::path::Path::new(
+        &root,
+    ))
+    .to_json()
+}
+
+/// miniprogram: lower Route + `#server` stubs + Canonical Style.
+#[napi]
+pub fn lower_miniprogram_route_server_style_json(root: String) -> String {
+    vmz_compiler::miniprogram_route_server_style::lower_miniprogram_route_server_style_slices(
+        std::path::Path::new(&root),
+    )
+    .to_json()
+}
+
+/// miniprogram: tooling deploy package + Mini Host handoff.
+#[napi]
+pub fn lower_miniprogram_tooling_deploy_json(root: String) -> String {
+    vmz_compiler::miniprogram_tooling_deploy::lower_miniprogram_tooling_deploy(std::path::Path::new(
+        &root,
+    ))
+    .to_json()
+}
+
+/// miniprogram: multi-adapter (≥2 packaging stubs) conformance.
+#[napi]
+pub fn lower_miniprogram_multi_adapter_json(root: String) -> String {
+    vmz_compiler::miniprogram_multi_adapter::lower_miniprogram_multi_adapter(std::path::Path::new(
+        &root,
+    ))
+    .to_json()
+}
+
 /// profile protocol catalog.
 #[napi]
 pub fn query_profile_protocol_catalog() -> String {
@@ -937,6 +991,48 @@ impl JsWorkspace {
     pub fn check_miniprogram_target_contract(&self) -> Result<String> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
         Ok(ws.check_miniprogram_target_contract())
+    }
+
+    /// miniprogram: TemplateSurface static slice JSON.
+    #[napi]
+    pub fn lower_miniprogram_static_slice(&self) -> Result<String> {
+        let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
+        Ok(ws.lower_miniprogram_static_slice())
+    }
+
+    /// miniprogram: BindingId patch + event table JSON.
+    #[napi]
+    pub fn lower_miniprogram_binding_event(&self) -> Result<String> {
+        let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
+        Ok(ws.lower_miniprogram_binding_event())
+    }
+
+    /// miniprogram: structure + lifecycle/dispose JSON.
+    #[napi]
+    pub fn lower_miniprogram_structure(&self) -> Result<String> {
+        let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
+        Ok(ws.lower_miniprogram_structure())
+    }
+
+    /// miniprogram: Route + `#server` + Canonical Style JSON.
+    #[napi]
+    pub fn lower_miniprogram_route_server_style(&self) -> Result<String> {
+        let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
+        Ok(ws.lower_miniprogram_route_server_style())
+    }
+
+    /// miniprogram: tooling deploy package + Mini Host handoff JSON.
+    #[napi]
+    pub fn lower_miniprogram_tooling_deploy(&self) -> Result<String> {
+        let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
+        Ok(ws.lower_miniprogram_tooling_deploy())
+    }
+
+    /// miniprogram: multi-adapter (≥2 packaging stubs) JSON.
+    #[napi]
+    pub fn lower_miniprogram_multi_adapter(&self) -> Result<String> {
+        let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
+        Ok(ws.lower_miniprogram_multi_adapter())
     }
 
     /// HostProfile / DeliveryProfile protocol check.

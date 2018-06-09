@@ -79,14 +79,8 @@ try {
             2,
         )}\n`,
     );
-    fs.writeFileSync(
-        path.join(pkgRoot, 'src', 'index.ts'),
-        `export { ping } from './query.ts';\nexport const name = 'fixture';\n`,
-    );
-    fs.writeFileSync(
-        path.join(pkgRoot, 'src', 'query.ts'),
-        `export function ping(): string { return 'pong'; }\n`,
-    );
+    fs.writeFileSync(path.join(pkgRoot, 'src', 'index.ts'), `export { ping } from './query.ts';\nexport const name = 'fixture';\n`);
+    fs.writeFileSync(path.join(pkgRoot, 'src', 'query.ts'), `export function ping(): string { return 'pong'; }\n`);
     // Simulate workspace resolution via node_modules link path (dir, not symlink — copy tree).
     const linked = path.join(appRoot, 'node_modules', '@vmz', 'fixture-client-lib');
     fs.cpSync(pkgRoot, linked, { recursive: true });

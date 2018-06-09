@@ -100,12 +100,7 @@ function materializeSourceTree(outDir, resolved, materializedSources, bareQueue)
     // Subpath bare specs often land on a file already vendored via a relative
     // import from the package root — still map the bare name to that vendor path.
     /** @type {string | null} */
-    let entryDest = vendorPathForSource(
-        outDir,
-        resolved.pkgName,
-        resolved.pkgRoot,
-        resolved.sourceFile,
-    );
+    let entryDest = vendorPathForSource(outDir, resolved.pkgName, resolved.pkgRoot, resolved.sourceFile);
 
     while (sourceQueue.length) {
         const sourceFile = sourceQueue.shift();
@@ -141,12 +136,7 @@ function listClientJs(outDir) {
     const out = [];
     walk(outDir, (file) => {
         const rel = path.relative(outDir, file).replace(/\\/g, '/');
-        if (
-            rel.startsWith('_vmz/') ||
-            rel.startsWith(`${VENDOR_DIR}/`) ||
-            rel.startsWith('#server/') ||
-            rel.startsWith('_vmz_server/')
-        ) {
+        if (rel.startsWith('_vmz/') || rel.startsWith(`${VENDOR_DIR}/`) || rel.startsWith('#server/') || rel.startsWith('_vmz_server/')) {
             return;
         }
         if (rel.endsWith('.js') || rel.endsWith('.mjs')) out.push(file);
@@ -329,7 +319,9 @@ function transpileTs(source, filename) {
 }
 
 function rewriteTsExt(p) {
-    return String(p).replace(/\.tsx$/i, '.js').replace(/\.ts$/i, '.js');
+    return String(p)
+        .replace(/\.tsx$/i, '.js')
+        .replace(/\.ts$/i, '.js');
 }
 
 export function rewriteRelativeTsSpecs(js) {

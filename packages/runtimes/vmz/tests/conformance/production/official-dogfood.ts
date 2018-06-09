@@ -660,9 +660,7 @@ async function proveHomepageLocaleTransition(baseUrl: string): Promise<string> {
         if (!openLang) throw new Error('site-language details missing');
         await page.click('[data-dogfood="locale-en-us"]');
         await page.waitForFunction(
-            () =>
-                location.pathname.startsWith('/en-us') &&
-                document.documentElement.getAttribute('data-locale') === 'en-us',
+            () => location.pathname.startsWith('/en-us') && document.documentElement.getAttribute('data-locale') === 'en-us',
             { timeout: 15000 },
         );
         const viaUi = await page.evaluate(() => ({

@@ -130,10 +130,7 @@ export async function emitWebStatic(distDir, opts = {}) {
             const absHtml = path.join(distDir, gen.htmlPath);
             fs.mkdirSync(path.dirname(absHtml), { recursive: true });
             // Each LocaleId HTML must retain locale on same-app Links (realization authority).
-            const localizedBody =
-                gen.localeId && localeArt
-                    ? localizeBodyLinks(bodyHtml, gen.localeId, localeArt)
-                    : bodyHtml;
+            const localizedBody = gen.localeId && localeArt ? localizeBodyLinks(bodyHtml, gen.localeId, localeArt) : bodyHtml;
             const html = wrapDocument({
                 bodyHtml: localizedBody,
                 chunkId: page.chunkId,
@@ -452,11 +449,7 @@ function expandLocaleStaticGenerations(input) {
     const directions = Object.fromEntries((localeArt.locales || []).map((l) => [l.id, l.direction || 'ltr']));
     const defaultLocale = localeArt.defaultLocale || locales[0];
     const forRoute = (localeArt.realizations || []).filter(
-        (r) =>
-            r.routeId === routeId ||
-            r.routeId === input.chunkId ||
-            r.pathPattern === pattern ||
-            (r.path === pattern && !r.prefixed),
+        (r) => r.routeId === routeId || r.routeId === input.chunkId || r.pathPattern === pattern || (r.path === pattern && !r.prefixed),
     );
     /** @type {any[]} */
     const out = [];

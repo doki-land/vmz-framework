@@ -29,10 +29,7 @@ function readJson(file: string): any {
 function installServerResolver(setServerModuleResolver: (fn: (id: string) => string) => void, dist: string) {
     setServerModuleResolver((moduleId: string) => {
         const rel = moduleId.replace(/^#server\//, '');
-        const candidates = [
-            path.join(dist, '#server', `${rel}.js`),
-            path.join(dist, '_vmz_server', `${rel}.js`),
-        ];
+        const candidates = [path.join(dist, '#server', `${rel}.js`), path.join(dist, '_vmz_server', `${rel}.js`)];
         for (const c of candidates) {
             if (fs.existsSync(c)) return pathToFileURL(c).href;
         }
@@ -95,9 +92,7 @@ if (!Array.isArray(artifact.publicRoutes) || artifact.publicRoutes.length < 1) {
 }
 if (!Array.isArray(routes) || routes.length < 1) fail('vmz-routes.json empty');
 
-const publicMe = artifact.publicRoutes.find(
-    (r: any) => r.path === '/api/users/me' && String(r.verb).toUpperCase() === 'GET',
-);
+const publicMe = artifact.publicRoutes.find((r: any) => r.path === '/api/users/me' && String(r.verb).toUpperCase() === 'GET');
 if (!publicMe) fail('public route GET /api/users/me missing');
 if (publicMe.visibility !== 'public') fail('ServerRoute must be visibility=public');
 

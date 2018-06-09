@@ -20,12 +20,7 @@
                 "density.compact.padding-x"
             ],
             "surfaces": ["WebSurface"],
-            "contracts": [
-                "semantic-name",
-                "registry-not-loose-svg",
-                "decorative-or-labelled",
-                "token-color-only"
-            ]
+            "contracts": ["semantic-name", "registry-not-loose-svg", "decorative-or-labelled", "token-color-only"]
         }
     },
     "composition": {

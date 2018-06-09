@@ -257,9 +257,7 @@ export function publishRelease(releasesRoot, distDir, envelope) {
     const dest = path.join(root, digest);
     const destDist = path.join(dest, 'dist');
     if (root === srcDist || root.startsWith(srcDist + path.sep) || destDist.startsWith(srcDist + path.sep)) {
-        throw new Error(
-            `publishRelease: releasesRoot must not be under distDir (got releasesRoot=${root}, distDir=${srcDist})`,
-        );
+        throw new Error(`publishRelease: releasesRoot must not be under distDir (got releasesRoot=${root}, distDir=${srcDist})`);
     }
     fs.mkdirSync(dest, { recursive: true });
     // Immutable snapshot of packed dist (exclude prior releases nesting).

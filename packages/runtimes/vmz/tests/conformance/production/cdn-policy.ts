@@ -114,9 +114,7 @@ try {
     if (!Array.isArray(policy.localeCache?.locales) || !policy.localeCache.locales.includes('zh-hans')) {
         errors.push(`localeCache.locales missing zh-hans: ${JSON.stringify(policy.localeCache)}`);
     }
-    const aboutEn = (policy.routes || []).find(
-        (r: { path?: string; localeId?: string }) => r.path === '/about' && r.localeId === 'en-us',
-    );
+    const aboutEn = (policy.routes || []).find((r: { path?: string; localeId?: string }) => r.path === '/about' && r.localeId === 'en-us');
     const aboutZh = (policy.routes || []).find(
         (r: { path?: string; localeId?: string }) => r.path === '/zh-hans/about' && r.localeId === 'zh-hans',
     );
@@ -147,9 +145,7 @@ try {
     }
     const omitDefault = await get(`${host.baseUrl}/en-us/about`);
     if (omitDefault.status !== 301 || String(omitDefault.headers.location || '') !== '/about') {
-        errors.push(
-            `omit-prefix CDN redirect want 301 /about, got ${omitDefault.status} ${omitDefault.headers.location}`,
-        );
+        errors.push(`omit-prefix CDN redirect want 301 /about, got ${omitDefault.status} ${omitDefault.headers.location}`);
     }
     if (!redirectsText.includes('/en-us/about') || !redirectsText.includes('/about')) {
         errors.push(`netlify _redirects missing omit-prefix /en-us/about → /about: ${redirectsText}`);

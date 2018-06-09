@@ -31,11 +31,7 @@ export function buildCdnPolicyManifest(staticManifest, opts = {}) {
     const origin = String(staticManifest.origin || '');
     const localeArt = opts.localeArtifact || null;
     const localeRedirects = buildOmitPrefixRedirects(staticManifest, localeArt);
-    const redirects = [
-        { from: '/home', to: '/', status: 301, reason: 'canonical-alias' },
-        ...localeRedirects,
-        ...(opts.redirects || []),
-    ];
+    const redirects = [{ from: '/home', to: '/', status: 301, reason: 'canonical-alias' }, ...localeRedirects, ...(opts.redirects || [])];
     const headers = [
         { match: '**/*.html', headers: { 'cache-control': CACHE_HTML } },
         {
@@ -130,8 +126,7 @@ function buildOmitPrefixRedirects(staticManifest, localeArt) {
     for (const r of staticManifest.routes || []) {
         if (r.localeId !== defaultLocale) continue;
         const canonical = String(r.path || '/');
-        const from =
-            canonical === '/' ? `/${defaultLocale}` : `/${defaultLocale}${canonical.startsWith('/') ? canonical : `/${canonical}`}`;
+        const from = canonical === '/' ? `/${defaultLocale}` : `/${defaultLocale}${canonical.startsWith('/') ? canonical : `/${canonical}`}`;
         if (seen.has(from)) continue;
         seen.add(from);
         out.push({

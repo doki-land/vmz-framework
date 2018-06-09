@@ -62,6 +62,36 @@ export const CHECKS: Record<string, CheckEntry> = {
 
     // miniprogram/
     'miniprogram-target': { file: 'miniprogram/miniprogram-target.ts' },
+    'miniprogram-static-slice': {
+        file: 'miniprogram/miniprogram-static-slice.ts',
+        description: 'Mini TemplateSurface static slice — neutral template + logic data',
+        pre: ['build:runtimes'],
+    },
+    'miniprogram-binding-event': {
+        file: 'miniprogram/miniprogram-binding-event.ts',
+        description: 'Mini BindingId patch + event table (counter slice)',
+        pre: ['build:runtimes'],
+    },
+    'miniprogram-structure': {
+        file: 'miniprogram/miniprogram-structure.ts',
+        description: 'Mini if/each/component/slot + lifecycle/dispose tables',
+        pre: ['build:runtimes'],
+    },
+    'miniprogram-route-server-style': {
+        file: 'miniprogram/miniprogram-route-server-style.ts',
+        description: 'Mini Route realization + #server stubs + Canonical Style',
+        pre: ['build:runtimes'],
+    },
+    'miniprogram-tooling-deploy': {
+        file: 'miniprogram/miniprogram-tooling-deploy.ts',
+        description: 'Mini deploy package + deterministic host + vendor tooling handoff',
+        pre: ['build:runtimes'],
+    },
+    'miniprogram-multi-adapter': {
+        file: 'miniprogram/miniprogram-multi-adapter.ts',
+        description: 'Mini ≥2 packaging adapters share one neutral deploy package',
+        pre: ['build:runtimes'],
+    },
 
     // native/
     'native-host': { file: 'native/native-host.ts' },
@@ -273,6 +303,12 @@ export const CHECK_ALL = [
     'deployment-proof',
     'causal-trace',
     'miniprogram-target',
+    'miniprogram-static-slice',
+    'miniprogram-binding-event',
+    'miniprogram-structure',
+    'miniprogram-route-server-style',
+    'miniprogram-tooling-deploy',
+    'miniprogram-multi-adapter',
     'host-profile',
     'profile-solver',
     'unified-executor',

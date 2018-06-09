@@ -34,7 +34,7 @@
             "expect": {
                 "chunkCountMin": 2,
                 "equalsRenderToString": true,
-                "firstChunkContains": "<button"
+                "firstChunkContains": "data-testid=\"counter-root\""
             }
         }
     ]

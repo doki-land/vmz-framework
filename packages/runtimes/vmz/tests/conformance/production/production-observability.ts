@@ -362,9 +362,7 @@ upsertCheck(proof, {
 upsertCheck(proof, {
     id: 'production-observability.cookie-nonce-boundary',
     status:
-        sec.cookieNamespace && sec.sessionNamespace && sec.requireNonceForInline === true && !/nonce-/.test(profileCsp)
-            ? 'passed'
-            : 'failed',
+        sec.cookieNamespace && sec.sessionNamespace && sec.requireNonceForInline === true && !/nonce-/.test(profileCsp) ? 'passed' : 'failed',
     detail: 'profile = CSP header-level; cookie/session/nonce runtime bind deferred',
 });
 upsertCheck(proof, {
@@ -390,9 +388,7 @@ proof.knownLimitations = proof.knownLimitations.filter(
 writeProof(proof, root);
 if (errors.length) fail(errors.join('\n'));
 
-console.log(
-    `production-observability PASS: digest=${digestA.slice(0, 12)} budgets+CSP+health+redaction+trace+fault-inject thin`,
-);
+console.log(`production-observability PASS: digest=${digestA.slice(0, 12)} budgets+CSP+health+redaction+trace+fault-inject thin`);
 console.log('production-observability NOTE: deep fault matrix / sampling dashboards still open; cookie/nonce = CSP header-level profile');
 
 function get(url: string): Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }> {

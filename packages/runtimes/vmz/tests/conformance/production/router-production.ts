@@ -595,8 +595,7 @@ async function proveScrollFocus(shopUrl: string): Promise<string> {
                     location.pathname === '/shop/offer' &&
                     document.body.innerText.includes('route-shop-offer') &&
                     last.scrollMode === 'top' &&
-                    (last.focusTarget === 'offer-main' ||
-                        document.activeElement?.getAttribute?.('data-vmz-focus') === 'offer-main')
+                    (last.focusTarget === 'offer-main' || document.activeElement?.getAttribute?.('data-vmz-focus') === 'offer-main')
                 );
             },
             { timeout: 10000 },
@@ -721,9 +720,7 @@ async function proveLocaleRealization(distDir: string, baseUrl: string): Promise
 
     const prefixedDefault = await get(`${baseUrl}/en-us/about`);
     if (prefixedDefault.status !== 302 || String(prefixedDefault.headers.location || '') !== '/about') {
-        throw new Error(
-            `omit-prefix default redirect want 302 /about, got ${prefixedDefault.status} ${prefixedDefault.headers.location}`,
-        );
+        throw new Error(`omit-prefix default redirect want 302 /about, got ${prefixedDefault.status} ${prefixedDefault.headers.location}`);
     }
 
     const { resolveBrowserExecutable } = await import(

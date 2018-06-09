@@ -24,10 +24,7 @@ if (typeof handleFetchRequest !== 'function') {
 
 setServerModuleResolver((moduleId) => {
     const rel = String(moduleId || '').replace(/^#server\//, '');
-    const candidates = [
-        path.join(dist, '#server', `${rel}.js`),
-        path.join(dist, '_vmz_server', `${rel}.js`),
-    ];
+    const candidates = [path.join(dist, '#server', `${rel}.js`), path.join(dist, '_vmz_server', `${rel}.js`)];
     for (const c of candidates) {
         if (fs.existsSync(c)) return pathToFileURL(c).href;
     }

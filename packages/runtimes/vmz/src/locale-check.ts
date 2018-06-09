@@ -278,8 +278,7 @@ export function checkLocales(opts) {
         diagnostics.push({
             code: DIAG_MANIFEST_MISSING,
             severity: 'warning',
-            message:
-                'locales/locales.json5 missing — declare LocaleId policy under /locales (native i18n, not an afterthought)',
+            message: 'locales/locales.json5 missing — declare LocaleId policy under /locales (native i18n, not an afterthought)',
             path: 'locales/locales.json5',
         });
         return emptyReport(projectRoot, diagnostics);

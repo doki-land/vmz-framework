@@ -33,15 +33,11 @@ function runVmzTest(project, filter, label) {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-t2b-'));
     const reportPath = path.join(tmp, 'report.json');
     console.log(`-browser gate: ${label}`);
-    const run = spawnSync(
-        process.execPath,
-        [vmzBin, 'test', project, '--mode', 'browser', '--filter', filter, '--json', reportPath],
-        {
-            cwd: root,
-            encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'pipe'],
-        },
-    );
+    const run = spawnSync(process.execPath, [vmzBin, 'test', project, '--mode', 'browser', '--filter', filter, '--json', reportPath], {
+        cwd: root,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+    });
     if (run.status !== 0) {
         fail(`vmz test exited ${run.status}\n${run.stdout}\n${run.stderr}`);
     }

@@ -38,10 +38,7 @@ export function parseActionLocator(action: Record<string, unknown>): {
     warnings: string[];
 } {
     const warnings: string[] = [];
-    const loc =
-        action && typeof action.locator === 'object' && action.locator
-            ? (action.locator as Record<string, unknown>)
-            : null;
+    const loc = action && typeof action.locator === 'object' && action.locator ? (action.locator as Record<string, unknown>) : null;
     if (loc) {
         const kind = String(loc.kind || '');
         if (kind === 'role') {
@@ -98,14 +95,14 @@ export function defaultClickLocator(): BrowserLocator {
  * In-page locator resolver (serializable for page.evaluate).
  * Returns match metadata; host waits until unique + actionable.
  */
-export function resolveLocatorInPage(
-    locator: BrowserLocator,
-    opts: BrowserActionOptions = {},
-): LocatorResolveResult {
+export function resolveLocatorInPage(locator: BrowserLocator, opts: BrowserActionOptions = {}): LocatorResolveResult {
     const root = document.getElementById('app') || document.body;
     if (!root) return { ok: false, count: 0, actionable: false, reason: '#app missing', index: -1 };
 
-    const normalize = (s: unknown) => String(s || '').replace(/\s+/g, ' ').trim();
+    const normalize = (s: unknown) =>
+        String(s || '')
+            .replace(/\s+/g, ' ')
+            .trim();
     const nameOf = (el: Element) => {
         const labelled = el.getAttribute('aria-label');
         if (labelled) return normalize(labelled);
@@ -185,9 +182,7 @@ export function resolveLocatorInPage(
             found = pool.filter((el) => {
                 const n = nameOf(el);
                 const optVal = el.getAttribute('data-vmz-option') || (el instanceof HTMLOptionElement ? el.value : '');
-                return locator.exact
-                    ? n === want || optVal === want
-                    : n.includes(want) || String(optVal).includes(want);
+                return locator.exact ? n === want || optVal === want : n.includes(want) || String(optVal).includes(want);
             });
         } else {
             found = pool;

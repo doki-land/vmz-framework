@@ -84,7 +84,21 @@ async function callServerLocal(moduleId, method, args) {
  * @param {unknown[]} args
  */
 async function callServerHttp(moduleId, method, args) {
-    const rpcPath = (typeof globalThis !== 'undefined' && globalThis.__VMZ_RPC_PATH) || DEFAULT_RPC_PATH;
+    let rpcPath = (typeof globalThis !== 'undefined' && globalThis.__VMZ_RPC_PATH) || DEFAULT_RPC_PATH;
+    // Node undici `fetch` rejects relative URLs; browsers accept path-only.
+    if (typeof rpcPath === 'string' && !/^https?:\/\//i.test(rpcPath)) {
+        const origin =
+            (typeof globalThis !== 'undefined' && globalThis.__VMZ_RPC_ORIGIN) ||
+            (typeof window !== 'undefined' && window.location && window.location.origin) ||
+            null;
+        if (origin) {
+            rpcPath = new URL(rpcPath, origin).href;
+        } else if (typeof window === 'undefined') {
+            const host = (typeof process !== 'undefined' && (process.env.VMZ_HOST || process.env.HOST)) || '127.0.0.1';
+            const port = (typeof process !== 'undefined' && (process.env.VMZ_PORT || process.env.PORT)) || '5173';
+            rpcPath = new URL(rpcPath, `http://${host}:${port}`).href;
+        }
+    }
     const res = await fetch(rpcPath, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },

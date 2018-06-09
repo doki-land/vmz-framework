@@ -24,8 +24,7 @@ export function installClientNavigation(opts = {}) {
     const win = typeof window !== 'undefined' ? window : null;
     const hist = opts.history || win?.history;
     const loc = opts.location || win?.location;
-    const fetchImplDefault =
-        opts.fetchImpl || (typeof fetch === 'function' ? fetch.bind(globalThis) : null);
+    const fetchImplDefault = opts.fetchImpl || (typeof fetch === 'function' ? fetch.bind(globalThis) : null);
     /** @type {typeof fetch | null} */
     let fetchImpl = fetchImplDefault;
     if (!doc || !hist || !loc || !fetchImpl) {
@@ -645,14 +644,7 @@ function canRetainLayouts(root, prevLayout, nextLayout) {
  * @param {Element} nextApp
  */
 function applyAppAttrs(root, nextApp) {
-    for (const name of [
-        'data-vmz-page',
-        'data-vmz-props',
-        'data-vmz-layout',
-        'data-vmz-route',
-        'data-vmz-locale',
-        'data-vmz-dir',
-    ]) {
+    for (const name of ['data-vmz-page', 'data-vmz-props', 'data-vmz-layout', 'data-vmz-route', 'data-vmz-locale', 'data-vmz-dir']) {
         const v = nextApp.getAttribute(name);
         if (v == null) root.removeAttribute(name);
         else root.setAttribute(name, v);

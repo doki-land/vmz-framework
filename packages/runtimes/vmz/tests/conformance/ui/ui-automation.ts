@@ -855,8 +855,7 @@ async function proveFormDepth(page) {
         date: !!document.querySelector('[data-vmz-ui="date-picker"] #home-form-date'),
         dateNative: !!document.querySelector('[data-vmz-ui="date-picker"] input[type="date"]'),
         upload: !!document.querySelector('[data-vmz-ui="upload"] #home-form-file'),
-        uploadDest:
-            document.querySelector('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-destination') || '',
+        uploadDest: document.querySelector('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-destination') || '',
         field: !!document.getElementById('home-form-email'),
         novalidate: document.querySelector('[data-vmz-ui="form"]')?.getAttribute('data-novalidate') === 'true',
     }));
@@ -979,21 +978,23 @@ async function proveFormDepth(page) {
         const opt = document.querySelector('[data-vmz-ui="select"] [data-vmz-option="ops"]');
         if (opt instanceof HTMLElement) opt.click();
     });
-    await page.waitForFunction(
-        () => {
-            const state = document.querySelector('[data-dogfood="form-state"]')?.textContent || '';
-            const label = document.querySelector('#home-form-role .vmz-ui-select__value')?.textContent || '';
-            return state.includes('role:ops') || label.includes('Operations');
-        },
-        { timeout: 5000 },
-    ).catch(async (err) => {
-        const dbg = await page.evaluate(() => ({
-            state: document.querySelector('[data-dogfood="form-state"]')?.textContent || '',
-            label: document.querySelector('#home-form-role .vmz-ui-select__value')?.textContent || '',
-            open: !!document.querySelector('[data-vmz-ui="select"] [data-vmz-option="ops"]'),
-        }));
-        fail(`Form depth: role select did not apply ops: ${JSON.stringify(dbg)} (${err})`);
-    });
+    await page
+        .waitForFunction(
+            () => {
+                const state = document.querySelector('[data-dogfood="form-state"]')?.textContent || '';
+                const label = document.querySelector('#home-form-role .vmz-ui-select__value')?.textContent || '';
+                return state.includes('role:ops') || label.includes('Operations');
+            },
+            { timeout: 5000 },
+        )
+        .catch(async (err) => {
+            const dbg = await page.evaluate(() => ({
+                state: document.querySelector('[data-dogfood="form-state"]')?.textContent || '',
+                label: document.querySelector('#home-form-role .vmz-ui-select__value')?.textContent || '',
+                open: !!document.querySelector('[data-vmz-ui="select"] [data-vmz-option="ops"]'),
+            }));
+            fail(`Form depth: role select did not apply ops: ${JSON.stringify(dbg)} (${err})`);
+        });
     // DatePicker: open owned calendar → navigate to Aug 2026 if needed → pick 13.
     await page.evaluate(() => {
         document.getElementById('home-form-date')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -1063,10 +1064,9 @@ async function proveFormDepth(page) {
     await page.evaluate(() => {
         document.querySelector('[data-vmz-upload="cancel"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
-    await page.waitForFunction(
-        () => document.querySelector('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-status') === 'cancelled',
-        { timeout: 8000 },
-    );
+    await page.waitForFunction(() => document.querySelector('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-status') === 'cancelled', {
+        timeout: 8000,
+    });
     try {
         fs.unlinkSync(cancelFixture);
     } catch {
@@ -1098,67 +1098,69 @@ async function proveFormDepth(page) {
         { timeout: 5000 },
         uploadName,
     );
-    await page.waitForFunction(
-        (wantHex) => {
-            const root = document.querySelector('[data-vmz-ui="upload"]');
-            const result = document.querySelector('[data-vmz-upload="result"]')?.textContent || '';
-            const state = document.querySelector('[data-dogfood="form-state"]')?.textContent || '';
-            const m = /attachment:(att-\S+) \((\d+) bytes\)(?: head:([0-9a-f]+))?/.exec(result);
-            const reported = m ? Number(m[2]) : -1;
-            const head = m && m[3] ? m[3] : '';
-            const progressOk =
-                !!document.querySelector('[data-vmz-upload="progress"]') ||
-                root?.getAttribute('data-progress') === '100';
-            // Fixture: %PDF-1.4 + NUL + 0xFF 0xFE + LF — head must preserve 00 and ff.
-            return (
-                root?.getAttribute('data-vmz-upload-status') === 'done' &&
-                progressOk &&
-                !!m &&
-                reported === wantHex.length / 2 &&
-                head.startsWith(wantHex) &&
-                state.includes('upload:done') &&
-                state.includes(`attachment:${m[1]}`)
-            );
-        },
-        { timeout: 12000 },
-        Buffer.from(uploadBytes).toString('hex'),
-    ).catch(async (err) => {
-        const dbg = await page.evaluate(() => ({
-            status: document.querySelector('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-status') || '',
-            progressAttr: document.querySelector('[data-vmz-ui="upload"]')?.getAttribute('data-progress') || '',
-            result: document.querySelector('[data-vmz-upload="result"]')?.textContent || '',
-            statusText: document.querySelector('[data-vmz-upload="status"]')?.textContent || '',
-            file: document.querySelector('[data-vmz-upload="file"]')?.textContent || '',
-            progress: !!document.querySelector('[data-vmz-upload="progress"]'),
-            state: document.querySelector('[data-dogfood="form-state"]')?.textContent || '',
-        }));
-        fail(`Form depth: Upload did not reach done+binary headHex: ${JSON.stringify(dbg)} (${err})`);
-    });
+    await page
+        .waitForFunction(
+            (wantHex) => {
+                const root = document.querySelector('[data-vmz-ui="upload"]');
+                const result = document.querySelector('[data-vmz-upload="result"]')?.textContent || '';
+                const state = document.querySelector('[data-dogfood="form-state"]')?.textContent || '';
+                const m = /attachment:(att-\S+) \((\d+) bytes\)(?: head:([0-9a-f]+))?/.exec(result);
+                const reported = m ? Number(m[2]) : -1;
+                const head = m && m[3] ? m[3] : '';
+                const progressOk = !!document.querySelector('[data-vmz-upload="progress"]') || root?.getAttribute('data-progress') === '100';
+                // Fixture: %PDF-1.4 + NUL + 0xFF 0xFE + LF — head must preserve 00 and ff.
+                return (
+                    root?.getAttribute('data-vmz-upload-status') === 'done' &&
+                    progressOk &&
+                    !!m &&
+                    reported === wantHex.length / 2 &&
+                    head.startsWith(wantHex) &&
+                    state.includes('upload:done') &&
+                    state.includes(`attachment:${m[1]}`)
+                );
+            },
+            { timeout: 12000 },
+            Buffer.from(uploadBytes).toString('hex'),
+        )
+        .catch(async (err) => {
+            const dbg = await page.evaluate(() => ({
+                status: document.querySelector('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-status') || '',
+                progressAttr: document.querySelector('[data-vmz-ui="upload"]')?.getAttribute('data-progress') || '',
+                result: document.querySelector('[data-vmz-upload="result"]')?.textContent || '',
+                statusText: document.querySelector('[data-vmz-upload="status"]')?.textContent || '',
+                file: document.querySelector('[data-vmz-upload="file"]')?.textContent || '',
+                progress: !!document.querySelector('[data-vmz-upload="progress"]'),
+                state: document.querySelector('[data-dogfood="form-state"]')?.textContent || '',
+            }));
+            fail(`Form depth: Upload did not reach done+binary headHex: ${JSON.stringify(dbg)} (${err})`);
+        });
     await page.waitForSelector('[data-vmz-autocomplete="list"] [data-vmz-option="alpha"]', { timeout: 5000 });
     await page.evaluate(() => {
         const opt = document.querySelector('[data-vmz-autocomplete="list"] [data-vmz-option="alpha"]');
         if (opt instanceof HTMLElement) opt.click();
     });
-    await page.waitForFunction(
-        () => {
-            const state = document.querySelector('[data-dogfood="form-state"]')?.textContent || '';
-            return (
-                state.includes('email:ops@example.com') &&
-                state.includes('role:ops') &&
-                state.includes('team:Alpha Platform') &&
-                state.includes('date:2026-08-13') &&
-                state.includes('file:vmz-form-upload-') &&
-                state.includes('upload:done') &&
-                /attachment:att-/.test(state) &&
-                state.includes('plan:pro') &&
-                state.includes('agree:yes')
-            );
-        },
-        { timeout: 8000 },
-    ).catch(async (err) => {
-        const state = await page.evaluate(() => document.querySelector('[data-dogfood="form-state"]')?.textContent || '');
-        fail(`Form depth: form-state incomplete before submit: ${JSON.stringify(state)} (${err})`);
-    });
+    await page
+        .waitForFunction(
+            () => {
+                const state = document.querySelector('[data-dogfood="form-state"]')?.textContent || '';
+                return (
+                    state.includes('email:ops@example.com') &&
+                    state.includes('role:ops') &&
+                    state.includes('team:Alpha Platform') &&
+                    state.includes('date:2026-08-13') &&
+                    state.includes('file:vmz-form-upload-') &&
+                    state.includes('upload:done') &&
+                    /attachment:att-/.test(state) &&
+                    state.includes('plan:pro') &&
+                    state.includes('agree:yes')
+                );
+            },
+            { timeout: 8000 },
+        )
+        .catch(async (err) => {
+            const state = await page.evaluate(() => document.querySelector('[data-dogfood="form-state"]')?.textContent || '');
+            fail(`Form depth: form-state incomplete before submit: ${JSON.stringify(state)} (${err})`);
+        });
     await page.evaluate(() => {
         const form = document.querySelector('[data-dogfood="form"] [data-vmz-ui="form"]');
         if (form instanceof HTMLFormElement) {
@@ -1234,10 +1236,12 @@ async function proveUploadDestinations(page) {
     console.log('ui-automation: Upload destinations client + object…');
 
     const clientRoot = await page.evaluate(
-        () => document.querySelector('#home-upload-client')?.closest('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-destination') || '',
+        () =>
+            document.querySelector('#home-upload-client')?.closest('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-destination') || '',
     );
     const objectRoot = await page.evaluate(
-        () => document.querySelector('#home-upload-object')?.closest('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-destination') || '',
+        () =>
+            document.querySelector('#home-upload-object')?.closest('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-destination') || '',
     );
     if (clientRoot !== 'client') fail(`Upload destinations: client dest attr want client got ${JSON.stringify(clientRoot)}`);
     if (objectRoot !== 'object') fail(`Upload destinations: object dest attr want object got ${JSON.stringify(objectRoot)}`);
@@ -1258,31 +1262,38 @@ async function proveUploadDestinations(page) {
         'tool-site.txt',
         'home-upload-client',
     );
-    await page.waitForFunction(
-        (byteLen) => {
-            const root = document.querySelector('#home-upload-client')?.closest('[data-vmz-ui="upload"]');
-            const state = document.querySelector('[data-dogfood="upload-client-state"]')?.textContent || '';
-            const result = root?.querySelector('[data-vmz-upload="result"]')?.textContent || '';
-            return (
-                root?.getAttribute('data-vmz-upload-status') === 'done' &&
-                state.includes('client:done') &&
-                state.includes('name:tool-site.txt') &&
-                state.includes(`bytes:${byteLen}`) &&
-                result.includes('client:')
-            );
-        },
-        { timeout: 8000 },
-        clientBytes.length,
-    ).catch(async (err) => {
-        const dbg = await page.evaluate(() => ({
-            status: document.querySelector('#home-upload-client')?.closest('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-status'),
-            state: document.querySelector('[data-dogfood="upload-client-state"]')?.textContent || '',
-            result:
-                document.querySelector('#home-upload-client')?.closest('[data-vmz-ui="upload"]')?.querySelector('[data-vmz-upload="result"]')
-                    ?.textContent || '',
-        }));
-        fail(`Upload destinations: client path failed: ${JSON.stringify(dbg)} (${err})`);
-    });
+    await page
+        .waitForFunction(
+            (byteLen) => {
+                const root = document.querySelector('#home-upload-client')?.closest('[data-vmz-ui="upload"]');
+                const state = document.querySelector('[data-dogfood="upload-client-state"]')?.textContent || '';
+                const result = root?.querySelector('[data-vmz-upload="result"]')?.textContent || '';
+                return (
+                    root?.getAttribute('data-vmz-upload-status') === 'done' &&
+                    state.includes('client:done') &&
+                    state.includes('name:tool-site.txt') &&
+                    state.includes(`bytes:${byteLen}`) &&
+                    result.includes('client:')
+                );
+            },
+            { timeout: 8000 },
+            clientBytes.length,
+        )
+        .catch(async (err) => {
+            const dbg = await page.evaluate(() => ({
+                status: document
+                    .querySelector('#home-upload-client')
+                    ?.closest('[data-vmz-ui="upload"]')
+                    ?.getAttribute('data-vmz-upload-status'),
+                state: document.querySelector('[data-dogfood="upload-client-state"]')?.textContent || '',
+                result:
+                    document
+                        .querySelector('#home-upload-client')
+                        ?.closest('[data-vmz-ui="upload"]')
+                        ?.querySelector('[data-vmz-upload="result"]')?.textContent || '',
+            }));
+            fail(`Upload destinations: client path failed: ${JSON.stringify(dbg)} (${err})`);
+        });
 
     // object: #server presign → component PUT → object key.
     const objectFixture = [0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34, 0x00, 0xff, 0xfe, 0x0a];
@@ -1300,34 +1311,43 @@ async function proveUploadDestinations(page) {
         'object-put.pdf',
         'home-upload-object',
     );
-    await page.waitForFunction(
-        (byteLen) => {
-            const root = document.querySelector('#home-upload-object')?.closest('[data-vmz-ui="upload"]');
-            const state = document.querySelector('[data-dogfood="upload-object-state"]')?.textContent || '';
-            const result = root?.querySelector('[data-vmz-upload="result"]')?.textContent || '';
-            return (
-                root?.getAttribute('data-vmz-upload-status') === 'done' &&
-                state.includes('object:done') &&
-                /key:obj-/.test(state) &&
-                state.includes(`bytes:${byteLen}`) &&
-                result.includes('object:')
-            );
-        },
-        { timeout: 12000 },
-        objectFixture.length,
-    ).catch(async (err) => {
-        const dbg = await page.evaluate(() => ({
-            status: document.querySelector('#home-upload-object')?.closest('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-status'),
-            state: document.querySelector('[data-dogfood="upload-object-state"]')?.textContent || '',
-            result:
-                document.querySelector('#home-upload-object')?.closest('[data-vmz-ui="upload"]')?.querySelector('[data-vmz-upload="result"]')
-                    ?.textContent || '',
-            statusText:
-                document.querySelector('#home-upload-object')?.closest('[data-vmz-ui="upload"]')?.querySelector('[data-vmz-upload="status"]')
-                    ?.textContent || '',
-        }));
-        fail(`Upload destinations: object path failed: ${JSON.stringify(dbg)} (${err})`);
-    });
+    await page
+        .waitForFunction(
+            (byteLen) => {
+                const root = document.querySelector('#home-upload-object')?.closest('[data-vmz-ui="upload"]');
+                const state = document.querySelector('[data-dogfood="upload-object-state"]')?.textContent || '';
+                const result = root?.querySelector('[data-vmz-upload="result"]')?.textContent || '';
+                return (
+                    root?.getAttribute('data-vmz-upload-status') === 'done' &&
+                    state.includes('object:done') &&
+                    /key:obj-/.test(state) &&
+                    state.includes(`bytes:${byteLen}`) &&
+                    result.includes('object:')
+                );
+            },
+            { timeout: 12000 },
+            objectFixture.length,
+        )
+        .catch(async (err) => {
+            const dbg = await page.evaluate(() => ({
+                status: document
+                    .querySelector('#home-upload-object')
+                    ?.closest('[data-vmz-ui="upload"]')
+                    ?.getAttribute('data-vmz-upload-status'),
+                state: document.querySelector('[data-dogfood="upload-object-state"]')?.textContent || '',
+                result:
+                    document
+                        .querySelector('#home-upload-object')
+                        ?.closest('[data-vmz-ui="upload"]')
+                        ?.querySelector('[data-vmz-upload="result"]')?.textContent || '',
+                statusText:
+                    document
+                        .querySelector('#home-upload-object')
+                        ?.closest('[data-vmz-ui="upload"]')
+                        ?.querySelector('[data-vmz-upload="status"]')?.textContent || '',
+            }));
+            fail(`Upload destinations: object path failed: ${JSON.stringify(dbg)} (${err})`);
+        });
 
     console.log('ui-automation: Upload destinations client + object PASS');
 
@@ -1376,36 +1396,38 @@ async function proveUploadSelectionConstraints(page) {
         input.files = dt.files;
         input.dispatchEvent(new Event('change', { bubbles: true }));
     });
-    await page.waitForFunction(
-        () => {
-            const root = document.querySelector('#home-upload-multi')?.closest('[data-vmz-ui="upload"]');
-            const state = document.querySelector('[data-dogfood="upload-multi-state"]')?.textContent || '';
-            const result = root?.querySelector('[data-vmz-upload="result"]')?.textContent || '';
-            const ids = (state.match(/ids:([^;]*)/) || [])[1] || '';
-            const idList = ids.split(',').filter(Boolean);
-            return (
-                root?.getAttribute('data-vmz-upload-status') === 'done' &&
-                state.includes('multi:done') &&
-                state.includes('count:2') &&
-                idList.length === 2 &&
-                idList.every((id) => id.startsWith('att-')) &&
-                result.includes('2 file(s) ready')
-            );
-        },
-        { timeout: 12000 },
-    ).catch(async (err) => {
-        const dbg = await page.evaluate(() => ({
-            status: document.querySelector('#home-upload-multi')?.closest('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-status'),
-            state: document.querySelector('[data-dogfood="upload-multi-state"]')?.textContent || '',
-            result:
-                document.querySelector('#home-upload-multi')?.closest('[data-vmz-ui="upload"]')?.querySelector('[data-vmz-upload="result"]')
-                    ?.textContent || '',
-            statusText:
-                document.querySelector('#home-upload-multi')?.closest('[data-vmz-ui="upload"]')?.querySelector('[data-vmz-upload="status"]')
-                    ?.textContent || '',
-        }));
-        fail(`Upload selection: multiple path failed: ${JSON.stringify(dbg)} (${err})`);
-    });
+    await page
+        .waitForFunction(
+            () => {
+                const root = document.querySelector('#home-upload-multi')?.closest('[data-vmz-ui="upload"]');
+                const state = document.querySelector('[data-dogfood="upload-multi-state"]')?.textContent || '';
+                const result = root?.querySelector('[data-vmz-upload="result"]')?.textContent || '';
+                const ids = (state.match(/ids:([^;]*)/) || [])[1] || '';
+                const idList = ids.split(',').filter(Boolean);
+                return (
+                    root?.getAttribute('data-vmz-upload-status') === 'done' &&
+                    state.includes('multi:done') &&
+                    state.includes('count:2') &&
+                    idList.length === 2 &&
+                    idList.every((id) => id.startsWith('att-')) &&
+                    result.includes('2 file(s) ready')
+                );
+            },
+            { timeout: 12000 },
+        )
+        .catch(async (err) => {
+            const dbg = await page.evaluate(() => ({
+                status: document.querySelector('#home-upload-multi')?.closest('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-status'),
+                state: document.querySelector('[data-dogfood="upload-multi-state"]')?.textContent || '',
+                result:
+                    document.querySelector('#home-upload-multi')?.closest('[data-vmz-ui="upload"]')?.querySelector('[data-vmz-upload="result"]')
+                        ?.textContent || '',
+                statusText:
+                    document.querySelector('#home-upload-multi')?.closest('[data-vmz-ui="upload"]')?.querySelector('[data-vmz-upload="status"]')
+                        ?.textContent || '',
+            }));
+            fail(`Upload selection: multiple path failed: ${JSON.stringify(dbg)} (${err})`);
+        });
 
     // directory mode: inject multi FileList (folder pick result) on client destination.
     await page.evaluate(() => {
@@ -1421,32 +1443,34 @@ async function proveUploadSelectionConstraints(page) {
         input.files = dt.files;
         input.dispatchEvent(new Event('change', { bubbles: true }));
     });
-    await page.waitForFunction(
-        () => {
-            const root = document.querySelector('#home-upload-dir')?.closest('[data-vmz-ui="upload"]');
-            const state = document.querySelector('[data-dogfood="upload-dir-state"]')?.textContent || '';
-            return (
-                root?.getAttribute('data-vmz-upload-status') === 'done' &&
-                root?.getAttribute('data-vmz-upload-mode') === 'directory' &&
-                state.includes('dir:done') &&
-                state.includes('count:3') &&
-                state.includes('folder-a.txt') &&
-                state.includes('folder-b.pdf') &&
-                state.includes('folder-c.md')
-            );
-        },
-        { timeout: 8000 },
-    ).catch(async (err) => {
-        const dbg = await page.evaluate(() => ({
-            status: document.querySelector('#home-upload-dir')?.closest('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-status'),
-            mode: document.querySelector('#home-upload-dir')?.closest('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-mode'),
-            state: document.querySelector('[data-dogfood="upload-dir-state"]')?.textContent || '',
-            statusText:
-                document.querySelector('#home-upload-dir')?.closest('[data-vmz-ui="upload"]')?.querySelector('[data-vmz-upload="status"]')
-                    ?.textContent || '',
-        }));
-        fail(`Upload selection: directory path failed: ${JSON.stringify(dbg)} (${err})`);
-    });
+    await page
+        .waitForFunction(
+            () => {
+                const root = document.querySelector('#home-upload-dir')?.closest('[data-vmz-ui="upload"]');
+                const state = document.querySelector('[data-dogfood="upload-dir-state"]')?.textContent || '';
+                return (
+                    root?.getAttribute('data-vmz-upload-status') === 'done' &&
+                    root?.getAttribute('data-vmz-upload-mode') === 'directory' &&
+                    state.includes('dir:done') &&
+                    state.includes('count:3') &&
+                    state.includes('folder-a.txt') &&
+                    state.includes('folder-b.pdf') &&
+                    state.includes('folder-c.md')
+                );
+            },
+            { timeout: 8000 },
+        )
+        .catch(async (err) => {
+            const dbg = await page.evaluate(() => ({
+                status: document.querySelector('#home-upload-dir')?.closest('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-status'),
+                mode: document.querySelector('#home-upload-dir')?.closest('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-mode'),
+                state: document.querySelector('[data-dogfood="upload-dir-state"]')?.textContent || '',
+                statusText:
+                    document.querySelector('#home-upload-dir')?.closest('[data-vmz-ui="upload"]')?.querySelector('[data-vmz-upload="status"]')
+                        ?.textContent || '',
+            }));
+            fail(`Upload selection: directory path failed: ${JSON.stringify(dbg)} (${err})`);
+        });
 
     console.log('ui-automation: Upload selection multiple + directory PASS');
     await proveUploadResumable(page);
@@ -1496,34 +1520,39 @@ async function proveUploadResumable(page) {
     );
 
     // Wait until session is live (init done) and at least one chunk landed — then Pause.
-    await page.waitForFunction(
-        () => {
-            const root = document.querySelector('#home-upload-resume')?.closest('[data-vmz-ui="upload"]');
-            const session = root?.getAttribute('data-vmz-upload-session') || '';
-            const m = /^(\d+)\/(\d+):up-/.exec(session);
-            return (
-                root?.getAttribute('data-vmz-upload-status') === 'uploading' &&
-                !!document.querySelector('#home-upload-resume')?.closest('[data-vmz-ui="upload"]')?.querySelector('[data-vmz-upload="cancel"]') &&
-                !!m &&
-                Number(m[1]) >= 1 &&
-                Number(m[2]) >= 2
-            );
-        },
-        { timeout: 12000 },
-    ).catch(async (err) => {
-        const dbg = await page.evaluate(() => {
-            const root = document.querySelector('#home-upload-resume')?.closest('[data-vmz-ui="upload"]');
-            return {
-                status: root?.getAttribute('data-vmz-upload-status') || '',
-                session: root?.getAttribute('data-vmz-upload-session') || '',
-                chunk: root?.getAttribute('data-vmz-upload-chunk') || '',
-                cancel: !!root?.querySelector('[data-vmz-upload="cancel"]'),
-                statusText: root?.querySelector('[data-vmz-upload="status"]')?.textContent || '',
-                state: document.querySelector('[data-dogfood="upload-resume-state"]')?.textContent || '',
-            };
+    await page
+        .waitForFunction(
+            () => {
+                const root = document.querySelector('#home-upload-resume')?.closest('[data-vmz-ui="upload"]');
+                const session = root?.getAttribute('data-vmz-upload-session') || '';
+                const m = /^(\d+)\/(\d+):up-/.exec(session);
+                return (
+                    root?.getAttribute('data-vmz-upload-status') === 'uploading' &&
+                    !!document
+                        .querySelector('#home-upload-resume')
+                        ?.closest('[data-vmz-ui="upload"]')
+                        ?.querySelector('[data-vmz-upload="cancel"]') &&
+                    !!m &&
+                    Number(m[1]) >= 1 &&
+                    Number(m[2]) >= 2
+                );
+            },
+            { timeout: 12000 },
+        )
+        .catch(async (err) => {
+            const dbg = await page.evaluate(() => {
+                const root = document.querySelector('#home-upload-resume')?.closest('[data-vmz-ui="upload"]');
+                return {
+                    status: root?.getAttribute('data-vmz-upload-status') || '',
+                    session: root?.getAttribute('data-vmz-upload-session') || '',
+                    chunk: root?.getAttribute('data-vmz-upload-chunk') || '',
+                    cancel: !!root?.querySelector('[data-vmz-upload="cancel"]'),
+                    statusText: root?.querySelector('[data-vmz-upload="status"]')?.textContent || '',
+                    state: document.querySelector('[data-dogfood="upload-resume-state"]')?.textContent || '',
+                };
+            });
+            fail(`Upload resumable: did not reach mid-chunk uploading: ${JSON.stringify(dbg)} (${err})`);
         });
-        fail(`Upload resumable: did not reach mid-chunk uploading: ${JSON.stringify(dbg)} (${err})`);
-    });
 
     const pausedAt = await page.evaluate(() => {
         const root = document.querySelector('#home-upload-resume')?.closest('[data-vmz-ui="upload"]');
@@ -1532,32 +1561,34 @@ async function proveUploadResumable(page) {
         return session;
     });
 
-    await page.waitForFunction(
-        () => {
-            const root = document.querySelector('#home-upload-resume')?.closest('[data-vmz-ui="upload"]');
-            const session = root?.getAttribute('data-vmz-upload-session') || '';
-            return (
-                root?.getAttribute('data-vmz-upload-status') === 'paused' &&
-                !!root?.querySelector('[data-vmz-upload="resume"]') &&
-                /up-/.test(session) &&
-                (document.querySelector('[data-dogfood="upload-resume-state"]')?.textContent || '').includes('resume:paused')
-            );
-        },
-        { timeout: 8000 },
-    ).catch(async (err) => {
-        const dbg = await page.evaluate((sessionBeforePause) => {
-            const root = document.querySelector('#home-upload-resume')?.closest('[data-vmz-ui="upload"]');
-            return {
-                status: root?.getAttribute('data-vmz-upload-status') || '',
-                session: root?.getAttribute('data-vmz-upload-session') || '',
-                resumeBtn: !!root?.querySelector('[data-vmz-upload="resume"]'),
-                statusText: root?.querySelector('[data-vmz-upload="status"]')?.textContent || '',
-                state: document.querySelector('[data-dogfood="upload-resume-state"]')?.textContent || '',
-                sessionBeforePause,
-            };
-        }, pausedAt);
-        fail(`Upload resumable: pause did not stick: ${JSON.stringify(dbg)} (${err})`);
-    });
+    await page
+        .waitForFunction(
+            () => {
+                const root = document.querySelector('#home-upload-resume')?.closest('[data-vmz-ui="upload"]');
+                const session = root?.getAttribute('data-vmz-upload-session') || '';
+                return (
+                    root?.getAttribute('data-vmz-upload-status') === 'paused' &&
+                    !!root?.querySelector('[data-vmz-upload="resume"]') &&
+                    /up-/.test(session) &&
+                    (document.querySelector('[data-dogfood="upload-resume-state"]')?.textContent || '').includes('resume:paused')
+                );
+            },
+            { timeout: 8000 },
+        )
+        .catch(async (err) => {
+            const dbg = await page.evaluate((sessionBeforePause) => {
+                const root = document.querySelector('#home-upload-resume')?.closest('[data-vmz-ui="upload"]');
+                return {
+                    status: root?.getAttribute('data-vmz-upload-status') || '',
+                    session: root?.getAttribute('data-vmz-upload-session') || '',
+                    resumeBtn: !!root?.querySelector('[data-vmz-upload="resume"]'),
+                    statusText: root?.querySelector('[data-vmz-upload="status"]')?.textContent || '',
+                    state: document.querySelector('[data-dogfood="upload-resume-state"]')?.textContent || '',
+                    sessionBeforePause,
+                };
+            }, pausedAt);
+            fail(`Upload resumable: pause did not stick: ${JSON.stringify(dbg)} (${err})`);
+        });
 
     await page.evaluate(() => {
         document
@@ -1567,39 +1598,41 @@ async function proveUploadResumable(page) {
             ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    await page.waitForFunction(
-        (wantHex) => {
-            const root = document.querySelector('#home-upload-resume')?.closest('[data-vmz-ui="upload"]');
-            const result = root?.querySelector('[data-vmz-upload="result"]')?.textContent || '';
-            const state = document.querySelector('[data-dogfood="upload-resume-state"]')?.textContent || '';
-            const m = /attachment:(att-\S+) \((\d+) bytes\)(?: head:([0-9a-f]+))?(?: chunks:(\d+))?/.exec(result);
-            return (
-                root?.getAttribute('data-vmz-upload-status') === 'done' &&
-                !!m &&
-                Number(m[2]) === 40 &&
-                (m[3] || '').startsWith(wantHex) &&
-                Number(m[4]) === 5 &&
-                state.includes('resume:done') &&
-                state.includes('bytes:40') &&
-                state.includes('chunks:5') &&
-                state.includes(`head:${wantHex}`)
-            );
-        },
-        { timeout: 20000 },
-        wantHead,
-    ).catch(async (err) => {
-        const dbg = await page.evaluate(() => {
-            const root = document.querySelector('#home-upload-resume')?.closest('[data-vmz-ui="upload"]');
-            return {
-                status: root?.getAttribute('data-vmz-upload-status') || '',
-                session: root?.getAttribute('data-vmz-upload-session') || '',
-                result: root?.querySelector('[data-vmz-upload="result"]')?.textContent || '',
-                statusText: root?.querySelector('[data-vmz-upload="status"]')?.textContent || '',
-                state: document.querySelector('[data-dogfood="upload-resume-state"]')?.textContent || '',
-            };
+    await page
+        .waitForFunction(
+            (wantHex) => {
+                const root = document.querySelector('#home-upload-resume')?.closest('[data-vmz-ui="upload"]');
+                const result = root?.querySelector('[data-vmz-upload="result"]')?.textContent || '';
+                const state = document.querySelector('[data-dogfood="upload-resume-state"]')?.textContent || '';
+                const m = /attachment:(att-\S+) \((\d+) bytes\)(?: head:([0-9a-f]+))?(?: chunks:(\d+))?/.exec(result);
+                return (
+                    root?.getAttribute('data-vmz-upload-status') === 'done' &&
+                    !!m &&
+                    Number(m[2]) === 40 &&
+                    (m[3] || '').startsWith(wantHex) &&
+                    Number(m[4]) === 5 &&
+                    state.includes('resume:done') &&
+                    state.includes('bytes:40') &&
+                    state.includes('chunks:5') &&
+                    state.includes(`head:${wantHex}`)
+                );
+            },
+            { timeout: 20000 },
+            wantHead,
+        )
+        .catch(async (err) => {
+            const dbg = await page.evaluate(() => {
+                const root = document.querySelector('#home-upload-resume')?.closest('[data-vmz-ui="upload"]');
+                return {
+                    status: root?.getAttribute('data-vmz-upload-status') || '',
+                    session: root?.getAttribute('data-vmz-upload-session') || '',
+                    result: root?.querySelector('[data-vmz-upload="result"]')?.textContent || '',
+                    statusText: root?.querySelector('[data-vmz-upload="status"]')?.textContent || '',
+                    state: document.querySelector('[data-dogfood="upload-resume-state"]')?.textContent || '',
+                };
+            });
+            fail(`Upload resumable: resume→done failed: ${JSON.stringify(dbg)} (${err})`);
         });
-        fail(`Upload resumable: resume→done failed: ${JSON.stringify(dbg)} (${err})`);
-    });
 
     console.log('ui-automation: Upload resumable pause/resume PASS');
 }

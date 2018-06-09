@@ -243,6 +243,24 @@ export interface Workspace {
     /** miniprogram: target-neutral contract check JSON. */
     checkMiniprogramTargetContract(): string;
 
+    /** miniprogram: TemplateSurface static slice (neutral template + logic data). */
+    lowerMiniprogramStaticSlice(): string;
+
+    /** miniprogram: BindingId patch table + event table. */
+    lowerMiniprogramBindingEvent(): string;
+
+    /** miniprogram: structure (if/each/component/slot) + lifecycle/dispose. */
+    lowerMiniprogramStructure(): string;
+
+    /** miniprogram: Route realization + `#server` stubs + Canonical Style. */
+    lowerMiniprogramRouteServerStyle(): string;
+
+    /** miniprogram: tooling deploy package + Mini Host handoff. */
+    lowerMiniprogramToolingDeploy(): string;
+
+    /** miniprogram: multi-adapter (≥2 packaging stubs) conformance. */
+    lowerMiniprogramMultiAdapter(): string;
+
     /** HostProfile / DeliveryProfile protocol check JSON. */
     checkHostProfileProtocol(): string;
 
@@ -610,10 +628,7 @@ export function emitServerArtifact(
         packDigest?: string | null;
     },
 ): { artifact: Record<string, unknown>; path: string; httpContractDigest: string };
-export function projectServerRuntimeAdapter(
-    artifact: Record<string, unknown>,
-    adapterId: string,
-): Record<string, unknown>;
+export function projectServerRuntimeAdapter(artifact: Record<string, unknown>, adapterId: string): Record<string, unknown>;
 
 export const BUILD_PROOF_SCHEMA: string;
 export const ASSEMBLE_MANIFEST_SCHEMA: string;
@@ -716,6 +731,81 @@ export function targetCatalog(): {
 };
 export function queryTargetProtocolCatalog(): string;
 export function checkMiniprogramTargetContractJson(rootPath: string): string;
+/** miniprogram: TemplateSurface static slice JSON. */
+export function lowerMiniprogramStaticSliceJson(rootPath: string): string;
+/** miniprogram: BindingId patch + event table JSON. */
+export function lowerMiniprogramBindingEventJson(rootPath: string): string;
+/** miniprogram: structure + lifecycle/dispose JSON. */
+export function lowerMiniprogramStructureJson(rootPath: string): string;
+/** miniprogram: Route + `#server` + Canonical Style JSON. */
+export function lowerMiniprogramRouteServerStyleJson(rootPath: string): string;
+
+export function lowerMiniprogramToolingDeployJson(rootPath: string): string;
+
+export function lowerMiniprogramMultiAdapterJson(rootPath: string): string;
+
+export function createMiniHost(opts: {
+    package: {
+        schema: string;
+        platformId?: string;
+        host?: { schema?: string; kind?: string; [k: string]: unknown };
+        vendorTooling?: {
+            role?: string;
+            invokedInCi?: boolean;
+            [k: string]: unknown;
+        };
+        constraints?: {
+            wxmlEmitter?: boolean;
+            wxssEmitter?: boolean;
+            serverImplInMiniPackage?: boolean;
+            [k: string]: unknown;
+        };
+        artifacts?: Array<{ chunkId?: string; artifactPath?: string }>;
+        pages?: Array<{ routeId?: string; chunkId?: string }>;
+        routeLinks?: Array<{ routeId?: string; fromChunkId?: string }>;
+        serverCapabilities?: Array<{ method?: string; chunkId?: string }>;
+        [k: string]: unknown;
+    };
+    loadArtifact: (artifactPath: string) => {
+        template?: string;
+        logic?: string;
+        eventTable?: string;
+        dataPatchTable?: string;
+        manifest?: string;
+        style?: string;
+        platformId?: string;
+        [k: string]: unknown;
+    };
+}): {
+    mount(chunkId?: string): { chunkId: string; data: Record<string, unknown> };
+    dispatchEvent(handlerId: string): {
+        handlerId: string;
+        method?: string;
+        patchPaths: string[];
+        data: Record<string, unknown>;
+    };
+    navigate(routeId: string): {
+        routeId: string;
+        chunkId: string;
+        data: Record<string, unknown>;
+    };
+    callServerStub(method: string): {
+        method: string;
+        scheme: string;
+        transport: string;
+        pending: boolean;
+        bodyShipped: boolean;
+    };
+    getState(): {
+        chunkId: string | null;
+        data: Record<string, unknown>;
+        appliedPatches: string[];
+        navigations: string[];
+        serverCalls: Array<{ method: string; scheme: string }>;
+        lifecycle: string[];
+    };
+    package: unknown;
+};
 
 export const PROFILE_PROTOCOL: string;
 export const PROFILE_HOST_SCHEMA: string;

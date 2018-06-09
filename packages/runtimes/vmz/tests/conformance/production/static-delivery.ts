@@ -201,7 +201,15 @@ upsertCheck(proof, {
 });
 upsertCheck(proof, {
     id: 'static-delivery.seo',
-    status: errors.some((e) => e.includes('canonical') || e.includes('SEO') || e.includes('sitemap') || e.includes('robots') || e.includes('hreflang') || e.includes('locale'))
+    status: errors.some(
+        (e) =>
+            e.includes('canonical') ||
+            e.includes('SEO') ||
+            e.includes('sitemap') ||
+            e.includes('robots') ||
+            e.includes('hreflang') ||
+            e.includes('locale'),
+    )
         ? 'failed'
         : 'passed',
     detail: 'title/description/canonical/robots/hreflang + locale-prefixed HTML seed + sitemap/robots.txt',

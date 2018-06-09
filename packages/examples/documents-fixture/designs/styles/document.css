@@ -36,12 +36,12 @@ nav[aria-label="Documents"] {
     border-bottom: 1px solid var(--color-border);
 }
 
-:where([data-density='compact']) nav[aria-label="Documents"] {
+:where([data-density="compact"]) nav[aria-label="Documents"] {
     gap: var(--vmz-density-compact-gap, 0.45rem);
     padding: var(--vmz-density-compact-padding-y, 0.35rem) var(--vmz-density-compact-padding-x, 0.65rem);
 }
 
-:where([data-density='dense']) nav[aria-label="Documents"] {
+:where([data-density="dense"]) nav[aria-label="Documents"] {
     gap: var(--vmz-density-dense-gap, 0.3rem);
     padding: var(--vmz-density-dense-padding-y, 0.2rem) var(--vmz-density-dense-padding-x, 0.45rem);
 }

@@ -693,6 +693,39 @@ export function checkMiniprogramTargetContractJson(rootPath) {
     return native.checkMiniprogramTargetContractJson(rootPath);
 }
 
+export function lowerMiniprogramStaticSliceJson(rootPath) {
+    const native = loadNative();
+    return native.lowerMiniprogramStaticSliceJson(rootPath);
+}
+
+export function lowerMiniprogramBindingEventJson(rootPath) {
+    const native = loadNative();
+    return native.lowerMiniprogramBindingEventJson(rootPath);
+}
+
+export function lowerMiniprogramStructureJson(rootPath) {
+    const native = loadNative();
+    return native.lowerMiniprogramStructureJson(rootPath);
+}
+
+export function lowerMiniprogramRouteServerStyleJson(rootPath) {
+    const native = loadNative();
+    return native.lowerMiniprogramRouteServerStyleJson(rootPath);
+}
+
+export function lowerMiniprogramToolingDeployJson(rootPath) {
+    const native = loadNative();
+    return native.lowerMiniprogramToolingDeployJson(rootPath);
+}
+
+export function lowerMiniprogramMultiAdapterJson(rootPath) {
+    const native = loadNative();
+    return native.lowerMiniprogramMultiAdapterJson(rootPath);
+}
+
+import { createMiniHost } from './mini-host.js';
+export { createMiniHost };
+
 export function queryProfileProtocolCatalog() {
     const native = loadNative();
     return native.queryProfileProtocolCatalog();
@@ -1100,6 +1133,13 @@ export default {
     checkApplicationsJson,
     queryTargetProtocolCatalog,
     checkMiniprogramTargetContractJson,
+    lowerMiniprogramStaticSliceJson,
+    lowerMiniprogramBindingEventJson,
+    lowerMiniprogramStructureJson,
+    lowerMiniprogramRouteServerStyleJson,
+    lowerMiniprogramToolingDeployJson,
+    lowerMiniprogramMultiAdapterJson,
+    createMiniHost,
     queryProfileProtocolCatalog,
     checkHostProfileProtocolJson,
     checkProfileSolverJson,

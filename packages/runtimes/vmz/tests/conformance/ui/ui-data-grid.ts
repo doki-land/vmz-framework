@@ -356,34 +356,33 @@ async function proveBrowser(dist) {
             );
 
             await page.click('[data-vmz-sort="status"]');
-            await page.waitForFunction(
-                () => {
-                    const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
-                    return state.includes('sort:status:');
-                },
-                { timeout: 5000 },
-            ).catch(async (err) => {
-                const dbg = await page.evaluate(() => {
-                    const sortBtn = document.querySelector('[data-vmz-sort="status"]');
-                    sortBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-                    return {
-                        state: document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '',
-                        hasSort: !!document.querySelector('[data-vmz-sort="status"]'),
-                    };
+            await page
+                .waitForFunction(
+                    () => {
+                        const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                        return state.includes('sort:status:');
+                    },
+                    { timeout: 5000 },
+                )
+                .catch(async (err) => {
+                    const dbg = await page.evaluate(() => {
+                        const sortBtn = document.querySelector('[data-vmz-sort="status"]');
+                        sortBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                        return {
+                            state: document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '',
+                            hasSort: !!document.querySelector('[data-vmz-sort="status"]'),
+                        };
+                    });
+                    // Retry wait after synthetic click
+                    try {
+                        await page.waitForFunction(
+                            () => (document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '').includes('sort:status:'),
+                            { timeout: 3000 },
+                        );
+                    } catch {
+                        fail(`sort status failed: ${JSON.stringify(dbg)} (${err})`);
+                    }
                 });
-                // Retry wait after synthetic click
-                try {
-                    await page.waitForFunction(
-                        () =>
-                            (document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '').includes(
-                                'sort:status:',
-                            ),
-                        { timeout: 3000 },
-                    );
-                } catch {
-                    fail(`sort status failed: ${JSON.stringify(dbg)} (${err})`);
-                }
-            });
 
             await page.evaluate(() => {
                 const btn = [...document.querySelectorAll('[data-dogfood="datagrid"] button.vmz-ui-btn')].find((b) =>
@@ -407,10 +406,7 @@ async function proveBrowser(dist) {
             await page.waitForFunction(
                 () => {
                     const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
-                    return (
-                        !!document.querySelector('[data-vmz-ui="data-grid"] [data-row-kind="group"]') &&
-                        /window:0-\d+/.test(state)
-                    );
+                    return !!document.querySelector('[data-vmz-ui="data-grid"] [data-row-kind="group"]') && /window:0-\d+/.test(state);
                 },
                 { timeout: 5000 },
             );
@@ -452,8 +448,8 @@ async function proveBrowser(dist) {
 
             const collapseKey = groupProof.key;
             const leafBefore = await page.evaluate((key) => {
-                return [...document.querySelectorAll(`[data-vmz-ui="data-grid"] [data-row-kind="row"][data-group-key="${key}"]`)].map(
-                    (r) => r.getAttribute('data-vmz-row'),
+                return [...document.querySelectorAll(`[data-vmz-ui="data-grid"] [data-row-kind="row"][data-group-key="${key}"]`)].map((r) =>
+                    r.getAttribute('data-vmz-row'),
                 );
             }, collapseKey);
             if (leafBefore.length < 1) {
@@ -464,9 +460,7 @@ async function proveBrowser(dist) {
             await page.waitForFunction(
                 (key) => {
                     const header = document.querySelector(`[data-vmz-ui="data-grid"] [data-row-kind="group"][data-group-key="${key}"]`);
-                    const leaves = document.querySelectorAll(
-                        `[data-vmz-ui="data-grid"] [data-row-kind="row"][data-group-key="${key}"]`,
-                    );
+                    const leaves = document.querySelectorAll(`[data-vmz-ui="data-grid"] [data-row-kind="row"][data-group-key="${key}"]`);
                     const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
                     const expandedPart = (state.split('expanded:')[1] || '').split(';')[0] || '';
                     const expandedKeys = expandedPart
@@ -483,9 +477,7 @@ async function proveBrowser(dist) {
             await page.waitForFunction(
                 (key) => {
                     const header = document.querySelector(`[data-vmz-ui="data-grid"] [data-row-kind="group"][data-group-key="${key}"]`);
-                    const leaves = document.querySelectorAll(
-                        `[data-vmz-ui="data-grid"] [data-row-kind="row"][data-group-key="${key}"]`,
-                    );
+                    const leaves = document.querySelectorAll(`[data-vmz-ui="data-grid"] [data-row-kind="row"][data-group-key="${key}"]`);
                     const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
                     const expandedPart = (state.split('expanded:')[1] || '').split(';')[0] || '';
                     const expandedKeys = expandedPart
@@ -557,7 +549,10 @@ async function proveBrowser(dist) {
                     // After collapse root, no descendants of that root should remain; simpler: root expanded=false
                     const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
                     const part = (state.split('treeExpanded:')[1] || '').split(';')[0] || '';
-                    const keys = part.split(',').map((s) => s.trim()).filter(Boolean);
+                    const keys = part
+                        .split(',')
+                        .map((s) => s.trim())
+                        .filter(Boolean);
                     return root?.getAttribute('data-expanded') === 'false' && !keys.includes(id);
                 },
                 { timeout: 5000 },

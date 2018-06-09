@@ -11,12 +11,7 @@ import path from 'node:path';
 export const EMBEDDED_RESOURCE_INDEX_SCHEMA = 'vmz.embedded.resource_index.v0';
 
 /** Paths that must never enter the embedded baseline closure. */
-const SKIP_NAMES = new Set([
-    'vmz-serve-host.mjs',
-    'vmz-serve-host.js',
-    'node_modules',
-    '.git',
-]);
+const SKIP_NAMES = new Set(['vmz-serve-host.mjs', 'vmz-serve-host.js', 'node_modules', '.git']);
 
 /**
  * Walk outDir and build path → digest → relative blob path map.

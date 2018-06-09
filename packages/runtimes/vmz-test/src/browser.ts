@@ -18,13 +18,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { resolveChunkArtifacts } from './compile.js';
-import {
-    createArtifactsDir,
-    writeFailureEvidence,
-    writeTimingOnly,
-    type BrowserTiming,
-    type StepTiming,
-} from './browser-evidence.js';
+import { createArtifactsDir, writeFailureEvidence, writeTimingOnly, type BrowserTiming, type StepTiming } from './browser-evidence.js';
 import { isServeHostManifest, resolveRoutePath, startServeHost, type ServeHostHandle } from './browser-serve.js';
 import {
     defaultClickLocator,
@@ -222,11 +216,9 @@ export async function runBrowserManifest(
     const programId = chunkId || null;
     const useServe = isServeHostManifest(manifest);
     const testId = String(manifest.id || 'anonymous');
-    const profile =
-        manifest.profile && typeof manifest.profile === 'object' ? (manifest.profile as Record<string, unknown>) : {};
+    const profile = manifest.profile && typeof manifest.profile === 'object' ? (manifest.profile as Record<string, unknown>) : {};
     const failOnConsoleError = profile.failOnConsoleError !== false && (useServe || profile.failOnConsoleError === true);
-    const failOnRequestFailed =
-        profile.failOnRequestFailed !== false && (useServe || profile.failOnRequestFailed === true);
+    const failOnRequestFailed = profile.failOnRequestFailed !== false && (useServe || profile.failOnRequestFailed === true);
 
     if (!chunkId) {
         fail('program.chunkId missing');
@@ -374,7 +366,8 @@ export async function runBrowserManifest(
         } else {
             await page.goto(`${origin}/__vmz/harness`, { waitUntil: 'domcontentloaded' });
 
-            const components = program.components && typeof program.components === 'object' ? (program.components as Record<string, string>) : {};
+            const components =
+                program.components && typeof program.components === 'object' ? (program.components as Record<string, string>) : {};
 
             const boot = await page.evaluate(
                 async (cfg: { origin: string; chunkPath: string; components: Record<string, string> }) => {
@@ -434,9 +427,7 @@ export async function runBrowserManifest(
                         path: a.path != null ? String(a.path) : undefined,
                         params:
                             a.params && typeof a.params === 'object'
-                                ? Object.fromEntries(
-                                      Object.entries(a.params as Record<string, unknown>).map(([k, v]) => [k, String(v)]),
-                                  )
+                                ? Object.fromEntries(Object.entries(a.params as Record<string, unknown>).map(([k, v]) => [k, String(v)]))
                                 : undefined,
                     });
                     const url = new URL(pathname, origin).toString();
@@ -956,9 +947,7 @@ async function waitForLocator(
         if (last && last.ok && last.actionable && last.count === 1) return last;
         await sleep(40);
     }
-    throw new Error(
-        `locator timeout (${timeoutMs}ms): ${last?.reason || 'unknown'} count=${last?.count ?? 0} ${JSON.stringify(locator)}`,
-    );
+    throw new Error(`locator timeout (${timeoutMs}ms): ${last?.reason || 'unknown'} count=${last?.count ?? 0} ${JSON.stringify(locator)}`);
 }
 
 async function clickTarget(page: { evaluate: (...args: unknown[]) => Promise<unknown> }): Promise<void> {
@@ -972,10 +961,7 @@ async function clickTarget(page: { evaluate: (...args: unknown[]) => Promise<unk
     if (!ok) throw new Error('click: resolved target missing in document');
 }
 
-async function fillTarget(
-    page: { evaluate: (...args: unknown[]) => Promise<unknown> },
-    value: unknown,
-): Promise<void> {
+async function fillTarget(page: { evaluate: (...args: unknown[]) => Promise<unknown> }, value: unknown): Promise<void> {
     const ok = await page.evaluate((v: unknown) => {
         const el = document.querySelector('[data-vmz-bh-target="1"]') as HTMLInputElement | HTMLTextAreaElement | null;
         if (!el) return false;
@@ -991,14 +977,9 @@ async function fillTarget(
     if (!ok) throw new Error('fill: resolved target missing or not an input');
 }
 
-async function pressTarget(
-    page: { evaluate: (...args: unknown[]) => Promise<unknown> },
-    key: unknown,
-): Promise<void> {
+async function pressTarget(page: { evaluate: (...args: unknown[]) => Promise<unknown> }, key: unknown): Promise<void> {
     const ok = await page.evaluate((k: unknown) => {
-        const el =
-            (document.querySelector('[data-vmz-bh-target="1"]') as HTMLElement | null) ||
-            (document.activeElement as HTMLElement | null);
+        const el = (document.querySelector('[data-vmz-bh-target="1"]') as HTMLElement | null) || (document.activeElement as HTMLElement | null);
         if (!el) return false;
         el.dispatchEvent(new KeyboardEvent('keydown', { key: String(k), bubbles: true }));
         el.dispatchEvent(new KeyboardEvent('keyup', { key: String(k), bubbles: true }));
@@ -1017,6 +998,7 @@ async function pageText(page: { evaluate: (...args: unknown[]) => Promise<unknow
 
 /**
  * Native <select> or listbox/combobox (data-vmz-option / role=option).
+ * Prefer option value (data-vmz-option) then accessible name/label.
  */
 async function selectTarget(
     page: {
@@ -1038,7 +1020,8 @@ async function selectTarget(
             return { ok: true, kind: 'native' };
         }
         // Custom combobox/listbox: open if needed, then click option.
-        el.click();
+        const expanded = el.getAttribute('aria-expanded');
+        if (expanded !== 'true') el.click();
         return { ok: true, kind: 'custom' };
     }, want);
     if (!native || !(native as { ok?: boolean }).ok) {
@@ -1046,6 +1029,15 @@ async function selectTarget(
     }
     if ((native as { kind?: string }).kind === 'native') return;
 
+    // Prefer stable option value contract, then accessible name.
+    const byValue: BrowserLocator = { kind: 'css', selector: `[data-vmz-option="${want.replace(/"/g, '\\"')}"]` };
+    try {
+        await waitForLocator(page, byValue, opts);
+        await clickTarget(page);
+        return;
+    } catch {
+        /* fall through to role=option name */
+    }
     const optionLocator: BrowserLocator = { kind: 'role', role: 'option', name: want };
     await waitForLocator(page, optionLocator, opts);
     await clickTarget(page);

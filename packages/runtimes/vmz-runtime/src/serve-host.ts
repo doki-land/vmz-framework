@@ -31,6 +31,10 @@ const host = process.env.VMZ_HOST || '127.0.0.1';
 const port = Number(process.env.VMZ_PORT || process.env.PORT || 5173);
 const isDev = process.env.VMZ_DEV === '1' || process.env.VMZ_DEV === 'true';
 
+// Absolute origin for in-process client graphs that fall back to HTTP RPC
+// (separate `dist/vmz-runtime.js` instance without setServerModuleResolver).
+globalThis.__VMZ_RPC_ORIGIN = `http://${host}:${port}`;
+
 /**
  * Soft reload only busts the top-level `import(page?t=token)`. Nested relative
  * imports (`../../lib/units.js`) keep the first-loaded ESM cache entry — so a
@@ -685,9 +689,7 @@ async function softReload(opts = {}) {
         }
 
         if (!islandHmr) {
-            const pagesToLoad = reloadAllPages
-                ? nextCatalog
-                : nextCatalog.filter((p) => pageNeedsReload(p.chunkId, affected));
+            const pagesToLoad = reloadAllPages ? nextCatalog : nextCatalog.filter((p) => pageNeedsReload(p.chunkId, affected));
             for (const p of pagesToLoad) {
                 const pageRel = `${p.chunkId}.client.js`;
                 const href = bustUrl(pathToFileURL(path.join(distDir, pageRel)).href);
@@ -789,11 +791,7 @@ function shouldReloadAllPages(opts) {
     if (!opts.affected.length) return true;
     for (const f of opts.emitted) {
         const n = String(f).replace(/\\/g, '/');
-        if (
-            n.includes('/lib/') ||
-            /\/Application\.client\.js$/.test(n) ||
-            /\/vmz-(dom|runtime|http|client-nav)\.js$/.test(n)
-        ) {
+        if (n.includes('/lib/') || /\/Application\.client\.js$/.test(n) || /\/vmz-(dom|runtime|http|client-nav)\.js$/.test(n)) {
             return true;
         }
     }

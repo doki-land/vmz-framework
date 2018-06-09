@@ -323,9 +323,7 @@ if (build.status !== 0) {
 
     // --- Field / Dialog / RTL on production-inspector ---
     console.log('production-test: Field + Dialog + RTL on inspector…');
-    const localeAlreadyFailed = results.some(
-        (r) => r.scenarioId === 'production.locale.switch-rtl' && r.status === 'failed',
-    );
+    const localeAlreadyFailed = results.some((r) => r.scenarioId === 'production.locale.switch-rtl' && r.status === 'failed');
     const inspBuild = runVmzBuild(INSPECTOR, root);
     if (inspBuild.status !== 0) {
         const detail = (inspBuild.stderr || inspBuild.stdout).slice(0, 800);
@@ -592,9 +590,7 @@ async function proveLocaleTransition(routerDist: string): Promise<string> {
     }
 }
 
-async function proveInspectorFieldDialogRtl(
-    distDir: string,
-): Promise<{ field: string; dialog: string; rtl: string }> {
+async function proveInspectorFieldDialogRtl(distDir: string): Promise<{ field: string; dialog: string; rtl: string }> {
     const { resolveBrowserExecutable } = await import(
         pathToFileURL(path.join(root, 'packages', 'runtimes', 'vmz-test', 'dist', 'browser.js')).href
     );
@@ -617,10 +613,7 @@ async function proveInspectorFieldDialogRtl(
             await page.click('#inspector-query');
             await page.keyboard.type('bad id', { delay: 20 });
             try {
-                await page.waitForFunction(
-                    () => (document.body.innerText || '').includes('No spaces'),
-                    { timeout: 10000 },
-                );
+                await page.waitForFunction(() => (document.body.innerText || '').includes('No spaces'), { timeout: 10000 });
             } catch (err) {
                 const dump = await page.evaluate(() => ({
                     hasInput: !!document.getElementById('inspector-query'),
@@ -676,10 +669,9 @@ async function proveInspectorFieldDialogRtl(
             });
             if (!rtlClicked) throw new Error('Toggle RTL button missing');
             try {
-                await page.waitForFunction(
-                    () => document.querySelector('[data-dogfood="inspector"]')?.getAttribute('dir') === 'rtl',
-                    { timeout: 10000 },
-                );
+                await page.waitForFunction(() => document.querySelector('[data-dogfood="inspector"]')?.getAttribute('dir') === 'rtl', {
+                    timeout: 10000,
+                });
             } catch (err) {
                 const dump = await page.evaluate(() => ({
                     dir: document.querySelector('[data-dogfood="inspector"]')?.getAttribute('dir'),
@@ -830,10 +822,7 @@ export default class IndexPage {}
 `,
         );
         // Non-empty Style Theme so unknown_design_token runs; omit action.* / focus.ring required by Button.
-        fs.writeFileSync(
-            path.join(dir, 'designs', 'tokens', 'only-surface.json'),
-            JSON.stringify({ surface: { paper: '#ffffff' } }, null, 2),
-        );
+        fs.writeFileSync(path.join(dir, 'designs', 'tokens', 'only-surface.json'), JSON.stringify({ surface: { paper: '#ffffff' } }, null, 2));
         fs.writeFileSync(
             path.join(dir, 'designs', 'styles', 'index.scss'),
             `body { background: var(--vmz-surface-paper); }

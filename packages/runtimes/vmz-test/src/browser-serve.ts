@@ -34,10 +34,7 @@ function freePort(): Promise<number> {
  * Resolve author RouteId / pathPattern to a pathname for page.goto.
  * Prefers explicit path; then cdn-policy-manifest; then route-realization.
  */
-export function resolveRoutePath(
-    outDir: string,
-    opts: { routeId?: string; path?: string; params?: Record<string, string> },
-): string {
+export function resolveRoutePath(outDir: string, opts: { routeId?: string; path?: string; params?: Record<string, string> }): string {
     if (typeof opts.path === 'string' && opts.path.trim()) {
         return applyParams(opts.path.trim(), opts.params);
     }
