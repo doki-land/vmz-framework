@@ -58,41 +58,149 @@ pub fn emit_direct_create(
 }
 
 /// Emit `__vmzPlan` literal matching `units[].plan` in program.json (shared identity).
+///
+/// Built via oxc [`AstBuilder`](oxc_ast::builder::AstBuilder) + codegen (not `format!`).
 pub fn emit_vmz_plan(name: &str, plan: &vmz_types::ExecutionPlan) -> String {
+    use oxc_allocator::{Allocator, ArenaVec};
+    use oxc_ast::ast::{
+        ArrayExpressionElement, AssignmentTarget, Expression, IdentifierName, ObjectPropertyKind,
+        Program, PropertyKey, PropertyKind, Statement,
+    };
+    use oxc_ast::builder::AstBuilder;
+    use oxc_codegen::Codegen;
+    use oxc_span::{SPAN, SourceType};
+    use oxc_str::{Ident, Str};
+    use oxc_syntax::number::NumberBase;
+    use oxc_syntax::operator::AssignmentOperator;
     use vmz_protocol::PLAN_SCHEMA;
-    let mut nodes = String::from("[");
-    for (i, n) in plan.nodes.iter().enumerate() {
-        if i > 0 {
-            nodes.push(',');
-        }
-        let binding = n.binding().map(|b| b.to_string()).unwrap_or_else(|| "null".into());
-        let region = n.region().map(|r| r.to_string()).unwrap_or_else(|| "null".into());
-        let tag = match n.tag() {
-            Some(t) => format!("{:?}", t),
-            None => "null".into(),
-        };
-        let kids: Vec<String> = n.children().iter().map(|c| c.to_string()).collect();
-        let brs: Vec<String> = n.branches().iter().map(|c| c.to_string()).collect();
-        nodes.push_str(&format!(
-            "{{id:{},kind:{:?},binding:{},region:{},tag:{},children:[{}],branches:[{}]}}",
-            n.id(),
-            n.kind().as_str(),
-            binding,
-            region,
-            tag,
-            kids.join(","),
-            brs.join(",")
-        ));
+
+    struct PlanAst<'a> {
+        ast: AstBuilder<'a>,
     }
-    nodes.push(']');
-    let roots: Vec<String> = plan.root_ids.iter().map(|id| id.to_string()).collect();
-    format!(
-        "\n{name}.__vmzPlan = {{ schema: {:?}, status: {:?}, root_ids: [{}], nodes: {nodes} }};\n",
-        PLAN_SCHEMA,
-        plan.status.as_str(),
-        roots.join(", ")
-    )
+
+    impl<'a> PlanAst<'a> {
+        fn new(allocator: &'a Allocator) -> Self {
+            Self { ast: AstBuilder::new(allocator) }
+        }
+
+        fn str_lit(&self, s: &str) -> Expression<'a> {
+            Expression::new_string_literal(SPAN, Str::from_str_in(s, &self.ast), None, &self.ast)
+        }
+
+        fn num_lit(&self, n: u32) -> Expression<'a> {
+            Expression::new_numeric_literal(
+                SPAN,
+                f64::from(n),
+                None,
+                NumberBase::Decimal,
+                &self.ast,
+            )
+        }
+
+        fn null_lit(&self) -> Expression<'a> {
+            Expression::new_null_literal(SPAN, &self.ast)
+        }
+
+        fn opt_u32(&self, v: Option<u32>) -> Expression<'a> {
+            match v {
+                Some(n) => self.num_lit(n),
+                None => self.null_lit(),
+            }
+        }
+
+        fn prop(&self, key: &str, value: Expression<'a>) -> ObjectPropertyKind<'a> {
+            ObjectPropertyKind::new_object_property(
+                SPAN,
+                PropertyKind::Init,
+                PropertyKey::new_static_identifier(
+                    SPAN,
+                    Ident::from_str_in(key, &self.ast),
+                    &self.ast,
+                ),
+                value,
+                false,
+                false,
+                false,
+                &self.ast,
+            )
+        }
+
+        fn u32_array(&self, ids: &[u32]) -> Expression<'a> {
+            let mut elements = ArenaVec::with_capacity_in(ids.len(), &self.ast);
+            for id in ids {
+                elements.push(ArrayExpressionElement::from(self.num_lit(*id)));
+            }
+            Expression::new_array_expression(SPAN, elements, &self.ast)
+        }
+    }
+
+    let allocator = Allocator::default();
+    let b = PlanAst::new(&allocator);
+
+    let mut node_elems = ArenaVec::with_capacity_in(plan.nodes.len(), &b.ast);
+    for n in &plan.nodes {
+        let tag = match n.tag() {
+            Some(t) => b.str_lit(t),
+            None => b.null_lit(),
+        };
+        let props = ArenaVec::from_iter_in(
+            [
+                b.prop("id", b.num_lit(n.id())),
+                b.prop("kind", b.str_lit(n.kind().as_str())),
+                b.prop("binding", b.opt_u32(n.binding())),
+                b.prop("region", b.opt_u32(n.region())),
+                b.prop("tag", tag),
+                b.prop("children", b.u32_array(n.children())),
+                b.prop("branches", b.u32_array(n.branches())),
+            ],
+            &b.ast,
+        );
+        node_elems.push(ArrayExpressionElement::from(Expression::new_object_expression(
+            SPAN, props, &b.ast,
+        )));
+    }
+
+    let plan_props = ArenaVec::from_iter_in(
+        [
+            b.prop("schema", b.str_lit(PLAN_SCHEMA)),
+            b.prop("status", b.str_lit(plan.status.as_str())),
+            b.prop("root_ids", b.u32_array(&plan.root_ids)),
+            b.prop("nodes", Expression::new_array_expression(SPAN, node_elems, &b.ast)),
+        ],
+        &b.ast,
+    );
+    let plan_obj = Expression::new_object_expression(SPAN, plan_props, &b.ast);
+
+    let left = AssignmentTarget::new_static_member_expression(
+        SPAN,
+        Expression::new_identifier(SPAN, Ident::from_str_in(name, &b.ast), &b.ast),
+        IdentifierName::new(SPAN, Ident::from_str_in("__vmzPlan", &b.ast), &b.ast),
+        false,
+        &b.ast,
+    );
+    let assign = Expression::new_assignment_expression(
+        SPAN,
+        AssignmentOperator::Assign,
+        left,
+        plan_obj,
+        &b.ast,
+    );
+    let stmt = Statement::new_expression_statement(SPAN, assign, &b.ast);
+    let body = ArenaVec::from_iter_in([stmt], &b.ast);
+    let program = Program::new(
+        SPAN,
+        SourceType::cjs(),
+        "",
+        ArenaVec::new_in(&b.ast),
+        None,
+        ArenaVec::new_in(&b.ast),
+        body,
+        &b.ast,
+    );
+    let code = Codegen::new().build(&program).code;
+    format!("\n{code}")
 }
+
 
 fn emit_create_body(
     nodes: &[ViewNode],
