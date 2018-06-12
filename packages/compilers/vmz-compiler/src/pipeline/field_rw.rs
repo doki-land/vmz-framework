@@ -682,10 +682,7 @@ pub fn analyze_expr_reads(expr: &Expression<'_>, field_names: &[String]) -> Vec<
 /// Emits stable DepKey strings: `user.name` (path) or `user` (field root).
 /// Falls back to a simple scan if the snippet does not parse.
 pub fn collect_template_deps(expr: &str, fields: &[String], scope: &[String]) -> Vec<String> {
-    collect_template_dep_keys(expr, fields, scope)
-        .into_iter()
-        .map(|k| k.to_stable_string())
-        .collect()
+    vmz_generator::js::collect_template_deps(expr, fields, scope)
 }
 
 /// Property paths rooted at an `each` alias (`tag` / `tag.label` ?`[]` / `["label"]`).

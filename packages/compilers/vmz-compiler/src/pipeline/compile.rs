@@ -10,7 +10,7 @@ use crate::affected::{AffectedPlan, chunk_id_for, plan_affected};
 use crate::analyze::analyze_script;
 use crate::check::{CheckOptions, check_path};
 use crate::diagnostic::ReportedDiagnostic;
-use crate::emit::{ServerBridge, emit_client_js_with_ir, emit_server_js};
+use crate::emit::{ServerBridge, emit_server_js};
 use crate::project::{VmzModuleKind, discover_vmz_files};
 use crate::reactive_build::build_program_module_with_server;
 use crate::scss::{ScssCompilerHandle, ScssEmitRequest};
@@ -849,7 +849,7 @@ fn emit_file(
     let native_view = program.units.first().map(|u| &u.view);
     let exec_plan = program.units.first().map(|u| &u.plan);
 
-    let client_js = match emit_client_js_with_ir(
+    let (client_js, client_map) = match crate::emit::emit_client_js_with_ir_mapped(
         &parsed.client.content,
         &client,
         &template_ir,
@@ -858,7 +858,7 @@ fn emit_file(
         native_view,
         exec_plan,
     ) {
-        Ok(js) => js,
+        Ok(pair) => pair,
         Err(e) => {
             report
                 .diagnostics
@@ -886,6 +886,11 @@ fn emit_file(
     };
     fs::write(&client_path, &client_js)?;
     report.emitted.push(client_path);
+    if let Some(map) = client_map {
+        let map_path = out_dir.join(format!("{stem}.client.js.map"));
+        fs::write(&map_path, map)?;
+        report.emitted.push(map_path);
+    }
 
     if let (Some(server_an), Some(server_block), Some(id)) =
         (server.as_ref(), parsed.server.as_ref(), server_id.as_ref())

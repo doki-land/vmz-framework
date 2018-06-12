@@ -17,7 +17,6 @@ use crate::server_slice::ServerSliceProof;
 use crate::sfc::{ScriptKind, ScriptLanguage, parse_vmz};
 use crate::template::{AttrValue, TemplateIr, TemplateNode, parse_template};
 use crate::virtual_server;
-use oxc_span::Span;
 use vmz_types::{ComponentDecl, ServerAttach};
 
 /// Options for [`check_path`] / [`check_project`].

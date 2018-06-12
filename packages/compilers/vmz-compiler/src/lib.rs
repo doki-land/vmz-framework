@@ -1,9 +1,12 @@
-//! VMZ compiler: `.vmz` SFC + oxc analysis + check/build.
+//! VMZ compiler: `.vmz` SFC + oxc analysis + Program Graph / Execution Plan + Workspace.
+//!
+//! Text artifact printers live in **`vmz-generator`** (CodeGenerators). This crate
+//! orchestrates analyze → IR → `vmz_generator::*` → disk layout.
 //!
 //! Source layout (subsystems, not dump folders):
 //! - [`parse`] - SFC / template / analyze / format
-//! - [`pipeline`] - check / compile / graph / emit
-//! - [`style`] - designs / TW / SCSS / emit / explain
+//! - [`pipeline`] - check / compile / graph / emit orchestration
+//! - [`style`] - designs / TW / SCSS hooks (CSS print → generator)
 //! - [`application`] - collection / mount
 //! - [`session`] - Workspace / affected / plugin contributions
 //! - [`tooling`] - rename / index / transaction / deployment proof
