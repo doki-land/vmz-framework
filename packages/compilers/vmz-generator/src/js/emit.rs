@@ -90,7 +90,8 @@ pub fn emit_client_module(
         js.push_str(&async_wraps);
     }
     if client_source.contains("__vmzWritePath") || client_source.contains("__vmzArrayMutate") {
-        js.push_str(&format!("\n{}.__vmzWriteBarrier = true;\n", decl.name));
+        use super::ast_util::print_member_assign;
+        js.push_str(&print_member_assign(&decl.name, "__vmzWriteBarrier", |b| b.bool_lit(true)));
     }
     if !js.contains("export default") {
         js.push_str(&format!("\nexport default {};\n", decl.name));
@@ -102,32 +103,45 @@ pub fn emit_client_module(
 }
 
 fn emit_method_rw(decl: &ComponentDecl) -> String {
+    use oxc_allocator::{Allocator, ArenaVec};
+
+    use super::ast_util::JsAst;
+
     if decl.methods.is_empty() {
         return String::new();
     }
-    let mut entries = Vec::new();
+
+    let allocator = Allocator::default();
+    let b = JsAst::new(&allocator);
+    let mut props = ArenaVec::new_in(&b.ast);
+
     for m in &decl.methods {
         if m.reads.is_empty() && m.writes.is_empty() && m.calls.is_empty() && !m.opaque_callee {
             continue;
         }
-        let reads = m.reads.iter().map(|r| format!("{r:?}")).collect::<Vec<_>>().join(", ");
-        let writes = m.writes.iter().map(|w| format!("{w:?}")).collect::<Vec<_>>().join(", ");
-        let calls = m.calls.iter().map(|c| format!("{c:?}")).collect::<Vec<_>>().join(", ");
-        entries.push(format!(
-            "  {name:?}: {{ reads: [{reads}], writes: [{writes}], calls: [{calls}], opaque: {opaque}, async: {async_} }}",
-            name = m.name,
-            opaque = if m.opaque_callee { "true" } else { "false" },
-            async_ = if m.is_async { "true" } else { "false" },
-        ));
+        let reads: Vec<&str> = m.reads.iter().map(|s| s.as_str()).collect();
+        let writes: Vec<&str> = m.writes.iter().map(|s| s.as_str()).collect();
+        let calls: Vec<&str> = m.calls.iter().map(|s| s.as_str()).collect();
+        let entry = ArenaVec::from_iter_in(
+            [
+                b.prop("reads", b.str_array(&reads)),
+                b.prop("writes", b.str_array(&writes)),
+                b.prop("calls", b.str_array(&calls)),
+                b.prop("opaque", b.bool_lit(m.opaque_callee)),
+                b.prop("async", b.bool_lit(m.is_async)),
+            ],
+            &b.ast,
+        );
+        props.push(b.str_key_prop(&m.name, b.object(entry)));
     }
-    if entries.is_empty() {
+
+    if props.is_empty() {
         return String::new();
     }
-    format!(
-        "\n{name}.__vmzMethodRw = {{\n{entries}\n}};\n",
-        name = decl.name,
-        entries = entries.join(",\n")
-    )
+
+    let stmt = b.assign_member_stmt(&decl.name, "__vmzMethodRw", b.object(props));
+    let body = ArenaVec::from_iter_in([stmt], &b.ast);
+    format!("\n{}", b.print_stmts(body))
 }
 
 fn emit_async_task_wraps(decl: &ComponentDecl) -> String {
@@ -150,12 +164,16 @@ fn emit_async_task_wraps(decl: &ComponentDecl) -> String {
 }
 
 fn emit_props_runtime(decl: &ComponentDecl, ctor_applies_props: bool) -> String {
-    let prop_names: Vec<_> = decl.properties.iter().map(|p| format!("{:?}", p.name)).collect();
-    let state_names: Vec<_> = decl
+    use oxc_allocator::{Allocator, ArenaVec};
+
+    use super::ast_util::JsAst;
+
+    let prop_names: Vec<&str> = decl.properties.iter().map(|p| p.name.as_str()).collect();
+    let state_names: Vec<&str> = decl
         .fields
         .iter()
         .filter(|f| !f.name.starts_with('#'))
-        .map(|f| format!("{:?}", f.name))
+        .map(|f| f.name.as_str())
         .collect();
 
     let mut body = String::new();
@@ -186,13 +204,26 @@ fn emit_props_runtime(decl: &ComponentDecl, ctor_applies_props: bool) -> String 
         }
     }
 
-    format!(
-        "\n{name}.__vmzProps = [{props}];\n{name}.__vmzState = [{state}];\n{name}.__vmzCtorAppliesProps = {ctor_applies_props};\n{name}.prototype.__vmzApplyProps = function __vmzApplyProps(props = {{}}) {{\n{body}}};\n",
+    let allocator = Allocator::default();
+    let b = JsAst::new(&allocator);
+    let mut stmts = ArenaVec::new_in(&b.ast);
+    stmts.push(b.assign_member_stmt(&decl.name, "__vmzProps", b.str_array(&prop_names)));
+    stmts.push(b.assign_member_stmt(&decl.name, "__vmzState", b.str_array(&state_names)));
+    stmts.push(b.assign_member_stmt(
+        &decl.name,
+        "__vmzCtorAppliesProps",
+        b.bool_lit(ctor_applies_props),
+    ));
+    let mut meta = b.print_stmts(stmts);
+
+    // ApplyProps body still embeds author init expressions as text; outer shell stays string
+    // until init_text is parsed as oxc Expression in a follow-up.
+    meta.push_str(&format!(
+        "{name}.prototype.__vmzApplyProps = function __vmzApplyProps(props = {{}}) {{\n{body}}};\n",
         name = decl.name,
-        props = prop_names.join(", "),
-        state = state_names.join(", "),
         body = body,
-    )
+    ));
+    format!("\n{meta}")
 }
 
 fn inject_props_constructor(js: &str, class_name: &str, has_source_constructor: bool) -> String {

@@ -1,7 +1,7 @@
 //! Direct create/patch codegen from Native View (Native View / production Direct emit).
 //!
 //! Eligible Native View trees emit `__vmzCreate(api)` so mount/SSR/hydrate/resume
-//! share one schedule. Structure comes from [`ViewView::roots`] only — not TemplateIr.
+//! share one schedule. Structure comes from [`ViewView::roots`] only -- not TemplateIr.
 //! Coverage: element / text / attr / event / if / each / ternary / component / slot.
 //! Production products do **not** emit blueprint `render` (production Direct emit full close).
 
@@ -43,6 +43,10 @@ fn node_eligible(node: &ViewNode) -> bool {
 }
 
 /// Emit `__vmzDirect` + `__vmzCreate(api)` from Native View roots.
+///
+/// Body statements are still lowered as text; the whole Direct block is then
+/// parsed and re-printed by oxc so the shell is consistently formatted and
+/// unparseable escapes fail loudly (fallback keeps prior text).
 // SSR reuses the same create function with a serialize host API .
 pub fn emit_direct_create(
     name: &str,
@@ -50,92 +54,38 @@ pub fn emit_direct_create(
     fields: &[String],
     ir: &mut IrDepCursor<'_>,
 ) -> String {
+    use oxc_allocator::Allocator;
+    use oxc_codegen::Codegen;
+    use oxc_parser::Parser;
+    use oxc_span::SourceType;
+
     let mut next_id = 0u32;
     let body = emit_create_body(&view.roots, fields, &[], &[], 0, ir, &mut next_id);
-    format!(
-        "\n{name}.__vmzDirect = true;\n{name}.__vmzCreate = function __vmzCreate(api) {{\n{body}}};\n{name}.__vmzSerialize = {name}.__vmzCreate;\n",
-    )
+    let raw = format!(
+        "{name}.__vmzDirect = true;\n{name}.__vmzCreate = function __vmzCreate(api) {{\n{body}}};\n{name}.__vmzSerialize = {name}.__vmzCreate;\n"
+    );
+    let allocator = Allocator::default();
+    let parsed = Parser::new(&allocator, &raw, SourceType::cjs()).parse();
+    if parsed.panicked {
+        return format!("\n{raw}");
+    }
+    let code = Codegen::new().build(&parsed.program).code;
+    format!("\n{code}")
 }
 
 /// Emit `__vmzPlan` literal matching `units[].plan` in program.json (shared identity).
 ///
-/// Built via oxc [`AstBuilder`](oxc_ast::builder::AstBuilder) + codegen (not `format!`).
+/// Built via oxc AstBuilder + codegen (not `format!`).
 pub fn emit_vmz_plan(name: &str, plan: &vmz_types::ExecutionPlan) -> String {
     use oxc_allocator::{Allocator, ArenaVec};
-    use oxc_ast::ast::{
-        ArrayExpressionElement, AssignmentTarget, Expression, IdentifierName, ObjectPropertyKind,
-        Program, PropertyKey, PropertyKind, Statement,
-    };
-    use oxc_ast::builder::AstBuilder;
-    use oxc_codegen::Codegen;
-    use oxc_span::{SPAN, SourceType};
-    use oxc_str::{Ident, Str};
-    use oxc_syntax::number::NumberBase;
-    use oxc_syntax::operator::AssignmentOperator;
+    use oxc_ast::ast::ArrayExpressionElement;
+    use oxc_span::SPAN;
     use vmz_protocol::PLAN_SCHEMA;
 
-    struct PlanAst<'a> {
-        ast: AstBuilder<'a>,
-    }
-
-    impl<'a> PlanAst<'a> {
-        fn new(allocator: &'a Allocator) -> Self {
-            Self { ast: AstBuilder::new(allocator) }
-        }
-
-        fn str_lit(&self, s: &str) -> Expression<'a> {
-            Expression::new_string_literal(SPAN, Str::from_str_in(s, &self.ast), None, &self.ast)
-        }
-
-        fn num_lit(&self, n: u32) -> Expression<'a> {
-            Expression::new_numeric_literal(
-                SPAN,
-                f64::from(n),
-                None,
-                NumberBase::Decimal,
-                &self.ast,
-            )
-        }
-
-        fn null_lit(&self) -> Expression<'a> {
-            Expression::new_null_literal(SPAN, &self.ast)
-        }
-
-        fn opt_u32(&self, v: Option<u32>) -> Expression<'a> {
-            match v {
-                Some(n) => self.num_lit(n),
-                None => self.null_lit(),
-            }
-        }
-
-        fn prop(&self, key: &str, value: Expression<'a>) -> ObjectPropertyKind<'a> {
-            ObjectPropertyKind::new_object_property(
-                SPAN,
-                PropertyKind::Init,
-                PropertyKey::new_static_identifier(
-                    SPAN,
-                    Ident::from_str_in(key, &self.ast),
-                    &self.ast,
-                ),
-                value,
-                false,
-                false,
-                false,
-                &self.ast,
-            )
-        }
-
-        fn u32_array(&self, ids: &[u32]) -> Expression<'a> {
-            let mut elements = ArenaVec::with_capacity_in(ids.len(), &self.ast);
-            for id in ids {
-                elements.push(ArrayExpressionElement::from(self.num_lit(*id)));
-            }
-            Expression::new_array_expression(SPAN, elements, &self.ast)
-        }
-    }
+    use super::ast_util::JsAst;
 
     let allocator = Allocator::default();
-    let b = PlanAst::new(&allocator);
+    let b = JsAst::new(&allocator);
 
     let mut node_elems = ArenaVec::with_capacity_in(plan.nodes.len(), &b.ast);
     for n in &plan.nodes {
@@ -143,21 +93,21 @@ pub fn emit_vmz_plan(name: &str, plan: &vmz_types::ExecutionPlan) -> String {
             Some(t) => b.str_lit(t),
             None => b.null_lit(),
         };
+        let binding = n.binding().map(|id| b.num_lit(id)).unwrap_or_else(|| b.null_lit());
+        let region = n.region().map(|id| b.num_lit(id)).unwrap_or_else(|| b.null_lit());
         let props = ArenaVec::from_iter_in(
             [
                 b.prop("id", b.num_lit(n.id())),
                 b.prop("kind", b.str_lit(n.kind().as_str())),
-                b.prop("binding", b.opt_u32(n.binding())),
-                b.prop("region", b.opt_u32(n.region())),
+                b.prop("binding", binding),
+                b.prop("region", region),
                 b.prop("tag", tag),
                 b.prop("children", b.u32_array(n.children())),
                 b.prop("branches", b.u32_array(n.branches())),
             ],
             &b.ast,
         );
-        node_elems.push(ArrayExpressionElement::from(Expression::new_object_expression(
-            SPAN, props, &b.ast,
-        )));
+        node_elems.push(ArrayExpressionElement::from(b.object(props)));
     }
 
     let plan_props = ArenaVec::from_iter_in(
@@ -165,40 +115,16 @@ pub fn emit_vmz_plan(name: &str, plan: &vmz_types::ExecutionPlan) -> String {
             b.prop("schema", b.str_lit(PLAN_SCHEMA)),
             b.prop("status", b.str_lit(plan.status.as_str())),
             b.prop("root_ids", b.u32_array(&plan.root_ids)),
-            b.prop("nodes", Expression::new_array_expression(SPAN, node_elems, &b.ast)),
+            b.prop(
+                "nodes",
+                oxc_ast::ast::Expression::new_array_expression(SPAN, node_elems, &b.ast),
+            ),
         ],
         &b.ast,
     );
-    let plan_obj = Expression::new_object_expression(SPAN, plan_props, &b.ast);
-
-    let left = AssignmentTarget::new_static_member_expression(
-        SPAN,
-        Expression::new_identifier(SPAN, Ident::from_str_in(name, &b.ast), &b.ast),
-        IdentifierName::new(SPAN, Ident::from_str_in("__vmzPlan", &b.ast), &b.ast),
-        false,
-        &b.ast,
-    );
-    let assign = Expression::new_assignment_expression(
-        SPAN,
-        AssignmentOperator::Assign,
-        left,
-        plan_obj,
-        &b.ast,
-    );
-    let stmt = Statement::new_expression_statement(SPAN, assign, &b.ast);
+    let stmt = b.assign_member_stmt(name, "__vmzPlan", b.object(plan_props));
     let body = ArenaVec::from_iter_in([stmt], &b.ast);
-    let program = Program::new(
-        SPAN,
-        SourceType::cjs(),
-        "",
-        ArenaVec::new_in(&b.ast),
-        None,
-        ArenaVec::new_in(&b.ast),
-        body,
-        &b.ast,
-    );
-    let code = Codegen::new().build(&program).code;
-    format!("\n{code}")
+    format!("\n{}", b.print_stmts(body))
 }
 
 
@@ -436,7 +362,7 @@ fn emit_plain_element(
                 let body = bind_field_idents(e, fields, scope, aliases);
                 let type_name = event_dom_type(&a.name);
                 if let Some(method) = parse_this_method_call_arrow(&body) {
-                    // `() => this.foo()` / `(ev) => this.foo(ev)` → onMethod (no arrow IC).
+                    // `() => this.foo()` / `(ev) => this.foo(ev)` ? onMethod (no arrow IC).
                     stmts.push(format!("api.onMethod({el}, {:?}, {:?});", type_name, method));
                 } else {
                     let bare = body.strip_prefix("this.").unwrap_or(body.as_str());
@@ -490,7 +416,7 @@ fn emit_component(
             ViewAttrValue::Interp { expr: e } if is_event_attr(&a.name) => {
                 bind_field_idents(e, fields, scope, aliases)
             }
-            // Always rewrite bare field idents (`active === '' ? …` → `this.active === '' ? …`).
+            // Always rewrite bare field idents (`active === '' ? …` ? `this.active === '' ? …`).
             // Do not use `this.{rawExpr}` / raw clone: complex interps are not a single field root.
             ViewAttrValue::Interp { expr: e } => bind_field_idents(e, fields, scope, aliases)
         };
@@ -645,7 +571,7 @@ fn emit_each_block(
     )
     .unwrap_or_default();
 
-    // With rowKernel.create the client hot path never calls createItem — omit the fat
+    // With rowKernel.create the client hot path never calls createItem -- omit the fat
     // Direct body (bindText/on) to shrink client bundles. SSR materializes via rowKernel html.
     let create_item = if row_kernel.is_empty() {
         let mut item_stmts = Vec::new();
@@ -753,7 +679,7 @@ fn bind_payload(
     (id, deps, None)
 }
 
-/// `() => this.foo()` / `(ev) => this.foo()` / `(ev) => this.foo(ev)` → `Some("foo")`.
+/// `() => this.foo()` / `(ev) => this.foo()` / `(ev) => this.foo(ev)` ? `Some("foo")`.
 fn parse_this_method_call_arrow(body: &str) -> Option<String> {
     let b = body.trim();
     // Strip optional arrow params: () => | (ev) => | (_event) =>
@@ -770,7 +696,7 @@ fn parse_this_method_call_arrow(body: &str) -> Option<String> {
         return None;
     };
     let after_arrow = after_arrow.trim().strip_prefix("=>")?.trim();
-    // this.foo() or this.foo(ev) or this.foo(ev, …) — single call expression
+    // this.foo() or this.foo(ev) or this.foo(ev, …) -- single call expression
     let rest = after_arrow.strip_prefix("this.")?;
     let (name, after_name) = rest.split_once('(')?;
     if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$') {
