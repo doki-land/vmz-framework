@@ -7,6 +7,7 @@ use oxc_ast::ast::{
 };
 use oxc_ast::builder::AstBuilder;
 use oxc_codegen::Codegen;
+use oxc_parser::Parser;
 use oxc_span::{SPAN, SourceType};
 use oxc_str::{Ident, Str};
 use oxc_syntax::number::NumberBase;
@@ -124,6 +125,13 @@ impl<'a> JsAst<'a> {
         Statement::new_expression_statement(SPAN, assign, &self.ast)
     }
 
+    /// Print a single expression (no trailing semicolon).
+    pub fn print_expr(&self, expr: Expression<'a>) -> String {
+        let mut codegen = Codegen::new();
+        codegen.print_expression(&expr);
+        codegen.into_source_text()
+    }
+
     /// Print statements as a Program (script).
     pub fn print_stmts(&self, stmts: ArenaVec<'a, Statement<'a>>) -> String {
         let program = Program::new(
@@ -138,6 +146,31 @@ impl<'a> JsAst<'a> {
         );
         Codegen::new().build(&program).code
     }
+}
+
+/// Print a JS string literal via oxc codegen (correct escapes; not Rust `Debug`).
+pub fn js_string_literal(s: &str) -> String {
+    let allocator = Allocator::default();
+    let b = JsAst::new(&allocator);
+    b.print_expr(b.str_lit(s))
+}
+
+/// `export default Name;`
+pub fn print_export_default(name: &str) -> String {
+    let src = format!("export default {name};\n");
+    oxc_reprint_module(&src).unwrap_or(src)
+}
+
+/// Parse module / script source and re-print with oxc codegen.
+///
+/// Used as a formatting + escape gate for transitional text-built snippets.
+pub fn oxc_reprint_module(source: &str) -> Option<String> {
+    let allocator = Allocator::default();
+    let parsed = Parser::new(&allocator, source, SourceType::mjs()).parse();
+    if parsed.panicked {
+        return None;
+    }
+    Some(Codegen::new().build(&parsed.program).code)
 }
 
 /// Print a single assignment statement `name.member = value` with leading newline.
@@ -157,8 +190,6 @@ pub fn print_member_assign(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oxc_parser::Parser;
-    use oxc_span::SourceType;
 
     #[test]
     fn string_lit_roundtrips_through_codegen() {
@@ -167,6 +198,16 @@ mod tests {
         let parsed = Parser::new(&allocator, code.trim(), SourceType::cjs()).parse();
         assert!(!parsed.panicked, "must re-parse: {code}");
         assert!(code.contains("__flag"));
+    }
+
+    #[test]
+    fn js_string_literal_escapes_quotes_and_newlines() {
+        let lit = js_string_literal("a\"b\nc</script>");
+        assert!(lit.starts_with('"') && lit.ends_with('"'), "{lit}");
+        let allocator = Allocator::default();
+        let wrapped = format!("x = {lit};");
+        let parsed = Parser::new(&allocator, &wrapped, SourceType::cjs()).parse();
+        assert!(!parsed.panicked, "must re-parse: {wrapped}");
     }
 
     #[test]
