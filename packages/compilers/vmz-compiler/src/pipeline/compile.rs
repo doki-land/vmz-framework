@@ -589,7 +589,7 @@ fn style_input_fingerprint(
     (sha256_hex_bytes(buf.as_bytes()), regs)
 }
 fn emit_routes_json(options: &CompileOptions, report: &mut CompileReport) -> crate::Result<()> {
-    let json = serde_json::to_string_pretty(&report.routes).unwrap_or_else(|_| "[]".into());
+    let json = vmz_generator::to_pretty_json(&report.routes).unwrap_or_else(|_| "[]".into());
     let out = options.out_dir.join("vmz-routes.json");
     fs::write(&out, format!("{json}\n"))?;
     report.emitted.push(out);
@@ -932,7 +932,10 @@ fn emit_file(
     let meta_path = out_dir.join(format!("{stem}.vmz.json"));
     fs::write(
         &meta_path,
-        format!("{}\n", serde_json::to_string_pretty(&meta).unwrap_or_else(|_| "{}".into())),
+        format!(
+            "{}\n",
+            vmz_generator::to_pretty_json(&meta).unwrap_or_else(|_| "{}".into())
+        ),
     )?;
     report.emitted.push(meta_path);
 
@@ -1025,7 +1028,10 @@ fn emit_deployment_json(
     let out = options.out_dir.join("vmz-deployment.json");
     fs::write(
         &out,
-        format!("{}\n", serde_json::to_string_pretty(&doc).unwrap_or_else(|_| "{}".into())),
+        format!(
+            "{}\n",
+            vmz_generator::to_pretty_json(&doc).unwrap_or_else(|_| "{}".into())
+        ),
     )?;
     report.emitted.push(out);
     Ok(())

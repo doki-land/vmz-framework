@@ -242,13 +242,11 @@ fn is_event_attr(name: &str) -> bool {
 }
 
 fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
+    vmz_generator::escape_xml_text(s)
 }
 
 fn escape_xml_attr(s: &str) -> String {
-    escape_xml(s).replace('"', "&quot;")
+    vmz_generator::escape_xml_attr(s)
 }
 
 fn collect_program_json(root: &Path) -> Vec<PathBuf> {
