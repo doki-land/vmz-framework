@@ -1553,6 +1553,7 @@ dependencies = [
  "napi-derive",
  "serde_json",
  "vmz-compiler",
+ "vmz-generator",
  "vmz-inspector",
  "vmz-plugin-sasso",
  "vmz-plugin-tailwind",

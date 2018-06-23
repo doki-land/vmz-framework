@@ -15,7 +15,7 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { buildIntegratedDocuments, projectHasDocuments } from './document-integrate.js';
-import { createWorkspace } from './index.js';
+import { createWorkspace, resolveNativePath } from './index.js';
 import { emitLocaleRuntimeModules, localeHasErrors } from './locale-check.js';
 import { log } from './log.js';
 import { diffFingerprints, fileFingerprintMap } from './watch-diff.js';
@@ -361,6 +361,7 @@ function defaultSpawnHost(opts) {
             VMZ_PORT: String(opts.port),
             VMZ_HOST: opts.host,
             VMZ_DEV: '1',
+            VMZ_NATIVE_NODE: resolveNativePath(),
         },
         stdio: ['ignore', 'inherit', 'inherit'],
     });

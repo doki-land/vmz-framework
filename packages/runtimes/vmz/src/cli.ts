@@ -6,7 +6,7 @@
 import { spawn } from 'node:child_process';
 import { copyFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { HOST_PROTOCOL, createWorkspace, getProtocolVersions, resolveCoreRuntimeDist } from './index.js';
+import { HOST_PROTOCOL, createWorkspace, getProtocolVersions, resolveCoreRuntimeDist, resolveNativePath } from './index.js';
 import { createDevSession } from './dev-session.js';
 import { gateGlobalProjectCommand, getInvocationContext, isGlobalAllowedCommand } from './invocation.js';
 import { log } from './log.js';
@@ -498,6 +498,7 @@ async function cmdServe(args) {
             VMZ_DIST: outDir,
             VMZ_PORT: String(port),
             VMZ_HOST: host,
+            VMZ_NATIVE_NODE: resolveNativePath(),
         },
         stdio: 'inherit',
     });
