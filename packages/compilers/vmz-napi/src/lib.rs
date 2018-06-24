@@ -1188,3 +1188,97 @@ pub fn generate_serve_entry_client(
 pub fn generate_serve_entry_event(cache_query: String) -> String {
     vmz_generator::js::emit_serve_entry_event(&cache_query).code
 }
+
+/// Hreflang alternate for [`generate_page_shell`].
+#[napi(object)]
+pub struct JsHreflangAlternate {
+    /// `hreflang` attribute.
+    pub hreflang: String,
+    /// Absolute `href`.
+    pub href: String,
+}
+
+/// SEO meta for [`generate_page_shell`].
+#[napi(object)]
+pub struct JsPageShellMeta {
+    /// Document title.
+    pub title: String,
+    /// Meta description.
+    pub description: String,
+    /// Canonical URL.
+    pub canonical: String,
+    /// Robots content.
+    pub robots: String,
+    /// `html[lang]` / locale id.
+    pub lang: String,
+    /// `dir` (`ltr` / `rtl`).
+    pub dir: String,
+    /// Optional hreflang alternates.
+    pub alternates: Option<Vec<JsHreflangAlternate>>,
+}
+
+/// Input for [`generate_page_shell`].
+#[napi(object)]
+pub struct JsPageShellInput {
+    /// Trusted SSR / static body HTML.
+    pub body_html: String,
+    /// `data-vmz-page` chunk id.
+    pub chunk_id: String,
+    /// Layout chain chunk ids.
+    pub layout_chain: Vec<String>,
+    /// Already-stringified props JSON.
+    pub props_json: String,
+    /// Head meta.
+    pub meta: JsPageShellMeta,
+    /// Optional CSS entry (e.g. `vmz.css`).
+    pub css_entry: Option<String>,
+    /// Omit entry-client when true.
+    pub is_error_document: Option<bool>,
+}
+
+/// Generate production page HTML shell via MarkupCodeGenerator.
+#[napi]
+pub fn generate_page_shell(input: JsPageShellInput) -> String {
+    let meta = vmz_generator::PageShellMeta {
+        title: input.meta.title,
+        description: input.meta.description,
+        canonical: input.meta.canonical,
+        robots: input.meta.robots,
+        lang: input.meta.lang,
+        dir: input.meta.dir,
+        alternates: input
+            .meta
+            .alternates
+            .unwrap_or_default()
+            .into_iter()
+            .map(|a| vmz_generator::HreflangAlternate {
+                hreflang: a.hreflang,
+                href: a.href,
+            })
+            .collect(),
+    };
+    vmz_generator::emit_page_shell(&vmz_generator::PageShellInput {
+        body_html: input.body_html,
+        chunk_id: input.chunk_id,
+        layout_chain: input.layout_chain,
+        props_json: input.props_json,
+        meta,
+        css_entry: input.css_entry,
+        is_error_document: input.is_error_document.unwrap_or(false),
+    })
+}
+
+/// One sitemap URL for [`generate_sitemap_xml`].
+#[napi(object)]
+pub struct JsSitemapUrl {
+    /// Absolute loc URL.
+    pub loc: String,
+}
+
+/// Generate `sitemap.xml` via MarkupCodeGenerator.
+#[napi]
+pub fn generate_sitemap_xml(urls: Vec<JsSitemapUrl>) -> String {
+    let urls: Vec<_> =
+        urls.into_iter().map(|u| vmz_generator::SitemapUrl { loc: u.loc }).collect();
+    vmz_generator::emit_sitemap_xml(&urls)
+}

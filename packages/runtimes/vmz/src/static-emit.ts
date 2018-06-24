@@ -6,11 +6,14 @@
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { emitCdnPolicy } from './cdn-policy.js';
 import { emitContentAddressedAssets } from './content-addressed-assets.js';
 import { absoluteUrl, buildLocalePageMeta, localizeBodyLinks } from './locale-router.js';
+
+const require = createRequire(import.meta.url);
 
 export const STATIC_DELIVERY_MANIFEST_SCHEMA = 'vmz.static.delivery_manifest.v0';
 
@@ -529,10 +532,31 @@ function readCssEntry(distDir) {
  */
 function wrapDocument(input) {
     const propsJson = JSON.stringify(input.props ?? {});
-    const layoutAttr = input.layoutChain.length ? ` data-vmz-layout="${escapeAttr(input.layoutChain.join(','))}"` : '';
-    const pageAttr = input.chunkId ? ` data-vmz-page="${escapeAttr(input.chunkId)}"` : '';
     const localeId = input.meta.lang || 'en';
     const dir = input.meta.dir || 'ltr';
+    const native = tryNativeGenerator();
+    if (native?.generatePageShell) {
+        return native.generatePageShell({
+            bodyHtml: input.bodyHtml,
+            chunkId: input.chunkId || '',
+            layoutChain: input.layoutChain || [],
+            propsJson,
+            meta: {
+                title: input.meta.title,
+                description: input.meta.description,
+                canonical: input.meta.canonical,
+                robots: input.meta.robots,
+                lang: localeId,
+                dir,
+                alternates: input.meta.alternates || [],
+            },
+            cssEntry: input.cssEntry || null,
+            isErrorDocument: !!input.isErrorDocument,
+        });
+    }
+    // Fallback only when native addon unavailable (dev bootstrap).
+    const layoutAttr = input.layoutChain.length ? ` data-vmz-layout="${escapeAttr(input.layoutChain.join(','))}"` : '';
+    const pageAttr = input.chunkId ? ` data-vmz-page="${escapeAttr(input.chunkId)}"` : '';
     const localeAttr = ` data-vmz-locale="${escapeAttr(localeId)}" data-vmz-dir="${escapeAttr(dir)}"`;
     const cssLink = input.cssEntry ? `  <link rel="stylesheet" href="/${String(input.cssEntry).replace(/^\/+/, '')}" />\n` : '';
     const entry = input.isErrorDocument ? '' : `  <script type="module" src="/entry-client.js"></script>\n`;
@@ -567,17 +591,83 @@ ${entry}</body>
 function buildSitemap(origin, generations) {
     const urls = generations
         .filter((g) => !String(g.robots).includes('noindex'))
+        .map((g) => ({ loc: g.canonical }));
+    const native = tryNativeGenerator();
+    if (native?.generateSitemapXml) {
+        return native.generateSitemapXml(urls);
+    }
+    const body = urls
         .map(
             (g) => `  <url>
-    <loc>${escapeXml(g.canonical)}</loc>
+    <loc>${escapeXml(g.loc)}</loc>
   </url>`,
         )
         .join('\n');
     return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls}
+${body}
 </urlset>
 `;
+}
+
+/** @type {any} */
+let _nativeGen;
+
+function tryNativeGenerator() {
+    if (_nativeGen !== undefined) return _nativeGen;
+    try {
+        const envPath =
+            (typeof process.env.VMZ_NATIVE_NODE === 'string' && process.env.VMZ_NATIVE_NODE.trim()) ||
+            '';
+        if (envPath) {
+            _nativeGen = require(path.resolve(envPath));
+            return _nativeGen;
+        }
+        const { platform, arch } = process;
+        let triple = `${platform}-${arch}`;
+        if (platform === 'win32' && arch === 'x64') triple = 'win32-x64-msvc';
+        else if (platform === 'win32' && arch === 'arm64') triple = 'win32-arm64-msvc';
+        else if (platform === 'darwin' && arch === 'arm64') triple = 'darwin-arm64';
+        else if (platform === 'darwin' && arch === 'x64') triple = 'darwin-x64';
+        else if (platform === 'linux' && arch === 'x64') triple = 'linux-x64-gnu';
+        else if (platform === 'linux' && arch === 'arm64') triple = 'linux-arm64-gnu';
+        const short =
+            triple === 'win32-x64-msvc'
+                ? 'win32-x64'
+                : triple === 'win32-arm64-msvc'
+                  ? 'win32-arm64'
+                  : triple === 'linux-x64-gnu'
+                    ? 'linux-x64'
+                    : triple === 'linux-arm64-gnu'
+                      ? 'linux-arm64'
+                      : triple;
+        const pkgRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+        /** @type {string[]} */
+        const candidates = [];
+        for (const name of [`@vmz/vmz-${short}`]) {
+            try {
+                const resolved = require.resolve(`${name}/package.json`);
+                const dir = path.dirname(resolved);
+                candidates.push(path.join(dir, `vmz.${triple}.node`), path.join(dir, 'vmz.node'));
+            } catch {
+                /* optional */
+            }
+            candidates.push(
+                path.join(pkgRoot, 'node_modules', name, `vmz.${triple}.node`),
+                path.join(pkgRoot, 'node_modules', name, 'vmz.node'),
+            );
+        }
+        for (const p of candidates) {
+            if (fs.existsSync(p)) {
+                _nativeGen = require(p);
+                return _nativeGen;
+            }
+        }
+        _nativeGen = null;
+    } catch {
+        _nativeGen = null;
+    }
+    return _nativeGen;
 }
 
 function escapeHtml(s) {

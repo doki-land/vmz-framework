@@ -27,5 +27,8 @@ pub use css::{
     emit_style_bundle, emit_theme_css, format_css, theme_attr_selector, validate_css,
 };
 pub use json::{to_json, to_pretty_json};
-pub use markup::{MarkupDocument, MarkupNode, emit_html_document, emit_markup};
+pub use markup::{
+    HreflangAlternate, MarkupDocument, MarkupNode, PageShellInput, PageShellMeta, SitemapUrl,
+    emit_html_document, emit_markup, emit_mini_template, emit_page_shell, emit_sitemap_xml,
+};
 pub use lang::emit_rust_server_unit;
