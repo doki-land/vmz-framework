@@ -1282,3 +1282,36 @@ pub fn generate_sitemap_xml(urls: Vec<JsSitemapUrl>) -> String {
         urls.into_iter().map(|u| vmz_generator::SitemapUrl { loc: u.loc }).collect();
     vmz_generator::emit_sitemap_xml(&urls)
 }
+
+/// One locale export for [`generate_locale_runtime_module`].
+#[napi(object)]
+pub struct JsLocaleExport {
+    /// JS export name.
+    pub export_name: String,
+    /// Flattened variants as `[localeId, template, …]` pairs.
+    pub variants: Vec<Vec<String>>,
+    /// Whether the function takes `args`.
+    pub has_params: bool,
+}
+
+/// Generate `dist/locales/*.js` via JsCodeGenerator (oxc reprint).
+#[napi]
+pub fn generate_locale_runtime_module(default_locale: String, exports: Vec<JsLocaleExport>) -> String {
+    let exports: Vec<_> = exports
+        .into_iter()
+        .map(|e| {
+            let mut variants = Vec::new();
+            for pair in e.variants {
+                if pair.len() >= 2 {
+                    variants.push((pair[0].clone(), pair[1].clone()));
+                }
+            }
+            vmz_generator::js::LocaleExport {
+                export_name: e.export_name,
+                variants,
+                has_params: e.has_params,
+            }
+        })
+        .collect();
+    vmz_generator::js::emit_locale_runtime_module(&default_locale, &exports).code
+}
