@@ -62,11 +62,7 @@ impl EmittedArtifact {
 
     /// Write `text` to `path`, creating parent directories.
     pub fn write_to(&self, root: &Path) -> std::io::Result<PathBuf> {
-        let out = if self.path.is_absolute() {
-            self.path.clone()
-        } else {
-            root.join(&self.path)
-        };
+        let out = if self.path.is_absolute() { self.path.clone() } else { root.join(&self.path) };
         if let Some(parent) = out.parent() {
             std::fs::create_dir_all(parent)?;
         }

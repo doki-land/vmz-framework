@@ -2,7 +2,7 @@
 
 use oxc_span::GetSpan;
 
-/// Trusted raw HTML binding (`html={expr}`) — not a DOM attribute.
+/// Trusted raw HTML binding (`html={expr}`) - not a DOM attribute.
 pub fn is_html_attr(name: &str) -> bool {
     name == "html"
 }
@@ -52,7 +52,7 @@ pub fn looks_like_ternary(expr: &str) -> bool {
     false
 }
 
-/// Top-level `a ? b : c` → (test, consequent, alternate).
+/// Top-level `a ? b : c` -> (test, consequent, alternate).
 pub fn split_ternary_parts(expr: &str) -> Option<(String, String, String)> {
     let src = format!("({expr})");
     let allocator = oxc_allocator::Allocator::default();
@@ -74,11 +74,7 @@ pub fn split_ternary_parts(expr: &str) -> Option<(String, String, String)> {
     let slice = |span: oxc_span::Span| -> Option<String> {
         let s = span.start as usize;
         let e = span.end as usize;
-        if s < e && e <= src.len() {
-            Some(src[s..e].trim().to_string())
-        } else {
-            None
-        }
+        if s < e && e <= src.len() { Some(src[s..e].trim().to_string()) } else { None }
     };
     let test = slice(cond.test.span())?;
     let cons = slice(cond.consequent.span())?;
@@ -123,11 +119,10 @@ fn bind_field_idents_oxc(
     use std::collections::HashSet;
 
     use oxc_allocator::Allocator;
-    use oxc_ast::ast::{Expression, IdentifierName, MemberExpression, Statement};
-    use oxc_ast_visit::{
-        VisitMut,
-        walk_mut::{walk_expression},
+    use oxc_ast::ast::{
+        Expression, IdentifierName, MemberExpression, SimpleAssignmentTarget, Statement,
     };
+    use oxc_ast_visit::{VisitMut, walk_mut};
     use oxc_codegen::{Codegen, CodegenOptions};
     use oxc_parser::Parser;
     use oxc_span::{SPAN, SourceType};
@@ -196,7 +191,35 @@ fn bind_field_idents_oxc(
                 }
                 _ => {}
             }
-            walk_expression(self, expr);
+            walk_mut::walk_expression(self, expr);
+        }
+
+        fn visit_simple_assignment_target(&mut self, target: &mut SimpleAssignmentTarget<'a>) {
+            // `count++` / `count = 1` use AssignmentTargetIdentifier, not Expression::Identifier.
+            if let SimpleAssignmentTarget::AssignmentTargetIdentifier(id) = target {
+                let name = id.name.as_str();
+                if let Some(to) = self.aliases.get(name) {
+                    if let Some(replacement) = parse_alias_assignment_target(&self.ast, to) {
+                        *target = replacement;
+                    }
+                    return;
+                }
+                if self.fields.contains(name) && !self.scope.contains(name) {
+                    *target = SimpleAssignmentTarget::new_static_member_expression(
+                        SPAN,
+                        self.ast.ident("this"),
+                        IdentifierName::new(
+                            SPAN,
+                            Ident::from_str_in(name, &self.ast.ast),
+                            &self.ast.ast,
+                        ),
+                        false,
+                        &self.ast.ast,
+                    );
+                    return;
+                }
+            }
+            walk_mut::walk_simple_assignment_target(self, target);
         }
 
         fn visit_member_expression(&mut self, expr: &mut MemberExpression<'a>) {
@@ -233,23 +256,44 @@ fn bind_field_idents_oxc(
         Some(expr)
     }
 
+    fn parse_alias_assignment_target<'a>(
+        b: &JsAst<'a>,
+        alias: &str,
+    ) -> Option<SimpleAssignmentTarget<'a>> {
+        let parts: Vec<&str> = alias.split('.').collect();
+        if parts.len() < 2 || parts.iter().any(|p| p.is_empty()) {
+            return None;
+        }
+        let mut expr = b.ident(parts[0]);
+        for part in &parts[1..parts.len() - 1] {
+            expr = Expression::new_static_member_expression(
+                SPAN,
+                expr,
+                IdentifierName::new(SPAN, Ident::from_str_in(part, &b.ast), &b.ast),
+                false,
+                &b.ast,
+            );
+        }
+        let last = parts[parts.len() - 1];
+        Some(SimpleAssignmentTarget::new_static_member_expression(
+            SPAN,
+            expr,
+            IdentifierName::new(SPAN, Ident::from_str_in(last, &b.ast), &b.ast),
+            false,
+            &b.ast,
+        ))
+    }
+
     let ast = JsAst::new(&allocator);
-    let mut binder = Binder {
-        ast,
-        fields: &field_set,
-        scope: &scope_set,
-        aliases: &alias_map,
-    };
+    let mut binder = Binder { ast, fields: &field_set, scope: &scope_set, aliases: &alias_map };
     binder.visit_expression(&mut es.expression);
 
     let mut top = &es.expression;
     while let Expression::ParenthesizedExpression(p) = top {
         top = &p.expression;
     }
-    let mut codegen = Codegen::new().with_options(CodegenOptions {
-        single_quote: true,
-        ..CodegenOptions::default()
-    });
+    let mut codegen = Codegen::new()
+        .with_options(CodegenOptions { single_quote: true, ..CodegenOptions::default() });
     codegen.print_expression(top);
     let out = codegen.into_source_text();
     let out = out.trim().trim_end_matches(';').trim().to_string();
@@ -319,4 +363,41 @@ fn bind_field_idents_legacy(
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::bind_field_idents;
+
+    #[test]
+    fn binds_count_in_arrow_update() {
+        let fields = vec!["count".into()];
+        let out = bind_field_idents("() => count++", &fields, &[], &[]);
+        assert!(out.contains("this.count"), "got {out}");
+        let out2 = bind_field_idents("count++", &fields, &[], &[]);
+        assert!(out2.contains("this.count"), "got {out2}");
+        let out3 = bind_field_idents("() => { count = 1 }", &fields, &[], &[]);
+        assert!(out3.contains("this.count"), "got {out3}");
+    }
+
+    #[test]
+    fn binds_row_kernel_class_shape() {
+        let fields = vec!["rows".into(), "selected".into()];
+        let scope = vec!["row".into(), "index".into()];
+        let aliases = vec![("row".into(), "box1.item".into()), ("index".into(), "box1.index".into())];
+        let out = bind_field_idents(
+            "selected === row.id ? \"danger\" : \"\"",
+            &fields,
+            &scope,
+            &aliases,
+        );
+        assert!(
+            out.starts_with("this.selected") || out.contains("this.selected ==="),
+            "unexpected shape: {out}"
+        );
+        assert!(out.contains("box1.item.id"), "got {out}");
+        let act = bind_field_idents("() => this.select(row.id)", &fields, &scope, &aliases);
+        eprintln!("ACT={act}");
+        eprintln!("CLASS={out}");
+    }
 }

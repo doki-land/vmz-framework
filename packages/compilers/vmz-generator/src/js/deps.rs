@@ -1,4 +1,4 @@
-//! Template expression → transitional dep strings (oxc).
+//! Template expression -> transitional dep strings (oxc).
 
 use oxc_ast::ast::{Expression, MemberExpression};
 use oxc_ast_visit::{Visit, walk};

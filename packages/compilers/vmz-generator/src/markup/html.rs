@@ -35,7 +35,7 @@ pub struct PageShellMeta {
 pub struct PageShellInput {
     /// Trusted SSR / static body HTML (not re-escaped).
     pub body_html: String,
-    /// `data-vmz-page` chunk id (empty ⇒ omit).
+    /// `data-vmz-page` chunk id (empty => omit).
     pub chunk_id: String,
     /// Layout chain chunk ids.
     pub layout_chain: Vec<String>,
@@ -50,21 +50,11 @@ pub struct PageShellInput {
 }
 
 fn el(tag: &str, attrs: Vec<(String, String)>, children: Vec<MarkupNode>) -> MarkupNode {
-    MarkupNode::Element {
-        tag: tag.into(),
-        attrs,
-        children,
-        void: false,
-    }
+    MarkupNode::Element { tag: tag.into(), attrs, children, void: false }
 }
 
 fn void_el(tag: &str, attrs: Vec<(String, String)>) -> MarkupNode {
-    MarkupNode::Element {
-        tag: tag.into(),
-        attrs,
-        children: vec![],
-        void: true,
-    }
+    MarkupNode::Element { tag: tag.into(), attrs, children: vec![], void: true }
 }
 
 fn attr(name: &str, value: impl Into<String>) -> (String, String) {
@@ -81,10 +71,7 @@ pub fn emit_html_document(
         void_el("meta", vec![attr("charset", "utf-8")]),
         void_el(
             "meta",
-            vec![
-                attr("name", "viewport"),
-                attr("content", "width=device-width, initial-scale=1"),
-            ],
+            vec![attr("name", "viewport"), attr("content", "width=device-width, initial-scale=1")],
         ),
         el("title", vec![], vec![MarkupNode::Text(title.into())]),
     ];
@@ -95,10 +82,7 @@ pub fn emit_html_document(
         roots: vec![el(
             "html",
             vec![attr("lang", "en")],
-            vec![
-                el("head", vec![], head_kids),
-                el("body", vec![], body_children),
-            ],
+            vec![el("head", vec![], head_kids), el("body", vec![], body_children)],
         )],
     };
     emit_markup(&doc)
@@ -106,45 +90,22 @@ pub fn emit_html_document(
 
 /// Emit the production page HTML shell (static delivery / SSR wrap).
 pub fn emit_page_shell(input: &PageShellInput) -> String {
-    let locale_id = if input.meta.lang.is_empty() {
-        "en"
-    } else {
-        input.meta.lang.as_str()
-    };
-    let dir = if input.meta.dir.is_empty() {
-        "ltr"
-    } else {
-        input.meta.dir.as_str()
-    };
+    let locale_id = if input.meta.lang.is_empty() { "en" } else { input.meta.lang.as_str() };
+    let dir = if input.meta.dir.is_empty() { "ltr" } else { input.meta.dir.as_str() };
 
     let mut head_kids = vec![
         void_el("meta", vec![attr("charset", "utf-8")]),
         void_el(
             "meta",
-            vec![
-                attr("name", "viewport"),
-                attr("content", "width=device-width, initial-scale=1"),
-            ],
+            vec![attr("name", "viewport"), attr("content", "width=device-width, initial-scale=1")],
         ),
         el("title", vec![], vec![MarkupNode::Text(input.meta.title.clone())]),
         void_el(
             "meta",
-            vec![
-                attr("name", "description"),
-                attr("content", input.meta.description.clone()),
-            ],
+            vec![attr("name", "description"), attr("content", input.meta.description.clone())],
         ),
-        void_el(
-            "meta",
-            vec![attr("name", "robots"), attr("content", input.meta.robots.clone())],
-        ),
-        void_el(
-            "link",
-            vec![
-                attr("rel", "canonical"),
-                attr("href", input.meta.canonical.clone()),
-            ],
-        ),
+        void_el("meta", vec![attr("name", "robots"), attr("content", input.meta.robots.clone())]),
+        void_el("link", vec![attr("rel", "canonical"), attr("href", input.meta.canonical.clone())]),
     ];
 
     for a in &input.meta.alternates {
@@ -160,32 +121,20 @@ pub fn emit_page_shell(input: &PageShellInput) -> String {
 
     head_kids.push(void_el(
         "meta",
-        vec![
-            attr("property", "og:title"),
-            attr("content", input.meta.title.clone()),
-        ],
+        vec![attr("property", "og:title"), attr("content", input.meta.title.clone())],
     ));
     head_kids.push(void_el(
         "meta",
-        vec![
-            attr("property", "og:description"),
-            attr("content", input.meta.description.clone()),
-        ],
+        vec![attr("property", "og:description"), attr("content", input.meta.description.clone())],
     ));
     head_kids.push(void_el(
         "meta",
-        vec![
-            attr("property", "og:url"),
-            attr("content", input.meta.canonical.clone()),
-        ],
+        vec![attr("property", "og:url"), attr("content", input.meta.canonical.clone())],
     ));
 
     if let Some(css) = &input.css_entry {
         let href = format!("/{}", css.trim_start_matches('/'));
-        head_kids.push(void_el(
-            "link",
-            vec![attr("rel", "stylesheet"), attr("href", href)],
-        ));
+        head_kids.push(void_el("link", vec![attr("rel", "stylesheet"), attr("href", href)]));
     }
 
     let mut app_attrs = vec![attr("id", "app")];
@@ -219,11 +168,7 @@ pub fn emit_page_shell(input: &PageShellInput) -> String {
         dialect: MarkupDialect::Html5,
         roots: vec![el(
             "html",
-            vec![
-                attr("lang", locale_id),
-                attr("data-locale", locale_id),
-                attr("dir", dir),
-            ],
+            vec![attr("lang", locale_id), attr("data-locale", locale_id), attr("dir", dir)],
             vec![el("head", vec![], head_kids), el("body", vec![], body_kids)],
         )],
     };
@@ -295,9 +240,7 @@ mod tests {
 
     #[test]
     fn sitemap_escapes_loc() {
-        let xml = emit_sitemap_xml(&[SitemapUrl {
-            loc: "https://ex.test/a&b".into(),
-        }]);
+        let xml = emit_sitemap_xml(&[SitemapUrl { loc: "https://ex.test/a&b".into() }]);
         assert!(xml.contains("https://ex.test/a&amp;b"));
         assert!(xml.contains("urlset"));
     }

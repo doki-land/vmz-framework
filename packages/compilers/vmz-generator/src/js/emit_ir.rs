@@ -1,4 +1,4 @@
-//! Adapter: Reactive view → transitional blueprint `deps` + BindingId.
+//! Adapter: Reactive view -> transitional blueprint `deps` + BindingId.
 //!
 //! Emitter consumes Program/Reactive IR.
 //! Control-flow deps (`if` / ternary) come **only** from `ControlRegion`
@@ -103,7 +103,7 @@ impl<'a> IrDepCursor<'a> {
         None
     }
 
-    /// Take `if` / `else-if` / `else` chain — deps **only** from ControlRegion + IfCond.
+    /// Take `if` / `else-if` / `else` chain - deps **only** from ControlRegion + IfCond.
     pub fn take_if(&mut self, first_cond: &str) -> Option<TakenControlFlow> {
         // Prefer IfCond binding (BindingId hot path), then its region.
         if let Some(taken) = self.take_binding(&[BindingKind::IfCond], first_cond) {
@@ -155,7 +155,7 @@ impl<'a> IrDepCursor<'a> {
             .and_then(|b| b.region())
             .and_then(|rid| self.comp.control_regions.iter().find(|r| r.id == rid))?;
         if self.used_regions.contains(&region.id.0) {
-            // Region already consumed — still return binding-level CF from reads.
+            // Region already consumed - still return binding-level CF from reads.
             return Some(TakenControlFlow {
                 binding_id: Some(taken.id),
                 stable: taken.deps.clone(),

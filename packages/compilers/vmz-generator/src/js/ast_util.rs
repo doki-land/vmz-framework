@@ -25,7 +25,7 @@ impl<'a> JsAst<'a> {
         Self { ast: AstBuilder::new(allocator) }
     }
 
-    /// `"…"`.
+    /// `"..."`.
     pub fn str_lit(&self, s: &str) -> Expression<'a> {
         Expression::new_string_literal(SPAN, Str::from_str_in(s, &self.ast), None, &self.ast)
     }
@@ -50,7 +50,7 @@ impl<'a> JsAst<'a> {
         Expression::new_identifier(SPAN, Ident::from_str_in(name, &self.ast), &self.ast)
     }
 
-    /// `{ key: value, … }` property.
+    /// `{ key: value, ... }` property.
     pub fn prop(&self, key: &str, value: Expression<'a>) -> ObjectPropertyKind<'a> {
         ObjectPropertyKind::new_object_property(
             SPAN,
@@ -78,7 +78,7 @@ impl<'a> JsAst<'a> {
         )
     }
 
-    /// `[…]` of string literals.
+    /// `[...]` of string literals.
     pub fn str_array(&self, items: &[&str]) -> Expression<'a> {
         let mut elements = ArenaVec::with_capacity_in(items.len(), &self.ast);
         for s in items {
@@ -87,7 +87,7 @@ impl<'a> JsAst<'a> {
         Expression::new_array_expression(SPAN, elements, &self.ast)
     }
 
-    /// `[…]` of u32 literals.
+    /// `[...]` of u32 literals.
     pub fn u32_array(&self, ids: &[u32]) -> Expression<'a> {
         let mut elements = ArenaVec::with_capacity_in(ids.len(), &self.ast);
         for id in ids {
