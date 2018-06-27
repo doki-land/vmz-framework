@@ -2,14 +2,8 @@
 
 use std::path::PathBuf;
 
-use std::time::{SystemTime, UNIX_EPOCH};
 use vmz_debugger::causal_replay::*;
 use vmz_protocol::{ProgramEdgeKind, StableIdKind, TraceStatus};
-
-fn tmp() -> PathBuf {
-    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-    std::env::temp_dir().join(format!("vmz-x5-{nanos}"))
-}
 
 #[test]
 fn ingest_rejects_bad_kind() {

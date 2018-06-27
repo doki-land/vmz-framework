@@ -215,10 +215,7 @@ pub fn dispatch(session: &LspSession, request: &Value) -> Option<JsonRpcResponse
     let params = request.get("params").cloned().unwrap_or(Value::Null);
 
     // Notifications have no id.
-    if id.is_none() {
-        return None;
-    }
-    let id = id.unwrap();
+    let id = id?;
 
     match method {
         "initialize" => Some(JsonRpcResponse::ok(id, initialize_result())),

@@ -1,6 +1,6 @@
 //! Moved from `src/collect.rs` (cargo-cry: tests next to Cargo.toml).
 
-use vmz_plugin_tailwind::collect::*;
+use vmz_plugin_tailwind::*;
 
 const SAMPLE: &str = r#"<template>
   <button class="save" style:tw="px-4 py-2 rounded">Save</button>

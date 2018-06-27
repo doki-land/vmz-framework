@@ -1,6 +1,9 @@
 //! Moved from `src/production.rs` (cargo-cry: tests next to Cargo.toml).
 
-use vmz_plugin_sasso::production::*;
+use std::path::Path;
+
+use vmz_compiler::StyleLanguage;
+use vmz_plugin_sasso::{compile_source, strip_at_tailwind};
 
 #[test]
 fn strips_at_tailwind_block() {

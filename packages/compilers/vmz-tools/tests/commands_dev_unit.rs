@@ -1,6 +1,8 @@
 //! Moved from `src/commands/dev.rs` (cargo-cry: tests next to Cargo.toml).
 
 use std::fs;
+use std::thread;
+use std::time::Duration;
 use vmz_tools::commands::dev::*;
 
 #[test]

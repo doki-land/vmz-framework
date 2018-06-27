@@ -28,10 +28,7 @@ pub fn run(args: Args) -> Result<()> {
     let mut stdout = io::stdout();
     let mut reader = stdin.lock();
 
-    loop {
-        let Some(req) = read_lsp_message(&mut reader)? else {
-            break;
-        };
+    while let Some(req) = read_lsp_message(&mut reader)? {
         if req.get("method").and_then(|m| m.as_str()) == Some("exit") {
             break;
         }

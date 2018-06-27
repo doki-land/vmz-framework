@@ -133,8 +133,8 @@ pub fn src_fingerprint(src: &Path) -> Result<u64> {
 }
 
 fn is_watched_source(path: &Path) -> bool {
-    match path.extension().and_then(|e| e.to_str()) {
-        Some("vmz" | "ts" | "tsx" | "js" | "mjs" | "css" | "json") => true,
-        _ => false,
-    }
+    matches!(
+        path.extension().and_then(|e| e.to_str()),
+        Some("vmz" | "ts" | "tsx" | "js" | "mjs" | "css" | "json")
+    )
 }

@@ -107,7 +107,8 @@ fn compile_file(path: &Path, project_root: &Path, designs_styles: &Path) -> Resu
     compile(&text, &opts).map_err(|e| e.to_string())
 }
 
-fn compile_source(
+/// Compile a single style source string (used by production emit and unit tests).
+pub fn compile_source(
     source: String,
     lang: StyleLanguage,
     path: &Path,
@@ -130,8 +131,8 @@ fn compile_source(
     }
 }
 
-/// Remove `@tailwind { … }` / bare `@tailwind` so SCSS does not see TW directives.
-fn strip_at_tailwind(style: &str) -> String {
+/// Remove `@tailwind { ... }` / bare `@tailwind` so SCSS does not see TW directives.
+pub fn strip_at_tailwind(style: &str) -> String {
     let mut out = String::with_capacity(style.len());
     let mut i = 0;
     while i < style.len() {
@@ -196,10 +197,7 @@ fn list_style_files(dir: &Path) -> Vec<PathBuf> {
         if !p.is_file() {
             continue;
         }
-        match p.extension().and_then(|e| e.to_str()) {
-            Some("scss" | "css" | "sass") => out.push(p),
-            _ => {}
-        }
+        if let Some("scss" | "css" | "sass") = p.extension().and_then(|e| e.to_str()) { out.push(p) }
     }
     out
 }
