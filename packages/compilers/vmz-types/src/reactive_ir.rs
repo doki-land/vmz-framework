@@ -98,20 +98,12 @@ impl ReactiveComponent {
                         .map(|s| s.name.as_str())
                         .unwrap_or("?");
                     let mut s = name.to_string();
-                    for (i, fr) in frames.iter().enumerate() {
-                        if i == 0 {
-                            for prop in &fr.via {
-                                s.push('.');
-                                s.push_str(self.prop_name(*prop));
-                            }
-                            s.push_str(".*");
-                        } else {
-                            for prop in &fr.via {
-                                s.push('.');
-                                s.push_str(self.prop_name(*prop));
-                            }
-                            s.push_str(".*");
+                    for fr in frames {
+                        for prop in &fr.via {
+                            s.push('.');
+                            s.push_str(self.prop_name(*prop));
                         }
+                        s.push_str(".*");
                     }
                     if frames.is_empty() {
                         s.push_str(".*");
@@ -887,6 +879,7 @@ impl ReactiveComponentBuilder {
     }
 
     /// Allocate a new effect summary for a method.
+    #[allow(clippy::too_many_arguments)]
     pub fn add_effect(
         &mut self,
         name: impl Into<String>,

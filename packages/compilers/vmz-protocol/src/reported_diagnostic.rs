@@ -135,8 +135,8 @@ impl ReportedDiagnostic {
     /// First label as a DX [`SourceSpan`], when present.
     pub fn source_span(&self) -> Option<SourceSpan> {
         let label = self.diagnostic.labels.first()?;
-        let start = label.offset() as u32;
-        let end = start.saturating_add(label.len() as u32);
+        let start = label.offset();
+        let end = start.saturating_add(label.len());
         Some(SourceSpan { path: self.path.to_string_lossy().into_owned(), start, end })
     }
 
