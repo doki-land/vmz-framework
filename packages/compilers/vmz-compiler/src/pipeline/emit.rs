@@ -62,11 +62,7 @@ pub fn emit_client_js_with_ir_mapped(
     plan: Option<&vmz_types::ExecutionPlan>,
 ) -> Result<(String, Option<String>), String> {
     let owned = if reactive.is_none() {
-        Some(build_reactive_module(
-            &format!("{}.client", client.decl.name),
-            &client.decl,
-            template,
-        ))
+        Some(build_reactive_module(&format!("{}.client", client.decl.name), &client.decl, template))
     } else {
         None
     };
@@ -76,7 +72,7 @@ pub fn emit_client_js_with_ir_mapped(
 
     let owned_view =
         if view.is_none() { Some(build_native_view(template, comp, None)) } else { None };
-    let view = view.or_else(|| owned_view.as_ref()).expect("native view");
+    let view = view.or(owned_view.as_ref()).expect("native view");
 
     let owned_fields: std::collections::HashSet<String> = client
         .decl
@@ -99,18 +95,10 @@ pub fn emit_client_js_with_ir_mapped(
         }
     };
 
-    let mut emitted = emit_client_module(
-        &barrier.source,
-        &client.decl,
-        bridge.as_ref(),
-        comp,
-        view,
-        plan_ref,
-    )?;
+    let mut emitted =
+        emit_client_module(&barrier.source, &client.decl, bridge.as_ref(), comp, view, plan_ref)?;
     if barrier.rewritten > 0 && !emitted.code.contains("__vmzWriteBarrier") {
-        emitted
-            .code
-            .push_str(&format!("\n{}.__vmzWriteBarrier = true;\n", client.decl.name));
+        emitted.code.push_str(&format!("\n{}.__vmzWriteBarrier = true;\n", client.decl.name));
     }
     Ok((emitted.code, emitted.map))
 }
@@ -143,12 +131,10 @@ pub fn emit_server_js(
     server: &AnalyzedScript,
     module_id: &str,
 ) -> Result<String, String> {
-    let EmittedJs { code, .. } = emit_server_module(
-        server_source,
-        &server.decl,
-        module_id,
-        |js, id| crate::virtual_server::rewrite_imports_to_relative(js, id),
-    )?;
+    let EmittedJs { code, .. } =
+        emit_server_module(server_source, &server.decl, module_id, |js, id| {
+            crate::virtual_server::rewrite_imports_to_relative(js, id)
+        })?;
     Ok(code)
 }
 

@@ -257,6 +257,7 @@ fn walk_element_branch(
     walk_element_stripping(node, fields, scope, each_frames, b, None, &[strip_name], true);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn walk_element_stripping(
     node: &TemplateNode,
     fields: &[String],
@@ -388,6 +389,7 @@ fn add_text_binding(
     add_expr_binding(expr, BindingKind::Text, None, fields, scope, each_frames, b, region);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn add_expr_binding(
     expr: &str,
     kind: BindingKind,

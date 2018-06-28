@@ -209,7 +209,7 @@ fn reachable_style_files(entry: &Path, styles_dir: &Path) -> HashSet<PathBuf> {
             }
         }
     }
-    seen.into_iter().map(PathBuf::from).collect()
+    seen.into_iter().collect()
 }
 
 fn canonicalize_lossy(path: &Path) -> PathBuf {

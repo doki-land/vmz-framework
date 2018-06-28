@@ -5,10 +5,10 @@
 //! for diagnostics; summaries must not silently miss callees already on the graph.
 //!
 //! Conservative widen:
-//! - cycles ?monotonic fixed-point (no silent miss)
-//! - `opaque_callee` (dynamic `this[k]`, or unresolved `this.foo`) ?`field.*` on
-//! every component field for both reads and writes; flag propagates through the
-//! call graph so callers also widen
+//! - cycles -> monotonic fixed-point (no silent miss)
+//! - `opaque_callee` (dynamic `this[k]`, or unresolved `this.foo`) -> `field.*` on
+//!   every component field for both reads and writes; flag propagates through the
+//!   call graph so callers also widen
 
 use std::collections::HashMap;
 

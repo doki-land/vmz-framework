@@ -443,9 +443,9 @@ pub fn lower_miniprogram_route_server_style_json(root: String) -> String {
 /// miniprogram: tooling deploy package + Mini Host handoff.
 #[napi]
 pub fn lower_miniprogram_tooling_deploy_json(root: String) -> String {
-    vmz_compiler::miniprogram_tooling_deploy::lower_miniprogram_tooling_deploy(std::path::Path::new(
-        &root,
-    ))
+    vmz_compiler::miniprogram_tooling_deploy::lower_miniprogram_tooling_deploy(
+        std::path::Path::new(&root),
+    )
     .to_json()
 }
 
@@ -1251,10 +1251,7 @@ pub fn generate_page_shell(input: JsPageShellInput) -> String {
             .alternates
             .unwrap_or_default()
             .into_iter()
-            .map(|a| vmz_generator::HreflangAlternate {
-                hreflang: a.hreflang,
-                href: a.href,
-            })
+            .map(|a| vmz_generator::HreflangAlternate { hreflang: a.hreflang, href: a.href })
             .collect(),
     };
     vmz_generator::emit_page_shell(&vmz_generator::PageShellInput {
@@ -1278,8 +1275,7 @@ pub struct JsSitemapUrl {
 /// Generate `sitemap.xml` via MarkupCodeGenerator.
 #[napi]
 pub fn generate_sitemap_xml(urls: Vec<JsSitemapUrl>) -> String {
-    let urls: Vec<_> =
-        urls.into_iter().map(|u| vmz_generator::SitemapUrl { loc: u.loc }).collect();
+    let urls: Vec<_> = urls.into_iter().map(|u| vmz_generator::SitemapUrl { loc: u.loc }).collect();
     vmz_generator::emit_sitemap_xml(&urls)
 }
 
@@ -1296,7 +1292,10 @@ pub struct JsLocaleExport {
 
 /// Generate `dist/locales/*.js` via JsCodeGenerator (oxc reprint).
 #[napi]
-pub fn generate_locale_runtime_module(default_locale: String, exports: Vec<JsLocaleExport>) -> String {
+pub fn generate_locale_runtime_module(
+    default_locale: String,
+    exports: Vec<JsLocaleExport>,
+) -> String {
     let exports: Vec<_> = exports
         .into_iter()
         .map(|e| {

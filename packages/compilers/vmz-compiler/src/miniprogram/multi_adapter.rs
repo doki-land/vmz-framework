@@ -8,14 +8,16 @@ use std::fs;
 use std::path::Path;
 
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
-use vmz_protocol::{CheckReportStatus, DIAG_ARTIFACT_INVALID, PLAN_SCHEMA, Severity, TargetDiagnostic};
+use vmz_protocol::{
+    CheckReportStatus, DIAG_ARTIFACT_INVALID, PLAN_SCHEMA, Severity, TargetDiagnostic,
+};
 
 use super::static_slice::MINI_TEMPLATE_DIALECT;
 use super::tooling_deploy::{
-    lower_miniprogram_tooling_deploy, MINI_DEPLOY_PACKAGE_SCHEMA, MINI_DEV_SESSION_SCHEMA,
-    MINI_HOST_SCHEMA, MINI_VENDOR_TOOLING_SCHEMA,
+    MINI_DEPLOY_PACKAGE_SCHEMA, MINI_DEV_SESSION_SCHEMA, MINI_HOST_SCHEMA,
+    MINI_VENDOR_TOOLING_SCHEMA, lower_miniprogram_tooling_deploy,
 };
 
 /// Report schema for multi-adapter check/lower.
@@ -67,7 +69,12 @@ impl MiniMultiAdapterReport {
     }
 }
 
-fn diag(path: &str, severity: Severity, message: impl Into<String>, code: &str) -> TargetDiagnostic {
+fn diag(
+    path: &str,
+    severity: Severity,
+    message: impl Into<String>,
+    code: &str,
+) -> TargetDiagnostic {
     TargetDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
@@ -171,11 +178,7 @@ pub fn validate_multi_adapter_manifest(manifest: &Value, out: &mut Vec<TargetDia
         ));
     }
 
-    if manifest
-        .get("allowsPlatformSemanticFork")
-        .and_then(|v| v.as_bool())
-        == Some(true)
-    {
+    if manifest.get("allowsPlatformSemanticFork").and_then(|v| v.as_bool()) == Some(true) {
         out.push(diag(
             "allowsPlatformSemanticFork",
             Severity::Error,
@@ -186,13 +189,7 @@ pub fn validate_multi_adapter_manifest(manifest: &Value, out: &mut Vec<TargetDia
 
     let expected_shared = shared_mini_contracts();
     let shared = manifest.get("shared").cloned().unwrap_or(json!({}));
-    for key in [
-        "artifactSchema",
-        "deployPackageSchema",
-        "hostSchema",
-        "dialect",
-        "planSchema",
-    ] {
+    for key in ["artifactSchema", "deployPackageSchema", "hostSchema", "dialect", "planSchema"] {
         let got = shared.get(key).and_then(|v| v.as_str()).unwrap_or("");
         let want = expected_shared.get(key).and_then(|v| v.as_str()).unwrap_or("");
         if got != want {
@@ -213,16 +210,10 @@ pub fn validate_multi_adapter_manifest(manifest: &Value, out: &mut Vec<TargetDia
         }
     }
 
-    let adapters = manifest
-        .get("adapters")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let adapters = manifest.get("adapters").and_then(|v| v.as_array()).cloned().unwrap_or_default();
 
     for want_id in REQUIRED_MINI_ADAPTERS {
-        if !adapters.iter().any(|a| {
-            a.get("adapterId").and_then(|v| v.as_str()) == Some(*want_id)
-        }) {
+        if !adapters.iter().any(|a| a.get("adapterId").and_then(|v| v.as_str()) == Some(*want_id)) {
             out.push(diag(
                 "adapters",
                 Severity::Error,
@@ -242,10 +233,7 @@ pub fn validate_multi_adapter_manifest(manifest: &Value, out: &mut Vec<TargetDia
     }
 
     for adapter in &adapters {
-        let id = adapter
-            .get("adapterId")
-            .and_then(|v| v.as_str())
-            .unwrap_or("?");
+        let id = adapter.get("adapterId").and_then(|v| v.as_str()).unwrap_or("?");
         let path = format!("adapters.{id}");
 
         if adapter.get("schema").and_then(|v| v.as_str()) != Some(MINI_ADAPTER_CONTRIBUTION_SCHEMA)
@@ -273,11 +261,7 @@ pub fn validate_multi_adapter_manifest(manifest: &Value, out: &mut Vec<TargetDia
                 DIAG_MINI_ADAPTER_SEMANTIC_CORE,
             ));
         }
-        if adapter
-            .get("isSemanticTruthSource")
-            .and_then(|v| v.as_bool())
-            == Some(true)
-        {
+        if adapter.get("isSemanticTruthSource").and_then(|v| v.as_bool()) == Some(true) {
             out.push(diag(
                 &format!("{path}.isSemanticTruthSource"),
                 Severity::Error,
@@ -285,11 +269,7 @@ pub fn validate_multi_adapter_manifest(manifest: &Value, out: &mut Vec<TargetDia
                 DIAG_MINI_ADAPTER_SEMANTIC_CORE,
             ));
         }
-        if adapter
-            .get("consumesNeutralPackage")
-            .and_then(|v| v.as_bool())
-            != Some(true)
-        {
+        if adapter.get("consumesNeutralPackage").and_then(|v| v.as_bool()) != Some(true) {
             out.push(diag(
                 &format!("{path}.consumesNeutralPackage"),
                 Severity::Error,
@@ -297,9 +277,7 @@ pub fn validate_multi_adapter_manifest(manifest: &Value, out: &mut Vec<TargetDia
                 DIAG_MINI_SHARED_FORK,
             ));
         }
-        if adapter
-            .pointer("/elementMapping/vendorTemplateEmitter")
-            .and_then(|v| v.as_bool())
+        if adapter.pointer("/elementMapping/vendorTemplateEmitter").and_then(|v| v.as_bool())
             == Some(true)
         {
             out.push(diag(
@@ -309,10 +287,8 @@ pub fn validate_multi_adapter_manifest(manifest: &Value, out: &mut Vec<TargetDia
                 DIAG_MINI_ADAPTER_SEMANTIC_CORE,
             ));
         }
-        let vendor_role = adapter
-            .pointer("/vendorTooling/role")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let vendor_role =
+            adapter.pointer("/vendorTooling/role").and_then(|v| v.as_str()).unwrap_or("");
         if vendor_role != "transport-conformance" {
             out.push(diag(
                 &format!("{path}.vendorTooling.role"),
@@ -321,11 +297,7 @@ pub fn validate_multi_adapter_manifest(manifest: &Value, out: &mut Vec<TargetDia
                 DIAG_MINI_ADAPTER_SEMANTIC_CORE,
             ));
         }
-        if adapter
-            .pointer("/vendorTooling/invokedInCi")
-            .and_then(|v| v.as_bool())
-            != Some(false)
-        {
+        if adapter.pointer("/vendorTooling/invokedInCi").and_then(|v| v.as_bool()) != Some(false) {
             out.push(diag(
                 &format!("{path}.vendorTooling.invokedInCi"),
                 Severity::Error,
@@ -374,11 +346,8 @@ pub fn lower_miniprogram_multi_adapter(root: &Path) -> MiniMultiAdapterReport {
     diagnostics.extend(deploy.diagnostics.clone());
 
     let manifest_rel = "dist/_vmz/mini-deploy/multi-adapter.json";
-    let manifest_abs = root
-        .join("dist")
-        .join("_vmz")
-        .join("mini-deploy")
-        .join("multi-adapter.json");
+    let manifest_abs =
+        root.join("dist").join("_vmz").join("mini-deploy").join("multi-adapter.json");
 
     if deploy.status == CheckReportStatus::Failed {
         return MiniMultiAdapterReport {
@@ -478,13 +447,18 @@ mod tests {
             ]
         });
         validate_multi_adapter_manifest(&bad, &mut diags);
-        assert!(diags.iter().any(|d| d.code_string().as_deref() == Some(DIAG_MINI_MISSING_ADAPTER)));
+        assert!(
+            diags.iter().any(|d| d.code_string().as_deref() == Some(DIAG_MINI_MISSING_ADAPTER))
+        );
     }
 
     #[test]
     fn accepts_canonical_dual_adapters() {
         let mut diags = Vec::new();
-        validate_multi_adapter_manifest(&build_manifest("dist/_vmz/mini-deploy/package.json"), &mut diags);
+        validate_multi_adapter_manifest(
+            &build_manifest("dist/_vmz/mini-deploy/package.json"),
+            &mut diags,
+        );
         assert!(diags.iter().all(|d| !d.is_error()), "{diags:?}");
     }
 }

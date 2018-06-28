@@ -108,7 +108,7 @@ pub fn relocate_manifest(
         })?;
         entries.push(RelocatedUrlEntry {
             id: e.id.clone(),
-            kind: e.kind.clone(),
+            kind: e.kind,
             logical_path: e.logical_path.clone(),
             href,
         });

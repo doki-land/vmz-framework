@@ -1,8 +1,6 @@
 //! Structure / lifecycle unit tests.
 
-use vmz_compiler::miniprogram::structure::{
-    lower_unit_structure, MINI_LIFECYCLE_TABLE_SCHEMA,
-};
+use vmz_compiler::miniprogram::structure::{MINI_LIFECYCLE_TABLE_SCHEMA, lower_unit_structure};
 use vmz_protocol::VmzModuleKind;
 use vmz_types::{
     Binding, BindingId, DeploymentView, DisposeRegionSource, ExecutionPlan, FieldId, FieldKind,
@@ -50,11 +48,7 @@ fn sample_unit() -> ProgramUnit {
                     body: Box::new(ViewNode::Text { value: "hi".into() }),
                 }],
             },
-            ViewNode::Slot {
-                name: None,
-                attrs: vec![],
-                children: vec![],
-            },
+            ViewNode::Slot { name: None, attrs: vec![], children: vec![] },
         ],
     };
     let reactive = ReactiveComponent {
@@ -72,12 +66,7 @@ fn sample_unit() -> ProgramUnit {
                 region: None,
                 expr: None,
             },
-            Binding::Text {
-                id: BindingId(1),
-                reads: vec![],
-                region: None,
-                expr: None,
-            },
+            Binding::Text { id: BindingId(1), reads: vec![], region: None, expr: None },
             Binding::ComponentProp {
                 id: BindingId(2),
                 reads: vec![],
@@ -85,12 +74,7 @@ fn sample_unit() -> ProgramUnit {
                 expr: None,
                 attr: "label".into(),
             },
-            Binding::IfCond {
-                id: BindingId(3),
-                reads: vec![],
-                region: None,
-                expr: None,
-            },
+            Binding::IfCond { id: BindingId(3), reads: vec![], region: None, expr: None },
         ],
         effects: vec![],
         control_regions: vec![],

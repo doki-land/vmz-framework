@@ -932,10 +932,7 @@ fn emit_file(
     let meta_path = out_dir.join(format!("{stem}.vmz.json"));
     fs::write(
         &meta_path,
-        format!(
-            "{}\n",
-            vmz_generator::to_pretty_json(&meta).unwrap_or_else(|_| "{}".into())
-        ),
+        format!("{}\n", vmz_generator::to_pretty_json(&meta).unwrap_or_else(|_| "{}".into())),
     )?;
     report.emitted.push(meta_path);
 
@@ -1028,10 +1025,7 @@ fn emit_deployment_json(
     let out = options.out_dir.join("vmz-deployment.json");
     fs::write(
         &out,
-        format!(
-            "{}\n",
-            vmz_generator::to_pretty_json(&doc).unwrap_or_else(|_| "{}".into())
-        ),
+        format!("{}\n", vmz_generator::to_pretty_json(&doc).unwrap_or_else(|_| "{}".into())),
     )?;
     report.emitted.push(out);
     Ok(())

@@ -48,12 +48,7 @@ pub fn analyze_rust_server_dsl(source: &str) -> AnalyzedScript {
     let mut decl = ComponentDecl::new(type_name, Span::default());
     decl.methods = methods;
 
-    AnalyzedScript {
-        kind: ScriptKind::Server,
-        decl,
-        parse_errors,
-        forbidden_factories: Vec::new(),
-    }
+    AnalyzedScript { kind: ScriptKind::Server, decl, parse_errors, forbidden_factories: Vec::new() }
 }
 
 /// Emit rustc-facing glue for one server unit + JSON capability table.
@@ -75,10 +70,8 @@ fn extract_server_type_name(source: &str) -> Option<String> {
         } else {
             continue;
         };
-        let name: String = rest
-            .chars()
-            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
-            .collect();
+        let name: String =
+            rest.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
         if !name.is_empty() {
             return Some(name);
         }
@@ -95,10 +88,8 @@ fn extract_capability_methods(source: &str) -> Vec<MethodDecl> {
             continue;
         };
         // Skip `fn main`
-        let name: String = after_fn
-            .chars()
-            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
-            .collect();
+        let name: String =
+            after_fn.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
         if name.is_empty() || name == "main" || name == "new" {
             continue;
         }

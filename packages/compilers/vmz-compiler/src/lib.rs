@@ -72,13 +72,13 @@ pub use native::multi_platform;
 pub use native::shell as native_shell;
 pub use native::surface as native_surface;
 
-pub use miniprogram::target as miniprogram_target;
-pub use miniprogram::static_slice as miniprogram_static_slice;
 pub use miniprogram::binding_event as miniprogram_binding_event;
-pub use miniprogram::structure as miniprogram_structure;
-pub use miniprogram::route_server_style as miniprogram_route_server_style;
-pub use miniprogram::tooling_deploy as miniprogram_tooling_deploy;
 pub use miniprogram::multi_adapter as miniprogram_multi_adapter;
+pub use miniprogram::route_server_style as miniprogram_route_server_style;
+pub use miniprogram::static_slice as miniprogram_static_slice;
+pub use miniprogram::structure as miniprogram_structure;
+pub use miniprogram::target as miniprogram_target;
+pub use miniprogram::tooling_deploy as miniprogram_tooling_deploy;
 
 pub use platform::conformance as cross_host_conformance;
 pub use platform::delivery as delivery_proof;

@@ -2,7 +2,6 @@
 
 use std::fs;
 
-use std::path::PathBuf;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 use vmz_compiler::platform::solver::*;
@@ -199,7 +198,7 @@ fn prefers_surface_breaks_ambiguity() {
     };
     let mut diags = Vec::new();
     let manifest = solve_profile(&host, &delivery, &input, &mut diags);
-    assert!(diags.iter().all(|d| d.is_error() == false));
+    assert!(diags.iter().all(|d| !d.is_error()));
     assert_eq!(manifest.surface_assignments.assignments[0].surface_id, "vmz.surface.native.alt");
     assert_eq!(
         manifest.surface_assignments.assignments[0].reason,

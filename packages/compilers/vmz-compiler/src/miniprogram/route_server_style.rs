@@ -1,7 +1,7 @@
 //! Route / `#server` / Canonical Style lowering (TemplateSurface).
 //!
 //! Composes on structure slice: wraps lifecycle manifest with route realization
-//! + server transport stubs; fills `style` with vendor-neutral class/CSS tokens.
+//! and server transport stubs; fills `style` with vendor-neutral class/CSS tokens.
 //! Not a WeChat WXML/WXSS emitter; does not ship `#server` implementation bodies.
 
 use std::collections::BTreeSet;
@@ -9,7 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use walkdir::WalkDir;
 
 use vmz_protocol::{
@@ -18,8 +18,8 @@ use vmz_protocol::{
 };
 use vmz_types::{ProgramModule, ProgramUnit, ViewAttrValue, ViewNode, ViewStatus};
 
-use super::structure::{lower_unit_structure, MINI_LIFECYCLE_TABLE_SCHEMA};
 use super::static_slice::MINI_TEMPLATE_DIALECT;
+use super::structure::{MINI_LIFECYCLE_TABLE_SCHEMA, lower_unit_structure};
 
 /// Report schema for route/server/style lowering.
 pub const MINI_ROUTE_SERVER_STYLE_REPORT_SCHEMA: &str = "vmz.target.mini_route_server_style.v0";
@@ -75,7 +75,12 @@ impl MiniRouteServerStyleReport {
     }
 }
 
-fn diag(path: &str, severity: Severity, message: impl Into<String>, code: &str) -> TargetDiagnostic {
+fn diag(
+    path: &str,
+    severity: Severity,
+    message: impl Into<String>,
+    code: &str,
+) -> TargetDiagnostic {
     TargetDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
@@ -124,11 +129,7 @@ pub fn lower_unit_route_server_style(
     artifact.manifest = Some(manifest.to_string());
     artifact.style = Some(style.to_string());
 
-    if artifact
-        .template
-        .as_deref()
-        .is_some_and(|t| t.contains("wx:") || t.contains("wxss"))
-    {
+    if artifact.template.as_deref().is_some_and(|t| t.contains("wx:") || t.contains("wxss")) {
         diagnostics.push(diag(
             path_for_diag,
             Severity::Error,
@@ -252,7 +253,7 @@ fn collect_class_tokens(roots: &[ViewNode]) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
     fn walk(node: &ViewNode, out: &mut BTreeSet<String>) {
         match node {
-            ViewNode::Element { attrs, children, each: _, .. } => {
+            ViewNode::Element { attrs, children, .. } => {
                 for a in attrs {
                     if a.name == "class" {
                         if let ViewAttrValue::Static { value } = &a.value {
@@ -350,11 +351,7 @@ fn read_css_bundle(root: &Path) -> Option<String> {
             }
         }
     }
-    if parts.is_empty() {
-        None
-    } else {
-        Some(parts.join("\n"))
-    }
+    if parts.is_empty() { None } else { Some(parts.join("\n")) }
 }
 
 fn collect_program_json(root: &Path) -> Vec<PathBuf> {
@@ -378,14 +375,12 @@ fn collect_program_json(root: &Path) -> Vec<PathBuf> {
 }
 
 fn is_page_or_app(unit: &ProgramUnit) -> bool {
-    matches!(
-        unit.deployment.unit_kind,
-        Some(VmzModuleKind::Page) | Some(VmzModuleKind::App)
-    ) || unit
-        .deployment
-        .chunk_id
-        .as_deref()
-        .is_some_and(|c| c.starts_with("pages/") || c == "Application")
+    matches!(unit.deployment.unit_kind, Some(VmzModuleKind::Page) | Some(VmzModuleKind::App))
+        || unit
+            .deployment
+            .chunk_id
+            .as_deref()
+            .is_some_and(|c| c.starts_with("pages/") || c == "Application")
 }
 
 /// Lower page/app units with route + `#server` stubs + Canonical Style.
@@ -412,11 +407,8 @@ pub fn lower_miniprogram_route_server_style_slices(root: &Path) -> MiniRouteServ
 
     let mut modules = Vec::new();
     for prog_path in &programs {
-        let rel = prog_path
-            .strip_prefix(root)
-            .unwrap_or(prog_path)
-            .to_string_lossy()
-            .replace('\\', "/");
+        let rel =
+            prog_path.strip_prefix(root).unwrap_or(prog_path).to_string_lossy().replace('\\', "/");
         match fs::read_to_string(prog_path).and_then(|t| {
             serde_json::from_str::<ProgramModule>(&t)
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
@@ -439,11 +431,8 @@ pub fn lower_miniprogram_route_server_style_slices(root: &Path) -> MiniRouteServ
     let _ = fs::create_dir_all(&out_mini);
 
     for (prog_path, module) in programs.iter().zip(modules.iter()) {
-        let rel = prog_path
-            .strip_prefix(root)
-            .unwrap_or(prog_path)
-            .to_string_lossy()
-            .replace('\\', "/");
+        let rel =
+            prog_path.strip_prefix(root).unwrap_or(prog_path).to_string_lossy().replace('\\', "/");
         for unit in &module.units {
             if !is_page_or_app(unit) {
                 continue;
@@ -451,11 +440,7 @@ pub fn lower_miniprogram_route_server_style_slices(root: &Path) -> MiniRouteServ
             if unit.view.status != ViewStatus::Native {
                 continue;
             }
-            let chunk = unit
-                .deployment
-                .chunk_id
-                .clone()
-                .unwrap_or_else(|| unit.name.clone());
+            let chunk = unit.deployment.chunk_id.clone().unwrap_or_else(|| unit.name.clone());
             match lower_unit_route_server_style(
                 "mini-program",
                 unit,
@@ -467,7 +452,8 @@ pub fn lower_miniprogram_route_server_style_slices(root: &Path) -> MiniRouteServ
                     diagnostics.append(&mut unit_diags);
                     let file_name = format!("{}.mini.json", chunk.replace('/', "__"));
                     let abs = out_mini.join(&file_name);
-                    let body = serde_json::to_string_pretty(&artifact).unwrap_or_else(|_| "{}".into());
+                    let body =
+                        serde_json::to_string_pretty(&artifact).unwrap_or_else(|_| "{}".into());
                     if let Err(e) = fs::write(&abs, format!("{body}\n")) {
                         diagnostics.push(diag(
                             &rel,
@@ -477,11 +463,8 @@ pub fn lower_miniprogram_route_server_style_slices(root: &Path) -> MiniRouteServ
                         ));
                         continue;
                     }
-                    let artifact_rel = abs
-                        .strip_prefix(root)
-                        .unwrap_or(&abs)
-                        .to_string_lossy()
-                        .replace('\\', "/");
+                    let artifact_rel =
+                        abs.strip_prefix(root).unwrap_or(&abs).to_string_lossy().replace('\\', "/");
                     artifacts.push(MiniRouteServerStyleUnitResult {
                         chunk_id: chunk,
                         unit_name: unit.name.clone(),

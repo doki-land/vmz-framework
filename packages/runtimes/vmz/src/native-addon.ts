@@ -19,9 +19,7 @@ let cached;
 export function tryLoadNativeAddon() {
     if (cached !== undefined) return cached;
     try {
-        const envPath =
-            (typeof process.env.VMZ_NATIVE_NODE === 'string' && process.env.VMZ_NATIVE_NODE.trim()) ||
-            '';
+        const envPath = (typeof process.env.VMZ_NATIVE_NODE === 'string' && process.env.VMZ_NATIVE_NODE.trim()) || '';
         if (envPath) {
             cached = require(path.resolve(envPath));
             return cached;
@@ -55,10 +53,7 @@ export function tryLoadNativeAddon() {
         } catch {
             /* optional */
         }
-        candidates.push(
-            path.join(pkgRoot, 'node_modules', name, `vmz.${triple}.node`),
-            path.join(pkgRoot, 'node_modules', name, 'vmz.node'),
-        );
+        candidates.push(path.join(pkgRoot, 'node_modules', name, `vmz.${triple}.node`), path.join(pkgRoot, 'node_modules', name, 'vmz.node'));
         for (const p of candidates) {
             if (fs.existsSync(p)) {
                 cached = require(p);

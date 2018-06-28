@@ -1,6 +1,6 @@
 //! Moved from `src/tooling/rename.rs` (cargo-cry: tests next to Cargo.toml).
 
-use vmz_protocol::{DxPreviewStatus, RenameIntent, StableIdKind, TextEdit, WorkspaceEditStatus};
+use vmz_protocol::{DxPreviewStatus, RenameIntent, StableIdKind, WorkspaceEditStatus};
 
 use std::fs;
 
