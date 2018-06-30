@@ -17,6 +17,10 @@ pub enum ContentType {
     Xml,
     /// JSON document.
     Json,
+    /// JSON5 document (author config / locales / SFC data blocks).
+    Json5,
+    /// YAML document (optional `lang="yaml"` author surface).
+    Yaml,
     /// Other / Rust glue / plain text.
     Text,
 }
