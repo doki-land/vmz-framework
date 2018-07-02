@@ -71,7 +71,7 @@ pub struct MiniRouteServerStyleReport {
 impl MiniRouteServerStyleReport {
     /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
+        vmz_generator::to_pretty_json(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
@@ -126,8 +126,8 @@ pub fn lower_unit_route_server_style(
         "serverTransport": server,
     });
 
-    artifact.manifest = Some(manifest.to_string());
-    artifact.style = Some(style.to_string());
+    artifact.manifest = Some(crate::miniprogram::compact_json(&manifest));
+    artifact.style = Some(crate::miniprogram::compact_json(&style));
 
     if artifact.template.as_deref().is_some_and(|t| t.contains("wx:") || t.contains("wxss")) {
         diagnostics.push(diag(
@@ -453,7 +453,7 @@ pub fn lower_miniprogram_route_server_style_slices(root: &Path) -> MiniRouteServ
                     let file_name = format!("{}.mini.json", chunk.replace('/', "__"));
                     let abs = out_mini.join(&file_name);
                     let body =
-                        serde_json::to_string_pretty(&artifact).unwrap_or_else(|_| "{}".into());
+                        vmz_generator::to_pretty_json(&artifact).unwrap_or_else(|_| "{}".into());
                     if let Err(e) = fs::write(&abs, format!("{body}\n")) {
                         diagnostics.push(diag(
                             &rel,

@@ -64,7 +64,7 @@ pub struct MiniStaticSliceReport {
 impl MiniStaticSliceReport {
     /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
+        vmz_generator::to_pretty_json(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
@@ -136,7 +136,7 @@ pub fn lower_view_static_slice(
         platform_id: platform_id.into(),
         template: Some(template),
         style: None,
-        logic: Some(logic.to_string()),
+        logic: Some(crate::miniprogram::compact_json(&logic)),
         event_table: None,
         data_patch_table: None,
         manifest: None,
@@ -342,7 +342,7 @@ pub fn lower_miniprogram_static_slices(root: &Path) -> MiniStaticSliceReport {
                     let file_name = format!("{}.mini.json", chunk.replace('/', "__"));
                     let abs = out_mini.join(&file_name);
                     let body =
-                        serde_json::to_string_pretty(&artifact).unwrap_or_else(|_| "{}".into());
+                        vmz_generator::to_pretty_json(&artifact).unwrap_or_else(|_| "{}".into());
                     if let Err(e) = fs::write(&abs, format!("{body}\n")) {
                         diagnostics.push(diag(
                             &rel,

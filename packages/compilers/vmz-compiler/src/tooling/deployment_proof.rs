@@ -107,7 +107,7 @@ pub struct BoundaryValidatorDocument {
 impl BoundaryValidatorDocument {
     /// Pretty-print JSON for N-API / file emit.
     pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
+        vmz_generator::to_pretty_json(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
@@ -201,7 +201,7 @@ pub struct LeakageDocument {
 impl LeakageDocument {
     /// Pretty-print JSON for N-API / file emit.
     pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
+        vmz_generator::to_pretty_json(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
@@ -273,7 +273,7 @@ pub struct CapabilityTargetDocument {
 impl CapabilityTargetDocument {
     /// Pretty-print JSON for N-API / file emit.
     pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
+        vmz_generator::to_pretty_json(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
@@ -302,7 +302,7 @@ pub struct DeadGraphDocument {
 impl DeadGraphDocument {
     /// Pretty-print JSON for N-API / file emit.
     pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
+        vmz_generator::to_pretty_json(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
@@ -327,7 +327,7 @@ pub struct DeploymentProofCheckReport {
 impl DeploymentProofCheckReport {
     /// Pretty-print JSON for N-API / file emit.
     pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
+        vmz_generator::to_pretty_json(self).unwrap_or_else(|_| "{}".into())
     }
 }
 

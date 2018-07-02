@@ -63,7 +63,7 @@ pub struct MiniStructureReport {
 impl MiniStructureReport {
     /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
+        vmz_generator::to_pretty_json(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
@@ -168,13 +168,10 @@ pub fn lower_unit_structure(
     let event_table = if ev.handlers.is_empty() {
         None
     } else {
-        Some(
-            json!({
-                "schema": MINI_EVENT_TABLE_SCHEMA,
-                "handlers": ev.handlers,
-            })
-            .to_string(),
-        )
+        Some(crate::miniprogram::compact_json(&json!({
+            "schema": MINI_EVENT_TABLE_SCHEMA,
+            "handlers": ev.handlers,
+        })))
     };
 
     let lifecycle = build_lifecycle_table(unit);
@@ -184,10 +181,10 @@ pub fn lower_unit_structure(
         platform_id: platform_id.into(),
         template: Some(template),
         style: None,
-        logic: Some(logic.to_string()),
+        logic: Some(crate::miniprogram::compact_json(&logic)),
         event_table,
-        data_patch_table: Some(data_patch.to_string()),
-        manifest: Some(lifecycle.to_string()),
+        data_patch_table: Some(crate::miniprogram::compact_json(&data_patch)),
+        manifest: Some(crate::miniprogram::compact_json(&lifecycle)),
         plan_schema: PLAN_SCHEMA.into(),
     };
     Ok((artifact, diagnostics))
@@ -665,7 +662,7 @@ pub fn lower_miniprogram_structure_slices(root: &Path) -> MiniStructureReport {
                     let file_name = format!("{}.mini.json", chunk.replace('/', "__"));
                     let abs = out_mini.join(&file_name);
                     let body =
-                        serde_json::to_string_pretty(&artifact).unwrap_or_else(|_| "{}".into());
+                        vmz_generator::to_pretty_json(&artifact).unwrap_or_else(|_| "{}".into());
                     if let Err(e) = fs::write(&abs, format!("{body}\n")) {
                         diagnostics.push(diag(
                             &rel,

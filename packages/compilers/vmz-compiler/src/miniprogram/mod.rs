@@ -9,3 +9,8 @@ pub mod static_slice;
 pub mod structure;
 pub mod target;
 pub mod tooling_deploy;
+
+/// Compact JSON text for Mini artifact fields (logic / event / patch / manifest).
+pub(crate) fn compact_json<T: serde::Serialize>(value: &T) -> String {
+    vmz_generator::to_json(value).unwrap_or_else(|_| "{}".into())
+}

@@ -467,5 +467,5 @@ pub fn relocate_manifest_json(manifest_json: &str, base: &str) -> Result<String,
     let app_base = parse_application_base(base, Some(manifest.application_id.clone()))
         .map_err(|d| d.message().to_owned())?;
     let relocated = relocate_manifest(&manifest, &app_base).map_err(|d| d.message().to_owned())?;
-    serde_json::to_string_pretty(&relocated).map_err(|e| e.to_string())
+    vmz_generator::to_pretty_json(&relocated).map_err(|e| e.to_string())
 }

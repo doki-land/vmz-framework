@@ -956,10 +956,13 @@ fn emit_file(
     }
     let reactive = program.to_reactive_module();
     let reactive_path = out_dir.join(format!("{stem}.reactive.json"));
-    fs::write(&reactive_path, reactive.to_json())?;
+    let reactive_json =
+        vmz_generator::to_pretty_json(&reactive).unwrap_or_else(|_| "{}".into());
+    fs::write(&reactive_path, format!("{reactive_json}\n"))?;
     report.emitted.push(reactive_path);
     let program_path = out_dir.join(format!("{stem}.program.json"));
-    fs::write(&program_path, program.to_json())?;
+    let program_json = vmz_generator::to_pretty_json(&program).unwrap_or_else(|_| "{}".into());
+    fs::write(&program_path, format!("{program_json}\n"))?;
     report.emitted.push(program_path);
 
     let _ = options.release;

@@ -362,7 +362,7 @@ impl ContributionStore {
                     contribution_id: stored.item.id.clone(),
                     manifest: manifest.clone(),
                 };
-                let body = serde_json::to_string_pretty(&doc)
+                let body = vmz_generator::to_pretty_json(&doc)
                     .map_err(|e| format!("serialize plugin target `{target_id}`: {e}"))?;
                 std::fs::write(&file, format!("{body}\n"))?;
                 emitted.push(file);
@@ -377,7 +377,7 @@ impl ContributionStore {
 
         summary.targets.sort_by(|a, b| a.id.cmp(&b.id));
         let summary_path = out_dir.join("vmz-plugin-targets.json");
-        let summary_body = serde_json::to_string_pretty(&summary)
+        let summary_body = vmz_generator::to_pretty_json(&summary)
             .map_err(|e| format!("serialize plugin targets summary: {e}"))?;
         std::fs::write(&summary_path, format!("{summary_body}\n"))?;
         emitted.push(summary_path);
