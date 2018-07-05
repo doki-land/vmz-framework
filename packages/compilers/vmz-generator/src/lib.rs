@@ -31,6 +31,8 @@ pub use json::{
 };
 pub use lang::emit_rust_server_unit;
 pub use markup::{
-    HreflangAlternate, MarkupDocument, MarkupNode, PageShellInput, PageShellMeta, SitemapUrl,
-    emit_html_document, emit_markup, emit_mini_template, emit_page_shell, emit_sitemap_xml,
+    HreflangAlternate, MINI_TEMPLATE_DIALECT, MarkupDocument, MarkupNode, MiniEmitError,
+    MiniEmitErrorKind, MiniEventHandler, MiniTemplateEmit, MiniTemplateProfile, PageShellInput,
+    PageShellMeta, SitemapUrl, emit_html_document, emit_markup, emit_mini_template,
+    emit_mini_template_profile, emit_page_shell, emit_sitemap_xml,
 };

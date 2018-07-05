@@ -8,7 +8,6 @@
 //! Unsupported here (→ diagnostic, deferred): `if` / `each` / `component` /
 //! `slot` / event wiring (MP2+) / lifecycle (MP3+).
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -17,10 +16,11 @@ use serde_json::{Value, json};
 use walkdir::WalkDir;
 
 use vmz_protocol::{
-    CheckReportStatus, DIAG_ARTIFACT_INVALID, DIAG_PLATFORM_UNSUPPORTED,
-    MINI_PROGRAM_ARTIFACT_SCHEMA, MiniProgramArtifact, Severity, TargetDiagnostic, VmzModuleKind,
+    CheckReportStatus, DIAG_ARTIFACT_INVALID, MiniProgramArtifact, MINI_PROGRAM_ARTIFACT_SCHEMA,
+    Severity, TargetDiagnostic, VmzModuleKind,
 };
-use vmz_types::{ProgramModule, ViewAttrValue, ViewNode, ViewStatus, ViewView};
+use vmz_types::{ProgramModule, ViewStatus, ViewView};
+use vmz_generator::MiniTemplateProfile;
 
 /// Report schema for MP1 static-slice lowering.
 pub const MINI_STATIC_SLICE_REPORT_SCHEMA: &str = "vmz.target.mini_static_slice.v0";
@@ -29,7 +29,7 @@ pub const MINI_STATIC_SLICE_REPORT_SCHEMA: &str = "vmz.target.mini_static_slice.
 pub const MINI_LOGIC_SCHEMA: &str = "vmz.mini.logic.v0";
 
 /// Template dialect marker (vendor-neutral; not `wxml`).
-pub const MINI_TEMPLATE_DIALECT: &str = "vmz.mini.template.v0";
+pub use vmz_generator::MINI_TEMPLATE_DIALECT;
 
 /// One successfully lowered page unit.
 #[derive(Debug, Clone, Serialize)]
@@ -103,27 +103,21 @@ pub fn lower_view_static_slice(
         return Err(diagnostics);
     }
 
-    let mut bindings: BTreeMap<u32, ()> = BTreeMap::new();
-    let mut body = String::new();
-    for root in &view.roots {
-        match emit_node(root, &mut bindings, path_for_diag, &mut diagnostics) {
-            Ok(chunk) => body.push_str(&chunk),
-            Err(()) => return Err(diagnostics),
-        }
-    }
+    let emit = match vmz_generator::emit_mini_template_profile(
+        &view.roots,
+        MiniTemplateProfile::Static,
+        None,
+    ) {
+        Ok(e) => e,
+        Err(errs) => return Err(crate::miniprogram::map_mini_emit_errors(path_for_diag, errs)),
+    };
 
     if diagnostics.iter().any(|d| d.is_error()) {
         return Err(diagnostics);
     }
 
-    let template = if view.roots.len() == 1 {
-        format!("<!-- {MINI_TEMPLATE_DIALECT} -->\n{body}")
-    } else {
-        format!("<!-- {MINI_TEMPLATE_DIALECT} -->\n<view class=\"vmz-root\">\n{body}</view>\n")
-    };
-
     let mut b_obj = serde_json::Map::new();
-    for id in bindings.keys() {
+    for id in emit.patch_bindings.keys() {
         b_obj.insert(format!("B_{id}"), Value::String(String::new()));
     }
     let logic = json!({
@@ -134,7 +128,7 @@ pub fn lower_view_static_slice(
     let artifact = MiniProgramArtifact {
         schema: MINI_PROGRAM_ARTIFACT_SCHEMA.into(),
         platform_id: platform_id.into(),
-        template: Some(template),
+        template: Some(emit.template),
         style: None,
         logic: Some(crate::miniprogram::compact_json(&logic)),
         event_table: None,
@@ -143,115 +137,6 @@ pub fn lower_view_static_slice(
         plan_schema: vmz_protocol::PLAN_SCHEMA.into(),
     };
     Ok((artifact, diagnostics))
-}
-
-fn emit_node(
-    node: &ViewNode,
-    bindings: &mut BTreeMap<u32, ()>,
-    path: &str,
-    diags: &mut Vec<TargetDiagnostic>,
-) -> Result<String, ()> {
-    match node {
-        ViewNode::Text { value } => Ok(escape_xml(value)),
-        ViewNode::Interp { binding, .. } => {
-            let Some(b) = binding else {
-                diags.push(diag(
-                    path,
-                    Severity::Error,
-                    "static slice: interp without BindingId",
-                    DIAG_ARTIFACT_INVALID,
-                ));
-                return Err(());
-            };
-            bindings.insert(b.0, ());
-            Ok(format!("{{{{b.B_{}}}}}", b.0))
-        }
-        ViewNode::Element { tag, attrs, children, each } => {
-            if each.is_some() {
-                diags.push(diag(
-                    path,
-                    Severity::Error,
-                    format!("static slice does not lower `each` on <{tag}> (structure deferred)"),
-                    DIAG_PLATFORM_UNSUPPORTED,
-                ));
-                return Err(());
-            }
-            let mut attr_s = String::new();
-            for a in attrs {
-                if is_event_attr(&a.name) {
-                    // Event table is MP2 — omit from static template.
-                    continue;
-                }
-                match &a.value {
-                    ViewAttrValue::Static { value } => {
-                        attr_s.push_str(&format!(" {}=\"{}\"", a.name, escape_xml_attr(value)));
-                    }
-                    ViewAttrValue::Bare => {
-                        attr_s.push(' ');
-                        attr_s.push_str(&a.name);
-                    }
-                    ViewAttrValue::Interp { .. } => {
-                        if let Some(b) = a.binding {
-                            bindings.insert(b.0, ());
-                            attr_s.push_str(&format!(" {}=\"{{{{b.B_{}}}}}\"", a.name, b.0));
-                        } else {
-                            // No BindingId yet — keep opaque placeholder, do not invent expr eval.
-                            attr_s.push_str(&format!(" {}=\"{{{{b.pending}}}}\"", a.name));
-                        }
-                    }
-                }
-            }
-            let mut inner = String::new();
-            for c in children {
-                inner.push_str(&emit_node(c, bindings, path, diags)?);
-            }
-            if inner.is_empty() {
-                Ok(format!("<{tag}{attr_s} />"))
-            } else {
-                Ok(format!("<{tag}{attr_s}>{inner}</{tag}>"))
-            }
-        }
-        ViewNode::If { .. } => {
-            diags.push(diag(
-                path,
-                Severity::Error,
-                "static slice does not lower `if` (structure deferred)",
-                DIAG_PLATFORM_UNSUPPORTED,
-            ));
-            Err(())
-        }
-        ViewNode::Component { tag, .. } => {
-            diags.push(diag(
-                path,
-                Severity::Error,
-                format!("static slice does not lower component <{tag}> (structure deferred)"),
-                DIAG_PLATFORM_UNSUPPORTED,
-            ));
-            Err(())
-        }
-        ViewNode::Slot { .. } => {
-            diags.push(diag(
-                path,
-                Severity::Error,
-                "static slice does not lower `slot` (structure deferred)",
-                DIAG_PLATFORM_UNSUPPORTED,
-            ));
-            Err(())
-        }
-    }
-}
-
-fn is_event_attr(name: &str) -> bool {
-    let n = name.trim();
-    n.starts_with('@') || n.starts_with("on") && n.len() > 2
-}
-
-fn escape_xml(s: &str) -> String {
-    vmz_generator::escape_xml_text(s)
-}
-
-fn escape_xml_attr(s: &str) -> String {
-    vmz_generator::escape_xml_attr(s)
 }
 
 fn collect_program_json(root: &Path) -> Vec<PathBuf> {
