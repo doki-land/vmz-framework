@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url';
 import { emitCdnPolicy } from './cdn-policy.js';
 import { emitContentAddressedAssets } from './content-addressed-assets.js';
 import { absoluteUrl, buildLocalePageMeta, localizeBodyLinks } from './locale-router.js';
-import { tryLoadNativeAddon } from './native-addon.js';
+import { requireNativeAddon } from './native-addon.js';
 
 export const STATIC_DELIVERY_MANIFEST_SCHEMA = 'vmz.static.delivery_manifest.v0';
 
@@ -532,54 +532,27 @@ function wrapDocument(input) {
     const propsJson = JSON.stringify(input.props ?? {});
     const localeId = input.meta.lang || 'en';
     const dir = input.meta.dir || 'ltr';
-    const native = tryLoadNativeAddon();
-    if (native?.generatePageShell) {
-        return native.generatePageShell({
-            bodyHtml: input.bodyHtml,
-            chunkId: input.chunkId || '',
-            layoutChain: input.layoutChain || [],
-            propsJson,
-            meta: {
-                title: input.meta.title,
-                description: input.meta.description,
-                canonical: input.meta.canonical,
-                robots: input.meta.robots,
-                lang: localeId,
-                dir,
-                alternates: input.meta.alternates || [],
-            },
-            cssEntry: input.cssEntry || null,
-            isErrorDocument: !!input.isErrorDocument,
-        });
+    const native = requireNativeAddon();
+    if (typeof native.generatePageShell !== 'function') {
+        throw new Error('vmz native addon missing generatePageShell — rebuild with `pnpm napi:build`');
     }
-    // Fallback only when native addon unavailable (dev bootstrap).
-    const layoutAttr = input.layoutChain.length ? ` data-vmz-layout="${escapeAttr(input.layoutChain.join(','))}"` : '';
-    const pageAttr = input.chunkId ? ` data-vmz-page="${escapeAttr(input.chunkId)}"` : '';
-    const localeAttr = ` data-vmz-locale="${escapeAttr(localeId)}" data-vmz-dir="${escapeAttr(dir)}"`;
-    const cssLink = input.cssEntry ? `  <link rel="stylesheet" href="/${String(input.cssEntry).replace(/^\/+/, '')}" />\n` : '';
-    const entry = input.isErrorDocument ? '' : `  <script type="module" src="/entry-client.js"></script>\n`;
-    const hreflang = (input.meta.alternates || [])
-        .map((a) => `  <link rel="alternate" hreflang="${escapeAttr(a.hreflang)}" href="${escapeAttr(a.href)}" />`)
-        .join('\n');
-    const hreflangBlock = hreflang ? `${hreflang}\n` : '';
-    return `<!DOCTYPE html>
-<html lang="${escapeAttr(localeId)}" data-locale="${escapeAttr(localeId)}" dir="${escapeAttr(dir)}">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${escapeHtml(input.meta.title)}</title>
-  <meta name="description" content="${escapeAttr(input.meta.description)}" />
-  <meta name="robots" content="${escapeAttr(input.meta.robots)}" />
-  <link rel="canonical" href="${escapeAttr(input.meta.canonical)}" />
-${hreflangBlock}  <meta property="og:title" content="${escapeAttr(input.meta.title)}" />
-  <meta property="og:description" content="${escapeAttr(input.meta.description)}" />
-  <meta property="og:url" content="${escapeAttr(input.meta.canonical)}" />
-${cssLink}</head>
-<body>
-  <div id="app"${pageAttr}${layoutAttr}${localeAttr} data-vmz-props="${escapeAttr(propsJson)}">${input.bodyHtml}</div>
-${entry}</body>
-</html>
-`;
+    return native.generatePageShell({
+        bodyHtml: input.bodyHtml,
+        chunkId: input.chunkId || '',
+        layoutChain: input.layoutChain || [],
+        propsJson,
+        meta: {
+            title: input.meta.title,
+            description: input.meta.description,
+            canonical: input.meta.canonical,
+            robots: input.meta.robots,
+            lang: localeId,
+            dir,
+            alternates: input.meta.alternates || [],
+        },
+        cssEntry: input.cssEntry || null,
+        isErrorDocument: !!input.isErrorDocument,
+    });
 }
 
 /**
@@ -588,32 +561,9 @@ ${entry}</body>
  */
 function buildSitemap(origin, generations) {
     const urls = generations.filter((g) => !String(g.robots).includes('noindex')).map((g) => ({ loc: g.canonical }));
-    const native = tryLoadNativeAddon();
-    if (native?.generateSitemapXml) {
-        return native.generateSitemapXml(urls);
+    const native = requireNativeAddon();
+    if (typeof native.generateSitemapXml !== 'function') {
+        throw new Error('vmz native addon missing generateSitemapXml — rebuild with `pnpm napi:build`');
     }
-    const body = urls
-        .map(
-            (g) => `  <url>
-    <loc>${escapeXml(g.loc)}</loc>
-  </url>`,
-        )
-        .join('\n');
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${body}
-</urlset>
-`;
-}
-
-function escapeHtml(s) {
-    return String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-}
-
-function escapeAttr(s) {
-    return escapeHtml(s).replaceAll('"', '&quot;');
-}
-
-function escapeXml(s) {
-    return escapeAttr(s).replaceAll("'", '&apos;');
+    return native.generateSitemapXml(urls);
 }
