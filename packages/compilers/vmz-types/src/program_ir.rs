@@ -1216,7 +1216,8 @@ impl ProgramModule {
         }
     }
 
-    /// Pretty-printed `*.program.json` via serde (no ad-hoc Value builders).
+    /// Pretty-printed dump for tooling. **Not** a production artifact printer —
+    /// write `*.program.json` via `vmz_generator::to_pretty_json` from the compiler.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
     }
