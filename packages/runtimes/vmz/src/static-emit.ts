@@ -559,7 +559,7 @@ function wrapDocument(input) {
  * @param {string} origin
  * @param {Array<{ canonical: string, robots: string }>} generations
  */
-function buildSitemap(origin, generations) {
+function buildSitemap(_origin, generations) {
     const urls = generations.filter((g) => !String(g.robots).includes('noindex')).map((g) => ({ loc: g.canonical }));
     const native = requireNativeAddon();
     if (typeof native.generateSitemapXml !== 'function') {
