@@ -9,6 +9,7 @@ import path from 'node:path';
 import { buildDocuments } from './document-build.js';
 import { resolveDocumentsRoot } from './document-check.js';
 import { log } from './log.js';
+import { requireNativeAddon } from './native-addon.js';
 
 /**
  * @param {string} projectRoot
@@ -67,24 +68,15 @@ function writeMountRootRedirects(manifest, outDir) {
         const relDir = base.replace(/^\//, '');
         const abs = path.join(outDir, relDir, 'index.html');
         fs.mkdirSync(path.dirname(abs), { recursive: true });
-        const html = `<!DOCTYPE html>
-<html lang="${escapeAttr(defaultLocale)}">
-<head>
-  <meta charset="utf-8" />
-  <meta http-equiv="refresh" content="0;url=${escapeAttr(target)}" />
-  <link rel="canonical" href="${escapeAttr(target)}" />
-  <title>Documents</title>
-</head>
-<body>
-  <p><a href="${escapeAttr(target)}">Continue to ${escapeAttr(defaultLocale)} docs</a></p>
-</body>
-</html>
-`;
+        const native = requireNativeAddon();
+        if (typeof native.generateRedirectHtml !== 'function') {
+            throw new Error('vmz native addon missing generateRedirectHtml — rebuild with `pnpm napi:build`');
+        }
+        const html = native.generateRedirectHtml({
+            lang: defaultLocale,
+            target,
+            title: 'Documents',
+        });
         fs.writeFileSync(abs, html, 'utf8');
     }
-}
-
-/** @param {string} s */
-function escapeAttr(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }

@@ -18,6 +18,7 @@ import {
 import { resolveMarkdownEngine } from './document-markdown.js';
 import { DOCUMENT_VIEW_SCHEMA } from './document-schema.js';
 import { createWorkspace } from './index.js';
+import { requireNativeAddon } from './native-addon.js';
 
 /**
  * @param {{ projectRoot: string, outDir?: string, strict?: boolean, engines?: { markdown?: string } }} opts
@@ -200,7 +201,6 @@ function renderStaticHtml({
         cssHrefs.push('/vmz.css');
     }
     if (designsHref) cssHrefs.push(hostChrome ? `/${designsHref}` : prefix + designsHref);
-    const cssLink = cssHrefs.map((href) => `  <link rel="stylesheet" href="${esc(href)}" />`).join('\n') + (cssHrefs.length ? '\n' : '');
     const navItems = nav
         .map((n) => {
             const href = relativeHref(htmlRel, n.href, route);
@@ -220,17 +220,11 @@ ${navItems}
     </ul>
   </nav>`;
 
+    /** @type {string} */
+    let bodyInner;
     if (hostChrome) {
         const header = hostChrome.header.replace(/(<a\s+href="\/d\/?")([^>]*>文档<\/a>)/, '$1 aria-current="page"$2');
-        return `<!DOCTYPE html>
-<html lang="${esc(locale)}">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${esc(title)}</title>
-${cssLink}</head>
-<body data-vmz-hydrate="island-only">
-  <div class="site site--docs">
+        bodyInner = `  <div class="site site--docs">
   <a class="skip-link" href="#main">Skip to content</a>
 ${header}
   <div class="doc-body">
@@ -247,29 +241,29 @@ ${playgroundShellHtml}
   </div>
 ${hostChrome.footer}
   </div>
-</body>
-</html>
 `;
-    }
-
-    return `<!DOCTYPE html>
-<html lang="${esc(locale)}">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${esc(title)}</title>
-${cssLink}</head>
-<body data-vmz-hydrate="island-only">
-  <a class="skip-link" href="#main">Skip to content</a>
+    } else {
+        bodyInner = `  <a class="skip-link" href="#main">Skip to content</a>
 ${docsNav}
 ${searchShellHtml}
   ${toc}<main id="main">
 ${bodyHtml}
 ${playgroundShellHtml}
   </main>
-</body>
-</html>
 `;
+    }
+
+    const native = requireNativeAddon();
+    if (typeof native.generateHtmlShell !== 'function') {
+        throw new Error('vmz native addon missing generateHtmlShell — rebuild with `pnpm napi:build`');
+    }
+    return native.generateHtmlShell({
+        title,
+        lang: locale,
+        cssHrefs,
+        bodyHtml: bodyInner,
+        bodyAttrs: ['data-vmz-hydrate', 'island-only'],
+    });
 }
 
 /**
