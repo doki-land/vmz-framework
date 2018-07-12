@@ -5,7 +5,7 @@
 // @ts-nocheck
 
 import crypto from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { SERVER_RUNTIMES } from './delivery-profile.js';
 import { writePrettyJsonFile } from './pretty-json.js';
