@@ -1374,3 +1374,23 @@ pub fn generate_locale_runtime_module(
         .collect();
     vmz_generator::js::emit_locale_runtime_module(&default_locale, &exports).code
 }
+
+/// Pretty-print a JSON document via JsonCodeGenerator.
+///
+/// `json_text` must be valid compact or pretty JSON (typically `JSON.stringify(value)`).
+/// Returns pretty-printed JSON **without** a trailing newline (callers add `\n` when writing files).
+#[napi]
+pub fn generate_pretty_json(json_text: String) -> Result<String> {
+    let value: serde_json::Value = serde_json::from_str(&json_text)
+        .map_err(|e| Error::from_reason(format!("generatePrettyJson: invalid JSON: {e}")))?;
+    vmz_generator::to_pretty_json(&value)
+        .map_err(|e| Error::from_reason(format!("generatePrettyJson: {e}")))
+}
+
+/// Compact JSON via JsonCodeGenerator (same parse → print contract as pretty).
+#[napi]
+pub fn generate_json(json_text: String) -> Result<String> {
+    let value: serde_json::Value = serde_json::from_str(&json_text)
+        .map_err(|e| Error::from_reason(format!("generateJson: invalid JSON: {e}")))?;
+    vmz_generator::to_json(&value).map_err(|e| Error::from_reason(format!("generateJson: {e}")))
+}
