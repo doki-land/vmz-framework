@@ -7,6 +7,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { writePrettyJsonFile } from './pretty-json.js';
 
 export const EMBEDDED_RESOURCE_INDEX_SCHEMA = 'vmz.embedded.resource_index.v0';
 
@@ -59,7 +60,7 @@ export function emitEmbeddedPackaging(outDir, opts = {}) {
     index.indexDigest = sha256Hex(canonicalJson({ ...index, indexDigest: undefined }));
 
     const indexPath = path.join(vmzDir, 'embedded-resource-index.json');
-    fs.writeFileSync(indexPath, `${JSON.stringify(index, null, 2)}\n`, 'utf8');
+    writePrettyJsonFile(indexPath, index);
 
     // Optional include_bytes entry point for Rust packaging adapters
     const rsPath = path.join(vmzDir, 'embedded_site.rs');

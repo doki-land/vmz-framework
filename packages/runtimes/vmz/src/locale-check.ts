@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import JSON5 from 'json5';
 import { requireNativeAddon } from './native-addon.js';
+import { writePrettyJsonFile } from './pretty-json.js';
 import {
     DIAG_CATALOG_CONFLICT,
     DIAG_CATALOG_PARSE,
@@ -724,7 +725,7 @@ export function emitLocaleTypedModules(report, outDir) {
         modules: (report.typedModules || []).map((m) => m.module),
         outDir,
     };
-    fs.writeFileSync(path.join(outDir, 'index.json'), `${JSON.stringify(index, null, 2)}\n`, 'utf8');
+    writePrettyJsonFile(path.join(outDir, 'index.json'), index);
     return written;
 }
 

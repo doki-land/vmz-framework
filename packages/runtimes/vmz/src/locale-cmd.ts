@@ -18,6 +18,7 @@ import {
     pseudoLocalizeCatalog,
 } from './locale-tooling.js';
 import { log } from './log.js';
+import { generatePrettyJson } from './pretty-json.js';
 
 function printLocaleHelp() {
     console.log(`vmz locale — /locales application i18n (–)
@@ -397,7 +398,7 @@ function cmdLocalePseudo(args) {
         const outDir = (typeof args.out === 'string' && args.out) || path.join(projectRoot, 'dist', 'locales-pseudo');
         fs.mkdirSync(outDir, { recursive: true });
         const outFile = path.join(outDir, `${report.pseudoLocale}.json`);
-        fs.writeFileSync(outFile, `${JSON.stringify(report.catalog, null, 2)}\n`, 'utf8');
+        fs.writeFileSync(outFile, `${generatePrettyJson(report.catalog)}\n`, 'utf8');
         log.info(`locale pseudo: source=${sourceLocale} keys=${Object.keys(report.catalog).length} out=${outFile}`);
     }
     return report.status === 'ready' ? 0 : 1;

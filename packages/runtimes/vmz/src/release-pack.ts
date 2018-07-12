@@ -10,6 +10,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { writePrettyJsonFile } from './pretty-json.js';
 
 export const RELEASE_ENVELOPE_SCHEMA = 'vmz.release.envelope.v0';
 export const APPLICATION_ARTIFACT_SCHEMA = 'vmz.application.artifact.v0';
@@ -211,7 +212,7 @@ export function packRelease(distDir, opts = {}) {
  * @param {unknown} value
  */
 function writeJson(file, value) {
-    fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+    writePrettyJsonFile(file, value);
 }
 
 /**

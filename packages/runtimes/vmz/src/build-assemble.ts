@@ -10,6 +10,7 @@ import { emitServerArtifact } from './server-artifact.js';
 import { emitEmbeddedPackaging } from './embedded-packaging.js';
 import { emitSiteDelivery } from './site-delivery.js';
 import { emitWebStatic } from './static-emit.js';
+import { writePrettyJsonFile } from './pretty-json.js';
 
 export const BUILD_PROOF_SCHEMA = 'vmz.build.proof.v0';
 export const ASSEMBLE_MANIFEST_SCHEMA = 'vmz.assemble.manifest.v0';
@@ -118,7 +119,7 @@ export async function assembleDelivery(outDir, ctx) {
     const vmzDir = path.join(outDir, '_vmz');
     mkdirSync(vmzDir, { recursive: true });
     const file = path.join(vmzDir, 'assemble-manifest.json');
-    writeFileSync(file, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
+    writePrettyJsonFile(file, result);
     return { manifest: result, path: file };
 }
 
@@ -196,6 +197,6 @@ export function emitBuildProof(outDir, ctx) {
     const vmzDir = path.join(outDir, '_vmz');
     mkdirSync(vmzDir, { recursive: true });
     const file = path.join(vmzDir, 'build-proof.json');
-    writeFileSync(file, `${JSON.stringify(body, null, 2)}\n`, 'utf8');
+    writePrettyJsonFile(file, body);
     return { proof: body, path: file };
 }

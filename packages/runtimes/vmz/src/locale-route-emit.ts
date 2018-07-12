@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { checkLocales, localeHasErrors } from './locale-check.js';
 import { buildLocalePageMeta, buildLocaleRouteRealizationTable } from './locale-router.js';
+import { writePrettyJsonFile } from './pretty-json.js';
 
 export const LOCALE_ROUTE_REALIZATION_ARTIFACT_SCHEMA = 'vmz.locale.route_realization.v0';
 
@@ -125,7 +126,7 @@ export function emitLocaleRouteRealization(projectRoot, distDir, opts = {}) {
     const vmzDir = path.join(distDir, '_vmz');
     fs.mkdirSync(vmzDir, { recursive: true });
     const outPath = path.join(vmzDir, 'locale-route-realization.json');
-    fs.writeFileSync(outPath, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
+    writePrettyJsonFile(outPath, artifact);
 
     const manifestOut = path.join(vmzDir, 'locale-manifest.json');
     fs.writeFileSync(

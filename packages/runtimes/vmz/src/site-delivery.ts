@@ -7,6 +7,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { writePrettyJsonFile } from './pretty-json.js';
 
 export const SITE_DELIVERY_CONTRACT_SCHEMA = 'vmz.site.delivery_contract.v0';
 export const SITE_DELIVERY_RESOLUTION_SCHEMA = 'vmz.site.delivery_resolution.v0';
@@ -330,11 +331,11 @@ export function emitSiteDelivery(outDir, deliveryRaw, opts = {}) {
     }
     const vmzDir = path.join(outDir, '_vmz');
     fs.mkdirSync(vmzDir, { recursive: true });
-    fs.writeFileSync(path.join(vmzDir, 'site-delivery-contract.json'), `${JSON.stringify(norm.contract, null, 2)}\n`, 'utf8');
+    writePrettyJsonFile(path.join(vmzDir, 'site-delivery-contract.json'), norm.contract);
     let resolution = null;
     if (opts.probes) {
         resolution = resolveSiteRelease(norm.contract, opts.probes);
-        fs.writeFileSync(path.join(vmzDir, 'site-delivery-resolution.json'), `${JSON.stringify(resolution, null, 2)}\n`, 'utf8');
+        writePrettyJsonFile(path.join(vmzDir, 'site-delivery-resolution.json'), resolution);
     }
     return { contract: norm.contract, resolution };
 }

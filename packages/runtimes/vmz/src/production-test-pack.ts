@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { canonicalJson, sha256Hex } from './release-pack.js';
+import { writePrettyJsonFile } from './pretty-json.js';
 
 export const PRODUCTION_SCENARIO_PACK_SCHEMA = 'vmz.production.scenario_pack.v0';
 export const PRODUCTION_CI_PROFILE_SCHEMA = 'vmz.production.ci_profile.v0';
@@ -443,9 +444,9 @@ export function emitProductionTestArtifacts(root, report, pack, profile) {
     const reportPath = path.join(dir, 'report.json');
     const packPath = path.join(dir, 'scenario-pack.json');
     const profilePath = path.join(dir, 'ci-profile.json');
-    fs.writeFileSync(reportPath, `${JSON.stringify(stamped, null, 2)}\n`, 'utf8');
-    fs.writeFileSync(packPath, `${JSON.stringify(pack, null, 2)}\n`, 'utf8');
-    fs.writeFileSync(profilePath, `${JSON.stringify(profile, null, 2)}\n`, 'utf8');
+    writePrettyJsonFile(reportPath, stamped);
+    writePrettyJsonFile(packPath, pack);
+    writePrettyJsonFile(profilePath, profile);
     return { reportPath, packPath, profilePath, report: stamped };
 }
 

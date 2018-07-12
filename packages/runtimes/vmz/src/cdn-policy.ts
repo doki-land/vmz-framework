@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { assertLocaleCacheKey, localeAwareCacheKey } from './locale-router.js';
+import { writePrettyJsonFile } from './pretty-json.js';
 
 export const CDN_POLICY_MANIFEST_SCHEMA = 'vmz.cdn.policy_manifest.v0';
 export const CDN_ADAPTER_PROJECTION_SCHEMA = 'vmz.cdn.adapter_projection.v0';
@@ -150,15 +151,15 @@ export function emitCdnPolicy(distDir, staticManifest, opts = {}) {
     const policy = buildCdnPolicyManifest(staticManifest, { ...opts, localeArtifact });
     const vmzDir = path.join(distDir, '_vmz');
     fs.mkdirSync(vmzDir, { recursive: true });
-    fs.writeFileSync(path.join(vmzDir, 'cdn-policy-manifest.json'), `${JSON.stringify(policy, null, 2)}\n`, 'utf8');
+    writePrettyJsonFile(path.join(vmzDir, 'cdn-policy-manifest.json'), policy);
 
     const local = projectCdnAdapter(policy, 'local-static');
     const netlify = projectCdnAdapter(policy, 'netlify');
     const adaptersDir = path.join(vmzDir, 'adapters');
     fs.mkdirSync(path.join(adaptersDir, 'local-static'), { recursive: true });
     fs.mkdirSync(path.join(adaptersDir, 'netlify'), { recursive: true });
-    fs.writeFileSync(path.join(adaptersDir, 'local-static', 'projection.json'), `${JSON.stringify(local, null, 2)}\n`, 'utf8');
-    fs.writeFileSync(path.join(adaptersDir, 'netlify', 'projection.json'), `${JSON.stringify(netlify, null, 2)}\n`, 'utf8');
+    writePrettyJsonFile(path.join(adaptersDir, 'local-static', 'projection.json'), local);
+    writePrettyJsonFile(path.join(adaptersDir, 'netlify', 'projection.json'), netlify);
     fs.writeFileSync(path.join(adaptersDir, 'netlify', '_headers'), String(netlify.files['_headers'] || ''), 'utf8');
     fs.writeFileSync(path.join(adaptersDir, 'netlify', '_redirects'), String(netlify.files['_redirects'] || ''), 'utf8');
 
