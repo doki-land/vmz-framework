@@ -7,6 +7,7 @@ members = [
     "packages/compilers/vmz-compiler",
     "packages/compilers/vmz-debugger",
     "packages/compilers/vmz-inspector",
+    "packages/compilers/vmz-formatter",
     "packages/compilers/vmz-tools",
     "packages/compilers/vmz-napi",
     "packages/compilers/vmz-plugin-tailwind",
@@ -20,7 +21,7 @@ edition = "2024"
 license = "MIT"
 authors = ["VMZ Contributors"]
 repository = "https://github.com/vmz-framework/vmz-framework"
-rust-version = "1.85"
+rust-version = "1.95"
 
 [workspace.dependencies]
 vmz-protocol = { path = "packages/compilers/vmz-protocol" }
@@ -29,22 +30,28 @@ vmz-generator = { path = "packages/compilers/vmz-generator" }
 vmz-compiler = { path = "packages/compilers/vmz-compiler" }
 vmz-debugger = { path = "packages/compilers/vmz-debugger" }
 vmz-inspector = { path = "packages/compilers/vmz-inspector" }
+vmz-formatter = { path = "packages/compilers/vmz-formatter" }
 vmz-plugin-tailwind = { path = "packages/compilers/vmz-plugin-tailwind" }
 vmz-plugin-sasso = { path = "packages/compilers/vmz-plugin-sasso" }
 
-oxc_allocator = "0.144.0"
-oxc_ast = "0.144.0"
-oxc_ast_visit = "0.144.0"
-oxc_codegen = { version = "0.144.0", features = ["sourcemap"] }
-oxc_diagnostics = "0.144.0"
-oxc_parser = "0.144.0"
-oxc_semantic = "0.144.0"
+# All oxc_* locked to one git tag (includes publish=false formatter crates).
+oxc_allocator = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
+oxc_ast = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
+oxc_ast_visit = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
+oxc_codegen = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0", features = ["sourcemap"] }
+oxc_diagnostics = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
+oxc_parser = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
+oxc_semantic = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
 oxc_sourcemap = "8.1.2"
-oxc_span = "0.144.0"
-oxc_str = "0.144.0"
-oxc_syntax = "0.144.0"
-oxc_transformer = "0.144.0"
+oxc_span = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
+oxc_str = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
+oxc_syntax = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
+oxc_transformer = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
+oxc_formatter = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
+oxc_formatter_core = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
+oxc_formatter_css = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
 oxc-css-parser = "0.0.11"
+editorconfig = "1.0.0"
 
 clap = { version = "4.6.6", features = ["derive"] }
 serde = { version = "1.0.229", features = ["derive"] }
@@ -63,6 +70,9 @@ napi-derive = "3.6.3"
 sasso = "0.8.1"
 tailwind = { git = "https://github.com/oovm/tailwind-rs.git", branch = "dev" }
 tailwind-css = { git = "https://github.com/oovm/tailwind-rs.git", branch = "dev" }
+
+[patch.crates-io]
+oxc_allocator = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
 
 [profile.release]
 lto = true
