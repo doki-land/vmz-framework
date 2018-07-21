@@ -17,6 +17,7 @@ clap.workspace = true
 serde_json.workspace = true
 vmz-compiler.workspace = true
 vmz-debugger.workspace = true
+vmz-formatter.workspace = true
 vmz-inspector.workspace = true
 vmz-plugin-tailwind.workspace = true
 vmz-plugin-sasso.workspace = true

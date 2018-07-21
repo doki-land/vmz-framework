@@ -1,7 +1,8 @@
-//! Format `.vmz` via oxc codegen (script blocks) + SFC reassemble.
+//! Format `.vmz` via `vmz-formatter` (oxc IR formatter + EditorConfig).
 
 use clap::Args as ClapArgs;
-use vmz_compiler::{FormatOptions, Result, bail, format_path};
+use vmz_compiler::{Result, bail};
+use vmz_formatter::{FormatOptions, format_path};
 
 use crate::cli::PathArgs;
 
@@ -17,7 +18,7 @@ pub struct Args {
     pub check: bool,
 }
 
-/// Format (or `--check`) each path via the compiler format pipeline.
+/// Format (or `--check`) each path via `vmz-formatter`.
 pub fn run(args: Args) -> Result<()> {
     let options = FormatOptions { check: args.check };
     for path in &args.paths.paths {

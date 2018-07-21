@@ -129,20 +129,12 @@ export function emitLocaleRouteRealization(projectRoot, distDir, opts = {}) {
     writePrettyJsonFile(outPath, artifact);
 
     const manifestOut = path.join(vmzDir, 'locale-manifest.json');
-    fs.writeFileSync(
-        manifestOut,
-        `${JSON.stringify(
-            {
-                schema: 'vmz.locale.manifest.v0',
-                defaultLocale,
-                locales: artifact.locales,
-                routing: artifact.routing,
-            },
-            null,
-            2,
-        )}\n`,
-        'utf8',
-    );
+    writePrettyJsonFile(manifestOut, {
+        schema: 'vmz.locale.manifest.v0',
+        defaultLocale,
+        locales: artifact.locales,
+        routing: artifact.routing,
+    });
 
     return {
         ok: true,

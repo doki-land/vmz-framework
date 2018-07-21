@@ -13,6 +13,7 @@ import { resolveMarkdownEngine } from './document-markdown.js';
 import { createWorkspace } from './index.js';
 import { log } from './log.js';
 import { parseArgs } from './cli.js';
+import { emitPrettyJson } from './pretty-json.js';
 
 function printDocumentHelp() {
     console.log(`vmz document — project /documents domain
@@ -101,13 +102,7 @@ async function cmdDocumentCheck(args) {
 
     const jsonOut = args.json;
     if (jsonOut) {
-        const text = JSON.stringify(manifest, null, 2);
-        if (typeof jsonOut === 'string') {
-            fs.writeFileSync(jsonOut, text + '\n', 'utf8');
-            log.info(`wrote ${jsonOut}`);
-        } else {
-            console.log(text);
-        }
+        emitPrettyJson(jsonOut, manifest, { logWrote: (p) => log.info(`wrote ${p}`) });
     } else {
         for (const d of manifest.diagnostics) {
             const loc = d.path ? ` (${d.path})` : '';

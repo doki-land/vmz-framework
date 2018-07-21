@@ -18,7 +18,7 @@ import {
     pseudoLocalizeCatalog,
 } from './locale-tooling.js';
 import { log } from './log.js';
-import { generatePrettyJson } from './pretty-json.js';
+import { emitPrettyJson, generatePrettyJson } from './pretty-json.js';
 
 function printLocaleHelp() {
     console.log(`vmz locale — /locales application i18n (–)
@@ -102,13 +102,7 @@ function cmdLocaleCheck(args) {
     const report = checkLocales({ projectRoot, strict: Boolean(args.strict) });
     const jsonOut = args.json;
     if (jsonOut) {
-        const text = JSON.stringify(report, null, 2);
-        if (typeof jsonOut === 'string') {
-            fs.writeFileSync(jsonOut, `${text}\n`, 'utf8');
-            log.info(`wrote ${jsonOut}`);
-        } else {
-            console.log(text);
-        }
+        emitPrettyJson(jsonOut, report, { logWrote: (p) => log.info(`wrote ${p}`) });
     } else {
         for (const d of report.diagnostics) {
             const loc = d.path ? ` (${d.path})` : '';
@@ -163,7 +157,7 @@ function cmdLocaleRename(args) {
     const report = checkLocales({ projectRoot, checkUnused: false });
     const plan = planLocaleRename(report, fromId, toId);
     if (args.json) {
-        console.log(JSON.stringify(plan, null, 2));
+        emitPrettyJson(args.json, plan);
     } else if (plan.status !== 'ready') {
         log.error(plan.error || 'rename failed');
     } else {
@@ -191,13 +185,7 @@ function cmdLocaleRuntimeCheck(args) {
     });
     const { session: _session, ...jsonReport } = report;
     if (args.json) {
-        const text = JSON.stringify(jsonReport, null, 2);
-        if (typeof args.json === 'string') {
-            fs.writeFileSync(args.json, `${text}\n`, 'utf8');
-            log.info(`wrote ${args.json}`);
-        } else {
-            console.log(text);
-        }
+        emitJson(args, jsonReport);
     } else {
         for (const d of report.diagnostics) {
             if (d.severity === 'error') log.error(`${d.code}: ${d.message}`);
@@ -241,13 +229,7 @@ function cmdLocaleRouterCheck(args) {
         origin: routesFile.origin || 'https://example.test',
     });
     if (args.json) {
-        const text = JSON.stringify(report, null, 2);
-        if (typeof args.json === 'string') {
-            fs.writeFileSync(args.json, `${text}\n`, 'utf8');
-            log.info(`wrote ${args.json}`);
-        } else {
-            console.log(text);
-        }
+        emitJson(args, report);
     } else {
         for (const d of report.diagnostics) {
             if (d.severity === 'error') log.error(`${d.code}: ${d.message}`);
@@ -275,13 +257,7 @@ function cmdLocaleDeliveryCheck(args) {
         planVersion: 'plan.v0',
     });
     if (args.json) {
-        const text = JSON.stringify(report, null, 2);
-        if (typeof args.json === 'string') {
-            fs.writeFileSync(args.json, `${text}\n`, 'utf8');
-            log.info(`wrote ${args.json}`);
-        } else {
-            console.log(text);
-        }
+        emitJson(args, report);
     } else {
         for (const d of report.diagnostics) {
             if (d.severity === 'error') log.error(`${d.code}: ${d.message}`);
@@ -294,13 +270,9 @@ function cmdLocaleDeliveryCheck(args) {
 }
 
 function emitJson(args, report) {
-    const text = JSON.stringify(report, null, 2);
-    if (typeof args.json === 'string') {
-        fs.writeFileSync(args.json, `${text}\n`, 'utf8');
-        log.info(`wrote ${args.json}`);
-    } else {
-        console.log(text);
-    }
+    emitPrettyJson(args.json, report, {
+        logWrote: (p) => log.info(`wrote ${p}`),
+    });
 }
 
 function cmdLocaleExplain(args) {

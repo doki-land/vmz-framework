@@ -41,7 +41,7 @@ export default class Comp{/* keep */count=0;}
 
     let report = format_path(&file, &FormatOptions { check: false }).unwrap();
     assert_eq!(report.files_checked, 1);
-    assert!(report.files_written >= 1 || report.files_need_write >= 0);
+    assert!(report.files_written >= 1, "expected write: {:?}", report.diagnostics);
     assert!(!report.has_errors(), "{:?}", report.diagnostics);
 
     let out = fs::read_to_string(&file).unwrap();

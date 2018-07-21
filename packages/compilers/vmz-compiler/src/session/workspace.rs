@@ -9,7 +9,6 @@ use std::path::{Path, PathBuf};
 
 use crate::check::{CheckOptions, CheckReport, check_path, check_project};
 use crate::compile::{CompileOptions, CompileReport, compile_path, compile_project};
-use crate::format::{FormatOptions, FormatReport, format_path};
 use crate::plugin::{
     ApplyContributionsReport, ContributionBatch, ContributionStore, PLUGIN_PROTOCOL_V1,
 };
@@ -243,11 +242,6 @@ impl Workspace {
             if root.is_file() { check_path(root, options)? } else { check_project(root, options)? };
         report.diagnostics.extend(self.contributions.analyzer_diagnostics());
         Ok(report)
-    }
-
-    /// format `.vmz` under the workspace root (oxc codegen via `format_path`).
-    pub fn format(&mut self, options: &FormatOptions) -> crate::Result<FormatReport> {
-        format_path(&self.options.root, options)
     }
 
     /// Compile with default [`BuildRequest`] (debug, no analysis ticket).
