@@ -29,6 +29,8 @@
         "lint": "biome check .",
         "fmt": "biome format --write . && cargo fmt --all --manifest-path Cargo.toml",
         "fmt:check": "biome format . && cargo fmt --all --check --manifest-path Cargo.toml",
+        "fmt:vmz": "cargo run --manifest-path Cargo.toml -q -p vmz-tools -- format .",
+        "fmt:vmz:check": "cargo run --manifest-path Cargo.toml -q -p vmz-tools -- format --check .",
         "clean": "rimraf .turbo packages/examples/*/dist target"
     },
     "pnpm": {

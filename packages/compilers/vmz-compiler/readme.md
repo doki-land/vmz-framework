@@ -8,13 +8,13 @@ Direct emit, and the long-lived **`Workspace`** session façade (N1).
 | **Crate**      | `vmz-compiler`                                                                        |
 | **Kind**       | library                                                                               |
 | **Publish**    | `false` (workspace-internal)                                                          |
-| **Depends on** | `vmz-protocol`, `vmz-types`, [`vmz-debugger`](../vmz-debugger/) (explain façade only) |
+| **Depends on** | `vmz-protocol`, `vmz-types`, [`vmz-debugger`](../vmz-debugger/) (explain façade only), [`vmz-generator`](../vmz-generator/) |
 
 ## Features
 
 - Parse `.vmz` (script / template / style / static router·meta blocks)
 - Build program modules, dependency / reactive views, Direct DOM schedules
-- Project `check` / `compile` / `format` primitives used by inspector and CLI
+- Project `check` / `compile` primitives used by inspector and CLI
 - Style **core**: `/designs`, TW/SCSS **hooks**, style emit & token diagnostics (engines are separate crates)
 - Application collection / mount composition helpers
 - `Workspace`: handshake, incremental dirty rebuild, affected plans, plugin contributions
@@ -25,6 +25,7 @@ Direct emit, and the long-lived **`Workspace`** session façade (N1).
 | Capability                                        | Owner                                             |
 |---------------------------------------------------|---------------------------------------------------|
 | Soft/hard inspect profiles (`vmz check` / `lint`) | [`vmz-inspector`](../vmz-inspector/)              |
+| Author `.vmz` format (`vmz format`)               | [`vmz-formatter`](../vmz-formatter/)              |
 | Causal explain, trace, LSP/MCP protocol           | [`vmz-debugger`](../vmz-debugger/)                |
 | Tailwind / SCSS engine implementation             | `vmz-plugin-tailwind`, `vmz-plugin-sasso`         |
 | Competing semantic IRs                            | Out of scope — one Program Graph / Execution Plan |
@@ -36,7 +37,7 @@ the concrete engine packages.
 
 ```text
 src/
-  parse/          SFC · template IR · analyze · format
+  parse/          SFC · template IR · analyze (author format → vmz-formatter)
   pipeline/       check · compile · graph · emit · #server · WriteBarrier
   style/          designs · TW/SCSS hooks · emit · explain · token diag
   application/    collection / mount 

@@ -15,7 +15,7 @@ place native stdio servers are wired.
 
 | Command      | Role                                                            |
 |--------------|-----------------------------------------------------------------|
-| `vmz format` | Format `.vmz` / scripts                                         |
+| `vmz format` | Format `.vmz` via [`vmz-formatter`](../vmz-formatter/) (oxc IR + EditorConfig; default write / `--check`) |
 | `vmz check`  | Inspector Check profile                                         |
 | `vmz lint`   | Inspector Lint profile                                          |
 | `vmz build`  | Build artifacts                                                 |
