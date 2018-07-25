@@ -24,7 +24,7 @@ pub enum VmzCommand {
     /// Scaffold a minimal app with a local `vmz` dependency
     #[command(alias = "init")]
     New(new::Args),
-    /// Format `.vmz` / TypeScript sources
+    /// Format `.vmz` (oxc IR formatter + EditorConfig; writes by default)
     Format(format::Args),
     /// Type-check and validate the project without emitting
     Check(check::Args),

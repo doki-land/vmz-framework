@@ -6,7 +6,7 @@ pub mod build;
 pub mod check;
 /// `vmz dev` -- build, serve, and rebuild on `src/` changes.
 pub mod dev;
-/// `vmz format` -- rewrite or check `.vmz` / script formatting.
+/// `vmz format` — author `.vmz` via `vmz-formatter` (default write / `--check`).
 pub mod format;
 /// `vmz lint` -- check plus soft convention advice.
 pub mod lint;
