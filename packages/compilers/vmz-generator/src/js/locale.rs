@@ -1,6 +1,6 @@
 //! Locale runtime modules (`dist/locales/*.js`).
 
-use super::ast_util::oxc_reprint_module;
+use super::ast_util::oxc_reprint_module_required;
 use super::emit::EmittedJs;
 
 /// One exported message function in a locale module.
@@ -73,6 +73,82 @@ pub fn emit_locale_runtime_module(default_locale: &str, exports: &[LocaleExport]
     }
     lines.push(String::new());
     let raw = lines.join("\n");
-    let code = oxc_reprint_module(&raw).unwrap_or(raw);
+    let code = oxc_reprint_module_required(&raw, "locale runtime module");
     EmittedJs { code, map: None }
+}
+
+/// One typed-module parameter for [`emit_locale_typed_module`].
+#[derive(Debug, Clone)]
+pub struct LocaleTypedParam {
+    /// Parameter name.
+    pub name: String,
+    /// `plural` / `number` -> `number`; otherwise `string`.
+    pub kind: String,
+}
+
+/// One `export declare function` in a locale `.d.ts` stub.
+#[derive(Debug, Clone)]
+pub struct LocaleTypedExport {
+    /// Export function name.
+    pub export_name: String,
+    /// ICU / message params (empty => zero-arg).
+    pub params: Vec<LocaleTypedParam>,
+}
+
+/// Emit `#locales/{catalog}.d.ts` stub text (`vmz.locale.typed_module.v0`).
+pub fn emit_locale_typed_module(module_label: &str, exports: &[LocaleTypedExport]) -> String {
+    let mut lines = vec![
+        format!("/** Generated LocalizedText module - {module_label} (vmz.locale.typed_module.v0) */"),
+        "export type LocalizedText = string & { readonly __brand: 'LocalizedText' };".into(),
+        String::new(),
+    ];
+    for exp in exports {
+        if exp.params.is_empty() {
+            lines.push(format!(
+                "export declare function {}(): LocalizedText;",
+                exp.export_name
+            ));
+        } else {
+            let args: Vec<String> = exp
+                .params
+                .iter()
+                .map(|p| {
+                    let ty = if p.kind == "plural" || p.kind == "number" {
+                        "number"
+                    } else {
+                        "string"
+                    };
+                    format!("{}: {ty}", p.name)
+                })
+                .collect();
+            lines.push(format!(
+                "export declare function {}(args: {{ {} }}): LocalizedText;",
+                exp.export_name,
+                args.join("; ")
+            ));
+        }
+    }
+    lines.push(String::new());
+    lines.join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn typed_module_emits_params() {
+        let text = emit_locale_typed_module(
+            "#locales/ui",
+            &[
+                LocaleTypedExport { export_name: "hello".into(), params: vec![] },
+                LocaleTypedExport {
+                    export_name: "count".into(),
+                    params: vec![LocaleTypedParam { name: "n".into(), kind: "plural".into() }],
+                },
+            ],
+        );
+        assert!(text.contains("export declare function hello(): LocalizedText;"));
+        assert!(text.contains("export declare function count(args: { n: number }): LocalizedText;"));
+    }
 }

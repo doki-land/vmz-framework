@@ -35,5 +35,5 @@ pub use markup::{
     MiniEmitError, MiniEmitErrorKind, MiniEventHandler, MiniTemplateEmit, MiniTemplateProfile,
     PageShellInput, PageShellMeta, RedirectHtmlInput, SitemapUrl, emit_html_document,
     emit_html_shell, emit_markup, emit_mini_template, emit_mini_template_profile, emit_page_shell,
-    emit_redirect_html, emit_sitemap_xml,
+    emit_redirect_html, emit_robots_txt, emit_sitemap_xml,
 };

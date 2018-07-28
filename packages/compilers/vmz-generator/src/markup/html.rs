@@ -109,10 +109,8 @@ pub fn emit_html_shell(input: &HtmlShellInput) -> String {
         el("title", vec![], vec![MarkupNode::Text(input.title.clone())]),
     ];
     for href in &input.css_hrefs {
-        head_kids.push(void_el(
-            "link",
-            vec![attr("rel", "stylesheet"), attr("href", href.clone())],
-        ));
+        head_kids
+            .push(void_el("link", vec![attr("rel", "stylesheet"), attr("href", href.clone())]));
     }
     head_kids.extend(input.head_extra.iter().cloned());
 
@@ -128,10 +126,7 @@ pub fn emit_html_shell(input: &HtmlShellInput) -> String {
         roots: vec![el(
             "html",
             vec![attr("lang", lang)],
-            vec![
-                el("head", vec![], head_kids),
-                el("body", input.body_attrs.clone(), body_kids),
-            ],
+            vec![el("head", vec![], head_kids), el("body", input.body_attrs.clone(), body_kids)],
         )],
     };
     emit_markup(&doc)
@@ -160,21 +155,14 @@ pub fn emit_redirect_html(input: &RedirectHtmlInput) -> String {
     let head_extra = vec![
         void_el(
             "meta",
-            vec![
-                attr("http-equiv", "refresh"),
-                attr("content", format!("0;url={}", input.target)),
-            ],
+            vec![attr("http-equiv", "refresh"), attr("content", format!("0;url={}", input.target))],
         ),
         void_el("link", vec![attr("rel", "canonical"), attr("href", input.target.clone())]),
     ];
     let body = vec![el(
         "p",
         vec![],
-        vec![el(
-            "a",
-            vec![attr("href", input.target.clone())],
-            vec![MarkupNode::Text(label)],
-        )],
+        vec![el("a", vec![attr("href", input.target.clone())], vec![MarkupNode::Text(label)])],
     )];
     emit_html_shell(&HtmlShellInput {
         title: input.title.clone(),
@@ -306,9 +294,22 @@ pub fn emit_sitemap_xml(urls: &[SitemapUrl]) -> String {
     out
 }
 
+/// Emit static-delivery `robots.txt` (allow site, disallow `/404`, point at sitemap).
+pub fn emit_robots_txt(sitemap_absolute_url: &str) -> String {
+    format!("User-agent: *\nAllow: /\nDisallow: /404\nSitemap: {sitemap_absolute_url}\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn robots_txt_includes_sitemap() {
+        let txt = emit_robots_txt("https://ex.test/sitemap.xml");
+        assert!(txt.contains("Disallow: /404"));
+        assert!(txt.contains("Sitemap: https://ex.test/sitemap.xml"));
+        assert!(txt.ends_with('\n'));
+    }
 
     #[test]
     fn page_shell_escapes_title_and_attrs() {

@@ -6,8 +6,9 @@ mod wxml;
 
 pub use ast::{MarkupDocument, MarkupNode, emit_markup};
 pub use html::{
-    HreflangAlternate, HtmlShellInput, PageShellInput, PageShellMeta, RedirectHtmlInput, SitemapUrl,
-    emit_html_document, emit_html_shell, emit_page_shell, emit_redirect_html, emit_sitemap_xml,
+    HreflangAlternate, HtmlShellInput, PageShellInput, PageShellMeta, RedirectHtmlInput,
+    SitemapUrl, emit_html_document, emit_html_shell, emit_page_shell, emit_redirect_html,
+    emit_robots_txt, emit_sitemap_xml,
 };
 pub use wxml::{
     MINI_TEMPLATE_DIALECT, MiniEmitError, MiniEmitErrorKind, MiniEventHandler, MiniTemplateEmit,

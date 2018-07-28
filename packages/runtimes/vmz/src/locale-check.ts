@@ -700,24 +700,19 @@ export function emitLocaleTypedModules(report, outDir) {
     fs.mkdirSync(outDir, { recursive: true });
     /** @type {string[]} */
     const written = [];
+    const native = requireNativeAddon();
+    if (typeof native.generateLocaleTypedModule !== 'function') {
+        throw new Error('vmz native addon missing generateLocaleTypedModule — rebuild with `pnpm napi:build`');
+    }
     for (const mod of report.typedModules || []) {
-        const lines = [
-            `/** Generated LocalizedText module — ${mod.module} (vmz.locale.typed_module.v0) */`,
-            `export type LocalizedText = string & { readonly __brand: 'LocalizedText' };`,
-            '',
-        ];
-        for (const exp of mod.exports) {
-            if (!exp.params.length) {
-                lines.push(`export declare function ${exp.exportName}(): LocalizedText;`);
-            } else {
-                const args = exp.params.map((p) => `${p.name}: ${p.kind === 'plural' || p.kind === 'number' ? 'number' : 'string'}`).join('; ');
-                lines.push(`export declare function ${exp.exportName}(args: { ${args} }): LocalizedText;`);
-            }
-        }
-        lines.push('');
+        const exports = (mod.exports || []).map((exp) => ({
+            exportName: exp.exportName,
+            params: (exp.params || []).map((p) => ({ name: p.name, kind: p.kind || 'string' })),
+        }));
+        const text = native.generateLocaleTypedModule(mod.module, exports);
         const file = path.join(outDir, `${mod.catalogId}.d.ts`);
         fs.mkdirSync(path.dirname(file), { recursive: true });
-        fs.writeFileSync(file, lines.join('\n'), 'utf8');
+        fs.writeFileSync(file, text, 'utf8');
         written.push(file);
     }
     const index = {
@@ -775,9 +770,7 @@ export function emitLocaleRuntimeModules(projectRoot, distDir) {
         }
         const native = requireNativeAddon();
         if (typeof native.generateLocaleRuntimeModule !== 'function') {
-            throw new Error(
-                'vmz native addon missing generateLocaleRuntimeModule — rebuild with `pnpm napi:build`',
-            );
+            throw new Error('vmz native addon missing generateLocaleRuntimeModule — rebuild with `pnpm napi:build`');
         }
         const code = native.generateLocaleRuntimeModule(defaultLocale, exports);
         const file = path.join(localesOut, `${mod.catalogId}.js`);
