@@ -162,10 +162,14 @@ pub fn try_emit_row_kernel_js(
     };
 
     // IIFE: monomorphic applyByField[slot] for leaf/host; apply = full row (no slot chain).
-    Some(format!(
-        "rowKernel: (function(){{ var hydrate = {hydrate}; var applyByField = {apply_by_field}; var apply = {apply}; var create = {create}; return {{ html: {:?}, hydrate: hydrate, apply: apply, applyByField: applyByField, create: create, events: [{events_js}]{key_field_js}{host_fields_js}{act_arg_js}{item_fields_js}{class_item_js}{text_slots_js} }}; }})(), ",
+    // Build as a parseable expression, force oxc reprint, then splice as an object property.
+    let iife = format!(
+        "(function(){{ var hydrate = {hydrate}; var applyByField = {apply_by_field}; var apply = {apply}; var create = {create}; return {{ html: {:?}, hydrate: hydrate, apply: apply, applyByField: applyByField, create: create, events: [{events_js}]{key_field_js}{host_fields_js}{act_arg_js}{item_fields_js}{class_item_js}{text_slots_js} }}; }})()",
         html
-    ))
+    );
+    let reprinted = super::ast_util::oxc_reprint_module_required(&format!("{iife};\n"), "rowKernel");
+    let expr = reprinted.trim().trim_end_matches(';').trim();
+    Some(format!("rowKernel: {expr}, "))
 }
 
 fn emit_html_element(
@@ -472,13 +476,13 @@ fn emit_apply_js(
 
     for (i, (_path, field)) in texts.iter().enumerate() {
         let mut body = format!("root.__vmzT{i}.nodeValue = item.{field};\n");
-        if let Some((_, on_val, off_val, host, item_f)) = class {
-            if item_f == field {
-                body.push_str(&format!(
-                    "root.className = this.{host} === item.{item_f} ? {:?} : {:?};\n",
-                    on_val, off_val
-                ));
-            }
+        if let Some((_, on_val, off_val, host, item_f)) = class
+            && item_f == field
+        {
+            body.push_str(&format!(
+                "root.className = this.{host} === item.{item_f} ? {:?} : {:?};\n",
+                on_val, off_val
+            ));
         }
         by_field_entries.push(format!(
             "{:?}: function(root, item) {{\n{} }}",

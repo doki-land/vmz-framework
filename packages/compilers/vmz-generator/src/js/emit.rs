@@ -71,14 +71,14 @@ pub fn emit_client_module(
     {
         let mut ir_direct = IrDepCursor::new(reactive);
         js.push_str(&emit_direct_create(&decl.name, view, &field_names, &mut ir_direct));
-        if let Some(plan_ref) = plan {
-            if plan_ref.status != PlanStatus::Empty {
-                let emit_plan = std::env::var("VMZ_EMIT_PLAN")
-                    .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-                    .unwrap_or(false);
-                if emit_plan {
-                    js.push_str(&emit_vmz_plan(&decl.name, plan_ref));
-                }
+        if let Some(plan_ref) = plan
+            && plan_ref.status != PlanStatus::Empty
+        {
+            let emit_plan = std::env::var("VMZ_EMIT_PLAN")
+                .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                .unwrap_or(false);
+            if emit_plan {
+                js.push_str(&emit_vmz_plan(&decl.name, plan_ref));
             }
         }
     }
@@ -148,7 +148,7 @@ fn emit_method_rw(decl: &ComponentDecl) -> String {
 }
 
 fn emit_async_task_wraps(decl: &ComponentDecl) -> String {
-    use super::ast_util::{js_string_literal, oxc_reprint_module};
+    use super::ast_util::{js_string_literal, oxc_reprint_module_required};
 
     let mut out = String::new();
     for m in &decl.methods {
@@ -168,7 +168,7 @@ fn emit_async_task_wraps(decl: &ComponentDecl) -> String {
     if out.is_empty() {
         return out;
     }
-    oxc_reprint_module(out.trim_start()).map(|c| format!("\n{c}")).unwrap_or(out)
+    format!("\n{}", oxc_reprint_module_required(out.trim_start(), "async task wraps"))
 }
 
 fn emit_props_runtime(decl: &ComponentDecl, ctor_applies_props: bool) -> String {
@@ -289,7 +289,7 @@ fn strip_http_surface(source: &str) -> String {
 }
 
 fn emit_server_client_stub(bridge: &ServerBridge) -> String {
-    use super::ast_util::{js_string_literal, oxc_reprint_module};
+    use super::ast_util::{js_string_literal, oxc_reprint_module_required};
 
     let mut methods = String::new();
     for m in &bridge.methods {
@@ -308,7 +308,7 @@ fn emit_server_client_stub(bridge: &ServerBridge) -> String {
         name = bridge.class_name,
         methods = methods,
     );
-    oxc_reprint_module(&raw).unwrap_or(raw)
+    oxc_reprint_module_required(&raw, "server client stub")
 }
 
 /// Rewrite virtual import specs (`vmz:runtime`, `vmz:dom`) to relative paths.
@@ -393,6 +393,7 @@ export {{ hydrate, mount, __vmzLazy }};
         eager_list = eager_regs.join(", "),
         lazy_block = lazy_regs.join(",\n"),
     );
+    let code = super::ast_util::oxc_reprint_module_required(&code, "eager/lazy entry-client");
     EmittedJs { code, map: None }
 }
 

@@ -7,7 +7,7 @@
 
 #![allow(clippy::too_many_arguments)]
 
-use super::ast_util::{js_string_literal, oxc_reprint_module};
+use super::ast_util::js_string_literal;
 use super::emit_ir::IrDepCursor;
 use super::helpers::{
     bind_field_idents, collect_deps_oxc, event_dom_type, is_event_attr, is_html_attr,
@@ -37,10 +37,10 @@ fn node_eligible(node: &ViewNode) -> bool {
         ViewNode::Text { .. } | ViewNode::Interp { .. } => true,
         ViewNode::Element { attrs, children, .. } => {
             for a in attrs {
-                if let ViewAttrValue::Interp { expr: e } = &a.value {
-                    if !is_event_attr(&a.name) {
-                        let _ = e; // ternary attrs allowed (CF bind)
-                    }
+                if let ViewAttrValue::Interp { expr: e } = &a.value
+                    && !is_event_attr(&a.name)
+                {
+                    let _ = e; // ternary attrs allowed (CF bind)
                 }
             }
             nodes_eligible(children)
@@ -54,9 +54,9 @@ fn node_eligible(node: &ViewNode) -> bool {
 
 /// Emit `__vmzDirect` + `__vmzCreate(api)` from Native View roots.
 ///
-/// Body statements are still lowered as text; the whole Direct block is then
-/// parsed and re-printed by oxc so the shell is consistently formatted and
-/// unparseable escapes fail loudly (fallback keeps prior text).
+/// Create body statements are still lowered as text, then parsed into a function
+/// expression. Outer `name.__vmz*` assignments are built with oxc AstBuilder and
+/// printed once (no soft fallback to unparsed text).
 /// SSR reuses the same create function with a serialize host API.
 pub fn emit_direct_create(
     name: &str,
@@ -64,15 +64,39 @@ pub fn emit_direct_create(
     fields: &[String],
     ir: &mut IrDepCursor<'_>,
 ) -> String {
+    use super::ast_util::JsAst;
+    use oxc_allocator::{Allocator, ArenaVec, CloneIn};
+    use oxc_ast::ast::Statement;
+    use oxc_parser::Parser;
+    use oxc_span::SourceType;
+
     let mut next_id = 0u32;
     let body = emit_create_body(&view.roots, fields, &[], &[], 0, ir, &mut next_id);
-    let raw = format!(
-        "{name}.__vmzDirect = true;\n{name}.__vmzCreate = function __vmzCreate(api) {{\n{body}}};\n{name}.__vmzSerialize = {name}.__vmzCreate;\n"
-    );
-    match oxc_reprint_module(&raw) {
-        Some(code) => format!("\n{code}"),
-        None => format!("\n{raw}"),
+    let fn_src = format!("(function __vmzCreate(api) {{\n{body}}})");
+
+    let allocator = Allocator::default();
+    let parsed = Parser::new(&allocator, &fn_src, SourceType::cjs()).parse();
+    if parsed.panicked {
+        panic!(
+            "vmz-generator: Direct create body failed oxc parse for `{name}` ({} bytes)",
+            fn_src.len()
+        );
     }
+    let create_expr = match parsed.program.body.first() {
+        Some(Statement::ExpressionStatement(stmt)) => stmt.expression.clone_in(&allocator),
+        _ => panic!("vmz-generator: Direct create expected function expression for `{name}`"),
+    };
+
+    let b = JsAst::new(&allocator);
+    let stmts = ArenaVec::from_iter_in(
+        [
+            b.assign_member_stmt(name, "__vmzDirect", b.bool_lit(true)),
+            b.assign_member_stmt(name, "__vmzCreate", create_expr),
+            b.assign_member_stmt(name, "__vmzSerialize", b.member(name, "__vmzCreate")),
+        ],
+        &b.ast,
+    );
+    format!("\n{}", b.print_stmts(stmts))
 }
 
 /// Emit `__vmzPlan` literal matching `units[].plan` in program.json (shared identity).
@@ -225,17 +249,17 @@ fn emit_node(
         ),
         ViewNode::Slot { name, attrs, children } => {
             let mut attrs = attrs.clone();
-            if let Some(n) = name {
-                if !attrs.iter().any(|a| a.name == "name") {
-                    attrs.insert(
-                        0,
-                        ViewAttr {
-                            name: "name".into(),
-                            value: ViewAttrValue::Static { value: n.clone() },
-                            binding: None,
-                        },
-                    );
-                }
+            if let Some(n) = name
+                && !attrs.iter().any(|a| a.name == "name")
+            {
+                attrs.insert(
+                    0,
+                    ViewAttr {
+                        name: "name".into(),
+                        value: ViewAttrValue::Static { value: n.clone() },
+                        binding: None,
+                    },
+                );
             }
             emit_plain_element(
                 "slot", &attrs, children, fields, scope, aliases, each_depth, ir, stmts, next_id,
@@ -628,36 +652,32 @@ fn bind_payload(
     aliases: &[(String, String)],
     ir: &IrDepCursor<'_>,
 ) -> (Option<u32>, Vec<String>, Option<String>) {
-    if looks_like_ternary(expr) {
-        if let Some(bid) = binding {
-            if let Some(cf) = ir.control_flow_for_binding(bid.0) {
-                if let Some((test_src, _, _)) = split_ternary_parts(expr) {
-                    let stable = cf
-                        .branches
-                        .first()
-                        .map(|b| b.cond_deps.clone())
-                        .unwrap_or_else(|| cf.stable.clone());
-                    let cons_deps =
-                        cf.branches.first().map(|b| b.body_deps.clone()).unwrap_or_default();
-                    let alt_deps =
-                        cf.branches.get(1).map(|b| b.body_deps.clone()).unwrap_or_default();
-                    let mut deps_all = cf.stable.clone();
-                    for d in stable.iter().chain(cons_deps.iter()).chain(alt_deps.iter()) {
-                        if !deps_all.iter().any(|x| x == d) {
-                            deps_all.push(d.clone());
-                        }
-                    }
-                    let stable_js = deps_js(&stable);
-                    let cons_js = deps_js(&cons_deps);
-                    let alt_js = deps_js(&alt_deps);
-                    let test_body = bind_field_idents(&test_src, fields, scope, aliases);
-                    let cf_js = format!(
-                        "{{ stable: [{stable_js}], branches: [{{ cond: function() {{ return ({test_body}); }}, deps: [{cons_js}] }},{{ deps: [{alt_js}] }}] }}"
-                    );
-                    return (Some(bid.0), deps_all, Some(cf_js));
-                }
+    if looks_like_ternary(expr)
+        && let Some(bid) = binding
+        && let Some(cf) = ir.control_flow_for_binding(bid.0)
+        && let Some((test_src, _, _)) = split_ternary_parts(expr)
+    {
+        let stable = cf
+            .branches
+            .first()
+            .map(|b| b.cond_deps.clone())
+            .unwrap_or_else(|| cf.stable.clone());
+        let cons_deps = cf.branches.first().map(|b| b.body_deps.clone()).unwrap_or_default();
+        let alt_deps = cf.branches.get(1).map(|b| b.body_deps.clone()).unwrap_or_default();
+        let mut deps_all = cf.stable.clone();
+        for d in stable.iter().chain(cons_deps.iter()).chain(alt_deps.iter()) {
+            if !deps_all.iter().any(|x| x == d) {
+                deps_all.push(d.clone());
             }
         }
+        let stable_js = deps_js(&stable);
+        let cons_js = deps_js(&cons_deps);
+        let alt_js = deps_js(&alt_deps);
+        let test_body = bind_field_idents(&test_src, fields, scope, aliases);
+        let cf_js = format!(
+            "{{ stable: [{stable_js}], branches: [{{ cond: function() {{ return ({test_body}); }}, deps: [{cons_js}] }},{{ deps: [{alt_js}] }}] }}"
+        );
+        return (Some(bid.0), deps_all, Some(cf_js));
     }
     let (id, deps) = binding_deps(ir, binding, expr, fields, scope);
     (id, deps, None)

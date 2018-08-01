@@ -101,6 +101,17 @@ impl<'a> JsAst<'a> {
         Expression::new_object_expression(SPAN, props, &self.ast)
     }
 
+    /// `object.member` expression.
+    pub fn member(&self, object: &str, member: &str) -> Expression<'a> {
+        Expression::new_static_member_expression(
+            SPAN,
+            self.ident(object),
+            IdentifierName::new(SPAN, Ident::from_str_in(member, &self.ast), &self.ast),
+            false,
+            &self.ast,
+        )
+    }
+
     /// `left.name = value` as a statement (`left` is an identifier).
     pub fn assign_member_stmt(
         &self,
@@ -158,7 +169,7 @@ pub fn js_string_literal(s: &str) -> String {
 /// `export default Name;`
 pub fn print_export_default(name: &str) -> String {
     let src = format!("export default {name};\n");
-    oxc_reprint_module(&src).unwrap_or(src)
+    oxc_reprint_module_required(&src, "export default")
 }
 
 /// Parse module / script source and re-print with oxc codegen.
@@ -171,6 +182,13 @@ pub fn oxc_reprint_module(source: &str) -> Option<String> {
         return None;
     }
     Some(Codegen::new().build(&parsed.program).code)
+}
+
+/// Like [`oxc_reprint_module`], but fails loudly instead of keeping raw text.
+pub fn oxc_reprint_module_required(source: &str, context: &str) -> String {
+    oxc_reprint_module(source).unwrap_or_else(|| {
+        panic!("vmz-generator: oxc failed to parse/reprint JS ({context}; {} bytes)", source.len());
+    })
 }
 
 /// Print a single assignment statement `name.member = value` with leading newline.
