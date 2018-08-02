@@ -1,19 +1,19 @@
 <template>
   <main data-vmz-focus="shop-main">
-    <h1>Shop home</h1>
-    <p>route-shop</p>
-    <div data-vmz-scroll-pad="1" style="height: 2200px">scroll-pad</div>
-    <Link to="ShopOfferPage">Offer</Link>
-  </main>
+      <h1>Shop home</h1>
+      <p>route-shop</p>
+      <div data-vmz-scroll-pad="1" style="height: 2200px">scroll-pad</div>
+      <Link to="ShopOfferPage">Offer</Link>
+    </main>
 </template>
 
 <script client>
 export default class ShopIndexPage {
-  static meta() {
-    return {
-      title: 'Shop · Production Router',
-      description: 'Shop index under shared Layout',
-    };
-  }
+	static meta() {
+		return {
+			title: "Shop · Production Router",
+			description: "Shop index under shared Layout"
+		};
+	}
 }
 </script>

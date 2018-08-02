@@ -497,7 +497,9 @@ fn list_style_files(dir: &Path) -> Vec<PathBuf> {
     };
     for ent in rd.flatten() {
         let p = ent.path();
-        if let Some("scss" | "sass" | "css") = p.extension().and_then(|e| e.to_str()) { out.push(p) }
+        if let Some("scss" | "sass" | "css") = p.extension().and_then(|e| e.to_str()) {
+            out.push(p)
+        }
     }
     out.sort();
     out

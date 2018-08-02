@@ -13,14 +13,14 @@ use serde::Serialize;
 use serde_json::{Value, json};
 use walkdir::WalkDir;
 
+use vmz_generator::MiniTemplateProfile;
 use vmz_protocol::{
-    CheckReportStatus, DIAG_ARTIFACT_INVALID, MiniProgramArtifact, MINI_PROGRAM_ARTIFACT_SCHEMA,
+    CheckReportStatus, DIAG_ARTIFACT_INVALID, MINI_PROGRAM_ARTIFACT_SCHEMA, MiniProgramArtifact,
     PLAN_SCHEMA, Severity, TargetDiagnostic, VmzModuleKind,
 };
 use vmz_types::{
     BindingKind, IrDepPath, ProgramModule, ProgramUnit, ReactiveComponent, ViewStatus, ViewView,
 };
-use vmz_generator::MiniTemplateProfile;
 
 use super::static_slice::{MINI_LOGIC_SCHEMA, MINI_TEMPLATE_DIALECT};
 

@@ -147,7 +147,27 @@ fn editorconfig_end_of_line_crlf() {
 }
 
 #[test]
-fn check_mode_does_not_write() {
+fn format_is_idempotent() {
+    let dir = temp_dir("idempotent");
+    write(
+        &dir.join(".editorconfig"),
+        "root = true\n[*]\nindent_style = space\nindent_size = 2\nend_of_line = lf\ninsert_final_newline = true\n",
+    );
+    let file = dir.join("Nest.vmz");
+    write(
+        &file,
+        "<template>\n<main>\n  <h1>Hi</h1>\n</main>\n</template>\n\n<script client>\nexport default class Nest {}\n</script>\n",
+    );
+
+    format_path(&file, &FormatOptions { check: false }).unwrap();
+    let once = fs::read_to_string(&file).unwrap();
+    let report = format_path(&file, &FormatOptions { check: false }).unwrap();
+    let twice = fs::read_to_string(&file).unwrap();
+    assert_eq!(once, twice, "second format must not change output");
+    assert_eq!(report.files_written, 0);
+    assert_eq!(report.files_need_write, 0);
+}
+
     let dir = temp_dir("check");
     write(
         &dir.join(".editorconfig"),

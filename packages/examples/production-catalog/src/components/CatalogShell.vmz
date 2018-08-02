@@ -1,12 +1,12 @@
 <template>
   <section class="shell">
-    <header>
-      <p>layout shell</p>
-    </header>
-    <div class="body">
-      <slot />
-    </div>
-  </section>
+      <header>
+        <p>layout shell</p>
+      </header>
+      <div class="body">
+        <slot />
+      </div>
+    </section>
 </template>
 
 <script client>

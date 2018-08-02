@@ -1,0 +1,11 @@
+<template>
+  <header class="vmz-ui-header" data-vmz-ui="header"><slot /></header>
+</template>
+
+<style>
+  .vmz-ui-header{min-height:4rem;display:flex;align-items:center;padding:0 1.5rem;border-bottom:1px solid var(--vmz-line-default,#d9d9d9);background:var(--vmz-surface-paper,#fff)}
+</style>
+
+<script client>
+export default class Header {}
+</script>

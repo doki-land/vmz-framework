@@ -1,69 +1,87 @@
 <template>
   <main>
-    <h1>Product {id}</h1>
-    <p>route-product</p>
-    <p>loader-title:{title}</p>
-    <p if={actionNote}>action-note:{actionNote}</p>
-    <Link to="IndexPage">Home</Link>
-  </main>
+      <h1>Product {id}</h1>
+      <p>route-product</p>
+      <p>loader-title:{title}</p>
+      <p if={actionNote}>action-note:{actionNote}</p>
+      <Link to="IndexPage">Home</Link>
+    </main>
 </template>
 
 <script client>
 export default class ProductPage {
-  public id: string = '';
-  public title: string = '';
-  public actionNote: string = '';
-
-  static async access(ctx: { params: { id?: string } }) {
-    const id = ctx?.params?.id ?? '';
-    if (id === 'blocked') return { kind: 'not-found' };
-    if (id === 'secret') return { kind: 'deny' };
-    if (id === 'elsewhere') return { kind: 'redirect', location: '/about' };
-    return { kind: 'allow' };
-  }
-
-  static async load(ctx: {
-    params: { id?: string };
-    signal?: AbortSignal;
-    searchParams?: URLSearchParams;
-  }) {
-    const id = ctx?.params?.id ?? '';
-    const slow = ctx?.searchParams?.get?.('slow') === '1';
-    if (slow) {
-      await sleepAbortable(120, ctx?.signal);
-      if (ctx?.signal?.aborted) {
-        return { title: 'STALE-CANCELLED' };
-      }
-    }
-    if (ctx?.signal?.aborted) {
-      return { title: 'STALE-CANCELLED' };
-    }
-    return { title: `Widget ${id}` };
-  }
-
-  static async action(ctx: { params: { id?: string }; body?: { note?: string } }) {
-    const id = ctx?.params?.id ?? '';
-    const note = ctx?.body?.note ?? 'ok';
-    if (id === 'bounce') return { kind: 'redirect', location: '/about' };
-    return { kind: 'allow', props: { actionNote: note } };
-  }
+	public id: string = "";
+	public title: string = "";
+	public actionNote: string = "";
+	static async access(ctx: {
+		params: {
+			id?: string;
+		};
+	}) {
+		const id = ctx?.params?.id ?? "";
+		if (id === "blocked") return { kind: "not-found" };
+		if (id === "secret") return { kind: "deny" };
+		if (id === "elsewhere") return {
+			kind: "redirect",
+			location: "/about"
+		};
+		return { kind: "allow" };
+	}
+	static async load(ctx: {
+		params: {
+			id?: string;
+		};
+		signal?: AbortSignal;
+		searchParams?: URLSearchParams;
+	}) {
+		const id = ctx?.params?.id ?? "";
+		const slow = ctx?.searchParams?.get?.("slow") === "1";
+		if (slow) {
+			await sleepAbortable(120, ctx?.signal);
+			if (ctx?.signal?.aborted) {
+				return { title: "STALE-CANCELLED" };
+			}
+		}
+		if (ctx?.signal?.aborted) {
+			return { title: "STALE-CANCELLED" };
+		}
+		return { title: `Widget ${id}` };
+	}
+	static async action(ctx: {
+		params: {
+			id?: string;
+		};
+		body?: {
+			note?: string;
+		};
+	}) {
+		const id = ctx?.params?.id ?? "";
+		const note = ctx?.body?.note ?? "ok";
+		if (id === "bounce") return {
+			kind: "redirect",
+			location: "/about"
+		};
+		return {
+			kind: "allow",
+			props: { actionNote: note }
+		};
+	}
 }
-
 function sleepAbortable(ms: number, signal?: AbortSignal) {
-  return new Promise<void>((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
-      return;
-    }
-    const t = setTimeout(() => resolve(), ms);
-    const onAbort = () => {
-      clearTimeout(t);
-      reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
-    };
-    signal?.addEventListener?.('abort', onAbort, { once: true });
-  }).catch((err) => {
-    if (err && err.name === 'AbortError') return;
-    throw err;
-  });
+	return new Promise<void>((resolve, reject) => {
+		if (signal?.aborted) {
+			reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+			return;
+		}
+		const t = setTimeout(() => resolve(), ms);
+		const onAbort = () => {
+			clearTimeout(t);
+			reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+		};
+		signal?.addEventListener?.("abort", onAbort, { once: true });
+	}).catch((err) => {
+		if (err && err.name === "AbortError") return;
+		throw err;
+	});
 }
 </script>

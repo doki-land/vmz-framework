@@ -1,0 +1,29 @@
+<template>
+  <div class="vmz-ui-segmented" data-vmz-ui="segmented" role="group" aria-label={label}>
+    <button
+      each={options}
+      as="opt"
+      key={opt.value}
+      type="button"
+      aria-pressed={opt.value === value ? 'true' : 'false'}
+      onClick={() => onPick(opt.value)}
+    >{opt.label}</button>
+  </div>
+</template>
+<style>
+.vmz-ui-segmented{display:inline-flex;max-width:100%;padding:.2rem;border-radius:var(--vmz-radius-md,6px);background:var(--vmz-surface-mist);overflow-x:auto}
+.vmz-ui-segmented button{min-height:2rem;padding:.3rem .75rem;border:0;border-radius:calc(var(--vmz-radius-md,6px) - 2px);background:transparent;color:var(--vmz-text-steel);font:inherit;font-size:.875rem;font-weight:550;white-space:nowrap;cursor:pointer}
+.vmz-ui-segmented button[aria-pressed='true']{background:var(--vmz-surface-paper);color:var(--vmz-text-ink);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.vmz-ui-segmented button:focus-visible{outline:2px solid var(--vmz-focus-ring);outline-offset:-2px}
+</style>
+<script client>
+export default class Segmented {
+  public label: string = 'Segments';
+  public value: string = '';
+  public options: Array<{ value: string; label: string }> = [];
+  public onChange: ((value: string) => void) | null = null;
+  onPick(next: string) {
+    if (typeof this.onChange === 'function') this.onChange(next);
+  }
+}
+</script>

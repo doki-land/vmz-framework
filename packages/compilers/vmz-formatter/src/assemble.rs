@@ -124,10 +124,11 @@ fn emit_script_block(block: &ScriptBlock, body: &str, settings: &EditorSettings)
 fn indent_block(content: &str, settings: &EditorSettings) -> String {
     let nl = settings.newline();
     let unit = settings.indent_unit();
+    let lines = normalize_relative_lines(content);
     let mut out = String::new();
-    for line in content.lines() {
+    for line in lines {
         let line = if settings.trim_trailing_whitespace {
-            line.trim_end()
+            line.trim_end().to_string()
         } else {
             line
         };
@@ -135,11 +136,40 @@ fn indent_block(content: &str, settings: &EditorSettings) -> String {
             out.push_str(nl);
         } else {
             out.push_str(&unit);
-            out.push_str(line);
+            out.push_str(&line);
             out.push_str(nl);
         }
     }
     out
+}
+
+/// Drop the shared leading indent so envelope re-indent is idempotent, while
+/// preserving relative indentation inside the block.
+fn normalize_relative_lines(content: &str) -> Vec<String> {
+    let raw: Vec<&str> = content.lines().collect();
+    let mut min_indent: Option<usize> = None;
+    for line in &raw {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let indent = line.len() - line.trim_start().len();
+        min_indent = Some(match min_indent {
+            Some(m) => m.min(indent),
+            None => indent,
+        });
+    }
+    let min_indent = min_indent.unwrap_or(0);
+    raw.into_iter()
+        .map(|line| {
+            if line.trim().is_empty() {
+                String::new()
+            } else if min_indent == 0 {
+                line.to_string()
+            } else {
+                line.get(min_indent..).unwrap_or(line).to_string()
+            }
+        })
+        .collect()
 }
 
 fn ensure_trailing_nl(body: &str, nl: &str) -> String {

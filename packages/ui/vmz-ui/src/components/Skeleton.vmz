@@ -1,80 +1,80 @@
 <template>
   <div
-    class="vmz-ui-skeleton"
-    data-vmz-ui="skeleton"
-    data-loading={loadingAttr}
-    role="status"
-    aria-live="polite"
-    aria-busy={loadingAttr}
-  >
-    <div if={loading} class="vmz-ui-skeleton__block" data-vmz-skeleton="block"></div>
-    <div if={loading} class="vmz-ui-skeleton__line" data-vmz-skeleton="line"></div>
-    <div if={loading} class="vmz-ui-skeleton__line" data-vmz-skeleton="line"></div>
-    <div if={!loading} class="vmz-ui-skeleton__content">
-      <slot />
+      class="vmz-ui-skeleton"
+      data-vmz-ui="skeleton"
+      data-loading={loadingAttr}
+      role="status"
+      aria-live="polite"
+      aria-busy={loadingAttr}
+    >
+      <div if={loading} class="vmz-ui-skeleton__block" data-vmz-skeleton="block"></div>
+      <div if={loading} class="vmz-ui-skeleton__line" data-vmz-skeleton="line"></div>
+      <div if={loading} class="vmz-ui-skeleton__line" data-vmz-skeleton="line"></div>
+      <div if={!loading} class="vmz-ui-skeleton__content">
+        <slot />
+      </div>
     </div>
-  </div>
 </template>
 
 <style>
-.vmz-ui-skeleton {
-  display: flex;
-  flex-direction: column;
-  gap: var(--vmz-density-compact-gap);
-  min-height: 4.5rem;
-}
-
-.vmz-ui-skeleton__block,
-.vmz-ui-skeleton__line {
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--vmz-action-primary-background) 18%, transparent);
-  animation: vmz-ui-skeleton-pulse var(--vmz-motion-overlay-duration) var(--vmz-motion-overlay-easing) infinite alternate;
-}
-
-.vmz-ui-skeleton__block {
-  width: 100%;
-  height: 2.5rem;
-}
-
-.vmz-ui-skeleton__line {
-  width: 72%;
-  height: 0.75rem;
-}
-
-.vmz-ui-skeleton__line + .vmz-ui-skeleton__line {
-  width: 48%;
-}
-
-.vmz-ui-skeleton__content {
-  display: flex;
-  flex-direction: column;
-  gap: inherit;
-}
-
-@keyframes vmz-ui-skeleton-pulse {
-  from {
-    opacity: 0.55;
+  .vmz-ui-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vmz-density-compact-gap);
+    min-height: 4.5rem;
   }
-  to {
-    opacity: 1;
-  }
-}
 
-@media (prefers-reduced-motion: reduce) {
   .vmz-ui-skeleton__block,
   .vmz-ui-skeleton__line {
-    animation: none;
+    border-radius: var(--vmz-radius-md, 6px);
+    background: color-mix(in srgb, var(--vmz-action-primary-background) 18%, transparent);
+    animation: vmz-ui-skeleton-pulse var(--vmz-motion-overlay-duration) var(--vmz-motion-overlay-easing) infinite alternate;
   }
-}
+
+  .vmz-ui-skeleton__block {
+    width: 100%;
+    height: 2.5rem;
+  }
+
+  .vmz-ui-skeleton__line {
+    width: 72%;
+    height: 0.75rem;
+  }
+
+  .vmz-ui-skeleton__line + .vmz-ui-skeleton__line {
+    width: 48%;
+  }
+
+  .vmz-ui-skeleton__content {
+    display: flex;
+    flex-direction: column;
+    gap: inherit;
+  }
+
+  @keyframes vmz-ui-skeleton-pulse {
+    from {
+      opacity: 0.55;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .vmz-ui-skeleton__block,
+    .vmz-ui-skeleton__line {
+      animation: none;
+    }
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — Skeleton (UI5 Console Surface).
- * Loading placeholder with stable min-height (CLS guard); parent owns loading.
- */
+* VMZ UI — Skeleton (UI5 Console Surface).
+* Loading placeholder with stable min-height (CLS guard); parent owns loading.
+*/
 export default class Skeleton {
-  public loading: boolean = true;
-  public loadingAttr: string = 'true';
+	public loading: boolean = true;
+	public loadingAttr: string = "true";
 }
 </script>

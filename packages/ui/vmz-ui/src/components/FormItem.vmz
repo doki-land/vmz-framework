@@ -1,78 +1,78 @@
 <template>
   <div
-    class="vmz-ui-form-item"
-    data-vmz-ui="form-item"
-    data-required={requiredAttr}
-    data-invalid={invalidAttr}
-  >
-    <label if={label} class="vmz-ui-form-item__label" for={controlId}>
-      <span>{label}</span>
-      <span if={required} class="vmz-ui-form-item__required" aria-hidden="true">*</span>
-    </label>
-    <div class="vmz-ui-form-item__control">
-      <slot />
+      class="vmz-ui-form-item"
+      data-vmz-ui="form-item"
+      data-required={requiredAttr}
+      data-invalid={invalidAttr}
+    >
+      <label if={label} class="vmz-ui-form-item__label" for={controlId}>
+        <span>{label}</span>
+        <span if={required} class="vmz-ui-form-item__required" aria-hidden="true">*</span>
+      </label>
+      <div class="vmz-ui-form-item__control">
+        <slot />
+      </div>
+      <p if={description} id={descriptionId} class="vmz-ui-form-item__description">{description}</p>
+      <p if={error} id={errorId} class="vmz-ui-form-item__error" role="alert">{error}</p>
     </div>
-    <p if={description} id={descriptionId} class="vmz-ui-form-item__description">{description}</p>
-    <p if={error} id={errorId} class="vmz-ui-form-item__error" role="alert">{error}</p>
-  </div>
 </template>
 
 <style>
-.vmz-ui-form-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  max-width: 28rem;
-}
+  .vmz-ui-form-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    max-width: 28rem;
+  }
 
-.vmz-ui-form-item__label {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.25rem;
-  font: inherit;
-  font-weight: 600;
-}
+  .vmz-ui-form-item__label {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.25rem;
+    font: inherit;
+    font-weight: 600;
+  }
 
-.vmz-ui-form-item__required {
-  color: var(--vmz-status-danger-accent);
-  font-weight: 700;
-}
+  .vmz-ui-form-item__required {
+    color: var(--vmz-status-danger-accent);
+    font-weight: 700;
+  }
 
-.vmz-ui-form-item__control {
-  min-width: 0;
-}
+  .vmz-ui-form-item__control {
+    min-width: 0;
+  }
 
-.vmz-ui-form-item__description {
-  margin: 0;
-  opacity: 0.75;
-  font-size: 0.9em;
-}
+  .vmz-ui-form-item__description {
+    margin: 0;
+    opacity: 0.75;
+    font-size: 0.9em;
+  }
 
-.vmz-ui-form-item__error {
-  margin: 0;
-  color: var(--vmz-status-danger-foreground);
-  font-size: 0.9em;
-}
+  .vmz-ui-form-item__error {
+    margin: 0;
+    color: var(--vmz-status-danger-foreground);
+    font-size: 0.9em;
+  }
 
-.vmz-ui-form-item[data-invalid='true'] .vmz-ui-form-item__control :where(input, select, textarea) {
-  border-color: var(--vmz-status-danger-accent);
-}
+  .vmz-ui-form-item[data-invalid='true'] .vmz-ui-form-item__control :where(input, select, textarea) {
+    border-color: var(--vmz-status-danger-accent);
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — FormItem.
- * Label / description / error shell for slotted controls; parent owns validation strings.
- */
+* VMZ UI — FormItem.
+* Label / description / error shell for slotted controls; parent owns validation strings.
+*/
 export default class FormItem {
-  public label: string = '';
-  public description: string = '';
-  public error: string = '';
-  public required: boolean = false;
-  public requiredAttr: string = 'false';
-  public invalidAttr: string = 'false';
-  public controlId: string = 'vmz-form-item';
-  public descriptionId: string = 'vmz-form-item-desc';
-  public errorId: string = 'vmz-form-item-err';
+	public label: string = "";
+	public description: string = "";
+	public error: string = "";
+	public required: boolean = false;
+	public requiredAttr: string = "false";
+	public invalidAttr: string = "false";
+	public controlId: string = "vmz-form-item";
+	public descriptionId: string = "vmz-form-item-desc";
+	public errorId: string = "vmz-form-item-err";
 }
 </script>

@@ -1,0 +1,6 @@
+<template><aside class="vmz-ui-sider" data-vmz-ui="sider"><slot /></aside></template>
+<style>
+.vmz-ui-sider{width:16rem;padding:1rem;border-right:1px solid var(--vmz-line-default);background:var(--vmz-surface-paper)}
+@media(max-width:720px){.vmz-ui-sider{width:100%;border-right:0;border-bottom:1px solid var(--vmz-line-default)}}
+</style>
+<script client>export default class Sider {}</script>

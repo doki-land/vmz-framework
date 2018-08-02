@@ -3,7 +3,6 @@
 use std::fs;
 use vmz_protocol::*;
 
-
 use std::time::{SystemTime, UNIX_EPOCH};
 use vmz_compiler::native::multi_platform::*;
 use vmz_protocol::MultiPlatformAdapter;

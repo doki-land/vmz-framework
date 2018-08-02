@@ -1,116 +1,116 @@
 <template>
   <div class="vmz-ui-list" data-vmz-ui="list">
-    <p if={label} class="vmz-ui-list__label" id={labelId}>{label}</p>
-    <ul
-      class="vmz-ui-list__items"
-      role="listbox"
-      aria-labelledby={labelId}
-      aria-label={label}
-      onClick={onListClick}
-      onKeyDown={onListKeyDown}
-    >
-      <li
-        each={items}
-        as="item"
-        key={item.id}
-        class="vmz-ui-list__item"
-        role="option"
-        id={item.id}
-        data-vmz-list-item={item.id}
-        aria-selected={selected === item.id ? 'true' : 'false'}
-        tabindex={selected === item.id ? 0 : -1}
+      <p if={label} class="vmz-ui-list__label" id={labelId}>{label}</p>
+      <ul
+        class="vmz-ui-list__items"
+        role="listbox"
+        aria-labelledby={labelId}
+        aria-label={label}
+        onClick={onListClick}
+        onKeyDown={onListKeyDown}
       >
-        {item.title}
-      </li>
-    </ul>
-  </div>
+        <li
+          each={items}
+          as="item"
+          key={item.id}
+          class="vmz-ui-list__item"
+          role="option"
+          id={item.id}
+          data-vmz-list-item={item.id}
+          aria-selected={selected === item.id ? 'true' : 'false'}
+          tabindex={selected === item.id ? 0 : -1}
+        >
+          {item.title}
+        </li>
+      </ul>
+    </div>
 </template>
 
 <style>
-.vmz-ui-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  max-width: 28rem;
-}
+  .vmz-ui-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    max-width: 28rem;
+  }
 
-.vmz-ui-list__label {
-  margin: 0;
-  font-weight: 600;
-  color: var(--vmz-text-ink);
-}
+  .vmz-ui-list__label {
+    margin: 0;
+    font-weight: 600;
+    color: var(--vmz-text-ink);
+  }
 
-.vmz-ui-list__items {
-  margin: 0;
-  padding: 0.25rem;
-  list-style: none;
-  border: 1px solid var(--vmz-line-default);
-  border-radius: 2px;
-  background: var(--vmz-surface-paper);
-  color: var(--vmz-text-ink);
-}
+  .vmz-ui-list__items {
+    margin: 0;
+    padding: 0.25rem;
+    list-style: none;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
+  }
 
-.vmz-ui-list__item {
-  padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
-  border-radius: 2px;
-  cursor: pointer;
-  outline: none;
-}
+  .vmz-ui-list__item {
+    padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
+    border-radius: var(--vmz-radius-md, 6px);
+    cursor: pointer;
+    outline: none;
+  }
 
-.vmz-ui-list__item[aria-selected='true'] {
-  background: var(--vmz-action-primary-background);
-  color: var(--vmz-action-primary-foreground);
-}
+  .vmz-ui-list__item[aria-selected='true'] {
+    background: var(--vmz-action-primary-background);
+    color: var(--vmz-action-primary-foreground);
+  }
 
-.vmz-ui-list__item:hover {
-  background: color-mix(in srgb, var(--vmz-action-primary-background) 14%, transparent);
-}
+  .vmz-ui-list__item:hover {
+    background: color-mix(in srgb, var(--vmz-action-primary-background) 14%, transparent);
+  }
 
-.vmz-ui-list__item[aria-selected='true']:hover {
-  background: var(--vmz-action-primary-hover);
-}
+  .vmz-ui-list__item[aria-selected='true']:hover {
+    background: var(--vmz-action-primary-hover);
+  }
 
-.vmz-ui-list__item:focus-visible {
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-}
+  .vmz-ui-list__item:focus-visible {
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — List (ordinary selectable list).
- * Parent owns `selected` id; click + Arrow/Home/End. Not a DataGrid.
- */
+* VMZ UI — List (ordinary selectable list).
+* Parent owns `selected` id; click + Arrow/Home/End. Not a DataGrid.
+*/
 export default class List {
-  public label: string = 'List';
-  public labelId: string = 'vmz-list-label';
-  public selected: string = '';
-  /** @type {{ id: string, title: string }[]} */
-  public items: { id: string; title: string }[] = [];
-  public onSelect: ((id: string) => void) | null = null;
-
-  select(id) {
-    if (typeof this.onSelect === 'function') this.onSelect(id);
-  }
-
-  onListClick(ev) {
-    const t = ev && ev.target;
-    const el = t && typeof t.closest === 'function' ? t.closest('[data-vmz-list-item]') : null;
-    const id = el && typeof el.getAttribute === 'function' ? el.getAttribute('data-vmz-list-item') : null;
-    if (id) this.select(id);
-  }
-
-  onListKeyDown(ev) {
-    if (!ev || !this.items?.length) return;
-    const ids = this.items.map((it) => it.id);
-    const idx = Math.max(0, ids.indexOf(this.selected));
-    let next = idx;
-    if (ev.key === 'ArrowDown') next = (idx + 1) % ids.length;
-    else if (ev.key === 'ArrowUp') next = (idx - 1 + ids.length) % ids.length;
-    else if (ev.key === 'Home') next = 0;
-    else if (ev.key === 'End') next = ids.length - 1;
-    else return;
-    ev.preventDefault();
-    this.select(ids[next]);
-  }
+	public label: string = "List";
+	public labelId: string = "vmz-list-label";
+	public selected: string = "";
+	/** @type {{ id: string, title: string }[]} */
+	public items: {
+		id: string;
+		title: string;
+	}[] = [];
+	public onSelect: ((id: string) => void) | null = null;
+	select(id) {
+		if (typeof this.onSelect === "function") this.onSelect(id);
+	}
+	onListClick(ev) {
+		const t = ev && ev.target;
+		const el = t && typeof t.closest === "function" ? t.closest("[data-vmz-list-item]") : null;
+		const id = el && typeof el.getAttribute === "function" ? el.getAttribute("data-vmz-list-item") : null;
+		if (id) this.select(id);
+	}
+	onListKeyDown(ev) {
+		if (!ev || !this.items?.length) return;
+		const ids = this.items.map((it) => it.id);
+		const idx = Math.max(0, ids.indexOf(this.selected));
+		let next = idx;
+		if (ev.key === "ArrowDown") next = (idx + 1) % ids.length;
+		else if (ev.key === "ArrowUp") next = (idx - 1 + ids.length) % ids.length;
+		else if (ev.key === "Home") next = 0;
+		else if (ev.key === "End") next = ids.length - 1;
+		else return;
+		ev.preventDefault();
+		this.select(ids[next]);
+	}
 }
 </script>

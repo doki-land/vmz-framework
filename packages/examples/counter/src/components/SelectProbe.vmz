@@ -1,0 +1,38 @@
+<template>
+  <div data-testid="select-probe">
+      <Select
+        label="Plan"
+        controlId="probe-plan"
+        value={plan}
+        options={planOptions}
+        onChange={(e) => this.onPlan(e)}
+      />
+      <p data-testid="select-probe-value">plan:{plan || 'none'}</p>
+    </div>
+</template>
+
+<script client>
+/**
+* Browser Host fixture: @vmz/ui Select via protocol select (combobox + data-vmz-option).
+*/
+export default class SelectProbe {
+	plan = "";
+	planOptions = [
+		{
+			value: "",
+			label: "—"
+		},
+		{
+			value: "ops",
+			label: "Ops"
+		},
+		{
+			value: "dev",
+			label: "Dev"
+		}
+	];
+	onPlan(e) {
+		this.plan = e && e.target ? String(e.target.value) : "";
+	}
+}
+</script>

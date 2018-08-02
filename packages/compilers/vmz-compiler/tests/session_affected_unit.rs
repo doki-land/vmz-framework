@@ -1,6 +1,5 @@
 //! Moved from `src/session/affected.rs` (cargo-cry: tests next to Cargo.toml).
 
-
 use std::fs;
 use vmz_compiler::session::affected::*;
 

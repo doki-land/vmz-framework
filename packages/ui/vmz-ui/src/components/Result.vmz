@@ -1,84 +1,84 @@
 <template>
   <section
-    class="vmz-ui-result"
-    data-vmz-ui="result"
-    data-status={status}
-  >
-    <p class="vmz-ui-result__title">{title}</p>
-    <p if={description} class="vmz-ui-result__description">{description}</p>
-    <div class="vmz-ui-result__actions">
-      <slot />
-    </div>
-  </section>
+      class="vmz-ui-result"
+      data-vmz-ui="result"
+      data-status={status}
+    >
+      <p class="vmz-ui-result__title">{title}</p>
+      <p if={description} class="vmz-ui-result__description">{description}</p>
+      <div class="vmz-ui-result__actions">
+        <slot />
+      </div>
+    </section>
 </template>
 
 <style>
-.vmz-ui-result {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--vmz-density-control-gap);
-  padding: calc(var(--vmz-density-control-padding-y) * 1.5) var(--vmz-density-control-padding-x);
-  border: 1px solid var(--vmz-status-info-accent);
-  border-radius: 2px;
-  color: var(--vmz-status-info-foreground);
-}
+  .vmz-ui-result {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--vmz-density-control-gap);
+    padding: calc(var(--vmz-density-control-padding-y) * 1.5) var(--vmz-density-control-padding-x);
+    border: 1px solid var(--vmz-status-info-accent);
+    border-radius: var(--vmz-radius-md, 6px);
+    color: var(--vmz-status-info-foreground);
+  }
 
-.vmz-ui-result[data-status='info'] {
-  border-color: var(--vmz-status-info-accent);
-  color: var(--vmz-status-info-foreground);
-}
+  .vmz-ui-result[data-status='info'] {
+    border-color: var(--vmz-status-info-accent);
+    color: var(--vmz-status-info-foreground);
+  }
 
-.vmz-ui-result[data-status='success'] {
-  border-color: var(--vmz-status-success-accent);
-  color: var(--vmz-status-success-foreground);
-}
+  .vmz-ui-result[data-status='success'] {
+    border-color: var(--vmz-status-success-accent);
+    color: var(--vmz-status-success-foreground);
+  }
 
-.vmz-ui-result[data-status='warning'] {
-  border-color: var(--vmz-status-warning-accent);
-  color: var(--vmz-status-warning-foreground);
-}
+  .vmz-ui-result[data-status='warning'] {
+    border-color: var(--vmz-status-warning-accent);
+    color: var(--vmz-status-warning-foreground);
+  }
 
-.vmz-ui-result[data-status='danger'] {
-  border-color: var(--vmz-status-danger-accent);
-  color: var(--vmz-status-danger-foreground);
-}
+  .vmz-ui-result[data-status='danger'] {
+    border-color: var(--vmz-status-danger-accent);
+    color: var(--vmz-status-danger-foreground);
+  }
 
-:where([data-density='compact']) .vmz-ui-result {
-  gap: var(--vmz-density-compact-gap);
-  padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
-}
+  :where([data-density='compact']) .vmz-ui-result {
+    gap: var(--vmz-density-compact-gap);
+    padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+  }
 
-.vmz-ui-result__title {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 700;
-}
+  .vmz-ui-result__title {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+  }
 
-.vmz-ui-result__description {
-  margin: 0;
-  opacity: 0.9;
-}
+  .vmz-ui-result__description {
+    margin: 0;
+    opacity: 0.9;
+  }
 
-.vmz-ui-result__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
+  .vmz-ui-result__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
 
-.vmz-ui-result__actions:empty {
-  display: none;
-}
+  .vmz-ui-result__actions:empty {
+    display: none;
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — Result (UI4 Commercial Surface).
- * Outcome block for success/error flows; status → status.* tokens.
- */
+* VMZ UI — Result (UI4 Commercial Surface).
+* Outcome block for success/error flows; status → status.* tokens.
+*/
 export default class Result {
-  public title: string = '';
-  public description: string = '';
-  public status: string = 'info';
+	public title: string = "";
+	public description: string = "";
+	public status: string = "info";
 }
 </script>

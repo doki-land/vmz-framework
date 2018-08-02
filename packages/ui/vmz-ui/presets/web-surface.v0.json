@@ -3,21 +3,34 @@
     "id": "web-surface",
     "package": "@vmz/ui",
     "materialize": "Copy or resolve into application /designs Style Theme (tokens/*.json + themes/*.json). Preset is not a second runtime theme.",
+    "foundation": {
+        "radius": { "sm": "2px", "md": "6px", "lg": "8px" },
+        "controlHeight": { "sm": "1.5rem", "middle": "2rem", "lg": "2.5rem" },
+        "layoutMaxWidth": "75rem",
+        "surfacePage": "#F5F5F5",
+        "surfaceFill": "#FAFAFA",
+        "textTertiary": "#8C8C8C",
+        "lineDefault": "#D9D9D9",
+        "lineSubtle": "#F0F0F0",
+        "shadowCard": "none",
+        "shadowCardHover": "0 1px 2px -2px rgba(0,0,0,.08), 0 3px 6px 0 rgba(0,0,0,.06), 0 5px 12px 4px rgba(0,0,0,.04)",
+        "shadowPopup": "0 6px 16px 0 rgba(0,0,0,.08), 0 3px 6px -4px rgba(0,0,0,.12), 0 9px 28px 8px rgba(0,0,0,.05)"
+    },
     "density": {
         "control": {
-            "padding-y": "0.55rem",
-            "padding-x": "0.95rem",
-            "gap": "0.75rem"
+            "padding-y": "0.25rem",
+            "padding-x": "0.75rem",
+            "gap": "0.5rem"
         },
         "compact": {
-            "padding-y": "0.35rem",
-            "padding-x": "0.65rem",
-            "gap": "0.45rem"
+            "padding-y": "0.125rem",
+            "padding-x": "0.5rem",
+            "gap": "0.35rem"
         },
         "dense": {
-            "padding-y": "0.2rem",
-            "padding-x": "0.45rem",
-            "gap": "0.3rem"
+            "padding-y": "0",
+            "padding-x": "0.35rem",
+            "gap": "0.25rem"
         }
     },
     "activation": {
@@ -30,5 +43,6 @@
         "default": "application tokens base",
         "dark": "themes/dark.json overlay",
         "high-contrast": "themes/high-contrast.json overlay — stronger ink/line/focus"
-    }
+    },
+    "visualIntent": "Modern commercial product chrome: neutral structure borders (never brand outline on every box), flat cards, soft focus rings, quiet page fill. Brand color is for actions/selection — not scaffolding."
 }

@@ -1,0 +1,11 @@
+<template>
+  <main class="vmz-ui-content" data-vmz-ui="content"><slot /></main>
+</template>
+
+<style>
+  .vmz-ui-content{flex:1;min-width:0;padding:1.5rem}
+</style>
+
+<script client>
+export default class Content {}
+</script>

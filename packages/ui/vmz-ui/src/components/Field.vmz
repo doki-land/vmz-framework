@@ -1,122 +1,117 @@
 <template>
   <div class="vmz-ui-field" data-vmz-ui="field" data-invalid={invalidAttr}>
-    <label if={label} class="vmz-ui-field__label" for={controlId}>{label}</label>
-    <input
-      id={controlId}
-      class="vmz-ui-field__control"
-      type={type}
-      value={value}
-      min={min}
-      max={max}
-      step={step}
-      disabled={disabled}
-      aria-invalid={error ? 'true' : 'false'}
-      aria-describedby={describedBy}
-      onInput={onInput}
-    />
-    <p if={description} id={descriptionId} class="vmz-ui-field__description">{description}</p>
-    <p if={error} id={errorId} class="vmz-ui-field__error" role="alert">{error}</p>
-  </div>
+      <label if={label} class="vmz-ui-field__label" for={controlId}>{label}</label>
+      <input
+        id={controlId}
+        class="vmz-ui-field__control"
+        type={type}
+        value={value}
+        min={min}
+        max={max}
+        step={step}
+        disabled={disabled}
+        aria-invalid={error ? 'true' : 'false'}
+        aria-describedby={describedBy}
+        onInput={onInput}
+      />
+      <p if={description} id={descriptionId} class="vmz-ui-field__description">{description}</p>
+      <p if={error} id={errorId} class="vmz-ui-field__error" role="alert">{error}</p>
+    </div>
 </template>
 
 <style>
 .vmz-ui-field {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.35rem;
   max-width: 28rem;
 }
 
 .vmz-ui-field__label {
   font: inherit;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: var(--vmz-text-ink, inherit);
 }
 
 .vmz-ui-field__control {
   box-sizing: border-box;
   width: 100%;
-  font-family: var(--vmz-font-mono, ui-monospace, monospace);
-  font-size: 0.95rem;
-  line-height: 1.4;
-  padding: calc(var(--vmz-density-control-padding-y, 0.55rem) + 0.05rem)
-    calc(var(--vmz-density-control-padding-x, 0.95rem) + 0.05rem);
-  border: 1px solid var(--vmz-line-default, #d9dee3);
-  border-left: 3px solid var(--vmz-action-primary-background);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--vmz-surface-mist, #f4f6f8) 55%, var(--vmz-surface-paper, #fff));
+  min-height: var(--vmz-control-height, 2rem);
+  font-family: var(--vmz-font-sans, inherit);
+  font-size: 0.875rem;
+  line-height: 1.5715;
+  padding: var(--vmz-density-control-padding-y, 0.25rem)
+    var(--vmz-density-control-padding-x, 0.75rem);
+  border: 1px solid var(--vmz-line-default, #d9d9d9);
+  border-radius: var(--vmz-radius-md, 6px);
+  background: var(--vmz-surface-paper, #fff);
   color: var(--vmz-text-ink, inherit);
   outline: none;
-  box-shadow: inset 0 1px 2px rgba(16, 24, 40, 0.04);
   transition:
     border-color var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, linear),
-    box-shadow var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, linear),
-    background-color var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, linear);
+    box-shadow var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, linear);
 }
 
 .vmz-ui-field__control::placeholder {
-  color: var(--vmz-text-steel, #66707a);
-  opacity: 0.85;
+  color: var(--vmz-text-steel, #8c8c8c);
+  opacity: 1;
 }
 
 .vmz-ui-field[data-invalid='true'] .vmz-ui-field__control {
   border-color: var(--vmz-status-danger-accent);
-  border-left-color: var(--vmz-status-danger-accent);
-  background: color-mix(in srgb, var(--vmz-status-danger-accent) 8%, var(--vmz-surface-paper, #fff));
 }
 
 .vmz-ui-field__control:hover:not(:disabled):not(:focus-visible) {
-  border-color: color-mix(in srgb, var(--vmz-action-primary-background) 55%, var(--vmz-line-default, #d9dee3));
+  border-color: var(--vmz-action-primary-background);
 }
 
 .vmz-ui-field__control:focus-visible {
   border-color: var(--vmz-action-primary-background);
-  background: var(--vmz-surface-paper, #fff);
-  box-shadow:
-    inset 0 1px 2px rgba(16, 24, 40, 0.03),
-    0 0 0 2px var(--vmz-focus-ring);
+  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
 }
 
 .vmz-ui-field__control:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+  background: var(--vmz-surface-mist, #fafafa);
 }
 
 .vmz-ui-field__description {
   margin: 0;
-  color: var(--vmz-text-steel, #66707a);
-  font-size: 0.9em;
+  color: var(--vmz-text-steel, #8c8c8c);
+  font-size: 0.875rem;
   line-height: 1.4;
 }
 
 .vmz-ui-field__error {
   margin: 0;
   color: var(--vmz-status-danger-foreground);
-  font-size: 0.9em;
+  font-size: 0.875rem;
 }
 </style>
 
 <script client>
 /**
- * VMZ UI — Field (UI1).
- * Label / description / error association via for + aria-describedby.
- * Colors only from Style Theme semantic tokens.
- */
+* VMZ UI — Field (UI1).
+* Label / description / error association via for + aria-describedby.
+* Colors only from Style Theme semantic tokens.
+*/
 export default class Field {
-  public label: string = '';
-  public description: string = '';
-  public error: string = '';
-  public value: string = '';
-  public type: string = 'text';
-  public min: string = '';
-  public max: string = '';
-  public step: string = '';
-  public disabled: boolean = false;
-  public invalidAttr: string = 'false';
-  public controlId: string = 'vmz-field';
-  public descriptionId: string = 'vmz-field-desc';
-  public errorId: string = 'vmz-field-err';
-  public describedBy: string = '';
-  public onInput: ((e: Event) => void) | null = null;
+	public label: string = "";
+	public description: string = "";
+	public error: string = "";
+	public value: string = "";
+	public type: string = "text";
+	public min: string = "";
+	public max: string = "";
+	public step: string = "";
+	public disabled: boolean = false;
+	public invalidAttr: string = "false";
+	public controlId: string = "vmz-field";
+	public descriptionId: string = "vmz-field-desc";
+	public errorId: string = "vmz-field-err";
+	public describedBy: string = "";
+	public onInput: ((e: Event) => void) | null = null;
 }
 </script>

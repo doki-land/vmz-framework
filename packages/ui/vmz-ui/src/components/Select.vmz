@@ -1,66 +1,91 @@
 <template>
   <div
-    class={'vmz-ui-select' + (open ? ' is-opened' : '')}
-    data-vmz-ui="select"
-    data-invalid={invalidAttr}
-  >
-    <label if={label} class="vmz-ui-select__label" for={controlId}>{label}</label>
-    <button
-      type="button"
-      id={controlId}
-      class="vmz-ui-select__control"
-      role="combobox"
-      disabled={disabled}
-      aria-haspopup="listbox"
-      aria-expanded={open ? 'true' : 'false'}
-      aria-controls={listId}
-      aria-invalid={error ? 'true' : 'false'}
-      aria-describedby={describedBy}
-      onClick={toggle}
-      onKeyDown={onTriggerKeyDown}
+      class={'vmz-ui-select' + (open ? ' is-opened' : '') + (isMultiple ? ' is-multiple' : '')}
+      data-vmz-ui="select"
+      data-mode={mode}
+      data-searchable={searchableAttr}
+      data-invalid={invalidAttr}
     >
-      <span class="vmz-ui-select__value">{displayLabel}</span>
-      <span class="vmz-ui-select__chev" aria-hidden="true"></span>
-    </button>
-    <ul
-      if={open}
-      id={listId}
-      class="vmz-ui-select__list"
-      role="listbox"
-      tabindex="-1"
-      data-vmz-overlay="select"
-      data-vmz-overlay-owner="select"
-      data-vmz-focus="enter"
-      onKeyDown={onListKeyDown}
-    >
-      <li each={options} as="opt" key={opt.value} role="presentation">
-        <button
-          type="button"
-          class={'vmz-ui-select__option' + (opt.value === value ? ' is-on' : '')}
-          role="option"
-          data-vmz-option={opt.value}
-          aria-selected={opt.value === value ? 'true' : 'false'}
-          onClick={onOptionClick}
-        >{opt.label}</button>
-      </li>
-    </ul>
-    <p if={description} id={descriptionId} class="vmz-ui-select__description">{description}</p>
-    <p if={error} id={errorId} class="vmz-ui-select__error" role="alert">{error}</p>
-  </div>
+      <label if={label} class="vmz-ui-select__label" for={controlId}>{label}</label>
+      <button
+        type="button"
+        id={controlId}
+        class="vmz-ui-select__control"
+        role="combobox"
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open ? 'true' : 'false'}
+        aria-controls={listId}
+        aria-invalid={error ? 'true' : 'false'}
+        aria-describedby={describedBy}
+        aria-multiselectable={isMultiple ? 'true' : 'false'}
+        onClick={toggle}
+        onKeyDown={onTriggerKeyDown}
+      >
+        <span class="vmz-ui-select__value">{displayLabel}</span>
+        <span class="vmz-ui-select__chev" aria-hidden="true"></span>
+      </button>
+      <div
+        if={open}
+        id={listId}
+        class="vmz-ui-select__panel"
+        data-vmz-overlay="select"
+        data-vmz-overlay-owner="select"
+        data-vmz-focus="enter"
+      >
+        <div if={searchable} class="vmz-ui-select__search">
+          <input
+            type="search"
+            class="vmz-ui-select__search-input"
+            data-vmz-select="search"
+            value={searchQuery}
+            placeholder={searchPlaceholder}
+            aria-label={searchPlaceholder}
+            onInput={onSearchInput}
+            onKeyDown={onSearchKeyDown}
+          />
+        </div>
+        <ul
+          class="vmz-ui-select__list"
+          role="listbox"
+          aria-multiselectable={isMultiple ? 'true' : 'false'}
+          tabindex="-1"
+          onKeyDown={onListKeyDown}
+        >
+          <li if={showEmpty} class="vmz-ui-select__empty" role="presentation">{emptyText}</li>
+          <li each={visibleOptions} as="opt" key={opt.value} role="presentation">
+            <button
+              type="button"
+              class={'vmz-ui-select__option' + (opt.selected ? ' is-on' : '')}
+              role="option"
+              data-vmz-option={opt.value}
+              aria-selected={opt.selected ? 'true' : 'false'}
+              onClick={onOptionClick}
+            >{opt.label}</button>
+          </li>
+        </ul>
+        <div if={isMultiple} class="vmz-ui-select__footer">
+          <button type="button" class="vmz-ui-select__done" data-vmz-select="done" onClick={close}>Done</button>
+        </div>
+      </div>
+      <p if={description} id={descriptionId} class="vmz-ui-select__description">{description}</p>
+      <p if={error} id={errorId} class="vmz-ui-select__error" role="alert">{error}</p>
+    </div>
 </template>
 
 <style>
-.vmz-ui-select {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  max-width: 28rem;
-}
+  .vmz-ui-select {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    max-width: 28rem;
+  }
 
 .vmz-ui-select__label {
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
+  font-size: 0.875rem;
 }
 
 .vmz-ui-select__control {
@@ -69,288 +94,434 @@
   justify-content: space-between;
   gap: 0.55rem;
   width: 100%;
+  min-height: var(--vmz-control-height, 2rem);
   box-sizing: border-box;
   font: inherit;
+  font-size: 0.875rem;
   text-align: left;
   padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
-  border: 1px solid var(--vmz-action-primary-background);
-  border-radius: 2px;
-  background: var(--vmz-surface-paper, transparent);
+  border: 1px solid var(--vmz-line-default, #d9d9d9);
+  border-radius: var(--vmz-radius-md, 6px);
+  background: var(--vmz-surface-paper, #fff);
   color: inherit;
   outline: none;
   cursor: pointer;
+  transition: border-color var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, linear),
+    box-shadow var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, linear);
 }
 
 .vmz-ui-select[data-invalid='true'] .vmz-ui-select__control {
   border-color: var(--vmz-status-danger-accent);
 }
 
+.vmz-ui-select__control:hover:not(:disabled) {
+  border-color: var(--vmz-action-primary-background);
+}
+
 .vmz-ui-select__control:focus-visible,
 .vmz-ui-select.is-opened .vmz-ui-select__control {
+  border-color: var(--vmz-action-primary-background);
   box-shadow: 0 0 0 2px var(--vmz-focus-ring);
 }
 
-.vmz-ui-select__control:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
+  .vmz-ui-select__control:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
 
-.vmz-ui-select__value {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+  .vmz-ui-select__value {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
-.vmz-ui-select__chev {
-  flex: 0 0 auto;
-  width: 0.45rem;
-  height: 0.45rem;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: rotate(45deg) translate(-1px, -2px);
-  opacity: 0.7;
-}
+  .vmz-ui-select__chev {
+    flex: 0 0 auto;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg) translate(-1px, -2px);
+    opacity: 0.7;
+  }
 
-.vmz-ui-select.is-opened .vmz-ui-select__chev {
-  transform: rotate(225deg) translate(-1px, -1px);
-}
+  .vmz-ui-select.is-opened .vmz-ui-select__chev {
+    transform: rotate(225deg) translate(-1px, -1px);
+  }
 
-.vmz-ui-select__list {
-  position: absolute;
-  z-index: 40;
-  top: calc(100% + 0.25rem);
-  left: 0;
-  right: 0;
-  margin: 0;
-  padding: 0.25rem;
-  list-style: none;
-  max-height: 16rem;
-  overflow: auto;
-  border: 1px solid var(--vmz-action-primary-background);
-  border-radius: 2px;
-  background: var(--vmz-surface-paper, #fff);
-  color: inherit;
-  box-shadow: 0 10px 24px color-mix(in srgb, #000 16%, transparent);
-  outline: none;
-}
+  .vmz-ui-select__panel {
+    position: absolute;
+    z-index: 40;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--vmz-line-default, #d9d9d9);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-surface-paper, #fff);
+    color: inherit;
+    box-shadow: var(--vmz-shadow-popup, 0 6px 16px 0 rgba(0,0,0,.08), 0 3px 6px -4px rgba(0,0,0,.12));
+    outline: none;
+  }
 
-.vmz-ui-select__option {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  text-align: left;
-  font: inherit;
-  padding: 0.4rem 0.65rem;
-  border: 0;
-  border-radius: 2px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  outline: none;
-}
+  .vmz-ui-select__search {
+    padding: 0.4rem 0.45rem 0.15rem;
+  }
 
-.vmz-ui-select__option:hover,
-.vmz-ui-select__option:focus-visible {
-  background: color-mix(in srgb, var(--vmz-action-primary-background) 18%, transparent);
-}
+  .vmz-ui-select__search-input {
+    width: 100%;
+    box-sizing: border-box;
+    font: inherit;
+    font-size: 0.875rem;
+    padding: 0.25rem 0.55rem;
+    border: 1px solid var(--vmz-line-default, #d9d9d9);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-surface-paper, #fff);
+    color: inherit;
+    outline: none;
+  }
 
-.vmz-ui-select__option.is-on {
-  background: color-mix(in srgb, var(--vmz-action-primary-background) 28%, transparent);
-  font-weight: 600;
-}
+  .vmz-ui-select__search-input:focus-visible {
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+  }
 
-.vmz-ui-select__description {
-  margin: 0;
-  opacity: 0.75;
-  font-size: 0.9em;
-}
+  .vmz-ui-select__list {
+    margin: 0;
+    padding: 0.25rem;
+    list-style: none;
+    max-height: 16rem;
+    overflow: auto;
+    outline: none;
+  }
 
-.vmz-ui-select__error {
-  margin: 0;
-  color: var(--vmz-status-danger-foreground);
-  font-size: 0.9em;
-}
+  .vmz-ui-select__empty {
+    padding: 0.55rem 0.65rem;
+    opacity: 0.7;
+    font-size: 0.92em;
+  }
+
+  .vmz-ui-select__option {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: left;
+    font: inherit;
+    padding: 0.4rem 0.65rem;
+    border: 0;
+    border-radius: var(--vmz-radius-md, 6px);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    outline: none;
+  }
+
+  .vmz-ui-select__option:hover,
+  .vmz-ui-select__option:focus-visible {
+    background: color-mix(in srgb, var(--vmz-action-primary-background) 18%, transparent);
+  }
+
+  .vmz-ui-select__option.is-on {
+    background: color-mix(in srgb, var(--vmz-action-primary-background) 28%, transparent);
+    font-weight: 600;
+  }
+
+  .vmz-ui-select__footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.35rem 0.45rem 0.45rem;
+    border-top: 1px solid var(--vmz-line-default, #d9dee3);
+  }
+
+  .vmz-ui-select__done {
+    font: inherit;
+    font-weight: 600;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--vmz-line-default, #d9dee3);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-surface-paper, #fff);
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .vmz-ui-select__description {
+    margin: 0;
+    opacity: 0.75;
+    font-size: 0.9em;
+  }
+
+  .vmz-ui-select__error {
+    margin: 0;
+    color: var(--vmz-status-danger-foreground);
+    font-size: 0.9em;
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — Select.
- * Owned listbox (button + options panel). Never native <select> option popup:
- * OS popup cannot carry Style Theme / density / overlay ownership.
- * Parent owns value + options; change via onChange Event-like { target: { value } }.
- */
+* VMZ UI — Select.
+* Owned listbox (trigger + panel + role=option). Never native <select> popup.
+* Parent owns value (single) or values (multiple) + options.
+* mode=multiple keeps panel open until Done/Escape; searchable filters visible options.
+*/
 export default class Select {
-  public label: string = '';
-  public description: string = '';
-  public error: string = '';
-  public value: string = '';
-  public options: Array<{ value: string; label: string }> = [];
-  public disabled: boolean = false;
-  public invalidAttr: string = 'false';
-  public controlId: string = 'vmz-select';
-  public listId: string = 'vmz-select-list';
-  public descriptionId: string = 'vmz-select-desc';
-  public errorId: string = 'vmz-select-err';
-  public describedBy: string = '';
-  public onChange: ((e: { target: { value: string } }) => void) | null = null;
-
-  open = false;
-  displayLabel = '';
-
-  _docKeyHandler = null;
-  _docPointerHandler = null;
-  _observer = null;
-
-  onMount() {
-    this.syncLabel();
-    this.listId = `${this.controlId}-list`;
-    if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return;
-    const root = this.__vmzDomRoot;
-    if (!root || typeof root.querySelector !== 'function') return;
-    this._observer = new MutationObserver(() => this._syncOverlay());
-    this._observer.observe(root, { childList: true, subtree: true });
-  }
-
-  onDestroy() {
-    if (this._observer) {
-      this._observer.disconnect();
-      this._observer = null;
-    }
-    this._teardownDoc();
-  }
-
-  syncLabel() {
-    const hit = (this.options || []).find((o) => o.value === this.value);
-    this.displayLabel = hit ? hit.label : this.value || '—';
-  }
-
-  toggle() {
-    if (this.disabled) return;
-    if (this.open) this.close();
-    else this.open = true;
-  }
-
-  close() {
-    this.open = false;
-  }
-
-  choose(next: string) {
-    this.close();
-    if (next === this.value) return;
-    if (typeof this.onChange === 'function') {
-      this.onChange({ target: { value: next } });
-    }
-  }
-
-  onOptionClick(ev: Event) {
-    const t = ev?.target as Element | null;
-    const el =
-      (t && typeof (t as HTMLElement).closest === 'function'
-        ? ((t as HTMLElement).closest('[data-vmz-option]') as HTMLElement | null)
-        : null) || (ev?.currentTarget as HTMLElement | null);
-    const id = el && typeof el.getAttribute === 'function' ? el.getAttribute('data-vmz-option') : null;
-    if (id) this.choose(id);
-  }
-
-  onTriggerKeyDown(ev: KeyboardEvent) {
-    if (!ev || this.disabled) return;
-    if ((ev.key === 'ArrowDown' || ev.key === 'Enter' || ev.key === ' ') && !this.open) {
-      ev.preventDefault();
-      this.open = true;
-    } else if (ev.key === 'Escape' && this.open) {
-      ev.preventDefault();
-      this.close();
-    }
-  }
-
-  onListKeyDown(ev: KeyboardEvent) {
-    if (!ev) return;
-    if (ev.key === 'Escape') {
-      ev.preventDefault();
-      this.close();
-      return;
-    }
-    const root = this.__vmzDomRoot;
-    const list =
-      root && typeof root.querySelector === 'function'
-        ? root.querySelector(`[data-vmz-overlay="select"]`)
-        : null;
-    if (!list) return;
-    const nodes = [...list.querySelectorAll('[role="option"]')].filter(
-      (n) => n instanceof HTMLElement && n.offsetParent !== null,
-    );
-    if (!nodes.length) return;
-    const idx = nodes.indexOf(document.activeElement as Element);
-    if (ev.key === 'ArrowDown') {
-      ev.preventDefault();
-      (nodes[(idx + 1 + nodes.length) % nodes.length] as HTMLElement).focus();
-    } else if (ev.key === 'ArrowUp') {
-      ev.preventDefault();
-      (nodes[(idx - 1 + nodes.length) % nodes.length] as HTMLElement).focus();
-    } else if (ev.key === 'Home') {
-      ev.preventDefault();
-      (nodes[0] as HTMLElement).focus();
-    } else if (ev.key === 'End') {
-      ev.preventDefault();
-      (nodes[nodes.length - 1] as HTMLElement).focus();
-    } else if (ev.key === 'Enter' || ev.key === ' ') {
-      const active = document.activeElement as HTMLElement | null;
-      const id = active?.getAttribute?.('data-vmz-option');
-      if (id) {
-        ev.preventDefault();
-        this.choose(id);
-      }
-    }
-  }
-
-  _syncOverlay() {
-    const root = this.__vmzDomRoot;
-    const panel =
-      root && typeof root.querySelector === 'function'
-        ? root.querySelector('[data-vmz-overlay="select"][data-vmz-focus="enter"]')
-        : null;
-    if (panel && this.open) this._bindDoc(panel as HTMLElement);
-    else if (!panel) this._teardownDoc();
-    this.syncLabel();
-  }
-
-  _bindDoc(panel: HTMLElement) {
-    if (typeof document === 'undefined') return;
-    if (!this._docKeyHandler) {
-      this._docKeyHandler = (ev: KeyboardEvent) => {
-        if (ev.key === 'Escape') {
-          ev.preventDefault();
-          this.close();
-        }
-      };
-      document.addEventListener('keydown', this._docKeyHandler);
-    }
-    if (!this._docPointerHandler) {
-      const root = this.__vmzDomRoot;
-      this._docPointerHandler = (ev: Event) => {
-        const t = ev.target;
-        if (!(t instanceof Node)) return;
-        if (root && typeof root.contains === 'function' && root.contains(t)) return;
-        this.close();
-      };
-      document.addEventListener('pointerdown', this._docPointerHandler, true);
-    }
-    const first = panel.querySelector('[role="option"]');
-    if (first instanceof HTMLElement) first.focus();
-    else panel.focus();
-  }
-
-  _teardownDoc() {
-    if (typeof document !== 'undefined') {
-      if (this._docKeyHandler) document.removeEventListener('keydown', this._docKeyHandler);
-      if (this._docPointerHandler) {
-        document.removeEventListener('pointerdown', this._docPointerHandler, true);
-      }
-    }
-    this._docKeyHandler = null;
-    this._docPointerHandler = null;
-  }
+	public label: string = "";
+	public description: string = "";
+	public error: string = "";
+	/** single mode */
+	public value: string = "";
+	/** multiple mode — parent owns array */
+	public values: string[] = [];
+	public options: Array<{
+		value: string;
+		label: string;
+	}> = [];
+	/** "single" | "multiple" */
+	public mode: string = "single";
+	public searchable: boolean = false;
+	public searchPlaceholder: string = "Search";
+	public emptyText: string = "No matches";
+	public disabled: boolean = false;
+	public invalidAttr: string = "false";
+	public controlId: string = "vmz-select";
+	public listId: string = "vmz-select-list";
+	public descriptionId: string = "vmz-select-desc";
+	public errorId: string = "vmz-select-err";
+	public describedBy: string = "";
+	public onChange: ((e: {
+		target: {
+			value: string;
+			values: string[];
+		};
+	}) => void) | null = null;
+	open = false;
+	displayLabel = "";
+	searchQuery = "";
+	isMultiple = false;
+	searchableAttr = "false";
+	showEmpty = false;
+	visibleOptions: Array<{
+		value: string;
+		label: string;
+		selected: boolean;
+	}> = [];
+	_docKeyHandler = null;
+	_docPointerHandler = null;
+	_observer = null;
+	onMount() {
+		this.listId = `${this.controlId}-list`;
+		this._syncMode();
+		this._rebuildVisible();
+		if (typeof document === "undefined" || typeof MutationObserver === "undefined") return;
+		const root = this.__vmzDomRoot;
+		if (!root || typeof root.querySelector !== "function") return;
+		this._observer = new MutationObserver(() => this._syncOverlay());
+		this._observer.observe(root, {
+			childList: true,
+			subtree: true
+		});
+	}
+	onDestroy() {
+		if (this._observer) {
+			this._observer.disconnect();
+			this._observer = null;
+		}
+		this._teardownDoc();
+	}
+	_syncMode() {
+		this.isMultiple = String(this.mode || "single") === "multiple";
+		this.searchableAttr = this.searchable ? "true" : "false";
+	}
+	_selectedSet() {
+		if (this.isMultiple) {
+			return new Set((this.values || []).map((v) => String(v)));
+		}
+		return new Set(this.value ? [String(this.value)] : []);
+	}
+	_rebuildVisible() {
+		this._syncMode();
+		const q = String(this.searchQuery || "").trim().toLowerCase();
+		const selected = this._selectedSet();
+		const all = this.options || [];
+		const filtered = !q ? all : all.filter((o) => {
+			const label = String(o.label || "").toLowerCase();
+			const value = String(o.value || "").toLowerCase();
+			return label.includes(q) || value.includes(q);
+		});
+		this.visibleOptions = filtered.map((o) => ({
+			value: String(o.value),
+			label: String(o.label),
+			selected: selected.has(String(o.value))
+		}));
+		this.showEmpty = this.visibleOptions.length === 0;
+		this._syncLabel();
+	}
+	_syncLabel() {
+		const opts = this.options || [];
+		if (this.isMultiple) {
+			const selected = this._selectedSet();
+			const labels = opts.filter((o) => selected.has(String(o.value))).map((o) => o.label);
+			if (!labels.length) this.displayLabel = "—";
+			else if (labels.length <= 2) this.displayLabel = labels.join(", ");
+			else this.displayLabel = `${labels[0]}, ${labels[1]} +${labels.length - 2}`;
+			return;
+		}
+		const hit = opts.find((o) => String(o.value) === String(this.value));
+		this.displayLabel = hit ? hit.label : this.value || "—";
+	}
+	toggle() {
+		if (this.disabled) return;
+		if (this.open) this.close();
+		else this.openPanel();
+	}
+	openPanel() {
+		this.searchQuery = "";
+		this._rebuildVisible();
+		this.open = true;
+	}
+	close() {
+		this.open = false;
+		this.searchQuery = "";
+		this._rebuildVisible();
+	}
+	_emit(nextValue: string, nextValues: string[]) {
+		if (typeof this.onChange === "function") {
+			this.onChange({ target: {
+				value: nextValue,
+				values: nextValues
+			} });
+		}
+	}
+	choose(next: string) {
+		if (!next && next !== "") return;
+		if (this.isMultiple) {
+			const cur = [...this.values || []].map(String);
+			const idx = cur.indexOf(String(next));
+			if (idx >= 0) cur.splice(idx, 1);
+			else cur.push(String(next));
+			this._emit(cur.join(","), cur);
+			this._rebuildVisible();
+			return;
+		}
+		this.close();
+		if (next === this.value) return;
+		this._emit(String(next), next ? [String(next)] : []);
+	}
+	onSearchInput(ev: Event) {
+		const t = ev?.target as HTMLInputElement | null;
+		this.searchQuery = t ? String(t.value || "") : "";
+		this._rebuildVisible();
+	}
+	onSearchKeyDown(ev: KeyboardEvent) {
+		if (!ev) return;
+		if (ev.key === "Escape") {
+			ev.preventDefault();
+			this.close();
+		} else if (ev.key === "ArrowDown") {
+			ev.preventDefault();
+			const root = this.__vmzDomRoot;
+			const first = root && typeof root.querySelector === "function" ? root.querySelector("[data-vmz-overlay=\"select\"] [role=\"option\"]") : null;
+			if (first instanceof HTMLElement) first.focus();
+		}
+	}
+	onOptionClick(ev: Event) {
+		const t = ev?.target as Element | null;
+		const el = (t && typeof (t as HTMLElement).closest === "function" ? (t as HTMLElement).closest("[data-vmz-option]") as HTMLElement | null : null) || ev?.currentTarget as HTMLElement | null;
+		const id = el && typeof el.getAttribute === "function" ? el.getAttribute("data-vmz-option") : null;
+		if (id != null) this.choose(id);
+	}
+	onTriggerKeyDown(ev: KeyboardEvent) {
+		if (!ev || this.disabled) return;
+		if ((ev.key === "ArrowDown" || ev.key === "Enter" || ev.key === " ") && !this.open) {
+			ev.preventDefault();
+			this.openPanel();
+		} else if (ev.key === "Escape" && this.open) {
+			ev.preventDefault();
+			this.close();
+		}
+	}
+	onListKeyDown(ev: KeyboardEvent) {
+		if (!ev) return;
+		if (ev.key === "Escape") {
+			ev.preventDefault();
+			this.close();
+			return;
+		}
+		const root = this.__vmzDomRoot;
+		const list = root && typeof root.querySelector === "function" ? root.querySelector(`[data-vmz-overlay="select"] [role="listbox"]`) : null;
+		if (!list) return;
+		const nodes = [...list.querySelectorAll("[role=\"option\"]")].filter((n) => n instanceof HTMLElement && n.offsetParent !== null);
+		if (!nodes.length) return;
+		const idx = nodes.indexOf(document.activeElement as Element);
+		if (ev.key === "ArrowDown") {
+			ev.preventDefault();
+			(nodes[(idx + 1 + nodes.length) % nodes.length] as HTMLElement).focus();
+		} else if (ev.key === "ArrowUp") {
+			ev.preventDefault();
+			(nodes[(idx - 1 + nodes.length) % nodes.length] as HTMLElement).focus();
+		} else if (ev.key === "Home") {
+			ev.preventDefault();
+			(nodes[0] as HTMLElement).focus();
+		} else if (ev.key === "End") {
+			ev.preventDefault();
+			(nodes[nodes.length - 1] as HTMLElement).focus();
+		} else if (ev.key === "Enter" || ev.key === " ") {
+			const active = document.activeElement as HTMLElement | null;
+			const id = active?.getAttribute?.("data-vmz-option");
+			if (id) {
+				ev.preventDefault();
+				this.choose(id);
+			}
+		}
+	}
+	_syncOverlay() {
+		const root = this.__vmzDomRoot;
+		const panel = root && typeof root.querySelector === "function" ? root.querySelector("[data-vmz-overlay=\"select\"][data-vmz-focus=\"enter\"]") : null;
+		if (panel && this.open) this._bindDoc(panel as HTMLElement);
+		else if (!panel) this._teardownDoc();
+		this._rebuildVisible();
+	}
+	_bindDoc(panel: HTMLElement) {
+		if (typeof document === "undefined") return;
+		if (!this._docKeyHandler) {
+			this._docKeyHandler = (ev: KeyboardEvent) => {
+				if (ev.key === "Escape") {
+					ev.preventDefault();
+					this.close();
+				}
+			};
+			document.addEventListener("keydown", this._docKeyHandler);
+		}
+		if (!this._docPointerHandler) {
+			const root = this.__vmzDomRoot;
+			this._docPointerHandler = (ev: Event) => {
+				const t = ev.target;
+				if (!(t instanceof Node)) return;
+				if (root && typeof root.contains === "function" && root.contains(t)) return;
+				this.close();
+			};
+			document.addEventListener("pointerdown", this._docPointerHandler, true);
+		}
+		const search = panel.querySelector("[data-vmz-select=\"search\"]");
+		if (search instanceof HTMLElement) {
+			search.focus();
+			return;
+		}
+		const first = panel.querySelector("[role=\"option\"]");
+		if (first instanceof HTMLElement) first.focus();
+		else panel.focus();
+	}
+	_teardownDoc() {
+		if (typeof document !== "undefined") {
+			if (this._docKeyHandler) document.removeEventListener("keydown", this._docKeyHandler);
+			if (this._docPointerHandler) {
+				document.removeEventListener("pointerdown", this._docPointerHandler, true);
+			}
+		}
+		this._docKeyHandler = null;
+		this._docPointerHandler = null;
+	}
 }
 </script>

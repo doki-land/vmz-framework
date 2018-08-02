@@ -1,67 +1,72 @@
 <template>
   <ol class="vmz-ui-timeline" data-vmz-ui="timeline" aria-label={label}>
-    <li each={items} as="item" key={item.id} class="vmz-ui-timeline__item" data-vmz-audit={item.id}>
-      <p class="vmz-ui-timeline__time">{item.time}</p>
-      <p class="vmz-ui-timeline__title">{item.title}</p>
-      <p if={item.detail} class="vmz-ui-timeline__detail">{item.detail}</p>
-    </li>
-  </ol>
+      <li each={items} as="item" key={item.id} class="vmz-ui-timeline__item" data-vmz-audit={item.id}>
+        <p class="vmz-ui-timeline__time">{item.time}</p>
+        <p class="vmz-ui-timeline__title">{item.title}</p>
+        <p if={item.detail} class="vmz-ui-timeline__detail">{item.detail}</p>
+      </li>
+    </ol>
 </template>
 
 <style>
-.vmz-ui-timeline {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--vmz-density-compact-gap);
-  border-left: 2px solid var(--vmz-action-primary-background);
-}
+  .vmz-ui-timeline {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--vmz-density-compact-gap);
+    border-left: 2px solid var(--vmz-line-default);
+  }
 
-.vmz-ui-timeline__item {
-  position: relative;
-  padding: 0.15rem 0 0.15rem 0.85rem;
-}
+  .vmz-ui-timeline__item {
+    position: relative;
+    padding: 0.15rem 0 0.15rem 0.85rem;
+  }
 
-.vmz-ui-timeline__item::before {
-  content: '';
-  position: absolute;
-  left: -0.35rem;
-  top: 0.45rem;
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 999px;
-  background: var(--vmz-action-primary-background);
-}
+  .vmz-ui-timeline__item::before {
+    content: '';
+    position: absolute;
+    left: -0.35rem;
+    top: 0.45rem;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 999px;
+    background: var(--vmz-action-primary-background);
+  }
 
-.vmz-ui-timeline__time {
-  margin: 0;
-  font-size: 0.85em;
-  opacity: 0.75;
-  color: var(--vmz-action-primary-active);
-}
+  .vmz-ui-timeline__time {
+    margin: 0;
+    font-size: 0.85em;
+    opacity: 0.75;
+    color: var(--vmz-action-primary-active);
+  }
 
-.vmz-ui-timeline__title {
-  margin: 0.15rem 0 0;
-  font-weight: 700;
-  color: var(--vmz-action-primary-active);
-}
+  .vmz-ui-timeline__title {
+    margin: 0.15rem 0 0;
+    font-weight: 700;
+    color: var(--vmz-action-primary-active);
+  }
 
-.vmz-ui-timeline__detail {
-  margin: 0.2rem 0 0;
-  opacity: 0.9;
-}
+  .vmz-ui-timeline__detail {
+    margin: 0.2rem 0 0;
+    opacity: 0.9;
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — Timeline (UI5 Console audit trail).
- * Parent owns audit items; stable ids for list identity.
- */
+* VMZ UI — Timeline (UI5 Console audit trail).
+* Parent owns audit items; stable ids for list identity.
+*/
 export default class Timeline {
-  public label: string = 'Audit';
-  /** @type {{ id: string, time: string, title: string, detail?: string }[]} */
-  public items: { id: string; time: string; title: string; detail?: string }[] = [];
+	public label: string = "Audit";
+	/** @type {{ id: string, time: string, title: string, detail?: string }[]} */
+	public items: {
+		id: string;
+		time: string;
+		title: string;
+		detail?: string;
+	}[] = [];
 }
 </script>

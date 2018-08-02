@@ -1,0 +1,16 @@
+<template>
+  <span class="vmz-ui-avatar" data-vmz-ui="avatar" data-size={size} aria-label={label}><img if={src} src={src} alt="" /><span if={!src}>{text}</span></span>
+</template>
+
+<style>
+  .vmz-ui-avatar{display:inline-flex;align-items:center;justify-content:center;width:2rem;height:2rem;overflow:hidden;border-radius:50%;background:color-mix(in srgb,var(--vmz-action-primary-background,#1677ff) 14%,white);color:var(--vmz-action-primary-active,#0958d9);font-weight:650}.vmz-ui-avatar[data-size='small']{width:1.5rem;height:1.5rem;font-size:.75rem}.vmz-ui-avatar[data-size='large']{width:2.75rem;height:2.75rem;font-size:1.1rem}.vmz-ui-avatar img{width:100%;height:100%;object-fit:cover}
+</style>
+
+<script client>
+export default class Avatar {
+	public src: string = "";
+	public text: string = "";
+	public label: string = "";
+	public size: string = "middle";
+}
+</script>

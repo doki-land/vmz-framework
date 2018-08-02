@@ -10,8 +10,8 @@ pub mod structure;
 pub mod target;
 pub mod tooling_deploy;
 
-use vmz_protocol::{DIAG_ARTIFACT_INVALID, DIAG_PLATFORM_UNSUPPORTED, Severity, TargetDiagnostic};
 use vmz_generator::{MiniEmitError, MiniEmitErrorKind};
+use vmz_protocol::{DIAG_ARTIFACT_INVALID, DIAG_PLATFORM_UNSUPPORTED, Severity, TargetDiagnostic};
 
 /// Compact JSON text for Mini artifact fields (logic / event / patch / manifest).
 pub(crate) fn compact_json<T: serde::Serialize>(value: &T) -> String {

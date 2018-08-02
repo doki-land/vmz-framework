@@ -20,9 +20,7 @@ let cached;
 export function requireNativeAddon() {
     const native = tryLoadNativeAddon();
     if (!native) {
-        throw new Error(
-            'vmz native addon missing — run `pnpm napi:build` (CodeGenerators live in vmz-generator via N-API)',
-        );
+        throw new Error('vmz native addon missing — run `pnpm napi:build` (CodeGenerators live in vmz-generator via N-API)');
     }
     return native;
 }

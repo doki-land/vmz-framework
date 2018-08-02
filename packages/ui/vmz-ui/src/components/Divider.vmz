@@ -1,0 +1,19 @@
+<template>
+  <div class="vmz-ui-divider" data-vmz-ui="divider" data-direction={direction} role="separator">
+    <span if={label}>{label}</span>
+  </div>
+</template>
+<style>
+.vmz-ui-divider{display:flex;align-items:center;gap:.75rem;width:100%;color:var(--vmz-text-steel);font-size:.875rem}
+.vmz-ui-divider:before,.vmz-ui-divider:after{content:'';height:1px;flex:1;background:var(--vmz-line-default)}
+.vmz-ui-divider:not(:has(span)):before{flex:1}
+.vmz-ui-divider:not(:has(span)):after{display:none}
+.vmz-ui-divider[data-direction='vertical']{display:inline-block;width:1px;height:1em;background:var(--vmz-line-default)}
+.vmz-ui-divider[data-direction='vertical']:before,.vmz-ui-divider[data-direction='vertical']:after{display:none}
+</style>
+<script client>
+export default class Divider {
+  public direction: string = 'horizontal';
+  public label: string = '';
+}
+</script>

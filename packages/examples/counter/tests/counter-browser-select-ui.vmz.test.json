@@ -1,0 +1,54 @@
+{
+    "schema": "vmz.test.manifest.v0",
+    "id": "counter.browser.select.ui",
+    "title": "Browser Host: select deepen against @vmz/ui Select (combobox)",
+    "modes": ["browser"],
+    "program": {
+        "chunkId": "components/SelectProbe",
+        "unitName": "SelectProbe"
+    },
+    "plan": {
+        "schema": "vmz.plan.v0",
+        "ref": "unit.plan"
+    },
+    "actions": [
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "mount",
+            "props": {}
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "select",
+            "locator": { "kind": "role", "role": "combobox", "name": "Plan" },
+            "value": "ops"
+        },
+        {
+            "schema": "vmz.test.action.v0",
+            "kind": "flush"
+        }
+    ],
+    "assertions": [
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "text",
+            "expect": {
+                "contains": "plan:ops"
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "state",
+            "expect": {
+                "plan": "ops"
+            }
+        },
+        {
+            "schema": "vmz.test.assertion.v0",
+            "kind": "timing",
+            "expect": {
+                "minSteps": 2
+            }
+        }
+    ]
+}

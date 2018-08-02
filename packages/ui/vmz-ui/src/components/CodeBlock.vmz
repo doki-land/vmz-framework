@@ -1,67 +1,67 @@
 <template>
   <figure class="vmz-ui-code-block" data-vmz-ui="code-block">
-    <div class="vmz-ui-code-block__bar">
-      <figcaption if={caption} class="vmz-ui-code-block__caption">{caption}</figcaption>
-      <Button type="button" variant="ghost" onClick={onCopy}>{copyLabel}</Button>
-    </div>
-    <pre class="vmz-ui-code-block__pre"><code class="vmz-ui-code-block__code">{code}</code></pre>
-  </figure>
+      <div class="vmz-ui-code-block__bar">
+        <figcaption if={caption} class="vmz-ui-code-block__caption">{caption}</figcaption>
+        <Button type="button" variant="ghost" onClick={onCopy}>{copyLabel}</Button>
+      </div>
+      <pre class="vmz-ui-code-block__pre"><code class="vmz-ui-code-block__code">{code}</code></pre>
+    </figure>
 </template>
 
 <style>
-.vmz-ui-code-block {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  border: 1px solid var(--vmz-line-default);
-  border-radius: 2px;
-  background: var(--vmz-surface-mist);
-  overflow: hidden;
-}
+  .vmz-ui-code-block {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-surface-mist);
+    overflow: hidden;
+  }
 
-.vmz-ui-code-block__bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.45rem;
-  padding: 0.35rem 0.55rem;
-  border-bottom: 1px solid var(--vmz-line-default);
-  background: var(--vmz-surface-paper);
-}
+  .vmz-ui-code-block__bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.45rem;
+    padding: 0.35rem 0.55rem;
+    border-bottom: 1px solid var(--vmz-line-default);
+    background: var(--vmz-surface-paper);
+  }
 
-.vmz-ui-code-block__caption {
-  margin: 0;
-  font-family: var(--vmz-font-mono);
-  font-size: 0.8rem;
-  color: var(--vmz-text-steel);
-}
+  .vmz-ui-code-block__caption {
+    margin: 0;
+    font-family: var(--vmz-font-mono);
+    font-size: 0.8rem;
+    color: var(--vmz-text-steel);
+  }
 
-.vmz-ui-code-block__pre {
-  margin: 0;
-  padding: 0.85rem 1rem;
-  overflow-x: auto;
-}
+  .vmz-ui-code-block__pre {
+    margin: 0;
+    padding: 0.85rem 1rem;
+    overflow-x: auto;
+  }
 
-.vmz-ui-code-block__code {
-  font-family: var(--vmz-font-mono);
-  font-size: 0.88rem;
-  line-height: 1.5;
-  color: var(--vmz-text-ink);
-  white-space: pre;
-}
+  .vmz-ui-code-block__code {
+    font-family: var(--vmz-font-mono);
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: var(--vmz-text-ink);
+    white-space: pre;
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — CodeBlock (Document/Product composition).
- * Source is readable in SSR HTML; copy is progressive enhancement via onCopy.
- */
+* VMZ UI — CodeBlock (Document/Product composition).
+* Source is readable in SSR HTML; copy is progressive enhancement via onCopy.
+*/
 export default class CodeBlock {
-  public code: string = '';
-  public caption: string = '';
-  public copyLabel: string = 'Copy';
-  public onCopy: ((e: Event) => void) | null = null;
+	public code: string = "";
+	public caption: string = "";
+	public copyLabel: string = "Copy";
+	public onCopy: ((e: Event) => void) | null = null;
 }
 </script>

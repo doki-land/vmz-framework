@@ -11,7 +11,8 @@
         "test": "vmz test ."
     },
     "dependencies": {
-        "@vmz/core": "workspace:*"
+        "@vmz/core": "workspace:*",
+        "@vmz/ui": "workspace:*"
     },
     "devDependencies": {
         "vmz": "workspace:*"

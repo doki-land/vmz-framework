@@ -1,0 +1,11 @@
+<template>
+  <footer class="vmz-ui-footer" data-vmz-ui="footer"><slot /></footer>
+</template>
+
+<style>
+  .vmz-ui-footer{padding:1.5rem;color:var(--vmz-text-steel,#646a73);font-size:.875rem;text-align:center}
+</style>
+
+<script client>
+export default class Footer {}
+</script>

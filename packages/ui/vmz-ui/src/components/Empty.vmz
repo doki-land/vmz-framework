@@ -1,52 +1,52 @@
 <template>
   <div class="vmz-ui-empty" data-vmz-ui="empty">
-    <h2 class="vmz-ui-empty__title">{title}</h2>
-    <p if={description} class="vmz-ui-empty__description">{description}</p>
-    <div class="vmz-ui-empty__actions">
-      <slot />
+      <h2 class="vmz-ui-empty__title">{title}</h2>
+      <p if={description} class="vmz-ui-empty__description">{description}</p>
+      <div class="vmz-ui-empty__actions">
+        <slot />
+      </div>
     </div>
-  </div>
 </template>
 
 <style>
-.vmz-ui-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.65rem;
-  padding: 1.5rem 1.15rem;
-  border: 1px dashed var(--vmz-line-default);
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--vmz-surface-mist) 70%, var(--vmz-surface-paper));
-  color: var(--vmz-text-ink);
-}
+  .vmz-ui-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 1.5rem 1.15rem;
+    border: 1px dashed var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: color-mix(in srgb, var(--vmz-surface-mist) 70%, var(--vmz-surface-paper));
+    color: var(--vmz-text-ink);
+  }
 
-.vmz-ui-empty__title {
-  margin: 0;
-  font-family: var(--vmz-font-display);
-  font-size: 1.1rem;
-  font-weight: 700;
-}
+  .vmz-ui-empty__title {
+    margin: 0;
+    font-family: var(--vmz-font-display);
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
 
-.vmz-ui-empty__description {
-  margin: 0;
-  color: var(--vmz-text-steel);
-  max-width: 36rem;
-  line-height: 1.45;
-}
+  .vmz-ui-empty__description {
+    margin: 0;
+    color: var(--vmz-text-steel);
+    max-width: 36rem;
+    line-height: 1.45;
+  }
 
-.vmz-ui-empty__actions:empty {
-  display: none;
-}
+  .vmz-ui-empty__actions:empty {
+    display: none;
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — Empty (Commercial composition).
- * Empty / zero-state surface with optional action slot.
- */
+* VMZ UI — Empty (Commercial composition).
+* Empty / zero-state surface with optional action slot.
+*/
 export default class Empty {
-  public title: string = 'Nothing here yet';
-  public description: string = '';
+	public title: string = "Nothing here yet";
+	public description: string = "";
 }
 </script>

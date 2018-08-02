@@ -1,27 +1,27 @@
 <template>
   <section class="vmz-ui-filter-bar" data-vmz-ui="filter-bar" aria-label={label}>
-    <slot />
-  </section>
+      <slot />
+    </section>
 </template>
 
 <style>
-.vmz-ui-filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 0.75rem 1rem;
-  padding: 0.75rem 0.85rem;
-  border: 1px solid var(--vmz-action-primary-background);
-  border-radius: 2px;
-}
+  .vmz-ui-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem 1rem;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — FilterBar (Console composition).
- * Dense filter/query landmark; parent projects Field + action controls.
- */
+* VMZ UI — FilterBar (Console composition).
+* Dense filter/query landmark; parent projects Field + action controls.
+*/
 export default class FilterBar {
-  public label: string = 'Filters';
+	public label: string = "Filters";
 }
 </script>

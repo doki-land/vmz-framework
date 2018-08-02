@@ -27,3 +27,19 @@ export function generatePrettyJson(value) {
 export function writePrettyJsonFile(filePath, value) {
     fs.writeFileSync(filePath, `${generatePrettyJson(value)}\n`, 'utf8');
 }
+
+/**
+ * CLI `--json` helper: write to a path when `target` is a string, else stdout.
+ * @param {string | boolean | undefined} target
+ * @param {unknown} value
+ * @param {{ logWrote?: (path: string) => void }} [opts]
+ */
+export function emitPrettyJson(target, value, opts = {}) {
+    const text = generatePrettyJson(value);
+    if (typeof target === 'string') {
+        fs.writeFileSync(target, `${text}\n`, 'utf8');
+        if (typeof opts.logWrote === 'function') opts.logWrote(target);
+        return;
+    }
+    console.log(text);
+}

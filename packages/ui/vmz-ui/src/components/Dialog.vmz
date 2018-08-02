@@ -1,442 +1,423 @@
 <template>
   <div
-    class="vmz-ui-dialog-root"
-    data-vmz-ui="dialog"
-    data-vmz-overlay-open={open}
-  >
-    <div
-      if={open}
-      class="vmz-ui-dialog"
-      data-vmz-overlay="dialog"
-      data-vmz-overlay-owner="dialog"
-      data-vmz-overlay-stack={stackLevel}
+      class="vmz-ui-dialog-root"
+      data-vmz-ui="dialog"
+      data-vmz-overlay-open={open}
     >
-      <button
-        type="button"
-        class="vmz-ui-dialog__backdrop"
-        data-vmz-overlay-layer="backdrop"
-        aria-label="Dismiss dialog"
-        onClick={dismiss}
-      ></button>
       <div
-        class="vmz-ui-dialog__panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabindex="-1"
-        data-vmz-overlay-layer="panel"
-        data-vmz-focus="enter"
-        data-vmz-motion="overlay-enter"
-        data-vmz-motion-token="motion.overlay"
-        onKeyDown={onPanelKeyDown}
+        if={open}
+        class="vmz-ui-dialog"
+        data-vmz-overlay="dialog"
+        data-vmz-overlay-owner="dialog"
+        data-vmz-overlay-stack={stackLevel}
       >
-        <h2 id={titleId} class="vmz-ui-dialog__title">{title}</h2>
-        <div class="vmz-ui-dialog__body">
-          <slot />
-        </div>
-        <div class="vmz-ui-dialog__actions">
-          <button type="button" class="vmz-ui-dialog__close" data-vmz-focus="close" onClick={dismiss}>
-            Close
-          </button>
+        <button
+          type="button"
+          class="vmz-ui-dialog__backdrop"
+          data-vmz-overlay-layer="backdrop"
+          aria-label="Dismiss dialog"
+          onClick={dismiss}
+        ></button>
+        <div
+          class="vmz-ui-dialog__panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          tabindex="-1"
+          data-vmz-overlay-layer="panel"
+          data-vmz-focus="enter"
+          data-vmz-motion="overlay-enter"
+          data-vmz-motion-token="motion.overlay"
+          onKeyDown={onPanelKeyDown}
+        >
+          <h2 id={titleId} class="vmz-ui-dialog__title">{title}</h2>
+          <div class="vmz-ui-dialog__body">
+            <slot />
+          </div>
+          <div class="vmz-ui-dialog__actions">
+            <button type="button" class="vmz-ui-dialog__close" data-vmz-focus="close" onClick={dismiss}>
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 </template>
 
 <style>
-.vmz-ui-dialog-root {
-  display: block;
-}
-
-.vmz-ui-dialog {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: grid;
-  place-items: center;
-}
-
-.vmz-ui-dialog[data-vmz-overlay-stack='1'] {
-  z-index: 50;
-}
-
-.vmz-ui-dialog[data-vmz-overlay-stack='2'] {
-  z-index: 60;
-}
-
-.vmz-ui-dialog[data-vmz-overlay-stack='3'] {
-  z-index: 70;
-}
-
-.vmz-ui-dialog__backdrop {
-  position: absolute;
-  inset: 0;
-  border: 0;
-  padding: 0;
-  margin: 0;
-  cursor: pointer;
-  background: color-mix(in srgb, var(--vmz-action-primary-active) 35%, transparent);
-  animation: vmz-ui-overlay-fade-in var(--vmz-motion-overlay-duration) var(--vmz-motion-overlay-easing);
-}
-
-.vmz-ui-dialog__panel {
-  position: relative;
-  z-index: 1;
-  width: min(28rem, calc(100vw - 2rem));
-  padding: 1rem 1.1rem 1.1rem;
-  border: 1px solid var(--vmz-action-primary-background);
-  border-radius: 2px;
-  background: var(--vmz-action-primary-foreground);
-  color: var(--vmz-action-primary-active);
-  outline: none;
-  animation: vmz-ui-overlay-panel-in var(--vmz-motion-overlay-duration) var(--vmz-motion-overlay-easing);
-}
-
-.vmz-ui-dialog[data-vmz-motion-adopt='true'] .vmz-ui-dialog__backdrop,
-.vmz-ui-dialog[data-vmz-motion-adopt='true'] .vmz-ui-dialog__panel {
-  animation: none;
-}
-
-.vmz-ui-dialog[data-vmz-motion-phase='exit'] .vmz-ui-dialog__backdrop {
-  animation: vmz-ui-overlay-fade-out var(--vmz-motion-overlay-duration) var(--vmz-motion-overlay-easing);
-}
-
-.vmz-ui-dialog[data-vmz-motion-phase='exit'] .vmz-ui-dialog__panel {
-  animation: vmz-ui-overlay-panel-out var(--vmz-motion-overlay-duration) var(--vmz-motion-overlay-easing);
-}
-
-.vmz-ui-dialog__panel:focus-visible {
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-}
-
-.vmz-ui-dialog__title {
-  margin: 0 0 0.65rem;
-  font-size: 1.1rem;
-}
-
-.vmz-ui-dialog__body {
-  margin-bottom: 0.9rem;
-}
-
-.vmz-ui-dialog__close {
-  font: inherit;
-  font-weight: 600;
-  padding: 0.45rem 0.8rem;
-  border: 1px solid transparent;
-  border-radius: 2px;
-  cursor: pointer;
-  background: var(--vmz-action-primary-background);
-  color: var(--vmz-action-primary-foreground);
-}
-
-.vmz-ui-dialog__close:focus-visible {
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-}
-
-@keyframes vmz-ui-overlay-fade-in {
-  from {
-    opacity: 0;
+  .vmz-ui-dialog-root {
+    display: block;
   }
-  to {
-    opacity: 1;
-  }
-}
 
-@keyframes vmz-ui-overlay-panel-in {
-  from {
-    opacity: 0;
-    transform: translateY(0.35rem);
+  .vmz-ui-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: grid;
+    place-items: center;
   }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
 
-@keyframes vmz-ui-overlay-fade-out {
-  from {
-    opacity: 1;
+  .vmz-ui-dialog[data-vmz-overlay-stack='1'] {
+    z-index: 50;
   }
-  to {
-    opacity: 0;
-  }
-}
 
-@keyframes vmz-ui-overlay-panel-out {
-  from {
-    opacity: 1;
-    transform: none;
+  .vmz-ui-dialog[data-vmz-overlay-stack='2'] {
+    z-index: 60;
   }
-  to {
-    opacity: 0;
-    transform: translateY(0.35rem);
-  }
-}
 
-@media (prefers-reduced-motion: reduce) {
-  .vmz-ui-dialog__backdrop,
-  .vmz-ui-dialog__panel,
-  .vmz-ui-dialog[data-vmz-motion-phase='exit'] .vmz-ui-dialog__backdrop,
-  .vmz-ui-dialog[data-vmz-motion-phase='exit'] .vmz-ui-dialog__panel {
+  .vmz-ui-dialog[data-vmz-overlay-stack='3'] {
+    z-index: 70;
+  }
+
+  .vmz-ui-dialog__backdrop {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    background: rgba(0, 0, 0, 0.45);
+    animation: vmz-ui-overlay-fade-in var(--vmz-motion-overlay-duration) var(--vmz-motion-overlay-easing);
+  }
+
+  .vmz-ui-dialog__panel {
+    position: relative;
+    z-index: 1;
+    width: min(32rem, calc(100vw - 2rem));
+    padding: 1.25rem 1.5rem 1.25rem;
+    border: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
+    border-radius: var(--vmz-radius-lg, 8px);
+    background: var(--vmz-surface-paper, #fff);
+    color: var(--vmz-text-ink);
+    box-shadow: var(--vmz-shadow-popup);
+    outline: none;
+    animation: vmz-ui-overlay-panel-in var(--vmz-motion-overlay-duration) var(--vmz-motion-overlay-easing);
+  }
+
+  .vmz-ui-dialog[data-vmz-motion-adopt='true'] .vmz-ui-dialog__backdrop,
+  .vmz-ui-dialog[data-vmz-motion-adopt='true'] .vmz-ui-dialog__panel {
     animation: none;
   }
-}
+
+  .vmz-ui-dialog[data-vmz-motion-phase='exit'] .vmz-ui-dialog__backdrop {
+    animation: vmz-ui-overlay-fade-out var(--vmz-motion-overlay-duration) var(--vmz-motion-overlay-easing);
+  }
+
+  .vmz-ui-dialog[data-vmz-motion-phase='exit'] .vmz-ui-dialog__panel {
+    animation: vmz-ui-overlay-panel-out var(--vmz-motion-overlay-duration) var(--vmz-motion-overlay-easing);
+  }
+
+  .vmz-ui-dialog__panel:focus-visible {
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+  }
+
+  .vmz-ui-dialog__title {
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--vmz-text-ink);
+  }
+
+  .vmz-ui-dialog__body {
+    margin-bottom: 1rem;
+    color: var(--vmz-text-ink);
+  }
+
+  .vmz-ui-dialog__close {
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 400;
+    min-height: var(--vmz-control-height, 2rem);
+    padding: 0.25rem 0.95rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+    cursor: pointer;
+    background: var(--vmz-surface-paper, #fff);
+    color: var(--vmz-text-ink);
+  }
+
+  .vmz-ui-dialog__close:hover {
+    color: var(--vmz-action-primary-background);
+    border-color: var(--vmz-action-primary-background);
+  }
+
+  .vmz-ui-dialog__close:focus-visible {
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+  }
+
+  @keyframes vmz-ui-overlay-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes vmz-ui-overlay-panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.35rem);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes vmz-ui-overlay-fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes vmz-ui-overlay-panel-out {
+    from {
+      opacity: 1;
+      transform: none;
+    }
+    to {
+      opacity: 0;
+      transform: translateY(0.35rem);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .vmz-ui-dialog__backdrop,
+    .vmz-ui-dialog__panel,
+    .vmz-ui-dialog[data-vmz-motion-phase='exit'] .vmz-ui-dialog__backdrop,
+    .vmz-ui-dialog[data-vmz-motion-phase='exit'] .vmz-ui-dialog__panel {
+      animation: none;
+    }
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — Dialog (UI1).
- * Live `open` + overlay ownership + focus + Escape/outside dismiss + stackLevel.
- * SSR/resume adopt skips enter replay; dismiss plays overlay-exit then calls onClose.
- */
+* VMZ UI — Dialog (UI1).
+* Live `open` + overlay ownership + focus + Escape/outside dismiss + stackLevel.
+* SSR/resume adopt skips enter replay; dismiss plays overlay-exit then calls onClose.
+*/
 export default class Dialog {
-  public open: boolean = false;
-  public title: string = 'Dialog';
-  public titleId: string = 'vmz-dialog-title';
-  public stackLevel: string = '0';
-  public onClose: (() => void) | null = null;
-
-  _restoreFocus = null;
-  _panel = null;
-  _docKeyHandler = null;
-  _observer = null;
-  _adoptNextEnter = false;
-  _exiting = false;
-  _exitTimer = null;
-  /** Motion generation — exit timer and cancel edges key off this owner counter. */
-  _motionGen = 0;
-
-  async onMount() {
-    if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return;
-    const root = this.__vmzDomRoot;
-    if (!root || typeof root.querySelector !== 'function') return;
-    if (root.querySelector('[data-vmz-overlay="dialog"]')) this._adoptNextEnter = true;
-    this._observer = new MutationObserver(() => this._syncFromDom());
-    this._observer.observe(root, { childList: true, subtree: true });
-    this._syncFromDom();
-  }
-
-  onDestroy() {
-    if (this._exitTimer) {
-      clearTimeout(this._exitTimer);
-      this._exitTimer = null;
-    }
-    this._exiting = false;
-    if (this._observer) {
-      this._observer.disconnect();
-      this._observer = null;
-    }
-    this._teardownDocKey();
-    this._panel = null;
-    this._restoreFocus = null;
-  }
-
-  dismiss() {
-    if (!this._isTopmostStack()) return;
-    // Reverse / interrupt: second dismiss during exit cancels close (stay open).
-    if (this._exiting) {
-      this._cancelExit('reverse');
-      return;
-    }
-    const panel = this._panel;
-    const overlay =
-      panel && typeof panel.closest === 'function' ? panel.closest('[data-vmz-overlay="dialog"]') : null;
-    const reduce =
-      typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (panel && overlay && !reduce) {
-      this._exiting = true;
-      const exitGen = this._motionGen;
-      overlay.setAttribute('data-vmz-motion-phase', 'exit');
-      overlay.removeAttribute('data-vmz-motion-cancelled');
-      panel.setAttribute('data-vmz-motion', 'overlay-exit');
-      const ms = this._overlayDurationMs(panel);
-      this._exitTimer = setTimeout(() => {
-        this._exitTimer = null;
-        // Stale exit after interrupt/re-enter must not call onClose.
-        if (!this._exiting || exitGen !== this._motionGen) return;
-        this._exiting = false;
-        if (typeof this.onClose === 'function') this.onClose();
-      }, ms);
-      return;
-    }
-    if (typeof this.onClose === 'function') this.onClose();
-  }
-
-  _cancelExit(reason) {
-    if (this._exitTimer) {
-      clearTimeout(this._exitTimer);
-      this._exitTimer = null;
-    }
-    this._exiting = false;
-    this._motionGen += 1;
-    const panel = this._panel;
-    const overlay =
-      panel && typeof panel.closest === 'function' ? panel.closest('[data-vmz-overlay="dialog"]') : null;
-    if (overlay) {
-      overlay.removeAttribute('data-vmz-motion-phase');
-      overlay.setAttribute('data-vmz-motion-cancelled', reason || 'true');
-      overlay.setAttribute('data-vmz-motion-gen', String(this._motionGen));
-    }
-    if (panel) {
-      panel.setAttribute('data-vmz-motion', 'overlay-enter');
-    }
-  }
-
-  _overlayDurationMs(panel) {
-    try {
-      const raw = (getComputedStyle(panel).getPropertyValue('--vmz-motion-overlay-duration') || '').trim() || '180ms';
-      if (raw.endsWith('ms')) return Math.max(0, Number.parseFloat(raw) || 180);
-      if (raw.endsWith('s')) return Math.max(0, (Number.parseFloat(raw) || 0.18) * 1000);
-      return 180;
-    } catch {
-      return 180;
-    }
-  }
-
-  _isTopmostStack() {
-    if (typeof document === 'undefined') return true;
-    const root = this.__vmzDomRoot;
-    const mine =
-      root && typeof root.querySelector === 'function'
-        ? root.querySelector('[data-vmz-overlay][data-vmz-overlay-stack]')
-        : null;
-    if (!mine) return true;
-    const myStack = Number(mine.getAttribute('data-vmz-overlay-stack') || this.stackLevel || '0');
-    const open = [...document.querySelectorAll('[data-vmz-overlay][data-vmz-overlay-stack]')];
-    let max = -Infinity;
-    for (const el of open) {
-      const n = Number(el.getAttribute('data-vmz-overlay-stack') || '0');
-      if (Number.isFinite(n) && n > max) max = n;
-    }
-    if (!Number.isFinite(max)) return true;
-    if ((Number.isFinite(myStack) ? myStack : 0) < max) return false;
-    if ((Number.isFinite(myStack) ? myStack : 0) > max) return true;
-    const same = open.filter((el) => Number(el.getAttribute('data-vmz-overlay-stack') || '0') === max);
-    return same[same.length - 1] === mine;
-  }
-
-  onPanelKeyDown(ev) {
-    if (!ev || ev.key !== 'Tab') return;
-    const panel = this._panel;
-    if (!panel) return;
-    const nodes = panel.querySelectorAll(
-      'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])',
-    );
-    const list = [];
-    for (const n of nodes) {
-      if (n instanceof HTMLElement && n.offsetParent !== null) list.push(n);
-    }
-    if (panel.tabIndex >= 0) list.unshift(panel);
-    if (!list.length) {
-      ev.preventDefault();
-      panel.focus();
-      return;
-    }
-    const first = list[0];
-    const last = list[list.length - 1];
-    const active = document.activeElement;
-    if (ev.shiftKey) {
-      if (active === first || active === panel) {
-        ev.preventDefault();
-        last.focus();
-      }
-    } else if (active === last) {
-      ev.preventDefault();
-      first.focus();
-    }
-  }
-
-  _syncFromDom() {
-    const root = this.__vmzDomRoot;
-    const panel =
-      root && typeof root.querySelector === 'function'
-        ? root.querySelector('[data-vmz-focus="enter"]')
-        : null;
-    if (panel && !this._panel) {
-      this._enterFocus(panel);
-    } else if (!panel && this._panel) {
-      this._exitFocus();
-    }
-  }
-
-  _enterFocus(panel) {
-    if (typeof document === 'undefined') return;
-    const active = document.activeElement;
-    if (!this._restoreFocus) {
-      const root = this.__vmzDomRoot;
-      const outside =
-        active instanceof HTMLElement &&
-        active !== document.body &&
-        !(root && typeof root.contains === 'function' && root.contains(active));
-      if (outside) this._restoreFocus = active;
-    }
-    this._panel = panel instanceof HTMLElement ? panel : null;
-    const overlay =
-      this._panel && typeof this._panel.closest === 'function'
-        ? this._panel.closest('[data-vmz-overlay="dialog"]')
-        : null;
-    // Owner remount / re-enter cancels any in-flight exit from a prior generation.
-    if (this._exiting) {
-      this._cancelExit('reenter');
-    } else {
-      this._motionGen += 1;
-    }
-    if (overlay) {
-      overlay.setAttribute('data-vmz-motion-gen', String(this._motionGen));
-    }
-    if (this._adoptNextEnter && overlay) {
-      overlay.setAttribute('data-vmz-motion-adopt', 'true');
-      this._panel.setAttribute('data-vmz-motion', 'overlay-stable');
-      this._adoptNextEnter = false;
-    } else if (overlay) {
-      overlay.removeAttribute('data-vmz-motion-adopt');
-      overlay.removeAttribute('data-vmz-motion-phase');
-      overlay.removeAttribute('data-vmz-motion-cancelled');
-      this._panel.setAttribute('data-vmz-motion', 'overlay-enter');
-    }
-    if (this._panel && typeof this._panel.focus === 'function') {
-      this._panel.focus();
-    }
-    if (!this._docKeyHandler) {
-      this._docKeyHandler = (ev) => {
-        if (ev.key !== 'Escape') return;
-        if (ev.defaultPrevented) return;
-        if (!this._isTopmostStack()) return;
-        ev.preventDefault();
-        ev.stopPropagation();
-        this.dismiss();
-      };
-      document.addEventListener('keydown', this._docKeyHandler);
-    }
-  }
-
-  _exitFocus() {
-    if (this._exitTimer) {
-      clearTimeout(this._exitTimer);
-      this._exitTimer = null;
-    }
-    this._exiting = false;
-    this._teardownDocKey();
-    this._panel = null;
-    const restore = this._restoreFocus;
-    this._restoreFocus = null;
-    const focusTarget =
-      restore && typeof restore.focus === 'function' && document.contains(restore)
-        ? restore
-        : document.querySelector('button.vmz-ui-btn');
-    if (focusTarget && typeof focusTarget.focus === 'function') {
-      focusTarget.focus();
-    }
-  }
-
-  _teardownDocKey() {
-    if (typeof document !== 'undefined' && this._docKeyHandler) {
-      document.removeEventListener('keydown', this._docKeyHandler);
-    }
-    this._docKeyHandler = null;
-  }
+	public open: boolean = false;
+	public title: string = "Dialog";
+	public titleId: string = "vmz-dialog-title";
+	public stackLevel: string = "0";
+	public onClose: (() => void) | null = null;
+	_restoreFocus = null;
+	_panel = null;
+	_docKeyHandler = null;
+	_observer = null;
+	_adoptNextEnter = false;
+	_exiting = false;
+	_exitTimer = null;
+	/** Motion generation — exit timer and cancel edges key off this owner counter. */
+	_motionGen = 0;
+	async onMount() {
+		if (typeof document === "undefined" || typeof MutationObserver === "undefined") return;
+		const root = this.__vmzDomRoot;
+		if (!root || typeof root.querySelector !== "function") return;
+		if (root.querySelector("[data-vmz-overlay=\"dialog\"]")) this._adoptNextEnter = true;
+		this._observer = new MutationObserver(() => this._syncFromDom());
+		this._observer.observe(root, {
+			childList: true,
+			subtree: true
+		});
+		this._syncFromDom();
+	}
+	onDestroy() {
+		if (this._exitTimer) {
+			clearTimeout(this._exitTimer);
+			this._exitTimer = null;
+		}
+		this._exiting = false;
+		if (this._observer) {
+			this._observer.disconnect();
+			this._observer = null;
+		}
+		this._teardownDocKey();
+		this._panel = null;
+		this._restoreFocus = null;
+	}
+	dismiss() {
+		if (!this._isTopmostStack()) return;
+		// Reverse / interrupt: second dismiss during exit cancels close (stay open).
+		if (this._exiting) {
+			this._cancelExit("reverse");
+			return;
+		}
+		const panel = this._panel;
+		const overlay = panel && typeof panel.closest === "function" ? panel.closest("[data-vmz-overlay=\"dialog\"]") : null;
+		const reduce = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+		if (panel && overlay && !reduce) {
+			this._exiting = true;
+			const exitGen = this._motionGen;
+			overlay.setAttribute("data-vmz-motion-phase", "exit");
+			overlay.removeAttribute("data-vmz-motion-cancelled");
+			panel.setAttribute("data-vmz-motion", "overlay-exit");
+			const ms = this._overlayDurationMs(panel);
+			this._exitTimer = setTimeout(() => {
+				this._exitTimer = null;
+				// Stale exit after interrupt/re-enter must not call onClose.
+				if (!this._exiting || exitGen !== this._motionGen) return;
+				this._exiting = false;
+				if (typeof this.onClose === "function") this.onClose();
+			}, ms);
+			return;
+		}
+		if (typeof this.onClose === "function") this.onClose();
+	}
+	_cancelExit(reason) {
+		if (this._exitTimer) {
+			clearTimeout(this._exitTimer);
+			this._exitTimer = null;
+		}
+		this._exiting = false;
+		this._motionGen += 1;
+		const panel = this._panel;
+		const overlay = panel && typeof panel.closest === "function" ? panel.closest("[data-vmz-overlay=\"dialog\"]") : null;
+		if (overlay) {
+			overlay.removeAttribute("data-vmz-motion-phase");
+			overlay.setAttribute("data-vmz-motion-cancelled", reason || "true");
+			overlay.setAttribute("data-vmz-motion-gen", String(this._motionGen));
+		}
+		if (panel) {
+			panel.setAttribute("data-vmz-motion", "overlay-enter");
+		}
+	}
+	_overlayDurationMs(panel) {
+		try {
+			const raw = (getComputedStyle(panel).getPropertyValue("--vmz-motion-overlay-duration") || "").trim() || "180ms";
+			if (raw.endsWith("ms")) return Math.max(0, Number.parseFloat(raw) || 180);
+			if (raw.endsWith("s")) return Math.max(0, (Number.parseFloat(raw) || .18) * 1e3);
+			return 180;
+		} catch {
+			return 180;
+		}
+	}
+	_isTopmostStack() {
+		if (typeof document === "undefined") return true;
+		const root = this.__vmzDomRoot;
+		const mine = root && typeof root.querySelector === "function" ? root.querySelector("[data-vmz-overlay][data-vmz-overlay-stack]") : null;
+		if (!mine) return true;
+		const myStack = Number(mine.getAttribute("data-vmz-overlay-stack") || this.stackLevel || "0");
+		const open = [...document.querySelectorAll("[data-vmz-overlay][data-vmz-overlay-stack]")];
+		let max = -Infinity;
+		for (const el of open) {
+			const n = Number(el.getAttribute("data-vmz-overlay-stack") || "0");
+			if (Number.isFinite(n) && n > max) max = n;
+		}
+		if (!Number.isFinite(max)) return true;
+		if ((Number.isFinite(myStack) ? myStack : 0) < max) return false;
+		if ((Number.isFinite(myStack) ? myStack : 0) > max) return true;
+		const same = open.filter((el) => Number(el.getAttribute("data-vmz-overlay-stack") || "0") === max);
+		return same[same.length - 1] === mine;
+	}
+	onPanelKeyDown(ev) {
+		if (!ev || ev.key !== "Tab") return;
+		const panel = this._panel;
+		if (!panel) return;
+		const nodes = panel.querySelectorAll("a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex=\"-1\"])");
+		const list = [];
+		for (const n of nodes) {
+			if (n instanceof HTMLElement && n.offsetParent !== null) list.push(n);
+		}
+		if (panel.tabIndex >= 0) list.unshift(panel);
+		if (!list.length) {
+			ev.preventDefault();
+			panel.focus();
+			return;
+		}
+		const first = list[0];
+		const last = list[list.length - 1];
+		const active = document.activeElement;
+		if (ev.shiftKey) {
+			if (active === first || active === panel) {
+				ev.preventDefault();
+				last.focus();
+			}
+		} else if (active === last) {
+			ev.preventDefault();
+			first.focus();
+		}
+	}
+	_syncFromDom() {
+		const root = this.__vmzDomRoot;
+		const panel = root && typeof root.querySelector === "function" ? root.querySelector("[data-vmz-focus=\"enter\"]") : null;
+		if (panel && !this._panel) {
+			this._enterFocus(panel);
+		} else if (!panel && this._panel) {
+			this._exitFocus();
+		}
+	}
+	_enterFocus(panel) {
+		if (typeof document === "undefined") return;
+		const active = document.activeElement;
+		if (!this._restoreFocus) {
+			const root = this.__vmzDomRoot;
+			const outside = active instanceof HTMLElement && active !== document.body && !(root && typeof root.contains === "function" && root.contains(active));
+			if (outside) this._restoreFocus = active;
+		}
+		this._panel = panel instanceof HTMLElement ? panel : null;
+		const overlay = this._panel && typeof this._panel.closest === "function" ? this._panel.closest("[data-vmz-overlay=\"dialog\"]") : null;
+		// Owner remount / re-enter cancels any in-flight exit from a prior generation.
+		if (this._exiting) {
+			this._cancelExit("reenter");
+		} else {
+			this._motionGen += 1;
+		}
+		if (overlay) {
+			overlay.setAttribute("data-vmz-motion-gen", String(this._motionGen));
+		}
+		if (this._adoptNextEnter && overlay) {
+			overlay.setAttribute("data-vmz-motion-adopt", "true");
+			this._panel.setAttribute("data-vmz-motion", "overlay-stable");
+			this._adoptNextEnter = false;
+		} else if (overlay) {
+			overlay.removeAttribute("data-vmz-motion-adopt");
+			overlay.removeAttribute("data-vmz-motion-phase");
+			overlay.removeAttribute("data-vmz-motion-cancelled");
+			this._panel.setAttribute("data-vmz-motion", "overlay-enter");
+		}
+		if (this._panel && typeof this._panel.focus === "function") {
+			this._panel.focus();
+		}
+		if (!this._docKeyHandler) {
+			this._docKeyHandler = (ev) => {
+				if (ev.key !== "Escape") return;
+				if (ev.defaultPrevented) return;
+				if (!this._isTopmostStack()) return;
+				ev.preventDefault();
+				ev.stopPropagation();
+				this.dismiss();
+			};
+			document.addEventListener("keydown", this._docKeyHandler);
+		}
+	}
+	_exitFocus() {
+		if (this._exitTimer) {
+			clearTimeout(this._exitTimer);
+			this._exitTimer = null;
+		}
+		this._exiting = false;
+		this._teardownDocKey();
+		this._panel = null;
+		const restore = this._restoreFocus;
+		this._restoreFocus = null;
+		const focusTarget = restore && typeof restore.focus === "function" && document.contains(restore) ? restore : document.querySelector("button.vmz-ui-btn");
+		if (focusTarget && typeof focusTarget.focus === "function") {
+			focusTarget.focus();
+		}
+	}
+	_teardownDocKey() {
+		if (typeof document !== "undefined" && this._docKeyHandler) {
+			document.removeEventListener("keydown", this._docKeyHandler);
+		}
+		this._docKeyHandler = null;
+	}
 }
 </script>
