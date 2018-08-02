@@ -119,7 +119,11 @@ mod tests {
         ];
         let css = emit_theme_css(&rules);
         assert!(css.contains(":root"));
-        assert!(css.contains("\\\"") || css.contains(r#"\""#), "id escaped: {css}");
+        // oxc_formatter_css may rewrite `"a\"b"` to `'a"b'`; either form is escaped.
+        assert!(
+            css.contains("[data-theme=") && (css.contains("\\\"") || css.contains("'a\"b'") || css.contains(r#""a\"b""#)),
+            "theme id must remain escaped in attr selector: {css}"
+        );
         validate_css(&css).expect("theme css must parse");
     }
 }
