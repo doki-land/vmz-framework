@@ -1232,10 +1232,18 @@ pub struct JsPageShellInput {
     pub props_json: String,
     /// Head meta.
     pub meta: JsPageShellMeta,
-    /// Optional CSS entry (e.g. `vmz.css`).
+    /// Optional CSS entry (e.g. `vmz.css` or `vmz.css?t=1`).
     pub css_entry: Option<String>,
     /// Omit entry-client when true.
     pub is_error_document: Option<bool>,
+    /// Extra `<html>` attrs as flattened `[name, value, …]` pairs.
+    pub html_extra_attrs: Option<Vec<String>>,
+    /// Trusted raw HTML appended in `<head>`.
+    pub head_extra_html: Option<String>,
+    /// Override module script `src` (default `/entry-client.js`).
+    pub module_script_src: Option<String>,
+    /// Trusted raw HTML after the module script.
+    pub body_tail_html: Option<String>,
 }
 
 /// Generate production page HTML shell via MarkupCodeGenerator.
@@ -1256,6 +1264,13 @@ pub fn generate_page_shell(input: JsPageShellInput) -> String {
             .map(|a| vmz_generator::HreflangAlternate { hreflang: a.hreflang, href: a.href })
             .collect(),
     };
+    let mut html_extra_attrs = Vec::new();
+    let flat = input.html_extra_attrs.unwrap_or_default();
+    let mut i = 0;
+    while i + 1 < flat.len() {
+        html_extra_attrs.push((flat[i].clone(), flat[i + 1].clone()));
+        i += 2;
+    }
     vmz_generator::emit_page_shell(&vmz_generator::PageShellInput {
         body_html: input.body_html,
         chunk_id: input.chunk_id,
@@ -1264,6 +1279,10 @@ pub fn generate_page_shell(input: JsPageShellInput) -> String {
         meta,
         css_entry: input.css_entry,
         is_error_document: input.is_error_document.unwrap_or(false),
+        html_extra_attrs,
+        head_extra_html: input.head_extra_html.unwrap_or_default(),
+        module_script_src: input.module_script_src,
+        body_tail_html: input.body_tail_html.unwrap_or_default(),
     })
 }
 
