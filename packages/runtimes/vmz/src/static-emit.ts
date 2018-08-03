@@ -406,8 +406,8 @@ async function resolvePageMeta(Page, ctx) {
     } else if (Page.meta && typeof Page.meta === 'object') {
         raw = Page.meta;
     }
-    const title = String(raw.title || `${guessTitle(ctx.pathname)} · VMZ`);
-    const description = String(raw.description || `VMZ page ${ctx.pathname}`);
+    const title = String(raw.title || guessTitle(ctx.pathname) || 'App');
+    const description = String(raw.description || '');
     const canonical = String(raw.canonical || `${ctx.origin}${ctx.pathname === '/' ? '/' : ctx.pathname}`);
     const robots = String(raw.robots || 'index,follow');
     const lang = String(raw.lang || 'en');
