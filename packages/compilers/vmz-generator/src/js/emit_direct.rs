@@ -7,7 +7,7 @@
 
 #![allow(clippy::too_many_arguments)]
 
-use super::ast_util::js_string_literal;
+use super::ast_util::{js_string_literal, print_one_stmt};
 use super::emit_ir::IrDepCursor;
 use super::helpers::{
     bind_field_idents, collect_deps_oxc, event_dom_type, is_event_attr, is_html_attr,
@@ -54,9 +54,10 @@ fn node_eligible(node: &ViewNode) -> bool {
 
 /// Emit `__vmzDirect` + `__vmzCreate(api)` from Native View roots.
 ///
-/// Create body statements are still lowered as text, then parsed into a function
-/// expression. Outer `name.__vmz*` assignments are built with oxc AstBuilder and
-/// printed once (no soft fallback to unparsed text).
+/// Create body statements for static text/element/attr/fragment are built with
+/// oxc AstBuilder (`print_one_stmt`). Control-flow / interp / events still lower
+/// as text, then the whole `__vmzCreate` function is parsed once. Outer
+/// `name.__vmz*` assignments are AstBuilder + single codegen (no soft fallback).
 /// SSR reuses the same create function with a serialize host API.
 pub fn emit_direct_create(
     name: &str,
@@ -165,9 +166,15 @@ fn emit_create_body(
         1 => roots[0].clone(),
         _ => {
             let frag = fresh("f", next_id);
-            stmts.insert(0, format!("var {frag} = api.frag();"));
+            stmts.insert(
+                0,
+                print_one_stmt(|b| b.var_stmt(&frag, b.api_call("frag", vec![]))),
+            );
             for r in &roots {
-                stmts.push(format!("{frag}.appendChild({r});"));
+                let child = r.clone();
+                stmts.push(print_one_stmt(|b| {
+                    b.expr_stmt(b.call(b.member(&frag, "appendChild"), vec![b.ident(&child)]))
+                }));
             }
             frag
         }
@@ -232,7 +239,10 @@ fn emit_node(
     match node {
         ViewNode::Text { value: t } => {
             let v = fresh("t", next_id);
-            stmts.push(format!("var {v} = api.text({});", q(t)));
+            let text = t.clone();
+            stmts.push(print_one_stmt(|b| {
+                b.var_stmt(&v, b.api_call("text", vec![b.str_lit(&text)]))
+            }));
             v
         }
         ViewNode::Interp { expr, binding } => {
@@ -358,21 +368,28 @@ fn emit_plain_element(
     next_id: &mut u32,
 ) -> String {
     let el = fresh("e", next_id);
-    stmts.push(format!("var {el} = api.el({});", q(tag)));
+    let tag_owned = tag.to_string();
+    stmts.push(print_one_stmt(|b| {
+        b.var_stmt(&el, b.api_call("el", vec![b.str_lit(&tag_owned)]))
+    }));
     for a in attrs {
         if a.name == "style:tw" {
             continue;
         }
         match &a.value {
             ViewAttrValue::Static { value: s } if is_html_attr(&a.name) => {
-                stmts.push(format!("api.setHtml({el}, {});", q(s)));
+                let html = s.clone();
+                stmts.push(print_one_stmt(|b| {
+                    b.expr_stmt(b.api_call("setHtml", vec![b.ident(&el), b.str_lit(&html)]))
+                }));
             }
             ViewAttrValue::Static { value: s } => {
-                if a.name == "className" {
-                    stmts.push(format!("api.attr({el}, \"class\", {});", q(s)));
-                } else {
-                    stmts.push(format!("api.attr({el}, {}, {});", q(&a.name), q(s)));
-                }
+                let attr_name = if a.name == "className" { "class" } else { a.name.as_str() };
+                let name = attr_name.to_string();
+                let val = s.clone();
+                stmts.push(print_one_stmt(|b| {
+                    b.expr_stmt(b.api_call("attr", vec![b.ident(&el), b.str_lit(&name), b.str_lit(&val)]))
+                }));
             }
             ViewAttrValue::Bare => {}
             ViewAttrValue::Interp { expr: e } if is_event_attr(&a.name) => {
@@ -400,7 +417,9 @@ fn emit_plain_element(
         }
     }
     for child in emit_nodes(children, fields, scope, aliases, each_depth, ir, stmts, next_id) {
-        stmts.push(format!("{el}.appendChild({child});"));
+        stmts.push(print_one_stmt(|b| {
+            b.expr_stmt(b.call(b.member(&el, "appendChild"), vec![b.ident(&child)]))
+        }));
     }
     el
 }

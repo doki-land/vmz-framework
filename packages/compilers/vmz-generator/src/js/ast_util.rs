@@ -2,8 +2,9 @@
 
 use oxc_allocator::{Allocator, ArenaVec};
 use oxc_ast::ast::{
-    ArrayExpressionElement, AssignmentTarget, Expression, IdentifierName, ObjectPropertyKind,
-    Program, PropertyKey, PropertyKind, Statement,
+    Argument, ArrayExpressionElement, AssignmentTarget, BindingPattern, Expression, IdentifierName,
+    ObjectPropertyKind, Program, PropertyKey, PropertyKind, Statement, VariableDeclarationKind,
+    VariableDeclarator,
 };
 use oxc_ast::builder::AstBuilder;
 use oxc_codegen::Codegen;
@@ -143,6 +144,44 @@ impl<'a> JsAst<'a> {
         codegen.into_source_text()
     }
 
+    /// `callee(args…)`.
+    pub fn call(&self, callee: Expression<'a>, args: Vec<Expression<'a>>) -> Expression<'a> {
+        let mut arguments = ArenaVec::with_capacity_in(args.len(), &self.ast);
+        for a in args {
+            arguments.push(Argument::from(a));
+        }
+        Expression::new_call_expression(SPAN, callee, None, arguments, false, &self.ast)
+    }
+
+    /// `api.method(args…)`.
+    pub fn api_call(&self, method: &str, args: Vec<Expression<'a>>) -> Expression<'a> {
+        self.call(self.member("api", method), args)
+    }
+
+    /// `var name = init;`
+    pub fn var_stmt(&self, name: &str, init: Expression<'a>) -> Statement<'a> {
+        let id = BindingPattern::new_binding_identifier(
+            SPAN,
+            Ident::from_str_in(name, &self.ast),
+            &self.ast,
+        );
+        let decl = VariableDeclarator::new(SPAN, id, None, Some(init), false, &self.ast);
+        let mut decls = ArenaVec::with_capacity_in(1, &self.ast);
+        decls.push(decl);
+        Statement::new_variable_declaration(
+            SPAN,
+            VariableDeclarationKind::Var,
+            decls,
+            false,
+            &self.ast,
+        )
+    }
+
+    /// `object.method(args…);` expression statement.
+    pub fn expr_stmt(&self, expr: Expression<'a>) -> Statement<'a> {
+        Statement::new_expression_statement(SPAN, expr, &self.ast)
+    }
+
     /// Print statements as a Program (script).
     pub fn print_stmts(&self, stmts: ArenaVec<'a, Statement<'a>>) -> String {
         let program = Program::new(
@@ -205,9 +244,27 @@ pub fn print_member_assign(
     format!("\n{}", b.print_stmts(body))
 }
 
+/// Print one statement via oxc codegen (no wrapping program comments).
+pub fn print_one_stmt(build: impl for<'a> FnOnce(&'a JsAst<'a>) -> Statement<'a>) -> String {
+    let allocator = Allocator::default();
+    let b = JsAst::new(&allocator);
+    let stmt = build(&b);
+    let body = ArenaVec::from_iter_in([stmt], &b.ast);
+    b.print_stmts(body).trim().to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn api_var_call_prints_and_reparses() {
+        let code = print_one_stmt(|b| b.var_stmt("t0", b.api_call("text", vec![b.str_lit("hi")])));
+        assert!(code.contains("api.text"), "{code}");
+        let allocator = Allocator::default();
+        let parsed = Parser::new(&allocator, &code, SourceType::cjs()).parse();
+        assert!(!parsed.panicked, "must re-parse: {code}");
+    }
 
     #[test]
     fn string_lit_roundtrips_through_codegen() {
