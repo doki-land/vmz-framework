@@ -299,13 +299,27 @@ fn emit_hydrate_js(
     _acts: &[(Vec<u32>, String, String, String)],
 ) -> String {
     // Single-row path (append one / reconcile miss). Create loop inlines its own writes.
-    // Seed __vmzT* (Text node) so applyByField / stride can use nodeValue.
+    // Seed `root.__vmzT[i]` (Text) so applyByField / stride use index, not `__vmzT` + slot.
     let mut body = String::from("root.__vmzBox = item;\n");
-    for (i, (path, field)) in texts.iter().enumerate() {
-        let parent = text_parent_expr("root", path);
-        body.push_str(&format!("root.__vmzE{i} = {parent};\n"));
-        body.push_str(&format!("root.__vmzT{i} = root.__vmzE{i}.firstChild;\n"));
-        body.push_str(&format!("root.__vmzT{i}.nodeValue = item.{field};\n"));
+    if !texts.is_empty() {
+        body.push_str("root.__vmzE = [");
+        for (i, (path, _)) in texts.iter().enumerate() {
+            if i > 0 {
+                body.push_str(", ");
+            }
+            body.push_str(&text_parent_expr("root", path));
+        }
+        body.push_str("];\nroot.__vmzT = [");
+        for i in 0..texts.len() {
+            if i > 0 {
+                body.push_str(", ");
+            }
+            body.push_str(&format!("root.__vmzE[{i}].firstChild"));
+        }
+        body.push_str("];\n");
+        for (i, (_, field)) in texts.iter().enumerate() {
+            body.push_str(&format!("root.__vmzT[{i}].nodeValue = item.{field};\n"));
+        }
     }
     // Acts come from cloned data-vmz-act; no per-row __vmzAct seed.
     if let Some((path, on_val, off_val, host, item_f)) = class {
@@ -343,8 +357,16 @@ fn emit_create_js(
     for (i, (_path, field)) in text_parents.iter().enumerate() {
         body.push_str(&format!("  var t{i} = {}.firstChild;\n", locals.text_names[i]));
         body.push_str(&format!("  t{i}.nodeValue = item.{field};\n"));
-        // Hot path only needs Text handles; `__vmzE*` rebuilt lazily in full apply.
-        body.push_str(&format!("  root.__vmzT{i} = t{i};\n"));
+    }
+    if !text_parents.is_empty() {
+        body.push_str("  root.__vmzT = [");
+        for i in 0..text_parents.len() {
+            if i > 0 {
+                body.push_str(", ");
+            }
+            body.push_str(&format!("t{i}"));
+        }
+        body.push_str("];\n");
     }
     if let Some((_path, on_val, off_val, _host, item_f)) = class {
         let class_target = locals.class_name.as_deref().unwrap_or("root");
@@ -467,7 +489,7 @@ fn emit_path_locals(
 /// Returns `(apply_full, applyByField_object)`.
 /// `applyByField` entries are monomorphic `(root, item) => ...` - no slot branching -
 /// so leaf updates (`rows.i.label`) stay one IC type in V8.
-/// Create/hydrate seed `root.__vmzT{i}` (Text); applyByField uses `nodeValue`.
+/// Create/hydrate seed `root.__vmzT[i]` (Text); applyByField uses `nodeValue`.
 fn emit_apply_js(
     texts: &[(Vec<u32>, String)],
     class: Option<&(Vec<u32>, String, String, String, String)>,
@@ -475,7 +497,7 @@ fn emit_apply_js(
     let mut by_field_entries = Vec::new();
 
     for (i, (_path, field)) in texts.iter().enumerate() {
-        let mut body = format!("root.__vmzT{i}.nodeValue = item.{field};\n");
+        let mut body = format!("root.__vmzT[{i}].nodeValue = item.{field};\n");
         if let Some((_, on_val, off_val, host, item_f)) = class
             && item_f == field
         {
@@ -504,15 +526,24 @@ fn emit_apply_js(
     // Full apply: no slot chain (unknown slot / identity change -> call this).
     let mut full = String::new();
     if !texts.is_empty() {
-        full.push_str("if (!root.__vmzT0) {\n");
+        full.push_str("if (!root.__vmzT) {\n  root.__vmzE = [");
         for (i, (path, _)) in texts.iter().enumerate() {
-            full.push_str(&format!("  root.__vmzE{i} = {};\n", text_parent_expr("root", path)));
-            full.push_str(&format!("  root.__vmzT{i} = root.__vmzE{i}.firstChild;\n"));
+            if i > 0 {
+                full.push_str(", ");
+            }
+            full.push_str(&text_parent_expr("root", path));
         }
-        full.push_str("}\n");
+        full.push_str("];\n  root.__vmzT = [");
+        for i in 0..texts.len() {
+            if i > 0 {
+                full.push_str(", ");
+            }
+            full.push_str(&format!("root.__vmzE[{i}].firstChild"));
+        }
+        full.push_str("];\n}\n");
     }
     for (i, (_path, field)) in texts.iter().enumerate() {
-        full.push_str(&format!("root.__vmzT{i}.nodeValue = item.{field};\n"));
+        full.push_str(&format!("root.__vmzT[{i}].nodeValue = item.{field};\n"));
     }
     if let Some((_path, on_val, off_val, host, item_f)) = class {
         full.push_str(&format!(

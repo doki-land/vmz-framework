@@ -1119,12 +1119,8 @@ export const directApi = {
             // DOM-as-entry (Element): drop expandos.
             if (entry.nodeType === 1) {
                 entry.__vmzBox = null;
-                entry.__vmzT0 = null;
-                entry.__vmzT1 = null;
-                entry.__vmzE0 = null;
-                entry.__vmzE1 = null;
-                entry.__vmzE2 = null;
-                entry.__vmzE3 = null;
+                entry.__vmzT = null;
+                entry.__vmzE = null;
                 entry.__vmzTexts = null;
                 entry.__vmzBp = null;
                 return;
@@ -2201,37 +2197,17 @@ export const directApi = {
             if (st <= 0) return false;
             const entries = entryByIndex;
             const n = arr.length;
-            // Fastest path: text-only leaf → mutate + __vmzT{n}.nodeValue (no applyByField).
+            // Fastest path: text-only leaf → mutate + __vmzT[slot].nodeValue (no applyByField).
             const slot = rkTextSlots ? rkTextSlots[leaf] : undefined;
             if (op === '+' && slot != null && !rkHostFieldSet.has(leaf)) {
-                if (slot === 0) {
-                    for (let i = s; i < n; i += st) {
-                        const item = arr[i];
-                        if (item == null || typeof item !== 'object') continue;
-                        const v = item[leaf] + rhs;
-                        item[leaf] = v;
-                        const entry = entries[i];
-                        if (entry && entry.nodeType === 1) entry.__vmzT0.nodeValue = v;
-                    }
-                } else if (slot === 1) {
-                    for (let i = s; i < n; i += st) {
-                        const item = arr[i];
-                        if (item == null || typeof item !== 'object') continue;
-                        const v = item[leaf] + rhs;
-                        item[leaf] = v;
-                        const entry = entries[i];
-                        if (entry && entry.nodeType === 1) entry.__vmzT1.nodeValue = v;
-                    }
-                } else {
-                    const tKey = '__vmzT' + slot;
-                    for (let i = s; i < n; i += st) {
-                        const item = arr[i];
-                        if (item == null || typeof item !== 'object') continue;
-                        const v = item[leaf] + rhs;
-                        item[leaf] = v;
-                        const entry = entries[i];
-                        if (entry && entry.nodeType === 1) entry[tKey].nodeValue = v;
-                    }
+                for (let i = s; i < n; i += st) {
+                    const item = arr[i];
+                    if (item == null || typeof item !== 'object') continue;
+                    const v = item[leaf] + rhs;
+                    item[leaf] = v;
+                    const entry = entries[i];
+                    const texts = entry && entry.nodeType === 1 ? entry.__vmzT : null;
+                    if (texts) texts[slot].nodeValue = v;
                 }
                 return true;
             }
@@ -2270,20 +2246,10 @@ export const directApi = {
                 item[leaf] = value;
                 if (slot != null && !needsThis) {
                     const entry = entries[i];
-                    if (entry && entry.nodeType === 1) {
-                        if (slot === 0) {
-                            entry.__vmzT0.nodeValue = value;
-                            continue;
-                        }
-                        if (slot === 1) {
-                            entry.__vmzT1.nodeValue = value;
-                            continue;
-                        }
-                        const tn = entry['__vmzT' + slot];
-                        if (tn) {
-                            tn.nodeValue = value;
-                            continue;
-                        }
+                    const texts = entry && entry.nodeType === 1 ? entry.__vmzT : null;
+                    if (texts) {
+                        texts[slot].nodeValue = value;
+                        continue;
                     }
                 }
                 const entry = entries[i];

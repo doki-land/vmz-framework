@@ -39,6 +39,7 @@ oxc_allocator = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.1
 oxc_ast = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
 oxc_ast_visit = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
 oxc_codegen = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0", features = ["sourcemap"] }
+oxc_minifier = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
 oxc_diagnostics = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
 oxc_parser = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
 oxc_semantic = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }

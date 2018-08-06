@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use super::ast_util::{js_string_literal, oxc_reprint_module_required};
-use super::emit::EmittedJs;
+use super::print::EmittedJs;
 
 /// Component entry descriptor for [`emit_serve_entry_client`].
 #[derive(Debug, Clone)]

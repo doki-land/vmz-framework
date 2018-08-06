@@ -18,13 +18,15 @@ pub use core::{
     ContentType, EmittedArtifact, GeneratorError, Provenance, Result, escape_css_string,
     escape_html_attr, escape_html_text, escape_xml_attr, escape_xml_text, sha256_hex,
 };
+pub use js::{
+    EmittedJs, JsPrintOptions, ServerBridge, bind_field_idents, emit_client_module,
+    emit_server_module, is_direct_eligible, print_js_source, transpile_ts, transpile_ts_printed,
+    transpile_ts_with_map,
+};
 pub use css::{
     StyleContribution, StyleEmitReport, StyleLayer, ThemeDecl, ThemeRule, css_var_name,
-    emit_style_bundle, emit_theme_css, format_css, theme_attr_selector, validate_css,
-};
-pub use js::{
-    EmittedJs, ServerBridge, bind_field_idents, emit_client_module, emit_server_module,
-    is_direct_eligible, transpile_ts, transpile_ts_with_map,
+    emit_style_bundle, emit_style_bundle_opts, emit_theme_css, format_css, minify_css,
+    print_css, theme_attr_selector, validate_css,
 };
 pub use json::{
     DataFormat, emit_data, emit_data_artifact, to_json, to_json5, to_pretty_json, to_yaml,

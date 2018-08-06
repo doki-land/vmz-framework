@@ -4,7 +4,7 @@ mod ast;
 mod html;
 mod wxml;
 
-pub use ast::{MarkupDocument, MarkupNode, emit_markup};
+pub use ast::{MarkupDocument, MarkupNode, emit_markup, emit_markup_opts};
 pub use html::{
     HreflangAlternate, HtmlShellInput, PageShellInput, PageShellMeta, RedirectHtmlInput,
     SitemapUrl, emit_html_document, emit_html_shell, emit_page_shell, emit_redirect_html,

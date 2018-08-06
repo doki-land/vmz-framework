@@ -1,7 +1,7 @@
 //! Locale runtime modules (`dist/locales/*.js`).
 
 use super::ast_util::oxc_reprint_module_required;
-use super::emit::EmittedJs;
+use super::print::EmittedJs;
 
 /// One exported message function in a locale module.
 #[derive(Debug, Clone)]

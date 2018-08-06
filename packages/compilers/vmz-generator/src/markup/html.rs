@@ -1,6 +1,6 @@
 //! HTML document helpers for static / serve hosts.
 
-use super::ast::{MarkupDialect, MarkupDocument, MarkupNode, emit_markup};
+use super::ast::{MarkupDialect, MarkupDocument, MarkupNode, emit_markup_opts};
 
 /// One hreflang alternate link.
 #[derive(Debug, Clone)]
@@ -55,6 +55,8 @@ pub struct PageShellInput {
     pub module_script_src: Option<String>,
     /// Trusted raw HTML after the module script (dev live reload / overlay).
     pub body_tail_html: String,
+    /// Compact print (no comments / extra whitespace).
+    pub minify: bool,
 }
 
 fn el(tag: &str, attrs: Vec<(String, String)>, children: Vec<MarkupNode>) -> MarkupNode {
@@ -83,6 +85,7 @@ pub fn emit_html_document(
         body_attrs: vec![],
         body_nodes: body_children,
         head_extra,
+        minify: false,
     })
 }
 
@@ -103,6 +106,8 @@ pub struct HtmlShellInput {
     pub body_nodes: Vec<MarkupNode>,
     /// Extra head nodes after charset/viewport/title/css.
     pub head_extra: Vec<MarkupNode>,
+    /// Compact print (no comments / extra whitespace).
+    pub minify: bool,
 }
 
 /// Emit an HTML5 document from [`HtmlShellInput`].
@@ -137,7 +142,7 @@ pub fn emit_html_shell(input: &HtmlShellInput) -> String {
             vec![el("head", vec![], head_kids), el("body", input.body_attrs.clone(), body_kids)],
         )],
     };
-    emit_markup(&doc)
+    emit_markup_opts(&doc, input.minify)
 }
 
 /// Meta-refresh redirect document (document mount roots, etc.).
@@ -180,6 +185,7 @@ pub fn emit_redirect_html(input: &RedirectHtmlInput) -> String {
         body_attrs: vec![],
         body_nodes: body,
         head_extra,
+        minify: false,
     })
 }
 
@@ -304,7 +310,7 @@ pub fn emit_page_shell(input: &PageShellInput) -> String {
             vec![el("head", vec![], head_kids), el("body", vec![], body_kids)],
         )],
     };
-    emit_markup(&doc)
+    emit_markup_opts(&doc, input.minify)
 }
 
 /// One sitemap URL entry.
@@ -335,7 +341,7 @@ pub fn emit_sitemap_xml(urls: &[SitemapUrl]) -> String {
             void: false,
         }],
     };
-    out.push_str(&emit_markup(&doc));
+    out.push_str(&emit_markup_opts(&doc, false));
     out
 }
 
@@ -378,6 +384,7 @@ mod tests {
             head_extra_html: String::new(),
             module_script_src: None,
             body_tail_html: String::new(),
+            minify: false,
         });
         assert!(html.contains("<!DOCTYPE html>"));
         assert!(html.contains("A &lt; B &amp; C"));
@@ -404,6 +411,7 @@ mod tests {
             body_attrs: vec![("data-vmz-hydrate".into(), "island-only".into())],
             body_nodes: vec![],
             head_extra: vec![],
+            minify: false,
         });
         assert!(html.contains("A &lt; B"));
         assert!(html.contains("lang=\"zh-hans\""));

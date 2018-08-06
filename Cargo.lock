@@ -870,14 +870,19 @@ name = "oxc_ecmascript"
 version = "0.144.0"
 source = "git+https://github.com/oxc-project/oxc?tag=crates_v0.144.0#b6f1458dece6bbd7f934d1d26c049d0d0c2bd68c"
 dependencies = [
+ "cow-utils",
  "dragonbox_ecma",
  "itoa",
  "num-bigint",
  "num-traits",
+ "oxc_allocator",
  "oxc_ast",
+ "oxc_compat",
  "oxc_data_structures",
+ "oxc_regular_expression",
  "oxc_span",
  "oxc_syntax",
+ "smallvec",
 ]
 
 [[package]]
@@ -956,6 +961,48 @@ source = "git+https://github.com/oxc-project/oxc?tag=crates_v0.144.0#b6f1458dece
 dependencies = [
  "oxc_ast",
  "oxc_span",
+ "rustc-hash",
+]
+
+[[package]]
+name = "oxc_mangler"
+version = "0.144.0"
+source = "git+https://github.com/oxc-project/oxc?tag=crates_v0.144.0#b6f1458dece6bbd7f934d1d26c049d0d0c2bd68c"
+dependencies = [
+ "itertools",
+ "oxc_allocator",
+ "oxc_ast",
+ "oxc_data_structures",
+ "oxc_ecmascript",
+ "oxc_index",
+ "oxc_semantic",
+ "oxc_span",
+ "oxc_str",
+ "oxc_syntax",
+ "rustc-hash",
+]
+
+[[package]]
+name = "oxc_minifier"
+version = "0.144.0"
+source = "git+https://github.com/oxc-project/oxc?tag=crates_v0.144.0#b6f1458dece6bbd7f934d1d26c049d0d0c2bd68c"
+dependencies = [
+ "cow-utils",
+ "itoa",
+ "oxc_allocator",
+ "oxc_ast",
+ "oxc_ast_visit",
+ "oxc_compat",
+ "oxc_data_structures",
+ "oxc_ecmascript",
+ "oxc_index",
+ "oxc_mangler",
+ "oxc_parser",
+ "oxc_semantic",
+ "oxc_span",
+ "oxc_str",
+ "oxc_syntax",
+ "oxc_traverse",
  "rustc-hash",
 ]
 
@@ -1720,7 +1767,9 @@ dependencies = [
  "oxc_ast",
  "oxc_ast_visit",
  "oxc_codegen",
+ "oxc_formatter_core",
  "oxc_formatter_css",
+ "oxc_minifier",
  "oxc_parser",
  "oxc_semantic",
  "oxc_sourcemap",
