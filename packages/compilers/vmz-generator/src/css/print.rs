@@ -102,6 +102,7 @@ fn compact_css(src: &str) -> String {
     let mut in_str: Option<u8> = None;
     let mut escaped = false;
     let mut last_punct = true;
+    let mut skipped_ws = false;
     while i < bytes.len() {
         let b = bytes[i];
         if let Some(q) = in_str {
@@ -115,6 +116,7 @@ fn compact_css(src: &str) -> String {
             }
             i += 1;
             last_punct = false;
+            skipped_ws = false;
             continue;
         }
         if b == b'/' && i + 1 < bytes.len() && bytes[i + 1] == b'*' {
@@ -123,6 +125,7 @@ fn compact_css(src: &str) -> String {
                 i += 1;
             }
             i = (i + 2).min(bytes.len());
+            skipped_ws = true;
             continue;
         }
         if b == b'"' || b == b'\'' {
@@ -130,19 +133,22 @@ fn compact_css(src: &str) -> String {
             out.push(b as char);
             i += 1;
             last_punct = false;
+            skipped_ws = false;
             continue;
         }
         if b.is_ascii_whitespace() {
             i += 1;
+            skipped_ws = true;
             continue;
         }
         let punct = matches!(b, b'{' | b'}' | b':' | b';' | b',' | b'(' | b')');
-        if !last_punct && !punct && !out.is_empty() {
+        if skipped_ws && !last_punct && !punct && !out.is_empty() {
             let prev = out.as_bytes()[out.len() - 1];
             if !matches!(prev, b'{' | b'}' | b':' | b';' | b',' | b'(' | b')') {
                 out.push(' ');
             }
         }
+        skipped_ws = false;
         if b >= 0x80 {
             let rest = &src[i..];
             let ch = rest.chars().next().unwrap();
@@ -161,6 +167,11 @@ fn compact_css(src: &str) -> String {
 /// Print CSS for artifacts: [`format_css`] (dev) or [`minify_css`] (release).
 pub fn print_css(css: &str, minify: bool) -> String {
     if minify { minify_css(css) } else { format_css(css) }
+}
+
+/// Print WXSS from Canonical CSS. Same oxc CSS path as [`print_css`]; `rpx` is kept.
+pub fn print_wxss(css: &str, minify: bool) -> String {
+    print_css(css, minify)
 }
 
 /// Emit per-layer assets and a composition entry that `@import`s them in order.
@@ -238,5 +249,16 @@ mod tests {
         assert!(min.contains("color:red") || min.contains("color: red"), "{min}");
         assert!(min.len() < src.len(), "min={} src={}", min.len(), src.len());
         assert!(min.contains("1px 2px"), "keep ident spaces: {min}");
+    }
+
+    #[test]
+    fn print_wxss_keeps_rpx() {
+        let src = ".page { padding: 24rpx 28rpx; color: #3d6b2f; }\n";
+        let out = print_wxss(src, false);
+        assert!(out.contains("24rpx"), "{out}");
+        assert!(out.contains("28rpx"), "{out}");
+        let min = print_wxss(src, true);
+        assert!(min.contains("24rpx"), "{min}");
+        assert!(!min.contains("/*"), "{min}");
     }
 }
