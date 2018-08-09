@@ -847,6 +847,12 @@ impl Workspace {
             .to_json()
     }
 
+    /// miniprogram: WeChat packaging files via `vmz-generator` (`pages/**/*.wxml|wxss`).
+    pub fn lower_miniprogram_wechat_packaging(&self) -> String {
+        crate::miniprogram_wechat_pack::lower_miniprogram_wechat_packaging(&self.options.root)
+            .to_json()
+    }
+
     /// miniprogram: multi-adapter (≥2 packaging stubs) conformance.
     pub fn lower_miniprogram_multi_adapter(&self) -> String {
         crate::miniprogram_multi_adapter::lower_miniprogram_multi_adapter(&self.options.root)
