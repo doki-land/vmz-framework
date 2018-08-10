@@ -258,6 +258,9 @@ export interface Workspace {
     /** miniprogram: tooling deploy package + Mini Host handoff. */
     lowerMiniprogramToolingDeploy(): string;
 
+    /** miniprogram: WeChat packaging (`pages/**/*.wxml|wxss` via vmz-generator). */
+    lowerMiniprogramWechatPackaging(): string;
+
     /** miniprogram: multi-adapter (≥2 packaging stubs) conformance. */
     lowerMiniprogramMultiAdapter(): string;
 
@@ -741,6 +744,9 @@ export function lowerMiniprogramStructureJson(rootPath: string): string;
 export function lowerMiniprogramRouteServerStyleJson(rootPath: string): string;
 
 export function lowerMiniprogramToolingDeployJson(rootPath: string): string;
+
+/** miniprogram: WeChat packaging files via vmz-generator. */
+export function lowerMiniprogramWechatPackagingJson(rootPath: string): string;
 
 export function lowerMiniprogramMultiAdapterJson(rootPath: string): string;
 

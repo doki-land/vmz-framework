@@ -449,6 +449,15 @@ pub fn lower_miniprogram_tooling_deploy_json(root: String) -> String {
     .to_json()
 }
 
+/// miniprogram: WeChat packaging files (`pages/**/*.wxml|wxss`) via vmz-generator.
+#[napi]
+pub fn lower_miniprogram_wechat_packaging_json(root: String) -> String {
+    vmz_compiler::miniprogram_wechat_pack::lower_miniprogram_wechat_packaging(std::path::Path::new(
+        &root,
+    ))
+    .to_json()
+}
+
 /// miniprogram: multi-adapter (≥2 packaging stubs) conformance.
 #[napi]
 pub fn lower_miniprogram_multi_adapter_json(root: String) -> String {
@@ -1030,6 +1039,13 @@ impl JsWorkspace {
         Ok(ws.lower_miniprogram_tooling_deploy())
     }
 
+    /// miniprogram: WeChat packaging JSON (`pages/**/*.wxml|wxss` via generator).
+    #[napi]
+    pub fn lower_miniprogram_wechat_packaging(&self) -> Result<String> {
+        let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
+        Ok(ws.lower_miniprogram_wechat_packaging())
+    }
+
     /// miniprogram: multi-adapter (≥2 packaging stubs) JSON.
     #[napi]
     pub fn lower_miniprogram_multi_adapter(&self) -> Result<String> {
@@ -1244,6 +1260,8 @@ pub struct JsPageShellInput {
     pub module_script_src: Option<String>,
     /// Trusted raw HTML after the module script.
     pub body_tail_html: Option<String>,
+    /// Compact print (no comments / extra whitespace).
+    pub minify: Option<bool>,
 }
 
 /// Generate production page HTML shell via MarkupCodeGenerator.
@@ -1283,6 +1301,7 @@ pub fn generate_page_shell(input: JsPageShellInput) -> String {
         head_extra_html: input.head_extra_html.unwrap_or_default(),
         module_script_src: input.module_script_src,
         body_tail_html: input.body_tail_html.unwrap_or_default(),
+        minify: input.minify.unwrap_or(false),
     })
 }
 
@@ -1313,6 +1332,8 @@ pub struct JsHtmlShellInput {
     pub body_html: String,
     /// Body attribute pairs `[name, value, …]` flattened (even length).
     pub body_attrs: Option<Vec<String>>,
+    /// Compact print (no comments / extra whitespace).
+    pub minify: Option<bool>,
 }
 
 /// Generate a generic HTML5 shell via MarkupCodeGenerator.
@@ -1333,6 +1354,7 @@ pub fn generate_html_shell(input: JsHtmlShellInput) -> String {
         body_attrs,
         body_nodes: vec![],
         head_extra: vec![],
+        minify: input.minify.unwrap_or(false),
     })
 }
 
