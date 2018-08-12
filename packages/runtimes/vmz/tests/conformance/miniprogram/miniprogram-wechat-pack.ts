@@ -62,14 +62,21 @@ if (report.status !== 'ready') {
     fail(`status ${report.status}: ${JSON.stringify(report.diagnostics)}`);
 }
 if (report.printer !== 'vmz-generator') fail(`printer ${report.printer}`);
-if (report.packRoot !== 'dist/_vmz/mini-deploy/wechat') fail(`packRoot ${report.packRoot}`);
+if (report.packRoot !== 'dist/wechat') fail(`packRoot ${report.packRoot}`);
 
-const wxmlPath = path.join(dir, 'dist', '_vmz', 'mini-deploy', 'wechat', 'pages', 'index', 'index.wxml');
-const wxssPath = path.join(dir, 'dist', '_vmz', 'mini-deploy', 'wechat', 'pages', 'index', 'index.wxss');
-const appJsonPath = path.join(dir, 'dist', '_vmz', 'mini-deploy', 'wechat', 'app.json');
+const pack = path.join(dir, 'dist', 'wechat');
+const wxmlPath = path.join(pack, 'pages', 'index', 'index.wxml');
+const wxssPath = path.join(pack, 'pages', 'index', 'index.wxss');
+const pageJsPath = path.join(pack, 'pages', 'index', 'index.js');
+const appJsonPath = path.join(pack, 'app.json');
+const appJsPath = path.join(pack, 'app.js');
+const projectPath = path.join(pack, 'project.config.json');
 if (!fs.existsSync(wxmlPath)) fail(`missing ${wxmlPath}`);
 if (!fs.existsSync(wxssPath)) fail(`missing ${wxssPath}`);
+if (!fs.existsSync(pageJsPath)) fail(`missing ${pageJsPath}`);
 if (!fs.existsSync(appJsonPath)) fail(`missing ${appJsonPath}`);
+if (!fs.existsSync(appJsPath)) fail(`missing ${appJsPath}`);
+if (!fs.existsSync(projectPath)) fail(`missing ${projectPath}`);
 
 const wxml = fs.readFileSync(wxmlPath, 'utf8');
 if (!wxml.includes('<view class="page">')) fail(`page view missing: ${wxml}`);
@@ -84,10 +91,15 @@ const app = JSON.parse(fs.readFileSync(appJsonPath, 'utf8'));
 if (!(app.pages || []).includes('pages/index/index')) {
     fail(`app.json pages ${JSON.stringify(app.pages)}`);
 }
+const project = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+if (project.compileType !== 'miniprogram') fail(`compileType ${project.compileType}`);
+if (project.miniprogramRoot !== './') fail(`miniprogramRoot ${project.miniprogramRoot}`);
+if (!fs.readFileSync(appJsPath, 'utf8').includes('App(')) fail('app.js missing App()');
+if (!fs.readFileSync(pageJsPath, 'utf8').includes('Page(')) fail('page js missing Page()');
 
 const wsReport = JSON.parse(ws.lowerMiniprogramWechatPackaging());
 if (wsReport.status !== 'ready') fail(`workspace lower ${wsReport.status}`);
 
 ws.dispose();
 fs.rmSync(dir, { recursive: true, force: true });
-console.log('miniprogram-wechat-pack PASS: pages/index/index.wxml+wxss via vmz-generator');
+console.log('miniprogram-wechat-pack PASS: dist/wechat DevTools project via vmz-generator');
