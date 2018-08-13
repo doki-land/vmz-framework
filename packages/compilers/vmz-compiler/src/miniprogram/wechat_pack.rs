@@ -2,6 +2,7 @@
 //!
 //! Writes a WeChat DevTools project under `dist/wechat/` (`dist/{target}/` layout):
 //! `app.json` / `app.js` / `app.wxss` / `project.config.json` / page files.
+//! Page JS includes `onShareAppMessage` so WeChat shows the forward menu.
 //! WXML/WXSS are not authoring truth; adapters must not own this printer.
 
 use std::fs;
@@ -244,10 +245,16 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
                     let wxss_rel = format!("{WECHAT_PACK_ROOT}/{stem}.wxss");
                     let json_rel = format!("{WECHAT_PACK_ROOT}/{stem}.json");
                     let js_rel = format!("{WECHAT_PACK_ROOT}/{stem}.js");
-                    let page_json = json!({ "usingComponents": {} });
+                    let page_json = json!({
+                        "usingComponents": {},
+                        "enableShareAppMessage": true
+                    });
                     let page_json_body =
                         vmz_generator::to_pretty_json(&page_json).unwrap_or_else(|_| "{}".into());
-                    let page_js = match print_chrome_js("Page({});\n", &format!("{stem}.js")) {
+                    let page_js = match print_chrome_js(
+                        "Page({ onShareAppMessage() { return { title: 'VMZ' }; } });\n",
+                        &format!("{stem}.js"),
+                    ) {
                         Ok(code) => code,
                         Err(e) => {
                             diagnostics.push(diag(
