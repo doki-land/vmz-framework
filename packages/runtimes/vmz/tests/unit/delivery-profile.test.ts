@@ -70,4 +70,31 @@ describe('delivery profiles (B0)', () => {
         if (!sel.ok) return;
         expect(sel.selection.assembly).toBe('local-static');
     });
+
+    it('keeps delivery.packaging.wechat as pure data', () => {
+        const norm = normalizeDeliveryAuthoring({
+            default: 'web-ssr',
+            profiles: {
+                'web-ssr': { host: 'browser', assembly: 'server-host', serverRuntime: 'node' },
+            },
+            packaging: {
+                wechat: { appId: 'wx47094018073f0644', projectName: 'waitrose-vmz-shell', title: 'Waitrose' },
+            },
+        });
+        expect(norm.ok).toBe(true);
+        if (!norm.ok) return;
+        expect(norm.table.packaging.wechat.appId).toBe('wx47094018073f0644');
+        expect(norm.table.packaging.wechat.title).toBe('Waitrose');
+    });
+
+    it('rejects wx APIs / unknown packaging vendors', () => {
+        const badVendor = normalizeDeliveryAuthoring({
+            packaging: { alipay: { appId: 'x' } },
+        });
+        expect(badVendor.ok).toBe(false);
+        const badField = normalizeDeliveryAuthoring({
+            packaging: { wechat: { onShareAppMessage: 'nope' } },
+        });
+        expect(badField.ok).toBe(false);
+    });
 });

@@ -94,6 +94,7 @@ if (!(app.pages || []).includes('pages/index/index')) {
 const project = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
 if (project.compileType !== 'miniprogram') fail(`compileType ${project.compileType}`);
 if (project.miniprogramRoot !== './') fail(`miniprogramRoot ${project.miniprogramRoot}`);
+if (project.appid !== 'touristappid') fail(`default appid ${project.appid}`);
 if (!fs.readFileSync(appJsPath, 'utf8').includes('App(')) fail('app.js missing App()');
 if (!fs.readFileSync(pageJsPath, 'utf8').includes('onShareAppMessage')) {
     fail('page js missing onShareAppMessage');
@@ -105,6 +106,29 @@ if (pageJson.enableShareAppMessage !== true) {
 
 const wsReport = JSON.parse(ws.lowerMiniprogramWechatPackaging());
 if (wsReport.status !== 'ready') fail(`workspace lower ${wsReport.status}`);
+
+fs.writeFileSync(
+    path.join(dir, 'vmz.config.ts'),
+    `export default {
+  delivery: {
+    packaging: {
+      wechat: { appId: 'wx47094018073f0644', projectName: 'waitrose-vmz-shell', title: 'Waitrose' },
+    },
+  },
+};
+`,
+);
+const configured = JSON.parse(lowerMiniprogramWechatPackagingJson(dir));
+if (configured.status !== 'ready') fail(`configured pack ${configured.status}`);
+const project2 = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+if (project2.appid !== 'wx47094018073f0644') fail(`configured appid ${project2.appid}`);
+if (project2.projectname !== 'waitrose-vmz-shell') fail(`configured projectname ${project2.projectname}`);
+const app2 = JSON.parse(fs.readFileSync(appJsonPath, 'utf8'));
+if (app2.window?.navigationBarTitleText !== 'Waitrose') {
+    fail(`configured title ${app2.window?.navigationBarTitleText}`);
+}
+const pageJs2 = fs.readFileSync(pageJsPath, 'utf8');
+if (!pageJs2.includes('Waitrose')) fail(`configured share title ${pageJs2}`);
 
 ws.dispose();
 fs.rmSync(dir, { recursive: true, force: true });

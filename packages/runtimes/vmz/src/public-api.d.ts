@@ -394,6 +394,8 @@ export interface DevSessionOptions {
     host?: string;
     port?: number;
     pollMs?: number;
+    /** `mini-program-wechat`: pack `dist/wechat` and skip browser serve-host. */
+    target?: 'browser' | 'mini-program-wechat';
     signal?: AbortSignal;
 }
 
@@ -588,6 +590,21 @@ export function emitSiteDelivery(
     opts?: { siteId?: string; probes?: Record<string, unknown> },
 ): { contract: Record<string, unknown>; resolution: Record<string, unknown> | null };
 
+export const WECHAT_PACKAGING_SCHEMA: string;
+export const WECHAT_PACKAGING_REL: string;
+export function wechatPackagingFromDelivery(delivery: unknown): {
+    schema: string;
+    appId: string;
+    projectName?: string;
+    title?: string;
+};
+export function materializeWechatPackaging(project: string): {
+    schema: string;
+    appId: string;
+    projectName?: string;
+    title?: string;
+};
+
 export const DELIVERY_PROFILE_AUTHORING_SCHEMA: string;
 export const BUILD_PROFILE_SELECTION_SCHEMA: string;
 export const ASSEMBLIES: readonly string[];
@@ -595,6 +612,10 @@ export const SERVER_RUNTIMES: readonly string[];
 export const BUILTIN_PROFILES: Record<string, { host: string; assembly: string; serverRuntime?: string }>;
 
 export function pickSiteAuthoring(raw: Record<string, unknown>): Record<string, unknown> | null;
+export function pickDeliveryPackaging(
+    raw: Record<string, unknown>,
+    diagnostics: Array<{ code: string; message: string }>,
+): Record<string, unknown> | null;
 export function normalizeDeliveryAuthoring(
     raw: unknown,
 ): { ok: true; table: Record<string, unknown> } | { ok: false; diagnostics: Array<{ code: string; message: string }> };
