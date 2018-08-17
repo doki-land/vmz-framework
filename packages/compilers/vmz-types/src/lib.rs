@@ -46,9 +46,10 @@ pub use program_ir::{
     LifetimeView, MotionTransitionDecl, MotionTransitionKind, MotionTransitionState, MotionTrigger,
     MotionView, PlanNode, PlanNodeKind, PlanStatus, ProgramEdge, ProgramEdgeKind, ProgramModule,
     ProgramUnit, ProgramUnitKind, ReducedMotionPolicy, ResourceDecl, ResourceKind, ResourceView,
-    ResumeEntryDecl, ResumeStrategy, SecretRequirement, SemanticField, SemanticMethod,
-    SemanticView, ServerAttach, ServerCallEdge, ServerCapability, ServerView, StubStatus, UnitId,
-    UnknownRecord, ViewAttr, ViewAttrValue, ViewEach, ViewIfBranch, ViewNode, ViewStatus, ViewView,
+    ResumeEntryDecl, ResumeStrategy, RouteTabDecl, SecretRequirement, SemanticField,
+    SemanticMethod, SemanticView, ServerAttach, ServerCallEdge, ServerCapability, ServerView,
+    StubStatus, UnitId, UnknownRecord, ViewAttr, ViewAttrValue, ViewEach, ViewIfBranch, ViewNode,
+    ViewStatus, ViewView,
 };
 pub use reactive_ir::{
     Binding, BindingId, BindingKind, ControlBranch, ControlRegion, DynamicStep, Effect, EffectId,

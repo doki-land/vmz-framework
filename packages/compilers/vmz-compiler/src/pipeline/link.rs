@@ -15,6 +15,7 @@ use oxc_span::SourceType;
 
 use crate::sfc::{DataBlock, ParsedVmz};
 use crate::template::{AttrValue, TemplateIr, TemplateNode};
+use vmz_types::RouteTabDecl;
 
 /// One RouteNode projection used for Link href realization.
 #[derive(Debug, Clone)]
@@ -29,6 +30,8 @@ pub struct RouteEntry {
     pub source: PathBuf,
     /// Optional load strategy hint from `<router>`.
     pub load: Option<String>,
+    /// Optional bottom-nav slot from `<router>.tab`.
+    pub tab: Option<RouteTabDecl>,
 }
 
 /// Workspace RouteId → path pattern table (compile-time Link resolver input).
@@ -68,6 +71,8 @@ pub struct RouteContractData {
     pub path: Option<String>,
     /// Optional load strategy (`eager`, `lazy`, …).
     pub load: Option<String>,
+    /// Optional bottom-nav slot (`order` / `label` / `icon`).
+    pub tab: Option<RouteTabDecl>,
 }
 
 /// Parse `<router>` JSON5 body and/or opening-tag attribute sugar into RouteContract.
@@ -104,14 +109,111 @@ pub fn parse_route_contract(block: &DataBlock) -> Result<RouteContractData, Stri
             .and_then(|v| v.as_str())
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty());
-        return Ok(RouteContractData { id, path, load });
+        reject_wechat_tab_keys(obj.keys())?;
+        let tab = match obj.get("tab") {
+            None => None,
+            Some(v) => Some(parse_route_tab(v)?),
+        };
+        return Ok(RouteContractData { id, path, load, tab });
     }
 
     // Attribute sugar only when body is empty (desugar → same RouteContract).
     let id = crate::sfc::parse_attr_value(&block.attrs, "id").filter(|s| !s.is_empty());
     let path = crate::sfc::parse_attr_value(&block.attrs, "path").filter(|s| !s.is_empty());
     let load = crate::sfc::parse_attr_value(&block.attrs, "load").filter(|s| !s.is_empty());
-    Ok(RouteContractData { id, path, load })
+    if crate::sfc::parse_attr_value(&block.attrs, "tab").is_some() {
+        return Err("`<router>.tab` is JSON5/YAML only (not attribute sugar)".into());
+    }
+    Ok(RouteContractData { id, path, load, tab: None })
+}
+
+fn reject_wechat_tab_keys<'a>(keys: impl Iterator<Item = &'a String>) -> Result<(), String> {
+    for k in keys {
+        if matches!(k.as_str(), "tabBar" | "iconPath" | "selectedIconPath" | "pagePath" | "custom")
+        {
+            return Err(format!(
+                "`<router>.{k}` is WeChat tabBar JSON; use `tab: {{ order, label, icon }}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn parse_route_tab(value: &serde_json::Value) -> Result<RouteTabDecl, String> {
+    let Some(obj) = value.as_object() else {
+        return Err("`<router>.tab` must be an object".into());
+    };
+    for k in obj.keys() {
+        if !matches!(k.as_str(), "order" | "label" | "icon" | "selectedIcon") {
+            if matches!(
+                k.as_str(),
+                "text" | "pagePath" | "iconPath" | "selectedIconPath" | "custom"
+            ) {
+                return Err(format!(
+                    "`<router>.tab.{k}` is WeChat tabBar JSON; use order/label/icon"
+                ));
+            }
+            return Err(format!("unknown `<router>.tab.{k}`"));
+        }
+    }
+    let order = obj
+        .get("order")
+        .ok_or_else(|| "`<router>.tab.order` is required".to_string())
+        .and_then(parse_tab_order)?;
+    let label = obj
+        .get("label")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "`<router>.tab.label` must be a non-empty string".to_string())?
+        .to_string();
+    let icon = obj
+        .get("icon")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "`<router>.tab.icon` must be a project-relative asset path".to_string())?;
+    let icon = parse_tab_asset(icon, "icon")?;
+    let selected_icon = match obj.get("selectedIcon") {
+        None => None,
+        Some(v) => {
+            let s = v
+                .as_str()
+                .ok_or_else(|| "`<router>.tab.selectedIcon` must be a string".to_string())?;
+            Some(parse_tab_asset(s, "selectedIcon")?)
+        }
+    };
+    Ok(RouteTabDecl { order, label, icon, selected_icon })
+}
+
+fn parse_tab_order(value: &serde_json::Value) -> Result<u32, String> {
+    let n = if let Some(u) = value.as_u64() {
+        u
+    } else if let Some(i) = value.as_i64() {
+        if i < 0 {
+            return Err("`<router>.tab.order` must be >= 0".into());
+        }
+        i as u64
+    } else if let Some(f) = value.as_f64() {
+        if !f.is_finite() || f.fract() != 0.0 || f < 0.0 {
+            return Err("`<router>.tab.order` must be a non-negative integer".into());
+        }
+        f as u64
+    } else {
+        return Err("`<router>.tab.order` must be a non-negative integer".into());
+    };
+    u32::try_from(n).map_err(|_| "`<router>.tab.order` is out of range".to_string())
+}
+
+fn parse_tab_asset(raw: &str, field: &str) -> Result<String, String> {
+    let t = raw.trim().replace('\\', "/");
+    if t.is_empty() {
+        return Err(format!("`<router>.tab.{field}` must be a project-relative asset path"));
+    }
+    if t.starts_with('/') || t.contains("://") || t.split('/').any(|s| s == ".." || s.is_empty()) {
+        return Err(format!(
+            "`<router>.tab.{field}` must be a project-relative posix path (no URL, no `..`)"
+        ));
+    }
+    Ok(t)
 }
 
 /// Default RouteId when `<router>.id` is omitted: export default class name (file rename safe).
@@ -192,6 +294,7 @@ pub fn collect_route_table(
             chunk_id: chunk_id.clone(),
             source: path.clone(),
             load: contract.load,
+            tab: contract.tab,
         }) {
             errors.push(e);
         }

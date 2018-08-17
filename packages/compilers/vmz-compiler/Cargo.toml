@@ -29,4 +29,5 @@ vmz-debugger.workspace = true
 vmz-protocol.workspace = true
 vmz-types.workspace = true
 vmz-generator.workspace = true
+resvg = "0.45.1"
 walkdir.workspace = true

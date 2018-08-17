@@ -1078,6 +1078,23 @@ pub struct DeploymentClientCall {
     pub from_client_method: Option<String>,
 }
 
+/// Bottom-nav slot projected from `<router>.tab` (host-neutral; Mini pack lowers it).
+///
+/// Not WeChat `tabBar` JSON. Authors write `order` / `label` / `icon`; packers rasterize.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RouteTabDecl {
+    /// Left-to-right slot index (duplicates are a pack diagnostic).
+    pub order: u32,
+    /// Tab label (safe string).
+    pub label: String,
+    /// Project-relative asset path (posix). SVG is the authoring form.
+    pub icon: String,
+    /// Optional selected-state asset; omit to re-rasterize [`Self::icon`].
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_none_or_empty_string")]
+    pub selected_icon: Option<String>,
+}
+
 /// Deployment / Island / chunk view.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -1111,6 +1128,9 @@ pub struct DeploymentView {
     /// Island / ResumeEntry products derived from View `client:*` (resume).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub resume_entries: Vec<ResumeEntryDecl>,
+    /// Optional bottom-nav slot from RouteContract.tab.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tab: Option<RouteTabDecl>,
 }
 
 /// Closed Island hydration strategy for [`ResumeEntryDecl`] (`client:*`).

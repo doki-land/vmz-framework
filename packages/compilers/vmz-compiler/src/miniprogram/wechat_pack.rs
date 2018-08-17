@@ -5,6 +5,7 @@
 //! Page JS includes `onShareAppMessage` so WeChat shows the forward menu.
 //! WXML/WXSS are not authoring truth; adapters must not own this printer.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -15,7 +16,11 @@ use walkdir::WalkDir;
 use vmz_protocol::{
     CheckReportStatus, DIAG_ARTIFACT_INVALID, Severity, TargetDiagnostic, VmzModuleKind,
 };
-use vmz_types::{ProgramModule, ProgramUnit};
+use vmz_types::{ProgramModule, ProgramUnit, RouteTabDecl};
+
+use super::wechat_tab::{TAB_BG, TAB_COLOR, TAB_SELECTED_COLOR, materialize_tab_icons};
+
+pub use super::wechat_tab::rasterize_svg_png;
 
 /// Report schema for WeChat packaging writes.
 pub const MINI_WECHAT_PACK_REPORT_SCHEMA: &str = "vmz.target.mini_wechat_pack.v0";
@@ -238,6 +243,7 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
     }
     let css = read_css_bundle(root);
     let mut app_pages: Vec<String> = Vec::new();
+    let mut tab_pages: Vec<(u32, String, RouteTabDecl)> = Vec::new();
 
     for prog_path in &programs {
         let rel =
@@ -321,6 +327,9 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
                         }
                     }
                     app_pages.push(stem.clone());
+                    if let Some(tab) = unit.deployment.tab.clone() {
+                        tab_pages.push((tab.order, stem.clone(), tab));
+                    }
                     pages.push(WechatPackFile {
                         chunk_id: chunk,
                         unit_name: unit.name.clone(),
@@ -335,13 +344,86 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
 
     app_pages.sort_by(|a, b| page_rank(a).cmp(&page_rank(b)).then_with(|| a.cmp(b)));
     app_pages.dedup();
-    let app_json = json!({
+
+    tab_pages.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+    let mut seen_orders = BTreeSet::new();
+    let mut tab_ok = true;
+    for (order, stem, _) in &tab_pages {
+        if !seen_orders.insert(*order) {
+            tab_ok = false;
+            diagnostics.push(diag(
+                stem,
+                Severity::Error,
+                format!("duplicate `<router>.tab.order` {order}"),
+                DIAG_ARTIFACT_INVALID,
+            ));
+        }
+    }
+    if tab_pages.len() == 1 {
+        tab_ok = false;
+        diagnostics.push(diag(
+            &tab_pages[0].1,
+            Severity::Error,
+            "native WeChat tabBar requires 2-5 `<router>.tab` pages",
+            DIAG_ARTIFACT_INVALID,
+        ));
+    } else if tab_pages.len() > 5 {
+        tab_ok = false;
+        diagnostics.push(diag(
+            "",
+            Severity::Error,
+            format!(
+                "native WeChat tabBar allows at most 5 `<router>.tab` pages (got {})",
+                tab_pages.len()
+            ),
+            DIAG_ARTIFACT_INVALID,
+        ));
+    }
+
+    let mut tab_list = Vec::new();
+    if tab_ok && tab_pages.len() >= 2 {
+        for (_, stem, tab) in &tab_pages {
+            match materialize_tab_icons(root, &pack_abs, tab) {
+                Ok((icon_path, selected_path)) => {
+                    tab_list.push(json!({
+                        "pagePath": stem,
+                        "text": tab.label,
+                        "iconPath": icon_path,
+                        "selectedIconPath": selected_path
+                    }));
+                }
+                Err(e) => {
+                    tab_ok = false;
+                    diagnostics.push(diag(stem, Severity::Error, e, DIAG_ARTIFACT_INVALID));
+                }
+            }
+        }
+    }
+    if tab_ok && tab_list.len() >= 2 {
+        let tab_stems: Vec<String> = tab_pages.iter().map(|t| t.1.clone()).collect();
+        let mut rest: Vec<String> =
+            app_pages.iter().filter(|p| !tab_stems.contains(p)).cloned().collect();
+        rest.sort_by(|a, b| page_rank(a).cmp(&page_rank(b)).then_with(|| a.cmp(b)));
+        app_pages = tab_stems.into_iter().chain(rest).collect();
+        app_pages.dedup();
+    }
+
+    let mut app_json = json!({
         "pages": app_pages,
         "window": {
             "navigationBarTitleText": wechat_title(&packaging)
         },
         "sitemapLocation": "sitemap.json"
     });
+    if tab_ok && tab_list.len() >= 2 {
+        app_json["tabBar"] = json!({
+            "color": TAB_COLOR,
+            "selectedColor": TAB_SELECTED_COLOR,
+            "backgroundColor": TAB_BG,
+            "borderStyle": "white",
+            "list": tab_list
+        });
+    }
     let app_json_rel = format!("{WECHAT_PACK_ROOT}/app.json");
     let app_json_body = vmz_generator::to_pretty_json(&app_json).unwrap_or_else(|_| "{}".into());
     if let Err(e) = write_pack_file(&root.join(&app_json_rel), &format!("{app_json_body}\n")) {

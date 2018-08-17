@@ -878,6 +878,9 @@ fn emit_file(
             .collect();
         let server_module_id = unit.server.module_id.clone();
         let resume_entries = unit.collect_resume_entries_from_view();
+        let tab = routes.and_then(|table| {
+            table.by_id.values().find(|e| e.chunk_id == chunk_id).and_then(|e| e.tab.clone())
+        });
         unit.deployment = DeploymentView {
             status: StubStatus::Partial,
             unit_kind: Some(kind),
@@ -889,6 +892,7 @@ fn emit_file(
             server_module_id,
             client_calls,
             resume_entries,
+            tab,
         };
     }
     let reactive_comp = program.units.first().map(|u| &u.reactive);

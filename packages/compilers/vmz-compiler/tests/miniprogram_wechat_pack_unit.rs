@@ -3,14 +3,14 @@
 use std::fs;
 
 use vmz_compiler::miniprogram::wechat_pack::{
-    emit_wechat_page, lower_miniprogram_wechat_packaging, wechat_page_stem,
+    emit_wechat_page, lower_miniprogram_wechat_packaging, rasterize_svg_png, wechat_page_stem,
 };
 use vmz_protocol::VmzModuleKind;
 use vmz_types::{
     Binding, BindingId, DeploymentView, Effect, EffectId, ExprId, FieldId, FieldKind, IrDepPath,
-    PROGRAM_SCHEMA, ProgramModule, ProgramUnit, ProgramUnitKind, ReactiveComponent, StateSlot,
-    StubStatus, UnitId, ViewAttr, ViewAttrValue, ViewEach, ViewNode, ViewStatus, ViewView,
-    WritePath,
+    PROGRAM_SCHEMA, ProgramModule, ProgramUnit, ProgramUnitKind, ReactiveComponent, RouteTabDecl,
+    StateSlot, StubStatus, UnitId, ViewAttr, ViewAttrValue, ViewEach, ViewNode, ViewStatus,
+    ViewView, WritePath,
 };
 
 fn home_unit() -> ProgramUnit {
@@ -129,6 +129,7 @@ fn home_unit() -> ProgramUnit {
             server_module_id: None,
             client_calls: vec![],
             resume_entries: vec![],
+            tab: None,
         },
         graph: Default::default(),
     }
@@ -214,5 +215,75 @@ fn writes_pages_under_dist_wechat() {
         app["pages"].as_array().unwrap().iter().any(|p| p.as_str() == Some("pages/home/home")),
         "{app}"
     );
+    assert!(app.get("tabBar").is_none(), "{app}");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+const TAB_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" fill="currentColor"/></svg>"#;
+
+#[test]
+fn rasterize_svg_writes_png_magic() {
+    let png = rasterize_svg_png(TAB_SVG, 81).expect("png");
+    assert!(png.starts_with(&[0x89, b'P', b'N', b'G']), "len={}", png.len());
+    assert!(png.len() > 32);
+}
+
+#[test]
+fn native_tab_bar_from_route_tab_and_svg() {
+    let nanos =
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+    let dir = std::env::temp_dir().join(format!("vmz-wechat-tab-{nanos}"));
+    fs::create_dir_all(dir.join("dist")).unwrap();
+    fs::create_dir_all(dir.join("assets")).unwrap();
+    fs::write(dir.join("assets/tab-home.svg"), TAB_SVG).unwrap();
+    fs::write(dir.join("assets/tab-me.svg"), TAB_SVG).unwrap();
+
+    let mut home = home_unit();
+    home.deployment.tab = Some(RouteTabDecl {
+        order: 0,
+        label: "首页".into(),
+        icon: "assets/tab-home.svg".into(),
+        selected_icon: None,
+    });
+    let mut me = home_unit();
+    me.name = "MePage".into();
+    me.deployment.chunk_id = Some("pages/me".into());
+    me.deployment.tab = Some(RouteTabDecl {
+        order: 4,
+        label: "我的".into(),
+        icon: "assets/tab-me.svg".into(),
+        selected_icon: None,
+    });
+    let module = ProgramModule {
+        schema: PROGRAM_SCHEMA.into(),
+        source: "src/pages/home.vmz".into(),
+        units: vec![home, me],
+    };
+    fs::write(
+        dir.join("dist").join("pages.program.json"),
+        serde_json::to_string_pretty(&module).unwrap(),
+    )
+    .unwrap();
+
+    let report = lower_miniprogram_wechat_packaging(&dir);
+    assert!(report.status == vmz_protocol::CheckReportStatus::Ready, "{:?}", report.diagnostics);
+    let app: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(dir.join("dist/wechat/app.json")).unwrap())
+            .unwrap();
+    assert!(app["tabBar"]["custom"].is_null(), "{app}");
+    let list = app["tabBar"]["list"].as_array().expect("list");
+    assert_eq!(list.len(), 2, "{app}");
+    assert_eq!(list[0]["pagePath"].as_str(), Some("pages/home/home"));
+    assert_eq!(list[0]["text"].as_str(), Some("首页"));
+    assert_eq!(list[0]["iconPath"].as_str(), Some("assets/tab-home.png"));
+    assert_eq!(list[0]["selectedIconPath"].as_str(), Some("assets/tab-home-on.png"));
+    assert_eq!(list[1]["pagePath"].as_str(), Some("pages/me/me"));
+    let pages = app["pages"].as_array().unwrap();
+    assert_eq!(pages[0].as_str(), Some("pages/home/home"), "{app}");
+    assert_eq!(pages[1].as_str(), Some("pages/me/me"), "{app}");
+    let home_png = fs::read(dir.join("dist/wechat/assets/tab-home.png")).unwrap();
+    let home_on = fs::read(dir.join("dist/wechat/assets/tab-home-on.png")).unwrap();
+    assert!(home_png.starts_with(&[0x89, b'P', b'N', b'G']));
+    assert!(home_on.starts_with(&[0x89, b'P', b'N', b'G']));
     let _ = fs::remove_dir_all(&dir);
 }
