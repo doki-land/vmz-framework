@@ -13,6 +13,13 @@ import { emitContentAddressedAssets } from './content-addressed-assets.js';
 import { absoluteUrl, buildLocalePageMeta, localizeBodyLinks } from './locale-router.js';
 import { requireNativeAddon } from './native-addon.js';
 import { writePrettyJsonFile } from './pretty-json.js';
+import {
+    filePathPatternFromChunk,
+    isRouteBoundaryStem,
+    listPublicPageUnits,
+    parsePathPattern,
+    unitBrowserPathPattern,
+} from './route-path.js';
 
 export const STATIC_DELIVERY_MANIFEST_SCHEMA = 'vmz.static.delivery_manifest.v0';
 
@@ -51,7 +58,7 @@ export async function emitWebStatic(distDir, opts = {}) {
     const skipped = [];
 
     for (const page of pageCatalog) {
-        const pattern = patternFromSegs(page.segs);
+        const pattern = page.pathPattern || patternFromSegs(page.segs);
         const routeId = guessRouteId(distDir, page.chunkId);
         if (page.segs.some((s) => s.kind === 'param' || s.kind === 'catch')) {
             skipped.push({
@@ -284,8 +291,10 @@ function sortKeys(value) {
  * @param {string} distDir
  */
 function listPageClientFiles(distDir) {
+    const fromDep = listPagesFromDeployment(distDir);
+    if (fromDep.length) return fromDep;
     const root = path.join(distDir, 'pages');
-    /** @type {Array<{ chunkId: string, segs: ReturnType<typeof parseChunkSegments> }>} */
+    /** @type {Array<{ chunkId: string, segs: ReturnType<typeof parsePathPattern>, pathPattern: string }>} */
     const out = [];
     function walk(abs, relParts) {
         let ents;
@@ -298,9 +307,10 @@ function listPageClientFiles(distDir) {
             if (e.isDirectory()) walk(path.join(abs, e.name), [...relParts, e.name]);
             else if (e.isFile() && e.name.endsWith('.client.js')) {
                 const stem = e.name.replace(/\.client\.js$/, '');
-                if (stem === 'Layout' || stem === 'Loading' || stem === 'Error' || stem === 'NotFound') continue;
+                if (isRouteBoundaryStem(stem)) continue;
                 const chunkId = ['pages', ...relParts, stem].join('/');
-                out.push({ chunkId, segs: parseChunkSegments(chunkId) });
+                const pathPattern = filePathPatternFromChunk(chunkId);
+                out.push({ chunkId, pathPattern, segs: parsePathPattern(pathPattern) });
             }
         }
     }
@@ -309,28 +319,25 @@ function listPageClientFiles(distDir) {
 }
 
 /**
- * @param {string} chunkId
+ * @param {string} distDir
  */
-function parseChunkSegments(chunkId) {
-    const rel = chunkId.replace(/^pages\//, '');
-    const parts = rel.split('/').filter(Boolean);
-    /** @type {Array<{ kind: 'static' | 'param' | 'catch', value?: string, name?: string }>} */
-    const segs = [];
-    for (let i = 0; i < parts.length; i++) {
-        const p = parts[i];
-        if (p.startsWith('(') && p.endsWith(')') && p.length > 2) continue;
-        if (p === 'index' && i === parts.length - 1) continue;
-        const catchAll = /^\[\.\.\.([^\]]+)\]$/.exec(p);
-        const param = /^\[([^\]]+)\]$/.exec(p);
-        if (catchAll) segs.push({ kind: 'catch', name: catchAll[1] });
-        else if (param) segs.push({ kind: 'param', name: param[1] });
-        else segs.push({ kind: 'static', value: p.toLowerCase() });
+function listPagesFromDeployment(distDir) {
+    const deploymentPath = path.join(distDir, 'vmz-deployment.json');
+    if (!fs.existsSync(deploymentPath)) return [];
+    try {
+        const deployment = JSON.parse(fs.readFileSync(deploymentPath, 'utf8'));
+        return listPublicPageUnits(deployment).map((u) => {
+            const chunkId = String(u.chunkId || '').replace(/\\/g, '/');
+            const pathPattern = unitBrowserPathPattern(u);
+            return { chunkId, pathPattern, segs: parsePathPattern(pathPattern) };
+        });
+    } catch {
+        return [];
     }
-    return segs;
 }
 
 /**
- * @param {ReturnType<typeof parseChunkSegments>} segs
+ * @param {ReturnType<typeof parsePathPattern>} segs
  */
 function patternFromSegs(segs) {
     if (!segs.length) return '/';
@@ -555,7 +562,8 @@ function wrapDocument(input) {
             dir,
             alternates: input.meta.alternates || [],
         },
-        cssEntry: input.cssEntry || null,
+        // napi Option<String>: omit/undefined = None; null is rejected as String
+        ...(input.cssEntry ? { cssEntry: String(input.cssEntry) } : {}),
         isErrorDocument: !!input.isErrorDocument,
     });
 }

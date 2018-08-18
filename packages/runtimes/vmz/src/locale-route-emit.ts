@@ -9,34 +9,9 @@ import path from 'node:path';
 import { checkLocales, localeHasErrors } from './locale-check.js';
 import { buildLocalePageMeta, buildLocaleRouteRealizationTable } from './locale-router.js';
 import { writePrettyJsonFile } from './pretty-json.js';
+import { listPublicPageUnits, unitBrowserPathPattern } from './route-path.js';
 
 export const LOCALE_ROUTE_REALIZATION_ARTIFACT_SCHEMA = 'vmz.locale.route_realization.v0';
-
-/**
- * @param {string} chunkId
- */
-function pathPatternFromChunk(chunkId) {
-    const rel = String(chunkId || '').replace(/^pages\//, '');
-    const parts = rel.split('/').filter(Boolean);
-    const segs = [];
-    for (let i = 0; i < parts.length; i++) {
-        const p = parts[i];
-        if (p === 'index' && i === parts.length - 1) continue;
-        segs.push(p);
-    }
-    return segs.length ? `/${segs.join('/')}` : '/';
-}
-
-/**
- * Layouts are not public RouteNodes for locale realization / SEO.
- * @param {string} chunkId
- */
-function isPublicPageChunk(chunkId) {
-    const id = String(chunkId || '');
-    if (!id.startsWith('pages/')) return false;
-    if (/(^|\/)Layout$/.test(id)) return false;
-    return true;
-}
 
 /**
  * @param {string} projectRoot
@@ -63,10 +38,10 @@ export function emitLocaleRouteRealization(projectRoot, distDir, opts = {}) {
         };
     }
     const deployment = JSON.parse(fs.readFileSync(deploymentPath, 'utf8'));
-    const pages = (deployment.units || []).filter((u) => u.kind === 'page' && isPublicPageChunk(String(u.chunkId)));
+    const pages = listPublicPageUnits(deployment);
     const routes = pages.map((u) => ({
         routeId: String(u.chunkId),
-        path: pathPatternFromChunk(String(u.chunkId)),
+        path: unitBrowserPathPattern(u),
     }));
 
     const localeEntries = report.manifest?.locales || [];

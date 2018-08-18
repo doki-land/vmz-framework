@@ -47,6 +47,11 @@ impl RouteTable {
         self.by_id.get(route_id)
     }
 
+    /// Look up a page route by deployment chunk id.
+    pub fn get_by_chunk(&self, chunk_id: &str) -> Option<&RouteEntry> {
+        self.by_id.values().find(|e| e.chunk_id == chunk_id)
+    }
+
     /// Insert a route; errors if the RouteId already exists.
     pub fn insert(&mut self, entry: RouteEntry) -> Result<(), String> {
         if let Some(prev) = self.by_id.get(&entry.route_id) {
@@ -245,6 +250,40 @@ pub fn path_pattern_from_chunk(chunk_id: &str) -> String {
     if segs.is_empty() { "/".into() } else { format!("/{}", segs.join("/")) }
 }
 
+/// Collision key for Browser HTTP paths (`:id` and `[id]` are the same slot).
+pub fn path_collision_key(pattern: &str) -> Result<String, String> {
+    let pat = pattern.trim();
+    if pat.is_empty() {
+        return Err("route path pattern is empty".into());
+    }
+    if !pat.starts_with('/') {
+        return Err(format!("route path must be an absolute HTTP path, got {pat:?}"));
+    }
+    if pat == "/" {
+        return Ok("/".into());
+    }
+    let mut out: Vec<String> = Vec::new();
+    for seg in pat.trim_start_matches('/').split('/') {
+        if seg.is_empty() || is_route_group_dir(seg) {
+            continue;
+        }
+        if let Some(name) = seg.strip_prefix("[...").and_then(|r| r.strip_suffix(']')) {
+            out.push(format!("[...{name}]"));
+            continue;
+        }
+        if let Some(name) = seg.strip_prefix('[').and_then(|r| r.strip_suffix(']')) {
+            out.push(format!("[{name}]"));
+            continue;
+        }
+        if let Some(name) = seg.strip_prefix(':') {
+            out.push(format!("[{name}]"));
+            continue;
+        }
+        out.push(seg.to_ascii_lowercase());
+    }
+    if out.is_empty() { Ok("/".into()) } else { Ok(format!("/{}", out.join("/"))) }
+}
+
 fn is_route_group_dir(seg: &str) -> bool {
     seg.starts_with('(') && seg.ends_with(')') && seg.len() > 2
 }
@@ -267,6 +306,7 @@ pub fn collect_route_table(
 ) -> Result<RouteTable, Vec<String>> {
     let mut table = RouteTable::default();
     let mut errors = Vec::new();
+    let mut by_http_path: BTreeMap<String, (String, PathBuf)> = BTreeMap::new();
     for (path, parsed, class_name, chunk_id) in parsed_pages {
         if is_route_boundary_chunk(chunk_id) {
             continue;
@@ -288,6 +328,22 @@ pub fn collect_route_table(
         }
         let path_pattern =
             contract.path.clone().unwrap_or_else(|| path_pattern_from_chunk(chunk_id));
+        let collision = match path_collision_key(&path_pattern) {
+            Ok(k) => k,
+            Err(e) => {
+                errors.push(format!("{}: {e}", path.display()));
+                continue;
+            }
+        };
+        if let Some((prev_id, prev_src)) = by_http_path.get(&collision) {
+            errors.push(format!(
+                "duplicate Browser path `{collision}` ({prev_id} @ {} vs {route_id} @ {})",
+                prev_src.display(),
+                path.display()
+            ));
+            continue;
+        }
+        by_http_path.insert(collision, (route_id.clone(), path.clone()));
         if let Err(e) = table.insert(RouteEntry {
             route_id,
             path_pattern,

@@ -173,6 +173,63 @@ fn path_pattern_skips_route_groups_and_boundaries() {
     assert!(!is_route_boundary_chunk("pages/shop/index"));
 }
 
+fn sample_page(
+    rel: &str,
+    router: &str,
+    class_name: &str,
+    chunk: &str,
+) -> (PathBuf, vmz_compiler::parse::sfc::ParsedVmz, String, String) {
+    let src = format!(
+        "<router>\n{router}\n</router>\n<template><div/></template>\n<script client>\nexport default class {class_name} {{}}\n</script>\n"
+    );
+    let parsed = vmz_compiler::parse::sfc::parse_vmz(rel, src).unwrap();
+    (PathBuf::from(rel), parsed, class_name.into(), chunk.into())
+}
+
+#[test]
+fn explicit_http_path_does_not_follow_file_route() {
+    use vmz_compiler::pipeline::link::{
+        collect_route_table, path_collision_key, path_pattern_from_chunk,
+    };
+    assert_eq!(path_pattern_from_chunk("pages/home"), "/home");
+    assert_eq!(path_collision_key("/").unwrap(), "/");
+    assert_eq!(path_collision_key("/users/:id").unwrap(), "/users/[id]");
+    let pages = [sample_page(
+        "src/pages/home.vmz",
+        r#"{ path: "/", tab: { order: 0, label: "Home", icon: "assets/tab-home.svg" } }"#,
+        "HomePage",
+        "pages/home",
+    )];
+    let table = collect_route_table(&pages).unwrap();
+    let home = table.get("HomePage").expect("HomePage");
+    assert_eq!(home.path_pattern, "/");
+    assert_eq!(home.chunk_id, "pages/home");
+}
+
+#[test]
+fn duplicate_browser_path_is_an_error() {
+    use vmz_compiler::pipeline::link::collect_route_table;
+    let pages = [
+        sample_page("src/pages/index.vmz", "{ path: '/' }", "IndexPage", "pages/index"),
+        sample_page("src/pages/home.vmz", "{ path: '/' }", "HomePage", "pages/home"),
+    ];
+    let err = collect_route_table(&pages).unwrap_err().join("\n");
+    assert!(err.contains("duplicate Browser path"), "{err}");
+}
+
+#[test]
+fn relative_or_mini_stem_path_is_rejected() {
+    use vmz_compiler::pipeline::link::collect_route_table;
+    let pages = [sample_page(
+        "src/pages/home.vmz",
+        r#"{ path: "pages/home/home" }"#,
+        "HomePage",
+        "pages/home",
+    )];
+    let err = collect_route_table(&pages).unwrap_err().join("\n");
+    assert!(err.contains("absolute HTTP path"), "{err}");
+}
+
 #[test]
 fn link_lowers_to_anchor_href() {
     let src = r#"

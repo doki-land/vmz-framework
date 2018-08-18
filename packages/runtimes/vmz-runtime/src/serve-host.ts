@@ -1,11 +1,12 @@
 // @ts-nocheck
 /**
- * Generic VMZ Node host — SSR file-route pages + dist static + RPC/REST.
+ * Generic VMZ Node host — SSR Route Graph pages + dist static + RPC/REST.
  *
  * Invoked by `vmz serve` / `vmz dev` (or: node dist/vmz-serve-host.mjs).
  *
- * Pathname → `pages/**` (PascalCase stem → lowercase URL; `index` → parent;
- * `[Param]` / `[...rest]` dynamic). Not an SPA shell.
+ * Pathname matches `vmz-deployment.json` `pathPattern` (explicit `<router>.path`
+ * or file-route default). Mini page stems are a different host projection.
+ * Not an SPA shell.
  *
  * `VMZ_DEV=1`: POST `/__vmz/reload` soft-reloads modules (cache-bust import);
  * GET `/__vmz/events` SSE notifies the browser:
@@ -530,7 +531,7 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
         throw new Error('vmz native addon missing generatePageShell — rebuild with `pnpm napi:build`');
     }
     const entrySrc = `/${eventOnlyShell ? 'entry-event.js' : 'entry-client.js'}?t=${reloadToken}`;
-    const cssHref = cssEntry ? `${String(cssEntry).replace(/^\/+/, '')}?t=${reloadToken}` : null;
+    const cssHref = cssEntry ? `${String(cssEntry).replace(/^\/+/, '')}?t=${reloadToken}` : undefined;
     yield native.generatePageShell({
         bodyHtml,
         chunkId,
@@ -545,7 +546,8 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
             dir,
             alternates: localeCtx.alternates || [],
         },
-        cssEntry: cssHref,
+        // napi Option<String>: omit/undefined = None; null is rejected as String
+        ...(cssHref ? { cssEntry: cssHref } : {}),
         isErrorDocument: false,
         htmlExtraAttrs,
         headExtraHtml: themeBoot,
@@ -1087,10 +1089,13 @@ async function listClientComponents(dir) {
 }
 
 /**
- * Discover compiled page modules under dist/pages.
+ * Discover compiled page modules. Prefer Route Graph `pathPattern` from
+ * `vmz-deployment.json`; fall back to walking `pages/**` (file-route only).
  * @param {string} dir
  */
 async function listPageClientFiles(dir) {
+    const fromDep = await listPagesFromDeployment(dir);
+    if (fromDep.length) return fromDep;
     const root = path.join(dir, 'pages');
     /** @type {Array<{ chunkId: string, pageRel: string, segs: ReturnType<typeof parseChunkSegments> }>} */
     const out = [];
@@ -1121,6 +1126,35 @@ async function listPageClientFiles(dir) {
 }
 
 /**
+ * @param {string} dir
+ */
+async function listPagesFromDeployment(dir) {
+    /** @type {Array<{ chunkId: string, pageRel: string, segs: ReturnType<typeof parseChunkSegments> }>} */
+    const out = [];
+    try {
+        const raw = await readFile(path.join(dir, 'vmz-deployment.json'), 'utf8');
+        const dep = JSON.parse(raw);
+        for (const unit of dep.units || []) {
+            if (unit?.kind !== 'page') continue;
+            const chunkId = String(unit.chunkId || '').replace(/\\/g, '/');
+            if (!chunkId.startsWith('pages/')) continue;
+            const stem = chunkId.split('/').pop() || '';
+            if (isRouteBoundaryStem(stem)) continue;
+            const pageRel = String(unit.clientEntry || `${chunkId}.client.js`).replace(/\\/g, '/');
+            const pattern = String(unit.pathPattern || '').trim();
+            out.push({
+                chunkId,
+                pageRel,
+                segs: pattern ? parsePathPattern(pattern) : parseChunkSegments(chunkId),
+            });
+        }
+    } catch {
+        return [];
+    }
+    return out;
+}
+
+/**
  * File-route segments from chunk id (`pages/Install` → `/install`).
  * Skips URL-invisible `(group)` dirs; boundary stems never reach here.
  * @param {string} chunkId
@@ -1134,13 +1168,39 @@ function parseChunkSegments(chunkId) {
         const p = parts[i];
         if (isRouteGroupDir(p)) continue;
         if (p === 'index' && i === parts.length - 1) continue;
-        const catchAll = /^\[\.\.\.([^\]]+)\]$/.exec(p);
-        const param = /^\[([^\]]+)\]$/.exec(p);
-        if (catchAll) segs.push({ kind: 'catch', name: catchAll[1] });
-        else if (param) segs.push({ kind: 'param', name: param[1] });
-        else segs.push({ kind: 'static', value: p.toLowerCase() });
+        segs.push(parsePathSegment(p));
     }
     return segs;
+}
+
+/**
+ * Browser HTTP pattern (`/` / `/home` / `/users/:id` / `/blog/[...slug]`).
+ * @param {string} pattern
+ */
+function parsePathPattern(pattern) {
+    const raw = String(pattern || '').trim();
+    if (!raw || raw === '/') return [];
+    const parts = raw.replace(/^\/+/, '').split('/').filter(Boolean);
+    /** @type {Array<{ kind: 'static' | 'param' | 'catch', value?: string, name?: string }>} */
+    const segs = [];
+    for (const p of parts) {
+        if (isRouteGroupDir(p)) continue;
+        segs.push(parsePathSegment(p));
+    }
+    return segs;
+}
+
+/**
+ * @param {string} p
+ */
+function parsePathSegment(p) {
+    const catchAll = /^\[\.\.\.([^\]]+)\]$/.exec(p);
+    const param = /^\[([^\]]+)\]$/.exec(p);
+    const colon = /^:([A-Za-z_][\w]*)$/.exec(p);
+    if (catchAll) return { kind: 'catch', name: catchAll[1] };
+    if (param) return { kind: 'param', name: param[1] };
+    if (colon) return { kind: 'param', name: colon[1] };
+    return { kind: 'static', value: p.toLowerCase() };
 }
 
 function isRouteGroupDir(seg) {

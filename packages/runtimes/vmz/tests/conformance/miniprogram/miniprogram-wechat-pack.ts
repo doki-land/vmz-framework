@@ -24,9 +24,10 @@ const tabSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rec
 fs.writeFileSync(path.join(dir, 'assets', 'tab-home.svg'), tabSvg);
 fs.writeFileSync(path.join(dir, 'assets', 'tab-me.svg'), tabSvg);
 fs.writeFileSync(
-    path.join(dir, 'src', 'pages', 'index.vmz'),
+    path.join(dir, 'src', 'pages', 'home.vmz'),
     `<router>
 {
+  path: "/",
   tab: { order: 0, label: "首页", icon: "assets/tab-home.svg" },
 }
 </router>
@@ -40,7 +41,7 @@ fs.writeFileSync(
 .page { padding: 24rpx; color: #3d6b2f; }
 </style>
 <script client>
-export default class IndexPage {
+export default class HomePage {
   store = 'Waitrose';
   deals = [{ id: 'd1', title: 'deal' }];
   onStore() { this.store = 'Waitrose 静安店'; }
@@ -91,10 +92,16 @@ if (report.status !== 'ready') {
 if (report.printer !== 'vmz-generator') fail(`printer ${report.printer}`);
 if (report.packRoot !== 'dist/wechat') fail(`packRoot ${report.packRoot}`);
 
+const dep = JSON.parse(fs.readFileSync(path.join(dir, 'dist', 'vmz-deployment.json'), 'utf8'));
+const homeUnit = (dep.units || []).find((u: { chunkId?: string }) => u.chunkId === 'pages/home');
+if (homeUnit?.pathPattern !== '/') {
+    fail(`Browser pathPattern want / for pages/home, got ${JSON.stringify(homeUnit)}`);
+}
+
 const pack = path.join(dir, 'dist', 'wechat');
-const wxmlPath = path.join(pack, 'pages', 'index', 'index.wxml');
-const wxssPath = path.join(pack, 'pages', 'index', 'index.wxss');
-const pageJsPath = path.join(pack, 'pages', 'index', 'index.js');
+const wxmlPath = path.join(pack, 'pages', 'home', 'home.wxml');
+const wxssPath = path.join(pack, 'pages', 'home', 'home.wxss');
+const pageJsPath = path.join(pack, 'pages', 'home', 'home.js');
 const appJsonPath = path.join(pack, 'app.json');
 const appJsPath = path.join(pack, 'app.js');
 const projectPath = path.join(pack, 'project.config.json');
@@ -113,14 +120,17 @@ if (wxml.includes('@click')) fail(`author event leaked: ${wxml}`);
 
 const wxss = fs.readFileSync(wxssPath, 'utf8');
 if (!wxss.includes('24rpx')) fail(`rpx missing: ${wxss}`);
-if (wxss.includes('me-only')) fail(`index wxss leaked me-only: ${wxss}`);
+if (wxss.includes('me-only')) fail(`home wxss leaked me-only: ${wxss}`);
 const meWxss = fs.readFileSync(path.join(pack, 'pages', 'me', 'me.wxss'), 'utf8');
 if (!meWxss.includes('me-only')) fail(`me wxss missing me-only: ${meWxss}`);
-if (meWxss.includes('24rpx')) fail(`me wxss leaked index padding: ${meWxss}`);
+if (meWxss.includes('24rpx')) fail(`me wxss leaked home padding: ${meWxss}`);
 
 const app = JSON.parse(fs.readFileSync(appJsonPath, 'utf8'));
-if (!(app.pages || []).includes('pages/index/index')) {
+if (!(app.pages || []).includes('pages/home/home')) {
     fail(`app.json pages ${JSON.stringify(app.pages)}`);
+}
+if ((app.pages || []).includes('pages/index/index')) {
+    fail(`Mini must not invent pages/index from Browser path /: ${JSON.stringify(app.pages)}`);
 }
 if (app.window?.navigationBarBackgroundColor !== '#3D6B2F') {
     fail(`nav bg ${app.window?.navigationBarBackgroundColor}`);
@@ -133,7 +143,7 @@ if (!fs.readFileSync(appJsPath, 'utf8').includes('App(')) fail('app.js missing A
 if (!fs.readFileSync(pageJsPath, 'utf8').includes('onShareAppMessage')) {
     fail('page js missing onShareAppMessage');
 }
-const pageJson = JSON.parse(fs.readFileSync(path.join(pack, 'pages', 'index', 'index.json'), 'utf8'));
+const pageJson = JSON.parse(fs.readFileSync(path.join(pack, 'pages', 'home', 'home.json'), 'utf8'));
 if (pageJson.enableShareAppMessage !== true) {
     fail(`enableShareAppMessage ${pageJson.enableShareAppMessage}`);
 }
