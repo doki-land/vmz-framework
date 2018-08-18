@@ -1,11 +1,12 @@
 //! WeChat packaging layout: compiler orchestrates `vmz-generator` printers.
 //!
 //! Writes a WeChat DevTools project under `dist/wechat/` (`dist/{target}/` layout):
-//! `app.json` / `app.js` / `app.wxss` / `project.config.json` / page files.
-//! Page JS includes `onShareAppMessage` so WeChat shows the forward menu.
+//! `app.json` / `app.js` / `app.wxss` / `project.config.json` / page files /
+//! `custom-tab-bar/` when `<router>.tab` is present.
+//! Page JS seeds `data` from class field literals and may sync tab selection.
 //! WXML/WXSS are not authoring truth; adapters must not own this printer.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -18,7 +19,11 @@ use vmz_protocol::{
 };
 use vmz_types::{ProgramModule, ProgramUnit, RouteTabDecl};
 
-use super::wechat_tab::{TAB_BG, TAB_COLOR, TAB_SELECTED_COLOR, materialize_tab_icons};
+use super::wechat_page_js::{format_page_js, page_data_fields};
+use super::wechat_tab::{
+    CustomTabItem, TAB_BG, TAB_COLOR, TAB_SELECTED_COLOR, materialize_center_white_icon,
+    materialize_tab_icons, pack_app_wxss_chrome, write_custom_tab_bar,
+};
 use super::wechat_wxss::{load_pack_style, page_css};
 
 pub use super::wechat_tab::rasterize_svg_png;
@@ -195,6 +200,15 @@ fn write_pack_file(abs: &Path, body: &str) -> std::io::Result<()> {
     fs::write(abs, body)
 }
 
+struct PendingPage {
+    chunk_id: String,
+    unit_name: String,
+    stem: String,
+    module_source: String,
+    wxml: String,
+    wxss: String,
+}
+
 /// Lower page units into WeChat packaging files (generator printers only).
 pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
     let mut diagnostics = Vec::new();
@@ -225,6 +239,7 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
         let _ = fs::remove_dir_all(&legacy);
     }
     let styles = load_pack_style(root);
+    let mut pending: Vec<PendingPage> = Vec::new();
     let mut app_pages: Vec<String> = Vec::new();
     let mut tab_pages: Vec<(u32, String, RouteTabDecl)> = Vec::new();
 
@@ -264,62 +279,18 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
             let css = page_css(&styles, &module.source);
             match emit_wechat_page(unit, &css) {
                 Ok((wxml, wxss)) => {
-                    let wxml_rel = format!("{WECHAT_PACK_ROOT}/{stem}.wxml");
-                    let wxss_rel = format!("{WECHAT_PACK_ROOT}/{stem}.wxss");
-                    let json_rel = format!("{WECHAT_PACK_ROOT}/{stem}.json");
-                    let js_rel = format!("{WECHAT_PACK_ROOT}/{stem}.js");
-                    let page_json = json!({
-                        "usingComponents": {},
-                        "enableShareAppMessage": true
-                    });
-                    let page_json_body =
-                        vmz_generator::to_pretty_json(&page_json).unwrap_or_else(|_| "{}".into());
-                    let share_title = serde_json::to_string(wechat_title(&packaging))
-                        .unwrap_or_else(|_| "\"VMZ\"".into());
-                    let page_js_src = format!(
-                        "Page({{ onShareAppMessage() {{ return {{ title: {share_title} }}; }} }});\n"
-                    );
-                    let page_js = match print_chrome_js(&page_js_src, &format!("{stem}.js")) {
-                        Ok(code) => code,
-                        Err(e) => {
-                            diagnostics.push(diag(
-                                &js_rel,
-                                Severity::Error,
-                                format!("print page js failed: {e}"),
-                                DIAG_ARTIFACT_INVALID,
-                            ));
-                            continue;
-                        }
-                    };
-                    let mut written = Vec::new();
-                    for (rel_path, body) in [
-                        (wxml_rel.as_str(), wxml.as_str()),
-                        (wxss_rel.as_str(), wxss.as_str()),
-                        (json_rel.as_str(), page_json_body.as_str()),
-                        (js_rel.as_str(), page_js.as_str()),
-                    ] {
-                        if let Err(e) = write_pack_file(&root.join(rel_path), &format!("{body}\n"))
-                        {
-                            diagnostics.push(diag(
-                                rel_path,
-                                Severity::Error,
-                                format!("write wechat pack file failed: {e}"),
-                                DIAG_ARTIFACT_INVALID,
-                            ));
-                        } else {
-                            written.push(rel_path.to_string());
-                        }
-                    }
-                    app_pages.push(stem.clone());
                     if let Some(tab) = unit.deployment.tab.clone() {
                         tab_pages.push((tab.order, stem.clone(), tab));
                     }
-                    pages.push(WechatPackFile {
+                    pending.push(PendingPage {
                         chunk_id: chunk,
                         unit_name: unit.name.clone(),
-                        stem,
-                        files: written,
+                        stem: stem.clone(),
+                        module_source: module.source.clone(),
+                        wxml,
+                        wxss,
                     });
+                    app_pages.push(stem);
                 }
                 Err(mut unit_diags) => diagnostics.append(&mut unit_diags),
             }
@@ -348,7 +319,7 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
         diagnostics.push(diag(
             &tab_pages[0].1,
             Severity::Error,
-            "native WeChat tabBar requires 2-5 `<router>.tab` pages",
+            "WeChat custom tabBar requires 2-5 `<router>.tab` pages",
             DIAG_ARTIFACT_INVALID,
         ));
     } else if tab_pages.len() > 5 {
@@ -357,7 +328,7 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
             "",
             Severity::Error,
             format!(
-                "native WeChat tabBar allows at most 5 `<router>.tab` pages (got {})",
+                "WeChat custom tabBar allows at most 5 `<router>.tab` pages (got {})",
                 tab_pages.len()
             ),
             DIAG_ARTIFACT_INVALID,
@@ -365,16 +336,41 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
     }
 
     let mut tab_list = Vec::new();
+    let mut custom_items = Vec::new();
+    let mut center_white: Option<String> = None;
     if tab_ok && tab_pages.len() >= 2 {
-        for (_, stem, tab) in &tab_pages {
+        let raise_center = tab_pages.len() == 5;
+        for (i, (_, stem, tab)) in tab_pages.iter().enumerate() {
             match materialize_tab_icons(root, &pack_abs, tab) {
                 Ok((icon_path, selected_path)) => {
+                    let center = raise_center && i == 2;
+                    if center {
+                        match materialize_center_white_icon(root, &pack_abs, tab) {
+                            Ok(white) => center_white = Some(white),
+                            Err(e) => {
+                                tab_ok = false;
+                                diagnostics.push(diag(
+                                    stem,
+                                    Severity::Error,
+                                    e,
+                                    DIAG_ARTIFACT_INVALID,
+                                ));
+                            }
+                        }
+                    }
                     tab_list.push(json!({
                         "pagePath": stem,
                         "text": tab.label,
                         "iconPath": icon_path,
                         "selectedIconPath": selected_path
                     }));
+                    custom_items.push(CustomTabItem {
+                        page_path: stem.clone(),
+                        text: tab.label.clone(),
+                        icon_path,
+                        selected_icon_path: selected_path,
+                        center,
+                    });
                 }
                 Err(e) => {
                     tab_ok = false;
@@ -383,13 +379,86 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
             }
         }
     }
+
+    let mut tab_selected: BTreeMap<String, u32> = BTreeMap::new();
     if tab_ok && tab_list.len() >= 2 {
         let tab_stems: Vec<String> = tab_pages.iter().map(|t| t.1.clone()).collect();
+        for (i, stem) in tab_stems.iter().enumerate() {
+            tab_selected.insert(stem.clone(), i as u32);
+        }
         let mut rest: Vec<String> =
             app_pages.iter().filter(|p| !tab_stems.contains(p)).cloned().collect();
         rest.sort_by(|a, b| page_rank(a).cmp(&page_rank(b)).then_with(|| a.cmp(b)));
         app_pages = tab_stems.into_iter().chain(rest).collect();
         app_pages.dedup();
+
+        match write_custom_tab_bar(&pack_abs, &custom_items, center_white.as_deref()) {
+            Ok(_) => {}
+            Err(e) => {
+                tab_ok = false;
+                diagnostics.push(diag(
+                    "dist/wechat/custom-tab-bar",
+                    Severity::Error,
+                    e,
+                    DIAG_ARTIFACT_INVALID,
+                ));
+            }
+        }
+    }
+
+    let share_title =
+        serde_json::to_string(wechat_title(&packaging)).unwrap_or_else(|_| "\"VMZ\"".into());
+
+    for page in pending {
+        let wxml_rel = format!("{WECHAT_PACK_ROOT}/{}.wxml", page.stem);
+        let wxss_rel = format!("{WECHAT_PACK_ROOT}/{}.wxss", page.stem);
+        let json_rel = format!("{WECHAT_PACK_ROOT}/{}.json", page.stem);
+        let js_rel = format!("{WECHAT_PACK_ROOT}/{}.js", page.stem);
+        let page_json = json!({
+            "usingComponents": {},
+            "enableShareAppMessage": true
+        });
+        let page_json_body =
+            vmz_generator::to_pretty_json(&page_json).unwrap_or_else(|_| "{}".into());
+        let fields = page_data_fields(root, &page.module_source);
+        let selected = tab_selected.get(&page.stem).copied();
+        let page_js_src = format_page_js(&share_title, &fields, selected);
+        let page_js = match print_chrome_js(&page_js_src, &format!("{}.js", page.stem)) {
+            Ok(code) => code,
+            Err(e) => {
+                diagnostics.push(diag(
+                    &js_rel,
+                    Severity::Error,
+                    format!("print page js failed: {e}"),
+                    DIAG_ARTIFACT_INVALID,
+                ));
+                continue;
+            }
+        };
+        let mut written = Vec::new();
+        for (rel_path, body) in [
+            (wxml_rel.as_str(), page.wxml.as_str()),
+            (wxss_rel.as_str(), page.wxss.as_str()),
+            (json_rel.as_str(), page_json_body.as_str()),
+            (js_rel.as_str(), page_js.as_str()),
+        ] {
+            if let Err(e) = write_pack_file(&root.join(rel_path), &format!("{body}\n")) {
+                diagnostics.push(diag(
+                    rel_path,
+                    Severity::Error,
+                    format!("write wechat pack file failed: {e}"),
+                    DIAG_ARTIFACT_INVALID,
+                ));
+            } else {
+                written.push(rel_path.to_string());
+            }
+        }
+        pages.push(WechatPackFile {
+            chunk_id: page.chunk_id,
+            unit_name: page.unit_name,
+            stem: page.stem,
+            files: written,
+        });
     }
 
     let mut app_json = json!({
@@ -404,6 +473,7 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
     });
     if tab_ok && tab_list.len() >= 2 {
         app_json["tabBar"] = json!({
+            "custom": true,
             "color": TAB_COLOR,
             "selectedColor": TAB_SELECTED_COLOR,
             "backgroundColor": TAB_BG,
@@ -421,7 +491,13 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
             DIAG_ARTIFACT_INVALID,
         ));
     }
-    let app_wxss = vmz_generator::print_wxss(&styles.shared, false);
+
+    let mut app_wxss_src = styles.shared;
+    if !app_wxss_src.ends_with('\n') && !app_wxss_src.is_empty() {
+        app_wxss_src.push('\n');
+    }
+    app_wxss_src.push_str(pack_app_wxss_chrome());
+    let app_wxss = vmz_generator::print_wxss(&app_wxss_src, false);
     let app_wxss_rel = format!("{WECHAT_PACK_ROOT}/app.wxss");
     let _ = write_pack_file(&root.join(&app_wxss_rel), &format!("{app_wxss}\n"));
 
