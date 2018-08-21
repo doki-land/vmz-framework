@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
 import { addLimitation, readProof, runVmzBuild, upsertCheck, writeProof } from '../_lib/production-proof.ts';
+import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
 
 const root = repoRoot(import.meta.url);
 const HOMEPAGE = 'packages/homepage';
@@ -294,7 +295,7 @@ if (homeBuild.status === 0) {
     } else {
         const child = spawn(process.execPath, [hostJs], {
             cwd: dist,
-            env: { ...process.env, VMZ_DIST: dist, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(PORT) },
+            env: serveHostChildEnv({ VMZ_DIST: dist, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(PORT) }),
             stdio: ['ignore', 'pipe', 'pipe'],
         });
         try {

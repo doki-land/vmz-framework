@@ -36,6 +36,7 @@ import {
 } from 'vmz';
 import { repoRoot } from '../_lib/repo-root.ts';
 import { addLimitation, readProof, runVmzBuild, runVmzTest, upsertCheck, writeProof } from '../_lib/production-proof.ts';
+import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
 
 const root = repoRoot(import.meta.url);
 const ROUTER = 'packages/examples/production-router';
@@ -200,7 +201,7 @@ if (build.status !== 0) {
     try {
         child = spawn(process.execPath, [hostJs], {
             cwd: dist,
-            env: { ...process.env, VMZ_DIST: dist, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(PORT) },
+            env: serveHostChildEnv({ VMZ_DIST: dist, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(PORT) }),
             stdio: ['ignore', 'pipe', 'pipe'],
         });
         await new Promise<void>((resolve, reject) => {
@@ -521,7 +522,7 @@ async function startServeHost(distDir: string, port: number): Promise<{ kill: ()
     if (!fs.existsSync(hostJs)) throw new Error(`missing serve-host in ${distDir}`);
     const child = spawn(process.execPath, [hostJs], {
         cwd: distDir,
-        env: { ...process.env, VMZ_DIST: distDir, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(port) },
+        env: serveHostChildEnv({ VMZ_DIST: distDir, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(port) }),
         stdio: ['ignore', 'pipe', 'pipe'],
     });
     const kill = () => {
