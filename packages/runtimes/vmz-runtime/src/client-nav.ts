@@ -229,6 +229,10 @@ export function installClientNavigation(opts = {}) {
             let liveRoot = root;
             let retainedLayout = false;
 
+            // Apply target LocaleId before hydrate/onMount so `#locales/*` and
+            // retained shells (SiteHeader) see the committed projection.
+            applyLocaleRealization(nextApp);
+
             if (retainLayouts) {
                 applyAppAttrs(root, nextApp);
                 if (chunkId) {

@@ -96,19 +96,32 @@ export default class SiteHeader {
     this.deployDocHref = this.localeId === 'en-us' ? '/d/en-us/guide/deploy/' : '/d/zh-hans/guide/deploy/';
   }
 
+  applyLocaleCopy(preferred) {
+    const fromDom =
+      typeof document !== 'undefined' ? document.documentElement.getAttribute('data-locale') : null;
+    this.localeId = preferred || fromDom || this.localeId || 'zh-hans';
+    const g = typeof globalThis !== 'undefined' ? globalThis : null;
+    const prev = g ? g.__vmzLocaleIdHint : undefined;
+    if (g) g.__vmzLocaleIdHint = this.localeId;
+    try {
+      this.refreshCopy();
+    } finally {
+      if (g) {
+        if (prev === undefined) delete g.__vmzLocaleIdHint;
+        else g.__vmzLocaleIdHint = prev;
+      }
+    }
+  }
+
   async switchLocale(to) {
     if (typeof window === 'undefined') return;
     const fn = window.__vmzTransitionLocale;
     if (typeof fn !== 'function') return;
     const r = await fn(to);
     if (r && r.status === 'committed') {
-      this.localeId = document.documentElement.getAttribute('data-locale') || to;
-      this.refreshCopy();
-      // Soft nav may settle attributes a tick later; re-sync copy after paint.
-      queueMicrotask(() => {
-        this.localeId = document.documentElement.getAttribute('data-locale') || this.localeId;
-        this.refreshCopy();
-      });
+      this.applyLocaleCopy(to);
+      // Soft nav may settle a tick later; re-sync after paint.
+      queueMicrotask(() => this.applyLocaleCopy(to));
     }
   }
 }
