@@ -74,7 +74,10 @@ for (const name of [
     const src = fs.readFileSync(srcPath, 'utf8');
     for (const tok of row.tokens || []) {
         const cssVar = `--vmz-${String(tok).split('.').join('-')}`;
-        if (!src.includes(`var(${cssVar})`)) errors.push(`${name} missing ${cssVar}`);
+        // Accept `var(--tok)` and `var(--tok, fallback)`.
+        if (!src.includes(`var(${cssVar}`) && !src.includes(cssVar)) {
+            errors.push(`${name} missing ${cssVar}`);
+        }
     }
     for (const hex of contract.forbiddenBrandHex || []) {
         if (src.toLowerCase().includes(String(hex).toLowerCase())) {
@@ -272,7 +275,14 @@ if (homeBuild.status !== 0) {
         errors.push('homepage missing designs/document/chrome.css');
     } else {
         const chrome = fs.readFileSync(path.join(root, HOMEPAGE, 'designs/document/chrome.css'), 'utf8');
-        if (!chrome.includes('var(--vmz-density-control-padding-y') || !chrome.includes("data-density='dense'")) {
+        const hasDensityVar =
+            chrome.includes('var(--vmz-density-control-padding-y') || chrome.includes('--vmz-density-control-padding-y');
+        const hasDense =
+            chrome.includes('data-density="dense"') ||
+            chrome.includes("data-density='dense'") ||
+            chrome.includes('[data-density="dense"]') ||
+            chrome.includes("[data-density='dense']");
+        if (!hasDensityVar || !hasDense) {
             errors.push('homepage document chrome must consume density tokens');
         }
     }
@@ -468,10 +478,15 @@ let docsDetail = '';
                 docsDetail = 'documents build missing vmz-designs.css asset';
             } else {
                 const css = fs.readFileSync(cssPath, 'utf8');
+                const hasDense =
+                    css.includes('data-density="dense"') ||
+                    css.includes("data-density='dense'") ||
+                    css.includes('[data-density="dense"]') ||
+                    css.includes("[data-density='dense']");
                 if (
                     !css.includes('--vmz-density-control-padding-y') ||
                     !css.includes('--vmz-density-dense-padding-y') ||
-                    !css.includes("data-density='dense'")
+                    !hasDense
                 ) {
                     docsOk = false;
                     docsDetail = 'documents CSS missing density token emit / dense activation';
@@ -662,6 +677,14 @@ async function proveHomepageLocaleTransition(baseUrl: string): Promise<string> {
         await page.click('[data-dogfood="locale-en-us"]');
         await page.waitForFunction(
             () => location.pathname.startsWith('/en-us') && document.documentElement.getAttribute('data-locale') === 'en-us',
+            { timeout: 15000 },
+        );
+        // Locale message modules read data-locale; wait until SiteHeader CTA refreshes.
+        await page.waitForFunction(
+            () => {
+                const t = (document.querySelector('.site-nav__cta') as HTMLElement | null)?.textContent?.trim() || '';
+                return t.length > 0 && t !== '开始使用';
+            },
             { timeout: 15000 },
         );
         const viaUi = await page.evaluate(() => ({

@@ -104,6 +104,11 @@ export default class SiteHeader {
     if (r && r.status === 'committed') {
       this.localeId = document.documentElement.getAttribute('data-locale') || to;
       this.refreshCopy();
+      // Soft nav may settle attributes a tick later; re-sync copy after paint.
+      queueMicrotask(() => {
+        this.localeId = document.documentElement.getAttribute('data-locale') || this.localeId;
+        this.refreshCopy();
+      });
     }
   }
 }
