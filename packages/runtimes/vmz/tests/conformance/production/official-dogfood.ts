@@ -568,7 +568,6 @@ upsertCheck(proof, {
 
 const gaps = [
     'Dogfood: sibling vmz-panel product app not gated in this driver (production-inspector stands in as ordinary panel-shaped app)',
-    'Dogfood: homepage landing body copy still bilingual-hardcoded; SiteHeader #locales + LocaleTransition covered',
     'Dogfood: documents search UX not covered',
 ];
 for (const g of gaps) addLimitation(proof, g);
@@ -580,7 +579,8 @@ proof.knownLimitations = proof.knownLimitations.filter(
         !l.includes('Dogfood: homepage locale switch matrix + documents search UX') &&
         !l.includes('Dogfood: I2 LocaleTransition / I3 hreflang / homepage locale switch matrix') &&
         !l.includes('Dogfood: homepage locale switch matrix still open') &&
-        !l.includes('Dogfood: homepage message-binding / SiteHeader still uses documents hard links'),
+        !l.includes('Dogfood: homepage message-binding / SiteHeader still uses documents hard links') &&
+        !l.includes('Dogfood: homepage landing body copy still bilingual-hardcoded'),
 );
 
 writeProof(proof, root);
@@ -687,15 +687,62 @@ async function proveHomepageLocaleTransition(baseUrl: string): Promise<string> {
             },
             { timeout: 15000 },
         );
-        const viaUi = await page.evaluate(() => ({
-            path: location.pathname,
-            locale: document.documentElement.getAttribute('data-locale'),
-            start: (document.querySelector('.site-nav__cta') as HTMLElement | null)?.textContent?.trim() || '',
-            hardDocLink: !!document.querySelector('.site-language__menu a[href^="/d/"]'),
-        }));
+        // Landing + footer message matrix must follow LocaleId (not zh-hans hard links).
+        await page.waitForFunction(
+            () => {
+                const cta = document.querySelector('[data-dogfood="landing-primary-cta"]') as HTMLAnchorElement | null;
+                const footer = document.querySelector('[data-dogfood="footer-docs"]') as HTMLAnchorElement | null;
+                const ctaText = cta?.textContent?.trim() || '';
+                const ctaHref = cta?.getAttribute('href') || '';
+                const footerHref = footer?.getAttribute('href') || '';
+                return (
+                    ctaText.length > 0 &&
+                    ctaText !== '开始构建' &&
+                    ctaHref.includes('/d/en-us/') &&
+                    !ctaHref.includes('/d/zh-hans/') &&
+                    footerHref.includes('/d/en-us/') &&
+                    !footerHref.includes('/d/zh-hans/')
+                );
+            },
+            { timeout: 15000 },
+        );
+        const viaUi = await page.evaluate(() => {
+            const cta = document.querySelector('[data-dogfood="landing-primary-cta"]') as HTMLAnchorElement | null;
+            const secondary = document.querySelector(
+                '[data-dogfood="landing-secondary-cta"]',
+            ) as HTMLAnchorElement | null;
+            const footer = document.querySelector('[data-dogfood="footer-docs"]') as HTMLAnchorElement | null;
+            return {
+                path: location.pathname,
+                locale: document.documentElement.getAttribute('data-locale'),
+                start: (document.querySelector('.site-nav__cta') as HTMLElement | null)?.textContent?.trim() || '',
+                hardDocLink: !!document.querySelector('.site-language__menu a[href^="/d/"]'),
+                landingCta: cta?.textContent?.trim() || '',
+                landingCtaHref: cta?.getAttribute('href') || '',
+                landingSecondaryHref: secondary?.getAttribute('href') || '',
+                footerDocs: footer?.textContent?.trim() || '',
+                footerDocsHref: footer?.getAttribute('href') || '',
+            };
+        });
         if (viaUi.hardDocLink) throw new Error('language menu must not hard-link /d/…');
         if (!viaUi.start || viaUi.start === '开始使用') {
             throw new Error(`SiteHeader #locales start label want English, got ${JSON.stringify(viaUi)}`);
+        }
+        if (!viaUi.landingCta || viaUi.landingCta === '开始构建') {
+            throw new Error(`landing primary CTA want English, got ${JSON.stringify(viaUi)}`);
+        }
+        if (!viaUi.landingCtaHref.includes('/d/en-us/') || viaUi.landingCtaHref.includes('/d/zh-hans/')) {
+            throw new Error(`landing primary CTA href want /d/en-us/, got ${JSON.stringify(viaUi)}`);
+        }
+        if (!viaUi.landingSecondaryHref.includes('/d/en-us/')) {
+            throw new Error(`landing secondary CTA href want /d/en-us/, got ${JSON.stringify(viaUi)}`);
+        }
+        if (!viaUi.footerDocsHref.includes('/d/en-us/') || viaUi.footerDocsHref.includes('/d/zh-hans/')) {
+            throw new Error(`footer docs href want /d/en-us/, got ${JSON.stringify(viaUi)}`);
+        }
+        if (!viaUi.footerDocs || viaUi.footerDocs === '文档') {
+            // en-us catalog uses "Docs"; reject leftover zh label.
+            throw new Error(`footer docs label want English, got ${JSON.stringify(viaUi)}`);
         }
 
         const rejected = await page.evaluate(async () => {
@@ -711,7 +758,7 @@ async function proveHomepageLocaleTransition(baseUrl: string): Promise<string> {
         if (rejected.status !== 'rejected' || rejected.afterLocale !== 'en-us') {
             throw new Error(`unsupported locale must reject+retain: ${JSON.stringify(rejected)}`);
         }
-        return 'LocaleTransition API + SiteHeader button + #locales common labels';
+        return 'LocaleTransition API + SiteHeader + landing/footer #locales matrix';
     } finally {
         await browser.close();
     }

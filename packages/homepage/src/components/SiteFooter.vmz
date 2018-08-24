@@ -1,21 +1,21 @@
 <template>
-  <footer class="site-footer">
+  <footer class="site-footer" data-dogfood="site-footer">
     <div class="site-footer__brand">
-      <span class="site-footer__mark">VMZ</span>
-      <p class="site-footer__tag">让编译器理解整套应用，并为 Web、SSR、Native 与 Edge 生成精确的交付结果。</p>
+      <span class="site-footer__mark">{brandLabel}</span>
+      <p class="site-footer__tag">{footerTagLabel}</p>
     </div>
-    <nav class="site-footer__group" aria-label="产品">
+    <nav class="site-footer__group" aria-label={productNavLabel}>
       <b>Product</b>
-      <a href="/d/">文档</a>
-      <a href="/d/zh-hans/guide/">入门指南</a>
-      <a href="/d/zh-hans/guide/deploy/">部署指南</a>
-      <a href="/deploy-planner">部署计划器</a>
-      <a href="/#showcase">UI 组件</a>
+      <a data-dogfood="footer-docs" href={docsRootHref}>{docsLabel}</a>
+      <a href={guideHref}>{gettingStartedGuideLabel}</a>
+      <a href={deployDocHref}>{deployGuideLabel}</a>
+      <a href="/deploy-planner">{deployPlannerLabel}</a>
+      <a href="/#showcase">{showcaseLabel}</a>
     </nav>
-    <nav class="site-footer__group" aria-label="资源">
+    <nav class="site-footer__group" aria-label={resourcesNavLabel}>
       <b>Resources</b>
       <a href="/welcome">Welcome</a>
-      <a href="/d/zh-hans/plugins/">官方插件</a>
+      <a href={pluginsHref}>{pluginsLabel}</a>
       <a href="https://github.com/doki-land/vmz-framework">GitHub</a>
     </nav>
     <p class="site-footer__note">VMZ · Full-stack application compiler</p>
@@ -23,5 +23,69 @@
 </template>
 
 <script client>
-export default class SiteFooter {}
+import {
+  brand,
+  docs,
+  deployPlanner,
+  showcase,
+  gettingStartedGuide,
+  deployGuide,
+  plugins,
+  footerTag,
+  productNav,
+  resourcesNav,
+} from '#locales/common';
+import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../lib/locale-copy.ts';
+
+export default class SiteFooter {
+  localeId = 'zh-hans';
+  brandLabel = '';
+  footerTagLabel = '';
+  docsLabel = '';
+  gettingStartedGuideLabel = '';
+  deployGuideLabel = '';
+  deployPlannerLabel = '';
+  showcaseLabel = '';
+  pluginsLabel = '';
+  productNavLabel = '';
+  resourcesNavLabel = '';
+  docsRootHref = '/d/zh-hans/';
+  guideHref = '/d/zh-hans/guide/';
+  deployDocHref = '/d/zh-hans/guide/deploy/';
+  pluginsHref = '/d/zh-hans/plugins/';
+  _unwatchLocale = null;
+
+  onMount() {
+    this.applyLocaleCopy();
+    this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+  }
+
+  onDestroy() {
+    if (typeof this._unwatchLocale === 'function') this._unwatchLocale();
+    this._unwatchLocale = null;
+  }
+
+  refreshCopy() {
+    this.brandLabel = brand();
+    this.footerTagLabel = footerTag();
+    this.docsLabel = docs();
+    this.gettingStartedGuideLabel = gettingStartedGuide();
+    this.deployGuideLabel = deployGuide();
+    this.deployPlannerLabel = deployPlanner();
+    this.showcaseLabel = showcase();
+    this.pluginsLabel = plugins();
+    this.productNavLabel = productNav();
+    this.resourcesNavLabel = resourcesNav();
+    const paths = docsPaths(this.localeId);
+    this.docsRootHref = paths.docsRootHref;
+    this.guideHref = paths.guideHref;
+    this.deployDocHref = paths.deployDocHref;
+    this.pluginsHref = paths.pluginsHref;
+  }
+
+  applyLocaleCopy(preferred) {
+    this.localeId = readLocaleId(preferred);
+    withLocaleHint(this.localeId, () => this.refreshCopy());
+  }
+}
 </script>
