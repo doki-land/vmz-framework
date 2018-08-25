@@ -138,6 +138,9 @@ if (app.window?.navigationBarBackgroundColor !== '#3D6B2F') {
 const project = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
 if (project.compileType !== 'miniprogram') fail(`compileType ${project.compileType}`);
 if (project.miniprogramRoot !== './') fail(`miniprogramRoot ${project.miniprogramRoot}`);
+if (String(project.miniprogramRoot).includes('miniprogram/')) {
+    fail(`DevTools must open dist/wechat flat root, not nested miniprogram/: ${project.miniprogramRoot}`);
+}
 if (project.appid !== 'touristappid') fail(`default appid ${project.appid}`);
 if (!fs.readFileSync(appJsPath, 'utf8').includes('App(')) fail('app.js missing App()');
 if (!fs.readFileSync(pageJsPath, 'utf8').includes('onShareAppMessage')) {

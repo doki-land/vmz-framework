@@ -155,4 +155,43 @@ describe('vmz Node CLI host (N2)', () => {
         expect(code).toBe(0);
         fs.rmSync(dir, { recursive: true, force: true });
     });
+
+    it('vmz build --target mini-program-wechat packs dist/wechat', async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-cli-wechat-build-'));
+        fs.mkdirSync(path.join(dir, 'src', 'pages'), { recursive: true });
+        fs.writeFileSync(
+            path.join(dir, 'src', 'Application.vmz'),
+            `<template><slot /></template>
+<script client>
+export default class Application {}
+</script>
+`,
+        );
+        fs.writeFileSync(
+            path.join(dir, 'src', 'pages', 'home.vmz'),
+            `<template><view class="home"><text>{n}</text><button @click={inc}>+</button></view></template>
+<style>
+.home { color: #111; }
+</style>
+<script client>
+export default class HomePage {
+  n = 0;
+  inc() { this.n = this.n + 1; }
+}
+</script>
+`,
+        );
+        const code = await runCli(['build', dir, '--target', 'mini-program-wechat']);
+        expect(code).toBe(0);
+        const packRoot = path.join(dir, 'dist', 'wechat');
+        expect(fs.existsSync(path.join(packRoot, 'app.json'))).toBe(true);
+        expect(fs.existsSync(path.join(packRoot, 'project.config.json'))).toBe(true);
+        const projectCfg = JSON.parse(fs.readFileSync(path.join(packRoot, 'project.config.json'), 'utf8'));
+        expect(projectCfg.miniprogramRoot).toBe('./');
+        const stem = path.join(packRoot, 'pages', 'home', 'home');
+        for (const ext of ['wxml', 'wxss', 'json', 'js']) {
+            expect(fs.existsSync(`${stem}.${ext}`)).toBe(true);
+        }
+        fs.rmSync(dir, { recursive: true, force: true });
+    });
 });
