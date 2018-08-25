@@ -13,6 +13,7 @@ const files = [
     'affected.test.ts',
     'html-binding.test.ts',
     'cli-host.test.ts',
+    'dev-watch-roots.test.ts',
     'invocation.test.ts',
     'plugin.test.ts',
     'port.test.ts',
