@@ -14,6 +14,7 @@ import { pathToFileURL } from 'node:url';
 import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
 import { addLimitation, readProof, runVmzBuild, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
+import { proveHomepageLocaleTransition as proveHomepageLocaleTransitionImpl } from './homepage-locale-dogfood.ts';
 
 const root = repoRoot(import.meta.url);
 const HOMEPAGE = 'packages/homepage';
@@ -569,6 +570,7 @@ upsertCheck(proof, {
 const gaps = [
     'Dogfood: sibling vmz-panel product app not gated in this driver (production-inspector stands in as ordinary panel-shaped app)',
     'Dogfood: documents search UX not covered',
+    'Dogfood: homepage features/showcase/feedback prose not yet in #locales catalog',
 ];
 for (const g of gaps) addLimitation(proof, g);
 proof.knownLimitations = proof.knownLimitations.filter(
@@ -622,146 +624,12 @@ async function loadPuppeteerCore(): Promise<any> {
 }
 
 async function proveHomepageLocaleTransition(baseUrl: string): Promise<string> {
-    const { resolveBrowserExecutable } = await import(
-        pathToFileURL(path.join(root, 'packages', 'runtimes', 'vmz-test', 'dist', 'browser.js')).href
-    );
-    const chrome = resolveBrowserExecutable();
-    if (!chrome) throw new Error('Chrome/Edge not found (set VMZ_BROWSER)');
-    const puppeteer = await loadPuppeteerCore();
-    const browser = await puppeteer.launch({
-        executablePath: chrome,
-        headless: true,
-        args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+    return proveHomepageLocaleTransitionImpl({
+        root,
+        homepageRel: HOMEPAGE,
+        baseUrl,
+        loadPuppeteerCore,
     });
-    try {
-        const page = await browser.newPage();
-        await page.goto(`${baseUrl}/ui`, { waitUntil: 'networkidle0', timeout: 30000 });
-        await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 15000 });
-        const before = await page.evaluate(() => ({
-            path: location.pathname,
-            locale: document.documentElement.getAttribute('data-locale'),
-            routing: document.documentElement.getAttribute('data-vmz-locale-routing'),
-        }));
-        if (!before.routing) throw new Error(`missing data-vmz-locale-routing: ${JSON.stringify(before)}`);
-        if (before.locale && before.locale !== 'zh-hans') {
-            throw new Error(`default locale want zh-hans, got ${JSON.stringify(before)}`);
-        }
-
-        const committed = await page.evaluate(async () => {
-            const r = await (window as any).__vmzTransitionLocale('en-us');
-            return {
-                ...r,
-                path: location.pathname,
-                locale: document.documentElement.getAttribute('data-locale'),
-                lang: document.documentElement.lang,
-            };
-        });
-        if (committed.status !== 'committed' || committed.locale !== 'en-us') {
-            throw new Error(`LocaleTransition commit failed: ${JSON.stringify(committed)}`);
-        }
-        if (committed.path !== '/en-us/ui' && committed.path !== '/en-us/ui/') {
-            throw new Error(`LocaleTransition path want /en-us/ui, got ${committed.path}`);
-        }
-
-        // SiteHeader dogfood: language menu uses LocaleTransition (not /d/ hard links).
-        await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle0', timeout: 30000 });
-        await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 15000 });
-        await page.waitForSelector('[data-dogfood="site-header"]', { timeout: 10000 });
-        const openLang = await page.evaluate(() => {
-            const details = document.querySelector('.site-language') as HTMLDetailsElement | null;
-            if (!details) return false;
-            details.open = true;
-            return true;
-        });
-        if (!openLang) throw new Error('site-language details missing');
-        await page.click('[data-dogfood="locale-en-us"]');
-        await page.waitForFunction(
-            () => location.pathname.startsWith('/en-us') && document.documentElement.getAttribute('data-locale') === 'en-us',
-            { timeout: 15000 },
-        );
-        // Locale message modules read data-locale; wait until SiteHeader CTA refreshes.
-        await page.waitForFunction(
-            () => {
-                const t = (document.querySelector('.site-nav__cta') as HTMLElement | null)?.textContent?.trim() || '';
-                return t.length > 0 && t !== '开始使用';
-            },
-            { timeout: 15000 },
-        );
-        // Landing + footer message matrix must follow LocaleId (not zh-hans hard links).
-        await page.waitForFunction(
-            () => {
-                const cta = document.querySelector('[data-dogfood="landing-primary-cta"]') as HTMLAnchorElement | null;
-                const footer = document.querySelector('[data-dogfood="footer-docs"]') as HTMLAnchorElement | null;
-                const ctaText = cta?.textContent?.trim() || '';
-                const ctaHref = cta?.getAttribute('href') || '';
-                const footerHref = footer?.getAttribute('href') || '';
-                return (
-                    ctaText.length > 0 &&
-                    ctaText !== '开始构建' &&
-                    ctaHref.includes('/d/en-us/') &&
-                    !ctaHref.includes('/d/zh-hans/') &&
-                    footerHref.includes('/d/en-us/') &&
-                    !footerHref.includes('/d/zh-hans/')
-                );
-            },
-            { timeout: 15000 },
-        );
-        const viaUi = await page.evaluate(() => {
-            const cta = document.querySelector('[data-dogfood="landing-primary-cta"]') as HTMLAnchorElement | null;
-            const secondary = document.querySelector(
-                '[data-dogfood="landing-secondary-cta"]',
-            ) as HTMLAnchorElement | null;
-            const footer = document.querySelector('[data-dogfood="footer-docs"]') as HTMLAnchorElement | null;
-            return {
-                path: location.pathname,
-                locale: document.documentElement.getAttribute('data-locale'),
-                start: (document.querySelector('.site-nav__cta') as HTMLElement | null)?.textContent?.trim() || '',
-                hardDocLink: !!document.querySelector('.site-language__menu a[href^="/d/"]'),
-                landingCta: cta?.textContent?.trim() || '',
-                landingCtaHref: cta?.getAttribute('href') || '',
-                landingSecondaryHref: secondary?.getAttribute('href') || '',
-                footerDocs: footer?.textContent?.trim() || '',
-                footerDocsHref: footer?.getAttribute('href') || '',
-            };
-        });
-        if (viaUi.hardDocLink) throw new Error('language menu must not hard-link /d/…');
-        if (!viaUi.start || viaUi.start === '开始使用') {
-            throw new Error(`SiteHeader #locales start label want English, got ${JSON.stringify(viaUi)}`);
-        }
-        if (!viaUi.landingCta || viaUi.landingCta === '开始构建') {
-            throw new Error(`landing primary CTA want English, got ${JSON.stringify(viaUi)}`);
-        }
-        if (!viaUi.landingCtaHref.includes('/d/en-us/') || viaUi.landingCtaHref.includes('/d/zh-hans/')) {
-            throw new Error(`landing primary CTA href want /d/en-us/, got ${JSON.stringify(viaUi)}`);
-        }
-        if (!viaUi.landingSecondaryHref.includes('/d/en-us/')) {
-            throw new Error(`landing secondary CTA href want /d/en-us/, got ${JSON.stringify(viaUi)}`);
-        }
-        if (!viaUi.footerDocsHref.includes('/d/en-us/') || viaUi.footerDocsHref.includes('/d/zh-hans/')) {
-            throw new Error(`footer docs href want /d/en-us/, got ${JSON.stringify(viaUi)}`);
-        }
-        if (!viaUi.footerDocs || viaUi.footerDocs === '文档') {
-            // en-us catalog uses "Docs"; reject leftover zh label.
-            throw new Error(`footer docs label want English, got ${JSON.stringify(viaUi)}`);
-        }
-
-        const rejected = await page.evaluate(async () => {
-            const beforeLocale = document.documentElement.getAttribute('data-locale');
-            const r = await (window as any).__vmzTransitionLocale('ja-jp');
-            return {
-                ...r,
-                beforeLocale,
-                afterLocale: document.documentElement.getAttribute('data-locale'),
-                path: location.pathname,
-            };
-        });
-        if (rejected.status !== 'rejected' || rejected.afterLocale !== 'en-us') {
-            throw new Error(`unsupported locale must reject+retain: ${JSON.stringify(rejected)}`);
-        }
-        return 'LocaleTransition API + SiteHeader + landing/footer #locales matrix';
-    } finally {
-        await browser.close();
-    }
 }
 
 function get(url: string): Promise<{ status: number; body: string }> {
