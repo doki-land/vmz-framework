@@ -18,6 +18,8 @@ const files = [
     'plugin.test.ts',
     'port.test.ts',
     'delivery-profile.test.ts',
+    'layout-slot-inject.test.ts',
+    'rowkernel-ssr.test.ts',
 ].map((f) => path.join(here, 'unit', f));
 
 const r = spawnSync(process.execPath, ['--import', resolveHook, '--test', '--experimental-strip-types', ...files], {
