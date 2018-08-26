@@ -48,6 +48,7 @@ const JS_PACKAGES = [
     { dir: 'packages/plugins/vmz-plugin-echarts' },
     { dir: 'packages/plugins/vmz-plugin-iconify' },
     { dir: 'packages/ui/vmz-ui' },
+    { dir: 'packages/ui/vmz-ui-icons' },
     { dir: 'packages/runtimes/vmz', publishName: '@vmz/vmz' },
 ];
 

@@ -83,6 +83,7 @@ const JS_STUBS = [
     '@vmz/plugin-mermaid',
     '@vmz/plugin-echarts',
     '@vmz/plugin-iconify',
+    '@vmz/ui-icons',
 ];
 
 const NATIVE_STUBS = [
