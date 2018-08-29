@@ -35,6 +35,7 @@ fs.writeFileSync(
   <div class="page">
     <div class="loc" @click={onStore}>{store}</div>
     <div class="deal" each={deals} as="item" key={item.id}>{item.title}</div>
+    <div if={showBanner}>banner</div>
   </div>
 </template>
 <style>
@@ -44,6 +45,7 @@ fs.writeFileSync(
 export default class HomePage {
   store = 'Waitrose';
   deals = [{ id: 'd1', title: 'deal' }];
+  showBanner = true;
   onStore() { this.store = 'Waitrose 静安店'; }
 }
 </script>
@@ -115,15 +117,42 @@ if (!fs.existsSync(projectPath)) fail(`missing ${projectPath}`);
 const wxml = fs.readFileSync(wxmlPath, 'utf8');
 if (!wxml.includes('<view class="page">')) fail(`page view missing: ${wxml}`);
 if (!wxml.includes('bindtap="onStore"')) fail(`bindtap missing: ${wxml}`);
-if (!wxml.includes('wx:for=')) fail(`wx:for missing: ${wxml}`);
+if (!/wx:for="\{\{b\.B_\d+\}\}"/.test(wxml)) {
+    fail(`wx:for must use BindingId path b.B_*: ${wxml}`);
+}
+if (!/wx:if="\{\{b\.B_\d+\}\}"/.test(wxml)) {
+    fail(`wx:if must use BindingId path b.B_*: ${wxml}`);
+}
 if (wxml.includes('@click')) fail(`author event leaked: ${wxml}`);
 
 const wxss = fs.readFileSync(wxssPath, 'utf8');
 if (!wxss.includes('24rpx')) fail(`rpx missing: ${wxss}`);
 if (wxss.includes('me-only')) fail(`home wxss leaked me-only: ${wxss}`);
+if (wxss.includes('vmz-style') || /@import\s+["'].*vmz\.css/.test(wxss)) {
+    fail(`page wxss must not pull full vmz-style.css: ${wxss}`);
+}
 const meWxss = fs.readFileSync(path.join(pack, 'pages', 'me', 'me.wxss'), 'utf8');
 if (!meWxss.includes('me-only')) fail(`me wxss missing me-only: ${meWxss}`);
 if (meWxss.includes('24rpx')) fail(`me wxss leaked home padding: ${meWxss}`);
+
+const pageJs = fs.readFileSync(pageJsPath, 'utf8');
+if (!pageJs.includes('b:')) fail(`page data missing BindingId root b: ${pageJs}`);
+if (!/B_\d+\s*:/.test(pageJs)) fail(`page data missing B_* seeds: ${pageJs}`);
+if (!pageJs.includes('Waitrose')) fail(`page data/share missing Waitrose: ${pageJs}`);
+if (!/B_\d+\s*:\s*true/.test(pageJs) && !/B_\d+\s*:\s*\[/.test(pageJs)) {
+    fail(`page BindingId seeds should include literal inits (bool/array): ${pageJs}`);
+}
+if (/\bstore\s*:/.test(pageJs)) {
+    fail(`page data must seed b.B_* not field name store: ${pageJs}`);
+}
+if (/\bdeals\s*:/.test(pageJs)) {
+    fail(`page data must seed b.B_* not field name deals: ${pageJs}`);
+}
+if (/\bshowBanner\s*:/.test(pageJs)) {
+    fail(`page data must seed b.B_* not field name showBanner: ${pageJs}`);
+}
+if (!pageJs.includes('onShareAppMessage')) fail('page js missing onShareAppMessage');
+if (!pageJs.includes('getTabBar')) fail(`tab page missing getTabBar: ${pageJs}`);
 
 const app = JSON.parse(fs.readFileSync(appJsonPath, 'utf8'));
 if (!(app.pages || []).includes('pages/home/home')) {
@@ -143,9 +172,6 @@ if (String(project.miniprogramRoot).includes('miniprogram/')) {
 }
 if (project.appid !== 'touristappid') fail(`default appid ${project.appid}`);
 if (!fs.readFileSync(appJsPath, 'utf8').includes('App(')) fail('app.js missing App()');
-if (!fs.readFileSync(pageJsPath, 'utf8').includes('onShareAppMessage')) {
-    fail('page js missing onShareAppMessage');
-}
 const pageJson = JSON.parse(fs.readFileSync(path.join(pack, 'pages', 'home', 'home.json'), 'utf8'));
 if (pageJson.enableShareAppMessage !== true) {
     fail(`enableShareAppMessage ${pageJson.enableShareAppMessage}`);
@@ -162,10 +188,6 @@ if (!fs.existsSync(customTabJs)) fail('custom-tab-bar/index.js missing');
 if (!fs.readFileSync(customTabJs, 'utf8').includes('switchTab')) {
     fail('custom-tab-bar missing switchTab');
 }
-const pageJs = fs.readFileSync(pageJsPath, 'utf8');
-if (!pageJs.includes('store:')) fail(`page data missing store: ${pageJs}`);
-if (!pageJs.includes('Waitrose')) fail(`page data/share missing Waitrose: ${pageJs}`);
-if (!pageJs.includes('getTabBar')) fail(`tab page missing getTabBar: ${pageJs}`);
 const tabPng = path.join(pack, 'assets', 'tab-home.png');
 const tabOn = path.join(pack, 'assets', 'tab-home-on.png');
 if (!fs.existsSync(tabPng) || !fs.existsSync(tabOn)) fail('tab png missing');

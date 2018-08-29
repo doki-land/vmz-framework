@@ -16,7 +16,7 @@ use vmz_types::{
 fn home_unit() -> ProgramUnit {
     let view = ViewView {
         status: ViewStatus::Native,
-        binding_ids: vec![BindingId(0), BindingId(2), BindingId(3)],
+        binding_ids: vec![BindingId(0), BindingId(2), BindingId(3), BindingId(4)],
         region_ids: vec![],
         roots: vec![ViewNode::Element {
             tag: "div".into(),
@@ -66,17 +66,25 @@ fn home_unit() -> ProgramUnit {
                         region: None,
                     }),
                 },
+                ViewNode::If {
+                    region: None,
+                    binding: Some(BindingId(4)),
+                    branches: vec![vmz_types::ViewIfBranch {
+                        cond: Some("showBanner".into()),
+                        body: Box::new(ViewNode::Text { value: "banner".into() }),
+                    }],
+                },
             ],
             each: None,
         }],
     };
     let reactive = ReactiveComponent {
         name: "HomePage".into(),
-        state_slots: vec![StateSlot {
-            id: FieldId(0),
-            name: "store".into(),
-            kind: FieldKind::State,
-        }],
+        state_slots: vec![
+            StateSlot { id: FieldId(0), name: "store".into(), kind: FieldKind::State },
+            StateSlot { id: FieldId(1), name: "deals".into(), kind: FieldKind::State },
+            StateSlot { id: FieldId(2), name: "showBanner".into(), kind: FieldKind::State },
+        ],
         properties: vec![],
         bindings: vec![
             Binding::Text {
@@ -91,6 +99,18 @@ fn home_unit() -> ProgramUnit {
                 region: None,
                 expr: Some(ExprId(0)),
                 attr: "@click".into(),
+            },
+            Binding::EachList {
+                id: BindingId(3),
+                reads: vec![IrDepPath::Field(FieldId(1))],
+                region: None,
+                expr: Some(ExprId(2)),
+            },
+            Binding::IfCond {
+                id: BindingId(4),
+                reads: vec![IrDepPath::Field(FieldId(2))],
+                region: None,
+                expr: Some(ExprId(3)),
             },
         ],
         effects: vec![Effect {
@@ -143,13 +163,19 @@ fn stem_follows_wechat_page_file_layout() {
 
 #[test]
 fn emit_matches_rewrite_mini_home_markers() {
-    let (wxml, wxss) = emit_wechat_page(&home_unit(), ".page { padding: 24rpx; }\n").expect("ok");
+    let (wxml, wxss, patches) =
+        emit_wechat_page(&home_unit(), ".page { padding: 24rpx; }\n").expect("ok");
     assert!(wxml.contains("<view class=\"page\">"), "{wxml}");
     assert!(wxml.contains("bindtap=\"onStore\""), "{wxml}");
     assert!(wxml.contains("wx:for=\"{{b.B_3}}\""), "{wxml}");
+    assert!(wxml.contains("wx:if=\"{{b.B_4}}\""), "{wxml}");
     assert!(wxml.contains("{{item.title}}"), "{wxml}");
     assert!(!wxml.contains("@click"), "{wxml}");
     assert!(wxss.contains("24rpx"), "{wxss}");
+    assert!(patches.contains_key(&0), "{patches:?}");
+    assert!(patches.contains_key(&3), "{patches:?}");
+    assert!(patches.contains_key(&4), "{patches:?}");
+    assert!(!patches.contains_key(&2), "event binding must not seed data: {patches:?}");
 }
 
 #[test]
@@ -158,6 +184,20 @@ fn writes_pages_under_dist_wechat() {
         std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
     let dir = std::env::temp_dir().join(format!("vmz-wechat-pack-{nanos}"));
     fs::create_dir_all(dir.join("dist")).unwrap();
+    fs::create_dir_all(dir.join("src/pages")).unwrap();
+    fs::write(
+        dir.join("src/pages/home.vmz"),
+        r#"<template><div>{store}</div></template>
+<script client>
+export default class HomePage {
+  store = 'Waitrose';
+  deals = [{ id: 'd1', title: 'deal' }];
+  showBanner = true;
+}
+</script>
+"#,
+    )
+    .unwrap();
     let module = ProgramModule {
         schema: PROGRAM_SCHEMA.into(),
         source: "src/pages/home.vmz".into(),
@@ -186,16 +226,18 @@ fn writes_pages_under_dist_wechat() {
     let wxml = fs::read_to_string(&wxml_path).unwrap();
     let wxss = fs::read_to_string(&wxss_path).unwrap();
     assert!(wxml.contains("bindtap=\"onStore\""), "{wxml}");
+    assert!(wxml.contains("wx:if=\"{{b.B_4}}\""), "{wxml}");
     assert!(wxss.contains("#3d6b2f") || wxss.contains(".page"), "{wxss}");
+    let page_js_body = fs::read_to_string(&page_js).unwrap();
+    assert!(page_js_body.contains("onShareAppMessage"), "{page_js_body}");
+    assert!(page_js_body.contains("Waitrose"), "{page_js_body}");
+    assert!(page_js_body.contains("b:"), "{page_js_body}");
+    assert!(page_js_body.contains("B_0:"), "{page_js_body}");
+    assert!(page_js_body.contains("B_3:"), "{page_js_body}");
+    assert!(page_js_body.contains("B_4:"), "{page_js_body}");
     assert!(
-        fs::read_to_string(&page_js).unwrap().contains("onShareAppMessage"),
-        "{}",
-        fs::read_to_string(&page_js).unwrap()
-    );
-    assert!(
-        fs::read_to_string(&page_js).unwrap().contains("Waitrose"),
-        "{}",
-        fs::read_to_string(&page_js).unwrap()
+        !page_js_body.contains("store:"),
+        "must seed BindingId paths, not field names: {page_js_body}"
     );
     assert!(
         fs::read_to_string(&app_js).unwrap().contains("App("),
