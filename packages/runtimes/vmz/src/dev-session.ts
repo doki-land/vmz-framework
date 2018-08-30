@@ -18,12 +18,7 @@ import { buildIntegratedDocuments, projectHasDocuments } from './document-integr
 import { createWorkspace, resolveNativePath } from './index.js';
 import { emitLocaleRuntimeModules, localeHasErrors } from './locale-check.js';
 import { log } from './log.js';
-import {
-    coalesceRootBurst,
-    collectDevWatchRoots,
-    isDependencyPath,
-    mergeDirtySets,
-} from './dev-watch-roots.js';
+import { coalesceRootBurst, collectDevWatchRoots, isDependencyPath, mergeDirtySets } from './dev-watch-roots.js';
 import { diffFingerprints, fileFingerprintMap } from './watch-diff.js';
 
 /**
@@ -404,9 +399,7 @@ export function createDevSession(options) {
 
                 let needFullReload = batch.docsDirty;
                 if (batch.srcChanged.length || batch.srcDeleted.length) {
-                    log.info(
-                        `change detected (${batch.srcChanged.length} update, ${batch.srcDeleted.length} delete) — affected rebuild…`,
-                    );
+                    log.info(`change detected (${batch.srcChanged.length} update, ${batch.srcDeleted.length} delete) — affected rebuild…`);
                     const changes = [
                         ...batch.srcChanged.map((p) => ({ path: p, kind: /** @type {'update'} */ ('update') })),
                         ...batch.srcDeleted.map((p) => ({ path: p, kind: /** @type {'delete'} */ ('delete') })),

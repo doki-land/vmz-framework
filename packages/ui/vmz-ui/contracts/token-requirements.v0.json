@@ -239,12 +239,7 @@
         "Dialog": {
             "source": "src/components/Dialog.vmz",
             "stableHint": "ui.Dialog",
-            "tokens": [
-                "action.primary.background",
-                "focus.ring",
-                "motion.overlay.duration",
-                "motion.overlay.easing"
-            ],
+            "tokens": ["action.primary.background", "focus.ring", "motion.overlay.duration", "motion.overlay.easing"],
             "surfaces": ["WebSurface"],
             "contracts": [
                 "overlay-ownership",
@@ -298,12 +293,7 @@
         "Drawer": {
             "source": "src/components/Drawer.vmz",
             "stableHint": "ui.Drawer",
-            "tokens": [
-                "action.primary.background",
-                "focus.ring",
-                "motion.overlay.duration",
-                "motion.overlay.easing"
-            ],
+            "tokens": ["action.primary.background", "focus.ring", "motion.overlay.duration", "motion.overlay.easing"],
             "surfaces": ["WebSurface"],
             "contracts": [
                 "overlay-ownership",

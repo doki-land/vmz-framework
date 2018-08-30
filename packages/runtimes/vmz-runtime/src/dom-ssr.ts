@@ -497,10 +497,7 @@ function serializeRowFromKernel(inst, rk, box, key) {
         }
         const cause = _ssrDocumentLastError;
         const detail = cause && cause.message ? cause.message : 'unavailable';
-        throw new Error(
-            `vmz:dom SSR rowKernel requires a document (createItem omitted): ${detail}`,
-            cause ? { cause } : undefined,
-        );
+        throw new Error(`vmz:dom SSR rowKernel requires a document (createItem omitted): ${detail}`, cause ? { cause } : undefined);
     }
     const tpl = document.createElement('template');
     tpl.innerHTML = rk.html;

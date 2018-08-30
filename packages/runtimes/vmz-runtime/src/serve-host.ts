@@ -1378,9 +1378,7 @@ function emitEntryEvent(token) {
 function requireNativeGenerator() {
     if (_nativeGen !== undefined) {
         if (!_nativeGen) {
-            throw new Error(
-                'vmz native addon missing — run `pnpm napi:build` (serve entry printers live in vmz-generator via N-API)',
-            );
+            throw new Error('vmz native addon missing — run `pnpm napi:build` (serve entry printers live in vmz-generator via N-API)');
         }
         return _nativeGen;
     }
@@ -1436,9 +1434,7 @@ function requireNativeGenerator() {
         _nativeGen = null;
     }
     if (!_nativeGen) {
-        throw new Error(
-            'vmz native addon missing — run `pnpm napi:build` (serve entry printers live in vmz-generator via N-API)',
-        );
+        throw new Error('vmz native addon missing — run `pnpm napi:build` (serve entry printers live in vmz-generator via N-API)');
     }
     return _nativeGen;
 }

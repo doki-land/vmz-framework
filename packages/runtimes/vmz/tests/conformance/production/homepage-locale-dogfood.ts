@@ -137,10 +137,8 @@ export async function proveHomepageLocaleTransition(opts: {
                         String(s || '')
                             .replace(/\s+/g, '')
                             .trim();
-                    const text = (sel: string) =>
-                        norm((document.querySelector(sel) as HTMLElement | null)?.textContent || '');
-                    const href = (sel: string) =>
-                        (document.querySelector(sel) as HTMLAnchorElement | null)?.getAttribute('href') || '';
+                    const text = (sel: string) => norm((document.querySelector(sel) as HTMLElement | null)?.textContent || '');
+                    const href = (sel: string) => (document.querySelector(sel) as HTMLAnchorElement | null)?.getAttribute('href') || '';
                     return (
                         document.documentElement.getAttribute('data-locale') === expected.localeId &&
                         text('[data-dogfood="landing-hero-kicker"]') === expected.heroKicker &&
@@ -173,16 +171,12 @@ export async function proveHomepageLocaleTransition(opts: {
             return true;
         });
         if (!openLang) throw new Error('site-language details missing');
-        const hardDocLink = await page.evaluate(
-            () => !!document.querySelector('.site-language__menu a[href^="/d/"]'),
-        );
+        const hardDocLink = await page.evaluate(() => !!document.querySelector('.site-language__menu a[href^="/d/"]'));
         if (hardDocLink) throw new Error('language menu must not hard-link /d/…');
 
         await page.click('[data-dogfood="locale-en-us"]');
         await page.waitForFunction(
-            () =>
-                location.pathname.startsWith('/en-us') &&
-                document.documentElement.getAttribute('data-locale') === 'en-us',
+            () => location.pathname.startsWith('/en-us') && document.documentElement.getAttribute('data-locale') === 'en-us',
             { timeout: 15000 },
         );
         const enSnap = await waitBodyMatches(en, 'en-us');

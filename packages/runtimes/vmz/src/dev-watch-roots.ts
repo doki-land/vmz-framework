@@ -175,8 +175,7 @@ export function collectDevWatchRoots(opts) {
                 } catch {
                     /* keep */
                 }
-                const underProject =
-                    abs === project || abs.startsWith(project + path.sep) || abs.startsWith(project + '/');
+                const underProject = abs === project || abs.startsWith(project + path.sep) || abs.startsWith(project + '/');
                 if (underProject) continue;
                 const root = watchRootForSourceFile(abs);
                 if (root) depSet.add(path.resolve(root));
@@ -192,9 +191,7 @@ export function collectDevWatchRoots(opts) {
 
     // Drop dependency roots that are already under an application root.
     const dependencyRoots = [...depSet].filter((r) => {
-        return !applicationRoots.some(
-            (app) => r === app || r.startsWith(app + path.sep) || r.startsWith(app + '/'),
-        );
+        return !applicationRoots.some((app) => r === app || r.startsWith(app + path.sep) || r.startsWith(app + '/'));
     });
 
     const roots = [...applicationRoots];
@@ -212,7 +209,5 @@ export function collectDevWatchRoots(opts) {
  */
 export function isDependencyPath(file, dependencyRoots) {
     const abs = path.resolve(file);
-    return (dependencyRoots || []).some(
-        (r) => abs === r || abs.startsWith(r + path.sep) || abs.startsWith(r + '/'),
-    );
+    return (dependencyRoots || []).some((r) => abs === r || abs.startsWith(r + path.sep) || abs.startsWith(r + '/'));
 }

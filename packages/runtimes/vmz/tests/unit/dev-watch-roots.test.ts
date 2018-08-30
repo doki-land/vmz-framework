@@ -113,9 +113,7 @@ describe('dev-watch coalesce + roots (v0.1.5)', () => {
         const kitSrc = path.resolve(path.join(kit, 'src'));
         expect(watched.dependencyRoots.map((r) => path.resolve(r))).toContain(kitSrc);
         expect(watched.roots.map((r) => path.resolve(r))).toContain(kitSrc);
-        expect(watched.applicationRoots.some((r) => path.resolve(r) === path.resolve(path.join(app, 'src')))).toBe(
-            true,
-        );
+        expect(watched.applicationRoots.some((r) => path.resolve(r) === path.resolve(path.join(app, 'src')))).toBe(true);
 
         fs.rmSync(root, { recursive: true, force: true });
     });

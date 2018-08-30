@@ -45,10 +45,7 @@ export function unitBrowserPathPattern(unit: DeploymentPageUnit | null | undefin
     return filePathPatternFromChunk(String(unit?.chunkId || ''));
 }
 
-export type PathSeg =
-    | { kind: 'static'; value: string }
-    | { kind: 'param'; name: string }
-    | { kind: 'catch'; name: string };
+export type PathSeg = { kind: 'static'; value: string } | { kind: 'param'; name: string } | { kind: 'catch'; name: string };
 
 export function parsePathPattern(pattern: string): PathSeg[] {
     const raw = String(pattern || '').trim();

@@ -41,3 +41,7 @@ scripts/.placeholder-npm-cache.json
 # N-API / publish staging (under dist/; never commit)
 # Intermediate verify/build outputs stay in dist/ (already ignored above).
 artifacts/
+
+# Design/handoffs live only in workspace ????/ ? never recreate in this repo
+docs/
+
