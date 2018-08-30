@@ -422,8 +422,8 @@ function* streamSerializeChunks(node) {
 }
 
 /**
- * Document-free rowKernel SSR: fill generator text placeholders (` `) from textSlots + item.
- * Prefer this over linkedom — createItem was omitted because html + slots are enough.
+ * Document-free rowKernel SSR fill (transitional / pre-0.1.7 emit only).
+ * Prefer `serializeItem` (IR schedule). Do not treat this as the long-term contract.
  * @param {{ html: string, textSlots?: Record<string, number>, hostFields?: string[] }} rk
  * @param {any} item
  * @param {any} key
@@ -702,7 +702,11 @@ const serializeApi = {
             let dom = null;
             if (typeof spec.createItem === 'function') {
                 dom = spec.createItem.call(inst, serializeApi, box);
+            } else if (typeof spec.serializeItem === 'function') {
+                // IR-homologous schedule (v0.1.7): same Direct body as fat createItem.
+                dom = spec.serializeItem.call(inst, serializeApi, box);
             } else if (spec.rowKernel && typeof spec.rowKernel.html === 'string') {
+                // Transitional only: pre-0.1.7 emit without serializeItem.
                 dom = serializeRowFromKernel(inst, spec.rowKernel, box, k);
             }
             if (dom) {

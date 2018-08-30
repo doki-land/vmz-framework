@@ -691,17 +691,24 @@ function sendHtml(res, status, html) {
  * @param {AbortSignal} [signal]
  */
 async function sendHtmlStream(res, status, source, signal) {
-    res.writeHead(status, {
+    const aborted = () => Boolean(signal?.aborted || res.destroyed || res.writableEnded || !res.writable);
+    const headers = {
         'content-type': 'text/html; charset=utf-8',
         'transfer-encoding': 'chunked',
         'cache-control': 'no-cache',
-    });
-    const aborted = () => Boolean(signal?.aborted || res.destroyed || res.writableEnded || !res.writable);
+    };
+    // Defer writeHead until the first successful chunk so SSR throw → clean 500
+    // (not headersSent + destroy → ERR_EMPTY_RESPONSE).
+    let started = false;
     try {
         for await (const chunk of source) {
             if (aborted()) break;
             if (chunk == null || chunk === '') continue;
             const s = typeof chunk === 'string' ? chunk : String(chunk);
+            if (!started) {
+                res.writeHead(status, headers);
+                started = true;
+            }
             const ok = res.write(s);
             if (!ok) {
                 await Promise.race([
@@ -716,10 +723,16 @@ async function sendHtmlStream(res, status, source, signal) {
                 if (aborted()) break;
             }
         }
+        if (!started && !aborted()) {
+            res.writeHead(status, headers);
+            started = true;
+        }
     } catch (err) {
-        if (!aborted()) throw err;
+        if (aborted()) return;
+        // Before headers: let outer handler sendJson(500). After headers: rethrow → destroy.
+        throw err;
     }
-    if (!res.writableEnded && !res.destroyed) {
+    if (started && !res.writableEnded && !res.destroyed) {
         res.end();
     }
 }

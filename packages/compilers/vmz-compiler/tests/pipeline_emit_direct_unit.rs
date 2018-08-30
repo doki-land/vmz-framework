@@ -66,6 +66,26 @@ export default class ListDemo {
 }
 
 #[test]
+fn each_row_kernel_emits_serialize_item_with_null_create_item() {
+    let src = r#"
+export default class DealsPage {
+  deals: { id: string; title: string; note: string }[] = [];
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<div><article class="deal" each={deals} as="d" key={d.id}><h3>{d.title}</h3><p>{d.note}</p></article></div>"#,
+    );
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains("rowKernel:"), "expected rowKernel for static deals row: {js}");
+    assert!(js.contains("createItem: null"), "client createItem must be null: {js}");
+    assert!(js.contains("serializeItem:"), "SSR must get IR-homologous serializeItem: {js}");
+    assert!(js.contains("api.bindText(this,"), "serializeItem body uses bindText: {js}");
+}
+
+#[test]
 fn component_tag_is_eligible() {
     let src = r#"
 export default class Host {
