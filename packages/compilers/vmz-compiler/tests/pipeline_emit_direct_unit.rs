@@ -25,7 +25,10 @@ export default class CounterButton {
     assert!(is_direct_eligible(view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
     assert!(js.contains("__vmzDirect = true"), "{js}");
-    assert!(js.contains("__vmzCreate = function __vmzCreate(api)"), "{js}");
+    assert!(
+        js.contains("function __vmzCreate(api)"),
+        "expected __vmzCreate factory: {js}"
+    );
     assert!(js.contains("api.bindText(this,"), "{js}");
     assert!(js.contains("api.bindText(this, 1,"), "{js}");
     assert!(!js.contains("prototype.render"), "{js}");
