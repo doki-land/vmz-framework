@@ -1,0 +1,12 @@
+<template>
+  <p data-testid="brand">{label}</p>
+</template>
+<script client>
+import { brand } from '#locales/common';
+
+export default class IndexPage {
+  get label() {
+    return brand();
+  }
+}
+</script>

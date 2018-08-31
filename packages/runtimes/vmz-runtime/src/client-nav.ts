@@ -419,10 +419,11 @@ export function installClientNavigation(opts = {}) {
 
     /**
      * Atomic LocaleTransition (browser host slice):
-     * validate → realize path → navigate/fetch → commit locale attrs from SSR HTML.
+     * - prefix: validate → realize path → navigate/fetch → commit locale attrs from SSR HTML
+     * - none: validate → Host persist (localStorage+cookie) → commit attrs → reload (v1; no URL rewrite)
      * Failure keeps the previous locale surface (no half-page commit).
      * @param {string} toLocale
-     * @param {{ replace?: boolean }} [opts]
+     * @param {{ replace?: boolean, reload?: boolean }} [opts]
      */
     async function transitionLocale(toLocale, opts = {}) {
         const fromLocale = doc.documentElement?.getAttribute('data-locale') || null;
@@ -458,6 +459,11 @@ export function installClientNavigation(opts = {}) {
             };
             if (win) win.__vmzLastLocaleTransition = out;
             return out;
+        }
+
+        const strategy = routing.strategy || 'prefix';
+        if (strategy === 'none') {
+            return transitionLocaleNone(toLocale, fromLocale, opts);
         }
 
         const gen = ++localeTransitionGeneration;
@@ -517,6 +523,60 @@ export function installClientNavigation(opts = {}) {
             generation: gen,
         };
         if (win) win.__vmzLastLocaleTransition = out;
+        return out;
+    }
+
+    /**
+     * `routing.strategy: 'none'` — LocaleId is Host preference, not URL.
+     * Persist → commit document attrs + hint → full reload so `#locales/*` re-resolve (I2 v1).
+     * @param {string} toLocale
+     * @param {string | null} fromLocale
+     * @param {{ reload?: boolean }} [opts]
+     */
+    function transitionLocaleNone(toLocale, fromLocale, opts = {}) {
+        const STORE_KEY = 'vmz.locale';
+        try {
+            try {
+                localStorage.setItem(STORE_KEY, toLocale);
+            } catch {
+                /* private mode */
+            }
+            try {
+                doc.cookie = `${STORE_KEY}=${encodeURIComponent(toLocale)}; path=/; max-age=31536000; SameSite=Lax`;
+            } catch {
+                /* ignore */
+            }
+            if (doc.documentElement) {
+                doc.documentElement.setAttribute('data-locale', toLocale);
+                doc.documentElement.setAttribute('lang', toLocale);
+            }
+            if (win) win.__vmzLocaleIdHint = toLocale;
+        } catch (err) {
+            const out = {
+                status: 'rolled_back',
+                fromLocale,
+                toLocale,
+                reason: 'persist_failed',
+                detail: err && err.message ? String(err.message) : String(err),
+            };
+            if (win) win.__vmzLastLocaleTransition = out;
+            return out;
+        }
+
+        const out = {
+            status: 'committed',
+            fromLocale,
+            toLocale,
+            reason: 'ok',
+            strategy: 'none',
+            href: loc.pathname + loc.search,
+            reload: opts.reload !== false,
+        };
+        if (win) win.__vmzLastLocaleTransition = out;
+        // Reload so generated `#locales` modules re-run __vmzLocaleId() with new preference.
+        if (opts.reload !== false && loc && typeof loc.reload === 'function') {
+            loc.reload();
+        }
         return out;
     }
 
