@@ -52,7 +52,7 @@ import {
   langZhFull,
   langEn,
 } from '#locales/common';
-import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../lib/locale-copy.ts';
+import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
 
 export default class SiteHeader {
   localeId = 'zh-hans';

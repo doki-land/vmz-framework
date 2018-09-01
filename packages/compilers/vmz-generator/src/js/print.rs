@@ -95,7 +95,11 @@ pub fn print_js_program<'a>(
 }
 
 /// Parse `source` as JS/TS (from `filename` extension) then [`print_js_program`].
-pub fn print_js_source(source: &str, filename: &str, options: &JsPrintOptions) -> Result<EmittedJs, String> {
+pub fn print_js_source(
+    source: &str,
+    filename: &str,
+    options: &JsPrintOptions,
+) -> Result<EmittedJs, String> {
     let allocator = Allocator::default();
     let source_type = SourceType::from_path(filename).unwrap_or_else(|_| SourceType::mjs());
     let parsed = Parser::new(&allocator, source, source_type).parse();
@@ -110,11 +114,7 @@ pub fn print_js_source(source: &str, filename: &str, options: &JsPrintOptions) -
 fn source_mapping_url(options: &JsPrintOptions) -> Option<String> {
     let path = options.source_map_path.as_ref()?;
     let name = path.file_name()?.to_string_lossy();
-    if name.ends_with(".map") {
-        Some(name.into_owned())
-    } else {
-        Some(format!("{name}.map"))
-    }
+    if name.ends_with(".map") { Some(name.into_owned()) } else { Some(format!("{name}.map")) }
 }
 
 #[cfg(test)]
@@ -125,11 +125,21 @@ mod tests {
     fn minify_and_map_together() {
         let src = "export function keepMe(x) {\n  const unusedDead = 1;\n  const longName = 1 + 1;\n  return longName + x;\n}\n";
         let pretty = print_js_source(src, "keep.js", &JsPrintOptions::mapped("keep.js")).unwrap();
-        let mini = print_js_source(src, "keep.js", &JsPrintOptions::release_mapped("keep.js")).unwrap();
-        assert!(pretty.map.as_ref().is_some_and(|m| m.contains("\"mappings\"")), "{:?}", pretty.map);
+        let mini =
+            print_js_source(src, "keep.js", &JsPrintOptions::release_mapped("keep.js")).unwrap();
+        assert!(
+            pretty.map.as_ref().is_some_and(|m| m.contains("\"mappings\"")),
+            "{:?}",
+            pretty.map
+        );
         assert!(mini.map.as_ref().is_some_and(|m| m.contains("\"mappings\"")), "{:?}", mini.map);
         assert!(mini.code.contains("sourceMappingURL=keep.js.map"), "{}", mini.code);
-        assert!(mini.code.len() < pretty.code.len(), "mini={} pretty={}", mini.code.len(), pretty.code.len());
+        assert!(
+            mini.code.len() < pretty.code.len(),
+            "mini={} pretty={}",
+            mini.code.len(),
+            pretty.code.len()
+        );
         assert!(!mini.code.contains("unusedDead"), "{}", mini.code);
         assert!(mini.code.contains("keepMe"), "top-level export kept: {}", mini.code);
     }
@@ -137,15 +147,23 @@ mod tests {
     #[test]
     fn inner_binding_mangles_without_reserved_vmz() {
         let src = "export function wrap() {\n  function __vmzCreate(api) { return api; }\n  return __vmzCreate;\n}\n";
-        let mini = print_js_source(src, "x.js", &JsPrintOptions { minify: true, source_map_path: None }).unwrap();
+        let mini =
+            print_js_source(src, "x.js", &JsPrintOptions { minify: true, source_map_path: None })
+                .unwrap();
         assert!(!mini.code.contains("__vmzCreate"), "local binding should mangle: {}", mini.code);
         assert!(mini.code.contains("wrap"), "{}", mini.code);
     }
 
     #[test]
     fn property_key_vmz_create_stays() {
-        let src = "export class Home {}\nHome.__vmzCreate = function __vmzCreate(api) { return api; };\n";
-        let mini = print_js_source(src, "Home.js", &JsPrintOptions { minify: true, source_map_path: None }).unwrap();
+        let src =
+            "export class Home {}\nHome.__vmzCreate = function __vmzCreate(api) { return api; };\n";
+        let mini = print_js_source(
+            src,
+            "Home.js",
+            &JsPrintOptions { minify: true, source_map_path: None },
+        )
+        .unwrap();
         assert!(mini.code.contains("__vmzCreate"), "ABI property key stays: {}", mini.code);
     }
 }

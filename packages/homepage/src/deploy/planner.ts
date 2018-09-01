@@ -81,7 +81,7 @@ const STATIC_HOSTS_DOC = `${DEPLOY_GUIDE}/static-hosts`;
 
 /** Heading ids must match document renderer slugify (see dist recipes.html). */
 const RECIPE_DOCS: Record<string, string> = {
-    'static': `${DEPLOY_GUIDE}/recipes#static-只有-cdn-对象存储`,
+    static: `${DEPLOY_GUIDE}/recipes#static-只有-cdn-对象存储`,
     'web-ssr': `${DEPLOY_GUIDE}/recipes#web-ssr-单机全栈默认`,
     'web-hybrid': `${DEPLOY_GUIDE}/recipes#web-hybrid-cdn-独立服务端`,
     'web-client': `${DEPLOY_GUIDE}/recipes#web-client-纯前端-本地盘`,

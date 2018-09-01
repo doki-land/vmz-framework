@@ -127,11 +127,8 @@ fn indent_block(content: &str, settings: &EditorSettings) -> String {
     let lines = normalize_relative_lines(content);
     let mut out = String::new();
     for line in lines {
-        let line = if settings.trim_trailing_whitespace {
-            line.trim_end().to_string()
-        } else {
-            line
-        };
+        let line =
+            if settings.trim_trailing_whitespace { line.trim_end().to_string() } else { line };
         if line.is_empty() {
             out.push_str(nl);
         } else {

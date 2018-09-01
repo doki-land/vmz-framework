@@ -167,7 +167,8 @@ pub fn try_emit_row_kernel_js(
         "(function(){{ var hydrate = {hydrate}; var applyByField = {apply_by_field}; var apply = {apply}; var create = {create}; return {{ html: {:?}, hydrate: hydrate, apply: apply, applyByField: applyByField, create: create, events: [{events_js}]{key_field_js}{host_fields_js}{act_arg_js}{item_fields_js}{class_item_js}{text_slots_js} }}; }})()",
         html
     );
-    let reprinted = super::ast_util::oxc_reprint_module_required(&format!("{iife};\n"), "rowKernel");
+    let reprinted =
+        super::ast_util::oxc_reprint_module_required(&format!("{iife};\n"), "rowKernel");
     let expr = reprinted.trim().trim_end_matches(';').trim();
     Some(format!("rowKernel: {expr}, "))
 }

@@ -17,16 +17,28 @@ function dealSerializeItem(api: any, box: { item: { title: string; note: string 
     api.attr(root, 'class', 'deal');
     const h = api.el('h3');
     const tTitle = api.text('');
-    api.bindText(this, null, [], function () {
-        return box.item.title;
-    }, tTitle);
+    api.bindText(
+        this,
+        null,
+        [],
+        function () {
+            return box.item.title;
+        },
+        tTitle,
+    );
     h.appendChild(tTitle);
     root.appendChild(h);
     const p = api.el('p');
     const tNote = api.text('');
-    api.bindText(this, null, [], function () {
-        return box.item.note;
-    }, tNote);
+    api.bindText(
+        this,
+        null,
+        [],
+        function () {
+            return box.item.note;
+        },
+        tNote,
+    );
     p.appendChild(tNote);
     root.appendChild(p);
     return root;
@@ -103,9 +115,15 @@ describe('rowKernel SSR (serializeItem / IR)', () => {
                         serializeItem(apiInner: any, box: { item: { label: string } }) {
                             const li = apiInner.el('li');
                             const t = apiInner.text('');
-                            apiInner.bindText(this, null, [], function () {
-                                return box.item.label;
-                            }, t);
+                            apiInner.bindText(
+                                this,
+                                null,
+                                [],
+                                function () {
+                                    return box.item.label;
+                                },
+                                t,
+                            );
                             li.appendChild(t);
                             return li;
                         },

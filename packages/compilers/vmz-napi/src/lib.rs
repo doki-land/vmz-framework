@@ -1455,10 +1455,7 @@ pub fn generate_locale_typed_module(
             params: e
                 .params
                 .into_iter()
-                .map(|p| vmz_generator::js::LocaleTypedParam {
-                    name: p.name,
-                    kind: p.kind,
-                })
+                .map(|p| vmz_generator::js::LocaleTypedParam { name: p.name, kind: p.kind })
                 .collect(),
         })
         .collect();

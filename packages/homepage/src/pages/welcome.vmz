@@ -25,7 +25,7 @@
 
 <script client>
 import { brand, docs, explore, start } from '#locales/common';
-import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../lib/locale-copy.ts';
+import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
 
 export default class WelcomePage {
   localeId = 'zh-hans';

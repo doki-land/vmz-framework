@@ -33,16 +33,8 @@ fn normalize_style_body(source: &str, settings: &EditorSettings) -> String {
     let mut lines: Vec<String> = source
         .lines()
         .map(|l| {
-            let l = if settings.trim_trailing_whitespace {
-                l.trim_end()
-            } else {
-                l
-            };
-            if l.is_empty() {
-                String::new()
-            } else {
-                format!("{unit}{l}")
-            }
+            let l = if settings.trim_trailing_whitespace { l.trim_end() } else { l };
+            if l.is_empty() { String::new() } else { format!("{unit}{l}") }
         })
         .collect();
     while lines.last().is_some_and(|l| l.is_empty()) {

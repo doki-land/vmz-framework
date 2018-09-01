@@ -45,7 +45,10 @@ impl FormatReport {
 ///
 /// Directory walks stay local to `path` (skip `node_modules` / `dist` / …).
 /// Unlike compile discovery, author format does **not** rewrite dependency packages.
-pub fn format_path(path: impl AsRef<Path>, options: &FormatOptions) -> vmz_compiler::Result<FormatReport> {
+pub fn format_path(
+    path: impl AsRef<Path>,
+    options: &FormatOptions,
+) -> vmz_compiler::Result<FormatReport> {
     let path = path.as_ref();
     let mut report = FormatReport::default();
     if path.is_file() {

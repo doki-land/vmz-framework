@@ -44,11 +44,8 @@ pub fn emit_wechat_wxml(
         return Err(ctx.errors);
     }
 
-    let template = if roots.len() == 1 {
-        body
-    } else {
-        format!("<view class=\"vmz-root\">{body}</view>")
-    };
+    let template =
+        if roots.len() == 1 { body } else { format!("<view class=\"vmz-root\">{body}</view>") };
 
     Ok(MiniTemplateEmit { template, patch_bindings, handlers: ctx.handlers })
 }
@@ -379,83 +376,81 @@ mod tests {
     #[test]
     fn home_slice_matches_rewrite_mini_shape() {
         // Mirrors rewrite-mini home: store interp, bindtap, wx:for deals.
-        let roots = [
-            ViewNode::Element {
-                tag: "div".into(),
-                attrs: vec![ViewAttr {
-                    name: "class".into(),
-                    value: ViewAttrValue::Static { value: "page".into() },
-                    binding: None,
-                }],
-                children: vec![
-                    ViewNode::Element {
-                        tag: "div".into(),
-                        attrs: vec![
-                            ViewAttr {
-                                name: "class".into(),
-                                value: ViewAttrValue::Static { value: "loc".into() },
-                                binding: None,
-                            },
-                            ViewAttr {
-                                name: "@click".into(),
-                                value: ViewAttrValue::Interp { expr: "onStore".into() },
-                                binding: Some(BindingId(2)),
-                            },
-                        ],
-                        children: vec![ViewNode::Element {
-                            tag: "span".into(),
-                            attrs: vec![ViewAttr {
-                                name: "class".into(),
-                                value: ViewAttrValue::Static { value: "loc-name".into() },
-                                binding: None,
-                            }],
-                            children: vec![ViewNode::Interp {
-                                expr: "store".into(),
-                                binding: Some(BindingId(0)),
-                            }],
-                            each: None,
+        let roots = [ViewNode::Element {
+            tag: "div".into(),
+            attrs: vec![ViewAttr {
+                name: "class".into(),
+                value: ViewAttrValue::Static { value: "page".into() },
+                binding: None,
+            }],
+            children: vec![
+                ViewNode::Element {
+                    tag: "div".into(),
+                    attrs: vec![
+                        ViewAttr {
+                            name: "class".into(),
+                            value: ViewAttrValue::Static { value: "loc".into() },
+                            binding: None,
+                        },
+                        ViewAttr {
+                            name: "@click".into(),
+                            value: ViewAttrValue::Interp { expr: "onStore".into() },
+                            binding: Some(BindingId(2)),
+                        },
+                    ],
+                    children: vec![ViewNode::Element {
+                        tag: "span".into(),
+                        attrs: vec![ViewAttr {
+                            name: "class".into(),
+                            value: ViewAttrValue::Static { value: "loc-name".into() },
+                            binding: None,
+                        }],
+                        children: vec![ViewNode::Interp {
+                            expr: "store".into(),
+                            binding: Some(BindingId(0)),
                         }],
                         each: None,
-                    },
-                    ViewNode::Element {
-                        tag: "div".into(),
-                        attrs: vec![
-                            ViewAttr {
-                                name: "class".into(),
-                                value: ViewAttrValue::Static { value: "deal".into() },
-                                binding: None,
-                            },
-                            ViewAttr {
-                                name: "data-id".into(),
-                                value: ViewAttrValue::Interp { expr: "item.id".into() },
-                                binding: None,
-                            },
-                        ],
-                        children: vec![ViewNode::Interp {
-                            expr: "item.title".into(),
-                            binding: Some(BindingId(1)),
-                        }],
-                        each: Some(ViewEach {
-                            list_expr: "deals".into(),
-                            as_name: "item".into(),
-                            key_expr: Some("item.id".into()),
-                            list_binding: Some(BindingId(3)),
-                            key_binding: None,
-                            region: None,
-                        }),
-                    },
-                    ViewNode::If {
+                    }],
+                    each: None,
+                },
+                ViewNode::Element {
+                    tag: "div".into(),
+                    attrs: vec![
+                        ViewAttr {
+                            name: "class".into(),
+                            value: ViewAttrValue::Static { value: "deal".into() },
+                            binding: None,
+                        },
+                        ViewAttr {
+                            name: "data-id".into(),
+                            value: ViewAttrValue::Interp { expr: "item.id".into() },
+                            binding: None,
+                        },
+                    ],
+                    children: vec![ViewNode::Interp {
+                        expr: "item.title".into(),
+                        binding: Some(BindingId(1)),
+                    }],
+                    each: Some(ViewEach {
+                        list_expr: "deals".into(),
+                        as_name: "item".into(),
+                        key_expr: Some("item.id".into()),
+                        list_binding: Some(BindingId(3)),
+                        key_binding: None,
                         region: None,
-                        binding: Some(BindingId(4)),
-                        branches: vec![ViewIfBranch {
-                            cond: Some("show".into()),
-                            body: Box::new(ViewNode::Text { value: "hi".into() }),
-                        }],
-                    },
-                ],
-                each: None,
-            },
-        ];
+                    }),
+                },
+                ViewNode::If {
+                    region: None,
+                    binding: Some(BindingId(4)),
+                    branches: vec![ViewIfBranch {
+                        cond: Some("show".into()),
+                        body: Box::new(ViewNode::Text { value: "hi".into() }),
+                    }],
+                },
+            ],
+            each: None,
+        }];
         let emit = emit_wechat_wxml(&roots, Some(&on_store_reactive())).expect("ok");
         assert!(emit.template.contains("<view class=\"page\">"), "{}", emit.template);
         assert!(emit.template.contains("bindtap=\"onStore\""), "{}", emit.template);

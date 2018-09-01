@@ -15,8 +15,8 @@ mod transpile;
 
 pub use deps::collect_template_deps;
 pub use emit::{
-    ServerBridge, emit_client_module, emit_entry_client, emit_server_module, rewrite_ts_spec_imports,
-    rewrite_virtual_import,
+    ServerBridge, emit_client_module, emit_entry_client, emit_server_module,
+    rewrite_ts_spec_imports, rewrite_virtual_import,
 };
 pub use emit_direct::{emit_direct_create, emit_vmz_plan, is_direct_eligible};
 pub use emit_ir::{IrDepCursor, TakenBinding, TakenCfBranch, TakenControlFlow};

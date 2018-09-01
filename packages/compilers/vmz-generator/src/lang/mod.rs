@@ -57,8 +57,5 @@ pub type ServerType = {type_name};
             .collect::<Vec<_>>(),
     });
 
-    (
-        rs,
-        crate::to_pretty_json(&table).unwrap_or_else(|_| "{}".into()),
-    )
+    (rs, crate::to_pretty_json(&table).unwrap_or_else(|_| "{}".into()))
 }

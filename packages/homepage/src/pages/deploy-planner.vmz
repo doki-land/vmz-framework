@@ -404,7 +404,7 @@
 </style>
 
 <script client>
-import { buildDeployPlan, DEFAULT_ANSWERS } from '../lib/deploy-planner.ts';
+import { buildDeployPlan, DEFAULT_ANSWERS } from '../deploy/planner.ts';
 
 export default class DeployPlannerPage {
   secrets = DEFAULT_ANSWERS.secrets;

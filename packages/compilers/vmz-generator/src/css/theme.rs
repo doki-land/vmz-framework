@@ -121,7 +121,8 @@ mod tests {
         assert!(css.contains(":root"));
         // oxc_formatter_css may rewrite `"a\"b"` to `'a"b'`; either form is escaped.
         assert!(
-            css.contains("[data-theme=") && (css.contains("\\\"") || css.contains("'a\"b'") || css.contains(r#""a\"b""#)),
+            css.contains("[data-theme=")
+                && (css.contains("\\\"") || css.contains("'a\"b'") || css.contains(r#""a\"b""#)),
             "theme id must remain escaped in attr selector: {css}"
         );
         validate_css(&css).expect("theme css must parse");

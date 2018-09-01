@@ -51,11 +51,7 @@ impl Default for EditorSettings {
 impl EditorSettings {
     /// Indent string for one level of template / data-block envelope.
     pub fn indent_unit(&self) -> String {
-        if self.use_tabs {
-            "\t".to_string()
-        } else {
-            " ".repeat(usize::from(self.indent_width))
-        }
+        if self.use_tabs { "\t".to_string() } else { " ".repeat(usize::from(self.indent_width)) }
     }
 
     /// Line break sequence for SFC assembly.
@@ -68,11 +64,7 @@ impl EditorSettings {
     }
 
     fn core_indent_style(&self) -> IndentStyle {
-        if self.use_tabs {
-            IndentStyle::Tab
-        } else {
-            IndentStyle::Space
-        }
+        if self.use_tabs { IndentStyle::Tab } else { IndentStyle::Space }
     }
 
     fn core_indent_width(&self) -> IndentWidth {

@@ -30,7 +30,10 @@ pub fn transpile_ts_with_map(
     transpile_ts_printed(
         source,
         filename,
-        &JsPrintOptions { minify: false, source_map_path: source_map_path.map(|p| p.to_path_buf()) },
+        &JsPrintOptions {
+            minify: false,
+            source_map_path: source_map_path.map(|p| p.to_path_buf()),
+        },
     )
 }
 

@@ -7,7 +7,10 @@ use vmz_compiler::{ScriptBlock, ScriptLanguage};
 use crate::editorconfig::EditorSettings;
 
 /// Format one script block. Non-TS languages keep body text (envelope trim only).
-pub fn format_script_block(block: &ScriptBlock, settings: &EditorSettings) -> Result<String, String> {
+pub fn format_script_block(
+    block: &ScriptBlock,
+    settings: &EditorSettings,
+) -> Result<String, String> {
     match block.lang {
         ScriptLanguage::Ts => format_ts(&block.content, settings),
         ScriptLanguage::Rust | ScriptLanguage::Python | ScriptLanguage::Java => {
@@ -34,11 +37,7 @@ fn normalize_body(source: &str, settings: &EditorSettings) -> String {
     let mut lines: Vec<String> = source
         .lines()
         .map(|l| {
-            if settings.trim_trailing_whitespace {
-                l.trim_end().to_string()
-            } else {
-                l.to_string()
-            }
+            if settings.trim_trailing_whitespace { l.trim_end().to_string() } else { l.to_string() }
         })
         .collect();
     while lines.last().is_some_and(|l| l.is_empty()) {

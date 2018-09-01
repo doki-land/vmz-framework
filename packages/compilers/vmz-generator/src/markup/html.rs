@@ -285,10 +285,7 @@ pub fn emit_page_shell(input: &PageShellInput) -> String {
     }];
 
     if !input.is_error_document {
-        let src = input
-            .module_script_src
-            .clone()
-            .unwrap_or_else(|| "/entry-client.js".into());
+        let src = input.module_script_src.clone().unwrap_or_else(|| "/entry-client.js".into());
         if !src.is_empty() {
             body_kids.push(el("script", vec![attr("type", "module"), attr("src", src)], vec![]));
         }
@@ -298,7 +295,8 @@ pub fn emit_page_shell(input: &PageShellInput) -> String {
         body_kids.push(MarkupNode::Raw(input.body_tail_html.clone()));
     }
 
-    let mut html_attrs = vec![attr("lang", locale_id), attr("data-locale", locale_id), attr("dir", dir)];
+    let mut html_attrs =
+        vec![attr("lang", locale_id), attr("data-locale", locale_id), attr("dir", dir)];
     html_attrs.extend(input.html_extra_attrs.iter().cloned());
 
     let doc = MarkupDocument {

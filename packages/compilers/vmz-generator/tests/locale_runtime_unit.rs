@@ -13,16 +13,13 @@ fn none_strategy_reads_local_storage_before_data_locale() {
         }],
     )
     .code;
-    let none = js
-        .find("strategy === \"none\"")
-        .expect("must branch on routing.strategy none");
+    let none = js.find("strategy === \"none\"").expect("must branch on routing.strategy none");
     let after_none = &js[none..];
     let pref = after_none
         .find("localStorage.getItem(\"vmz.locale\")")
         .expect("none branch must read vmz.locale");
-    let data_locale = js
-        .find("getAttribute(\"data-locale\")")
-        .expect("must still fall back to data-locale");
+    let data_locale =
+        js.find("getAttribute(\"data-locale\")").expect("must still fall back to data-locale");
     assert!(
         none + pref < data_locale,
         "for strategy none, localStorage preference must run before data-locale fallback"

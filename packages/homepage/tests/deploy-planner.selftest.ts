@@ -2,7 +2,7 @@
  * Smoke checks for deploy-planner decision table + agent prompt.
  * Run: pnpm --filter @vmz/homepage test:deploy-planner
  */
-import { buildDeployPlan, DEFAULT_ANSWERS } from '../src/lib/deploy-planner.ts';
+import { buildDeployPlan, DEFAULT_ANSWERS } from '../src/deploy/planner.ts';
 
 function assert(cond: boolean, msg: string) {
     if (!cond) throw new Error(msg);

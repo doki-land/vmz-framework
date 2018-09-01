@@ -166,10 +166,7 @@ fn emit_create_body(
         1 => roots[0].clone(),
         _ => {
             let frag = fresh("f", next_id);
-            stmts.insert(
-                0,
-                print_one_stmt(|b| b.var_stmt(&frag, b.api_call("frag", vec![]))),
-            );
+            stmts.insert(0, print_one_stmt(|b| b.var_stmt(&frag, b.api_call("frag", vec![]))));
             for r in &roots {
                 let child = r.clone();
                 stmts.push(print_one_stmt(|b| {
@@ -369,9 +366,7 @@ fn emit_plain_element(
 ) -> String {
     let el = fresh("e", next_id);
     let tag_owned = tag.to_string();
-    stmts.push(print_one_stmt(|b| {
-        b.var_stmt(&el, b.api_call("el", vec![b.str_lit(&tag_owned)]))
-    }));
+    stmts.push(print_one_stmt(|b| b.var_stmt(&el, b.api_call("el", vec![b.str_lit(&tag_owned)]))));
     for a in attrs {
         if a.name == "style:tw" {
             continue;
@@ -388,7 +383,9 @@ fn emit_plain_element(
                 let name = attr_name.to_string();
                 let val = s.clone();
                 stmts.push(print_one_stmt(|b| {
-                    b.expr_stmt(b.api_call("attr", vec![b.ident(&el), b.str_lit(&name), b.str_lit(&val)]))
+                    b.expr_stmt(
+                        b.api_call("attr", vec![b.ident(&el), b.str_lit(&name), b.str_lit(&val)]),
+                    )
                 }));
             }
             ViewAttrValue::Bare => {}
@@ -681,11 +678,8 @@ fn bind_payload(
         && let Some(cf) = ir.control_flow_for_binding(bid.0)
         && let Some((test_src, _, _)) = split_ternary_parts(expr)
     {
-        let stable = cf
-            .branches
-            .first()
-            .map(|b| b.cond_deps.clone())
-            .unwrap_or_else(|| cf.stable.clone());
+        let stable =
+            cf.branches.first().map(|b| b.cond_deps.clone()).unwrap_or_else(|| cf.stable.clone());
         let cons_deps = cf.branches.first().map(|b| b.body_deps.clone()).unwrap_or_default();
         let alt_deps = cf.branches.get(1).map(|b| b.body_deps.clone()).unwrap_or_default();
         let mut deps_all = cf.stable.clone();

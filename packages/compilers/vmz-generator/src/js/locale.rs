@@ -111,26 +111,22 @@ pub struct LocaleTypedExport {
 /// Emit `#locales/{catalog}.d.ts` stub text (`vmz.locale.typed_module.v0`).
 pub fn emit_locale_typed_module(module_label: &str, exports: &[LocaleTypedExport]) -> String {
     let mut lines = vec![
-        format!("/** Generated LocalizedText module - {module_label} (vmz.locale.typed_module.v0) */"),
+        format!(
+            "/** Generated LocalizedText module - {module_label} (vmz.locale.typed_module.v0) */"
+        ),
         "export type LocalizedText = string & { readonly __brand: 'LocalizedText' };".into(),
         String::new(),
     ];
     for exp in exports {
         if exp.params.is_empty() {
-            lines.push(format!(
-                "export declare function {}(): LocalizedText;",
-                exp.export_name
-            ));
+            lines.push(format!("export declare function {}(): LocalizedText;", exp.export_name));
         } else {
             let args: Vec<String> = exp
                 .params
                 .iter()
                 .map(|p| {
-                    let ty = if p.kind == "plural" || p.kind == "number" {
-                        "number"
-                    } else {
-                        "string"
-                    };
+                    let ty =
+                        if p.kind == "plural" || p.kind == "number" { "number" } else { "string" };
                     format!("{}: {ty}", p.name)
                 })
                 .collect();
@@ -162,6 +158,8 @@ mod tests {
             ],
         );
         assert!(text.contains("export declare function hello(): LocalizedText;"));
-        assert!(text.contains("export declare function count(args: { n: number }): LocalizedText;"));
+        assert!(
+            text.contains("export declare function count(args: { n: number }): LocalizedText;")
+        );
     }
 }
