@@ -11,7 +11,7 @@ describe('delivery profiles (B0)', () => {
         expect(norm.ok).toBe(true);
         if (!norm.ok) return;
         expect(norm.table.default).toBe('web-ssr');
-        expect(norm.table.profiles['web-static'].assembly).toBe('static-cdn');
+        expect(norm.table.profiles.static.assembly).toBe('static-cdn');
         const sel = selectBuildProfile(norm.table, '');
         expect(sel.ok).toBe(true);
         if (!sel.ok) return;
@@ -19,11 +19,11 @@ describe('delivery profiles (B0)', () => {
         expect(sel.selection.assembly).toBe('server-host');
     });
 
-    it('selects --profile web-static from builtins', () => {
+    it('selects --profile static from builtins', () => {
         const norm = normalizeDeliveryAuthoring(null);
         expect(norm.ok).toBe(true);
         if (!norm.ok) return;
-        const sel = selectBuildProfile(norm.table, 'web-static');
+        const sel = selectBuildProfile(norm.table, 'static');
         expect(sel.ok).toBe(true);
         if (!sel.ok) return;
         expect(sel.selection.assembly).toBe('static-cdn');

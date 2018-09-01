@@ -142,7 +142,7 @@ export function normalizeSiteDelivery(raw, opts = {}) {
         artifact: String(d.artifact),
         expectedCompatibility: d.expectedCompatibility || {
             runtime: 'vmz',
-            deliveryProfiles: ['web-static', 'filesystem'],
+            deliveryProfiles: ['static', 'filesystem'],
         },
         sources,
         resolutionPolicy: {

@@ -7,7 +7,7 @@ Authors should not memorize `assembly` enums first. Ask: **what machines and tru
 
 | Your setup | Recipe | Build |
 |------------|--------|-------|
-| Object storage / CDN only, no trusted backend | `web-static` | `vmz build --profile web-static` |
+| Object storage / CDN only, no trusted backend | `static` | `vmz build --profile static` |
 | One Node (or later Rust host) for the whole site | `web-ssr` (default) | `vmz build` |
 | CDN for static + separate SSR/API host | `web-hybrid` | `vmz build --profile web-hybrid` |
 | Local disk / client-only practice | `web-client` | `vmz build --profile web-client` |

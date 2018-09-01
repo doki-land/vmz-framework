@@ -1,5 +1,5 @@
 /**
- * A3-static — web-static profile: per-route HTML, real 404, SEO head,
+ * A3-static — static profile: per-route HTML, real 404, SEO head,
  * sitemap/robots, StaticDeliveryManifest (no SPA fallback).
  */
 
@@ -8,6 +8,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
+import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
 import { addLimitation, readProof, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 
 const root = repoRoot(import.meta.url);
@@ -31,13 +32,14 @@ function get(url: string): Promise<{ status: number; body: string }> {
     });
 }
 
-console.log('static-delivery: vmz build --profile web-static…');
+console.log('static-delivery: vmz build --profile static…');
 const example = path.join(root, ...EXAMPLE.split('/'));
 const dist = path.join(example, 'dist');
-const build = spawnSync(process.execPath, [vmzBin(root), 'build', example, '--profile', 'web-static', '--origin', ORIGIN], {
+const build = spawnSync(process.execPath, [vmzBin(root), 'build', example, '--profile', 'static', '--origin', ORIGIN], {
     cwd: root,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
+    env: serveHostChildEnv(),
 });
 const proof = readProof(root);
 if (build.status !== 0) {
@@ -46,9 +48,9 @@ if (build.status !== 0) {
         status: 'failed',
         detail: (build.stderr || build.stdout).slice(0, 2000),
     });
-    addLimitation(proof, 'A3: web-static build failed');
+    addLimitation(proof, 'A3: static build failed');
     writeProof(proof, root);
-    fail(`vmz build --profile web-static exited ${build.status}\n${build.stdout}\n${build.stderr}`);
+    fail(`vmz build --profile static exited ${build.status}\n${build.stdout}\n${build.stderr}`);
 }
 
 const manifestPath = path.join(dist, '_vmz', 'static-delivery-manifest.json');
@@ -58,7 +60,7 @@ if (manifest.schema !== 'vmz.static.delivery_manifest.v0') {
     fail(`bad manifest schema: ${manifest.schema}`);
 }
 if (manifest.spaFallback !== false) fail('spaFallback must be false');
-if (manifest.deliveryProfile !== 'web-static') fail(`deliveryProfile=${manifest.deliveryProfile}`);
+if (manifest.deliveryProfile !== 'static') fail(`deliveryProfile=${manifest.deliveryProfile}`);
 
 const requiredHtml = [
     'index.html',
@@ -227,17 +229,17 @@ upsertCheck(proof, {
     detail: manifest.manifestDigest,
 });
 
-proof.deliveryProfile = 'web-static';
+proof.deliveryProfile = 'static';
 const gaps = [
-    'A3: Browser Production Profile / web-static v1 does not include StaticParameterized enumeration (explicit exclude; dynamic static param matrix deferred)',
+    'A3: Browser Production Profile / static v1 does not include StaticParameterized enumeration (explicit exclude; dynamic static param matrix deferred)',
 ];
 for (const g of gaps) addLimitation(proof, g);
 proof.knownLimitations = proof.knownLimitations.filter(
     (l) =>
         !l.includes('A3: CDN / provider adapters / StaticDeliveryManifest matrix not covered') &&
         !l.includes('A3: CDN provider adapters / cache-policy manifests not covered') &&
-        !l.includes('A3: web-static / SEO') &&
-        !l.includes('A3: web-static build failed') &&
+        !l.includes('A3: static / SEO') &&
+        !l.includes('A3: static build failed') &&
         !l.includes('A3: content-addressed assets/<hash> immutable CDN layout not covered') &&
         !l.includes('A3: locale-prefixed static HTML / hreflang matrix not covered') &&
         !l.includes('SiteDeliveryContract resolver not covered') &&
@@ -247,5 +249,30 @@ proof.knownLimitations = proof.knownLimitations.filter(
 writeProof(proof, root);
 if (errors.length) fail(errors.join('\n'));
 
-console.log('static-delivery PASS: web-static HTML + 404 + SEO/hreflang + locale-prefixed seed + manifest (no SPA fallback)');
+// Nested @vmz/ui: official homepage static assemble (component registry preload).
+console.log('static-delivery: homepage @vmz/ui static assemble…');
+const homepage = path.join(root, 'packages/homepage');
+const homepageDist = path.join(homepage, 'dist-static-conformance');
+const hpBuild = spawnSync(
+    process.execPath,
+    [vmzBin(root), 'build', homepage, '--release', '--profile', 'static', '--origin', ORIGIN, '--out-dir', homepageDist],
+    { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: serveHostChildEnv() },
+);
+if (hpBuild.status !== 0) {
+    fail(`homepage static build failed: ${hpBuild.status}\n${hpBuild.stdout}\n${hpBuild.stderr}`);
+}
+const hpIndex = path.join(homepageDist, 'index.html');
+if (!fs.existsSync(hpIndex)) fail('homepage static missing index.html');
+const hpHtml = fs.readFileSync(hpIndex, 'utf8');
+if (!hpHtml.includes('<!DOCTYPE html>') && !hpHtml.includes('<html')) {
+    fail('homepage index.html does not look like a document shell');
+}
+upsertCheck(proof, {
+    id: 'static-delivery.ui-registry',
+    status: 'passed',
+    detail: 'homepage static assemble with @vmz/ui nested components',
+});
+writeProof(proof, root);
+
+console.log('static-delivery PASS: static HTML + 404 + SEO/hreflang + locale-prefixed seed + manifest (no SPA fallback)');
 console.log('static-delivery NOTE: StaticParameterized explicitly excluded from this profile');

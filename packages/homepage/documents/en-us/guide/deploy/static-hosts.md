@@ -1,6 +1,6 @@
 # Static host fill-in checklist
 
-For **`web-static` / `static-cdn`**.
+For **`static` / `static-cdn`**.
 
 **Two axes:**
 
@@ -14,7 +14,7 @@ For **`web-static` / `static-cdn`**.
 
 | Item | Value |
 |------|--------|
-| Recipe | `vmz build --release --profile web-static` |
+| Recipe | `vmz build --release --profile static` |
 | Publish root | Trust `StaticDeliveryManifest` (often `dist`) |
 | Public env | e.g. `VMZ_SITE_ORIGIN`; never ship secrets in the static artifact |
 

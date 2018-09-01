@@ -2,7 +2,7 @@
 
 下列片段可直接放进项目根 `vmz.config.ts`。未列出的高级字段请看 [配置参考](./config-reference.md)。
 
-## web-static — 只有 CDN / 对象存储
+## static — 只有 CDN / 对象存储
 
 适合：营销站、文档站、无密钥的公开内容。
 
@@ -13,17 +13,17 @@ import { defineConfig } from 'vmz'
 
 export default defineConfig({
   delivery: {
-    default: 'web-static',
+    default: 'static',
     profiles: {
-      'web-static': { host: 'browser', assembly: 'static-cdn' },
+      'static': { host: 'browser', assembly: 'static-cdn' },
     },
   },
 })
 ```
 
 ```bash
-vmz build --profile web-static
-vmz serve --profile web-static   # 预览合同，不会用 SPA fallback 掩盖缺页
+vmz build --profile static
+vmz serve --profile static   # 预览合同，不会用 SPA fallback 掩盖缺页
 ```
 
 ## web-ssr — 单机全栈（默认）
@@ -130,7 +130,7 @@ export default defineConfig({
 同一仓库可声明多个 `profiles`，构建时选择：
 
 ```bash
-vmz build --profile web-static
+vmz build --profile static
 ```
 
 选平台与发布方式、生成 **agent 提示词**：见 [计划器](./planner.md)（站点路由 ``/deploy-planner``）。  

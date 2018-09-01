@@ -1,6 +1,6 @@
 # 纯静态托管平台填写清单
 
-面向 **`web-static` / `static-cdn`**。
+面向 **`static` / `static-cdn`**。
 
 **两轴：**
 
@@ -14,7 +14,7 @@
 
 | 项 | 值 |
 |----|----|
-| 配方 | `vmz build --release --profile web-static` |
+| 配方 | `vmz build --release --profile static` |
 | 发布根目录 | 以 `StaticDeliveryManifest` 为准（常见 `dist`） |
 | 公开 env | 如 `VMZ_SITE_ORIGIN`；禁止把 secret 打进静态产物 |
 

@@ -81,7 +81,7 @@ const STATIC_HOSTS_DOC = `${DEPLOY_GUIDE}/static-hosts`;
 
 /** Heading ids must match document renderer slugify (see dist recipes.html). */
 const RECIPE_DOCS: Record<string, string> = {
-    'web-static': `${DEPLOY_GUIDE}/recipes#web-static-只有-cdn-对象存储`,
+    'static': `${DEPLOY_GUIDE}/recipes#static-只有-cdn-对象存储`,
     'web-ssr': `${DEPLOY_GUIDE}/recipes#web-ssr-单机全栈默认`,
     'web-hybrid': `${DEPLOY_GUIDE}/recipes#web-hybrid-cdn-独立服务端`,
     'web-client': `${DEPLOY_GUIDE}/recipes#web-client-纯前端-本地盘`,
@@ -172,13 +172,13 @@ function pickRecipe(answers: PlannerAnswers, cautions: string[]): RecipePick {
 
     if (hasStaticVendor(vendors) && html !== 'request-ssr') {
         if (server !== 'none') {
-            cautions.push('已选纯静态托管：推荐 web-static。源码可有 <script server>，该 profile 只交付可静态证明的面。');
+            cautions.push('已选纯静态托管：推荐 static。源码可有 <script server>，该 profile 只交付可静态证明的面。');
         } else {
-            cautions.push('纯静态托管：web-static。源码可有 <script server>；依赖运行时 server / secret() 的 route 以 check/build 为准。');
+            cautions.push('纯静态托管：static。源码可有 <script server>；依赖运行时 server / secret() 的 route 以 check/build 为准。');
         }
         return {
-            recipeId: 'web-static',
-            profileId: 'web-static',
+            recipeId: 'static',
+            profileId: 'static',
             assembly: 'static-cdn',
         };
     }
@@ -237,8 +237,8 @@ function pickRecipe(answers: PlannerAnswers, cautions: string[]): RecipePick {
         };
     }
     return {
-        recipeId: 'web-static',
-        profileId: 'web-static',
+        recipeId: 'static',
+        profileId: 'static',
         assembly: 'static-cdn',
     };
 }

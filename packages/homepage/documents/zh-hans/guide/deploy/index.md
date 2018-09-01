@@ -7,7 +7,7 @@
 
 | 你的情况 | 用这个配方 | 构建 |
 |----------|------------|------|
-| 只有对象存储 / CDN，没有可信后端 | `web-static` | `vmz build --profile web-static` |
+| 只有对象存储 / CDN，没有可信后端 | `static` | `vmz build --profile static` |
 | 一台 Node（或日后 Rust host）跑整站 | `web-ssr`（默认） | `vmz build` |
 | CDN 放静态，另有一台跑 SSR/API | `web-hybrid` | `vmz build --profile web-hybrid` |
 | 本地盘预览 / 纯前端练习 | `web-client` | `vmz build --profile web-client` |

@@ -210,7 +210,7 @@ export const CHECKS: Record<string, CheckEntry> = {
     },
     'static-delivery': {
         file: 'production/static-delivery.ts',
-        description: 'A3-static web-static HTML + 404 + SEO + StaticDeliveryManifest',
+        description: 'A3-static static HTML + 404 + SEO + StaticDeliveryManifest',
     },
     'cdn-policy': {
         file: 'production/cdn-policy.ts',

@@ -28,6 +28,10 @@
         "./client-nav": {
             "types": "./dist/client-nav.d.ts",
             "default": "./dist/client-nav.js"
+        },
+        "./component-registry": {
+            "types": "./dist/list-client-components.d.ts",
+            "default": "./dist/list-client-components.js"
         }
     },
     "files": [

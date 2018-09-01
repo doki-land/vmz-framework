@@ -92,7 +92,7 @@ export function buildCdnPolicyManifest(staticManifest, opts = {}) {
     const body = {
         schema: CDN_POLICY_MANIFEST_SCHEMA,
         applicationId: staticManifest.applicationId || null,
-        deliveryProfile: 'web-static',
+        deliveryProfile: 'static',
         origin,
         spaFallback: false,
         staticManifestDigest: staticManifest.manifestDigest || null,

@@ -125,7 +125,7 @@ Usage:
 Options:
   --out-dir, -o <dir>   Output directory (default: dist)
   --release             Release build (omit serve-host; pack minify slot; proof)
-  --profile <name>      Delivery profile (default from config; builtins: web-ssr|web-static|web-client|web-hybrid)
+  --profile <name>      Delivery profile (default from config; builtins: web-ssr|static|web-client|web-hybrid)
   --target <id>         browser (default) | mini-program-wechat (pack dist/wechat for WeChat DevTools; build+dev)
   --origin <url>        Site origin for static-cdn canonical/sitemap
   --host <host>         Listen host (default: 127.0.0.1)
@@ -458,7 +458,7 @@ async function cmdBuild(args) {
         let assemble = null;
         try {
             if (selected.selection.assembly === 'static-cdn') {
-                log.info(`web-static emit ${outDir}`);
+                log.info(`static emit ${outDir}`);
             }
             assemble = await assembleDelivery(outDir, {
                 selection: selected.selection,
@@ -472,7 +472,7 @@ async function cmdBuild(args) {
             });
             for (const step of assemble.manifest.steps || []) {
                 if (step.kind === 'static-cdn') {
-                    log.info(`web-static ok (${step.htmlFiles} html, ${step.skipped} skipped, digest=${String(step.digest).slice(0, 12)}…)`);
+                    log.info(`static ok (${step.htmlFiles} html, ${step.skipped} skipped, digest=${String(step.digest).slice(0, 12)}…)`);
                 } else if (step.kind === 'site-delivery' && step.digest) {
                     log.info(`site-delivery ok (digest=${String(step.digest).slice(0, 12)}…)`);
                 }

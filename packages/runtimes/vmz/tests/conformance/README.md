@@ -25,7 +25,7 @@ TypeScript drivers under **domain folders** — not a flat dump:
       Layout + **SPA takeover** + **SPA layout retention**（scroll/focus / locale realization 仍开）
     - `pnpm verify -- release-artifact` — **A3** filesystem：pack + CURRENT/PREVIOUS + rollback + diff（CDN adapters /
       assets hash 仍开）
-    - `pnpm verify -- static-delivery` — **A3-static**：`web-static` 逐路由 HTML + `404.html` + SEO head/sitemap/robots +
+    - `pnpm verify -- static-delivery` — **A3-static**：`static` 逐路由 HTML + `404.html` + SEO head/sitemap/robots +
       StaticDeliveryManifest（无 SPA fallback；locale 矩阵仍开）
     - `pnpm verify -- cdn-policy` — **A3-cdn**：中立 CDNPolicy + local-static host + netlify
       投影（routing/cache/resume/rollback）

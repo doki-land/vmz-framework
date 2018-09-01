@@ -2,7 +2,7 @@
 
 Minimal `vmz.config.ts` snippets. Full fields: [config reference](./config-reference.md).
 
-## web-static
+## static
 
 Marketing / docs / public content without secrets.
 
@@ -13,17 +13,17 @@ import { defineConfig } from 'vmz'
 
 export default defineConfig({
   delivery: {
-    default: 'web-static',
+    default: 'static',
     profiles: {
-      'web-static': { host: 'browser', assembly: 'static-cdn' },
+      'static': { host: 'browser', assembly: 'static-cdn' },
     },
   },
 })
 ```
 
 ```bash
-vmz build --profile web-static
-vmz serve --profile web-static
+vmz build --profile static
+vmz serve --profile static
 ```
 
 ## web-ssr (default)
@@ -118,7 +118,7 @@ Fallback is **whole-release** selection, never file-level mix.
 ## Switching profiles
 
 ```bash
-vmz build --profile web-static
+vmz build --profile static
 ```
 
 Pick platforms + ship mode and copy an **agent prompt**: see [planner](./planner.md) (site route ``/deploy-planner``).  

@@ -246,7 +246,7 @@ export async function handleNodeRequest(req, res, opts = {}) {
         }
 
         // Static first for assets + DocumentMount (`/d/…`) so docs aren't swallowed by SSR 404 shells.
-        // web-static route HTML (`index.html`, `about/index.html`, …) is a CDN/deploy projection only —
+        // static route HTML (`index.html`, `about/index.html`, …) is a CDN/deploy projection only —
         // when Server Host SSR is active, those files must not shadow live render (local/dev ≡ SSR truth).
         if (verb === 'GET' && opts.distDir) {
             const nodePath = await import('node:path');
@@ -416,7 +416,7 @@ function safeDistFile(distDir, pathname, nodePath) {
 }
 
 /**
- * web-static emits per-route HTML beside client assets. That HTML is for CDN / local-static
+ * static profile emits per-route HTML beside client assets. That HTML is for CDN / local-static
  * delivery hosts — not for Server Host when SSR is available. DocumentMount stays static.
  * @param {string} file
  * @param {string} pathname

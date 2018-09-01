@@ -1,6 +1,6 @@
 /**
  * A3: content-addressed assets/<hash> layout for immutable CDN objects.
- * Logical paths stay available for serve/dev; web-static HTML rewrites to hashed URLs.
+ * Logical paths stay available for serve/dev; static HTML rewrites to hashed URLs.
  * Identical bytes → identical asset path (cross-release / cross-source reuse by digest).
  */
 // @ts-nocheck

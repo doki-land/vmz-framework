@@ -9,6 +9,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { CACHE_ASSET_IMMUTABLE, CACHE_HTML, listenLocalStaticHost, packRelease, publishRelease, readPointer, rollbackRelease } from 'vmz';
 import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
+import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
 import { addLimitation, readProof, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 
 const root = repoRoot(import.meta.url);
@@ -37,13 +38,14 @@ function get(url: string): Promise<{ status: number; body: string; headers: http
     });
 }
 
-console.log('cdn-policy: vmz build --profile web-static…');
+console.log('cdn-policy: vmz build --profile static…');
 const example = path.join(root, ...EXAMPLE.split('/'));
 const dist = path.join(example, 'dist');
-const build = spawnSync(process.execPath, [vmzBin(root), 'build', example, '--profile', 'web-static', '--origin', ORIGIN], {
+const build = spawnSync(process.execPath, [vmzBin(root), 'build', example, '--profile', 'static', '--origin', ORIGIN], {
     cwd: root,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
+    env: serveHostChildEnv(),
 });
 const proof = readProof(root);
 if (build.status !== 0) {
@@ -53,7 +55,7 @@ if (build.status !== 0) {
         detail: (build.stderr || build.stdout).slice(0, 2000),
     });
     writeProof(proof, root);
-    fail(`web-static build failed: ${build.status}\n${build.stdout}\n${build.stderr}`);
+    fail(`static build failed: ${build.status}\n${build.stdout}\n${build.stderr}`);
 }
 
 const policyPath = path.join(dist, '_vmz', 'cdn-policy-manifest.json');
@@ -85,7 +87,7 @@ try {
     const alias = await get(`${host.baseUrl}/home`);
     const missing = await get(`${host.baseUrl}/no-such-route`);
     const assetsManifestPath = path.join(dist, '_vmz', 'content-addressed-assets.json');
-    if (!fs.existsSync(assetsManifestPath)) fail('cdn-policy expects content-addressed-assets.json from web-static');
+    if (!fs.existsSync(assetsManifestPath)) fail('cdn-policy expects content-addressed-assets.json from static');
     const assetsManifest = JSON.parse(fs.readFileSync(assetsManifestPath, 'utf8'));
     const entryObj = (assetsManifest.objects || []).find((o: { logicalPath: string }) => o.logicalPath === 'entry-client.js');
     if (!entryObj?.assetPath) fail('missing hashed entry-client.js');
@@ -245,7 +247,7 @@ upsertCheck(proof, {
     status: errors.some((e) => e.includes('rollback') || e.includes('digest') || e.includes('CURRENT') || e.includes('mutate'))
         ? 'failed'
         : 'passed',
-    detail: 'web-static artifact pack + CURRENT/PREVIOUS rollback',
+    detail: 'static artifact pack + CURRENT/PREVIOUS rollback',
 });
 
 const gaps = ['A3: second real CDN provider adapter beyond netlify projection not covered'];

@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { preloadComponentRegistry } from '@vmz/core/component-registry';
 import { emitCdnPolicy } from './cdn-policy.js';
 import { emitContentAddressedAssets } from './content-addressed-assets.js';
 import { absoluteUrl, buildLocalePageMeta, localizeBodyLinks } from './locale-router.js';
@@ -33,7 +34,8 @@ export async function emitWebStatic(distDir, opts = {}) {
     if (!fs.existsSync(domPath)) {
         throw new Error(`emitWebStatic: missing ${domPath} — run vmz build first`);
     }
-    const { renderToString, renderToStream } = await import(pathToFileURL(domPath).href);
+    const { renderToString, renderToStream, registerComponents } = await import(pathToFileURL(domPath).href);
+    await preloadComponentRegistry(distDir, registerComponents);
 
     const pageCatalog = listPageClientFiles(distDir);
     /** @type {Array<{
@@ -201,7 +203,7 @@ export async function emitWebStatic(distDir, opts = {}) {
     const manifest = {
         schema: STATIC_DELIVERY_MANIFEST_SCHEMA,
         applicationId,
-        deliveryProfile: 'web-static',
+        deliveryProfile: 'static',
         origin,
         generatedAt: new Date().toISOString(),
         spaFallback: false,

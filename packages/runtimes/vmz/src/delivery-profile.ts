@@ -17,7 +17,7 @@ export const SERVER_RUNTIMES = Object.freeze(['node', 'worker', 'deno', 'bun', '
 /** Official built-in aliases when not overridden in config. */
 export const BUILTIN_PROFILES = Object.freeze({
     'web-client': { host: 'browser', assembly: 'local-static' },
-    'web-static': { host: 'browser', assembly: 'static-cdn' },
+    static: { host: 'browser', assembly: 'static-cdn' },
     'web-ssr': { host: 'browser', assembly: 'server-host', serverRuntime: 'node' },
     'web-hybrid': { host: 'browser', assembly: 'cdn+server', serverRuntime: 'node' },
 });

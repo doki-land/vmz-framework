@@ -9,13 +9,13 @@ function assert(cond: boolean, msg: string) {
 }
 
 const staticPlan = buildDeployPlan(DEFAULT_ANSWERS);
-assert(staticPlan.profileId === 'web-static', 'default → web-static');
+assert(staticPlan.profileId === 'static', 'default → static');
 assert(staticPlan.ship === 'git-ci', 'default ship git-ci');
 assert(typeof staticPlan.agentPrompt === 'string' && staticPlan.agentPrompt.length > 200, 'prompt');
 assert(staticPlan.agentPrompt.includes('VMZ 部署落地任务'), 'prompt title');
 assert(!('planJson' in staticPlan), 'no hand-copy planJson field');
 assert(
-    staticPlan.deepLinks.some((l) => l.href.includes('#web-static-只有-cdn-对象存储')),
+    staticPlan.deepLinks.some((l) => l.href.includes('#static-只有-cdn-对象存储')),
     'recipe deep link slug',
 );
 assert(

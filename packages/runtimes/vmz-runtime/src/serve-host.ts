@@ -24,6 +24,7 @@ import { createRequire, registerHooks } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { registerComponents, renderToStream, renderToString } from './vmz-dom.js';
+import { listClientComponents } from './list-client-components.js';
 import { handleNodeRequest, setRoutes, setServerModuleResolver } from './vmz-runtime.js';
 
 const require = createRequire(import.meta.url);
@@ -482,10 +483,7 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
               `d.innerHTML="<div style='max-width:56rem;margin:0 auto'><p style='color:#f87171;font-weight:700'>Dev Error</p><pre style='white-space:pre-wrap'>"+String(e.message||e).replace(/[<>&]/g,function(c){return {"<":"&lt;",">":"&gt;","&":"&amp;"}[c]})+"</pre></div>";` +
               `document.documentElement.appendChild(d);})();</script>`
             : '';
-    const buildIdBoot =
-        isDev && lastDevBuildId
-            ? `\n  <script>window.__VMZ_DEV_BUILD_ID__=${JSON.stringify(lastDevBuildId)};</script>`
-            : '';
+    const buildIdBoot = isDev && lastDevBuildId ? `\n  <script>window.__VMZ_DEV_BUILD_ID__=${JSON.stringify(lastDevBuildId)};</script>` : '';
     if (signal?.aborted) return;
     const themeId = resolveThemeId(opts.searchParams, opts.cookieHeader);
     const themeBoot = themeBootstrapScript();
@@ -1091,43 +1089,6 @@ async function loadPageCtor(chunkId) {
     const mod = await import(href);
     pageCtors.set(chunkId, mod.default);
     return mod.default;
-}
-
-/**
- * @param {string} dir
- * @returns {Promise<Array<{ name: string, entry: string }>>}
- */
-async function listClientComponents(dir) {
-    /** @type {Map<string, { name: string, entry: string }>} */
-    const byName = new Map();
-    try {
-        const raw = await readFile(path.join(dir, 'vmz-deployment.json'), 'utf8');
-        const dep = JSON.parse(raw);
-        for (const unit of dep.units || []) {
-            if (unit?.kind !== 'component') continue;
-            const chunkId = String(unit.chunkId || '');
-            const name = chunkId.split('/').pop();
-            if (!name) continue;
-            const entry = String(unit.clientEntry || `${chunkId}.client.js`).replace(/\\/g, '/');
-            byName.set(name, { name, entry });
-        }
-    } catch {
-        /* fall through to directory scan */
-    }
-    if (byName.size === 0) {
-        const folder = path.join(dir, 'components');
-        let files = [];
-        try {
-            files = await readdir(folder);
-        } catch {
-            return [];
-        }
-        for (const f of files.filter((name) => name.endsWith('.client.js'))) {
-            const name = f.replace(/\.client\.js$/, '');
-            byName.set(name, { name, entry: `components/${name}.client.js` });
-        }
-    }
-    return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
