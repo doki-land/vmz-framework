@@ -1,7 +1,7 @@
 /**
  * A3: content-addressed assets/<hash> layout for immutable CDN objects.
  * Logical paths stay available for serve/dev; static HTML rewrites to hashed URLs.
- * Identical bytes → identical asset path (cross-release / cross-source reuse by digest).
+ * CSS aggregators (vmz.css) rewrite `@import` to hashed sibling paths under assets/.
  */
 // @ts-nocheck
 
@@ -19,11 +19,37 @@ const DEFAULT_CANDIDATES = [
     'entry-event.js',
     'vmz.css',
     'vmz-designs.css',
+    'vmz-style.css',
     'vmz-dom.js',
     'vmz-runtime.js',
     'vmz-http.js',
     'vmz-client-nav.js',
 ];
+
+/** CSS files that may @import other logical CSS; processed after leaf CSS is hashed. */
+const CSS_AGGREGATORS = new Set(['vmz.css']);
+
+const CSS_IMPORT_RE = /@import\s*(?:url\()?['"]?(\.\/)?([^'")\s;]+)['"]?\)?/gi;
+
+/**
+ * Rewrite relative `@import "./foo.css"` to hashed paths under assets/.
+ * @param {string} cssText
+ * @param {Record<string, string>} rewrites logical (no leading slash) or `/logical` → `assets/hash.ext`
+ */
+export function rewriteCssImports(cssText, rewrites) {
+    return cssText.replace(CSS_IMPORT_RE, (match, _dot, target) => {
+        const logical = String(target || '').replace(/^\.\//, '');
+        if (!logical) return match;
+        const hashed =
+            rewrites[logical] ||
+            rewrites[`/${logical}`] ||
+            rewrites[`assets/${logical}`];
+        if (!hashed) return match;
+        const rel = hashed.startsWith('/') ? hashed.slice(1) : hashed;
+        const sibling = rel.startsWith('assets/') ? `./${path.basename(rel)}` : `./${rel}`;
+        return `@import"${sibling}"`;
+    });
+}
 
 /**
  * Emit `assets/<sha256>.<ext>` copies and rewrite HTML href/src to hashed URLs.
@@ -44,34 +70,23 @@ export function emitContentAddressedAssets(distDir, opts = {}) {
     /** @type {Record<string, string>} */
     const rewrites = {};
 
-    for (const rel of candidates) {
-        const logical = String(rel).replace(/\\/g, '/').replace(/^\//, '');
-        const src = path.join(abs, ...logical.split('/'));
-        if (!fs.existsSync(src) || !fs.statSync(src).isFile()) continue;
-        const buf = fs.readFileSync(src);
-        const digest = sha256Hex(buf);
-        const ext = path.extname(logical) || '';
-        const assetRel = `assets/${digest}${ext}`;
-        const dest = path.join(abs, ...assetRel.split('/'));
-        if (!fs.existsSync(dest)) {
-            fs.mkdirSync(path.dirname(dest), { recursive: true });
-            fs.writeFileSync(dest, buf);
-        } else {
-            // Cross-release reuse: identical digest must not be rewritten.
-            const existing = sha256Hex(fs.readFileSync(dest));
-            if (existing !== digest) {
-                throw new Error(`content-address collision at ${assetRel}`);
-            }
-        }
-        objects.push({
-            logicalPath: logical,
-            assetPath: assetRel,
-            digest,
-            bytes: buf.length,
-            immutable: true,
+    const ordered = orderCandidates(candidates);
+    for (const rel of ordered) {
+        ingestCandidate(abs, rel, rewrites, objects, { transform: null });
+    }
+
+    // Aggregator CSS (vmz.css) must import hashed leaf files — rewrite then hash.
+    for (const rel of ordered) {
+        if (!CSS_AGGREGATORS.has(rel)) continue;
+        const src = path.join(abs, rel);
+        if (!fs.existsSync(src)) continue;
+        const rewritten = rewriteCssImports(fs.readFileSync(src, 'utf8'), rewrites);
+        removeLogicalObject(objects, rel);
+        delete rewrites[`/${rel}`];
+        delete rewrites[rel];
+        ingestCandidate(abs, rel, rewrites, objects, {
+            transform: () => Buffer.from(rewritten, 'utf8'),
         });
-        rewrites[`/${logical}`] = `/${assetRel}`;
-        rewrites[logical] = assetRel;
     }
 
     objects.sort((a, b) => (a.logicalPath < b.logicalPath ? -1 : a.logicalPath > b.logicalPath ? 1 : 0));
@@ -97,6 +112,71 @@ export function emitContentAddressedAssets(distDir, opts = {}) {
     writePrettyJsonFile(outPath, manifest);
 
     return { manifest, assetsDir, rewrites, manifestPath: outPath };
+}
+
+/**
+ * @param {string[]} candidates
+ */
+function orderCandidates(candidates) {
+    const set = new Set(candidates.map((c) => String(c).replace(/\\/g, '/').replace(/^\//, '')));
+    /** @type {string[]} */
+    const out = [];
+    for (const name of DEFAULT_CANDIDATES) {
+        if (set.has(name) && !CSS_AGGREGATORS.has(name)) out.push(name);
+    }
+    for (const name of [...set].sort()) {
+        if (!CSS_AGGREGATORS.has(name) && !out.includes(name)) out.push(name);
+    }
+    if (set.has('vmz.css')) out.push('vmz.css');
+    return out;
+}
+
+/**
+ * @param {Array<Record<string, any>>} objects
+ * @param {string} logical
+ */
+function removeLogicalObject(objects, logical) {
+    const idx = objects.findIndex((o) => o.logicalPath === logical);
+    if (idx >= 0) objects.splice(idx, 1);
+}
+
+/**
+ * @param {string} absDist
+ * @param {string} rel
+ * @param {Record<string, string>} rewrites
+ * @param {Array<Record<string, any>>} objects
+ * @param {{ transform?: ((buf: Buffer) => Buffer) | null }} opts
+ */
+function ingestCandidate(absDist, rel, rewrites, objects, opts) {
+    const logical = String(rel).replace(/\\/g, '/').replace(/^\//, '');
+    const src = path.join(absDist, ...logical.split('/'));
+    if (!fs.existsSync(src) || !fs.statSync(src).isFile()) return;
+    let buf = fs.readFileSync(src);
+    if (typeof opts.transform === 'function') {
+        buf = opts.transform(buf);
+    }
+    const digest = sha256Hex(buf);
+    const ext = path.extname(logical) || '';
+    const assetRel = `assets/${digest}${ext}`;
+    const dest = path.join(absDist, ...assetRel.split('/'));
+    if (!fs.existsSync(dest)) {
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.writeFileSync(dest, buf);
+    } else {
+        const existing = sha256Hex(fs.readFileSync(dest));
+        if (existing !== digest) {
+            throw new Error(`content-address collision at ${assetRel}`);
+        }
+    }
+    objects.push({
+        logicalPath: logical,
+        assetPath: assetRel,
+        digest,
+        bytes: buf.length,
+        immutable: true,
+    });
+    rewrites[`/${logical}`] = `/${assetRel}`;
+    rewrites[logical] = assetRel;
 }
 
 /**
@@ -133,7 +213,6 @@ export function assertSharedAssetPath(distDir, a, b, ext = '.js') {
     const rel = `assets/${da}${ext}`;
     const dest = path.join(distDir, ...rel.split('/'));
     fs.writeFileSync(dest, typeof a === 'string' ? Buffer.from(a) : a);
-    // Second write of identical bytes must be reuse, not fork.
     fs.writeFileSync(dest, typeof b === 'string' ? Buffer.from(b) : b);
     const again = resolveAssetByDigest(distDir, da, ext);
     if (!again || again.assetPath !== rel) {
@@ -148,7 +227,6 @@ function collectCandidates(distDir) {
     for (const name of DEFAULT_CANDIDATES) {
         if (fs.existsSync(path.join(distDir, name))) out.push(name);
     }
-    // Include top-level *.client.js and pages/**/*.client.js referenced by resume.
     walk(distDir, distDir, (rel) => {
         if (/\.client\.js$/i.test(rel)) out.push(rel);
     });
@@ -179,7 +257,6 @@ function rewriteHtmlReferences(distDir, rewrites) {
         let text = fs.readFileSync(file, 'utf8');
         let next = text;
         for (const [from, to] of pairs) {
-            // href="/x" src="/x" and unquoted variants in attributes
             next = next.split(from).join(to);
         }
         if (next !== text) {

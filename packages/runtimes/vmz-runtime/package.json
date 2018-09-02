@@ -32,6 +32,10 @@
         "./component-registry": {
             "types": "./dist/list-client-components.d.ts",
             "default": "./dist/list-client-components.js"
+        },
+        "./render-host": {
+            "types": "./dist/render-host.d.ts",
+            "default": "./dist/render-host.js"
         }
     },
     "files": [

@@ -55,7 +55,7 @@ impl ComponentGraph {
             let ir = crate::template::parse_template(&parsed.template.content);
             let mut child_chunks = Vec::new();
             let mut seen = HashSet::new();
-            for tag in component_tags(&ir) {
+            for tag in component_tags(&ir, &by_tag) {
                 let Some(child) = by_tag.get(&tag) else {
                     continue;
                 };
@@ -97,31 +97,40 @@ impl ComponentGraph {
     }
 }
 
-fn component_tags(ir: &TemplateIr) -> Vec<String> {
+fn component_tags(ir: &TemplateIr, by_tag: &HashMap<String, String>) -> Vec<String> {
     let mut out = Vec::new();
     let mut seen = HashSet::new();
     for root in &ir.roots {
-        walk(root, &mut out, &mut seen);
+        walk(root, by_tag, &mut out, &mut seen);
     }
     out
 }
 
-fn walk(node: &TemplateNode, out: &mut Vec<String>, seen: &mut HashSet<String>) {
+fn walk(
+    node: &TemplateNode,
+    by_tag: &HashMap<String, String>,
+    out: &mut Vec<String>,
+    seen: &mut HashSet<String>,
+) {
     match node {
         TemplateNode::Element { tag, children, .. } => {
-            if is_component_tag(tag) && seen.insert(tag.clone()) {
+            if is_component_tag(tag, by_tag) && seen.insert(tag.clone()) {
                 out.push(tag.clone());
             }
             for c in children {
-                walk(c, out, seen);
+                walk(c, by_tag, out, seen);
             }
         }
         TemplateNode::Text(_) | TemplateNode::Interp(_) => {}
     }
 }
 
-fn is_component_tag(tag: &str) -> bool {
-    // Built-in `<Link>` lowers to `<a>`; never a component chunk edge.
+fn is_component_tag(tag: &str, by_tag: &HashMap<String, String>) -> bool {
+    // When a real component chunk exists (e.g. `@vmz/ui` Link), keep the deployment edge.
+    if by_tag.contains_key(tag) {
+        return true;
+    }
+    // Built-in `<Link>` lowers to `<a>` when no component chunk is registered.
     if tag == "Link" {
         return false;
     }

@@ -8,7 +8,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { preloadComponentRegistry } from '@vmz/core/component-registry';
+import { createRenderHost } from '@vmz/core/render-host';
+import { listClientComponentsSync } from '@vmz/core/component-registry';
 import { emitCdnPolicy } from './cdn-policy.js';
 import { emitContentAddressedAssets } from './content-addressed-assets.js';
 import { absoluteUrl, buildLocalePageMeta, localizeBodyLinks } from './locale-router.js';
@@ -34,8 +35,8 @@ export async function emitWebStatic(distDir, opts = {}) {
     if (!fs.existsSync(domPath)) {
         throw new Error(`emitWebStatic: missing ${domPath} — run vmz build first`);
     }
-    const { renderToString, renderToStream, registerComponents } = await import(pathToFileURL(domPath).href);
-    await preloadComponentRegistry(distDir, registerComponents);
+    const host = await createRenderHost(distDir, { strictDeployment: true, preload: 'none' });
+    const { renderToString, renderToStream } = host;
 
     const pageCatalog = listPageClientFiles(distDir);
     /** @type {Array<{
@@ -110,6 +111,7 @@ export async function emitWebStatic(distDir, opts = {}) {
 
         const meta = await resolvePageMeta(Page, { params, props, pathname: pattern, origin });
         const layoutChain = resolveLayoutChain(distDir, page.chunkId);
+        await host.ensureComponents([page.chunkId, ...layoutChain]);
         let bodyHtml = '';
         for await (const chunk of renderToStream(Page, props, {})) {
             bodyHtml += chunk;
@@ -232,6 +234,8 @@ export async function emitWebStatic(distDir, opts = {}) {
     const digest = sha256Hex(canonicalJson(manifest));
     manifest.manifestDigest = digest;
     writePrettyJsonFile(path.join(vmzDir, 'static-delivery-manifest.json'), manifest);
+
+    emitStaticClientEntries(distDir, pageCatalog);
 
     const assets = emitContentAddressedAssets(distDir);
     manifest.contentAddressedAssets = {
@@ -575,4 +579,55 @@ function buildSitemap(_origin, generations) {
         throw new Error('vmz native addon missing generateSitemapXml — rebuild with `pnpm napi:build`');
     }
     return native.generateSitemapXml(urls);
+}
+
+/**
+ * Static CDN must ship entry-client/event like serve-host (content-addressed + HTML rewrite).
+ * @param {string} distDir
+ * @param {Array<{ chunkId: string }>} pageCatalog
+ */
+function emitStaticClientEntries(distDir, pageCatalog) {
+    const componentEntries = listClientComponentsSync(distDir, { strict: true });
+    const indexChunk = pageCatalog.find((p) => p.chunkId === 'pages/index')?.chunkId || pageCatalog[0]?.chunkId || 'pages/index';
+    const resumeEntries = loadPageResumeEntriesSync(distDir, indexChunk);
+    const lazySet = new Set(
+        resumeEntries.filter((e) => isEventResumeStrategy(e.strategy)).map((e) => e.component).filter(Boolean),
+    );
+    const eager = componentEntries.filter((e) => !lazySet.has(e.name));
+    const lazy = componentEntries.filter((e) => lazySet.has(e.name));
+    const native = requireNativeAddon();
+    if (typeof native.generateServeEntryClient !== 'function') {
+        throw new Error('vmz native addon missing generateServeEntryClient — rebuild with `pnpm napi:build`');
+    }
+    fs.writeFileSync(path.join(distDir, 'entry-client.js'), native.generateServeEntryClient(eager, lazy, ''), 'utf8');
+    if (typeof native.generateServeEntryEvent === 'function') {
+        fs.writeFileSync(path.join(distDir, 'entry-event.js'), native.generateServeEntryEvent(''), 'utf8');
+    }
+}
+
+/**
+ * @param {string} distDir
+ * @param {string} chunkId
+ */
+function loadPageResumeEntriesSync(distDir, chunkId) {
+    try {
+        const dep = JSON.parse(fs.readFileSync(path.join(distDir, 'vmz-deployment.json'), 'utf8'));
+        const units = Array.isArray(dep.units) ? dep.units : [];
+        const page =
+            units.find((u) => u.chunkId === chunkId) ||
+            units.find((u) => u.chunkId === 'pages/index') ||
+            units.find((u) => u.kind === 'page');
+        const entries = Array.isArray(page?.resumeEntries) ? page.resumeEntries : [];
+        return entries.map((e) => ({
+            component: String(e.component || ''),
+            strategy: String(e.strategy || ''),
+        }));
+    } catch {
+        return [];
+    }
+}
+
+/** @param {string} strategy */
+function isEventResumeStrategy(strategy) {
+    return strategy === 'event' || strategy === 'click' || String(strategy).startsWith('event:');
 }

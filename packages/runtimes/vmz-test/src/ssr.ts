@@ -5,6 +5,7 @@
 
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { bootstrapComponentRegistry } from '@vmz/core/component-registry';
 import { resolveChunkArtifacts } from './compile.js';
 import { installHeadlessDocument } from './logic.js';
 
@@ -50,17 +51,18 @@ export async function runSsrManifest(manifest: Record<string, unknown>, ctx: { o
 
     const components =
         program.components && typeof program.components === 'object' ? (program.components as Record<string, string>) : undefined;
-    if (components) {
-        const map: Record<string, any> = {};
-        for (const [name, chunk] of Object.entries(components)) {
-            const cArts = resolveChunkArtifacts(ctx.outDir, chunk);
-            if (!cArts.clientPath) {
-                fail(`missing component ${chunk}`);
-                continue;
-            }
-            map[name] = (await import(pathToFileURL(cArts.clientPath).href)).default;
+    if (typeof dom.registerComponents === 'function') {
+        try {
+            await bootstrapComponentRegistry(ctx.outDir, dom.registerComponents, {
+                strict: process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true',
+                closureRoots: [chunkId.replace(/\\/g, '/')],
+                explicit: components,
+                preload: 'closure',
+            });
+        } catch (e) {
+            fail(`bootstrap component registry: ${e instanceof Error ? e.message : String(e)}`);
+            return { status: 'error', diagnostics, planId: null, programId };
         }
-        dom.registerComponents(map);
     }
 
     let html = '';

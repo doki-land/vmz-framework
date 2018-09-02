@@ -17,6 +17,7 @@ import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { resolveComponentEntries } from '@vmz/core/component-registry';
 import { resolveChunkArtifacts } from './compile.js';
 import { createArtifactsDir, writeFailureEvidence, writeTimingOnly, type BrowserTiming, type StepTiming } from './browser-evidence.js';
 import { isServeHostManifest, resolveRoutePath, startServeHost, type ServeHostHandle } from './browser-serve.js';
@@ -366,16 +367,21 @@ export async function runBrowserManifest(
         } else {
             await page.goto(`${origin}/__vmz/harness`, { waitUntil: 'domcontentloaded' });
 
-            const components =
-                program.components && typeof program.components === 'object' ? (program.components as Record<string, string>) : {};
+            const explicitComponents =
+                program.components && typeof program.components === 'object' ? (program.components as Record<string, string>) : undefined;
+            const registryStrict = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+            const registryEntries = await resolveComponentEntries(ctx.outDir, explicitComponents, {
+                strict: registryStrict,
+                closureRoots: [chunkId.replace(/\\/g, '/')],
+            });
 
             const boot = await page.evaluate(
-                async (cfg: { origin: string; chunkPath: string; components: Record<string, string> }) => {
+                async (cfg: { origin: string; chunkPath: string; registry: Array<{ name: string; entry: string }> }) => {
                     const dom = await import(/* @vite-ignore */ `${cfg.origin}/vmz-dom.js`);
                     const Comp = (await import(/* @vite-ignore */ `${cfg.origin}/${cfg.chunkPath}.client.js`)).default;
                     const map: Record<string, unknown> = {};
-                    for (const [name, chunk] of Object.entries(cfg.components)) {
-                        map[name] = (await import(/* @vite-ignore */ `${cfg.origin}/${chunk}.client.js`)).default;
+                    for (const { name, entry } of cfg.registry) {
+                        map[name] = (await import(/* @vite-ignore */ `${cfg.origin}/${entry}`)).default;
                     }
                     if (Object.keys(map).length && typeof dom.registerComponents === 'function') {
                         dom.registerComponents(map);
@@ -399,7 +405,7 @@ export async function runBrowserManifest(
                 {
                     origin,
                     chunkPath: chunkId.replace(/\\/g, '/'),
-                    components,
+                    registry: registryEntries,
                 },
             );
 

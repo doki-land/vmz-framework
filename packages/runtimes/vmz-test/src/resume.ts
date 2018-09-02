@@ -5,6 +5,7 @@
 
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { bootstrapComponentRegistry } from '@vmz/core/component-registry';
 import { resolveChunkArtifacts } from './compile.js';
 import { installHeadlessDocument } from './logic.js';
 
@@ -59,16 +60,21 @@ export async function runResumeManifest(
     const components =
         program.components && typeof program.components === 'object' ? (program.components as Record<string, string>) : undefined;
     const loaded: Record<string, any> = {};
-    if (components) {
-        for (const [name, chunk] of Object.entries(components)) {
-            const cArts = resolveChunkArtifacts(ctx.outDir, chunk);
-            if (!cArts.clientPath) {
-                fail(`missing component ${chunk}`);
-                continue;
-            }
-            loaded[name] = (await import(pathToFileURL(cArts.clientPath).href)).default;
+    if (typeof dom.registerComponents === 'function') {
+        try {
+            Object.assign(
+                loaded,
+                await bootstrapComponentRegistry(ctx.outDir, dom.registerComponents, {
+                    strict: process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true',
+                    closureRoots: [chunkId.replace(/\\/g, '/')],
+                    explicit: components,
+                    preload: 'closure',
+                }),
+            );
+        } catch (e) {
+            fail(`bootstrap component registry: ${e instanceof Error ? e.message : String(e)}`);
+            return { status: 'error', diagnostics, planId: null, programId };
         }
-        dom.registerComponents(loaded);
     }
 
     let html = '';

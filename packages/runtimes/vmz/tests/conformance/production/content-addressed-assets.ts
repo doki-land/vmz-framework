@@ -84,6 +84,26 @@ if (entry && !home.includes(`/${entry.assetPath}`)) {
     errors.push(`index.html missing hashed entry ${entry.assetPath}`);
 }
 
+const vmzCssObj = (assetsManifest?.objects || []).find((o: { logicalPath: string }) => o.logicalPath === 'vmz.css');
+if (vmzCssObj?.assetPath) {
+    const hashedCss = fs.readFileSync(path.join(dist, ...String(vmzCssObj.assetPath).split('/')), 'utf8');
+    if (hashedCss.includes('vmz-designs.css') || hashedCss.includes('vmz-style.css')) {
+        errors.push('hashed vmz.css still contains unrewritten logical @import paths');
+    }
+    const designs = (assetsManifest?.objects || []).find((o: { logicalPath: string }) => o.logicalPath === 'vmz-designs.css');
+    const style = (assetsManifest?.objects || []).find((o: { logicalPath: string }) => o.logicalPath === 'vmz-style.css');
+    if (designs && !hashedCss.includes(path.basename(String(designs.assetPath)))) {
+        errors.push('hashed vmz.css missing hashed vmz-designs import');
+    }
+    if (style && fs.existsSync(path.join(dist, 'vmz-style.css')) && !hashedCss.includes(path.basename(String(style.assetPath)))) {
+        errors.push('hashed vmz.css missing hashed vmz-style import');
+    }
+}
+if (fs.existsSync(path.join(dist, 'vmz-style.css'))) {
+    const styleObj = (assetsManifest?.objects || []).find((o: { logicalPath: string }) => o.logicalPath === 'vmz-style.css');
+    if (!styleObj?.assetPath) errors.push('vmz-style.css not content-addressed');
+}
+
 const staticManifest = JSON.parse(fs.readFileSync(path.join(dist, '_vmz', 'static-delivery-manifest.json'), 'utf8'));
 if (!staticManifest.contentAddressedAssets?.manifestDigest) {
     errors.push('StaticDeliveryManifest missing contentAddressedAssets link');

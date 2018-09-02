@@ -123,6 +123,19 @@ jobs:
           echo "version=$v" >> "$GITHUB_OUTPUT"
           echo "resolved version=$v"
 
+      - name: Require green CI on tagged commit
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          conclusion="$(gh run list --repo "${{ github.repository }}" --commit "${{ github.sha }}" --workflow ci.yml --json conclusion -q '.[0].conclusion // empty')"
+          if [[ "$conclusion" != "success" ]]; then
+            echo "Refusing npm publish: CI workflow conclusion on ${{ github.sha }} is '${conclusion:-missing}' (need success)" >&2
+            exit 1
+          fi
+          echo "CI success confirmed for tagged commit"
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 

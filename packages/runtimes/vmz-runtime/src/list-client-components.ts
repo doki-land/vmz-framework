@@ -1,106 +1,153 @@
 // @ts-nocheck
 /**
  * Discover compiled client component modules from dist (deployment graph or components/).
- * Shared by serve-host SSR and static emit assemble.
+ * Shared by serve-host SSR, static emit, and test hosts.
  */
 
 import fs from 'node:fs';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import {
+    bootstrapComponentRegistry,
+    componentEntriesFromDeployment,
+    mergeExplicitComponentEntries,
+    readDeploymentDocument,
+} from './deployment-registry.js';
+
+export {
+    DEPLOYMENT_SCHEMA,
+    readDeploymentDocument,
+    componentEntriesFromDeployment,
+    collectDependsOnClosure,
+    dedupeComponentEntriesByTag,
+    mergeExplicitComponentEntries,
+    loadComponentEntries,
+    importAndRegisterComponentEntries,
+    bootstrapComponentRegistry,
+} from './deployment-registry.js';
+
+export { createRenderHost } from './render-host.js';
 
 /**
  * @param {string} dir
- * @returns {Promise<Array<{ name: string, entry: string }>>}
+ * @param {{ strict?: boolean }} [opts]
+ * @returns {Promise<Array<{ name: string, entry: string, chunkId?: string }>>}
  */
-export async function listClientComponents(dir) {
-    /** @type {Map<string, { name: string, entry: string }>} */
-    const byName = new Map();
+export async function listClientComponents(dir, opts = {}) {
+    const deployment = readDeploymentDocument(dir, { strict: opts.strict === true });
+    if (deployment) {
+        return componentEntriesFromDeployment(deployment).map((e) => ({
+            name: e.name,
+            entry: e.entry,
+            chunkId: e.chunkId,
+        }));
+    }
+    const folder = path.join(dir, 'components');
+    /** @type {string[]} */
+    let files = [];
     try {
-        const raw = await readFile(path.join(dir, 'vmz-deployment.json'), 'utf8');
-        const dep = JSON.parse(raw);
-        for (const unit of dep.units || []) {
-            if (unit?.kind !== 'component') continue;
-            const chunkId = String(unit.chunkId || '');
-            const name = chunkId.split('/').pop();
-            if (!name) continue;
-            const entry = String(unit.clientEntry || `${chunkId}.client.js`).replace(/\\/g, '/');
-            byName.set(name, { name, entry });
-        }
+        files = await readdir(folder);
     } catch {
-        /* fall through to directory scan */
+        return [];
     }
-    if (byName.size === 0) {
-        const folder = path.join(dir, 'components');
-        let files = [];
-        try {
-            files = await readdir(folder);
-        } catch {
-            return [];
-        }
-        for (const f of files.filter((name) => name.endsWith('.client.js'))) {
+    return files
+        .filter((name) => name.endsWith('.client.js'))
+        .map((f) => {
             const name = f.replace(/\.client\.js$/, '');
-            byName.set(name, { name, entry: `components/${name}.client.js` });
-        }
-    }
-    return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+            return { name, entry: `components/${name}.client.js`, chunkId: `components/${name}` };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
  * Sync variant for callers that already use fs sync (legacy static-emit helpers).
  * @param {string} dir
- * @returns {Array<{ name: string, entry: string }>}
+ * @param {{ strict?: boolean }} [opts]
+ * @returns {Array<{ name: string, entry: string, chunkId?: string }>}
  */
-export function listClientComponentsSync(dir) {
-    /** @type {Map<string, { name: string, entry: string }>} */
-    const byName = new Map();
-    const deploymentPath = path.join(dir, 'vmz-deployment.json');
-    if (fs.existsSync(deploymentPath)) {
-        try {
-            const dep = JSON.parse(fs.readFileSync(deploymentPath, 'utf8'));
-            for (const unit of dep.units || []) {
-                if (unit?.kind !== 'component') continue;
-                const chunkId = String(unit.chunkId || '');
-                const name = chunkId.split('/').pop();
-                if (!name) continue;
-                const entry = String(unit.clientEntry || `${chunkId}.client.js`).replace(/\\/g, '/');
-                byName.set(name, { name, entry });
-            }
-        } catch {
-            /* fall through */
-        }
+export function listClientComponentsSync(dir, opts = {}) {
+    const deployment = readDeploymentDocument(dir, { strict: opts.strict === true });
+    if (deployment) {
+        return componentEntriesFromDeployment(deployment).map((e) => ({
+            name: e.name,
+            entry: e.entry,
+            chunkId: e.chunkId,
+        }));
     }
-    if (byName.size === 0) {
-        const folder = path.join(dir, 'components');
-        let files = [];
-        try {
-            files = fs.readdirSync(folder);
-        } catch {
-            return [];
-        }
-        for (const f of files.filter((name) => name.endsWith('.client.js'))) {
+    const folder = path.join(dir, 'components');
+    /** @type {string[]} */
+    let files = [];
+    try {
+        files = fs.readdirSync(folder);
+    } catch {
+        return [];
+    }
+    return files
+        .filter((name) => name.endsWith('.client.js'))
+        .map((f) => {
             const name = f.replace(/\.client\.js$/, '');
-            byName.set(name, { name, entry: `components/${name}.client.js` });
-        }
-    }
-    return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+            return { name, entry: `components/${name}.client.js`, chunkId: `components/${name}` };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
- * Import all (or filtered) client components and register for SSR / static emit.
+ * @param {Array<{ name: string, entry: string, chunkId?: string }>} entries
+ * @param {Record<string, string> | undefined} explicit
+ * @returns {Array<{ name: string, entry: string, chunkId?: string }>}
+ */
+export function mergeComponentEntries(entries, explicit) {
+    const normalized = entries.map((e) => ({
+        chunkId: e.chunkId || `components/${e.name}`,
+        name: e.name,
+        entry: e.entry,
+    }));
+    return mergeExplicitComponentEntries(normalized, explicit).map((e) => ({
+        name: e.name,
+        entry: e.entry,
+        chunkId: e.chunkId,
+    }));
+}
+
+/**
+ * @param {string} distDir
+ * @param {Record<string, string> | undefined} [explicit]
+ * @param {{ strict?: boolean, closureRoots?: string[] }} [opts]
+ * @returns {Promise<Array<{ name: string, entry: string, chunkId?: string }>>}
+ */
+export async function resolveComponentEntries(distDir, explicit, opts = {}) {
+    const { loadComponentEntries } = await import('./deployment-registry.js');
+    const entries = await loadComponentEntries(distDir, {
+        strict: opts.strict,
+        closureRoots: opts.closureRoots,
+        explicit,
+    });
+    return entries.map((e) => ({ name: e.name, entry: e.entry, chunkId: e.chunkId }));
+}
+
+/**
+ * Import all (or filtered) client components and register for SSR / static emit / test hosts.
  * @param {string} distDir
  * @param {(map: Record<string, unknown>) => void} registerComponents
  * @param {{
  *   cacheBust?: string | number,
- *   include?: (entry: { name: string, entry: string }) => boolean,
+ *   include?: (entry: { name: string, entry: string, chunkId?: string }) => boolean,
+ *   explicit?: Record<string, string>,
+ *   strict?: boolean,
+ *   closureRoots?: string[],
+ *   preload?: 'all' | 'closure' | 'none',
  * }} [opts]
  */
 export async function preloadComponentRegistry(distDir, registerComponents, opts = {}) {
-    const entries = await listClientComponents(distDir);
+    let entries = await resolveComponentEntries(distDir, opts.explicit, {
+        strict: opts.strict,
+        closureRoots: opts.closureRoots,
+    });
+    if (opts.include) entries = entries.filter((e) => opts.include(e));
     /** @type {Record<string, unknown>} */
     const map = {};
     for (const entry of entries) {
-        if (opts.include && !opts.include(entry)) continue;
         const abs = path.join(distDir, entry.entry);
         let href = pathToFileURL(abs).href;
         if (opts.cacheBust != null && opts.cacheBust !== '') {

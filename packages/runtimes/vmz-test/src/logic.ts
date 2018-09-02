@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
+import { bootstrapComponentRegistry } from '@vmz/core/component-registry';
 import { resolveChunkArtifacts } from './compile.js';
 
 const require = createRequire(import.meta.url);
@@ -64,14 +65,13 @@ export async function createLogicHost(opts: { outDir: string; chunkId: string; c
         throw new Error('logic host requires Direct __vmzCreate (rebuild with current compiler)');
     }
 
-    if (opts.components && typeof dom.registerComponents === 'function') {
-        const map: Record<string, any> = {};
-        for (const [name, chunk] of Object.entries(opts.components)) {
-            const cArts = resolveChunkArtifacts(opts.outDir, chunk);
-            if (!cArts.clientPath) throw new Error(`registerComponents: missing ${chunk}.client.js`);
-            map[name] = (await import(pathToFileURL(cArts.clientPath).href)).default;
-        }
-        dom.registerComponents(map);
+    if (typeof dom.registerComponents === 'function') {
+        await bootstrapComponentRegistry(opts.outDir, dom.registerComponents, {
+            strict: process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true',
+            closureRoots: [opts.chunkId.replace(/\\/g, '/')],
+            explicit: opts.components,
+            preload: 'closure',
+        });
     }
 
     if (typeof dom.__vmzPrecisionEnable === 'function') {

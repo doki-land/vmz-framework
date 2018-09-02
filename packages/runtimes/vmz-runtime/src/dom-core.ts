@@ -153,7 +153,7 @@ function noteDomMove() {
     if (precision.enabled) precision.domMoves++;
 }
 
-/** @param {Record<string, any>} map */
+/** @param {Record<string, any>} map — Prefer createRenderHost().ensureComponents(); process-global registry. */
 export function registerComponents(map) {
     Object.assign(components, map);
 }

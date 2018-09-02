@@ -38,3 +38,34 @@ fn reverse_edge_page_depends_on_component() {
     assert!(expanded.contains("components/UserCard"));
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn link_tag_when_component_chunk_exists() {
+    let dir = std::env::temp_dir().join(format!("vmz-dep-link-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("src/components")).unwrap();
+    fs::create_dir_all(dir.join("src/pages")).unwrap();
+    let link = dir.join("src/components/Link.vmz");
+    let page = dir.join("src/pages/product.vmz");
+    fs::write(
+        &link,
+        "<template><a>{href}</a></template>\n<script client>\nexport default class Link {}\n</script>\n",
+    )
+    .unwrap();
+    fs::write(
+        &page,
+        "<template><Link href=\"/x\" /></template>\n<script client>\nexport default class Product {}\n</script>\n",
+    )
+    .unwrap();
+    let src = dir.join("src");
+    let units = vec![
+        (link.clone(), VmzModuleKind::Component, chunk_id_for(&src, &link)),
+        (page.clone(), VmzModuleKind::Page, chunk_id_for(&src, &page)),
+    ];
+    let g = ComponentGraph::build(&src, &units);
+    assert_eq!(
+        g.deps.get("pages/product").map(|v| v.as_slice()),
+        Some(vec!["components/Link".to_string()].as_slice())
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
