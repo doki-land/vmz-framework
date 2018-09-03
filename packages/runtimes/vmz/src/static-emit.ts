@@ -591,7 +591,10 @@ function emitStaticClientEntries(distDir, pageCatalog) {
     const indexChunk = pageCatalog.find((p) => p.chunkId === 'pages/index')?.chunkId || pageCatalog[0]?.chunkId || 'pages/index';
     const resumeEntries = loadPageResumeEntriesSync(distDir, indexChunk);
     const lazySet = new Set(
-        resumeEntries.filter((e) => isEventResumeStrategy(e.strategy)).map((e) => e.component).filter(Boolean),
+        resumeEntries
+            .filter((e) => isEventResumeStrategy(e.strategy))
+            .map((e) => e.component)
+            .filter(Boolean),
     );
     const eager = componentEntries.filter((e) => !lazySet.has(e.name));
     const lazy = componentEntries.filter((e) => lazySet.has(e.name));
@@ -614,9 +617,7 @@ function loadPageResumeEntriesSync(distDir, chunkId) {
         const dep = JSON.parse(fs.readFileSync(path.join(distDir, 'vmz-deployment.json'), 'utf8'));
         const units = Array.isArray(dep.units) ? dep.units : [];
         const page =
-            units.find((u) => u.chunkId === chunkId) ||
-            units.find((u) => u.chunkId === 'pages/index') ||
-            units.find((u) => u.kind === 'page');
+            units.find((u) => u.chunkId === chunkId) || units.find((u) => u.chunkId === 'pages/index') || units.find((u) => u.kind === 'page');
         const entries = Array.isArray(page?.resumeEntries) ? page.resumeEntries : [];
         return entries.map((e) => ({
             component: String(e.component || ''),

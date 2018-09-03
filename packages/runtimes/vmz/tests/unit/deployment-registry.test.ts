@@ -2,18 +2,25 @@
  * Unit tests — deployment registry closure + tag conflict detection.
  */
 import assert from 'node:assert/strict';
-import {
-    collectDependsOnClosure,
-    componentEntriesFromDeployment,
-    dedupeComponentEntriesByTag,
-} from '@vmz/core/component-registry';
+import { collectDependsOnClosure, componentEntriesFromDeployment, dedupeComponentEntriesByTag } from '@vmz/core/component-registry';
 
 const deployment = {
     schema: 'vmz.deployment.v0',
     units: [
-        { chunkId: 'components/SelectProbe', kind: 'component', dependsOn: ['components/Select'], clientEntry: 'components/SelectProbe.client.js' },
+        {
+            chunkId: 'components/SelectProbe',
+            kind: 'component',
+            dependsOn: ['components/Select'],
+            clientEntry: 'components/SelectProbe.client.js',
+        },
         { chunkId: 'components/Select', kind: 'component', dependsOn: [], clientEntry: 'components/Select.client.js' },
-        { chunkId: 'components/ButtonA', kind: 'component', dependsOn: [], clientEntry: 'components/ButtonA.client.js', source: 'pkg-a/Button.vmz' },
+        {
+            chunkId: 'components/ButtonA',
+            kind: 'component',
+            dependsOn: [],
+            clientEntry: 'components/ButtonA.client.js',
+            source: 'pkg-a/Button.vmz',
+        },
         { chunkId: 'vendor/ButtonB', kind: 'component', dependsOn: [], clientEntry: 'vendor/ButtonB.client.js', source: 'pkg-b/Button.vmz' },
     ],
 };

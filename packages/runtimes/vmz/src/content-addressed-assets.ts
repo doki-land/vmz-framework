@@ -40,10 +40,7 @@ export function rewriteCssImports(cssText, rewrites) {
     return cssText.replace(CSS_IMPORT_RE, (match, _dot, target) => {
         const logical = String(target || '').replace(/^\.\//, '');
         if (!logical) return match;
-        const hashed =
-            rewrites[logical] ||
-            rewrites[`/${logical}`] ||
-            rewrites[`assets/${logical}`];
+        const hashed = rewrites[logical] || rewrites[`/${logical}`] || rewrites[`assets/${logical}`];
         if (!hashed) return match;
         const rel = hashed.startsWith('/') ? hashed.slice(1) : hashed;
         const sibling = rel.startsWith('assets/') ? `./${path.basename(rel)}` : `./${rel}`;
