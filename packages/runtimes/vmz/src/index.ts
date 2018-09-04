@@ -5,7 +5,7 @@
  */
 
 import { createRequire } from 'node:module';
-import { existsSync } from 'node:fs';
+import { copyFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { materializeWechatPackaging } from './wechat-packaging.js';
@@ -635,6 +635,33 @@ export function resolveCoreRuntimeDist() {
     return null;
 }
 
+/** Runtime companions required by dist/vmz-serve-host.mjs relative imports. */
+export const SERVE_HOST_RUNTIME_FILES = [
+    ['serve-host.mjs', 'vmz-serve-host.mjs'],
+    ['list-client-components.js', 'list-client-components.js'],
+    ['deployment-registry.js', 'deployment-registry.js'],
+    ['render-host.js', 'render-host.js'],
+];
+
+/**
+ * Copy serve-host + registry bootstrap modules from `@vmz/core` into app outDir.
+ * @param {string} outDir
+ * @param {string} [coreDist]
+ */
+export function materializeServeHostRuntime(outDir, coreDist = resolveCoreRuntimeDist()) {
+    if (!coreDist) {
+        throw new Error('materializeServeHostRuntime: @vmz/core dist not found');
+    }
+    for (const [srcName, outName] of SERVE_HOST_RUNTIME_FILES) {
+        const src = path.join(coreDist, srcName);
+        const dst = path.join(outDir, outName);
+        if (!existsSync(src)) {
+            throw new Error(`materializeServeHostRuntime: missing ${src}`);
+        }
+        copyFileSync(src, dst);
+    }
+}
+
 /**
  * @typedef {object} WorkspaceOptions
  * @property {string} root
@@ -1163,6 +1190,8 @@ export default {
     expectedProtocol,
     resolveNativePath,
     resolveCoreRuntimeDist,
+    materializeServeHostRuntime,
+    SERVE_HOST_RUNTIME_FILES,
     loadNative,
     getProtocolVersions,
     handshake,

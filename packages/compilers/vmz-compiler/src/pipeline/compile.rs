@@ -655,6 +655,11 @@ fn emit_runtime_js(options: &CompileOptions, report: &mut CompileReport) -> crat
     // (~26KB) — Node CLI materializes from `@vmz/core` when serving if missing.
     if !options.release {
         copies.push(("serve-host.mjs", "vmz-serve-host.mjs"));
+        copies.extend([
+            ("list-client-components.js", "list-client-components.js"),
+            ("deployment-registry.js", "deployment-registry.js"),
+            ("render-host.js", "render-host.js"),
+        ]);
     }
     for (src_name, out_name) in copies {
         let runtime_src = runtime_root.join(src_name);

@@ -6,7 +6,7 @@
 import { spawn } from 'node:child_process';
 import { copyFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { HOST_PROTOCOL, createWorkspace, getProtocolVersions, resolveCoreRuntimeDist, resolveNativePath } from './index.js';
+import { HOST_PROTOCOL, createWorkspace, getProtocolVersions, materializeServeHostRuntime, resolveCoreRuntimeDist, resolveNativePath } from './index.js';
 import { createDevSession } from './dev-session.js';
 import { gateGlobalProjectCommand, getInvocationContext, isGlobalAllowedCommand } from './invocation.js';
 import { log } from './log.js';
@@ -507,13 +507,11 @@ async function cmdServe(args) {
     });
     const hostJs = path.join(outDir, 'vmz-serve-host.mjs');
     if (!existsSync(hostJs)) {
-        const coreDist = resolveCoreRuntimeDist();
-        const src = coreDist ? path.join(coreDist, 'serve-host.mjs') : null;
-        if (src && existsSync(src)) {
-            copyFileSync(src, hostJs);
+        try {
+            materializeServeHostRuntime(outDir);
             log.info(`materialized ${hostJs} from @vmz/core (release builds omit it)`);
-        } else {
-            log.error(`missing ${hostJs} — run \`vmz build\` (without --release) or ensure @vmz/core is installed`);
+        } catch (err) {
+            log.error(`missing ${hostJs} — run \`vmz build\` (without --release) or ensure @vmz/core is installed (${err instanceof Error ? err.message : err})`);
             return 1;
         }
     }
