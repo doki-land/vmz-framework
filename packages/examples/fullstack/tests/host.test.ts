@@ -4,6 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 import { expect } from '../../../../scripts/test/expect.mjs';
 import { exampleDist, exampleRoot } from '@vmz-examples/test-utils';
+import { resolveNativePath } from 'vmz';
 
 const dist = exampleDist('fullstack');
 const root = exampleRoot('fullstack');
@@ -49,6 +50,7 @@ describe('fullstack host', () => {
                 VMZ_DIST: dist,
                 VMZ_HOST: '127.0.0.1',
                 VMZ_PORT: String(port),
+                VMZ_NATIVE_NODE: resolveNativePath(),
             },
             stdio: ['ignore', 'pipe', 'pipe'],
         });
