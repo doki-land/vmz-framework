@@ -67,14 +67,20 @@ export function renderHostChromeTemplate(template, localeId, messages, opts) {
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const bindings = {
         brandLabel: messages.brand || 'Iris',
+        brandFullLabel: `${messages.brand || 'Iris'} ORM`,
         navHomeLabel: messages.navHome || 'Home',
         navDocsLabel: messages.navDocs || 'Docs',
+        navPlaygroundLabel: messages.navPlayground || 'Playground',
         navGithubLabel: messages.navGithub || 'GitHub',
         selectLanguageLabel: messages.selectLanguage || 'Language',
         langZhLabel: messages.langZh || '中文',
         langEnLabel: messages.langEn || 'English',
         footerTagLabel: messages.footerTag || messages.brand || 'Iris',
+        footerScopeLabel: messages.footerScopeNote || '',
         footerCopyrightLabel: messages.footerCopyright || '',
+        footerGuideLabel: messages.footerGuide || messages.ctaInstall || 'Getting started',
+        footerColProductLabel: messages.footerColProduct || 'Product',
+        footerColProjectLabel: messages.footerColProject || 'Project',
         ctaInstallLabel: messages.ctaInstall || messages.ctaDocs || 'Docs',
         docsRootHref: opts.docsRootHref,
         guideHref: opts.guideHref,
@@ -93,13 +99,18 @@ export function renderHostChromeTemplate(template, localeId, messages, opts) {
     html = html.replace(/<Link(\s)/g, '<a class="vmz-ui-link"$1');
     html = html.replace(/<\/Link>/g, '</a>');
     html = html.replace(/<Icon[^>]*\/>/g, '');
+    html = html.replace(/<div class="locale-switch"[\s\S]*?<\/div>/g, () => {
+        const zh = `<button type="button" class="locale-switch__btn${localeId === 'zh-hans' ? ' is-active' : ''}" data-vmz-locale-pick="zh-hans"${localeId === 'zh-hans' ? ' aria-current="true"' : ''}>${esc(bindings.langZhLabel)}</button>`;
+        const en = `<button type="button" class="locale-switch__btn${localeId === 'en-us' ? ' is-active' : ''}" data-vmz-locale-pick="en-us"${localeId === 'en-us' ? ' aria-current="true"' : ''}>${esc(bindings.langEnLabel)}</button>`;
+        return `<div class="locale-switch" role="group" aria-label="${esc(bindings.selectLanguageLabel)}">${zh}${en}</div>`;
+    });
     html = html.replace(
         /<Button[\s\S]*?onClick=\{\(\) => this\.switchLocale\('zh-hans'\)\}[\s\S]*?>\s*[\s\S]*?<\/Button>/g,
-        `<button type="button" class="vmz-ui-button vmz-ui-button--ghost" data-vmz-locale-pick="zh-hans"${localeId === 'zh-hans' ? ' aria-current="true"' : ''}>${esc(bindings.langZhLabel)}</button>`,
+        `<button type="button" class="locale-switch__btn${localeId === 'zh-hans' ? ' is-active' : ''}" data-vmz-locale-pick="zh-hans"${localeId === 'zh-hans' ? ' aria-current="true"' : ''}>${esc(bindings.langZhLabel)}</button>`,
     );
     html = html.replace(
         /<Button[\s\S]*?onClick=\{\(\) => this\.switchLocale\('en-us'\)\}[\s\S]*?>\s*[\s\S]*?<\/Button>/g,
-        `<button type="button" class="vmz-ui-button vmz-ui-button--ghost" data-vmz-locale-pick="en-us"${localeId === 'en-us' ? ' aria-current="true"' : ''}>${esc(bindings.langEnLabel)}</button>`,
+        `<button type="button" class="locale-switch__btn${localeId === 'en-us' ? ' is-active' : ''}" data-vmz-locale-pick="en-us"${localeId === 'en-us' ? ' aria-current="true"' : ''}>${esc(bindings.langEnLabel)}</button>`,
     );
     html = html.replace(/<Button[\s\S]*?<\/Button>/g, '');
     html = html.replace(/aria-current=\{localeId === '[^']+' \? 'true' : null\}/g, '');

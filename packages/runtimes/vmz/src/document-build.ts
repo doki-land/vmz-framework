@@ -222,10 +222,7 @@ function renderStaticHtml({
     if (designsHref) cssHrefs.push(hostChrome ? `/${designsHref}` : prefix + designsHref);
     const navItems = nav
         .map((n) => {
-            const href =
-                routing.strategy === 'none' || routing.strategy === 'domain'
-                    ? n.href
-                    : relativeHref(htmlRel, n.href, route);
+            const href = routing.strategy === 'none' || routing.strategy === 'domain' ? n.href : relativeHref(htmlRel, n.href, route);
             const current = n.href === route ? ' aria-current="page"' : '';
             return `      <li><a href="${esc(href)}"${current}>${esc(n.title)}</a></li>`;
         })

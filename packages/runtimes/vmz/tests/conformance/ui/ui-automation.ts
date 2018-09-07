@@ -756,9 +756,12 @@ async function proveCommercialComposition(page) {
 
     // Form + Dialog still interactive inside Card composition.
     await page.type('#home-commercial-email', 'ops@example.com');
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="commercial-email"]')?.textContent?.includes('ops@example.com'), {
-        timeout: 5000,
-    });
+    await page.waitForFunction(
+        () => document.querySelector('[data-vmz-fixture="commercial-email"]')?.textContent?.includes('ops@example.com'),
+        {
+            timeout: 5000,
+        },
+    );
     // Contact Card contains Confirm button.
     await page.evaluate(() => {
         const btn = [...document.querySelectorAll('[data-vmz-ui="card"] button.vmz-ui-btn')].find((b) =>
@@ -1979,8 +1982,9 @@ async function proveMotionContinuity(page) {
     await page.waitForFunction(
         () =>
             !!document.querySelector('[data-vmz-fixture="motion-interrupt"] [data-vmz-motion="overlay-exit"]') ||
-            document.querySelector('[data-vmz-fixture="motion-interrupt"] [data-vmz-overlay="dialog"]')?.getAttribute('data-vmz-motion-phase') ===
-                'exit',
+            document
+                .querySelector('[data-vmz-fixture="motion-interrupt"] [data-vmz-overlay="dialog"]')
+                ?.getAttribute('data-vmz-motion-phase') === 'exit',
         { timeout: 5000 },
     );
 
@@ -2168,7 +2172,9 @@ async function proveUi4Surface(page) {
         );
         btn?.click();
     });
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui4-done"]')?.textContent?.includes('done:yes'), { timeout: 5000 });
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui4-done"]')?.textContent?.includes('done:yes'), {
+        timeout: 5000,
+    });
 
     console.log('ui-automation: UI4 surface PASS');
     await proveUi5Console(page);
@@ -2398,7 +2404,9 @@ async function proveDocumentProduct(page) {
             return {
                 ok: false,
                 density: root?.getAttribute('data-density') || '',
-                buttons: [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].map((b) => (b.textContent || '').trim()),
+                buttons: [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].map((b) =>
+                    (b.textContent || '').trim(),
+                ),
             };
         }
         const cs = getComputedStyle(el);
