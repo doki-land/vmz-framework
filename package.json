@@ -13,7 +13,7 @@
         "napi:build": "node scripts/build/napi.mjs",
         "build:vmz-test": "pnpm --filter @vmz/test run build",
         "build:runtimes": "pnpm --filter @vmz/protocol --filter vmz-fixtures --filter @vmz/core --filter vmz --filter @vmz/test run build",
-        "build:examples": "pnpm -r --filter \"./packages/examples/*\" --filter \"!@vmz-examples/test-utils\" --filter \"!@vmz-examples/documents-fixture\" run build",
+        "build:examples": "pnpm -r --filter \"./packages/examples/*\" --filter \"!@vmz-examples/test-utils\" --filter \"!@vmz-examples/documents-fixture\" --filter \"!@vmz-examples/analysis\" run build",
         "check:examples": "pnpm -r --filter \"./packages/examples/*\" --filter \"!@vmz-examples/test-utils\" run check",
         "verify": "node --import ./scripts/test/resolve-ts-from-js.mjs --experimental-strip-types packages/runtimes/vmz/tests/conformance/run.ts",
         "verify:list": "node --import ./scripts/test/resolve-ts-from-js.mjs --experimental-strip-types packages/runtimes/vmz/tests/conformance/run.ts --list",
