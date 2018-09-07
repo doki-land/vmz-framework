@@ -19,7 +19,7 @@ This is a **preview** release. It is **not** `production-ready` and **not** a ma
 
 Headline surface for this cut:
 
-- Commercial / Console / Document-Product composition dogfood (homepage)
+- Commercial / Console / Document-Product composition on official homepage
 - Form depth, Structure, Overlay stacking, DataTable (ordinary HTML table — not `@vmz/ui-data-grid`)
 - DatePicker owned calendar overlay (not native `input[type=date]` popup)
 - Upload multipart binary (parent-owned FormData → `#server` File/Blob; progress/cancel)
@@ -35,7 +35,7 @@ Verify:
 pnpm verify -- ui-automation
 pnpm verify -- ui7
 pnpm verify -- ui-data-grid
-pnpm verify -- official-dogfood
+pnpm verify -- official-homepage
 ```
 
 Still open relative to Browser Production Profile v1: `browser-production` aggregate core gaps,

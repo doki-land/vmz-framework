@@ -3,7 +3,7 @@
     "version": "0.0.0",
     "private": true,
     "type": "module",
-    "description": "Ordinary Application dogfood for panel/Inspector-shaped Field/Dialog + explain markers (no framework special-case)",
+    "description": "Ordinary Application fixture for panel/Inspector-shaped Field/Dialog + explain markers (no framework special-case)",
     "scripts": {
         "check": "vmz check .",
         "build": "vmz build .",

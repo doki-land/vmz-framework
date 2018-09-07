@@ -42,6 +42,6 @@
     "composition": {
         "reuseFrom": "@vmz/ui",
         "mustNotShip": ["Button", "Field", "Dialog", "Form", "Empty", "Skeleton"],
-        "dogfoodWith": ["BulkActions", "FilterBar", "Pagination", "ConsoleShell", "Field"]
+        "composeWith": ["BulkActions", "FilterBar", "Pagination", "ConsoleShell", "Field"]
     }
 }

@@ -1,14 +1,14 @@
 <template>
-  <div data-dogfood="motion">
+  <div data-vmz-fixture="motion">
     <h1>Motion lab</h1>
-    <p>Ordinary homepage route dogfooding Motion continuity + exit + interrupt/cancel + SSR resume adopt.</p>
+    <p>Motion continuity lab: exit, interrupt/cancel, and SSR resume adopt.</p>
 
-    <section data-dogfood="motion-feedback">
+    <section data-vmz-fixture="motion-feedback">
       <Button type="button" onClick={() => (clicks += 1)}>Pulse</Button>
-      <p data-dogfood="motion-clicks">clicks:{clicks}</p>
+      <p data-vmz-fixture="motion-clicks">clicks:{clicks}</p>
     </section>
 
-    <section data-dogfood="motion-overlay">
+    <section data-vmz-fixture="motion-overlay">
       <Button type="button" onClick={() => (dialogOpen = true)}>Open dialog</Button>
       <Dialog
         open={dialogOpen}
@@ -16,7 +16,7 @@
         titleId="home-motion-dialog-title"
         onClose={() => (dialogOpen = false)}
       >
-        <p data-dogfood="motion-dialog-body">Overlay enter/exit uses motion.overlay tokens.</p>
+        <p data-vmz-fixture="motion-dialog-body">Overlay enter/exit uses motion.overlay tokens.</p>
       </Dialog>
       <Button type="button" onClick={() => (drawerOpen = true)}>Open drawer</Button>
       <Drawer
@@ -25,12 +25,12 @@
         titleId="home-motion-drawer-title"
         onClose={() => (drawerOpen = false)}
       >
-        <p data-dogfood="motion-drawer-body">Drawer enter/exit uses motion.overlay tokens.</p>
+        <p data-vmz-fixture="motion-drawer-body">Drawer enter/exit uses motion.overlay tokens.</p>
       </Drawer>
     </section>
 
-    <section data-dogfood="motion-interrupt">
-      <p data-dogfood="motion-interrupt-state">
+    <section data-vmz-fixture="motion-interrupt">
+      <p data-vmz-fixture="motion-interrupt-state">
         interrupt-dialog:{interruptDialogOpen ? 'open' : 'closed'}
       </p>
       <Button type="button" onClick={() => this.openInterruptDialog()}>Open interrupt dialog</Button>
@@ -40,14 +40,14 @@
         titleId="home-motion-interrupt-dialog-title"
         onClose={() => this.onInterruptDialogClose()}
       >
-        <p data-dogfood="motion-interrupt-body">
+        <p data-vmz-fixture="motion-interrupt-body">
           Escape starts exit; Escape again cancels exit (motion generation / cancel edge).
         </p>
       </Dialog>
     </section>
 
-    <section data-dogfood="motion-resume">
-      <p data-dogfood="motion-resume-state">ssr-dialog:{ssrDialogOpen ? 'open' : 'closed'}</p>
+    <section data-vmz-fixture="motion-resume">
+      <p data-vmz-fixture="motion-resume-state">ssr-dialog:{ssrDialogOpen ? 'open' : 'closed'}</p>
       <Button type="button" onClick={() => (ssrDialogOpen = true)}>Reopen SSR dialog</Button>
       <Dialog
         open={ssrDialogOpen}
@@ -55,15 +55,15 @@
         titleId="home-motion-ssr-dialog-title"
         onClose={() => (ssrDialogOpen = false)}
       >
-        <p data-dogfood="motion-resume-body">SSR-stable overlay — resume keeps enter from replaying.</p>
+        <p data-vmz-fixture="motion-resume-body">SSR-stable overlay — resume keeps enter from replaying.</p>
       </Dialog>
     </section>
 
-    <section data-dogfood="motion-list">
+    <section data-vmz-fixture="motion-list">
       <Button type="button" onClick={() => this.filterAlpha()}>Filter Alpha</Button>
       <Button type="button" onClick={() => this.resetRows()}>Reset rows</Button>
       <Table columns={columns} rows={rows} hasRowAction={rowAction} />
-      <p data-dogfood="motion-row-count">rows:{rowCount}</p>
+      <p data-vmz-fixture="motion-row-count">rows:{rowCount}</p>
     </section>
   </div>
 </template>

@@ -28,17 +28,20 @@ pub fn emit_serve_entry_client(
         format!("?{cache_query}")
     };
     let mut imports = String::new();
+    let mut reg_names: Vec<String> = Vec::new();
+    let mut seen = std::collections::BTreeSet::new();
     for e in eager {
+        if !seen.insert(e.name.clone()) {
+            continue;
+        }
+        reg_names.push(e.name.clone());
         let spec = js_string_literal(&format!("./{}{}", e.entry, q));
         imports.push_str(&format!("import {} from {spec};\n", e.name));
     }
-    let map = if eager.is_empty() {
+    let map = if reg_names.is_empty() {
         String::new()
     } else {
-        format!(
-            "registerComponents({{ {} }});",
-            eager.iter().map(|e| e.name.as_str()).collect::<Vec<_>>().join(", ")
-        )
+        format!("registerComponents({{ {} }});", reg_names.join(", "))
     };
     let mut entry_by_name = BTreeMap::new();
     for e in eager.iter().chain(lazy.iter()) {

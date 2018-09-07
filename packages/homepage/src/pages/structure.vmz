@@ -1,5 +1,5 @@
 <template>
-  <div data-dogfood="structure">
+  <div data-vmz-fixture="structure">
     <AppShell brand="VMZ" homeHref="/" navLabel="Structure" nav={navItems}>
       <Alert
         tone="info"
@@ -8,7 +8,7 @@
         description="Accordion / Steps / List / Tree — parent owns open, current, selection, and expand state."
       />
 
-      <p data-dogfood="structure-state">
+      <p data-vmz-fixture="structure-state">
         faq:{faqOpen || 'none'};step:{stepCurrent};list:{listSelected || 'none'};tree:{treeSelected || 'none'};expanded:{treeExpandedAttr}
       </p>
 

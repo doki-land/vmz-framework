@@ -11,6 +11,7 @@ import { pathToFileURL } from 'node:url';
 import {
     bootstrapComponentRegistry,
     componentEntriesFromDeployment,
+    dedupeComponentEntriesByTag,
     mergeExplicitComponentEntries,
     readDeploymentDocument,
 } from './deployment-registry.js';
@@ -35,13 +36,24 @@ export { createRenderHost } from './render-host.js';
  * @returns {Promise<Array<{ name: string, entry: string, chunkId?: string }>>}
  */
 export async function listClientComponents(dir, opts = {}) {
-    const deployment = readDeploymentDocument(dir, { strict: opts.strict === true });
+    const strict = opts.strict === true;
+    const deployment = readDeploymentDocument(dir, { strict });
     if (deployment) {
-        return componentEntriesFromDeployment(deployment).map((e) => ({
+        return dedupeComponentEntriesByTag(
+            componentEntriesFromDeployment(deployment).map((e) => ({
+                chunkId: e.chunkId,
+                name: e.name,
+                entry: e.entry,
+                source: e.source,
+            })),
+        ).map((e) => ({
             name: e.name,
             entry: e.entry,
             chunkId: e.chunkId,
         }));
+    }
+    if (strict) {
+        throw new Error(`vmz: missing vmz-deployment.json under ${dir} (strict deployment mode)`);
     }
     const folder = path.join(dir, 'components');
     /** @type {string[]} */
@@ -67,13 +79,24 @@ export async function listClientComponents(dir, opts = {}) {
  * @returns {Array<{ name: string, entry: string, chunkId?: string }>}
  */
 export function listClientComponentsSync(dir, opts = {}) {
-    const deployment = readDeploymentDocument(dir, { strict: opts.strict === true });
+    const strict = opts.strict === true;
+    const deployment = readDeploymentDocument(dir, { strict });
     if (deployment) {
-        return componentEntriesFromDeployment(deployment).map((e) => ({
+        return dedupeComponentEntriesByTag(
+            componentEntriesFromDeployment(deployment).map((e) => ({
+                chunkId: e.chunkId,
+                name: e.name,
+                entry: e.entry,
+                source: e.source,
+            })),
+        ).map((e) => ({
             name: e.name,
             entry: e.entry,
             chunkId: e.chunkId,
         }));
+    }
+    if (strict) {
+        throw new Error(`vmz: missing vmz-deployment.json under ${dir} (strict deployment mode)`);
     }
     const folder = path.join(dir, 'components');
     /** @type {string[]} */

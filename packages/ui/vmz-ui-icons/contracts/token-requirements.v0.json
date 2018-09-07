@@ -26,6 +26,6 @@
     "composition": {
         "reuseFrom": "@vmz/ui",
         "mustNotShip": ["Button", "Field", "Dialog", "Form", "Empty", "Skeleton", "Tooltip"],
-        "dogfoodWith": ["Button", "Empty", "Badge"]
+        "composeWith": ["Button", "Empty", "Badge"]
     }
 }

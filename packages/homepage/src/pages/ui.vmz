@@ -1,7 +1,7 @@
 <template>
-  <main class="ui-lab" data-dogfood="ui-lab">
+  <main class="ui-lab" data-vmz-fixture="ui-lab">
     <h1>UI lab</h1>
-    <p>Ordinary homepage route dogfooding @vmz/ui UI1 + UI2 Form / Disclosure.</p>
+    <p>@vmz/ui UI1 + UI2 Form / Disclosure lab.</p>
 
     <section>
       <Field
@@ -14,27 +14,27 @@
         value={name}
         onInput={(e) => (name = e.target.value)}
       />
-      <p data-dogfood="field-value">value:{name}</p>
+      <p data-vmz-fixture="field-value">value:{name}</p>
     </section>
 
-    <section data-dogfood="ui2-form">
+    <section data-vmz-fixture="ui2-form">
       <Checkbox
         label="Accept terms"
         controlId="home-ui-agree"
         checked={agree}
         onChange={(e) => (agree = e.target.checked)}
       />
-      <p data-dogfood="checkbox-value">agree:{agree ? 'yes' : 'no'}</p>
+      <p data-vmz-fixture="checkbox-value">agree:{agree ? 'yes' : 'no'}</p>
       <Switch
         label="Email notifications"
         controlId="home-ui-notify"
         checked={notify}
         onChange={(v) => (notify = v)}
       />
-      <p data-dogfood="switch-value">notify:{notify ? 'on' : 'off'}</p>
+      <p data-vmz-fixture="switch-value">notify:{notify ? 'on' : 'off'}</p>
     </section>
 
-    <section data-dogfood="ui2-tabs">
+    <section data-vmz-fixture="ui2-tabs">
       <Tabs
         label="Profile sections"
         selected={tab}
@@ -42,11 +42,11 @@
         items={tabItems}
         onSelect={(id) => (tab = id)}
       >
-        <p data-dogfood="tab-panel">panel:{tab}</p>
+        <p data-vmz-fixture="tab-panel">panel:{tab}</p>
       </Tabs>
     </section>
 
-    <section data-dogfood="ui2-menu">
+    <section data-vmz-fixture="ui2-menu">
       <Menu
         label="Actions"
         menuId="home-ui-menu"
@@ -55,27 +55,27 @@
         onOpenChange={(v) => (menuOpen = v)}
         onSelect={(id) => (menuChoice = id)}
       />
-      <p data-dogfood="menu-choice">menu:{menuChoice || 'none'}</p>
+      <p data-vmz-fixture="menu-choice">menu:{menuChoice || 'none'}</p>
     </section>
 
-    <section data-dogfood="ui1-dialog">
+    <section data-vmz-fixture="ui1-dialog">
       <Button type="button" onClick={() => (open = true)}>Open dialog</Button>
       <Dialog open={open} title="Confirm" titleId="home-ui-dialog-title" onClose={() => (open = false)}>
-        <p data-dogfood="dialog-body">Dialog body for homepage dogfood.</p>
+        <p data-vmz-fixture="dialog-body">Dialog body for UI lab.</p>
       </Dialog>
     </section>
 
-    <section data-dogfood="ui2-drawer">
+    <section data-vmz-fixture="ui2-drawer">
       <Button type="button" onClick={() => (drawerOpen = true)}>Open drawer</Button>
       <Drawer open={drawerOpen} title="Details" titleId="home-ui-drawer-title" onClose={() => (drawerOpen = false)}>
-        <p data-dogfood="drawer-body">Drawer body for homepage dogfood.</p>
+        <p data-vmz-fixture="drawer-body">Drawer body for UI lab.</p>
       </Drawer>
     </section>
 
-    <section data-dogfood="ui2-popover">
+    <section data-vmz-fixture="ui2-popover">
       <Button type="button" onClick={() => (popoverOpen = true)}>Open popover</Button>
       <Popover open={popoverOpen} title="Hint" titleId="home-ui-popover-title" onClose={() => (popoverOpen = false)}>
-        <p data-dogfood="popover-body">Popover body for homepage dogfood.</p>
+        <p data-vmz-fixture="popover-body">Popover body for UI lab.</p>
       </Popover>
     </section>
   </main>

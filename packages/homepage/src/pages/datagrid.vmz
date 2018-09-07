@@ -1,5 +1,5 @@
 <template>
-  <div data-dogfood="datagrid" data-density="compact" data-grid-mode={viewMode}>
+  <div data-vmz-fixture="datagrid" data-density="compact" data-grid-mode={viewMode}>
     <ConsoleShell
       brand="VMZ"
       homeHref="/"
@@ -14,23 +14,23 @@
         description="@vmz/ui-data-grid — virtualized + pinned + group/tree/edit + parent-owned pivot matrix (row×col→sum). Not a second spreadsheet runtime."
       />
 
-      <p data-dogfood="datagrid-state">
+      <p data-vmz-fixture="datagrid-state">
         mode:{viewMode};total:{totalRows};flat:{flatCount};visible:{visibleCount};window:{windowStart}-{windowEnd};selected:{selectedAttr || 'none'};count:{selectedCount};sort:{sortKey}:{sortDir};group:{groupBy};groups:{groupCount};expanded:{expandedAttr};agg:{aggSample};tree:{treeAttr};depthMax:{depthMax};treeExpanded:{treeExpandedAttr};editing:{editingKey || 'none'};draft:{editDraft || '-'};scoreSample:{scoreSample};pivot:{pivotAttr};pivotRows:{pivotRowCount};pivotCols:{pivotColsLabel};pivotMeasure:{pivotMeasure};pivotSample:{pivotSample}
       </p>
 
-      <div data-dogfood="datagrid-modes">
-        <span data-dogfood="mode-group">
+      <div data-vmz-fixture="datagrid-modes">
+        <span data-vmz-fixture="mode-group">
           <Button type="button" variant="secondary" onClick={() => this.setMode('group')}>Group mode</Button>
         </span>
-        <span data-dogfood="mode-tree">
+        <span data-vmz-fixture="mode-tree">
           <Button type="button" variant="secondary" onClick={() => this.setMode('tree')}>Tree mode</Button>
         </span>
-        <span data-dogfood="mode-pivot">
+        <span data-vmz-fixture="mode-pivot">
           <Button type="button" variant="secondary" onClick={() => this.setMode('pivot')}>Pivot mode</Button>
         </span>
       </div>
 
-      <div if={showEditField} data-dogfood="datagrid-edit-field">
+      <div if={showEditField} data-vmz-fixture="datagrid-edit-field">
         <Field
           label="Cell draft (Field mirror)"
           controlId="datagrid-edit-draft"

@@ -251,7 +251,9 @@ export async function handleNodeRequest(req, res, opts = {}) {
         if (verb === 'GET' && opts.distDir) {
             const nodePath = await import('node:path');
             const { readFile, stat } = await import('node:fs/promises');
-            const file = await resolveDistStatic(opts.distDir, url.pathname, nodePath, stat);
+            const file = await resolveDistStatic(opts.distDir, url.pathname, nodePath, stat, {
+                cookieHeader: String(req.headers.cookie || ''),
+            });
             const hasSsr =
                 typeof opts.renderPageStream === 'function' ||
                 typeof opts.renderPage === 'function' ||

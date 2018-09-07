@@ -83,7 +83,7 @@ const plan = JSON.parse(rename.stdout);
 if (plan.schema !== 'vmz.locale.rename.v0' || plan.status !== 'ready') fail(`rename plan ${JSON.stringify(plan)}`);
 if (!(plan.edits || []).length) fail('rename edits empty');
 
-console.log(': dogfood thin slice — build emits dist/locales runtime…');
+console.log('locale-messages: fixture thin slice — build emits dist/locales runtime…');
 const built = runVmz(['build', fixture], fixture);
 if (built.status !== 0) fail(`fixture build failed\n${built.stdout}\n${built.stderr}`);
 const runtimeJs = path.join(fixture, 'dist', 'locales', 'common.js');

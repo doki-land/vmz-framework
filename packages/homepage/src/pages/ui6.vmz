@@ -1,5 +1,5 @@
 <template>
-  <div data-dogfood="ui6" data-density={density} dir={dir}>
+  <div data-vmz-fixture="ui6" data-density={density} dir={dir}>
     <AppShell brand="VMZ" homeHref="/" navLabel="UI6" nav={navItems}>
       <Alert
         tone="info"
@@ -8,7 +8,7 @@
         description="comfortable → compact → dense; dir ltr/rtl; high-contrast theme overlay from /designs."
       />
 
-      <p data-dogfood="ui6-state">density:{density};dir:{dir};theme:{theme}</p>
+      <p data-vmz-fixture="ui6-state">density:{density};dir:{dir};theme:{theme}</p>
       <div class="vmz-ui6-actions">
         <Button type="button" onClick={() => this.cycleDensity()}>Cycle density</Button>
         <Button type="button" variant="secondary" onClick={() => this.toggleDir()}>Toggle RTL</Button>

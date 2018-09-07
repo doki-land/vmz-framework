@@ -140,14 +140,14 @@ for (const tok of button.tokens) {
     }
 }
 
-console.log('ui-automation: homepage dogfood discovers Button from @vmz/ui…');
+console.log('ui-automation: homepage fixture discovers Button from @vmz/ui…');
 {
     const dep = JSON.parse(fs.readFileSync(path.join(homepage, 'package.json'), 'utf8'));
     if (!dep.dependencies?.['@vmz/ui'] && !dep.devDependencies?.['@vmz/ui']) {
         fail('homepage must depend on @vmz/ui');
     }
     const indexVmz = fs.readFileSync(path.join(homepage, 'src', 'pages', 'index.vmz'), 'utf8');
-    if (!indexVmz.includes('<Button')) fail('homepage index must dogfood <Button>');
+    if (!indexVmz.includes('<Button')) fail('homepage index must compose <Button>');
     const buttonDirect = path.join(homepage, 'dist', 'Button.client.js');
     const buttonNested = path.join(homepage, 'dist', 'components', 'Button.client.js');
     if (!fs.existsSync(buttonDirect) && !fs.existsSync(buttonNested)) {
@@ -339,7 +339,7 @@ async function proveUi1FocusOverlay() {
             const pageProbe = await page.evaluate(() => ({
                 title: document.title,
                 buttons: [...document.querySelectorAll('button')].map((b) => (b.textContent || '').trim()),
-                hasUiLab: !!document.querySelector('[data-dogfood="ui-lab"]'),
+                hasUiLab: !!document.querySelector('[data-vmz-fixture="ui-lab"]'),
                 bodySlice: (document.body?.innerText || '').slice(0, 400),
             }));
             if (!pageProbe.hasUiLab) fail(`UI lab page missing: ${JSON.stringify(pageProbe)}`);
@@ -385,7 +385,7 @@ async function proveUi1FocusOverlay() {
             if (!fieldFocus.ok) fail(`Field: control must be focusable: ${JSON.stringify(fieldFocus)}`);
 
             // Dialog: open → focus enter on panel.
-            const dialogOpener = '[data-dogfood="ui1-dialog"] button.vmz-ui-btn';
+            const dialogOpener = '[data-vmz-fixture="ui1-dialog"] button.vmz-ui-btn';
             const opened = await page.evaluate((sel) => !!document.querySelector(sel), dialogOpener);
             if (!opened) fail('Dialog: Open dialog button missing');
             await page.focus(dialogOpener);
@@ -518,12 +518,12 @@ async function proveUi2InPage(page) {
     }
     await page.click('#home-ui-agree');
     try {
-        await page.waitForFunction(() => document.querySelector('[data-dogfood="checkbox-value"]')?.textContent?.includes('agree:yes'), {
+        await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="checkbox-value"]')?.textContent?.includes('agree:yes'), {
             timeout: 5000,
         });
     } catch {
         const snap = await page.evaluate(() => ({
-            text: document.querySelector('[data-dogfood="checkbox-value"]')?.textContent || null,
+            text: document.querySelector('[data-vmz-fixture="checkbox-value"]')?.textContent || null,
             checked: document.getElementById('home-ui-agree')?.checked ?? null,
         }));
         fail(`Checkbox: live checked did not update parent: ${JSON.stringify(snap)}`);
@@ -548,7 +548,7 @@ async function proveUi2InPage(page) {
                 const el = document.getElementById('home-ui-notify');
                 const aria = el?.getAttribute('aria-checked');
                 const on = aria === 'true' || aria === '';
-                const textOk = document.querySelector('[data-dogfood="switch-value"]')?.textContent?.includes('notify:on');
+                const textOk = document.querySelector('[data-vmz-fixture="switch-value"]')?.textContent?.includes('notify:on');
                 return !!(textOk && on);
             },
             { timeout: 5000 },
@@ -561,7 +561,7 @@ async function proveUi2InPage(page) {
             return {
                 aria: el?.getAttribute('aria-checked'),
                 hasAria: el?.hasAttribute('aria-checked'),
-                text: document.querySelector('[data-dogfood="switch-value"]')?.textContent || null,
+                text: document.querySelector('[data-vmz-fixture="switch-value"]')?.textContent || null,
                 instChecked: inst ? !!inst.checked : null,
             };
         });
@@ -574,7 +574,7 @@ async function proveUi2InPage(page) {
         await page.waitForFunction(
             () =>
                 document.querySelector('[data-vmz-tab="home-ui-tab-security"]')?.getAttribute('aria-selected') === 'true' &&
-                document.querySelector('[data-dogfood="tab-panel"]')?.textContent?.includes('panel:home-ui-tab-security'),
+                document.querySelector('[data-vmz-fixture="tab-panel"]')?.textContent?.includes('panel:home-ui-tab-security'),
             { timeout: 5000 },
         );
     } catch {
@@ -583,7 +583,7 @@ async function proveUi2InPage(page) {
             const inst = host && host.__vmzInst;
             return {
                 selectedAttr: document.querySelector('[data-vmz-tab="home-ui-tab-security"]')?.getAttribute('aria-selected'),
-                panel: document.querySelector('[data-dogfood="tab-panel"]')?.textContent || null,
+                panel: document.querySelector('[data-vmz-fixture="tab-panel"]')?.textContent || null,
                 instSelected: inst ? inst.selected : null,
             };
         });
@@ -595,13 +595,13 @@ async function proveUi2InPage(page) {
         await page.waitForFunction(
             () =>
                 document.querySelector('[data-vmz-tab="home-ui-tab-billing"]')?.getAttribute('aria-selected') === 'true' &&
-                document.querySelector('[data-dogfood="tab-panel"]')?.textContent?.includes('panel:home-ui-tab-billing'),
+                document.querySelector('[data-vmz-fixture="tab-panel"]')?.textContent?.includes('panel:home-ui-tab-billing'),
             { timeout: 5000 },
         );
     } catch {
         const snap = await page.evaluate(() => ({
             selectedAttr: document.querySelector('[data-vmz-tab="home-ui-tab-billing"]')?.getAttribute('aria-selected'),
-            panel: document.querySelector('[data-dogfood="tab-panel"]')?.textContent || null,
+            panel: document.querySelector('[data-vmz-fixture="tab-panel"]')?.textContent || null,
         }));
         fail(`Tabs: keyboard select did not update: ${JSON.stringify(snap)}`);
     }
@@ -629,7 +629,7 @@ async function proveUi2InPage(page) {
     );
 
     // Drawer: modal overlay ownership + Escape restore.
-    const drawerOpener = '[data-dogfood="ui2-drawer"] button.vmz-ui-btn';
+    const drawerOpener = '[data-vmz-fixture="ui2-drawer"] button.vmz-ui-btn';
     await page.focus(drawerOpener);
     await page.click(drawerOpener);
     await page.waitForSelector('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]', { timeout: 5000 });
@@ -655,7 +655,7 @@ async function proveUi2InPage(page) {
     );
 
     // Popover: non-modal + Escape restore + outside dismiss.
-    const popoverOpener = '[data-dogfood="ui2-popover"] button.vmz-ui-btn';
+    const popoverOpener = '[data-vmz-fixture="ui2-popover"] button.vmz-ui-btn';
     await page.focus(popoverOpener);
     await page.click(popoverOpener);
     await page.waitForSelector('[data-vmz-overlay="popover"] [data-vmz-focus="enter"]', { timeout: 5000 });
@@ -714,16 +714,16 @@ async function proveCommercialComposition(page) {
     if (!fs.existsSync(commercialSrc)) fail('homepage missing src/pages/commercial.vmz');
 
     await page.goto(`http://127.0.0.1:18781/commercial`, { waitUntil: 'networkidle0', timeout: 20000 });
-    await page.waitForSelector('[data-dogfood="commercial"]', { timeout: 10000 });
+    await page.waitForSelector('[data-vmz-fixture="commercial"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
         shell: !!document.querySelector('[data-vmz-ui="app-shell"]'),
         header: !!document.querySelector('[data-vmz-shell="header"]'),
         main: !!document.querySelector('[data-vmz-shell="main"]'),
         nav: !!document.querySelector('[data-vmz-nav="commercial"]'),
-        hero: !!document.querySelector('[data-dogfood="commercial-hero"]'),
-        features: !!document.querySelector('[data-dogfood="commercial-features"]'),
-        pricing: !!document.querySelector('[data-dogfood="commercial-pricing"]'),
+        hero: !!document.querySelector('[data-vmz-fixture="commercial-hero"]'),
+        features: !!document.querySelector('[data-vmz-fixture="commercial-features"]'),
+        pricing: !!document.querySelector('[data-vmz-fixture="commercial-pricing"]'),
         badge: !!document.querySelector('[data-vmz-ui="badge"]'),
         link: !!document.querySelector('[data-vmz-ui="link"]'),
         secondary: !!document.querySelector('button.vmz-ui-btn[data-variant="secondary"]'),
@@ -756,7 +756,7 @@ async function proveCommercialComposition(page) {
 
     // Form + Dialog still interactive inside Card composition.
     await page.type('#home-commercial-email', 'ops@example.com');
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="commercial-email"]')?.textContent?.includes('ops@example.com'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="commercial-email"]')?.textContent?.includes('ops@example.com'), {
         timeout: 5000,
     });
     // Contact Card contains Confirm button.
@@ -781,13 +781,13 @@ async function proveCommercialComposition(page) {
         () =>
             !document.querySelector('[data-vmz-ui="empty"]') &&
             !!document.querySelector('[data-vmz-ui="alert"][data-tone="success"]') &&
-            !!document.querySelector('[data-dogfood="commercial-notify"] [data-vmz-ui="notification"]'),
+            !!document.querySelector('[data-vmz-fixture="commercial-notify"] [data-vmz-ui="notification"]'),
         { timeout: 5000 },
     );
 
     // Drawer from composition page.
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="commercial"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="commercial"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Open details'),
         );
         btn?.click();
@@ -823,10 +823,10 @@ async function proveFormDepth(page) {
         fail('Form depth: form.vmz must not hand-roll upload XHR — use @vmz/ui Upload destination/action');
     }
     if (!/destination="server"/.test(formSrcText) || !/action="\/api\/form\/attachment"/.test(formSrcText)) {
-        fail('Form depth: form.vmz must dogfood Upload destination=server + action');
+        fail('Form depth: form.vmz must compose Upload destination=server + action');
     }
     if (!/destination="client"/.test(formSrcText) || !/destination="object"/.test(formSrcText)) {
-        fail('Form depth: form.vmz must dogfood Upload destination=client and destination=object');
+        fail('Form depth: form.vmz must compose Upload destination=client and destination=object');
     }
     if (!/onPresign=\{\(file\) => this\.presignObject\(file\)\}/.test(formSrcText) || !/\/api\/form\/presign/.test(formSrcText)) {
         fail('Form depth: form.vmz must bind Upload onPresign via #server /api/form/presign');
@@ -835,14 +835,14 @@ async function proveFormDepth(page) {
         fail('Form depth: form.vmz must bind Upload onValue (result ownership)');
     }
     if (!/chunkSize=\{8\}/.test(formSrcText) || !/action="\/api\/form\/resumable"/.test(formSrcText)) {
-        fail('Form depth: form.vmz must dogfood Upload chunkSize + /api/form/resumable');
+        fail('Form depth: form.vmz must compose Upload chunkSize + /api/form/resumable');
     }
     if (!/\/api\/form\/resumable\/init/.test(formSrcText) || !/\/api\/form\/resumable\/chunk/.test(formSrcText)) {
         fail('Form depth: form.vmz #server must expose resumable init/chunk routes');
     }
 
     await page.goto(`http://127.0.0.1:18781/form`, { waitUntil: 'networkidle0', timeout: 20000 });
-    await page.waitForSelector('[data-dogfood="form"]', { timeout: 10000 });
+    await page.waitForSelector('[data-vmz-fixture="form"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
         form: !!document.querySelector('[data-vmz-ui="form"]'),
@@ -889,7 +889,7 @@ async function proveFormDepth(page) {
 
     // Tooltip parent-owned open.
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="form-email-row"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="form-email-row"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Why?'),
         );
         btn?.click();
@@ -906,7 +906,7 @@ async function proveFormDepth(page) {
 
     // Empty submit → summary + field errors (parent-owned validation).
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="form"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="form"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Send request'),
         );
         btn?.click();
@@ -920,7 +920,7 @@ async function proveFormDepth(page) {
             document.querySelector('#home-form-date-err')?.textContent?.includes('preferred date') &&
             document.querySelector('#home-form-file-err')?.textContent?.includes('Attach and upload a file') &&
             document.querySelector('#home-form-plan-err')?.textContent?.includes('Pick a plan') &&
-            document.querySelector('[data-dogfood="form-agree-error"]')?.textContent?.includes('Consent'),
+            document.querySelector('[data-vmz-fixture="form-agree-error"]')?.textContent?.includes('Consent'),
         { timeout: 5000 },
     );
     const invalid = await page.evaluate(() => ({
@@ -981,7 +981,7 @@ async function proveFormDepth(page) {
     await page
         .waitForFunction(
             () => {
-                const state = document.querySelector('[data-dogfood="form-state"]')?.textContent || '';
+                const state = document.querySelector('[data-vmz-fixture="form-state"]')?.textContent || '';
                 const label = document.querySelector('#home-form-role .vmz-ui-select__value')?.textContent || '';
                 return state.includes('role:ops') || label.includes('Operations');
             },
@@ -989,7 +989,7 @@ async function proveFormDepth(page) {
         )
         .catch(async (err) => {
             const dbg = await page.evaluate(() => ({
-                state: document.querySelector('[data-dogfood="form-state"]')?.textContent || '',
+                state: document.querySelector('[data-vmz-fixture="form-state"]')?.textContent || '',
                 label: document.querySelector('#home-form-role .vmz-ui-select__value')?.textContent || '',
                 open: !!document.querySelector('[data-vmz-ui="select"] [data-vmz-option="ops"]'),
             }));
@@ -1045,7 +1045,7 @@ async function proveFormDepth(page) {
             month: document.querySelector('[data-vmz-date="month"]')?.textContent || '',
             dayBtn: !!document.querySelector('[data-vmz-date-iso="2026-08-13"]:not(.is-outside)'),
             open: !!document.querySelector('[data-vmz-overlay="date-picker"]'),
-            preferred: document.querySelector('[data-dogfood="form-state"]')?.textContent || '',
+            preferred: document.querySelector('[data-vmz-fixture="form-state"]')?.textContent || '',
         }));
         fail(`Form depth: DatePicker did not adopt 2026-08-13: ${JSON.stringify(dbg)}`);
     }
@@ -1103,7 +1103,7 @@ async function proveFormDepth(page) {
             (wantHex) => {
                 const root = document.querySelector('[data-vmz-ui="upload"]');
                 const result = document.querySelector('[data-vmz-upload="result"]')?.textContent || '';
-                const state = document.querySelector('[data-dogfood="form-state"]')?.textContent || '';
+                const state = document.querySelector('[data-vmz-fixture="form-state"]')?.textContent || '';
                 const m = /attachment:(att-\S+) \((\d+) bytes\)(?: head:([0-9a-f]+))?/.exec(result);
                 const reported = m ? Number(m[2]) : -1;
                 const head = m && m[3] ? m[3] : '';
@@ -1130,7 +1130,7 @@ async function proveFormDepth(page) {
                 statusText: document.querySelector('[data-vmz-upload="status"]')?.textContent || '',
                 file: document.querySelector('[data-vmz-upload="file"]')?.textContent || '',
                 progress: !!document.querySelector('[data-vmz-upload="progress"]'),
-                state: document.querySelector('[data-dogfood="form-state"]')?.textContent || '',
+                state: document.querySelector('[data-vmz-fixture="form-state"]')?.textContent || '',
             }));
             fail(`Form depth: Upload did not reach done+binary headHex: ${JSON.stringify(dbg)} (${err})`);
         });
@@ -1142,7 +1142,7 @@ async function proveFormDepth(page) {
     await page
         .waitForFunction(
             () => {
-                const state = document.querySelector('[data-dogfood="form-state"]')?.textContent || '';
+                const state = document.querySelector('[data-vmz-fixture="form-state"]')?.textContent || '';
                 return (
                     state.includes('email:ops@example.com') &&
                     state.includes('role:ops') &&
@@ -1158,11 +1158,11 @@ async function proveFormDepth(page) {
             { timeout: 8000 },
         )
         .catch(async (err) => {
-            const state = await page.evaluate(() => document.querySelector('[data-dogfood="form-state"]')?.textContent || '');
+            const state = await page.evaluate(() => document.querySelector('[data-vmz-fixture="form-state"]')?.textContent || '');
             fail(`Form depth: form-state incomplete before submit: ${JSON.stringify(state)} (${err})`);
         });
     await page.evaluate(() => {
-        const form = document.querySelector('[data-dogfood="form"] [data-vmz-ui="form"]');
+        const form = document.querySelector('[data-vmz-fixture="form"] [data-vmz-ui="form"]');
         if (form instanceof HTMLFormElement) {
             form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
         }
@@ -1171,13 +1171,13 @@ async function proveFormDepth(page) {
         await page.waitForFunction(
             () =>
                 !document.querySelector('[data-vmz-form="summary"]') &&
-                document.querySelector('[data-dogfood="form-state"]')?.textContent?.includes('submitted:true') &&
-                !!document.querySelector('[data-dogfood="form-success"] [data-vmz-ui="result"]'),
+                document.querySelector('[data-vmz-fixture="form-state"]')?.textContent?.includes('submitted:true') &&
+                !!document.querySelector('[data-vmz-fixture="form-success"] [data-vmz-ui="result"]'),
             { timeout: 8000 },
         );
     } catch {
         const snap = await page.evaluate(() => ({
-            state: document.querySelector('[data-dogfood="form-state"]')?.textContent || '',
+            state: document.querySelector('[data-vmz-fixture="form-state"]')?.textContent || '',
             summary: document.querySelector('[data-vmz-form="summary"]')?.textContent || '',
             emailErr: document.querySelector('#home-form-email-err')?.textContent || '',
             roleErr: document.querySelector('#home-form-role-err')?.textContent || '',
@@ -1185,29 +1185,29 @@ async function proveFormDepth(page) {
             dateErr: document.querySelector('#home-form-date-err')?.textContent || '',
             fileErr: document.querySelector('#home-form-file-err')?.textContent || '',
             planErr: document.querySelector('#home-form-plan-err')?.textContent || '',
-            agreeErr: document.querySelector('[data-dogfood="form-agree-error"]')?.textContent || '',
-            success: !!document.querySelector('[data-dogfood="form-success"]'),
+            agreeErr: document.querySelector('[data-vmz-fixture="form-agree-error"]')?.textContent || '',
+            success: !!document.querySelector('[data-vmz-fixture="form-success"]'),
         }));
         fail(`Form depth: valid submit did not clear errors / mark submitted: ${JSON.stringify(snap)}`);
     }
 
     // Reset clears values + success.
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="form"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="form"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Reset'),
         );
         btn?.click();
     });
     await page.waitForFunction(
         () =>
-            document.querySelector('[data-dogfood="form-state"]')?.textContent?.includes('submitted:false') &&
-            document.querySelector('[data-dogfood="form-state"]')?.textContent?.includes('email:;') &&
-            document.querySelector('[data-dogfood="form-state"]')?.textContent?.includes('team:;') &&
-            document.querySelector('[data-dogfood="form-state"]')?.textContent?.includes('date:;') &&
-            document.querySelector('[data-dogfood="form-state"]')?.textContent?.includes('file:;') &&
-            document.querySelector('[data-dogfood="form-state"]')?.textContent?.includes('upload:idle') &&
-            document.querySelector('[data-dogfood="form-state"]')?.textContent?.includes('attachment:;') &&
-            !document.querySelector('[data-dogfood="form-success"]'),
+            document.querySelector('[data-vmz-fixture="form-state"]')?.textContent?.includes('submitted:false') &&
+            document.querySelector('[data-vmz-fixture="form-state"]')?.textContent?.includes('email:;') &&
+            document.querySelector('[data-vmz-fixture="form-state"]')?.textContent?.includes('team:;') &&
+            document.querySelector('[data-vmz-fixture="form-state"]')?.textContent?.includes('date:;') &&
+            document.querySelector('[data-vmz-fixture="form-state"]')?.textContent?.includes('file:;') &&
+            document.querySelector('[data-vmz-fixture="form-state"]')?.textContent?.includes('upload:idle') &&
+            document.querySelector('[data-vmz-fixture="form-state"]')?.textContent?.includes('attachment:;') &&
+            !document.querySelector('[data-vmz-fixture="form-success"]'),
         { timeout: 5000 },
     );
 
@@ -1222,7 +1222,7 @@ async function proveFormDepth(page) {
     // Commercial Form shell still opens Dialog on valid email.
     await page.goto(`http://127.0.0.1:18781/commercial`, { waitUntil: 'networkidle0', timeout: 20000 });
     await page.waitForSelector('[data-vmz-ui="form"]', { timeout: 10000 });
-    const commercialForm = await page.evaluate(() => !!document.querySelector('[data-dogfood="commercial"] [data-vmz-ui="form"]'));
+    const commercialForm = await page.evaluate(() => !!document.querySelector('[data-vmz-fixture="commercial"] [data-vmz-ui="form"]'));
     if (!commercialForm) fail('Form depth: commercial Contact must use Form shell');
 
     console.log('ui-automation: Form depth PASS');
@@ -1266,7 +1266,7 @@ async function proveUploadDestinations(page) {
         .waitForFunction(
             (byteLen) => {
                 const root = document.querySelector('#home-upload-client')?.closest('[data-vmz-ui="upload"]');
-                const state = document.querySelector('[data-dogfood="upload-client-state"]')?.textContent || '';
+                const state = document.querySelector('[data-vmz-fixture="upload-client-state"]')?.textContent || '';
                 const result = root?.querySelector('[data-vmz-upload="result"]')?.textContent || '';
                 return (
                     root?.getAttribute('data-vmz-upload-status') === 'done' &&
@@ -1285,7 +1285,7 @@ async function proveUploadDestinations(page) {
                     .querySelector('#home-upload-client')
                     ?.closest('[data-vmz-ui="upload"]')
                     ?.getAttribute('data-vmz-upload-status'),
-                state: document.querySelector('[data-dogfood="upload-client-state"]')?.textContent || '',
+                state: document.querySelector('[data-vmz-fixture="upload-client-state"]')?.textContent || '',
                 result:
                     document
                         .querySelector('#home-upload-client')
@@ -1315,7 +1315,7 @@ async function proveUploadDestinations(page) {
         .waitForFunction(
             (byteLen) => {
                 const root = document.querySelector('#home-upload-object')?.closest('[data-vmz-ui="upload"]');
-                const state = document.querySelector('[data-dogfood="upload-object-state"]')?.textContent || '';
+                const state = document.querySelector('[data-vmz-fixture="upload-object-state"]')?.textContent || '';
                 const result = root?.querySelector('[data-vmz-upload="result"]')?.textContent || '';
                 return (
                     root?.getAttribute('data-vmz-upload-status') === 'done' &&
@@ -1334,7 +1334,7 @@ async function proveUploadDestinations(page) {
                     .querySelector('#home-upload-object')
                     ?.closest('[data-vmz-ui="upload"]')
                     ?.getAttribute('data-vmz-upload-status'),
-                state: document.querySelector('[data-dogfood="upload-object-state"]')?.textContent || '',
+                state: document.querySelector('[data-vmz-fixture="upload-object-state"]')?.textContent || '',
                 result:
                     document
                         .querySelector('#home-upload-object')
@@ -1400,7 +1400,7 @@ async function proveUploadSelectionConstraints(page) {
         .waitForFunction(
             () => {
                 const root = document.querySelector('#home-upload-multi')?.closest('[data-vmz-ui="upload"]');
-                const state = document.querySelector('[data-dogfood="upload-multi-state"]')?.textContent || '';
+                const state = document.querySelector('[data-vmz-fixture="upload-multi-state"]')?.textContent || '';
                 const result = root?.querySelector('[data-vmz-upload="result"]')?.textContent || '';
                 const ids = (state.match(/ids:([^;]*)/) || [])[1] || '';
                 const idList = ids.split(',').filter(Boolean);
@@ -1418,7 +1418,7 @@ async function proveUploadSelectionConstraints(page) {
         .catch(async (err) => {
             const dbg = await page.evaluate(() => ({
                 status: document.querySelector('#home-upload-multi')?.closest('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-status'),
-                state: document.querySelector('[data-dogfood="upload-multi-state"]')?.textContent || '',
+                state: document.querySelector('[data-vmz-fixture="upload-multi-state"]')?.textContent || '',
                 result:
                     document.querySelector('#home-upload-multi')?.closest('[data-vmz-ui="upload"]')?.querySelector('[data-vmz-upload="result"]')
                         ?.textContent || '',
@@ -1447,7 +1447,7 @@ async function proveUploadSelectionConstraints(page) {
         .waitForFunction(
             () => {
                 const root = document.querySelector('#home-upload-dir')?.closest('[data-vmz-ui="upload"]');
-                const state = document.querySelector('[data-dogfood="upload-dir-state"]')?.textContent || '';
+                const state = document.querySelector('[data-vmz-fixture="upload-dir-state"]')?.textContent || '';
                 return (
                     root?.getAttribute('data-vmz-upload-status') === 'done' &&
                     root?.getAttribute('data-vmz-upload-mode') === 'directory' &&
@@ -1464,7 +1464,7 @@ async function proveUploadSelectionConstraints(page) {
             const dbg = await page.evaluate(() => ({
                 status: document.querySelector('#home-upload-dir')?.closest('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-status'),
                 mode: document.querySelector('#home-upload-dir')?.closest('[data-vmz-ui="upload"]')?.getAttribute('data-vmz-upload-mode'),
-                state: document.querySelector('[data-dogfood="upload-dir-state"]')?.textContent || '',
+                state: document.querySelector('[data-vmz-fixture="upload-dir-state"]')?.textContent || '',
                 statusText:
                     document.querySelector('#home-upload-dir')?.closest('[data-vmz-ui="upload"]')?.querySelector('[data-vmz-upload="status"]')
                         ?.textContent || '',
@@ -1548,7 +1548,7 @@ async function proveUploadResumable(page) {
                     chunk: root?.getAttribute('data-vmz-upload-chunk') || '',
                     cancel: !!root?.querySelector('[data-vmz-upload="cancel"]'),
                     statusText: root?.querySelector('[data-vmz-upload="status"]')?.textContent || '',
-                    state: document.querySelector('[data-dogfood="upload-resume-state"]')?.textContent || '',
+                    state: document.querySelector('[data-vmz-fixture="upload-resume-state"]')?.textContent || '',
                 };
             });
             fail(`Upload resumable: did not reach mid-chunk uploading: ${JSON.stringify(dbg)} (${err})`);
@@ -1570,7 +1570,7 @@ async function proveUploadResumable(page) {
                     root?.getAttribute('data-vmz-upload-status') === 'paused' &&
                     !!root?.querySelector('[data-vmz-upload="resume"]') &&
                     /up-/.test(session) &&
-                    (document.querySelector('[data-dogfood="upload-resume-state"]')?.textContent || '').includes('resume:paused')
+                    (document.querySelector('[data-vmz-fixture="upload-resume-state"]')?.textContent || '').includes('resume:paused')
                 );
             },
             { timeout: 8000 },
@@ -1583,7 +1583,7 @@ async function proveUploadResumable(page) {
                     session: root?.getAttribute('data-vmz-upload-session') || '',
                     resumeBtn: !!root?.querySelector('[data-vmz-upload="resume"]'),
                     statusText: root?.querySelector('[data-vmz-upload="status"]')?.textContent || '',
-                    state: document.querySelector('[data-dogfood="upload-resume-state"]')?.textContent || '',
+                    state: document.querySelector('[data-vmz-fixture="upload-resume-state"]')?.textContent || '',
                     sessionBeforePause,
                 };
             }, pausedAt);
@@ -1603,7 +1603,7 @@ async function proveUploadResumable(page) {
             (wantHex) => {
                 const root = document.querySelector('#home-upload-resume')?.closest('[data-vmz-ui="upload"]');
                 const result = root?.querySelector('[data-vmz-upload="result"]')?.textContent || '';
-                const state = document.querySelector('[data-dogfood="upload-resume-state"]')?.textContent || '';
+                const state = document.querySelector('[data-vmz-fixture="upload-resume-state"]')?.textContent || '';
                 const m = /attachment:(att-\S+) \((\d+) bytes\)(?: head:([0-9a-f]+))?(?: chunks:(\d+))?/.exec(result);
                 return (
                     root?.getAttribute('data-vmz-upload-status') === 'done' &&
@@ -1628,7 +1628,7 @@ async function proveUploadResumable(page) {
                     session: root?.getAttribute('data-vmz-upload-session') || '',
                     result: root?.querySelector('[data-vmz-upload="result"]')?.textContent || '',
                     statusText: root?.querySelector('[data-vmz-upload="status"]')?.textContent || '',
-                    state: document.querySelector('[data-dogfood="upload-resume-state"]')?.textContent || '',
+                    state: document.querySelector('[data-vmz-fixture="upload-resume-state"]')?.textContent || '',
                 };
             });
             fail(`Upload resumable: resume→done failed: ${JSON.stringify(dbg)} (${err})`);
@@ -1655,7 +1655,7 @@ async function proveConsoleComposition(page) {
     if (!fs.existsSync(consoleSrc)) fail('homepage missing src/pages/console.vmz');
 
     await page.goto(`http://127.0.0.1:18781/console`, { waitUntil: 'networkidle0', timeout: 20000 });
-    await page.waitForSelector('[data-dogfood="console"]', { timeout: 10000 });
+    await page.waitForSelector('[data-vmz-fixture="console"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
         shell: !!document.querySelector('[data-vmz-ui="console-shell"]'),
@@ -1679,11 +1679,11 @@ async function proveConsoleComposition(page) {
     if (markers.rows < 1) fail(`Console: expected table rows, got ${markers.rows}`);
 
     await page.type('#home-console-query', 'Alpha');
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="console-query"]')?.textContent?.includes('Alpha'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="console-query"]')?.textContent?.includes('Alpha'), {
         timeout: 5000,
     });
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="console"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Apply'),
         );
         btn?.click();
@@ -1691,17 +1691,17 @@ async function proveConsoleComposition(page) {
     await page.waitForFunction(() => document.querySelectorAll('[data-vmz-row]').length === 1, { timeout: 5000 });
 
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="console"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Select visible'),
         );
         btn?.click();
     });
     await page.waitForSelector('[data-vmz-ui="bulk-actions"]', { timeout: 5000 });
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="bulk-count"]')?.textContent?.includes('1 selected'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="bulk-count"]')?.textContent?.includes('1 selected'), {
         timeout: 5000,
     });
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="console"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Clear selection'),
         );
         btn?.click();
@@ -1713,7 +1713,7 @@ async function proveConsoleComposition(page) {
         btn?.click();
     });
     await page.waitForSelector('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]', { timeout: 5000 });
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="console-drawer-body"]')?.textContent?.includes('detail:r1'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="console-drawer-body"]')?.textContent?.includes('detail:r1'), {
         timeout: 5000,
     });
     await page.keyboard.press('Escape');
@@ -1733,19 +1733,19 @@ async function proveConsoleComposition(page) {
     await page.keyboard.press('Backspace');
     await page.keyboard.press('Backspace');
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="console"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Apply'),
         );
         btn?.click();
     });
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="page-status"]')?.textContent?.includes('Page 1 / 2'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="page-status"]')?.textContent?.includes('Page 1 / 2'), {
         timeout: 5000,
     });
     await page.evaluate(() => {
         const btn = [...document.querySelectorAll('[data-vmz-ui="pagination"] button')].find((b) => (b.textContent || '').includes('Next'));
         btn?.click();
     });
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="page-status"]')?.textContent?.includes('Page 2 / 2'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="page-status"]')?.textContent?.includes('Page 2 / 2'), {
         timeout: 5000,
     });
 
@@ -1789,13 +1789,13 @@ async function proveMotionContinuity(page) {
     if (!buttonSrc.includes('data-vmz-motion="control"')) fail('Button must mark control motion');
 
     await page.goto(`http://127.0.0.1:18781/motion`, { waitUntil: 'networkidle0', timeout: 20000 });
-    await page.waitForSelector('[data-dogfood="motion"]', { timeout: 10000 });
+    await page.waitForSelector('[data-vmz-fixture="motion"]', { timeout: 10000 });
     await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
 
     // SSR resume adopt: first paint dialog must skip enter replay.
-    await page.waitForSelector('[data-dogfood="motion-resume"] [data-vmz-overlay="dialog"]', { timeout: 10000 });
+    await page.waitForSelector('[data-vmz-fixture="motion-resume"] [data-vmz-overlay="dialog"]', { timeout: 10000 });
     const resumeAdopt = await page.evaluate(() => {
-        const overlay = document.querySelector('[data-dogfood="motion-resume"] [data-vmz-overlay="dialog"]');
+        const overlay = document.querySelector('[data-vmz-fixture="motion-resume"] [data-vmz-overlay="dialog"]');
         const panel = overlay?.querySelector('[data-vmz-focus="enter"]');
         if (!overlay || !panel) return { ok: false, reason: 'missing ssr dialog' };
         const cs = getComputedStyle(panel);
@@ -1804,7 +1804,7 @@ async function proveMotionContinuity(page) {
             adopt: overlay.getAttribute('data-vmz-motion-adopt') === 'true',
             motion: panel.getAttribute('data-vmz-motion') || '',
             animation: cs.animationName || 'none',
-            state: document.querySelector('[data-dogfood="motion-resume-state"]')?.textContent || '',
+            state: document.querySelector('[data-vmz-fixture="motion-resume-state"]')?.textContent || '',
         };
     });
     if (!resumeAdopt.ok) fail(`Motion resume: ${resumeAdopt.reason}`);
@@ -1821,19 +1821,19 @@ async function proveMotionContinuity(page) {
     await page.keyboard.press('Escape');
     await page.waitForFunction(
         () =>
-            !!document.querySelector('[data-dogfood="motion-resume"] [data-vmz-motion="overlay-exit"]') ||
-            !document.querySelector('[data-dogfood="motion-resume"] [data-vmz-overlay="dialog"]'),
+            !!document.querySelector('[data-vmz-fixture="motion-resume"] [data-vmz-motion="overlay-exit"]') ||
+            !document.querySelector('[data-vmz-fixture="motion-resume"] [data-vmz-overlay="dialog"]'),
         { timeout: 5000 },
     );
     await page.waitForFunction(
         () =>
-            !document.querySelector('[data-dogfood="motion-resume"] [data-vmz-overlay="dialog"]') &&
-            document.querySelector('[data-dogfood="motion-resume-state"]')?.textContent?.includes('ssr-dialog:closed'),
+            !document.querySelector('[data-vmz-fixture="motion-resume"] [data-vmz-overlay="dialog"]') &&
+            document.querySelector('[data-vmz-fixture="motion-resume-state"]')?.textContent?.includes('ssr-dialog:closed'),
         { timeout: 5000 },
     );
 
     const feedback = await page.evaluate(() => {
-        const btn = document.querySelector('[data-dogfood="motion-feedback"] button.vmz-ui-btn');
+        const btn = document.querySelector('[data-vmz-fixture="motion-feedback"] button.vmz-ui-btn');
         if (!btn) return { ok: false, reason: 'missing pulse button' };
         const cs = getComputedStyle(btn);
         const duration = (cs.getPropertyValue('--vmz-motion-control-duration') || '').trim();
@@ -1860,19 +1860,19 @@ async function proveMotionContinuity(page) {
 
     const t0 = Date.now();
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="motion-feedback"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="motion-feedback"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Pulse'),
         );
         btn?.click();
     });
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="motion-clicks"]')?.textContent?.includes('clicks:1'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="motion-clicks"]')?.textContent?.includes('clicks:1'), {
         timeout: 2000,
     });
     const feedbackMs = Date.now() - t0;
     if (feedbackMs > 1000) fail(`Motion: immediate feedback too slow (${feedbackMs}ms)`);
 
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="motion-overlay"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="motion-overlay"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Open dialog'),
         );
         btn?.click();
@@ -1898,24 +1898,24 @@ async function proveMotionContinuity(page) {
     await page.keyboard.press('Escape');
     await page.waitForFunction(
         () =>
-            !!document.querySelector('[data-dogfood="motion-overlay"] [data-vmz-motion="overlay-exit"]') ||
-            !document.querySelector('[data-dogfood="motion-overlay"] [data-vmz-overlay="dialog"]'),
+            !!document.querySelector('[data-vmz-fixture="motion-overlay"] [data-vmz-motion="overlay-exit"]') ||
+            !document.querySelector('[data-vmz-fixture="motion-overlay"] [data-vmz-overlay="dialog"]'),
         { timeout: 5000 },
     );
-    await page.waitForFunction(() => !document.querySelector('[data-dogfood="motion-overlay"] [data-vmz-overlay="dialog"]'), {
+    await page.waitForFunction(() => !document.querySelector('[data-vmz-fixture="motion-overlay"] [data-vmz-overlay="dialog"]'), {
         timeout: 5000,
     });
 
     // Reopen after exit → enter animation returns (not adopt).
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="motion-overlay"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="motion-overlay"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Open dialog'),
         );
         btn?.click();
     });
     await page.waitForSelector('[data-vmz-overlay="dialog"] [data-vmz-motion="overlay-enter"]', { timeout: 5000 });
     const reenter = await page.evaluate(() => {
-        const overlay = document.querySelector('[data-dogfood="motion-overlay"] [data-vmz-overlay="dialog"]');
+        const overlay = document.querySelector('[data-vmz-fixture="motion-overlay"] [data-vmz-overlay="dialog"]');
         const panel = overlay?.querySelector('[data-vmz-focus="enter"]');
         const cs = panel ? getComputedStyle(panel) : null;
         return {
@@ -1930,14 +1930,14 @@ async function proveMotionContinuity(page) {
         fail(`Motion: client reopen enter animation missing: ${reenter.animation}`);
     }
     await page.keyboard.press('Escape');
-    await page.waitForFunction(() => !document.querySelector('[data-dogfood="motion-overlay"] [data-vmz-overlay="dialog"]'), {
+    await page.waitForFunction(() => !document.querySelector('[data-vmz-fixture="motion-overlay"] [data-vmz-overlay="dialog"]'), {
         timeout: 5000,
     });
 
     // Reduced motion: final open/close state unchanged.
     await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="motion-overlay"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="motion-overlay"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Open dialog'),
         );
         btn?.click();
@@ -1961,16 +1961,16 @@ async function proveMotionContinuity(page) {
 
     // Motion PG interruptibility thin gate: Escape starts exit; Escape again cancels (no zombie onClose).
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="motion-interrupt"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="motion-interrupt"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Open interrupt dialog'),
         );
         btn?.click();
     });
-    await page.waitForSelector('[data-dogfood="motion-interrupt"] [data-vmz-overlay="dialog"] [data-vmz-motion="overlay-enter"]', {
+    await page.waitForSelector('[data-vmz-fixture="motion-interrupt"] [data-vmz-overlay="dialog"] [data-vmz-motion="overlay-enter"]', {
         timeout: 5000,
     });
     const interruptGenBefore = await page.evaluate(() => {
-        const overlay = document.querySelector('[data-dogfood="motion-interrupt"] [data-vmz-overlay="dialog"]');
+        const overlay = document.querySelector('[data-vmz-fixture="motion-interrupt"] [data-vmz-overlay="dialog"]');
         return overlay?.getAttribute('data-vmz-motion-gen') || '';
     });
     if (!interruptGenBefore) fail('Motion interrupt: expected data-vmz-motion-gen on open overlay');
@@ -1978,8 +1978,8 @@ async function proveMotionContinuity(page) {
     await page.keyboard.press('Escape');
     await page.waitForFunction(
         () =>
-            !!document.querySelector('[data-dogfood="motion-interrupt"] [data-vmz-motion="overlay-exit"]') ||
-            document.querySelector('[data-dogfood="motion-interrupt"] [data-vmz-overlay="dialog"]')?.getAttribute('data-vmz-motion-phase') ===
+            !!document.querySelector('[data-vmz-fixture="motion-interrupt"] [data-vmz-motion="overlay-exit"]') ||
+            document.querySelector('[data-vmz-fixture="motion-interrupt"] [data-vmz-overlay="dialog"]')?.getAttribute('data-vmz-motion-phase') ===
                 'exit',
         { timeout: 5000 },
     );
@@ -1987,7 +1987,7 @@ async function proveMotionContinuity(page) {
     await page.keyboard.press('Escape');
     await page.waitForFunction(
         () => {
-            const overlay = document.querySelector('[data-dogfood="motion-interrupt"] [data-vmz-overlay="dialog"]');
+            const overlay = document.querySelector('[data-vmz-fixture="motion-interrupt"] [data-vmz-overlay="dialog"]');
             if (!overlay) return false;
             return (
                 overlay.getAttribute('data-vmz-motion-cancelled') === 'reverse' &&
@@ -1998,8 +1998,8 @@ async function proveMotionContinuity(page) {
         { timeout: 5000 },
     );
     const interruptAfterCancel = await page.evaluate(() => {
-        const overlay = document.querySelector('[data-dogfood="motion-interrupt"] [data-vmz-overlay="dialog"]');
-        const state = document.querySelector('[data-dogfood="motion-interrupt-state"]')?.textContent || '';
+        const overlay = document.querySelector('[data-vmz-fixture="motion-interrupt"] [data-vmz-overlay="dialog"]');
+        const state = document.querySelector('[data-vmz-fixture="motion-interrupt-state"]')?.textContent || '';
         return {
             open: !!overlay,
             cancelled: overlay?.getAttribute('data-vmz-motion-cancelled') || '',
@@ -2022,8 +2022,8 @@ async function proveMotionContinuity(page) {
     // Stale exit timer must not close after cancel.
     await new Promise((r) => setTimeout(r, 250));
     const stillOpen = await page.evaluate(() => {
-        const overlay = document.querySelector('[data-dogfood="motion-interrupt"] [data-vmz-overlay="dialog"]');
-        const state = document.querySelector('[data-dogfood="motion-interrupt-state"]')?.textContent || '';
+        const overlay = document.querySelector('[data-vmz-fixture="motion-interrupt"] [data-vmz-overlay="dialog"]');
+        const state = document.querySelector('[data-vmz-fixture="motion-interrupt-state"]')?.textContent || '';
         return { open: !!overlay, state };
     });
     if (!stillOpen.open || !stillOpen.state.includes('interrupt-dialog:open')) {
@@ -2033,13 +2033,13 @@ async function proveMotionContinuity(page) {
     // Complete close after interrupt.
     await page.keyboard.press('Escape');
     await page.waitForFunction(
-        () => document.querySelector('[data-dogfood="motion-interrupt-state"]')?.textContent?.includes('interrupt-dialog:closed'),
+        () => document.querySelector('[data-vmz-fixture="motion-interrupt-state"]')?.textContent?.includes('interrupt-dialog:closed'),
         { timeout: 5000 },
     );
 
     // List identity: filter keeps stable row id.
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="motion-list"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="motion-list"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Filter Alpha'),
         );
         btn?.click();
@@ -2048,7 +2048,7 @@ async function proveMotionContinuity(page) {
         () =>
             document.querySelectorAll('[data-vmz-row]').length === 1 &&
             !!document.querySelector('[data-vmz-row="r1"]') &&
-            document.querySelector('[data-dogfood="motion-row-count"]')?.textContent?.includes('rows:1'),
+            document.querySelector('[data-vmz-fixture="motion-row-count"]')?.textContent?.includes('rows:1'),
         { timeout: 5000 },
     );
 
@@ -2083,7 +2083,7 @@ async function proveUi4Surface(page) {
     if (!fs.existsSync(ui4Src)) fail('homepage missing src/pages/ui4.vmz');
 
     await page.goto(`http://127.0.0.1:18781/ui4`, { waitUntil: 'networkidle0', timeout: 20000 });
-    await page.waitForSelector('[data-dogfood="ui4"]', { timeout: 10000 });
+    await page.waitForSelector('[data-vmz-fixture="ui4"]', { timeout: 10000 });
 
     const tones = await page.evaluate(() => {
         const out = {};
@@ -2118,7 +2118,7 @@ async function proveUi4Surface(page) {
         notification: !!document.querySelector('[data-vmz-ui="notification"][data-tone="warning"]'),
         result: !!document.querySelector('[data-vmz-ui="result"][data-status="success"]'),
         empty: !!document.querySelector('[data-vmz-ui="empty"]'),
-        density: document.querySelector('[data-dogfood="ui4"]')?.getAttribute('data-density') || '',
+        density: document.querySelector('[data-vmz-fixture="ui4"]')?.getAttribute('data-density') || '',
     }));
     if (!markers.notification || !markers.result || !markers.empty) {
         fail(`UI4: Notification/Result/Empty missing: ${JSON.stringify(markers)}`);
@@ -2126,7 +2126,7 @@ async function proveUi4Surface(page) {
     if (markers.density !== 'comfortable') fail(`UI4: default density want comfortable, got ${markers.density}`);
 
     const beforePad = await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="ui4"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui4"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Toggle density'),
         );
         if (!btn) return null;
@@ -2141,19 +2141,19 @@ async function proveUi4Surface(page) {
     if (beforePad.controlY === beforePad.compactY) fail('UI4: control and compact density must differ');
 
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="ui4"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui4"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Toggle density'),
         );
         btn?.click();
     });
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="ui4"]')?.getAttribute('data-density') === 'compact', {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui4"]')?.getAttribute('data-density') === 'compact', {
         timeout: 5000,
     });
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="ui4-density"]')?.textContent?.includes('density:compact'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui4-density"]')?.textContent?.includes('density:compact'), {
         timeout: 5000,
     });
     const afterPad = await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="ui4"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui4"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Toggle density'),
         );
         return btn ? getComputedStyle(btn).paddingTop : null;
@@ -2168,7 +2168,7 @@ async function proveUi4Surface(page) {
         );
         btn?.click();
     });
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="ui4-done"]')?.textContent?.includes('done:yes'), { timeout: 5000 });
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui4-done"]')?.textContent?.includes('done:yes'), { timeout: 5000 });
 
     console.log('ui-automation: UI4 surface PASS');
     await proveUi5Console(page);
@@ -2197,15 +2197,15 @@ async function proveUi5Console(page) {
     if (!fs.existsSync(ui5Src)) fail('homepage missing src/pages/ui5.vmz');
 
     await page.goto(`http://127.0.0.1:18781/ui5`, { waitUntil: 'networkidle0', timeout: 20000 });
-    await page.waitForSelector('[data-dogfood="ui5"]', { timeout: 10000 });
+    await page.waitForSelector('[data-vmz-fixture="ui5"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
-        density: document.querySelector('[data-dogfood="ui5"]')?.getAttribute('data-density') || '',
+        density: document.querySelector('[data-vmz-fixture="ui5"]')?.getAttribute('data-density') || '',
         crumb: !!document.querySelector('[data-vmz-ui="breadcrumb"] [data-vmz-crumb="ui5"]'),
         query: !!document.querySelector('[data-vmz-ui="query-form"][data-dense="true"]'),
         skeleton: !!document.querySelector('[data-vmz-ui="skeleton"][data-loading="true"]'),
         timeline: document.querySelectorAll('[data-vmz-ui="timeline"] [data-vmz-audit]').length,
-        exportDisabled: [...document.querySelectorAll('[data-dogfood="ui5"] button.vmz-ui-btn')].some(
+        exportDisabled: [...document.querySelectorAll('[data-vmz-fixture="ui5"] button.vmz-ui-btn')].some(
             (b) => (b.textContent || '').includes('Export') && b.disabled,
         ),
     }));
@@ -2217,11 +2217,11 @@ async function proveUi5Console(page) {
     if (!markers.exportDisabled) fail('UI5: Export must start permission-disabled');
 
     await page.type('#home-ui5-name', 'Beta');
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="ui5-query"]')?.textContent?.includes('name:Beta'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui5-query"]')?.textContent?.includes('name:Beta'), {
         timeout: 5000,
     });
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="ui5"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui5"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Search'),
         );
         btn?.click();
@@ -2238,7 +2238,7 @@ async function proveUi5Console(page) {
         const btn = document.querySelector('[data-vmz-sort="status"]');
         btn?.click();
     });
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="ui5-sort"]')?.textContent?.includes('sort:status:'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui5-sort"]')?.textContent?.includes('sort:status:'), {
         timeout: 5000,
     });
 
@@ -2250,12 +2250,12 @@ async function proveUi5Console(page) {
     if (!blocked) fail('UI5: row action must be disabled while write denied');
 
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="ui5"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui5"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Toggle write'),
         );
         btn?.click();
     });
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="ui5-perm"]')?.textContent?.includes('write:allowed'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui5-perm"]')?.textContent?.includes('write:allowed'), {
         timeout: 5000,
     });
     await page.evaluate(() => {
@@ -2263,7 +2263,7 @@ async function proveUi5Console(page) {
         btn?.click();
     });
     await page.waitForSelector('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]', { timeout: 5000 });
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="ui5-drawer-body"]')?.textContent?.includes('detail:r2'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui5-drawer-body"]')?.textContent?.includes('detail:r2'), {
         timeout: 5000,
     });
     await page.keyboard.press('Escape');
@@ -2271,7 +2271,7 @@ async function proveUi5Console(page) {
 
     // Skeleton can return to loading with stable marker.
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="ui5"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui5"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Toggle loading'),
         );
         btn?.click();
@@ -2305,7 +2305,7 @@ async function proveDocumentProduct(page) {
     if (!fs.existsSync(productSrc)) fail('homepage missing src/pages/product.vmz');
 
     await page.goto(`http://127.0.0.1:18781/product`, { waitUntil: 'networkidle0', timeout: 20000 });
-    await page.waitForSelector('[data-dogfood="product"]', { timeout: 10000 });
+    await page.waitForSelector('[data-vmz-fixture="product"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
         shell: !!document.querySelector('[data-vmz-ui="app-shell"]'),
@@ -2329,28 +2329,28 @@ async function proveDocumentProduct(page) {
 
     // Locale switch keeps composition readable.
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="product"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Locale:'),
         );
         btn?.click();
     });
     await page.waitForFunction(
         () =>
-            document.querySelector('[data-dogfood="product-meta"]')?.textContent?.includes('locale:zh') &&
+            document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent?.includes('locale:zh') &&
             document.getElementById('overview')?.textContent?.includes('产品'),
         { timeout: 5000 },
     );
 
     // Version switch updates CodeBlock source.
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="product"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Switch version'),
         );
         btn?.click();
     });
     await page.waitForFunction(
         () =>
-            document.querySelector('[data-dogfood="product-meta"]')?.textContent?.includes('version:v0') &&
+            document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent?.includes('version:v0') &&
             (document.querySelector('[data-vmz-ui="code-block"] code')?.textContent || '').includes('@0.0.0'),
         { timeout: 5000 },
     );
@@ -2359,7 +2359,7 @@ async function proveDocumentProduct(page) {
     await page.type('#home-product-search', 'install');
     await page.waitForFunction(
         () =>
-            document.querySelector('[data-dogfood="product-meta"]')?.textContent?.includes('search:install') &&
+            document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent?.includes('search:install') &&
             !!document.getElementById('install') &&
             !!document.getElementById('overview') &&
             !!document.querySelector('[data-vmz-toc="install"]') &&
@@ -2376,21 +2376,21 @@ async function proveDocumentProduct(page) {
     });
     await page.waitForFunction(
         () =>
-            document.querySelector('[data-dogfood="product-meta"]')?.textContent?.includes('copied:yes') &&
-            !!document.querySelector('[data-dogfood="product-copied"]'),
+            document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent?.includes('copied:yes') &&
+            !!document.querySelector('[data-vmz-fixture="product-copied"]'),
         { timeout: 5000 },
     );
 
     // Document surface shares UI6 density/RTL activation (not a parallel theme).
     await page.goto(`http://127.0.0.1:18781/product`, { waitUntil: 'networkidle0', timeout: 20000 });
-    await page.waitForSelector('[data-dogfood="product"]', { timeout: 10000 });
+    await page.waitForSelector('[data-vmz-fixture="product"]', { timeout: 10000 });
 
     const productDensity = await page.evaluate(() => {
-        const root = document.querySelector('[data-dogfood="product"]');
-        const cycle = [...document.querySelectorAll('[data-dogfood="product"] button.vmz-ui-btn')].find((b) =>
+        const root = document.querySelector('[data-vmz-fixture="product"]');
+        const cycle = [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Cycle density'),
         );
-        const sample = [...document.querySelectorAll('[data-dogfood="product"] button.vmz-ui-btn')].find((b) =>
+        const sample = [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Switch version'),
         );
         const el = sample || cycle;
@@ -2398,7 +2398,7 @@ async function proveDocumentProduct(page) {
             return {
                 ok: false,
                 density: root?.getAttribute('data-density') || '',
-                buttons: [...document.querySelectorAll('[data-dogfood="product"] button.vmz-ui-btn')].map((b) => (b.textContent || '').trim()),
+                buttons: [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].map((b) => (b.textContent || '').trim()),
             };
         }
         const cs = getComputedStyle(el);
@@ -2406,7 +2406,7 @@ async function proveDocumentProduct(page) {
             ok: true,
             density: root.getAttribute('data-density') || '',
             dir: root.getAttribute('dir') || '',
-            meta: document.querySelector('[data-dogfood="product-meta"]')?.textContent || '',
+            meta: document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent || '',
             paddingTop: cs.paddingTop,
             controlY: (cs.getPropertyValue('--vmz-density-control-padding-y') || '').trim(),
             compactY: (cs.getPropertyValue('--vmz-density-compact-padding-y') || '').trim(),
@@ -2425,47 +2425,47 @@ async function proveDocumentProduct(page) {
     }
     const productPadComfortable = productDensity.paddingTop;
     const productLtrGeom = await page.evaluate(() => {
-        const brand = document.querySelector('[data-dogfood="product"] [data-vmz-shell="header"] .vmz-ui-app-shell__brand');
-        const nav = document.querySelector('[data-dogfood="product"] [data-vmz-shell="header"] .vmz-ui-app-shell__nav');
+        const brand = document.querySelector('[data-vmz-fixture="product"] [data-vmz-shell="header"] .vmz-ui-app-shell__brand');
+        const nav = document.querySelector('[data-vmz-fixture="product"] [data-vmz-shell="header"] .vmz-ui-app-shell__nav');
         if (!brand || !nav) return null;
         return { brandLeft: brand.getBoundingClientRect().left, navLeft: nav.getBoundingClientRect().left };
     });
     if (!productLtrGeom) fail('Document density: AppShell geometry missing (ltr)');
 
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="product"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Cycle density'),
         );
         btn?.click();
     });
     try {
-        await page.waitForFunction(() => document.querySelector('[data-dogfood="product"]')?.getAttribute('data-density') === 'compact', {
+        await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="product"]')?.getAttribute('data-density') === 'compact', {
             timeout: 5000,
         });
     } catch {
         const snap = await page.evaluate(() => ({
-            density: document.querySelector('[data-dogfood="product"]')?.getAttribute('data-density') || '',
-            meta: document.querySelector('[data-dogfood="product-meta"]')?.textContent || '',
-            hasCycle: [...document.querySelectorAll('[data-dogfood="product"] button.vmz-ui-btn')].some((b) =>
+            density: document.querySelector('[data-vmz-fixture="product"]')?.getAttribute('data-density') || '',
+            meta: document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent || '',
+            hasCycle: [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].some((b) =>
                 (b.textContent || '').includes('Cycle density'),
             ),
         }));
         fail(`Document density: cycle to compact failed: ${JSON.stringify(snap)}`);
     }
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="product"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Cycle density'),
         );
         btn?.click();
     });
     await page.waitForFunction(
         () =>
-            document.querySelector('[data-dogfood="product"]')?.getAttribute('data-density') === 'dense' &&
-            document.querySelector('[data-dogfood="product-meta"]')?.textContent?.includes('density:dense'),
+            document.querySelector('[data-vmz-fixture="product"]')?.getAttribute('data-density') === 'dense' &&
+            document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent?.includes('density:dense'),
         { timeout: 5000 },
     );
     const productPadDense = await page.evaluate(() => {
-        const sample = [...document.querySelectorAll('[data-dogfood="product"] button.vmz-ui-btn')].find((b) =>
+        const sample = [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Switch version'),
         );
         return sample ? getComputedStyle(sample).paddingTop : '';
@@ -2475,20 +2475,20 @@ async function proveDocumentProduct(page) {
     }
 
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="product"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Toggle RTL'),
         );
         btn?.click();
     });
     await page.waitForFunction(
         () =>
-            document.querySelector('[data-dogfood="product"]')?.getAttribute('dir') === 'rtl' &&
-            document.querySelector('[data-dogfood="product-meta"]')?.textContent?.includes('dir:rtl'),
+            document.querySelector('[data-vmz-fixture="product"]')?.getAttribute('dir') === 'rtl' &&
+            document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent?.includes('dir:rtl'),
         { timeout: 5000 },
     );
     const productRtlGeom = await page.evaluate(() => {
-        const brand = document.querySelector('[data-dogfood="product"] [data-vmz-shell="header"] .vmz-ui-app-shell__brand');
-        const nav = document.querySelector('[data-dogfood="product"] [data-vmz-shell="header"] .vmz-ui-app-shell__nav');
+        const brand = document.querySelector('[data-vmz-fixture="product"] [data-vmz-shell="header"] .vmz-ui-app-shell__brand');
+        const nav = document.querySelector('[data-vmz-fixture="product"] [data-vmz-shell="header"] .vmz-ui-app-shell__nav');
         if (!brand || !nav) return null;
         return { brandLeft: brand.getBoundingClientRect().left, navLeft: nav.getBoundingClientRect().left };
     });
@@ -2549,15 +2549,15 @@ async function proveUi6DensityRtlPreset(page) {
     if (!fs.existsSync(ui6Src)) fail('homepage missing src/pages/ui6.vmz');
 
     await page.goto(`http://127.0.0.1:18781/ui6`, { waitUntil: 'networkidle0', timeout: 20000 });
-    await page.waitForSelector('[data-dogfood="ui6"]', { timeout: 10000 });
+    await page.waitForSelector('[data-vmz-fixture="ui6"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
         shell: !!document.querySelector('[data-vmz-ui="app-shell"]'),
         field: !!document.querySelector('[data-vmz-ui="field"] #home-ui6-sample'),
         card: !!document.querySelector('[data-vmz-ui="card"]'),
-        density: document.querySelector('[data-dogfood="ui6"]')?.getAttribute('data-density') || '',
-        dir: document.querySelector('[data-dogfood="ui6"]')?.getAttribute('dir') || '',
-        state: document.querySelector('[data-dogfood="ui6-state"]')?.textContent || '',
+        density: document.querySelector('[data-vmz-fixture="ui6"]')?.getAttribute('data-density') || '',
+        dir: document.querySelector('[data-vmz-fixture="ui6"]')?.getAttribute('dir') || '',
+        state: document.querySelector('[data-vmz-fixture="ui6-state"]')?.textContent || '',
     }));
     if (!markers.shell || !markers.field || !markers.card) {
         fail(`UI6: markers missing: ${JSON.stringify(markers)}`);
@@ -2568,7 +2568,7 @@ async function proveUi6DensityRtlPreset(page) {
     if (!markers.state.includes('theme:default')) fail(`UI6: default theme marker missing: ${markers.state}`);
 
     const densVars = await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="ui6"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui6"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Probe control'),
         );
         if (!btn) return null;
@@ -2590,16 +2590,16 @@ async function proveUi6DensityRtlPreset(page) {
 
     // comfortable → compact
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="ui6"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui6"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Cycle density'),
         );
         btn?.click();
     });
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="ui6"]')?.getAttribute('data-density') === 'compact', {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui6"]')?.getAttribute('data-density') === 'compact', {
         timeout: 5000,
     });
     const compactPad = await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="ui6"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui6"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Probe control'),
         );
         return btn ? getComputedStyle(btn).paddingTop : '';
@@ -2610,19 +2610,19 @@ async function proveUi6DensityRtlPreset(page) {
 
     // compact → dense
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="ui6"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui6"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Cycle density'),
         );
         btn?.click();
     });
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="ui6"]')?.getAttribute('data-density') === 'dense', {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui6"]')?.getAttribute('data-density') === 'dense', {
         timeout: 5000,
     });
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="ui6-state"]')?.textContent?.includes('density:dense'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui6-state"]')?.textContent?.includes('density:dense'), {
         timeout: 5000,
     });
     const densePad = await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="ui6"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui6"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Probe control'),
         );
         return btn ? getComputedStyle(btn).paddingTop : '';
@@ -2640,19 +2640,19 @@ async function proveUi6DensityRtlPreset(page) {
     });
     if (!ltrGeom) fail('UI6: shell header geometry missing (ltr)');
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="ui6"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui6"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Toggle RTL'),
         );
         btn?.click();
     });
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="ui6"]')?.getAttribute('dir') === 'rtl', {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui6"]')?.getAttribute('dir') === 'rtl', {
         timeout: 5000,
     });
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="ui6-state"]')?.textContent?.includes('dir:rtl'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui6-state"]')?.textContent?.includes('dir:rtl'), {
         timeout: 5000,
     });
     const rtlGeom = await page.evaluate(() => {
-        const root = document.querySelector('[data-dogfood="ui6"]');
+        const root = document.querySelector('[data-vmz-fixture="ui6"]');
         const brand = document.querySelector('[data-vmz-shell="header"] .vmz-ui-app-shell__brand');
         const nav = document.querySelector('[data-vmz-shell="header"] .vmz-ui-app-shell__nav');
         if (!root || !brand || !nav) return null;
@@ -2670,11 +2670,11 @@ async function proveUi6DensityRtlPreset(page) {
 
     // High-contrast theme overlay via documentElement data-theme.
     const beforeInk = await page.evaluate(() => {
-        const el = document.querySelector('[data-dogfood="ui6"]');
+        const el = document.querySelector('[data-vmz-fixture="ui6"]');
         return el ? (getComputedStyle(el).getPropertyValue('--vmz-text-ink') || '').trim() : '';
     });
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="ui6"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui6"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Toggle high-contrast'),
         );
         btn?.click();
@@ -2682,11 +2682,11 @@ async function proveUi6DensityRtlPreset(page) {
     await page.waitForFunction(
         () =>
             document.documentElement.getAttribute('data-theme') === 'high-contrast' &&
-            document.querySelector('[data-dogfood="ui6-state"]')?.textContent?.includes('theme:high-contrast'),
+            document.querySelector('[data-vmz-fixture="ui6-state"]')?.textContent?.includes('theme:high-contrast'),
         { timeout: 5000 },
     );
     const afterInk = await page.evaluate(() => {
-        const el = document.querySelector('[data-dogfood="ui6"]');
+        const el = document.querySelector('[data-vmz-fixture="ui6"]');
         return el ? (getComputedStyle(el).getPropertyValue('--vmz-text-ink') || '').trim() : '';
     });
     if (!afterInk || afterInk === beforeInk) {
@@ -2720,7 +2720,7 @@ async function proveStructureComposition(page) {
     if (!fs.existsSync(structureSrc)) fail('homepage missing src/pages/structure.vmz');
 
     await page.goto(`http://127.0.0.1:18781/structure`, { waitUntil: 'networkidle0', timeout: 20000 });
-    await page.waitForSelector('[data-dogfood="structure"]', { timeout: 10000 });
+    await page.waitForSelector('[data-vmz-fixture="structure"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
         accordion: !!document.querySelector('[data-vmz-ui="accordion"]'),
@@ -2732,7 +2732,7 @@ async function proveStructureComposition(page) {
         listSelected: document.querySelector('[data-vmz-list-item="alpha"]')?.getAttribute('aria-selected') || '',
         treeSelected: document.querySelector('[data-vmz-tree-item="platform"]')?.getAttribute('aria-selected') || '',
         treeChild: !!document.querySelector('[data-vmz-tree-item="runtime"]'),
-        state: document.querySelector('[data-dogfood="structure-state"]')?.textContent || '',
+        state: document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent || '',
     }));
     if (!markers.accordion || !markers.steps || !markers.list || !markers.tree) {
         fail(`Structure: markers missing: ${JSON.stringify(markers)}`);
@@ -2753,20 +2753,20 @@ async function proveStructureComposition(page) {
         () =>
             !!document.querySelector('[data-vmz-accordion-panel="access"]') &&
             !document.querySelector('[data-vmz-accordion-panel="billing"]') &&
-            document.querySelector('[data-dogfood="structure-state"]')?.textContent?.includes('faq:access'),
+            document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent?.includes('faq:access'),
         { timeout: 5000 },
     );
     await page.click('[data-vmz-accordion-trigger="access"]');
     await page.waitForFunction(
         () =>
             !document.querySelector('[data-vmz-accordion-panel="access"]') &&
-            document.querySelector('[data-dogfood="structure-state"]')?.textContent?.includes('faq:none'),
+            document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent?.includes('faq:none'),
         { timeout: 5000 },
     );
 
     // Steps next/back.
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="structure"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="structure"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Next'),
         );
         btn?.click();
@@ -2775,11 +2775,11 @@ async function proveStructureComposition(page) {
         () =>
             document.querySelector('[data-vmz-step="workspace"]')?.getAttribute('data-status') === 'current' &&
             document.querySelector('[data-vmz-step="account"]')?.getAttribute('data-status') === 'done' &&
-            document.querySelector('[data-dogfood="structure-state"]')?.textContent?.includes('step:workspace'),
+            document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent?.includes('step:workspace'),
         { timeout: 5000 },
     );
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="structure"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="structure"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Back'),
         );
         btn?.click();
@@ -2787,7 +2787,7 @@ async function proveStructureComposition(page) {
     await page.waitForFunction(
         () =>
             document.querySelector('[data-vmz-step="account"]')?.getAttribute('data-status') === 'current' &&
-            document.querySelector('[data-dogfood="structure-state"]')?.textContent?.includes('step:account'),
+            document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent?.includes('step:account'),
         { timeout: 5000 },
     );
 
@@ -2796,7 +2796,7 @@ async function proveStructureComposition(page) {
     await page.waitForFunction(
         () =>
             document.querySelector('[data-vmz-list-item="beta"]')?.getAttribute('aria-selected') === 'true' &&
-            document.querySelector('[data-dogfood="structure-state"]')?.textContent?.includes('list:beta'),
+            document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent?.includes('list:beta'),
         { timeout: 5000 },
     );
 
@@ -2806,7 +2806,7 @@ async function proveStructureComposition(page) {
         () =>
             !document.querySelector('[data-vmz-tree-item="runtime"]') &&
             document.querySelector('[data-vmz-tree-item="platform"]')?.getAttribute('aria-expanded') === 'false' &&
-            !document.querySelector('[data-dogfood="structure-state"]')?.textContent?.includes('expanded:platform'),
+            !document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent?.includes('expanded:platform'),
         { timeout: 5000 },
     );
     await page.click('[data-vmz-tree-twist="platform"]');
@@ -2817,8 +2817,8 @@ async function proveStructureComposition(page) {
     await page.waitForFunction(
         () =>
             document.querySelector('[data-vmz-tree-item="browser"]')?.getAttribute('aria-selected') === 'true' &&
-            document.querySelector('[data-dogfood="structure-state"]')?.textContent?.includes('tree:browser') &&
-            document.querySelector('[data-dogfood="structure-state"]')?.textContent?.includes('expanded:platform,runtime'),
+            document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent?.includes('tree:browser') &&
+            document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent?.includes('expanded:platform,runtime'),
         { timeout: 5000 },
     );
 
@@ -2844,11 +2844,11 @@ async function proveOverlayStacking(page) {
     if (!fs.existsSync(stackingSrc)) fail('homepage missing src/pages/stacking.vmz');
 
     await page.goto(`http://127.0.0.1:18781/stacking`, { waitUntil: 'networkidle0', timeout: 20000 });
-    await page.waitForSelector('[data-dogfood="stacking"]', { timeout: 10000 });
+    await page.waitForSelector('[data-vmz-fixture="stacking"]', { timeout: 10000 });
 
     // Programmatic .click() — overlays cover page chrome; CDP mouse would hit backdrop.
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="stacking"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="stacking"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Open drawer'),
         );
         btn?.click();
@@ -2856,7 +2856,7 @@ async function proveOverlayStacking(page) {
     await page.waitForSelector('[data-vmz-overlay="drawer"][data-vmz-overlay-stack="0"]', { timeout: 5000 });
 
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="stacking"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="stacking"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Open dialog'),
         );
         if (!btn) throw new Error('Open dialog button missing');
@@ -2866,7 +2866,7 @@ async function proveOverlayStacking(page) {
         await page.waitForSelector('[data-vmz-overlay="dialog"][data-vmz-overlay-stack="1"]', { timeout: 8000 });
     } catch {
         const snap = await page.evaluate(() => ({
-            state: document.querySelector('[data-dogfood="stacking-state"]')?.textContent || '',
+            state: document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent || '',
             dialog: !!document.querySelector('[data-vmz-overlay="dialog"]'),
             dialogStack: document.querySelector('[data-vmz-overlay="dialog"]')?.getAttribute('data-vmz-overlay-stack'),
             drawer: !!document.querySelector('[data-vmz-overlay="drawer"]'),
@@ -2875,7 +2875,7 @@ async function proveOverlayStacking(page) {
     }
 
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="stacking"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="stacking"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Open popover'),
         );
         if (!btn) throw new Error('Open popover button missing');
@@ -2885,7 +2885,7 @@ async function proveOverlayStacking(page) {
         await page.waitForSelector('[data-vmz-overlay="popover"][data-vmz-overlay-stack="2"]', { timeout: 8000 });
     } catch {
         const snap = await page.evaluate(() => ({
-            state: document.querySelector('[data-dogfood="stacking-state"]')?.textContent || '',
+            state: document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent || '',
             popover: !!document.querySelector('[data-vmz-overlay="popover"]'),
             popoverStack: document.querySelector('[data-vmz-overlay="popover"]')?.getAttribute('data-vmz-overlay-stack'),
         }));
@@ -2893,9 +2893,9 @@ async function proveOverlayStacking(page) {
     }
     await page.waitForFunction(
         () =>
-            document.querySelector('[data-dogfood="stacking-state"]')?.textContent?.includes('drawer:open') &&
-            document.querySelector('[data-dogfood="stacking-state"]')?.textContent?.includes('dialog:open') &&
-            document.querySelector('[data-dogfood="stacking-state"]')?.textContent?.includes('popover:open'),
+            document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent?.includes('drawer:open') &&
+            document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent?.includes('dialog:open') &&
+            document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent?.includes('popover:open'),
         { timeout: 5000 },
     );
 
@@ -2918,13 +2918,13 @@ async function proveOverlayStacking(page) {
                 !document.querySelector('[data-vmz-overlay="popover"]') &&
                 !!document.querySelector('[data-vmz-overlay="dialog"]') &&
                 !!document.querySelector('[data-vmz-overlay="drawer"]') &&
-                document.querySelector('[data-dogfood="stacking-state"]')?.textContent?.includes('popover:closed') &&
-                document.querySelector('[data-dogfood="stacking-state"]')?.textContent?.includes('dialog:open'),
+                document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent?.includes('popover:closed') &&
+                document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent?.includes('dialog:open'),
             { timeout: 8000 },
         );
     } catch {
         const snap = await page.evaluate(() => ({
-            state: document.querySelector('[data-dogfood="stacking-state"]')?.textContent || '',
+            state: document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent || '',
             popover: !!document.querySelector('[data-vmz-overlay="popover"]'),
             dialog: !!document.querySelector('[data-vmz-overlay="dialog"]'),
             drawer: !!document.querySelector('[data-vmz-overlay="drawer"]'),
@@ -2937,8 +2937,8 @@ async function proveOverlayStacking(page) {
         () =>
             !document.querySelector('[data-vmz-overlay="dialog"]') &&
             !!document.querySelector('[data-vmz-overlay="drawer"]') &&
-            document.querySelector('[data-dogfood="stacking-state"]')?.textContent?.includes('dialog:closed') &&
-            document.querySelector('[data-dogfood="stacking-state"]')?.textContent?.includes('drawer:open'),
+            document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent?.includes('dialog:closed') &&
+            document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent?.includes('drawer:open'),
         { timeout: 5000 },
     );
 
@@ -2946,7 +2946,7 @@ async function proveOverlayStacking(page) {
     await page.waitForFunction(
         () =>
             !document.querySelector('[data-vmz-overlay="drawer"]') &&
-            document.querySelector('[data-dogfood="stacking-state"]')?.textContent?.includes('drawer:closed'),
+            document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent?.includes('drawer:closed'),
         { timeout: 5000 },
     );
 
@@ -2979,7 +2979,7 @@ async function proveDataTable(page) {
     if (!fs.existsSync(pageSrc)) fail('homepage missing src/pages/datatable.vmz');
 
     await page.goto(`http://127.0.0.1:18781/datatable`, { waitUntil: 'networkidle0', timeout: 20000 });
-    await page.waitForSelector('[data-dogfood="datatable"]', { timeout: 10000 });
+    await page.waitForSelector('[data-vmz-fixture="datatable"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => {
         const wrap = document.querySelector('[data-vmz-ui="data-table"]');
@@ -2987,7 +2987,7 @@ async function proveDataTable(page) {
         const cs = th ? getComputedStyle(th) : null;
         return {
             table: !!wrap,
-            density: document.querySelector('[data-dogfood="datatable"]')?.getAttribute('data-density') || '',
+            density: document.querySelector('[data-vmz-fixture="datatable"]')?.getAttribute('data-density') || '',
             rows: document.querySelectorAll('[data-vmz-ui="data-table"] [data-vmz-row]').length,
             sticky: cs?.position || '',
             selectAll: !!document.querySelector('[data-vmz-select-all]'),
@@ -3003,8 +3003,8 @@ async function proveDataTable(page) {
     await page.waitForFunction(
         () =>
             document.querySelector('[data-vmz-row="r2"]')?.getAttribute('data-selected') === 'true' &&
-            document.querySelector('[data-dogfood="datatable-state"]')?.textContent?.includes('selected:r2') &&
-            document.querySelector('[data-dogfood="datatable-state"]')?.textContent?.includes('count:1') &&
+            document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent?.includes('selected:r2') &&
+            document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent?.includes('count:1') &&
             !!document.querySelector('[data-vmz-ui="bulk-actions"]'),
         { timeout: 5000 },
     );
@@ -3013,31 +3013,31 @@ async function proveDataTable(page) {
     await page.waitForFunction(
         () =>
             document.querySelectorAll('[data-vmz-ui="data-table"] [data-vmz-row][data-selected="true"]').length === 5 &&
-            document.querySelector('[data-dogfood="datatable-state"]')?.textContent?.includes('count:5'),
+            document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent?.includes('count:5'),
         { timeout: 5000 },
     );
 
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-dogfood="datatable"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="datatable"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Clear'),
         );
         btn?.click();
     });
     await page.waitForFunction(
         () =>
-            document.querySelector('[data-dogfood="datatable-state"]')?.textContent?.includes('selected:none') &&
+            document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent?.includes('selected:none') &&
             !document.querySelector('[data-vmz-ui="bulk-actions"]'),
         { timeout: 5000 },
     );
 
     await page.click('[data-vmz-sort="status"]');
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="datatable-state"]')?.textContent?.includes('sort:status:'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent?.includes('sort:status:'), {
         timeout: 5000,
     });
 
     await page.click('[data-vmz-row-action="r1"]');
     await page.waitForSelector('[data-vmz-overlay="drawer"]', { timeout: 5000 });
-    await page.waitForFunction(() => document.querySelector('[data-dogfood="datatable-drawer-body"]')?.textContent?.includes('detail:r1'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="datatable-drawer-body"]')?.textContent?.includes('detail:r1'), {
         timeout: 5000,
     });
 
@@ -3046,11 +3046,11 @@ async function proveDataTable(page) {
 }
 
 /**
- * Documents + panel density/RTL dogfood — fixture Style Theme density + inspector panel surface.
+ * Documents + panel density/RTL fixture — Style Theme density + inspector panel surface.
  * @param {import('puppeteer-core').Page} page
  */
 async function proveDocumentsPanelDensity(page) {
-    console.log('ui-automation: documents/panel density/RTL dogfood…');
+    console.log('ui-automation: documents/panel density/RTL fixture…');
     const { spawn } = await import('node:child_process');
 
     const docsFixture = path.join(root, 'packages', 'examples', 'documents-fixture');
@@ -3073,7 +3073,7 @@ async function proveDocumentsPanelDensity(page) {
     if (!fs.existsSync(inspSrc)) fail('production-inspector missing src/pages/index.vmz');
     const inspVmz = fs.readFileSync(inspSrc, 'utf8');
     for (const tag of ['AppShell', 'Field', 'Dialog', 'Button']) {
-        if (!inspVmz.includes(`<${tag}`)) fail(`production-inspector must dogfood <${tag}>`);
+        if (!inspVmz.includes(`<${tag}`)) fail(`production-inspector must compose <${tag}>`);
     }
     if (!inspVmz.includes('data-density') || !inspVmz.includes('dir={dir}')) {
         fail('production-inspector must bind data-density and dir');
@@ -3121,21 +3121,21 @@ async function proveDocumentsPanelDensity(page) {
         });
 
         await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'networkidle0', timeout: 20000 });
-        await page.waitForSelector('[data-dogfood="inspector"]', { timeout: 10000 });
+        await page.waitForSelector('[data-vmz-fixture="inspector"]', { timeout: 10000 });
 
         const markers = await page.evaluate(() => {
-            const root = document.querySelector('[data-dogfood="inspector"]');
-            const sample = [...document.querySelectorAll('[data-dogfood="inspector"] button.vmz-ui-btn')].find((b) =>
+            const root = document.querySelector('[data-vmz-fixture="inspector"]');
+            const sample = [...document.querySelectorAll('[data-vmz-fixture="inspector"] button.vmz-ui-btn')].find((b) =>
                 (b.textContent || '').includes('Cycle density'),
             );
             const cs = sample ? getComputedStyle(sample) : null;
             return {
                 density: root?.getAttribute('data-density') || '',
                 dir: root?.getAttribute('dir') || '',
-                state: document.querySelector('[data-dogfood="inspector-state"]')?.textContent || '',
+                state: document.querySelector('[data-vmz-fixture="inspector-state"]')?.textContent || '',
                 shell: !!document.querySelector('[data-vmz-ui="app-shell"]'),
                 field: !!document.getElementById('inspector-query'),
-                dialogBtn: [...document.querySelectorAll('[data-dogfood="inspector"] button.vmz-ui-btn')].some((b) =>
+                dialogBtn: [...document.querySelectorAll('[data-vmz-fixture="inspector"] button.vmz-ui-btn')].some((b) =>
                     (b.textContent || '').includes('Replay error'),
                 ),
                 paddingTop: cs?.paddingTop || '',
@@ -3160,28 +3160,28 @@ async function proveDocumentsPanelDensity(page) {
 
         const beforePad = markers.paddingTop;
         await page.evaluate(() => {
-            const btn = [...document.querySelectorAll('[data-dogfood="inspector"] button.vmz-ui-btn')].find((b) =>
+            const btn = [...document.querySelectorAll('[data-vmz-fixture="inspector"] button.vmz-ui-btn')].find((b) =>
                 (b.textContent || '').includes('Cycle density'),
             );
             btn?.click();
         });
-        await page.waitForFunction(() => document.querySelector('[data-dogfood="inspector"]')?.getAttribute('data-density') === 'compact', {
+        await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="inspector"]')?.getAttribute('data-density') === 'compact', {
             timeout: 5000,
         });
         await page.evaluate(() => {
-            const btn = [...document.querySelectorAll('[data-dogfood="inspector"] button.vmz-ui-btn')].find((b) =>
+            const btn = [...document.querySelectorAll('[data-vmz-fixture="inspector"] button.vmz-ui-btn')].find((b) =>
                 (b.textContent || '').includes('Cycle density'),
             );
             btn?.click();
         });
         await page.waitForFunction(
             () =>
-                document.querySelector('[data-dogfood="inspector"]')?.getAttribute('data-density') === 'dense' &&
-                document.querySelector('[data-dogfood="inspector-state"]')?.textContent?.includes('density:dense'),
+                document.querySelector('[data-vmz-fixture="inspector"]')?.getAttribute('data-density') === 'dense' &&
+                document.querySelector('[data-vmz-fixture="inspector-state"]')?.textContent?.includes('density:dense'),
             { timeout: 5000 },
         );
         const afterPad = await page.evaluate(() => {
-            const btn = [...document.querySelectorAll('[data-dogfood="inspector"] button.vmz-ui-btn')].find((b) =>
+            const btn = [...document.querySelectorAll('[data-vmz-fixture="inspector"] button.vmz-ui-btn')].find((b) =>
                 (b.textContent || '').includes('Cycle density'),
             );
             return btn ? getComputedStyle(btn).paddingTop : '';
@@ -3191,15 +3191,15 @@ async function proveDocumentsPanelDensity(page) {
         }
 
         await page.evaluate(() => {
-            const btn = [...document.querySelectorAll('[data-dogfood="inspector"] button.vmz-ui-btn')].find((b) =>
+            const btn = [...document.querySelectorAll('[data-vmz-fixture="inspector"] button.vmz-ui-btn')].find((b) =>
                 (b.textContent || '').includes('Toggle RTL'),
             );
             btn?.click();
         });
         await page.waitForFunction(
             () =>
-                document.querySelector('[data-dogfood="inspector"]')?.getAttribute('dir') === 'rtl' &&
-                document.querySelector('[data-dogfood="inspector-state"]')?.textContent?.includes('dir:rtl'),
+                document.querySelector('[data-vmz-fixture="inspector"]')?.getAttribute('dir') === 'rtl' &&
+                document.querySelector('[data-vmz-fixture="inspector-state"]')?.textContent?.includes('dir:rtl'),
             { timeout: 5000 },
         );
         const rtlGeom = await page.evaluate(() => {
@@ -3214,7 +3214,7 @@ async function proveDocumentsPanelDensity(page) {
 
         // Dialog still owns overlay after density/RTL wiring.
         await page.evaluate(() => {
-            const btn = [...document.querySelectorAll('[data-dogfood="inspector"] button.vmz-ui-btn')].find((b) =>
+            const btn = [...document.querySelectorAll('[data-vmz-fixture="inspector"] button.vmz-ui-btn')].find((b) =>
                 (b.textContent || '').includes('Replay error'),
             );
             btn?.click();

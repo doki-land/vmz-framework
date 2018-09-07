@@ -1,9 +1,9 @@
 <template>
-  <div data-dogfood="inspector" data-density={density} dir={dir}>
+  <div data-vmz-fixture="inspector" data-density={density} dir={dir}>
     <AppShell brand="Inspector" homeHref="/" navLabel="Panel" nav={navItems}>
-      <p data-dogfood-explain>explain:route=InspectorPage</p>
-      <p data-dogfood-trace>trace:facet=route</p>
-      <p data-dogfood="inspector-state">density:{density};dir:{dir}</p>
+      <p data-vmz-fixture="inspector-explain">explain:route=InspectorPage</p>
+      <p data-vmz-fixture="inspector-trace">trace:facet=route</p>
+      <p data-vmz-fixture="inspector-state">density:{density};dir:{dir}</p>
 
       <div class="inspector-actions">
         <Button type="button" onClick={() => this.cycleDensity()}>Cycle density</Button>
@@ -24,7 +24,7 @@
 
       <Button type="button" onClick={() => this.openDialog()}>Replay error</Button>
       <Dialog open={open} title="Error replay" titleId="inspector-dialog-title" onClose={() => this.closeDialog()}>
-        <p data-dogfood-replay>replay:generation=1</p>
+        <p data-vmz-fixture="inspector-replay">replay:generation=1</p>
       </Dialog>
     </AppShell>
   </div>

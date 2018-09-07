@@ -670,12 +670,12 @@ async function proveInspectorFieldDialogRtl(distDir: string): Promise<{ field: s
             });
             if (!rtlClicked) throw new Error('Toggle RTL button missing');
             try {
-                await page.waitForFunction(() => document.querySelector('[data-dogfood="inspector"]')?.getAttribute('dir') === 'rtl', {
+                await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="inspector"]')?.getAttribute('dir') === 'rtl', {
                     timeout: 10000,
                 });
             } catch (err) {
                 const dump = await page.evaluate(() => ({
-                    dir: document.querySelector('[data-dogfood="inspector"]')?.getAttribute('dir'),
+                    dir: document.querySelector('[data-vmz-fixture="inspector"]')?.getAttribute('dir'),
                     text: (document.body.innerText || '').slice(0, 300),
                 }));
                 throw new Error(`RTL toggle wait failed: ${JSON.stringify(dump)} (${err instanceof Error ? err.message : err})`);

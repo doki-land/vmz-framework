@@ -7,7 +7,9 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { listenLocalStaticHost } from 'vmz';
 import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
+import { assertHashedCssImportsHttp } from '../_lib/assert-hashed-css-imports.ts';
 import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
 import { addLimitation, readProof, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 
@@ -249,6 +251,25 @@ proof.knownLimitations = proof.knownLimitations.filter(
 writeProof(proof, root);
 if (errors.length) fail(errors.join('\n'));
 
+console.log('static-delivery: hashed CSS @import HTTP (production-router)…');
+const cdnPolicyPath = path.join(dist, '_vmz', 'cdn-policy-manifest.json');
+if (!fs.existsSync(cdnPolicyPath)) fail(`missing ${cdnPolicyPath}`);
+const cdnPolicy = JSON.parse(fs.readFileSync(cdnPolicyPath, 'utf8'));
+const cssHost = await listenLocalStaticHost(dist, cdnPolicy, { host: '127.0.0.1', port: 18774 });
+const cssErrors: string[] = [];
+try {
+    cssErrors.push(...(await assertHashedCssImportsHttp(dist, cssHost.baseUrl)));
+} finally {
+    await cssHost.close();
+}
+if (cssErrors.length) fail(cssErrors.join('\n'));
+upsertCheck(proof, {
+    id: 'static-delivery.css-import-http',
+    status: 'passed',
+    detail: 'production-router hashed vmz.css @import HTTP 200 text/css',
+});
+writeProof(proof, root);
+
 // Nested @vmz/ui: official homepage static assemble (component registry preload).
 console.log('static-delivery: homepage @vmz/ui static assemble…');
 const homepage = path.join(root, 'packages/homepage');
@@ -271,6 +292,23 @@ upsertCheck(proof, {
     id: 'static-delivery.ui-registry',
     status: 'passed',
     detail: 'homepage static assemble with @vmz/ui nested components',
+});
+console.log('static-delivery: hashed CSS @import HTTP (homepage)…');
+const hpPolicyPath = path.join(homepageDist, '_vmz', 'cdn-policy-manifest.json');
+if (!fs.existsSync(hpPolicyPath)) fail(`homepage missing ${hpPolicyPath}`);
+const hpPolicy = JSON.parse(fs.readFileSync(hpPolicyPath, 'utf8'));
+const hpCssHost = await listenLocalStaticHost(homepageDist, hpPolicy, { host: '127.0.0.1', port: 18775 });
+const hpCssErrors: string[] = [];
+try {
+    hpCssErrors.push(...(await assertHashedCssImportsHttp(homepageDist, hpCssHost.baseUrl)));
+} finally {
+    await hpCssHost.close();
+}
+if (hpCssErrors.length) fail(hpCssErrors.join('\n'));
+upsertCheck(proof, {
+    id: 'static-delivery.css-import-http-homepage',
+    status: 'passed',
+    detail: 'homepage hashed vmz.css @import HTTP 200 text/css',
 });
 writeProof(proof, root);
 

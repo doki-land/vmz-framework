@@ -1,10 +1,10 @@
 /**
- * ui-data-grid deepen gate — @vmz/ui-data-grid package + homepage /datagrid dogfood.
+ * ui-data-grid deepen gate — @vmz/ui-data-grid package + homepage /datagrid fixture.
  *
  * Asserts:
  * - package identity; peer @vmz/ui; no Button/Field/Dialog shells
  * - token-requirements (virtualization + pinned + group + tree + edit + pivot-matrix)
- * - homepage dogfood modes + browser proofs for virtual window, group, tree, edit, pivot
+ * - homepage fixture modes + browser proofs for virtual window, group, tree, edit, pivot
  */
 
 import { spawnSync } from 'node:child_process';
@@ -144,7 +144,7 @@ if (/data-vmz-ui="data-grid"|row-virtualization|pinned-column/i.test(dtSrc)) {
     fail('@vmz/ui DataTable must not claim data-grid deep markers');
 }
 
-console.log('ui-data-grid: homepage dogfood dependency + page…');
+console.log('ui-data-grid: homepage /datagrid fixture dependency + page…');
 const homePkg = JSON.parse(fs.readFileSync(path.join(homepage, 'package.json'), 'utf8'));
 if (!homePkg.dependencies?.['@vmz/ui-data-grid']) {
     fail('homepage must depend on @vmz/ui-data-grid');
@@ -152,23 +152,23 @@ if (!homePkg.dependencies?.['@vmz/ui-data-grid']) {
 const pageSrcPath = path.join(homepage, 'src', 'pages', 'datagrid.vmz');
 if (!fs.existsSync(pageSrcPath)) fail('homepage missing src/pages/datagrid.vmz');
 const pageSrc = fs.readFileSync(pageSrcPath, 'utf8');
-if (!pageSrc.includes('<DataGrid') || !pageSrc.includes('data-dogfood="datagrid"')) {
-    fail('homepage /datagrid must dogfood <DataGrid>');
+if (!pageSrc.includes('<DataGrid') || !pageSrc.includes('data-vmz-fixture="datagrid"')) {
+    fail('homepage /datagrid must compose <DataGrid>');
 }
 if (!pageSrc.includes('<BulkActions') || !pageSrc.includes('<ConsoleShell')) {
     fail('homepage /datagrid must reuse @vmz/ui BulkActions/ConsoleShell');
 }
 if (!pageSrc.includes('groupBy') || !pageSrc.includes('onToggleGroup') || !pageSrc.includes('aggSample')) {
-    fail('homepage /datagrid must dogfood parent-owned groupBy + aggregates');
+    fail('homepage /datagrid must compose parent-owned groupBy + aggregates');
 }
 if (!pageSrc.includes('setMode') || !pageSrc.includes('onToggleTree') || !pageSrc.includes('mode-tree')) {
-    fail('homepage /datagrid must dogfood tree mode + onToggleTree');
+    fail('homepage /datagrid must compose tree mode + onToggleTree');
 }
 if (!pageSrc.includes('<Field') || !pageSrc.includes('onStartEdit') || !pageSrc.includes('editingKey')) {
-    fail('homepage /datagrid must dogfood cell edit + @vmz/ui Field mirror');
+    fail('homepage /datagrid must compose cell edit + @vmz/ui Field mirror');
 }
 if (!pageSrc.includes('mode-pivot') || !pageSrc.includes('buildPivotRows') || !pageSrc.includes('pivotSample')) {
-    fail('homepage /datagrid must dogfood parent-owned pivot matrix');
+    fail('homepage /datagrid must compose parent-owned pivot matrix');
 }
 
 console.log('ui-data-grid: build homepage…');
@@ -248,7 +248,7 @@ async function proveBrowser(dist) {
             const page = await browser.newPage();
             page.setDefaultTimeout(20000);
             await page.goto(`http://127.0.0.1:${PORT}/datagrid`, { waitUntil: 'networkidle0', timeout: 20000 });
-            await page.waitForSelector('[data-dogfood="datagrid"]', { timeout: 10000 });
+            await page.waitForSelector('[data-vmz-fixture="datagrid"]', { timeout: 10000 });
             await page.waitForFunction(
                 () => {
                     const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
@@ -261,7 +261,7 @@ async function proveBrowser(dist) {
 
             const initial = await page.evaluate(() => {
                 const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
-                const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                 const rows = [...document.querySelectorAll('[data-vmz-ui="data-grid"] [data-vmz-row]')];
                 const pinned = document.querySelector(
                     '[data-vmz-ui="data-grid"] [data-vmz-col="name"][data-pinned="true"], [data-vmz-ui="data-grid"] .vmz-ui-datagrid__cell--pinned-data',
@@ -313,7 +313,7 @@ async function proveBrowser(dist) {
                 (prev) => {
                     const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
                     const first = document.querySelector('[data-vmz-ui="data-grid"] [data-vmz-row]')?.getAttribute('data-vmz-row');
-                    const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                     return !!wrap && first && first !== prev && state.includes('window:') && !state.includes('window:0-');
                 },
                 { timeout: 5000 },
@@ -324,7 +324,7 @@ async function proveBrowser(dist) {
                 const rows = [...document.querySelectorAll('[data-vmz-ui="data-grid"] [data-vmz-row]')].map((r) =>
                     r.getAttribute('data-vmz-row'),
                 );
-                const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                 const total = Number(document.querySelector('[data-vmz-ui="data-grid"]')?.getAttribute('data-total-rows') || 0);
                 return { rows, state, total, visible: rows.length };
             });
@@ -343,7 +343,7 @@ async function proveBrowser(dist) {
             await page.click(`[data-vmz-select="${pickId}"]`);
             await page.waitForFunction(
                 (id) => {
-                    const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                     return (
                         document.querySelector(`[data-vmz-row="${id}"]`)?.getAttribute('data-selected') === 'true' &&
                         state.includes(`selected:${id}`) &&
@@ -359,7 +359,7 @@ async function proveBrowser(dist) {
             await page
                 .waitForFunction(
                     () => {
-                        const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                        const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                         return state.includes('sort:status:');
                     },
                     { timeout: 5000 },
@@ -369,14 +369,14 @@ async function proveBrowser(dist) {
                         const sortBtn = document.querySelector('[data-vmz-sort="status"]');
                         sortBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
                         return {
-                            state: document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '',
+                            state: document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '',
                             hasSort: !!document.querySelector('[data-vmz-sort="status"]'),
                         };
                     });
                     // Retry wait after synthetic click
                     try {
                         await page.waitForFunction(
-                            () => (document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '').includes('sort:status:'),
+                            () => (document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '').includes('sort:status:'),
                             { timeout: 3000 },
                         );
                     } catch {
@@ -385,14 +385,14 @@ async function proveBrowser(dist) {
                 });
 
             await page.evaluate(() => {
-                const btn = [...document.querySelectorAll('[data-dogfood="datagrid"] button.vmz-ui-btn')].find((b) =>
+                const btn = [...document.querySelectorAll('[data-vmz-fixture="datagrid"] button.vmz-ui-btn')].find((b) =>
                     (b.textContent || '').includes('Clear'),
                 );
                 btn?.click();
             });
             await page.waitForFunction(
                 () => {
-                    const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                     return state.includes('selected:none') && !document.querySelector('[data-vmz-ui="bulk-actions"]');
                 },
                 { timeout: 5000 },
@@ -405,7 +405,7 @@ async function proveBrowser(dist) {
             });
             await page.waitForFunction(
                 () => {
-                    const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                     return !!document.querySelector('[data-vmz-ui="data-grid"] [data-row-kind="group"]') && /window:0-\d+/.test(state);
                 },
                 { timeout: 5000 },
@@ -414,7 +414,7 @@ async function proveBrowser(dist) {
             // Group + aggregation deepen: headers present, collapse removes leaves, expand restores.
             const groupProof = await page.evaluate(() => {
                 const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
-                const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                 const groups = [...document.querySelectorAll('[data-vmz-ui="data-grid"] [data-row-kind="group"]')];
                 const firstGroup = groups[0];
                 const key = firstGroup?.getAttribute('data-group-key') || '';
@@ -461,7 +461,7 @@ async function proveBrowser(dist) {
                 (key) => {
                     const header = document.querySelector(`[data-vmz-ui="data-grid"] [data-row-kind="group"][data-group-key="${key}"]`);
                     const leaves = document.querySelectorAll(`[data-vmz-ui="data-grid"] [data-row-kind="row"][data-group-key="${key}"]`);
-                    const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                     const expandedPart = (state.split('expanded:')[1] || '').split(';')[0] || '';
                     const expandedKeys = expandedPart
                         .split(',')
@@ -478,7 +478,7 @@ async function proveBrowser(dist) {
                 (key) => {
                     const header = document.querySelector(`[data-vmz-ui="data-grid"] [data-row-kind="group"][data-group-key="${key}"]`);
                     const leaves = document.querySelectorAll(`[data-vmz-ui="data-grid"] [data-row-kind="row"][data-group-key="${key}"]`);
-                    const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                     const expandedPart = (state.split('expanded:')[1] || '').split(';')[0] || '';
                     const expandedKeys = expandedPart
                         .split(',')
@@ -491,11 +491,11 @@ async function proveBrowser(dist) {
             );
 
             // Tree mode deepen: switch mode, prove depth + expand/collapse.
-            await page.click('[data-dogfood="mode-tree"] button');
+            await page.click('[data-vmz-fixture="mode-tree"] button');
             await page.waitForFunction(
                 () => {
                     const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
-                    const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                     return (
                         wrap?.getAttribute('data-vmz-grid-tree') === 'true' &&
                         state.includes('mode:tree') &&
@@ -508,7 +508,7 @@ async function proveBrowser(dist) {
 
             const treeProof = await page.evaluate(() => {
                 const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
-                const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                 const depth0 = document.querySelector('[data-vmz-ui="data-grid"] [data-row-kind="tree"][data-depth="0"]');
                 const depth2 = document.querySelector('[data-vmz-ui="data-grid"] [data-row-kind="tree"][data-depth="2"]');
                 const rootId = depth0?.getAttribute('data-vmz-row') || '';
@@ -547,7 +547,7 @@ async function proveBrowser(dist) {
                         `[data-vmz-ui="data-grid"] [data-row-kind="tree"][data-depth="1"], [data-vmz-ui="data-grid"] [data-row-kind="tree"][data-depth="2"]`,
                     );
                     // After collapse root, no descendants of that root should remain; simpler: root expanded=false
-                    const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                     const part = (state.split('treeExpanded:')[1] || '').split(';')[0] || '';
                     const keys = part
                         .split(',')
@@ -563,7 +563,7 @@ async function proveBrowser(dist) {
             await page.waitForFunction(
                 (id) => {
                     const root = document.querySelector(`[data-vmz-ui="data-grid"] [data-vmz-row="${id}"]`);
-                    const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                     const part = (state.split('treeExpanded:')[1] || '').split(';')[0] || '';
                     const keys = part
                         .split(',')
@@ -576,10 +576,10 @@ async function proveBrowser(dist) {
             );
 
             // Cell editing: back to group mode, edit a leaf score, commit, Field mirror.
-            await page.click('[data-dogfood="mode-group"] button');
+            await page.click('[data-vmz-fixture="mode-group"] button');
             await page.waitForFunction(
                 () => {
-                    const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                     return (
                         state.includes('mode:group') &&
                         document.querySelector('[data-vmz-ui="data-grid"]')?.getAttribute('data-vmz-grid-tree') === 'false' &&
@@ -606,11 +606,11 @@ async function proveBrowser(dist) {
             await page.waitForFunction(
                 (key) => {
                     const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
-                    const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                     return (
                         wrap?.getAttribute('data-vmz-grid-edit') === key &&
                         !!document.querySelector(`[data-vmz-cell-editor="${key}"]`) &&
-                        !!document.querySelector('[data-dogfood="datagrid-edit-field"] [data-vmz-ui="field"]') &&
+                        !!document.querySelector('[data-vmz-fixture="datagrid-edit-field"] [data-vmz-ui="field"]') &&
                         state.includes(`editing:${key}`)
                     );
                 },
@@ -638,7 +638,7 @@ async function proveBrowser(dist) {
 
             await page.waitForFunction(
                 (key, value, prev) => {
-                    const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                     const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
                     const cellText =
                         document.querySelector(`[data-vmz-cell-start-edit="${key}"]`)?.textContent ||
@@ -660,7 +660,7 @@ async function proveBrowser(dist) {
             );
 
             const afterEdit = await page.evaluate((key) => {
-                const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                 const text = document.querySelector(`[data-vmz-cell-start-edit="${key}"]`)?.textContent || '';
                 return { state, text, editAttr: document.querySelector('[data-vmz-ui="data-grid"]')?.getAttribute('data-vmz-grid-edit') };
             }, editTarget.key);
@@ -671,11 +671,11 @@ async function proveBrowser(dist) {
             }
 
             // Pivot mode: parent-owned owner×region→sum(score) matrix.
-            await page.click('[data-dogfood="mode-pivot"] button');
+            await page.click('[data-vmz-fixture="mode-pivot"] button');
             await page.waitForFunction(
                 () => {
                     const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
-                    const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                     return (
                         wrap?.getAttribute('data-vmz-grid-pivot') === 'true' &&
                         state.includes('mode:pivot') &&
@@ -689,7 +689,7 @@ async function proveBrowser(dist) {
 
             const pivotProof = await page.evaluate(() => {
                 const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
-                const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                 const cols = [...document.querySelectorAll('[data-vmz-ui="data-grid"] [data-pivot-col="true"]')].map(
                     (c) => c.getAttribute('data-vmz-col') || '',
                 );
@@ -728,7 +728,7 @@ async function proveBrowser(dist) {
             });
             await page.waitForFunction(
                 () => {
-                    const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                     return state.includes('sort:total:');
                 },
                 { timeout: 5000 },
@@ -738,7 +738,7 @@ async function proveBrowser(dist) {
             });
             await page.waitForFunction(
                 (prev) => {
-                    const state = document.querySelector('[data-dogfood="datagrid-state"]')?.textContent || '';
+                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
                     const first = document.querySelector('[data-vmz-ui="data-grid"] [data-row-kind="pivot"]')?.getAttribute('data-vmz-row');
                     return state.includes('sort:total:desc') && !!first && first !== prev;
                 },

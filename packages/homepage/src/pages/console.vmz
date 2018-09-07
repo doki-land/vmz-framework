@@ -1,5 +1,5 @@
 <template>
-  <div data-dogfood="console">
+  <div data-vmz-fixture="console">
     <ConsoleShell
       brand="VMZ"
       homeHref="/"
@@ -21,7 +21,7 @@
         <Button type="button" onClick={() => this.selectVisible()}>Select visible</Button>
       </FilterBar>
 
-      <p data-dogfood="console-query">query:{query}</p>
+      <p data-vmz-fixture="console-query">query:{query}</p>
 
       <BulkActions
         label="Bulk actions"
@@ -54,7 +54,7 @@
         titleId="home-console-drawer-title"
         onClose={() => (drawerOpen = false)}
       >
-        <p data-dogfood="console-drawer-body">detail:{detailId}</p>
+        <p data-vmz-fixture="console-drawer-body">detail:{detailId}</p>
       </Drawer>
     </ConsoleShell>
   </div>

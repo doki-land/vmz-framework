@@ -373,7 +373,7 @@ upsertCheck(proof, {
 });
 
 const gaps = [
-    'A5: dogfood staging fault injection deep matrix (slow / reload / locale chunk) still open; thin 404 + stale-artifact rollback covered',
+    'A5: fixture staging fault injection deep matrix (slow / reload / locale chunk) still open; thin 404 + stale-artifact rollback covered',
     'A5: live error-rate / latency dashboards + diagnostic sampling pipeline not covered',
     'A5: Browser Production Profile v1 security is CSP header-level only; cookie/session namespace + inline nonce runtime binding deferred',
 ];
@@ -382,7 +382,7 @@ proof.knownLimitations = proof.knownLimitations.filter(
     (l) =>
         !l.includes('A5: production trace schema') &&
         !l.includes('A5: sensitive-data redaction + performance budgets not gated') &&
-        !l.includes('A5: dogfood staging fault injection (server error') &&
+        !l.includes('A5: fixture staging fault injection (server error') &&
         !l.includes('A5: browser-enforced cookie/session namespace + nonce runtime binding not covered'),
 );
 

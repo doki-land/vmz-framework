@@ -5,7 +5,7 @@
 
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { bootstrapComponentRegistry } from '@vmz/core/component-registry';
+import { createRenderHost } from '@vmz/core/render-host';
 import { resolveChunkArtifacts } from './compile.js';
 import { installHeadlessDocument } from './logic.js';
 
@@ -47,35 +47,24 @@ export async function runResumeManifest(
     (globalThis as any).requestIdleCallback = (cb: (deadline: object) => void) =>
         setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 1 }), 0);
 
-    let dom: any;
+    const components =
+        program.components && typeof program.components === 'object' ? (program.components as Record<string, string>) : undefined;
+    let renderHost: Awaited<ReturnType<typeof createRenderHost>>;
     let Page: any;
+    let loaded: Record<string, any> = {};
     try {
-        dom = await import(pathToFileURL(path.join(ctx.outDir, 'vmz-dom.js')).href);
+        renderHost = await createRenderHost(ctx.outDir, {
+            strictDeployment: process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true',
+            preload: 'none',
+            explicit: components,
+        });
+        loaded = await renderHost.ensureComponents([chunkId.replace(/\\/g, '/')]);
         Page = (await import(pathToFileURL(arts.clientPath).href)).default;
     } catch (e) {
         fail(`import dist: ${e instanceof Error ? e.message : String(e)}`);
         return { status: 'error', diagnostics, planId: null, programId };
     }
-
-    const components =
-        program.components && typeof program.components === 'object' ? (program.components as Record<string, string>) : undefined;
-    const loaded: Record<string, any> = {};
-    if (typeof dom.registerComponents === 'function') {
-        try {
-            Object.assign(
-                loaded,
-                await bootstrapComponentRegistry(ctx.outDir, dom.registerComponents, {
-                    strict: process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true',
-                    closureRoots: [chunkId.replace(/\\/g, '/')],
-                    explicit: components,
-                    preload: 'closure',
-                }),
-            );
-        } catch (e) {
-            fail(`bootstrap component registry: ${e instanceof Error ? e.message : String(e)}`);
-            return { status: 'error', diagnostics, planId: null, programId };
-        }
-    }
+    const dom = renderHost.dom;
 
     let html = '';
     let island: Element | null = null;

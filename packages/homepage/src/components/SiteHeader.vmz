@@ -1,5 +1,5 @@
 <template>
-  <header class="site-header" data-dogfood="site-header">
+  <header class="site-header" data-vmz-fixture="site-header">
     <a class="site-brand" href="/" aria-label={homeLabel}>
       <span class="site-brand__mark">{brandLabel}</span>
       <span class="site-brand__pulse" aria-hidden="true"></span>
@@ -16,7 +16,7 @@
         <div class="site-language__menu">
           <button
             type="button"
-            data-dogfood="locale-zh-hans"
+            data-vmz-fixture="locale-zh-hans"
             aria-current={localeId === 'zh-hans' ? 'true' : null}
             onClick={() => this.switchLocale('zh-hans')}
           >
@@ -24,7 +24,7 @@
           </button>
           <button
             type="button"
-            data-dogfood="locale-en-us"
+            data-vmz-fixture="locale-en-us"
             aria-current={localeId === 'en-us' ? 'true' : null}
             onClick={() => this.switchLocale('en-us')}
           >

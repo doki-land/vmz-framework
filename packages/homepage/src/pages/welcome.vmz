@@ -11,7 +11,7 @@
       <p class="welcome-v2__lede">一份程序图，连接组件、状态与服务端边界。开发时获得更快反馈，交付时让每个运行环境只得到它真正需要的部分。</p>
       <div class="welcome-v2__actions">
         <a class="welcome-v2__primary" href="/">{exploreLabel}</a>
-        <a class="welcome-v2__secondary" data-dogfood="welcome-start" href={guideHref}>{startLabel} <span aria-hidden="true">→</span></a>
+        <a class="welcome-v2__secondary" data-vmz-fixture="welcome-start" href={guideHref}>{startLabel} <span aria-hidden="true">→</span></a>
       </div>
     </section>
 

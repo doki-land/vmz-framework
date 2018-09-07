@@ -23,7 +23,7 @@ import http from 'node:http';
 import { createRequire, registerHooks } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { registerComponents, renderToStream, renderToString } from './vmz-dom.js';
+import { createRenderHost } from './render-host.js';
 import { listClientComponents } from './list-client-components.js';
 import { handleNodeRequest, setRoutes, setServerModuleResolver } from './vmz-runtime.js';
 
@@ -76,6 +76,8 @@ if (isDev) {
 
 /** @type {number} */
 let reloadToken = Date.now();
+/** @type {Awaited<ReturnType<typeof createRenderHost>> | null} */
+let ssrRenderHost = null;
 /** @type {string | null} Correlatable build id from vmz dev (Living §12.8). */
 let lastDevBuildId = null;
 /** @type {Array<{ chunkId: string, pageRel: string, segs: ReturnType<typeof parseChunkSegments> }>} */
@@ -508,9 +510,17 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
     const pageDocMeta = resolvePageDocumentMeta(Page);
     const prevLocaleHint = globalThis.__vmzLocaleIdHint;
     globalThis.__vmzLocaleIdHint = localeId;
+    if (!ssrRenderHost) {
+        ssrRenderHost = await createRenderHost(distDir, {
+            strictDeployment: !isDev,
+            preload: 'none',
+            cacheBust: reloadToken,
+        });
+    }
+    await ssrRenderHost.ensureComponents([chunkId, ...layoutChain]);
     let bodyHtml = '';
     try {
-        for await (const chunk of renderToStream(Page, props, { signal })) {
+        for await (const chunk of ssrRenderHost.renderToStream(Page, props, { signal })) {
             if (signal?.aborted) return;
             bodyHtml += chunk;
         }
@@ -519,7 +529,7 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
         for (let i = layoutChain.length - 1; i >= 0; i--) {
             const Layout = await loadPageCtor(layoutChain[i]);
             if (!Layout) continue;
-            bodyHtml = await renderToString(Layout, {}, { signal, slotHtml: bodyHtml });
+            bodyHtml = await ssrRenderHost.renderToString(Layout, {}, { signal, slotHtml: bodyHtml });
             if (signal?.aborted) return;
         }
         // Locale discipline: same-app Links retain current LocaleId (realization authority).
@@ -714,31 +724,19 @@ async function softReload(opts = {}) {
             localeArtifact = null;
         }
 
-        const componentEntries = await listClientComponents(distDir);
+        const componentEntries = await listClientComponents(distDir, { strict: !isDev });
+        ssrRenderHost = await createRenderHost(distDir, {
+            strictDeployment: !isDev,
+            preload: 'none',
+            cacheBust: nextToken,
+        });
         const nextCatalog = await listPageClientFiles(distDir);
         if (!nextCatalog.length) {
             throw new Error(`vmz serve: no pages/**/*.client.js in ${distDir}`);
         }
 
-        /** @type {Record<string, any>} */
-        const components = {};
         /** @type {Map<string, any>} */
         const nextCtors = new Map();
-        const affectedNames = new Set(
-            affected
-                .map((c) => String(c))
-                .filter((c) => c.startsWith('components/') || !c.includes('/'))
-                .map((c) => c.split('/').pop())
-                .filter(Boolean),
-        );
-        for (const entry of componentEntries) {
-            if (islandHmr && affectedNames.size > 0 && !affectedNames.has(entry.name)) {
-                continue;
-            }
-            const href = bustUrl(pathToFileURL(path.join(distDir, entry.entry)).href);
-            const mod = await import(href);
-            components[entry.name] = mod.default;
-        }
 
         if (!islandHmr) {
             const pagesToLoad = reloadAllPages ? nextCatalog : nextCatalog.filter((p) => pageNeedsReload(p.chunkId, affected));
@@ -763,9 +761,6 @@ async function softReload(opts = {}) {
                     if (!nextCatalog.some((p) => p.chunkId === id)) pageCtors.delete(id);
                 }
             }
-        }
-        if (Object.keys(components).length) {
-            registerComponents(components);
         }
 
         const indexChunk = pageCatalog.find((p) => p.chunkId === 'pages/index')?.chunkId || pageCatalog[0].chunkId;

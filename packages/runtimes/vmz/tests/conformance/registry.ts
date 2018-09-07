@@ -256,9 +256,9 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'production/production-observability.ts',
         description: 'A5 trace / redaction / CSP / budget / health',
     },
-    'official-dogfood': {
-        file: 'production/official-dogfood.ts',
-        description: 'Official homepage/documents/inspector dogfood + @vmz/ui Field/Dialog',
+    'official-homepage': {
+        file: 'production/official-homepage.ts',
+        description: 'Official homepage + documents + inspector fixture + @vmz/ui Field/Dialog',
     },
     // M-PR0: public semantic ids as composites over existing evidence (no parallel fake gates).
     'resume-lazy': {
@@ -270,16 +270,16 @@ export const CHECKS: Record<string, CheckEntry> = {
         composite: ['content-addressed-assets', 'static-delivery'],
     },
     'ui-commercial': {
-        description: 'Commercial surface — ui-automation + official-dogfood',
-        composite: ['ui-automation', 'official-dogfood'],
+        description: 'Commercial surface — ui-automation + official-homepage',
+        composite: ['ui-automation', 'official-homepage'],
     },
     'ui-console': {
-        description: 'Console surface — ui-automation + official-dogfood',
-        composite: ['ui-automation', 'official-dogfood'],
+        description: 'Console surface — ui-automation + official-homepage',
+        composite: ['ui-automation', 'official-homepage'],
     },
     'motion-continuity': {
-        description: 'Motion continuity — motion-ir + ui7 + official-dogfood',
-        composite: ['motion-ir', 'ui7', 'official-dogfood'],
+        description: 'Motion continuity — motion-ir + ui7 + official-homepage',
+        composite: ['motion-ir', 'ui7', 'official-homepage'],
     },
     'browser-production': {
         description: 'Browser Production Profile v1 aggregate',
@@ -294,7 +294,7 @@ export const CHECKS: Record<string, CheckEntry> = {
             'site-delivery',
             'production-test',
             'production-observability',
-            'official-dogfood',
+            'official-homepage',
         ],
     },
 };

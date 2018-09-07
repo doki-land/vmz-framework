@@ -1,5 +1,5 @@
 <template>
-  <div data-dogfood="datatable" data-density="compact">
+  <div data-vmz-fixture="datatable" data-density="compact">
     <ConsoleShell
       brand="VMZ"
       homeHref="/"
@@ -14,7 +14,7 @@
         description="Ordinary HTML table with parent-owned selection + sticky header. Large-grid package is separate."
       />
 
-      <p data-dogfood="datatable-state">
+      <p data-vmz-fixture="datatable-state">
         selected:{selectedAttr || 'none'};count:{selectedCount};sort:{sortKey}:{sortDir};detail:{detailId || 'none'}
       </p>
 
@@ -45,7 +45,7 @@
         titleId="home-datatable-drawer-title"
         onClose={() => (drawerOpen = false)}
       >
-        <p data-dogfood="datatable-drawer-body">detail:{detailId}</p>
+        <p data-vmz-fixture="datatable-drawer-body">detail:{detailId}</p>
       </Drawer>
     </ConsoleShell>
   </div>

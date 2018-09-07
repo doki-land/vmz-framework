@@ -8,6 +8,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { buildDocuments } from './document-build.js';
 import { resolveDocumentsRoot } from './document-check.js';
+import { loadLocalesRouting } from './document-host-chrome.js';
+import { pageHtmlRel } from './document-enrich.js';
 import { log } from './log.js';
 import { requireNativeAddon } from './native-addon.js';
 
@@ -43,7 +45,7 @@ export async function buildIntegratedDocuments(opts) {
             }
             return { ok: false, error: 'document diagnostics', pages: 0 };
         }
-        writeMountRootRedirects(result.manifest, outDir);
+        writeMountRootRedirects(result.manifest, outDir, projectRoot);
         log.info(`document mount: pages=${result.pages.length} → ${path.relative(process.cwd(), outDir) || '.'}`);
         return { ok: true, pages: result.pages.length };
     } catch (e) {
@@ -54,20 +56,32 @@ export async function buildIntegratedDocuments(opts) {
 }
 
 /**
- * Emit `{routeBase}/index.html` → defaultLocale landing (for /d/ and /docs/).
+ * Emit `{routeBase}/index.html` for integrated mounts.
+ * `routing.strategy: none` → copy default-locale docs index (LocaleId is Host state).
+ * prefix strategy → redirect HTML to `{routeBase}/{defaultLocale}/`.
  * @param {import('./document-schema.js').DocumentManifest} manifest
  * @param {string} outDir
+ * @param {string} projectRoot
  */
-function writeMountRootRedirects(manifest, outDir) {
+function writeMountRootRedirects(manifest, outDir, projectRoot) {
     const defaultLocale = manifest.defaultLocale || manifest.locales?.[0];
     if (!defaultLocale) return;
+    const routing = loadLocalesRouting(projectRoot) || { strategy: 'prefix' };
     for (const mount of manifest.mounts || []) {
         if (!mount?.routeBase || mount.routeBase === '/') continue;
         const base = String(mount.routeBase).replace(/\/$/, '');
-        const target = `${base}/${defaultLocale}/`;
         const relDir = base.replace(/^\//, '');
         const abs = path.join(outDir, relDir, 'index.html');
         fs.mkdirSync(path.dirname(abs), { recursive: true });
+        if (routing.strategy === 'none' || routing.strategy === 'domain') {
+            const srcRel = pageHtmlRel(base, defaultLocale, 'index');
+            const srcAbs = path.join(outDir, srcRel);
+            if (fs.existsSync(srcAbs)) {
+                fs.copyFileSync(srcAbs, abs);
+            }
+            continue;
+        }
+        const target = `${base}/${defaultLocale}/`;
         const native = requireNativeAddon();
         if (typeof native.generateRedirectHtml !== 'function') {
             throw new Error('vmz native addon missing generateRedirectHtml — rebuild with `pnpm napi:build`');

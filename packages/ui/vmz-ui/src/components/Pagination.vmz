@@ -8,7 +8,7 @@
       >
         Previous
       </button>
-      <p class="vmz-ui-pagination__status" data-dogfood="page-status">{status}</p>
+      <p class="vmz-ui-pagination__status" data-vmz-fixture="page-status">{status}</p>
       <button
         type="button"
         class="vmz-ui-pagination__btn"

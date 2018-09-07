@@ -1,5 +1,5 @@
 <template>
-  <div data-dogfood="ui5" data-density="compact">
+  <div data-vmz-fixture="ui5" data-density="compact">
     <ConsoleShell
       brand="VMZ"
       homeHref="/"
@@ -32,9 +32,9 @@
         <Button type="button" disabled={writeDisabled}>Export</Button>
       </QueryForm>
 
-      <p data-dogfood="ui5-query">name:{nameQuery};status:{statusQuery}</p>
-      <p data-dogfood="ui5-sort">sort:{sortKey}:{sortDir}</p>
-      <p data-dogfood="ui5-perm">write:{writeDisabled ? 'denied' : 'allowed'}</p>
+      <p data-vmz-fixture="ui5-query">name:{nameQuery};status:{statusQuery}</p>
+      <p data-vmz-fixture="ui5-sort">sort:{sortKey}:{sortDir}</p>
+      <p data-vmz-fixture="ui5-perm">write:{writeDisabled ? 'denied' : 'allowed'}</p>
 
       <Button type="button" onClick={() => this.toggleLoading()}>Toggle loading</Button>
       <Button type="button" onClick={() => this.toggleWrite()}>Toggle write</Button>
@@ -62,7 +62,7 @@
         titleId="home-ui5-drawer-title"
         onClose={() => (drawerOpen = false)}
       >
-        <p data-dogfood="ui5-drawer-body">detail:{detailId}</p>
+        <p data-vmz-fixture="ui5-drawer-body">detail:{detailId}</p>
       </Drawer>
     </ConsoleShell>
   </div>

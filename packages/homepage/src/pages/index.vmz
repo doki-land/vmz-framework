@@ -2,13 +2,13 @@
   <div class="site landing-page landing-v2 landing-brand">
     <SiteHeader />
     <main>
-      <section class="v2-hero" aria-labelledby="landing-title" data-dogfood="landing-brand">
-        <p class="v2-kicker" data-dogfood="landing-hero-kicker"><span></span> {heroKickerLabel}</p>
-        <h1 id="landing-title" data-dogfood="landing-hero-title">{heroTitleLeadLabel}<br /><em>{heroTitleEmLabel}</em></h1>
-        <p class="v2-lede" data-dogfood="landing-hero-lede">{heroLedeLabel}</p>
+      <section class="v2-hero" aria-labelledby="landing-title" data-vmz-fixture="landing-brand">
+        <p class="v2-kicker" data-vmz-fixture="landing-hero-kicker"><span></span> {heroKickerLabel}</p>
+        <h1 id="landing-title" data-vmz-fixture="landing-hero-title">{heroTitleLeadLabel}<br /><em>{heroTitleEmLabel}</em></h1>
+        <p class="v2-lede" data-vmz-fixture="landing-hero-lede">{heroLedeLabel}</p>
         <div class="v2-actions">
-          <a class="v2-button v2-button--primary" data-dogfood="landing-primary-cta" href={guideHref}>{buildLabel}</a>
-          <a class="v2-button v2-button--text" data-dogfood="landing-secondary-cta" href={docsRootHref}>{readDocsLabel} <span aria-hidden="true">→</span></a>
+          <a class="v2-button v2-button--primary" data-vmz-fixture="landing-primary-cta" href={guideHref}>{buildLabel}</a>
+          <a class="v2-button v2-button--text" data-vmz-fixture="landing-secondary-cta" href={docsRootHref}>{readDocsLabel} <span aria-hidden="true">→</span></a>
         </div>
         <div class="v2-signal" aria-label="VMZ compilation model">
           <div><small>Author</small><strong>Components</strong></div>
@@ -22,8 +22,8 @@
       <section class="v2-statement" aria-labelledby="statement-title">
         <p class="v2-index">01 / WHY VMZ</p>
         <div>
-          <h2 id="statement-title" data-dogfood="landing-statement-title">{statementTitleLeadLabel}<br /><em>{statementTitleEmLabel}</em></h2>
-          <p data-dogfood="landing-statement-body">{statementBodyLabel}</p>
+          <h2 id="statement-title" data-vmz-fixture="landing-statement-title">{statementTitleLeadLabel}<br /><em>{statementTitleEmLabel}</em></h2>
+          <p data-vmz-fixture="landing-statement-body">{statementBodyLabel}</p>
         </div>
       </section>
 
@@ -111,10 +111,10 @@
 
       <section class="v2-start" aria-labelledby="start-title">
         <p class="v2-index">05 / GET STARTED</p>
-        <h2 id="start-title" data-dogfood="landing-start-title">{startTitleLabel}</h2>
-        <p data-dogfood="landing-start-lede">{startLedeLabel}</p>
+        <h2 id="start-title" data-vmz-fixture="landing-start-title">{startTitleLabel}</h2>
+        <p data-vmz-fixture="landing-start-lede">{startLedeLabel}</p>
         <div class="v2-command"><code>pnpm create vmz-app my-app</code><Button type="button" variant="secondary" onClick={() => this.copyCommand()}>{copied ? '已复制' : '复制'}</Button></div>
-        <div class="v2-actions"><a class="v2-button v2-button--light" data-dogfood="landing-start-cta" href={guideHref}>{startLabel}</a><a class="v2-button v2-button--dark-text" href="/deploy-planner">{deployPlannerLabel} →</a></div>
+        <div class="v2-actions"><a class="v2-button v2-button--light" data-vmz-fixture="landing-start-cta" href={guideHref}>{startLabel}</a><a class="v2-button v2-button--dark-text" href="/deploy-planner">{deployPlannerLabel} →</a></div>
       </section>
     </main>
     <SiteFooter />

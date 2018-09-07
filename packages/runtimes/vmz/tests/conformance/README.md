@@ -35,9 +35,9 @@ TypeScript drivers under **domain folders** — not a flat dump:
       fallback（不混装文件交付；Rust packaging / live remote crypto 仍开）
     - `pnpm verify -- production-test` — **A4**：生产用户路径场景包 + deterministic CI（Field/Dialog/locale/theme/mount 仍
       quarantine）
-    - `pnpm verify -- production-observability` — **A5**：trace facets + redaction + CSP + budgets + health/ready（dogfood
+    - `pnpm verify -- production-observability` — **A5**：trace facets + redaction + CSP + budgets + health/ready（fixture
       fault injection / sampling 仪表仍开）
-    - `pnpm verify -- official-dogfood` — **Dogfood**：homepage SSR + documents + production-inspector + `@vmz/ui`
+    - `pnpm verify -- official-homepage` — **Official homepage**：homepage SSR + documents + production-inspector + `@vmz/ui`
       Button/Field/Dialog（sibling panel / focus-loop 仍开）
     - `pnpm verify -- browser-production` — aggregate **薄绿**（proof 未关前不宣称 production-ready；也尚未进入默认
       `pnpm verify`）

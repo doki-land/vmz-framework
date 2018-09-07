@@ -346,7 +346,11 @@ export async function runBrowserManifest(
         page = await browser.newPage();
         page.setDefaultTimeout(15000);
         page.on('console', (msg: { type: () => string; text: () => string }) => {
-            if (msg.type() === 'error') consoleErrors.push(msg.text());
+            if (msg.type() !== 'error') return;
+            const text = msg.text();
+            // Chrome also logs network 404s here; requestfailed gate carries URL + resource-type filters.
+            if (/Failed to load resource:.+404/i.test(text)) return;
+            consoleErrors.push(text);
         });
         page.on('pageerror', (err: Error) => {
             consoleErrors.push(err instanceof Error ? err.message : String(err));

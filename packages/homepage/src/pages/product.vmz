@@ -1,7 +1,7 @@
 <template>
-  <div data-dogfood="product" data-density={density} dir={dir}>
+  <div data-vmz-fixture="product" data-density={density} dir={dir}>
     <AppShell brand="VMZ" homeHref="/" navLabel="Product" nav={navItems}>
-      <div class="vmz-product-toolbar" data-dogfood="product-toolbar">
+      <div class="vmz-product-toolbar" data-vmz-fixture="product-toolbar">
         <Badge tone="brand">{versionLabel}</Badge>
         <Button type="button" variant="secondary" onClick={() => this.toggleVersion()}>
           Switch version
@@ -20,7 +20,7 @@
           value={search}
           onInput={(e) => this.onSearch(e)}
         />
-        <p data-dogfood="product-meta">
+        <p data-vmz-fixture="product-meta">
           version:{version};locale:{locale};search:{search};copied:{copied};density:{density};dir:{dir}
         </p>
       </div>
@@ -59,7 +59,7 @@
                 onCopy={() => this.copyInstall()}
               />
             </div>
-            <p if={copiedYes} data-dogfood="product-copied" role="status">Copied install snippet</p>
+            <p if={copiedYes} data-vmz-fixture="product-copied" role="status">Copied install snippet</p>
           </div>
 
           <div>

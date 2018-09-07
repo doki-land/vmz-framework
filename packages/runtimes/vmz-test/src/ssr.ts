@@ -5,7 +5,7 @@
 
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { bootstrapComponentRegistry } from '@vmz/core/component-registry';
+import { createRenderHost } from '@vmz/core/render-host';
 import { resolveChunkArtifacts } from './compile.js';
 import { installHeadlessDocument } from './logic.js';
 
@@ -39,31 +39,23 @@ export async function runSsrManifest(manifest: Record<string, unknown>, ctx: { o
     }
 
     installHeadlessDocument();
-    let dom: any;
+    const components =
+        program.components && typeof program.components === 'object' ? (program.components as Record<string, string>) : undefined;
+    let renderHost: Awaited<ReturnType<typeof createRenderHost>>;
     let Component: any;
     try {
-        dom = await import(pathToFileURL(path.join(ctx.outDir, 'vmz-dom.js')).href);
+        renderHost = await createRenderHost(ctx.outDir, {
+            strictDeployment: process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true',
+            preload: 'none',
+            explicit: components,
+        });
+        await renderHost.ensureComponents([chunkId.replace(/\\/g, '/')]);
         Component = (await import(pathToFileURL(arts.clientPath).href)).default;
     } catch (e) {
         fail(`import dist: ${e instanceof Error ? e.message : String(e)}`);
         return { status: 'error', diagnostics, planId: null, programId };
     }
-
-    const components =
-        program.components && typeof program.components === 'object' ? (program.components as Record<string, string>) : undefined;
-    if (typeof dom.registerComponents === 'function') {
-        try {
-            await bootstrapComponentRegistry(ctx.outDir, dom.registerComponents, {
-                strict: process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true',
-                closureRoots: [chunkId.replace(/\\/g, '/')],
-                explicit: components,
-                preload: 'closure',
-            });
-        } catch (e) {
-            fail(`bootstrap component registry: ${e instanceof Error ? e.message : String(e)}`);
-            return { status: 'error', diagnostics, planId: null, programId };
-        }
-    }
+    const dom = renderHost.dom;
 
     let html = '';
     let streamChunks: string[] = [];

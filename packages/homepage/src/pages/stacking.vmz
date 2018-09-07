@@ -1,5 +1,5 @@
 <template>
-  <div data-dogfood="stacking">
+  <div data-vmz-fixture="stacking">
     <AppShell brand="VMZ" homeHref="/" navLabel="Stacking" nav={navItems}>
       <Alert
         tone="info"
@@ -8,7 +8,7 @@
         description="Drawer → Dialog → Popover with rising stackLevel; Escape closes topmost only. Parent owns the stack."
       />
 
-      <p data-dogfood="stacking-state">
+      <p data-vmz-fixture="stacking-state">
         drawer:{drawerOpen ? 'open' : 'closed'};dialog:{dialogOpen ? 'open' : 'closed'};popover:{popoverOpen ? 'open' : 'closed'}
       </p>
 
@@ -25,7 +25,7 @@
         stackLevel="0"
         onClose={() => this.closeDrawer()}
       >
-        <p data-dogfood="stacking-drawer-body">Base layer stackLevel=0</p>
+        <p data-vmz-fixture="stacking-drawer-body">Base layer stackLevel=0</p>
       </Drawer>
 
       <Dialog
@@ -35,7 +35,7 @@
         stackLevel="1"
         onClose={() => this.closeDialog()}
       >
-        <p data-dogfood="stacking-dialog-body">Middle layer stackLevel=1</p>
+        <p data-vmz-fixture="stacking-dialog-body">Middle layer stackLevel=1</p>
       </Dialog>
 
       <Popover
@@ -45,7 +45,7 @@
         stackLevel="2"
         onClose={() => this.closePopover()}
       >
-        <p data-dogfood="stacking-popover-body">Top layer stackLevel=2</p>
+        <p data-vmz-fixture="stacking-popover-body">Top layer stackLevel=2</p>
       </Popover>
     </AppShell>
   </div>

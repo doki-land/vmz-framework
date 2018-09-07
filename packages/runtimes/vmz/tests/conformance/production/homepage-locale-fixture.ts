@@ -1,5 +1,5 @@
 /**
- * Catalog-driven homepage locale dogfood helpers.
+ * Catalog-driven homepage locale fixture helpers.
  * Product copy lives only in homepage locales common.json5; never hardcode here.
  */
 
@@ -112,8 +112,8 @@ export async function proveHomepageLocaleTransition(opts: {
 
         await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle0', timeout: 30000 });
         await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 15000 });
-        await page.waitForSelector('[data-dogfood="site-header"]', { timeout: 10000 });
-        await page.waitForSelector('[data-dogfood="landing-hero-lede"]', { timeout: 10000 });
+        await page.waitForSelector('[data-vmz-fixture="site-header"]', { timeout: 10000 });
+        await page.waitForSelector('[data-vmz-fixture="landing-hero-lede"]', { timeout: 10000 });
 
         const waitBodyMatches = async (catalog: HomepageCommonCatalog, localeId: string) => {
             const want = {
@@ -141,19 +141,19 @@ export async function proveHomepageLocaleTransition(opts: {
                     const href = (sel: string) => (document.querySelector(sel) as HTMLAnchorElement | null)?.getAttribute('href') || '';
                     return (
                         document.documentElement.getAttribute('data-locale') === expected.localeId &&
-                        text('[data-dogfood="landing-hero-kicker"]') === expected.heroKicker &&
-                        text('[data-dogfood="landing-hero-title"]') === expected.heroTitle &&
-                        text('[data-dogfood="landing-hero-lede"]') === expected.heroLede &&
-                        text('[data-dogfood="landing-statement-title"]') === expected.statementTitle &&
-                        text('[data-dogfood="landing-statement-body"]') === expected.statementBody &&
-                        text('[data-dogfood="landing-start-title"]') === expected.startTitle &&
-                        text('[data-dogfood="landing-start-lede"]') === expected.startLede &&
-                        text('[data-dogfood="landing-primary-cta"]') === expected.build &&
+                        text('[data-vmz-fixture="landing-hero-kicker"]') === expected.heroKicker &&
+                        text('[data-vmz-fixture="landing-hero-title"]') === expected.heroTitle &&
+                        text('[data-vmz-fixture="landing-hero-lede"]') === expected.heroLede &&
+                        text('[data-vmz-fixture="landing-statement-title"]') === expected.statementTitle &&
+                        text('[data-vmz-fixture="landing-statement-body"]') === expected.statementBody &&
+                        text('[data-vmz-fixture="landing-start-title"]') === expected.startTitle &&
+                        text('[data-vmz-fixture="landing-start-lede"]') === expected.startLede &&
+                        text('[data-vmz-fixture="landing-primary-cta"]') === expected.build &&
                         text('.site-nav__cta') === expected.start &&
-                        text('[data-dogfood="footer-docs"]') === expected.docs &&
-                        href('[data-dogfood="landing-primary-cta"]').includes(expected.guideHref) &&
-                        href('[data-dogfood="landing-secondary-cta"]').includes(expected.docsRootHref) &&
-                        href('[data-dogfood="footer-docs"]').includes(expected.docsRootHref)
+                        text('[data-vmz-fixture="footer-docs"]') === expected.docs &&
+                        href('[data-vmz-fixture="landing-primary-cta"]').includes(expected.guideHref) &&
+                        href('[data-vmz-fixture="landing-secondary-cta"]').includes(expected.docsRootHref) &&
+                        href('[data-vmz-fixture="footer-docs"]').includes(expected.docsRootHref)
                     );
                 },
                 { timeout: 15000 },
@@ -174,7 +174,7 @@ export async function proveHomepageLocaleTransition(opts: {
         const hardDocLink = await page.evaluate(() => !!document.querySelector('.site-language__menu a[href^="/d/"]'));
         if (hardDocLink) throw new Error('language menu must not hard-link /d/…');
 
-        await page.click('[data-dogfood="locale-en-us"]');
+        await page.click('[data-vmz-fixture="locale-en-us"]');
         await page.waitForFunction(
             () => location.pathname.startsWith('/en-us') && document.documentElement.getAttribute('data-locale') === 'en-us',
             { timeout: 15000 },

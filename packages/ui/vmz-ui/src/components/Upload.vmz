@@ -316,7 +316,7 @@ export default class Upload {
 	}>) | null = null;
 	/** Parent receives serializable results (no File handles required). */
 	public onValue: ((items: UploadValueItem[]) => void) | null = null;
-	/** Parent mirrors overall status for form dogfood / submit gates. */
+	/** Parent mirrors overall status for form fixture / submit gates. */
 	public onStatus: ((status: string) => void) | null = null;
 	public cancelLabel: string = "Cancel upload";
 	public resumeLabel: string = "Resume upload";

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
-import { bootstrapComponentRegistry } from '@vmz/core/component-registry';
+import { createRenderHost } from '@vmz/core/render-host';
 import { resolveChunkArtifacts } from './compile.js';
 
 const require = createRequire(import.meta.url);
@@ -65,14 +65,13 @@ export async function createLogicHost(opts: { outDir: string; chunkId: string; c
         throw new Error('logic host requires Direct __vmzCreate (rebuild with current compiler)');
     }
 
-    if (typeof dom.registerComponents === 'function') {
-        await bootstrapComponentRegistry(opts.outDir, dom.registerComponents, {
-            strict: process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true',
-            closureRoots: [opts.chunkId.replace(/\\/g, '/')],
-            explicit: opts.components,
-            preload: 'closure',
-        });
-    }
+    const strict = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+    const renderHost = await createRenderHost(opts.outDir, {
+        strictDeployment: strict,
+        preload: 'none',
+        explicit: opts.components,
+    });
+    await renderHost.ensureComponents([opts.chunkId.replace(/\\/g, '/')]);
 
     if (typeof dom.__vmzPrecisionEnable === 'function') {
         dom.__vmzPrecisionEnable(true);

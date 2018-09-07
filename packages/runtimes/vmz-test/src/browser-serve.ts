@@ -3,15 +3,62 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export type ServeHostHandle = {
     port: number;
     origin: string;
     kill: () => void;
 };
+
+const require = createRequire(import.meta.url);
+
+/** Same discovery as `vmz serve` / conformance `serveHostChildEnv`. */
+function resolveNativeNodePath(): string {
+    const { platform, arch } = process;
+    let triple = `${platform}-${arch}`;
+    if (platform === 'win32' && arch === 'x64') triple = 'win32-x64-msvc';
+    else if (platform === 'win32' && arch === 'arm64') triple = 'win32-arm64-msvc';
+    else if (platform === 'darwin' && arch === 'arm64') triple = 'darwin-arm64';
+    else if (platform === 'darwin' && arch === 'x64') triple = 'darwin-x64';
+    else if (platform === 'linux' && arch === 'x64') triple = 'linux-x64-gnu';
+    else if (platform === 'linux' && arch === 'arm64') triple = 'linux-arm64-gnu';
+    const short =
+        triple === 'win32-x64-msvc'
+            ? 'win32-x64'
+            : triple === 'win32-arm64-msvc'
+              ? 'win32-arm64'
+              : triple === 'linux-x64-gnu'
+                ? 'linux-x64'
+                : triple === 'linux-arm64-gnu'
+                  ? 'linux-arm64'
+                  : triple;
+    const name = `@vmz/vmz-${short}`;
+    /** @type {string[]} */
+    const candidates = [];
+    try {
+        const pkgJson = require.resolve(`${name}/package.json`);
+        const dir = path.dirname(pkgJson);
+        candidates.push(path.join(dir, `vmz.${triple}.node`), path.join(dir, 'vmz.node'));
+    } catch {
+        /* optional dep missing */
+    }
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    candidates.push(
+        path.join(here, '..', '..', '..', 'runtimes', `vmz-${short}`, `vmz.${triple}.node`),
+        path.join(here, '..', '..', '..', 'runtimes', `vmz-${short}`, 'vmz.node'),
+    );
+    for (const p of candidates) {
+        if (fs.existsSync(p)) return path.resolve(p);
+    }
+    throw new Error(
+        `serve host: vmz native addon not found for ${name}. Run pnpm napi:build\nLooked in:\n${candidates.map((c) => `  - ${c}`).join('\n')}`,
+    );
+}
 
 function freePort(): Promise<number> {
     return new Promise((resolve, reject) => {
@@ -115,7 +162,13 @@ export async function startServeHost(outDir: string): Promise<ServeHostHandle> {
     const port = await freePort();
     const child: ChildProcess = spawn(process.execPath, [hostJs], {
         cwd: outDir,
-        env: { ...process.env, VMZ_DIST: outDir, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(port) },
+        env: {
+            ...process.env,
+            VMZ_DIST: outDir,
+            VMZ_HOST: '127.0.0.1',
+            VMZ_PORT: String(port),
+            VMZ_NATIVE_NODE: resolveNativeNodePath(),
+        },
         stdio: ['ignore', 'pipe', 'pipe'],
     });
     const kill = () => {

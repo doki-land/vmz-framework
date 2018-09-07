@@ -9,6 +9,14 @@ import { resolveDocumentDesignsCss } from './document-designs.js';
 import { enrichDocumentContent, pageHtmlRel } from './document-enrich.js';
 import { enrichDocumentEvidence } from './document-evidence.js';
 import {
+    docsRouteNone,
+    loadLocaleCommonMessages,
+    loadLocalesRouting,
+    localeNonePickerScript,
+    readSiteGithubUrl,
+    renderHostChromeTemplate,
+} from './document-host-chrome.js';
+import {
     artifactHrefFromHtml,
     buildDocumentIslands,
     buildDocumentSearch,
@@ -29,10 +37,12 @@ export async function buildDocuments(opts) {
     const outDir = path.resolve(opts.outDir || path.join(projectRoot, 'dist', 'documents'));
     const strict = Boolean(opts.strict);
     const manifest = checkDocuments({ projectRoot, strict });
+    const routing = loadLocalesRouting(projectRoot) || { strategy: 'prefix' };
     const engine = await resolveMarkdownEngine({ engines: opts.engines, projectRoot });
     const enriched = enrichDocumentContent(manifest, {
         analyzeMarkdown: engine.analyzeMarkdown,
         projectRoot,
+        routing,
     });
     manifest.diagnostics = enriched.diagnostics;
     const evidence = await enrichDocumentEvidence(manifest, {
@@ -69,8 +79,8 @@ export async function buildDocuments(opts) {
     manifest.search = search;
     manifest.islands = islands;
 
-    const hostChrome = resolveHostSiteChrome(projectRoot);
-    const useHostShell = Boolean(hostChrome) && (manifest.mounts || []).some((m) => m.mode === 'integrated');
+    const hostChromeRaw = resolveHostSiteChromeRaw(projectRoot);
+    const useHostShell = Boolean(hostChromeRaw) && (manifest.mounts || []).some((m) => m.mode === 'integrated');
 
     fs.mkdirSync(outDir, { recursive: true });
     const designs = resolveDocumentDesignsCss(projectRoot);
@@ -145,7 +155,12 @@ export async function buildDocuments(opts) {
             htmlRel,
             searchShellHtml: shells.searchHtml,
             playgroundShellHtml: shells.playgroundHtml,
-            hostChrome: useHostShell ? hostChrome : null,
+            hostChrome: useHostShell
+                ? renderHostChromeForLocale(projectRoot, page.identity.locale, routing, enriched.routeBase, hostChromeRaw)
+                : null,
+            routing,
+            routeBase: enriched.routeBase,
+            pageKey: page.identity.pageKey,
         });
         fs.writeFileSync(htmlAbs, html, 'utf8');
         written.push({ route: info.route, htmlPath: htmlRel, viewPath: viewRel });
@@ -190,6 +205,9 @@ function renderStaticHtml({
     searchShellHtml = '',
     playgroundShellHtml = '',
     hostChrome = null,
+    routing = { strategy: 'prefix' },
+    routeBase = '/docs',
+    pageKey = 'index',
 }) {
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const depth = htmlRel.split('/').length - 1;
@@ -204,7 +222,10 @@ function renderStaticHtml({
     if (designsHref) cssHrefs.push(hostChrome ? `/${designsHref}` : prefix + designsHref);
     const navItems = nav
         .map((n) => {
-            const href = relativeHref(htmlRel, n.href, route);
+            const href =
+                routing.strategy === 'none' || routing.strategy === 'domain'
+                    ? n.href
+                    : relativeHref(htmlRel, n.href, route);
             const current = n.href === route ? ' aria-current="page"' : '';
             return `      <li><a href="${esc(href)}"${current}>${esc(n.title)}</a></li>`;
         })
@@ -242,6 +263,7 @@ ${playgroundShellHtml}
   </div>
 ${hostChrome.footer}
   </div>
+${routing.strategy === 'none' && hostChrome ? localeNonePickerScript() : ''}
 `;
     } else {
         bodyInner = `  <a class="skip-link" href="#main">Skip to content</a>
@@ -272,7 +294,7 @@ ${playgroundShellHtml}
  * @param {string} projectRoot
  * @returns {{ header: string, footer: string } | null}
  */
-function resolveHostSiteChrome(projectRoot) {
+function resolveHostSiteChromeRaw(projectRoot) {
     const headerPath = path.join(projectRoot, 'src', 'components', 'SiteHeader.vmz');
     const footerPath = path.join(projectRoot, 'src', 'components', 'SiteFooter.vmz');
     if (!fs.existsSync(headerPath) || !fs.existsSync(footerPath)) return null;
@@ -280,6 +302,31 @@ function resolveHostSiteChrome(projectRoot) {
     const footer = extractVmzTemplateHtml(footerPath);
     if (!header || !footer) return null;
     return { header, footer };
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} localeId
+ * @param {{ strategy?: string }} routing
+ * @param {string} routeBase
+ * @param {{ header: string, footer: string }} raw
+ */
+function renderHostChromeForLocale(projectRoot, localeId, routing, routeBase, raw) {
+    const messages = loadLocaleCommonMessages(projectRoot, localeId);
+    const githubUrl = readSiteGithubUrl(projectRoot);
+    const docsRootHref =
+        routing.strategy === 'none' || routing.strategy === 'domain'
+            ? `${routeBase.replace(/\/$/, '')}/`
+            : `${routeBase.replace(/\/$/, '')}/${localeId}/`;
+    const guideHref =
+        routing.strategy === 'none' || routing.strategy === 'domain'
+            ? docsRouteNone(routeBase, 'guide/getting-started')
+            : `${docsRootHref}guide/getting-started`;
+    const opts = { docsRootHref, guideHref, githubUrl, routing };
+    return {
+        header: renderHostChromeTemplate(raw.header, localeId, messages, opts),
+        footer: renderHostChromeTemplate(raw.footer, localeId, messages, opts),
+    };
 }
 
 /** @param {string} filePath */

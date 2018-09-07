@@ -10,6 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { CACHE_ASSET_IMMUTABLE, CACHE_HTML, assertSharedAssetPath, listenLocalStaticHost, resolveAssetByDigest } from 'vmz';
 import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
 import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
+import { assertHashedCssImportsHttp } from '../_lib/assert-hashed-css-imports.ts';
 import { addLimitation, readProof, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 
 const root = repoRoot(import.meta.url);
@@ -132,6 +133,8 @@ try {
             errors.push(`hashed asset cache want immutable, got ${asset.headers['cache-control']}`);
         }
     }
+    console.log('content-addressed-assets: hashed CSS @import HTTP…');
+    errors.push(...(await assertHashedCssImportsHttp(dist, host.baseUrl, get)));
 } finally {
     await host.close();
 }
@@ -152,6 +155,11 @@ upsertCheck(proof, {
     id: 'content-addressed-assets.cdn-immutable',
     status: errors.some((e) => e.includes('cache') || e.includes('immutable')) ? 'failed' : 'passed',
     detail: CACHE_ASSET_IMMUTABLE,
+});
+upsertCheck(proof, {
+    id: 'content-addressed-assets.css-import-http',
+    status: errors.some((e) => e.includes('@import') || e.includes('text/css') || e.includes('vmz.css')) ? 'failed' : 'passed',
+    detail: 'hashed vmz.css @import siblings 200 text/css',
 });
 
 const gaps = ['A3: second real CDN provider adapter beyond netlify projection not covered'];

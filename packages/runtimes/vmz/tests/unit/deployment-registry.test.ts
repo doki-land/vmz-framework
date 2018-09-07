@@ -2,7 +2,11 @@
  * Unit tests — deployment registry closure + tag conflict detection.
  */
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { collectDependsOnClosure, componentEntriesFromDeployment, dedupeComponentEntriesByTag } from '@vmz/core/component-registry';
+import { listClientComponents } from '@vmz/core/component-registry';
 
 const deployment = {
     schema: 'vmz.deployment.v0',
@@ -44,5 +48,12 @@ assert.throws(
         ),
     /component tag <Button>/,
 );
+
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-strict-deploy-'));
+try {
+    await assert.rejects(() => listClientComponents(tmpDir, { strict: true }), /missing vmz-deployment\.json/);
+} finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+}
 
 console.log('deployment-registry unit: PASS');

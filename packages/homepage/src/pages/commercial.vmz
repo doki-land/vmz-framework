@@ -1,7 +1,7 @@
 <template>
-  <div data-dogfood="commercial">
+  <div data-vmz-fixture="commercial">
     <AppShell brand="VMZ" homeHref="/" navLabel="Commercial" nav={navItems}>
-      <div if={notifyOpen} data-dogfood="commercial-notify">
+      <div if={notifyOpen} data-vmz-fixture="commercial-notify">
         <Notification
           tone="success"
           roleName="status"
@@ -12,7 +12,7 @@
         </Notification>
       </div>
 
-      <section class="vmz-commercial-hero" data-dogfood="commercial-hero" aria-labelledby="commercial-hero-title">
+      <section class="vmz-commercial-hero" data-vmz-fixture="commercial-hero" aria-labelledby="commercial-hero-title">
         <Badge tone="brand">Official UI</Badge>
         <h1 id="commercial-hero-title" class="vmz-commercial-hero__title">VMZ</h1>
         <p class="vmz-commercial-hero__lead">
@@ -32,7 +32,7 @@
         description="AppShell, hero, feature comparison, pricing, Form, Notification, Empty, Dialog, and Drawer on one route."
       />
 
-      <section data-dogfood="commercial-features" aria-labelledby="commercial-features-title">
+      <section data-vmz-fixture="commercial-features" aria-labelledby="commercial-features-title">
         <h2 id="commercial-features-title" class="vmz-commercial-section-title">What you get</h2>
         <div class="vmz-commercial-grid">
           <Card title="Router-first" description="One Route Graph owns URL, load, metadata, and resume boundaries." />
@@ -41,7 +41,7 @@
         </div>
       </section>
 
-      <section data-dogfood="commercial-pricing" aria-labelledby="commercial-pricing-title">
+      <section data-vmz-fixture="commercial-pricing" aria-labelledby="commercial-pricing-title">
         <h2 id="commercial-pricing-title" class="vmz-commercial-section-title">Plans</h2>
         <div class="vmz-commercial-grid vmz-commercial-grid--pricing">
           <Card title="Starter" description="Local static host and CDN WebArtifact.">
@@ -49,7 +49,7 @@
             <Badge tone="info">Self-serve</Badge>
             <Button type="button" variant="secondary" onClick={() => this.scrollContact()}>Contact sales</Button>
           </Card>
-          <Card title="Production" description="ServerArtifact parity, observability, and official dogfood gates.">
+          <Card title="Production" description="ServerArtifact parity, observability, and official conformance gates.">
             <p class="vmz-commercial-price"><span>Team</span> release proof</p>
             <Badge tone="success">Recommended</Badge>
             <Button type="button" onClick={() => this.scrollContact()}>Talk to us</Button>
@@ -78,11 +78,11 @@
             value={email}
             onInput={(e) => this.onEmail(e)}
           />
-          <p data-dogfood="commercial-email">email:{email}</p>
-          <div data-dogfood="commercial-form-actions" class="vmz-commercial-actions">
+          <p data-vmz-fixture="commercial-email">email:{email}</p>
+          <div data-vmz-fixture="commercial-form-actions" class="vmz-commercial-actions">
             <Button type="submit">Confirm</Button>
             <Button type="reset" variant="secondary">Clear</Button>
-            <span if={submitting} data-dogfood="commercial-spinner">
+            <span if={submitting} data-vmz-fixture="commercial-spinner">
               <Spinner label="Sending" />
             </span>
           </div>
@@ -93,7 +93,7 @@
           titleId="home-commercial-dialog-title"
           onClose={() => (dialogOpen = false)}
         >
-          <p data-dogfood="commercial-dialog-body">Confirm sending to {email}</p>
+          <p data-vmz-fixture="commercial-dialog-body">Confirm sending to {email}</p>
         </Dialog>
       </Card>
 
@@ -118,7 +118,7 @@
           titleId="home-commercial-drawer-title"
           onClose={() => (drawerOpen = false)}
         >
-          <p data-dogfood="commercial-drawer-body">Drawer inside commercial composition.</p>
+          <p data-vmz-fixture="commercial-drawer-body">Drawer inside commercial composition.</p>
           <Link href="/console">Open Console surface</Link>
         </Drawer>
       </Card>

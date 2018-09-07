@@ -9,10 +9,16 @@ import { DIAG } from './document-schema.js';
  * @param {string} routeBase e.g. /docs
  * @param {string} locale
  * @param {string} pageKey
+ * @param {{ strategy?: string }} [routing]
  */
-export function pageRoute(routeBase, locale, pageKey) {
+export function pageRoute(routeBase, locale, pageKey, routing = {}) {
     const base = String(routeBase || '/').replace(/\/$/, '') || '';
     const key = pageKey === 'index' ? '' : pageKey.replace(/\\/g, '/');
+    const strategy = routing.strategy || 'prefix';
+    if (strategy === 'none' || strategy === 'domain') {
+        const parts = [base.replace(/^\//, ''), key].filter((p) => p !== '');
+        return '/' + (parts.length ? parts.join('/') : '');
+    }
     const parts = [base.replace(/^\//, ''), locale, key].filter((p) => p !== '');
     return '/' + parts.join('/');
 }
@@ -35,6 +41,7 @@ export function pageHtmlRel(routeBase, locale, pageKey) {
  */
 export function enrichDocumentContent(manifest, ctx) {
     const routeBase = manifest.mounts?.[0]?.routeBase || '/docs';
+    const routing = ctx.routing || { strategy: 'prefix' };
     /** @type {Map<string, { html: string, headings: any[], links: any[], title: string, route: string, anchors: string[] }>} */
     const byId = new Map();
     /** @type {import('./document-schema.js').DocumentDiagnostic[]} */
@@ -45,7 +52,7 @@ export function enrichDocumentContent(manifest, ctx) {
         const abs = path.isAbsolute(page.sourcePath) ? page.sourcePath : path.join(manifest.root, page.sourcePath);
         const source = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : '';
         const analyzed = ctx.analyzeMarkdown(source);
-        const route = pageRoute(routeBase, page.identity.locale, page.identity.pageKey);
+        const route = pageRoute(routeBase, page.identity.locale, page.identity.pageKey, routing);
         const anchors = analyzed.headings.map((h) => h.id);
         const title = analyzed.headings.find((h) => h.level === 1)?.text || analyzed.headings[0]?.text || page.identity.pageKey;
         // Duplicate anchors on page
@@ -61,7 +68,10 @@ export function enrichDocumentContent(manifest, ctx) {
             }
             seen.add(id);
         }
-        if (routeOwners.has(route)) {
+        const owner = `${page.identity.locale}:${page.identity.pageKey}`;
+        if (routing.strategy === 'none' || routing.strategy === 'domain') {
+            routeOwners.set(route, owner);
+        } else if (routeOwners.has(route)) {
             diagnostics.push({
                 code: DIAG.ROUTE_DUPLICATE,
                 severity: 'error',
@@ -69,7 +79,7 @@ export function enrichDocumentContent(manifest, ctx) {
                 path: page.sourcePath,
             });
         } else {
-            routeOwners.set(route, `${page.identity.locale}:${page.identity.pageKey}`);
+            routeOwners.set(route, owner);
         }
         page.route = route;
         page.anchors = anchors;
