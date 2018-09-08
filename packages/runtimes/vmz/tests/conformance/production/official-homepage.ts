@@ -454,12 +454,20 @@ let docsDetail = '';
         docsOk = true;
     }
     if (docsOk) {
-        const en = path.join(docProject, 'dist/documents/en-us/index.html');
-        const zh = path.join(docProject, 'dist/documents/zh-hans/index.html');
+        const enCandidates = [
+            path.join(docProject, 'dist/documents/docs/en-us/index.html'),
+            path.join(docProject, 'dist/documents/en-us/index.html'),
+        ];
+        const zhCandidates = [
+            path.join(docProject, 'dist/documents/docs/zh-hans/index.html'),
+            path.join(docProject, 'dist/documents/zh-hans/index.html'),
+        ];
+        const en = enCandidates.find((p) => fs.existsSync(p));
+        const zh = zhCandidates.find((p) => fs.existsSync(p));
         const evidence = path.join(docProject, 'documents/en-us/guide/evidence.md');
-        if (!fs.existsSync(en) || !fs.existsSync(zh)) {
+        if (!en || !zh) {
             docsOk = false;
-            docsDetail = 'missing locale HTML under dist/documents';
+            docsDetail = 'missing locale HTML under dist/documents (expected docs/<locale>/index.html)';
         } else if (!fs.existsSync(evidence) || !fs.readFileSync(evidence, 'utf8').includes('vmz-api:')) {
             docsOk = false;
             docsDetail = 'evidence.md missing vmz-api source evidence';

@@ -162,7 +162,8 @@ function ingestCandidate(absDist, rel, rewrites, objects, opts) {
     } else {
         const existing = sha256Hex(fs.readFileSync(dest));
         if (existing !== digest) {
-            throw new Error(`content-address collision at ${assetRel}`);
+            // Stale assets/ from a prior partial build can reuse hash filenames with different bytes.
+            fs.writeFileSync(dest, buf);
         }
     }
     objects.push({

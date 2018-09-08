@@ -274,6 +274,9 @@ writeProof(proof, root);
 console.log('static-delivery: homepage @vmz/ui static assemble…');
 const homepage = path.join(root, 'packages/homepage');
 const homepageDist = path.join(homepage, 'dist-static-conformance');
+if (fs.existsSync(homepageDist)) {
+    fs.rmSync(homepageDist, { recursive: true, force: true });
+}
 const hpBuild = spawnSync(
     process.execPath,
     [vmzBin(root), 'build', homepage, '--release', '--profile', 'static', '--origin', ORIGIN, '--out-dir', homepageDist],

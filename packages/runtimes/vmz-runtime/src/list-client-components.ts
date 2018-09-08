@@ -46,6 +46,7 @@ export async function listClientComponents(dir, opts = {}) {
                 entry: e.entry,
                 source: e.source,
             })),
+            { strict },
         ).map((e) => ({
             name: e.name,
             entry: e.entry,
@@ -89,6 +90,7 @@ export function listClientComponentsSync(dir, opts = {}) {
                 entry: e.entry,
                 source: e.source,
             })),
+            { strict },
         ).map((e) => ({
             name: e.name,
             entry: e.entry,
