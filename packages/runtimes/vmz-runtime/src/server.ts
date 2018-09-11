@@ -746,9 +746,15 @@ async function sendHtmlStream(res, status, source, signal) {
  * @param {string} type
  */
 function sendBytes(res, status, body, type) {
-    res.writeHead(status, {
+    /** @type {Record<string, string | number>} */
+    const headers = {
         'content-type': type,
         'content-length': body.byteLength,
-    });
+    };
+    // Dev: stylesheets are rebuilt in-place — never cache @import siblings (VMZ-8).
+    if (process.env.VMZ_DEV === '1' && typeof type === 'string' && type.startsWith('text/css')) {
+        headers['cache-control'] = 'no-store';
+    }
+    res.writeHead(status, headers);
     res.end(body);
 }

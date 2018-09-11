@@ -203,6 +203,27 @@ export function collectDevWatchRoots(opts) {
 }
 
 /**
+ * Classify which watch bucket a root belongs to.
+ * @param {string} root
+ * @param {{
+ *   src: string,
+ *   docsRoot: string,
+ *   localesRoot: string,
+ *   designsRoot: string,
+ *   dependencyRoots: string[],
+ * }} ctx
+ * @returns {'src' | 'locales' | 'docs' | 'designs' | 'dep' | 'other'}
+ */
+export function classifyWatchRoot(root, ctx) {
+    if (root === ctx.src) return 'src';
+    if (root === ctx.localesRoot) return 'locales';
+    if (root === ctx.docsRoot) return 'docs';
+    if (root === ctx.designsRoot) return 'designs';
+    if ((ctx.dependencyRoots || []).includes(root)) return 'dep';
+    return 'other';
+}
+
+/**
  * Classify whether a changed file lives under a dependency watch root (not app src).
  * @param {string} file
  * @param {string[]} dependencyRoots

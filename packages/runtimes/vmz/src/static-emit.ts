@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createRenderHost } from '@vmz/core/render-host';
+import { resolveRouteLayoutChain } from '@vmz/core/route-layout-chain';
 import { listClientComponentsSync } from '@vmz/core/component-registry';
 import { emitCdnPolicy } from './cdn-policy.js';
 import { emitContentAddressedAssets } from './content-addressed-assets.js';
@@ -110,7 +111,7 @@ export async function emitWebStatic(distDir, opts = {}) {
         }
 
         const meta = await resolvePageMeta(Page, { params, props, pathname: pattern, origin });
-        const layoutChain = resolveLayoutChain(distDir, page.chunkId);
+        const layoutChain = resolveRouteLayoutChain(distDir, page.chunkId);
         await host.ensureComponents([page.chunkId, ...layoutChain]);
         let bodyHtml = '';
         for await (const chunk of renderToStream(Page, props, {})) {
@@ -367,24 +368,6 @@ async function loadCtor(distDir, chunkId) {
     const href = pathToFileURL(path.join(distDir, `${chunkId}.client.js`)).href;
     const mod = await import(`${href}?t=${Date.now()}`);
     return mod.default;
-}
-
-/**
- * @param {string} distDir
- * @param {string} pageChunkId
- */
-function resolveLayoutChain(distDir, pageChunkId) {
-    const rel = pageChunkId.replace(/^pages\//, '');
-    const parts = rel.split('/').filter(Boolean);
-    parts.pop();
-    /** @type {string[]} */
-    const chain = [];
-    for (let i = parts.length; i >= 0; i--) {
-        const dirParts = parts.slice(0, i);
-        const layoutChunk = ['pages', ...dirParts, 'Layout'].join('/');
-        if (fs.existsSync(path.join(distDir, `${layoutChunk}.client.js`))) chain.unshift(layoutChunk);
-    }
-    return chain;
 }
 
 /**

@@ -272,6 +272,9 @@ try {
     if (!shop.body.includes('data-vmz-layout') || !shop.body.includes('shop/Layout')) {
         errors.push(`GET /shop missing data-vmz-layout: ${shop.body.slice(0, 300)}`);
     }
+    if (!shop.body.includes('Application') || !shop.body.includes('application-shell')) {
+        errors.push(`GET /shop missing Application shell SSR wrap: ${shop.body.slice(0, 400)}`);
+    }
     if (offer.status !== 200 || !offer.body.includes('layout-shop') || !offer.body.includes('route-shop-offer')) {
         errors.push(`GET /shop/offer want layout+offer, got ${offer.status} ${offer.body.slice(0, 400)}`);
     }
@@ -510,8 +513,8 @@ async function proveSpaLayoutRetention(shopUrl: string): Promise<string> {
             if (!Array.isArray(layouts) || layouts.length < 1) {
                 return { ok: false, reason: 'missing __vmzLayoutInsts after hydrateRoute' };
             }
-            const layout = layouts[0];
-            if (typeof layout.bump !== 'function') {
+            const layout = layouts.find((l: { bump?: () => void }) => typeof l?.bump === 'function');
+            if (!layout || typeof layout.bump !== 'function') {
                 return { ok: false, reason: 'ShopLayout.bump missing' };
             }
             layout.bump();
@@ -540,12 +543,15 @@ async function proveSpaLayoutRetention(shopUrl: string): Promise<string> {
         const after = await page.evaluate(() => {
             const root = document.getElementById('app') as any;
             const layouts = root && root.__vmzLayoutInsts;
+            const shopLayout = Array.isArray(layouts)
+                ? layouts.find((l: { bump?: () => void }) => typeof l?.bump === 'function')
+                : null;
             const last = (window as any).__vmzLastClientNav || {};
             return {
                 path: location.pathname,
                 boot: (window as any).__vmzBootId,
                 retained: !!last.retainedLayout,
-                ticks: Array.isArray(layouts) && layouts[0] ? layouts[0].ticks : null,
+                ticks: shopLayout ? shopLayout.ticks : null,
                 text: document.body.innerText,
                 layoutAttr: root ? root.getAttribute('data-vmz-layout') : null,
             };
@@ -564,6 +570,9 @@ async function proveSpaLayoutRetention(shopUrl: string): Promise<string> {
         }
         if (!String(after.layoutAttr || '').includes('shop/Layout')) {
             throw new Error(`data-vmz-layout missing after retention: ${after.layoutAttr}`);
+        }
+        if (!String(after.layoutAttr || '').includes('Application')) {
+            throw new Error(`data-vmz-layout missing Application shell: ${after.layoutAttr}`);
         }
 
         return 'SPA same-layout nav retains Layout ticks (shop→offer, retainedLayout=true)';

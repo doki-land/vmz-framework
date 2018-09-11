@@ -659,6 +659,7 @@ fn emit_runtime_js(options: &CompileOptions, report: &mut CompileReport) -> crat
             ("list-client-components.js", "list-client-components.js"),
             ("deployment-registry.js", "deployment-registry.js"),
             ("render-host.js", "render-host.js"),
+            ("route-layout-chain.js", "route-layout-chain.js"),
         ]);
     }
     for (src_name, out_name) in copies {

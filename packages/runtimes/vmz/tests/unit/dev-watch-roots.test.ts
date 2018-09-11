@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { expect } from '../../../../../scripts/test/expect.mjs';
-import { coalesceRootBurst, collectDevWatchRoots, mergeDirtySets } from '../../src/dev-watch-roots.ts';
+import { coalesceRootBurst, collectDevWatchRoots, classifyWatchRoot, mergeDirtySets } from '../../src/dev-watch-roots.ts';
 import { fileFingerprintMap } from '../../src/watch-diff.ts';
 
 describe('dev-watch coalesce + roots (v0.1.5)', () => {
@@ -116,5 +116,21 @@ describe('dev-watch coalesce + roots (v0.1.5)', () => {
         expect(watched.applicationRoots.some((r) => path.resolve(r) === path.resolve(path.join(app, 'src')))).toBe(true);
 
         fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it('classifyWatchRoot routes designs/ to designs bucket (VMZ-8)', () => {
+        const project = '/tmp/app';
+        const ctx = {
+            src: path.join(project, 'src'),
+            docsRoot: path.join(project, 'documents'),
+            localesRoot: path.join(project, 'locales'),
+            designsRoot: path.join(project, 'designs'),
+            dependencyRoots: [path.join(project, 'node_modules', '@pkg', 'ui', 'src')],
+        };
+        expect(classifyWatchRoot(ctx.designsRoot, ctx)).toBe('designs');
+        expect(classifyWatchRoot(ctx.src, ctx)).toBe('src');
+        expect(classifyWatchRoot(ctx.docsRoot, ctx)).toBe('docs');
+        expect(classifyWatchRoot(ctx.dependencyRoots[0], ctx)).toBe('dep');
+        expect(classifyWatchRoot(path.join(project, 'other'), ctx)).toBe('other');
     });
 });

@@ -1,5 +1,7 @@
 <template>
-  <slot />
+  <div class="app-shell" data-vmz-fixture="application-shell">
+    <slot />
+  </div>
 </template>
 
 <script client>

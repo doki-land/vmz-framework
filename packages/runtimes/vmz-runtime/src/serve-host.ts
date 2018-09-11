@@ -25,6 +25,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRenderHost } from './render-host.js';
 import { listClientComponents } from './list-client-components.js';
+import { resolveRouteLayoutChain } from './route-layout-chain.js';
 import { handleNodeRequest, setRoutes, setServerModuleResolver } from './vmz-runtime.js';
 
 const require = createRequire(import.meta.url);
@@ -86,6 +87,8 @@ let pageCatalog = [];
 const pageCtors = new Map();
 /** Stylesheet from deployment `cssEntry` (e.g. vmz.css). */
 let cssEntry = null;
+/** Fingerprint of style inputs — busts `@import` siblings when tokens change (VMZ-8). */
+let styleBundleHash = null;
 /** @type {{ defaultThemeId: string, themeIds: string[], activationAttr: string, contentHash: string|null } | null} */
 let styleTheme = null;
 /** Locale route realization artifact from `_vmz/locale-route-realization.json` (optional). */
@@ -287,7 +290,7 @@ async function renderPageStream(pathname, opts = {}) {
     const resumeEntries = await loadPageResumeEntries(distDir, match.chunkId);
     const strategies = resumeEntries.map((e) => e.strategy);
     const eventOnlyShell = isEventOnlyShell(strategies);
-    const layoutChain = resolveLayoutChain(match.chunkId);
+    const layoutChain = resolveRouteLayoutChain(distDir, match.chunkId);
     return {
         status,
         stream: emitPageHtml(Page, match.chunkId, eventOnlyShell, props, opts, layoutChain, localeCtx),
@@ -547,7 +550,7 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
         throw new Error('vmz native addon missing generatePageShell — rebuild with `pnpm napi:build`');
     }
     const entrySrc = `/${eventOnlyShell ? 'entry-event.js' : 'entry-client.js'}?t=${reloadToken}`;
-    const cssHref = cssEntry ? `${String(cssEntry).replace(/^\/+/, '')}?t=${reloadToken}` : undefined;
+    const cssHref = cssEntryWithBust(cssEntry);
     yield native.generatePageShell({
         bodyHtml,
         chunkId,
@@ -767,6 +770,7 @@ async function softReload(opts = {}) {
         const resumeEntries = await loadPageResumeEntries(distDir, indexChunk);
         const styleMeta = await loadDeploymentStyle(distDir);
         cssEntry = styleMeta.cssEntry;
+        styleBundleHash = styleMeta.styleBundleHash;
         styleTheme = styleMeta.styleTheme;
         const lazyEventNames = resumeEntries
             .filter((e) => isEventStrategy(e.strategy))
@@ -1209,30 +1213,6 @@ function isRouteBoundaryStem(stem) {
     return stem === 'Layout' || stem === 'Loading' || stem === 'Error' || stem === 'NotFound';
 }
 
-/**
- * Nearest `Layout.client.js` walking up from the page chunk (outer→inner).
- * @param {string} pageChunkId
- * @returns {string[]}
- */
-function resolveLayoutChain(pageChunkId) {
-    const rel = pageChunkId.replace(/^pages\//, '');
-    const parts = rel.split('/').filter(Boolean);
-    parts.pop(); // page stem
-    /** @type {string[]} */
-    const chain = [];
-    for (let i = parts.length; i >= 0; i--) {
-        const dirParts = parts.slice(0, i);
-        const layoutChunk = ['pages', ...dirParts, 'Layout'].join('/');
-        const abs = path.join(distDir, `${layoutChunk}.client.js`);
-        try {
-            // sync existence — layouts are compile artifacts next to pages
-            if (existsSync(abs)) chain.unshift(layoutChunk);
-        } catch {
-            /* ignore */
-        }
-    }
-    return chain;
-}
 
 /**
  * @param {string} pathname
@@ -1443,6 +1423,19 @@ function requireNativeGenerator() {
 const THEME_STORE_KEY = 'vmz-theme';
 /** Host preference key for `routing.strategy: 'none'` (cookie + localStorage). */
 const LOCALE_STORE_KEY = 'vmz.locale';
+
+/**
+ * Cache-bust stylesheet entry for dev reload (token + serve revision).
+ * @param {string | null | undefined} entry
+ */
+function cssEntryWithBust(entry) {
+    if (!entry) return undefined;
+    const base = String(entry).replace(/^\/+/, '');
+    const params = new URLSearchParams();
+    params.set('t', String(reloadToken));
+    if (styleBundleHash) params.set('h', styleBundleHash);
+    return `${base}?${params.toString()}`;
+}
 
 /**
  * @param {string} dir

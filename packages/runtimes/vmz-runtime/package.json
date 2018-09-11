@@ -36,6 +36,10 @@
         "./render-host": {
             "types": "./dist/render-host.d.ts",
             "default": "./dist/render-host.js"
+        },
+        "./route-layout-chain": {
+            "types": "./dist/route-layout-chain.d.ts",
+            "default": "./dist/route-layout-chain.js"
         }
     },
     "files": [

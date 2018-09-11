@@ -18,7 +18,7 @@ import { buildIntegratedDocuments, projectHasDocuments } from './document-integr
 import { createWorkspace, resolveNativePath } from './index.js';
 import { emitLocaleRuntimeModules, localeHasErrors } from './locale-check.js';
 import { log } from './log.js';
-import { coalesceRootBurst, collectDevWatchRoots, isDependencyPath, mergeDirtySets } from './dev-watch-roots.js';
+import { coalesceRootBurst, collectDevWatchRoots, classifyWatchRoot, isDependencyPath, mergeDirtySets } from './dev-watch-roots.js';
 import { diffFingerprints, fileFingerprintMap } from './watch-diff.js';
 
 /**
@@ -199,6 +199,7 @@ export function createDevSession(options) {
         }
         const docsRoot = path.join(project, 'documents');
         const localesRoot = path.join(project, 'locales');
+        const designsRoot = path.join(project, 'designs');
         const watched = collectDevWatchRoots({ project, outDir });
         /** @type {string[]} */
         const watchRoots = [...watched.roots];
@@ -229,32 +230,40 @@ export function createDevSession(options) {
          * Scan all watch roots into a batch. Does not update fingerprints.
          */
         function scanBatch() {
-            /** @type {{ srcChanged: string[], srcDeleted: string[], depChanged: string[], depDeleted: string[], docsDirty: boolean, localesDirty: boolean }} */
+            /** @type {{ srcChanged: string[], srcDeleted: string[], depChanged: string[], depDeleted: string[], designsChanged: string[], designsDeleted: string[], docsDirty: boolean, localesDirty: boolean, designsDirty: boolean }} */
             const batch = {
                 srcChanged: [],
                 srcDeleted: [],
                 depChanged: [],
                 depDeleted: [],
+                designsChanged: [],
+                designsDeleted: [],
                 docsDirty: false,
                 localesDirty: false,
+                designsDirty: false,
             };
+            const watchCtx = { src, docsRoot, localesRoot, designsRoot, dependencyRoots };
             for (const root of watchRoots) {
                 const prev = fingerprints.get(root) || new Map();
                 const next = fileFingerprintMap(root);
                 const diff = diffFingerprints(prev, next);
                 if (!diff.changed.length && !diff.deleted.length) continue;
-                if (root === src) {
+                const kind = classifyWatchRoot(root, watchCtx);
+                if (kind === 'src') {
                     batch.srcChanged.push(...diff.changed);
                     batch.srcDeleted.push(...diff.deleted);
-                } else if (root === localesRoot) {
+                } else if (kind === 'locales') {
                     batch.localesDirty = true;
-                } else if (root === docsRoot) {
+                } else if (kind === 'docs') {
                     batch.docsDirty = true;
-                } else if (dependencyRoots.includes(root)) {
+                } else if (kind === 'designs') {
+                    batch.designsDirty = true;
+                    batch.designsChanged.push(...diff.changed);
+                    batch.designsDeleted.push(...diff.deleted);
+                } else if (kind === 'dep') {
                     batch.depChanged.push(...diff.changed);
                     batch.depDeleted.push(...diff.deleted);
                 } else {
-                    // designs or other application roots → treat like docs (full reload)
                     batch.docsDirty = true;
                 }
             }
@@ -288,7 +297,8 @@ export function createDevSession(options) {
                 }
                 const srcDirty = batch.srcChanged.length + batch.srcDeleted.length;
                 const depDirty = batch.depChanged.length + batch.depDeleted.length;
-                if (!srcDirty && !depDirty && !batch.docsDirty && !batch.localesDirty) continue;
+                const designsDirty = batch.designsDirty || batch.designsChanged.length + batch.designsDeleted.length;
+                if (!srcDirty && !depDirty && !batch.docsDirty && !batch.localesDirty && !designsDirty) continue;
 
                 // Coalesce multi-file bursts without dropping the initial dirty set.
                 if (srcDirty > 1) {
@@ -343,6 +353,13 @@ export function createDevSession(options) {
                     batch.depDeleted = depMerged.deleted;
                     batch.docsDirty = batch.docsDirty || residual.docsDirty;
                     batch.localesDirty = batch.localesDirty || residual.localesDirty;
+                    batch.designsDirty = batch.designsDirty || residual.designsDirty;
+                    const designsMerged = mergeDirtySets(
+                        { changed: batch.designsChanged, deleted: batch.designsDeleted },
+                        { changed: residual.designsChanged, deleted: residual.designsDeleted },
+                    );
+                    batch.designsChanged = designsMerged.changed;
+                    batch.designsDeleted = designsMerged.deleted;
                 }
 
                 commitFingerprints();
@@ -353,7 +370,8 @@ export function createDevSession(options) {
                     !batch.depChanged.length &&
                     !batch.depDeleted.length &&
                     !batch.docsDirty &&
-                    !batch.localesDirty
+                    !batch.localesDirty &&
+                    !(batch.designsDirty || batch.designsChanged.length || batch.designsDeleted.length)
                 ) {
                     continue;
                 }
@@ -397,7 +415,7 @@ export function createDevSession(options) {
                     continue;
                 }
 
-                let needFullReload = batch.docsDirty;
+                let needFullReload = batch.docsDirty || batch.designsDirty;
                 if (batch.srcChanged.length || batch.srcDeleted.length) {
                     log.info(`change detected (${batch.srcChanged.length} update, ${batch.srcDeleted.length} delete) — affected rebuild…`);
                     const changes = [
@@ -439,6 +457,38 @@ export function createDevSession(options) {
                                 ? 'soft reload ok (island HMR)'
                                 : 'soft reload ok',
                     );
+                    continue;
+                }
+
+                if (batch.designsChanged.length || batch.designsDeleted.length || batch.designsDirty) {
+                    log.info(
+                        `designs change detected (${batch.designsChanged.length} update, ${batch.designsDeleted.length} delete) — rebuilding styles…`,
+                    );
+                    const changes = [
+                        ...batch.designsChanged.map((p) => ({ path: p, kind: /** @type {'update'} */ ('update') })),
+                        ...batch.designsDeleted.map((p) => ({ path: p, kind: /** @type {'delete'} */ ('delete') })),
+                    ];
+                    const report = rebuild(changes.length ? changes : undefined);
+                    if (!printReport(report, 'rebuild')) {
+                        log.warn('designs rebuild failed — keeping previous styles');
+                        continue;
+                    }
+                    if (batch.docsDirty || projectHasDocuments(project)) {
+                        const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
+                        if (!docs.ok) log.warn('document mount rebuild failed — keeping previous docs');
+                    }
+                    if (wechatPreview) {
+                        if (!packWechatPreview()) log.warn('wechat pack failed — keeping previous dist/wechat');
+                        continue;
+                    }
+                    const kind = await reloadAfterBuild({
+                        affectedChunks: report.affectedChunks ?? [],
+                        seedChunks: report.seedChunks ?? [],
+                        emitted: report.emitted ?? [],
+                        full: true,
+                        islandHmr: false,
+                    });
+                    log.info(kind === 'respawn' ? 'reload ok (respawned; designs)' : 'soft reload ok (full page; designs)');
                     continue;
                 }
 

@@ -135,6 +135,29 @@ if (fs.statSync(path.join(dist, 'vmz-designs.css')).mtimeMs !== mtime1) {
     fail('vmz-designs.css rewritten despite unchanged fingerprint');
 }
 
+console.log('style-theme: token JSON change rebuilds designs CSS…');
+{
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-style-token-'));
+    copyProject(example, tmp);
+    const tokensPath = path.join(tmp, 'designs', 'tokens', 'colors-spacing.json');
+    const tokens = JSON.parse(fs.readFileSync(tokensPath, 'utf8'));
+    const first = runBuild(tmp);
+    if (first.status !== 0) fail(`token baseline build failed\n${first.out}`);
+    const dep1 = JSON.parse(fs.readFileSync(path.join(tmp, 'dist', 'vmz-deployment.json'), 'utf8'));
+    const hashBefore = dep1.styleBundleHash;
+    const cssBefore = fs.readFileSync(path.join(tmp, 'dist', 'vmz-designs.css'), 'utf8');
+    tokens.colors['watch-probe'] = '#aabbcc';
+    fs.writeFileSync(tokensPath, `${JSON.stringify(tokens, null, 4)}\n`, 'utf8');
+    const second = runBuild(tmp);
+    if (second.status !== 0) fail(`token rebuild failed\n${second.out}`);
+    const dep2 = JSON.parse(fs.readFileSync(path.join(tmp, 'dist', 'vmz-deployment.json'), 'utf8'));
+    if (dep2.styleBundleHash === hashBefore) fail('styleBundleHash must change when designs/tokens change');
+    const cssAfter = fs.readFileSync(path.join(tmp, 'dist', 'vmz-designs.css'), 'utf8');
+    if (cssAfter === cssBefore) fail('vmz-designs.css must change when designs/tokens change');
+    if (!cssAfter.includes('--vmz-colors-watch-probe')) fail('token CSS var missing after rebuild');
+    fs.rmSync(tmp, { recursive: true, force: true });
+}
+
 console.log('style-theme: unknown var fixture…');
 {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-style-var-'));

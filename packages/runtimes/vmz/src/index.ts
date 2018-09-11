@@ -641,6 +641,7 @@ export const SERVE_HOST_RUNTIME_FILES = [
     ['list-client-components.js', 'list-client-components.js'],
     ['deployment-registry.js', 'deployment-registry.js'],
     ['render-host.js', 'render-host.js'],
+    ['route-layout-chain.js', 'route-layout-chain.js'],
 ];
 
 /**
