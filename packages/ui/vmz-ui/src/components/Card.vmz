@@ -63,6 +63,11 @@
     gap: var(--vmz-density-control-gap);
   }
 
+  /* Direct hosts wrapping inline chips (Badge) must not introduce a block box (VMZ-10). */
+  .vmz-ui-card__body > [data-vmz]:has(> .vmz-ui-badge) {
+    display: contents;
+  }
+
   :where([data-density='compact']) .vmz-ui-card__body {
     gap: var(--vmz-density-compact-gap);
   }

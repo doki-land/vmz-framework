@@ -16,6 +16,56 @@ pub fn is_event_attr(name: &str) -> bool {
     bytes.len() >= 3 && bytes[..2].eq_ignore_ascii_case(b"on") && bytes[2].is_ascii_uppercase()
 }
 
+/// Wrap bare `methodName` / `this.methodName` handlers as `(ev) => this.method(ev)`.
+pub fn wrap_event_handler_body(body: &str) -> String {
+    let body = body.trim();
+    if let Some(method) = parse_this_method_call_arrow(body) {
+        return format!("(ev) => this.{method}(ev)");
+    }
+    let bare = body.strip_prefix("this.").unwrap_or(body);
+    let is_method_ref = !bare.is_empty()
+        && bare.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
+        && !bare.contains('(');
+    if is_method_ref {
+        return format!("(ev) => this.{bare}(ev)");
+    }
+    body.to_string()
+}
+
+/// `() => this.foo()` / `(ev) => this.foo(ev)` → `Some("foo")`.
+pub fn parse_this_method_call_arrow(body: &str) -> Option<String> {
+    let b = body.trim();
+    let after_arrow = if let Some(rest) = b.strip_prefix("()") {
+        rest
+    } else {
+        let i = b.find("=>")?;
+        if b.as_bytes().first() == Some(&b'(') {
+            &b[i..]
+        } else {
+            return None;
+        }
+    };
+    let after_arrow = after_arrow.trim().strip_prefix("=>")?.trim();
+    let rest = after_arrow.strip_prefix("this.")?;
+    let (name, after_name) = rest.split_once('(')?;
+    if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$') {
+        return None;
+    }
+    let after_name = after_name.trim();
+    let close = after_name.find(')')?;
+    let args = after_name[..close].trim();
+    let trail = after_name[close + 1..].trim();
+    if !trail.is_empty() && trail != ";" {
+        return None;
+    }
+    if !args.is_empty()
+        && !args.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
+    {
+        return None;
+    }
+    Some(name.to_string())
+}
+
 /// DOM event type from `onClick` / `@click` / `@click.stop` / `on:click`.
 pub fn event_dom_type(name: &str) -> String {
     let raw = if let Some(rest) = name.strip_prefix('@') {

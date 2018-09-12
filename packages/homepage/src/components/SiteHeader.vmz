@@ -110,8 +110,23 @@ export default class SiteHeader {
   async switchLocale(to) {
     if (typeof window === 'undefined') return;
     const fn = window.__vmzTransitionLocale;
-    if (typeof fn !== 'function') return;
+    if (typeof fn !== 'function') {
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('[vmz] locale switch skipped: __vmzTransitionLocale missing (dev host not bootstrapped?)');
+      }
+      if (window) {
+        window.__vmzLastLocaleTransition = {
+          status: 'rejected',
+          toLocale: to,
+          reason: 'missing_host',
+        };
+      }
+      return;
+    }
     const r = await fn(to);
+    if (r && r.status !== 'committed' && typeof console !== 'undefined' && console.warn) {
+      console.warn('[vmz] locale transition not committed:', r.status, r.reason || '');
+    }
     if (r && r.status === 'committed') {
       this.applyLocaleCopy(to);
       // Soft nav may settle a tick later; re-sync after paint.

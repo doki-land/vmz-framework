@@ -11,7 +11,8 @@ use super::ast_util::{js_string_literal, print_one_stmt};
 use super::emit_ir::IrDepCursor;
 use super::helpers::{
     bind_field_idents, collect_deps_oxc, event_dom_type, is_event_attr, is_html_attr,
-    looks_like_ternary, sanitize_interp, split_ternary_parts,
+    looks_like_ternary, parse_this_method_call_arrow, sanitize_interp, split_ternary_parts,
+    wrap_event_handler_body,
 };
 use vmz_types::{BindingId, ViewAttr, ViewAttrValue, ViewEach, ViewNode, ViewStatus, ViewView};
 
@@ -396,12 +397,7 @@ fn emit_plain_element(
                     // `() => this.foo()` / `(ev) => this.foo(ev)` ? onMethod (no arrow IC).
                     stmts.push(format!("api.onMethod({el}, {}, {});", q(&type_name), q(&method)));
                 } else {
-                    let bare = body.strip_prefix("this.").unwrap_or(body.as_str());
-                    let is_method_ref = !bare.is_empty()
-                        && bare.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
-                        && !bare.contains('(');
-                    let handler =
-                        if is_method_ref { format!("(ev) => this.{bare}(ev)") } else { body };
+                    let handler = wrap_event_handler_body(&body);
                     stmts.push(format!("api.on({el}, {}, {handler});", q(&type_name)));
                 }
             }
@@ -447,7 +443,7 @@ fn emit_component(
             ViewAttrValue::Static { value: s } => q(s),
             ViewAttrValue::Bare => "true".to_string(),
             ViewAttrValue::Interp { expr: e } if is_event_attr(&a.name) => {
-                bind_field_idents(e, fields, scope, aliases)
+                wrap_event_handler_body(&bind_field_idents(e, fields, scope, aliases))
             }
             // Always rewrite bare field idents for complex interps (not a single field root).
             ViewAttrValue::Interp { expr: e } => bind_field_idents(e, fields, scope, aliases),
@@ -701,41 +697,3 @@ fn bind_payload(
     (id, deps, None)
 }
 
-/// `() => this.foo()` / `(ev) => this.foo()` / `(ev) => this.foo(ev)` ? `Some("foo")`.
-fn parse_this_method_call_arrow(body: &str) -> Option<String> {
-    let b = body.trim();
-    // Strip optional arrow params: () => | (ev) => | (_event) =>
-    let after_arrow = if let Some(rest) = b.strip_prefix("()") {
-        rest
-    } else {
-        let i = b.find("=>")?;
-        // (ev) => ...
-        if b.as_bytes().first() == Some(&b'(') {
-            &b[i..]
-        } else {
-            return None;
-        }
-    };
-    let after_arrow = after_arrow.trim().strip_prefix("=>")?.trim();
-    // this.foo() or this.foo(ev) -- single call expression
-    let rest = after_arrow.strip_prefix("this.")?;
-    let (name, after_name) = rest.split_once('(')?;
-    if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$') {
-        return None;
-    }
-    // Must be a call that closes; allow optional single arg (the event).
-    let after_name = after_name.trim();
-    let close = after_name.find(')')?;
-    let args = after_name[..close].trim();
-    let trail = after_name[close + 1..].trim();
-    if !trail.is_empty() && trail != ";" {
-        return None;
-    }
-    if !args.is_empty() {
-        // Only allow a simple identifier arg (ev).
-        if !args.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$') {
-            return None;
-        }
-    }
-    Some(name.to_string())
-}

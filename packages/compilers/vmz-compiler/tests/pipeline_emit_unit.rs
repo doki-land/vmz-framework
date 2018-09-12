@@ -222,6 +222,22 @@ export default class IndexPage {
 }
 
 #[test]
+fn wraps_bare_method_ref_on_component_event_prop() {
+    let src = r#"
+export default class Page {
+  onSelect(_id) {}
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let ir = parse_template(r#"<Select onChange={onSelect} />"#);
+    let js = emit_client_js(src, &client, &ir, None).unwrap();
+    assert!(
+        js.contains(r#""onChange": (ev) => this.onSelect(ev)"#),
+        "{js}"
+    );
+}
+
+#[test]
 fn emits_client_idle_directive() {
     let src = "export default class IndexPage { title = 'x'; }";
     let client = analyze_script(ScriptKind::Client, src);

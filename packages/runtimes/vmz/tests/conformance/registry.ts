@@ -163,6 +163,7 @@ export const CHECKS: Record<string, CheckEntry> = {
     'locale-routing': { file: 'locale/locale-routing.ts', pre: ['build:protocol-vmz'] },
     'locale-ssr': { file: 'locale/locale-ssr.ts', pre: ['build:protocol-vmz'] },
     'locale-host': { file: 'locale/locale-host.ts', pre: ['build:protocol-vmz'] },
+    'locale-transition': { file: 'locale/locale-transition.ts', pre: ['build:runtimes'] },
     'locale-none': {
         file: 'locale/locale-none.ts',
         description: 'routing.strategy none Host preference + SSR negotiate + prefix cookie regression (v0.1.8)',
@@ -357,6 +358,7 @@ export const CHECK_ALL = [
     'locale-layout',
     'locale-messages',
     'locale-routing',
+    'locale-transition',
     'locale-ssr',
     'locale-host',
     'locale-none',

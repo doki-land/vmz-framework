@@ -98,6 +98,8 @@ describe('locale none host transition (v0.1.8)', () => {
             expect(rejected.status).toBe('rejected');
             expect(rejected.reason).toBe('unsupported');
             expect(doc.documentElement.getAttribute('data-locale')).toBe('zh-hans');
+            expect(win.__vmzLastLocaleTransition?.status).toBe('rejected');
+            expect(win.__vmzLastLocaleTransition?.reason).toBe('unsupported');
         } finally {
             if (prevLS === undefined) delete globalThis.localStorage;
             else globalThis.localStorage = prevLS;

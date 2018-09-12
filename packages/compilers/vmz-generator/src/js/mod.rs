@@ -23,6 +23,7 @@ pub use emit_ir::{IrDepCursor, TakenBinding, TakenCfBranch, TakenControlFlow};
 pub use entry::{EntryComponent, emit_serve_entry_client, emit_serve_entry_event};
 pub use helpers::{
     bind_field_idents, collect_deps_oxc, event_dom_type, is_component_tag, is_event_attr,
+    parse_this_method_call_arrow, wrap_event_handler_body,
     is_html_attr, looks_like_ternary, sanitize_interp, split_ternary_parts,
 };
 pub use locale::{
