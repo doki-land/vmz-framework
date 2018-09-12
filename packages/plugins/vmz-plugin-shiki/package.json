@@ -5,24 +5,33 @@
     "type": "module",
     "description": "VMZ Shiki adapter - <Shiki> + code engine registration",
     "license": "MIT",
-    "main": "./vmz.plugin.ts",
-    "types": "./vmz.plugin.ts",
+    "main": "./dist/vmz.plugin.js",
+    "types": "./dist/vmz.plugin.d.ts",
     "exports": {
         ".": {
-            "types": "./vmz.plugin.ts",
-            "default": "./vmz.plugin.ts"
+            "types": "./dist/vmz.plugin.d.ts",
+            "default": "./dist/vmz.plugin.js"
         },
         "./runtime": {
-            "types": "./runtime.ts",
-            "default": "./runtime.ts"
+            "types": "./dist/runtime.d.ts",
+            "default": "./dist/runtime.js"
         }
+    },
+    "files": [
+        "dist",
+        "components",
+        "README.md"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json",
+        "prepack": "pnpm run build"
     },
     "dependencies": {
         "@vmz/plugin": "workspace:*"
     },
     "peerDependencies": {
         "shiki": ">=3",
-        "vmz-textmate": "workspace:*"
+        "vmz-textmate": "*"
     },
     "peerDependenciesMeta": {
         "shiki": {
@@ -31,6 +40,12 @@
         "vmz-textmate": {
             "optional": true
         }
+    },
+    "devDependencies": {
+        "@types/node": "^22.15.0",
+        "shiki": "^3.12.2",
+        "typescript": "^5.8.3",
+        "vmz-textmate": "workspace:*"
     },
     "keywords": [
         "vmz",

@@ -22,6 +22,7 @@ const resolveHook = pathToFileURL(path.join(root, 'scripts/test/resolve-ts-from-
 
 const PRESETS: Record<string, [string, string[]]> = {
     'build:runtimes': ['pnpm', ['build:runtimes']],
+    'build:plugin-shiki': ['pnpm', ['--filter', '@vmz/plugin-shiki', 'run', 'build']],
     'build:vmz-test': ['pnpm', ['build:vmz-test']],
     'build:protocol-vmz': ['pnpm', ['--filter', '@vmz/protocol', '--filter', 'vmz', 'run', 'build']],
 };

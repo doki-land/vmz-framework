@@ -9,7 +9,7 @@ import { describe, it } from 'node:test';
 import { expect } from '../../../../../scripts/test/expect.mjs';
 import { PLUGIN_PROTOCOL, applyPlugins, contentHash, createWorkspace, defineConfig, definePlugin, loadVmzConfig } from 'vmz';
 import katexPlugin from '@vmz/plugin-katex';
-import shikiPlugin from '@vmz/plugin-shiki';
+import shiki from '@vmz/plugin-shiki';
 import conformance from 'vmz-plugin-conformance';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -128,7 +128,7 @@ export default definePlugin({
         );
         const outDir = path.join(dir, 'dist');
         const ws = createWorkspace({ root: dir, outDir });
-        const reports = await applyPlugins(ws, [katexPlugin, shikiPlugin], {
+        const reports = await applyPlugins(ws, [katexPlugin, shiki()], {
             project: dir,
             outDir,
             engines: { math: 'katex', code: 'shiki' },

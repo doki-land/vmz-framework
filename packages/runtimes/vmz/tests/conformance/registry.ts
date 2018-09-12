@@ -31,6 +31,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'Plugin contribution protocol',
         pre: ['build:runtimes'],
     },
+    'plugin-shiki': {
+        file: 'toolchain/plugin-shiki.ts',
+        description: 'Shiki plugin textmate peer + published runtime',
+        pre: ['build:plugin-shiki'],
+    },
     affected: { file: 'toolchain/affected.ts', description: 'Affected rebuild' },
 
     // tooling/
@@ -304,6 +309,7 @@ export const CHECK_ALL = [
     'program-ir',
     'node-cli',
     'plugin',
+    'plugin-shiki',
     'affected',
     'protocol-catalog',
     'rename',

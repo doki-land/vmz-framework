@@ -22,6 +22,21 @@ It is especially useful for:
 - tutorials that move between prose and real VMZ components;
 - source browsers that need trustworthy language presentation.
 
+## Third-party TextMate grammar (VMZ-2)
+
+By default the runtime loads `vmz-textmate/shiki`. For other languages (e.g. VOS), pass a peer adapter:
+
+```ts
+import shiki from '@vmz/plugin-shiki';
+
+export default defineConfig({
+  plugins: [shiki({ textmate: '@game-gpt/vos-textmate/shiki' })],
+  engines: { code: 'shiki' },
+});
+```
+
+The plugin writes `dist/_vmz/plugin-shiki.config.json`; the runtime reads it in SSR (`VMZ_DIST`) and in the browser (`fetch`).
+
 ## VMZ boundary
 
 Shiki owns source presentation. VMZ owns document structure, SSR, optional interaction, testing, and delivery. The
