@@ -8,14 +8,7 @@ import { checkDocuments, manifestHasErrors } from './document-check.js';
 import { resolveDocumentDesignsCss } from './document-designs.js';
 import { enrichDocumentContent, pageHtmlRel } from './document-enrich.js';
 import { enrichDocumentEvidence } from './document-evidence.js';
-import {
-    docsRouteNone,
-    loadLocaleCommonMessages,
-    loadLocalesRouting,
-    localeNonePickerScript,
-    readSiteGithubUrl,
-    renderHostChromeTemplate,
-} from './document-host-chrome.js';
+import { assertIntegratedDistReady, renderCompiledDocumentLayout } from './document-layout-render.js';
 import {
     artifactHrefFromHtml,
     buildDocumentIslands,
@@ -24,13 +17,14 @@ import {
     renderIslandShellsHtml,
 } from './document-interactive.js';
 import { resolveMarkdownEngine } from './document-markdown.js';
+import { loadLocalesRouting } from './document-routing-config.js';
 import { DOCUMENT_VIEW_SCHEMA } from './document-schema.js';
 import { createWorkspace } from './index.js';
 import { requireNativeAddon } from './native-addon.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 
 /**
- * @param {{ projectRoot: string, outDir?: string, strict?: boolean, engines?: { markdown?: string } }} opts
+ * @param {{ projectRoot: string, outDir?: string, appDistDir?: string, strict?: boolean, engines?: { markdown?: string } }} opts
  */
 export async function buildDocuments(opts) {
     const projectRoot = path.resolve(opts.projectRoot);
@@ -79,8 +73,12 @@ export async function buildDocuments(opts) {
     manifest.search = search;
     manifest.islands = islands;
 
-    const hostChromeRaw = resolveHostSiteChromeRaw(projectRoot);
-    const useHostShell = Boolean(hostChromeRaw) && (manifest.mounts || []).some((m) => m.mode === 'integrated');
+    const integratedMount = (manifest.mounts || []).some((m) => m.mode === 'integrated');
+    const appDistDir = resolveAppDistDir(opts, outDir);
+    const useCompiledShell = Boolean(integratedMount && appDistDir);
+    if (integratedMount && appDistDir) {
+        assertIntegratedDistReady(appDistDir);
+    }
 
     fs.mkdirSync(outDir, { recursive: true });
     const designs = resolveDocumentDesignsCss(projectRoot);
@@ -111,6 +109,20 @@ export async function buildDocuments(opts) {
             pageKey: page.identity.pageKey,
             locale: page.identity.locale,
         });
+        const slotHtml = buildDocumentSlotHtml({
+            nav,
+            bodyHtml: info.html,
+            headings: info.headings,
+            htmlRel,
+            route: info.route,
+            routing,
+            searchShellHtml: shells.searchHtml,
+            playgroundShellHtml: shells.playgroundHtml,
+        });
+        let compiledLayoutHtml = null;
+        if (useCompiledShell) {
+            compiledLayoutHtml = await renderCompiledDocumentLayout(appDistDir, page.identity.locale, slotHtml);
+        }
         const view = {
             schema: DOCUMENT_VIEW_SCHEMA,
             pageKey: page.identity.pageKey,
@@ -124,7 +136,7 @@ export async function buildDocuments(opts) {
             designsCss: designsHref,
             noJsReadable: true,
             hydrate: 'island-only',
-            hostShell: useHostShell,
+            hostShell: useCompiledShell ? 'compiled-layout' : false,
             islands: ['DocumentSearch'].concat(
                 (islands.islands || [])
                     .filter(
@@ -155,12 +167,9 @@ export async function buildDocuments(opts) {
             htmlRel,
             searchShellHtml: shells.searchHtml,
             playgroundShellHtml: shells.playgroundHtml,
-            hostChrome: useHostShell
-                ? renderHostChromeForLocale(projectRoot, page.identity.locale, routing, enriched.routeBase, hostChromeRaw)
-                : null,
             routing,
-            routeBase: enriched.routeBase,
-            pageKey: page.identity.pageKey,
+            compiledLayoutHtml,
+            useCompiledShell,
         });
         fs.writeFileSync(htmlAbs, html, 'utf8');
         written.push({ route: info.route, htmlPath: htmlRel, viewPath: viewRel });
@@ -176,6 +185,7 @@ export async function buildDocuments(opts) {
             outDir: path.relative(projectRoot, outDir).replace(/\\/g, '/') || '.',
             designs: designs.source,
             designsCss: designsHref,
+            hostShell: useCompiledShell ? 'compiled-layout' : 'standalone',
             pages: written,
             evidence: 'document.evidence.json',
             search: 'document.search.json',
@@ -190,36 +200,31 @@ export async function buildDocuments(opts) {
 }
 
 /**
- * No-JS readable static HTML: nav + main landmarks, Island shells without scripts.
- * Integrated mounts reuse host SiteHeader/SiteFooter templates when present.
+ * @param {{ appDistDir?: string }} opts
+ * @param {string} outDir
  */
-function renderStaticHtml({
-    title,
-    locale,
-    route,
+function resolveAppDistDir(opts, outDir) {
+    if (opts.appDistDir) {
+        const p = path.resolve(opts.appDistDir);
+        return fs.existsSync(path.join(p, 'vmz-dom.js')) ? p : null;
+    }
+    return fs.existsSync(path.join(outDir, 'vmz-dom.js')) ? outDir : null;
+}
+
+/**
+ * Document main column + sidebar (injected into DocumentLayout slot).
+ */
+function buildDocumentSlotHtml({
     nav,
     bodyHtml,
     headings,
-    designsHref,
     htmlRel,
+    route,
+    routing,
     searchShellHtml = '',
     playgroundShellHtml = '',
-    hostChrome = null,
-    routing = { strategy: 'prefix' },
-    routeBase = '/docs',
-    pageKey = 'index',
 }) {
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    const depth = htmlRel.split('/').length - 1;
-    const prefix = depth > 0 ? '../'.repeat(depth) : './';
-    /** @type {string[]} */
-    const cssHrefs = [];
-    if (hostChrome) {
-        // Integrated documents are served with pretty directory URLs. Root
-        // absolute assets remain correct for both emitted files and rewrites.
-        cssHrefs.push('/vmz.css');
-    }
-    if (designsHref) cssHrefs.push(hostChrome ? `/${designsHref}` : prefix + designsHref);
     const navItems = nav
         .map((n) => {
             const href = routing.strategy === 'none' || routing.strategy === 'domain' ? n.href : relativeHref(htmlRel, n.href, route);
@@ -238,16 +243,7 @@ function renderStaticHtml({
 ${navItems}
     </ul>
   </nav>`;
-
-    /** @type {string} */
-    let bodyInner;
-    if (hostChrome) {
-        const header = hostChrome.header.replace(/(<a\s+href="\/d\/?")([^>]*>文档<\/a>)/, '$1 aria-current="page"$2');
-        bodyInner = `  <div class="site site--docs">
-  <a class="skip-link" href="#main">Skip to content</a>
-${header}
-  <div class="doc-body">
-    <aside class="doc-sidebar">
+    return `    <aside class="doc-sidebar">
 ${docsNav}
 ${searchShellHtml}
     </aside>
@@ -256,15 +252,62 @@ ${searchShellHtml}
 ${bodyHtml}
 ${playgroundShellHtml}
   </main>
-    </div>
-  </div>
-${hostChrome.footer}
-  </div>
-${routing.strategy === 'none' && hostChrome ? localeNonePickerScript() : ''}
-`;
+    </div>`;
+}
+
+/**
+ * No-JS readable static HTML: nav + main landmarks, Island shells without scripts.
+ * Integrated mounts wrap content in compiled DocumentLayout (SiteHeader/SiteFooter SSR).
+ */
+function renderStaticHtml({
+    title,
+    locale,
+    route,
+    nav,
+    bodyHtml,
+    headings,
+    designsHref,
+    htmlRel,
+    searchShellHtml = '',
+    playgroundShellHtml = '',
+    routing = { strategy: 'prefix' },
+    compiledLayoutHtml,
+    useCompiledShell = false,
+}) {
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const depth = htmlRel.split('/').length - 1;
+    const prefix = depth > 0 ? '../'.repeat(depth) : './';
+    /** @type {string[]} */
+    const cssHrefs = [];
+    if (useCompiledShell) {
+        cssHrefs.push('/vmz.css');
+    }
+    if (designsHref) cssHrefs.push(useCompiledShell ? `/${designsHref}` : prefix + designsHref);
+
+    /** @type {string} */
+    let bodyInner;
+    if (useCompiledShell) {
+        bodyInner = compiledLayoutHtml;
     } else {
+        const navItems = nav
+            .map((n) => {
+                const href = routing.strategy === 'none' || routing.strategy === 'domain' ? n.href : relativeHref(htmlRel, n.href, route);
+                const current = n.href === route ? ' aria-current="page"' : '';
+                return `      <li><a href="${esc(href)}"${current}>${esc(n.title)}</a></li>`;
+            })
+            .join('\n');
+        const toc =
+            headings.length > 1
+                ? `<nav aria-label="On this page" class="toc">\n    <ol>\n${headings
+                      .map((h) => `      <li class="h${h.level}"><a href="#${esc(h.id)}">${esc(h.text)}</a></li>`)
+                      .join('\n')}\n    </ol>\n  </nav>\n`
+                : '';
         bodyInner = `  <a class="skip-link" href="#main">Skip to content</a>
-${docsNav}
+  <nav aria-label="Documents" class="doc-subnav">
+    <ul>
+${navItems}
+    </ul>
+  </nav>
 ${searchShellHtml}
   ${toc}<main id="main">
 ${bodyHtml}
@@ -284,53 +327,6 @@ ${playgroundShellHtml}
         bodyHtml: bodyInner,
         bodyAttrs: ['data-vmz-hydrate', 'island-only'],
     });
-}
-
-/**
- * Integrated DocumentMount: reuse host SiteHeader / SiteFooter .vmz templates.
- * @param {string} projectRoot
- * @returns {{ header: string, footer: string } | null}
- */
-function resolveHostSiteChromeRaw(projectRoot) {
-    const headerPath = path.join(projectRoot, 'src', 'components', 'SiteHeader.vmz');
-    const footerPath = path.join(projectRoot, 'src', 'components', 'SiteFooter.vmz');
-    if (!fs.existsSync(headerPath) || !fs.existsSync(footerPath)) return null;
-    const header = extractVmzTemplateHtml(headerPath);
-    const footer = extractVmzTemplateHtml(footerPath);
-    if (!header || !footer) return null;
-    return { header, footer };
-}
-
-/**
- * @param {string} projectRoot
- * @param {string} localeId
- * @param {{ strategy?: string }} routing
- * @param {string} routeBase
- * @param {{ header: string, footer: string }} raw
- */
-function renderHostChromeForLocale(projectRoot, localeId, routing, routeBase, raw) {
-    const messages = loadLocaleCommonMessages(projectRoot, localeId);
-    const githubUrl = readSiteGithubUrl(projectRoot);
-    const docsRootHref =
-        routing.strategy === 'none' || routing.strategy === 'domain'
-            ? `${routeBase.replace(/\/$/, '')}/`
-            : `${routeBase.replace(/\/$/, '')}/${localeId}/`;
-    const guideHref =
-        routing.strategy === 'none' || routing.strategy === 'domain'
-            ? docsRouteNone(routeBase, 'guide/getting-started')
-            : `${docsRootHref}guide/getting-started`;
-    const opts = { docsRootHref, guideHref, githubUrl, routing };
-    return {
-        header: renderHostChromeTemplate(raw.header, localeId, messages, opts),
-        footer: renderHostChromeTemplate(raw.footer, localeId, messages, opts),
-    };
-}
-
-/** @param {string} filePath */
-function extractVmzTemplateHtml(filePath) {
-    const src = fs.readFileSync(filePath, 'utf8');
-    const m = src.match(/<template>([\s\S]*?)<\/template>/);
-    return m ? m[1].trim() : '';
 }
 
 function relativeHref(fromHtmlRel, toRoute, _fromRoute) {

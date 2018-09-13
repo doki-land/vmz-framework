@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { buildDocuments } from './document-build.js';
 import { resolveDocumentsRoot } from './document-check.js';
-import { loadLocalesRouting } from './document-host-chrome.js';
+import { loadLocalesRouting } from './document-routing-config.js';
 import { pageHtmlRel } from './document-enrich.js';
 import { log } from './log.js';
 import { requireNativeAddon } from './native-addon.js';
@@ -36,6 +36,7 @@ export async function buildIntegratedDocuments(opts) {
         const result = await buildDocuments({
             projectRoot,
             outDir,
+            appDistDir: outDir,
             strict: Boolean(opts.strict),
         });
         if (!result.ok) {

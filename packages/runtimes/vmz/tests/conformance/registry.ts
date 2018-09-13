@@ -156,6 +156,11 @@ export const CHECKS: Record<string, CheckEntry> = {
     'document-static': { file: 'document/document-static.ts' },
     'document-evidence': { file: 'document/document-evidence.ts' },
     'document-host': { file: 'document/document-host.ts' },
+    'document-integrated-layout': {
+        file: 'document/document-integrated-layout.ts',
+        description: 'Compiled DocumentLayout integrated mount (VMZ-11; no regex chrome)',
+        pre: ['build:runtimes'],
+    },
 
     // locale/
     'locale-layout': { file: 'locale/locale-layout.ts', pre: ['build:protocol-vmz'] },
@@ -355,6 +360,7 @@ export const CHECK_ALL = [
     'document-static',
     'document-evidence',
     'document-host',
+    'document-integrated-layout',
     'locale-layout',
     'locale-messages',
     'locale-routing',

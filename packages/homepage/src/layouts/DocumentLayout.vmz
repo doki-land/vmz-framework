@@ -1,0 +1,14 @@
+<template>
+  <div class="site site--docs">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <SiteHeader />
+    <div class="doc-body">
+      <slot />
+    </div>
+    <SiteFooter />
+  </div>
+</template>
+
+<script client>
+export default class DocumentLayout {}
+</script>
