@@ -11,8 +11,8 @@ import http from 'node:http';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { repoRoot } from '../_lib/repo-root.ts';
 import { addLimitation, readProof, runVmzBuild, upsertCheck, writeProof } from '../_lib/production-proof.ts';
+import { repoRoot } from '../_lib/repo-root.ts';
 import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
 
 const root = repoRoot(import.meta.url);
@@ -543,9 +543,7 @@ async function proveSpaLayoutRetention(shopUrl: string): Promise<string> {
         const after = await page.evaluate(() => {
             const root = document.getElementById('app') as any;
             const layouts = root && root.__vmzLayoutInsts;
-            const shopLayout = Array.isArray(layouts)
-                ? layouts.find((l: { bump?: () => void }) => typeof l?.bump === 'function')
-                : null;
+            const shopLayout = Array.isArray(layouts) ? layouts.find((l: { bump?: () => void }) => typeof l?.bump === 'function') : null;
             const last = (window as any).__vmzLastClientNav || {};
             return {
                 path: location.pathname,

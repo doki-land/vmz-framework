@@ -58,8 +58,7 @@ pub fn parse_this_method_call_arrow(body: &str) -> Option<String> {
     if !trail.is_empty() && trail != ";" {
         return None;
     }
-    if !args.is_empty()
-        && !args.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
+    if !args.is_empty() && !args.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
     {
         return None;
     }

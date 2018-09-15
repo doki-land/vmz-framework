@@ -231,10 +231,7 @@ export default class Page {
     let client = analyze_script(ScriptKind::Client, src);
     let ir = parse_template(r#"<Select onChange={onSelect} />"#);
     let js = emit_client_js(src, &client, &ir, None).unwrap();
-    assert!(
-        js.contains(r#""onChange": (ev) => this.onSelect(ev)"#),
-        "{js}"
-    );
+    assert!(js.contains(r#""onChange": (ev) => this.onSelect(ev)"#), "{js}");
 }
 
 #[test]

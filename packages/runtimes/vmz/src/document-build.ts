@@ -8,7 +8,6 @@ import { checkDocuments, manifestHasErrors } from './document-check.js';
 import { resolveDocumentDesignsCss } from './document-designs.js';
 import { enrichDocumentContent, pageHtmlRel } from './document-enrich.js';
 import { enrichDocumentEvidence } from './document-evidence.js';
-import { assertIntegratedDistReady, renderCompiledDocumentLayout } from './document-layout-render.js';
 import {
     artifactHrefFromHtml,
     buildDocumentIslands,
@@ -16,6 +15,7 @@ import {
     collectFenceBodies,
     renderIslandShellsHtml,
 } from './document-interactive.js';
+import { assertIntegratedDistReady, renderCompiledDocumentLayout } from './document-layout-render.js';
 import { resolveMarkdownEngine } from './document-markdown.js';
 import { loadLocalesRouting } from './document-routing-config.js';
 import { DOCUMENT_VIEW_SCHEMA } from './document-schema.js';
@@ -214,16 +214,7 @@ function resolveAppDistDir(opts, outDir) {
 /**
  * Document main column + sidebar (injected into DocumentLayout slot).
  */
-function buildDocumentSlotHtml({
-    nav,
-    bodyHtml,
-    headings,
-    htmlRel,
-    route,
-    routing,
-    searchShellHtml = '',
-    playgroundShellHtml = '',
-}) {
+function buildDocumentSlotHtml({ nav, bodyHtml, headings, htmlRel, route, routing, searchShellHtml = '', playgroundShellHtml = '' }) {
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const navItems = nav
         .map((n) => {

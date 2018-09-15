@@ -38,9 +38,7 @@ fs.writeFileSync(
 );
 
 const { shiki } = await import(pathToFileURL(distPlugin).href);
-const { configureShiki, getShikiRuntimeConfig, resetShikiRuntimeForTests, highlight } = await import(
-    pathToFileURL(distRuntime).href
-);
+const { configureShiki, getShikiRuntimeConfig, resetShikiRuntimeForTests, highlight } = await import(pathToFileURL(distRuntime).href);
 
 resetShikiRuntimeForTests();
 const plugin = shiki({ textmate: pathToFileURL(customTextmate).href });

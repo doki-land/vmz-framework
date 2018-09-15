@@ -23,15 +23,11 @@ export function resolveDocumentLayoutChunkId(distDir) {
 export function assertIntegratedDistReady(distDir) {
     const dom = path.join(distDir, 'vmz-dom.js');
     if (!fs.existsSync(dom)) {
-        throw new Error(
-            'integrated document mount requires vmz build output (vmz-dom.js in app dist). Run `vmz build` before document emit.',
-        );
+        throw new Error('integrated document mount requires vmz build output (vmz-dom.js in app dist). Run `vmz build` before document emit.');
     }
     const chunkId = resolveDocumentLayoutChunkId(distDir);
     if (!chunkId) {
-        throw new Error(
-            'integrated document mount requires compiled DocumentLayout (add src/layouts/DocumentLayout.vmz and rebuild)',
-        );
+        throw new Error('integrated document mount requires compiled DocumentLayout (add src/layouts/DocumentLayout.vmz and rebuild)');
     }
     return chunkId;
 }

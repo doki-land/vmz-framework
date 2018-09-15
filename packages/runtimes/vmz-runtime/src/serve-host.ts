@@ -1213,7 +1213,6 @@ function isRouteBoundaryStem(stem) {
     return stem === 'Layout' || stem === 'Loading' || stem === 'Error' || stem === 'NotFound';
 }
 
-
 /**
  * @param {string} pathname
  * @param {typeof pageCatalog} catalog

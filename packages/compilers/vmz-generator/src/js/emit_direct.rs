@@ -696,4 +696,3 @@ fn bind_payload(
     let (id, deps) = binding_deps(ir, binding, expr, fields, scope);
     (id, deps, None)
 }
-

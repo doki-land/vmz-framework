@@ -7,8 +7,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { repoRoot } from '../_lib/repo-root.ts';
 import { runVmzBuild } from '../_lib/production-proof.ts';
+import { repoRoot } from '../_lib/repo-root.ts';
 
 const root = repoRoot(import.meta.url);
 const HOMEPAGE = 'packages/homepage';
@@ -52,10 +52,7 @@ if (manifest.build?.hostShell !== 'compiled-layout') {
     fail(`expected hostShell compiled-layout, got ${JSON.stringify(manifest.build?.hostShell)}`);
 }
 
-const docIndexCandidates = [
-    path.join(dist, 'd/zh-hans/index.html'),
-    path.join(dist, 'd/en-us/index.html'),
-];
+const docIndexCandidates = [path.join(dist, 'd/zh-hans/index.html'), path.join(dist, 'd/en-us/index.html')];
 const docIndex = docIndexCandidates.find((p) => fs.existsSync(p));
 if (!docIndex) fail('missing integrated document HTML under dist/d/<locale>/index.html');
 
