@@ -327,6 +327,12 @@ function publishJs(version) {
         pkg.version = version;
         delete pkg.private;
         pkg.publishConfig = { ...(pkg.publishConfig ?? {}), access: 'public' };
+        // CI already built dist/; staged publish trees omit tsconfig — never run prepack on npm publish.
+        if (pkg.scripts) {
+            delete pkg.scripts.prepack;
+            delete pkg.scripts.prepare;
+            if (Object.keys(pkg.scripts).length === 0) delete pkg.scripts;
+        }
         if (!pkg.repository) {
             pkg.repository = {
                 type: 'git',

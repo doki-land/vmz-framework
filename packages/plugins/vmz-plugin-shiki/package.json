@@ -23,8 +23,7 @@
         "README.md"
     ],
     "scripts": {
-        "build": "tsc -p tsconfig.json",
-        "prepack": "pnpm run build"
+        "build": "tsc -p tsconfig.json"
     },
     "dependencies": {
         "@vmz/plugin": "workspace:*"
