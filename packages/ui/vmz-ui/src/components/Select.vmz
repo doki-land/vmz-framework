@@ -394,6 +394,10 @@ export default class Select {
 			} });
 		}
 	}
+	/** Parent-owned prop writes (bindComponentProp) — keep derived label/options in sync. */
+	__vmzOnParentProp(name: string) {
+		if (name === "value" || name === "values" || name === "options") this._rebuildVisible();
+	}
 	choose(next: string) {
 		if (!next && next !== "") return;
 		if (this.isMultiple) {
@@ -401,13 +405,20 @@ export default class Select {
 			const idx = cur.indexOf(String(next));
 			if (idx >= 0) cur.splice(idx, 1);
 			else cur.push(String(next));
-			this._emit(cur.join(","), cur);
+			this.values = cur;
 			this._rebuildVisible();
+			this._emit(cur.join(","), cur);
 			return;
 		}
+		const nextStr = String(next);
+		if (nextStr === String(this.value)) {
+			this.close();
+			return;
+		}
+		this.value = nextStr;
+		this._rebuildVisible();
+		this._emit(nextStr, nextStr ? [nextStr] : []);
 		this.close();
-		if (next === this.value) return;
-		this._emit(String(next), next ? [String(next)] : []);
 	}
 	onSearchInput(ev: Event) {
 		const t = ev?.target as HTMLInputElement | null;

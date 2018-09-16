@@ -515,6 +515,13 @@ export const directApi = {
             if (!child || child.__vmzDestroyed) return;
             if (typeof propName !== 'string' || !propName || propName.startsWith('#')) return;
             child[propName] = raw;
+            if (typeof child.__vmzOnParentProp === 'function') {
+                try {
+                    child.__vmzOnParentProp(propName, raw);
+                } catch (err) {
+                    console.error('vmz:dom __vmzOnParentProp', err);
+                }
+            }
             scheduleRefresh(child, { type: 'replace', root: propName });
         });
     },
