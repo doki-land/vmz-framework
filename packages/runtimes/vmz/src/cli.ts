@@ -535,6 +535,7 @@ async function cmdServe(args) {
             VMZ_DIST: outDir,
             VMZ_PORT: String(port),
             VMZ_HOST: host,
+            VMZ_PROJECT_ROOT: project,
             VMZ_NATIVE_NODE: resolveNativePath(),
         },
         stdio: 'inherit',

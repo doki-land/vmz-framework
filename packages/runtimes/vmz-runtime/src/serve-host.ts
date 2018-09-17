@@ -32,6 +32,68 @@ const require = createRequire(import.meta.url);
 
 const distDir = process.env.VMZ_DIST ? path.resolve(process.env.VMZ_DIST) : path.dirname(fileURLToPath(import.meta.url));
 
+/** App project root for bare import / JSON resolve (dev SSR ≡ build node_modules). */
+function projectRootForResolve() {
+    const fromEnv = typeof process.env.VMZ_PROJECT_ROOT === 'string' ? process.env.VMZ_PROJECT_ROOT.trim() : '';
+    if (fromEnv) return path.resolve(fromEnv);
+    return process.cwd();
+}
+
+/** @type {ReturnType<typeof createRequire> | null} */
+let appPackageRequire = null;
+
+function appPackageRequireResolve() {
+    if (!appPackageRequire) {
+        const root = projectRootForResolve();
+        const pkg = path.join(root, 'package.json');
+        appPackageRequire = existsSync(pkg) ? createRequire(pkg) : require;
+    }
+    return appPackageRequire;
+}
+
+/**
+ * Dev/prod serve-host: resolve workspace peers + JSON imports from the app package root.
+ * Dist-relative ESM cannot see app `node_modules` without this hook.
+ */
+function installAppModuleResolveHooks() {
+    registerHooks({
+        resolve(specifier, context, nextResolve) {
+            if (
+                !specifier ||
+                specifier.startsWith('.') ||
+                specifier.startsWith('node:') ||
+                specifier.startsWith('file:') ||
+                specifier.startsWith('#')
+            ) {
+                return nextResolve(specifier, context);
+            }
+            try {
+                const resolved = appPackageRequireResolve().resolve(specifier);
+                return { url: pathToFileURL(resolved).href, shortCircuit: true };
+            } catch {
+                return nextResolve(specifier, context);
+            }
+        },
+        load(url, context, nextLoad) {
+            const pathOnly = url.split('?')[0].split('#')[0];
+            if (!pathOnly.endsWith('.json')) return nextLoad(url, context);
+            try {
+                const filePath = fileURLToPath(pathOnly);
+                const raw = readFileSync(filePath, 'utf8');
+                return {
+                    format: 'module',
+                    shortCircuit: true,
+                    source: `export default ${raw}`,
+                };
+            } catch {
+                return nextLoad(url, context);
+            }
+        },
+    });
+}
+
+installAppModuleResolveHooks();
+
 const host = process.env.VMZ_HOST || '127.0.0.1';
 const port = Number(process.env.VMZ_PORT || process.env.PORT || 5173);
 const isDev = process.env.VMZ_DEV === '1' || process.env.VMZ_DEV === 'true';

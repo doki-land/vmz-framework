@@ -577,6 +577,7 @@ function defaultSpawnHost(opts) {
             VMZ_PORT: String(opts.port),
             VMZ_HOST: opts.host,
             VMZ_DEV: '1',
+            VMZ_PROJECT_ROOT: opts.project,
             VMZ_NATIVE_NODE: resolveNativePath(),
         },
         stdio: ['ignore', 'inherit', 'inherit'],

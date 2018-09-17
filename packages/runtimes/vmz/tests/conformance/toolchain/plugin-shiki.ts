@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { repoRoot } from '../_lib/repo-root.ts';
 
 const root = repoRoot(import.meta.url);
@@ -78,4 +78,59 @@ if (!String(pkg.exports['.'].default).includes('dist/')) fail('main export must 
 if (!String(pkg.exports['./runtime'].default).includes('dist/')) fail('runtime export must target dist/');
 
 fs.rmSync(tmp, { recursive: true, force: true });
+
+console.log('plugin-shiki: serve-host bare import + JSON resolve…');
+const probeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-serve-resolve-'));
+const peerPkg = path.join(probeRoot, 'node_modules', '@test', 'vos-textmate');
+fs.mkdirSync(peerPkg, { recursive: true });
+fs.writeFileSync(
+    path.join(peerPkg, 'package.json'),
+    JSON.stringify({ name: '@test/vos-textmate', type: 'module', exports: { './shiki': './shiki.mjs' } }),
+    'utf8',
+);
+fs.writeFileSync(path.join(peerPkg, 'shiki.mjs'), 'export const marker = "peer-ok";\n', 'utf8');
+fs.writeFileSync(path.join(probeRoot, 'vos.tmLanguage.json'), JSON.stringify({ name: 'vos' }), 'utf8');
+fs.writeFileSync(path.join(probeRoot, 'package.json'), JSON.stringify({ name: 'vmz-serve-resolve-probe', type: 'module' }), 'utf8');
+
+const { createRequire, registerHooks } = await import('node:module');
+const probePkg = path.join(probeRoot, 'package.json');
+const probeRequire = createRequire(probePkg);
+registerHooks({
+    resolve(specifier, context, nextResolve) {
+        if (
+            !specifier ||
+            specifier.startsWith('.') ||
+            specifier.startsWith('node:') ||
+            specifier.startsWith('file:') ||
+            specifier.startsWith('#')
+        ) {
+            return nextResolve(specifier, context);
+        }
+        try {
+            const resolved = probeRequire.resolve(specifier);
+            return { url: pathToFileURL(resolved).href, shortCircuit: true };
+        } catch {
+            return nextResolve(specifier, context);
+        }
+    },
+    load(url, context, nextLoad) {
+        const pathOnly = url.split('?')[0].split('#')[0];
+        if (!pathOnly.endsWith('.json')) return nextLoad(url, context);
+        try {
+            const filePath = fileURLToPath(pathOnly);
+            const raw = fs.readFileSync(filePath, 'utf8');
+            return { format: 'module', shortCircuit: true, source: `export default ${raw}` };
+        } catch {
+            return nextLoad(url, context);
+        }
+    },
+});
+const peer = await import('@test/vos-textmate/shiki');
+if (peer.marker !== 'peer-ok') fail('bare peer import failed');
+const grammarUrl = pathToFileURL(path.join(probeRoot, 'vos.tmLanguage.json')).href;
+const grammar = await import(grammarUrl);
+if (!grammar.default || grammar.default.name !== 'vos') fail('JSON import hook failed');
+fs.rmSync(probeRoot, { recursive: true, force: true });
+
+console.log('plugin-shiki PASS');
 console.log('PLUGIN-SHIKI GATE OK');

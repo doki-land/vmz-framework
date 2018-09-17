@@ -13,3 +13,15 @@ export function serveHostChildEnv(extra: Record<string, string | undefined> = {}
         ...extra,
     };
 }
+
+/**
+ * Child env for serve-host spawned from an application project directory.
+ * @param {string} projectRoot
+ * @param {Record<string, string | undefined>} [extra]
+ */
+export function serveHostProjectEnv(projectRoot: string, extra: Record<string, string | undefined> = {}): NodeJS.ProcessEnv {
+    return serveHostChildEnv({
+        VMZ_PROJECT_ROOT: projectRoot,
+        ...extra,
+    });
+}
