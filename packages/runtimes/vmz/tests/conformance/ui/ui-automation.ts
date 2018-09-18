@@ -16,12 +16,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { repoRoot } from '../_lib/repo-root.ts';
+import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
+import { serveHostChildEnv, serveHostProjectEnv } from '../_lib/serve-host-env.ts';
 
 const root = repoRoot(import.meta.url);
 const uiRoot = path.join(root, 'packages', 'ui', 'vmz-ui');
 const homepage = path.join(root, 'packages', 'homepage');
-const cargo = process.env.CARGO || 'cargo';
 const DIAG_UNKNOWN = 'vmz::style::unknown_design_token';
 const SCHEMA = 'vmz.ui.token_requirements.v0';
 
@@ -48,10 +48,11 @@ function dottedToCssVar(dotted) {
 }
 
 function runBuild(projectDir) {
-    const r = spawnSync(cargo, ['run', '-p', 'vmz-tools', '--quiet', '--', 'build', projectDir], {
+    const r = spawnSync(process.execPath, [vmzBin(root), 'build', projectDir], {
         cwd: root,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
+        env: serveHostChildEnv(),
     });
     return { status: r.status ?? 1, out: `${r.stdout || ''}\n${r.stderr || ''}` };
 }
@@ -292,7 +293,11 @@ async function proveUi1FocusOverlay() {
     const PORT = 18781;
     const child = spawn(process.execPath, [hostJs], {
         cwd: dist,
-        env: { ...process.env, VMZ_DIST: dist, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(PORT) },
+        env: serveHostProjectEnv(homepage, {
+            VMZ_DIST: dist,
+            VMZ_HOST: '127.0.0.1',
+            VMZ_PORT: String(PORT),
+        }),
         stdio: ['ignore', 'pipe', 'pipe'],
     });
     const kill = () => {
