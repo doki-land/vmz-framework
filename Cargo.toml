@@ -10,6 +10,7 @@ members = [
     "packages/compilers/vmz-formatter",
     "packages/compilers/vmz-tools",
     "packages/compilers/vmz-napi",
+    "packages/compilers/vmz-artifacts",
     "packages/compilers/vmz-plugin-tailwind",
     "packages/compilers/vmz-plugin-sasso",
 ]
@@ -28,6 +29,7 @@ vmz-protocol = { path = "packages/compilers/vmz-protocol" }
 vmz-types = { path = "packages/compilers/vmz-types" }
 vmz-generator = { path = "packages/compilers/vmz-generator" }
 vmz-compiler = { path = "packages/compilers/vmz-compiler" }
+vmz-artifacts = { path = "packages/compilers/vmz-artifacts" }
 vmz-debugger = { path = "packages/compilers/vmz-debugger" }
 vmz-inspector = { path = "packages/compilers/vmz-inspector" }
 vmz-formatter = { path = "packages/compilers/vmz-formatter" }

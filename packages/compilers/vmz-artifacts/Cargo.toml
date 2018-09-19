@@ -1,0 +1,19 @@
+[package]
+name = "vmz-artifacts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+description = "VMZ artifact parse/validate/query — shared by CLI and N-API"
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+vmz-compiler = { workspace = true }
+vmz-protocol = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
