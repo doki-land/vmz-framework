@@ -1481,3 +1481,50 @@ pub fn generate_json(json_text: String) -> Result<String> {
         .map_err(|e| Error::from_reason(format!("generateJson: invalid JSON: {e}")))?;
     vmz_generator::to_json(&value).map_err(|e| Error::from_reason(format!("generateJson: {e}")))
 }
+
+/// One component row from [`vmz_artifacts::component_entries`].
+#[napi(object)]
+pub struct JsComponentEntry {
+    /// Stable chunk id.
+    pub chunk_id: String,
+    /// Component tag (basename).
+    pub name: String,
+    /// Client entry path relative to dist.
+    pub entry: String,
+    /// Workspace-relative `.vmz` source.
+    pub source: String,
+}
+
+/// Validate `vmz-deployment.json` body (schema + serde shape).
+#[napi]
+pub fn deployment_validate(json_text: String) -> Result<()> {
+    vmz_artifacts::parse_deployment_json(&json_text)
+        .map(|_| ())
+        .map_err(|e| Error::from_reason(e.to_string()))
+}
+
+/// Component entries from a deployment document JSON string.
+#[napi]
+pub fn deployment_component_entries(json_text: String) -> Result<Vec<JsComponentEntry>> {
+    let doc = vmz_artifacts::parse_deployment_json(&json_text)
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+    Ok(vmz_artifacts::component_entries(&doc)
+        .into_iter()
+        .map(|e| JsComponentEntry {
+            chunk_id: e.chunk_id,
+            name: e.name,
+            entry: e.entry,
+            source: e.source,
+        })
+        .collect())
+}
+
+/// Forward `dependsOn` closure for root chunk ids (includes roots).
+#[napi]
+pub fn deployment_depends_on_closure(json_text: String, roots: Vec<String>) -> Result<Vec<String>> {
+    let doc = vmz_artifacts::parse_deployment_json(&json_text)
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+    Ok(vmz_artifacts::collect_depends_on_closure(&doc, &roots)
+        .into_iter()
+        .collect())
+}

@@ -19,6 +19,7 @@ vmz-compiler.workspace = true
 vmz-formatter.workspace = true
 vmz-generator.workspace = true
 vmz-inspector.workspace = true
+vmz-artifacts.workspace = true
 vmz-protocol.workspace = true
 vmz-plugin-tailwind.workspace = true
 vmz-plugin-sasso.workspace = true
