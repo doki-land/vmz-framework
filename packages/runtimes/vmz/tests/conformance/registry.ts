@@ -25,6 +25,10 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'toolchain/program-ir.ts',
         description: 'CLI vs N-API *.program.json identity',
     },
+    'deployment-artifacts': {
+        file: 'toolchain/deployment-artifacts.ts',
+        description: 'Rust vmz-artifacts vs TS deployment-registry parity',
+    },
     'node-cli': { file: 'toolchain/node-cli.ts', description: 'Node CLI / Workspace host' },
     plugin: {
         file: 'toolchain/plugin.ts',
@@ -313,6 +317,7 @@ export const CHECKS: Record<string, CheckEntry> = {
 /** Default suite for `pnpm verify` (no args) / `pnpm verify --all`. */
 export const CHECK_ALL = [
     'program-ir',
+    'deployment-artifacts',
     'node-cli',
     'plugin',
     'plugin-shiki',
