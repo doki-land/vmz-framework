@@ -25,6 +25,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRenderHost } from './render-host.js';
 import { listClientComponents } from './list-client-components.js';
+import { loadNativeAddon } from './native-addon.js';
 import { resolveRouteLayoutChain } from './route-layout-chain.js';
 import { handleNodeRequest, setRoutes, setServerModuleResolver } from './vmz-runtime.js';
 
@@ -164,12 +165,6 @@ let shuttingDown = false;
 let ready = false;
 /** @type {{ message: string, stack?: string, at: number } | null} */
 let lastDevError = null;
-/**
- * Native CodeGenerators handle — must be declared before top-level `await softReload()`
- * (TDZ: requireNativeGenerator may run during that await).
- * @type {any}
- */
-let _nativeGen;
 
 setServerModuleResolver((moduleId) => {
     const rel = moduleId.replace(/^#server\//, '') + '.js';
@@ -406,7 +401,7 @@ function normalizeActionResult(acted) {
  * @param {string} marker
  */
 async function* emitAccessShell(marker) {
-    const native = requireNativeGenerator();
+    const native = loadNativeAddon();
     if (typeof native.generateHtmlShell !== 'function') {
         throw new Error('vmz native addon missing generateHtmlShell — rebuild with `pnpm napi:build`');
     }
@@ -607,7 +602,7 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
     }
     if (signal?.aborted) return;
 
-    const native = requireNativeGenerator();
+    const native = loadNativeAddon();
     if (typeof native.generatePageShell !== 'function') {
         throw new Error('vmz native addon missing generatePageShell — rebuild with `pnpm napi:build`');
     }
@@ -986,7 +981,7 @@ async function* emitDevErrorHtml(err) {
     };
   })();
   </script>`;
-    const native = requireNativeGenerator();
+    const native = loadNativeAddon();
     if (typeof native.generateHtmlShell !== 'function') {
         throw new Error('vmz native addon missing generateHtmlShell — rebuild with `pnpm napi:build`');
     }
@@ -1389,7 +1384,7 @@ async function runRouteGate(pathname, chunkId) {
  */
 function emitEntryClient(eager, lazy, token) {
     const q = `?t=${token}`;
-    const native = requireNativeGenerator();
+    const native = loadNativeAddon();
     if (typeof native.generateServeEntryClient !== 'function') {
         throw new Error('vmz native addon missing generateServeEntryClient — rebuild with `pnpm napi:build`');
     }
@@ -1403,79 +1398,11 @@ function emitEntryClient(eager, lazy, token) {
  */
 function emitEntryEvent(token) {
     const q = `?t=${token}`;
-    const native = requireNativeGenerator();
+    const native = loadNativeAddon();
     if (typeof native.generateServeEntryEvent !== 'function') {
         throw new Error('vmz native addon missing generateServeEntryEvent — rebuild with `pnpm napi:build`');
     }
     return native.generateServeEntryEvent(q);
-}
-
-/**
- * Load vmz N-API CodeGenerators (same discovery as `@vmz/vmz` native-addon).
- * @returns {any}
- */
-function requireNativeGenerator() {
-    if (_nativeGen !== undefined) {
-        if (!_nativeGen) {
-            throw new Error('vmz native addon missing — run `pnpm napi:build` (serve entry printers live in vmz-generator via N-API)');
-        }
-        return _nativeGen;
-    }
-    try {
-        const envPath = (typeof process.env.VMZ_NATIVE_NODE === 'string' && process.env.VMZ_NATIVE_NODE.trim()) || '';
-        if (envPath) {
-            _nativeGen = require(path.resolve(envPath));
-            return _nativeGen;
-        }
-        const { platform, arch } = process;
-        let triple = `${platform}-${arch}`;
-        if (platform === 'win32' && arch === 'x64') triple = 'win32-x64-msvc';
-        else if (platform === 'win32' && arch === 'arm64') triple = 'win32-arm64-msvc';
-        else if (platform === 'darwin' && arch === 'arm64') triple = 'darwin-arm64';
-        else if (platform === 'darwin' && arch === 'x64') triple = 'darwin-x64';
-        else if (platform === 'linux' && arch === 'x64') triple = 'linux-x64-gnu';
-        else if (platform === 'linux' && arch === 'arm64') triple = 'linux-arm64-gnu';
-        const short =
-            triple === 'win32-x64-msvc'
-                ? 'win32-x64'
-                : triple === 'win32-arm64-msvc'
-                  ? 'win32-arm64'
-                  : triple === 'linux-x64-gnu'
-                    ? 'linux-x64'
-                    : triple === 'linux-arm64-gnu'
-                      ? 'linux-arm64'
-                      : triple;
-        const name = `@vmz/vmz-${short}`;
-        /** @type {string[]} */
-        const candidates = [];
-        try {
-            const resolved = require.resolve(`${name}/package.json`);
-            const dir = path.dirname(resolved);
-            candidates.push(path.join(dir, `vmz.${triple}.node`), path.join(dir, 'vmz.node'));
-        } catch {
-            /* optional */
-        }
-        const here = path.dirname(fileURLToPath(import.meta.url));
-        candidates.push(
-            path.join(here, 'node_modules', name, `vmz.${triple}.node`),
-            path.join(here, 'node_modules', name, 'vmz.node'),
-            path.join(here, '..', 'node_modules', name, `vmz.${triple}.node`),
-            path.join(here, '..', 'node_modules', name, 'vmz.node'),
-        );
-        for (const p of candidates) {
-            if (existsSync(p)) {
-                _nativeGen = require(p);
-                return _nativeGen;
-            }
-        }
-        _nativeGen = null;
-    } catch {
-        _nativeGen = null;
-    }
-    if (!_nativeGen) {
-        throw new Error('vmz native addon missing — run `pnpm napi:build` (serve entry printers live in vmz-generator via N-API)');
-    }
-    return _nativeGen;
 }
 
 /**

@@ -656,6 +656,7 @@ fn emit_runtime_js(options: &CompileOptions, report: &mut CompileReport) -> crat
     if !options.release {
         copies.push(("serve-host.mjs", "vmz-serve-host.mjs"));
         copies.extend([
+            ("native-addon.js", "native-addon.js"),
             ("list-client-components.js", "list-client-components.js"),
             ("deployment-registry.js", "deployment-registry.js"),
             ("render-host.js", "render-host.js"),

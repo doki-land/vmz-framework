@@ -58,6 +58,14 @@
     "dependencies": {
         "linkedom": "^0.18.13"
     },
+    "optionalDependencies": {
+        "@vmz/vmz-win32-x64": "workspace:*",
+        "@vmz/vmz-win32-arm64": "workspace:*",
+        "@vmz/vmz-darwin-x64": "workspace:*",
+        "@vmz/vmz-darwin-arm64": "workspace:*",
+        "@vmz/vmz-linux-x64": "workspace:*",
+        "@vmz/vmz-linux-arm64": "workspace:*"
+    },
     "devDependencies": {
         "@types/node": "^22.15.0",
         "typescript": "^5.8.3"

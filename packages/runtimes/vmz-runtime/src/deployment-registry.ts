@@ -1,15 +1,25 @@
 // @ts-nocheck
 /**
  * Deployment graph → component registry bootstrap (shared by all SSR/DOM hosts).
- * Replaces ad-hoc registerComponents calls with an explicit preload contract.
+ * Parse/validate and graph queries delegate to Rust vmz-artifacts via N-API.
  */
 
 import fs from 'node:fs';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { loadNativeAddon, requireNativeFn } from './native-addon.js';
 
 export const DEPLOYMENT_SCHEMA = 'vmz.deployment.v0';
+
+/**
+ * @param {string} jsonText
+ * @returns {any}
+ */
+function parseDeploymentJson(jsonText) {
+    requireNativeFn('deploymentValidate')(jsonText);
+    return JSON.parse(jsonText);
+}
 
 /**
  * @param {string} distDir
@@ -32,18 +42,12 @@ export function readDeploymentDocument(distDir, opts = {}) {
         if (strict) throw new Error(`vmz: cannot read vmz-deployment.json: ${e instanceof Error ? e.message : e}`);
         return null;
     }
-    let doc;
     try {
-        doc = JSON.parse(raw);
+        return parseDeploymentJson(raw);
     } catch (e) {
         if (strict) throw new Error(`vmz: invalid vmz-deployment.json: ${e instanceof Error ? e.message : e}`);
         return null;
     }
-    if (doc.schema !== DEPLOYMENT_SCHEMA) {
-        if (strict) throw new Error(`vmz: unsupported deployment schema ${doc.schema}`);
-        return null;
-    }
-    return doc;
 }
 
 /**
@@ -51,22 +55,8 @@ export function readDeploymentDocument(distDir, opts = {}) {
  * @returns {Array<{ chunkId: string, name: string, entry: string, source: string }>}
  */
 export function componentEntriesFromDeployment(deployment) {
-    /** @type {Array<{ chunkId: string, name: string, entry: string, source: string }>} */
-    const out = [];
-    for (const unit of deployment.units || []) {
-        if (unit?.kind !== 'component') continue;
-        const chunkId = String(unit.chunkId || '').replace(/\\/g, '/');
-        const name = chunkId.split('/').pop();
-        if (!name) continue;
-        const entry = String(unit.clientEntry || `${chunkId}.client.js`).replace(/\\/g, '/');
-        out.push({
-            chunkId,
-            name,
-            entry,
-            source: String(unit.source || ''),
-        });
-    }
-    return out.sort((a, b) => a.chunkId.localeCompare(b.chunkId));
+    const json = JSON.stringify(deployment);
+    return requireNativeFn('deploymentComponentEntries')(json);
 }
 
 /**
@@ -75,27 +65,9 @@ export function componentEntriesFromDeployment(deployment) {
  * @returns {Set<string>}
  */
 export function collectDependsOnClosure(deployment, rootChunkIds) {
-    /** @type {Map<string, any>} */
-    const byId = new Map();
-    for (const unit of deployment.units || []) {
-        byId.set(String(unit.chunkId || '').replace(/\\/g, '/'), unit);
-    }
-    /** @type {Set<string>} */
-    const out = new Set();
-    /** @type {string[]} */
-    const stack = rootChunkIds.map((id) => String(id).replace(/\\/g, '/')).filter(Boolean);
-    while (stack.length) {
-        const id = stack.pop();
-        if (!id || out.has(id)) continue;
-        out.add(id);
-        const unit = byId.get(id);
-        if (!unit) continue;
-        for (const dep of unit.dependsOn || []) {
-            const d = String(dep).replace(/\\/g, '/');
-            if (!out.has(d)) stack.push(d);
-        }
-    }
-    return out;
+    const json = JSON.stringify(deployment);
+    const ids = requireNativeFn('deploymentDependsOnClosure')(json, rootChunkIds);
+    return new Set(ids);
 }
 
 /**

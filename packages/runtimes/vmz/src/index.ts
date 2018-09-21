@@ -638,6 +638,7 @@ export function resolveCoreRuntimeDist() {
 /** Runtime companions required by dist/vmz-serve-host.mjs relative imports. */
 export const SERVE_HOST_RUNTIME_FILES = [
     ['serve-host.mjs', 'vmz-serve-host.mjs'],
+    ['native-addon.js', 'native-addon.js'],
     ['list-client-components.js', 'list-client-components.js'],
     ['deployment-registry.js', 'deployment-registry.js'],
     ['render-host.js', 'render-host.js'],
