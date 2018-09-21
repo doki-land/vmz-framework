@@ -27,7 +27,7 @@ export const CHECKS: Record<string, CheckEntry> = {
     },
     'deployment-artifacts': {
         file: 'toolchain/deployment-artifacts.ts',
-        description: 'Rust vmz-artifacts vs TS deployment-registry parity',
+        description: 'Rust vmz-artifacts N-API and @vmz/core deployment host wiring',
     },
     'node-cli': { file: 'toolchain/node-cli.ts', description: 'Node CLI / Workspace host' },
     plugin: {

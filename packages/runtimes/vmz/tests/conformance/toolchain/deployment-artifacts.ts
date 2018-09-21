@@ -1,5 +1,5 @@
 /**
- * deployment-artifacts — Rust vmz-artifacts vs TS deployment-registry parity (Phase 1).
+ * deployment-artifacts — Rust vmz-artifacts N-API + @vmz/core host wiring (Phase 2).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -48,6 +48,34 @@ const FIXTURE = `{
   ]
 }`;
 
+const EXPECTED_CLOSURE = [
+    'components/Button',
+    'components/Icon',
+    'layouts/App',
+    'pages/index',
+].sort();
+
+const EXPECTED_COMPONENT_ENTRIES = [
+    {
+        chunkId: 'components/Button',
+        name: 'Button',
+        entry: 'components/Button.client.js',
+        source: 'src/components/Button.vmz',
+    },
+    {
+        chunkId: 'components/Icon',
+        name: 'Icon',
+        entry: 'components/Icon.client.js',
+        source: 'src/components/Icon.vmz',
+    },
+    {
+        chunkId: 'layouts/App',
+        name: 'App',
+        entry: 'layouts/App.client.js',
+        source: 'src/layouts/App.vmz',
+    },
+];
+
 console.log('deployment-artifacts: native addon…');
 const native = loadNative();
 
@@ -58,24 +86,26 @@ if (typeof native.deploymentValidate !== 'function') {
 native.deploymentValidate(FIXTURE);
 
 const doc = JSON.parse(FIXTURE);
-const tsClosure = [...collectDependsOnClosure(doc, ['pages/index'])].sort();
+
 const nativeClosure = [...native.deploymentDependsOnClosure(FIXTURE, ['pages/index'])].sort();
-
-if (JSON.stringify(tsClosure) !== JSON.stringify(nativeClosure)) {
-    fail(`closure mismatch TS=${JSON.stringify(tsClosure)} native=${JSON.stringify(nativeClosure)}`);
+if (JSON.stringify(nativeClosure) !== JSON.stringify(EXPECTED_CLOSURE)) {
+    fail(`native closure mismatch expected=${JSON.stringify(EXPECTED_CLOSURE)} got=${JSON.stringify(nativeClosure)}`);
 }
 
-const tsEntries = componentEntriesFromDeployment(doc);
 const nativeEntries = native.deploymentComponentEntries(FIXTURE);
-if (tsEntries.length !== nativeEntries.length) {
-    fail(`component entry count TS=${tsEntries.length} native=${nativeEntries.length}`);
+if (JSON.stringify(nativeEntries) !== JSON.stringify(EXPECTED_COMPONENT_ENTRIES)) {
+    fail(`native component entries mismatch expected=${JSON.stringify(EXPECTED_COMPONENT_ENTRIES)} got=${JSON.stringify(nativeEntries)}`);
 }
-for (let i = 0; i < tsEntries.length; i++) {
-    const a = tsEntries[i];
-    const b = nativeEntries[i];
-    if (a.chunkId !== b.chunkId || a.name !== b.name || a.entry !== b.entry || a.source !== b.source) {
-        fail(`component entry[${i}] mismatch TS=${JSON.stringify(a)} native=${JSON.stringify(b)}`);
-    }
+
+console.log('deployment-artifacts: @vmz/core host (N-API-backed)…');
+const hostClosure = [...collectDependsOnClosure(doc, ['pages/index'])].sort();
+if (JSON.stringify(hostClosure) !== JSON.stringify(EXPECTED_CLOSURE)) {
+    fail(`host closure mismatch expected=${JSON.stringify(EXPECTED_CLOSURE)} got=${JSON.stringify(hostClosure)}`);
+}
+
+const hostEntries = componentEntriesFromDeployment(doc);
+if (JSON.stringify(hostEntries) !== JSON.stringify(EXPECTED_COMPONENT_ENTRIES)) {
+    fail(`host component entries mismatch expected=${JSON.stringify(EXPECTED_COMPONENT_ENTRIES)} got=${JSON.stringify(hostEntries)}`);
 }
 
 const counterDist = path.join(root, 'packages/examples/counter/dist/vmz-deployment.json');
@@ -86,9 +116,9 @@ if (fs.existsSync(counterDist)) {
     const page = (liveDoc.units || []).find((u: { kind?: string }) => u.kind === 'page');
     if (page?.chunkId) {
         const roots = [String(page.chunkId)];
-        const ts = [...collectDependsOnClosure(liveDoc, roots)].sort();
+        const host = [...collectDependsOnClosure(liveDoc, roots)].sort();
         const nat = [...native.deploymentDependsOnClosure(live, roots)].sort();
-        if (JSON.stringify(ts) !== JSON.stringify(nat)) {
+        if (JSON.stringify(host) !== JSON.stringify(nat)) {
             fail(`live counter closure mismatch for ${page.chunkId}`);
         }
     }
