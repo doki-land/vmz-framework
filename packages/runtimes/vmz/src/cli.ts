@@ -130,7 +130,7 @@ Usage:
   vmz help                      Show this help
 
 Options:
-  --out-dir, -o <dir>   Output directory (default: dist)
+  --out-dir, -o <dir>   Output directory (default: dist; multi-artifact root — static CDN publish dist/cdn, not bare dist/)
   --release             Release build (omit serve-host; pack minify slot; proof)
   --profile <name>      Delivery profile (default from config; builtins: web-ssr|static|web-client|web-hybrid)
   --target <id>         browser (default) | mini-program-wechat (pack dist/wechat for WeChat DevTools; build+dev)
