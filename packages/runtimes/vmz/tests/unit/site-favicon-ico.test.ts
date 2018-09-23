@@ -5,10 +5,7 @@ import assert from 'node:assert/strict';
 import { packPngsIntoIco } from '../../dist/site-favicon.js';
 
 // Minimal valid 1x1 PNG
-const png = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-    'base64',
-);
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 const ico = packPngsIntoIco([
     { png, size: 16 },
     { png, size: 32 },

@@ -36,11 +36,7 @@ const RESERVED_EXACT = new Set([
 export function emitPublicStaticAssets(distDir, opts = {}) {
     const absDist = path.resolve(distDir);
     const projectRoot = opts.projectRoot ? path.resolve(opts.projectRoot) : null;
-    const publicDir = opts.publicDir
-        ? path.resolve(opts.publicDir)
-        : projectRoot
-          ? path.join(projectRoot, 'public')
-          : null;
+    const publicDir = opts.publicDir ? path.resolve(opts.publicDir) : projectRoot ? path.join(projectRoot, 'public') : null;
 
     if (!publicDir || !fs.existsSync(publicDir) || !fs.statSync(publicDir).isDirectory()) {
         const skipped = {

@@ -166,9 +166,7 @@ upsertCheck(proof, {
 });
 upsertCheck(proof, {
     id: 'content-addressed-assets.entry-import-http',
-    status: errors.some((e) => e.includes('entry-client') || e.includes('entry import') || e.includes('./ relative'))
-        ? 'failed'
-        : 'passed',
+    status: errors.some((e) => e.includes('entry-client') || e.includes('entry import') || e.includes('./ relative')) ? 'failed' : 'passed',
     detail: 'hashed entry-client ESM imports resolve 200 from /assets/',
 });
 

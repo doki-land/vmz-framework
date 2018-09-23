@@ -22,6 +22,7 @@
  *   #   NPM_TOTP_SECRET=<authenticator base32>
  *   #   NPM_TOKEN=npm_xxx
  *   pnpm placeholder:trust
+ *   pnpm placeholder:trust -- --only @vmz/vmz-skills
  */
 
 import { spawnSync } from 'node:child_process';
@@ -84,6 +85,7 @@ const JS_STUBS = [
     '@vmz/plugin-echarts',
     '@vmz/plugin-iconify',
     '@vmz/ui-icons',
+    '@vmz/vmz-skills',
 ];
 
 const NATIVE_STUBS = [
@@ -124,6 +126,7 @@ function takeFlag(args, flag) {
 
 const dryRun = rest.includes('--dry-run');
 const refresh = rest.includes('--refresh');
+const onlyName = takeFlag(rest, '--only');
 const token = takeFlag(rest, '--token') ?? process.env.NPM_TOKEN ?? localEnv.NPM_TOKEN ?? localEnv.TOKEN;
 
 const otpFlag = takeFlag(rest, '--otp') ?? process.env.NPM_OTP ?? localEnv.NPM_OTP ?? localEnv.OTP;
@@ -182,13 +185,23 @@ if (rest.includes('--publish') || rest.includes('--trust')) {
 }
 
 /** @type {StubSpec[]} */
-const STUBS = [
+const STUBS_ALL = [
     ...JS_STUBS.map((name) => ({ name })),
     ...NATIVE_STUBS.map((s) => ({
         ...s,
         description: `Optional native binary for @vmz/vmz (${s.name.replace(/^@vmz\/tools-/, '')}). Placeholder only.`,
     })),
 ];
+
+/** @type {StubSpec[]} */
+const STUBS = (() => {
+    if (!onlyName) return STUBS_ALL;
+    const hit = STUBS_ALL.filter((s) => s.name === onlyName);
+    if (hit.length === 0) {
+        fail(`--only ${onlyName}: not in placeholder set`);
+    }
+    return hit;
+})();
 
 /** @returns {CacheFile} */
 function loadCache() {

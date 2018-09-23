@@ -44,18 +44,19 @@ jobs:
             triple: darwin-arm64
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
+          package-manager-cache: false
 
       - name: Install dependencies
         run: pnpm install
@@ -85,7 +86,7 @@ jobs:
           ls -la "$out"
 
       - name: Upload native artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: native-${{ matrix.short }}
           path: dist/${{ matrix.short }}
@@ -98,7 +99,7 @@ jobs:
     environment: NPM_PUBLISH
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Resolve version
         id: ver
@@ -140,14 +141,16 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
           # Do NOT set registry-url: it writes _authToken=${NODE_AUTH_TOKEN} into
           # the runner npmrc and blocks Trusted Publisher OIDC (npm E404 on PUT).
+          # Lockfile is gitignored; setup-node@v5 auto-cache requires pnpm-lock.yaml.
+          package-manager-cache: false
 
       - name: Ensure npm supports Trusted Publishing
         run: npm install -g npm@latest
@@ -159,7 +162,7 @@ jobs:
         run: pnpm build:runtimes
 
       - name: Download native artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: native-*
           path: dist/native-artifacts

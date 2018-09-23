@@ -57,10 +57,7 @@ function nativeCandidatePaths() {
     }
     let dir = path.dirname(fileURLToPath(import.meta.url));
     for (let depth = 0; depth < 12; depth++) {
-        candidates.push(
-            path.join(dir, 'node_modules', name, `vmz.${triple}.node`),
-            path.join(dir, 'node_modules', name, 'vmz.node'),
-        );
+        candidates.push(path.join(dir, 'node_modules', name, `vmz.${triple}.node`), path.join(dir, 'node_modules', name, 'vmz.node'));
         const parent = path.dirname(dir);
         if (parent === dir) break;
         dir = parent;

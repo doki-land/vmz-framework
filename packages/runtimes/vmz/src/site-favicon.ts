@@ -72,9 +72,7 @@ export function emitSiteFavicon(distDir, opts = {}) {
         source: src.rel,
         svg: 'assets/favicon.svg',
         ico: icoPath ? 'favicon.ico' : null,
-        png: ICO_SIZES.filter((px) => fs.existsSync(path.join(assetsDir, `favicon-${px}.png`))).map(
-            (px) => `assets/favicon-${px}.png`,
-        ),
+        png: ICO_SIZES.filter((px) => fs.existsSync(path.join(assetsDir, `favicon-${px}.png`))).map((px) => `assets/favicon-${px}.png`),
         headHtml,
     };
     const vmzDir = path.join(absDist, '_vmz');
@@ -104,10 +102,7 @@ export function readSiteFaviconHeadHtml(distDir) {
  * @param {string|null} projectRoot
  */
 function discoverFaviconSvg(distDir, projectRoot) {
-    const candidates = [
-        path.join(distDir, 'assets', 'favicon.svg'),
-        path.join(distDir, 'favicon.svg'),
-    ];
+    const candidates = [path.join(distDir, 'assets', 'favicon.svg'), path.join(distDir, 'favicon.svg')];
     if (projectRoot) {
         candidates.push(
             path.join(projectRoot, 'assets', 'favicon.svg'),

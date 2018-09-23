@@ -19,12 +19,12 @@ SSR/resume behavior, `vmz test`, or deployment artifact.
 
 ## Delivery / dist layout (multi-artifact)
 
-- `vmz build` is **multi-artifact**. Default `--out-dir` is `dist` (workspace root for outputs) — **not** “upload this whole tree to a CDN”.
-- For **static CDN** (`delivery` profile `static` → `assembly: static-cdn`), emit and publish **`dist/cdn`** only:
-  - Prefer: `vmz build . --out-dir dist/cdn` (and `delivery.default: 'static'` in `vmz.config.ts`).
-  - CDN / Netlify / Pages **Publish directory** = the app’s `dist/cdn` (multi-page `**/index.html`).
-- **Never** tell users to publish bare `dist/` when the app may also hold server-host, hybrid, or other assemblies under the same out root.
-- Design truth lives in the workspace VMZ Living doc `04` (Build 产物布局与 CDN 发布); do not invent parallel out-dir schemes in app READMEs. Agent Skills must not deep-link internal decision paths.
+- `vmz build` is **multi-artifact**. Default `--out-dir` is `dist` (workspace root) — **not** the CDN publish tree.
+- Three layers: **profile id** (e.g. `static`) · **assembly** (`web-static`) · **`name`** (subdir under out-dir).
+- Static CDN: `profiles.static` with `assembly: 'web-static'` and `name: 'cdn'` → publish **`dist/cdn`** only.
+  - Omit `name` → default `dist/static`.
+  - **Never** teach `--out-dir dist/cdn` as the naming mechanism.
+- Downstream apps call published npm `vmz`. Do not require sibling overlay / `link:` for CI.
 
 ## Workflow
 

@@ -25,10 +25,9 @@ try {
         await page.waitForSelector('[data-vmz-overlay="select"]', { timeout: 5000 });
         console.log('select open: PASS');
         await page.click('[data-vmz-option="ops"]');
-        await page.waitForFunction(
-            () => document.querySelector('.vmz-ui-select__value')?.textContent?.includes('Operations'),
-            { timeout: 5000 },
-        );
+        await page.waitForFunction(() => document.querySelector('.vmz-ui-select__value')?.textContent?.includes('Operations'), {
+            timeout: 5000,
+        });
         console.log('select pick: PASS');
     } catch {
         const after = await page.evaluate(() => ({

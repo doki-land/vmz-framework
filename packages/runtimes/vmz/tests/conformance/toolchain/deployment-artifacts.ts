@@ -48,12 +48,7 @@ const FIXTURE = `{
   ]
 }`;
 
-const EXPECTED_CLOSURE = [
-    'components/Button',
-    'components/Icon',
-    'layouts/App',
-    'pages/index',
-].sort();
+const EXPECTED_CLOSURE = ['components/Button', 'components/Icon', 'layouts/App', 'pages/index'].sort();
 
 const EXPECTED_COMPONENT_ENTRIES = [
     {

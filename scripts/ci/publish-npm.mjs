@@ -49,7 +49,9 @@ const JS_PACKAGES = [
     { dir: 'packages/plugins/vmz-plugin-iconify' },
     { dir: 'packages/ui/vmz-ui' },
     { dir: 'packages/ui/vmz-ui-icons' },
+    // After CLI: new stubs without Trusted Publisher must not block `@vmz/vmz`.
     { dir: 'packages/runtimes/vmz', publishName: '@vmz/vmz' },
+    { dir: 'packages/runtimes/vmz-skills' },
 ];
 
 function fail(msg) {
@@ -265,8 +267,25 @@ function publishNative(version, artifactsRoot) {
 function publishJs(version) {
     let published = 0;
     let skipped = 0;
+    /** @type {string[]} */
+    const authFailed = [];
+    /** @type {string[]} */
+    const otherFailed = [];
 
-    const optionalNatives = Object.fromEntries(NATIVE_PLATFORMS.map((p) => [`@vmz/vmz-${p.short}`, version]));
+    // Only pin platforms that ship a binary this release (CI matrix today:
+    // win32-x64 / linux-x64 / darwin-arm64). Other triples stay on placeholder
+    // stubs until a runner or cross-compile lands — do not advertise missing @version.
+    /** @type {Record<string, string>} */
+    const optionalNatives = {};
+    for (const plat of NATIVE_PLATFORMS) {
+        const n = `@vmz/vmz-${plat.short}`;
+        const artDir = path.join(artifactsRoot, plat.short);
+        if (fs.existsSync(artDir) || versionExists(n, version)) {
+            optionalNatives[n] = version;
+        } else {
+            console.log(` · ${n}@${version} not built this release — omit from optionalDependencies`);
+        }
+    }
 
     for (const spec of JS_PACKAGES) {
         const abs = path.join(ROOT, spec.dir);
@@ -358,12 +377,30 @@ function publishJs(version) {
             console.log(` ✓ ${name}@${version} already on registry — skip`);
             skipped += 1;
         } else if (outcome === 'auth') {
-            fail(`OIDC/auth failed for ${name}. Add Trusted Publisher: file=publish-npm.yml env=NPM_PUBLISH repo=doki-land/vmz-framework`);
-        } else if (outcome === 'missing') {
-            fail(
-                `${name} is not on the registry yet. Create the name first via placeholder stubs (tag placeholder-v0.0.0 / pnpm placeholder:publish), then retry real publish.`,
+            console.error(
+                `ci-publish-npm: OIDC/auth failed for ${name} — continue; fix Trusted Publisher (file=publish-npm.yml env=NPM_PUBLISH repo=doki-land/vmz-framework) then re-run`,
             );
-        } else fail(`publish failed for ${name}`);
+            authFailed.push(name);
+        } else if (outcome === 'missing') {
+            console.error(
+                `ci-publish-npm: ${name} missing on registry — create 0.0.0 stub via pnpm placeholder:publish, then Trusted Publisher via pnpm placeholder:trust -- --only ${name}`,
+            );
+            otherFailed.push(name);
+        } else {
+            console.error(`ci-publish-npm: publish failed for ${name} — continue remaining packages`);
+            otherFailed.push(name);
+        }
+    }
+
+    if (authFailed.length || otherFailed.length) {
+        const parts = [];
+        if (authFailed.length) {
+            parts.push(
+                `Trusted Publisher missing/auth failed: ${authFailed.join(', ')} (local: pnpm placeholder:trust -- --only <name>)`,
+            );
+        }
+        if (otherFailed.length) parts.push(`other failures: ${otherFailed.join(', ')}`);
+        fail(parts.join('; '));
     }
     return { published, skipped };
 }
