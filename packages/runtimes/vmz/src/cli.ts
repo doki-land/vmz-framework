@@ -476,6 +476,7 @@ async function cmdBuild(args) {
                 siteId: cfg.application?.id || undefined,
                 origin,
                 pack: pack.manifest,
+                projectRoot: project,
             });
             for (const step of assemble.manifest.steps || []) {
                 if (step.kind === 'static-cdn') {

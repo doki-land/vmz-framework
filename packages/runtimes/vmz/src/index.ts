@@ -973,7 +973,19 @@ export {
     resolveAssetByDigest,
     assertSharedAssetPath,
     contentAddressedAssetsDigest,
+    rewriteCssImports,
+    rewriteJsEntryRelativeImports,
 } from './content-addressed-assets.js';
+export {
+    SITE_FAVICON_SCHEMA,
+    emitSiteFavicon,
+    readSiteFaviconHeadHtml,
+    packPngsIntoIco,
+} from './site-favicon.js';
+export {
+    PUBLIC_STATIC_ASSETS_SCHEMA,
+    emitPublicStaticAssets,
+} from './public-static-assets.js';
 export {
     CDN_POLICY_MANIFEST_SCHEMA,
     CDN_ADAPTER_PROJECTION_SCHEMA,

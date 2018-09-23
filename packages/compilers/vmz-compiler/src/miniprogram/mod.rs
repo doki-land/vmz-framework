@@ -11,7 +11,7 @@ pub mod target;
 pub mod tooling_deploy;
 pub mod wechat_pack;
 mod wechat_page_js;
-mod wechat_tab;
+pub mod wechat_tab;
 mod wechat_wxss;
 
 use vmz_generator::{MiniEmitError, MiniEmitErrorKind};

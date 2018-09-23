@@ -1528,3 +1528,11 @@ pub fn deployment_depends_on_closure(json_text: String, roots: Vec<String>) -> R
         .into_iter()
         .collect())
 }
+
+/// Rasterize SVG markup to a square PNG (site favicon / tab icons).
+#[napi]
+pub fn rasterize_svg_png(svg: String, px: u32) -> Result<Buffer> {
+    let bytes = vmz_compiler::miniprogram::wechat_tab::rasterize_svg_png(&svg, px)
+        .map_err(Error::from_reason)?;
+    Ok(Buffer::from(bytes))
+}

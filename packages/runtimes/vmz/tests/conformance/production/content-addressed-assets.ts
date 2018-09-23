@@ -11,6 +11,7 @@ import { CACHE_ASSET_IMMUTABLE, CACHE_HTML, assertSharedAssetPath, listenLocalSt
 import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
 import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
 import { assertHashedCssImportsHttp } from '../_lib/assert-hashed-css-imports.ts';
+import { assertHashedEntryImportsHttp } from '../_lib/assert-hashed-entry-imports.ts';
 import { addLimitation, readProof, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 
 const root = repoRoot(import.meta.url);
@@ -135,6 +136,8 @@ try {
     }
     console.log('content-addressed-assets: hashed CSS @import HTTP…');
     errors.push(...(await assertHashedCssImportsHttp(dist, host.baseUrl, get)));
+    console.log('content-addressed-assets: hashed entry-client ESM import HTTP…');
+    errors.push(...(await assertHashedEntryImportsHttp(dist, host.baseUrl, get)));
 } finally {
     await host.close();
 }
@@ -160,6 +163,13 @@ upsertCheck(proof, {
     id: 'content-addressed-assets.css-import-http',
     status: errors.some((e) => e.includes('@import') || e.includes('text/css') || e.includes('vmz.css')) ? 'failed' : 'passed',
     detail: 'hashed vmz.css @import siblings 200 text/css',
+});
+upsertCheck(proof, {
+    id: 'content-addressed-assets.entry-import-http',
+    status: errors.some((e) => e.includes('entry-client') || e.includes('entry import') || e.includes('./ relative'))
+        ? 'failed'
+        : 'passed',
+    detail: 'hashed entry-client ESM imports resolve 200 from /assets/',
 });
 
 const gaps = ['A3: second real CDN provider adapter beyond netlify projection not covered'];

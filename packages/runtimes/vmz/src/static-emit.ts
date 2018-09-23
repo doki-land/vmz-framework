@@ -16,7 +16,9 @@ import { emitContentAddressedAssets } from './content-addressed-assets.js';
 import { absoluteUrl, buildLocalePageMeta, localizeBodyLinks } from './locale-router.js';
 import { requireNativeAddon } from './native-addon.js';
 import { writePrettyJsonFile } from './pretty-json.js';
+import { emitPublicStaticAssets } from './public-static-assets.js';
 import { filePathPatternFromChunk, isRouteBoundaryStem, listPublicPageUnits, parsePathPattern, unitBrowserPathPattern } from './route-path.js';
+import { emitSiteFavicon, readSiteFaviconHeadHtml } from './site-favicon.js';
 
 export const STATIC_DELIVERY_MANIFEST_SCHEMA = 'vmz.static.delivery_manifest.v0';
 
@@ -36,6 +38,9 @@ export async function emitWebStatic(distDir, opts = {}) {
     if (!fs.existsSync(domPath)) {
         throw new Error(`emitWebStatic: missing ${domPath} — run vmz build first`);
     }
+    emitSiteFavicon(distDir, { projectRoot: opts.projectRoot });
+    const faviconHead = readSiteFaviconHeadHtml(distDir);
+    const publicAssets = emitPublicStaticAssets(distDir, { projectRoot: opts.projectRoot });
     const host = await createRenderHost(distDir, { strictDeployment: true, preload: 'none' });
     const { renderToString, renderToStream } = host;
 
@@ -146,6 +151,7 @@ export async function emitWebStatic(distDir, opts = {}) {
                 props,
                 meta: gen.meta,
                 cssEntry: readCssEntry(distDir),
+                headExtraHtml: faviconHead,
             });
             fs.writeFileSync(absHtml, html, 'utf8');
             generations.push({
@@ -178,6 +184,7 @@ export async function emitWebStatic(distDir, opts = {}) {
         },
         cssEntry: readCssEntry(distDir),
         isErrorDocument: true,
+        headExtraHtml: faviconHead,
     });
     fs.writeFileSync(path.join(distDir, '404.html'), notFoundHtml, 'utf8');
 
@@ -231,6 +238,12 @@ export async function emitWebStatic(distDir, opts = {}) {
             sitemap: 'sitemap.xml',
             robots: 'robots.txt',
         },
+        publicAssets: {
+            schema: publicAssets.schema,
+            status: publicAssets.status,
+            fileCount: publicAssets.fileCount ?? 0,
+            source: publicAssets.source || null,
+        },
     };
     const digest = sha256Hex(canonicalJson(manifest));
     manifest.manifestDigest = digest;
@@ -258,6 +271,7 @@ export async function emitWebStatic(distDir, opts = {}) {
         skipped,
         digest: manifest.manifestDigest,
         assets: assets.manifest,
+        publicAssets,
         cdnPolicy: cdn.policy,
         cdnAdapters: cdn.adapters,
     };
@@ -521,6 +535,7 @@ function readCssEntry(distDir) {
  *   meta: { title: string, description: string, canonical: string, robots: string, lang: string, dir?: string, alternates?: Array<{ hreflang: string, href: string }> },
  *   cssEntry: string | null,
  *   isErrorDocument?: boolean,
+ *   headExtraHtml?: string,
  * }} input
  */
 function wrapDocument(input) {
@@ -548,6 +563,7 @@ function wrapDocument(input) {
         // napi Option<String>: omit/undefined = None; null is rejected as String
         ...(input.cssEntry ? { cssEntry: String(input.cssEntry) } : {}),
         isErrorDocument: !!input.isErrorDocument,
+        ...(input.headExtraHtml ? { headExtraHtml: String(input.headExtraHtml) } : {}),
     });
 }
 

@@ -9,6 +9,8 @@ import { semanticIdsForAssembly, sha256Hex, canonicalJson } from './delivery-pro
 import { emitServerArtifact } from './server-artifact.js';
 import { emitEmbeddedPackaging } from './embedded-packaging.js';
 import { emitSiteDelivery } from './site-delivery.js';
+import { emitSiteFavicon } from './site-favicon.js';
+import { emitPublicStaticAssets } from './public-static-assets.js';
 import { emitWebStatic } from './static-emit.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 
@@ -31,7 +33,10 @@ export async function assembleDelivery(outDir, ctx) {
     };
 
     if (assembly === 'static-cdn' || assembly === 'cdn+server') {
-        const staticResult = await emitWebStatic(outDir, { origin: ctx.origin });
+        const staticResult = await emitWebStatic(outDir, {
+            origin: ctx.origin,
+            projectRoot: ctx.projectRoot,
+        });
         result.steps.push({
             kind: 'static-cdn',
             digest: staticResult.digest,
@@ -43,6 +48,10 @@ export async function assembleDelivery(outDir, ctx) {
             htmlFiles: staticResult.htmlFiles,
             skipped: staticResult.skipped,
         };
+    } else if (assembly === 'server-host' || assembly === 'local-static') {
+        // SSR / local packs: favicon + opaque public/ for serve-host.
+        emitSiteFavicon(outDir, { projectRoot: ctx.projectRoot });
+        emitPublicStaticAssets(outDir, { projectRoot: ctx.projectRoot });
     }
 
     if (assembly === 'local-static') {

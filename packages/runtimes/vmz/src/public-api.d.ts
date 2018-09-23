@@ -526,6 +526,25 @@ export function assertSharedAssetPath(
     ext?: string,
 ): { ok: boolean; assetPath?: string; digest?: string; reason?: string; digestA?: string; digestB?: string; rel?: string };
 export function contentAddressedAssetsDigest(manifest: Record<string, unknown>): string;
+export function rewriteCssImports(cssText: string, rewrites: Record<string, string>): string;
+export function rewriteJsEntryRelativeImports(
+    jsText: string,
+    rewrites?: Record<string, string>,
+): string;
+
+export const SITE_FAVICON_SCHEMA: string;
+export function emitSiteFavicon(
+    distDir: string,
+    opts?: { projectRoot?: string; skipNative?: boolean },
+): Record<string, unknown>;
+export function readSiteFaviconHeadHtml(distDir: string): string;
+export function packPngsIntoIco(images: Array<{ png: Buffer; size: number }>): Buffer;
+
+export const PUBLIC_STATIC_ASSETS_SCHEMA: string;
+export function emitPublicStaticAssets(
+    distDir: string,
+    opts?: { projectRoot?: string; publicDir?: string },
+): Record<string, unknown>;
 
 export const CDN_POLICY_MANIFEST_SCHEMA: string;
 export const CDN_ADAPTER_PROJECTION_SCHEMA: string;
