@@ -148,7 +148,7 @@ function pickRecipe(answers: PlannerAnswers, cautions: string[]): RecipePick {
 
     if (secrets === 'yes') {
         if (html === 'cdn-prebuild' || html === 'browser-only' || server === 'none') {
-            cautions.push('T.secrets=yes：不得推荐纯 static-cdn / local-static 作为生产配方，已改选含可信 server 的配方。');
+            cautions.push('T.secrets=yes：不得推荐纯 web-static / local-static 作为生产配方，已改选含可信 server 的配方。');
         }
         if (hasStaticVendor(vendors)) {
             cautions.push('已选静态托管平台，但 secrets=yes：静态面只能挂公开壳；密钥须另有可信 server（hybrid）或改掉 secrets。');
@@ -179,7 +179,7 @@ function pickRecipe(answers: PlannerAnswers, cautions: string[]): RecipePick {
         return {
             recipeId: 'static',
             profileId: 'static',
-            assembly: 'static-cdn',
+            assembly: 'web-static',
         };
     }
 
@@ -239,7 +239,7 @@ function pickRecipe(answers: PlannerAnswers, cautions: string[]): RecipePick {
     return {
         recipeId: 'static',
         profileId: 'static',
-        assembly: 'static-cdn',
+        assembly: 'web-static',
     };
 }
 
@@ -268,6 +268,10 @@ function buildSnippet(pick: RecipePick): string {
             `        assembly: '${pick.assembly}',`,
             `        serverRuntime: '${pick.serverRuntime}',`,
             '      },',
+        );
+    } else if (pick.assembly === 'web-static') {
+        lines.push(
+            `      '${pick.profileId}': { host: 'browser', assembly: 'web-static', name: 'cdn' },`,
         );
     } else {
         lines.push(`      '${pick.profileId}': { host: 'browser', assembly: '${pick.assembly}' },`);
@@ -677,7 +681,7 @@ export function buildDeployPlan(answers: PlannerAnswers): DeployPlanView {
         { label: '密钥与环境变量', href: `${DEPLOY_GUIDE}/secrets-env` },
         { label: 'vmz deploy', href: `${DEPLOY_GUIDE}/cli` },
     ];
-    if (hasStaticVendor(answers.vendors) || pick.assembly === 'static-cdn') {
+    if (hasStaticVendor(answers.vendors) || pick.assembly === 'web-static') {
         deepLinks.splice(2, 0, { label: '纯静态平台填写清单', href: STATIC_HOSTS_DOC });
     }
 

@@ -626,6 +626,15 @@ export function pickDeliveryPackaging(
     raw: Record<string, unknown>,
     diagnostics: Array<{ code: string; message: string }>,
 ): Record<string, unknown> | null;
+export function normalizeProfileArtifactName(
+    id: string,
+    rawName: unknown,
+    diagnostics: Array<{ code: string; message: string }>,
+): string | null;
+export function resolveProfileArtifactDir(
+    outDir: string,
+    profile: { name?: string; id?: string; nameExplicit?: boolean } | null | undefined,
+): string;
 export function normalizeDeliveryAuthoring(
     raw: unknown,
 ): { ok: true; table: Record<string, unknown> } | { ok: false; diagnostics: Array<{ code: string; message: string }> };

@@ -32,13 +32,13 @@ export async function assembleDelivery(outDir, ctx) {
         steps: [],
     };
 
-    if (assembly === 'static-cdn' || assembly === 'cdn+server') {
+    if (assembly === 'web-static' || assembly === 'cdn+server') {
         const staticResult = await emitWebStatic(outDir, {
             origin: ctx.origin,
             projectRoot: ctx.projectRoot,
         });
         result.steps.push({
-            kind: 'static-cdn',
+            kind: 'web-static',
             digest: staticResult.digest,
             htmlFiles: staticResult.htmlFiles?.length ?? 0,
             skipped: staticResult.skipped?.length ?? 0,
@@ -146,7 +146,7 @@ export function emitBuildProof(outDir, ctx) {
     };
     for (const id of semanticIds) {
         if (id === 'static-delivery') {
-            const step = (ctx.assemble?.steps || []).find((s) => s.kind === 'static-cdn');
+            const step = (ctx.assemble?.steps || []).find((s) => s.kind === 'web-static');
             slots[id] = step
                 ? { status: 'emitted', detail: `digest=${String(step.digest).slice(0, 12)}` }
                 : { status: 'pending', detail: 'assembly requires static emit' };

@@ -1034,6 +1034,8 @@ export {
     BUILTIN_PROFILES,
     pickSiteAuthoring,
     pickDeliveryPackaging,
+    normalizeProfileArtifactName,
+    resolveProfileArtifactDir,
     normalizeDeliveryAuthoring,
     selectBuildProfile,
     semanticIdsForAssembly,

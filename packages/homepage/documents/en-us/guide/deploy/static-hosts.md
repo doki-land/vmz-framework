@@ -1,6 +1,6 @@
 # Static host fill-in checklist
 
-For **`static` / `static-cdn`**.
+For **`static` / `web-static`** (publish `dist/<name>`, convention `name: 'cdn'` → `dist/cdn`).
 
 **Two axes:**
 

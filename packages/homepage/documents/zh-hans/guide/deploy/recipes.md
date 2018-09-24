@@ -15,15 +15,16 @@ export default defineConfig({
   delivery: {
     default: 'static',
     profiles: {
-      'static': { host: 'browser', assembly: 'static-cdn' },
+      'static': { host: 'browser', assembly: 'web-static', name: 'cdn' },
     },
   },
 })
 ```
 
 ```bash
-vmz build --profile static
+vmz build --profile static   # 产物 → dist/cdn
 vmz serve --profile static   # 预览合同，不会用 SPA fallback 掩盖缺页
+# CDN / Netlify Publish 只上传 dist/cdn，不要整棵 dist/
 ```
 
 ## web-ssr — 单机全栈（默认）

@@ -5,22 +5,71 @@
 // @ts-nocheck
 
 import crypto from 'node:crypto';
+import path from 'node:path';
 
 export const DELIVERY_PROFILE_AUTHORING_SCHEMA = 'vmz.delivery.authoring.v0';
 export const BUILD_PROFILE_SELECTION_SCHEMA = 'vmz.build.profile_selection.v0';
 
-/** Browser-era assembly kinds (04 B5). */
-export const ASSEMBLIES = Object.freeze(['local-static', 'static-cdn', 'server-host', 'cdn+server', 'rust-embedded']);
+/** Browser-era assembly kinds (04 B5). `static-cdn` was renamed to `web-static`. */
+export const ASSEMBLIES = Object.freeze(['local-static', 'web-static', 'server-host', 'cdn+server', 'rust-embedded']);
 
 export const SERVER_RUNTIMES = Object.freeze(['node', 'worker', 'deno', 'bun', 'rust-host']);
 
 /** Official built-in aliases when not overridden in config. */
 export const BUILTIN_PROFILES = Object.freeze({
     'web-client': { host: 'browser', assembly: 'local-static' },
-    static: { host: 'browser', assembly: 'static-cdn' },
+    static: { host: 'browser', assembly: 'web-static' },
     'web-ssr': { host: 'browser', assembly: 'server-host', serverRuntime: 'node' },
     'web-hybrid': { host: 'browser', assembly: 'cdn+server', serverRuntime: 'node' },
 });
+
+/**
+ * Profile artifact directory name under CLI `--out-dir` (default = profile id).
+ * @param {string} id
+ * @param {unknown} rawName
+ * @param {Array<{ code: string, message: string }>} diagnostics
+ * @returns {string | null}
+ */
+export function normalizeProfileArtifactName(id, rawName, diagnostics) {
+    const fallback = String(id || '').trim();
+    if (rawName == null || rawName === '') return fallback || null;
+    if (typeof rawName !== 'string') {
+        diagnostics.push({
+            code: 'delivery.profile.name',
+            message: `profiles.${id}.name must be a string (got ${typeof rawName})`,
+        });
+        return null;
+    }
+    const name = rawName.trim();
+    if (!name) {
+        diagnostics.push({
+            code: 'delivery.profile.name',
+            message: `profiles.${id}.name must be a non-empty string`,
+        });
+        return null;
+    }
+    if (name === '.' || name === '..' || name.includes('/') || name.includes('\\') || name.includes('\0')) {
+        diagnostics.push({
+            code: 'delivery.profile.name',
+            message: `profiles.${id}.name must be a single path segment under --out-dir (got '${name}')`,
+        });
+        return null;
+    }
+    return name;
+}
+
+/**
+ * Workspace `--out-dir` + profile `name` → artifact root.
+ * Always nests: `path.join(outDir, name)` where `name` defaults to profile id
+ * (`name: 'cdn'` → `dist/cdn`; omit → `dist/static` for profile `static`).
+ * @param {string} outDir
+ * @param {{ name?: string, id?: string } | null | undefined} profile
+ */
+export function resolveProfileArtifactDir(outDir, profile) {
+    const name = String(profile?.name || profile?.id || '').trim();
+    if (!name) return outDir;
+    return path.join(outDir, name);
+}
 
 function isPlainObject(v) {
     return v != null && typeof v === 'object' && !Array.isArray(v);
@@ -122,7 +171,14 @@ function normalizeProfileEntry(entry, id, diagnostics) {
             message: `profiles.${id}.host: only 'browser' is supported before Browser Production (got ${host})`,
         });
     }
-    const assembly = String(entry.assembly || '').trim();
+    let assembly = String(entry.assembly || '').trim();
+    if (assembly === 'static-cdn') {
+        diagnostics.push({
+            code: 'delivery.profile.assembly.renamed',
+            message: `profiles.${id}.assembly 'static-cdn' was renamed to 'web-static'`,
+        });
+        return null;
+    }
     if (!ASSEMBLIES.includes(assembly)) {
         diagnostics.push({
             code: 'delivery.profile.assembly',
@@ -130,6 +186,9 @@ function normalizeProfileEntry(entry, id, diagnostics) {
         });
         return null;
     }
+    const nameExplicit = entry.name != null && String(entry.name).trim() !== '';
+    const name = normalizeProfileArtifactName(id, nameExplicit ? entry.name : id, diagnostics);
+    if (!name) return null;
     let serverRuntime = null;
     if (assembly === 'server-host' || assembly === 'cdn+server') {
         serverRuntime = String(entry.serverRuntime || 'node');
@@ -169,6 +228,9 @@ function normalizeProfileEntry(entry, id, diagnostics) {
     }
     return {
         id,
+        name,
+        /** True when author set `profiles.<id>.name`; false → `name` defaulted to profile id. */
+        nameExplicit,
         host: 'browser',
         assembly,
         serverRuntime,
@@ -302,6 +364,8 @@ export function selectBuildProfile(table, cliProfile = '') {
     const selection = {
         schema: BUILD_PROFILE_SELECTION_SCHEMA,
         profileId: id,
+        name: profile.name,
+        nameExplicit: Boolean(profile.nameExplicit),
         host: profile.host,
         assembly: profile.assembly,
         serverRuntime: profile.serverRuntime,
@@ -315,7 +379,7 @@ export function selectBuildProfile(table, cliProfile = '') {
 
 export function semanticIdsForAssembly(assembly) {
     switch (assembly) {
-        case 'static-cdn':
+        case 'web-static':
             return ['static-delivery', 'asset-graph'];
         case 'server-host':
             return ['server-host', 'asset-graph'];

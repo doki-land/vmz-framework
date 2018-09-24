@@ -138,13 +138,18 @@ export interface SiteDeliveryAuthoring {
     securityPolicy?: unknown;
 }
 
-export type DeliveryAssembly = 'local-static' | 'static-cdn' | 'server-host' | 'cdn+server' | 'rust-embedded';
+export type DeliveryAssembly = 'local-static' | 'web-static' | 'server-host' | 'cdn+server' | 'rust-embedded';
 
 export type DeliveryServerRuntime = 'node' | 'worker' | 'deno' | 'bun' | 'rust-host';
 
 export interface DeliveryProfileAuthoring {
     host?: 'browser';
     assembly: DeliveryAssembly;
+    /**
+     * Artifact directory under CLI `--out-dir` (default = profile id).
+     * Example: profile `static` + `name: 'cdn'` → `dist/cdn`.
+     */
+    name?: string;
     serverRuntime?: DeliveryServerRuntime;
     /** Inline site sources or `defineSite({...})`. */
     sources?: SiteDeliveryAuthoring | SiteDeliveryAuthoring['sources'];

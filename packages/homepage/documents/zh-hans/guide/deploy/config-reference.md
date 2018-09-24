@@ -13,7 +13,8 @@
 |------|------|
 | `default` | `vmz build` 未传 `--profile` 时使用的 id |
 | `profiles.<id>.host` | 当前 Browser 期仅 `browser` |
-| `profiles.<id>.assembly` | `local-static` \| `static-cdn` \| `server-host` \| `cdn+server` \| `rust-embedded` |
+| `profiles.<id>.assembly` | `local-static` \| `web-static` \| `server-host` \| `cdn+server` \| `rust-embedded`（旧名 `static-cdn` 已废） |
+| `profiles.<id>.name` | 产物子目录，落在 CLI `--out-dir`（默认 `dist`）下；省略 = profile id。CDN 惯例 `name: 'cdn'` → `dist/cdn` |
 | `profiles.<id>.serverRuntime` | `server-host` / `cdn+server` 时：`node` \| `worker` \| `deno` \| `bun` \| `rust-host` |
 | `profiles.<id>.sources` | 可选；`defineSite({ artifact, sources, resolution… })`，与装配正交 |
 | `delivery.deploy.plan` | 可选；指向机器可读 DeployPlan（供 `vmz deploy --plan`）。**人手勿手抄**——由编码 agent / 工具生成；互动计划器主输出是 [提示词](./planner.md) |

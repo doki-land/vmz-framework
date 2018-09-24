@@ -42,7 +42,7 @@ function get(url: string): Promise<{ status: number; body: string; headers: http
 
 console.log('content-addressed-assets: vmz build --profile static…');
 const example = path.join(root, ...EXAMPLE.split('/'));
-const dist = path.join(example, 'dist');
+const dist = path.join(example, 'dist', 'static');
 const build = spawnSync(process.execPath, [vmzBin(root), 'build', example, '--profile', 'static', '--origin', ORIGIN], {
     cwd: root,
     encoding: 'utf8',

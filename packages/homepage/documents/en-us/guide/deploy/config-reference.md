@@ -13,7 +13,8 @@ Read [topology picker](./index.md) and [recipes](./recipes.md) first.
 |-------|---------|
 | `default` | Profile when `vmz build` omits `--profile` |
 | `profiles.<id>.host` | Browser era: `browser` only |
-| `profiles.<id>.assembly` | `local-static` \| `static-cdn` \| `server-host` \| `cdn+server` \| `rust-embedded` |
+| `profiles.<id>.assembly` | `local-static` \| `web-static` \| `server-host` \| `cdn+server` \| `rust-embedded` (legacy `static-cdn` removed) |
+| `profiles.<id>.name` | Artifact subdir under CLI `--out-dir` (default `dist`); omit = profile id. CDN convention `name: 'cdn'` → `dist/cdn` |
 | `profiles.<id>.serverRuntime` | For server assemblies: `node` \| `worker` \| `deno` \| `bun` \| `rust-host` |
 | `profiles.<id>.sources` | Optional `defineSite({...})`; orthogonal to assembly |
 | `delivery.deploy.plan` | Optional path to a machine-readable DeployPlan for `vmz deploy --plan`. **Do not hand-copy** — an agent/tool writes it; the interactive planner’s primary output is a [prompt](./planner.md) |

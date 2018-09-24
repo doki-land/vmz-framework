@@ -15,15 +15,16 @@ export default defineConfig({
   delivery: {
     default: 'static',
     profiles: {
-      'static': { host: 'browser', assembly: 'static-cdn' },
+      'static': { host: 'browser', assembly: 'web-static', name: 'cdn' },
     },
   },
 })
 ```
 
 ```bash
-vmz build --profile static
+vmz build --profile static   # artifacts → dist/cdn
 vmz serve --profile static
+# CDN / Netlify Publish: upload dist/cdn only — never the whole dist/ tree
 ```
 
 ## web-ssr (default)

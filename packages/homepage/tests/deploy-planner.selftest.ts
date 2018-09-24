@@ -28,7 +28,7 @@ const secretsPlan = buildDeployPlan({
     secrets: 'yes',
     vendors: ['cloudflare-pages'],
 });
-assert(secretsPlan.assembly !== 'static-cdn', 'secrets ban static');
+assert(secretsPlan.assembly !== 'web-static', 'secrets ban static');
 assert(
     secretsPlan.adapters.some((a) => a.kind === 'cloudflare-pages'),
     'platform kind',

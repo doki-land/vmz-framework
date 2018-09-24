@@ -1,6 +1,6 @@
 # 纯静态托管平台填写清单
 
-面向 **`static` / `static-cdn`**。
+面向 **`static` / `web-static`**（发布 `dist/<name>`，惯例 `name: 'cdn'` → `dist/cdn`）。
 
 **两轴：**
 

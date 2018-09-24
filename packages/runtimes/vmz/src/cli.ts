@@ -31,7 +31,7 @@ import { cmdRefactor } from './refactor-cmd.js';
 import { cmdExplain } from './explain-cmd.js';
 import { resolveNativeVmzCli } from './resolve-native-cli.js';
 import { loadVmzConfig } from './plugin-host.js';
-import { normalizeDeliveryAuthoring, selectBuildProfile } from './delivery-profile.js';
+import { normalizeDeliveryAuthoring, resolveProfileArtifactDir, selectBuildProfile } from './delivery-profile.js';
 import { packFromDeploymentIr } from './pack.js';
 import { assembleDelivery, emitBuildProof } from './build-assemble.js';
 
@@ -130,11 +130,11 @@ Usage:
   vmz help                      Show this help
 
 Options:
-  --out-dir, -o <dir>   Output directory (default: dist; multi-artifact root — static CDN publish dist/cdn, not bare dist/)
+  --out-dir, -o <dir>   Workspace output root (default: dist). Profile artifacts land in <out-dir>/<name> (name defaults to profile id; CDN: name:'cdn' → dist/cdn)
   --release             Release build (omit serve-host; pack minify slot; proof)
   --profile <name>      Delivery profile (default from config; builtins: web-ssr|static|web-client|web-hybrid)
   --target <id>         browser (default) | mini-program-wechat (pack dist/wechat for WeChat DevTools; build+dev)
-  --origin <url>        Site origin for static-cdn canonical/sitemap
+  --origin <url>        Site origin for web-static canonical/sitemap
   --host <host>         Listen host (default: 127.0.0.1)
   --port <port>         Listen port (dev: omit = auto from 5173; set = lock)
   --poll-ms <ms>        Dev watch poll interval (default: 300)
@@ -353,28 +353,31 @@ async function cmdBuild(args) {
         return 1;
     }
     const wechatPack = targetRaw === 'mini-program-wechat';
-    const { project, outDir } = resolveWorkspaceDirs({
+    const { project, outDir: outDirRoot } = resolveWorkspaceDirs({
         path: pathArg,
         outDir: typeof args['out-dir'] === 'string' ? args['out-dir'] : undefined,
     });
-    log.info(`build ${project} → ${outDir}${wechatPack ? ' (target=mini-program-wechat)' : ''}`);
+    const cfg = await loadVmzConfig(project);
+    const cliProfile = typeof args.profile === 'string' ? args.profile : '';
+    const norm = normalizeDeliveryAuthoring(cfg.delivery ?? null);
+    if (!norm.ok) {
+        log.diagnostics(norm.diagnostics ?? []);
+        log.error('delivery authoring invalid');
+        return 1;
+    }
+    const selected = selectBuildProfile(norm.table, cliProfile);
+    if (!selected.ok) {
+        log.diagnostics(selected.diagnostics ?? []);
+        log.error(`unknown build --profile ${cliProfile || norm.table.default}`);
+        return 1;
+    }
+    const outDir = resolveProfileArtifactDir(outDirRoot, selected.profile);
+    log.info(
+        `build ${project} → ${outDir}${wechatPack ? ' (target=mini-program-wechat)' : ''} (out-dir=${outDirRoot}, name=${selected.profile.name})`,
+    );
     const ws = createWorkspace({ root: project, outDir });
     try {
-        const cfg = await loadVmzConfig(project);
-        const cliProfile = typeof args.profile === 'string' ? args.profile : '';
-        const norm = normalizeDeliveryAuthoring(cfg.delivery ?? null);
-        if (!norm.ok) {
-            log.diagnostics(norm.diagnostics ?? []);
-            log.error('delivery authoring invalid');
-            return 1;
-        }
-        const selected = selectBuildProfile(norm.table, cliProfile);
-        if (!selected.ok) {
-            log.diagnostics(selected.diagnostics ?? []);
-            log.error(`unknown build --profile ${cliProfile || norm.table.default}`);
-            return 1;
-        }
-        log.info(`delivery profile ${selected.selection.profileId} (assembly=${selected.selection.assembly})`);
+        log.info(`delivery profile ${selected.selection.profileId} (assembly=${selected.selection.assembly}, name=${selected.profile.name})`);
 
         const code = await runWithPlugins(ws, project, outDir, () => {
             const report = ws.build(Boolean(args.release));
@@ -464,7 +467,7 @@ async function cmdBuild(args) {
         const origin = typeof args.origin === 'string' ? args.origin : undefined;
         let assemble = null;
         try {
-            if (selected.selection.assembly === 'static-cdn') {
+            if (selected.selection.assembly === 'web-static') {
                 log.info(`static emit ${outDir}`);
             }
             assemble = await assembleDelivery(outDir, {
@@ -479,7 +482,7 @@ async function cmdBuild(args) {
                 projectRoot: project,
             });
             for (const step of assemble.manifest.steps || []) {
-                if (step.kind === 'static-cdn') {
+                if (step.kind === 'web-static') {
                     log.info(`static ok (${step.htmlFiles} html, ${step.skipped} skipped, digest=${String(step.digest).slice(0, 12)}…)`);
                 } else if (step.kind === 'site-delivery' && step.digest) {
                     log.info(`site-delivery ok (digest=${String(step.digest).slice(0, 12)}…)`);
@@ -509,10 +512,25 @@ async function cmdServe(args) {
         const code = await cmdBuild(args);
         if (code !== 0) return code;
     }
-    const { project, outDir } = resolveWorkspaceDirs({
+    const { project, outDir: outDirRoot } = resolveWorkspaceDirs({
         path: pathArg,
         outDir: typeof args['out-dir'] === 'string' ? args['out-dir'] : undefined,
     });
+    const cfg = await loadVmzConfig(project);
+    const cliProfile = typeof args.profile === 'string' ? args.profile : '';
+    const norm = normalizeDeliveryAuthoring(cfg.delivery ?? null);
+    if (!norm.ok) {
+        log.diagnostics(norm.diagnostics ?? []);
+        log.error('delivery authoring invalid');
+        return 1;
+    }
+    const selected = selectBuildProfile(norm.table, cliProfile);
+    if (!selected.ok) {
+        log.diagnostics(selected.diagnostics ?? []);
+        log.error(`unknown build --profile ${cliProfile || norm.table.default}`);
+        return 1;
+    }
+    const outDir = resolveProfileArtifactDir(outDirRoot, selected.profile);
     const hostJs = path.join(outDir, 'vmz-serve-host.mjs');
     if (!existsSync(hostJs)) {
         try {
@@ -562,10 +580,25 @@ async function cmdServe(args) {
  */
 async function cmdDev(args) {
     const pathArg = args._[0] ?? '.';
-    const { project, outDir } = resolveWorkspaceDirs({
+    const { project, outDir: outDirRoot } = resolveWorkspaceDirs({
         path: pathArg,
         outDir: typeof args['out-dir'] === 'string' ? args['out-dir'] : undefined,
     });
+    const cfg = await loadVmzConfig(project);
+    const cliProfile = typeof args.profile === 'string' ? args.profile : '';
+    const norm = normalizeDeliveryAuthoring(cfg.delivery ?? null);
+    if (!norm.ok) {
+        log.diagnostics(norm.diagnostics ?? []);
+        log.error('delivery authoring invalid');
+        return 1;
+    }
+    const selected = selectBuildProfile(norm.table, cliProfile);
+    if (!selected.ok) {
+        log.diagnostics(selected.diagnostics ?? []);
+        log.error(`unknown build --profile ${cliProfile || norm.table.default}`);
+        return 1;
+    }
+    const outDir = resolveProfileArtifactDir(outDirRoot, selected.profile);
     const host = typeof args.host === 'string' ? args.host : '127.0.0.1';
     const portLocked = Object.prototype.hasOwnProperty.call(args, 'port');
     let port;

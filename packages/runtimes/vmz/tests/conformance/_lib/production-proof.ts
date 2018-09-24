@@ -129,11 +129,23 @@ export function runVmzTest(
     return { status: run.status ?? 1, stdout: run.stdout || '', stderr: run.stderr || '', report, reportPath };
 }
 
-export function runVmzBuild(exampleRel: string, root = repoRoot()): { status: number; stdout: string; stderr: string; dist: string } {
+/**
+ * CLI `vmz build` — artifacts land under `<out-dir>/<profile.name>` (default name = profile id).
+ * No config → builtin default `web-ssr` → `dist/web-ssr`.
+ */
+export function runVmzBuild(
+    exampleRel: string,
+    root = repoRoot(),
+    opts: { profile?: string; outDir?: string } = {},
+): { status: number; stdout: string; stderr: string; dist: string } {
     // Absolute paths (temp fixtures) must not be joined onto repo root.
     const example = path.isAbsolute(exampleRel) ? exampleRel : path.join(root, ...exampleRel.split('/'));
-    const dist = path.join(example, 'dist');
-    const run = spawnSync(process.execPath, [vmzBin(root), 'build', example], {
+    // Always pass --profile so artifact dir matches `<out-dir>/<name>` (name defaults to profile id).
+    const profileId = String(opts.profile || 'web-ssr').trim() || 'web-ssr';
+    const outDirRoot = opts.outDir ? path.resolve(example, opts.outDir) : path.join(example, 'dist');
+    const dist = path.join(outDirRoot, profileId);
+    const args = [vmzBin(root), 'build', example, '--out-dir', outDirRoot, '--profile', profileId];
+    const run = spawnSync(process.execPath, args, {
         cwd: root,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
