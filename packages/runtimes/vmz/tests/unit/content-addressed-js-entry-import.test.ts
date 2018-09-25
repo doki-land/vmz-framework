@@ -20,11 +20,21 @@ assert.match(out, /import\("\.\.\/"\s*\+\s*chunkId/);
 assert.doesNotMatch(out, /from "\.\/vmz-dom\.js"/);
 assert.doesNotMatch(out, /import\("\.\/"\s*\+/);
 
+// Even when a hashed sibling exists in rewrites, JS must still use ../ (Bug B:
+// hashed barrel under assets/ keeps export * from './dom-core.js' → /assets/dom-core.js 404).
 const hashed = rewriteJsEntryRelativeImports('import x from "./vmz-dom.js";', {
     'vmz-dom.js': 'assets/abc123.js',
     '/vmz-dom.js': '/assets/abc123.js',
 });
-assert.match(hashed, /from "\.\/abc123\.js"/);
-assert.doesNotMatch(hashed, /vmz-dom\.js/);
+assert.match(hashed, /from "\.\.\/vmz-dom\.js"/);
+assert.doesNotMatch(hashed, /from "\.\/abc123\.js"/);
+assert.doesNotMatch(hashed, /from "\.\/vmz-dom\.js"/);
+
+const barrel = rewriteJsEntryRelativeImports(
+    `export * from './dom-core.js';\nexport * from "./dom-ssr.js";\n`,
+    {},
+);
+assert.match(barrel, /from '\.\.\/dom-core\.js'/);
+assert.match(barrel, /from "\.\.\/dom-ssr\.js"/);
 
 console.log('content-addressed-js-entry-import unit: PASS');

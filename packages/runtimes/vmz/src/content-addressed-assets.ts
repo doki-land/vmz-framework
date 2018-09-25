@@ -2,8 +2,8 @@
  * A3: content-addressed assets/<hash> layout for immutable CDN objects.
  * Logical paths stay available for serve/dev; static HTML rewrites to hashed URLs.
  * CSS aggregators (vmz.css) rewrite `@import` to hashed sibling paths under assets/.
- * JS entry aggregators (entry-client/event) rewrite ESM `./` so hashed `/assets/<hash>.js`
- * still resolves to dist-root modules (parity with CSS @import rewrite).
+ * JS under assets/ always rewrites ESM `./` → `../` so barrels (vmz-dom → dom-core)
+ * resolve at dist root — never prefer hashed siblings for JS (second-hop 404).
  */
 // @ts-nocheck
 
@@ -54,16 +54,18 @@ export function rewriteCssImports(cssText, rewrites) {
 }
 
 /**
- * Rewrite entry-module relative ESM so a file served from `/assets/<hash>.js`
- * resolves dependencies against dist root (and dynamic `import("./"+…)` likewise).
+ * Rewrite relative ESM so a file served from `/assets/<hash>.js` resolves against
+ * dist root (static `from "./x"` / `export * from "./x"` + dynamic `import("./"+…)`).
  *
- * Prefer `../…` over copying the full graph under assets/ (fix A).
- * When `rewrites` has a hashed sibling, static `./logical` may become `./<hash>.ext`.
+ * Always use `../…` (Fix A). Do **not** prefer hashed siblings under `assets/`:
+ * barrels like `vmz-dom.js` (`export * from './dom-core.js'`) would then resolve
+ * as `/assets/dom-core.js` and 404. `rewrites` is accepted for API parity with CSS
+ * but intentionally ignored for JS path choice.
  *
  * @param {string} jsText
- * @param {Record<string, string>} [rewrites]
+ * @param {Record<string, string>} [_rewrites]
  */
-export function rewriteJsEntryRelativeImports(jsText, rewrites = {}) {
+export function rewriteJsEntryRelativeImports(jsText, _rewrites = {}) {
     let out = String(jsText || '');
     // Dynamic: import("./" + id) → import("../" + id)
     out = out.replace(/import\(\s*"\.\/"\s*\+/g, 'import("../"+');
@@ -72,12 +74,6 @@ export function rewriteJsEntryRelativeImports(jsText, rewrites = {}) {
     const rewriteSpec = (spec) => {
         const logical = String(spec || '').replace(/^\.\//, '');
         if (!logical || logical.startsWith('../') || logical.startsWith('/')) return spec;
-        const pathPart = logical.split('?')[0];
-        const hashed = rewrites[pathPart] || rewrites[`/${pathPart}`] || rewrites[`assets/${pathPart}`];
-        if (hashed) {
-            const rel = String(hashed).replace(/^\//, '');
-            return rel.startsWith('assets/') ? `./${path.basename(rel)}` : `./${rel}`;
-        }
         return `../${logical}`;
     };
 
@@ -115,6 +111,21 @@ export function emitContentAddressedAssets(distDir, opts = {}) {
 
     const ordered = orderCandidates(candidates);
     for (const rel of ordered) {
+        // Aggregators are replaced in later passes; leaf JS must rewrite ./ → ../ so a
+        // hashed barrel under assets/ never 404s on second-hop relative re-exports.
+        if (CSS_AGGREGATORS.has(rel) || JS_ENTRY_AGGREGATORS.has(rel)) {
+            ingestCandidate(abs, rel, rewrites, objects, { transform: null });
+            continue;
+        }
+        if (/\.m?js$/i.test(rel)) {
+            const src = path.join(abs, rel);
+            if (!fs.existsSync(src)) continue;
+            const rewritten = rewriteJsEntryRelativeImports(fs.readFileSync(src, 'utf8'), {});
+            ingestCandidate(abs, rel, rewrites, objects, {
+                transform: () => Buffer.from(rewritten, 'utf8'),
+            });
+            continue;
+        }
         ingestCandidate(abs, rel, rewrites, objects, { transform: null });
     }
 
