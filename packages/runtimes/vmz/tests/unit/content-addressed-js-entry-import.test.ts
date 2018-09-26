@@ -30,10 +30,7 @@ assert.match(hashed, /from "\.\.\/vmz-dom\.js"/);
 assert.doesNotMatch(hashed, /from "\.\/abc123\.js"/);
 assert.doesNotMatch(hashed, /from "\.\/vmz-dom\.js"/);
 
-const barrel = rewriteJsEntryRelativeImports(
-    `export * from './dom-core.js';\nexport * from "./dom-ssr.js";\n`,
-    {},
-);
+const barrel = rewriteJsEntryRelativeImports(`export * from './dom-core.js';\nexport * from "./dom-ssr.js";\n`, {});
 assert.match(barrel, /from '\.\.\/dom-core\.js'/);
 assert.match(barrel, /from "\.\.\/dom-ssr\.js"/);
 

@@ -32,9 +32,7 @@ function collectStaticSpecs(jsText: string): string[] {
 /** Resolve a relative/absolute ESM spec against the URL path of the importing module. */
 function resolveSpecAgainstImporter(importerUrlPath: string, spec: string): string | null {
     if (spec.startsWith('/')) return spec;
-    const importerDir = importerUrlPath.includes('/')
-        ? importerUrlPath.slice(0, importerUrlPath.lastIndexOf('/'))
-        : '';
+    const importerDir = importerUrlPath.includes('/') ? importerUrlPath.slice(0, importerUrlPath.lastIndexOf('/')) : '';
     if (spec.startsWith('./')) {
         const leaf = spec.slice(2);
         return importerDir ? `${importerDir}/${leaf}` : `/${leaf}`;
@@ -96,9 +94,7 @@ export async function assertHashedEntryImportsHttp(
     }
     const js = entryRes.body;
     if (/\bfrom\s+['"]\.\/(?!\.\.)/.test(js) || /import\(\s*['"]\.\/['"]\s*\+/.test(js)) {
-        errors.push(
-            'hashed entry-client.js still contains ./ relative imports (must be ../ only; hashed sibling breaks barrel second-hop)',
-        );
+        errors.push('hashed entry-client.js still contains ./ relative imports (must be ../ only; hashed sibling breaks barrel second-hop)');
     }
 
     const specs = collectStaticSpecs(js).filter((s) => s.startsWith('../') || s.startsWith('./') || s.startsWith('/'));
@@ -130,9 +126,7 @@ export async function assertHashedEntryImportsHttp(
             const hopUrl = `${baseUrl}${hopPath}`;
             const hopRes = await getFn(hopUrl);
             if (hopRes.status !== 200) {
-                errors.push(
-                    `GET ${hopUrl} status ${hopRes.status} (second-hop from ${urlPath} import ${hop}; Bug B barrel under assets/)`,
-                );
+                errors.push(`GET ${hopUrl} status ${hopRes.status} (second-hop from ${urlPath} import ${hop}; Bug B barrel under assets/)`);
             }
         }
     }

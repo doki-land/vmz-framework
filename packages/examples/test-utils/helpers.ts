@@ -5,8 +5,27 @@ import { parseHTML } from 'linkedom';
 
 const packagesRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
+const PROFILE_ARTIFACT_DIRS = ['web-ssr', 'static', 'cdn', 'web-client', 'web-hybrid'] as const;
+
+/**
+ * Resolve example assemble root after `profiles.*.name` nesting.
+ * Prefer `dist/<profile>` (default web-ssr) over a stale bare `dist/` from older builds.
+ */
 export function exampleDist(name: 'counter' | 'island' | 'fullstack'): string {
-    return path.join(packagesRoot, 'examples', name, 'dist');
+    const root = path.join(packagesRoot, 'examples', name, 'dist');
+    for (const nested of PROFILE_ARTIFACT_DIRS) {
+        const candidate = path.join(root, nested);
+        if (fs.existsSync(path.join(candidate, 'vmz-runtime.js'))) return candidate;
+    }
+    if (fs.existsSync(root)) {
+        for (const ent of fs.readdirSync(root, { withFileTypes: true })) {
+            if (!ent.isDirectory() || ent.name.startsWith('_') || ent.name === 'assets') continue;
+            const candidate = path.join(root, ent.name);
+            if (fs.existsSync(path.join(candidate, 'vmz-runtime.js'))) return candidate;
+        }
+    }
+    if (fs.existsSync(path.join(root, 'vmz-runtime.js'))) return root;
+    return root;
 }
 
 export function exampleRoot(name: 'counter' | 'island' | 'fullstack'): string {
@@ -68,10 +87,11 @@ export function installServerResolver(setServerModuleResolver: (fn: (id: string)
 }
 
 export function installDocument(html: string) {
-    const { window, document } = parseHTML(html);
-    globalThis.document = document;
-    globalThis.window = window as unknown as Window & typeof globalThis;
-    return { window, document, app: document.getElementById('app') };
+    const { document, window } = parseHTML(html);
+    (globalThis as any).document = document;
+    (globalThis as any).window = window;
+    (globalThis as any).HTMLElement = (window as any).HTMLElement;
+    return { document, window, app: document.getElementById('app') };
 }
 
 export function readJson<T = unknown>(file: string): T {

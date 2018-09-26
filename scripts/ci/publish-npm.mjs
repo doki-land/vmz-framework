@@ -109,9 +109,7 @@ function assertRegistryVmzPack(version) {
     try {
         const pack = run('npm', ['pack', `@vmz/vmz@${version}`, '--pack-destination', tmp], { cwd: tmp });
         if (pack.status !== 0) {
-            fail(
-                `could not npm pack @vmz/vmz@${version} from registry to re-assert (stale-pack guard): ${pack.stderr || pack.stdout}`,
-            );
+            fail(`could not npm pack @vmz/vmz@${version} from registry to re-assert (stale-pack guard): ${pack.stderr || pack.stdout}`);
         }
         const tgz = fs.readdirSync(tmp).find((f) => f.endsWith('.tgz'));
         if (!tgz) fail(`npm pack @vmz/vmz@${version} produced no .tgz`);
@@ -477,9 +475,7 @@ function publishJs(version) {
     if (authFailed.length || otherFailed.length) {
         const parts = [];
         if (authFailed.length) {
-            parts.push(
-                `Trusted Publisher missing/auth failed: ${authFailed.join(', ')} (local: pnpm placeholder:trust -- --only <name>)`,
-            );
+            parts.push(`Trusted Publisher missing/auth failed: ${authFailed.join(', ')} (local: pnpm placeholder:trust -- --only <name>)`);
         }
         if (otherFailed.length) parts.push(`other failures: ${otherFailed.join(', ')}`);
         fail(parts.join('; '));

@@ -270,9 +270,7 @@ function buildSnippet(pick: RecipePick): string {
             '      },',
         );
     } else if (pick.assembly === 'web-static') {
-        lines.push(
-            `      '${pick.profileId}': { host: 'browser', assembly: 'web-static', name: 'cdn' },`,
-        );
+        lines.push(`      '${pick.profileId}': { host: 'browser', assembly: 'web-static', name: 'cdn' },`);
     } else {
         lines.push(`      '${pick.profileId}': { host: 'browser', assembly: '${pick.assembly}' },`);
     }

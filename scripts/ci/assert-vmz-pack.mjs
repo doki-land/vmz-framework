@@ -50,13 +50,7 @@ for (const rel of required) {
 }
 
 // Source modules that must exist and compile into dist (catch incomplete checkout / stale tree).
-for (const srcRel of [
-    'content-addressed-assets.ts',
-    'public-static-assets.ts',
-    'site-favicon.ts',
-    'pretty-json.ts',
-    'delivery-profile.ts',
-]) {
+for (const srcRel of ['content-addressed-assets.ts', 'public-static-assets.ts', 'site-favicon.ts', 'pretty-json.ts', 'delivery-profile.ts']) {
     if (!fs.existsSync(path.join(SRC, srcRel))) {
         fail(`missing source ${srcRel} — cannot claim a complete @vmz/vmz pack`);
     }
