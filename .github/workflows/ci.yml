@@ -55,6 +55,9 @@ jobs:
       - name: Build runtimes (native + JS)
         run: pnpm build:runtimes
 
+      - name: Assert @vmz/vmz dist pack contract
+        run: node scripts/ci/assert-vmz-pack.mjs
+
       - name: Build tools + examples
         run: pnpm build
 
@@ -82,6 +85,9 @@ jobs:
 
       - name: Build runtimes (native + JS)
         run: pnpm build:runtimes
+
+      - name: Assert @vmz/vmz dist pack contract
+        run: node scripts/ci/assert-vmz-pack.mjs
 
       - name: Install Chromium (browser host / CDP)
         uses: browser-actions/setup-chrome@v2

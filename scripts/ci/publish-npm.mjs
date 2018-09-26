@@ -31,7 +31,7 @@ const NATIVE_PLATFORMS = [
 /**
  * Publish order: leaves first. `publishName` overrides package.json name when set
  * (CLI package is `@vmz/vmz`; native optional packages are `@vmz/vmz-<platform>`).
- * @type {{ dir: string, publishName?: string }[]}
+ * @type {{ dir: string, publishName?: string, optionalPublish?: boolean }[]}
  */
 const JS_PACKAGES = [
     { dir: 'packages/runtimes/vmz-protocol' },
@@ -49,9 +49,10 @@ const JS_PACKAGES = [
     { dir: 'packages/plugins/vmz-plugin-iconify' },
     { dir: 'packages/ui/vmz-ui' },
     { dir: 'packages/ui/vmz-ui-icons' },
-    // After CLI: new stubs without Trusted Publisher must not block `@vmz/vmz`.
+    // CLI before optional sidecar packages so a missing Trusted Publisher on skills
+    // cannot block `@vmz/vmz` (0.1.13 tag publish failed after packing skills).
     { dir: 'packages/runtimes/vmz', publishName: '@vmz/vmz' },
-    { dir: 'packages/runtimes/vmz-skills' },
+    { dir: 'packages/runtimes/vmz-skills', optionalPublish: true },
 ];
 
 function fail(msg) {
@@ -72,6 +73,64 @@ function run(cmd, args, opts = {}) {
         stdout: String(r.stdout ?? '').trim(),
         stderr: String(r.stderr ?? '').trim(),
     };
+}
+
+function assertVmzCliDist() {
+    const r = run(process.execPath, [path.join(ROOT, 'scripts/ci/assert-vmz-pack.mjs')]);
+    if (r.status !== 0) {
+        fail(r.stderr || r.stdout || 'assert-vmz-pack failed');
+    }
+    if (r.stdout) console.log(r.stdout);
+}
+
+/**
+ * After staging `@vmz/vmz`, re-assert packed tree before npm publish.
+ * @param {string} stage
+ */
+function assertVmzCliStage(stage) {
+    const stageDist = path.join(stage, 'dist');
+    const r = run(process.execPath, [path.join(ROOT, 'scripts/ci/assert-vmz-pack.mjs'), `--dir=${stageDist}`]);
+    if (r.status !== 0) {
+        fail(r.stderr || r.stdout || `assert-vmz-pack failed for staged ${stageDist}`);
+    }
+    if (r.stdout) console.log(r.stdout);
+}
+
+/**
+ * When `@vmz/vmz@version` already exists (idempotent skip), download the registry
+ * tarball and assert pack contract. Prevents a green re-run from masking a stale
+ * publish (0.1.13 incident). On failure: bump semver — do not yank+replace.
+ * @param {string} version
+ */
+function assertRegistryVmzPack(version) {
+    const tmp = path.join(os.tmpdir(), `vmz-assert-registry-${version}-${Date.now()}`);
+    fs.rmSync(tmp, { recursive: true, force: true });
+    fs.mkdirSync(tmp, { recursive: true });
+    try {
+        const pack = run('npm', ['pack', `@vmz/vmz@${version}`, '--pack-destination', tmp], { cwd: tmp });
+        if (pack.status !== 0) {
+            fail(
+                `could not npm pack @vmz/vmz@${version} from registry to re-assert (stale-pack guard): ${pack.stderr || pack.stdout}`,
+            );
+        }
+        const tgz = fs.readdirSync(tmp).find((f) => f.endsWith('.tgz'));
+        if (!tgz) fail(`npm pack @vmz/vmz@${version} produced no .tgz`);
+        const extract = run('tar', ['-xzf', path.join(tmp, tgz), '-C', tmp]);
+        if (extract.status !== 0) {
+            // Windows CI publish runs on ubuntu-latest; tar is available there.
+            fail(`failed to extract registry tarball ${tgz}: ${extract.stderr || extract.stdout}`);
+        }
+        const dist = path.join(tmp, 'package', 'dist');
+        const r = run(process.execPath, [path.join(ROOT, 'scripts/ci/assert-vmz-pack.mjs'), `--dir=${dist}`]);
+        if (r.status !== 0) {
+            fail(
+                `registry @vmz/vmz@${version} fails pack contract (stale/incomplete dist). Do not skip — bump to a new semver and republish. ${r.stderr || r.stdout}`,
+            );
+        }
+        if (r.stdout) console.log(`registry re-assert: ${r.stdout}`);
+    } finally {
+        fs.rmSync(tmp, { recursive: true, force: true });
+    }
 }
 
 function resolveVersion() {
@@ -295,6 +354,9 @@ function publishJs(version) {
         if (!name) fail(`no name for ${spec.dir}`);
 
         if (versionExists(name, version)) {
+            if (name === '@vmz/vmz') {
+                assertRegistryVmzPack(version);
+            }
             console.log(` ✓ ${name}@${version} already on registry — skip`);
             skipped += 1;
             continue;
@@ -339,6 +401,7 @@ function publishJs(version) {
             for (const f of fs.readdirSync(stage)) {
                 if (f.endsWith('.node')) fs.unlinkSync(path.join(stage, f));
             }
+            assertVmzCliStage(stage);
         }
 
         const pkg = rewriteDepsField({ ...raw }, version);
@@ -377,18 +440,37 @@ function publishJs(version) {
             console.log(` ✓ ${name}@${version} already on registry — skip`);
             skipped += 1;
         } else if (outcome === 'auth') {
-            console.error(
-                `ci-publish-npm: OIDC/auth failed for ${name} — continue; fix Trusted Publisher (file=publish-npm.yml env=NPM_PUBLISH repo=doki-land/vmz-framework) then re-run`,
-            );
-            authFailed.push(name);
+            if (spec.optionalPublish) {
+                console.error(
+                    `ci-publish-npm: OIDC/auth failed for optional ${name} — skip (fix Trusted Publisher: file=publish-npm.yml env=NPM_PUBLISH); continuing`,
+                );
+                skipped += 1;
+            } else {
+                console.error(
+                    `ci-publish-npm: OIDC/auth failed for ${name} — continue; fix Trusted Publisher (file=publish-npm.yml env=NPM_PUBLISH repo=doki-land/vmz-framework) then re-run`,
+                );
+                authFailed.push(name);
+            }
         } else if (outcome === 'missing') {
-            console.error(
-                `ci-publish-npm: ${name} missing on registry — create 0.0.0 stub via pnpm placeholder:publish, then Trusted Publisher via pnpm placeholder:trust -- --only ${name}`,
-            );
-            otherFailed.push(name);
+            if (spec.optionalPublish) {
+                console.error(
+                    `ci-publish-npm: optional ${name} missing on registry — skip (pnpm placeholder:publish + placeholder:trust); continuing`,
+                );
+                skipped += 1;
+            } else {
+                console.error(
+                    `ci-publish-npm: ${name} missing on registry — create 0.0.0 stub via pnpm placeholder:publish, then Trusted Publisher via pnpm placeholder:trust -- --only ${name}`,
+                );
+                otherFailed.push(name);
+            }
         } else {
-            console.error(`ci-publish-npm: publish failed for ${name} — continue remaining packages`);
-            otherFailed.push(name);
+            if (spec.optionalPublish) {
+                console.error(`ci-publish-npm: optional ${name} publish failed — skip; continuing`);
+                skipped += 1;
+            } else {
+                console.error(`ci-publish-npm: publish failed for ${name} — continue remaining packages`);
+                otherFailed.push(name);
+            }
         }
     }
 
@@ -414,6 +496,8 @@ delete process.env.NODE_AUTH_TOKEN;
 delete process.env.NPM_TOKEN;
 
 const artifactsRoot = process.env.VMZ_NATIVE_ARTIFACTS || path.join(ROOT, 'dist');
+
+assertVmzCliDist();
 
 const native = publishNative(version, artifactsRoot);
 const js = publishJs(version);

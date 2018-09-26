@@ -4,8 +4,11 @@
 #   env  = NPM_PUBLISH
 #
 # Triggers:
-#   - push tag v*           (e.g. v0.0.4)
-#   - workflow_dispatch     (manual retry / version input)
+#   - push tag v*           (e.g. v0.1.14) — preferred
+#   - workflow_dispatch     (retry only): version MUST match an existing tag;
+#     jobs checkout that tag peel — never publish branch HEAD with a free version
+#     (0.1.13 incident: dispatch from dev@aaced24a published 0.1.13 while tag
+#     v0.1.13 → 1c36aa2 and tag-push publish failed).
 # Do not register Trusted Publisher on any other workflow file.
 
 name: Publish npm
@@ -17,8 +20,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version without v prefix (required for workflow_dispatch)'
-        required: false
+        description: 'Must match existing git tag vX.Y.Z (retry only; checkout forced to that tag)'
+        required: true
         type: string
 
 permissions:
@@ -26,8 +29,44 @@ permissions:
   id-token: write
 
 jobs:
+  provenance:
+    name: Bind version ↔ tag ↔ commit
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.bind.outputs.version }}
+      sha: ${{ steps.bind.outputs.sha }}
+      tag: ${{ steps.bind.outputs.tag }}
+    steps:
+      - name: Checkout (for tag fetch)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Bind publish tag
+        id: bind
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: node scripts/ci/bind-publish-tag.mjs
+
+      - name: Require green CI on tag commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_SHA: ${{ steps.bind.outputs.sha }}
+        run: |
+          set -euo pipefail
+          conclusion="$(gh run list --repo "${{ github.repository }}" --commit "${TAG_SHA}" --workflow ci.yml --json conclusion -q '.[0].conclusion // empty')"
+          if [[ "$conclusion" != "success" ]]; then
+            echo "Refusing npm publish: CI on ${TAG_SHA} is '${conclusion:-missing}' (need success)" >&2
+            exit 1
+          fi
+          echo "CI success confirmed for ${TAG_SHA}"
+
   build-native:
     name: Native ${{ matrix.short }}
+    needs: provenance
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -43,8 +82,22 @@ jobs:
             short: darwin-arm64
             triple: darwin-arm64
     steps:
-      - name: Checkout
+      - name: Checkout tag peel
         uses: actions/checkout@v5
+        with:
+          ref: refs/tags/${{ needs.provenance.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Verify HEAD is bound tag SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          head="$(git rev-parse HEAD)"
+          want="${{ needs.provenance.outputs.sha }}"
+          if [[ "$head" != "$want" ]]; then
+            echo "Refusing native build: HEAD=$head != bound tag sha=$want" >&2
+            exit 1
+          fi
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -94,48 +147,27 @@ jobs:
 
   publish:
     name: Publish packages
-    needs: build-native
+    needs: [provenance, build-native]
     runs-on: ubuntu-latest
     environment: NPM_PUBLISH
     steps:
-      - name: Checkout
+      - name: Checkout tag peel
         uses: actions/checkout@v5
+        with:
+          ref: refs/tags/${{ needs.provenance.outputs.tag }}
+          fetch-depth: 0
 
-      - name: Resolve version
-        id: ver
+      - name: Verify HEAD is bound tag SHA
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            v="${{ inputs.version }}"
-            v="${v#v}"
-            if [[ -z "$v" ]]; then
-              echo "inputs.version required for workflow_dispatch" >&2
-              exit 1
-            fi
-          else
-            ref="${GITHUB_REF#refs/tags/}"
-            v="${ref#v}"
-            if [[ -z "$v" || "$v" == *"/"* ]]; then
-              echo "could not parse version from GITHUB_REF=$GITHUB_REF" >&2
-              exit 1
-            fi
-          fi
-          echo "version=$v" >> "$GITHUB_OUTPUT"
-          echo "resolved version=$v"
-
-      - name: Require green CI on tagged commit
-        if: github.event_name == 'push'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          conclusion="$(gh run list --repo "${{ github.repository }}" --commit "${{ github.sha }}" --workflow ci.yml --json conclusion -q '.[0].conclusion // empty')"
-          if [[ "$conclusion" != "success" ]]; then
-            echo "Refusing npm publish: CI workflow conclusion on ${{ github.sha }} is '${conclusion:-missing}' (need success)" >&2
+          head="$(git rev-parse HEAD)"
+          want="${{ needs.provenance.outputs.sha }}"
+          if [[ "$head" != "$want" ]]; then
+            echo "Refusing publish: HEAD=$head != bound tag sha=$want" >&2
             exit 1
           fi
-          echo "CI success confirmed for tagged commit"
+          echo "publishing ${{ needs.provenance.outputs.tag }} @ $head"
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -160,6 +192,9 @@ jobs:
 
       - name: Build JS runtimes + tools
         run: pnpm build:runtimes
+
+      - name: Assert @vmz/vmz dist pack contract
+        run: node scripts/ci/assert-vmz-pack.mjs
 
       - name: Download native artifacts
         uses: actions/download-artifact@v5
@@ -197,5 +232,5 @@ jobs:
       - name: Publish real packages
         env:
           VMZ_NATIVE_ARTIFACTS: ${{ github.workspace }}/dist/native-flat
-          GITHUB_REF: refs/tags/v${{ steps.ver.outputs.version }}
-        run: node scripts/ci/publish-npm.mjs --version=${{ steps.ver.outputs.version }}
+          GITHUB_REF: refs/tags/v${{ needs.provenance.outputs.version }}
+        run: node scripts/ci/publish-npm.mjs --version=${{ needs.provenance.outputs.version }}
