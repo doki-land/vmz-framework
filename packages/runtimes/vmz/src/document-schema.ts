@@ -60,7 +60,14 @@ export const DOCUMENT_SEARCH_SCHEMA = 'vmz.document.search.v0';
 export const DOCUMENT_ISLANDS_SCHEMA = 'vmz.document.islands.v0';
 
 /** Top-level non-locale reserved names under /documents */
-export const DOCUMENT_RESERVED_TOP = new Set(['package.json', 'documents.config.ts', 'documents.config.json', 'documents.config.js', 'public']);
+export const DOCUMENT_RESERVED_TOP = new Set([
+    'package.json',
+    'documents.config.ts',
+    'documents.config.json',
+    'documents.config.json5',
+    'documents.config.js',
+    'public',
+]);
 
 /** Known locale aliases → canonical key (lowercase, hyphen). */
 export const LOCALE_ALIASES = {

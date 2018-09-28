@@ -1,12 +1,15 @@
 // @ts-nocheck
 /**
  * Build DocumentManifest + run / --strict checks.
+ *
+ * Author documents config is parsed by Rust DocumentRoutePlan; TS only
+ * merges filesystem scan (pageKeys) and coverage diagnostics.
  */
 
-import fs from 'node:fs';
 import path from 'node:path';
-import { DIAG, DOCUMENT_MANIFEST_SCHEMA } from './document-schema.js';
+import { loadDocumentRoutePlan, mapPlanDiagnostics } from './author-input.js';
 import { scanDocumentsTree } from './document-scan.js';
+import { DIAG, DOCUMENT_MANIFEST_SCHEMA } from './document-schema.js';
 
 /**
  * Resolve project documents root.
@@ -17,60 +20,37 @@ export function resolveDocumentsRoot(projectRoot) {
 }
 
 /**
- * Parse documents.config.json or a JSON-compatible export-default .ts/.js.
- * @param {string} documentsRoot
- * @returns {{ config: Record<string, any> | null, diagnostics: any[], configPath: string | null }}
+ * Load normalized DocumentRoutePlan from Rust (author JSON5/JSON/declaration).
+ * @param {string} projectRoot
  */
-export function loadDocumentsConfig(documentsRoot) {
-    /** @type {any[]} */
-    const diagnostics = [];
-    const candidates = ['documents.config.json', 'documents.config.ts', 'documents.config.js'];
-    for (const name of candidates) {
-        const p = path.join(documentsRoot, name);
-        if (!fs.existsSync(p)) continue;
-        try {
-            const raw = fs.readFileSync(p, 'utf8');
-            const config = parseConfigSource(raw, name);
-            return { config, diagnostics, configPath: p };
-        } catch (e) {
-            diagnostics.push({
-                code: DIAG.CONFIG_INVALID,
-                severity: 'error',
-                message: `failed to parse ${name}: ${e instanceof Error ? e.message : String(e)}`,
-                path: p,
-            });
-            return { config: null, diagnostics, configPath: p };
-        }
-    }
-    return { config: null, diagnostics, configPath: null };
+export function loadDocumentsRoutePlan(projectRoot) {
+    return loadDocumentRoutePlan(projectRoot);
 }
 
 /**
- *: only declaration objects — no arbitrary hooks.
- * @param {string} raw
- * @param {string} filename
+ * @deprecated Prefer loadDocumentsRoutePlan(projectRoot). Kept for call sites that
+ * only need the plan-shaped config fields.
+ * @param {string} documentsRoot
  */
-function parseConfigSource(raw, filename) {
-    if (filename.endsWith('.json')) {
-        return JSON.parse(raw);
+export function loadDocumentsConfig(documentsRoot) {
+    const projectRoot = path.dirname(documentsRoot);
+    const plan = loadDocumentRoutePlan(projectRoot);
+    const diagnostics = mapPlanDiagnostics(plan.diagnostics);
+    const configPath = plan.sourcePath ? path.join(projectRoot, plan.sourcePath) : null;
+    const missing = diagnostics.some((d) => d.code === DIAG.CONFIG_MISSING);
+    if (missing) {
+        return { config: null, diagnostics, configPath, plan };
     }
-    // Strip line/block comments, then require `export default { ... }`
-    let s = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-    s = s.trim();
-    const m = s.match(/^export\s+default\s+([\s\S]*?);?\s*$/);
-    if (!m) {
-        throw new Error('expected `export default { ... }` (JSON-compatible declaration only)');
+    /** @type {Record<string, any>} */
+    const config = {
+        defaultLocale: plan.defaultLocale ?? undefined,
+        locales: Object.fromEntries(Object.entries(plan.localeLabels || {}).map(([id, label]) => [id, { label }])),
+        collections: Object.fromEntries((plan.collections || []).map((c) => [c.id, { source: c.sourceRoot, mount: c.routeBase }])),
+    };
+    if (plan.silentFallbackRequested) {
+        config.fallback = true;
     }
-    let body = m[1].trim();
-    // Quote bare keys: { defaultLocale: "x" } → { "defaultLocale": "x" }
-    body = body.replace(/([,{]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/g, '$1"$2":');
-    // Single-quoted strings → JSON double-quoted
-    body = body.replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_, inner) =>
-        JSON.stringify(inner.replace(/\\'/g, "'").replace(/\\"/g, '"').replace(/\\\\/g, '\\')),
-    );
-    // Trailing commas
-    body = body.replace(/,\s*([}\]])/g, '$1');
-    return JSON.parse(body);
+    return { config, diagnostics, configPath, plan };
 }
 
 /**
@@ -90,58 +70,52 @@ export function checkDocuments(opts) {
     const scanned = scanDocumentsTree(documentsRoot);
     diagnostics.push(...scanned.diagnostics);
 
-    const { config, diagnostics: cfgDiags, configPath } = loadDocumentsConfig(documentsRoot);
-    diagnostics.push(...cfgDiags);
+    const plan = loadDocumentRoutePlan(projectRoot);
+    diagnostics.push(...mapPlanDiagnostics(plan.diagnostics));
 
-    if (!config) {
-        diagnostics.push({
-            code: DIAG.CONFIG_MISSING,
-            severity: strict ? 'error' : 'warning',
-            message: 'documents.config.json|ts missing; strict mode requires defaultLocale + locales for strict coverage checks',
-            path: documentsRoot,
-        });
+    const configMissing = (plan.diagnostics || []).some((d) => d.code === DIAG.CONFIG_MISSING);
+    const configPath = plan.sourcePath ? path.join(projectRoot, plan.sourcePath) : null;
+
+    if (configMissing && strict) {
+        // Plan already emitted warning; elevate message under --strict if needed.
+        if (!diagnostics.some((d) => d.code === DIAG.CONFIG_MISSING && d.severity === 'error')) {
+            diagnostics.push({
+                code: DIAG.CONFIG_MISSING,
+                severity: 'error',
+                message: 'documents.config.json|json5|ts|js missing; strict mode requires defaultLocale + locales for strict coverage checks',
+                path: documentsRoot,
+            });
+        }
     }
 
     /** @type {Record<string, string>} */
-    const localeLabels = {};
-    let defaultLocale = null;
+    const localeLabels = { ...(plan.localeLabels || {}) };
+    const defaultLocale = plan.defaultLocale || null;
     /** @type {import('./document-schema.js').DocumentCollection[]} */
     const collections = [];
     /** @type {import('./document-schema.js').DocumentMount[]} */
     const mounts = [];
 
-    if (config && typeof config === 'object') {
-        if (typeof config.defaultLocale === 'string') {
-            defaultLocale = config.defaultLocale;
-        }
-        if (config.locales && typeof config.locales === 'object') {
-            for (const [k, v] of Object.entries(config.locales)) {
-                localeLabels[k] = v && typeof v === 'object' && typeof v.label === 'string' ? v.label : k;
-            }
-        }
-        if (config.collections && typeof config.collections === 'object') {
-            for (const [id, c] of Object.entries(config.collections)) {
-                const sourceRoot = c && typeof c === 'object' && typeof c.source === 'string' ? c.source : '.';
-                const routeBase = c && typeof c === 'object' && typeof c.mount === 'string' ? c.mount : '/docs';
-                const pageKeys = [
-                    ...new Set(
-                        scanned.pages
-                            .filter((p) => {
-                                if (sourceRoot === '.' || sourceRoot === './') return true;
-                                const prefix = sourceRoot.replace(/^\.\//, '').replace(/\/$/, '');
-                                return p.identity.pageKey === prefix || p.identity.pageKey.startsWith(prefix + '/');
-                            })
-                            .map((p) => p.identity.pageKey),
-                    ),
-                ].sort();
-                collections.push({ id, sourceRoot, pageKeys });
-                mounts.push({
-                    collectionId: id,
-                    routeBase,
-                    mode: routeBase === '/' ? 'standalone' : 'integrated',
-                });
-            }
-        }
+    for (const c of plan.collections || []) {
+        const sourceRoot = c.sourceRoot || '.';
+        const routeBase = c.routeBase || '/docs';
+        const pageKeys = [
+            ...new Set(
+                scanned.pages
+                    .filter((p) => {
+                        if (sourceRoot === '.' || sourceRoot === './') return true;
+                        const prefix = sourceRoot.replace(/^\.\//, '').replace(/\/$/, '');
+                        return p.identity.pageKey === prefix || p.identity.pageKey.startsWith(`${prefix}/`);
+                    })
+                    .map((p) => p.identity.pageKey),
+            ),
+        ].sort();
+        collections.push({ id: c.id, sourceRoot, pageKeys });
+        mounts.push({
+            collectionId: c.id,
+            routeBase,
+            mode: routeBase === '/' ? 'standalone' : 'integrated',
+        });
     }
 
     if (collections.length === 0) {
@@ -150,7 +124,6 @@ export function checkDocuments(opts) {
         mounts.push({ collectionId: 'default', routeBase: '/docs', mode: 'integrated' });
     }
 
-    // Config locales vs disk
     const diskLocales = new Set(scanned.locales);
     const configLocales = Object.keys(localeLabels);
     if (defaultLocale) {
@@ -188,16 +161,6 @@ export function checkDocuments(opts) {
                 path: configPath || documentsRoot,
             });
         }
-    }
-
-    // no silent whole-page fallback by default
-    if (config && config.fallback === true) {
-        diagnostics.push({
-            code: DIAG.FALLBACK_SILENT,
-            severity: 'error',
-            message: 'silent whole-page fallback is forbidden; allow only explicit nav/metadata or per-page fallback',
-            path: configPath || documentsRoot,
-        });
     }
 
     // Coverage: default locale PageKeys are baseline; other locales missing/orphan under --strict

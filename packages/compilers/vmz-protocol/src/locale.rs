@@ -13,6 +13,9 @@ pub const LOCALE_PROTOCOL: &str = "vmz.locale.protocol.v0";
 /// Schema id for the compiled LocaleManifest document.
 pub const LOCALE_MANIFEST_SCHEMA: &str = "vmz.locale.manifest.v0";
 
+/// Schema id for the normalized LocalePlan consumed by hosts (CLI ≡ N-API).
+pub const LOCALE_PLAN_SCHEMA: &str = "vmz.locale.plan.v0";
+
 /// Schema id for a per-locale MessageCatalog artifact.
 pub const MESSAGE_CATALOG_SCHEMA: &str = "vmz.locale.message_catalog.v0";
 
@@ -279,6 +282,7 @@ impl LocaleProtocolCatalog {
                     kind: "manifest".into(),
                     schema: LOCALE_MANIFEST_SCHEMA.into(),
                 },
+                LocaleDocumentKind { kind: "plan".into(), schema: LOCALE_PLAN_SCHEMA.into() },
                 LocaleDocumentKind {
                     kind: "message_catalog".into(),
                     schema: MESSAGE_CATALOG_SCHEMA.into(),
@@ -476,6 +480,69 @@ pub struct LocaleManifestFile {
 
 fn default_missing() -> String {
     "error".into()
+}
+
+/// Normalized locale plan consumed by CLI / N-API / TS hosts (not author JSON5).
+///
+/// Hosts must read this document (or an equivalent N-API result). They must not
+/// re-parse `locales/locales.json5` with a second JSON5 implementation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalePlan {
+    /// Always [`LOCALE_PLAN_SCHEMA`].
+    pub schema: String,
+    /// Author manifest schema id echoed for tooling (`vmz.locale.manifest.v0`).
+    pub manifest_schema: String,
+    /// Workspace-relative path of the author source, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_path: Option<String>,
+    /// Default LocaleId for negotiation and optional prefix omit.
+    pub default_locale: String,
+    /// Declared locales in author order (invalid entries omitted; see diagnostics).
+    pub locales: Vec<LocaleEntry>,
+    /// Fallback chains keyed by LocaleId.
+    #[serde(default)]
+    pub fallback: std::collections::BTreeMap<String, Vec<String>>,
+    /// Normalized URL routing policy (defaults applied).
+    pub routing: LocaleRoutingPolicy,
+    /// Missing-message policy: `error` | other host-defined modes.
+    pub missing: String,
+    /// Structured diagnostics from parse / normalize / validate.
+    #[serde(default)]
+    pub diagnostics: Vec<crate::ReportedDiagnostic>,
+}
+
+impl LocalePlan {
+    /// True when any diagnostic has severity `error`.
+    pub fn has_errors(&self) -> bool {
+        self.diagnostics.iter().any(|d| d.is_error())
+    }
+
+    /// Pretty-printed JSON for N-API / CLI dump.
+    pub fn to_json(&self) -> String {
+        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
+    }
+
+    /// Empty plan used when the author manifest is missing.
+    pub fn missing_manifest(
+        source_path: impl Into<String>,
+        diagnostic: crate::ReportedDiagnostic,
+    ) -> Self {
+        Self {
+            schema: LOCALE_PLAN_SCHEMA.into(),
+            manifest_schema: LOCALE_MANIFEST_SCHEMA.into(),
+            source_path: Some(source_path.into()),
+            default_locale: String::new(),
+            locales: Vec::new(),
+            fallback: std::collections::BTreeMap::new(),
+            routing: LocaleRoutingPolicy {
+                strategy: "prefix".into(),
+                default_prefix: "include".into(),
+            },
+            missing: "error".into(),
+            diagnostics: vec![diagnostic],
+        }
+    }
 }
 
 impl LocaleManifestFile {

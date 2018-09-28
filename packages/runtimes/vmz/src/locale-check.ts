@@ -6,24 +6,19 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import JSON5 from 'json5';
-import { requireNativeAddon } from './native-addon.js';
-import { writePrettyJsonFile } from './pretty-json.js';
+import { loadLocalePlan, mapPlanDiagnostics, parseAuthorInput } from './author-input.js';
 import {
     DIAG_CATALOG_CONFLICT,
     DIAG_CATALOG_PARSE,
-    DIAG_DEFAULT_MISSING,
     DIAG_DIR_MISSING,
     DIAG_DIR_ORPHAN,
-    DIAG_FALLBACK_CYCLE,
-    DIAG_FALLBACK_UNKNOWN,
-    DIAG_ID_COLLISION,
     DIAG_ID_INVALID,
     DIAG_LAYOUT_ILLEGAL,
     DIAG_MANIFEST_MISSING,
     DIAG_MESSAGE_ARRAY_FORBIDDEN,
     DIAG_MESSAGE_HTML_FORBIDDEN,
     DIAG_MESSAGE_MISSING_DEFAULT,
+    DIAG_MESSAGE_MISSING_VARIANT,
     DIAG_MESSAGE_PARAMETER_MISMATCH,
     DIAG_MESSAGE_SYNTAX_INVALID,
     DIAG_MESSAGE_UNUSED,
@@ -36,6 +31,8 @@ import {
     MESSAGE_CATALOG_SCHEMA,
     MESSAGE_NODE_SCHEMA,
 } from './locale-schema.js';
+import { requireNativeAddon } from './native-addon.js';
+import { writePrettyJsonFile } from './pretty-json.js';
 
 /**
  * @param {string} literal
@@ -270,127 +267,58 @@ export function checkLocales(opts) {
     /** @type {Array<{ code: string, severity: string, message: string, path?: string }>} */
     const diagnostics = [];
 
-    const manifestPathJson5 = path.join(localesRoot, 'locales.json5');
-    const manifestPathJson = path.join(localesRoot, 'locales.json');
-    const manifestPath = fs.existsSync(manifestPathJson5) ? manifestPathJson5 : fs.existsSync(manifestPathJson) ? manifestPathJson : null;
+    const plan = loadLocalePlan(projectRoot);
+    diagnostics.push(...mapPlanDiagnostics(plan.diagnostics));
 
-    if (!fs.existsSync(localesRoot) || !manifestPath) {
-        // Discipline nudge: i18n is first-class — missing policy is never silent.
-        // Soft for now (warning); production profiles may elevate to error later.
-        diagnostics.push({
-            code: DIAG_MANIFEST_MISSING,
-            severity: 'warning',
-            message: 'locales/locales.json5 missing — declare LocaleId policy under /locales (native i18n, not an afterthought)',
-            path: 'locales/locales.json5',
-        });
+    const missingManifest = (plan.diagnostics || []).some((d) => d.code === DIAG_MANIFEST_MISSING);
+    if (missingManifest || !plan.locales?.length) {
         return emptyReport(projectRoot, diagnostics);
     }
 
-    /** @type {any} */
-    let rawManifest = null;
-    try {
-        rawManifest = JSON5.parse(fs.readFileSync(manifestPath, 'utf8'));
-    } catch (e) {
-        diagnostics.push({
-            code: DIAG_CATALOG_PARSE,
-            severity: 'error',
-            message: `locales.json5 parse failed: ${e.message || e}`,
-            path: path.relative(projectRoot, manifestPath).replace(/\\/g, '/'),
-        });
-        return emptyReport(projectRoot, diagnostics);
-    }
-
-    const localeEntries = Array.isArray(rawManifest.locales) ? rawManifest.locales : [];
+    const localeEntries = plan.locales || [];
     /** @type {string[]} */
-    const orderedIds = [];
+    const orderedIds = localeEntries.map((e) => e.id);
     /** @type {Set<string>} */
-    const seen = new Set();
-    for (const entry of localeEntries) {
-        const id = String(entry?.id || '');
-        const v = validateLocaleId(id);
-        if (!v.ok) {
-            diagnostics.push({
-                code: DIAG_ID_INVALID,
-                severity: 'error',
-                message: v.message,
-                path: path.relative(projectRoot, manifestPath).replace(/\\/g, '/'),
-            });
-            continue;
-        }
-        if (seen.has(id)) {
-            diagnostics.push({
-                code: DIAG_ID_COLLISION,
-                severity: 'error',
-                message: `duplicate LocaleId ${id} in locales[]`,
-                path: path.relative(projectRoot, manifestPath).replace(/\\/g, '/'),
-            });
-            continue;
-        }
-        seen.add(id);
-        orderedIds.push(id);
-    }
-
-    const defaultLocale = String(rawManifest.defaultLocale || '');
-    if (!defaultLocale || !seen.has(defaultLocale)) {
-        diagnostics.push({
-            code: DIAG_DEFAULT_MISSING,
-            severity: 'error',
-            message: `defaultLocale ${JSON.stringify(defaultLocale)} missing from locales[]`,
-            path: path.relative(projectRoot, manifestPath).replace(/\\/g, '/'),
-        });
-    }
-
-    const fallback = rawManifest.fallback && typeof rawManifest.fallback === 'object' ? rawManifest.fallback : {};
-    const fb = findFallbackCycles(fallback, seen);
-    for (const u of fb.unknown) {
-        diagnostics.push({
-            code: DIAG_FALLBACK_UNKNOWN,
-            severity: 'error',
-            message: `fallback references unknown LocaleId: ${u}`,
-            path: path.relative(projectRoot, manifestPath).replace(/\\/g, '/'),
-        });
-    }
-    for (const c of fb.cycles) {
-        diagnostics.push({
-            code: DIAG_FALLBACK_CYCLE,
-            severity: 'error',
-            message: `fallback cycle: ${c}`,
-            path: path.relative(projectRoot, manifestPath).replace(/\\/g, '/'),
-        });
-    }
+    const seen = new Set(orderedIds);
+    const defaultLocale = String(plan.defaultLocale || '');
+    const fallback = plan.fallback && typeof plan.fallback === 'object' ? plan.fallback : {};
+    const missingPolicy = plan.missing || 'error';
+    const routing = plan.routing || { strategy: 'prefix', defaultPrefix: 'include' };
 
     /** @type {string[]} */
     const diskLocales = [];
-    for (const ent of fs.readdirSync(localesRoot, { withFileTypes: true })) {
-        if (LOCALE_RESERVED_TOP.has(ent.name)) continue;
-        if (ent.isFile()) {
-            diagnostics.push({
-                code: DIAG_LAYOUT_ILLEGAL,
-                severity: 'error',
-                message: `illegal top-level file under /locales: ${ent.name} (only locales.json5 + LocaleId dirs)`,
-                path: `locales/${ent.name}`,
-            });
-            continue;
-        }
-        if (!ent.isDirectory()) continue;
-        const v = validateLocaleId(ent.name);
-        if (!v.ok) {
-            diagnostics.push({
-                code: DIAG_ID_INVALID,
-                severity: 'error',
-                message: `directory ${ent.name}: ${v.message}`,
-                path: `locales/${ent.name}`,
-            });
-            continue;
-        }
-        diskLocales.push(ent.name);
-        if (!seen.has(ent.name)) {
-            diagnostics.push({
-                code: DIAG_DIR_ORPHAN,
-                severity: 'error',
-                message: `locale directory ${ent.name} not listed in locales.json5 locales[]`,
-                path: `locales/${ent.name}`,
-            });
+    if (fs.existsSync(localesRoot)) {
+        for (const ent of fs.readdirSync(localesRoot, { withFileTypes: true })) {
+            if (LOCALE_RESERVED_TOP.has(ent.name)) continue;
+            if (ent.isFile()) {
+                diagnostics.push({
+                    code: DIAG_LAYOUT_ILLEGAL,
+                    severity: 'error',
+                    message: `illegal top-level file under /locales: ${ent.name} (only locales.json5 + LocaleId dirs)`,
+                    path: `locales/${ent.name}`,
+                });
+                continue;
+            }
+            if (!ent.isDirectory()) continue;
+            const v = validateLocaleId(ent.name);
+            if (!v.ok) {
+                diagnostics.push({
+                    code: DIAG_ID_INVALID,
+                    severity: 'error',
+                    message: `directory ${ent.name}: ${v.message}`,
+                    path: `locales/${ent.name}`,
+                });
+                continue;
+            }
+            diskLocales.push(ent.name);
+            if (!seen.has(ent.name)) {
+                diagnostics.push({
+                    code: DIAG_DIR_ORPHAN,
+                    severity: 'error',
+                    message: `locale directory ${ent.name} not listed in locales.json5 locales[]`,
+                    path: `locales/${ent.name}`,
+                });
+            }
         }
     }
     for (const id of orderedIds) {
@@ -429,7 +357,7 @@ export function checkLocales(opts) {
                     });
                     return;
                 }
-                parsed = JSON5.parse(text);
+                parsed = parseAuthorInput(text);
             } catch (e) {
                 diagnostics.push({
                     code: DIAG_CATALOG_PARSE,
@@ -473,7 +401,6 @@ export function checkLocales(opts) {
         });
     }
 
-    // Default locale must define every MessageId; param contracts must match across variants.
     for (const node of messages.values()) {
         if (defaultLocale && !node.variants[defaultLocale]) {
             diagnostics.push({
@@ -502,7 +429,7 @@ export function checkLocales(opts) {
                 if (!node.variants[loc] && loc !== defaultLocale) {
                     const edges = fallback[loc] || [];
                     const canFallback = edges.some((e) => node.variants[e]);
-                    if (!canFallback && rawManifest.missing !== 'warn') {
+                    if (!canFallback && missingPolicy !== 'warn') {
                         diagnostics.push({
                             code: DIAG_MESSAGE_MISSING_VARIANT,
                             severity: 'error',
@@ -514,7 +441,6 @@ export function checkLocales(opts) {
         }
     }
 
-    // scan source for #locales/* imports / message references.
     const used = scanLocaleUsages(projectRoot);
     /** @type {any[]} */
     const typedModules = [];
@@ -588,12 +514,12 @@ export function checkLocales(opts) {
         localesRoot: path.relative(projectRoot, localesRoot).replace(/\\/g, '/') || 'locales',
         manifest: {
             schema: LOCALE_MANIFEST_SCHEMA,
-            schemaVersion: rawManifest.schemaVersion ?? 1,
+            schemaVersion: 1,
             defaultLocale,
             locales: localeEntries,
             fallback,
-            routing: rawManifest.routing || { strategy: 'prefix', defaultPrefix: 'include' },
-            missing: rawManifest.missing || 'error',
+            routing,
+            missing: missingPolicy,
         },
         catalogIds: catalogIds.sort(),
         messageCatalog: {
@@ -791,7 +717,7 @@ function rewriteLocaleImportsInDist(distDir) {
     const files = [];
     walkDistJs(distDir, (file) => files.push(file));
     for (const file of files) {
-        let text = fs.readFileSync(file, 'utf8');
+        const text = fs.readFileSync(file, 'utf8');
         if (!text.includes('#locales/')) continue;
         const fromDir = path.dirname(file);
         // Emit path is dist/locales/*.js — `#` cannot appear in ESM file URLs (fragment).

@@ -139,7 +139,7 @@ jobs:
           ls -la "$out"
 
       - name: Upload native artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: native-${{ matrix.short }}
           path: dist/${{ matrix.short }}
@@ -197,7 +197,7 @@ jobs:
         run: node scripts/ci/assert-vmz-pack.mjs
 
       - name: Download native artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: native-*
           path: dist/native-artifacts

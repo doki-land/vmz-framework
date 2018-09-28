@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashMap};
 
 use serde::{Deserialize, Serialize};
-use vmz_compiler::{DeploymentDocument, DEPLOYMENT_SCHEMA};
+use vmz_compiler::{DEPLOYMENT_SCHEMA, DeploymentDocument};
 use vmz_protocol::VmzModuleKind;
 
 use crate::error::ArtifactError;
@@ -56,12 +56,7 @@ pub fn component_entries(doc: &DeploymentDocument) -> Vec<ComponentEntry> {
         } else {
             normalize_chunk_id(&unit.client_entry)
         };
-        out.push(ComponentEntry {
-            chunk_id,
-            name,
-            entry,
-            source: unit.source.clone(),
-        });
+        out.push(ComponentEntry { chunk_id, name, entry, source: unit.source.clone() });
     }
     out.sort_by(|a, b| a.chunk_id.cmp(&b.chunk_id));
     out
@@ -77,11 +72,8 @@ pub fn collect_depends_on_closure(
         by_id.insert(normalize_chunk_id(&unit.chunk_id), idx);
     }
     let mut out = BTreeSet::new();
-    let mut stack: Vec<String> = roots
-        .iter()
-        .map(|r| normalize_chunk_id(r.as_ref()))
-        .filter(|s| !s.is_empty())
-        .collect();
+    let mut stack: Vec<String> =
+        roots.iter().map(|r| normalize_chunk_id(r.as_ref())).filter(|s| !s.is_empty()).collect();
     while let Some(id) = stack.pop() {
         if !out.insert(id.clone()) {
             continue;

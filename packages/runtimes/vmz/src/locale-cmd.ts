@@ -4,7 +4,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import JSON5 from 'json5';
+import { parseAuthorInput } from './author-input.js';
 import { parseArgs } from './cli.js';
 import { checkLocales, emitLocaleTypedModules, localeHasErrors, planLocaleRename } from './locale-check.js';
 import { checkLocaleDelivery } from './locale-delivery.js';
@@ -202,7 +202,7 @@ function loadRoutesFixture(projectRoot) {
     const candidates = [path.join(projectRoot, 'locale-routes.json5'), path.join(projectRoot, 'locale-routes.json')];
     for (const p of candidates) {
         if (fs.existsSync(p)) {
-            return JSON5.parse(fs.readFileSync(p, 'utf8'));
+            return parseAuthorInput(fs.readFileSync(p, 'utf8'));
         }
     }
     return {
@@ -384,7 +384,7 @@ function cmdLocaleConformance(args) {
     const routesPath = path.join(projectRoot, 'locale-routes.json5');
     if (fs.existsSync(routesPath)) {
         try {
-            const routesFile = JSON5.parse(fs.readFileSync(routesPath, 'utf8'));
+            const routesFile = parseAuthorInput(fs.readFileSync(routesPath, 'utf8'));
             routeIds = (routesFile.routes || []).map((r) => r.routeId);
         } catch {
             /* ignore */

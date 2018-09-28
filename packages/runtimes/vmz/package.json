@@ -52,8 +52,7 @@
         "@vmz/core": "workspace:*",
         "@vmz/plugin": "workspace:*",
         "@vmz/protocol": "workspace:*",
-        "jiti": "^2.6.1",
-        "json5": "^2.2.3"
+        "jiti": "^2.6.1"
     },
     "peerDependencies": {
         "@vmz/plugin-markdown-it": "workspace:*",

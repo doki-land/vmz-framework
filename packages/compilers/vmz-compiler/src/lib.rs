@@ -21,6 +21,8 @@ pub mod error;
 pub use error::{Error, Result, ResultExt};
 
 pub mod application;
+pub mod document;
+pub mod locale;
 pub mod miniprogram;
 pub mod native;
 pub mod parse;

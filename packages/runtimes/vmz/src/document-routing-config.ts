@@ -1,31 +1,25 @@
 // @ts-nocheck
 /**
- * Project locale routing config for document mount (locales/locales.json5).
+ * Project locale routing — consume Rust LocalePlan (no author JSON5 in TS).
  */
 
-import fs from 'node:fs';
-import path from 'node:path';
+import { loadLocalePlan } from './author-input.js';
 
 /**
  * @param {string} projectRoot
- * @returns {{ strategy?: string, defaultLocale?: string } | null}
+ * @returns {{ strategy?: string, defaultPrefix?: string, defaultLocale?: string } | null}
  */
 export function loadLocalesRouting(projectRoot) {
-    const p = path.join(projectRoot, 'locales', 'locales.json5');
-    if (!fs.existsSync(p)) return null;
-    try {
-        const raw = fs.readFileSync(p, 'utf8');
-        let s = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-        const m = s.match(/routing\s*:\s*\{([\s\S]*?)\}/);
-        if (!m) return null;
-        let block = `{${m[1]}}`;
-        block = block.replace(/([,{]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/g, '$1"$2":');
-        block = block.replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_, inner) => JSON.stringify(inner));
-        block = block.replace(/,\s*([}\]])/g, '$1');
-        return JSON.parse(block);
-    } catch {
+    const plan = loadLocalePlan(projectRoot);
+    if (!plan || plan.diagnostics?.some((d) => d.code === 'vmz::locale::manifest_missing')) {
         return null;
     }
+    const routing = plan.routing || {};
+    return {
+        strategy: routing.strategy || 'prefix',
+        defaultPrefix: routing.defaultPrefix || 'include',
+        defaultLocale: plan.defaultLocale || undefined,
+    };
 }
 
 /**
@@ -36,5 +30,5 @@ export function docsRouteNone(routeBase, pageKey) {
     const base = String(routeBase || '/').replace(/\/$/, '') || '';
     const key = pageKey === 'index' ? '' : pageKey.replace(/\\/g, '/');
     const parts = [base.replace(/^\//, ''), key].filter((p) => p !== '');
-    return '/' + (parts.length ? parts.join('/') : '');
+    return `/${parts.length ? parts.join('/') : ''}`;
 }

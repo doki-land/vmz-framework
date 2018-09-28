@@ -21,7 +21,6 @@
         "package": "echo \"run vsce package after pnpm sync\""
     },
     "dependencies": {
-        "json5": "^2.2.3",
         "vscode-languageclient": "^9.0.1",
         "vmz-textmate": "workspace:*"
     },

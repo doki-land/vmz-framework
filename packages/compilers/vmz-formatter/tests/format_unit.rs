@@ -45,7 +45,10 @@ export default class Comp{/* keep */count=0;}
     assert!(!report.has_errors(), "{:?}", report.diagnostics);
 
     let out = fs::read_to_string(&file).unwrap();
-    assert!(out.contains("/* keep */"), "formatter must preserve comments (not codegen strip): {out}");
+    assert!(
+        out.contains("/* keep */"),
+        "formatter must preserve comments (not codegen strip): {out}"
+    );
     assert!(out.contains("class Comp"), "{out}");
     assert!(out.contains("<template>"), "{out}");
 }
@@ -121,10 +124,7 @@ fn editorconfig_vmz_glob_overrides_star() {
 
     format_path(&file, &FormatOptions { check: false }).unwrap();
     let out = fs::read_to_string(&file).unwrap();
-    assert!(
-        out.contains("\n    <div"),
-        "expected [*.vmz] indent_size=4 to win over [*]: {out:?}"
-    );
+    assert!(out.contains("\n    <div"), "expected [*.vmz] indent_size=4 to win over [*]: {out:?}");
 }
 
 #[test]
@@ -168,6 +168,8 @@ fn format_is_idempotent() {
     assert_eq!(report.files_need_write, 0);
 }
 
+#[test]
+fn check_mode_does_not_write() {
     let dir = temp_dir("check");
     write(
         &dir.join(".editorconfig"),

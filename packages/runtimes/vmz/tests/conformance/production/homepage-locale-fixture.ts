@@ -6,13 +6,21 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import JSON5 from 'json5';
+import { loadNative } from 'vmz';
 
 export type HomepageCommonCatalog = Record<string, string>;
 
+function parseAuthorInput(source: string): unknown {
+    const native = loadNative();
+    if (typeof native.authorJson5ToCanonicalJson !== 'function') {
+        throw new Error('native missing authorJson5ToCanonicalJson — run `pnpm napi:build`');
+    }
+    return JSON.parse(native.authorJson5ToCanonicalJson(String(source)));
+}
+
 export function loadHomepageCommonCatalog(root: string, homepageRel: string, localeId: string): HomepageCommonCatalog {
     const p = path.join(root, homepageRel, 'locales', localeId, 'common.json5');
-    const raw = JSON5.parse(fs.readFileSync(p, 'utf8')) as HomepageCommonCatalog;
+    const raw = parseAuthorInput(fs.readFileSync(p, 'utf8')) as HomepageCommonCatalog;
     if (!raw || typeof raw !== 'object') throw new Error(`bad catalog ${p}`);
     return raw;
 }

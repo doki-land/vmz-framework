@@ -1524,9 +1524,7 @@ pub fn deployment_component_entries(json_text: String) -> Result<Vec<JsComponent
 pub fn deployment_depends_on_closure(json_text: String, roots: Vec<String>) -> Result<Vec<String>> {
     let doc = vmz_artifacts::parse_deployment_json(&json_text)
         .map_err(|e| Error::from_reason(e.to_string()))?;
-    Ok(vmz_artifacts::collect_depends_on_closure(&doc, &roots)
-        .into_iter()
-        .collect())
+    Ok(vmz_artifacts::collect_depends_on_closure(&doc, &roots).into_iter().collect())
 }
 
 /// Rasterize SVG markup to a square PNG (site favicon / tab icons).
@@ -1535,4 +1533,53 @@ pub fn rasterize_svg_png(svg: String, px: u32) -> Result<Buffer> {
     let bytes = vmz_compiler::miniprogram::wechat_tab::rasterize_svg_png(&svg, px)
         .map_err(Error::from_reason)?;
     Ok(Buffer::from(bytes))
+}
+
+/// Load + normalize `locales/locales.json5` into a canonical [`LocalePlan`] JSON string.
+///
+/// Domain service: hosts must not re-parse author JSON5 for locale policy.
+#[napi]
+pub fn load_locale_plan(project_root: String) -> Result<String> {
+    let plan = vmz_compiler::locale::load_locale_plan(project_root);
+    Ok(plan.to_json())
+}
+
+/// Parse author locale manifest source (JSON5/JSON) into [`LocalePlan`] JSON.
+#[napi]
+pub fn load_locale_plan_from_source(source: String, source_path: String) -> Result<String> {
+    let plan = vmz_compiler::locale::load_locale_plan_from_source(&source, source_path);
+    Ok(plan.to_json())
+}
+
+/// Load + normalize documents config into a canonical [`DocumentRoutePlan`] JSON string.
+#[napi]
+pub fn load_document_route_plan(project_root: String) -> Result<String> {
+    let plan = vmz_compiler::document::load_document_route_plan(project_root);
+    Ok(plan.to_json())
+}
+
+/// Parse author documents config source into [`DocumentRoutePlan`] JSON.
+///
+/// `file_name` must be one of `documents.config.json5|json|ts|js`.
+#[napi]
+pub fn load_document_route_plan_from_source(
+    source: String,
+    source_path: String,
+    file_name: String,
+) -> Result<String> {
+    let plan = vmz_compiler::document::load_document_route_plan_from_source(
+        &source,
+        source_path,
+        &file_name,
+    );
+    Ok(plan.to_json())
+}
+
+/// Degrade arbitrary author JSON5 to canonical JSON text (catalogs / transitional).
+///
+/// Not a semantic API for locale/document policy — use [`load_locale_plan`] /
+/// [`load_document_route_plan`] for those domains.
+#[napi]
+pub fn author_json5_to_canonical_json(source: String) -> Result<String> {
+    vmz_compiler::locale::author_json5_to_canonical_json(&source).map_err(Error::from_reason)
 }
