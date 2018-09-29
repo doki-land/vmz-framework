@@ -67,7 +67,9 @@ pub type TwCompilerHandle = Arc<dyn TwCompiler>;
 
 /// Register TW tokens from an already-parsed `.vmz`.
 pub fn register_tw_from_parsed(parsed: &ParsedVmz, out: &mut Vec<TwRegistration>) {
-    let ir = parse_template(&parsed.template.content);
+    let Ok(ir) = parse_template(&parsed.template.content) else {
+        return;
+    };
     register_style_tw_nodes(&ir.roots, &parsed.path, out);
     if let Some(style) = &parsed.style {
         register_at_tailwind(&parsed.path, &style.content, out);

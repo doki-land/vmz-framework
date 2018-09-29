@@ -1,10 +1,10 @@
-//! Moved from `src/parse/template.rs` (cargo-cry: tests next to Cargo.toml).
+//! Vue template syntax unit tests (syntax ≡ Vue; JSX hard-rejected).
 
 use vmz_compiler::parse::template::*;
 
 #[test]
-fn parses_interp() {
-    let ir = parse_template("<h2>{user.name}</h2>");
+fn parses_mustache_interp() {
+    let ir = parse_template("<h2>{{ user.name }}</h2>").unwrap();
     assert_eq!(ir.roots.len(), 1);
     match &ir.roots[0] {
         TemplateNode::Element { tag, children, .. } => {
@@ -16,8 +16,10 @@ fn parses_interp() {
 }
 
 #[test]
-fn skips_html_comments() {
-    let ir = parse_template("<!-- auto -->\n<CounterButton initial={0} />");
+fn skips_html_comments_and_bind_attr() {
+    let ir = parse_template(r#"<!-- auto -->
+<CounterButton :initial="0" />"#)
+    .unwrap();
     assert_eq!(ir.roots.len(), 1);
     match &ir.roots[0] {
         TemplateNode::Element { tag, attrs, .. } => {
@@ -31,8 +33,8 @@ fn skips_html_comments() {
 }
 
 #[test]
-fn parses_if_attr() {
-    let ir = parse_template(r#"<p if={!user}>Loading</p>"#);
+fn parses_v_if_directive() {
+    let ir = parse_template(r#"<p v-if="!user">Loading</p>"#).unwrap();
     match &ir.roots[0] {
         TemplateNode::Element { tag, attrs, .. } => {
             assert_eq!(tag, "p");
@@ -44,8 +46,46 @@ fn parses_if_attr() {
 }
 
 #[test]
+fn parses_v_for_into_each_as() {
+    let ir = parse_template(r#"<li v-for="tag in tags" :key="tag.id">{{ tag.label }}</li>"#).unwrap();
+    match &ir.roots[0] {
+        TemplateNode::Element { attrs, children, .. } => {
+            assert!(attrs.iter().any(|a| a.name == "each" && matches!(&a.value, AttrValue::Interp(s) if s == "tags")));
+            assert!(attrs.iter().any(|a| a.name == "as" && matches!(&a.value, AttrValue::Static(s) if s == "tag")));
+            assert!(attrs.iter().any(|a| a.name == "key" && matches!(&a.value, AttrValue::Interp(s) if s == "tag.id")));
+            assert!(matches!(&children[0], TemplateNode::Interp(s) if s == "tag.label"));
+        }
+        _ => panic!("expected element"),
+    }
+}
+
+#[test]
+fn parses_event_shorthand() {
+    let ir = parse_template(r#"<button type="button" @click="selectFirst">select</button>"#).unwrap();
+    match &ir.roots[0] {
+        TemplateNode::Element { attrs, .. } => {
+            let click = attrs.iter().find(|a| a.name == "@click").expect("@click");
+            assert!(matches!(&click.value, AttrValue::Interp(s) if s == "selectFirst"));
+        }
+        _ => panic!("expected element"),
+    }
+}
+
+#[test]
+fn rejects_jsx_text_interp() {
+    let err = parse_template("<h2>{user.name}</h2>").unwrap_err();
+    assert!(err.message.contains("JSX") || err.message.contains("single-brace"), "{err}");
+}
+
+#[test]
+fn rejects_jsx_attr_bind() {
+    let err = parse_template(r#"<Button onClick={increment} />"#).unwrap_err();
+    assert!(err.message.contains("JSX"), "{err}");
+}
+
+#[test]
 fn decodes_named_entities_in_text() {
-    let ir = parse_template("<li>CV &gt; 5% &amp; ok</li>");
+    let ir = parse_template("<li>CV &gt; 5% &amp; ok</li>").unwrap();
     match &ir.roots[0] {
         TemplateNode::Element { children, .. } => match &children[0] {
             TemplateNode::Text(t) => assert_eq!(t, "CV > 5% & ok"),
@@ -58,7 +98,7 @@ fn decodes_named_entities_in_text() {
 #[test]
 fn decodes_numeric_and_attr() {
     assert_eq!(decode_html_entities("a&#62;b&#x3c;c"), "a>b<c");
-    let ir = parse_template(r#"<a title="A &quot;B&quot;">x</a>"#);
+    let ir = parse_template(r#"<a title="A &quot;B&quot;">x</a>"#).unwrap();
     match &ir.roots[0] {
         TemplateNode::Element { attrs, .. } => {
             assert_eq!(attrs[0].value, AttrValue::Static("A \"B\"".into()));

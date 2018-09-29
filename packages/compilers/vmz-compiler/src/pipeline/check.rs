@@ -87,7 +87,15 @@ pub fn check_project(root: impl AsRef<Path>, options: &CheckOptions) -> crate::R
     match crate::pipeline::link::collect_route_table(&page_units) {
         Ok(table) => {
             for (path, parsed, _, _) in &page_units {
-                let ir = parse_template(&parsed.template.content);
+                let ir = match parse_template(&parsed.template.content) {
+                    Ok(ir) => ir,
+                    Err(e) => {
+                        report
+                            .diagnostics
+                            .push(ReportedDiagnostic::error(path, format!("template: {e}")));
+                        continue;
+                    }
+                };
                 for err in crate::pipeline::link::check_template_links(&ir, &table) {
                     report
                         .diagnostics
@@ -182,7 +190,13 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
         ));
     }
 
-    let ir = parse_template(&parsed.template.content);
+    let ir = match parse_template(&parsed.template.content) {
+        Ok(ir) => ir,
+        Err(e) => {
+            report.diagnostics.push(ReportedDiagnostic::error(path, format!("template: {e}")));
+            return;
+        }
+    };
     check_each_keys(path, &ir, report);
 
     // Program IR A: surface Unknown widenings as advice (never silent).

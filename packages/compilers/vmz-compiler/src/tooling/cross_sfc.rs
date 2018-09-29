@@ -159,7 +159,9 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
                 owners: vec![StableId::new(StableIdKind::Component, class_name.clone())],
                 tags: vec!["x2".into()],
             });
-            let ir = parse_template(&parsed.template.content);
+            let Ok(ir) = parse_template(&parsed.template.content) else {
+                continue;
+            };
             if true {
                 for (ts, te) in template_name_spans(&ir, &parsed.template.content, &name) {
                     let tspan = SourceSpan {
@@ -204,7 +206,9 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
                 owners: vec![StableId::new(StableIdKind::Component, class_name.clone())],
                 tags: vec!["x2".into()],
             });
-            let ir = parse_template(&parsed.template.content);
+            let Ok(ir) = parse_template(&parsed.template.content) else {
+                continue;
+            };
             if true {
                 for (ts, te) in template_handler_spans(&ir, &parsed.template.content, &name) {
                     let tspan = SourceSpan {
@@ -292,7 +296,9 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
         let Ok(parsed) = parse_vmz(&abs, source) else {
             continue;
         };
-        let ir = parse_template(&parsed.template.content);
+        let Ok(ir) = parse_template(&parsed.template.content) else {
+            continue;
+        };
         for tag in collect_component_tags(&ir) {
             if let Some(def_rel) = by_stem.get(&tag) {
                 if def_rel == &rel {
@@ -455,7 +461,9 @@ fn collect_method_edits(
             });
             refs += 1;
         }
-        let ir = parse_template(&parsed.template.content);
+        let Ok(ir) = parse_template(&parsed.template.content) else {
+            continue;
+        };
         if true {
             for (ts, te) in template_handler_spans(&ir, &parsed.template.content, from) {
                 edits.push(TextEdit {
@@ -510,7 +518,9 @@ fn collect_component_edits(
             }
         }
         // Usages: <From ...>
-        let ir = parse_template(&parsed.template.content);
+        let Ok(ir) = parse_template(&parsed.template.content) else {
+            continue;
+        };
         if true {
             let tags = collect_component_tags(&ir);
             if tags.iter().any(|t| t == from) {

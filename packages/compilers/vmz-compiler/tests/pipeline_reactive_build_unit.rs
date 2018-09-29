@@ -18,7 +18,7 @@ fn ternary_builds_control_region_with_body_reads() {
             span: Span::default(),
         });
     }
-    let tpl = parse_template(r#"{enabled ? user.name : account.name}"#);
+    let tpl = parse_template(r#"{{ enabled ? user.name : account.name }}"#).unwrap();
     let module = build_reactive_module("T.vmz", &decl, &tpl);
     let c = &module.components[0];
     assert_eq!(c.control_regions.len(), 1, "ternary must create one region");
@@ -52,8 +52,9 @@ fn distinguishes_user_name_and_bio() {
         span: Span::default(),
     });
     let tpl = parse_template(
-        r#"<p if={!user}>L</p><div else><h2>{user.name}</h2><p>{user.bio}</p><li each={tags} as="tag" key={tag}>{tag}</li></div>"#,
-    );
+        r#"<p v-if="!user">L</p><div v-else><h2>{{ user.name }}</h2><p>{{ user.bio }}</p><li v-for="tag in tags" :key="tag">{{ tag }}</li></div>"#,
+    )
+    .unwrap();
     let module = build_reactive_module("UserCard.vmz", &decl, &tpl);
     let json = module.to_json();
     assert!(json.contains("user.name"), "{json}");
@@ -89,7 +90,7 @@ fn keyed_each_item_prop_is_list_item() {
         visibility: Visibility::Private,
         span: Span::default(),
     });
-    let tpl = parse_template(r#"<li each={tags} as="tag" key={tag.id}>{tag.label}</li>"#);
+    let tpl = parse_template(r#"<li v-for="tag in tags" :key="tag.id">{{ tag.label }}</li>"#).unwrap();
     let module = build_reactive_module("TagList.vmz", &decl, &tpl);
     let c = &module.components[0];
     let stables: Vec<String> = c
@@ -128,7 +129,7 @@ fn dynamic_index_path_is_dynamic_path() {
             span: Span::default(),
         });
     }
-    let tpl = parse_template(r#"{items[selected].label}"#);
+    let tpl = parse_template(r#"{{ items[selected].label }}"#).unwrap();
     let module = build_reactive_module("Pick.vmz", &decl, &tpl);
     let c = &module.components[0];
     let stables: Vec<String> = c
@@ -162,8 +163,9 @@ fn nested_each_alias_list_is_nested_list_item() {
         span: Span::default(),
     });
     let tpl = parse_template(
-        r#"<div each={groups} as="g" key={g.id}><span each={g.items} as="item" key={item.id}>{item.label}</span></div>"#,
-    );
+        r#"<div v-for="g in groups" :key="g.id"><span v-for="item in g.items" :key="item.id">{{ item.label }}</span></div>"#,
+    )
+    .unwrap();
     let module = build_reactive_module("Groups.vmz", &decl, &tpl);
     let c = &module.components[0];
     let stables: Vec<String> = c
@@ -199,7 +201,7 @@ fn multi_segment_dynamic_index_path() {
             span: Span::default(),
         });
     }
-    let tpl = parse_template(r#"{rows[ri].cells[ci].value}"#);
+    let tpl = parse_template(r#"{{ rows[ri].cells[ci].value }}"#).unwrap();
     let module = build_reactive_module("Grid.vmz", &decl, &tpl);
     let c = &module.components[0];
     let stables: Vec<String> = c
@@ -240,7 +242,7 @@ fn each_without_proveable_list_field_skips_list_item() {
         span: Span::default(),
     });
     // Ternary list ?not a single Field root ?no ListItem frame.
-    let tpl = parse_template(r#"<li each={a ? a : b} as="item" key={item}>{item}</li>"#);
+    let tpl = parse_template(r#"<li v-for="item in (a ? a : b)" :key="item">{{ item }}</li>"#).unwrap();
     let module = build_reactive_module("Mixed.vmz", &decl, &tpl);
     let json = module.to_json();
     assert!(
@@ -260,7 +262,7 @@ fn program_module_lifts_reactive_view() {
         visibility: Visibility::Private,
         span: Span::default(),
     });
-    let tpl = parse_template("<h2>{user.name}</h2>");
+    let tpl = parse_template("<h2>{{ user.name }}</h2>").unwrap();
     let program = build_program_module("UserCard.vmz", &decl, &tpl);
     let json = program.to_json();
     assert!(json.contains("vmz.program.v0"), "{json}");
@@ -285,7 +287,7 @@ fn program_module_attaches_server_capabilities() {
         visibility: Visibility::Private,
         span: Span::default(),
     });
-    let tpl = parse_template("<h2>{user.name}</h2>");
+    let tpl = parse_template("<h2>{{ user.name }}</h2>").unwrap();
     let attach = ServerAttach {
         module_id: "#server/components/UserCard".into(),
         class_name: "UserCardServer".into(),
@@ -390,7 +392,7 @@ fn effect_records_sibling_method_calls() {
         star_reasons: Vec::new(),
         span: Span::default(),
     });
-    let tpl = parse_template("<button on:click={onClick}>{user.name}</button>");
+    let tpl = parse_template(r#"<button @click="onClick">{{ user.name }}</button>"#).unwrap();
     let module = build_reactive_module("Card.vmz", &decl, &tpl);
     let c = &module.components[0];
     let on_click = c.effects.iter().find(|e| e.name == "onClick").expect("onClick effect");

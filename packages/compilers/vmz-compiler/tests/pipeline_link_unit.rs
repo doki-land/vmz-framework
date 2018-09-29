@@ -237,8 +237,9 @@ export default class IndexPage {}
 "#;
     let client = analyze_script(ScriptKind::Client, src);
     let tpl = parse_template(
-        r#"<nav><Link to="AboutPage">About</Link><Link to="ProductPage" params={ id: 'sku-1' }>Product</Link></nav>"#,
-    );
+        r#"<nav><Link to="AboutPage">About</Link><Link to="ProductPage" :params="{ id: 'sku-1' }">Product</Link></nav>"#,
+    )
+    .unwrap();
     let table = demo_table();
     let program = build_program_module_with_server("t.vmz", &client.decl, &tpl, None, Some(&table));
     assert_eq!(program.units[0].view.status, ViewStatus::Native);

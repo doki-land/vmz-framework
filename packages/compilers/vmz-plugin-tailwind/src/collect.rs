@@ -83,7 +83,23 @@ pub fn collect_from_vmz(parsed: &ParsedVmz) -> (TwCollection, Vec<ReportedDiagno
     let mut diagnostics = Vec::new();
     let mut sites = Vec::new();
 
-    let ir = parse_template(&parsed.template.content);
+    let ir = match parse_template(&parsed.template.content) {
+        Ok(ir) => ir,
+        Err(e) => {
+            diagnostics.push(ReportedDiagnostic::error(
+                &parsed.path,
+                format!("template: {e}"),
+            ));
+            return (
+                TwCollection {
+                    path: parsed.path.clone(),
+                    sites,
+                    static_tokens: Vec::new(),
+                },
+                diagnostics,
+            );
+        }
+    };
     walk_nodes(
         &ir.roots,
         &parsed.path,

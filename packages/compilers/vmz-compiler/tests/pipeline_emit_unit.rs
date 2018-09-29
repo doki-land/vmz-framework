@@ -20,7 +20,7 @@ this.user = await UserCardServer.fetchUser();
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let ir = parse_template("<p>{user.name}</p>");
+    let ir = parse_template("<p>{{ user.name }}</p>").unwrap();
     let bridge = ServerBridge {
         module_id: "#server/components/UserCard".into(),
         class_name: "UserCardServer".into(),
@@ -69,7 +69,7 @@ fn preserves_source_constructor_without_injecting_a_duplicate() {
         "export default class LargeComponent {{\n{fields}\n  constructor() {{ this.field0 = 99; }}\n}}"
     );
     let client = analyze_script(ScriptKind::Client, &src);
-    let template = parse_template("<p>{field0}</p>");
+    let template = parse_template("<p>{{ field0 }}</p>").unwrap();
     let js = emit_client_js(&src, &client, &template, None).unwrap();
 
     assert_eq!(js.matches("constructor(").count(), 1, "{js}");
@@ -83,7 +83,7 @@ fn emit_consumes_shared_reactive_view_deps() {
 
     let src = "export default class Card { user = { name: \"a\", bio: \"b\" }; }";
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl = parse_template("<h2>{user.name}</h2><p>{user.bio}</p>");
+    let tpl = parse_template("<h2>{{ user.name }}</h2><p>{{ user.bio }}</p>").unwrap();
     let reactive = build_reactive_module("Card.vmz", &client.decl, &tpl);
     let comp = &reactive.components[0];
     let js = emit_client_js_with_ir(src, &client, &tpl, None, Some(comp), None, None).unwrap();
@@ -124,7 +124,7 @@ fn emit_consumes_shared_reactive_view_deps() {
 fn emits_if_directive() {
     let src = "export default class Card { user = null; }";
     let client = analyze_script(ScriptKind::Client, src);
-    let ir = parse_template(r#"<p if={!user}>Loading</p><div if={user}>{user.name}</div>"#);
+    let ir = parse_template(r#"<p v-if="!user">Loading</p><div v-if="user">{{ user.name }}</div>"#).unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
     assert!(js.contains("api.ifBlock(this,"), "{js}");
     assert!(js.contains("!this.user") || js.contains("!(this.user)"), "{js}");
@@ -136,7 +136,7 @@ fn emits_if_directive() {
 fn emits_conditional_bind_cf() {
     let src = "export default class T { enabled = true; user = { name: \"a\" }; account = { name: \"b\" }; }";
     let client = analyze_script(ScriptKind::Client, src);
-    let ir = parse_template(r#"{enabled ? user.name : account.name}"#);
+    let ir = parse_template(r#"{{ enabled ? user.name : account.name }}"#).unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
     assert!(js.contains("api.bindText(this,"), "{js}");
     assert!(js.contains("stable:"), "{js}");
@@ -150,7 +150,7 @@ fn emits_conditional_bind_cf() {
 fn if_deps_come_from_control_region_only() {
     let src = "export default class T { show = true; aText = \"A\"; bText = \"B\"; }";
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl = parse_template(r#"<div><p if={show}>{aText}</p><p else>{bText}</p></div>"#);
+    let tpl = parse_template(r#"<div><p v-if="show">{{ aText }}</p><p v-else>{{ bText }}</p></div>"#).unwrap();
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
     // Structural if deps = stable cond only (show), not body texts.
     assert!(
@@ -171,8 +171,8 @@ export default class Card {
 "#;
     let client = analyze_script(ScriptKind::Client, src);
     let ir = parse_template(
-        r#"<p if={!user}>Loading</p><p else-if={error}>{error}</p><div else><li each={tags} as="tag" key={tag}>{tag}</li></div>"#,
-    );
+        r#"<p v-if="!user">Loading</p><p v-else-if="error">{{ error }}</p><div v-else><li v-for="tag in tags" :key="tag">{{ tag }}</li></div>"#,
+    ).unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
     assert!(js.contains("api.ifBlock(this,"), "{js}");
     assert!(js.contains("this.error") || js.contains("(this.error)"), "{js}");
@@ -191,7 +191,7 @@ export default class CounterButton {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let ir = parse_template("<button>{count}</button>");
+    let ir = parse_template("<button>{{ count }}</button>").unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
     assert!(js.contains("__vmzProps = [\"initial\"]"));
     assert!(js.contains("__vmzState = [\"count\"]"));
@@ -208,8 +208,9 @@ export default class IndexPage {
 "#;
     let client = analyze_script(ScriptKind::Client, src);
     let ir = parse_template(
-        r#"<main><CounterButton /><button type="button" onClick={() => count++}>{count}</button></main>"#,
-    );
+        r#"<main><CounterButton /><button type="button" @click="() => count++">{{ count }}</button></main>"#,
+    )
+    .unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
     assert!(js.contains("api.component(this,"), "{js}");
     assert!(js.contains("\"CounterButton\""), "{js}");
@@ -229,7 +230,7 @@ export default class Page {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let ir = parse_template(r#"<Select onChange={onSelect} />"#);
+    let ir = parse_template(r#"<Select :onChange="onSelect" />"#).unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
     assert!(js.contains(r#""onChange": (ev) => this.onSelect(ev)"#), "{js}");
 }
@@ -238,7 +239,7 @@ export default class Page {
 fn emits_client_idle_directive() {
     let src = "export default class IndexPage { title = 'x'; }";
     let client = analyze_script(ScriptKind::Client, src);
-    let ir = parse_template(r#"<LikeButton client:idle label="Like" />"#);
+    let ir = parse_template(r#"<LikeButton client:idle label="Like" />"#).unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
     assert!(js.contains("api.component(this,"), "{js}");
     assert!(js.contains("\"idle\"") || js.contains("'idle'"), "{js}");

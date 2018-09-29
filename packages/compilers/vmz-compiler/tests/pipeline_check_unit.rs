@@ -24,7 +24,7 @@ fn check_template_snippet(template: &str) -> CheckReport {
 
 #[test]
 fn warns_each_without_key() {
-    let report = check_template_snippet(r#"<li each={tags} as="tag">{tag}</li>"#);
+    let report = check_template_snippet(r#"<li v-for="tag in tags">{{ tag }}</li>"#);
     assert!(
         report
             .diagnostics
@@ -37,7 +37,7 @@ fn warns_each_without_key() {
 
 #[test]
 fn errors_constant_key() {
-    let report = check_template_snippet(r#"<li each={tags} as="tag" key={"x"}>{tag}</li>"#);
+    let report = check_template_snippet(r#"<li v-for="tag in tags" :key="'x'">{{ tag }}</li>"#);
     assert!(
         report
             .diagnostics
@@ -51,7 +51,7 @@ fn errors_constant_key() {
 #[test]
 fn ok_property_key() {
     let report =
-        check_template_snippet(r#"<li each={tags} as="tag" key={tag.id}>{tag.label}</li>"#);
+        check_template_snippet(r#"<li v-for="tag in tags" :key="tag.id">{{ tag.label }}</li>"#);
     assert!(
         !report.diagnostics.iter().any(|d| d.message().contains("each")),
         "{:?}",

@@ -18,7 +18,8 @@ export default class CounterButton {
 "#;
     let client = analyze_script(ScriptKind::Client, src);
     let tpl =
-        parse_template(r#"<button type="button" onClick={() => count++}>count: {count}</button>"#);
+        parse_template(r#"<button type="button" @click="() => count++">count: {{ count }}</button>"#)
+            .unwrap();
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     let view = &program.units[0].view;
     assert_eq!(view.status, ViewStatus::Native);
@@ -41,7 +42,7 @@ export default class BranchDemo {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl = parse_template(r#"<div><p if={showA}>{aText}</p><p else>{bText}</p></div>"#);
+    let tpl = parse_template(r#"<div><p v-if="showA">{{ aText }}</p><p v-else>{{ bText }}</p></div>"#).unwrap();
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
@@ -57,7 +58,7 @@ export default class ListDemo {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl = parse_template(r#"<ul><li each={tags} as="tag" key={tag.id}>{tag.label}</li></ul>"#);
+    let tpl = parse_template(r#"<ul><li v-for="tag in tags" :key="tag.id">{{ tag.label }}</li></ul>"#).unwrap();
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
@@ -74,8 +75,8 @@ export default class DealsPage {
 "#;
     let client = analyze_script(ScriptKind::Client, src);
     let tpl = parse_template(
-        r#"<div><article class="deal" each={deals} as="d" key={d.id}><h3>{d.title}</h3><p>{d.note}</p></article></div>"#,
-    );
+        r#"<div><article class="deal" v-for="d in deals" :key="d.id"><h3>{{ d.title }}</h3><p>{{ d.note }}</p></article></div>"#,
+    ).unwrap();
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
@@ -93,7 +94,7 @@ export default class Host {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl = parse_template(r#"<div><Child count={x} /></div>"#);
+    let tpl = parse_template(r#"<div><Child :count="x" /></div>"#).unwrap();
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     assert!(program.units[0]
@@ -113,7 +114,7 @@ export default class LikeButton {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl = parse_template(r#"<button>{liked ? '♥' : '♡'}</button>"#);
+    let tpl = parse_template(r#"<button>{{ liked ? '♥' : '♡' }}</button>"#).unwrap();
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
@@ -130,7 +131,7 @@ fn slot_is_eligible() {
 export default class Application {}
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl = parse_template(r#"<div><slot /></div>"#);
+    let tpl = parse_template(r#"<div><slot /></div>"#).unwrap();
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
@@ -147,7 +148,7 @@ export default class BranchDemo {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl = parse_template(r#"<div><p if={showA}>{aText}</p><p else>{bText}</p></div>"#);
+    let tpl = parse_template(r#"<div><p v-if="showA">{{ aText }}</p><p v-else>{{ bText }}</p></div>"#).unwrap();
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     assert!(program.units[0].view.roots.iter().any(|n| {
@@ -163,7 +164,7 @@ export default class HtmlDemo {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl = parse_template(r#"<div html={markup}></div>"#);
+    let tpl = parse_template(r#"<div v-html="markup"></div>"#).unwrap();
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
@@ -180,7 +181,7 @@ export default class CatalogList {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl = parse_template(r#"<button type="button" @click={selectFirst}>select</button>"#);
+    let tpl = parse_template(r#"<button type="button" @click="selectFirst">select</button>"#).unwrap();
     let roots = &tpl.roots;
     assert_eq!(roots.len(), 1, "button must parse as one element, not text/@click split");
     let js = emit_client_js(src, &client, &tpl, None).unwrap();

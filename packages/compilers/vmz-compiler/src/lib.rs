@@ -139,7 +139,9 @@ pub use style_token_diag::{
     validate_style_tw_design_token_refs, validate_unreferenced_global_styles,
     validate_unused_design_tokens, validate_vmz_css_var_refs,
 };
-pub use template::{AttrValue, TemplateAttr, TemplateIr, TemplateNode, parse_template};
+pub use template::{
+    AttrValue, TemplateAttr, TemplateIr, TemplateNode, TemplateParseError, parse_template,
+};
 pub use tw::{
     TwCompiler, TwCompilerHandle, TwEmitRequest, TwEmitResult, TwRegKind, TwRegistration,
     register_tw_from_parsed,

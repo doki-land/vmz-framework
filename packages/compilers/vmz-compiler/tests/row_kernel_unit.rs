@@ -81,8 +81,8 @@ fn keyed_static_row_emits_row_kernel() {
     assert!(js.is_some(), "expected rowKernel for static keyed row");
     let js = js.unwrap();
     assert!(js.contains("rowKernel:"), "{js}");
-    assert!(js.contains("hydrate:"), "{js}");
-    assert!(js.contains("create:"), "{js}");
+    assert!(js.contains("hydrate"), "{js}");
+    assert!(js.contains("create"), "{js}");
     assert!(js.contains("insertBefore"), "{js}");
     assert!(js.contains("cloneNode"), "{js}");
     assert!(js.contains("itemFields"), "{js}");

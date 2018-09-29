@@ -52,7 +52,9 @@ impl ComponentGraph {
             let Ok(parsed) = parse_vmz(path, source) else {
                 continue;
             };
-            let ir = crate::template::parse_template(&parsed.template.content);
+            let Ok(ir) = crate::template::parse_template(&parsed.template.content) else {
+                continue;
+            };
             let mut child_chunks = Vec::new();
             let mut seen = HashSet::new();
             for tag in component_tags(&ir, &by_tag) {

@@ -848,7 +848,16 @@ fn emit_file(
         ));
     }
     let server = parsed.server.as_ref().map(|s| analyze_script(ScriptKind::Server, &s.content));
-    let template_ir = parse_template(&parsed.template.content);
+    let template_ir = match parse_template(&parsed.template.content) {
+        Ok(ir) => ir,
+        Err(e) => {
+            report.diagnostics.push(ReportedDiagnostic::error(
+                path,
+                format!("template: {e}"),
+            ));
+            return Ok(());
+        }
+    };
 
     let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("component");
 
