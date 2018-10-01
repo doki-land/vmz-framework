@@ -1,7 +1,7 @@
 <template>
   <section>
-      <span>{user.flag}</span>
-      <em>{user.name}</em>
+      <span>{{ user.flag }}</span>
+      <em>{{ user.name }}</em>
     </section>
 </template>
 

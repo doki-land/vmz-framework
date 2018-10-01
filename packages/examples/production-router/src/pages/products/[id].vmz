@@ -1,9 +1,9 @@
 <template>
   <main>
-      <h1>Product {id}</h1>
+      <h1>Product {{ id }}</h1>
       <p>route-product</p>
-      <p>loader-title:{title}</p>
-      <p if={actionNote}>action-note:{actionNote}</p>
+      <p>loader-title:{{ title }}</p>
+      <p v-if="actionNote">action-note:{{ actionNote }}</p>
       <Link to="IndexPage">Home</Link>
     </main>
 </template>

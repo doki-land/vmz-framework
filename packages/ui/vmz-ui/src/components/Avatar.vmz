@@ -1,5 +1,5 @@
 <template>
-  <span class="vmz-ui-avatar" data-vmz-ui="avatar" data-size={size} aria-label={label}><img if={src} src={src} alt="" /><span if={!src}>{text}</span></span>
+  <span class="vmz-ui-avatar" data-vmz-ui="avatar" :data-size="size" :aria-label="label"><img v-if="src" :src="src" alt="" /><span v-if="!src">{{ text }}</span></span>
 </template>
 
 <style>

@@ -1,40 +1,39 @@
 <template>
   <div class="vmz-ui-tree" data-vmz-ui="tree">
-      <p if={label} class="vmz-ui-tree__label" id={labelId}>{label}</p>
+      <p v-if="label" class="vmz-ui-tree__label" :id="labelId">{{ label }}</p>
       <ul
         class="vmz-ui-tree__items"
         role="tree"
-        aria-labelledby={labelId}
-        aria-label={label}
-        onClick={onTreeClick}
-        onKeyDown={onTreeKeyDown}
+        :aria-labelledby="labelId"
+        :aria-label="label"
+        @click="onTreeClick"
+        :onKeyDown="onTreeKeyDown"
       >
         <li
-          each={items}
-          as="item"
-          key={item.id}
+          v-for="item in items"
+          :key="item.id"
           class="vmz-ui-tree__item"
           role="treeitem"
-          id={item.id}
-          data-vmz-tree-item={item.id}
-          data-depth={item.depth}
-          aria-selected={selected === item.id ? 'true' : 'false'}
-          aria-expanded={item.expandedAttr}
-          tabindex={selected === item.id ? 0 : -1}
-          style={item.padStyle}
+          :id="item.id"
+          :data-vmz-tree-item="item.id"
+          :data-depth="item.depth"
+          :aria-selected="selected === item.id ? 'true' : 'false'"
+          :aria-expanded="item.expandedAttr"
+          :tabindex="selected === item.id ? 0 : -1"
+          :style="item.padStyle"
         >
           <button
-            if={item.expandable}
+            v-if="item.expandable"
             type="button"
             class="vmz-ui-tree__twist"
-            data-vmz-tree-twist={item.id}
-            aria-label={item.twistLabel}
+            :data-vmz-tree-twist="item.id"
+            :aria-label="item.twistLabel"
             tabindex="-1"
           >
-            {item.expanded ? '−' : '+'}
+            {{ item.expanded ? '−' : '+' }}
           </button>
-          <span if={!item.expandable} class="vmz-ui-tree__twist-spacer" aria-hidden="true"></span>
-          <span class="vmz-ui-tree__title" data-vmz-tree-title={item.id}>{item.title}</span>
+          <span v-if="!item.expandable" class="vmz-ui-tree__twist-spacer" aria-hidden="true"></span>
+          <span class="vmz-ui-tree__title" :data-vmz-tree-title="item.id">{{ item.title }}</span>
         </li>
       </ul>
     </div>

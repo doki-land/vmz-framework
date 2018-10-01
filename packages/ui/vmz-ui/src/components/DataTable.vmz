@@ -2,56 +2,55 @@
   <div
       class="vmz-ui-datatable-wrap"
       data-vmz-ui="data-table"
-      data-sort-key={sortKey}
-      data-sort-dir={sortDir}
-      data-selected-count={selectedCount}
+      :data-sort-key="sortKey"
+      :data-sort-dir="sortDir"
+      :data-selected-count="selectedCount"
     >
       <table class="vmz-ui-datatable">
-        <thead onClick={onHeadClick}>
+        <thead @click="onHeadClick">
           <tr>
             <th scope="col" class="vmz-ui-datatable__check">
               <input
                 type="checkbox"
                 class="vmz-ui-datatable__box"
                 data-vmz-select-all="true"
-                aria-label={selectAllLabel}
-                checked={allSelected}
+                :aria-label="selectAllLabel"
+                :checked="allSelected"
               />
             </th>
-            <th each={columns} as="col" key={col.id} scope="col" data-vmz-col={col.id}>
-              <button type="button" class="vmz-ui-datatable__sort" data-vmz-sort={col.id}>
-                {col.title}
+            <th v-for="col in columns" :key="col.id" scope="col" :data-vmz-col="col.id">
+              <button type="button" class="vmz-ui-datatable__sort" :data-vmz-sort="col.id">
+                {{ col.title }}
               </button>
             </th>
-            <th if={hasRowAction} scope="col">{actionTitle}</th>
+            <th v-if="hasRowAction" scope="col">{{ actionTitle }}</th>
           </tr>
         </thead>
-        <tbody onClick={onBodyClick}>
+        <tbody @click="onBodyClick">
           <tr
-            each={rows}
-            as="row"
-            key={row.id}
-            data-vmz-row={row.id}
-            data-selected={row.selectedAttr}
+            v-for="row in rows"
+            :key="row.id"
+            :data-vmz-row="row.id"
+            :data-selected="row.selectedAttr"
           >
             <td class="vmz-ui-datatable__check">
               <input
                 type="checkbox"
                 class="vmz-ui-datatable__box"
-                data-vmz-select={row.id}
-                aria-label={row.selectLabel}
-                checked={row.selected}
+                :data-vmz-select="row.id"
+                :aria-label="row.selectLabel"
+                :checked="row.selected"
               />
             </td>
-            <td each={row.cells} as="cell">{cell}</td>
-            <td if={hasRowAction}>
+            <td v-for="cell in row.cells">{{ cell }}</td>
+            <td v-if="hasRowAction">
               <button
                 type="button"
                 class="vmz-ui-datatable__row-action"
-                data-vmz-row-action={row.id}
-                disabled={rowActionDisabled}
+                :data-vmz-row-action="row.id"
+                :disabled="rowActionDisabled"
               >
-                {actionLabel}
+                {{ actionLabel }}
               </button>
             </td>
           </tr>

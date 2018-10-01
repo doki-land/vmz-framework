@@ -1,19 +1,19 @@
 <template>
-  <nav class="vmz-ui-pagination" data-vmz-ui="pagination" aria-label={label}>
+  <nav class="vmz-ui-pagination" data-vmz-ui="pagination" :aria-label="label">
       <button
         type="button"
         class="vmz-ui-pagination__btn"
-        disabled={prevDisabled}
-        onClick={onPrevClick}
+        :disabled="prevDisabled"
+        @click="onPrevClick"
       >
         Previous
       </button>
-      <p class="vmz-ui-pagination__status" data-vmz-fixture="page-status">{status}</p>
+      <p class="vmz-ui-pagination__status" data-vmz-fixture="page-status">{{ status }}</p>
       <button
         type="button"
         class="vmz-ui-pagination__btn"
-        disabled={nextDisabled}
-        onClick={onNextClick}
+        :disabled="nextDisabled"
+        @click="onNextClick"
       >
         Next
       </button>

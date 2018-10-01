@@ -2,19 +2,19 @@
   <div
       class="vmz-ui-tooltip"
       data-vmz-ui="tooltip"
-      data-open={openAttr}
+      :data-open="openAttr"
     >
       <div class="vmz-ui-tooltip__trigger" data-vmz-tooltip="trigger">
         <slot />
       </div>
       <div
-        if={open}
+        v-if="open"
         class="vmz-ui-tooltip__bubble"
         role="tooltip"
-        id={tooltipId}
+        :id="tooltipId"
         data-vmz-tooltip="bubble"
       >
-        {content}
+        {{ content }}
       </div>
     </div>
 </template>

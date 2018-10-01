@@ -3,12 +3,12 @@
     <SiteHeader />
     <main>
       <section class="v2-hero" aria-labelledby="landing-title" data-vmz-fixture="landing-brand">
-        <p class="v2-kicker" data-vmz-fixture="landing-hero-kicker"><span></span> {heroKickerLabel}</p>
-        <h1 id="landing-title" data-vmz-fixture="landing-hero-title">{heroTitleLeadLabel}<br /><em>{heroTitleEmLabel}</em></h1>
-        <p class="v2-lede" data-vmz-fixture="landing-hero-lede">{heroLedeLabel}</p>
+        <p class="v2-kicker" data-vmz-fixture="landing-hero-kicker"><span></span> {{ heroKickerLabel }}</p>
+        <h1 id="landing-title" data-vmz-fixture="landing-hero-title">{{ heroTitleLeadLabel }}<br /><em>{{ heroTitleEmLabel }}</em></h1>
+        <p class="v2-lede" data-vmz-fixture="landing-hero-lede">{{ heroLedeLabel }}</p>
         <div class="v2-actions">
-          <a class="v2-button v2-button--primary" data-vmz-fixture="landing-primary-cta" href={guideHref}>{buildLabel}</a>
-          <a class="v2-button v2-button--text" data-vmz-fixture="landing-secondary-cta" href={docsRootHref}>{readDocsLabel} <span aria-hidden="true">→</span></a>
+          <a class="v2-button v2-button--primary" data-vmz-fixture="landing-primary-cta" :href="guideHref">{{ buildLabel }}</a>
+          <a class="v2-button v2-button--text" data-vmz-fixture="landing-secondary-cta" :href="docsRootHref">{{ readDocsLabel }} <span aria-hidden="true">→</span></a>
         </div>
         <div class="v2-signal" aria-label="VMZ compilation model">
           <div><small>Author</small><strong>Components</strong></div>
@@ -22,8 +22,8 @@
       <section class="v2-statement" aria-labelledby="statement-title">
         <p class="v2-index">01 / WHY VMZ</p>
         <div>
-          <h2 id="statement-title" data-vmz-fixture="landing-statement-title">{statementTitleLeadLabel}<br /><em>{statementTitleEmLabel}</em></h2>
-          <p data-vmz-fixture="landing-statement-body">{statementBodyLabel}</p>
+          <h2 id="statement-title" data-vmz-fixture="landing-statement-title">{{ statementTitleLeadLabel }}<br /><em>{{ statementTitleEmLabel }}</em></h2>
+          <p data-vmz-fixture="landing-statement-body">{{ statementBodyLabel }}</p>
         </div>
       </section>
 
@@ -96,25 +96,25 @@
             <small>Production workspace</small>
           </aside>
           <div class="v2-product__work">
-          <div class="v2-product__bar"><div><span>Projects / vmz-site</span><strong>Release Center</strong></div><Button type="button" onClick={() => (notifyOpen = true)}>创建发布</Button></div>
-          <Tabs label="Product views" selected={showcaseTab} panelId="landing-showcase-panel" items={showcaseTabs} onSelect={(id) => (showcaseTab = id)}>
-            <div if={showcaseTab === 'overview'} class="v2-dashboard">
+          <div class="v2-product__bar"><div><span>Projects / vmz-site</span><strong>Release Center</strong></div><Button type="button" @click="() => (notifyOpen = true)">创建发布</Button></div>
+          <Tabs label="Product views" :selected="showcaseTab" panelId="landing-showcase-panel" :items="showcaseTabs" :onSelect="(id) => (showcaseTab = id)">
+            <div v-if="showcaseTab === 'overview'" class="v2-dashboard">
               <div class="v2-metrics"><Card title="Build" description="main · latest"><Badge tone="success">Ready</Badge><strong>Production</strong></Card><Card title="Affected scope" description="Last compilation"><Badge tone="info">Direct</Badge><strong>1 region</strong></Card><Card title="Targets" description="Current profile"><Badge tone="brand">4 active</Badge><strong>Web to Edge</strong></Card></div>
-              <div class="v2-table"><Table columns={surfaceColumns} rows={surfaceRows} sortKey="surface" sortDir="asc" hasRowAction={false} /></div>
+              <div class="v2-table"><Table :columns="surfaceColumns" :rows="surfaceRows" sortKey="surface" sortDir="asc" :hasRowAction="false" /></div>
             </div>
-            <div if={showcaseTab === 'source'} class="v2-source"><CodeBlock code={codeSample} language="vmz" title="Counter.vmz" /></div>
-            <div if={showcaseTab === 'activity'} class="v2-empty"><Badge tone="success">All systems ready</Badge><h3>最近的变更已经交付。</h3><p>Program Graph 与所有目标环境保持同步。</p></div>
+            <div v-if="showcaseTab === 'source'" class="v2-source"><CodeBlock :code="codeSample" language="vmz" title="Counter.vmz" /></div>
+            <div v-if="showcaseTab === 'activity'" class="v2-empty"><Badge tone="success">All systems ready</Badge><h3>最近的变更已经交付。</h3><p>Program Graph 与所有目标环境保持同步。</p></div>
           </Tabs></div>
         </div>
-        <div if={notifyOpen} class="v2-notification"><Notification tone="success" roleName="status" title="发布已创建" description="Web、SSR、Native 与 Edge 目标正在生成。"><Button type="button" variant="ghost" onClick={() => (notifyOpen = false)}>关闭</Button></Notification></div>
+        <div v-if="notifyOpen" class="v2-notification"><Notification tone="success" roleName="status" title="发布已创建" description="Web、SSR、Native 与 Edge 目标正在生成。"><Button type="button" variant="ghost" @click="() => (notifyOpen = false)">关闭</Button></Notification></div>
       </section>
 
       <section class="v2-start" aria-labelledby="start-title">
         <p class="v2-index">05 / GET STARTED</p>
-        <h2 id="start-title" data-vmz-fixture="landing-start-title">{startTitleLabel}</h2>
-        <p data-vmz-fixture="landing-start-lede">{startLedeLabel}</p>
-        <div class="v2-command"><code>pnpm create vmz-app my-app</code><Button type="button" variant="secondary" onClick={() => this.copyCommand()}>{copied ? '已复制' : '复制'}</Button></div>
-        <div class="v2-actions"><a class="v2-button v2-button--light" data-vmz-fixture="landing-start-cta" href={guideHref}>{startLabel}</a><a class="v2-button v2-button--dark-text" href="/deploy-planner">{deployPlannerLabel} →</a></div>
+        <h2 id="start-title" data-vmz-fixture="landing-start-title">{{ startTitleLabel }}</h2>
+        <p data-vmz-fixture="landing-start-lede">{{ startLedeLabel }}</p>
+        <div class="v2-command"><code>pnpm create vmz-app my-app</code><Button type="button" variant="secondary" @click="() => this.copyCommand()">{{ copied ? '已复制' : '复制' }}</Button></div>
+        <div class="v2-actions"><a class="v2-button v2-button--light" data-vmz-fixture="landing-start-cta" :href="guideHref">{{ startLabel }}</a><a class="v2-button v2-button--dark-text" href="/deploy-planner">{{ deployPlannerLabel }} →</a></div>
       </section>
     </main>
     <SiteFooter />
@@ -161,7 +161,7 @@ export default class IndexPage {
   guideHref = '/d/zh-hans/guide/';
   _unwatchLocale = null;
   showcaseTabs = [{ id: 'overview', title: '概览', controls: 'landing-showcase-panel' }, { id: 'source', title: '源码', controls: 'landing-showcase-panel' }, { id: 'activity', title: '活动', controls: 'landing-showcase-panel' }];
-  codeSample = '<template>\n  <Button onClick={increment}>\n    Count {count}\n  </Button>\n</template>';
+  codeSample = '<template>\n  <Button @click="increment">\n    Count {{ count }}\n  </Button>\n</template>';
   surfaceColumns = [{ id: 'surface', title: '目标' }, { id: 'result', title: '交付结果' }, { id: 'status', title: '状态' }];
   surfaceRows = [{ id: 'browser', cells: ['Browser', 'Direct DOM update', 'Ready'] }, { id: 'ssr', cells: ['SSR', 'HTML + resume', 'Ready'] }, { id: 'native', cells: ['Native', 'Host operations', 'Ready'] }, { id: 'edge', cells: ['Edge', 'Server capabilities', 'Ready'] }];
 

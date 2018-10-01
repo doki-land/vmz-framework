@@ -1,11 +1,11 @@
 <template>
-  <div data-vmz-fixture="datagrid" data-density="compact" data-grid-mode={viewMode}>
+  <div data-vmz-fixture="datagrid" data-density="compact" :data-grid-mode="viewMode">
     <ConsoleShell
       brand="VMZ"
       homeHref="/"
       title="DataGrid"
       navLabel="Console"
-      nav={navItems}
+      :nav="navItems"
     >
       <Alert
         tone="info"
@@ -15,68 +15,68 @@
       />
 
       <p data-vmz-fixture="datagrid-state">
-        mode:{viewMode};total:{totalRows};flat:{flatCount};visible:{visibleCount};window:{windowStart}-{windowEnd};selected:{selectedAttr || 'none'};count:{selectedCount};sort:{sortKey}:{sortDir};group:{groupBy};groups:{groupCount};expanded:{expandedAttr};agg:{aggSample};tree:{treeAttr};depthMax:{depthMax};treeExpanded:{treeExpandedAttr};editing:{editingKey || 'none'};draft:{editDraft || '-'};scoreSample:{scoreSample};pivot:{pivotAttr};pivotRows:{pivotRowCount};pivotCols:{pivotColsLabel};pivotMeasure:{pivotMeasure};pivotSample:{pivotSample}
+        mode:{{ viewMode }};total:{{ totalRows }};flat:{{ flatCount }};visible:{{ visibleCount }};window:{{ windowStart }}-{{ windowEnd }};selected:{{ selectedAttr || 'none' }};count:{{ selectedCount }};sort:{{ sortKey }}:{{ sortDir }};group:{{ groupBy }};groups:{{ groupCount }};expanded:{{ expandedAttr }};agg:{{ aggSample }};tree:{{ treeAttr }};depthMax:{{ depthMax }};treeExpanded:{{ treeExpandedAttr }};editing:{{ editingKey || 'none' }};draft:{{ editDraft || '-' }};scoreSample:{{ scoreSample }};pivot:{{ pivotAttr }};pivotRows:{{ pivotRowCount }};pivotCols:{{ pivotColsLabel }};pivotMeasure:{{ pivotMeasure }};pivotSample:{{ pivotSample }}
       </p>
 
       <div data-vmz-fixture="datagrid-modes">
         <span data-vmz-fixture="mode-group">
-          <Button type="button" variant="secondary" onClick={() => this.setMode('group')}>Group mode</Button>
+          <Button type="button" variant="secondary" @click="() => this.setMode('group')">Group mode</Button>
         </span>
         <span data-vmz-fixture="mode-tree">
-          <Button type="button" variant="secondary" onClick={() => this.setMode('tree')}>Tree mode</Button>
+          <Button type="button" variant="secondary" @click="() => this.setMode('tree')">Tree mode</Button>
         </span>
         <span data-vmz-fixture="mode-pivot">
-          <Button type="button" variant="secondary" onClick={() => this.setMode('pivot')}>Pivot mode</Button>
+          <Button type="button" variant="secondary" @click="() => this.setMode('pivot')">Pivot mode</Button>
         </span>
       </div>
 
-      <div if={showEditField} data-vmz-fixture="datagrid-edit-field">
+      <div v-if="showEditField" data-vmz-fixture="datagrid-edit-field">
         <Field
           label="Cell draft (Field mirror)"
           controlId="datagrid-edit-draft"
           descriptionId="datagrid-edit-draft-desc"
           errorId="datagrid-edit-draft-err"
           description="Parent-owned draft mirrored via @vmz/ui Field — DataGrid does not ship Field."
-          value={editDraft}
-          onInput={(e) => this.onFieldDraft(e)}
+          :value="editDraft"
+          @input="(e) => this.onFieldDraft(e)"
         />
       </div>
 
-      <BulkActions label="Bulk actions" selectedCount={selectedCount} countLabel={bulkLabel}>
-        <Button type="button" variant="secondary" onClick={() => this.clearSelection()}>Clear</Button>
+      <BulkActions label="Bulk actions" :selectedCount="selectedCount" :countLabel="bulkLabel">
+        <Button type="button" variant="secondary" @click="() => this.clearSelection()">Clear</Button>
       </BulkActions>
 
       <DataGrid
-        columns={columns}
-        rows={rows}
-        totalRows={totalRowsLabel}
-        visibleCount={visibleCountLabel}
+        :columns="columns"
+        :rows="rows"
+        :totalRows="totalRowsLabel"
+        :visibleCount="visibleCountLabel"
         pinnedCols="1"
-        sortKey={sortKey}
-        sortDir={sortDir}
-        selectedCount={selectedCountLabel}
-        allSelected={allSelected}
+        :sortKey="sortKey"
+        :sortDir="sortDir"
+        :selectedCount="selectedCountLabel"
+        :allSelected="allSelected"
         selectAllLabel="Select all leaf rows in dataset"
-        groupByAttr={groupBy}
-        groupCount={groupCountLabel}
-        treeAttr={treeAttr}
-        pivotAttr={pivotAttr}
-        pivotColsAttr={pivotColsLabel}
-        editingAttr={editingKey}
-        rowLayoutStyle={rowLayoutStyle}
-        canvasStyle={canvasStyle}
-        padTopStyle={padTopStyle}
-        padBottomStyle={padBottomStyle}
-        onScroll={(top) => this.onScroll(top)}
-        onSort={(id) => this.sortBy(id)}
-        onToggleRow={(id) => this.toggleRow(id)}
-        onToggleAll={() => this.toggleAll()}
-        onToggleGroup={(key) => this.toggleGroup(key)}
-        onToggleTree={(id) => this.toggleTree(id)}
-        onStartEdit={(key) => this.startEdit(key)}
-        onEditInput={(v) => this.onEditInput(v)}
-        onCommitEdit={() => this.commitEdit()}
-        onCancelEdit={() => this.cancelEdit()}
+        :groupByAttr="groupBy"
+        :groupCount="groupCountLabel"
+        :treeAttr="treeAttr"
+        :pivotAttr="pivotAttr"
+        :pivotColsAttr="pivotColsLabel"
+        :editingAttr="editingKey"
+        :rowLayoutStyle="rowLayoutStyle"
+        :canvasStyle="canvasStyle"
+        :padTopStyle="padTopStyle"
+        :padBottomStyle="padBottomStyle"
+        :onScroll="(top) => this.onScroll(top)"
+        :onSort="(id) => this.sortBy(id)"
+        :onToggleRow="(id) => this.toggleRow(id)"
+        :onToggleAll="() => this.toggleAll()"
+        :onToggleGroup="(key) => this.toggleGroup(key)"
+        :onToggleTree="(id) => this.toggleTree(id)"
+        :onStartEdit="(key) => this.startEdit(key)"
+        :onEditInput="(v) => this.onEditInput(v)"
+        :onCommitEdit="() => this.commitEdit()"
+        :onCancelEdit="() => this.cancelEdit()"
       />
     </ConsoleShell>
   </div>

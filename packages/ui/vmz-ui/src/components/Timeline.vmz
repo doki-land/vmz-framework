@@ -1,9 +1,9 @@
 <template>
-  <ol class="vmz-ui-timeline" data-vmz-ui="timeline" aria-label={label}>
-      <li each={items} as="item" key={item.id} class="vmz-ui-timeline__item" data-vmz-audit={item.id}>
-        <p class="vmz-ui-timeline__time">{item.time}</p>
-        <p class="vmz-ui-timeline__title">{item.title}</p>
-        <p if={item.detail} class="vmz-ui-timeline__detail">{item.detail}</p>
+  <ol class="vmz-ui-timeline" data-vmz-ui="timeline" :aria-label="label">
+      <li v-for="item in items" :key="item.id" class="vmz-ui-timeline__item" :data-vmz-audit="item.id">
+        <p class="vmz-ui-timeline__time">{{ item.time }}</p>
+        <p class="vmz-ui-timeline__title">{{ item.title }}</p>
+        <p v-if="item.detail" class="vmz-ui-timeline__detail">{{ item.detail }}</p>
       </li>
     </ol>
 </template>

@@ -5,19 +5,19 @@
       homeHref="/"
       title="Console UI5"
       navLabel="Console"
-      nav={navItems}
+      :nav="navItems"
     >
-      <Breadcrumb label="Console path" items={crumbs} />
+      <Breadcrumb label="Console path" :items="crumbs" />
 
-      <QueryForm label="Dense query" onSubmit={() => this.applyQuery()}>
+      <QueryForm label="Dense query" @submit="() => this.applyQuery()">
         <Field
           label="Name"
           controlId="home-ui5-name"
           descriptionId="home-ui5-name-desc"
           errorId="home-ui5-name-err"
           describedBy="home-ui5-name-desc"
-          value={nameQuery}
-          onInput={(e) => (nameQuery = e.target.value)}
+          :value="nameQuery"
+          @input="(e) => (nameQuery = e.target.value)"
         />
         <Field
           label="Status"
@@ -25,44 +25,44 @@
           descriptionId="home-ui5-status-desc"
           errorId="home-ui5-status-err"
           describedBy="home-ui5-status-desc"
-          value={statusQuery}
-          onInput={(e) => (statusQuery = e.target.value)}
+          :value="statusQuery"
+          @input="(e) => (statusQuery = e.target.value)"
         />
-        <Button type="button" onClick={() => this.applyQuery()}>Search</Button>
-        <Button type="button" disabled={writeDisabled}>Export</Button>
+        <Button type="button" @click="() => this.applyQuery()">Search</Button>
+        <Button type="button" :disabled="writeDisabled">Export</Button>
       </QueryForm>
 
-      <p data-vmz-fixture="ui5-query">name:{nameQuery};status:{statusQuery}</p>
-      <p data-vmz-fixture="ui5-sort">sort:{sortKey}:{sortDir}</p>
-      <p data-vmz-fixture="ui5-perm">write:{writeDisabled ? 'denied' : 'allowed'}</p>
+      <p data-vmz-fixture="ui5-query">name:{{ nameQuery }};status:{{ statusQuery }}</p>
+      <p data-vmz-fixture="ui5-sort">sort:{{ sortKey }}:{{ sortDir }}</p>
+      <p data-vmz-fixture="ui5-perm">write:{{ writeDisabled ? 'denied' : 'allowed' }}</p>
 
-      <Button type="button" onClick={() => this.toggleLoading()}>Toggle loading</Button>
-      <Button type="button" onClick={() => this.toggleWrite()}>Toggle write</Button>
+      <Button type="button" @click="() => this.toggleLoading()">Toggle loading</Button>
+      <Button type="button" @click="() => this.toggleWrite()">Toggle write</Button>
 
-      <Skeleton loading={loading} loadingAttr={loadingAttr}>
+      <Skeleton :loading="loading" :loadingAttr="loadingAttr">
         <Table
-          columns={columns}
-          rows={rows}
-          hasRowAction={rowAction}
-          rowActionDisabled={writeDisabled}
+          :columns="columns"
+          :rows="rows"
+          :hasRowAction="rowAction"
+          :rowActionDisabled="writeDisabled"
           actionTitle="Detail"
           actionLabel="Open"
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSort={(id) => this.sortBy(id)}
-          onRowAction={(id) => this.openDetail(id)}
+          :sortKey="sortKey"
+          :sortDir="sortDir"
+          :onSort="(id) => this.sortBy(id)"
+          :onRowAction="(id) => this.openDetail(id)"
         />
       </Skeleton>
 
-      <Timeline label="Audit" items={auditItems} />
+      <Timeline label="Audit" :items="auditItems" />
 
       <Drawer
-        open={drawerOpen}
+        :open="drawerOpen"
         title="Row detail"
         titleId="home-ui5-drawer-title"
-        onClose={() => (drawerOpen = false)}
+        :onClose="() => (drawerOpen = false)"
       >
-        <p data-vmz-fixture="ui5-drawer-body">detail:{detailId}</p>
+        <p data-vmz-fixture="ui5-drawer-body">detail:{{ detailId }}</p>
       </Drawer>
     </ConsoleShell>
   </div>

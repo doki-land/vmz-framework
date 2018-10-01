@@ -1,21 +1,21 @@
 <template>
-  <div class="vmz-ui-field" data-vmz-ui="field" data-invalid={invalidAttr}>
-      <label if={label} class="vmz-ui-field__label" for={controlId}>{label}</label>
+  <div class="vmz-ui-field" data-vmz-ui="field" :data-invalid="invalidAttr">
+      <label v-if="label" class="vmz-ui-field__label" :for="controlId">{{ label }}</label>
       <input
-        id={controlId}
+        :id="controlId"
         class="vmz-ui-field__control"
-        type={type}
-        value={value}
-        min={min}
-        max={max}
-        step={step}
-        disabled={disabled}
-        aria-invalid={error ? 'true' : 'false'}
-        aria-describedby={describedBy}
-        onInput={onInput}
+        :type="type"
+        :value="value"
+        :min="min"
+        :max="max"
+        :step="step"
+        :disabled="disabled"
+        :aria-invalid="error ? 'true' : 'false'"
+        :aria-describedby="describedBy"
+        @input="onInput"
       />
-      <p if={description} id={descriptionId} class="vmz-ui-field__description">{description}</p>
-      <p if={error} id={errorId} class="vmz-ui-field__error" role="alert">{error}</p>
+      <p v-if="description" :id="descriptionId" class="vmz-ui-field__description">{{ description }}</p>
+      <p v-if="error" :id="errorId" class="vmz-ui-field__error" role="alert">{{ error }}</p>
     </div>
 </template>
 

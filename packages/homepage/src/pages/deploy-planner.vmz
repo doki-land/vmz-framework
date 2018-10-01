@@ -19,67 +19,67 @@
           <fieldset class="planner__field">
             <legend>T.secrets · 密钥 / 会话是否必须留在可信服务器？</legend>
             <div class="planner__chips" role="group">
-              <button type="button" class={secretsNoneClass} onClick={() => this.setSecrets('none')}>无（公开内容）</button>
-              <button type="button" class={secretsYesClass} onClick={() => this.setSecrets('yes')}>是（需可信 server）</button>
+              <button type="button" :class="secretsNoneClass" @click="() => this.setSecrets('none')">无（公开内容）</button>
+              <button type="button" :class="secretsYesClass" @click="() => this.setSecrets('yes')">是（需可信 server）</button>
             </div>
           </fieldset>
 
           <fieldset class="planner__field">
             <legend>T.html · 首屏 HTML 从哪来？</legend>
             <div class="planner__chips" role="group">
-              <button type="button" class={htmlCdnClass} onClick={() => this.setHtml('cdn-prebuild')}>CDN 预生成</button>
-              <button type="button" class={htmlSsrClass} onClick={() => this.setHtml('request-ssr')}>请求时 SSR</button>
-              <button type="button" class={htmlBrowserClass} onClick={() => this.setHtml('browser-only')}>纯浏览器</button>
+              <button type="button" :class="htmlCdnClass" @click="() => this.setHtml('cdn-prebuild')">CDN 预生成</button>
+              <button type="button" :class="htmlSsrClass" @click="() => this.setHtml('request-ssr')">请求时 SSR</button>
+              <button type="button" :class="htmlBrowserClass" @click="() => this.setHtml('browser-only')">纯浏览器</button>
             </div>
           </fieldset>
 
           <fieldset class="planner__field">
             <legend>T.assets · 静态资源放哪？</legend>
             <div class="planner__chips" role="group">
-              <button type="button" class={assetsSameClass} onClick={() => this.setAssets('same-host')}>同机</button>
-              <button type="button" class={assetsCdnClass} onClick={() => this.setAssets('cdn')}>CDN</button>
-              <button type="button" class={assetsEmbedClass} onClick={() => this.setAssets('embedded-binary')}>嵌进二进制</button>
+              <button type="button" :class="assetsSameClass" @click="() => this.setAssets('same-host')">同机</button>
+              <button type="button" :class="assetsCdnClass" @click="() => this.setAssets('cdn')">CDN</button>
+              <button type="button" :class="assetsEmbedClass" @click="() => this.setAssets('embedded-binary')">嵌进二进制</button>
             </div>
           </fieldset>
 
           <fieldset class="planner__field">
             <legend>T.server · 服务端进程？</legend>
             <div class="planner__chips" role="group">
-              <button type="button" class={serverNoneClass} onClick={() => this.setServer('none')}>无</button>
-              <button type="button" class={serverNodeClass} onClick={() => this.setServer('node')}>Node</button>
-              <button type="button" class={serverWorkerClass} onClick={() => this.setServer('worker')}>Worker</button>
-              <button type="button" class={serverRustClass} onClick={() => this.setServer('rust-host')}>Rust</button>
+              <button type="button" :class="serverNoneClass" @click="() => this.setServer('none')">无</button>
+              <button type="button" :class="serverNodeClass" @click="() => this.setServer('node')">Node</button>
+              <button type="button" :class="serverWorkerClass" @click="() => this.setServer('worker')">Worker</button>
+              <button type="button" :class="serverRustClass" @click="() => this.setServer('rust-host')">Rust</button>
             </div>
           </fieldset>
 
           <fieldset class="planner__field">
             <legend>T.update · 嵌入基线 + 远程整包更新？</legend>
             <div class="planner__chips" role="group">
-              <button type="button" class={updateNoClass} onClick={() => this.setUpdate('no')}>否</button>
-              <button type="button" class={updateYesClass} onClick={() => this.setUpdate('release-fallback')}>是（release-fallback）</button>
+              <button type="button" :class="updateNoClass" @click="() => this.setUpdate('no')">否</button>
+              <button type="button" :class="updateYesClass" @click="() => this.setUpdate('release-fallback')">是（release-fallback）</button>
             </div>
           </fieldset>
 
           <fieldset class="planner__field">
             <legend>T.ship · 怎么发布？（与平台正交）</legend>
             <div class="planner__chips" role="group">
-              <button type="button" class={shipCiClass} onClick={() => this.setShip('git-ci')}>Git CI（配流水线 + push）</button>
-              <button type="button" class={shipUploadClass} onClick={() => this.setShip('direct-upload')}>本机直传</button>
+              <button type="button" :class="shipCiClass" @click="() => this.setShip('git-ci')">Git CI（配流水线 + push）</button>
+              <button type="button" :class="shipUploadClass" @click="() => this.setShip('direct-upload')">本机直传</button>
             </div>
           </fieldset>
 
           <fieldset class="planner__field">
             <legend>T.vendor · 外部托管平台（可多选）</legend>
             <div class="planner__chips planner__chips--wrap" role="group">
-              <button type="button" class={vendorPagesClass} onClick={() => this.toggleVendor('cloudflare-pages')}>Cloudflare Pages</button>
-              <button type="button" class={vendorGhPagesClass} onClick={() => this.toggleVendor('github-pages')}>GitHub Pages</button>
-              <button type="button" class={vendorVercelClass} onClick={() => this.toggleVendor('vercel')}>Vercel</button>
-              <button type="button" class={vendorNetlifyClass} onClick={() => this.toggleVendor('netlify')}>Netlify</button>
-              <button type="button" class={vendorEdgeoneClass} onClick={() => this.toggleVendor('tencent-edgeone')}>腾讯 EdgeOne</button>
-              <button type="button" class={vendorWorkersClass} onClick={() => this.toggleVendor('cloudflare-workers')}>CF Workers</button>
-              <button type="button" class={vendorS3Class} onClick={() => this.toggleVendor('s3-cloudfront')}>S3 + CloudFront</button>
-              <button type="button" class={vendorNodeClass} onClick={() => this.toggleVendor('node-vps')}>自建 Node</button>
-              <button type="button" class={vendorRustClass} onClick={() => this.toggleVendor('rust-bin')}>Rust 二进制</button>
+              <button type="button" :class="vendorPagesClass" @click="() => this.toggleVendor('cloudflare-pages')">Cloudflare Pages</button>
+              <button type="button" :class="vendorGhPagesClass" @click="() => this.toggleVendor('github-pages')">GitHub Pages</button>
+              <button type="button" :class="vendorVercelClass" @click="() => this.toggleVendor('vercel')">Vercel</button>
+              <button type="button" :class="vendorNetlifyClass" @click="() => this.toggleVendor('netlify')">Netlify</button>
+              <button type="button" :class="vendorEdgeoneClass" @click="() => this.toggleVendor('tencent-edgeone')">腾讯 EdgeOne</button>
+              <button type="button" :class="vendorWorkersClass" @click="() => this.toggleVendor('cloudflare-workers')">CF Workers</button>
+              <button type="button" :class="vendorS3Class" @click="() => this.toggleVendor('s3-cloudfront')">S3 + CloudFront</button>
+              <button type="button" :class="vendorNodeClass" @click="() => this.toggleVendor('node-vps')">自建 Node</button>
+              <button type="button" :class="vendorRustClass" @click="() => this.toggleVendor('rust-bin')">Rust 二进制</button>
             </div>
           </fieldset>
         </section>
@@ -88,63 +88,63 @@
           <div class="planner__result-head">
             <h2 id="plan-title">Agent 提示词</h2>
             <div class="planner__copy-row">
-              <Button type="button" variant="secondary" onClick={() => this.copyPrompt()}>{copyLabel}</Button>
+              <Button type="button" variant="secondary" @click="() => this.copyPrompt()">{{ copyLabel }}</Button>
             </div>
           </div>
 
-          <p class="planner__disclaimer" role="note">{disclaimer}</p>
-          <p if={promptCopyFailed} class="planner__copy-error" role="alert">复制失败：请手动选中下方提示词，或检查剪贴板权限。</p>
+          <p class="planner__disclaimer" role="note">{{ disclaimer }}</p>
+          <p v-if="promptCopyFailed" class="planner__copy-error" role="alert">复制失败：请手动选中下方提示词，或检查剪贴板权限。</p>
 
           <dl class="planner__meta">
-            <div><dt>profile</dt><dd><code>{profileId}</code></dd></div>
-            <div><dt>assembly</dt><dd><code>{assembly}</code></dd></div>
-            <div><dt>ship</dt><dd><code>{ship}</code></dd></div>
-            <div if={hasServerRuntime}><dt>serverRuntime</dt><dd><code>{serverRuntime}</code></dd></div>
-            <div><dt>requiredEnv</dt><dd><code>{requiredEnvLabel}</code></dd></div>
+            <div><dt>profile</dt><dd><code>{{ profileId }}</code></dd></div>
+            <div><dt>assembly</dt><dd><code>{{ assembly }}</code></dd></div>
+            <div><dt>ship</dt><dd><code>{{ ship }}</code></dd></div>
+            <div v-if="hasServerRuntime"><dt>serverRuntime</dt><dd><code>{{ serverRuntime }}</code></dd></div>
+            <div><dt>requiredEnv</dt><dd><code>{{ requiredEnvLabel }}</code></dd></div>
           </dl>
 
-          <div if={hasCautions} class="planner__cautions" role="status">
+          <div v-if="hasCautions" class="planner__cautions" role="status">
             <h3>选型警告</h3>
             <ul>
-              <li each={cautionItems} as="item" key={item.id}>{item.text}</li>
+              <li v-for="item in cautionItems" :key="item.id">{{ item.text }}</li>
             </ul>
           </div>
 
           <h3>完整提示词</h3>
-          <pre class="planner__code planner__code--prompt"><code>{agentPrompt}</code></pre>
+          <pre class="planner__code planner__code--prompt"><code>{{ agentPrompt }}</code></pre>
 
           <details class="planner__summary">
             <summary>扫一眼摘要（命令 · 外部清单 · delivery 意图）</summary>
             <h4>建议命令</h4>
             <ul class="planner__commands">
-              <li each={commandItems} as="item" key={item.id}><code>{item.text}</code></li>
+              <li v-for="item in commandItems" :key="item.id"><code>{{ item.text }}</code></li>
             </ul>
             <h4>外部填写清单</h4>
             <div class="planner__steps">
-              <article each={stepItems} as="step" key={step.id} class="planner__step">
-                <h5>{step.title}</h5>
+              <article v-for="step in stepItems" :key="step.id" class="planner__step">
+                <h5>{{ step.title }}</h5>
                 <p class="planner__axis-label">控制台</p>
                 <ul>
-                  <li each={step.console} as="field">{field}</li>
+                  <li v-for="field in step.console">{{ field }}</li>
                 </ul>
                 <p class="planner__axis-label">Git CI</p>
                 <ul>
-                  <li each={step.ci} as="field">{field}</li>
+                  <li v-for="field in step.ci">{{ field }}</li>
                 </ul>
                 <p class="planner__axis-label">本机直传</p>
                 <ul>
-                  <li each={step.localPush} as="field">{field}</li>
+                  <li v-for="field in step.localPush">{{ field }}</li>
                 </ul>
               </article>
             </div>
             <h4>delivery 意图</h4>
-            <pre class="planner__code"><code>{vmzConfigSnippet}</code></pre>
+            <pre class="planner__code"><code>{{ vmzConfigSnippet }}</code></pre>
           </details>
 
           <h3>深链</h3>
           <ul class="planner__links">
-            <li each={deepLinkItems} as="link" key={link.href}>
-              <a href={link.href}>{link.label}</a>
+            <li v-for="link in deepLinkItems" :key="link.href">
+              <a :href="link.href">{{ link.label }}</a>
             </li>
           </ul>
         </section>

@@ -1,19 +1,19 @@
 <template>
   <button
-      type={type}
+      :type="type"
       class="vmz-ui-btn"
       data-vmz-ui="button"
       data-vmz-motion="control"
       data-vmz-motion-token="motion.control"
-      data-variant={variant}
-      data-size={size}
-      data-block={block ? 'true' : 'false'}
-      data-loading={loading ? 'true' : 'false'}
-      disabled={disabled}
-      aria-busy={loading ? 'true' : 'false'}
-      onClick={onClick}
+      :data-variant="variant"
+      :data-size="size"
+      :data-block="block ? 'true' : 'false'"
+      :data-loading="loading ? 'true' : 'false'"
+      :disabled="disabled"
+      :aria-busy="loading ? 'true' : 'false'"
+      @click="onClick"
     >
-      <span if={loading} class="vmz-ui-btn__spinner" aria-hidden="true"></span>
+      <span v-if="loading" class="vmz-ui-btn__spinner" aria-hidden="true"></span>
       <slot />
     </button>
 </template>

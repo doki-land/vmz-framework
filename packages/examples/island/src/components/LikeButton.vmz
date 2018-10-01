@@ -1,6 +1,6 @@
 <template>
-  <button type="button" onClick={() => (liked = !liked)}>
-      {label}: {liked ? '♥' : '♡'}
+  <button type="button" @click="() => (liked = !liked)">
+      {{ label }}: {{ liked ? '♥' : '♡' }}
     </button>
 </template>
 

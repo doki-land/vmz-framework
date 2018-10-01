@@ -1,75 +1,75 @@
 <template>
   <div
-      class={'vmz-ui-select' + (open ? ' is-opened' : '') + (isMultiple ? ' is-multiple' : '')}
+      :class="'vmz-ui-select' + (open ? ' is-opened' : '') + (isMultiple ? ' is-multiple' : '')"
       data-vmz-ui="select"
-      data-mode={mode}
-      data-searchable={searchableAttr}
-      data-invalid={invalidAttr}
+      :data-mode="mode"
+      :data-searchable="searchableAttr"
+      :data-invalid="invalidAttr"
     >
-      <label if={label} class="vmz-ui-select__label" for={controlId}>{label}</label>
+      <label v-if="label" class="vmz-ui-select__label" :for="controlId">{{ label }}</label>
       <button
         type="button"
-        id={controlId}
+        :id="controlId"
         class="vmz-ui-select__control"
         role="combobox"
-        disabled={disabled}
+        :disabled="disabled"
         aria-haspopup="listbox"
-        aria-expanded={open ? 'true' : 'false'}
-        aria-controls={listId}
-        aria-invalid={error ? 'true' : 'false'}
-        aria-describedby={describedBy}
-        aria-multiselectable={isMultiple ? 'true' : 'false'}
-        onClick={toggle}
-        onKeyDown={onTriggerKeyDown}
+        :aria-expanded="open ? 'true' : 'false'"
+        :aria-controls="listId"
+        :aria-invalid="error ? 'true' : 'false'"
+        :aria-describedby="describedBy"
+        :aria-multiselectable="isMultiple ? 'true' : 'false'"
+        @click="toggle"
+        :onKeyDown="onTriggerKeyDown"
       >
-        <span class="vmz-ui-select__value">{displayLabel}</span>
+        <span class="vmz-ui-select__value">{{ displayLabel }}</span>
         <span class="vmz-ui-select__chev" aria-hidden="true"></span>
       </button>
       <div
-        if={open}
-        id={listId}
+        v-if="open"
+        :id="listId"
         class="vmz-ui-select__panel"
         data-vmz-overlay="select"
         data-vmz-overlay-owner="select"
         data-vmz-focus="enter"
       >
-        <div if={searchable} class="vmz-ui-select__search">
+        <div v-if="searchable" class="vmz-ui-select__search">
           <input
             type="search"
             class="vmz-ui-select__search-input"
             data-vmz-select="search"
-            value={searchQuery}
-            placeholder={searchPlaceholder}
-            aria-label={searchPlaceholder}
-            onInput={onSearchInput}
-            onKeyDown={onSearchKeyDown}
+            :value="searchQuery"
+            :placeholder="searchPlaceholder"
+            :aria-label="searchPlaceholder"
+            @input="onSearchInput"
+            :onKeyDown="onSearchKeyDown"
           />
         </div>
         <ul
           class="vmz-ui-select__list"
           role="listbox"
-          aria-multiselectable={isMultiple ? 'true' : 'false'}
+          :aria-multiselectable="isMultiple ? 'true' : 'false'"
           tabindex="-1"
-          onKeyDown={onListKeyDown}
+          :onKeyDown="onListKeyDown"
         >
-          <li if={showEmpty} class="vmz-ui-select__empty" role="presentation">{emptyText}</li>
-          <li each={visibleOptions} as="opt" key={opt.value} role="presentation">
+          <li v-if="showEmpty" class="vmz-ui-select__empty" role="presentation">{{ emptyText }}</li>
+          <li v-for="opt in visibleOptions" :key="opt.value" role="presentation">
             <button
               type="button"
-              class={'vmz-ui-select__option' + (opt.selected ? ' is-on' : '')}
+              :class="'vmz-ui-select__option' + (opt.selected ? ' is-on' : '')"
               role="option"
-              data-vmz-option={opt.value}
-              aria-selected={opt.selected ? 'true' : 'false'}
-              onClick={onOptionClick}
-            >{opt.label}</button>
+              :data-vmz-option="opt.value"
+              :aria-selected="opt.selected ? 'true' : 'false'"
+              @click="onOptionClick"
+            >{{ opt.label }}</button>
           </li>
         </ul>
-        <div if={isMultiple} class="vmz-ui-select__footer">
-          <button type="button" class="vmz-ui-select__done" data-vmz-select="done" onClick={close}>Done</button>
+        <div v-if="isMultiple" class="vmz-ui-select__footer">
+          <button type="button" class="vmz-ui-select__done" data-vmz-select="done" @click="close">Done</button>
         </div>
       </div>
-      <p if={description} id={descriptionId} class="vmz-ui-select__description">{description}</p>
-      <p if={error} id={errorId} class="vmz-ui-select__error" role="alert">{error}</p>
+      <p v-if="description" :id="descriptionId" class="vmz-ui-select__description">{{ description }}</p>
+      <p v-if="error" :id="errorId" class="vmz-ui-select__error" role="alert">{{ error }}</p>
     </div>
 </template>
 

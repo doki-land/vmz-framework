@@ -1,4 +1,4 @@
-<template><div class="vmz-ui-typography" data-vmz-ui="typography" data-variant={variant}><slot /></div></template>
+<template><div class="vmz-ui-typography" data-vmz-ui="typography" :data-variant="variant"><slot /></div></template>
 <style>
 .vmz-ui-typography{margin:0;color:var(--vmz-text-ink);font:inherit;line-height:1.6}
 .vmz-ui-typography[data-variant='title']{font-family:var(--vmz-font-display,var(--vmz-font-sans));font-size:1.5rem;font-weight:650;line-height:1.3}

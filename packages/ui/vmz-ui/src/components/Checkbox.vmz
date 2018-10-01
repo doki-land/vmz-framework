@@ -1,15 +1,15 @@
 <template>
-  <label class="vmz-ui-checkbox" data-vmz-ui="checkbox" for={controlId}>
+  <label class="vmz-ui-checkbox" data-vmz-ui="checkbox" :for="controlId">
       <input
-        id={controlId}
+        :id="controlId"
         class="vmz-ui-checkbox__input"
         type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        aria-describedby={describedBy}
-        onClick={onToggle}
+        :checked="checked"
+        :disabled="disabled"
+        :aria-describedby="describedBy"
+        @click="onToggle"
       />
-      <span class="vmz-ui-checkbox__label">{label}</span>
+      <span class="vmz-ui-checkbox__label">{{ label }}</span>
     </label>
 </template>
 

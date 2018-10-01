@@ -1,12 +1,12 @@
 <template>
   <div
-      if={selectedCount}
+      v-if="selectedCount"
       class="vmz-ui-bulk-actions"
       data-vmz-ui="bulk-actions"
       role="region"
-      aria-label={label}
+      :aria-label="label"
     >
-      <p class="vmz-ui-bulk-actions__count" data-vmz-fixture="bulk-count">{countLabel}</p>
+      <p class="vmz-ui-bulk-actions__count" data-vmz-fixture="bulk-count">{{ countLabel }}</p>
       <div class="vmz-ui-bulk-actions__actions">
         <slot />
       </div>

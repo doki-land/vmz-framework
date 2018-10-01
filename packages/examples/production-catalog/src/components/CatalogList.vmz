@@ -1,15 +1,15 @@
 <template>
   <section>
       <ul>
-        <li each={items} as="item" key={item.id}>
-          <ProductRow title={item.title} />
+        <li v-for="item in items" :key="item.id">
+          <ProductRow :title="item.title" />
         </li>
       </ul>
-      <p if={selected}>selected: {selected}</p>
-      <p else>none selected</p>
-      <p>async: {asyncLabel}</p>
-      <button type="button" @click={selectFirst}>select</button>
-      <button type="button" @click={clear}>clear</button>
+      <p v-if="selected">selected: {{ selected }}</p>
+      <p v-else>none selected</p>
+      <p>async: {{ asyncLabel }}</p>
+      <button type="button" @click="selectFirst">select</button>
+      <button type="button" @click="clear">clear</button>
     </section>
 </template>
 

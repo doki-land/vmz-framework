@@ -3,11 +3,11 @@
       <Select
         label="Plan"
         controlId="probe-plan"
-        value={plan}
-        options={planOptions}
-        onChange={(e) => this.onPlan(e)}
+        :value="plan"
+        :options="planOptions"
+        :onChange="(e) => this.onPlan(e)"
       />
-      <p data-testid="select-probe-value">plan:{plan || 'none'}</p>
+      <p data-testid="select-probe-value">plan:{{ plan || 'none' }}</p>
     </div>
 </template>
 

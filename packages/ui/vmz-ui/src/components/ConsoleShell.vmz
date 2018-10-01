@@ -1,22 +1,22 @@
 <template>
   <div class="vmz-ui-console-shell" data-vmz-ui="console-shell">
-      <aside class="vmz-ui-console-shell__sidebar" data-vmz-shell="sidebar" aria-label={navLabel}>
-        <a class="vmz-ui-console-shell__brand" href={homeHref}>{brand}</a>
+      <aside class="vmz-ui-console-shell__sidebar" data-vmz-shell="sidebar" :aria-label="navLabel">
+        <a class="vmz-ui-console-shell__brand" :href="homeHref">{{ brand }}</a>
         <nav class="vmz-ui-console-shell__nav">
-          <a each={nav} as="item" key={item.id} href={item.href} data-vmz-nav={item.id}>
-            {item.title}
+          <a v-for="item in nav" :key="item.id" :href="item.href" :data-vmz-nav="item.id">
+            {{ item.title }}
           </a>
         </nav>
       </aside>
       <div class="vmz-ui-console-shell__body">
         <header class="vmz-ui-console-shell__header" data-vmz-shell="header">
-          <h1 class="vmz-ui-console-shell__title">{title}</h1>
+          <h1 class="vmz-ui-console-shell__title">{{ title }}</h1>
         </header>
         <main class="vmz-ui-console-shell__main" data-vmz-shell="main">
           <slot />
         </main>
-        <footer if={footer} class="vmz-ui-console-shell__footer" data-vmz-shell="footer">
-          {footer}
+        <footer v-if="footer" class="vmz-ui-console-shell__footer" data-vmz-shell="footer">
+          {{ footer }}
         </footer>
       </div>
     </div>

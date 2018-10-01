@@ -2,15 +2,15 @@
   <div
       class="vmz-ui-skeleton"
       data-vmz-ui="skeleton"
-      data-loading={loadingAttr}
+      :data-loading="loadingAttr"
       role="status"
       aria-live="polite"
-      aria-busy={loadingAttr}
+      :aria-busy="loadingAttr"
     >
-      <div if={loading} class="vmz-ui-skeleton__block" data-vmz-skeleton="block"></div>
-      <div if={loading} class="vmz-ui-skeleton__line" data-vmz-skeleton="line"></div>
-      <div if={loading} class="vmz-ui-skeleton__line" data-vmz-skeleton="line"></div>
-      <div if={!loading} class="vmz-ui-skeleton__content">
+      <div v-if="loading" class="vmz-ui-skeleton__block" data-vmz-skeleton="block"></div>
+      <div v-if="loading" class="vmz-ui-skeleton__line" data-vmz-skeleton="line"></div>
+      <div v-if="loading" class="vmz-ui-skeleton__line" data-vmz-skeleton="line"></div>
+      <div v-if="!loading" class="vmz-ui-skeleton__content">
         <slot />
       </div>
     </div>

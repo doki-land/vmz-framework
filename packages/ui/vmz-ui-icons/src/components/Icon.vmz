@@ -2,13 +2,13 @@
   <span
     class="vmz-ui-icon"
     data-vmz-ui="icon"
-    data-icon={name}
-    data-size={size}
-    role={roleAttr}
-    aria-hidden={hiddenAttr}
-    aria-label={labelAttr}
+    :data-icon="name"
+    :data-size="size"
+    :role="roleAttr"
+    :aria-hidden="hiddenAttr"
+    :aria-label="labelAttr"
   >
-    <span class="vmz-ui-icon__mark mono" aria-hidden="true">{mark}</span>
+    <span class="vmz-ui-icon__mark mono" aria-hidden="true">{{ mark }}</span>
   </span>
 </template>
 

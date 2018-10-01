@@ -5,24 +5,24 @@
         <input
           type="text"
           data-testid="counter-note"
-          value={note}
-          onInput={(e) => (note = e.target.value)}
+          :value="note"
+          @input="(e) => (note = e.target.value)"
         />
       </label>
       <button
         type="button"
         aria-label="Increment counter"
         data-testid="counter-inc"
-        onClick={() => count++}
+        @click="() => count++"
       >
-        count: {count}
+        count: {{ count }}
       </button>
       <label>
         Plan
         <select
           data-testid="counter-plan"
-          value={plan}
-          onChange={(e) => (plan = e.target.value)}
+          :value="plan"
+          @change="(e) => (plan = e.target.value)"
         >
           <option value="">—</option>
           <option value="ops">Ops</option>

@@ -1,6 +1,6 @@
 <template>
-  <div class="vmz-ui-divider" data-vmz-ui="divider" data-direction={direction} role="separator">
-    <span if={label}>{label}</span>
+  <div class="vmz-ui-divider" data-vmz-ui="divider" :data-direction="direction" role="separator">
+    <span v-if="label">{{ label }}</span>
   </div>
 </template>
 <style>

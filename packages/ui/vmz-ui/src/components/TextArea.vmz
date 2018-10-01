@@ -1,19 +1,19 @@
 <template>
-  <div class="vmz-ui-textarea" data-vmz-ui="textarea" data-invalid={invalidAttr}>
-      <label if={label} class="vmz-ui-textarea__label" for={controlId}>{label}</label>
+  <div class="vmz-ui-textarea" data-vmz-ui="textarea" :data-invalid="invalidAttr">
+      <label v-if="label" class="vmz-ui-textarea__label" :for="controlId">{{ label }}</label>
       <textarea
-        id={controlId}
+        :id="controlId"
         class="vmz-ui-textarea__control"
-        rows={rows}
-        value={value}
-        disabled={disabled}
-        readonly={readonly}
-        aria-invalid={error ? 'true' : 'false'}
-        aria-describedby={describedBy}
-        onInput={onInput}
+        :rows="rows"
+        :value="value"
+        :disabled="disabled"
+        :readonly="readonly"
+        :aria-invalid="error ? 'true' : 'false'"
+        :aria-describedby="describedBy"
+        @input="onInput"
       ></textarea>
-      <p if={description} id={descriptionId} class="vmz-ui-textarea__description">{description}</p>
-      <p if={error} id={errorId} class="vmz-ui-textarea__error" role="alert">{error}</p>
+      <p v-if="description" :id="descriptionId" class="vmz-ui-textarea__description">{{ description }}</p>
+      <p v-if="error" :id="errorId" class="vmz-ui-textarea__error" role="alert">{{ error }}</p>
     </div>
 </template>
 

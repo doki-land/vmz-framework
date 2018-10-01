@@ -1,9 +1,9 @@
 <template>
-  <nav class="vmz-ui-breadcrumb" data-vmz-ui="breadcrumb" aria-label={label}>
+  <nav class="vmz-ui-breadcrumb" data-vmz-ui="breadcrumb" :aria-label="label">
       <ol class="vmz-ui-breadcrumb__list">
-        <li each={items} as="item" key={item.id} class="vmz-ui-breadcrumb__item" data-vmz-crumb={item.id}>
-          <a if={item.href} class="vmz-ui-breadcrumb__link" href={item.href}>{item.title}</a>
-          <span if={!item.href} class="vmz-ui-breadcrumb__current" aria-current="page">{item.title}</span>
+        <li v-for="item in items" :key="item.id" class="vmz-ui-breadcrumb__item" :data-vmz-crumb="item.id">
+          <a v-if="item.href" class="vmz-ui-breadcrumb__link" :href="item.href">{{ item.title }}</a>
+          <span v-if="!item.href" class="vmz-ui-breadcrumb__current" aria-current="page">{{ item.title }}</span>
         </li>
       </ol>
     </nav>

@@ -1,6 +1,6 @@
 <template>
-  <button type="button" onClick={() => (open = !open)}>
-      chip:{open ? 'on' : 'off'}
+  <button type="button" @click="() => (open = !open)">
+      chip:{{ open ? 'on' : 'off' }}
     </button>
 </template>
 

@@ -1,7 +1,7 @@
 <template>
-  <div class="vmz-ui-progress" data-vmz-ui="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
-    <div class="vmz-ui-progress__track"><span style={'width:' + percent + '%'}></span></div>
-    <span if={showInfo} class="vmz-ui-progress__text">{percent}%</span>
+  <div class="vmz-ui-progress" data-vmz-ui="progress" role="progressbar" :aria-valuemin="0" :aria-valuemax="100" :aria-valuenow="percent">
+    <div class="vmz-ui-progress__track"><span :style="'width:' + percent + '%'"></span></div>
+    <span v-if="showInfo" class="vmz-ui-progress__text">{{ percent }}%</span>
   </div>
 </template>
 <style>

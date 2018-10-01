@@ -1,38 +1,38 @@
 <template>
   <header class="site-header" data-vmz-fixture="site-header">
-    <a class="site-brand" href="/" aria-label={homeLabel}>
-      <span class="site-brand__mark">{brandLabel}</span>
+    <a class="site-brand" href="/" :aria-label="homeLabel">
+      <span class="site-brand__mark">{{ brandLabel }}</span>
       <span class="site-brand__pulse" aria-hidden="true"></span>
     </a>
     <nav class="site-nav" aria-label="Primary">
-      <a href={docsRootHref}>{docsLabel}</a>
-      <a href={guideHref}>{guideLabel}</a>
-      <a href={deployDocHref}>{deployLabel}</a>
-      <a href="/deploy-planner">{deployPlannerLabel}</a>
-      <a href="/#showcase">{showcaseLabel}</a>
+      <a :href="docsRootHref">{{ docsLabel }}</a>
+      <a :href="guideHref">{{ guideLabel }}</a>
+      <a :href="deployDocHref">{{ deployLabel }}</a>
+      <a href="/deploy-planner">{{ deployPlannerLabel }}</a>
+      <a href="/#showcase">{{ showcaseLabel }}</a>
       <a href="https://github.com/doki-land/vmz-framework">GitHub</a>
       <details class="site-language">
-        <summary aria-label={selectLanguageLabel}>{langSummary}</summary>
+        <summary :aria-label="selectLanguageLabel">{{ langSummary }}</summary>
         <div class="site-language__menu">
           <button
             type="button"
             data-vmz-fixture="locale-zh-hans"
-            aria-current={localeId === 'zh-hans' ? 'true' : null}
-            onClick={() => this.switchLocale('zh-hans')}
+            :aria-current="localeId === 'zh-hans' ? 'true' : null"
+            @click="() => this.switchLocale('zh-hans')"
           >
-            {langZhFullLabel}
+            {{ langZhFullLabel }}
           </button>
           <button
             type="button"
             data-vmz-fixture="locale-en-us"
-            aria-current={localeId === 'en-us' ? 'true' : null}
-            onClick={() => this.switchLocale('en-us')}
+            :aria-current="localeId === 'en-us' ? 'true' : null"
+            @click="() => this.switchLocale('en-us')"
           >
-            {langEnLabel}
+            {{ langEnLabel }}
           </button>
         </div>
       </details>
-      <a class="site-nav__cta" href={guideHref}>{startLabel}</a>
+      <a class="site-nav__cta" :href="guideHref">{{ startLabel }}</a>
     </nav>
   </header>
 </template>

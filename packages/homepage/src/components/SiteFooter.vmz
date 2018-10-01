@@ -1,21 +1,21 @@
 <template>
   <footer class="site-footer" data-vmz-fixture="site-footer">
     <div class="site-footer__brand">
-      <span class="site-footer__mark">{brandLabel}</span>
-      <p class="site-footer__tag">{footerTagLabel}</p>
+      <span class="site-footer__mark">{{ brandLabel }}</span>
+      <p class="site-footer__tag">{{ footerTagLabel }}</p>
     </div>
-    <nav class="site-footer__group" aria-label={productNavLabel}>
+    <nav class="site-footer__group" :aria-label="productNavLabel">
       <b>Product</b>
-      <a data-vmz-fixture="footer-docs" href={docsRootHref}>{docsLabel}</a>
-      <a href={guideHref}>{gettingStartedGuideLabel}</a>
-      <a href={deployDocHref}>{deployGuideLabel}</a>
-      <a href="/deploy-planner">{deployPlannerLabel}</a>
-      <a href="/#showcase">{showcaseLabel}</a>
+      <a data-vmz-fixture="footer-docs" :href="docsRootHref">{{ docsLabel }}</a>
+      <a :href="guideHref">{{ gettingStartedGuideLabel }}</a>
+      <a :href="deployDocHref">{{ deployGuideLabel }}</a>
+      <a href="/deploy-planner">{{ deployPlannerLabel }}</a>
+      <a href="/#showcase">{{ showcaseLabel }}</a>
     </nav>
-    <nav class="site-footer__group" aria-label={resourcesNavLabel}>
+    <nav class="site-footer__group" :aria-label="resourcesNavLabel">
       <b>Resources</b>
       <a href="/welcome">Welcome</a>
-      <a href={pluginsHref}>{pluginsLabel}</a>
+      <a :href="pluginsHref">{{ pluginsLabel }}</a>
       <a href="https://github.com/doki-land/vmz-framework">GitHub</a>
     </nav>
     <p class="site-footer__note">VMZ · Full-stack application compiler</p>

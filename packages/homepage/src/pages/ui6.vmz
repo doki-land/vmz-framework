@@ -1,6 +1,6 @@
 <template>
-  <div data-vmz-fixture="ui6" data-density={density} dir={dir}>
-    <AppShell brand="VMZ" homeHref="/" navLabel="UI6" nav={navItems}>
+  <div data-vmz-fixture="ui6" :data-density="density" :dir="dir">
+    <AppShell brand="VMZ" homeHref="/" navLabel="UI6" :nav="navItems">
       <Alert
         tone="info"
         roleName="status"
@@ -8,11 +8,11 @@
         description="comfortable → compact → dense; dir ltr/rtl; high-contrast theme overlay from /designs."
       />
 
-      <p data-vmz-fixture="ui6-state">density:{density};dir:{dir};theme:{theme}</p>
+      <p data-vmz-fixture="ui6-state">density:{{ density }};dir:{{ dir }};theme:{{ theme }}</p>
       <div class="vmz-ui6-actions">
-        <Button type="button" onClick={() => this.cycleDensity()}>Cycle density</Button>
-        <Button type="button" variant="secondary" onClick={() => this.toggleDir()}>Toggle RTL</Button>
-        <Button type="button" variant="ghost" onClick={() => this.toggleTheme()}>Toggle high-contrast</Button>
+        <Button type="button" @click="() => this.cycleDensity()">Cycle density</Button>
+        <Button type="button" variant="secondary" @click="() => this.toggleDir()">Toggle RTL</Button>
+        <Button type="button" variant="ghost" @click="() => this.toggleTheme()">Toggle high-contrast</Button>
       </div>
 
       <Card title="Density sample" description="Button padding follows data-density; chrome from Style Theme.">
@@ -21,8 +21,8 @@
           description="Control spacing from density tokens"
           controlId="home-ui6-sample"
           descriptionId="home-ui6-sample-desc"
-          value={sample}
-          onInput={(e) => this.onSample(e)}
+          :value="sample"
+          @input="(e) => this.onSample(e)"
         />
         <Button type="button">Probe control</Button>
       </Card>

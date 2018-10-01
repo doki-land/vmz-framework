@@ -1,16 +1,15 @@
 <template>
-  <aside class="vmz-ui-toc" data-vmz-ui="toc" aria-label={label}>
-      <p class="vmz-ui-toc__title">{label}</p>
+  <aside class="vmz-ui-toc" data-vmz-ui="toc" :aria-label="label">
+      <p class="vmz-ui-toc__title">{{ label }}</p>
       <nav class="vmz-ui-toc__nav">
         <a
-          each={items}
-          as="item"
-          key={item.id}
+          v-for="item in items"
+          :key="item.id"
           class="vmz-ui-toc__link"
-          href={item.href}
-          data-vmz-toc={item.id}
+          :href="item.href"
+          :data-vmz-toc="item.id"
         >
-          {item.title}
+          {{ item.title }}
         </a>
       </nav>
     </aside>

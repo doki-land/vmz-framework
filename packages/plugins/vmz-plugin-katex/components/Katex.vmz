@@ -1,5 +1,5 @@
 <template>
-  <div class="katex-host" html={format(tex, display)}></div>
+  <div class="katex-host" v-html="format(tex, display)"></div>
 </template>
 
 <script client>

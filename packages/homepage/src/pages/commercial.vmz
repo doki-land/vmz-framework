@@ -1,14 +1,14 @@
 <template>
   <div data-vmz-fixture="commercial">
-    <AppShell brand="VMZ" homeHref="/" navLabel="Commercial" nav={navItems}>
-      <div if={notifyOpen} data-vmz-fixture="commercial-notify">
+    <AppShell brand="VMZ" homeHref="/" navLabel="Commercial" :nav="navItems">
+      <div v-if="notifyOpen" data-vmz-fixture="commercial-notify">
         <Notification
           tone="success"
           roleName="status"
           title="Message queued"
           description="We will reply to your work email within one business day."
         >
-          <Button type="button" variant="ghost" onClick={() => (notifyOpen = false)}>Dismiss</Button>
+          <Button type="button" variant="ghost" @click="() => (notifyOpen = false)">Dismiss</Button>
         </Notification>
       </div>
 
@@ -19,8 +19,8 @@
           Vue-familiar authoring. Compile once into a Unified Program Graph — ship Commercial pages without a second design runtime.
         </p>
         <div class="vmz-commercial-hero__actions">
-          <Button type="button" onClick={() => this.scrollContact()}>Start a project</Button>
-          <Button type="button" variant="secondary" onClick={() => (drawerOpen = true)}>Open details</Button>
+          <Button type="button" @click="() => this.scrollContact()">Start a project</Button>
+          <Button type="button" variant="secondary" @click="() => (drawerOpen = true)">Open details</Button>
           <Link href="/documents">Read the docs</Link>
         </div>
       </section>
@@ -47,12 +47,12 @@
           <Card title="Starter" description="Local static host and CDN WebArtifact.">
             <p class="vmz-commercial-price"><span>Open</span> source core</p>
             <Badge tone="info">Self-serve</Badge>
-            <Button type="button" variant="secondary" onClick={() => this.scrollContact()}>Contact sales</Button>
+            <Button type="button" variant="secondary" @click="() => this.scrollContact()">Contact sales</Button>
           </Card>
           <Card title="Production" description="ServerArtifact parity, observability, and official conformance gates.">
             <p class="vmz-commercial-price"><span>Team</span> release proof</p>
             <Badge tone="success">Recommended</Badge>
-            <Button type="button" onClick={() => this.scrollContact()}>Talk to us</Button>
+            <Button type="button" @click="() => this.scrollContact()">Talk to us</Button>
           </Card>
         </div>
       </section>
@@ -60,11 +60,11 @@
       <Card title="Contact" description="Parent-owned Form values and validation — no parallel form store.">
         <Form
           label="Contact"
-          errorSummary={contactSummary}
+          :errorSummary="contactSummary"
           summaryId="home-commercial-summary"
-          describedBy={contactDescribedBy}
-          onSubmit={() => this.confirmContact()}
-          onReset={() => this.resetContact()}
+          :describedBy="contactDescribedBy"
+          @submit="() => this.confirmContact()"
+          :onReset="() => this.resetContact()"
         >
           <Field
             label="Work email"
@@ -72,38 +72,38 @@
             controlId="home-commercial-email"
             descriptionId="home-commercial-email-desc"
             errorId="home-commercial-email-err"
-            describedBy={emailDescribedBy}
-            error={emailError}
-            invalidAttr={emailInvalid}
-            value={email}
-            onInput={(e) => this.onEmail(e)}
+            :describedBy="emailDescribedBy"
+            :error="emailError"
+            :invalidAttr="emailInvalid"
+            :value="email"
+            @input="(e) => this.onEmail(e)"
           />
-          <p data-vmz-fixture="commercial-email">email:{email}</p>
+          <p data-vmz-fixture="commercial-email">email:{{ email }}</p>
           <div data-vmz-fixture="commercial-form-actions" class="vmz-commercial-actions">
             <Button type="submit">Confirm</Button>
             <Button type="reset" variant="secondary">Clear</Button>
-            <span if={submitting} data-vmz-fixture="commercial-spinner">
+            <span v-if="submitting" data-vmz-fixture="commercial-spinner">
               <Spinner label="Sending" />
             </span>
           </div>
         </Form>
         <Dialog
-          open={dialogOpen}
+          :open="dialogOpen"
           title="Send message"
           titleId="home-commercial-dialog-title"
-          onClose={() => (dialogOpen = false)}
+          :onClose="() => (dialogOpen = false)"
         >
-          <p data-vmz-fixture="commercial-dialog-body">Confirm sending to {email}</p>
+          <p data-vmz-fixture="commercial-dialog-body">Confirm sending to {{ email }}</p>
         </Dialog>
       </Card>
 
       <Card title="Workspace" description="Empty → success feedback stays inside the same composition.">
-        <div if={showEmpty}>
+        <div v-if="showEmpty">
           <Empty title="No projects yet" description="Create a project to see it listed here.">
-            <Button type="button" onClick={() => this.createProject()}>Create project</Button>
+            <Button type="button" @click="() => this.createProject()">Create project</Button>
           </Empty>
         </div>
-        <div if={!showEmpty}>
+        <div v-if="!showEmpty">
           <Alert
             tone="success"
             roleName="status"
@@ -111,12 +111,12 @@
             description="Empty state dismissed — composition continues with feedback."
           />
         </div>
-        <Button type="button" variant="secondary" onClick={() => (drawerOpen = true)}>Open details</Button>
+        <Button type="button" variant="secondary" @click="() => (drawerOpen = true)">Open details</Button>
         <Drawer
-          open={drawerOpen}
+          :open="drawerOpen"
           title="Project details"
           titleId="home-commercial-drawer-title"
-          onClose={() => (drawerOpen = false)}
+          :onClose="() => (drawerOpen = false)"
         >
           <p data-vmz-fixture="commercial-drawer-body">Drawer inside commercial composition.</p>
           <Link href="/console">Open Console surface</Link>

@@ -2,9 +2,9 @@
   <a
       class="vmz-ui-link"
       data-vmz-ui="link"
-      href={href}
-      target={target}
-      rel={rel}
+      :href="href"
+      :target="target"
+      :rel="rel"
     >
       <slot />
     </a>

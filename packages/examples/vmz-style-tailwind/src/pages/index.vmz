@@ -1,11 +1,11 @@
 <template>
   <main>
       <h1 class="title">TW + SCSS + designs</h1>
-      <p class="hint">Theme: {themeLabel}</p>
-      <button type="button" class="save-button" style:tw="px-4 py-2 rounded bg-action" onClick={() => save()}>
+      <p class="hint">Theme: {{ themeLabel }}</p>
+      <button type="button" class="save-button" style:tw="px-4 py-2 rounded bg-action" @click="() => save()">
         Save
       </button>
-      <button type="button" class="theme-toggle" style:tw="px-4 py-2 rounded bg-action" onClick={() => toggleTheme()}>
+      <button type="button" class="theme-toggle" style:tw="px-4 py-2 rounded bg-action" @click="() => toggleTheme()">
         Toggle theme
       </button>
     </main>

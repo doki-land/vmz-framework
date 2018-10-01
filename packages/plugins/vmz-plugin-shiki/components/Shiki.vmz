@@ -1,5 +1,5 @@
 <template>
-  <div class="shiki-host" html={html != null ? html : highlightSync(code, lang, theme)}></div>
+  <div class="shiki-host" v-html="html != null ? html : highlightSync(code, lang, theme)"></div>
 </template>
 
 <script client>

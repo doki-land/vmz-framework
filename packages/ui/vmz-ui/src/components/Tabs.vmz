@@ -3,32 +3,31 @@
       <div
         class="vmz-ui-tabs__list"
         role="tablist"
-        aria-label={label}
-        onKeyDown={onListKeyDown}
-        onClick={onListClick}
+        :aria-label="label"
+        :onKeyDown="onListKeyDown"
+        @click="onListClick"
       >
         <button
-          each={items}
-          as="item"
-          key={item.id}
+          v-for="item in items"
+          :key="item.id"
           type="button"
           class="vmz-ui-tabs__tab"
           role="tab"
-          id={item.id}
-          data-vmz-tab={item.id}
-          aria-selected={selected === item.id ? 'true' : 'false'}
-          aria-controls={item.controls}
-          tabindex={selected === item.id ? 0 : -1}
+          :id="item.id"
+          :data-vmz-tab="item.id"
+          :aria-selected="selected === item.id ? 'true' : 'false'"
+          :aria-controls="item.controls"
+          :tabindex="selected === item.id ? 0 : -1"
         >
-          {item.title}
+          {{ item.title }}
         </button>
       </div>
       <div
         class="vmz-ui-tabs__panel"
         role="tabpanel"
-        id={panelId}
-        data-vmz-tab-panel={selected}
-        aria-labelledby={selected}
+        :id="panelId"
+        :data-vmz-tab-panel="selected"
+        :aria-labelledby="selected"
         tabindex="0"
       >
         <slot />

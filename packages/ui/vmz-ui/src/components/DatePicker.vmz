@@ -1,40 +1,40 @@
 <template>
   <div
-      class={'vmz-ui-date-picker' + (open ? ' is-opened' : '')}
+      :class="'vmz-ui-date-picker' + (open ? ' is-opened' : '')"
       data-vmz-ui="date-picker"
-      data-mode={mode}
-      data-invalid={invalidAttr}
+      :data-mode="mode"
+      :data-invalid="invalidAttr"
     >
-      <label if={label} class="vmz-ui-date-picker__label" for={controlId}>{label}</label>
+      <label v-if="label" class="vmz-ui-date-picker__label" :for="controlId">{{ label }}</label>
       <button
         type="button"
-        id={controlId}
+        :id="controlId"
         class="vmz-ui-date-picker__control"
-        disabled={disabled}
+        :disabled="disabled"
         aria-haspopup="dialog"
-        aria-expanded={open ? 'true' : 'false'}
-        aria-controls={panelId}
-        aria-invalid={error ? 'true' : 'false'}
-        aria-describedby={describedBy}
-        onClick={toggle}
-        onKeyDown={onTriggerKeyDown}
+        :aria-expanded="open ? 'true' : 'false'"
+        :aria-controls="panelId"
+        :aria-invalid="error ? 'true' : 'false'"
+        :aria-describedby="describedBy"
+        @click="toggle"
+        :onKeyDown="onTriggerKeyDown"
       >
-        <span class="vmz-ui-date-picker__value" data-vmz-date="value">{displayLabel}</span>
+        <span class="vmz-ui-date-picker__value" data-vmz-date="value">{{ displayLabel }}</span>
         <span class="vmz-ui-date-picker__chev" aria-hidden="true"></span>
       </button>
       <div
-        if={open}
-        id={panelId}
+        v-if="open"
+        :id="panelId"
         class="vmz-ui-date-picker__panel"
         role="dialog"
         aria-modal="false"
-        aria-label={panelLabel}
+        :aria-label="panelLabel"
         tabindex="-1"
         data-vmz-overlay="date-picker"
         data-vmz-overlay-owner="date-picker"
         data-vmz-focus="enter"
         data-vmz-date="panel"
-        onKeyDown={onPanelKeyDown}
+        :onKeyDown="onPanelKeyDown"
       >
         <div class="vmz-ui-date-picker__monthbar">
           <button
@@ -42,45 +42,42 @@
             class="vmz-ui-date-picker__nav"
             data-vmz-date="prev"
             aria-label="Previous month"
-            onClick={prevMonth}
+            @click="prevMonth"
           >‹</button>
-          <p class="vmz-ui-date-picker__month" data-vmz-date="month">{monthLabel}</p>
+          <p class="vmz-ui-date-picker__month" data-vmz-date="month">{{ monthLabel }}</p>
           <button
             type="button"
             class="vmz-ui-date-picker__nav"
             data-vmz-date="next"
             aria-label="Next month"
-            onClick={nextMonth}
+            @click="nextMonth"
           >›</button>
         </div>
         <div class="vmz-ui-date-picker__weekdays" aria-hidden="true">
           <span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span>
         </div>
-        <div class="vmz-ui-date-picker__grid" role="grid" aria-labelledby={panelId}>
+        <div class="vmz-ui-date-picker__grid" role="grid" :aria-labelledby="panelId">
           <button
-            each={days}
-            as="day"
-            key={day.key}
+            v-for="day in days"
+            :key="day.key"
             type="button"
             role="gridcell"
-            class={
-              'vmz-ui-date-picker__day' +
+            :class="'vmz-ui-date-picker__day' +
               (day.inMonth ? '' : ' is-outside') +
               (day.selected ? ' is-on' : '') +
               (day.inRange ? ' is-in-range' : '') +
               (day.rangeEdge ? ' is-range-edge' : '') +
-              (day.disabled ? ' is-disabled' : '')
-            }
-            data-vmz-date-iso={day.iso}
-            aria-selected={day.selected ? 'true' : 'false'}
-            aria-disabled={day.disabled ? 'true' : 'false'}
-            disabled={day.disabled}
-            onClick={onDayClick}
-          >{day.label}</button>
+              (day.disabled ? ' is-disabled' : '')"
+            :data-vmz-date-iso="day.iso"
+            :aria-selected="day.selected ? 'true' : 'false'"
+            :aria-disabled="day.disabled ? 'true' : 'false'"
+            :disabled="day.disabled"
+            @click="onDayClick"
+          >{{ day.label }}</button>
         </div>
       </div>
-      <p if={description} id={descriptionId} class="vmz-ui-date-picker__description">{description}</p>
-      <p if={error} id={errorId} class="vmz-ui-date-picker__error" role="alert">{error}</p>
+      <p v-if="description" :id="descriptionId" class="vmz-ui-date-picker__description">{{ description }}</p>
+      <p v-if="error" :id="errorId" class="vmz-ui-date-picker__error" role="alert">{{ error }}</p>
     </div>
 </template>
 

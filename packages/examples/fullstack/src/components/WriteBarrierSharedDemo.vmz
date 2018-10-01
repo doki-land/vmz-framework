@@ -1,7 +1,7 @@
 <template>
   <section>
-      <p>{primary.name}</p>
-      <p>{secondary.name}</p>
+      <p>{{ primary.name }}</p>
+      <p>{{ secondary.name }}</p>
     </section>
 </template>
 

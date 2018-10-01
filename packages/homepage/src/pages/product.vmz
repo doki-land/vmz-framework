@@ -1,37 +1,37 @@
 <template>
-  <div data-vmz-fixture="product" data-density={density} dir={dir}>
-    <AppShell brand="VMZ" homeHref="/" navLabel="Product" nav={navItems}>
+  <div data-vmz-fixture="product" :data-density="density" :dir="dir">
+    <AppShell brand="VMZ" homeHref="/" navLabel="Product" :nav="navItems">
       <div class="vmz-product-toolbar" data-vmz-fixture="product-toolbar">
-        <Badge tone="brand">{versionLabel}</Badge>
-        <Button type="button" variant="secondary" onClick={() => this.toggleVersion()}>
+        <Badge tone="brand">{{ versionLabel }}</Badge>
+        <Button type="button" variant="secondary" @click="() => this.toggleVersion()">
           Switch version
         </Button>
-        <Button type="button" variant="ghost" onClick={() => this.toggleLocale()}>
-          Locale: {localeLabel}
+        <Button type="button" variant="ghost" @click="() => this.toggleLocale()">
+          Locale: {{ localeLabel }}
         </Button>
-        <Button type="button" onClick={() => this.cycleDensity()}>Cycle density</Button>
-        <Button type="button" variant="secondary" onClick={() => this.toggleDir()}>Toggle RTL</Button>
+        <Button type="button" @click="() => this.cycleDensity()">Cycle density</Button>
+        <Button type="button" variant="secondary" @click="() => this.toggleDir()">Toggle RTL</Button>
         <Field
           label="Search"
           controlId="home-product-search"
           descriptionId="home-product-search-desc"
           errorId="home-product-search-err"
           describedBy="home-product-search-desc"
-          value={search}
-          onInput={(e) => this.onSearch(e)}
+          :value="search"
+          @input="(e) => this.onSearch(e)"
         />
         <p data-vmz-fixture="product-meta">
-          version:{version};locale:{locale};search:{search};copied:{copied};density:{density};dir:{dir}
+          version:{{ version }};locale:{{ locale }};search:{{ search }};copied:{{ copied }};density:{{ density }};dir:{{ dir }}
         </p>
       </div>
 
       <div class="vmz-product-layout">
-        <Toc label="On this page" items={tocItems} />
+        <Toc label="On this page" :items="tocItems" />
 
         <Prose>
           <div>
-            <h1 id="overview">{titleText}</h1>
-            <p class="lead">{leadText}</p>
+            <h1 id="overview">{{ titleText }}</h1>
+            <p class="lead">{{ leadText }}</p>
             <Callout
               tone="info"
               roleName="note"
@@ -43,23 +43,23 @@
           <div>
             <h2 id="install">Install</h2>
             <p>Install the official UI package and materialize tokens from application /designs.</p>
-            <div if={isV1}>
+            <div v-if="isV1">
               <CodeBlock
                 caption="shell"
                 code="pnpm add @vmz/ui"
-                copyLabel={copyLabel}
-                onCopy={() => this.copyInstall()}
+                :copyLabel="copyLabel"
+                :onCopy="() => this.copyInstall()"
               />
             </div>
-            <div if={isV0}>
+            <div v-if="isV0">
               <CodeBlock
                 caption="shell"
                 code="pnpm add @vmz/ui@0.0.0"
-                copyLabel={copyLabel}
-                onCopy={() => this.copyInstall()}
+                :copyLabel="copyLabel"
+                :onCopy="() => this.copyInstall()"
               />
             </div>
-            <p if={copiedYes} data-vmz-fixture="product-copied" role="status">Copied install snippet</p>
+            <p v-if="copiedYes" data-vmz-fixture="product-copied" role="status">Copied install snippet</p>
           </div>
 
           <div>

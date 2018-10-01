@@ -2,11 +2,11 @@
   <div
       class="vmz-ui-notification"
       data-vmz-ui="notification"
-      data-tone={tone}
-      role={roleName}
+      :data-tone="tone"
+      :role="roleName"
     >
-      <p if={title} class="vmz-ui-notification__title">{title}</p>
-      <p if={description} class="vmz-ui-notification__description">{description}</p>
+      <p v-if="title" class="vmz-ui-notification__title">{{ title }}</p>
+      <p v-if="description" class="vmz-ui-notification__description">{{ description }}</p>
       <div class="vmz-ui-notification__actions">
         <slot />
       </div>

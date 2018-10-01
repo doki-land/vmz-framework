@@ -2,10 +2,10 @@
   <section
       class="vmz-ui-result"
       data-vmz-ui="result"
-      data-status={status}
+      :data-status="status"
     >
-      <p class="vmz-ui-result__title">{title}</p>
-      <p if={description} class="vmz-ui-result__description">{description}</p>
+      <p class="vmz-ui-result__title">{{ title }}</p>
+      <p v-if="description" class="vmz-ui-result__description">{{ description }}</p>
       <div class="vmz-ui-result__actions">
         <slot />
       </div>

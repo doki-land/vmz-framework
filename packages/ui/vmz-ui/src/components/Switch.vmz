@@ -1,19 +1,19 @@
 <template>
-  <label class="vmz-ui-switch" data-vmz-ui="switch" for={controlId}>
+  <label class="vmz-ui-switch" data-vmz-ui="switch" :for="controlId">
       <button
-        id={controlId}
+        :id="controlId"
         type="button"
         class="vmz-ui-switch__control"
         role="switch"
-        aria-checked={checked}
-        aria-describedby={describedBy}
-        disabled={disabled}
-        onClick={toggle}
-        onKeyDown={onKeyDown}
+        :aria-checked="checked"
+        :aria-describedby="describedBy"
+        :disabled="disabled"
+        @click="toggle"
+        :onKeyDown="onKeyDown"
       >
         <span class="vmz-ui-switch__thumb" aria-hidden="true"></span>
       </button>
-      <span class="vmz-ui-switch__label">{label}</span>
+      <span class="vmz-ui-switch__label">{{ label }}</span>
     </label>
 </template>
 

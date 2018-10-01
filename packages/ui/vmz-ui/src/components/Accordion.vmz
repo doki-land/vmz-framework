@@ -1,28 +1,28 @@
 <template>
-  <div class="vmz-ui-accordion" data-vmz-ui="accordion" aria-label={label}>
-      <div each={items} as="item" key={item.id} class="vmz-ui-accordion__item" data-vmz-accordion={item.id}>
+  <div class="vmz-ui-accordion" data-vmz-ui="accordion" :aria-label="label">
+      <div v-for="item in items" :key="item.id" class="vmz-ui-accordion__item" :data-vmz-accordion="item.id">
         <h3 class="vmz-ui-accordion__heading">
           <button
             type="button"
             class="vmz-ui-accordion__trigger"
-            id={item.triggerId}
-            data-vmz-accordion-trigger={item.id}
-            aria-expanded={openId === item.id ? 'true' : 'false'}
-            aria-controls={item.panelId}
-            onClick={() => this.toggle(item.id)}
+            :id="item.triggerId"
+            :data-vmz-accordion-trigger="item.id"
+            :aria-expanded="openId === item.id ? 'true' : 'false'"
+            :aria-controls="item.panelId"
+            @click="() => this.toggle(item.id)"
           >
-            {item.title}
+            {{ item.title }}
           </button>
         </h3>
         <div
-          if={openId === item.id}
-          id={item.panelId}
+          v-if="openId === item.id"
+          :id="item.panelId"
           class="vmz-ui-accordion__panel"
           role="region"
-          data-vmz-accordion-panel={item.id}
-          aria-labelledby={item.triggerId}
+          :data-vmz-accordion-panel="item.id"
+          :aria-labelledby="item.triggerId"
         >
-          {item.body}
+          {{ item.body }}
         </div>
       </div>
     </div>

@@ -1,13 +1,12 @@
 <template>
-  <div class="vmz-ui-segmented" data-vmz-ui="segmented" role="group" aria-label={label}>
+  <div class="vmz-ui-segmented" data-vmz-ui="segmented" role="group" :aria-label="label">
     <button
-      each={options}
-      as="opt"
-      key={opt.value}
+      v-for="opt in options"
+      :key="opt.value"
       type="button"
-      aria-pressed={opt.value === value ? 'true' : 'false'}
-      onClick={() => onPick(opt.value)}
-    >{opt.label}</button>
+      :aria-pressed="opt.value === value ? 'true' : 'false'"
+      @click="() => onPick(opt.value)"
+    >{{ opt.label }}</button>
   </div>
 </template>
 <style>

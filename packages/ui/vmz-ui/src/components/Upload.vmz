@@ -1,74 +1,73 @@
 <template>
   <div
-      class={'vmz-ui-upload' + (dragOver ? ' is-dragover' : '')}
+      :class="'vmz-ui-upload' + (dragOver ? ' is-dragover' : '')"
       data-vmz-ui="upload"
-      data-vmz-upload-destination={destination}
-      data-vmz-upload-mode={selectionMode}
-      data-vmz-upload-directory={directoryAttr}
-      data-vmz-upload-chunk={chunkAttr}
-      data-vmz-upload-session={sessionAttr}
-      data-invalid={invalidAttr}
-      data-vmz-upload-status={status}
-      data-progress={progress}
-      onDragEnter={onDragEnter}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
+      :data-vmz-upload-destination="destination"
+      :data-vmz-upload-mode="selectionMode"
+      :data-vmz-upload-directory="directoryAttr"
+      :data-vmz-upload-chunk="chunkAttr"
+      :data-vmz-upload-session="sessionAttr"
+      :data-invalid="invalidAttr"
+      :data-vmz-upload-status="status"
+      :data-progress="progress"
+      :onDragEnter="onDragEnter"
+      :onDragOver="onDragOver"
+      :onDragLeave="onDragLeave"
+      :onDrop="onDrop"
     >
-      <label if={label} class="vmz-ui-upload__label" for={controlId}>{label}</label>
+      <label v-if="label" class="vmz-ui-upload__label" :for="controlId">{{ label }}</label>
 
       <div class="vmz-ui-upload__zone" data-vmz-upload="zone">
         <input
-          id={controlId}
+          :id="controlId"
           class="vmz-ui-upload__control"
           type="file"
-          accept={accept}
-          multiple={multiple}
-          disabled={inputDisabled}
-          aria-invalid={error ? 'true' : 'false'}
-          aria-describedby={describedBy}
-          data-vmz-upload-directory={directoryAttr}
-          onChange={onPick}
+          :accept="accept"
+          :multiple="multiple"
+          :disabled="inputDisabled"
+          :aria-invalid="error ? 'true' : 'false'"
+          :aria-describedby="describedBy"
+          :data-vmz-upload-directory="directoryAttr"
+          @change="onPick"
         />
-        <p class="vmz-ui-upload__hint" data-vmz-upload="hint">{zoneHint}</p>
+        <p class="vmz-ui-upload__hint" data-vmz-upload="hint">{{ zoneHint }}</p>
       </div>
 
-      <ul if={hasItems} class="vmz-ui-upload__queue" data-vmz-upload="queue">
+      <ul v-if="hasItems" class="vmz-ui-upload__queue" data-vmz-upload="queue">
         <li
-          each={queue}
-          as="item"
-          key={item.key}
+          v-for="item in queue"
+          :key="item.key"
           class="vmz-ui-upload__item"
-          data-vmz-upload-item={item.key}
-          data-status={item.status}
+          :data-vmz-upload-item="item.key"
+          :data-status="item.status"
         >
-          <span class="vmz-ui-upload__item-name" data-vmz-upload="file">{item.name}</span>
-          <span class="vmz-ui-upload__item-meta">{item.meta}</span>
-          <span if={item.showBar} class="vmz-ui-upload__item-bar" style={item.barStyle} aria-hidden="true"></span>
+          <span class="vmz-ui-upload__item-name" data-vmz-upload="file">{{ item.name }}</span>
+          <span class="vmz-ui-upload__item-meta">{{ item.meta }}</span>
+          <span v-if="item.showBar" class="vmz-ui-upload__item-bar" :style="item.barStyle" aria-hidden="true"></span>
         </li>
       </ul>
 
-      <p if={emptyHint} class="vmz-ui-upload__empty" data-vmz-upload="empty">{emptyText}</p>
+      <p v-if="emptyHint" class="vmz-ui-upload__empty" data-vmz-upload="empty">{{ emptyText }}</p>
 
-      <div if={showProgress} class="vmz-ui-upload__progress" data-vmz-upload="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progress} aria-label={progressLabel}>
-        <div class="vmz-ui-upload__bar" style={progressStyle}></div>
-        <span class="vmz-ui-upload__pct" data-vmz-upload="pct">{progressLabel}</span>
+      <div v-if="showProgress" class="vmz-ui-upload__progress" data-vmz-upload="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="progress" :aria-label="progressLabel">
+        <div class="vmz-ui-upload__bar" :style="progressStyle"></div>
+        <span class="vmz-ui-upload__pct" data-vmz-upload="pct">{{ progressLabel }}</span>
       </div>
 
-      <p if={statusText} class="vmz-ui-upload__status" data-vmz-upload="status">{statusText}</p>
-      <p if={resultText} class="vmz-ui-upload__result" data-vmz-upload="result">{resultText}</p>
+      <p v-if="statusText" class="vmz-ui-upload__status" data-vmz-upload="status">{{ statusText }}</p>
+      <p v-if="resultText" class="vmz-ui-upload__result" data-vmz-upload="result">{{ resultText }}</p>
 
-      <div if={showActions} class="vmz-ui-upload__actions" data-vmz-upload="actions">
-        <button if={canCancel} type="button" class="vmz-ui-upload__cancel" data-vmz-upload="cancel" onClick={onCancelClick}>
-          {cancelLabel}
+      <div v-if="showActions" class="vmz-ui-upload__actions" data-vmz-upload="actions">
+        <button v-if="canCancel" type="button" class="vmz-ui-upload__cancel" data-vmz-upload="cancel" @click="onCancelClick">
+          {{ cancelLabel }}
         </button>
-        <button if={canResume} type="button" class="vmz-ui-upload__resume" data-vmz-upload="resume" onClick={onResumeClick}>
-          {resumeLabel}
+        <button v-if="canResume" type="button" class="vmz-ui-upload__resume" data-vmz-upload="resume" @click="onResumeClick">
+          {{ resumeLabel }}
         </button>
       </div>
 
-      <p if={description} id={descriptionId} class="vmz-ui-upload__description">{description}</p>
-      <p if={error} id={errorId} class="vmz-ui-upload__error" role="alert">{error}</p>
+      <p v-if="description" :id="descriptionId" class="vmz-ui-upload__description">{{ description }}</p>
+      <p v-if="error" :id="errorId" class="vmz-ui-upload__error" role="alert">{{ error }}</p>
     </div>
 </template>
 

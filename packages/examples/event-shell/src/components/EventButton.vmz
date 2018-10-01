@@ -1,6 +1,6 @@
 <template>
-  <button type="button" onClick={() => (armed = !armed)}>
-      {label}: {armed ? 'ON' : 'OFF'}
+  <button type="button" @click="() => (armed = !armed)">
+      {{ label }}: {{ armed ? 'ON' : 'OFF' }}
     </button>
 </template>
 

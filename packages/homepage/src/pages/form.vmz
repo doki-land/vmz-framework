@@ -1,6 +1,6 @@
 <template>
   <div data-vmz-fixture="form">
-    <AppShell brand="VMZ" homeHref="/" navLabel="Form" nav={navItems}>
+    <AppShell brand="VMZ" homeHref="/" navLabel="Form" :nav="navItems">
       <Alert
         tone="info"
         roleName="status"
@@ -11,13 +11,13 @@
       <Card title="Contact request">
         <Form
           label="Contact request"
-          errorSummary={errorSummary}
+          :errorSummary="errorSummary"
           summaryId="home-form-summary"
-          describedBy={formDescribedBy}
-          disabled={submitting}
-          disabledAttr={disabledAttr}
-          onSubmit={() => this.submit()}
-          onReset={() => this.reset()}
+          :describedBy="formDescribedBy"
+          :disabled="submitting"
+          :disabledAttr="disabledAttr"
+          @submit="() => this.submit()"
+          :onReset="() => this.reset()"
         >
           <div class="vmz-form-email-row" data-vmz-fixture="form-email-row">
             <Field
@@ -26,24 +26,24 @@
               controlId="home-form-email"
               descriptionId="home-form-email-desc"
               errorId="home-form-email-err"
-              describedBy={emailDescribedBy}
-              error={emailError}
-              invalidAttr={emailInvalid}
-              value={email}
-              onInput={(e) => this.onEmail(e)}
+              :describedBy="emailDescribedBy"
+              :error="emailError"
+              :invalidAttr="emailInvalid"
+              :value="email"
+              @input="(e) => this.onEmail(e)"
             />
-            <Tooltip open={tipOpen} openAttr={tipOpenAttr} content="Use your company domain when possible." tooltipId="home-form-email-tip">
-              <Button type="button" variant="ghost" onClick={() => this.toggleTip()}>Why?</Button>
+            <Tooltip :open="tipOpen" :openAttr="tipOpenAttr" content="Use your company domain when possible." tooltipId="home-form-email-tip">
+              <Button type="button" variant="ghost" @click="() => this.toggleTip()">Why?</Button>
             </Tooltip>
           </div>
 
           <FormItem
             label="Role"
             description="Who should we route this to"
-            required={roleRequired}
+            :required="roleRequired"
             requiredAttr="true"
-            error={roleError}
-            invalidAttr={roleInvalid}
+            :error="roleError"
+            :invalidAttr="roleInvalid"
             controlId="home-form-role"
             descriptionId="home-form-role-desc"
             errorId="home-form-role-err"
@@ -51,12 +51,12 @@
             <Select
               label=""
               controlId="home-form-role"
-              describedBy={roleDescribedBy}
+              :describedBy="roleDescribedBy"
               error=""
-              invalidAttr={roleInvalid}
-              value={role}
-              options={roleOptions}
-              onChange={(e) => this.onRole(e)}
+              :invalidAttr="roleInvalid"
+              :value="role"
+              :options="roleOptions"
+              @change="(e) => this.onRole(e)"
             />
           </FormItem>
 
@@ -67,20 +67,20 @@
             listId="home-form-team-list"
             descriptionId="home-form-team-desc"
             errorId="home-form-team-err"
-            describedBy={teamDescribedBy}
-            error={teamError}
-            invalidAttr={teamInvalid}
-            value={team}
-            options={teamOptions}
-            listOpen={teamListOpen}
-            openAttr={teamOpenAttr}
-            showEmpty={teamEmpty}
+            :describedBy="teamDescribedBy"
+            :error="teamError"
+            :invalidAttr="teamInvalid"
+            :value="team"
+            :options="teamOptions"
+            :listOpen="teamListOpen"
+            :openAttr="teamOpenAttr"
+            :showEmpty="teamEmpty"
             emptyText="No matching team"
-            onInput={(e) => this.onTeamInput(e)}
-            onSelect={(v) => this.onTeamSelect(v)}
-            onClose={() => this.closeTeamList()}
+            @input="(e) => this.onTeamInput(e)"
+            :onSelect="(v) => this.onTeamSelect(v)"
+            :onClose="() => this.closeTeamList()"
           />
-          <p data-vmz-fixture="form-team">team:{team}</p>
+          <p data-vmz-fixture="form-team">team:{{ team }}</p>
 
           <DatePicker
             label="Preferred date"
@@ -88,11 +88,11 @@
             controlId="home-form-date"
             descriptionId="home-form-date-desc"
             errorId="home-form-date-err"
-            describedBy={dateDescribedBy}
-            error={dateError}
-            invalidAttr={dateInvalid}
-            value={preferredDate}
-            onChange={(e) => this.onDate(e)}
+            :describedBy="dateDescribedBy"
+            :error="dateError"
+            :invalidAttr="dateInvalid"
+            :value="preferredDate"
+            @change="(e) => this.onDate(e)"
           />
 
           <Upload
@@ -101,19 +101,19 @@
             destination="server"
             action="/api/form/attachment"
             accept=".txt,.md,.pdf"
-            maxBytes={262144}
-            maxCount={1}
+            :maxBytes="262144"
+            :maxCount="1"
             controlId="home-form-file"
             descriptionId="home-form-file-desc"
             errorId="home-form-file-err"
-            describedBy={fileDescribedBy}
-            error={fileError}
-            invalidAttr={fileInvalid}
+            :describedBy="fileDescribedBy"
+            :error="fileError"
+            :invalidAttr="fileInvalid"
             emptyText="No file selected"
             cancelLabel="Cancel upload"
-            clearToken={uploadClearToken}
-            onValue={(items) => this.onUploadValue(items)}
-            onStatus={(s) => this.onUploadStatus(s)}
+            :clearToken="uploadClearToken"
+            :onValue="(items) => this.onUploadValue(items)"
+            :onStatus="(s) => this.onUploadStatus(s)"
           />
 
           <TextArea
@@ -123,8 +123,8 @@
             descriptionId="home-form-message-desc"
             errorId="home-form-message-err"
             describedBy="home-form-message-desc"
-            value={message}
-            onInput={(e) => (message = e.target.value)}
+            :value="message"
+            @input="(e) => (message = e.target.value)"
           />
 
           <RadioGroup
@@ -133,21 +133,21 @@
             description="Billing intent"
             descriptionId="home-form-plan-desc"
             errorId="home-form-plan-err"
-            describedBy={planDescribedBy}
-            error={planError}
-            invalidAttr={planInvalid}
-            value={plan}
-            items={planItems}
-            onChange={(v) => this.onPlan(v)}
+            :describedBy="planDescribedBy"
+            :error="planError"
+            :invalidAttr="planInvalid"
+            :value="plan"
+            :items="planItems"
+            @change="(v) => this.onPlan(v)"
           />
 
           <Checkbox
             label="I agree to be contacted"
             controlId="home-form-agree"
-            checked={agree}
-            onChange={(e) => this.onAgree(e)}
+            :checked="agree"
+            @change="(e) => this.onAgree(e)"
           />
-          <p if={agreeError} data-vmz-fixture="form-agree-error" role="alert">{agreeError}</p>
+          <p v-if="agreeError" data-vmz-fixture="form-agree-error" role="alert">{{ agreeError }}</p>
 
           <div data-vmz-fixture="form-actions">
             <Button type="submit">Send request</Button>
@@ -155,8 +155,8 @@
           </div>
         </Form>
 
-        <p data-vmz-fixture="form-state">email:{email};role:{role};team:{team};date:{preferredDate};file:{fileName};upload:{uploadStatus};attachment:{attachmentId};plan:{plan};agree:{agree ? 'yes' : 'no'};submitted:{submitted}</p>
-        <div if={submitted} data-vmz-fixture="form-success">
+        <p data-vmz-fixture="form-state">email:{{ email }};role:{{ role }};team:{{ team }};date:{{ preferredDate }};file:{{ fileName }};upload:{{ uploadStatus }};attachment:{{ attachmentId }};plan:{{ plan }};agree:{{ agree ? 'yes' : 'no' }};submitted:{{ submitted }}</p>
+        <div v-if="submitted" data-vmz-fixture="form-success">
           <Result status="success" title="Request accepted" description="Validation cleared — form depth complete." />
         </div>
       </Card>
@@ -173,36 +173,36 @@
           description="destination=client — no network; parent gets local file descriptors"
           destination="client"
           accept="image/*,.txt,.md,.pdf"
-          maxBytes={262144}
-          maxCount={1}
+          :maxBytes="262144"
+          :maxCount="1"
           controlId="home-upload-client"
           descriptionId="home-upload-client-desc"
           errorId="home-upload-client-err"
           emptyText="No local file"
-          clearToken={clientClearToken}
-          onValue={(items) => this.onClientValue(items)}
-          onStatus={(s) => this.onClientStatus(s)}
+          :clearToken="clientClearToken"
+          :onValue="(items) => this.onClientValue(items)"
+          :onStatus="(s) => this.onClientStatus(s)"
         />
-        <p data-vmz-fixture="upload-client-state">client:{clientStatus};id:{clientId};name:{clientName};bytes:{clientBytes}</p>
+        <p data-vmz-fixture="upload-client-state">client:{{ clientStatus }};id:{{ clientId }};name:{{ clientName }};bytes:{{ clientBytes }}</p>
 
         <Upload
           label="Object (presign PUT)"
           description="destination=object — #server presign, component PUT; no cloud SDK in UI"
           destination="object"
           accept=".txt,.md,.pdf"
-          maxBytes={262144}
-          maxCount={1}
+          :maxBytes="262144"
+          :maxCount="1"
           controlId="home-upload-object"
           descriptionId="home-upload-object-desc"
           errorId="home-upload-object-err"
           emptyText="No object file"
           cancelLabel="Cancel object upload"
-          clearToken={objectClearToken}
-          onPresign={(file) => this.presignObject(file)}
-          onValue={(items) => this.onObjectValue(items)}
-          onStatus={(s) => this.onObjectStatus(s)}
+          :clearToken="objectClearToken"
+          :onPresign="(file) => this.presignObject(file)"
+          :onValue="(items) => this.onObjectValue(items)"
+          :onStatus="(s) => this.onObjectStatus(s)"
         />
-        <p data-vmz-fixture="upload-object-state">object:{objectStatus};key:{objectKey};bytes:{objectBytes}</p>
+        <p data-vmz-fixture="upload-object-state">object:{{ objectStatus }};key:{{ objectKey }};bytes:{{ objectBytes }}</p>
 
         <Upload
           label="Multiple (server)"
@@ -210,58 +210,58 @@
           destination="server"
           action="/api/form/attachment"
           accept=".txt,.md,.pdf"
-          multiple={true}
-          maxCount={3}
-          maxBytes={262144}
+          :multiple="true"
+          :maxCount="3"
+          :maxBytes="262144"
           controlId="home-upload-multi"
           descriptionId="home-upload-multi-desc"
           errorId="home-upload-multi-err"
           emptyText="No files selected"
           cancelLabel="Cancel multi upload"
-          clearToken={multiClearToken}
-          onValue={(items) => this.onMultiValue(items)}
-          onStatus={(s) => this.onMultiStatus(s)}
+          :clearToken="multiClearToken"
+          :onValue="(items) => this.onMultiValue(items)"
+          :onStatus="(s) => this.onMultiStatus(s)"
         />
-        <p data-vmz-fixture="upload-multi-state">multi:{multiStatus};count:{multiCount};ids:{multiIds}</p>
+        <p data-vmz-fixture="upload-multi-state">multi:{{ multiStatus }};count:{{ multiCount }};ids:{{ multiIds }}</p>
 
         <Upload
           label="Directory (client)"
           description="directory=true (webkitdirectory; UA-specific) — FileList treated as multi on client"
           destination="client"
           accept=".txt,.md,.pdf"
-          directory={true}
-          maxCount={8}
-          maxBytes={262144}
+          :directory="true"
+          :maxCount="8"
+          :maxBytes="262144"
           controlId="home-upload-dir"
           descriptionId="home-upload-dir-desc"
           errorId="home-upload-dir-err"
           emptyText="No folder files"
-          clearToken={dirClearToken}
-          onValue={(items) => this.onDirValue(items)}
-          onStatus={(s) => this.onDirStatus(s)}
+          :clearToken="dirClearToken"
+          :onValue="(items) => this.onDirValue(items)"
+          :onStatus="(s) => this.onDirStatus(s)"
         />
-        <p data-vmz-fixture="upload-dir-state">dir:{dirStatus};mode:{dirMode};count:{dirCount};names:{dirNames}</p>
+        <p data-vmz-fixture="upload-dir-state">dir:{{ dirStatus }};mode:{{ dirMode }};count:{{ dirCount }};names:{{ dirNames }}</p>
 
         <Upload
           label="Resumable (server chunks)"
           description="chunkSize>0 — init/chunk/complete; cancel→paused→Resume (same File session)"
           destination="server"
           action="/api/form/resumable"
-          chunkSize={8}
+          :chunkSize="8"
           accept=".txt,.md,.pdf"
-          maxBytes={262144}
-          maxCount={1}
+          :maxBytes="262144"
+          :maxCount="1"
           controlId="home-upload-resume"
           descriptionId="home-upload-resume-desc"
           errorId="home-upload-resume-err"
           emptyText="No resumable file"
           cancelLabel="Pause upload"
           resumeLabel="Resume upload"
-          clearToken={resumeClearToken}
-          onValue={(items) => this.onResumeValue(items)}
-          onStatus={(s) => this.onResumeStatus(s)}
+          :clearToken="resumeClearToken"
+          :onValue="(items) => this.onResumeValue(items)"
+          :onStatus="(s) => this.onResumeStatus(s)"
         />
-        <p data-vmz-fixture="upload-resume-state">resume:{resumeStatus};id:{resumeId};bytes:{resumeBytes};chunks:{resumeChunks};head:{resumeHead}</p>
+        <p data-vmz-fixture="upload-resume-state">resume:{{ resumeStatus }};id:{{ resumeId }};bytes:{{ resumeBytes }};chunks:{{ resumeChunks }};head:{{ resumeHead }}</p>
       </Card>
     </AppShell>
   </div>

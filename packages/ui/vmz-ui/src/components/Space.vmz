@@ -1,4 +1,4 @@
-<template><div class="vmz-ui-space" data-vmz-ui="space" data-direction={direction} data-size={size} data-wrap={wrap?'true':'false'}><slot /></div></template>
+<template><div class="vmz-ui-space" data-vmz-ui="space" :data-direction="direction" :data-size="size" :data-wrap="wrap?'true':'false'"><slot /></div></template>
 <style>
 .vmz-ui-space{display:flex;gap:var(--vmz-density-control-gap,.75rem)}
 .vmz-ui-space[data-direction='vertical']{flex-direction:column}

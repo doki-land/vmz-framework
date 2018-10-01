@@ -1,5 +1,5 @@
 <template>
-  <div class="markdown-host" html={format(source)}></div>
+  <div class="markdown-host" v-html="format(source)"></div>
 </template>
 
 <script client>

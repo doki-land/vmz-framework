@@ -1,7 +1,7 @@
 <template>
   <div class="vmz-ui-empty" data-vmz-ui="empty">
-      <h2 class="vmz-ui-empty__title">{title}</h2>
-      <p if={description} class="vmz-ui-empty__description">{description}</p>
+      <h2 class="vmz-ui-empty__title">{{ title }}</h2>
+      <p v-if="description" class="vmz-ui-empty__description">{{ description }}</p>
       <div class="vmz-ui-empty__actions">
         <slot />
       </div>

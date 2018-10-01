@@ -1,8 +1,8 @@
 <template>
-  <section class="vmz-ui-card" data-vmz-ui="card" data-size={size} data-bordered={bordered ? 'true' : 'false'} data-hoverable={hoverable ? 'true' : 'false'}>
-      <header if={title} class="vmz-ui-card__header">
-        <h2 class="vmz-ui-card__title">{title}</h2>
-        <p if={description} class="vmz-ui-card__description">{description}</p>
+  <section class="vmz-ui-card" data-vmz-ui="card" :data-size="size" :data-bordered="bordered ? 'true' : 'false'" :data-hoverable="hoverable ? 'true' : 'false'">
+      <header v-if="title" class="vmz-ui-card__header">
+        <h2 class="vmz-ui-card__title">{{ title }}</h2>
+        <p v-if="description" class="vmz-ui-card__description">{{ description }}</p>
       </header>
       <div class="vmz-ui-card__body">
         <slot />

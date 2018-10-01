@@ -3,8 +3,8 @@
       class="vmz-ui-query-form"
       data-vmz-ui="query-form"
       data-dense="true"
-      aria-label={label}
-      onSubmit={onSubmitGuard}
+      :aria-label="label"
+      @submit="onSubmitGuard"
     >
       <slot />
     </form>

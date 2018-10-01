@@ -1,5 +1,5 @@
 <template>
-  <span class="vmz-ui-badge" data-vmz-ui="badge" data-tone={tone}>
+  <span class="vmz-ui-badge" data-vmz-ui="badge" :data-tone="tone">
       <slot />
     </span>
 </template>

@@ -1,4 +1,4 @@
-<template><div class="vmz-ui-flex" data-vmz-ui="flex" data-vertical={vertical?'true':'false'} data-wrap={wrap?'true':'false'}><slot /></div></template>
+<template><div class="vmz-ui-flex" data-vmz-ui="flex" :data-vertical="vertical?'true':'false'" :data-wrap="wrap?'true':'false'"><slot /></div></template>
 <style>
 .vmz-ui-flex{display:flex;align-items:center;justify-content:flex-start;gap:.75rem;min-width:0}
 .vmz-ui-flex[data-vertical='true']{flex-direction:column;align-items:stretch}

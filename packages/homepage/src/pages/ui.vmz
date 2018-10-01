@@ -11,38 +11,38 @@
         descriptionId="home-ui-name-desc"
         errorId="home-ui-name-err"
         describedBy="home-ui-name-desc"
-        value={name}
-        onInput={(e) => (name = e.target.value)}
+        :value="name"
+        @input="(e) => (name = e.target.value)"
       />
-      <p data-vmz-fixture="field-value">value:{name}</p>
+      <p data-vmz-fixture="field-value">value:{{ name }}</p>
     </section>
 
     <section data-vmz-fixture="ui2-form">
       <Checkbox
         label="Accept terms"
         controlId="home-ui-agree"
-        checked={agree}
-        onChange={(e) => (agree = e.target.checked)}
+        :checked="agree"
+        @change="(e) => (agree = e.target.checked)"
       />
-      <p data-vmz-fixture="checkbox-value">agree:{agree ? 'yes' : 'no'}</p>
+      <p data-vmz-fixture="checkbox-value">agree:{{ agree ? 'yes' : 'no' }}</p>
       <Switch
         label="Email notifications"
         controlId="home-ui-notify"
-        checked={notify}
-        onChange={(v) => (notify = v)}
+        :checked="notify"
+        @change="(v) => (notify = v)"
       />
-      <p data-vmz-fixture="switch-value">notify:{notify ? 'on' : 'off'}</p>
+      <p data-vmz-fixture="switch-value">notify:{{ notify ? 'on' : 'off' }}</p>
     </section>
 
     <section data-vmz-fixture="ui2-tabs">
       <Tabs
         label="Profile sections"
-        selected={tab}
+        :selected="tab"
         panelId="home-ui-tabs-panel"
-        items={tabItems}
-        onSelect={(id) => (tab = id)}
+        :items="tabItems"
+        :onSelect="(id) => (tab = id)"
       >
-        <p data-vmz-fixture="tab-panel">panel:{tab}</p>
+        <p data-vmz-fixture="tab-panel">panel:{{ tab }}</p>
       </Tabs>
     </section>
 
@@ -50,31 +50,31 @@
       <Menu
         label="Actions"
         menuId="home-ui-menu"
-        open={menuOpen}
-        items={menuItems}
-        onOpenChange={(v) => (menuOpen = v)}
-        onSelect={(id) => (menuChoice = id)}
+        :open="menuOpen"
+        :items="menuItems"
+        :onOpenChange="(v) => (menuOpen = v)"
+        :onSelect="(id) => (menuChoice = id)"
       />
-      <p data-vmz-fixture="menu-choice">menu:{menuChoice || 'none'}</p>
+      <p data-vmz-fixture="menu-choice">menu:{{ menuChoice || 'none' }}</p>
     </section>
 
     <section data-vmz-fixture="ui1-dialog">
-      <Button type="button" onClick={() => (open = true)}>Open dialog</Button>
-      <Dialog open={open} title="Confirm" titleId="home-ui-dialog-title" onClose={() => (open = false)}>
+      <Button type="button" @click="() => (open = true)">Open dialog</Button>
+      <Dialog :open="open" title="Confirm" titleId="home-ui-dialog-title" :onClose="() => (open = false)">
         <p data-vmz-fixture="dialog-body">Dialog body for UI lab.</p>
       </Dialog>
     </section>
 
     <section data-vmz-fixture="ui2-drawer">
-      <Button type="button" onClick={() => (drawerOpen = true)}>Open drawer</Button>
-      <Drawer open={drawerOpen} title="Details" titleId="home-ui-drawer-title" onClose={() => (drawerOpen = false)}>
+      <Button type="button" @click="() => (drawerOpen = true)">Open drawer</Button>
+      <Drawer :open="drawerOpen" title="Details" titleId="home-ui-drawer-title" :onClose="() => (drawerOpen = false)">
         <p data-vmz-fixture="drawer-body">Drawer body for UI lab.</p>
       </Drawer>
     </section>
 
     <section data-vmz-fixture="ui2-popover">
-      <Button type="button" onClick={() => (popoverOpen = true)}>Open popover</Button>
-      <Popover open={popoverOpen} title="Hint" titleId="home-ui-popover-title" onClose={() => (popoverOpen = false)}>
+      <Button type="button" @click="() => (popoverOpen = true)">Open popover</Button>
+      <Popover :open="popoverOpen" title="Hint" titleId="home-ui-popover-title" :onClose="() => (popoverOpen = false)">
         <p data-vmz-fixture="popover-body">Popover body for UI lab.</p>
       </Popover>
     </section>

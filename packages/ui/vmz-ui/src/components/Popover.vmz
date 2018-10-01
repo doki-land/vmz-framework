@@ -2,38 +2,38 @@
   <div
       class="vmz-ui-popover-root"
       data-vmz-ui="popover"
-      data-vmz-overlay-open={open}
+      :data-vmz-overlay-open="open"
     >
       <div
-        if={open}
+        v-if="open"
         class="vmz-ui-popover"
         data-vmz-overlay="popover"
         data-vmz-overlay-owner="popover"
-        data-vmz-overlay-stack={stackLevel}
+        :data-vmz-overlay-stack="stackLevel"
       >
         <button
           type="button"
           class="vmz-ui-popover__backdrop"
           data-vmz-overlay-layer="backdrop"
           aria-label="Dismiss popover"
-          onClick={dismiss}
+          @click="dismiss"
         ></button>
         <div
           class="vmz-ui-popover__panel"
           role="dialog"
           aria-modal="false"
-          aria-labelledby={titleId}
+          :aria-labelledby="titleId"
           tabindex="-1"
           data-vmz-overlay-layer="panel"
           data-vmz-focus="enter"
-          onKeyDown={onPanelKeyDown}
+          :onKeyDown="onPanelKeyDown"
         >
-          <h2 id={titleId} class="vmz-ui-popover__title">{title}</h2>
+          <h2 :id="titleId" class="vmz-ui-popover__title">{{ title }}</h2>
           <div class="vmz-ui-popover__body">
             <slot />
           </div>
           <div class="vmz-ui-popover__actions">
-            <button type="button" class="vmz-ui-popover__close" data-vmz-focus="close" onClick={dismiss}>
+            <button type="button" class="vmz-ui-popover__close" data-vmz-focus="close" @click="dismiss">
               Close
             </button>
           </div>

@@ -1,5 +1,5 @@
 <template>
-  <section class="vmz-ui-filter-bar" data-vmz-ui="filter-bar" aria-label={label}>
+  <section class="vmz-ui-filter-bar" data-vmz-ui="filter-bar" :aria-label="label">
       <slot />
     </section>
 </template>

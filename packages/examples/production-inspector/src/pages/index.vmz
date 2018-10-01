@@ -1,29 +1,29 @@
 <template>
-  <div data-vmz-fixture="inspector" data-density={density} dir={dir}>
-    <AppShell brand="Inspector" homeHref="/" navLabel="Panel" nav={navItems}>
+  <div data-vmz-fixture="inspector" :data-density="density" :dir="dir">
+    <AppShell brand="Inspector" homeHref="/" navLabel="Panel" :nav="navItems">
       <p data-vmz-fixture="inspector-explain">explain:route=InspectorPage</p>
       <p data-vmz-fixture="inspector-trace">trace:facet=route</p>
-      <p data-vmz-fixture="inspector-state">density:{density};dir:{dir}</p>
+      <p data-vmz-fixture="inspector-state">density:{{ density }};dir:{{ dir }}</p>
 
       <div class="inspector-actions">
-        <Button type="button" onClick={() => this.cycleDensity()}>Cycle density</Button>
-        <Button type="button" variant="secondary" onClick={() => this.toggleDir()}>Toggle RTL</Button>
+        <Button type="button" @click="() => this.cycleDensity()">Cycle density</Button>
+        <Button type="button" variant="secondary" @click="() => this.toggleDir()">Toggle RTL</Button>
       </div>
 
       <Field
         label="Query"
         description="StableId or diagnostic code"
-        error={queryError}
+        :error="queryError"
         controlId="inspector-query"
         descriptionId="inspector-query-desc"
         errorId="inspector-query-err"
-        describedBy={queryDescribedBy}
-        value={query}
-        onInput={(e) => this.onQueryInput(e)}
+        :describedBy="queryDescribedBy"
+        :value="query"
+        @input="(e) => this.onQueryInput(e)"
       />
 
-      <Button type="button" onClick={() => this.openDialog()}>Replay error</Button>
-      <Dialog open={open} title="Error replay" titleId="inspector-dialog-title" onClose={() => this.closeDialog()}>
+      <Button type="button" @click="() => this.openDialog()">Replay error</Button>
+      <Dialog :open="open" title="Error replay" titleId="inspector-dialog-title" :onClose="() => this.closeDialog()">
         <p data-vmz-fixture="inspector-replay">replay:generation=1</p>
       </Dialog>
     </AppShell>

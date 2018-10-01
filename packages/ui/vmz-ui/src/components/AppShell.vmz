@@ -1,10 +1,10 @@
 <template>
   <div class="vmz-ui-app-shell" data-vmz-ui="app-shell">
       <header class="vmz-ui-app-shell__header" data-vmz-shell="header"><div class="vmz-ui-app-shell__header-inner">
-        <a class="vmz-ui-app-shell__brand" href={homeHref}>{brand}</a>
-        <nav class="vmz-ui-app-shell__nav" aria-label={navLabel}>
-          <a each={nav} as="item" key={item.id} href={item.href} data-vmz-nav={item.id}>
-            {item.title}
+        <a class="vmz-ui-app-shell__brand" :href="homeHref">{{ brand }}</a>
+        <nav class="vmz-ui-app-shell__nav" :aria-label="navLabel">
+          <a v-for="item in nav" :key="item.id" :href="item.href" :data-vmz-nav="item.id">
+            {{ item.title }}
           </a>
         </nav>
       </div></header>

@@ -1,7 +1,7 @@
 <template>
   <article>
       <header>
-        <h1>{title}</h1>
+        <h1>{{ title }}</h1>
         <p>Static shell - islands opt in with client:* directives.</p>
       </header>
 

@@ -1,6 +1,6 @@
 <template>
   <div data-vmz-fixture="stacking">
-    <AppShell brand="VMZ" homeHref="/" navLabel="Stacking" nav={navItems}>
+    <AppShell brand="VMZ" homeHref="/" navLabel="Stacking" :nav="navItems">
       <Alert
         tone="info"
         roleName="status"
@@ -9,41 +9,41 @@
       />
 
       <p data-vmz-fixture="stacking-state">
-        drawer:{drawerOpen ? 'open' : 'closed'};dialog:{dialogOpen ? 'open' : 'closed'};popover:{popoverOpen ? 'open' : 'closed'}
+        drawer:{{ drawerOpen ? 'open' : 'closed' }};dialog:{{ dialogOpen ? 'open' : 'closed' }};popover:{{ popoverOpen ? 'open' : 'closed' }}
       </p>
 
       <div class="vmz-stacking-actions">
-        <Button type="button" onClick={() => this.openDrawer()}>Open drawer (stack 0)</Button>
-        <Button type="button" variant="secondary" onClick={() => this.openDialog()}>Open dialog (stack 1)</Button>
-        <Button type="button" variant="ghost" onClick={() => this.openPopover()}>Open popover (stack 2)</Button>
+        <Button type="button" @click="() => this.openDrawer()">Open drawer (stack 0)</Button>
+        <Button type="button" variant="secondary" @click="() => this.openDialog()">Open dialog (stack 1)</Button>
+        <Button type="button" variant="ghost" @click="() => this.openPopover()">Open popover (stack 2)</Button>
       </div>
 
       <Drawer
-        open={drawerOpen}
+        :open="drawerOpen"
         title="Base drawer"
         titleId="home-stack-drawer-title"
         stackLevel="0"
-        onClose={() => this.closeDrawer()}
+        :onClose="() => this.closeDrawer()"
       >
         <p data-vmz-fixture="stacking-drawer-body">Base layer stackLevel=0</p>
       </Drawer>
 
       <Dialog
-        open={dialogOpen}
+        :open="dialogOpen"
         title="Stacked dialog"
         titleId="home-stack-dialog-title"
         stackLevel="1"
-        onClose={() => this.closeDialog()}
+        :onClose="() => this.closeDialog()"
       >
         <p data-vmz-fixture="stacking-dialog-body">Middle layer stackLevel=1</p>
       </Dialog>
 
       <Popover
-        open={popoverOpen}
+        :open="popoverOpen"
         title="Top popover"
         titleId="home-stack-popover-title"
         stackLevel="2"
-        onClose={() => this.closePopover()}
+        :onClose="() => this.closePopover()"
       >
         <p data-vmz-fixture="stacking-popover-body">Top layer stackLevel=2</p>
       </Popover>

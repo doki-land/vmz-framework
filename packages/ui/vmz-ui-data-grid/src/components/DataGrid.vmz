@@ -3,46 +3,45 @@
     class="vmz-ui-datagrid"
     data-vmz-ui="data-grid"
     data-vmz-grid="virtual-pinned"
-    data-vmz-grid-group={groupByAttr}
-    data-vmz-grid-tree={treeAttr}
-    data-vmz-grid-pivot={pivotAttr}
-    data-vmz-grid-edit={editingAttr}
-    data-total-rows={totalRows}
-    data-visible-count={visibleCount}
-    data-pinned-cols={pinnedCols}
-    data-sort-key={sortKey}
-    data-sort-dir={sortDir}
-    data-selected-count={selectedCount}
-    data-group-count={groupCount}
-    data-pivot-cols={pivotColsAttr}
+    :data-vmz-grid-group="groupByAttr"
+    :data-vmz-grid-tree="treeAttr"
+    :data-vmz-grid-pivot="pivotAttr"
+    :data-vmz-grid-edit="editingAttr"
+    :data-total-rows="totalRows"
+    :data-visible-count="visibleCount"
+    :data-pinned-cols="pinnedCols"
+    :data-sort-key="sortKey"
+    :data-sort-dir="sortDir"
+    :data-selected-count="selectedCount"
+    :data-group-count="groupCount"
+    :data-pivot-cols="pivotColsAttr"
   >
     <div
       class="vmz-ui-datagrid__viewport"
       data-vmz-grid-viewport="true"
-      onScroll={onViewportScroll}
+      :onScroll="onViewportScroll"
     >
-      <div class="vmz-ui-datagrid__canvas" style={canvasStyle}>
-        <div class="vmz-ui-datagrid__head" data-vmz-grid-head="true" style={rowLayoutStyle} onClick={onHeadClick}>
+      <div class="vmz-ui-datagrid__canvas" :style="canvasStyle">
+        <div class="vmz-ui-datagrid__head" data-vmz-grid-head="true" :style="rowLayoutStyle" @click="onHeadClick">
           <div class="vmz-ui-datagrid__cell vmz-ui-datagrid__cell--check vmz-ui-datagrid__cell--pinned" data-pinned="true">
             <input
               type="checkbox"
               class="vmz-ui-datagrid__box"
               data-vmz-select-all="true"
-              aria-label={selectAllLabel}
-              checked={allSelected}
+              :aria-label="selectAllLabel"
+              :checked="allSelected"
             />
           </div>
           <div
-            each={columns}
-            as="col"
-            key={col.id}
-            class={col.cellClass}
-            data-vmz-col={col.id}
-            data-pinned={col.pinnedAttr}
-            data-pivot-col={col.pivotColAttr}
+            v-for="col in columns"
+            :key="col.id"
+            :class="col.cellClass"
+            :data-vmz-col="col.id"
+            :data-pinned="col.pinnedAttr"
+            :data-pivot-col="col.pivotColAttr"
           >
-            <button type="button" class="vmz-ui-datagrid__sort" data-vmz-sort={col.id}>
-              {col.title}
+            <button type="button" class="vmz-ui-datagrid__sort" :data-vmz-sort="col.id">
+              {{ col.title }}
             </button>
           </div>
         </div>
@@ -50,78 +49,76 @@
         <div
           class="vmz-ui-datagrid__spacer"
           data-vmz-grid-spacer="top"
-          style={padTopStyle}
+          :style="padTopStyle"
           aria-hidden="true"
         ></div>
 
         <div
-          each={rows}
-          as="row"
-          key={row.id}
-          class={row.rowClass}
-          style={rowLayoutStyle}
-          data-vmz-row={row.id}
-          data-row-kind={row.kindAttr}
-          data-group-key={row.groupKey}
-          data-depth={row.depthAttr}
-          data-expanded={row.expandedAttr}
-          data-selected={row.selectedAttr}
-          data-pivot-row={row.pivotRowAttr}
-          onClick={onBodyClick}
+          v-for="row in rows"
+          :key="row.id"
+          :class="row.rowClass"
+          :style="rowLayoutStyle"
+          :data-vmz-row="row.id"
+          :data-row-kind="row.kindAttr"
+          :data-group-key="row.groupKey"
+          :data-depth="row.depthAttr"
+          :data-expanded="row.expandedAttr"
+          :data-selected="row.selectedAttr"
+          :data-pivot-row="row.pivotRowAttr"
+          @click="onBodyClick"
         >
-          <div if={row.isGroup} class="vmz-ui-datagrid__cell vmz-ui-datagrid__cell--check vmz-ui-datagrid__cell--pinned" data-pinned="true">
+          <div v-if="row.isGroup" class="vmz-ui-datagrid__cell vmz-ui-datagrid__cell--check vmz-ui-datagrid__cell--pinned" data-pinned="true">
             <button
               type="button"
               class="vmz-ui-datagrid__twist"
-              data-vmz-group-toggle={row.groupKey}
-              aria-expanded={row.expandedAttr}
-              aria-label={row.twistLabel}
+              :data-vmz-group-toggle="row.groupKey"
+              :aria-expanded="row.expandedAttr"
+              :aria-label="row.twistLabel"
             >
-              {row.twist}
+              {{ row.twist }}
             </button>
           </div>
-          <div if={row.isTreeExpandable} class="vmz-ui-datagrid__cell vmz-ui-datagrid__cell--check vmz-ui-datagrid__cell--pinned" data-pinned="true">
+          <div v-if="row.isTreeExpandable" class="vmz-ui-datagrid__cell vmz-ui-datagrid__cell--check vmz-ui-datagrid__cell--pinned" data-pinned="true">
             <button
               type="button"
               class="vmz-ui-datagrid__twist"
-              data-vmz-tree-toggle={row.id}
-              aria-expanded={row.expandedAttr}
-              aria-label={row.twistLabel}
+              :data-vmz-tree-toggle="row.id"
+              :aria-expanded="row.expandedAttr"
+              :aria-label="row.twistLabel"
             >
-              {row.twist}
+              {{ row.twist }}
             </button>
           </div>
-          <div if={row.isLeaf} class="vmz-ui-datagrid__cell vmz-ui-datagrid__cell--check vmz-ui-datagrid__cell--pinned" data-pinned="true">
+          <div v-if="row.isLeaf" class="vmz-ui-datagrid__cell vmz-ui-datagrid__cell--check vmz-ui-datagrid__cell--pinned" data-pinned="true">
             <input
               type="checkbox"
               class="vmz-ui-datagrid__box"
-              data-vmz-select={row.id}
-              aria-label={row.selectLabel}
-              checked={row.selected}
+              :data-vmz-select="row.id"
+              :aria-label="row.selectLabel"
+              :checked="row.selected"
             />
           </div>
           <div
-            each={row.cells}
-            as="cell"
-            key={cell.id}
-            class={cell.cellClass}
-            data-pinned={cell.pinnedAttr}
-            data-agg={cell.aggAttr}
-            data-editable={cell.editableAttr}
-            data-editing={cell.editingAttr}
-            style={cell.cellStyle}
+            v-for="cell in row.cells"
+            :key="cell.id"
+            :class="cell.cellClass"
+            :data-pinned="cell.pinnedAttr"
+            :data-agg="cell.aggAttr"
+            :data-editable="cell.editableAttr"
+            :data-editing="cell.editingAttr"
+            :style="cell.cellStyle"
           >
-            <span if={cell.showText} data-vmz-cell-start-edit={cell.startEditKey}>{cell.text}</span>
+            <span v-if="cell.showText" :data-vmz-cell-start-edit="cell.startEditKey">{{ cell.text }}</span>
             <input
-              if={cell.editing}
+              v-if="cell.editing"
               class="vmz-ui-datagrid__editor"
-              data-vmz-cell-editor={cell.cellKey}
-              value={cell.editValue}
-              aria-label={cell.editLabel}
-              onInput={onEditorInput}
-              onKeyDown={onEditorKeyDown}
-              onBlur={onEditorBlur}
-              onClick={onEditorClick}
+              :data-vmz-cell-editor="cell.cellKey"
+              :value="cell.editValue"
+              :aria-label="cell.editLabel"
+              @input="onEditorInput"
+              :onKeyDown="onEditorKeyDown"
+              @blur="onEditorBlur"
+              @click="onEditorClick"
             />
           </div>
         </div>
@@ -129,7 +126,7 @@
         <div
           class="vmz-ui-datagrid__spacer"
           data-vmz-grid-spacer="bottom"
-          style={padBottomStyle}
+          :style="padBottomStyle"
           aria-hidden="true"
         ></div>
       </div>

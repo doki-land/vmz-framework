@@ -2,7 +2,7 @@
   <main>
           <h1>Hello, VMZ</h1>
           <!-- `components/Greeting.vmz` auto-available — no import. -->
-          <Greeting name={name} />
+          <Greeting :name="name" />
         </main>
 </template>
 

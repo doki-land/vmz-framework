@@ -1,39 +1,38 @@
 <template>
-  <div class="vmz-ui-menu" data-vmz-ui="menu" data-vmz-overlay-open={open}>
+  <div class="vmz-ui-menu" data-vmz-ui="menu" :data-vmz-overlay-open="open">
       <button
         type="button"
         class="vmz-ui-menu__trigger"
         data-vmz-menu="trigger"
         aria-haspopup="menu"
-        aria-expanded={open ? 'true' : 'false'}
-        aria-controls={menuId}
-        onClick={toggle}
-        onKeyDown={onTriggerKeyDown}
+        :aria-expanded="open ? 'true' : 'false'"
+        :aria-controls="menuId"
+        @click="toggle"
+        :onKeyDown="onTriggerKeyDown"
       >
-        {label}
+        {{ label }}
       </button>
       <div
-        if={open}
-        id={menuId}
+        v-if="open"
+        :id="menuId"
         class="vmz-ui-menu__panel"
         role="menu"
         data-vmz-overlay="menu"
         data-vmz-overlay-owner="menu"
         data-vmz-focus="enter"
         tabindex="-1"
-        onKeyDown={onMenuKeyDown}
+        :onKeyDown="onMenuKeyDown"
       >
         <button
-          each={items}
-          as="item"
-          key={item.id}
+          v-for="item in items"
+          :key="item.id"
           type="button"
           class="vmz-ui-menu__item"
           role="menuitem"
-          data-vmz-menu-item={item.id}
-          onClick={onItemClick}
+          :data-vmz-menu-item="item.id"
+          @click="onItemClick"
         >
-          {item.title}
+          {{ item.title }}
         </button>
       </div>
     </div>

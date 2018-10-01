@@ -2,18 +2,18 @@
   <div
       class="vmz-ui-form-item"
       data-vmz-ui="form-item"
-      data-required={requiredAttr}
-      data-invalid={invalidAttr}
+      :data-required="requiredAttr"
+      :data-invalid="invalidAttr"
     >
-      <label if={label} class="vmz-ui-form-item__label" for={controlId}>
-        <span>{label}</span>
-        <span if={required} class="vmz-ui-form-item__required" aria-hidden="true">*</span>
+      <label v-if="label" class="vmz-ui-form-item__label" :for="controlId">
+        <span>{{ label }}</span>
+        <span v-if="required" class="vmz-ui-form-item__required" aria-hidden="true">*</span>
       </label>
       <div class="vmz-ui-form-item__control">
         <slot />
       </div>
-      <p if={description} id={descriptionId} class="vmz-ui-form-item__description">{description}</p>
-      <p if={error} id={errorId} class="vmz-ui-form-item__error" role="alert">{error}</p>
+      <p v-if="description" :id="descriptionId" class="vmz-ui-form-item__description">{{ description }}</p>
+      <p v-if="error" :id="errorId" class="vmz-ui-form-item__error" role="alert">{{ error }}</p>
     </div>
 </template>
 

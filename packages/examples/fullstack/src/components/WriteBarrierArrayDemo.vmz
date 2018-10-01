@@ -1,7 +1,7 @@
 <template>
   <section>
       <ul>
-        <li each={tags} as="tag" key={tag.id}>{tag.label}</li>
+        <li v-for="tag in tags" :key="tag.id">{{ tag.label }}</li>
       </ul>
     </section>
 </template>

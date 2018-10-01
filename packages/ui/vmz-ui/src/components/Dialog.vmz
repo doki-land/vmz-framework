@@ -2,40 +2,40 @@
   <div
       class="vmz-ui-dialog-root"
       data-vmz-ui="dialog"
-      data-vmz-overlay-open={open}
+      :data-vmz-overlay-open="open"
     >
       <div
-        if={open}
+        v-if="open"
         class="vmz-ui-dialog"
         data-vmz-overlay="dialog"
         data-vmz-overlay-owner="dialog"
-        data-vmz-overlay-stack={stackLevel}
+        :data-vmz-overlay-stack="stackLevel"
       >
         <button
           type="button"
           class="vmz-ui-dialog__backdrop"
           data-vmz-overlay-layer="backdrop"
           aria-label="Dismiss dialog"
-          onClick={dismiss}
+          @click="dismiss"
         ></button>
         <div
           class="vmz-ui-dialog__panel"
           role="dialog"
           aria-modal="true"
-          aria-labelledby={titleId}
+          :aria-labelledby="titleId"
           tabindex="-1"
           data-vmz-overlay-layer="panel"
           data-vmz-focus="enter"
           data-vmz-motion="overlay-enter"
           data-vmz-motion-token="motion.overlay"
-          onKeyDown={onPanelKeyDown}
+          :onKeyDown="onPanelKeyDown"
         >
-          <h2 id={titleId} class="vmz-ui-dialog__title">{title}</h2>
+          <h2 :id="titleId" class="vmz-ui-dialog__title">{{ title }}</h2>
           <div class="vmz-ui-dialog__body">
             <slot />
           </div>
           <div class="vmz-ui-dialog__actions">
-            <button type="button" class="vmz-ui-dialog__close" data-vmz-focus="close" onClick={dismiss}>
+            <button type="button" class="vmz-ui-dialog__close" data-vmz-focus="close" @click="dismiss">
               Close
             </button>
           </div>

@@ -1,26 +1,25 @@
 <template>
   <div class="vmz-ui-list" data-vmz-ui="list">
-      <p if={label} class="vmz-ui-list__label" id={labelId}>{label}</p>
+      <p v-if="label" class="vmz-ui-list__label" :id="labelId">{{ label }}</p>
       <ul
         class="vmz-ui-list__items"
         role="listbox"
-        aria-labelledby={labelId}
-        aria-label={label}
-        onClick={onListClick}
-        onKeyDown={onListKeyDown}
+        :aria-labelledby="labelId"
+        :aria-label="label"
+        @click="onListClick"
+        :onKeyDown="onListKeyDown"
       >
         <li
-          each={items}
-          as="item"
-          key={item.id}
+          v-for="item in items"
+          :key="item.id"
           class="vmz-ui-list__item"
           role="option"
-          id={item.id}
-          data-vmz-list-item={item.id}
-          aria-selected={selected === item.id ? 'true' : 'false'}
-          tabindex={selected === item.id ? 0 : -1}
+          :id="item.id"
+          :data-vmz-list-item="item.id"
+          :aria-selected="selected === item.id ? 'true' : 'false'"
+          :tabindex="selected === item.id ? 0 : -1"
         >
-          {item.title}
+          {{ item.title }}
         </li>
       </ul>
     </div>

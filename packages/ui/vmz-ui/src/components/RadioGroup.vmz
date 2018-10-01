@@ -2,34 +2,33 @@
   <fieldset
       class="vmz-ui-radio-group"
       data-vmz-ui="radio-group"
-      data-invalid={invalidAttr}
-      aria-describedby={describedBy}
-      disabled={disabled}
+      :data-invalid="invalidAttr"
+      :aria-describedby="describedBy"
+      :disabled="disabled"
     >
-      <legend class="vmz-ui-radio-group__legend">{label}</legend>
-      <div class="vmz-ui-radio-group__list" role="radiogroup" aria-label={label} onClick={onListClick}>
+      <legend class="vmz-ui-radio-group__legend">{{ label }}</legend>
+      <div class="vmz-ui-radio-group__list" role="radiogroup" :aria-label="label" @click="onListClick">
         <label
-          each={items}
-          as="item"
-          key={item.value}
+          v-for="item in items"
+          :key="item.value"
           class="vmz-ui-radio-group__option"
-          for={item.id}
+          :for="item.id"
         >
           <input
-            id={item.id}
+            :id="item.id"
             class="vmz-ui-radio-group__input"
             type="radio"
-            name={name}
-            value={item.value}
-            checked={value === item.value}
-            disabled={disabled}
-            data-vmz-radio={item.value}
+            :name="name"
+            :value="item.value"
+            :checked="value === item.value"
+            :disabled="disabled"
+            :data-vmz-radio="item.value"
           />
-          <span class="vmz-ui-radio-group__text">{item.label}</span>
+          <span class="vmz-ui-radio-group__text">{{ item.label }}</span>
         </label>
       </div>
-      <p if={description} id={descriptionId} class="vmz-ui-radio-group__description">{description}</p>
-      <p if={error} id={errorId} class="vmz-ui-radio-group__error" role="alert">{error}</p>
+      <p v-if="description" :id="descriptionId" class="vmz-ui-radio-group__description">{{ description }}</p>
+      <p v-if="error" :id="errorId" class="vmz-ui-radio-group__error" role="alert">{{ error }}</p>
     </fieldset>
 </template>
 

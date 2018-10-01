@@ -3,7 +3,7 @@
       class="vmz-ui-spinner"
       data-vmz-ui="spinner"
       role="status"
-      aria-label={label}
+      :aria-label="label"
     ></span>
 </template>
 

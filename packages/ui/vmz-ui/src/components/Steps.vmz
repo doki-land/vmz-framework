@@ -1,18 +1,17 @@
 <template>
-  <ol class="vmz-ui-steps" data-vmz-ui="steps" aria-label={label}>
+  <ol class="vmz-ui-steps" data-vmz-ui="steps" :aria-label="label">
       <li
-        each={items}
-        as="item"
-        key={item.id}
+        v-for="item in items"
+        :key="item.id"
         class="vmz-ui-steps__item"
-        data-vmz-step={item.id}
-        data-status={item.status}
-        aria-current={current === item.id ? 'step' : 'false'}
+        :data-vmz-step="item.id"
+        :data-status="item.status"
+        :aria-current="current === item.id ? 'step' : 'false'"
       >
-        <span class="vmz-ui-steps__index" data-vmz-step-index={item.id}>{item.index}</span>
+        <span class="vmz-ui-steps__index" :data-vmz-step-index="item.id">{{ item.index }}</span>
         <span class="vmz-ui-steps__body">
-          <span class="vmz-ui-steps__title">{item.title}</span>
-          <span if={item.description} class="vmz-ui-steps__description">{item.description}</span>
+          <span class="vmz-ui-steps__title">{{ item.title }}</span>
+          <span v-if="item.description" class="vmz-ui-steps__description">{{ item.description }}</span>
         </span>
       </li>
     </ol>

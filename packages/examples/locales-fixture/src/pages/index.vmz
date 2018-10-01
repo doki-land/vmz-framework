@@ -1,5 +1,5 @@
 <template>
-  <p>{label}</p>
+  <p>{{ label }}</p>
 </template>
 <script client>
 import { save, greeting, itemCount } from '#locales/account';

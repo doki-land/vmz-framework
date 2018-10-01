@@ -1,10 +1,10 @@
 <template>
   <figure class="vmz-ui-code-block" data-vmz-ui="code-block">
       <div class="vmz-ui-code-block__bar">
-        <figcaption if={caption} class="vmz-ui-code-block__caption">{caption}</figcaption>
-        <Button type="button" variant="ghost" onClick={onCopy}>{copyLabel}</Button>
+        <figcaption v-if="caption" class="vmz-ui-code-block__caption">{{ caption }}</figcaption>
+        <Button type="button" variant="ghost" @click="onCopy">{{ copyLabel }}</Button>
       </div>
-      <pre class="vmz-ui-code-block__pre"><code class="vmz-ui-code-block__code">{code}</code></pre>
+      <pre class="vmz-ui-code-block__pre"><code class="vmz-ui-code-block__code">{{ code }}</code></pre>
     </figure>
 </template>
 

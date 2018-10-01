@@ -1,27 +1,27 @@
 <template>
-  <div class="vmz-ui-table-wrap" data-vmz-ui="table" data-sort-key={sortKey} data-sort-dir={sortDir}>
+  <div class="vmz-ui-table-wrap" data-vmz-ui="table" :data-sort-key="sortKey" :data-sort-dir="sortDir">
       <table class="vmz-ui-table">
-        <thead onClick={onHeadClick}>
+        <thead @click="onHeadClick">
           <tr>
-            <th each={columns} as="col" key={col.id} scope="col" data-vmz-col={col.id}>
-              <button type="button" class="vmz-ui-table__sort" data-vmz-sort={col.id}>
-                {col.title}
+            <th v-for="col in columns" :key="col.id" scope="col" :data-vmz-col="col.id">
+              <button type="button" class="vmz-ui-table__sort" :data-vmz-sort="col.id">
+                {{ col.title }}
               </button>
             </th>
-            <th if={hasRowAction} scope="col">{actionTitle}</th>
+            <th v-if="hasRowAction" scope="col">{{ actionTitle }}</th>
           </tr>
         </thead>
-        <tbody onClick={onBodyClick}>
-          <tr each={rows} as="row" key={row.id} data-vmz-row={row.id}>
-            <td each={row.cells} as="cell">{cell}</td>
-            <td if={hasRowAction}>
+        <tbody @click="onBodyClick">
+          <tr v-for="row in rows" :key="row.id" :data-vmz-row="row.id">
+            <td v-for="cell in row.cells">{{ cell }}</td>
+            <td v-if="hasRowAction">
               <button
                 type="button"
                 class="vmz-ui-table__row-action"
-                data-vmz-row-action={row.id}
-                disabled={rowActionDisabled}
+                :data-vmz-row-action="row.id"
+                :disabled="rowActionDisabled"
               >
-                {actionLabel}
+                {{ actionLabel }}
               </button>
             </td>
           </tr>

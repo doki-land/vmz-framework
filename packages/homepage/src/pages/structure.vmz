@@ -1,6 +1,6 @@
 <template>
   <div data-vmz-fixture="structure">
-    <AppShell brand="VMZ" homeHref="/" navLabel="Structure" nav={navItems}>
+    <AppShell brand="VMZ" homeHref="/" navLabel="Structure" :nav="navItems">
       <Alert
         tone="info"
         roleName="status"
@@ -9,23 +9,23 @@
       />
 
       <p data-vmz-fixture="structure-state">
-        faq:{faqOpen || 'none'};step:{stepCurrent};list:{listSelected || 'none'};tree:{treeSelected || 'none'};expanded:{treeExpandedAttr}
+        faq:{{ faqOpen || 'none' }};step:{{ stepCurrent }};list:{{ listSelected || 'none' }};tree:{{ treeSelected || 'none' }};expanded:{{ treeExpandedAttr }}
       </p>
 
       <Card title="Accordion" description="Exclusive open; toggle same id closes.">
         <Accordion
           label="FAQ"
-          openId={faqOpen}
-          items={faqItems}
-          onToggle={(id) => this.onFaqToggle(id)}
+          :openId="faqOpen"
+          :items="faqItems"
+          :onToggle="(id) => this.onFaqToggle(id)"
         />
       </Card>
 
       <Card title="Steps" description="Parent owns current id and status flags.">
-        <Steps label="Onboarding" current={stepCurrent} items={stepItems} />
+        <Steps label="Onboarding" :current="stepCurrent" :items="stepItems" />
         <div class="vmz-structure-actions">
-          <Button type="button" variant="secondary" onClick={() => this.stepBack()}>Back</Button>
-          <Button type="button" onClick={() => this.stepNext()}>Next</Button>
+          <Button type="button" variant="secondary" @click="() => this.stepBack()">Back</Button>
+          <Button type="button" @click="() => this.stepNext()">Next</Button>
         </div>
       </Card>
 
@@ -33,9 +33,9 @@
         <List
           label="Teams"
           labelId="home-structure-list-label"
-          selected={listSelected}
-          items={listItems}
-          onSelect={(id) => this.onListSelect(id)}
+          :selected="listSelected"
+          :items="listItems"
+          :onSelect="(id) => this.onListSelect(id)"
         />
       </Card>
 
@@ -43,10 +43,10 @@
         <Tree
           label="Repos"
           labelId="home-structure-tree-label"
-          selected={treeSelected}
-          items={treeItems}
-          onSelect={(id) => this.onTreeSelect(id)}
-          onToggle={(id) => this.onTreeToggle(id)}
+          :selected="treeSelected"
+          :items="treeItems"
+          :onSelect="(id) => this.onTreeSelect(id)"
+          :onToggle="(id) => this.onTreeToggle(id)"
         />
       </Card>
     </AppShell>

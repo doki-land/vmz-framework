@@ -2,49 +2,48 @@
   <div
       class="vmz-ui-autocomplete"
       data-vmz-ui="autocomplete"
-      data-invalid={invalidAttr}
-      data-open={openAttr}
+      :data-invalid="invalidAttr"
+      :data-open="openAttr"
     >
-      <label if={label} class="vmz-ui-autocomplete__label" for={controlId}>{label}</label>
+      <label v-if="label" class="vmz-ui-autocomplete__label" :for="controlId">{{ label }}</label>
       <input
-        id={controlId}
+        :id="controlId"
         class="vmz-ui-autocomplete__control"
         type="text"
         role="combobox"
         autocomplete="off"
         aria-autocomplete="list"
-        aria-expanded={openAttr}
-        aria-controls={listId}
-        aria-invalid={error ? 'true' : 'false'}
-        aria-describedby={describedBy}
-        value={value}
-        disabled={disabled}
-        onInput={onInput}
-        onKeyDown={onKeyDown}
+        :aria-expanded="openAttr"
+        :aria-controls="listId"
+        :aria-invalid="error ? 'true' : 'false'"
+        :aria-describedby="describedBy"
+        :value="value"
+        :disabled="disabled"
+        @input="onInput"
+        :onKeyDown="onKeyDown"
       />
       <ul
-        if={listOpen}
-        id={listId}
+        v-if="listOpen"
+        :id="listId"
         class="vmz-ui-autocomplete__list"
         role="listbox"
         data-vmz-autocomplete="list"
-        onClick={onListClick}
+        @click="onListClick"
       >
         <li
-          each={options}
-          as="opt"
-          key={opt.value}
+          v-for="opt in options"
+          :key="opt.value"
           class="vmz-ui-autocomplete__option"
           role="option"
-          data-vmz-option={opt.value}
+          :data-vmz-option="opt.value"
           tabindex="-1"
         >
-          {opt.label}
+          {{ opt.label }}
         </li>
       </ul>
-      <p if={showEmpty} class="vmz-ui-autocomplete__empty" data-vmz-autocomplete="empty">{emptyText}</p>
-      <p if={description} id={descriptionId} class="vmz-ui-autocomplete__description">{description}</p>
-      <p if={error} id={errorId} class="vmz-ui-autocomplete__error" role="alert">{error}</p>
+      <p v-if="showEmpty" class="vmz-ui-autocomplete__empty" data-vmz-autocomplete="empty">{{ emptyText }}</p>
+      <p v-if="description" :id="descriptionId" class="vmz-ui-autocomplete__description">{{ description }}</p>
+      <p v-if="error" :id="errorId" class="vmz-ui-autocomplete__error" role="alert">{{ error }}</p>
     </div>
 </template>
 

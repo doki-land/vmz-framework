@@ -1,7 +1,7 @@
 <template>
   <div>
-      <p if={showA}>{aText}</p>
-      <p else>{bText}</p>
+      <p v-if="showA">{{ aText }}</p>
+      <p v-else>{{ bText }}</p>
     </div>
 </template>
 

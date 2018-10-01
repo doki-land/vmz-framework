@@ -1,6 +1,6 @@
 <template>
   <!-- `components/CounterButton.vmz` auto-imported -->
-    <CounterButton initial={7} />
+    <CounterButton :initial="7" />
 </template>
 
 <script client>

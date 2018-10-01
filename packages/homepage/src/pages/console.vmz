@@ -5,7 +5,7 @@
       homeHref="/"
       title="Operations"
       navLabel="Console"
-      nav={navItems}
+      :nav="navItems"
     >
       <FilterBar label="Query">
         <Field
@@ -14,47 +14,47 @@
           descriptionId="home-console-query-desc"
           errorId="home-console-query-err"
           describedBy="home-console-query-desc"
-          value={query}
-          onInput={(e) => (query = e.target.value)}
+          :value="query"
+          @input="(e) => (query = e.target.value)"
         />
-        <Button type="button" onClick={() => this.applyFilter()}>Apply</Button>
-        <Button type="button" onClick={() => this.selectVisible()}>Select visible</Button>
+        <Button type="button" @click="() => this.applyFilter()">Apply</Button>
+        <Button type="button" @click="() => this.selectVisible()">Select visible</Button>
       </FilterBar>
 
-      <p data-vmz-fixture="console-query">query:{query}</p>
+      <p data-vmz-fixture="console-query">query:{{ query }}</p>
 
       <BulkActions
         label="Bulk actions"
-        selectedCount={selectedCount}
-        countLabel={bulkLabel}
+        :selectedCount="selectedCount"
+        :countLabel="bulkLabel"
       />
-      <Button type="button" onClick={() => (selectedCount = 0)}>Clear selection</Button>
+      <Button type="button" @click="() => (selectedCount = 0)">Clear selection</Button>
 
       <Table
-        columns={columns}
-        rows={rows}
-        hasRowAction={rowAction}
+        :columns="columns"
+        :rows="rows"
+        :hasRowAction="rowAction"
         actionTitle="Detail"
         actionLabel="Open"
-        onRowAction={(id) => this.openDetail(id)}
+        :onRowAction="(id) => this.openDetail(id)"
       />
 
       <Pagination
         label="Rows"
-        status={pageStatus}
-        prevDisabled={prevDisabled}
-        nextDisabled={nextDisabled}
-        onPrev={() => this.goPrev()}
-        onNext={() => this.goNext()}
+        :status="pageStatus"
+        :prevDisabled="prevDisabled"
+        :nextDisabled="nextDisabled"
+        :onPrev="() => this.goPrev()"
+        :onNext="() => this.goNext()"
       />
 
       <Drawer
-        open={drawerOpen}
+        :open="drawerOpen"
         title="Row detail"
         titleId="home-console-drawer-title"
-        onClose={() => (drawerOpen = false)}
+        :onClose="() => (drawerOpen = false)"
       >
-        <p data-vmz-fixture="console-drawer-body">detail:{detailId}</p>
+        <p data-vmz-fixture="console-drawer-body">detail:{{ detailId }}</p>
       </Drawer>
     </ConsoleShell>
   </div>
