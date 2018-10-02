@@ -34,7 +34,7 @@ fs.writeFileSync(b, body('B'));
 fs.writeFileSync(
     card,
     `<template>
-  <p if={ready}>{label}</p>
+  <p v-if="ready">{{ label }}</p>
 </template>
 <script client>
 import { CardServer } from '#server/components/Card';
@@ -88,7 +88,7 @@ if (!(cardUnit?.capabilities || []).includes('load')) {
     fail(`Card capabilities missing load: ${JSON.stringify(cardUnit)}`);
 }
 if (!Array.isArray(cardUnit?.regionIds) || cardUnit.regionIds.length < 1) {
-    fail(`Card regionIds expected from if={}: ${JSON.stringify(cardUnit)}`);
+    fail(`Card regionIds expected from v-if: ${JSON.stringify(cardUnit)}`);
 }
 if (!cardUnit?.serverModuleId) {
     fail(`Card serverModuleId missing: ${JSON.stringify(cardUnit)}`);

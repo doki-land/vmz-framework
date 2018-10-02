@@ -33,9 +33,9 @@ fs.writeFileSync(
 </router>
 <template>
   <div class="page">
-    <div class="loc" @click={onStore}>{store}</div>
-    <div class="deal" each={deals} as="item" key={item.id}>{item.title}</div>
-    <div if={showBanner}>banner</div>
+    <div class="loc" @click="onStore">{{ store }}</div>
+    <div class="deal" v-for="item in deals" :key="item.id">{{ item.title }}</div>
+    <div v-if="showBanner">banner</div>
   </div>
 </template>
 <style>

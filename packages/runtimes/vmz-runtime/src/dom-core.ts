@@ -453,7 +453,8 @@ export const directApi = {
         /** @type {Record<string, any>} */
         const resolved = {};
         for (const [k, v] of Object.entries(props || {})) {
-            if (typeof v === 'function' && isEventPropName(k)) resolved[k] = v;
+            const onKey = typeof v === 'function' ? eventPropHandlerName(k) : null;
+            if (onKey) resolved[onKey] = v;
             else if (typeof v === 'function') resolved[k] = v.call(hostInst);
             else resolved[k] = v;
         }
@@ -2440,8 +2441,26 @@ function wireDirectBind(inst, bindingId, deps, get, write, cf) {
     trackDirectBind(inst, liveDeps, apply, bindingId);
 }
 
+/**
+ * Vue-familiar `@click` / legacy `onClick` → canonical `onXxx` prop name.
+ * Function props that are not events are treated as getters (`v.call(host)`).
+ * @param {unknown} name
+ * @returns {string | null}
+ */
+export function eventPropHandlerName(name) {
+    if (typeof name !== 'string' || !name) return null;
+    if (/^on[A-Z]/.test(name)) return name;
+    // `@input` → `onInput`; reject `@update:modelValue` until that surface exists.
+    if (name.charAt(0) === '@' && name.length > 1 && !name.includes(':')) {
+        const ev = name.slice(1);
+        if (!ev || !/^[A-Za-z]/.test(ev)) return null;
+        return `on${ev.charAt(0).toUpperCase()}${ev.slice(1)}`;
+    }
+    return null;
+}
+
 export function isEventPropName(name) {
-    return typeof name === 'string' && /^on[A-Z]/.test(name);
+    return eventPropHandlerName(name) != null;
 }
 
 /** Monotonic id for `bindComponentProp` BindingIds (per process). */

@@ -48,7 +48,7 @@ const pagePath = path.join(dir, 'src', 'pages', 'index.vmz');
 fs.writeFileSync(
     cardPath,
     `<template>
-  <button @click={increment}>{n}</button>
+  <button @click="increment">{{ n }}</button>
 </template>
 <script client>
 export default class Card {

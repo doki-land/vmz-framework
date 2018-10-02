@@ -44,7 +44,7 @@ fs.mkdirSync(path.join(dir, 'src', 'pages'), { recursive: true });
 fs.writeFileSync(
     path.join(dir, 'src', 'components', 'Card.vmz'),
     `<template>
-  <button @click={increment}>{n}</button>
+  <button @click="increment">{{ n }}</button>
 </template>
 <script client>
 export default class Card {

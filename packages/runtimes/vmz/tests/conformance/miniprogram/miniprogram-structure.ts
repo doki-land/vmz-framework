@@ -30,9 +30,9 @@ export default class Badge {
 fs.writeFileSync(
     path.join(dir, 'src', 'pages', 'index.vmz'),
     `<template>
-  <li each={items} as="it" key={it.id}>{it.name}</li>
+  <li v-for="it in items" :key="it.id">{{ it.name }}</li>
   <Badge label={title} />
-  <div if={show}>hi</div>
+  <div v-if="show">hi</div>
 </template>
 <script client>
 import Badge from '../components/Badge.vmz';

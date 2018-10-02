@@ -42,7 +42,7 @@ fs.writeFileSync(
     path.join(dir, 'src', 'components', 'Card.vmz'),
     `<template>
   <p>{n}</p>
-  <button @click={increment}>+</button>
+  <button @click="increment">+</button>
 </template>
 <script client>
 export default class Card {

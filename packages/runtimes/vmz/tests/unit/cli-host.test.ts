@@ -169,7 +169,7 @@ export default class Application {}
         );
         fs.writeFileSync(
             path.join(dir, 'src', 'pages', 'home.vmz'),
-            `<template><view class="home"><text>{n}</text><button @click={inc}>+</button></view></template>
+            `<template><view class="home"><text>{{ n }}</text><button @click="inc">+</button></view></template>
 <style>
 .home { color: #111; }
 </style>

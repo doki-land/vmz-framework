@@ -11,10 +11,10 @@ import {
     createInstance,
     destroy,
     directApi,
+    eventPropHandlerName,
     getRegisteredComponent,
     hasMeaningfulChild,
     isEventEntryStrategy,
-    isEventPropName,
     mount,
     noteDomCreate,
     resolveComponent,
@@ -723,7 +723,8 @@ const serializeApi = {
         /** @type {Record<string, any>} */
         const resolved = {};
         for (const [k, v] of Object.entries(props || {})) {
-            if (typeof v === 'function' && isEventPropName(k)) continue;
+            const onKey = typeof v === 'function' ? eventPropHandlerName(k) : null;
+            if (onKey) continue;
             else if (typeof v === 'function') resolved[k] = v.call(hostInst);
             else resolved[k] = v;
         }

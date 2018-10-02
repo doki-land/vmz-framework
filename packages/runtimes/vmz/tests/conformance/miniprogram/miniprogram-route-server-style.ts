@@ -21,7 +21,7 @@ fs.writeFileSync(
     `<template>
   <Link to="AboutPage">go</Link>
   <p class="hello" style:tw="text-sm">{n}</p>
-  <button @click={load}>{msg}</button>
+  <button @click="load">{{ msg }}</button>
 </template>
 <script client>
 export default class IndexPage {

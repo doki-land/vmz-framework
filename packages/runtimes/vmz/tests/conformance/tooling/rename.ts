@@ -50,7 +50,7 @@ fs.writeFileSync(
 </router>
 <template>
   <Link to="home" />
-  <p if={label}>{label}</p>
+  <p v-if="label">{{ label }}</p>
 </template>
 <script client>
 export default class Index {

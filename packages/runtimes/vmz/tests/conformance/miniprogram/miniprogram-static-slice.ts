@@ -24,7 +24,7 @@ fs.writeFileSync(
     path.join(dir, 'src', 'pages', 'index.vmz'),
     `<template>
   <p>hello</p>
-  <button @click={increment}>{n}</button>
+  <button @click="increment">{{ n }}</button>
 </template>
 <script client>
 export default class IndexPage {
