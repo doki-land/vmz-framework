@@ -1,8 +1,12 @@
 <template>
   <div class="vmz-ui-collapse" data-vmz-ui="collapse">
-    <details v-for="item in items" :key="item.id">
-      <summary>{{ item.title }}</summary>
-      <div class="vmz-ui-collapse__body">{{ item.body }}</div>
+    <details
+      v-for="item in items"
+      :key="item.id"
+      :data-vmz-collapse-item="item.id"
+    >
+      <summary :data-vmz-collapse-trigger="item.id">{{ item.title }}</summary>
+      <div class="vmz-ui-collapse__body" :data-vmz-collapse-body="item.id">{{ item.body }}</div>
     </details>
   </div>
 </template>

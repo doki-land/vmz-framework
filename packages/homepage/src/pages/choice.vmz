@@ -1,0 +1,81 @@
+<template>
+  <div data-vmz-fixture="choice">
+    <AppShell brand="VMZ" homeHref="/" navLabel="Choice" :nav="navItems">
+      <Alert
+        tone="info"
+        roleName="status"
+        title="Choice / disclosure"
+        description="Segmented / Dropdown / Collapse / Tag — Chrome automation covers pick, open, expand."
+      />
+
+      <p data-vmz-fixture="choice-state">segment:{{ segment }}</p>
+
+      <Card title="Segmented" description="Parent owns value via onChange.">
+        <Segmented
+          label="Density"
+          :value="segment"
+          :options="segmentOptions"
+          :onChange="(v) => this.onSegment(v)"
+        />
+      </Card>
+
+      <Card title="Dropdown" description="Native details disclosure.">
+        <Dropdown label="Actions" :items="dropdownItems" />
+      </Card>
+
+      <Card title="Collapse" description="Independent details panels.">
+        <Collapse :items="collapseItems" />
+      </Card>
+
+      <Card title="Tag" description="Status chip surface.">
+        <div data-vmz-fixture="choice-tags">
+          <Tag>Default</Tag>
+          <Tag status="success">Ready</Tag>
+          <Tag status="warning">Review</Tag>
+          <Tag status="error">Blocked</Tag>
+        </div>
+      </Card>
+    </AppShell>
+  </div>
+</template>
+
+<style>
+[data-vmz-fixture="choice-tags"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+</style>
+
+<script client>
+export default class ChoicePage {
+  segment = 'comfortable';
+
+  navItems = [
+    { id: 'choice', title: 'Choice', href: '/choice' },
+    { id: 'structure', title: 'Structure', href: '/structure' },
+    { id: 'ui', title: 'UI', href: '/ui' },
+  ];
+
+  segmentOptions = [
+    { value: 'comfortable', label: 'Comfortable' },
+    { value: 'compact', label: 'Compact' },
+    { value: 'dense', label: 'Dense' },
+  ];
+
+  dropdownItems = [
+    { id: 'edit', title: 'Edit', href: '#edit' },
+    { id: 'share', title: 'Share', href: '#share' },
+    { id: 'archive', title: 'Archive', href: '#archive' },
+  ];
+
+  collapseItems = [
+    { id: 'alpha', title: 'Alpha', body: 'Alpha panel body for automation.' },
+    { id: 'beta', title: 'Beta', body: 'Beta panel body for automation.' },
+  ];
+
+  onSegment(v) {
+    this.segment = v;
+  }
+}
+</script>

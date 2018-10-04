@@ -22,8 +22,26 @@ import { serveHostChildEnv, serveHostProjectEnv } from '../_lib/serve-host-env.t
 const root = repoRoot(import.meta.url);
 const uiRoot = path.join(root, 'packages', 'ui', 'vmz-ui');
 const homepage = path.join(root, 'packages', 'homepage');
+/** Nested delivery under `profiles.*.name` (builtin default `web-ssr`). */
+const HOME_DIST = path.join(homepage, 'dist', 'web-ssr');
 const DIAG_UNKNOWN = 'vmz::style::unknown_design_token';
 const SCHEMA = 'vmz.ui.token_requirements.v0';
+
+function walkFind(dir, name) {
+    if (!fs.existsSync(dir)) return null;
+    const stack = [dir];
+    while (stack.length) {
+        const cur = stack.pop();
+        for (const ent of fs.readdirSync(cur, { withFileTypes: true })) {
+            const p = path.join(cur, ent.name);
+            if (ent.isDirectory()) {
+                if (ent.name === 'node_modules' || ent.name === 'vendor') continue;
+                stack.push(p);
+            } else if (ent.name === name) return p;
+        }
+    }
+    return null;
+}
 
 function fail(msg) {
     console.error(`ui-automation GATE FAIL: ${msg}`);
@@ -133,7 +151,9 @@ if (!fs.existsSync(homeDensity)) fail('homepage missing designs/tokens/semantic-
 if (!fs.existsSync(homeBrand)) fail('homepage missing designs/tokens/brand.json');
 const homeBuild = runBuild(homepage);
 if (homeBuild.status !== 0) fail(`homepage build failed\n${homeBuild.out}`);
-const designsCss = fs.readFileSync(path.join(homepage, 'dist', 'vmz-designs.css'), 'utf8');
+const designsCssPath = path.join(HOME_DIST, 'vmz-designs.css');
+if (!fs.existsSync(designsCssPath)) fail(`homepage missing ${path.relative(root, designsCssPath)}`);
+const designsCss = fs.readFileSync(designsCssPath, 'utf8');
 for (const tok of button.tokens) {
     const cssVar = dottedToCssVar(tok);
     if (!designsCss.includes(`${cssVar}:`)) {
@@ -149,10 +169,8 @@ console.log('ui-automation: homepage fixture discovers Button from @vmz/ui…');
     }
     const indexVmz = fs.readFileSync(path.join(homepage, 'src', 'pages', 'index.vmz'), 'utf8');
     if (!indexVmz.includes('<Button')) fail('homepage index must compose <Button>');
-    const buttonDirect = path.join(homepage, 'dist', 'Button.client.js');
-    const buttonNested = path.join(homepage, 'dist', 'components', 'Button.client.js');
-    if (!fs.existsSync(buttonDirect) && !fs.existsSync(buttonNested)) {
-        fail('homepage build must emit Button.client.js from @vmz/ui');
+    if (!walkFind(HOME_DIST, 'Button.client.js')) {
+        fail('homepage build must emit Button.client.js from @vmz/ui under dist/web-ssr');
     }
 }
 
@@ -262,7 +280,7 @@ console.log('ui-automation: ok (UI0 contract)');
 console.log('ui-automation: UI1 Field/Dialog focus+overlay browser…');
 await proveUi1FocusOverlay();
 console.log(
-    'ui-automation: UI1+UI2+Commercial+Form+Console+Motion+UI4+UI5+Document/Product+UI6+Structure+Stacking+DataTable+documents/panel-density PASS',
+    'ui-automation: UI1+UI2+Commercial+Form+Console+Motion+UI4+UI5+Document/Product+UI6+Structure+Choice+Stacking+DataTable+documents/panel-density PASS',
 );
 
 async function proveUi1FocusOverlay() {
@@ -272,9 +290,9 @@ async function proveUi1FocusOverlay() {
 
     const homeBuild = runBuild(homepage);
     if (homeBuild.status !== 0) fail(`homepage rebuild for UI1 failed\n${homeBuild.out}`);
-    const dist = path.join(homepage, 'dist');
+    const dist = HOME_DIST;
     const hostJs = path.join(dist, 'vmz-serve-host.mjs');
-    if (!fs.existsSync(hostJs)) fail('homepage missing vmz-serve-host.mjs');
+    if (!fs.existsSync(hostJs)) fail('homepage missing dist/web-ssr/vmz-serve-host.mjs');
 
     const requireFromTest = createRequire(path.join(root, 'packages', 'runtimes', 'vmz-test', 'package.json'));
     let puppeteer;
@@ -325,6 +343,12 @@ async function proveUi1FocusOverlay() {
             });
         });
 
+        // Warm first SSR compile before Puppeteer navigation (cold /ui can exceed 20s).
+        {
+            const warm = await fetch(`http://127.0.0.1:${PORT}/ui`);
+            if (!warm.ok) fail(`UI1 warm GET /ui failed: ${warm.status}`);
+        }
+
         // Sanity: live prop binder present in page emit.
         const uiClient = fs.readFileSync(path.join(dist, 'pages', 'ui.client.js'), 'utf8');
         if (!uiClient.includes('bindComponentProp')) {
@@ -338,9 +362,9 @@ async function proveUi1FocusOverlay() {
         });
         try {
             const page = await browser.newPage();
-            page.setDefaultTimeout(20000);
-            await page.goto(`http://127.0.0.1:${PORT}/ui`, { waitUntil: 'networkidle0', timeout: 20000 });
-            await page.waitForSelector('#home-ui-name', { timeout: 10000 });
+            page.setDefaultTimeout(30000);
+            await page.goto(`http://127.0.0.1:${PORT}/ui`, { waitUntil: 'networkidle0', timeout: 60000 });
+            await page.waitForSelector('#home-ui-name', { timeout: 15000 });
             const pageProbe = await page.evaluate(() => ({
                 title: document.title,
                 buttons: [...document.querySelectorAll('button')].map((b) => (b.textContent || '').trim()),
@@ -718,7 +742,7 @@ async function proveCommercialComposition(page) {
     const commercialSrc = path.join(homepage, 'src', 'pages', 'commercial.vmz');
     if (!fs.existsSync(commercialSrc)) fail('homepage missing src/pages/commercial.vmz');
 
-    await page.goto(`http://127.0.0.1:18781/commercial`, { waitUntil: 'networkidle0', timeout: 20000 });
+    await page.goto(`http://127.0.0.1:18781/commercial`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="commercial"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
@@ -836,20 +860,23 @@ async function proveFormDepth(page) {
     if (!/destination="client"/.test(formSrcText) || !/destination="object"/.test(formSrcText)) {
         fail('Form depth: form.vmz must compose Upload destination=client and destination=object');
     }
-    if (!/onPresign=\{\(file\) => this\.presignObject\(file\)\}/.test(formSrcText) || !/\/api\/form\/presign/.test(formSrcText)) {
+    if (
+        !/:onPresign="\(file\) => this\.presignObject\(file\)"/.test(formSrcText) ||
+        !/\/api\/form\/presign/.test(formSrcText)
+    ) {
         fail('Form depth: form.vmz must bind Upload onPresign via #server /api/form/presign');
     }
-    if (!/onValue=\{/.test(formSrcText)) {
+    if (!/:onValue="/.test(formSrcText)) {
         fail('Form depth: form.vmz must bind Upload onValue (result ownership)');
     }
-    if (!/chunkSize=\{8\}/.test(formSrcText) || !/action="\/api\/form\/resumable"/.test(formSrcText)) {
+    if (!/:chunkSize="8"/.test(formSrcText) || !/action="\/api\/form\/resumable"/.test(formSrcText)) {
         fail('Form depth: form.vmz must compose Upload chunkSize + /api/form/resumable');
     }
     if (!/\/api\/form\/resumable\/init/.test(formSrcText) || !/\/api\/form\/resumable\/chunk/.test(formSrcText)) {
         fail('Form depth: form.vmz #server must expose resumable init/chunk routes');
     }
 
-    await page.goto(`http://127.0.0.1:18781/form`, { waitUntil: 'networkidle0', timeout: 20000 });
+    await page.goto(`http://127.0.0.1:18781/form`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="form"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
@@ -1228,7 +1255,7 @@ async function proveFormDepth(page) {
     await proveUploadDestinations(page);
 
     // Commercial Form shell still opens Dialog on valid email.
-    await page.goto(`http://127.0.0.1:18781/commercial`, { waitUntil: 'networkidle0', timeout: 20000 });
+    await page.goto(`http://127.0.0.1:18781/commercial`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-ui="form"]', { timeout: 10000 });
     const commercialForm = await page.evaluate(() => !!document.querySelector('[data-vmz-fixture="commercial"] [data-vmz-ui="form"]'));
     if (!commercialForm) fail('Form depth: commercial Contact must use Form shell');
@@ -1662,7 +1689,7 @@ async function proveConsoleComposition(page) {
     const consoleSrc = path.join(homepage, 'src', 'pages', 'console.vmz');
     if (!fs.existsSync(consoleSrc)) fail('homepage missing src/pages/console.vmz');
 
-    await page.goto(`http://127.0.0.1:18781/console`, { waitUntil: 'networkidle0', timeout: 20000 });
+    await page.goto(`http://127.0.0.1:18781/console`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="console"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
@@ -1796,7 +1823,7 @@ async function proveMotionContinuity(page) {
     }
     if (!buttonSrc.includes('data-vmz-motion="control"')) fail('Button must mark control motion');
 
-    await page.goto(`http://127.0.0.1:18781/motion`, { waitUntil: 'networkidle0', timeout: 20000 });
+    await page.goto(`http://127.0.0.1:18781/motion`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="motion"]', { timeout: 10000 });
     await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
 
@@ -2091,7 +2118,7 @@ async function proveUi4Surface(page) {
     const ui4Src = path.join(homepage, 'src', 'pages', 'ui4.vmz');
     if (!fs.existsSync(ui4Src)) fail('homepage missing src/pages/ui4.vmz');
 
-    await page.goto(`http://127.0.0.1:18781/ui4`, { waitUntil: 'networkidle0', timeout: 20000 });
+    await page.goto(`http://127.0.0.1:18781/ui4`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="ui4"]', { timeout: 10000 });
 
     const tones = await page.evaluate(() => {
@@ -2207,7 +2234,7 @@ async function proveUi5Console(page) {
     const ui5Src = path.join(homepage, 'src', 'pages', 'ui5.vmz');
     if (!fs.existsSync(ui5Src)) fail('homepage missing src/pages/ui5.vmz');
 
-    await page.goto(`http://127.0.0.1:18781/ui5`, { waitUntil: 'networkidle0', timeout: 20000 });
+    await page.goto(`http://127.0.0.1:18781/ui5`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="ui5"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
@@ -2315,7 +2342,7 @@ async function proveDocumentProduct(page) {
     const productSrc = path.join(homepage, 'src', 'pages', 'product.vmz');
     if (!fs.existsSync(productSrc)) fail('homepage missing src/pages/product.vmz');
 
-    await page.goto(`http://127.0.0.1:18781/product`, { waitUntil: 'networkidle0', timeout: 20000 });
+    await page.goto(`http://127.0.0.1:18781/product`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="product"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
@@ -2393,7 +2420,7 @@ async function proveDocumentProduct(page) {
     );
 
     // Document surface shares UI6 density/RTL activation (not a parallel theme).
-    await page.goto(`http://127.0.0.1:18781/product`, { waitUntil: 'networkidle0', timeout: 20000 });
+    await page.goto(`http://127.0.0.1:18781/product`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="product"]', { timeout: 10000 });
 
     const productDensity = await page.evaluate(() => {
@@ -2510,7 +2537,10 @@ async function proveDocumentProduct(page) {
     }
 
     const chromeCss = fs.readFileSync(path.join(homepage, 'designs', 'document', 'chrome.css'), 'utf8');
-    if (!chromeCss.includes('var(--vmz-density-control-padding-y') || !chromeCss.includes("data-density='dense'")) {
+    if (
+        !chromeCss.includes('var(--vmz-density-control-padding-y') ||
+        (!chromeCss.includes("data-density='dense'") && !chromeCss.includes('data-density="dense"'))
+    ) {
         fail('Document chrome.css must consume density tokens + dense activation');
     }
 
@@ -2561,7 +2591,7 @@ async function proveUi6DensityRtlPreset(page) {
     const ui6Src = path.join(homepage, 'src', 'pages', 'ui6.vmz');
     if (!fs.existsSync(ui6Src)) fail('homepage missing src/pages/ui6.vmz');
 
-    await page.goto(`http://127.0.0.1:18781/ui6`, { waitUntil: 'networkidle0', timeout: 20000 });
+    await page.goto(`http://127.0.0.1:18781/ui6`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="ui6"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
@@ -2732,7 +2762,7 @@ async function proveStructureComposition(page) {
     const structureSrc = path.join(homepage, 'src', 'pages', 'structure.vmz');
     if (!fs.existsSync(structureSrc)) fail('homepage missing src/pages/structure.vmz');
 
-    await page.goto(`http://127.0.0.1:18781/structure`, { waitUntil: 'networkidle0', timeout: 20000 });
+    await page.goto(`http://127.0.0.1:18781/structure`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="structure"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
@@ -2836,6 +2866,117 @@ async function proveStructureComposition(page) {
     );
 
     console.log('ui-automation: Structure composition PASS');
+    await proveChoiceDisclosure(page);
+}
+
+/**
+ * Choice / disclosure — Segmented / Dropdown / Collapse / Tag.
+ * @param {import('puppeteer-core').Page} page
+ */
+async function proveChoiceDisclosure(page) {
+    console.log('ui-automation: Choice Segmented/Dropdown/Collapse/Tag…');
+
+    for (const name of ['Segmented', 'Dropdown', 'Collapse', 'Tag']) {
+        const src = path.join(uiRoot, 'src', 'components', `${name}.vmz`);
+        if (!fs.existsSync(src)) fail(`Choice missing ${name}.vmz`);
+        if (!pkg.exports?.[`./${name}`]) fail(`Choice package exports must include ./${name}`);
+        if (!contract.components?.[name]) fail(`Choice token contract missing ${name}`);
+    }
+
+    const choiceSrc = path.join(homepage, 'src', 'pages', 'choice.vmz');
+    if (!fs.existsSync(choiceSrc)) fail('homepage missing src/pages/choice.vmz');
+
+    await page.goto(`http://127.0.0.1:18781/choice`, { waitUntil: 'networkidle0', timeout: 60000 });
+    await page.waitForSelector('[data-vmz-fixture="choice"]', { timeout: 10000 });
+
+    const markers = await page.evaluate(() => ({
+        segmented: !!document.querySelector('[data-vmz-ui="segmented"]'),
+        dropdown: !!document.querySelector('[data-vmz-ui="dropdown"]'),
+        collapse: !!document.querySelector('[data-vmz-ui="collapse"]'),
+        tag: !!document.querySelector('[data-vmz-ui="tag"]'),
+        segmentPressed:
+            document.querySelector('[data-vmz-segment="comfortable"]')?.getAttribute('aria-pressed') || '',
+        tagSuccess: !!document.querySelector('[data-vmz-ui="tag"][data-vmz-tag-status="success"]'),
+        tagError: !!document.querySelector('[data-vmz-ui="tag"][data-vmz-tag-status="error"]'),
+        state: document.querySelector('[data-vmz-fixture="choice-state"]')?.textContent || '',
+    }));
+    if (!markers.segmented || !markers.dropdown || !markers.collapse || !markers.tag) {
+        fail(`Choice: markers missing: ${JSON.stringify(markers)}`);
+    }
+    if (markers.segmentPressed !== 'true') fail(`Choice: comfortable should start pressed, got ${markers.segmentPressed}`);
+    if (!markers.tagSuccess || !markers.tagError) fail(`Choice: Tag status markers missing: ${JSON.stringify(markers)}`);
+    if (!markers.state.includes('segment:comfortable')) fail(`Choice: state marker incomplete: ${markers.state}`);
+
+    // Segmented parent-owned value.
+    await page.click('[data-vmz-segment="compact"]');
+    await page.waitForFunction(
+        () =>
+            document.querySelector('[data-vmz-segment="compact"]')?.getAttribute('aria-pressed') === 'true' &&
+            document.querySelector('[data-vmz-segment="comfortable"]')?.getAttribute('aria-pressed') === 'false' &&
+            document.querySelector('[data-vmz-fixture="choice-state"]')?.textContent?.includes('segment:compact'),
+        { timeout: 5000 },
+    );
+
+    // Dropdown native details open + menu items.
+    const dropdownClosed = await page.evaluate(() => {
+        const d = document.querySelector('[data-vmz-ui="dropdown"]');
+        return d instanceof HTMLDetailsElement ? !d.open : true;
+    });
+    if (!dropdownClosed) fail('Choice: Dropdown should start closed');
+    await page.click('[data-vmz-dropdown-trigger]');
+    await page.waitForFunction(
+        () => {
+            const d = document.querySelector('[data-vmz-ui="dropdown"]');
+            return (
+                d instanceof HTMLDetailsElement &&
+                d.open &&
+                !!document.querySelector('[data-vmz-dropdown-menu]') &&
+                !!document.querySelector('[data-vmz-dropdown-item="share"]')
+            );
+        },
+        { timeout: 5000 },
+    );
+    await page.click('[data-vmz-dropdown-trigger]');
+    await page.waitForFunction(
+        () => {
+            const d = document.querySelector('[data-vmz-ui="dropdown"]');
+            return d instanceof HTMLDetailsElement && !d.open;
+        },
+        { timeout: 5000 },
+    );
+
+    // Collapse independent panels.
+    await page.click('[data-vmz-collapse-trigger="alpha"]');
+    await page.waitForFunction(
+        () => {
+            const alpha = document.querySelector('[data-vmz-collapse-item="alpha"]');
+            const beta = document.querySelector('[data-vmz-collapse-item="beta"]');
+            return (
+                alpha instanceof HTMLDetailsElement &&
+                alpha.open &&
+                !!document.querySelector('[data-vmz-collapse-body="alpha"]') &&
+                beta instanceof HTMLDetailsElement &&
+                !beta.open
+            );
+        },
+        { timeout: 5000 },
+    );
+    await page.click('[data-vmz-collapse-trigger="beta"]');
+    await page.waitForFunction(
+        () => {
+            const alpha = document.querySelector('[data-vmz-collapse-item="alpha"]');
+            const beta = document.querySelector('[data-vmz-collapse-item="beta"]');
+            return (
+                alpha instanceof HTMLDetailsElement &&
+                alpha.open &&
+                beta instanceof HTMLDetailsElement &&
+                beta.open
+            );
+        },
+        { timeout: 5000 },
+    );
+
+    console.log('ui-automation: Choice disclosure PASS');
     await proveOverlayStacking(page);
 }
 
@@ -2856,7 +2997,7 @@ async function proveOverlayStacking(page) {
     const stackingSrc = path.join(homepage, 'src', 'pages', 'stacking.vmz');
     if (!fs.existsSync(stackingSrc)) fail('homepage missing src/pages/stacking.vmz');
 
-    await page.goto(`http://127.0.0.1:18781/stacking`, { waitUntil: 'networkidle0', timeout: 20000 });
+    await page.goto(`http://127.0.0.1:18781/stacking`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="stacking"]', { timeout: 10000 });
 
     // Programmatic .click() — overlays cover page chrome; CDP mouse would hit backdrop.
@@ -2991,7 +3132,7 @@ async function proveDataTable(page) {
     const pageSrc = path.join(homepage, 'src', 'pages', 'datatable.vmz');
     if (!fs.existsSync(pageSrc)) fail('homepage missing src/pages/datatable.vmz');
 
-    await page.goto(`http://127.0.0.1:18781/datatable`, { waitUntil: 'networkidle0', timeout: 20000 });
+    await page.goto(`http://127.0.0.1:18781/datatable`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="datatable"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => {
@@ -3077,7 +3218,10 @@ async function proveDocumentsPanelDensity(page) {
         }
     }
     const docCss = fs.readFileSync(path.join(docsFixture, 'designs', 'styles', 'document.css'), 'utf8');
-    if (!docCss.includes('var(--vmz-density-control-padding-y') || !docCss.includes("data-density='dense'")) {
+    if (
+        !docCss.includes('var(--vmz-density-control-padding-y') ||
+        (!docCss.includes("data-density='dense'") && !docCss.includes('data-density="dense"'))
+    ) {
         fail('documents-fixture document.css must consume density tokens + dense activation');
     }
 
@@ -3088,24 +3232,29 @@ async function proveDocumentsPanelDensity(page) {
     for (const tag of ['AppShell', 'Field', 'Dialog', 'Button']) {
         if (!inspVmz.includes(`<${tag}`)) fail(`production-inspector must compose <${tag}>`);
     }
-    if (!inspVmz.includes('data-density') || !inspVmz.includes('dir={dir}')) {
+    if (
+        !inspVmz.includes('data-density') ||
+        (!inspVmz.includes(':dir="dir"') && !inspVmz.includes("dir={dir}") && !inspVmz.includes(':dir={dir}'))
+    ) {
         fail('production-inspector must bind data-density and dir');
     }
 
     const inspBuild = runBuild(inspector);
     if (inspBuild.status !== 0) fail(`production-inspector build failed\n${inspBuild.out}`);
-    const inspDist = path.join(inspector, 'dist');
-    const inspDesigns = fs.readFileSync(path.join(inspDist, 'vmz-designs.css'), 'utf8');
+    const inspDist = path.join(inspector, 'dist', 'web-ssr');
+    const inspDesignsPath = path.join(inspDist, 'vmz-designs.css');
+    if (!fs.existsSync(inspDesignsPath)) fail('production-inspector missing dist/web-ssr/vmz-designs.css');
+    const inspDesigns = fs.readFileSync(inspDesignsPath, 'utf8');
     for (const v of ['--vmz-density-control-padding-y:', '--vmz-density-compact-padding-y:', '--vmz-density-dense-padding-y:']) {
         if (!inspDesigns.includes(v)) fail(`production-inspector vmz-designs.css missing ${v}`);
     }
     const hostJs = path.join(inspDist, 'vmz-serve-host.mjs');
-    if (!fs.existsSync(hostJs)) fail('production-inspector missing vmz-serve-host.mjs');
+    if (!fs.existsSync(hostJs)) fail('production-inspector missing dist/web-ssr/vmz-serve-host.mjs');
 
     const PORT = 18782;
     const child = spawn(process.execPath, [hostJs], {
         cwd: inspDist,
-        env: { ...process.env, VMZ_DIST: inspDist, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(PORT) },
+        env: serveHostProjectEnv(inspector, { VMZ_DIST: inspDist, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(PORT) }),
         stdio: ['ignore', 'pipe', 'pipe'],
     });
     const kill = () => {
@@ -3133,7 +3282,7 @@ async function proveDocumentsPanelDensity(page) {
             });
         });
 
-        await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'networkidle0', timeout: 20000 });
+        await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'networkidle0', timeout: 60000 });
         await page.waitForSelector('[data-vmz-fixture="inspector"]', { timeout: 10000 });
 
         const markers = await page.evaluate(() => {

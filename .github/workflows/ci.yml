@@ -141,3 +141,11 @@ jobs:
           PUPPETEER_EXECUTABLE_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
           CI: 'true'
         run: pnpm --filter @vmz-examples/fullstack run test
+
+      - name: UI automation (Chrome)
+        env:
+          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          VMZ_BROWSER: ${{ steps.setup-chrome.outputs.chrome-path }}
+          PUPPETEER_EXECUTABLE_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          CI: 'true'
+        run: pnpm verify -- ui-automation

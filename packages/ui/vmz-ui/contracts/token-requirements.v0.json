@@ -639,6 +639,62 @@
             ],
             "surfaces": ["WebSurface"],
             "contracts": ["hierarchy-rows", "parent-owned-expand", "parent-owned-selection", "keyboard-nav"]
+        },
+        "Segmented": {
+            "source": "src/components/Segmented.vmz",
+            "stableHint": "ui.Segmented",
+            "tokens": [
+                "surface.mist",
+                "surface.paper",
+                "text.steel",
+                "text.ink",
+                "focus.ring"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["parent-owned-value", "segment-press"]
+        },
+        "Dropdown": {
+            "source": "src/components/Dropdown.vmz",
+            "stableHint": "ui.Dropdown",
+            "tokens": [
+                "line.default",
+                "surface.paper",
+                "surface.mist",
+                "text.ink",
+                "shadow.popup"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["native-details-disclosure", "menu-links"]
+        },
+        "Collapse": {
+            "source": "src/components/Collapse.vmz",
+            "stableHint": "ui.Collapse",
+            "tokens": [
+                "line.default",
+                "surface.paper",
+                "surface.mist",
+                "text.steel"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["native-details-panels", "independent-open"]
+        },
+        "Tag": {
+            "source": "src/components/Tag.vmz",
+            "stableHint": "ui.Tag",
+            "tokens": [
+                "line.default",
+                "surface.mist",
+                "surface.paper",
+                "text.steel",
+                "status.success.accent",
+                "status.success.foreground",
+                "status.warning.accent",
+                "status.warning.foreground",
+                "status.danger.accent",
+                "status.danger.foreground"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["status-chip", "display-only"]
         }
     }
 }

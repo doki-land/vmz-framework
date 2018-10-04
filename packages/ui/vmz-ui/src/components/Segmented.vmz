@@ -4,8 +4,9 @@
       v-for="opt in options"
       :key="opt.value"
       type="button"
+      :data-vmz-segment="opt.value"
       :aria-pressed="opt.value === value ? 'true' : 'false'"
-      @click="() => onPick(opt.value)"
+      @click="() => this.onPick(opt.value)"
     >{{ opt.label }}</button>
   </div>
 </template>

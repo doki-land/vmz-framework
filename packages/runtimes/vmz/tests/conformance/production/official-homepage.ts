@@ -216,7 +216,7 @@ if (homeBuild.status !== 0) {
                 errors.push(`homepage /ui6 must compose <${tag}>`);
             }
         }
-        if (!ui6Vmz.includes('data-density') || !ui6Vmz.includes('dir={dir}')) {
+        if (!ui6Vmz.includes('data-density') || (!ui6Vmz.includes(':dir="dir"') && !ui6Vmz.includes('dir={dir}'))) {
             errors.push('homepage /ui6 must bind data-density and dir');
         }
     }
@@ -233,6 +233,16 @@ if (homeBuild.status !== 0) {
         for (const tag of ['Accordion', 'Steps', 'List', 'Tree', 'AppShell', 'Card']) {
             if (!structureVmz.includes(`<${tag}`)) {
                 errors.push(`homepage /structure must compose <${tag}>`);
+            }
+        }
+    }
+    if (!existsRel(HOMEPAGE, 'src', 'pages', 'choice.vmz')) {
+        errors.push('homepage missing /choice Segmented/Dropdown/Collapse/Tag page');
+    } else {
+        const choiceVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/choice.vmz'), 'utf8');
+        for (const tag of ['Segmented', 'Dropdown', 'Collapse', 'Tag', 'AppShell', 'Card']) {
+            if (!choiceVmz.includes(`<${tag}`)) {
+                errors.push(`homepage /choice must compose <${tag}>`);
             }
         }
     }
@@ -268,7 +278,7 @@ if (homeBuild.status !== 0) {
                 errors.push(`homepage /product must compose <${tag}>`);
             }
         }
-        if (!productVmz.includes('data-density') || !productVmz.includes('dir={dir}')) {
+        if (!productVmz.includes('data-density') || (!productVmz.includes(':dir="dir"') && !productVmz.includes('dir={dir}'))) {
             errors.push('homepage /product must bind data-density and dir');
         }
     }
@@ -320,6 +330,7 @@ if (homeBuild.status === 0) {
             const ui5Page = await get(`http://127.0.0.1:${PORT}/ui5`);
             const ui6Page = await get(`http://127.0.0.1:${PORT}/ui6`);
             const structurePage = await get(`http://127.0.0.1:${PORT}/structure`);
+            const choicePage = await get(`http://127.0.0.1:${PORT}/choice`);
             const stackingPage = await get(`http://127.0.0.1:${PORT}/stacking`);
             const datatablePage = await get(`http://127.0.0.1:${PORT}/datatable`);
             const productPage = await get(`http://127.0.0.1:${PORT}/product`);
@@ -383,6 +394,15 @@ if (homeBuild.status === 0) {
                 !structurePage.body.includes('data-vmz-ui="tree"')
             ) {
                 homeSsrDetail = 'GET /structure missing Accordion/Steps/List/Tree markers';
+            } else if (choicePage.status !== 200 || !choicePage.body.includes('data-vmz-fixture="choice"')) {
+                homeSsrDetail = `GET /choice ${choicePage.status} missing choice fixture`;
+            } else if (
+                !choicePage.body.includes('data-vmz-ui="segmented"') ||
+                !choicePage.body.includes('data-vmz-ui="dropdown"') ||
+                !choicePage.body.includes('data-vmz-ui="collapse"') ||
+                !choicePage.body.includes('data-vmz-ui="tag"')
+            ) {
+                homeSsrDetail = 'GET /choice missing Segmented/Dropdown/Collapse/Tag markers';
             } else if (stackingPage.status !== 200 || !stackingPage.body.includes('data-vmz-fixture="stacking"')) {
                 homeSsrDetail = `GET /stacking ${stackingPage.status} missing data-vmz-fixture="stacking"`;
             } else if (!stackingPage.body.includes('Open drawer (stack 0)')) {
@@ -402,7 +422,7 @@ if (homeBuild.status === 0) {
             } else {
                 homeSsrOk = true;
                 homeSsrDetail =
-                    'SSR / + /ui + /commercial + /form + /console + /motion + /ui4 + /ui5 + /ui6 + /structure + /stacking + /datatable + /product';
+                    'SSR / + /ui + /commercial + /form + /console + /motion + /ui4 + /ui5 + /ui6 + /structure + /choice + /stacking + /datatable + /product';
             }
 
             if (homeSsrOk) {
@@ -519,7 +539,11 @@ if (inspBuild.status !== 0) {
         const src = fs.readFileSync(path.join(root, INSPECTOR, 'src/pages/index.vmz'), 'utf8');
         if (!src.includes('data-vmz-fixture') && !page.includes('data-vmz-fixture')) {
             inspDetail = 'inspector page missing data-vmz-fixture markers';
-        } else if (!src.includes('<AppShell') || !src.includes('data-density') || !src.includes('dir={dir}')) {
+        } else if (
+            !src.includes('<AppShell') ||
+            !src.includes('data-density') ||
+            (!src.includes(':dir="dir"') && !src.includes('dir={dir}'))
+        ) {
             inspDetail = 'inspector must compose AppShell + density/dir';
         } else {
             const designsCss = path.join(inspBuild.dist, 'vmz-designs.css');
@@ -594,7 +618,7 @@ if (errors.length) fail(errors.join('\n'));
 console.log('official-homepage PASS: homepage SSR + LocaleTransition + documents + inspector + @vmz/ui Field/Dialog');
 console.log('official-homepage NOTE: sibling vmz-panel / @vmz/ui-data-grid deep / network upload / UI7 browser-timing still open');
 console.log(
-    'official-homepage NOTE: UI1–UI6 + Form depth + Structure + Stacking + DataTable + documents/panel density + Commercial/Console/Motion browser proof lives in `pnpm verify -- ui-automation`; Motion IR depth + UI7 pack in `pnpm verify -- ui7`; DataGrid thin gate in `pnpm verify -- ui-data-grid`',
+    'official-homepage NOTE: UI1–UI6 + Form depth + Structure + Choice + Stacking + DataTable + documents/panel density + Commercial/Console/Motion browser proof lives in `pnpm verify -- ui-automation`; Motion IR depth + UI7 pack in `pnpm verify -- ui7`; DataGrid thin gate in `pnpm verify -- ui-data-grid`',
 );
 
 function walkFind(dir: string, fileName: string): string | null {

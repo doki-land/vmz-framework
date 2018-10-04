@@ -1,8 +1,13 @@
 <template>
   <details class="vmz-ui-dropdown" data-vmz-ui="dropdown">
-    <summary>{{ label }}</summary>
-    <div class="vmz-ui-dropdown__menu">
-      <a v-for="item in items" :key="item.id" :href="item.href">{{ item.title }}</a>
+    <summary data-vmz-dropdown-trigger="1">{{ label }}</summary>
+    <div class="vmz-ui-dropdown__menu" data-vmz-dropdown-menu="1">
+      <a
+        v-for="item in items"
+        :key="item.id"
+        :href="item.href"
+        :data-vmz-dropdown-item="item.id"
+      >{{ item.title }}</a>
     </div>
   </details>
 </template>
