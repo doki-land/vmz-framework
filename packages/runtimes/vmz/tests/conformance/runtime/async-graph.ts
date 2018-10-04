@@ -1,6 +1,6 @@
 /**
  * AsyncTask graph: compiler lifts async effects to __vmzRunTask;
- * program.json carries async_task + spawns/cancels; destroy cancels compiled path.
+ * program.json carries async-task + spawns/cancels; destroy cancels compiled path.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -38,9 +38,10 @@ if (!/from\s+['"].*vmz-dom/.test(clientJs)) {
 const program = JSON.parse(fs.readFileSync(path.join(dist, 'components', 'CounterButton.program.json'), 'utf8'));
 const unit = (program.units || [])[0] || program;
 const resources = unit.resource?.resources || unit.resources || [];
-const task = resources.find((r) => r.kind === 'async_task' && r.name === 'softLoad');
+// Wire kind is Rust enum kebab-case (`async-task`), not snake_case.
+const task = resources.find((r) => r.kind === 'async-task' && r.name === 'softLoad');
 if (!task) {
-    fail(`program.json missing async_task softLoad: ${JSON.stringify(resources)}`);
+    fail(`program.json missing async-task softLoad: ${JSON.stringify(resources)}`);
 }
 const edges = unit.graph?.edges || [];
 const hasSpawns = edges.some((e) => e.kind === 'spawns' && String(e.from).includes('softLoad') && String(e.to).startsWith('task:'));
@@ -83,4 +84,4 @@ if (dom.__vmzTaskStatus(inst2, 'softLoad') !== 'success') {
 if (inst2.count !== 7) fail(`newer softLoad should set count=7, got ${inst2.count}`);
 
 console.log('-ASYNC-GRAPH GATE PASS');
-console.log(' emit __vmzRunTask + program async_task/spawns/cancels + destroy cancel');
+console.log(' emit __vmzRunTask + program async-task/spawns/cancels + destroy cancel');

@@ -860,10 +860,7 @@ async function proveFormDepth(page) {
     if (!/destination="client"/.test(formSrcText) || !/destination="object"/.test(formSrcText)) {
         fail('Form depth: form.vmz must compose Upload destination=client and destination=object');
     }
-    if (
-        !/:onPresign="\(file\) => this\.presignObject\(file\)"/.test(formSrcText) ||
-        !/\/api\/form\/presign/.test(formSrcText)
-    ) {
+    if (!/:onPresign="\(file\) => this\.presignObject\(file\)"/.test(formSrcText) || !/\/api\/form\/presign/.test(formSrcText)) {
         fail('Form depth: form.vmz must bind Upload onPresign via #server /api/form/presign');
     }
     if (!/:onValue="/.test(formSrcText)) {
@@ -2894,8 +2891,7 @@ async function proveChoiceDisclosure(page) {
         dropdown: !!document.querySelector('[data-vmz-ui="dropdown"]'),
         collapse: !!document.querySelector('[data-vmz-ui="collapse"]'),
         tag: !!document.querySelector('[data-vmz-ui="tag"]'),
-        segmentPressed:
-            document.querySelector('[data-vmz-segment="comfortable"]')?.getAttribute('aria-pressed') || '',
+        segmentPressed: document.querySelector('[data-vmz-segment="comfortable"]')?.getAttribute('aria-pressed') || '',
         tagSuccess: !!document.querySelector('[data-vmz-ui="tag"][data-vmz-tag-status="success"]'),
         tagError: !!document.querySelector('[data-vmz-ui="tag"][data-vmz-tag-status="error"]'),
         state: document.querySelector('[data-vmz-fixture="choice-state"]')?.textContent || '',
@@ -2966,12 +2962,7 @@ async function proveChoiceDisclosure(page) {
         () => {
             const alpha = document.querySelector('[data-vmz-collapse-item="alpha"]');
             const beta = document.querySelector('[data-vmz-collapse-item="beta"]');
-            return (
-                alpha instanceof HTMLDetailsElement &&
-                alpha.open &&
-                beta instanceof HTMLDetailsElement &&
-                beta.open
-            );
+            return alpha instanceof HTMLDetailsElement && alpha.open && beta instanceof HTMLDetailsElement && beta.open;
         },
         { timeout: 5000 },
     );
@@ -3234,7 +3225,7 @@ async function proveDocumentsPanelDensity(page) {
     }
     if (
         !inspVmz.includes('data-density') ||
-        (!inspVmz.includes(':dir="dir"') && !inspVmz.includes("dir={dir}") && !inspVmz.includes(':dir={dir}'))
+        (!inspVmz.includes(':dir="dir"') && !inspVmz.includes('dir={dir}') && !inspVmz.includes(':dir={dir}'))
     ) {
         fail('production-inspector must bind data-density and dir');
     }

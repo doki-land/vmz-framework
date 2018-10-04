@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { repoRoot } from '../_lib/repo-root.ts';
+import { serveHostProjectEnv, resolveDeliveryDist } from '../_lib/serve-host-env.ts';
 
 const root = repoRoot(import.meta.url);
 const island = path.join(root, 'packages', 'examples', 'island');
@@ -39,11 +40,15 @@ function runNode(script) {
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-ef-'));
 const reportPath = path.join(tmp, 'report.json');
 console.log('event-flow: EventEntry manifests…');
-const test = spawnSync(process.execPath, [vmzBin, 'test', island, '--filter', 'l5\\.(event|compile\\.event)', '--json', reportPath], {
-    cwd: root,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-});
+const test = spawnSync(
+    process.execPath,
+    [vmzBin, 'test', island, '--filter', '^resume\\.(event\\.|compile\\.event\\.)', '--json', reportPath],
+    {
+        cwd: root,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+    },
+);
 if (test.status !== 0) fail(`vmz test exited ${test.status}\n${test.stdout}\n${test.stderr}`);
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 if (report.status !== 'passed') {
@@ -67,14 +72,23 @@ const build = spawnSync(process.execPath, [vmzBin, 'build', counter], {
 });
 if (build.status !== 0) fail(`counter build failed\n${build.stdout}\n${build.stderr}`);
 
-const dist = path.join(counter, 'dist');
+const dist = (() => {
+    try {
+        return resolveDeliveryDist(counter);
+    } catch (e) {
+        fail(e instanceof Error ? e.message : String(e));
+    }
+})();
 const hostJs = path.join(dist, 'vmz-serve-host.mjs');
-if (!fs.existsSync(hostJs)) fail(`missing ${hostJs}`);
 
 const port = 18765;
 const child = spawn(process.execPath, [hostJs], {
     cwd: dist,
-    env: { ...process.env, VMZ_DIST: dist, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(port) },
+    env: serveHostProjectEnv(counter, {
+        VMZ_DIST: dist,
+        VMZ_HOST: '127.0.0.1',
+        VMZ_PORT: String(port),
+    }),
     stdio: ['ignore', 'pipe', 'pipe'],
 });
 
@@ -131,8 +145,11 @@ try {
     if (!te.includes('chunked') && !headers['content-length']) {
         // Node may coalesce; require either chunked or a full HTML document.
     }
-    if (!body.includes('<div id="app">') || !body.includes('count:')) {
+    if (!body.includes('id="app"') || !body.includes('count:')) {
         fail(`stream body missing app/count: ${body.slice(0, 200)}`);
+    }
+    if (!body.includes('data-testid="counter-root"')) {
+        fail(`stream body missing counter-root: ${body.slice(0, 200)}`);
     }
     if (!body.includes('entry-client.js')) fail('stream body missing entry-client');
     // Prefer observing multiple TCP data events; if Node coalesces, still require full HTML.

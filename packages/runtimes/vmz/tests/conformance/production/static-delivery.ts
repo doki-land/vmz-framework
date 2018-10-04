@@ -10,7 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { listenLocalStaticHost } from 'vmz';
 import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
 import { assertHashedCssImportsHttp } from '../_lib/assert-hashed-css-imports.ts';
-import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
+import { serveHostChildEnv, resolveProfileArtifactDir } from '../_lib/serve-host-env.ts';
 import { addLimitation, readProof, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 
 const root = repoRoot(import.meta.url);
@@ -273,20 +273,26 @@ writeProof(proof, root);
 // Nested @vmz/ui: official homepage static assemble (component registry preload).
 console.log('static-delivery: homepage @vmz/ui static assemble…');
 const homepage = path.join(root, 'packages/homepage');
-const homepageDist = path.join(homepage, 'dist-static-conformance');
-if (fs.existsSync(homepageDist)) {
-    fs.rmSync(homepageDist, { recursive: true, force: true });
+const homepageOutRoot = path.join(homepage, 'dist-static-conformance');
+if (fs.existsSync(homepageOutRoot)) {
+    fs.rmSync(homepageOutRoot, { recursive: true, force: true });
 }
 const hpBuild = spawnSync(
     process.execPath,
-    [vmzBin(root), 'build', homepage, '--release', '--profile', 'static', '--origin', ORIGIN, '--out-dir', homepageDist],
+    [vmzBin(root), 'build', homepage, '--release', '--profile', 'static', '--origin', ORIGIN, '--out-dir', homepageOutRoot],
     { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: serveHostChildEnv() },
 );
 if (hpBuild.status !== 0) {
     fail(`homepage static build failed: ${hpBuild.status}\n${hpBuild.stdout}\n${hpBuild.stderr}`);
 }
+let homepageDist: string;
+try {
+    homepageDist = resolveProfileArtifactDir(homepageOutRoot, 'static');
+} catch (e) {
+    fail(e instanceof Error ? e.message : String(e));
+}
 const hpIndex = path.join(homepageDist, 'index.html');
-if (!fs.existsSync(hpIndex)) fail('homepage static missing index.html');
+if (!fs.existsSync(hpIndex)) fail(`homepage static missing index.html under ${homepageDist}`);
 const hpHtml = fs.readFileSync(hpIndex, 'utf8');
 if (!hpHtml.includes('<!DOCTYPE html>') && !hpHtml.includes('<html')) {
     fail('homepage index.html does not look like a document shell');
@@ -294,7 +300,7 @@ if (!hpHtml.includes('<!DOCTYPE html>') && !hpHtml.includes('<html')) {
 upsertCheck(proof, {
     id: 'static-delivery.ui-registry',
     status: 'passed',
-    detail: 'homepage static assemble with @vmz/ui nested components',
+    detail: 'homepage static assemble with @vmz/ui nested components (dist/<profile>)',
 });
 console.log('static-delivery: hashed CSS @import HTTP (homepage)…');
 const hpPolicyPath = path.join(homepageDist, '_vmz', 'cdn-policy-manifest.json');

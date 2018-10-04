@@ -643,38 +643,21 @@
         "Segmented": {
             "source": "src/components/Segmented.vmz",
             "stableHint": "ui.Segmented",
-            "tokens": [
-                "surface.mist",
-                "surface.paper",
-                "text.steel",
-                "text.ink",
-                "focus.ring"
-            ],
+            "tokens": ["surface.mist", "surface.paper", "text.steel", "text.ink", "focus.ring"],
             "surfaces": ["WebSurface"],
             "contracts": ["parent-owned-value", "segment-press"]
         },
         "Dropdown": {
             "source": "src/components/Dropdown.vmz",
             "stableHint": "ui.Dropdown",
-            "tokens": [
-                "line.default",
-                "surface.paper",
-                "surface.mist",
-                "text.ink",
-                "shadow.popup"
-            ],
+            "tokens": ["line.default", "surface.paper", "surface.mist", "text.ink", "shadow.popup"],
             "surfaces": ["WebSurface"],
             "contracts": ["native-details-disclosure", "menu-links"]
         },
         "Collapse": {
             "source": "src/components/Collapse.vmz",
             "stableHint": "ui.Collapse",
-            "tokens": [
-                "line.default",
-                "surface.paper",
-                "surface.mist",
-                "text.steel"
-            ],
+            "tokens": ["line.default", "surface.paper", "surface.mist", "text.steel"],
             "surfaces": ["WebSurface"],
             "contracts": ["native-details-panels", "independent-open"]
         },

@@ -218,7 +218,7 @@ function proveCatalogIncremental(exampleRoot: string): string {
         if (!full.full) throw new Error('first build must be full');
 
         const dirty =
-            `<template>\n  <span class="row">inc-{title}</span>\n</template>\n\n` +
+            `<template>\n  <span class="row">inc-{{ title }}</span>\n</template>\n\n` +
             `<script client>\nexport default class ProductRow {\n  public title: string = '';\n}\n</script>\n`;
         fs.writeFileSync(rowPath, dirty);
         ws.updateFiles([{ path: rowPath, kind: 'update' }]);

@@ -217,6 +217,22 @@ async function renderPage(pathname, opts = {}) {
  * @returns {Promise<{ status: number, stream?: AsyncGenerator<string, void, void>, redirect?: string, headers?: Record<string, string> } | null>}
  */
 async function renderPageStream(pathname, opts = {}) {
+    try {
+        return await renderPageStreamInner(pathname, opts);
+    } catch (err) {
+        const normalized = normalizeDevError(err);
+        lastDevError = normalized;
+        console.error('vmz serve: renderPageStream failed', normalized.message);
+        return { status: 500, stream: emitDevErrorHtml(normalized) };
+    }
+}
+
+/**
+ * @param {string} pathname
+ * @param {{ signal?: AbortSignal, searchParams?: URLSearchParams, cookieHeader?: string, method?: string, body?: unknown }} [opts]
+ * @returns {Promise<{ status: number, stream?: AsyncGenerator<string, void, void>, redirect?: string, headers?: Record<string, string> } | null>}
+ */
+async function renderPageStreamInner(pathname, opts = {}) {
     if (isDev && lastDevError && pageCtors.size === 0) {
         return { status: 500, stream: emitDevErrorHtml(lastDevError) };
     }
@@ -965,7 +981,7 @@ async function* emitDevErrorHtml(err) {
     .hint{opacity:.65;font-size:12px}
   </style>`;
     const body = `${style}
-  <main>
+  <main data-vmz-error="500">
     <h1>Dev Error</h1>
     <pre>${msg}</pre>
     ${stack ? `<pre style="opacity:.7;font-size:12px">${stack}</pre>` : ''}
@@ -981,17 +997,22 @@ async function* emitDevErrorHtml(err) {
     };
   })();
   </script>`;
-    const native = loadNativeAddon();
-    if (typeof native.generateHtmlShell !== 'function') {
-        throw new Error('vmz native addon missing generateHtmlShell — rebuild with `pnpm napi:build`');
+    try {
+        const native = loadNativeAddon();
+        if (typeof native.generateHtmlShell === 'function') {
+            yield native.generateHtmlShell({
+                title: 'Dev Error',
+                lang: 'en',
+                cssHrefs: [],
+                bodyHtml: body,
+                bodyAttrs: [],
+            });
+            return;
+        }
+    } catch {
+        /* fall through to plain HTML — never throw from the error page itself */
     }
-    yield native.generateHtmlShell({
-        title: 'Dev Error',
-        lang: 'en',
-        cssHrefs: [],
-        bodyHtml: body,
-        bodyAttrs: [],
-    });
+    yield `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><title>Dev Error</title></head><body>${body}</body></html>`;
 }
 
 /** @param {string} s */

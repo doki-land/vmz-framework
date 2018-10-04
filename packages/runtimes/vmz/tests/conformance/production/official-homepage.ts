@@ -4,15 +4,14 @@
  * verify id: official-homepage
  */
 
-import { spawn } from 'node:child_process';
-import { createRequire } from 'node:module';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
+import { createRequire } from 'node:module';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
 import { addLimitation, readProof, runVmzBuild, upsertCheck, writeProof } from '../_lib/production-proof.ts';
+import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
 import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
 import { proveHomepageLocaleTransition as proveHomepageLocaleTransitionImpl } from './homepage-locale-fixture.ts';
 
@@ -420,9 +419,26 @@ if (homeBuild.status === 0) {
             ) {
                 homeSsrDetail = 'GET /product missing density/dir/Prose markers';
             } else {
-                homeSsrOk = true;
-                homeSsrDetail =
-                    'SSR / + /ui + /commercial + /form + /console + /motion + /ui4 + /ui5 + /ui6 + /structure + /choice + /stacking + /datatable + /product';
+                // Browser document navigation must get HTML error pages — not API JSON.
+                const missHtml = await getWithHeaders(`http://127.0.0.1:${PORT}/__vmz_no_such_page_error_wrap`, {
+                    Accept: 'text/html,application/xhtml+xml',
+                });
+                const missJson = await getWithHeaders(`http://127.0.0.1:${PORT}/__vmz_no_such_page_error_wrap`, {
+                    Accept: 'application/json',
+                });
+                if (missHtml.status !== 404 || !String(missHtml.headers['content-type'] || '').includes('text/html')) {
+                    homeSsrDetail = `HTML 404 wrap failed: status=${missHtml.status} ctype=${missHtml.headers['content-type']}`;
+                } else if (!missHtml.body.includes('data-vmz-error="404"') || missHtml.body.trimStart().startsWith('{')) {
+                    homeSsrDetail = 'HTML 404 wrap missing data-vmz-error or still JSON body';
+                } else if (missJson.status !== 404 || !String(missJson.headers['content-type'] || '').includes('application/json')) {
+                    homeSsrDetail = `JSON 404 wrap failed: status=${missJson.status} ctype=${missJson.headers['content-type']}`;
+                } else if (!missJson.body.includes('"error"') || !missJson.body.includes('not found')) {
+                    homeSsrDetail = `JSON 404 body unexpected: ${missJson.body.slice(0, 120)}`;
+                } else {
+                    homeSsrOk = true;
+                    homeSsrDetail =
+                        'SSR / + /ui + /commercial + /form + /console + /motion + /ui4 + /ui5 + /ui6 + /structure + /choice + /stacking + /datatable + /product + HTML/JSON error wrap';
+                }
             }
 
             if (homeSsrOk) {
@@ -539,11 +555,7 @@ if (inspBuild.status !== 0) {
         const src = fs.readFileSync(path.join(root, INSPECTOR, 'src/pages/index.vmz'), 'utf8');
         if (!src.includes('data-vmz-fixture') && !page.includes('data-vmz-fixture')) {
             inspDetail = 'inspector page missing data-vmz-fixture markers';
-        } else if (
-            !src.includes('<AppShell') ||
-            !src.includes('data-density') ||
-            (!src.includes(':dir="dir"') && !src.includes('dir={dir}'))
-        ) {
+        } else if (!src.includes('<AppShell') || !src.includes('data-density') || (!src.includes(':dir="dir"') && !src.includes('dir={dir}'))) {
             inspDetail = 'inspector must compose AppShell + density/dir';
         } else {
             const designsCss = path.join(inspBuild.dist, 'vmz-designs.css');
@@ -660,11 +672,24 @@ async function proveHomepageLocaleTransition(baseUrl: string): Promise<string> {
 }
 
 function get(url: string): Promise<{ status: number; body: string }> {
+    return getWithHeaders(url, {});
+}
+
+function getWithHeaders(
+    url: string,
+    headers: Record<string, string>,
+): Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }> {
     return new Promise((resolve, reject) => {
-        const req = http.get(url, (res) => {
+        const req = http.get(url, { headers }, (res) => {
             const parts: Buffer[] = [];
             res.on('data', (c) => parts.push(c));
-            res.on('end', () => resolve({ status: res.statusCode || 0, body: Buffer.concat(parts).toString('utf8') }));
+            res.on('end', () =>
+                resolve({
+                    status: res.statusCode || 0,
+                    body: Buffer.concat(parts).toString('utf8'),
+                    headers: res.headers,
+                }),
+            );
         });
         req.on('error', reject);
     });

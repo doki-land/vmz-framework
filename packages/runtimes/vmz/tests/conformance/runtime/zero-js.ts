@@ -8,8 +8,8 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { repoRoot } from '../_lib/repo-root.ts';
+import { serveHostProjectEnv, resolveDeliveryDist } from '../_lib/serve-host-env.ts';
 
 const root = repoRoot(import.meta.url);
 const example = path.join(root, 'packages', 'examples', 'event-shell');
@@ -31,7 +31,7 @@ if (build.status !== 0) fail(`build failed\n${build.stdout}\n${build.stderr}`);
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-zjs-'));
 const reportPath = path.join(tmp, 'report.json');
 console.log('resume-zerojs: compile manifest…');
-const test = spawnSync(process.execPath, [vmzBin, 'test', example, '--mode', 'compile', '--filter', 'l5\\.zerojs', '--json', reportPath], {
+const test = spawnSync(process.execPath, [vmzBin, 'test', example, '--mode', 'compile', '--filter', '^resume\\.zerojs', '--json', reportPath], {
     cwd: root,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -42,14 +42,23 @@ if (report.status !== 'passed') {
     fail(`report ${report.status}: ${JSON.stringify(report.tests, null, 2)}`);
 }
 
-const dist = path.join(example, 'dist');
+const dist = (() => {
+    try {
+        return resolveDeliveryDist(example);
+    } catch (e) {
+        fail(e instanceof Error ? e.message : String(e));
+    }
+})();
 const hostJs = path.join(dist, 'vmz-serve-host.mjs');
-if (!fs.existsSync(hostJs)) fail(`missing ${hostJs}`);
 
 const port = 18766;
 const child = spawn(process.execPath, [hostJs], {
     cwd: dist,
-    env: { ...process.env, VMZ_DIST: dist, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(port) },
+    env: serveHostProjectEnv(example, {
+        VMZ_DIST: dist,
+        VMZ_HOST: '127.0.0.1',
+        VMZ_PORT: String(port),
+    }),
     stdio: ['ignore', 'pipe', 'pipe'],
 });
 
@@ -106,7 +115,8 @@ try {
     }
 
     const entryClient = fs.readFileSync(path.join(dist, 'entry-client.js'), 'utf8');
-    if (!entryClient.includes('hydrate(')) {
+    // Idle/client entry uses hydrate / hydrateRoute (generator may emit either).
+    if (!/\bhydrate(?:Route|RoutePage)?\b/.test(entryClient)) {
         fail('entry-client.js should still exist for mixed/idle pages');
     }
 

@@ -343,7 +343,11 @@ export async function handleNodeRequest(req, res, opts = {}) {
         }
 
         if (!res.headersSent) {
-            sendJson(res, 404, { error: 'not found', path: url.pathname });
+            if (wantsBrowserHtml(req)) {
+                sendHtml(res, 404, browserErrorHtml(404, 'Not Found', `No page matched ${url.pathname}`));
+            } else {
+                sendJson(res, 404, { error: 'not found', path: url.pathname });
+            }
         }
     } catch (err) {
         if (res.headersSent || res.writableEnded || res.destroyed) {
@@ -355,9 +359,13 @@ export async function handleNodeRequest(req, res, opts = {}) {
             }
             return;
         }
-        sendJson(res, 500, {
-            error: err instanceof Error ? err.message : String(err),
-        });
+        const message = err instanceof Error ? err.message : String(err);
+        const stack = err instanceof Error ? err.stack : undefined;
+        if (wantsBrowserHtml(req)) {
+            sendHtml(res, 500, browserErrorHtml(500, 'Dev Error', message, stack));
+        } else {
+            sendJson(res, 500, { error: message });
+        }
     }
 }
 
@@ -590,7 +598,7 @@ function parseMultipartBuffer(buf, contentType) {
         const splitAt = indexOfBuffer(part, Buffer.from('\r\n\r\n'), 0);
         if (splitAt >= 0) {
             const headerText = part.subarray(0, splitAt).toString('utf8');
-            let body = part.subarray(splitAt + 4);
+            const body = part.subarray(splitAt + 4);
             const nameM = /content-disposition:[^\r\n]*;\s*name="([^"]*)"/i.exec(headerText);
             const fileM = /content-disposition:[^\r\n]*;\s*filename="([^"]*)"/i.exec(headerText);
             const typeM = /content-type:\s*([^\r\n]+)/i.exec(headerText);
@@ -654,6 +662,74 @@ function parseFormBody(raw, contentType) {
     } catch {
         return { raw };
     }
+}
+
+/**
+ * @param {import('node:http').IncomingMessage} req
+ * @returns {boolean}
+ */
+function wantsBrowserHtml(req) {
+    const accept = String(req.headers?.accept || '');
+    const method = String(req.method || 'GET').toUpperCase();
+    if (method !== 'GET' && method !== 'HEAD') return false;
+
+    // Document navigations: browsers send text/html and/or Sec-Fetch-Dest: document.
+    // Bare `*/*` / empty Accept (Node fetch, many API clients) must stay JSON.
+    const dest = String(req.headers?.['sec-fetch-dest'] || '');
+    const mode = String(req.headers?.['sec-fetch-mode'] || '');
+    if (dest === 'document' || mode === 'navigate') return true;
+
+    if (!accept || accept === '*/*') return false;
+
+    const html = accept.includes('text/html');
+    const json = accept.includes('application/json');
+    if (html && !json) return true;
+    if (html && json) {
+        const hi = accept.indexOf('text/html');
+        const ji = accept.indexOf('application/json');
+        return hi <= ji;
+    }
+    return false;
+}
+
+/**
+ * Browser-facing error document (no N-API). Used when SSR returns null or throws
+ * on a document navigation — must not fall back to API-shaped JSON.
+ * @param {number} status
+ * @param {string} title
+ * @param {string} message
+ * @param {string} [stack]
+ */
+function browserErrorHtml(status, title, message, stack) {
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const stackBlock = stack ? `<pre class="stack">${esc(stack)}</pre>` : '';
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${esc(title)}</title>
+  <style>
+    body{margin:0;background:#0f1115;color:#f4f4f5;font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    main{max-width:56rem;margin:0 auto;padding:2rem 1.25rem}
+    h1{margin:0 0 .75rem;color:#f87171;font-size:1.1rem}
+    .code{opacity:.65;font-size:12px;margin-bottom:.75rem}
+    pre{white-space:pre-wrap;margin:0 0 1rem}
+    .stack{opacity:.7;font-size:12px}
+    .hint{opacity:.65;font-size:12px}
+  </style>
+</head>
+<body data-vmz-error="${status}">
+  <main>
+    <p class="code">HTTP ${status}</p>
+    <h1>${esc(title)}</h1>
+    <pre>${esc(message)}</pre>
+    ${stackBlock}
+    <p class="hint">Document navigation returns HTML errors — not API JSON.</p>
+  </main>
+</body>
+</html>
+`;
 }
 
 /**

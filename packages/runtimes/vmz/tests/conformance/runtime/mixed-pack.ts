@@ -7,8 +7,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { repoRoot } from '../_lib/repo-root.ts';
+import { serveHostProjectEnv, resolveDeliveryDist } from '../_lib/serve-host-env.ts';
 
 const root = repoRoot(import.meta.url);
 const example = path.join(root, 'packages', 'examples', 'island');
@@ -27,14 +27,23 @@ const build = spawnSync(process.execPath, [vmzBin, 'build', example], {
 });
 if (build.status !== 0) fail(`build failed\n${build.stdout}\n${build.stderr}`);
 
-const dist = path.join(example, 'dist');
+const dist = (() => {
+    try {
+        return resolveDeliveryDist(example);
+    } catch (e) {
+        fail(e instanceof Error ? e.message : String(e));
+    }
+})();
 const hostJs = path.join(dist, 'vmz-serve-host.mjs');
-if (!fs.existsSync(hostJs)) fail(`missing ${hostJs}`);
 
 const port = 18767;
 const child = spawn(process.execPath, [hostJs], {
     cwd: dist,
-    env: { ...process.env, VMZ_DIST: dist, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(port) },
+    env: serveHostProjectEnv(example, {
+        VMZ_DIST: dist,
+        VMZ_HOST: '127.0.0.1',
+        VMZ_PORT: String(port),
+    }),
     stdio: ['ignore', 'pipe', 'pipe'],
 });
 
@@ -89,7 +98,7 @@ try {
     if (!entryClient.includes('__vmzLoadComponent')) {
         fail('entry-client.js must set __vmzLoadComponent for event islands');
     }
-    if (!entryClient.includes('hydrate(')) {
+    if (!/\bhydrate(?:Route|RoutePage)?\b/.test(entryClient)) {
         fail('entry-client.js must hydrate for idle/mixed shell');
     }
 
