@@ -1,9 +1,9 @@
 <template>
   <div data-vmz-fixture="choice">
-    <AppShell brand="VMZ" homeHref="/" navLabel="Choice" :nav="navItems">
+    <AppShell brand="VMZ" home-href="/" nav-label="Choice" :nav="navItems">
       <Alert
         tone="info"
-        roleName="status"
+        role-name="status"
         title="Choice / disclosure"
         description="Segmented / Dropdown / Collapse / Tag — Chrome automation covers pick, open, expand."
       />
@@ -15,7 +15,7 @@
           label="Density"
           :value="segment"
           :options="segmentOptions"
-          :onChange="(v) => this.onSegment(v)"
+          :on-change="(v) => this.onSegment(v)"
         />
       </Card>
 

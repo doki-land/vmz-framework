@@ -1,19 +1,19 @@
 <template>
   <div data-vmz-fixture="ui4" :data-density="density">
-    <AppShell brand="VMZ" homeHref="/" navLabel="UI4" :nav="navItems">
+    <AppShell brand="VMZ" home-href="/" nav-label="UI4" :nav="navItems">
       <p data-vmz-fixture="ui4-density">density:{{ density }}</p>
       <Button type="button" @click="() => this.toggleDensity()">Toggle density</Button>
 
       <Card title="Status tones">
-        <Alert tone="info" roleName="status" title="Info" description="status.info tokens" />
-        <Alert tone="success" roleName="status" title="Success" description="status.success tokens" />
-        <Alert tone="warning" roleName="status" title="Warning" description="status.warning tokens" />
-        <Alert tone="danger" roleName="alert" title="Danger" description="status.danger tokens" />
+        <Alert tone="info" role-name="status" title="Info" description="status.info tokens" />
+        <Alert tone="success" role-name="status" title="Success" description="status.success tokens" />
+        <Alert tone="warning" role-name="status" title="Warning" description="status.warning tokens" />
+        <Alert tone="danger" role-name="alert" title="Danger" description="status.danger tokens" />
       </Card>
 
       <Notification
         tone="warning"
-        roleName="status"
+        role-name="status"
         title="Deploy pending"
         description="Notification shares the status tone matrix."
       />

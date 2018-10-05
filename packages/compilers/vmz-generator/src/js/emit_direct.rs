@@ -10,9 +10,9 @@
 use super::ast_util::{js_string_literal, print_one_stmt};
 use super::emit_ir::IrDepCursor;
 use super::helpers::{
-    bind_field_idents, collect_deps_oxc, event_dom_type, is_event_attr, is_html_attr,
-    looks_like_ternary, parse_this_method_call_arrow, sanitize_interp, split_ternary_parts,
-    wrap_event_handler_body,
+    bind_field_idents, collect_deps_oxc, component_prop_wire_name, event_dom_type, is_event_attr,
+    is_html_attr, looks_like_ternary, parse_this_method_call_arrow, sanitize_interp,
+    split_ternary_parts, wrap_event_handler_body,
 };
 use vmz_types::{BindingId, ViewAttr, ViewAttrValue, ViewEach, ViewNode, ViewStatus, ViewView};
 
@@ -448,7 +448,8 @@ fn emit_component(
             // Always rewrite bare field idents for complex interps (not a single field root).
             ViewAttrValue::Interp { expr: e } => bind_field_idents(e, fields, scope, aliases),
         };
-        prop_parts.push(format!("{}:{}", q(&a.name), val));
+        let wire = component_prop_wire_name(&a.name);
+        prop_parts.push(format!("{}:{}", q(&wire), val));
     }
     let props = format!("{{{}}}", prop_parts.join(","));
     let client_arg = match &client {
@@ -472,9 +473,10 @@ fn emit_component(
             }
             let deps = deps_js(&deps);
             let body = bind_field_idents(e, fields, scope, aliases);
+            let wire = component_prop_wire_name(&a.name);
             stmts.push(format!(
                 "api.bindComponentProp(this, {v}, {}, [{deps}], function() {{ return {body}; }});",
-                q(&a.name)
+                q(&wire)
             ));
         }
     }

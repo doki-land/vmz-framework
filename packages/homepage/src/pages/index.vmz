@@ -97,16 +97,16 @@
           </aside>
           <div class="v2-product__work">
           <div class="v2-product__bar"><div><span>Projects / vmz-site</span><strong>Release Center</strong></div><Button type="button" @click="() => (notifyOpen = true)">创建发布</Button></div>
-          <Tabs label="Product views" :selected="showcaseTab" panelId="landing-showcase-panel" :items="showcaseTabs" :onSelect="(id) => (showcaseTab = id)">
+          <Tabs label="Product views" :selected="showcaseTab" panel-id="landing-showcase-panel" :items="showcaseTabs" :on-select="(id) => (showcaseTab = id)">
             <div v-if="showcaseTab === 'overview'" class="v2-dashboard">
               <div class="v2-metrics"><Card title="Build" description="main · latest"><Badge tone="success">Ready</Badge><strong>Production</strong></Card><Card title="Affected scope" description="Last compilation"><Badge tone="info">Direct</Badge><strong>1 region</strong></Card><Card title="Targets" description="Current profile"><Badge tone="brand">4 active</Badge><strong>Web to Edge</strong></Card></div>
-              <div class="v2-table"><Table :columns="surfaceColumns" :rows="surfaceRows" sortKey="surface" sortDir="asc" :hasRowAction="false" /></div>
+              <div class="v2-table"><Table :columns="surfaceColumns" :rows="surfaceRows" sort-key="surface" sort-dir="asc" :has-row-action="false" /></div>
             </div>
             <div v-if="showcaseTab === 'source'" class="v2-source"><CodeBlock :code="codeSample" language="vmz" title="Counter.vmz" /></div>
             <div v-if="showcaseTab === 'activity'" class="v2-empty"><Badge tone="success">All systems ready</Badge><h3>最近的变更已经交付。</h3><p>Program Graph 与所有目标环境保持同步。</p></div>
           </Tabs></div>
         </div>
-        <div v-if="notifyOpen" class="v2-notification"><Notification tone="success" roleName="status" title="发布已创建" description="Web、SSR、Native 与 Edge 目标正在生成。"><Button type="button" variant="ghost" @click="() => (notifyOpen = false)">关闭</Button></Notification></div>
+        <div v-if="notifyOpen" class="v2-notification"><Notification tone="success" role-name="status" title="发布已创建" description="Web、SSR、Native 与 Edge 目标正在生成。"><Button type="button" variant="ghost" @click="() => (notifyOpen = false)">关闭</Button></Notification></div>
       </section>
 
       <section class="v2-start" aria-labelledby="start-title">

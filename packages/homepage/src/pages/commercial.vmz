@@ -1,10 +1,10 @@
 <template>
   <div data-vmz-fixture="commercial">
-    <AppShell brand="VMZ" homeHref="/" navLabel="Commercial" :nav="navItems">
+    <AppShell brand="VMZ" home-href="/" nav-label="Commercial" :nav="navItems">
       <div v-if="notifyOpen" data-vmz-fixture="commercial-notify">
         <Notification
           tone="success"
-          roleName="status"
+          role-name="status"
           title="Message queued"
           description="We will reply to your work email within one business day."
         >
@@ -27,7 +27,7 @@
 
       <Alert
         tone="info"
-        roleName="status"
+        role-name="status"
         title="Commercial composition"
         description="AppShell, hero, feature comparison, pricing, Form, Notification, Empty, Dialog, and Drawer on one route."
       />
@@ -60,21 +60,21 @@
       <Card title="Contact" description="Parent-owned Form values and validation — no parallel form store.">
         <Form
           label="Contact"
-          :errorSummary="contactSummary"
-          summaryId="home-commercial-summary"
-          :describedBy="contactDescribedBy"
+          :error-summary="contactSummary"
+          summary-id="home-commercial-summary"
+          :described-by="contactDescribedBy"
           @submit="() => this.confirmContact()"
-          :onReset="() => this.resetContact()"
+          :on-reset="() => this.resetContact()"
         >
           <Field
             label="Work email"
             description="We will not share this address"
-            controlId="home-commercial-email"
-            descriptionId="home-commercial-email-desc"
-            errorId="home-commercial-email-err"
-            :describedBy="emailDescribedBy"
+            control-id="home-commercial-email"
+            description-id="home-commercial-email-desc"
+            error-id="home-commercial-email-err"
+            :described-by="emailDescribedBy"
             :error="emailError"
-            :invalidAttr="emailInvalid"
+            :invalid-attr="emailInvalid"
             :value="email"
             @input="(e) => this.onEmail(e)"
           />
@@ -90,8 +90,8 @@
         <Dialog
           :open="dialogOpen"
           title="Send message"
-          titleId="home-commercial-dialog-title"
-          :onClose="() => (dialogOpen = false)"
+          title-id="home-commercial-dialog-title"
+          :on-close="() => (dialogOpen = false)"
         >
           <p data-vmz-fixture="commercial-dialog-body">Confirm sending to {{ email }}</p>
         </Dialog>
@@ -106,7 +106,7 @@
         <div v-if="!showEmpty">
           <Alert
             tone="success"
-            roleName="status"
+            role-name="status"
             title="Project ready"
             description="Empty state dismissed — composition continues with feedback."
           />
@@ -115,8 +115,8 @@
         <Drawer
           :open="drawerOpen"
           title="Project details"
-          titleId="home-commercial-drawer-title"
-          :onClose="() => (drawerOpen = false)"
+          title-id="home-commercial-drawer-title"
+          :on-close="() => (drawerOpen = false)"
         >
           <p data-vmz-fixture="commercial-drawer-body">Drawer inside commercial composition.</p>
           <Link href="/console">Open Console surface</Link>

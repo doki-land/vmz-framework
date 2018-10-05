@@ -1,9 +1,9 @@
 <template>
   <div data-vmz-fixture="ui6" :data-density="density" :dir="dir">
-    <AppShell brand="VMZ" homeHref="/" navLabel="UI6" :nav="navItems">
+    <AppShell brand="VMZ" home-href="/" nav-label="UI6" :nav="navItems">
       <Alert
         tone="info"
-        roleName="status"
+        role-name="status"
         title="UI6 Density / RTL / Preset"
         description="comfortable → compact → dense; dir ltr/rtl; high-contrast theme overlay from /designs."
       />
@@ -19,8 +19,8 @@
         <Field
           label="Sample field"
           description="Control spacing from density tokens"
-          controlId="home-ui6-sample"
-          descriptionId="home-ui6-sample-desc"
+          control-id="home-ui6-sample"
+          description-id="home-ui6-sample-desc"
           :value="sample"
           @input="(e) => this.onSample(e)"
         />

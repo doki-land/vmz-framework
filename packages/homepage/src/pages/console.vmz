@@ -2,18 +2,18 @@
   <div data-vmz-fixture="console">
     <ConsoleShell
       brand="VMZ"
-      homeHref="/"
+      home-href="/"
       title="Operations"
-      navLabel="Console"
+      nav-label="Console"
       :nav="navItems"
     >
       <FilterBar label="Query">
         <Field
           label="Name contains"
-          controlId="home-console-query"
-          descriptionId="home-console-query-desc"
-          errorId="home-console-query-err"
-          describedBy="home-console-query-desc"
+          control-id="home-console-query"
+          description-id="home-console-query-desc"
+          error-id="home-console-query-err"
+          described-by="home-console-query-desc"
           :value="query"
           @input="(e) => (query = e.target.value)"
         />
@@ -25,34 +25,34 @@
 
       <BulkActions
         label="Bulk actions"
-        :selectedCount="selectedCount"
-        :countLabel="bulkLabel"
+        :selected-count="selectedCount"
+        :count-label="bulkLabel"
       />
       <Button type="button" @click="() => (selectedCount = 0)">Clear selection</Button>
 
       <Table
         :columns="columns"
         :rows="rows"
-        :hasRowAction="rowAction"
-        actionTitle="Detail"
-        actionLabel="Open"
-        :onRowAction="(id) => this.openDetail(id)"
+        :has-row-action="rowAction"
+        action-title="Detail"
+        action-label="Open"
+        :on-row-action="(id) => this.openDetail(id)"
       />
 
       <Pagination
         label="Rows"
         :status="pageStatus"
-        :prevDisabled="prevDisabled"
-        :nextDisabled="nextDisabled"
-        :onPrev="() => this.goPrev()"
-        :onNext="() => this.goNext()"
+        :prev-disabled="prevDisabled"
+        :next-disabled="nextDisabled"
+        :on-prev="() => this.goPrev()"
+        :on-next="() => this.goNext()"
       />
 
       <Drawer
         :open="drawerOpen"
         title="Row detail"
-        titleId="home-console-drawer-title"
-        :onClose="() => (drawerOpen = false)"
+        title-id="home-console-drawer-title"
+        :on-close="() => (drawerOpen = false)"
       >
         <p data-vmz-fixture="console-drawer-body">detail:{{ detailId }}</p>
       </Drawer>

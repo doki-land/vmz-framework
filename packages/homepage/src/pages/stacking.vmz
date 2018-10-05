@@ -1,9 +1,9 @@
 <template>
   <div data-vmz-fixture="stacking">
-    <AppShell brand="VMZ" homeHref="/" navLabel="Stacking" :nav="navItems">
+    <AppShell brand="VMZ" home-href="/" nav-label="Stacking" :nav="navItems">
       <Alert
         tone="info"
-        roleName="status"
+        role-name="status"
         title="Overlay stacking"
         description="Drawer → Dialog → Popover with rising stackLevel; Escape closes topmost only. Parent owns the stack."
       />
@@ -21,31 +21,31 @@
       <Drawer
         :open="drawerOpen"
         title="Base drawer"
-        titleId="home-stack-drawer-title"
-        stackLevel="0"
-        :onClose="() => this.closeDrawer()"
+        title-id="home-stack-drawer-title"
+        stack-level="0"
+        :on-close="() => this.closeDrawer()"
       >
-        <p data-vmz-fixture="stacking-drawer-body">Base layer stackLevel=0</p>
+        <p data-vmz-fixture="stacking-drawer-body">Base layer stack-level=0</p>
       </Drawer>
 
       <Dialog
         :open="dialogOpen"
         title="Stacked dialog"
-        titleId="home-stack-dialog-title"
-        stackLevel="1"
-        :onClose="() => this.closeDialog()"
+        title-id="home-stack-dialog-title"
+        stack-level="1"
+        :on-close="() => this.closeDialog()"
       >
-        <p data-vmz-fixture="stacking-dialog-body">Middle layer stackLevel=1</p>
+        <p data-vmz-fixture="stacking-dialog-body">Middle layer stack-level=1</p>
       </Dialog>
 
       <Popover
         :open="popoverOpen"
         title="Top popover"
-        titleId="home-stack-popover-title"
-        stackLevel="2"
-        :onClose="() => this.closePopover()"
+        title-id="home-stack-popover-title"
+        stack-level="2"
+        :on-close="() => this.closePopover()"
       >
-        <p data-vmz-fixture="stacking-popover-body">Top layer stackLevel=2</p>
+        <p data-vmz-fixture="stacking-popover-body">Top layer stack-level=2</p>
       </Popover>
     </AppShell>
   </div>

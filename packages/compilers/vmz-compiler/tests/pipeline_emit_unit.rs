@@ -236,6 +236,22 @@ export default class Page {
 }
 
 #[test]
+fn maps_component_at_click_to_on_click_wire_prop() {
+    let src = r#"
+export default class Page {
+  bump() {}
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let ir = parse_template(r#"<CounterButton @click="bump" :copy-label="'Copy'" />"#).unwrap();
+    let js = emit_client_js(src, &client, &ir, None).unwrap();
+    assert!(js.contains(r#""onClick": (ev) => this.bump(ev)"#), "{js}");
+    assert!(js.contains(r#""copyLabel":"#) || js.contains(r#""copyLabel": "#), "{js}");
+    assert!(!js.contains(r#""@click""#), "{js}");
+    assert!(!js.contains(r#""copy-label""#), "{js}");
+}
+
+#[test]
 fn emits_client_idle_directive() {
     let src = "export default class IndexPage { title = 'x'; }";
     let client = analyze_script(ScriptKind::Client, src);

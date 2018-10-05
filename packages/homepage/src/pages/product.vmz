@@ -1,6 +1,6 @@
 <template>
   <div data-vmz-fixture="product" :data-density="density" :dir="dir">
-    <AppShell brand="VMZ" homeHref="/" navLabel="Product" :nav="navItems">
+    <AppShell brand="VMZ" home-href="/" nav-label="Product" :nav="navItems">
       <div class="vmz-product-toolbar" data-vmz-fixture="product-toolbar">
         <Badge tone="brand">{{ versionLabel }}</Badge>
         <Button type="button" variant="secondary" @click="() => this.toggleVersion()">
@@ -13,10 +13,10 @@
         <Button type="button" variant="secondary" @click="() => this.toggleDir()">Toggle RTL</Button>
         <Field
           label="Search"
-          controlId="home-product-search"
-          descriptionId="home-product-search-desc"
-          errorId="home-product-search-err"
-          describedBy="home-product-search-desc"
+          control-id="home-product-search"
+          description-id="home-product-search-desc"
+          error-id="home-product-search-err"
+          described-by="home-product-search-desc"
           :value="search"
           @input="(e) => this.onSearch(e)"
         />
@@ -34,7 +34,7 @@
             <p class="lead">{{ leadText }}</p>
             <Callout
               tone="info"
-              roleName="note"
+              role-name="note"
               title="Zero-JS readable"
               description="Headings, callouts, and code remain in the first HTML. Copy and locale switch enhance, they do not own the content."
             />
@@ -47,16 +47,16 @@
               <CodeBlock
                 caption="shell"
                 code="pnpm add @vmz/ui"
-                :copyLabel="copyLabel"
-                :onCopy="() => this.copyInstall()"
+                :copy-label="copyLabel"
+                :on-copy="() => this.copyInstall()"
               />
             </div>
             <div v-if="isV0">
               <CodeBlock
                 caption="shell"
                 code="pnpm add @vmz/ui@0.0.0"
-                :copyLabel="copyLabel"
-                :onCopy="() => this.copyInstall()"
+                :copy-label="copyLabel"
+                :on-copy="() => this.copyInstall()"
               />
             </div>
             <p v-if="copiedYes" data-vmz-fixture="product-copied" role="status">Copied install snippet</p>
@@ -72,7 +72,7 @@
             </p>
             <Callout
               tone="warning"
-              roleName="note"
+              role-name="note"
               title="No second theme"
               description="Components consume semantic tokens only. Brand hex stays in /designs."
             />

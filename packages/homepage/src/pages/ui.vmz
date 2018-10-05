@@ -7,10 +7,10 @@
       <Field
         label="Display name"
         description="Shown on public profile"
-        controlId="home-ui-name"
-        descriptionId="home-ui-name-desc"
-        errorId="home-ui-name-err"
-        describedBy="home-ui-name-desc"
+        control-id="home-ui-name"
+        description-id="home-ui-name-desc"
+        error-id="home-ui-name-err"
+        described-by="home-ui-name-desc"
         :value="name"
         @input="(e) => (name = e.target.value)"
       />
@@ -20,14 +20,14 @@
     <section data-vmz-fixture="ui2-form">
       <Checkbox
         label="Accept terms"
-        controlId="home-ui-agree"
+        control-id="home-ui-agree"
         :checked="agree"
         @change="(e) => (agree = e.target.checked)"
       />
       <p data-vmz-fixture="checkbox-value">agree:{{ agree ? 'yes' : 'no' }}</p>
       <Switch
         label="Email notifications"
-        controlId="home-ui-notify"
+        control-id="home-ui-notify"
         :checked="notify"
         @change="(v) => (notify = v)"
       />
@@ -38,9 +38,9 @@
       <Tabs
         label="Profile sections"
         :selected="tab"
-        panelId="home-ui-tabs-panel"
+        panel-id="home-ui-tabs-panel"
         :items="tabItems"
-        :onSelect="(id) => (tab = id)"
+        :on-select="(id) => (tab = id)"
       >
         <p data-vmz-fixture="tab-panel">panel:{{ tab }}</p>
       </Tabs>
@@ -49,32 +49,32 @@
     <section data-vmz-fixture="ui2-menu">
       <Menu
         label="Actions"
-        menuId="home-ui-menu"
+        menu-id="home-ui-menu"
         :open="menuOpen"
         :items="menuItems"
-        :onOpenChange="(v) => (menuOpen = v)"
-        :onSelect="(id) => (menuChoice = id)"
+        :on-open-change="(v) => (menuOpen = v)"
+        :on-select="(id) => (menuChoice = id)"
       />
       <p data-vmz-fixture="menu-choice">menu:{{ menuChoice || 'none' }}</p>
     </section>
 
     <section data-vmz-fixture="ui1-dialog">
       <Button type="button" @click="() => (open = true)">Open dialog</Button>
-      <Dialog :open="open" title="Confirm" titleId="home-ui-dialog-title" :onClose="() => (open = false)">
+      <Dialog :open="open" title="Confirm" title-id="home-ui-dialog-title" :on-close="() => (open = false)">
         <p data-vmz-fixture="dialog-body">Dialog body for UI lab.</p>
       </Dialog>
     </section>
 
     <section data-vmz-fixture="ui2-drawer">
       <Button type="button" @click="() => (drawerOpen = true)">Open drawer</Button>
-      <Drawer :open="drawerOpen" title="Details" titleId="home-ui-drawer-title" :onClose="() => (drawerOpen = false)">
+      <Drawer :open="drawerOpen" title="Details" title-id="home-ui-drawer-title" :on-close="() => (drawerOpen = false)">
         <p data-vmz-fixture="drawer-body">Drawer body for UI lab.</p>
       </Drawer>
     </section>
 
     <section data-vmz-fixture="ui2-popover">
       <Button type="button" @click="() => (popoverOpen = true)">Open popover</Button>
-      <Popover :open="popoverOpen" title="Hint" titleId="home-ui-popover-title" :onClose="() => (popoverOpen = false)">
+      <Popover :open="popoverOpen" title="Hint" title-id="home-ui-popover-title" :on-close="() => (popoverOpen = false)">
         <p data-vmz-fixture="popover-body">Popover body for UI lab.</p>
       </Popover>
     </section>

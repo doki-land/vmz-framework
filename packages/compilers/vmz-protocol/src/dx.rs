@@ -428,9 +428,9 @@ impl CausalReplayCheckStatus {
 pub struct SourceSpan {
     /// Workspace-relative file path.
     pub path: String,
-    /// Inclusive byte offset start (oxc Span).
+    /// Inclusive UTF-8 byte offset start (oxc-compatible; **not** line/column).
     pub start: u32,
-    /// Exclusive byte offset end (oxc Span).
+    /// Exclusive UTF-8 byte offset end (oxc-compatible; **not** line/column).
     pub end: u32,
 }
 

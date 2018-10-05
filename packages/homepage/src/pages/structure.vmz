@@ -1,9 +1,9 @@
 <template>
   <div data-vmz-fixture="structure">
-    <AppShell brand="VMZ" homeHref="/" navLabel="Structure" :nav="navItems">
+    <AppShell brand="VMZ" home-href="/" nav-label="Structure" :nav="navItems">
       <Alert
         tone="info"
-        roleName="status"
+        role-name="status"
         title="Structure composition"
         description="Accordion / Steps / List / Tree — parent owns open, current, selection, and expand state."
       />
@@ -15,9 +15,9 @@
       <Card title="Accordion" description="Exclusive open; toggle same id closes.">
         <Accordion
           label="FAQ"
-          :openId="faqOpen"
+          :open-id="faqOpen"
           :items="faqItems"
-          :onToggle="(id) => this.onFaqToggle(id)"
+          :on-toggle="(id) => this.onFaqToggle(id)"
         />
       </Card>
 
@@ -32,21 +32,21 @@
       <Card title="List" description="Selectable listbox; Arrow/Home/End.">
         <List
           label="Teams"
-          labelId="home-structure-list-label"
+          label-id="home-structure-list-label"
           :selected="listSelected"
           :items="listItems"
-          :onSelect="(id) => this.onListSelect(id)"
+          :on-select="(id) => this.onListSelect(id)"
         />
       </Card>
 
       <Card title="Tree" description="Flat visible rows; parent expands/collapses.">
         <Tree
           label="Repos"
-          labelId="home-structure-tree-label"
+          label-id="home-structure-tree-label"
           :selected="treeSelected"
           :items="treeItems"
-          :onSelect="(id) => this.onTreeSelect(id)"
-          :onToggle="(id) => this.onTreeToggle(id)"
+          :on-select="(id) => this.onTreeSelect(id)"
+          :on-toggle="(id) => this.onTreeToggle(id)"
         />
       </Card>
     </AppShell>

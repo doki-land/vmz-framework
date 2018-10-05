@@ -2,14 +2,14 @@
   <div data-vmz-fixture="datagrid" data-density="compact" :data-grid-mode="viewMode">
     <ConsoleShell
       brand="VMZ"
-      homeHref="/"
+      home-href="/"
       title="DataGrid"
-      navLabel="Console"
+      nav-label="Console"
       :nav="navItems"
     >
       <Alert
         tone="info"
-        roleName="status"
+        role-name="status"
         title="DataGrid group + tree + edit + pivot"
         description="@vmz/ui-data-grid — virtualized + pinned + group/tree/edit + parent-owned pivot matrix (row×col→sum). Not a second spreadsheet runtime."
       />
@@ -33,50 +33,50 @@
       <div v-if="showEditField" data-vmz-fixture="datagrid-edit-field">
         <Field
           label="Cell draft (Field mirror)"
-          controlId="datagrid-edit-draft"
-          descriptionId="datagrid-edit-draft-desc"
-          errorId="datagrid-edit-draft-err"
+          control-id="datagrid-edit-draft"
+          description-id="datagrid-edit-draft-desc"
+          error-id="datagrid-edit-draft-err"
           description="Parent-owned draft mirrored via @vmz/ui Field — DataGrid does not ship Field."
           :value="editDraft"
           @input="(e) => this.onFieldDraft(e)"
         />
       </div>
 
-      <BulkActions label="Bulk actions" :selectedCount="selectedCount" :countLabel="bulkLabel">
+      <BulkActions label="Bulk actions" :selected-count="selectedCount" :count-label="bulkLabel">
         <Button type="button" variant="secondary" @click="() => this.clearSelection()">Clear</Button>
       </BulkActions>
 
       <DataGrid
         :columns="columns"
         :rows="rows"
-        :totalRows="totalRowsLabel"
-        :visibleCount="visibleCountLabel"
-        pinnedCols="1"
-        :sortKey="sortKey"
-        :sortDir="sortDir"
-        :selectedCount="selectedCountLabel"
-        :allSelected="allSelected"
-        selectAllLabel="Select all leaf rows in dataset"
-        :groupByAttr="groupBy"
-        :groupCount="groupCountLabel"
-        :treeAttr="treeAttr"
-        :pivotAttr="pivotAttr"
-        :pivotColsAttr="pivotColsLabel"
-        :editingAttr="editingKey"
-        :rowLayoutStyle="rowLayoutStyle"
-        :canvasStyle="canvasStyle"
-        :padTopStyle="padTopStyle"
-        :padBottomStyle="padBottomStyle"
-        :onScroll="(top) => this.onScroll(top)"
-        :onSort="(id) => this.sortBy(id)"
-        :onToggleRow="(id) => this.toggleRow(id)"
-        :onToggleAll="() => this.toggleAll()"
-        :onToggleGroup="(key) => this.toggleGroup(key)"
-        :onToggleTree="(id) => this.toggleTree(id)"
-        :onStartEdit="(key) => this.startEdit(key)"
-        :onEditInput="(v) => this.onEditInput(v)"
-        :onCommitEdit="() => this.commitEdit()"
-        :onCancelEdit="() => this.cancelEdit()"
+        :total-rows="totalRowsLabel"
+        :visible-count="visibleCountLabel"
+        pinned-cols="1"
+        :sort-key="sortKey"
+        :sort-dir="sortDir"
+        :selected-count="selectedCountLabel"
+        :all-selected="allSelected"
+        select-all-label="Select all leaf rows in dataset"
+        :group-by-attr="groupBy"
+        :group-count="groupCountLabel"
+        :tree-attr="treeAttr"
+        :pivot-attr="pivotAttr"
+        :pivot-cols-attr="pivotColsLabel"
+        :editing-attr="editingKey"
+        :row-layout-style="rowLayoutStyle"
+        :canvas-style="canvasStyle"
+        :pad-top-style="padTopStyle"
+        :pad-bottom-style="padBottomStyle"
+        :on-scroll="(top) => this.onScroll(top)"
+        :on-sort="(id) => this.sortBy(id)"
+        :on-toggle-row="(id) => this.toggleRow(id)"
+        :on-toggle-all="() => this.toggleAll()"
+        :on-toggle-group="(key) => this.toggleGroup(key)"
+        :on-toggle-tree="(id) => this.toggleTree(id)"
+        :on-start-edit="(key) => this.startEdit(key)"
+        :on-edit-input="(v) => this.onEditInput(v)"
+        :on-commit-edit="() => this.commitEdit()"
+        :on-cancel-edit="() => this.cancelEdit()"
       />
     </ConsoleShell>
   </div>

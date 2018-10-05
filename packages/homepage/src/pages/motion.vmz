@@ -13,8 +13,8 @@
       <Dialog
         :open="dialogOpen"
         title="Motion dialog"
-        titleId="home-motion-dialog-title"
-        :onClose="() => (dialogOpen = false)"
+        title-id="home-motion-dialog-title"
+        :on-close="() => (dialogOpen = false)"
       >
         <p data-vmz-fixture="motion-dialog-body">Overlay enter/exit uses motion.overlay tokens.</p>
       </Dialog>
@@ -22,8 +22,8 @@
       <Drawer
         :open="drawerOpen"
         title="Motion drawer"
-        titleId="home-motion-drawer-title"
-        :onClose="() => (drawerOpen = false)"
+        title-id="home-motion-drawer-title"
+        :on-close="() => (drawerOpen = false)"
       >
         <p data-vmz-fixture="motion-drawer-body">Drawer enter/exit uses motion.overlay tokens.</p>
       </Drawer>
@@ -37,8 +37,8 @@
       <Dialog
         :open="interruptDialogOpen"
         title="Interrupt dialog"
-        titleId="home-motion-interrupt-dialog-title"
-        :onClose="() => this.onInterruptDialogClose()"
+        title-id="home-motion-interrupt-dialog-title"
+        :on-close="() => this.onInterruptDialogClose()"
       >
         <p data-vmz-fixture="motion-interrupt-body">
           Escape starts exit; Escape again cancels exit (motion generation / cancel edge).
@@ -52,8 +52,8 @@
       <Dialog
         :open="ssrDialogOpen"
         title="SSR resume dialog"
-        titleId="home-motion-ssr-dialog-title"
-        :onClose="() => (ssrDialogOpen = false)"
+        title-id="home-motion-ssr-dialog-title"
+        :on-close="() => (ssrDialogOpen = false)"
       >
         <p data-vmz-fixture="motion-resume-body">SSR-stable overlay — resume keeps enter from replaying.</p>
       </Dialog>
@@ -62,7 +62,7 @@
     <section data-vmz-fixture="motion-list">
       <Button type="button" @click="() => this.filterAlpha()">Filter Alpha</Button>
       <Button type="button" @click="() => this.resetRows()">Reset rows</Button>
-      <Table :columns="columns" :rows="rows" :hasRowAction="rowAction" />
+      <Table :columns="columns" :rows="rows" :has-row-action="rowAction" />
       <p data-vmz-fixture="motion-row-count">rows:{{ rowCount }}</p>
     </section>
   </div>

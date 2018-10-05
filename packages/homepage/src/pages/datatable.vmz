@@ -2,14 +2,14 @@
   <div data-vmz-fixture="datatable" data-density="compact">
     <ConsoleShell
       brand="VMZ"
-      homeHref="/"
+      home-href="/"
       title="DataTable"
-      navLabel="Console"
+      nav-label="Console"
       :nav="navItems"
     >
       <Alert
         tone="info"
-        roleName="status"
+        role-name="status"
         title="DataTable thin gate"
         description="Ordinary HTML table with parent-owned selection + sticky header. Large-grid package is separate."
       />
@@ -18,32 +18,32 @@
         selected:{{ selectedAttr || 'none' }};count:{{ selectedCount }};sort:{{ sortKey }}:{{ sortDir }};detail:{{ detailId || 'none' }}
       </p>
 
-      <BulkActions label="Bulk actions" :selectedCount="selectedCount" :countLabel="bulkLabel">
+      <BulkActions label="Bulk actions" :selected-count="selectedCount" :count-label="bulkLabel">
         <Button type="button" variant="secondary" @click="() => this.clearSelection()">Clear</Button>
       </BulkActions>
 
       <DataTable
         :columns="columns"
         :rows="rows"
-        :hasRowAction="rowAction"
-        actionTitle="Detail"
-        actionLabel="Open"
-        :sortKey="sortKey"
-        :sortDir="sortDir"
-        :selectedCount="selectedCountLabel"
-        :allSelected="allSelected"
-        selectAllLabel="Select all visible rows"
-        :onSort="(id) => this.sortBy(id)"
-        :onToggleRow="(id) => this.toggleRow(id)"
-        :onToggleAll="() => this.toggleAll()"
-        :onRowAction="(id) => this.openDetail(id)"
+        :has-row-action="rowAction"
+        action-title="Detail"
+        action-label="Open"
+        :sort-key="sortKey"
+        :sort-dir="sortDir"
+        :selected-count="selectedCountLabel"
+        :all-selected="allSelected"
+        select-all-label="Select all visible rows"
+        :on-sort="(id) => this.sortBy(id)"
+        :on-toggle-row="(id) => this.toggleRow(id)"
+        :on-toggle-all="() => this.toggleAll()"
+        :on-row-action="(id) => this.openDetail(id)"
       />
 
       <Drawer
         :open="drawerOpen"
         title="Row detail"
-        titleId="home-datatable-drawer-title"
-        :onClose="() => (drawerOpen = false)"
+        title-id="home-datatable-drawer-title"
+        :on-close="() => (drawerOpen = false)"
       >
         <p data-vmz-fixture="datatable-drawer-body">detail:{{ detailId }}</p>
       </Drawer>

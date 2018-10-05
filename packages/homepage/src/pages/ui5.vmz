@@ -2,9 +2,9 @@
   <div data-vmz-fixture="ui5" data-density="compact">
     <ConsoleShell
       brand="VMZ"
-      homeHref="/"
+      home-href="/"
       title="Console UI5"
-      navLabel="Console"
+      nav-label="Console"
       :nav="navItems"
     >
       <Breadcrumb label="Console path" :items="crumbs" />
@@ -12,19 +12,19 @@
       <QueryForm label="Dense query" @submit="() => this.applyQuery()">
         <Field
           label="Name"
-          controlId="home-ui5-name"
-          descriptionId="home-ui5-name-desc"
-          errorId="home-ui5-name-err"
-          describedBy="home-ui5-name-desc"
+          control-id="home-ui5-name"
+          description-id="home-ui5-name-desc"
+          error-id="home-ui5-name-err"
+          described-by="home-ui5-name-desc"
           :value="nameQuery"
           @input="(e) => (nameQuery = e.target.value)"
         />
         <Field
           label="Status"
-          controlId="home-ui5-status"
-          descriptionId="home-ui5-status-desc"
-          errorId="home-ui5-status-err"
-          describedBy="home-ui5-status-desc"
+          control-id="home-ui5-status"
+          description-id="home-ui5-status-desc"
+          error-id="home-ui5-status-err"
+          described-by="home-ui5-status-desc"
           :value="statusQuery"
           @input="(e) => (statusQuery = e.target.value)"
         />
@@ -39,18 +39,18 @@
       <Button type="button" @click="() => this.toggleLoading()">Toggle loading</Button>
       <Button type="button" @click="() => this.toggleWrite()">Toggle write</Button>
 
-      <Skeleton :loading="loading" :loadingAttr="loadingAttr">
+      <Skeleton :loading="loading" :loading-attr="loadingAttr">
         <Table
           :columns="columns"
           :rows="rows"
-          :hasRowAction="rowAction"
-          :rowActionDisabled="writeDisabled"
-          actionTitle="Detail"
-          actionLabel="Open"
-          :sortKey="sortKey"
-          :sortDir="sortDir"
-          :onSort="(id) => this.sortBy(id)"
-          :onRowAction="(id) => this.openDetail(id)"
+          :has-row-action="rowAction"
+          :row-action-disabled="writeDisabled"
+          action-title="Detail"
+          action-label="Open"
+          :sort-key="sortKey"
+          :sort-dir="sortDir"
+          :on-sort="(id) => this.sortBy(id)"
+          :on-row-action="(id) => this.openDetail(id)"
         />
       </Skeleton>
 
@@ -59,8 +59,8 @@
       <Drawer
         :open="drawerOpen"
         title="Row detail"
-        titleId="home-ui5-drawer-title"
-        :onClose="() => (drawerOpen = false)"
+        title-id="home-ui5-drawer-title"
+        :on-close="() => (drawerOpen = false)"
       >
         <p data-vmz-fixture="ui5-drawer-body">detail:{{ detailId }}</p>
       </Drawer>

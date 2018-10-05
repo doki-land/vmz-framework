@@ -140,7 +140,9 @@ pub use style_token_diag::{
     validate_unused_design_tokens, validate_vmz_css_var_refs,
 };
 pub use template::{
-    AttrValue, TemplateAttr, TemplateIr, TemplateNode, TemplateParseError, parse_template,
+    AttrValue, ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg, TemplateAttr,
+    TemplateIr, TemplateNode, TemplateParseError, TemplateSpan, decode_html_entities,
+    lower_concrete_to_ir, parse_template, parse_template_concrete,
 };
 pub use tw::{
     TwCompiler, TwCompilerHandle, TwEmitRequest, TwEmitResult, TwRegKind, TwRegistration,
