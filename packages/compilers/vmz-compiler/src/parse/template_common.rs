@@ -13,7 +13,9 @@ pub struct TemplateParseError {
 
 impl fmt::Display for TemplateParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} (offset {})", self.message, self.offset)
+        // Position is carried as UTF-8 byte offset on this type / protocol
+        // `SourceSpan` — not embedded in the message string.
+        write!(f, "{}", self.message)
     }
 }
 

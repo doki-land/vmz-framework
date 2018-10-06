@@ -142,7 +142,7 @@ pub use style_token_diag::{
 pub use template::{
     AttrValue, ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg, TemplateAttr,
     TemplateIr, TemplateNode, TemplateParseError, TemplateSpan, decode_html_entities,
-    lower_concrete_to_ir, parse_template, parse_template_concrete,
+    lower_concrete_to_ir, parse_template, parse_template_concrete, template_parse_to_diagnostic,
 };
 pub use tw::{
     TwCompiler, TwCompilerHandle, TwEmitRequest, TwEmitResult, TwRegKind, TwRegistration,

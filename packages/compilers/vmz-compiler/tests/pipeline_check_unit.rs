@@ -58,3 +58,32 @@ fn ok_property_key() {
         report.diagnostics
     );
 }
+
+#[test]
+fn template_parse_error_carries_absolute_source_span() {
+    let dir = std::env::temp_dir().join(format!(
+        "vmz-check-jsx-span-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+    ));
+    let _ = fs::create_dir_all(&dir);
+    let path = dir.join("Bad.vmz");
+    // `<template>\n` is 11 UTF-8 bytes; JSX `{` sits in the body.
+    let src = "<template>\n<h2>{user.name}</h2>\n</template>\n\n<script client>\nexport default class Bad {}\n</script>\n";
+    fs::write(&path, src).unwrap();
+    let report = check_path(&path, &CheckOptions::default()).unwrap();
+    let diag = report
+        .diagnostics
+        .iter()
+        .find(|d| d.message().contains("template:"))
+        .expect("template diagnostic");
+    let span = diag.source_span().expect("SourceSpan on template diagnostic");
+    assert!(
+        span.start >= 11,
+        "expected absolute offset past `<template>\\n`, got {}",
+        span.start
+    );
+    assert!(span.end > span.start, "end-exclusive span");
+    assert!(!diag.message().contains("(offset"), "offset must not be message-only");
+    let _ = fs::remove_dir_all(&dir);
+}

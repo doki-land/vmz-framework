@@ -15,7 +15,7 @@ use crate::project::{VmzModuleKind, discover_vmz_files};
 use crate::reactive_build::build_program_module_with_server;
 use crate::scss::{ScssCompilerHandle, ScssEmitRequest};
 use crate::sfc::{ScriptKind, parse_vmz};
-use crate::template::parse_template;
+use crate::template::{parse_template, template_parse_to_diagnostic};
 use crate::tw::{TwCompilerHandle, TwEmitRequest, register_tw_from_parsed};
 use crate::virtual_server;
 use vmz_types::{DeploymentClientCall, DeploymentView, ProgramModule, StubStatus};
@@ -851,9 +851,10 @@ fn emit_file(
     let template_ir = match parse_template(&parsed.template.content) {
         Ok(ir) => ir,
         Err(e) => {
-            report.diagnostics.push(ReportedDiagnostic::error(
+            report.diagnostics.push(template_parse_to_diagnostic(
                 path,
-                format!("template: {e}"),
+                parsed.template.content_start,
+                &e,
             ));
             return Ok(());
         }

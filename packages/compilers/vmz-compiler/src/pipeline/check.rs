@@ -15,7 +15,9 @@ use crate::secrets::{collect_client_boundary_findings, collect_secret_requiremen
 use crate::server_calls::collect_server_class_calls;
 use crate::server_slice::ServerSliceProof;
 use crate::sfc::{ScriptKind, ScriptLanguage, parse_vmz};
-use crate::template::{AttrValue, TemplateIr, TemplateNode, parse_template};
+use crate::template::{
+    AttrValue, TemplateIr, TemplateNode, parse_template, template_parse_to_diagnostic,
+};
 use crate::virtual_server;
 use vmz_types::{ComponentDecl, ServerAttach};
 
@@ -90,9 +92,11 @@ pub fn check_project(root: impl AsRef<Path>, options: &CheckOptions) -> crate::R
                 let ir = match parse_template(&parsed.template.content) {
                     Ok(ir) => ir,
                     Err(e) => {
-                        report
-                            .diagnostics
-                            .push(ReportedDiagnostic::error(path, format!("template: {e}")));
+                        report.diagnostics.push(template_parse_to_diagnostic(
+                            path,
+                            parsed.template.content_start,
+                            &e,
+                        ));
                         continue;
                     }
                 };
@@ -193,7 +197,11 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
     let ir = match parse_template(&parsed.template.content) {
         Ok(ir) => ir,
         Err(e) => {
-            report.diagnostics.push(ReportedDiagnostic::error(path, format!("template: {e}")));
+            report.diagnostics.push(template_parse_to_diagnostic(
+                path,
+                parsed.template.content_start,
+                &e,
+            ));
             return;
         }
     };
