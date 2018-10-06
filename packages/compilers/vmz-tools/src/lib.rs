@@ -5,3 +5,5 @@
 pub mod cli;
 /// Subcommand implementations (`new`, `build`, `check`, ...).
 pub mod commands;
+/// CLI-only diagnostic formatting (`offset` → `line:col`).
+pub mod diagnostic_fmt;

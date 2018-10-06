@@ -3,6 +3,7 @@ use vmz_compiler::{Result, bail};
 use vmz_inspector::{InspectOptions, InspectProfile, failed, inspect_path};
 
 use crate::cli::PathArgs;
+use crate::diagnostic_fmt::eprint_diagnostics;
 
 /// Arguments for `vmz lint`.
 #[derive(Debug, ClapArgs)]
@@ -24,9 +25,7 @@ pub fn run(args: Args) -> Result<()> {
     for path in &args.paths.paths {
         let report = inspect_path(path, &options)?;
         println!("vmz lint: {} ({} file(s))", path.display(), report.files_checked);
-        for d in &report.diagnostics {
-            eprintln!("{d}");
-        }
+        eprint_diagnostics(&report.diagnostics);
         if failed(&report, &options) {
             failed_any = true;
         }
