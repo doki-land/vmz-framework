@@ -205,6 +205,13 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
             return;
         }
     };
+    for msg in crate::reactive_build::collect_template_expr_errors(&ir) {
+        report.diagnostics.push(ReportedDiagnostic::error(path, msg));
+    }
+    if report.diagnostics.iter().any(|d| d.is_error() && d.message().starts_with("invalid template expression"))
+    {
+        return;
+    }
     check_each_keys(path, &ir, report);
 
     // Program IR A: surface Unknown widenings as advice (never silent).

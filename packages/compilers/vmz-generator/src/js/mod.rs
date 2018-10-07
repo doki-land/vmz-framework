@@ -6,6 +6,8 @@ mod emit;
 mod emit_direct;
 mod emit_ir;
 mod entry;
+/// Shared oxc parse for template expression snippets.
+pub mod expr_parse;
 /// Shared expression / attr helpers (also used by `vmz-compiler` structural build).
 pub mod helpers;
 mod locale;
@@ -21,6 +23,9 @@ pub use emit::{
 pub use emit_direct::{emit_direct_create, emit_vmz_plan, is_direct_eligible};
 pub use emit_ir::{IrDepCursor, TakenBinding, TakenCfBranch, TakenControlFlow};
 pub use entry::{EntryComponent, emit_serve_entry_client, emit_serve_entry_event};
+pub use expr_parse::{
+    template_expr_snippet_error, template_expr_snippet_ok, wrap_template_expr_source,
+};
 pub use helpers::{
     bind_field_idents, collect_deps_oxc, event_dom_type, is_component_tag, is_event_attr,
     is_html_attr, looks_like_ternary, parse_this_method_call_arrow, sanitize_interp,

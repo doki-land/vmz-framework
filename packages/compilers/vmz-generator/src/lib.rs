@@ -25,8 +25,9 @@ pub use css::{
 };
 pub use js::{
     EmittedJs, JsPrintOptions, ServerBridge, bind_field_idents, emit_client_module,
-    emit_server_module, is_direct_eligible, print_js_source, transpile_ts, transpile_ts_printed,
-    transpile_ts_with_map,
+    emit_server_module, is_direct_eligible, print_js_source, template_expr_snippet_error,
+    template_expr_snippet_ok, transpile_ts, transpile_ts_printed, transpile_ts_with_map,
+    wrap_template_expr_source,
 };
 pub use json::{
     DataFormat, emit_data, emit_data_artifact, to_json, to_json5, to_pretty_json, to_yaml,

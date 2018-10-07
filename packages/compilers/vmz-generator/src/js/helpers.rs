@@ -171,10 +171,10 @@ pub fn looks_like_ternary(expr: &str) -> bool {
 
 /// Top-level `a ? b : c` -> (test, consequent, alternate).
 pub fn split_ternary_parts(expr: &str) -> Option<(String, String, String)> {
-    let src = format!("({expr})");
+    let src = super::expr_parse::wrap_template_expr_source(expr);
     let allocator = oxc_allocator::Allocator::default();
     let ret = oxc_parser::Parser::new(&allocator, &src, oxc_span::SourceType::ts()).parse();
-    if !ret.diagnostics.is_empty() {
+    if !ret.diagnostics.is_empty() || ret.panicked {
         return None;
     }
     let body = ret.program.body.first()?;
@@ -247,11 +247,11 @@ fn bind_field_idents_oxc(
 
     use super::ast_util::JsAst;
 
-    let src = format!("({expr})");
+    let src = super::expr_parse::wrap_template_expr_source(expr);
     let allocator = Allocator::default();
     let mut program = {
         let ret = Parser::new(&allocator, &src, SourceType::ts()).parse();
-        if ret.panicked {
+        if ret.panicked || !ret.diagnostics.is_empty() {
             return None;
         }
         ret.program

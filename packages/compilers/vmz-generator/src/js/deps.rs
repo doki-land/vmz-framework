@@ -19,10 +19,10 @@ pub fn collect_template_dep_keys(expr: &str, fields: &[String], scope: &[String]
     if trimmed.is_empty() || fields.is_empty() {
         return Vec::new();
     }
-    let src = format!("({trimmed})");
+    let src = super::expr_parse::wrap_template_expr_source(trimmed);
     let allocator = oxc_allocator::Allocator::default();
     let ret = oxc_parser::Parser::new(&allocator, &src, SourceType::ts()).parse();
-    if !ret.diagnostics.is_empty() {
+    if !ret.diagnostics.is_empty() || ret.panicked {
         return collect_template_deps_scan(trimmed, fields, scope);
     }
     let mut v =

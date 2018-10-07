@@ -859,6 +859,16 @@ fn emit_file(
             return Ok(());
         }
     };
+    for msg in crate::reactive_build::collect_template_expr_errors(&template_ir) {
+        report.diagnostics.push(ReportedDiagnostic::error(path, msg));
+    }
+    if report
+        .diagnostics
+        .iter()
+        .any(|d| d.is_error() && d.message().starts_with("invalid template expression"))
+    {
+        return Ok(());
+    }
 
     let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("component");
 

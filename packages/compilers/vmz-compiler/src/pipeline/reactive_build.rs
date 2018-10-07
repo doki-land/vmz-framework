@@ -12,6 +12,41 @@ use vmz_types::{
 
 use crate::field_rw::{collect_each_alias_prop_paths, collect_template_dep_keys};
 use crate::template::{AttrValue, TemplateAttr, TemplateIr, TemplateNode};
+use vmz_generator::template_expr_snippet_error;
+
+/// Collect oxc parse failures for every template expression binding (interp / attr).
+///
+/// Expressions remain `String` in IR; this is the early validation ingress before
+/// emit re-parses for codegen.
+pub fn collect_template_expr_errors(template: &TemplateIr) -> Vec<String> {
+    let mut out = Vec::new();
+    walk_expr_errors(&template.roots, &mut out);
+    out
+}
+
+fn walk_expr_errors(nodes: &[TemplateNode], out: &mut Vec<String>) {
+    for n in nodes {
+        match n {
+            TemplateNode::Interp(e) => push_expr_error(e, out),
+            TemplateNode::Text(_) => {}
+            TemplateNode::Element { attrs, children, .. } => {
+                for a in attrs {
+                    match &a.value {
+                        AttrValue::Interp(e) => push_expr_error(e, out),
+                        AttrValue::Static(_) => {}
+                    }
+                }
+                walk_expr_errors(children, out);
+            }
+        }
+    }
+}
+
+fn push_expr_error(expr: &str, out: &mut Vec<String>) {
+    if let Some(msg) = template_expr_snippet_error(expr) {
+        out.push(format!("invalid template expression `{expr}`: {msg}"));
+    }
+}
 
 /// Active keyed `each` frame for ListItem path construction (supports nested each).
 #[derive(Debug, Clone)]
@@ -440,10 +475,10 @@ fn add_expr_binding(
 fn split_ternary(expr: &str) -> Option<(String, String, String)> {
     use oxc_span::GetSpan;
 
-    let src = format!("({expr})");
+    let src = vmz_generator::js::wrap_template_expr_source(expr);
     let allocator = oxc_allocator::Allocator::default();
     let ret = oxc_parser::Parser::new(&allocator, &src, oxc_span::SourceType::ts()).parse();
-    if !ret.diagnostics.is_empty() {
+    if !ret.diagnostics.is_empty() || ret.panicked {
         return None;
     }
     let body = ret.program.body.first()?;

@@ -124,7 +124,9 @@ pub use plugin::{
     Rejection, sha256_hex_bytes,
 };
 pub use project::{VmzModuleKind, discover_vmz_files};
-pub use reactive_build::{build_program_module, build_program_module_with_server};
+pub use reactive_build::{
+    build_program_module, build_program_module_with_server, collect_template_expr_errors,
+};
 pub use scss::{ScssCompiler, ScssCompilerHandle, ScssEmitRequest, ScssEmitResult};
 pub use session_graph::{SessionClientCall, SessionGraph, SessionGraphDocument, SessionUnit};
 pub use sfc::{

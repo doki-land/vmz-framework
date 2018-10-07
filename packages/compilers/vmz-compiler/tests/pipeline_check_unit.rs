@@ -87,3 +87,16 @@ fn template_parse_error_carries_absolute_source_span() {
     assert!(!diag.message().contains("(offset"), "offset must not be message-only");
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn invalid_template_expression_fails_oxc_ingress() {
+    let report = check_template_snippet(r#"<p>{{ 1 + }}</p>"#);
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.message().contains("invalid template expression")),
+        "{:?}",
+        report.diagnostics
+    );
+}
