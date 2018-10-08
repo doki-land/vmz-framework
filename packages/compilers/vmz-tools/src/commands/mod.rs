@@ -16,5 +16,7 @@ pub mod lsp;
 pub mod mcp;
 /// `vmz new` / `vmz init` -- scaffold a minimal app.
 pub mod new;
+/// `vmz plan` -- dump frozen Rust plans as canonical JSON (CLI ≡ N-API).
+pub mod plan;
 /// `vmz serve` -- run the built serve-host against `dist/`.
 pub mod serve;

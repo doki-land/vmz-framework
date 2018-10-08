@@ -14,6 +14,7 @@ fn main() -> Result<()> {
         VmzCommand::Build(args) => commands::build::run(args),
         VmzCommand::Serve(args) => commands::serve::run(args),
         VmzCommand::Dev(args) => commands::dev::run(args),
+        VmzCommand::Plan(args) => commands::plan::run(args),
         VmzCommand::Lsp(args) => commands::lsp::run(args),
         VmzCommand::Mcp(args) => commands::mcp::run(args),
     }

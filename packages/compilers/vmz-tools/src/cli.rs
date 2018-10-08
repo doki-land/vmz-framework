@@ -2,14 +2,14 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-use crate::commands::{build, check, dev, format, lint, lsp, mcp, new, serve};
+use crate::commands::{build, check, dev, format, lint, lsp, mcp, new, plan, serve};
 
 /// Top-level `vmz` CLI parser (clap root).
 #[derive(Debug, Parser)]
 #[command(
     name = "vmz",
     version,
-    about = "VMZ toolchain: new, format, check, lint, build, serve, dev, lsp, mcp",
+    about = "VMZ toolchain: new, format, check, lint, build, serve, dev, plan, lsp, mcp",
     propagate_version = true
 )]
 pub struct VmzTools {
@@ -36,6 +36,8 @@ pub enum VmzCommand {
     Serve(serve::Args),
     /// Build, serve, and rebuild on `src/` changes
     Dev(dev::Args),
+    /// Dump frozen Rust plans as canonical JSON (same bytes as N-API)
+    Plan(plan::Args),
     /// Language server (stdio JSON-RPC; protocol in vmz-debugger)
     Lsp(lsp::Args),
     /// MCP server (stdio JSON-RPC; protocol in vmz-debugger)
