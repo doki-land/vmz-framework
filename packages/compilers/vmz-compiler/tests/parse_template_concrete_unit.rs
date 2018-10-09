@@ -165,6 +165,16 @@ fn v_model_concrete_ok_adapter_errors() {
     assert!(err.message.contains("v-model"), "{err}");
 }
 
+/// Freeze gate: unsupported Vue forms must fail at Concrete→IR, not grow TemplateAttr.
+#[test]
+fn template_attr_string_model_rejects_v_model_instead_of_string_special() {
+    let err = parse_template(r#"<input v-model="q" />"#).unwrap_err();
+    assert!(
+        err.message.contains("v-model") && !err.message.is_empty(),
+        "expected explicit reject, got {err}"
+    );
+}
+
 #[test]
 fn template_span_is_utf8_byte_offsets_end_exclusive() {
     let src = "<p>{{ x }}</p>";

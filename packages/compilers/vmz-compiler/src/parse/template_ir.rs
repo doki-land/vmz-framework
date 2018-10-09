@@ -1,5 +1,13 @@
 //! Legacy emit-facing template IR (`TemplateAttr` string model). Kept for
 //! structural_build / reactive_build / generator until Semantic / Execution IR lands.
+//!
+//! # Freeze (semantic baseline)
+//!
+//! **Do not** add new directive string specials on [`TemplateAttr`] (`if2`, `show`,
+//! `model`, `slot2`, …). New Vue author syntax must land on Concrete
+//! [`super::template_concrete::Directive`] first; the lower adapter may reject
+//! unsupported forms with an explicit [`super::template_common::TemplateParseError`].
+//! Emit still consumes this IR only as a temporary bridge.
 
 /// One node in the template tree produced by [`super::template::parse_template`].
 #[derive(Debug, Clone, PartialEq, Eq)]
