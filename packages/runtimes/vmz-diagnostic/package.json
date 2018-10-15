@@ -1,0 +1,36 @@
+{
+    "name": "@vmz/diagnostic",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Language-neutral diagnostic catalog render and pretty printer",
+    "license": "MIT",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "engines": {
+        "node": ">=20"
+    },
+    "scripts": {
+        "build": "tsc -p tsconfig.json"
+    },
+    "devDependencies": {
+        "@types/node": "^22.15.0",
+        "typescript": "^5.8.3"
+    },
+    "keywords": [
+        "vmz",
+        "diagnostic",
+        "i18n",
+        "pretty-print"
+    ]
+}

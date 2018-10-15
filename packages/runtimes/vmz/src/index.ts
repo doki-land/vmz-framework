@@ -931,6 +931,8 @@ export {
 } from './dev-watch-roots.js';
 export { findAvailablePort } from './port.js';
 export { runCli, parseArgs, printHelp, printGlobalHelp, printProjectHelp } from './cli.js';
+export { createCli, formatDiagnostic, formatDiagnostics, t } from './toolchain-dx.js';
+export type { LocalizePlugin } from './toolchain-dx.js';
 export {
     findNearestProjectVmz,
     getInvocationContext,

@@ -8,13 +8,12 @@ members = [
     "packages/compilers/vmz-debugger",
     "packages/compilers/vmz-inspector",
     "packages/compilers/vmz-formatter",
-    "packages/compilers/vmz-tools",
     "packages/compilers/vmz-napi",
     "packages/compilers/vmz-artifacts",
     "packages/compilers/vmz-plugin-tailwind",
     "packages/compilers/vmz-plugin-sasso",
 ]
-default-members = ["packages/compilers/vmz-tools"]
+default-members = ["packages/compilers/vmz-compiler"]
 
 [workspace.package]
 version = "0.1.0"

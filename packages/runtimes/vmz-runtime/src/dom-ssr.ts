@@ -649,15 +649,8 @@ const serializeApi = {
         el.children = [];
     },
     ifBlock(inst, bindingId, deps, branches) {
-        const host = {
-            __kind: 'el',
-            tag: 'span',
-            attrs: { 'data-vmz-if': '' },
-            children: [],
-            appendChild(c) {
-                if (c != null) this.children.push(c);
-            },
-        };
+        // No empty `span[data-vmz-if]` box (`ui-vif-dom`): false → empty frag.
+        const frag = serializeApi.frag();
         let idx = -1;
         for (let i = 0; i < branches.length; i++) {
             const b = branches[i];
@@ -676,9 +669,9 @@ const serializeApi = {
         }
         if (idx >= 0 && branches[idx].create) {
             const created = branches[idx].create.call(inst, serializeApi);
-            if (created) host.children.push(created);
+            if (created) frag.appendChild(created);
         }
-        return host;
+        return frag;
     },
     eachBlock(inst, bindingId, deps, spec) {
         const frag = serializeApi.frag();
@@ -782,7 +775,7 @@ const serializeApi = {
                 return {
                     __kind: 'el',
                     tag: 'div',
-                    attrs: { 'data-vmz': name },
+                    attrs: { 'data-vmz': name, style: 'display:contents' },
                     children: node ? [node] : [],
                     appendChild(c) {
                         if (c != null) this.children.push(c);

@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * `vmz` CLI invocation modes (JS gate only; Rust binary stays full).
+ * `vmz` CLI invocation modes (JS gate for `@vmz/vmz` only).
  *
  * Product install face: workspace `vmz` / publish `@vmz/vmz` (bin still `vmz`).
  *
@@ -119,16 +119,7 @@ export function getInvocationContext(opts = {}) {
  */
 export function isGlobalAllowedCommand(cmd) {
     if (!cmd) return true;
-    return (
-        cmd === 'help' ||
-        cmd === '-h' ||
-        cmd === '--help' ||
-        cmd === 'version' ||
-        cmd === '-V' ||
-        cmd === '--version' ||
-        cmd === 'new' ||
-        cmd === 'init'
-    );
+    return cmd === 'help' || cmd === '-h' || cmd === '--help' || cmd === 'version' || cmd === '-V' || cmd === '--version';
 }
 
 /**
@@ -170,7 +161,6 @@ export async function gateGlobalProjectCommand(opts) {
     }
     logError('this `vmz` is a global install (mode=global); project commands need a project install.');
     logError('Install in the app:  pnpm add -D @vmz/vmz');
-    logError('Or scaffold:         vmz new <dir>');
     logError('Then run:            pnpm exec vmz <command>');
     logError('(developer mode: run from vmz-framework packages/runtimes/vmz source — full CLI)');
     return { action: 'exit', code: 1 };

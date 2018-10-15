@@ -49,7 +49,9 @@
         }
     },
     "dependencies": {
+        "@vmz/commander": "workspace:*",
         "@vmz/core": "workspace:*",
+        "@vmz/diagnostic": "workspace:*",
         "@vmz/plugin": "workspace:*",
         "@vmz/protocol": "workspace:*",
         "jiti": "^2.6.1"

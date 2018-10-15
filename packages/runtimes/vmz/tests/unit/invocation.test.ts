@@ -8,7 +8,6 @@ import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { expect } from '../../../../../scripts/test/expect.mjs';
 import { findNearestProjectVmz, getInvocationContext, isGlobalAllowedCommand, resolveThisPackageRoot, runCli } from 'vmz';
-import { resolveNativeVmzCli } from '../../dist/resolve-native-cli.js';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -182,39 +181,26 @@ describe('vmz invocation gate', () => {
         fs.rmSync(dir, { recursive: true, force: true });
     });
 
-    it('new and init are globally allowed (Node gates only)', () => {
-        expect(isGlobalAllowedCommand('new')).toBe(true);
-        expect(isGlobalAllowedCommand('init')).toBe(true);
+    it('global mode only allows help and version', () => {
+        expect(isGlobalAllowedCommand('help')).toBe(true);
+        expect(isGlobalAllowedCommand('version')).toBe(true);
+        expect(isGlobalAllowedCommand('new')).toBe(false);
+        expect(isGlobalAllowedCommand('init')).toBe(false);
+        expect(isGlobalAllowedCommand('lsp')).toBe(false);
+        expect(isGlobalAllowedCommand('mcp')).toBe(false);
         expect(isGlobalAllowedCommand('check')).toBe(false);
     });
 
-    it('vmz new forwards to native CLI when binary is present', async () => {
-        const native = resolveNativeVmzCli();
-        if (!native) {
-            // Scaffold logic lives in Rust; skip smoke when native CLI is not built.
-            return;
-        }
-        const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-new-parent-'));
-        const prev = process.cwd();
-        process.chdir(parent);
-        try {
-            const code = await runCli(['new', 'demo-app'], {
-                cwd: parent,
-                thisPackageRoot: packageRoot,
-            });
-            expect(code).toBe(0);
-            const pkg = JSON.parse(fs.readFileSync(path.join(parent, 'demo-app', 'package.json'), 'utf8'));
-            expect(pkg.dependencies?.['@vmz/core']).toBeTruthy();
-            expect(pkg.devDependencies?.['@vmz/vmz']).toBeTruthy();
-            expect(fs.existsSync(path.join(parent, 'demo-app', 'src', 'Application.vmz'))).toBe(true);
-            expect(fs.existsSync(path.join(parent, 'demo-app', 'src', 'pages', 'index.vmz'))).toBe(true);
-        } finally {
-            process.chdir(prev);
-            fs.rmSync(parent, { recursive: true, force: true });
-        }
+    it('removed native-forward commands are unknown', async () => {
+        const codeNew = await runCli(['new', 'demo'], { cwd: packageRoot, thisPackageRoot: packageRoot });
+        expect(codeNew).toBe(1);
+        const codeLsp = await runCli(['lsp'], { cwd: packageRoot, thisPackageRoot: packageRoot });
+        expect(codeLsp).toBe(1);
+        const codeMcp = await runCli(['mcp'], { cwd: packageRoot, thisPackageRoot: packageRoot });
+        expect(codeMcp).toBe(1);
     });
 
-    it('global help mentions three modes and scaffold', async () => {
+    it('global help mentions three modes without scaffold commands', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-inv-help-'));
         const fakeGlobal = path.join(dir, 'npm-global', 'node_modules', '@vmz', 'vmz');
         fs.mkdirSync(fakeGlobal, { recursive: true });
@@ -233,11 +219,12 @@ describe('vmz invocation gate', () => {
                 thisPackageRoot: fakeGlobal,
             });
             expect(code).toBe(0);
-            expect(out.includes('vmz new')).toBe(true);
             expect(out.includes('Three install modes')).toBe(true);
             expect(out.includes('developer')).toBe(true);
             expect(out.includes('global mode')).toBe(true);
             expect(out.includes('@vmz/vmz')).toBe(true);
+            expect(out.includes('vmz new')).toBe(false);
+            expect(out.includes('vmz lsp')).toBe(false);
             expect(out.includes('vmz check [path]')).toBe(false);
         } finally {
             console.log = orig;

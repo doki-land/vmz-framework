@@ -450,6 +450,11 @@ export const directApi = {
         noteDomCreate();
         const host = document.createElement('div');
         host.setAttribute('data-vmz', name);
+        // Direct host default: no layout box (`ui-direct-host-box`). Islands keep a
+        // real box for hydrate / entry scheduling; true block surfaces opt in via CSS.
+        if (!client) {
+            host.style.display = 'contents';
+        }
         /** @type {Record<string, any>} */
         const resolved = {};
         for (const [k, v] of Object.entries(props || {})) {
@@ -552,7 +557,7 @@ export const directApi = {
         else hostEl.appendChild(node);
     },
     /**
-     * Direct if/else — no blueprint `kind: "if"` dispatch.
+     * Direct if/else — comment anchors (no empty `span[data-vmz-if]` layout box).
      * @param {object} inst
      * @param {number|string|null} bindingId
      * @param {string[]} deps
@@ -561,9 +566,12 @@ export const directApi = {
      */
     ifBlock(inst, bindingId, deps, branches, regionId = null) {
         noteDomCreate();
-        const host = document.createElement('span');
-        host.setAttribute('data-vmz-if', '');
-        if (regionId != null) host.setAttribute('data-vmz-region', String(regionId));
+        const start = document.createComment('vmz-if');
+        const end = document.createComment('/vmz-if');
+        if (regionId != null) start.__vmzRegion = regionId;
+        const frag = document.createDocumentFragment();
+        frag.appendChild(start);
+        frag.appendChild(end);
         /** @type {Array<Node | null>} */
         const cached = branches.map(() => null);
         /** @type {Array<Array<{ deps: string[], fn: => any, bindingId?: number|string|null }>>} */
@@ -639,13 +647,15 @@ export const directApi = {
             active = next;
             if (next < 0) return;
             wireBranch(next);
-            if (cached[next]) host.appendChild(cached[next]);
+            if (cached[next] && end.parentNode) {
+                end.parentNode.insertBefore(cached[next], end);
+            }
         };
 
         registerBind(inst, deps || [], apply, bindingId);
         if (directApi._itemPatches) directApi._itemPatches.push(apply);
         // parent destroy disposes all cached branch trees (pause ≠ destroy on switch).
-        host.__vmzDispose = () => {
+        start.__vmzDispose = () => {
             for (let i = 0; i < cached.length; i++) {
                 unwireBranch(i);
                 if (cached[i]) disposeDomTree(cached[i]);
@@ -654,7 +664,7 @@ export const directApi = {
             active = -1;
         };
         apply();
-        return host;
+        return frag;
     },
     /**
      * Direct keyed each — no blueprint `kind: "each"` dispatch.

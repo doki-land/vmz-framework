@@ -73,6 +73,8 @@ const JS_STUBS = [
     '@vmz/core',
     '@vmz/test',
     '@vmz/protocol',
+    '@vmz/commander',
+    '@vmz/diagnostic',
     '@vmz/ui',
     '@vmz/plugin',
     '@vmz/plugin-katex',

@@ -36,6 +36,8 @@ const NATIVE_PLATFORMS = [
 const JS_PACKAGES = [
     { dir: 'packages/runtimes/vmz-protocol' },
     { dir: 'packages/runtimes/vmz-runtime' },
+    { dir: 'packages/runtimes/vmz-commander' },
+    { dir: 'packages/runtimes/vmz-diagnostic' },
     { dir: 'packages/runtimes/vmz-test' },
     { dir: 'packages/plugins/vmz-plugin' },
     { dir: 'packages/plugins/vmz-plugin-katex' },

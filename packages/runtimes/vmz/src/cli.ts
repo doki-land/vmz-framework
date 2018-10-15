@@ -29,7 +29,6 @@ import { cmdApplication } from './application-cmd.js';
 import { cmdArtifact } from './release-cmd.js';
 import { cmdRefactor } from './refactor-cmd.js';
 import { cmdExplain } from './explain-cmd.js';
-import { resolveNativeVmzCli } from './resolve-native-cli.js';
 import { loadVmzConfig } from './plugin-host.js';
 import { normalizeDeliveryAuthoring, resolveProfileArtifactDir, selectBuildProfile } from './delivery-profile.js';
 import { packFromDeploymentIr } from './pack.js';
@@ -80,27 +79,25 @@ export function parseArgs(argv) {
 }
 
 export function printGlobalHelp() {
-    console.log(`vmz — global mode (scaffold only)
+    console.log(`vmz — global mode
 
 Install faces: @vmz/core (runtime) · @vmz/vmz (this CLI) · optional @vmz/ui / @vmz/plugin-*
 
 Three install modes:
   developer  monorepo source (packages/runtimes/vmz) — full CLI
   project    app node_modules/@vmz/vmz — full CLI
-  global     npm/pnpm -g — only new/init/help/version
+  global     npm/pnpm -g — only help/version (project commands need a project install)
 
-You are in global mode. Pin \`@vmz/vmz\` in the app so check/build/lsp
+You are in global mode. Pin \`@vmz/vmz\` in the app so check/build
 use a traceable project install.
 
 Usage:
-  vmz new|init <dir>            Scaffold (native CLI; Node only gates + forwards)
   vmz version                   Show host + native protocol versions
   vmz help                      Show this help
 
 Project commands:
   pnpm add @vmz/core && pnpm add -D @vmz/vmz
   pnpm exec vmz check
-  # or: vmz new my-app && cd my-app && pnpm install
 
 If a project \`node_modules/@vmz/vmz\` exists, a global
 \`vmz <cmd>\` re-execs that bin.
@@ -111,7 +108,6 @@ export function printProjectHelp() {
     console.log(`vmz — Node toolchain host (project / developer mode)
 
 Usage:
-  vmz new|init <dir>            Scaffold a minimal app (native CLI)
   vmz check [path]              Check project via Workspace
   vmz build [path] [options]    Build project via Workspace; --target mini-program-wechat packs dist/wechat
   vmz serve [path] [options]    Serve dist (optional --build)
@@ -124,8 +120,6 @@ Usage:
   vmz artifact <cmd>            Release pack / publish / rollback / diff (A3)
   vmz refactor <cmd>            DX rename plans / apply 
   vmz explain [style] <target>  DX causal explain (style Theme chain)
-  vmz lsp [root] [--out-dir]    Language server (stdio; native CLI)
-  vmz mcp [root] [--out-dir]    MCP server (stdio; native CLI)
   vmz version                   Show host + native protocol versions
   vmz help                      Show this help
 
@@ -196,9 +190,6 @@ export async function runCli(argv, opts = {}) {
 
     const args = parseArgs(rest);
     switch (cmd) {
-        case 'new':
-        case 'init':
-            return cmdNativeForward(cmd, rest);
         case 'check':
             return cmdCheck(args);
         case 'build':
@@ -231,45 +222,12 @@ export async function runCli(argv, opts = {}) {
             return cmdRefactor(rest);
         case 'explain':
             return cmdExplain(rest);
-        case 'lsp':
-            return cmdNativeForward('lsp', rest);
-        case 'mcp':
-            return cmdNativeForward('mcp', rest);
         default:
             log.error(`unknown command \`${cmd}\``);
             if (inv.mode === 'global') printGlobalHelp();
             else printProjectHelp();
             return 1;
     }
-}
-
-/**
- * Forward to the single native `vmz` binary (vmz-tools).
- * Scaffold / stdio servers live in Rust — Node only gates + re-execs.
- *
- * @param {'new' | 'init' | 'lsp' | 'mcp'} sub
- * @param {string[]} argv
- * @returns {Promise<number>}
- */
-function cmdNativeForward(sub, argv) {
-    const bin = resolveNativeVmzCli();
-    if (!bin) {
-        log.error('native `vmz` CLI not found (vmz-tools).');
-        log.error('Build: cargo build -p vmz-tools');
-        log.error('Or set VMZ_NATIVE to the absolute path of that binary.');
-        return Promise.resolve(1);
-    }
-    return new Promise((resolve) => {
-        const child = spawn(bin, [sub, ...argv], { stdio: 'inherit' });
-        child.on('error', (err) => {
-            log.error(`failed to spawn ${bin}: ${err.message}`);
-            resolve(1);
-        });
-        child.on('exit', (code, signal) => {
-            if (signal) resolve(1);
-            else resolve(code ?? 1);
-        });
-    });
 }
 
 function cmdVersion() {

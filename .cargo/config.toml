@@ -1,2 +1,3 @@
+# Empty on purpose: product CLI is `@vmz/vmz` (Node + N-API), not a Rust clap binary.
+# Keep this file so cargo aliases do not point at a removed package by accident.
 [alias]
-vmz = ["run", "-p", "vmz-tools", "--"]

@@ -5,14 +5,12 @@
     "type": "module",
     "packageManager": "pnpm@10.27.0",
     "scripts": {
-        "build": "pnpm build:runtimes && pnpm vmz:build && pnpm build:examples",
+        "build": "pnpm build:runtimes && pnpm build:examples",
         "vmz": "node packages/runtimes/vmz/bin/vmz.js",
-        "vmz:cargo": "cargo run --manifest-path Cargo.toml -p vmz-tools --",
-        "vmz:build": "cargo build --manifest-path Cargo.toml -p vmz-tools --release",
         "vmz:check": "cargo check --manifest-path Cargo.toml --workspace",
         "napi:build": "node scripts/build/napi.mjs",
         "build:vmz-test": "pnpm --filter @vmz/test run build",
-        "build:runtimes": "pnpm --filter @vmz/protocol --filter vmz-fixtures --filter @vmz/core --filter @vmz/plugin-shiki --filter vmz --filter @vmz/test run build",
+        "build:runtimes": "pnpm --filter @vmz/protocol --filter @vmz/commander --filter @vmz/diagnostic --filter vmz-fixtures --filter @vmz/core --filter @vmz/plugin-shiki --filter vmz --filter @vmz/test run build",
         "build:examples": "pnpm -r --filter \"./packages/examples/*\" --filter \"!@vmz-examples/test-utils\" --filter \"!@vmz-examples/documents-fixture\" --filter \"!@vmz-examples/analysis\" run build",
         "check:examples": "pnpm -r --filter \"./packages/examples/*\" --filter \"!@vmz-examples/test-utils\" run check",
         "verify": "node --import ./scripts/test/resolve-ts-from-js.mjs --experimental-strip-types packages/runtimes/vmz/tests/conformance/run.ts",
@@ -29,8 +27,8 @@
         "lint": "biome check .",
         "fmt": "biome format --write . && cargo fmt --all --manifest-path Cargo.toml",
         "fmt:check": "biome format . && cargo fmt --all --check --manifest-path Cargo.toml",
-        "fmt:vmz": "cargo run --manifest-path Cargo.toml -q -p vmz-tools -- format .",
-        "fmt:vmz:check": "cargo run --manifest-path Cargo.toml -q -p vmz-tools -- format --check .",
+        "fmt:vmz": "pnpm vmz format .",
+        "fmt:vmz:check": "pnpm vmz format --check .",
         "clean": "rimraf .turbo packages/examples/*/dist target"
     },
     "pnpm": {
