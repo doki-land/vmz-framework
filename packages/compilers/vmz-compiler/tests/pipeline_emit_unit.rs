@@ -124,7 +124,8 @@ fn emit_consumes_shared_reactive_view_deps() {
 fn emits_if_directive() {
     let src = "export default class Card { user = null; }";
     let client = analyze_script(ScriptKind::Client, src);
-    let ir = parse_template(r#"<p v-if="!user">Loading</p><div v-if="user">{{ user.name }}</div>"#).unwrap();
+    let ir = parse_template(r#"<p v-if="!user">Loading</p><div v-if="user">{{ user.name }}</div>"#)
+        .unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
     assert!(js.contains("api.ifBlock(this,"), "{js}");
     assert!(js.contains("!this.user") || js.contains("!(this.user)"), "{js}");
@@ -150,7 +151,9 @@ fn emits_conditional_bind_cf() {
 fn if_deps_come_from_control_region_only() {
     let src = "export default class T { show = true; aText = \"A\"; bText = \"B\"; }";
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl = parse_template(r#"<div><p v-if="show">{{ aText }}</p><p v-else>{{ bText }}</p></div>"#).unwrap();
+    let tpl =
+        parse_template(r#"<div><p v-if="show">{{ aText }}</p><p v-else>{{ bText }}</p></div>"#)
+            .unwrap();
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
     // Structural if deps = stable cond only (show), not body texts.
     assert!(

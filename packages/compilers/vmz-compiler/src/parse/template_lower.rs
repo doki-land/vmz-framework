@@ -1,9 +1,7 @@
 //! Adapter: Concrete AST → legacy [`TemplateIr`] (emit contract unchanged).
 
 use super::template_common::TemplateParseError;
-use super::template_concrete::{
-    ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg,
-};
+use super::template_concrete::{ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg};
 use super::template_ir::{AttrValue, TemplateAttr, TemplateIr, TemplateNode};
 
 /// Lower Concrete AST into the pipeline IR consumed by structural/reactive/emit.
@@ -28,12 +26,7 @@ fn lower_node(node: &ConcreteNode) -> Result<Option<TemplateNode>, TemplateParse
             }
         }
         ConcreteNode::Interpolation { expr, .. } => Ok(Some(TemplateNode::Interp(expr.clone()))),
-        ConcreteNode::Element {
-            tag,
-            attrs,
-            children,
-            ..
-        } => {
+        ConcreteNode::Element { tag, attrs, children, .. } => {
             let mut ir_attrs = Vec::new();
             for attr in attrs {
                 ir_attrs.extend(lower_attr(attr)?);
@@ -55,15 +48,17 @@ fn lower_node(node: &ConcreteNode) -> Result<Option<TemplateNode>, TemplateParse
 
 fn lower_attr(attr: &ConcreteAttr) -> Result<Vec<TemplateAttr>, TemplateParseError> {
     match attr {
-        ConcreteAttr::Static { name, value, .. } => Ok(vec![TemplateAttr {
-            name: name.clone(),
-            value: AttrValue::Static(value.clone()),
-        }]),
+        ConcreteAttr::Static { name, value, .. } => {
+            Ok(vec![TemplateAttr { name: name.clone(), value: AttrValue::Static(value.clone()) }])
+        }
         ConcreteAttr::Directive { dir, span } => lower_directive(dir, span.start as usize),
     }
 }
 
-fn lower_directive(dir: &Directive, offset: usize) -> Result<Vec<TemplateAttr>, TemplateParseError> {
+fn lower_directive(
+    dir: &Directive,
+    offset: usize,
+) -> Result<Vec<TemplateAttr>, TemplateParseError> {
     match dir {
         Directive::If { test } => Ok(vec![TemplateAttr {
             name: "if".into(),

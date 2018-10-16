@@ -58,11 +58,7 @@ pub fn event_handler_prop_name(name: &str) -> String {
         name
     };
     let ev = raw.split('.').next().unwrap_or(raw);
-    let camel = if ev.contains('-') {
-        kebab_to_camel(ev)
-    } else {
-        ev.to_string()
-    };
+    let camel = if ev.contains('-') { kebab_to_camel(ev) } else { ev.to_string() };
     let mut chars = camel.chars();
     match chars.next() {
         Some(c) => format!("on{}{}", c.to_ascii_uppercase(), chars.as_str()),

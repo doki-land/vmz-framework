@@ -114,8 +114,8 @@ pub use designs::{
     emit_style_theme_css, load_designs,
 };
 pub use diagnostic::{ReportedDiagnostic, Severity, parse_severity};
-pub use vmz_protocol::SourceSpan;
 pub use emit::{ServerBridge, bind_field_idents, emit_client_js, emit_client_js_with_ir};
+pub use offset_index::OffsetIndex;
 pub use plugin::{
     ApplyContributionsReport, ContributionBatch, ContributionDiff, ContributionItem,
     ContributionKind, ContributionStore, ExplainContributionRow, ExplainContributionSurface,
@@ -142,7 +142,6 @@ pub use style_token_diag::{
     validate_style_tw_design_token_refs, validate_unreferenced_global_styles,
     validate_unused_design_tokens, validate_vmz_css_var_refs,
 };
-pub use offset_index::OffsetIndex;
 pub use template::{
     AttrValue, ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg, TemplateAttr,
     TemplateIr, TemplateNode, TemplateParseError, TemplateSpan, decode_html_entities,
@@ -152,6 +151,7 @@ pub use tw::{
     TwCompiler, TwCompilerHandle, TwEmitRequest, TwEmitResult, TwRegKind, TwRegistration,
     register_tw_from_parsed,
 };
+pub use vmz_protocol::SourceSpan;
 pub use workspace::{
     BuildRequest, ChangeKind, FileChange, HandshakeError, PROTOCOL, ProtocolVersions,
     ProtocolVersionsOwned, Workspace, WorkspaceOptions, handshake,

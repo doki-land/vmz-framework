@@ -11,11 +11,7 @@ fn on_modifiers_structured_and_ir_strips() {
             assert!(!span.is_empty());
             match &attrs[0] {
                 ConcreteAttr::Directive {
-                    dir: Directive::On {
-                        arg: DirectiveArg::Static(ev),
-                        handler,
-                        modifiers,
-                    },
+                    dir: Directive::On { arg: DirectiveArg::Static(ev), handler, modifiers },
                     span: attr_span,
                 } => {
                     assert_eq!(ev, "click");
@@ -48,12 +44,7 @@ fn v_for_keeps_index_alias_on_concrete_only() {
         ConcreteNode::Element { attrs, .. } => {
             let for_dir = attrs.iter().find_map(|a| match a {
                 ConcreteAttr::Directive {
-                    dir: Directive::For {
-                        source,
-                        value_alias,
-                        key_alias,
-                        index_alias,
-                    },
+                    dir: Directive::For { source, value_alias, key_alias, index_alias },
                     ..
                 } => Some((source, value_alias, key_alias, index_alias)),
                 _ => None,
@@ -70,9 +61,19 @@ fn v_for_keeps_index_alias_on_concrete_only() {
     let ir = parse_template(src).unwrap();
     match &ir.roots[0] {
         TemplateNode::Element { attrs, .. } => {
-            assert!(attrs.iter().any(|a| a.name == "each" && matches!(&a.value, AttrValue::Interp(s) if s == "items")));
-            assert!(attrs.iter().any(|a| a.name == "as" && matches!(&a.value, AttrValue::Static(s) if s == "item")));
-            assert!(!attrs.iter().any(|a| matches!(&a.value, AttrValue::Static(s) if s == "index")));
+            assert!(
+                attrs.iter().any(|a| a.name == "each"
+                    && matches!(&a.value, AttrValue::Interp(s) if s == "items"))
+            );
+            assert!(
+                attrs
+                    .iter()
+                    .any(|a| a.name == "as"
+                        && matches!(&a.value, AttrValue::Static(s) if s == "item"))
+            );
+            assert!(
+                !attrs.iter().any(|a| matches!(&a.value, AttrValue::Static(s) if s == "index"))
+            );
         }
         other => panic!("expected element, got {other:?}"),
     }

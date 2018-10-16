@@ -78,11 +78,7 @@ fn template_parse_error_carries_absolute_source_span() {
         .find(|d| d.message().contains("template:"))
         .expect("template diagnostic");
     let span = diag.source_span().expect("SourceSpan on template diagnostic");
-    assert!(
-        span.start >= 11,
-        "expected absolute offset past `<template>\\n`, got {}",
-        span.start
-    );
+    assert!(span.start >= 11, "expected absolute offset past `<template>\\n`, got {}", span.start);
     assert!(span.end > span.start, "end-exclusive span");
     assert!(!diag.message().contains("(offset"), "offset must not be message-only");
     let _ = fs::remove_dir_all(&dir);

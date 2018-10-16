@@ -208,7 +208,10 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
     for msg in crate::reactive_build::collect_template_expr_errors(&ir) {
         report.diagnostics.push(ReportedDiagnostic::error(path, msg));
     }
-    if report.diagnostics.iter().any(|d| d.is_error() && d.message().starts_with("invalid template expression"))
+    if report
+        .diagnostics
+        .iter()
+        .any(|d| d.is_error() && d.message().starts_with("invalid template expression"))
     {
         return;
     }

@@ -200,17 +200,11 @@ struct RawAttr {
 
 impl<'a> ConcreteParser<'a> {
     fn err(&self, message: impl Into<String>) -> TemplateParseError {
-        TemplateParseError {
-            message: message.into(),
-            offset: self.pos,
-        }
+        TemplateParseError { message: message.into(), offset: self.pos }
     }
 
     fn err_at(&self, offset: usize, message: impl Into<String>) -> TemplateParseError {
-        TemplateParseError {
-            message: message.into(),
-            offset,
-        }
+        TemplateParseError { message: message.into(), offset }
     }
 
     fn rest(&self) -> &'a str {
@@ -269,10 +263,7 @@ impl<'a> ConcreteParser<'a> {
         if let Some(end) = self.rest().find("-->") {
             let value = self.input[body_start..body_start + end].to_string();
             self.pos += end + 3;
-            Ok(ConcreteNode::Comment {
-                value,
-                span: TemplateSpan::from_usize(start, self.pos),
-            })
+            Ok(ConcreteNode::Comment { value, span: TemplateSpan::from_usize(start, self.pos) })
         } else {
             self.pos = self.input.len();
             Ok(ConcreteNode::Comment {
@@ -345,18 +336,15 @@ impl<'a> ConcreteParser<'a> {
         if text.trim().is_empty() {
             return self.parse_node();
         }
-        Ok(Some(ConcreteNode::Text {
-            value: text,
-            span: TemplateSpan::from_usize(start, end),
-        }))
+        Ok(Some(ConcreteNode::Text { value: text, span: TemplateSpan::from_usize(start, end) }))
     }
 
     fn parse_element(&mut self) -> Result<ConcreteNode, TemplateParseError> {
         let elem_start = self.pos;
         self.bump(); // <
-        let tag = self.parse_tag_name()?.ok_or_else(|| {
-            self.err_at(elem_start, "expected tag name after `<`")
-        })?;
+        let tag = self
+            .parse_tag_name()?
+            .ok_or_else(|| self.err_at(elem_start, "expected tag name after `<`"))?;
         let mut raw_attrs = Vec::new();
         loop {
             self.skip_ws();
@@ -375,10 +363,7 @@ impl<'a> ConcreteParser<'a> {
                 break;
             }
             if self.pos >= self.input.len() {
-                return Err(self.err_at(
-                    elem_start,
-                    format!("unclosed start tag `<{tag}`"),
-                ));
+                return Err(self.err_at(elem_start, format!("unclosed start tag `<{tag}`")));
             }
             raw_attrs.push(self.parse_raw_attr()?);
         }
@@ -430,7 +415,14 @@ impl<'a> ConcreteParser<'a> {
             self.bump();
         }
         while let Some(c) = self.peek() {
-            if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == ':' || c == '.' || c == '[' || c == ']' {
+            if c.is_ascii_alphanumeric()
+                || c == '-'
+                || c == '_'
+                || c == ':'
+                || c == '.'
+                || c == '['
+                || c == ']'
+            {
                 self.bump();
             } else {
                 break;
@@ -505,59 +497,35 @@ fn classify_one(attr: RawAttr) -> Result<ConcreteAttr, TemplateParseError> {
 
     if name == "v-if" {
         let test = require_expr(&name, val, offset)?;
-        return Ok(ConcreteAttr::Directive {
-            dir: Directive::If { test },
-            span,
-        });
+        return Ok(ConcreteAttr::Directive { dir: Directive::If { test }, span });
     }
     if name == "v-else-if" {
         let test = require_expr(&name, val, offset)?;
-        return Ok(ConcreteAttr::Directive {
-            dir: Directive::ElseIf { test },
-            span,
-        });
+        return Ok(ConcreteAttr::Directive { dir: Directive::ElseIf { test }, span });
     }
     if name == "v-else" {
-        return Ok(ConcreteAttr::Directive {
-            dir: Directive::Else,
-            span,
-        });
+        return Ok(ConcreteAttr::Directive { dir: Directive::Else, span });
     }
     if name == "v-html" {
         let expr = require_expr(&name, val, offset)?;
-        return Ok(ConcreteAttr::Directive {
-            dir: Directive::Html { expr },
-            span,
-        });
+        return Ok(ConcreteAttr::Directive { dir: Directive::Html { expr }, span });
     }
     if name == "v-show" {
         let expr = require_expr(&name, val, offset)?;
-        return Ok(ConcreteAttr::Directive {
-            dir: Directive::Show { expr },
-            span,
-        });
+        return Ok(ConcreteAttr::Directive { dir: Directive::Show { expr }, span });
     }
     if name == "v-for" {
         let expr = require_expr(&name, val, offset)?;
         let for_dir = parse_v_for_concrete(&expr, offset)?;
-        return Ok(ConcreteAttr::Directive {
-            dir: for_dir,
-            span,
-        });
+        return Ok(ConcreteAttr::Directive { dir: for_dir, span });
     }
     if name == "v-bind" {
         let expr = require_expr(&name, val, offset)?;
-        return Ok(ConcreteAttr::Directive {
-            dir: Directive::BindObject { expr },
-            span,
-        });
+        return Ok(ConcreteAttr::Directive { dir: Directive::BindObject { expr }, span });
     }
     if name == "v-on" {
         let expr = require_expr(&name, val, offset)?;
-        return Ok(ConcreteAttr::Directive {
-            dir: Directive::OnObject { expr },
-            span,
-        });
+        return Ok(ConcreteAttr::Directive { dir: Directive::OnObject { expr }, span });
     }
     if name == "v-slot" {
         return Ok(ConcreteAttr::Directive {
@@ -569,21 +537,14 @@ fn classify_one(attr: RawAttr) -> Result<ConcreteAttr, TemplateParseError> {
         });
     }
     if name == "v-model" || name.starts_with("v-model.") || name.starts_with("v-model:") {
-        return Ok(ConcreteAttr::Directive {
-            dir: parse_v_model(&name, val, offset)?,
-            span,
-        });
+        return Ok(ConcreteAttr::Directive { dir: parse_v_model(&name, val, offset)?, span });
     }
 
     if let Some(rest) = name.strip_prefix(':') {
         let (arg, modifiers) = split_arg_modifiers(rest);
         let expr = require_expr(&name, val, offset)?;
         return Ok(ConcreteAttr::Directive {
-            dir: Directive::Bind {
-                arg: parse_directive_arg(&arg),
-                expr,
-                modifiers,
-            },
+            dir: Directive::Bind { arg: parse_directive_arg(&arg), expr, modifiers },
             span,
         });
     }
@@ -591,11 +552,7 @@ fn classify_one(attr: RawAttr) -> Result<ConcreteAttr, TemplateParseError> {
         let (arg, modifiers) = split_arg_modifiers(rest);
         let expr = require_expr(&name, val, offset)?;
         return Ok(ConcreteAttr::Directive {
-            dir: Directive::Bind {
-                arg: parse_directive_arg(&arg),
-                expr,
-                modifiers,
-            },
+            dir: Directive::Bind { arg: parse_directive_arg(&arg), expr, modifiers },
             span,
         });
     }
@@ -603,11 +560,7 @@ fn classify_one(attr: RawAttr) -> Result<ConcreteAttr, TemplateParseError> {
         let (arg, modifiers) = split_arg_modifiers(rest);
         let handler = require_expr(&name, val, offset)?;
         return Ok(ConcreteAttr::Directive {
-            dir: Directive::On {
-                arg: parse_directive_arg(&arg),
-                handler,
-                modifiers,
-            },
+            dir: Directive::On { arg: parse_directive_arg(&arg), handler, modifiers },
             span,
         });
     }
@@ -615,11 +568,7 @@ fn classify_one(attr: RawAttr) -> Result<ConcreteAttr, TemplateParseError> {
         let (arg, modifiers) = split_arg_modifiers(rest);
         let handler = require_expr(&name, val, offset)?;
         return Ok(ConcreteAttr::Directive {
-            dir: Directive::On {
-                arg: parse_directive_arg(&arg),
-                handler,
-                modifiers,
-            },
+            dir: Directive::On { arg: parse_directive_arg(&arg), handler, modifiers },
             span,
         });
     }
@@ -658,14 +607,14 @@ fn classify_one(attr: RawAttr) -> Result<ConcreteAttr, TemplateParseError> {
         });
     }
 
-    Ok(ConcreteAttr::Static {
-        name,
-        value: val.unwrap_or("").to_string(),
-        span,
-    })
+    Ok(ConcreteAttr::Static { name, value: val.unwrap_or("").to_string(), span })
 }
 
-fn require_expr(name: &str, val: Option<&str>, offset: usize) -> Result<String, TemplateParseError> {
+fn require_expr(
+    name: &str,
+    val: Option<&str>,
+    offset: usize,
+) -> Result<String, TemplateParseError> {
     match val {
         Some(s) if !s.is_empty() => Ok(s.to_string()),
         _ => Err(TemplateParseError {
@@ -691,11 +640,8 @@ fn split_arg_modifiers(rest: &str) -> (String, Vec<String>) {
         if let Some(end) = rest.find(']') {
             let arg = rest[..=end].to_string();
             let after = &rest[end + 1..];
-            let modifiers = after
-                .split('.')
-                .filter(|s| !s.is_empty())
-                .map(str::to_string)
-                .collect();
+            let modifiers =
+                after.split('.').filter(|s| !s.is_empty()).map(str::to_string).collect();
             return (arg, modifiers);
         }
     }
@@ -735,37 +681,17 @@ fn parse_v_model(
     // v-model / v-model.trim / v-model:title.lazy
     let rest = name.strip_prefix("v-model").unwrap_or("");
     if rest.is_empty() {
-        return Ok(Directive::Model {
-            arg: None,
-            expr,
-            modifiers: Vec::new(),
-        });
+        return Ok(Directive::Model { arg: None, expr, modifiers: Vec::new() });
     }
     if let Some(after) = rest.strip_prefix(':') {
         let (arg, modifiers) = split_arg_modifiers(after);
-        return Ok(Directive::Model {
-            arg: Some(arg),
-            expr,
-            modifiers,
-        });
+        return Ok(Directive::Model { arg: Some(arg), expr, modifiers });
     }
     if let Some(after) = rest.strip_prefix('.') {
-        let modifiers = after
-            .split('.')
-            .filter(|s| !s.is_empty())
-            .map(str::to_string)
-            .collect();
-        return Ok(Directive::Model {
-            arg: None,
-            expr,
-            modifiers,
-        });
+        let modifiers = after.split('.').filter(|s| !s.is_empty()).map(str::to_string).collect();
+        return Ok(Directive::Model { arg: None, expr, modifiers });
     }
-    Ok(Directive::Model {
-        arg: None,
-        expr,
-        modifiers: Vec::new(),
-    })
+    Ok(Directive::Model { arg: None, expr, modifiers: Vec::new() })
 }
 
 fn parse_v_for_concrete(expr: &str, offset: usize) -> Result<Directive, TemplateParseError> {
@@ -793,11 +719,7 @@ fn parse_v_for_concrete(expr: &str, offset: usize) -> Result<Directive, Template
 }
 
 fn parse_for_aliases(alias_part: &str) -> Option<(String, Option<String>, Option<String>)> {
-    let inner = alias_part
-        .trim()
-        .trim_start_matches('(')
-        .trim_end_matches(')')
-        .trim();
+    let inner = alias_part.trim().trim_start_matches('(').trim_end_matches(')').trim();
     if inner.is_empty() {
         return None;
     }
@@ -805,11 +727,7 @@ fn parse_for_aliases(alias_part: &str) -> Option<(String, Option<String>, Option
     match parts.as_slice() {
         [v] => Some(((*v).to_string(), None, None)),
         [v, k] => Some(((*v).to_string(), Some((*k).to_string()), None)),
-        [v, k, i] => Some((
-            (*v).to_string(),
-            Some((*k).to_string()),
-            Some((*i).to_string()),
-        )),
+        [v, k, i] => Some(((*v).to_string(), Some((*k).to_string()), Some((*i).to_string()))),
         _ => None,
     }
 }

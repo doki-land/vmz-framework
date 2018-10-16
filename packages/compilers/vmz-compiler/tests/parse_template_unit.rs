@@ -17,8 +17,10 @@ fn parses_mustache_interp() {
 
 #[test]
 fn skips_html_comments_and_bind_attr() {
-    let ir = parse_template(r#"<!-- auto -->
-<CounterButton :initial="0" />"#)
+    let ir = parse_template(
+        r#"<!-- auto -->
+<CounterButton :initial="0" />"#,
+    )
     .unwrap();
     assert_eq!(ir.roots.len(), 1);
     match &ir.roots[0] {
@@ -47,12 +49,23 @@ fn parses_v_if_directive() {
 
 #[test]
 fn parses_v_for_into_each_as() {
-    let ir = parse_template(r#"<li v-for="tag in tags" :key="tag.id">{{ tag.label }}</li>"#).unwrap();
+    let ir =
+        parse_template(r#"<li v-for="tag in tags" :key="tag.id">{{ tag.label }}</li>"#).unwrap();
     match &ir.roots[0] {
         TemplateNode::Element { attrs, children, .. } => {
-            assert!(attrs.iter().any(|a| a.name == "each" && matches!(&a.value, AttrValue::Interp(s) if s == "tags")));
-            assert!(attrs.iter().any(|a| a.name == "as" && matches!(&a.value, AttrValue::Static(s) if s == "tag")));
-            assert!(attrs.iter().any(|a| a.name == "key" && matches!(&a.value, AttrValue::Interp(s) if s == "tag.id")));
+            assert!(attrs.iter().any(
+                |a| a.name == "each" && matches!(&a.value, AttrValue::Interp(s) if s == "tags")
+            ));
+            assert!(
+                attrs
+                    .iter()
+                    .any(|a| a.name == "as"
+                        && matches!(&a.value, AttrValue::Static(s) if s == "tag"))
+            );
+            assert!(
+                attrs.iter().any(|a| a.name == "key"
+                    && matches!(&a.value, AttrValue::Interp(s) if s == "tag.id"))
+            );
             assert!(matches!(&children[0], TemplateNode::Interp(s) if s == "tag.label"));
         }
         _ => panic!("expected element"),
@@ -61,7 +74,8 @@ fn parses_v_for_into_each_as() {
 
 #[test]
 fn parses_event_shorthand() {
-    let ir = parse_template(r#"<button type="button" @click="selectFirst">select</button>"#).unwrap();
+    let ir =
+        parse_template(r#"<button type="button" @click="selectFirst">select</button>"#).unwrap();
     match &ir.roots[0] {
         TemplateNode::Element { attrs, .. } => {
             let click = attrs.iter().find(|a| a.name == "@click").expect("@click");

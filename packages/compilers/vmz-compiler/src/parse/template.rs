@@ -38,11 +38,6 @@ pub fn template_parse_to_diagnostic(
     let path = path.into();
     let (start, end) = TemplateSpan::from_usize(err.offset, err.offset.saturating_add(1))
         .to_absolute(content_start as u32);
-    ReportedDiagnostic::error(&path, format!("template: {}", err.message)).with_source_span(
-        SourceSpan {
-            path: path.to_string_lossy().into_owned(),
-            start,
-            end,
-        },
-    )
+    ReportedDiagnostic::error(&path, format!("template: {}", err.message))
+        .with_source_span(SourceSpan { path: path.to_string_lossy().into_owned(), start, end })
 }

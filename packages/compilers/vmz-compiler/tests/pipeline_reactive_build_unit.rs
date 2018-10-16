@@ -90,7 +90,8 @@ fn keyed_each_item_prop_is_list_item() {
         visibility: Visibility::Private,
         span: Span::default(),
     });
-    let tpl = parse_template(r#"<li v-for="tag in tags" :key="tag.id">{{ tag.label }}</li>"#).unwrap();
+    let tpl =
+        parse_template(r#"<li v-for="tag in tags" :key="tag.id">{{ tag.label }}</li>"#).unwrap();
     let module = build_reactive_module("TagList.vmz", &decl, &tpl);
     let c = &module.components[0];
     let stables: Vec<String> = c
@@ -242,7 +243,8 @@ fn each_without_proveable_list_field_skips_list_item() {
         span: Span::default(),
     });
     // Ternary list ?not a single Field root ?no ListItem frame.
-    let tpl = parse_template(r#"<li v-for="item in (a ? a : b)" :key="item">{{ item }}</li>"#).unwrap();
+    let tpl =
+        parse_template(r#"<li v-for="item in (a ? a : b)" :key="item">{{ item }}</li>"#).unwrap();
     let module = build_reactive_module("Mixed.vmz", &decl, &tpl);
     let json = module.to_json();
     assert!(

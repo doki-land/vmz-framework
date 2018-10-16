@@ -1,9 +1,14 @@
-//! Host path + [`OxcDiagnostic`] - the only diagnostic row type.
+//! Host path + [`OxcDiagnostic`] — the only diagnostic row type.
 //!
 //! No parallel DX DTO: `vmz.dx.*` JSON is the serde projection of this type
-//! (`path` / `severity` / `message` / `code` / `span`).
+//! (`path` / `severity` / `message` / `code` / `args` / `span`).
+//!
+//! `0.1.18` freezes the structured shape `code + args + span`. Natural-language
+//! `message` remains on the wire until `0.1.21` localization strips Rust as the
+//! user-facing truth source.
 
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
@@ -19,13 +24,18 @@ use crate::severity::{Severity, severity_wire};
 /// Path + [`OxcDiagnostic`]. Not a second diagnostic algebra.
 ///
 /// Wire shape for `vmz.dx.*` documents:
-/// `{ "path", "severity", "message", "code"?, "span"? }`.
+/// `{ "path", "severity", "message", "code"?, "args"?, "span"? }`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReportedDiagnostic {
     /// Workspace or absolute source path (empty = workspace-global).
     pub path: PathBuf,
     /// Underlying oxc diagnostic (severity, message, labels, code).
     pub diagnostic: OxcDiagnostic,
+    /// Structured message arguments (`code` + `args` + `span` contract).
+    ///
+    /// Keys are catalog argument names; values are already-stringified payloads.
+    /// Empty map is omitted on the wire (`None`).
+    pub args: Option<BTreeMap<String, String>>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
@@ -38,6 +48,8 @@ struct ReportedDiagnosticWire {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     code: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    args: Option<BTreeMap<String, String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     span: Option<SourceSpan>,
 }
 
@@ -47,6 +59,7 @@ impl ReportedDiagnostic {
         Self {
             path: path.into(),
             diagnostic: OxcDiagnostic::error(message.into()).with_error_code_scope("vmz"),
+            args: None,
         }
     }
 
@@ -55,6 +68,7 @@ impl ReportedDiagnostic {
         Self {
             path: path.into(),
             diagnostic: OxcDiagnostic::warn(message.into()).with_error_code_scope("vmz"),
+            args: None,
         }
     }
 
@@ -65,6 +79,7 @@ impl ReportedDiagnostic {
             diagnostic: OxcDiagnostic::error(message.into())
                 .with_error_code_scope("vmz")
                 .with_severity(Severity::Advice),
+            args: None,
         }
     }
 
@@ -88,6 +103,7 @@ impl ReportedDiagnostic {
             diagnostic: OxcDiagnostic::error(message.into())
                 .with_error_code_scope("vmz")
                 .with_label(span),
+            args: None,
         }
     }
 
@@ -95,6 +111,12 @@ impl ReportedDiagnostic {
     pub fn with_code(mut self, code: impl Into<String>) -> Self {
         self.diagnostic.code.scope = Some(Cow::Owned(code.into()));
         self.diagnostic.code.number = None;
+        self
+    }
+
+    /// Attach structured catalog arguments (empty map clears to `None` on the wire).
+    pub fn with_args(mut self, args: BTreeMap<String, String>) -> Self {
+        self.args = if args.is_empty() { None } else { Some(args) };
         self
     }
 
@@ -127,6 +149,11 @@ impl ReportedDiagnostic {
         &self.path
     }
 
+    /// Structured args (catalog placeholders), when present.
+    pub fn args(&self) -> Option<&BTreeMap<String, String>> {
+        self.args.as_ref()
+    }
+
     /// Stable code string for wire / LSP (`scope` or `scope(number)`).
     pub fn code_string(&self) -> Option<String> {
         self.diagnostic.code.is_some().then(|| self.diagnostic.code.to_string())
@@ -146,6 +173,7 @@ impl ReportedDiagnostic {
             severity: self.diagnostic.severity,
             message: self.diagnostic.message.to_string(),
             code: self.code_string(),
+            args: self.args.clone(),
             span: self.source_span(),
         }
     }
@@ -167,7 +195,8 @@ impl ReportedDiagnostic {
             }
             diagnostic = diagnostic.with_label(Span::new(span.start, span.end));
         }
-        Self { path, diagnostic }
+        let args = wire.args.filter(|m| !m.is_empty());
+        Self { path, diagnostic, args }
     }
 }
 

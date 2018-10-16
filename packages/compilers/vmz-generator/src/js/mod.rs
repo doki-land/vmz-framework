@@ -24,7 +24,8 @@ pub use emit_direct::{emit_direct_create, emit_vmz_plan, is_direct_eligible};
 pub use emit_ir::{IrDepCursor, TakenBinding, TakenCfBranch, TakenControlFlow};
 pub use entry::{EntryComponent, emit_serve_entry_client, emit_serve_entry_event};
 pub use expr_parse::{
-    template_expr_snippet_error, template_expr_snippet_ok, wrap_template_expr_source,
+    SnippetSpan, map_wrapped_span_to_snippet, template_expr_root_span, template_expr_snippet_error,
+    template_expr_snippet_error_with_span, template_expr_snippet_ok, wrap_template_expr_source,
 };
 pub use helpers::{
     bind_field_idents, collect_deps_oxc, event_dom_type, is_component_tag, is_event_attr,

@@ -82,7 +82,11 @@ pub fn map_engine_diagnostics(
         if let Some(span) = span {
             diag = diag.with_label(span);
         }
-        out.push(ReportedDiagnostic { path: collection.path.clone(), diagnostic: diag });
+        out.push(ReportedDiagnostic {
+            path: collection.path.clone(),
+            diagnostic: diag,
+            args: None,
+        });
     }
     out
 }

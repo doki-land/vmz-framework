@@ -22,10 +22,7 @@ pub struct TemplateSpan {
 impl TemplateSpan {
     /// Build a span from `usize` offsets (truncated to `u32`).
     pub fn from_usize(start: usize, end: usize) -> Self {
-        Self {
-            start: start as u32,
-            end: end as u32,
-        }
+        Self { start: start as u32, end: end as u32 }
     }
 
     /// Empty span at `offset`.
