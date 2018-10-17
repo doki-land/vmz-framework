@@ -1,7 +1,7 @@
 {
     "schema": "vmz.test.manifest.v0",
     "id": "l4.logic.if.region",
-    "title": ": if host data-vmz-region",
+    "title": "if region host data-vmz-region (comment-anchored ifBlock)",
     "modes": ["logic"],
     "program": {
         "chunkId": "components/BranchDemo",
@@ -22,7 +22,7 @@
             "schema": "vmz.test.assertion.v0",
             "kind": "exists",
             "expect": {
-                "selector": "[data-vmz-if][data-vmz-region]"
+                "selector": "[data-vmz-region]"
             }
         }
     ]

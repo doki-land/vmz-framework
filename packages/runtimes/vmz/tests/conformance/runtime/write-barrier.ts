@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { repoRoot } from '../_lib/repo-root.ts';
+import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
 import { parseHTML } from 'linkedom';
 
 const root = repoRoot(import.meta.url);
@@ -28,11 +28,10 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-l4wb-'));
 const dist = path.join(tmp, 'dist');
 
 console.log('-WB gate: building fullstack…');
-const build = spawnSync(
-    'cargo',
-    ['run', '--quiet', '--manifest-path', path.join(root, 'Cargo.toml'), '-p', 'vmz-tools', '--', 'build', example, '--out-dir', dist],
-    { cwd: root, stdio: 'inherit' },
-);
+const build = spawnSync(process.execPath, [vmzBin(root), 'build', example, '--out-dir', dist], {
+    cwd: root,
+    stdio: 'inherit',
+});
 if (build.status !== 0) fail(`build exited ${build.status}`);
 
 const clientPath = path.join(dist, 'components', 'WriteBarrierDemo.client.js');

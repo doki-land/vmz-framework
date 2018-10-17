@@ -26,27 +26,13 @@ export type BuildResult =
     | { ok: true; outDir: string; diagnostics: unknown[] }
     | { ok: false; outDir: string; diagnostics: unknown[]; error: string };
 
-/** Build project for compile/logic evidence. Prefers vmz-tools; optional N-API inject. */
+/** Build project for compile/logic evidence. Prefers N-API `createWorkspace`, else Node `@vmz/vmz`. */
 export function buildForCompile(project: string, outDir?: string, options: BuildOptions = {}): BuildResult {
     const dist = outDir || fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-test-compile-'));
     if (!fs.existsSync(dist)) fs.mkdirSync(dist, { recursive: true });
 
-    const preferNapi = process.env.VMZ_TEST_BUILD === 'napi';
     const repoRoot = options.repoRoot || repoRootGuess;
-
-    if (!preferNapi) {
-        const cargoToml = path.join(repoRoot, 'Cargo.toml');
-        if (fs.existsSync(cargoToml)) {
-            const cargo = spawnSync(
-                'cargo',
-                ['run', '--quiet', '--manifest-path', cargoToml, '-p', 'vmz-tools', '--', 'build', project, '--out-dir', dist],
-                { cwd: repoRoot, encoding: 'utf8' },
-            );
-            if (cargo.status === 0) {
-                return { ok: true, outDir: dist, diagnostics: [] };
-            }
-        }
-    }
+    const vmzJs = path.join(repoRoot, 'packages', 'runtimes', 'vmz', 'bin', 'vmz.js');
 
     if (options.createWorkspace) {
         try {
@@ -77,11 +63,27 @@ export function buildForCompile(project: string, outDir?: string, options: Build
         }
     }
 
+    if (fs.existsSync(vmzJs)) {
+        const run = spawnSync(process.execPath, [vmzJs, 'build', project, '--out-dir', dist], {
+            cwd: repoRoot,
+            encoding: 'utf8',
+        });
+        if (run.status === 0) {
+            return { ok: true, outDir: dist, diagnostics: [] };
+        }
+        return {
+            ok: false,
+            outDir: dist,
+            diagnostics: [],
+            error: `build failed via @vmz/vmz (exit ${run.status}): ${run.stderr || run.stdout || ''}`.trim(),
+        };
+    }
+
     return {
         ok: false,
         outDir: dist,
         diagnostics: [],
-        error: 'build failed: vmz-tools unavailable and no createWorkspace provided',
+        error: 'build failed: no createWorkspace provided and packages/runtimes/vmz/bin/vmz.js missing',
     };
 }
 

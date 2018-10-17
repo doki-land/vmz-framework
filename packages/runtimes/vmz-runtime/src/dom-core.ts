@@ -571,6 +571,15 @@ export const directApi = {
         if (regionId != null) start.__vmzRegion = regionId;
         const frag = document.createDocumentFragment();
         frag.appendChild(start);
+        /** @type {HTMLElement | null} */
+        let regionHost = null;
+        if (regionId != null) {
+            // Queryable region marker without a layout box (`display: contents`).
+            regionHost = document.createElement('span');
+            regionHost.style.display = 'contents';
+            regionHost.setAttribute('data-vmz-region', String(regionId));
+            frag.appendChild(regionHost);
+        }
         frag.appendChild(end);
         /** @type {Array<Node | null>} */
         const cached = branches.map(() => null);
@@ -648,7 +657,8 @@ export const directApi = {
             if (next < 0) return;
             wireBranch(next);
             if (cached[next] && end.parentNode) {
-                end.parentNode.insertBefore(cached[next], end);
+                if (regionHost) regionHost.appendChild(cached[next]);
+                else end.parentNode.insertBefore(cached[next], end);
             }
         };
 

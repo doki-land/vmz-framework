@@ -4,7 +4,7 @@
       <p>route-home</p>
       <nav>
         <Link to="AboutPage">About</Link>
-        <Link to="ProductPage" :params="id: 'sku-1'">Product</Link>
+        <Link to="ProductPage" :params="{ id: 'sku-1' }">Product</Link>
         <Link to="ShopIndexPage">Shop</Link>
         <Link to="LandingPage">Welcome</Link>
       </nav>

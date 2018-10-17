@@ -10,13 +10,12 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { repoRoot } from '../_lib/repo-root.ts';
+import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
 
 const root = repoRoot(import.meta.url);
 const gridRoot = path.join(root, 'packages', 'ui', 'vmz-ui-data-grid');
 const uiRoot = path.join(root, 'packages', 'ui', 'vmz-ui');
 const homepage = path.join(root, 'packages', 'homepage');
-const cargo = process.env.CARGO || 'cargo';
 const SCHEMA = 'vmz.ui.token_requirements.v0';
 const FORBIDDEN_HEX = ['#176BFF', '#0D57DB', '#FFB000', '#00C878', '#121416'];
 
@@ -26,7 +25,7 @@ function fail(msg) {
 }
 
 function runBuild(projectDir) {
-    const r = spawnSync(cargo, ['run', '-p', 'vmz-tools', '--quiet', '--', 'build', projectDir], {
+    const r = spawnSync(process.execPath, [vmzBin(root), 'build', projectDir], {
         cwd: root,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],

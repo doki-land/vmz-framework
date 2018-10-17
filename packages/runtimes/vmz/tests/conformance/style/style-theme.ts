@@ -17,7 +17,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { repoRoot } from '../_lib/repo-root.ts';
+import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
 
 const root = repoRoot(import.meta.url);
 const example = path.join(root, 'packages', 'examples', 'vmz-style-tailwind');
@@ -33,7 +33,7 @@ function fail(msg) {
 }
 
 function runBuild(projectDir) {
-    const r = spawnSync(cargo, ['run', '-p', 'vmz-tools', '--quiet', '--', 'build', projectDir], {
+    const r = spawnSync(process.execPath, [vmzBin(root), 'build', projectDir], {
         cwd: root,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],

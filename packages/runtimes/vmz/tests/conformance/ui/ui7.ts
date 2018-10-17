@@ -87,7 +87,7 @@ if (pack.id !== 'ui7') fail(`pack.id want ui7, got ${pack.id}`);
 if (!Array.isArray(pack.fixtures) || pack.fixtures.length === 0) fail('pack.fixtures empty');
 
 console.log('ui7: build homepage (program.json for @vmz/ui components)…');
-const build = spawnSync(cargo, ['run', '-p', 'vmz-tools', '--quiet', '--', 'build', homepage], {
+const build = spawnSync(process.execPath, [vmzBin, 'build', homepage], {
     cwd: root,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],

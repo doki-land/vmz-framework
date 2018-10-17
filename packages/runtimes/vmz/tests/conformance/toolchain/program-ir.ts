@@ -1,5 +1,5 @@
 /**
- * gate: CLI Workspace build and Node N-API build emit byte-identical `*.program.json`.
+ * gate: Node `@vmz/vmz` CLI build and N-API Workspace emit byte-identical `*.program.json`.
  *
  * Usage (repo root): node scripts/_gate_n1_program_ir.mjs
  * Requires: `pnpm napi:build` (or existing packages/runtimes/vmz/*.node)
@@ -9,8 +9,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { repoRoot } from '../_lib/repo-root.ts';
+import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
 import { createWorkspace, PROGRAM_IR_SCHEMA } from 'vmz';
 
 const root = repoRoot(import.meta.url);
@@ -39,12 +38,11 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-n1-ir-'));
 const distCli = path.join(tmp, 'cli');
 const distNapi = path.join(tmp, 'napi');
 
-console.log(' gate: building via CLI Workspace…');
-const cli = spawnSync(
-    'cargo',
-    ['run', '--quiet', '--manifest-path', path.join(root, 'Cargo.toml'), '-p', 'vmz-tools', '--', 'build', example, '--out-dir', distCli],
-    { cwd: root, stdio: 'inherit' },
-);
+console.log(' gate: building via Node `@vmz/vmz` CLI…');
+const cli = spawnSync(process.execPath, [vmzBin(root), 'build', example, '--out-dir', distCli], {
+    cwd: root,
+    stdio: 'inherit',
+});
 if (cli.status !== 0) fail(`CLI build exited ${cli.status}`);
 
 console.log(' gate: building via Node N-API Workspace…');
@@ -79,4 +77,4 @@ if (queried !== appJson) fail('queryProgramGraph !== emitted Application.program
 
 ws.dispose();
 fs.rmSync(tmp, { recursive: true, force: true });
-console.log(` GATE OK: ${cliMap.size} program.json file(s) byte-identical (CLI Workspace ≡ Node N-API)`);
+console.log(` GATE OK: ${cliMap.size} program.json file(s) byte-identical (@vmz/vmz CLI ≡ Node N-API)`);
