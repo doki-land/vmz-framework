@@ -29,6 +29,7 @@ import { cmdApplication } from './application-cmd.js';
 import { cmdArtifact } from './release-cmd.js';
 import { cmdRefactor } from './refactor-cmd.js';
 import { cmdExplain } from './explain-cmd.js';
+import { cmdPlan } from './plan-cmd.js';
 import { loadVmzConfig } from './plugin-host.js';
 import { normalizeDeliveryAuthoring, resolveProfileArtifactDir, selectBuildProfile } from './delivery-profile.js';
 import { packFromDeploymentIr } from './pack.js';
@@ -120,6 +121,7 @@ Usage:
   vmz artifact <cmd>            Release pack / publish / rollback / diff (A3)
   vmz refactor <cmd>            DX rename plans / apply 
   vmz explain [style] <target>  DX causal explain (style Theme chain)
+  vmz plan <kind> [root]        Dump frozen Rust plans via N-API (locale | document-route)
   vmz version                   Show host + native protocol versions
   vmz help                      Show this help
 
@@ -222,6 +224,8 @@ export async function runCli(argv, opts = {}) {
             return cmdRefactor(rest);
         case 'explain':
             return cmdExplain(rest);
+        case 'plan':
+            return cmdPlan(rest);
         default:
             log.error(`unknown command \`${cmd}\``);
             if (inv.mode === 'global') printGlobalHelp();
