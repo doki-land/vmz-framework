@@ -934,6 +934,12 @@ export { runCli, parseArgs, printHelp, printGlobalHelp, printProjectHelp } from 
 export { createCli, formatDiagnostic, formatDiagnostics, t } from './toolchain-dx.js';
 export type { LocalizePlugin } from './toolchain-dx.js';
 export {
+    VMZ_CLI_CATALOG_EN_US,
+    createVmzCliLocalize,
+    translateCatalog,
+    vmzCliLocalize,
+} from './toolchain-dx.js';
+export {
     findNearestProjectVmz,
     getInvocationContext,
     isGlobalAllowedCommand,
