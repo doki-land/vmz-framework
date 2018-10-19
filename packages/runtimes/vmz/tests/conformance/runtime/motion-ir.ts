@@ -10,7 +10,7 @@ import { repoRoot } from '../_lib/repo-root.ts';
 
 const root = repoRoot(import.meta.url);
 const homepage = path.join(root, 'packages', 'homepage');
-const cargo = process.env.CARGO || 'cargo';
+const vmzBin = path.join(root, 'packages', 'runtimes', 'vmz', 'bin', 'vmz.js');
 
 function fail(msg) {
     console.error(`motion-ir GATE FAIL: ${msg}`);
@@ -18,7 +18,7 @@ function fail(msg) {
 }
 
 console.log('motion-ir: build homepage (emits Dialog/Drawer/Button program.json)…');
-const build = spawnSync(cargo, ['run', '-p', 'vmz-tools', '--quiet', '--', 'build', homepage], {
+const build = spawnSync(process.execPath, [vmzBin, 'build', homepage], {
     cwd: root,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],

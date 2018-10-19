@@ -15,7 +15,6 @@ const homepage = path.join(root, 'packages', 'homepage');
 const packDir = path.join(root, 'packages', 'ui', 'vmz-ui', 'conformance');
 const packPath = path.join(packDir, 'pack.v0.json');
 const vmzBin = path.join(root, 'packages', 'runtimes', 'vmz', 'bin', 'vmz.js');
-const cargo = process.env.CARGO || 'cargo';
 
 function fail(msg) {
     console.error(`ui7 GATE FAIL: ${msg}`);
