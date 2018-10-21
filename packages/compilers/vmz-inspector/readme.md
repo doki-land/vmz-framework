@@ -8,11 +8,11 @@ the compiler pipeline.
 | **Crate**       | `vmz-inspector`                                   |
 | **Kind**        | library                                           |
 | **Publish**     | `false` (workspace-internal)                      |
-| **CLI surface** | `vmz check`, `vmz lint` (via N-API / `vmz-tools`) |
+| **CLI surface** | `vmz check`, `vmz lint` (via `@vmz/vmz` + N-API) |
 | **Depends on**  | [`vmz-compiler`](../vmz-compiler/)                |
 
 > **Not** [`vmz-debugger`](../vmz-debugger/). Inspector is pass/fail diagnostics. Debugger is the causal explain /
-> trace / replay **library**; LSP·MCP are hosted only as `vmz lsp` / `vmz mcp`.
+> trace / replay **library**; LSP/MCP stdio hosting is deferred (not a second product CLI).
 
 ## Features
 
@@ -61,8 +61,7 @@ rather than duplicating the whole analysis.
 ## Integration
 
 ```text
-Node `vmz`  →  vmz-napi  →  Workspace.check / lint  →  vmz-inspector
-vmz-tools   →  same inspect APIs
+`@vmz/vmz`  →  vmz-napi  →  Workspace.check / lint  →  vmz-inspector
 ```
 
 ## Development

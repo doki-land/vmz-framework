@@ -1,7 +1,7 @@
 {
     "name": "vmz",
     "displayName": "VMZ",
-    "description": "VMZ language support — TextMate grammar + LSP via `vmz lsp`",
+    "description": "VMZ language support — TextMate grammar (LSP host deferred)",
     "version": "0.1.0",
     "private": true,
     "publisher": "vmz-framework",
@@ -31,7 +31,7 @@
                 "vmz.lsp.path": {
                     "type": "string",
                     "default": "",
-                    "markdownDescription": "Absolute path to the **native** `vmz` binary (vmz-tools). Empty = auto-detect (`VMZ_NATIVE`, workspace `target/{release,debug}/vmz`, then `vmz` on PATH)."
+                    "markdownDescription": "Optional path to a future LSP stdio host. Product CLI is `@vmz/vmz` (N-API); native `vmz lsp` is deferred — leave empty unless you run a custom host."
                 },
                 "vmz.lsp.arguments": {
                     "type": "array",
@@ -39,7 +39,7 @@
                         "type": "string"
                     },
                     "default": [],
-                    "description": "Extra arguments after `lsp` (for example `--out-dir dist`)."
+                    "description": "Extra arguments for a custom LSP host (deferred)."
                 },
                 "vmz.lsp.trace": {
                     "type": "string",

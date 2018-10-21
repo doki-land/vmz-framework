@@ -34,8 +34,7 @@ Authoring formatter for `.vmz` SFCs: **oxc IR formatter** (not codegen pretty-pr
 ## Integration
 
 ```text
-vmz-tools  `vmz format`  →  vmz_formatter::format_path
-Node `vmz` → vmz-napi    →  vmz_formatter::format_path
+`@vmz/vmz`  `vmz format`  →  vmz-napi  →  vmz_formatter::format_path
 ```
 
 oxc crates (including publish=false formatters) are locked to one git tag in the workspace root `Cargo.toml`.
@@ -44,7 +43,7 @@ oxc crates (including publish=false formatters) are locked to one git tag in the
 
 ```bash
 cargo test -p vmz-formatter
-cargo run -p vmz-tools -- format --check path/to/File.vmz
+pnpm vmz format --check path/to/File.vmz
 ```
 
 ## License

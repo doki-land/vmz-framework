@@ -19,8 +19,7 @@ debugger façades—to the npm `vmz` package.
 
 - Re-implementing analysis, author format, or explain heuristics in JavaScript
 - Calling Node `oxfmt` / Biome for `.vmz` (format stays in Rust [`vmz-formatter`](../vmz-formatter/))
-- Replacing `vmz lsp` / `vmz mcp` stdio hosting ([`vmz-tools`](../vmz-tools/); protocol lib in [
-  `vmz-debugger`](../vmz-debugger/))
+- Owning a product CLI or LSP/MCP stdio binary (product entry is `@vmz/vmz`; protocol libs in [`vmz-debugger`](../vmz-debugger/))
 - Owning semantic IR
 
 ## Build

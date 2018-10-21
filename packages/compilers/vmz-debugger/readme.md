@@ -10,11 +10,11 @@ replay causality against emitted program graphs, and expose the same core as **L
 | **Publish**            | `false` (workspace-internal)                                                        |
 | **Depends on**         | [`vmz-protocol`](../vmz-protocol/)                                                  |
 | **Does not depend on** | `vmz-compiler` (no parse / emit)                                                    |
-| **Process host**       | the single native binary [`vmz`](../vmz-tools/) — subcommands `vmz lsp` / `vmz mcp` |
+| **Process host**       | product CLI `@vmz/vmz` (N-API). LSP/MCP stdio host deferred — library only today |
 
 > **Not** [`vmz-inspector`](../vmz-inspector/). Inspector answers “is this legal?” Debugger answers “why did the graph
 > update?”  
-> **Not** a second executable. There is only one native CLI: `vmz` (`vmz-tools`).
+> **Not** a second product CLI. User-facing commands go through `@vmz/vmz` + N-API.
 
 ## Features
 
@@ -52,8 +52,7 @@ fn demo(out_dir: &Path) {
 
 ### LSP / MCP modules
 
-Editors and agents must launch **`vmz lsp`** / **`vmz mcp`** (from [`vmz-tools`](../vmz-tools/)). Those commands call
-into this crate:
+Protocol handlers live in this crate as a **library**. Product stdio hosting is deferred (not a second CLI bin).
 
 ```rust
 use serde_json::json;
@@ -78,15 +77,11 @@ Custom LSP methods: `vmz/explain`, `vmz/ingestTrace`, `vmz/replayCausal`, `vmz/c
 | `vmz_replay_causal` | Causal replay        |
 | `vmz_check_x5`      | Umbrella report      |
 
-## Running the servers
+## Stdio hosting
 
-```bash
-# only native binary in the toolchain
-cargo run -p vmz-tools -- lsp /path/to/app --out-dir /path/to/app/dist
-cargo run -p vmz-tools -- mcp /path/to/app --out-dir /path/to/app/dist
-```
+Deferred. Call `vmz_debugger::lsp` / `::mcp` from a future `@vmz/vmz` or dedicated host; do **not** revive a parallel Rust product CLI.
 
-Both speak **line-delimited JSON-RPC** on stdio. Example MCP session (one JSON object per line):
+Both protocol surfaces speak **line-delimited JSON-RPC**. Example MCP session (one JSON object per line):
 
 ```json
 {
@@ -119,7 +114,7 @@ src/
   `check_causal_replay` **delegate here**.
 - Gate alias `vmz_compiler::causal_replay` re-exports `vmz_debugger::causal_replay` for older call sites.
 - Prefer `vmz_debugger::…` in new code.
-- Stdio hosting belongs in [`vmz-tools`](../vmz-tools/) only.
+- Stdio product hosting is deferred; do not add a parallel Rust CLI bin for it.
 
 ## Development
 
