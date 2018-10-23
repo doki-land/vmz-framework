@@ -772,10 +772,24 @@ const serializeApi = {
             serializeApi._inst = child;
             try {
                 const node = Ctor.__vmzCreate.call(child, serializeApi);
+                /** @type {Record<string, string>} */
+                const attrs = { 'data-vmz': name };
+                const hostBox = Ctor.__vmzHostBox;
+                if (
+                    hostBox === 'contents' ||
+                    (hostBox == null &&
+                        (name === 'Button' ||
+                            name === 'Badge' ||
+                            name === 'Link' ||
+                            name === 'Tag' ||
+                            name === 'Icon'))
+                ) {
+                    attrs.style = 'display:contents';
+                }
                 return {
                     __kind: 'el',
                     tag: 'div',
-                    attrs: { 'data-vmz': name, style: 'display:contents' },
+                    attrs,
                     children: node ? [node] : [],
                     appendChild(c) {
                         if (c != null) this.children.push(c);

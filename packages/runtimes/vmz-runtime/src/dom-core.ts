@@ -12,6 +12,19 @@
 const components = Object.create(null);
 
 /**
+ * Inline chip hosts that opt into `display: contents` (`ui-direct-host-box`).
+ * Block surfaces (DataTable / shells / overlays) must keep a real layout box.
+ * @type {Set<string>}
+ */
+const INLINE_HOST_CONTENTS = new Set([
+    'Button',
+    'Badge',
+    'Link',
+    'Tag',
+    'Icon',
+]);
+
+/**
  * Precision lab counters (test / MCP / benchmarks — not a user API).
  * Primary keys: BindingId (IR). `*ByDep` is transitional stable-string adapter.
  */
@@ -450,11 +463,6 @@ export const directApi = {
         noteDomCreate();
         const host = document.createElement('div');
         host.setAttribute('data-vmz', name);
-        // Direct host default: no layout box (`ui-direct-host-box`). Islands keep a
-        // real box for hydrate / entry scheduling; true block surfaces opt in via CSS.
-        if (!client) {
-            host.style.display = 'contents';
-        }
         /** @type {Record<string, any>} */
         const resolved = {};
         for (const [k, v] of Object.entries(props || {})) {
@@ -480,6 +488,13 @@ export const directApi = {
         }
         const Ctor = components[name];
         if (!Ctor) throw new Error(`vmz:dom unknown component <${name} />`);
+        // Inline chips opt into no-box host (`ui-direct-host-box`). Block surfaces
+        // (tables/shells/overlays) keep a real box — default `contents` breaks
+        // hit-testing / slot hosts (DataTable select timed out in ui-automation).
+        const hostBox = Ctor.__vmzHostBox;
+        if (hostBox === 'contents' || (hostBox == null && INLINE_HOST_CONTENTS.has(String(name)))) {
+            host.style.display = 'contents';
+        }
         const child = createInstance(Ctor, resolved);
         if (!(Ctor.__vmzDirect && typeof Ctor.__vmzCreate === 'function')) {
             throw new Error(`vmz:dom direct component <${name}> requires __vmzCreate (rebuild child with Direct)`);
