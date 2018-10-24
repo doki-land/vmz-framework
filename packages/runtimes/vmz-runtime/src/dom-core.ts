@@ -16,13 +16,7 @@ const components = Object.create(null);
  * Block surfaces (DataTable / shells / overlays) must keep a real layout box.
  * @type {Set<string>}
  */
-const INLINE_HOST_CONTENTS = new Set([
-    'Button',
-    'Badge',
-    'Link',
-    'Tag',
-    'Icon',
-]);
+const INLINE_HOST_CONTENTS = new Set(['Button', 'Badge', 'Link', 'Tag', 'Icon']);
 
 /**
  * Precision lab counters (test / MCP / benchmarks — not a user API).

@@ -19,11 +19,7 @@ export const VMZ_CLI_CATALOG_EN_US: LocaleCatalog = {
  * @param {Record<string, string> | undefined} args
  * @param {LocaleCatalog} catalog
  */
-export function translateCatalog(
-    id: string,
-    args: Record<string, string> | undefined,
-    catalog: LocaleCatalog,
-): string {
+export function translateCatalog(id: string, args: Record<string, string> | undefined, catalog: LocaleCatalog): string {
     const template = catalog[id];
     if (template == null) return `{{${id}}}`;
     return template.replace(/\{([a-zA-Z0-9_.-]+)\}/g, (_m, name) => {

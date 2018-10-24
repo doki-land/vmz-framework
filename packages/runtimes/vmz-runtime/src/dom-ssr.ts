@@ -777,12 +777,7 @@ const serializeApi = {
                 const hostBox = Ctor.__vmzHostBox;
                 if (
                     hostBox === 'contents' ||
-                    (hostBox == null &&
-                        (name === 'Button' ||
-                            name === 'Badge' ||
-                            name === 'Link' ||
-                            name === 'Tag' ||
-                            name === 'Icon'))
+                    (hostBox == null && (name === 'Button' || name === 'Badge' || name === 'Link' || name === 'Tag' || name === 'Icon'))
                 ) {
                     attrs.style = 'display:contents';
                 }

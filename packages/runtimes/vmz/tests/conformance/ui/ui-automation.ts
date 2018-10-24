@@ -3166,13 +3166,14 @@ async function proveDataTable(page) {
         const btn = [...document.querySelectorAll('[data-vmz-fixture="datatable"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Clear'),
         );
-        btn?.click();
+        if (!btn) throw new Error('DataTable: Clear button missing');
+        btn.click();
     });
     await page.waitForFunction(
         () =>
             document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent?.includes('selected:none') &&
             !document.querySelector('[data-vmz-ui="bulk-actions"]'),
-        { timeout: 5000 },
+        { timeout: 15000 },
     );
 
     await page.click('[data-vmz-sort="status"]');
