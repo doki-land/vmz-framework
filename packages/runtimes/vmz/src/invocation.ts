@@ -15,6 +15,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { vmzCliLocalize } from './cli-localize.js';
 
 /** @typedef {'developer' | 'project' | 'global'} InvocationMode */
 
@@ -153,15 +154,15 @@ export async function gateGlobalProjectCommand(opts) {
     if (ctx.nearestProjectVmz && ctx.nearestProjectVmz !== ctx.thisPackageRoot) {
         const bin = resolveVmzBin(ctx.nearestProjectVmz);
         if (!bin) {
-            logError('found project `vmz` / `@vmz/vmz` but bin/vmz.js is missing.');
+            logError(vmzCliLocalize.t('cli.err.project_bin_missing'));
             return { action: 'exit', code: 1 };
         }
         const code = await reexec(bin, argv);
         return { action: 'exit', code };
     }
-    logError('this `vmz` is a global install (mode=global); project commands need a project install.');
-    logError('Install in the app:  pnpm add -D @vmz/vmz');
-    logError('Then run:            pnpm exec vmz <command>');
-    logError('(developer mode: run from vmz-framework packages/runtimes/vmz source — full CLI)');
+    logError(vmzCliLocalize.t('cli.err.global_needs_project'));
+    logError(vmzCliLocalize.t('cli.err.global_install_hint'));
+    logError(vmzCliLocalize.t('cli.err.global_run_hint'));
+    logError(vmzCliLocalize.t('cli.err.global_developer_hint'));
     return { action: 'exit', code: 1 };
 }

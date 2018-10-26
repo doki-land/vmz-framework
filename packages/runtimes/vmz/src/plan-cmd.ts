@@ -8,19 +8,12 @@
 import path from 'node:path';
 import { loadDocumentRoutePlan, loadLocalePlan, mapPlanDiagnostics } from './author-input.js';
 import { parseArgs } from './cli.js';
+import { vmzCliLocalize } from './cli-localize.js';
 import { log } from './log.js';
 import { emitPrettyJson } from './pretty-json.js';
 
 function printPlanHelp() {
-    console.log(`vmz plan — dump frozen Rust plans (N-API)
-
-Usage:
-  vmz plan locale [root]            LocalePlan from locales/
-  vmz plan document-route [root]    DocumentRoutePlan from documents/
-
-Options:
-  --json [file]   Write plan JSON to file (default: stdout)
-`);
+    console.log(vmzCliLocalize.t('cli.help.plan'));
 }
 
 /**
@@ -48,7 +41,7 @@ export function cmdPlan(argv) {
             plan = loadDocumentRoutePlan(root);
             break;
         default:
-            log.error(`unknown plan kind \`${sub}\` (locale | document-route)`);
+            log.errorId('cli.err.unknown_plan_kind', { kind: String(sub) });
             printPlanHelp();
             return 1;
     }

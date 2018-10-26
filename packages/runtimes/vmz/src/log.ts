@@ -1,7 +1,10 @@
 // @ts-nocheck
 /**
- * Unified CLI logging / diagnostics .
+ * Unified CLI logging / diagnostics.
+ * Framework lines use `errorId` + `@vmz/vmz` catalog; wire diagnostics prefer catalog[code] when present.
  */
+
+import { renderDiagnosticMessage, vmzCliLocalize } from './cli-localize.js';
 
 /** @param {string} level */
 function stamp(level) {
@@ -21,20 +24,30 @@ export const log = {
     error(...args) {
         console.error(stamp('error'), ...args);
     },
-    /** @param {{ severity: string, path?: string, message: string, code?: string }} d */
+    /**
+     * Localized framework error (`cli.err.*`).
+     * @param {string} id
+     * @param {Record<string, string>} [args]
+     */
+    errorId(id, args) {
+        console.error(stamp('error'), vmzCliLocalize.t(id, args));
+    },
+    /** @param {{ severity: string, path?: string, message?: string, code?: string, args?: Record<string, string> }} d */
     diagnostic(d) {
         const sev = d.severity || 'error';
         const code = d.code ? `${d.code}: ` : '';
+        const message = renderDiagnosticMessage(d);
         const loc = d.path ? ` (${d.path})` : '';
-        // Prefer `vmz warn|error CODE: message (path)` so locale warnings are visible, not silent.
         if (sev === 'warning') {
-            console.error(`${stamp('warn')} ${code}${d.message}${loc}`);
+            console.error(`${stamp('warn')} ${code}${message}${loc}`);
             return;
         }
-        console.error(`${stamp(sev === 'error' ? 'error' : sev)} ${code}${d.path ? `${d.path}: ` : ''}${d.message}`);
+        console.error(
+            `${stamp(sev === 'error' ? 'error' : sev)} ${code}${d.path ? `${d.path}: ` : ''}${message}`,
+        );
     },
     /**
-     * @param {Array<{ severity: string, path?: string, message: string, code?: string }>} diagnostics
+     * @param {Array<{ severity: string, path?: string, message?: string, code?: string, args?: Record<string, string> }>} diagnostics
      * @param {{ denyWarnings?: boolean }} [opts]
      * @returns {number} failing count (errors, and warnings if denyWarnings)
      */

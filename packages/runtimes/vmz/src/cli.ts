@@ -34,6 +34,7 @@ import { loadVmzConfig } from './plugin-host.js';
 import { normalizeDeliveryAuthoring, resolveProfileArtifactDir, selectBuildProfile } from './delivery-profile.js';
 import { packFromDeploymentIr } from './pack.js';
 import { assembleDelivery, emitBuildProof } from './build-assemble.js';
+import { vmzCliLocalize } from './cli-localize.js';
 
 /**
  * @param {string[]} argv
@@ -80,73 +81,11 @@ export function parseArgs(argv) {
 }
 
 export function printGlobalHelp() {
-    console.log(`vmz — global mode
-
-Install faces: @vmz/core (runtime) · @vmz/vmz (this CLI) · optional @vmz/ui / @vmz/plugin-*
-
-Three install modes:
-  developer  monorepo source (packages/runtimes/vmz) — full CLI
-  project    app node_modules/@vmz/vmz — full CLI
-  global     npm/pnpm -g — only help/version (project commands need a project install)
-
-You are in global mode. Pin \`@vmz/vmz\` in the app so check/build
-use a traceable project install.
-
-Usage:
-  vmz version                   Show host + native protocol versions
-  vmz help                      Show this help
-
-Project commands:
-  pnpm add @vmz/core && pnpm add -D @vmz/vmz
-  pnpm exec vmz check
-
-If a project \`node_modules/@vmz/vmz\` exists, a global
-\`vmz <cmd>\` re-execs that bin.
-`);
+    console.log(vmzCliLocalize.t('cli.help.global'));
 }
 
 export function printProjectHelp() {
-    console.log(`vmz — Node toolchain host (project / developer mode)
-
-Usage:
-  vmz check [path]              Check project via Workspace
-  vmz build [path] [options]    Build project via Workspace; --target mini-program-wechat packs dist/wechat
-  vmz serve [path] [options]    Serve dist (optional --build)
-  vmz dev [path] [options]      Rebuild session; --target mini-program-wechat packs dist/wechat
-  vmz format [path] [--check]   Format .vmz via N-API (oxc formatter + EditorConfig)
-  vmz lint [path] [--deny-warnings]  Lint (= check) via N-API
-  vmz test [path] [options]     Native test discover / report
-  vmz document|docs <cmd>       Project /documents domain 
-  vmz application <cmd>         Application Collection / Mount 
-  vmz artifact <cmd>            Release pack / publish / rollback / diff (A3)
-  vmz refactor <cmd>            DX rename plans / apply 
-  vmz explain [style] <target>  DX causal explain (style Theme chain)
-  vmz plan <kind> [root]        Dump frozen Rust plans via N-API (locale | document-route)
-  vmz version                   Show host + native protocol versions
-  vmz help                      Show this help
-
-Options:
-  --out-dir, -o <dir>   Workspace output root (default: dist). Profile artifacts land in <out-dir>/<name> (name defaults to profile id; CDN: name:'cdn' → dist/cdn)
-  --release             Release build (omit serve-host; pack minify slot; proof)
-  --profile <name>      Delivery profile (default from config; builtins: web-ssr|static|web-client|web-hybrid)
-  --target <id>         browser (default) | mini-program-wechat (pack dist/wechat for WeChat DevTools; build+dev)
-  --origin <url>        Site origin for web-static canonical/sitemap
-  --host <host>         Listen host (default: 127.0.0.1)
-  --port <port>         Listen port (dev: omit = auto from 5173; set = lock)
-  --poll-ms <ms>        Dev watch poll interval (default: 300)
-  --build               Build before serve
-  --check               Format check-only (format)
-  --deny-warnings       Treat warnings as errors (lint)
-  --list                List discovered tests (test)
-  --json [file]         Emit TestReport / DocumentManifest / ApplicationCheckReport JSON
-  --mode <modes>        compile|logic|browser|ssr|resume|deployment|all (test)
-  --filter <pattern>    Filter by test id or file (test)
-  --application <id>    Run only tests for ApplicationId (standalone scope)
-  --mounted <id>        Run relocation + host-boundary tests for ApplicationId
-  --affected            Select tests from dirty VPG units (test; DX)
-  --root <dir>          Project root (document check)
-  --strict              Strict document locale/PageKey coverage (document check)
-`);
+    console.log(vmzCliLocalize.t('cli.help.project'));
 }
 
 /** @deprecated use printProjectHelp / printGlobalHelp */
@@ -227,7 +166,7 @@ export async function runCli(argv, opts = {}) {
         case 'plan':
             return cmdPlan(rest);
         default:
-            log.error(`unknown command \`${cmd}\``);
+            log.errorId('cli.err.unknown_command', { cmd: String(cmd) });
             if (inv.mode === 'global') printGlobalHelp();
             else printProjectHelp();
             return 1;
@@ -311,7 +250,7 @@ async function cmdBuild(args) {
     const pathArg = args._[0] ?? '.';
     const targetRaw = typeof args.target === 'string' ? args.target : 'browser';
     if (targetRaw !== 'browser' && targetRaw !== 'mini-program-wechat') {
-        log.error(`unknown --target ${targetRaw} (browser | mini-program-wechat)`);
+        log.errorId('cli.err.unknown_target', { target: String(targetRaw) });
         return 1;
     }
     const wechatPack = targetRaw === 'mini-program-wechat';
@@ -580,7 +519,7 @@ async function cmdDev(args) {
     const pollMs = Number(args['poll-ms'] ?? 300);
     const targetRaw = typeof args.target === 'string' ? args.target : 'browser';
     if (targetRaw !== 'browser' && targetRaw !== 'mini-program-wechat') {
-        log.error(`unknown --target ${targetRaw} (browser | mini-program-wechat)`);
+        log.errorId('cli.err.unknown_target', { target: String(targetRaw) });
         return 1;
     }
 
