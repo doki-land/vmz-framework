@@ -6,17 +6,18 @@ TypeScript CLI framework for VMZ tooling.
 - **Pluggable localization** via `.use({ t, resolveLocale? })` — this package does **not** ship language packs
 - Official catalogs live in `@vmz/vmz`; apps may plug in their own
 - Library only — product bin remains `@vmz/vmz`
-- Implement `parse` / help when the product CLI actually migrates here
 
 ```ts
 import { createCli } from '@vmz/commander';
+import { vmzCliLocalize } from '@vmz/vmz'; // or a local plugin
 
 const cli = createCli('vmz')
-  .use(myLocalizePlugin)
+  .use(vmzCliLocalize)
+  .help('cli.help.project')
   .command('build', 'cli.cmd.build')
-  .option('--out-dir <dir>', 'cli.opt.build.out-dir')
-  .action(async () => {
-    /* … */
+  .option('--out-dir, -o <dir>', 'cli.opt.out-dir')
+  .action(async (options) => {
+    /* options._ positionals; options['out-dir'] … */
   });
 
 await cli.parse(process.argv);
