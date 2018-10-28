@@ -1,4 +1,4 @@
-/** Minimal activation — highlighting is contributed via shared vmz-textmate grammar. */
+/** TextMate-only activation — product CLI is `@vmz/vmz` (no LSP client). */
 function activate() {}
 
 function deactivate() {}

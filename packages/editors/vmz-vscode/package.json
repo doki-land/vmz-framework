@@ -1,7 +1,7 @@
 {
     "name": "vmz",
     "displayName": "VMZ",
-    "description": "VMZ language support — TextMate grammar (LSP host deferred)",
+    "description": "VMZ TextMate grammar for `.vmz` — product toolchain is `@vmz/vmz`",
     "version": "0.1.0",
     "private": true,
     "publisher": "vmz-framework",
@@ -21,38 +21,9 @@
         "package": "echo \"run vsce package after pnpm sync\""
     },
     "dependencies": {
-        "vscode-languageclient": "^9.0.1",
         "vmz-textmate": "workspace:*"
     },
     "contributes": {
-        "configuration": {
-            "title": "VMZ",
-            "properties": {
-                "vmz.lsp.path": {
-                    "type": "string",
-                    "default": "",
-                    "markdownDescription": "Optional path to a future LSP stdio host. Product CLI is `@vmz/vmz` (N-API); native `vmz lsp` is deferred — leave empty unless you run a custom host."
-                },
-                "vmz.lsp.arguments": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "default": [],
-                    "description": "Extra arguments for a custom LSP host (deferred)."
-                },
-                "vmz.lsp.trace": {
-                    "type": "string",
-                    "enum": [
-                        "off",
-                        "messages",
-                        "verbose"
-                    ],
-                    "default": "off",
-                    "description": "Trace communication between VS Code and `vmz lsp`."
-                }
-            }
-        },
         "languages": [
             {
                 "id": "vmz",
