@@ -22,6 +22,11 @@ export type DiagnosticInput = {
     severity: Severity;
     code: string;
     args?: Record<string, string>;
+    /**
+     * Transitional wire prose when the product catalog has no entry for `code`.
+     * Prefer catalog templates; do not treat this as a second i18n source of truth.
+     */
+    message?: string;
     span?: SourceSpan;
 };
 
@@ -67,7 +72,11 @@ export function formatDiagnostic(d: DiagnosticInput, opts: FormatOptions): strin
         throw new Error('@vmz/diagnostic: DiagnosticInput.code is required');
     }
     const catalog = resolveCatalog(opts.locale, opts.catalog);
-    const message = t(d.code, d.args, catalog);
+    const message = Object.prototype.hasOwnProperty.call(catalog, d.code)
+        ? t(d.code, d.args, catalog)
+        : d.message != null && String(d.message).length
+          ? String(d.message)
+          : t(d.code, d.args, catalog);
     const where = formatWhere(d, opts);
     const head = where ? `${where}: ` : '';
     return `${head}${d.severity}[${d.code}]: ${message}`;
