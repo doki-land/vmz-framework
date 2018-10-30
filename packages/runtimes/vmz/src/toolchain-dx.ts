@@ -1,9 +1,8 @@
 /**
- * Soft wiring for future CLI / diagnostic migration.
+ * Product wiring for `@vmz/commander` / `@vmz/diagnostic`.
  *
- * Do not expand `@vmz/commander` / `@vmz/diagnostic` until `@vmz/vmz` migrates
- * a real command or pretty-print path onto them. Official i18n catalogs live in
- * `cli-localize.ts` and plug into commander via `.use(vmzCliLocalize)`.
+ * Official catalogs live in `cli-localize.ts` and plug in via `.use(vmzCliLocalize)`.
+ * `runCli` builds the command tree with `createCli` — do not reintroduce a hand-rolled switch.
  */
 
 export { createCli } from '@vmz/commander';

@@ -2,7 +2,7 @@
  * Official CLI / diagnostic localization for `@vmz/vmz`.
  *
  * Catalogs live here — not in `@vmz/commander`, `@vmz/diagnostic`, or a separate
- * `@vmz/i18n` package. Grow message ids as help / diagnostics migrate.
+ * `@vmz/i18n` package. Plug into commander via `.use(vmzCliLocalize)`.
  */
 
 import type { LocaleCatalog, LocalizePlugin } from '@vmz/commander';
@@ -75,17 +75,40 @@ Options:
   --strict              Strict document locale/PageKey coverage (document check)
 `,
 
-    'cli.help.plan': `vmz plan — dump frozen Rust plans (N-API)
+    'cli.cmd.check': 'Check project via Workspace',
+    'cli.cmd.build': 'Build project via Workspace',
+    'cli.cmd.serve': 'Serve dist (optional --build)',
+    'cli.cmd.dev': 'Rebuild session',
+    'cli.cmd.format': 'Format .vmz via N-API',
+    'cli.cmd.lint': 'Lint (= check) via N-API',
+    'cli.cmd.test': 'Native test discover / report',
+    'cli.cmd.document': 'Project /documents domain',
+    'cli.cmd.locale': 'Locale domain',
+    'cli.cmd.application': 'Application Collection / Mount',
+    'cli.cmd.artifact': 'Release pack / publish / rollback / diff',
+    'cli.cmd.refactor': 'DX rename plans / apply',
+    'cli.cmd.explain': 'DX causal explain',
+    'cli.cmd.plan': 'Dump frozen Rust plans via N-API',
+    'cli.cmd.plan.locale': 'LocalePlan from locales/',
+    'cli.cmd.plan.document-route': 'DocumentRoutePlan from documents/',
+    'cli.cmd.version': 'Show host + native protocol versions',
 
-Usage:
-  vmz plan locale [root]            LocalePlan from locales/
-  vmz plan document-route [root]    DocumentRoutePlan from documents/
-
-Options:
-  --json [file]   Write plan JSON to file (default: stdout)
-`,
+    'cli.opt.out-dir': 'Workspace output root (default: dist)',
+    'cli.opt.release': 'Release build (omit serve-host; pack minify; proof)',
+    'cli.opt.profile': 'Delivery profile id',
+    'cli.opt.target': 'browser | mini-program-wechat',
+    'cli.opt.origin': 'Site origin for web-static',
+    'cli.opt.host': 'Listen host',
+    'cli.opt.port': 'Listen port',
+    'cli.opt.poll-ms': 'Dev watch poll interval',
+    'cli.opt.build': 'Build before serve',
+    'cli.opt.check': 'Format check-only',
+    'cli.opt.deny-warnings': 'Treat warnings as errors',
+    'cli.opt.json': 'Write JSON to stdout or file',
 
     'cli.err.unknown_command': 'unknown command `{cmd}`',
+    'cli.err.unknown_option': 'unknown option `{option}`',
+    'cli.err.missing_option_value': 'missing value for `{option}`',
     'cli.err.unknown_plan_kind': 'unknown plan kind `{kind}` (locale | document-route)',
     'cli.err.unknown_target': 'unknown --target {target} (browser | mini-program-wechat)',
     'cli.err.project_bin_missing': 'found project `vmz` / `@vmz/vmz` but bin/vmz.js is missing.',
@@ -95,6 +118,9 @@ Options:
     'cli.err.global_run_hint': 'Then run:            pnpm exec vmz <command>',
     'cli.err.global_developer_hint':
         '(developer mode: run from vmz-framework packages/runtimes/vmz source — full CLI)',
+
+    /** Fallback when wire diagnostic has no code (args.message). */
+    'diag.message': '{message}',
 };
 
 /**
@@ -129,19 +155,3 @@ export function createVmzCliLocalize(opts: { locale?: string; catalog?: LocaleCa
 
 /** Default official plugin (`en-US`). */
 export const vmzCliLocalize = createVmzCliLocalize();
-
-/**
- * Prefer catalog[code] when present; otherwise keep transitional wire `message`.
- */
-export function renderDiagnosticMessage(
-    d: { code?: string; message?: string; args?: Record<string, string> },
-    localize: LocalizePlugin = vmzCliLocalize,
-): string {
-    const code = d.code ? String(d.code) : '';
-    if (code && Object.prototype.hasOwnProperty.call(VMZ_CLI_CATALOG_EN_US, code)) {
-        return localize.t(code, d.args);
-    }
-    if (d.message != null && String(d.message).length) return String(d.message);
-    if (code) return `{{${code}}}`;
-    return '';
-}

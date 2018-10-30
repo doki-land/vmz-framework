@@ -1,29 +1,25 @@
 // @ts-nocheck
 /**
  * `vmz plan` — dump frozen Rust plans as canonical JSON via N-API.
- * Same loaders as Workspace / locale / document hosts (`loadLocalePlan` /
- * `loadDocumentRoutePlan`); no parallel Rust clap product surface.
+ * Invoked from the product `@vmz/commander` tree (`plan locale|document-route`).
  */
 
 import path from 'node:path';
 import { loadDocumentRoutePlan, loadLocalePlan, mapPlanDiagnostics } from './author-input.js';
 import { parseArgs } from './cli.js';
-import { vmzCliLocalize } from './cli-localize.js';
 import { log } from './log.js';
 import { emitPrettyJson } from './pretty-json.js';
 
-function printPlanHelp() {
-    console.log(vmzCliLocalize.t('cli.help.plan'));
-}
-
 /**
- * @param {string[]} argv
+ * @param {string[]} argv  kind + remaining tokens (from commander action)
  * @returns {number}
  */
 export function cmdPlan(argv) {
     const [sub, ...rest] = argv;
     if (!sub || sub === 'help' || sub === '-h' || sub === '--help') {
-        printPlanHelp();
+        // Commander prints command help for `vmz plan` / `vmz plan help`;
+        // keep a tiny fallback when called directly in tests.
+        console.log('vmz plan locale|document-route [root] [--json [file]]');
         return 0;
     }
 
@@ -42,7 +38,6 @@ export function cmdPlan(argv) {
             break;
         default:
             log.errorId('cli.err.unknown_plan_kind', { kind: String(sub) });
-            printPlanHelp();
             return 1;
     }
 
@@ -52,7 +47,6 @@ export function cmdPlan(argv) {
         log.diagnostics(diagnostics);
     }
 
-    // Always emit plan body (stdout, or `--json <file>`).
     emitPrettyJson(typeof args.json === 'string' ? args.json : true, plan);
 
     return hardErrors.length ? 1 : 0;

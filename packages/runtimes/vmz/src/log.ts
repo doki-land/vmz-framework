@@ -1,10 +1,10 @@
 // @ts-nocheck
 /**
- * Unified CLI logging / diagnostics.
- * Framework lines use `errorId` + `@vmz/vmz` catalog; wire diagnostics prefer catalog[code] when present.
+ * Unified CLI logging / diagnostics via `@vmz/diagnostic` + product catalog.
  */
 
-import { renderDiagnosticMessage, vmzCliLocalize } from './cli-localize.js';
+import { formatDiagnostic } from '@vmz/diagnostic';
+import { VMZ_CLI_CATALOG_EN_US, vmzCliLocalize } from './cli-localize.js';
 
 /** @param {string} level */
 function stamp(level) {
@@ -32,22 +32,29 @@ export const log = {
     errorId(id, args) {
         console.error(stamp('error'), vmzCliLocalize.t(id, args));
     },
-    /** @param {{ severity: string, path?: string, message?: string, code?: string, args?: Record<string, string> }} d */
+    /** @param {{ severity?: string, path?: string, message?: string, code?: string, args?: Record<string, string>, span?: { start: number, end: number } }} d */
     diagnostic(d) {
-        const sev = d.severity || 'error';
-        const code = d.code ? `${d.code}: ` : '';
-        const message = renderDiagnosticMessage(d);
-        const loc = d.path ? ` (${d.path})` : '';
-        if (sev === 'warning') {
-            console.error(`${stamp('warn')} ${code}${message}${loc}`);
-            return;
-        }
-        console.error(
-            `${stamp(sev === 'error' ? 'error' : sev)} ${code}${d.path ? `${d.path}: ` : ''}${message}`,
+        const severity =
+            d.severity === 'warning' || d.severity === 'advice' || d.severity === 'error' ? d.severity : 'error';
+        const code = d.code && String(d.code).length ? String(d.code) : 'diag.message';
+        const line = formatDiagnostic(
+            {
+                path: d.path || '',
+                severity,
+                code,
+                args: d.args || (d.message ? { message: String(d.message) } : undefined),
+                message: d.message,
+                span: d.span,
+            },
+            {
+                locale: vmzCliLocalize.resolveLocale?.({ argv: [], env: process.env }) || 'en-US',
+                catalog: VMZ_CLI_CATALOG_EN_US,
+            },
         );
+        console.error(stamp(severity === 'warning' ? 'warn' : severity === 'error' ? 'error' : 'diag'), line);
     },
     /**
-     * @param {Array<{ severity: string, path?: string, message?: string, code?: string, args?: Record<string, string> }>} diagnostics
+     * @param {Array<{ severity?: string, path?: string, message?: string, code?: string, args?: Record<string, string> }>} diagnostics
      * @param {{ denyWarnings?: boolean }} [opts]
      * @returns {number} failing count (errors, and warnings if denyWarnings)
      */

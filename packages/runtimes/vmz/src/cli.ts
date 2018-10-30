@@ -34,6 +34,7 @@ import { loadVmzConfig } from './plugin-host.js';
 import { normalizeDeliveryAuthoring, resolveProfileArtifactDir, selectBuildProfile } from './delivery-profile.js';
 import { packFromDeploymentIr } from './pack.js';
 import { assembleDelivery, emitBuildProof } from './build-assemble.js';
+import { createCli } from '@vmz/commander';
 import { vmzCliLocalize } from './cli-localize.js';
 
 /**
@@ -94,6 +95,82 @@ export function printHelp() {
 }
 
 /**
+ * @param {{ helpId?: string }} [opts]
+ */
+function buildProductCli(opts = {}) {
+    const helpId = opts.helpId || 'cli.help.project';
+    const cli = createCli('vmz').use(vmzCliLocalize).help(helpId);
+
+    /** @param {import('@vmz/commander').Command} cmd */
+    const withWorkspaceOpts = (cmd) =>
+        cmd
+            .option('--out-dir, -o <dir>', 'cli.opt.out-dir')
+            .option('--release', 'cli.opt.release')
+            .option('--profile <name>', 'cli.opt.profile')
+            .option('--target <id>', 'cli.opt.target')
+            .option('--origin <url>', 'cli.opt.origin')
+            .option('--host <host>', 'cli.opt.host')
+            .option('--port <port>', 'cli.opt.port')
+            .option('--poll-ms <ms>', 'cli.opt.poll-ms')
+            .option('--build', 'cli.opt.build')
+            .option('--check', 'cli.opt.check')
+            .option('--deny-warnings', 'cli.opt.deny-warnings');
+
+    withWorkspaceOpts(cli.command('check', 'cli.cmd.check')).action((options) => cmdCheck(options));
+    withWorkspaceOpts(cli.command('build', 'cli.cmd.build')).action((options) => cmdBuild(options));
+    withWorkspaceOpts(cli.command('serve', 'cli.cmd.serve')).action((options) => cmdServe(options));
+    withWorkspaceOpts(cli.command('dev', 'cli.cmd.dev')).action((options) => cmdDev(options));
+    withWorkspaceOpts(cli.command('format', 'cli.cmd.format')).action((options) => cmdFormat(options));
+    withWorkspaceOpts(cli.command('lint', 'cli.cmd.lint')).action((options) => cmdLint(options));
+
+    cli.command('test', 'cli.cmd.test')
+        .passthrough()
+        .action((_o, ...args) => cmdTest(parseArgs(args)));
+    cli.command('document|docs', 'cli.cmd.document')
+        .passthrough()
+        .action((_o, ...args) => cmdDocument(args));
+    cli.command('locale|locales', 'cli.cmd.locale')
+        .passthrough()
+        .action((_o, ...args) => cmdLocale(args));
+    cli.command('application|applications|app', 'cli.cmd.application')
+        .passthrough()
+        .action((_o, ...args) => cmdApplication(args));
+    cli.command('artifact|artifacts|release', 'cli.cmd.artifact')
+        .passthrough()
+        .action((_o, ...args) => cmdArtifact(args));
+    cli.command('refactor', 'cli.cmd.refactor')
+        .passthrough()
+        .action((_o, ...args) => cmdRefactor(args));
+    cli.command('explain', 'cli.cmd.explain')
+        .passthrough()
+        .action((_o, ...args) => cmdExplain(args));
+
+    const plan = cli.command('plan', 'cli.cmd.plan');
+    plan.command('locale', 'cli.cmd.plan.locale')
+        .option('--json [file]', 'cli.opt.json')
+        .action((options) => cmdPlan(planRest('locale', options)));
+    plan.command('document-route|document_route', 'cli.cmd.plan.document-route')
+        .option('--json [file]', 'cli.opt.json')
+        .action((options) => cmdPlan(planRest('document-route', options)));
+
+    cli.command('version', 'cli.cmd.version').action(() => cmdVersion());
+    return cli;
+}
+
+/**
+ * @param {string} kind
+ * @param {import('@vmz/commander').ParsedOptions} options
+ */
+function planRest(kind, options) {
+    /** @type {string[]} */
+    const out = [kind];
+    if (options._?.length) out.push(...options._);
+    if (options.json === true) out.push('--json');
+    else if (typeof options.json === 'string') out.push('--json', options.json);
+    return out;
+}
+
+/**
  * @param {string[]} argv
  * @param {{
  * cwd?: string,
@@ -103,22 +180,15 @@ export function printHelp() {
  * @returns {Promise<number>}
  */
 export async function runCli(argv, opts = {}) {
-    const [cmd, ...rest] = argv;
+    const [cmd] = argv;
     const inv = getInvocationContext({
         cwd: opts.cwd,
         thisPackageRoot: opts.thisPackageRoot,
     });
 
-    if (!cmd || cmd === 'help' || cmd === '-h' || cmd === '--help') {
-        if (inv.mode === 'global') printGlobalHelp();
-        else printProjectHelp();
-        return 0;
-    }
-    if (cmd === 'version' || cmd === '-V' || cmd === '--version') {
-        return cmdVersion();
-    }
+    const helpId = inv.mode === 'global' ? 'cli.help.global' : 'cli.help.project';
 
-    if (!isGlobalAllowedCommand(cmd)) {
+    if (cmd && !isHelpToken(cmd) && cmd !== 'version' && cmd !== '-V' && cmd !== '--version' && !isGlobalAllowedCommand(cmd)) {
         const gated = await gateGlobalProjectCommand({
             argv,
             cwd: opts.cwd,
@@ -129,48 +199,15 @@ export async function runCli(argv, opts = {}) {
         if (gated.action === 'exit') return gated.code;
     }
 
-    const args = parseArgs(rest);
-    switch (cmd) {
-        case 'check':
-            return cmdCheck(args);
-        case 'build':
-            return cmdBuild(args);
-        case 'serve':
-            return cmdServe(args);
-        case 'dev':
-            return cmdDev(args);
-        case 'format':
-            return cmdFormat(args);
-        case 'lint':
-            return cmdLint(args);
-        case 'test':
-            return cmdTest(args);
-        case 'document':
-        case 'docs':
-            return cmdDocument(rest);
-        case 'locale':
-        case 'locales':
-            return cmdLocale(rest);
-        case 'application':
-        case 'applications':
-        case 'app':
-            return cmdApplication(rest);
-        case 'artifact':
-        case 'artifacts':
-        case 'release':
-            return cmdArtifact(rest);
-        case 'refactor':
-            return cmdRefactor(rest);
-        case 'explain':
-            return cmdExplain(rest);
-        case 'plan':
-            return cmdPlan(rest);
-        default:
-            log.errorId('cli.err.unknown_command', { cmd: String(cmd) });
-            if (inv.mode === 'global') printGlobalHelp();
-            else printProjectHelp();
-            return 1;
-    }
+    // Normalize version aliases onto the registered `version` command.
+    const normalized =
+        cmd === '-V' || cmd === '--version' ? ['version', ...argv.slice(1)] : argv;
+
+    return buildProductCli({ helpId }).parse(normalized);
+}
+
+function isHelpToken(token) {
+    return token === 'help' || token === '-h' || token === '--help';
 }
 
 function cmdVersion() {
