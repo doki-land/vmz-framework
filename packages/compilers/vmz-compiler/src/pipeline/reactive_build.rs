@@ -11,40 +11,116 @@ use vmz_types::{
 };
 
 use crate::field_rw::{collect_each_alias_prop_paths, collect_template_dep_keys};
-use crate::template::{AttrValue, TemplateAttr, TemplateIr, TemplateNode};
+use crate::template::{
+    AttrValue, ConcreteAttr, ConcreteIr, ConcreteNode, Directive, TemplateAttr, TemplateIr,
+    TemplateNode, TemplateSpan,
+};
 use vmz_generator::template_expr_snippet_error;
+
+/// One invalid template expression finding (body-local span for absolute conversion).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TemplateExprError {
+    /// Human message (`invalid template expression …`).
+    pub message: String,
+    /// UTF-8 `[start,end)` into the `<template>` body (not the SFC file).
+    pub body_span: TemplateSpan,
+}
 
 /// Collect oxc parse failures for every template expression binding (interp / attr).
 ///
 /// Expressions remain `String` in IR; this is the early validation ingress before
-/// emit re-parses for codegen.
+/// emit re-parses for codegen. Prefer [`collect_concrete_expr_errors`] when spans matter.
 pub fn collect_template_expr_errors(template: &TemplateIr) -> Vec<String> {
+    collect_concrete_expr_errors_from_ir(template).into_iter().map(|e| e.message).collect()
+}
+
+/// Walk Concrete AST and return expression errors with body-local spans.
+pub fn collect_concrete_expr_errors(concrete: &ConcreteIr) -> Vec<TemplateExprError> {
     let mut out = Vec::new();
-    walk_expr_errors(&template.roots, &mut out);
+    walk_concrete_expr_errors(&concrete.roots, &mut out);
     out
 }
 
-fn walk_expr_errors(nodes: &[TemplateNode], out: &mut Vec<String>) {
+fn collect_concrete_expr_errors_from_ir(template: &TemplateIr) -> Vec<TemplateExprError> {
+    let mut out = Vec::new();
+    walk_ir_expr_errors(&template.roots, &mut out);
+    out
+}
+
+fn walk_ir_expr_errors(nodes: &[TemplateNode], out: &mut Vec<TemplateExprError>) {
     for n in nodes {
         match n {
-            TemplateNode::Interp(e) => push_expr_error(e, out),
+            TemplateNode::Interp(e) => push_expr_error_ir(e, out),
             TemplateNode::Text(_) => {}
             TemplateNode::Element { attrs, children, .. } => {
                 for a in attrs {
                     match &a.value {
-                        AttrValue::Interp(e) => push_expr_error(e, out),
+                        AttrValue::Interp(e) => push_expr_error_ir(e, out),
                         AttrValue::Static(_) => {}
                     }
                 }
-                walk_expr_errors(children, out);
+                walk_ir_expr_errors(children, out);
             }
         }
     }
 }
 
-fn push_expr_error(expr: &str, out: &mut Vec<String>) {
+fn push_expr_error_ir(expr: &str, out: &mut Vec<TemplateExprError>) {
     if let Some(msg) = template_expr_snippet_error(expr) {
-        out.push(format!("invalid template expression `{expr}`: {msg}"));
+        out.push(TemplateExprError {
+            message: format!("invalid template expression `{expr}`: {msg}"),
+            // Legacy IR has no spans; callers that need offsets must use Concrete.
+            body_span: TemplateSpan { start: 0, end: 0 },
+        });
+    }
+}
+
+fn walk_concrete_expr_errors(nodes: &[ConcreteNode], out: &mut Vec<TemplateExprError>) {
+    for n in nodes {
+        match n {
+            ConcreteNode::Interpolation { expr, span, .. } => {
+                push_expr_error(expr, *span, out);
+            }
+            ConcreteNode::Text { .. } | ConcreteNode::Comment { .. } => {}
+            ConcreteNode::Element { attrs, children, .. } => {
+                for a in attrs {
+                    match a {
+                        ConcreteAttr::Static { .. } => {}
+                        ConcreteAttr::Directive { dir, span } => {
+                            for expr in directive_exprs(dir) {
+                                push_expr_error(expr, *span, out);
+                            }
+                        }
+                    }
+                }
+                walk_concrete_expr_errors(children, out);
+            }
+        }
+    }
+}
+
+fn directive_exprs(dir: &Directive) -> Vec<&str> {
+    match dir {
+        Directive::If { test } | Directive::ElseIf { test } => vec![test.as_str()],
+        Directive::Else => vec![],
+        Directive::For { source, .. } => vec![source.as_str()],
+        Directive::Bind { expr, .. } | Directive::BindObject { expr } => vec![expr.as_str()],
+        Directive::On { handler, .. } => vec![handler.as_str()],
+        Directive::OnObject { expr } => vec![expr.as_str()],
+        Directive::Html { expr } | Directive::Show { expr } | Directive::Model { expr, .. } => {
+            vec![expr.as_str()]
+        }
+        Directive::Slot { props, .. } => props.as_deref().into_iter().collect(),
+        Directive::Custom { expr, .. } => expr.as_deref().into_iter().collect(),
+    }
+}
+
+fn push_expr_error(expr: &str, body_span: TemplateSpan, out: &mut Vec<TemplateExprError>) {
+    if let Some(msg) = template_expr_snippet_error(expr) {
+        out.push(TemplateExprError {
+            message: format!("invalid template expression `{expr}`: {msg}"),
+            body_span,
+        });
     }
 }
 

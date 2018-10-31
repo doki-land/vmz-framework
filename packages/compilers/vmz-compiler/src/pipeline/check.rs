@@ -16,9 +16,11 @@ use crate::server_calls::collect_server_class_calls;
 use crate::server_slice::ServerSliceProof;
 use crate::sfc::{ScriptKind, ScriptLanguage, parse_vmz};
 use crate::template::{
-    AttrValue, TemplateIr, TemplateNode, parse_template, template_parse_to_diagnostic,
+    AttrValue, TemplateIr, TemplateNode, parse_template, parse_template_concrete,
+    template_parse_to_diagnostic, lower_concrete_to_ir,
 };
 use crate::virtual_server;
+use vmz_protocol::SourceSpan;
 use vmz_types::{ComponentDecl, ServerAttach};
 
 /// Options for [`check_path`] / [`check_project`].
@@ -194,7 +196,18 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
         ));
     }
 
-    let ir = match parse_template(&parsed.template.content) {
+    let concrete = match parse_template_concrete(&parsed.template.content) {
+        Ok(c) => c,
+        Err(e) => {
+            report.diagnostics.push(template_parse_to_diagnostic(
+                path,
+                parsed.template.content_start,
+                &e,
+            ));
+            return;
+        }
+    };
+    let ir = match lower_concrete_to_ir(&concrete) {
         Ok(ir) => ir,
         Err(e) => {
             report.diagnostics.push(template_parse_to_diagnostic(
@@ -205,8 +218,19 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
             return;
         }
     };
-    for msg in crate::reactive_build::collect_template_expr_errors(&ir) {
-        report.diagnostics.push(ReportedDiagnostic::error(path, msg));
+    let content_start = parsed.template.content_start as u32;
+    for err in crate::reactive_build::collect_concrete_expr_errors(&concrete) {
+        let (start, end) = err.body_span.to_absolute(content_start);
+        let path_s = path.to_string_lossy().into_owned();
+        report.diagnostics.push(
+            ReportedDiagnostic::error(path, err.message)
+                .with_code("vmz::template/invalid-expr")
+                .with_source_span(SourceSpan {
+                    path: path_s,
+                    start,
+                    end,
+                }),
+        );
     }
     if report
         .diagnostics

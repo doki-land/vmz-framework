@@ -87,12 +87,14 @@ fn template_parse_error_carries_absolute_source_span() {
 #[test]
 fn invalid_template_expression_fails_oxc_ingress() {
     let report = check_template_snippet(r#"<p>{{ 1 + }}</p>"#);
-    assert!(
-        report
-            .diagnostics
-            .iter()
-            .any(|d| d.is_error() && d.message().contains("invalid template expression")),
-        "{:?}",
-        report.diagnostics
-    );
+    let diag = report
+        .diagnostics
+        .iter()
+        .find(|d| d.is_error() && d.message().contains("invalid template expression"))
+        .unwrap_or_else(|| panic!("missing invalid-expr diagnostic: {:?}", report.diagnostics));
+    assert_eq!(diag.code_string().as_deref(), Some("vmz::template/invalid-expr"));
+    let span = diag.source_span().expect("invalid-expr must carry SourceSpan");
+    assert!(span.end > span.start, "span={span:?}");
+    // Snippet is `<template>\n<p>{{ 1 + }}</p>\n</template>…` — mustache body is past content_start.
+    assert!(span.start > 0, "absolute span must not be template-body-local 0");
 }

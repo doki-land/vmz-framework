@@ -15,9 +15,12 @@ use crate::project::{VmzModuleKind, discover_vmz_files};
 use crate::reactive_build::build_program_module_with_server;
 use crate::scss::{ScssCompilerHandle, ScssEmitRequest};
 use crate::sfc::{ScriptKind, parse_vmz};
-use crate::template::{parse_template, template_parse_to_diagnostic};
+use crate::template::{
+    lower_concrete_to_ir, parse_template_concrete, template_parse_to_diagnostic,
+};
 use crate::tw::{TwCompilerHandle, TwEmitRequest, register_tw_from_parsed};
 use crate::virtual_server;
+use vmz_protocol::SourceSpan;
 use vmz_types::{DeploymentClientCall, DeploymentView, ProgramModule, StubStatus};
 use walkdir::WalkDir;
 
@@ -848,7 +851,18 @@ fn emit_file(
         ));
     }
     let server = parsed.server.as_ref().map(|s| analyze_script(ScriptKind::Server, &s.content));
-    let template_ir = match parse_template(&parsed.template.content) {
+    let concrete = match parse_template_concrete(&parsed.template.content) {
+        Ok(c) => c,
+        Err(e) => {
+            report.diagnostics.push(template_parse_to_diagnostic(
+                path,
+                parsed.template.content_start,
+                &e,
+            ));
+            return Ok(());
+        }
+    };
+    let template_ir = match lower_concrete_to_ir(&concrete) {
         Ok(ir) => ir,
         Err(e) => {
             report.diagnostics.push(template_parse_to_diagnostic(
@@ -859,8 +873,19 @@ fn emit_file(
             return Ok(());
         }
     };
-    for msg in crate::reactive_build::collect_template_expr_errors(&template_ir) {
-        report.diagnostics.push(ReportedDiagnostic::error(path, msg));
+    let content_start = parsed.template.content_start as u32;
+    for err in crate::reactive_build::collect_concrete_expr_errors(&concrete) {
+        let (start, end) = err.body_span.to_absolute(content_start);
+        let path_s = path.to_string_lossy().into_owned();
+        report.diagnostics.push(
+            ReportedDiagnostic::error(path, err.message)
+                .with_code("vmz::template/invalid-expr")
+                .with_source_span(SourceSpan {
+                    path: path_s,
+                    start,
+                    end,
+                }),
+        );
     }
     if report
         .diagnostics
