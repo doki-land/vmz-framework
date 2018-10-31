@@ -144,9 +144,10 @@ pub use style_token_diag::{
     validate_unused_design_tokens, validate_vmz_css_var_refs,
 };
 pub use template::{
-    AttrValue, ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg, TemplateAttr,
-    TemplateIr, TemplateNode, TemplateParseError, TemplateSpan, decode_html_entities,
-    lower_concrete_to_ir, parse_template, parse_template_concrete, template_parse_to_diagnostic,
+    AttrValue, ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg, IfBranch,
+    SemanticIr, SemanticNode, TemplateAttr, TemplateIr, TemplateNode, TemplateParseError,
+    TemplateSpan, decode_html_entities, lower_concrete_to_ir, lower_concrete_to_semantic,
+    parse_template, parse_template_concrete, template_parse_to_diagnostic,
 };
 pub use tw::{
     TwCompiler, TwCompilerHandle, TwEmitRequest, TwEmitResult, TwRegKind, TwRegistration,
