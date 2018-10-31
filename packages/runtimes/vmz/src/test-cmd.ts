@@ -10,6 +10,23 @@ import { log } from './log.js';
 import { generatePrettyJson } from './pretty-json.js';
 
 /**
+ * @param {import('@vmz/commander').Cli | import('@vmz/commander').Command} cli
+ */
+export function registerTestCommand(cli) {
+    cli.command('test', 'cli.cmd.test')
+        .option('--out-dir, -o <dir>', 'cli.opt.out-dir')
+        .option('--list', 'cli.opt.list')
+        .option('--json [file]', 'cli.opt.json')
+        .option('--mode <modes>', 'cli.opt.mode')
+        .option('--filter <pattern>', 'cli.opt.filter')
+        .option('--application <id>', 'cli.opt.application')
+        .option('--mounted <id>', 'cli.opt.mounted')
+        .option('--affected', 'cli.opt.affected')
+        .option('--target <id>', 'cli.opt.target')
+        .action((options) => cmdTest(options));
+}
+
+/**
  * @returns {Promise<typeof import('@vmz/test')>}
  */
 async function loadTestPackage() {

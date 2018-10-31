@@ -1,43 +1,44 @@
 // @ts-nocheck
 /**
- * `vmz plan` — dump frozen Rust plans as canonical JSON via N-API.
- * Invoked from the product `@vmz/commander` tree (`plan locale|document-route`).
+ * `vmz plan` — dump frozen Rust plans via N-API; registered on `@vmz/commander`.
  */
 
 import path from 'node:path';
 import { loadDocumentRoutePlan, loadLocalePlan, mapPlanDiagnostics } from './author-input.js';
-import { parseArgs } from './cli.js';
 import { log } from './log.js';
 import { emitPrettyJson } from './pretty-json.js';
 
 /**
- * @param {string[]} argv  kind + remaining tokens (from commander action)
+ * @param {import('@vmz/commander').Command} parent
+ */
+export function registerPlanCommands(parent) {
+    const withJson = (cmd) => cmd.option('--json [file]', 'cli.opt.json');
+
+    withJson(parent.command('locale', 'cli.cmd.plan.locale')).action((options) => runPlanKind('locale', options));
+    withJson(parent.command('document-route|document_route', 'cli.cmd.plan.document-route')).action((options) =>
+        runPlanKind('document-route', options),
+    );
+}
+
+/**
+ * @param {'locale' | 'document-route'} kind
+ * @param {import('@vmz/commander').ParsedOptions} options
  * @returns {number}
  */
-export function cmdPlan(argv) {
-    const [sub, ...rest] = argv;
-    if (!sub || sub === 'help' || sub === '-h' || sub === '--help') {
-        // Commander prints command help for `vmz plan` / `vmz plan help`;
-        // keep a tiny fallback when called directly in tests.
-        console.log('vmz plan locale|document-route [root] [--json [file]]');
-        return 0;
-    }
-
-    const args = parseArgs(rest);
-    const rootArg = typeof args._[0] === 'string' ? args._[0] : '.';
+export function runPlanKind(kind, options) {
+    const rootArg = typeof options._[0] === 'string' ? options._[0] : '.';
     const root = path.resolve(rootArg);
 
     let plan;
-    switch (sub) {
+    switch (kind) {
         case 'locale':
             plan = loadLocalePlan(root);
             break;
         case 'document-route':
-        case 'document_route':
             plan = loadDocumentRoutePlan(root);
             break;
         default:
-            log.errorId('cli.err.unknown_plan_kind', { kind: String(sub) });
+            log.errorId('cli.err.unknown_plan_kind', { kind: String(kind) });
             return 1;
     }
 
@@ -47,7 +48,7 @@ export function cmdPlan(argv) {
         log.diagnostics(diagnostics);
     }
 
-    emitPrettyJson(typeof args.json === 'string' ? args.json : true, plan);
+    emitPrettyJson(typeof options.json === 'string' ? options.json : true, plan);
 
     return hardErrors.length ? 1 : 0;
 }

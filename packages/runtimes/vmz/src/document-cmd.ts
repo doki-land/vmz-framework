@@ -1,9 +1,8 @@
 // @ts-nocheck
 /**
- * `vmz document` / `vmz docs` CLI .
+ * `vmz document` / `vmz docs` — registered on `@vmz/commander`.
  */
 
-import fs from 'node:fs';
 import path from 'node:path';
 import { buildDocuments } from './document-build.js';
 import { checkDocuments, manifestHasErrors } from './document-check.js';
@@ -12,70 +11,24 @@ import { enrichDocumentEvidence } from './document-evidence.js';
 import { resolveMarkdownEngine } from './document-markdown.js';
 import { createWorkspace } from './index.js';
 import { log } from './log.js';
-import { parseArgs } from './cli.js';
 import { emitPrettyJson } from './pretty-json.js';
 
-function printDocumentHelp() {
-    console.log(`vmz document — project /documents domain
-
-Usage:
-  vmz document check [project]   Check locale tree + links/anchors + fence/API evidence
-  vmz document build [project]   Static HTML + view + evidence + search/islands + /designs CSS
-  vmz docs check|build […]       Alias of document
-
-Options:
-  --root <dir>     Project root (default: . or positional path)
-  --out <dir>      Build output (default: <project>/dist/documents)
-  --strict         Fail on missing/orphan translations & require defaultLocale
-  --json [file]    Emit DocumentManifest JSON to stdout or file
-`);
-}
-
 /**
- * @param {string[]} argv
- * @returns {Promise<number>}
+ * @param {import('@vmz/commander').Command} parent
  */
-export async function cmdDocument(argv) {
-    const [sub, ...rest] = argv;
-    if (!sub) {
-        if (process.stdout.isTTY) {
-            printDocumentHelp();
-            return 0;
-        }
-        log.error('vmz document requires a subcommand in non-interactive/CI contexts');
-        printDocumentHelp();
-        return 1;
-    }
-    if (sub === 'help' || sub === '-h' || sub === '--help') {
-        printDocumentHelp();
-        return 0;
-    }
-    if (sub.startsWith('-')) {
-        log.error('vmz document requires a subcommand (check|build)');
-        printDocumentHelp();
-        return 1;
-    }
+export function registerDocumentCommands(parent) {
+    const withOpts = (cmd) =>
+        cmd
+            .option('--root <dir>', 'cli.opt.root')
+            .option('--out <dir>', 'cli.opt.out')
+            .option('--strict', 'cli.opt.strict')
+            .option('--json [file]', 'cli.opt.json');
 
-    const args = parseArgs(rest);
-    switch (sub) {
-        case 'check':
-            return cmdDocumentCheck(args);
-        case 'build':
-            return cmdDocumentBuild(args);
-        case 'dev':
-        case 'serve':
-        case 'test':
-        case 'clean':
-            log.error(`vmz document ${sub} is not implemented yet`);
-            return 1;
-        default:
-            log.error(`unknown document subcommand \`${sub}\``);
-            printDocumentHelp();
-            return 1;
-    }
+    withOpts(parent.command('check', 'cli.cmd.document.check')).action((options) => cmdDocumentCheck(options));
+    withOpts(parent.command('build', 'cli.cmd.document.build')).action((options) => cmdDocumentBuild(options));
 }
 
-/** @param {Record<string, string | boolean> & { _: string[] }} args */
+/** @param {import('@vmz/commander').ParsedOptions} args */
 async function cmdDocumentCheck(args) {
     const project = (typeof args.root === 'string' && args.root) || (typeof args._[0] === 'string' && args._[0]) || '.';
     const projectRoot = path.resolve(project);
@@ -104,11 +57,7 @@ async function cmdDocumentCheck(args) {
     if (jsonOut) {
         emitPrettyJson(jsonOut, manifest, { logWrote: (p) => log.info(`wrote ${p}`) });
     } else {
-        for (const d of manifest.diagnostics) {
-            const loc = d.path ? ` (${d.path})` : '';
-            if (d.severity === 'error') log.error(`${d.code}: ${d.message}${loc}`);
-            else console.warn(`vmz warn ${d.code}: ${d.message}${loc}`);
-        }
+        log.diagnostics(manifest.diagnostics ?? []);
         log.info(
             `document check: locales=${manifest.locales.join(',') || '(none)'} pages=${manifest.pages.length} defaultLocale=${manifest.defaultLocale ?? '(none)'}`,
         );
@@ -117,7 +66,7 @@ async function cmdDocumentCheck(args) {
     return manifestHasErrors(manifest) ? 1 : 0;
 }
 
-/** @param {Record<string, string | boolean> & { _: string[] }} args */
+/** @param {import('@vmz/commander').ParsedOptions} args */
 async function cmdDocumentBuild(args) {
     const project = (typeof args.root === 'string' && args.root) || (typeof args._[0] === 'string' && args._[0]) || '.';
     const projectRoot = path.resolve(project);
@@ -132,14 +81,10 @@ async function cmdDocumentBuild(args) {
         return 1;
     }
 
-    for (const d of result.manifest.diagnostics || []) {
-        const loc = d.path ? ` (${d.path})` : '';
-        if (d.severity === 'error') log.error(`${d.code}: ${d.message}${loc}`);
-        else console.warn(`vmz warn ${d.code}: ${d.message}${loc}`);
-    }
+    log.diagnostics(result.manifest.diagnostics || []);
 
     if (!result.ok) {
-        log.error('document build aborted due to diagnostics');
+        log.errorId('cli.err.document_build_aborted');
         return 1;
     }
 

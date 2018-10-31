@@ -19,17 +19,17 @@ import { gateGlobalProjectCommand, getInvocationContext, isGlobalAllowedCommand 
 import { log } from './log.js';
 import { findAvailablePort } from './port.js';
 import { readPackageMeta, resolveWorkspaceDirs } from './resolve.js';
-import { cmdTest } from './test-cmd.js';
-import { cmdDocument } from './document-cmd.js';
+import { registerTestCommand } from './test-cmd.js';
+import { registerDocumentCommands } from './document-cmd.js';
 import { buildIntegratedDocuments, projectHasDocuments } from './document-integrate.js';
-import { cmdLocale } from './locale-cmd.js';
+import { registerLocaleCommands } from './locale-cmd.js';
 import { emitLocaleRuntimeModules, localeHasErrors } from './locale-check.js';
 import { emitLocaleRouteRealization } from './locale-route-emit.js';
 import { cmdApplication } from './application-cmd.js';
 import { cmdArtifact } from './release-cmd.js';
 import { cmdRefactor } from './refactor-cmd.js';
 import { cmdExplain } from './explain-cmd.js';
-import { cmdPlan } from './plan-cmd.js';
+import { registerPlanCommands } from './plan-cmd.js';
 import { loadVmzConfig } from './plugin-host.js';
 import { normalizeDeliveryAuthoring, resolveProfileArtifactDir, selectBuildProfile } from './delivery-profile.js';
 import { packFromDeploymentIr } from './pack.js';
@@ -123,15 +123,11 @@ function buildProductCli(opts = {}) {
     withWorkspaceOpts(cli.command('format', 'cli.cmd.format')).action((options) => cmdFormat(options));
     withWorkspaceOpts(cli.command('lint', 'cli.cmd.lint')).action((options) => cmdLint(options));
 
-    cli.command('test', 'cli.cmd.test')
-        .passthrough()
-        .action((_o, ...args) => cmdTest(parseArgs(args)));
-    cli.command('document|docs', 'cli.cmd.document')
-        .passthrough()
-        .action((_o, ...args) => cmdDocument(args));
-    cli.command('locale|locales', 'cli.cmd.locale')
-        .passthrough()
-        .action((_o, ...args) => cmdLocale(args));
+    registerTestCommand(cli);
+    registerDocumentCommands(cli.command('document|docs', 'cli.cmd.document'));
+    registerLocaleCommands(cli.command('locale|locales', 'cli.cmd.locale'));
+    registerPlanCommands(cli.command('plan', 'cli.cmd.plan'));
+
     cli.command('application|applications|app', 'cli.cmd.application')
         .passthrough()
         .action((_o, ...args) => cmdApplication(args));
@@ -145,29 +141,8 @@ function buildProductCli(opts = {}) {
         .passthrough()
         .action((_o, ...args) => cmdExplain(args));
 
-    const plan = cli.command('plan', 'cli.cmd.plan');
-    plan.command('locale', 'cli.cmd.plan.locale')
-        .option('--json [file]', 'cli.opt.json')
-        .action((options) => cmdPlan(planRest('locale', options)));
-    plan.command('document-route|document_route', 'cli.cmd.plan.document-route')
-        .option('--json [file]', 'cli.opt.json')
-        .action((options) => cmdPlan(planRest('document-route', options)));
-
     cli.command('version', 'cli.cmd.version').action(() => cmdVersion());
     return cli;
-}
-
-/**
- * @param {string} kind
- * @param {import('@vmz/commander').ParsedOptions} options
- */
-function planRest(kind, options) {
-    /** @type {string[]} */
-    const out = [kind];
-    if (options._?.length) out.push(...options._);
-    if (options.json === true) out.push('--json');
-    else if (typeof options.json === 'string') out.push('--json', options.json);
-    return out;
 }
 
 /**
