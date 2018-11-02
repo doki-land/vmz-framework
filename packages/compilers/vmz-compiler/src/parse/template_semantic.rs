@@ -6,7 +6,7 @@
 //! Execution IR lands.
 
 use super::template_common::TemplateParseError;
-use super::template_concrete::{ConcreteAttr, ConcreteIr, ConcreteNode, Directive};
+use super::template_concrete::{ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg};
 use super::template_span::TemplateSpan;
 
 /// Root of a Semantic template tree.
@@ -49,6 +49,23 @@ pub enum SemanticNode {
         /// Branches in source order; last may be `else` (`test == None`).
         branches: Vec<IfBranch>,
         /// Span covering the whole chain (first start .. last end).
+        span: TemplateSpan,
+    },
+    /// `v-for` iteration with full aliases and optional `:key` (not flat attrs).
+    ForNode {
+        /// Iterable / source expression.
+        source: String,
+        /// First alias (`item` in `(item, index) in items`).
+        value_alias: String,
+        /// Second alias when present (Vue key/index slot).
+        key_alias: Option<String>,
+        /// Third alias when present.
+        index_alias: Option<String>,
+        /// `:key` expression when present on the same element.
+        key: Option<String>,
+        /// Loop body (element with `v-for` / `:key` stripped).
+        body: Box<SemanticNode>,
+        /// Span of the `v-for` element.
         span: TemplateSpan,
     },
 }
@@ -108,6 +125,10 @@ fn lower_siblings(nodes: &[ConcreteNode]) -> Result<Vec<SemanticNode>, TemplateP
                         message: "`v-else` requires a preceding `v-if` / `v-else-if`".into(),
                         offset: span.start as usize,
                     });
+                }
+                None if for_directive(attrs).is_some() => {
+                    out.push(lower_for_element(&nodes[i])?);
+                    i += 1;
                 }
                 None => {
                     out.push(lower_element_strip_control_flow(&nodes[i])?);
@@ -192,6 +213,112 @@ fn take_if_chain(nodes: &[ConcreteNode]) -> Result<(SemanticNode, usize), Templa
     Ok((SemanticNode::IfChain { branches, span }, i))
 }
 
+fn for_directive(attrs: &[ConcreteAttr]) -> Option<&Directive> {
+    for a in attrs {
+        if let ConcreteAttr::Directive { dir: Directive::For { .. }, .. } = a {
+            return match a {
+                ConcreteAttr::Directive { dir, .. } => Some(dir),
+                _ => None,
+            };
+        }
+    }
+    None
+}
+
+fn bind_key_expr(attrs: &[ConcreteAttr]) -> Option<String> {
+    for a in attrs {
+        if let ConcreteAttr::Directive {
+            dir: Directive::Bind {
+                arg: DirectiveArg::Static(name),
+                expr,
+                ..
+            },
+            ..
+        } = a
+        {
+            if name == "key" {
+                return Some(expr.clone());
+            }
+        }
+    }
+    None
+}
+
+fn lower_for_element(node: &ConcreteNode) -> Result<SemanticNode, TemplateParseError> {
+    let ConcreteNode::Element {
+        tag,
+        attrs,
+        children,
+        span,
+    } = node
+    else {
+        return Err(TemplateParseError {
+            message: "internal: expected element".into(),
+            offset: 0,
+        });
+    };
+    lower_for_from_parts(tag, attrs, children, *span)
+}
+
+fn lower_for_from_parts(
+    tag: &str,
+    attrs: &[ConcreteAttr],
+    children: &[ConcreteNode],
+    span: TemplateSpan,
+) -> Result<SemanticNode, TemplateParseError> {
+    let Some(Directive::For {
+        source,
+        value_alias,
+        key_alias,
+        index_alias,
+    }) = for_directive(attrs).cloned()
+    else {
+        return Err(TemplateParseError {
+            message: "internal: expected `v-for`".into(),
+            offset: span.start as usize,
+        });
+    };
+    let key = bind_key_expr(attrs);
+    let body_attrs: Vec<ConcreteAttr> = attrs
+        .iter()
+        .filter(|a| {
+            !matches!(
+                a,
+                ConcreteAttr::Directive {
+                    dir: Directive::For { .. },
+                    ..
+                }
+            ) && !matches!(
+                a,
+                ConcreteAttr::Directive {
+                    dir: Directive::Bind {
+                        arg: DirectiveArg::Static(name),
+                        ..
+                    },
+                    ..
+                } if name == "key"
+            )
+        })
+        .cloned()
+        .collect();
+    let children = lower_siblings(children)?;
+    let body = SemanticNode::Element {
+        tag: tag.to_string(),
+        attrs: body_attrs,
+        children,
+        span,
+    };
+    Ok(SemanticNode::ForNode {
+        source,
+        value_alias,
+        key_alias,
+        index_alias,
+        key,
+        body: Box::new(body),
+        span,
+    })
+}
+
 fn lower_element_strip_control_flow(node: &ConcreteNode) -> Result<SemanticNode, TemplateParseError> {
     let ConcreteNode::Element {
         tag,
@@ -218,6 +345,9 @@ fn lower_element_strip_control_flow(node: &ConcreteNode) -> Result<SemanticNode,
         })
         .cloned()
         .collect();
+    if for_directive(&attrs).is_some() {
+        return lower_for_from_parts(tag, &attrs, children, *span);
+    }
     let children = lower_siblings(children)?;
     Ok(SemanticNode::Element {
         tag: tag.clone(),

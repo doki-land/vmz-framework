@@ -1,7 +1,8 @@
 //! Semantic AST fixtures (`IfChain` grouping; emit still via legacy TemplateIr).
 
 use vmz_compiler::{
-    SemanticNode, lower_concrete_to_semantic, parse_template_concrete,
+    ConcreteAttr, Directive, DirectiveArg, SemanticNode, lower_concrete_to_semantic,
+    parse_template_concrete,
 };
 
 #[test]
@@ -67,5 +68,82 @@ fn comment_between_chain_members_still_groups() {
             assert_eq!(branches[1].test, None);
         }
         other => panic!("expected IfChain, got {other:?}"),
+    }
+}
+
+#[test]
+fn for_node_keeps_aliases_and_key() {
+    let src = r#"<li v-for="(item, index) in items" :key="item.id">{{ item }}</li>"#;
+    let concrete = parse_template_concrete(src).unwrap();
+    let sem = lower_concrete_to_semantic(&concrete).unwrap();
+    assert_eq!(sem.roots.len(), 1);
+    match &sem.roots[0] {
+        SemanticNode::ForNode {
+            source,
+            value_alias,
+            key_alias,
+            index_alias,
+            key,
+            body,
+            ..
+        } => {
+            assert_eq!(source, "items");
+            assert_eq!(value_alias, "item");
+            assert_eq!(key_alias.as_deref(), Some("index"));
+            assert!(index_alias.is_none());
+            assert_eq!(key.as_deref(), Some("item.id"));
+            match body.as_ref() {
+                SemanticNode::Element { tag, attrs, .. } => {
+                    assert_eq!(tag, "li");
+                    assert!(
+                        !attrs.iter().any(|a| matches!(
+                            a,
+                            ConcreteAttr::Directive {
+                                dir: Directive::For { .. },
+                                ..
+                            }
+                        )),
+                        "v-for must be lifted off body attrs"
+                    );
+                    assert!(
+                        !attrs.iter().any(|a| matches!(
+                            a,
+                            ConcreteAttr::Directive {
+                                dir: Directive::Bind {
+                                    arg: DirectiveArg::Static(n),
+                                    ..
+                                },
+                                ..
+                            } if n == "key"
+                        )),
+                        ":key must be lifted off body attrs"
+                    );
+                }
+                other => panic!("expected Element body, got {other:?}"),
+            }
+        }
+        other => panic!("expected ForNode, got {other:?}"),
+    }
+}
+
+#[test]
+fn three_alias_for_retained() {
+    let src = r#"<li v-for="(v, k, i) in map" :key="k">{{ v }}</li>"#;
+    let concrete = parse_template_concrete(src).unwrap();
+    let sem = lower_concrete_to_semantic(&concrete).unwrap();
+    match &sem.roots[0] {
+        SemanticNode::ForNode {
+            value_alias,
+            key_alias,
+            index_alias,
+            key,
+            ..
+        } => {
+            assert_eq!(value_alias, "v");
+            assert_eq!(key_alias.as_deref(), Some("k"));
+            assert_eq!(index_alias.as_deref(), Some("i"));
+            assert_eq!(key.as_deref(), Some("k"));
+        }
+        other => panic!("expected ForNode, got {other:?}"),
     }
 }
