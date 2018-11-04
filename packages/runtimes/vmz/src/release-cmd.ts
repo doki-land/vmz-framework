@@ -1,68 +1,44 @@
 // @ts-nocheck
 /**
- * `vmz artifact` — pack / publish / rollback / diff (A3 filesystem Delivery Profile).
+ * `vmz artifact` — pack / publish / rollback / diff; registered on `@vmz/commander`.
  */
 
 import path from 'node:path';
 import { log } from './log.js';
 import { diffArtifacts, loadReleaseEnvelope, packRelease, publishRelease, readPointer, rollbackRelease } from './release-pack.js';
 
-function usage() {
-    console.log(`vmz artifact — filesystem release packaging (A3)
+/**
+ * @param {import('@vmz/commander').Command} parent
+ */
+export function registerArtifactCommands(parent) {
+    /** @param {import('@vmz/commander').Command} cmd */
+    const withOpts = (cmd) =>
+        cmd
+            .option('--releases <dir>', 'cli.opt.releases')
+            .option('--app-id <id>', 'cli.opt.app-id')
+            .option('--json', 'cli.opt.json');
 
-Usage:
-  vmz artifact pack [dist]              Write dist/_vmz manifests + envelope
-  vmz artifact publish [dist]           Pack + publish under dist/releases (atomic CURRENT)
-  vmz artifact rollback [releases]      Restore PREVIOUS pointer (no rebuild)
-  vmz artifact diff <aDigest> <bDigest> Structured file digest diff
-  vmz artifact current [releases]       Print CURRENT digest
-
-Options:
-  --releases <dir>   Releases root (default: <app>/dist/releases)
-  --app-id <id>      applicationId for envelope
-  --json             Machine-readable stdout
-`);
+    withOpts(parent.command('pack', 'cli.cmd.artifact.pack')).action((o) => runArtifact('pack', o));
+    withOpts(parent.command('publish', 'cli.cmd.artifact.publish')).action((o) => runArtifact('publish', o));
+    withOpts(parent.command('rollback', 'cli.cmd.artifact.rollback')).action((o) => runArtifact('rollback', o));
+    withOpts(parent.command('current', 'cli.cmd.artifact.current')).action((o) => runArtifact('current', o));
+    withOpts(parent.command('diff', 'cli.cmd.artifact.diff')).action((o) => runArtifact('diff', o));
 }
 
 /**
- * @param {string[]} argv
+ * @param {'pack'|'publish'|'rollback'|'current'|'diff'} sub
+ * @param {import('@vmz/commander').ParsedOptions} options
  * @param {{ root?: string }} [ctx]
  */
-export function cmdArtifact(argv, ctx = {}) {
-    const args = [...argv];
-    if (!args.length || args[0] === 'help' || args[0] === '--help') {
-        usage();
-        return 0;
-    }
-    const sub = args.shift();
-    /** @type {Record<string, string | boolean>} */
-    const flags = {};
-    /** @type {string[]} */
-    const pos = [];
-    for (let i = 0; i < args.length; i++) {
-        const a = args[i];
-        if (a === '--json') {
-            flags.json = true;
-            continue;
-        }
-        if (a === '--releases' || a === '--app-id') {
-            flags[a.slice(2)] = args[++i];
-            continue;
-        }
-        if (a.startsWith('--')) {
-            const eq = a.indexOf('=');
-            if (eq !== -1) flags[a.slice(2, eq)] = a.slice(eq + 1);
-            else flags[a.slice(2)] = true;
-            continue;
-        }
-        pos.push(a);
-    }
-
+export function runArtifact(sub, options, ctx = {}) {
     const cwd = path.resolve(ctx.root || process.cwd());
+    const pos = options._ || [];
     const dist = path.resolve(cwd, pos[0] || 'dist');
-    const releases = path.resolve(typeof flags.releases === 'string' ? flags.releases : path.join(cwd, 'dist', 'releases'));
-    const appId = typeof flags['app-id'] === 'string' ? flags['app-id'] : undefined;
-    const asJson = Boolean(flags.json);
+    const releases = path.resolve(
+        typeof options.releases === 'string' ? options.releases : path.join(cwd, 'dist', 'releases'),
+    );
+    const appId = typeof options['app-id'] === 'string' ? options['app-id'] : undefined;
+    const asJson = Boolean(options.json);
 
     try {
         if (sub === 'pack') {
@@ -97,7 +73,7 @@ export function cmdArtifact(argv, ctx = {}) {
             const aDig = pos[0];
             const bDig = pos[1];
             if (!aDig || !bDig) {
-                log.error('artifact diff requires <aDigest> <bDigest>');
+                log.errorId('cli.err.artifact_diff_usage');
                 return 1;
             }
             const a = loadReleaseEnvelope(releases, aDig);
@@ -111,8 +87,7 @@ export function cmdArtifact(argv, ctx = {}) {
             }
             return 0;
         }
-        log.error(`unknown artifact subcommand: ${sub}`);
-        usage();
+        log.errorId('cli.err.unknown_command', { cmd: `artifact ${sub}` });
         return 1;
     } catch (e) {
         log.error(String(e && e.message ? e.message : e));

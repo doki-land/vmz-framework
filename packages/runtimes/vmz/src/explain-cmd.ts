@@ -1,48 +1,53 @@
 // @ts-nocheck
 /**
- * `vmz explain` — DX causal explain queries .
- *
- * @param {string[]} argv args after `explain`
+ * `vmz explain` — DX causal explain; registered on `@vmz/commander`.
  */
+
 import { createWorkspace } from './index.js';
 import { log } from './log.js';
 import { resolveWorkspaceDirs } from './resolve.js';
 
 /**
- * @param {string[]} argv
+ * @param {import('@vmz/commander').Cli} cli
+ */
+export function registerExplainCommand(cli) {
+    cli.command('explain', 'cli.cmd.explain')
+        .option('--json', 'cli.opt.json')
+        .option('--out-dir, -o <dir>', 'cli.opt.out-dir')
+        .option('--target <id>', 'cli.opt.explain.target')
+        .option('--path <dir>', 'cli.opt.root')
+        .action((options) => cmdExplain(options));
+}
+
+/**
+ * @param {import('@vmz/commander').ParsedOptions} args
  * @returns {number}
  */
-export function cmdExplain(argv) {
-    const args = parse(argv);
-    if (args.help || args._[0] === 'help') {
-        printHelp();
-        return 0;
-    }
-
+export function cmdExplain(args) {
     let target;
     let pathArg = '.';
     if (args._[0] === 'style') {
         const node = args._[1];
         if (!node) {
-            log.error('usage: vmz explain style <node> [path]');
+            log.errorId('cli.err.explain_style_usage');
             return 1;
         }
         target = `style:${node}`;
-        pathArg = args._[2] ?? args.path ?? '.';
+        pathArg = args._[2] ?? (typeof args.path === 'string' ? args.path : '.');
     } else if (args._[0]) {
         target = String(args._[0]);
-        pathArg = args._[1] ?? args.path ?? '.';
+        pathArg = args._[1] ?? (typeof args.path === 'string' ? args.path : '.');
     } else if (args.target) {
         target = String(args.target);
-        pathArg = args.path ?? '.';
+        pathArg = typeof args.path === 'string' ? args.path : '.';
     } else {
-        printHelp();
+        log.errorId('cli.err.explain_usage');
         return 1;
     }
 
     const { project, outDir } = resolveWorkspaceDirs({
         path: String(pathArg),
-        outDir: args['out-dir'] ?? 'dist',
+        outDir: typeof args['out-dir'] === 'string' ? args['out-dir'] : 'dist',
     });
     const ws = createWorkspace({ root: project, outDir });
     if (typeof ws.explain !== 'function') {
@@ -73,50 +78,4 @@ export function cmdExplain(argv) {
         console.log(' (empty chain)');
     }
     return 0;
-}
-
-function printHelp() {
-    console.log(`vmz explain — causal explain (DX)
-
-Usage:
-  vmz explain style <node> [path]   Style Theme / style:tw / global styles
-  vmz explain <target> [path]       Generic Workspace.explain target
-
-Style nodes:
-  bg-action | colors.action | --vmz-colors-action
-  designs/styles/index.scss
-
-Options:
-  --json                 Print raw ExplainDocument JSON
-  --out-dir, -o <dir>    Dist directory (default: dist)
-`);
-}
-
-/**
- * @param {string[]} argv
- */
-function parse(argv) {
-    /** @type {Record<string, string | boolean> & { _: string[] }} */
-    const out = { _: [] };
-    for (let i = 0; i < argv.length; i++) {
-        const a = argv[i];
-        if (a.startsWith('--')) {
-            const eq = a.indexOf('=');
-            if (eq !== -1) {
-                out[a.slice(2, eq)] = a.slice(eq + 1);
-                continue;
-            }
-            const key = a.slice(2);
-            const next = argv[i + 1];
-            if (next && !next.startsWith('-') && key !== 'json' && key !== 'help') {
-                out[key] = next;
-                i += 1;
-            } else {
-                out[key] = true;
-            }
-            continue;
-        }
-        out._.push(a);
-    }
-    return out;
 }

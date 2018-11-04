@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * `vmz refactor` — RouteId/field safe rename (plan + atomic apply).
+ * `vmz refactor` — registered on `@vmz/commander`.
  */
 
 import { createWorkspace } from './index.js';
@@ -8,70 +8,24 @@ import { log } from './log.js';
 import { resolveWorkspaceDirs } from './resolve.js';
 
 /**
- * @param {string[]} argv args after `refactor`
- * @returns {Promise<number>}
+ * @param {import('@vmz/commander').Command} parent
  */
-export async function cmdRefactor(argv) {
-    const [sub, ...rest] = argv;
-    if (!sub || sub === 'help' || sub === '-h' || sub === '--help') {
-        printRefactorHelp();
-        return 0;
-    }
-    if (sub === 'rename') {
-        return cmdRename(rest);
-    }
-    log.error(`unknown refactor subcommand \`${sub}\``);
-    printRefactorHelp();
-    return 1;
+export function registerRefactorCommands(parent) {
+    parent
+        .command('rename', 'cli.cmd.refactor.rename')
+        .option('--kind <kind>', 'cli.opt.refactor.kind')
+        .option('--from <id>', 'cli.opt.refactor.from')
+        .option('--to <id>', 'cli.opt.refactor.to')
+        .option('--scope <chunk>', 'cli.opt.refactor.scope')
+        .option('--out-dir, -o <dir>', 'cli.opt.out-dir')
+        .option('--json [file]', 'cli.opt.json')
+        .option('--apply', 'cli.opt.apply')
+        .option('--explain', 'cli.opt.explain')
+        .action((options) => cmdRename(options));
 }
 
-function printRefactorHelp() {
-    console.log(`vmz refactor — workspace edit plans
-
-Usage:
-  vmz refactor rename --kind <route_id|field|method|component|capability> --from <id> --to <id> [path]
-                      [--scope <chunk>] [--json] [--apply] [--explain]
-
-Notes:
-  Returns WorkspaceEditPlan (\`vmz.dx.workspace_edit.v0\`).
-  route_id / field emit proven TextEdits; --apply writes atomically when status=ready.
-`);
-}
-
-/**
- * @param {string[]} argv
- */
-function parseRefactorArgs(argv) {
-    /** @type {Record<string, string | boolean> & { _: string[] }} */
-    const out = { _: [] };
-    for (let i = 0; i < argv.length; i++) {
-        const a = argv[i];
-        if (a.startsWith('--')) {
-            const eq = a.indexOf('=');
-            if (eq !== -1) {
-                out[a.slice(2, eq)] = a.slice(eq + 1);
-                continue;
-            }
-            const key = a.slice(2);
-            const next = argv[i + 1];
-            if (next && !next.startsWith('-')) {
-                out[key] = next;
-                i += 1;
-            } else {
-                out[key] = true;
-            }
-            continue;
-        }
-        out._.push(a);
-    }
-    return out;
-}
-
-/**
- * @param {string[]} argv
- */
-function cmdRename(argv) {
-    const args = parseRefactorArgs(argv);
+/** @param {import('@vmz/commander').ParsedOptions} args */
+function cmdRename(args) {
     const kind = typeof args.kind === 'string' ? args.kind : '';
     const from = typeof args.from === 'string' ? args.from : '';
     const to = typeof args.to === 'string' ? args.to : '';
@@ -81,8 +35,7 @@ function cmdRename(argv) {
     const wantExplain = args.explain === true;
 
     if (!kind || !from || !to) {
-        log.error('rename requires --kind, --from, and --to');
-        printRefactorHelp();
+        log.errorId('cli.err.refactor_rename_usage');
         return 1;
     }
 
@@ -149,9 +102,7 @@ function cmdRename(argv) {
             for (const e of plan.edits || []) {
                 console.log(` edit ${e.path} @${e.start}..${e.end} → ${JSON.stringify(e.newText)}`);
             }
-            for (const d of plan.diagnostics || []) {
-                console.log(` ${d.severity || 'info'}: ${d.message}`);
-            }
+            log.diagnostics(plan.diagnostics || []);
             if ((plan.edits || []).length === 0) {
                 console.log(' edits: (none)');
             }

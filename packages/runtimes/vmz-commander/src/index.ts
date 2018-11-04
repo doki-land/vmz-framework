@@ -41,6 +41,8 @@ export type OptionDef = {
     takesValue: boolean;
     /** True when value is optional (`[x]`): bare flag ⇒ `true`. */
     optionalValue: boolean;
+    /** True when the option may repeat (`--dirty <path>...` ⇒ `string[]`). */
+    repeatable: boolean;
 };
 
 /** Registered command node. */
@@ -328,11 +330,15 @@ function substitute(
     });
 }
 
-/** Parse `--out-dir <dir>` / `-o, --out-dir <dir>` / `--release` into an OptionDef. */
+/** Parse `--out-dir <dir>` / `-o, --out-dir <dir>` / `--dirty <path>...` into an OptionDef. */
 export function parseOptionDef(rawName: string, helpId: string): OptionDef {
+    const repeatable = /\.\.\.\s*$/.test(rawName) || /\.\.\.>/.test(rawName) || /\.\.\.]/.test(rawName);
     const optionalValue = /\[[^\]]+\]/.test(rawName);
-    const takesValue = optionalValue || /<[^>]+>/.test(rawName);
-    const cleaned = rawName.replace(/<[^>]+>|\[[^\]]+\]/g, '').trim();
+    const takesValue = optionalValue || /<[^>]+>/.test(rawName) || repeatable;
+    const cleaned = rawName
+        .replace(/\.\.\./g, '')
+        .replace(/<[^>]+>|\[[^\]]+\]/g, '')
+        .trim();
     const parts = cleaned
         .split(/[,\s]+/)
         .map((p) => p.trim())
@@ -346,7 +352,7 @@ export function parseOptionDef(rawName: string, helpId: string): OptionDef {
         throw new Error(`@vmz/commander: invalid option rawName ${JSON.stringify(rawName)}`);
     }
     const key = aliases.find((a) => a.length > 1) ?? aliases[0]!;
-    return { rawName, helpId, key, aliases, takesValue, optionalValue };
+    return { rawName, helpId, key, aliases, takesValue, optionalValue, repeatable };
 }
 
 /**
@@ -371,20 +377,20 @@ export function parseOptions(argv: string[], optionDefs: OptionDef[]): ParsedOpt
             if (!def) throw new Error(`unknown_option:--${long}`);
             if (def.takesValue) {
                 if (eq !== -1) {
-                    out[def.key] = a.slice(eq + 1);
+                    assignOption(out, def, a.slice(eq + 1));
                 } else {
                     const next = argv[i + 1];
                     if (next != null && !next.startsWith('-')) {
-                        out[def.key] = next;
+                        assignOption(out, def, next);
                         i += 1;
                     } else if (def.optionalValue) {
-                        out[def.key] = true;
+                        assignOption(out, def, true);
                     } else {
                         throw new Error(`missing_value:--${long}`);
                     }
                 }
             } else {
-                out[def.key] = true;
+                assignOption(out, def, true);
             }
             continue;
         }
@@ -395,19 +401,30 @@ export function parseOptions(argv: string[], optionDefs: OptionDef[]): ParsedOpt
             if (def.takesValue) {
                 const next = argv[i + 1];
                 if (next != null && !next.startsWith('-')) {
-                    out[def.key] = next;
+                    assignOption(out, def, next);
                     i += 1;
                 } else if (def.optionalValue) {
-                    out[def.key] = true;
+                    assignOption(out, def, true);
                 } else {
                     throw new Error(`missing_value:-${short}`);
                 }
             } else {
-                out[def.key] = true;
+                assignOption(out, def, true);
             }
             continue;
         }
         out._.push(a);
     }
     return out;
+}
+
+function assignOption(out: ParsedOptions, def: OptionDef, value: string | boolean): void {
+    if (def.repeatable) {
+        const cur = out[def.key];
+        const list = Array.isArray(cur) ? cur : [];
+        list.push(String(value));
+        out[def.key] = list;
+        return;
+    }
+    out[def.key] = value;
 }

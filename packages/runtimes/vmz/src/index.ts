@@ -951,8 +951,8 @@ export {
 export { resolveWorkspaceDirs, findPackageJson, readPackageMeta } from './resolve.js';
 export { resolvePackageRoot, resolveWorkspacePackages } from './packages.js';
 export { log } from './log.js';
-export { cmdApplication, runCheck as runApplicationCheck } from './application-cmd.js';
-export { cmdArtifact } from './release-cmd.js';
+export { registerApplicationCommands, runCheck as runApplicationCheck } from './application-cmd.js';
+export { registerArtifactCommands, runArtifact } from './release-cmd.js';
 export {
     ARTIFACT_DIFF_SCHEMA,
     DELIVERY_ARTIFACT_MANIFEST_SCHEMA,

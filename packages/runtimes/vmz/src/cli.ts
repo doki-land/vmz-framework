@@ -25,10 +25,10 @@ import { buildIntegratedDocuments, projectHasDocuments } from './document-integr
 import { registerLocaleCommands } from './locale-cmd.js';
 import { emitLocaleRuntimeModules, localeHasErrors } from './locale-check.js';
 import { emitLocaleRouteRealization } from './locale-route-emit.js';
-import { cmdApplication } from './application-cmd.js';
-import { cmdArtifact } from './release-cmd.js';
-import { cmdRefactor } from './refactor-cmd.js';
-import { cmdExplain } from './explain-cmd.js';
+import { registerApplicationCommands } from './application-cmd.js';
+import { registerArtifactCommands } from './release-cmd.js';
+import { registerRefactorCommands } from './refactor-cmd.js';
+import { registerExplainCommand } from './explain-cmd.js';
 import { registerPlanCommands } from './plan-cmd.js';
 import { loadVmzConfig } from './plugin-host.js';
 import { normalizeDeliveryAuthoring, resolveProfileArtifactDir, selectBuildProfile } from './delivery-profile.js';
@@ -127,19 +127,10 @@ function buildProductCli(opts = {}) {
     registerDocumentCommands(cli.command('document|docs', 'cli.cmd.document'));
     registerLocaleCommands(cli.command('locale|locales', 'cli.cmd.locale'));
     registerPlanCommands(cli.command('plan', 'cli.cmd.plan'));
-
-    cli.command('application|applications|app', 'cli.cmd.application')
-        .passthrough()
-        .action((_o, ...args) => cmdApplication(args));
-    cli.command('artifact|artifacts|release', 'cli.cmd.artifact')
-        .passthrough()
-        .action((_o, ...args) => cmdArtifact(args));
-    cli.command('refactor', 'cli.cmd.refactor')
-        .passthrough()
-        .action((_o, ...args) => cmdRefactor(args));
-    cli.command('explain', 'cli.cmd.explain')
-        .passthrough()
-        .action((_o, ...args) => cmdExplain(args));
+    registerApplicationCommands(cli.command('application|applications|app', 'cli.cmd.application'));
+    registerArtifactCommands(cli.command('artifact|artifacts|release', 'cli.cmd.artifact'));
+    registerRefactorCommands(cli.command('refactor', 'cli.cmd.refactor'));
+    registerExplainCommand(cli);
 
     cli.command('version', 'cli.cmd.version').action(() => cmdVersion());
     return cli;
