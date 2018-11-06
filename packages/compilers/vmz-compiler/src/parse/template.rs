@@ -17,7 +17,7 @@ pub use super::template_concrete::{
 pub use super::template_ir::{AttrValue, TemplateAttr, TemplateIr, TemplateNode};
 pub use super::template_lower::lower_concrete_to_ir;
 pub use super::template_semantic::{
-    IfBranch, SemanticIr, SemanticNode, lower_concrete_to_semantic,
+    EventTarget, IfBranch, SemanticIr, SemanticNode, SemanticProp, lower_concrete_to_semantic,
 };
 pub use super::template_span::TemplateSpan;
 

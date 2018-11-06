@@ -37,8 +37,8 @@ pub enum SemanticNode {
     Element {
         /// Tag name.
         tag: String,
-        /// Non-control-flow attributes (Concrete order).
-        attrs: Vec<ConcreteAttr>,
+        /// Structured props (Bind / On keep modifiers; no flat TemplateAttr).
+        props: Vec<SemanticProp>,
         /// Nested semantic children.
         children: Vec<SemanticNode>,
         /// Element span.
@@ -81,7 +81,75 @@ pub struct IfBranch {
     pub span: TemplateSpan,
 }
 
-/// Lower Concrete → Semantic (IfChain grouping; comments dropped).
+/// Event listener target classification (tag heuristic until component table lands).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventTarget {
+    /// Native DOM element (lowercase tag).
+    Dom,
+    /// Component tag (PascalCase / uppercase start).
+    Component,
+}
+
+/// Structured element prop on Semantic AST (BindPlan / EventPlan shapes).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SemanticProp {
+    /// Static HTML / component attribute.
+    Static {
+        /// Attribute name.
+        name: String,
+        /// Literal value.
+        value: String,
+        /// Attr span.
+        span: TemplateSpan,
+    },
+    /// `:arg` / `v-bind:arg` (BindPlan).
+    Bind {
+        /// Bound argument.
+        arg: DirectiveArg,
+        /// Value expression.
+        expr: String,
+        /// Modifiers (`sync`, …).
+        modifiers: Vec<String>,
+        /// Attr span.
+        span: TemplateSpan,
+    },
+    /// `v-bind="obj"`.
+    BindObject {
+        /// Object expression.
+        expr: String,
+        /// Attr span.
+        span: TemplateSpan,
+    },
+    /// `@arg` / `v-on:arg` (EventPlan).
+    On {
+        /// Event argument.
+        arg: DirectiveArg,
+        /// Handler expression.
+        handler: String,
+        /// Event modifiers (`stop`, `prevent`, …).
+        modifiers: Vec<String>,
+        /// Dom vs component callback.
+        target: EventTarget,
+        /// Attr span.
+        span: TemplateSpan,
+    },
+    /// `v-on="listeners"`.
+    OnObject {
+        /// Listeners object expression.
+        expr: String,
+        /// Attr span.
+        span: TemplateSpan,
+    },
+    /// Other directives kept structured from Concrete (slot/show/html/custom/model).
+    Directive {
+        /// Concrete directive payload.
+        dir: Directive,
+        /// Attr span.
+        span: TemplateSpan,
+    },
+}
+
+/// Lower Concrete → Semantic (IfChain / ForNode / Bind·On plans; comments dropped).
 pub fn lower_concrete_to_semantic(concrete: &ConcreteIr) -> Result<SemanticIr, TemplateParseError> {
     Ok(SemanticIr { roots: lower_siblings(&concrete.roots)? })
 }
@@ -304,7 +372,7 @@ fn lower_for_from_parts(
     let children = lower_siblings(children)?;
     let body = SemanticNode::Element {
         tag: tag.to_string(),
-        attrs: body_attrs,
+        props: lower_props(tag, &body_attrs),
         children,
         span,
     };
@@ -351,8 +419,70 @@ fn lower_element_strip_control_flow(node: &ConcreteNode) -> Result<SemanticNode,
     let children = lower_siblings(children)?;
     Ok(SemanticNode::Element {
         tag: tag.clone(),
-        attrs,
+        props: lower_props(tag, &attrs),
         children,
         span: *span,
     })
+}
+
+fn event_target_for_tag(tag: &str) -> EventTarget {
+    if tag.chars().next().is_some_and(|c| c.is_uppercase()) {
+        EventTarget::Component
+    } else {
+        EventTarget::Dom
+    }
+}
+
+fn lower_props(tag: &str, attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
+    let target = event_target_for_tag(tag);
+    let mut out = Vec::with_capacity(attrs.len());
+    for a in attrs {
+        match a {
+            ConcreteAttr::Static { name, value, span } => {
+                out.push(SemanticProp::Static {
+                    name: name.clone(),
+                    value: value.clone(),
+                    span: *span,
+                });
+            }
+            ConcreteAttr::Directive { dir, span } => match dir {
+                Directive::Bind { arg, expr, modifiers } => {
+                    out.push(SemanticProp::Bind {
+                        arg: arg.clone(),
+                        expr: expr.clone(),
+                        modifiers: modifiers.clone(),
+                        span: *span,
+                    });
+                }
+                Directive::BindObject { expr } => {
+                    out.push(SemanticProp::BindObject {
+                        expr: expr.clone(),
+                        span: *span,
+                    });
+                }
+                Directive::On { arg, handler, modifiers } => {
+                    out.push(SemanticProp::On {
+                        arg: arg.clone(),
+                        handler: handler.clone(),
+                        modifiers: modifiers.clone(),
+                        target,
+                        span: *span,
+                    });
+                }
+                Directive::OnObject { expr } => {
+                    out.push(SemanticProp::OnObject {
+                        expr: expr.clone(),
+                        span: *span,
+                    });
+                }
+                other => {
+                    out.push(SemanticProp::Directive {
+                        dir: other.clone(),
+                        span: *span,
+                    });
+                }
+            },
+        }
+    }
+    out
 }

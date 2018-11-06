@@ -1,8 +1,8 @@
 //! Semantic AST fixtures (`IfChain` grouping; emit still via legacy TemplateIr).
 
 use vmz_compiler::{
-    ConcreteAttr, Directive, DirectiveArg, SemanticNode, lower_concrete_to_semantic,
-    parse_template_concrete,
+    DirectiveArg, EventTarget, SemanticNode, SemanticProp, lower_concrete_to_semantic,
+    parse_template, parse_template_concrete,
 };
 
 #[test]
@@ -93,30 +93,27 @@ fn for_node_keeps_aliases_and_key() {
             assert!(index_alias.is_none());
             assert_eq!(key.as_deref(), Some("item.id"));
             match body.as_ref() {
-                SemanticNode::Element { tag, attrs, .. } => {
+                SemanticNode::Element { tag, props, .. } => {
                     assert_eq!(tag, "li");
                     assert!(
-                        !attrs.iter().any(|a| matches!(
-                            a,
-                            ConcreteAttr::Directive {
-                                dir: Directive::For { .. },
+                        !props.iter().any(|p| matches!(
+                            p,
+                            SemanticProp::Directive {
+                                dir: vmz_compiler::Directive::For { .. },
                                 ..
                             }
                         )),
-                        "v-for must be lifted off body attrs"
+                        "v-for must be lifted off body props"
                     );
                     assert!(
-                        !attrs.iter().any(|a| matches!(
-                            a,
-                            ConcreteAttr::Directive {
-                                dir: Directive::Bind {
-                                    arg: DirectiveArg::Static(n),
-                                    ..
-                                },
+                        !props.iter().any(|p| matches!(
+                            p,
+                            SemanticProp::Bind {
+                                arg: DirectiveArg::Static(n),
                                 ..
                             } if n == "key"
                         )),
-                        ":key must be lifted off body attrs"
+                        ":key must be lifted off body props"
                     );
                 }
                 other => panic!("expected Element body, got {other:?}"),
@@ -145,5 +142,79 @@ fn three_alias_for_retained() {
             assert_eq!(key.as_deref(), Some("k"));
         }
         other => panic!("expected ForNode, got {other:?}"),
+    }
+}
+
+#[test]
+fn on_modifiers_survive_semantic_event_plan() {
+    let src = r#"<button @click.stop.prevent="save">x</button>"#;
+    let concrete = parse_template_concrete(src).unwrap();
+    let sem = lower_concrete_to_semantic(&concrete).unwrap();
+    match &sem.roots[0] {
+        SemanticNode::Element { props, .. } => match &props[0] {
+            SemanticProp::On {
+                arg: DirectiveArg::Static(ev),
+                handler,
+                modifiers,
+                target,
+                ..
+            } => {
+                assert_eq!(ev, "click");
+                assert_eq!(handler, "save");
+                assert_eq!(modifiers, &["stop".to_string(), "prevent".to_string()]);
+                assert_eq!(*target, EventTarget::Dom);
+            }
+            other => panic!("expected On, got {other:?}"),
+        },
+        other => panic!("expected Element, got {other:?}"),
+    }
+    // Legacy IR still strips modifiers (transition).
+    let ir = parse_template(src).unwrap();
+    match &ir.roots[0] {
+        vmz_compiler::TemplateNode::Element { attrs, .. } => {
+            assert!(attrs.iter().any(|a| a.name == "@click"));
+            assert!(!attrs.iter().any(|a| a.name.contains("stop")));
+        }
+        other => panic!("expected IR element, got {other:?}"),
+    }
+}
+
+#[test]
+fn component_on_targets_component_event() {
+    let src = r#"<Counter @bump.stop="onBump" />"#;
+    let concrete = parse_template_concrete(src).unwrap();
+    let sem = lower_concrete_to_semantic(&concrete).unwrap();
+    match &sem.roots[0] {
+        SemanticNode::Element { props, .. } => match &props[0] {
+            SemanticProp::On { target, modifiers, .. } => {
+                assert_eq!(*target, EventTarget::Component);
+                assert_eq!(modifiers, &["stop".to_string()]);
+            }
+            other => panic!("expected On, got {other:?}"),
+        },
+        other => panic!("expected Element, got {other:?}"),
+    }
+}
+
+#[test]
+fn bind_plan_keeps_modifiers() {
+    let src = r#"<input :value.sync="q" />"#;
+    let concrete = parse_template_concrete(src).unwrap();
+    let sem = lower_concrete_to_semantic(&concrete).unwrap();
+    match &sem.roots[0] {
+        SemanticNode::Element { props, .. } => match &props[0] {
+            SemanticProp::Bind {
+                arg: DirectiveArg::Static(name),
+                expr,
+                modifiers,
+                ..
+            } => {
+                assert_eq!(name, "value");
+                assert_eq!(expr, "q");
+                assert_eq!(modifiers, &["sync".to_string()]);
+            }
+            other => panic!("expected Bind, got {other:?}"),
+        },
+        other => panic!("expected Element, got {other:?}"),
     }
 }
