@@ -125,8 +125,10 @@ pub use plugin::{
 };
 pub use project::{VmzModuleKind, discover_vmz_files};
 pub use reactive_build::{
-    build_program_module, build_program_module_with_server, collect_concrete_expr_errors,
-    collect_template_expr_errors, TemplateExprError,
+    build_program_module, build_program_module_asts, build_program_module_with_server,
+    build_program_module_with_server_asts, build_reactive_module,
+    build_reactive_module_from_semantic, collect_concrete_expr_errors, collect_template_expr_errors,
+    TemplateExprError,
 };
 pub use scss::{ScssCompiler, ScssCompilerHandle, ScssEmitRequest, ScssEmitResult};
 pub use session_graph::{SessionClientCall, SessionGraph, SessionGraphDocument, SessionUnit};
@@ -147,7 +149,7 @@ pub use template::{
     AttrValue, ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg, EventTarget,
     IfBranch, SemanticIr, SemanticNode, SemanticProp, TemplateAttr, TemplateIr, TemplateNode,
     TemplateParseError, TemplateSpan, decode_html_entities, lower_concrete_to_ir,
-    lower_concrete_to_semantic, parse_template, parse_template_concrete,
+    lower_concrete_to_semantic, parse_template, parse_template_asts, parse_template_concrete,
     template_parse_to_diagnostic,
 };
 pub use tw::{

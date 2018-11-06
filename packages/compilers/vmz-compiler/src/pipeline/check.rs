@@ -10,14 +10,13 @@ use crate::analyze::{AnalyzedScript, analyze_script};
 use crate::diagnostic::{ReportedDiagnostic, Severity};
 use crate::parse::rust_dsl::analyze_rust_server_dsl;
 use crate::project::discover_vmz_files;
-use crate::reactive_build::build_program_module_with_server;
 use crate::secrets::{collect_client_boundary_findings, collect_secret_requirements};
 use crate::server_calls::collect_server_class_calls;
 use crate::server_slice::ServerSliceProof;
 use crate::sfc::{ScriptKind, ScriptLanguage, parse_vmz};
 use crate::template::{
-    AttrValue, TemplateIr, TemplateNode, parse_template, parse_template_concrete,
-    template_parse_to_diagnostic, lower_concrete_to_ir,
+    AttrValue, TemplateIr, TemplateNode, lower_concrete_to_ir, lower_concrete_to_semantic,
+    parse_template, parse_template_concrete, template_parse_to_diagnostic,
 };
 use crate::virtual_server;
 use vmz_protocol::SourceSpan;
@@ -207,6 +206,17 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
             return;
         }
     };
+    let semantic = match lower_concrete_to_semantic(&concrete) {
+        Ok(s) => s,
+        Err(e) => {
+            report.diagnostics.push(template_parse_to_diagnostic(
+                path,
+                parsed.template.content_start,
+                &e,
+            ));
+            return;
+        }
+    };
     let ir = match lower_concrete_to_ir(&concrete) {
         Ok(ir) => ir,
         Err(e) => {
@@ -265,9 +275,10 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
             secret_requirements,
         }
     });
-    let program = build_program_module_with_server(
+    let program = crate::reactive_build::build_program_module_with_server_asts(
         &path.display().to_string(),
         &client.decl,
+        &semantic,
         &ir,
         server_attach.as_ref(),
         None,

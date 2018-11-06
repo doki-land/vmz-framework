@@ -409,3 +409,47 @@ fn effect_records_sibling_method_calls() {
         "onClick effect should compose refresh writes: {write_keys:?}"
     );
 }
+
+#[test]
+fn semantic_if_chain_builds_control_region_without_flat_attr_guess() {
+    let mut decl = ComponentDecl::new("T", Span::default());
+    for name in ["show", "aText", "bText"] {
+        decl.fields.push(FieldDecl {
+            name: name.into(),
+            type_text: None,
+            init_text: None,
+            kind: FieldKind::State,
+            visibility: Visibility::Private,
+            span: Span::default(),
+        });
+    }
+    let (sem, ir) = vmz_compiler::parse_template_asts(
+        r#"<div><p v-if="show">{{ aText }}</p><p v-else>{{ bText }}</p></div>"#,
+    )
+    .unwrap();
+    assert!(
+        matches!(sem.roots[0], vmz_compiler::SemanticNode::Element { .. }),
+        "outer element wraps IfChain"
+    );
+    let module = build_reactive_module_from_semantic("T.vmz", &decl, &sem);
+    let legacy = build_reactive_module("T.vmz", &decl, &ir);
+    let c = &module.components[0];
+    let if_regions: Vec<_> = c
+        .control_regions
+        .iter()
+        .filter(|r| r.branches.len() == 2 && r.branches[0].cond.is_some() && r.branches[1].cond.is_none())
+        .collect();
+    assert_eq!(if_regions.len(), 1, "Semantic IfChain → one if/else region; got {:?}", c.control_regions.len());
+    assert!(
+        c.bindings.iter().any(|b| b.kind() == BindingKind::IfCond),
+        "IfCond binding required"
+    );
+    // Same branch count as legacy TemplateIr walk (compat during dual-path).
+    let legacy_if = legacy
+        .components[0]
+        .control_regions
+        .iter()
+        .filter(|r| r.branches.len() == 2)
+        .count();
+    assert_eq!(if_regions.len(), legacy_if.max(1));
+}

@@ -29,6 +29,14 @@ pub fn parse_template(input: &str) -> Result<TemplateIr, TemplateParseError> {
     lower_concrete_to_ir(&concrete)
 }
 
+/// Parse once into Semantic AST + legacy TemplateIr (shared Concrete).
+pub fn parse_template_asts(input: &str) -> Result<(SemanticIr, TemplateIr), TemplateParseError> {
+    let concrete = parse_template_concrete(input)?;
+    let semantic = lower_concrete_to_semantic(&concrete)?;
+    let ir = lower_concrete_to_ir(&concrete)?;
+    Ok((semantic, ir))
+}
+
 /// Map a template-body-local parse error to a file-absolute [`ReportedDiagnostic`].
 ///
 /// `content_start` is the UTF-8 byte offset of the `<template>` body in the SFC

@@ -12,11 +12,11 @@ use crate::check::{CheckOptions, check_path};
 use crate::diagnostic::ReportedDiagnostic;
 use crate::emit::{ServerBridge, emit_server_js};
 use crate::project::{VmzModuleKind, discover_vmz_files};
-use crate::reactive_build::build_program_module_with_server;
 use crate::scss::{ScssCompilerHandle, ScssEmitRequest};
 use crate::sfc::{ScriptKind, parse_vmz};
 use crate::template::{
-    lower_concrete_to_ir, parse_template_concrete, template_parse_to_diagnostic,
+    lower_concrete_to_ir, lower_concrete_to_semantic, parse_template_concrete,
+    template_parse_to_diagnostic,
 };
 use crate::tw::{TwCompilerHandle, TwEmitRequest, register_tw_from_parsed};
 use crate::virtual_server;
@@ -862,6 +862,17 @@ fn emit_file(
             return Ok(());
         }
     };
+    let semantic = match lower_concrete_to_semantic(&concrete) {
+        Ok(s) => s,
+        Err(e) => {
+            report.diagnostics.push(template_parse_to_diagnostic(
+                path,
+                parsed.template.content_start,
+                &e,
+            ));
+            return Ok(());
+        }
+    };
     let template_ir = match lower_concrete_to_ir(&concrete) {
         Ok(ir) => ir,
         Err(e) => {
@@ -934,9 +945,10 @@ fn emit_file(
             }
         },
     );
-    let mut program = build_program_module_with_server(
+    let mut program = crate::reactive_build::build_program_module_with_server_asts(
         &path.display().to_string(),
         &client.decl,
+        &semantic,
         &template_ir,
         server_attach.as_ref(),
         routes,

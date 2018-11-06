@@ -12,8 +12,8 @@ use vmz_types::{
 
 use crate::field_rw::{collect_each_alias_prop_paths, collect_template_dep_keys};
 use crate::template::{
-    AttrValue, ConcreteAttr, ConcreteIr, ConcreteNode, Directive, TemplateAttr, TemplateIr,
-    TemplateNode, TemplateSpan,
+    AttrValue, ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg, SemanticIr,
+    SemanticNode, SemanticProp, TemplateAttr, TemplateIr, TemplateNode, TemplateSpan,
 };
 use vmz_generator::template_expr_snippet_error;
 
@@ -133,7 +133,38 @@ struct EachFrame {
     as_name: String,
 }
 
-/// Build a [`ReactiveModule`] from component decl + template (bindings, regions, effects).
+/// Build a [`ReactiveModule`] from component decl + **Semantic** template AST.
+///
+/// `IfChain` / `ForNode` drive control regions — no sibling flat-attr guessing.
+pub fn build_reactive_module_from_semantic(
+    source: &str,
+    decl: &ComponentDecl,
+    semantic: &SemanticIr,
+) -> ReactiveModule {
+    let mut b = ReactiveComponentBuilder::new(decl.name.clone());
+    for f in &decl.properties {
+        b.add_field(f.name.clone(), FieldKind::Prop);
+    }
+    for f in &decl.fields {
+        b.add_field(f.name.clone(), FieldKind::State);
+    }
+
+    let fields: Vec<String> =
+        decl.properties.iter().chain(decl.fields.iter()).map(|f| f.name.clone()).collect();
+
+    walk_semantic_nodes(&semantic.roots, &fields, &[], &[], &mut b, None);
+    finish_effects(&mut b, decl, &fields);
+
+    ReactiveModule {
+        schema: REACTIVE_SCHEMA.into(),
+        source: source.to_string(),
+        components: vec![b.finish()],
+    }
+}
+
+/// Build a [`ReactiveModule`] from component decl + legacy [`TemplateIr`].
+///
+/// Prefer [`build_reactive_module_from_semantic`] for if/for correctness.
 pub fn build_reactive_module(
     source: &str,
     decl: &ComponentDecl,
@@ -151,20 +182,32 @@ pub fn build_reactive_module(
         decl.properties.iter().chain(decl.fields.iter()).map(|f| f.name.clone()).collect();
 
     walk_nodes(&template.roots, &fields, &[], &[], &mut b, None);
+    finish_effects(&mut b, decl, &fields);
 
-    // Effects use composed summaries (idempotent if analyze already composed).
+    ReactiveModule {
+        schema: REACTIVE_SCHEMA.into(),
+        source: source.to_string(),
+        components: vec![b.finish()],
+    }
+}
+
+fn finish_effects(
+    b: &mut ReactiveComponentBuilder,
+    decl: &ComponentDecl,
+    fields: &[String],
+) {
     let mut methods = decl.methods.clone();
-    crate::method_compose::compose_cross_method_rw(&mut methods, &fields);
+    crate::method_compose::compose_cross_method_rw(&mut methods, fields);
     for m in &methods {
         if m.reads.is_empty() && m.writes.is_empty() && m.calls.is_empty() && !m.opaque_callee {
             continue;
         }
         let reads: Vec<IrDepPath> =
-            m.reads.iter().filter_map(|s| stable_to_ir(&mut b, s)).collect();
+            m.reads.iter().filter_map(|s| stable_to_ir(b, s)).collect();
         let writes: Vec<WritePath> = m
             .writes
             .iter()
-            .filter_map(|s| stable_to_ir(&mut b, s).map(|path| WritePath { path }))
+            .filter_map(|s| stable_to_ir(b, s).map(|path| WritePath { path }))
             .collect();
         b.add_effect(
             m.name.clone(),
@@ -176,21 +219,25 @@ pub fn build_reactive_module(
             m.star_reasons.clone(),
         );
     }
-
-    ReactiveModule {
-        schema: REACTIVE_SCHEMA.into(),
-        source: source.to_string(),
-        components: vec![b.finish()],
-    }
 }
 
-/// Build the Program IR shell with Reactive as the populated view.
+/// Build the Program IR shell with Reactive as the populated view (legacy TemplateIr reactive).
 pub fn build_program_module(
     source: &str,
     decl: &ComponentDecl,
     template: &TemplateIr,
 ) -> ProgramModule {
     build_program_module_with_server(source, decl, template, None, None)
+}
+
+/// Build Program IR from Semantic (reactive) + legacy TemplateIr (native view).
+pub fn build_program_module_asts(
+    source: &str,
+    decl: &ComponentDecl,
+    semantic: &SemanticIr,
+    template: &TemplateIr,
+) -> ProgramModule {
+    build_program_module_with_server_asts(source, decl, semantic, template, None, None)
 }
 
 /// Build Program IR and attach co-located server capabilities when present.
@@ -202,18 +249,320 @@ pub fn build_program_module_with_server(
     routes: Option<&crate::pipeline::link::RouteTable>,
 ) -> ProgramModule {
     let mut program = ProgramModule::from_reactive(build_reactive_module(source, decl, template));
+    attach_view_plan(&mut program, template, server, routes);
+    program
+}
+
+/// Preferred program path: Semantic drives reactive regions; TemplateIr still feeds view emit.
+pub fn build_program_module_with_server_asts(
+    source: &str,
+    decl: &ComponentDecl,
+    semantic: &SemanticIr,
+    template: &TemplateIr,
+    server: Option<&vmz_types::ServerAttach>,
+    routes: Option<&crate::pipeline::link::RouteTable>,
+) -> ProgramModule {
+    let mut program =
+        ProgramModule::from_reactive(build_reactive_module_from_semantic(source, decl, semantic));
+    attach_view_plan(&mut program, template, server, routes);
+    program
+}
+
+fn attach_view_plan(
+    program: &mut ProgramModule,
+    template: &TemplateIr,
+    server: Option<&vmz_types::ServerAttach>,
+    routes: Option<&crate::pipeline::link::RouteTable>,
+) {
     if let Some(unit) = program.units.first_mut() {
         if let Some(attach) = server {
             unit.attach_server(attach);
         }
-        // structural tree on ViewView (sole structure source for emit_direct).
         unit.view = crate::structural_build::build_native_view(template, &unit.reactive, routes);
-        // shared Execution Plan derived from Native View.
         unit.plan = crate::plan_build::build_execution_plan(&unit.view);
-        // lifetime / owns / disposes need Native View region kinds.
         unit.rebuild_projected_views();
     }
-    program
+}
+
+fn walk_semantic_nodes(
+    nodes: &[SemanticNode],
+    fields: &[String],
+    scope: &[String],
+    each_frames: &[EachFrame],
+    b: &mut ReactiveComponentBuilder,
+    region: Option<RegionId>,
+) {
+    for node in nodes {
+        match node {
+            SemanticNode::Text { .. } => {}
+            SemanticNode::Interpolation { expr, .. } => {
+                add_text_binding(expr, fields, scope, each_frames, b, region);
+            }
+            SemanticNode::IfChain { branches, .. } => {
+                walk_semantic_if_chain(branches, fields, scope, each_frames, b);
+            }
+            SemanticNode::ForNode { .. } => {
+                walk_semantic_for(node, fields, scope, each_frames, b, region);
+            }
+            SemanticNode::Element { .. } => {
+                walk_semantic_element(node, fields, scope, each_frames, b, region);
+            }
+        }
+    }
+}
+
+fn walk_semantic_if_chain(
+    branches: &[crate::template::IfBranch],
+    fields: &[String],
+    scope: &[String],
+    each_frames: &[EachFrame],
+    b: &mut ReactiveComponentBuilder,
+) {
+    let mut stable: Vec<IrDepPath> = Vec::new();
+    let mut control_branches: Vec<ControlBranch> = Vec::new();
+    let mut body_binding_lists: Vec<Vec<BindingId>> = Vec::new();
+    let mut first_cond: Option<String> = None;
+
+    for branch in branches {
+        let mut cond_reads = Vec::new();
+        let cond_expr = if let Some(c) = &branch.test {
+            let e = sanitize(c);
+            if first_cond.is_none() {
+                first_cond = Some(e.clone());
+            }
+            cond_reads = expr_to_paths(b, &e, fields, scope, each_frames);
+            for r in &cond_reads {
+                push_unique_path(&mut stable, r.clone());
+            }
+            Some(b.intern_expr(e))
+        } else {
+            None
+        };
+
+        let before = b.binding_count();
+        walk_semantic_nodes(
+            std::slice::from_ref(branch.body.as_ref()),
+            fields,
+            scope,
+            each_frames,
+            b,
+            None,
+        );
+        let after = b.binding_count();
+        let body_bindings: Vec<BindingId> = (before..after).map(BindingId).collect();
+        body_binding_lists.push(body_bindings.clone());
+        control_branches.push(ControlBranch {
+            cond: cond_expr,
+            cond_reads,
+            body_bindings,
+            body_reads: Vec::new(),
+        });
+    }
+
+    let region_id = b.add_control_region(stable.clone(), control_branches);
+    if let Some(first) = first_cond {
+        let cond_expr = b.intern_expr(first);
+        b.add_binding(BindingKind::IfCond, stable, Some(region_id), Some(cond_expr), None);
+    }
+    for ids in &body_binding_lists {
+        for id in ids {
+            if b.binding_kind(*id).is_some_and(|k| {
+                matches!(k, BindingKind::EachList | BindingKind::EachKey)
+            }) {
+                continue;
+            }
+            if b.binding_region(*id).is_some() {
+                continue;
+            }
+            b.set_binding_region(*id, region_id);
+        }
+    }
+}
+
+fn walk_semantic_for(
+    node: &SemanticNode,
+    fields: &[String],
+    scope: &[String],
+    each_frames: &[EachFrame],
+    b: &mut ReactiveComponentBuilder,
+    region: Option<RegionId>,
+) {
+    let SemanticNode::ForNode {
+        source,
+        value_alias,
+        key_alias,
+        index_alias,
+        key,
+        body,
+        ..
+    } = node
+    else {
+        return;
+    };
+
+    let e = sanitize(source);
+    let list_reads = expr_to_paths(b, &e, fields, scope, each_frames);
+    let list_expr_id = b.intern_expr(e);
+    let each_region = b.add_control_region(list_reads.clone(), Vec::new());
+    b.add_binding(
+        BindingKind::EachList,
+        list_reads.clone(),
+        Some(each_region),
+        Some(list_expr_id),
+        None,
+    );
+
+    let mut s = scope.to_vec();
+    if !value_alias.is_empty() && !s.iter().any(|x| x == value_alias) {
+        s.push(value_alias.clone());
+    }
+    if let Some(ka) = key_alias {
+        if !ka.is_empty() && !s.iter().any(|x| x == ka) {
+            s.push(ka.clone());
+        }
+    }
+    if let Some(ia) = index_alias {
+        if !ia.is_empty() && !s.iter().any(|x| x == ia) {
+            s.push(ia.clone());
+        }
+    }
+    if !s.iter().any(|x| x == "index") {
+        s.push("index".into());
+    }
+
+    let key_id = key.as_ref().map(|k| b.intern_expr(sanitize(k)));
+    let list_nest = nest_from_list_reads(&list_reads);
+    let mut frames = each_frames.to_vec();
+    if let Some((list, parent_frames, via)) = list_nest {
+        if !value_alias.is_empty() {
+            let mut item_frames = parent_frames;
+            item_frames.push(ListItemFrame { via, key: key_id });
+            frames.push(EachFrame {
+                list,
+                frames: item_frames,
+                as_name: value_alias.clone(),
+            });
+        }
+    }
+
+    if let Some(key_expr) = key {
+        let ke = sanitize(key_expr);
+        let key_reads = expr_to_paths(b, &ke, fields, &s, &frames);
+        let kid = key_id.expect("key_id set when key present");
+        b.add_binding(BindingKind::EachKey, key_reads, Some(each_region), Some(kid), None);
+    }
+
+    let child_region = Some(each_region).or(region);
+    walk_semantic_nodes(
+        std::slice::from_ref(body.as_ref()),
+        fields,
+        &s,
+        &frames,
+        b,
+        child_region,
+    );
+}
+
+fn walk_semantic_element(
+    node: &SemanticNode,
+    fields: &[String],
+    scope: &[String],
+    each_frames: &[EachFrame],
+    b: &mut ReactiveComponentBuilder,
+    region: Option<RegionId>,
+) {
+    let SemanticNode::Element { tag, props, children, .. } = node else {
+        return;
+    };
+
+    for p in props {
+        match p {
+            SemanticProp::Static { .. } => {}
+            SemanticProp::Bind { arg, expr, .. } => {
+                let name = match arg {
+                    DirectiveArg::Static(s) => s.clone(),
+                    DirectiveArg::Dynamic(_) => continue,
+                };
+                let kind = if is_component_tag(tag) {
+                    BindingKind::ComponentProp
+                } else {
+                    BindingKind::Attr
+                };
+                add_expr_binding(
+                    expr,
+                    kind,
+                    Some(name),
+                    fields,
+                    scope,
+                    each_frames,
+                    b,
+                    region,
+                );
+            }
+            SemanticProp::BindObject { expr, .. } => {
+                add_expr_binding(
+                    expr,
+                    BindingKind::Attr,
+                    Some("v-bind".into()),
+                    fields,
+                    scope,
+                    each_frames,
+                    b,
+                    region,
+                );
+            }
+            SemanticProp::On { arg, handler, .. } => {
+                let event = match arg {
+                    DirectiveArg::Static(s) => s.clone(),
+                    DirectiveArg::Dynamic(_) => continue,
+                };
+                let body = sanitize(handler);
+                let reads = expr_to_paths(b, &body, fields, scope, each_frames);
+                let expr = b.intern_expr(body);
+                b.add_binding(
+                    BindingKind::Event,
+                    reads,
+                    region,
+                    Some(expr),
+                    Some(format!("@{event}")),
+                );
+            }
+            SemanticProp::OnObject { expr, .. } => {
+                let body = sanitize(expr);
+                let reads = expr_to_paths(b, &body, fields, scope, each_frames);
+                let eid = b.intern_expr(body);
+                b.add_binding(
+                    BindingKind::Event,
+                    reads,
+                    region,
+                    Some(eid),
+                    Some("v-on".into()),
+                );
+            }
+            SemanticProp::Directive { dir, .. } => match dir {
+                Directive::Html { expr } | Directive::Show { expr } => {
+                    let name = if matches!(dir, Directive::Html { .. }) {
+                        "html"
+                    } else {
+                        "show"
+                    };
+                    add_expr_binding(
+                        expr,
+                        BindingKind::Attr,
+                        Some(name.into()),
+                        fields,
+                        scope,
+                        each_frames,
+                        b,
+                        region,
+                    );
+                }
+                _ => {}
+            },
+        }
+    }
+
+    walk_semantic_nodes(children, fields, scope, each_frames, b, region);
 }
 
 fn walk_nodes(
