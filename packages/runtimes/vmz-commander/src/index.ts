@@ -69,7 +69,14 @@ export interface Command {
 export interface Cli {
     use(plugin: LocalizePlugin): this;
     catalog(loader: CatalogLoader): this;
-    /** Root help banner message id (printed for `help` / `-h` / no args). */
+    /**
+     * Optional short intro line(s) before derived command/option lists.
+     * Do **not** paste full usage here — help is derived from the command tree.
+     */
+    intro(introId: string): this;
+    /**
+     * @deprecated Use {@link intro}. Kept as alias so older call sites compile.
+     */
     help(helpId: string): this;
     command(rawName: string, helpId: string): Command;
     parse(argv?: string[]): Promise<number>;
@@ -116,7 +123,7 @@ class CommandBuilder implements Command {
 class CliBuilder implements Cli {
     readonly name: string;
     private localize: LocalizePlugin | null = null;
-    private rootHelpId: string | null = null;
+    private introId: string | null = null;
     private readonly roots: CommandBuilder[] = [];
 
     constructor(name: string) {
@@ -148,10 +155,14 @@ class CliBuilder implements Cli {
         });
     }
 
-    help(helpId: string): this {
-        assertHelpId(helpId, 'help');
-        this.rootHelpId = helpId;
+    intro(introId: string): this {
+        assertHelpId(introId, 'intro');
+        this.introId = introId;
         return this;
+    }
+
+    help(helpId: string): this {
+        return this.intro(helpId);
     }
 
     command(rawName: string, helpId: string): Command {
@@ -169,7 +180,7 @@ class CliBuilder implements Cli {
         const argv = normalizeArgv(argvInput);
 
         if (argv.length === 0 || isHelpToken(argv[0]!)) {
-            this.printRootHelp(t);
+            console.log(this.formatRootHelp(t));
             return 0;
         }
 
@@ -177,23 +188,31 @@ class CliBuilder implements Cli {
         const matched = this.roots.find((c) => c.def.names.includes(cmdToken));
         if (!matched) {
             console.error(t('cli.err.unknown_command', { cmd: cmdToken }));
-            this.printRootHelp(t);
+            console.log(this.formatRootHelp(t));
             return 1;
         }
 
         return await this.dispatch(matched.def, argv.slice(1), t, [cmdToken]);
     }
 
-    private printRootHelp(t: LocalizePlugin['t']): void {
-        if (this.rootHelpId) {
-            console.log(t(this.rootHelpId));
-            return;
+    /** Derived root help: optional intro + commands/options from the registration tree. */
+    formatRootHelp(t: LocalizePlugin['t']): string {
+        const lines: string[] = [];
+        if (this.introId) {
+            lines.push(t(this.introId), '');
         }
-        const lines = [`${this.name}`, '', 'Commands:'];
+        lines.push(t('cli.ui.usage', { name: this.name }), '', t('cli.ui.commands'));
         for (const c of this.roots) {
-            lines.push(`  ${c.def.rawName.padEnd(24)} ${t(c.def.helpId)}`);
+            lines.push(`  ${c.def.rawName.padEnd(28)} ${t(c.def.helpId)}`);
         }
-        console.log(lines.join('\n'));
+        const opts = collectRootOptions(this.roots.map((c) => c.def));
+        if (opts.length) {
+            lines.push('', t('cli.ui.options'));
+            for (const o of opts) {
+                lines.push(`  ${o.rawName.padEnd(28)} ${t(o.helpId)}`);
+            }
+        }
+        return lines.join('\n');
     }
 
     private async dispatch(
@@ -203,7 +222,7 @@ class CliBuilder implements Cli {
         path: string[],
     ): Promise<number> {
         if (rest.length && isHelpToken(rest[0]!)) {
-            this.printCommandHelp(def, t, path);
+            console.log(formatCommandHelp(this.name, def, t, path));
             return 0;
         }
 
@@ -215,13 +234,13 @@ class CliBuilder implements Cli {
             }
             if (!def.action) {
                 console.error(t('cli.err.unknown_command', { cmd: [...path, childTok].join(' ') }));
-                this.printCommandHelp(def, t, path);
+                console.log(formatCommandHelp(this.name, def, t, path));
                 return 1;
             }
         }
 
         if (!def.action) {
-            this.printCommandHelp(def, t, path);
+            console.log(formatCommandHelp(this.name, def, t, path));
             return rest.length ? 1 : 0;
         }
 
@@ -239,7 +258,7 @@ class CliBuilder implements Cli {
             } else {
                 console.error(msg);
             }
-            this.printCommandHelp(def, t, path);
+            console.log(formatCommandHelp(this.name, def, t, path));
             return 1;
         }
 
@@ -247,24 +266,44 @@ class CliBuilder implements Cli {
         if (typeof result === 'number') return result;
         return 0;
     }
+}
 
-    private printCommandHelp(def: CommandDef, t: LocalizePlugin['t'], path: string[]): void {
-        const lines = [`${this.name} ${path.join(' ')} — ${t(def.helpId)}`, ''];
-        if (def.children.length) {
-            lines.push('Commands:');
-            for (const c of def.children) {
-                lines.push(`  ${c.rawName.padEnd(24)} ${t(c.helpId)}`);
-            }
-            lines.push('');
+/** Derive command help from one node (children + options). */
+export function formatCommandHelp(
+    cliName: string,
+    def: CommandDef,
+    t: LocalizePlugin['t'],
+    path: string[],
+): string {
+    const lines = [`${cliName} ${path.join(' ')} — ${t(def.helpId)}`, ''];
+    if (def.children.length) {
+        lines.push(t('cli.ui.commands'));
+        for (const c of def.children) {
+            lines.push(`  ${c.rawName.padEnd(28)} ${t(c.helpId)}`);
         }
-        if (def.options.length) {
-            lines.push('Options:');
-            for (const o of def.options) {
-                lines.push(`  ${o.rawName.padEnd(28)} ${t(o.helpId)}`);
-            }
-        }
-        console.log(lines.join('\n').trimEnd());
+        lines.push('');
     }
+    if (def.options.length) {
+        lines.push(t('cli.ui.options'));
+        for (const o of def.options) {
+            lines.push(`  ${o.rawName.padEnd(28)} ${t(o.helpId)}`);
+        }
+    }
+    return lines.join('\n').trimEnd();
+}
+
+/** Union options declared on root commands (dedupe by key, stable first-seen order). */
+function collectRootOptions(roots: CommandDef[]): OptionDef[] {
+    const seen = new Set<string>();
+    const out: OptionDef[] = [];
+    for (const root of roots) {
+        for (const o of root.options) {
+            if (seen.has(o.key)) continue;
+            seen.add(o.key);
+            out.push(o);
+        }
+    }
+    return out;
 }
 
 /**

@@ -1,79 +1,22 @@
 /**
  * Official CLI / diagnostic localization for `@vmz/vmz`.
  *
- * Catalogs live here — not in `@vmz/commander`, `@vmz/diagnostic`, or a separate
- * `@vmz/i18n` package. Plug into commander via `.use(vmzCliLocalize)`.
+ * Catalog = **atomic** message ids only (`cli.cmd.*` / `cli.opt.*` / `cli.err.*` / short intros).
+ * Full help text is **derived** by `@vmz/commander` from the registered command tree — do not
+ * paste Usage/Commands/Options walls here.
  */
 
 import type { LocaleCatalog, LocalizePlugin } from '@vmz/commander';
 
-/** Product `en-US` table. */
+/** Product `en-US` table (atomic ids). */
 export const VMZ_CLI_CATALOG_EN_US: LocaleCatalog = {
-    'cli.help.global': `vmz — global mode
-
-Install faces: @vmz/core (runtime) · @vmz/vmz (this CLI) · optional @vmz/ui / @vmz/plugin-*
-
-Three install modes:
-  developer  monorepo source (packages/runtimes/vmz) — full CLI
-  project    app node_modules/@vmz/vmz — full CLI
-  global     npm/pnpm -g — only help/version (project commands need a project install)
-
-You are in global mode. Pin \`@vmz/vmz\` in the app so check/build
-use a traceable project install.
-
-Usage:
-  vmz version                   Show host + native protocol versions
-  vmz help                      Show this help
-
-Project commands:
-  pnpm add @vmz/core && pnpm add -D @vmz/vmz
-  pnpm exec vmz check
-
-If a project \`node_modules/@vmz/vmz\` exists, a global
-\`vmz <cmd>\` re-execs that bin.
-`,
-
-    'cli.help.project': `vmz — Node toolchain host (project / developer mode)
-
-Usage:
-  vmz check [path]              Check project via Workspace
-  vmz build [path] [options]    Build project via Workspace; --target mini-program-wechat packs dist/wechat
-  vmz serve [path] [options]    Serve dist (optional --build)
-  vmz dev [path] [options]      Rebuild session; --target mini-program-wechat packs dist/wechat
-  vmz format [path] [--check]   Format .vmz via N-API (oxc formatter + EditorConfig)
-  vmz lint [path] [--deny-warnings]  Lint (= check) via N-API
-  vmz test [path] [options]     Native test discover / report
-  vmz document|docs <cmd>       Project /documents domain
-  vmz application <cmd>         Application Collection / Mount
-  vmz artifact <cmd>            Release pack / publish / rollback / diff (A3)
-  vmz refactor <cmd>            DX rename plans / apply
-  vmz explain [style] <target>  DX causal explain (style Theme chain)
-  vmz plan <kind> [root]        Dump frozen Rust plans via N-API (locale | document-route)
-  vmz version                   Show host + native protocol versions
-  vmz help                      Show this help
-
-Options:
-  --out-dir, -o <dir>   Workspace output root (default: dist). Profile artifacts land in <out-dir>/<name> (name defaults to profile id; CDN: name:'cdn' → dist/cdn)
-  --release             Release build (omit serve-host; pack minify slot; proof)
-  --profile <name>      Delivery profile (default from config; builtins: web-ssr|static|web-client|web-hybrid)
-  --target <id>         browser (default) | mini-program-wechat (pack dist/wechat for WeChat DevTools; build+dev)
-  --origin <url>        Site origin for web-static canonical/sitemap
-  --host <host>         Listen host (default: 127.0.0.1)
-  --port <port>         Listen port (dev: omit = auto from 5173; set = lock)
-  --poll-ms <ms>        Dev watch poll interval (default: 300)
-  --build               Build before serve
-  --check               Format check-only (format)
-  --deny-warnings       Treat warnings as errors (lint)
-  --list                List discovered tests (test)
-  --json [file]         Emit TestReport / DocumentManifest / ApplicationCheckReport JSON
-  --mode <modes>        compile|logic|browser|ssr|resume|deployment|all (test)
-  --filter <pattern>    Filter by test id or file (test)
-  --application <id>    Run only tests for ApplicationId (standalone scope)
-  --mounted <id>        Run relocation + host-boundary tests for ApplicationId
-  --affected            Select tests from dirty VPG units (test; DX)
-  --root <dir>          Project root (document check)
-  --strict              Strict document locale/PageKey coverage (document check)
-`,
+    // Help chrome (commander derives lists; these are section labels / short intros only)
+    'cli.ui.usage': 'Usage: {name} <command> [options]',
+    'cli.ui.commands': 'Commands:',
+    'cli.ui.options': 'Options:',
+    'cli.intro.project': 'vmz — Node toolchain host (`@vmz/vmz`, N-API)',
+    'cli.intro.global':
+        'vmz — global install (help/version only). Pin `@vmz/vmz` in the app (`pnpm add -D @vmz/vmz`) and run `pnpm exec vmz <command>`. A global `vmz` re-execs the nearest project bin when present.',
 
     'cli.cmd.check': 'Check project via Workspace',
     'cli.cmd.build': 'Build project via Workspace',

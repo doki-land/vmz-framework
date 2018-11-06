@@ -82,24 +82,31 @@ export function parseArgs(argv) {
 }
 
 export function printGlobalHelp() {
-    console.log(vmzCliLocalize.t('cli.help.global'));
+    return buildProductCli({ mode: 'global' }).parse(['help']);
 }
 
 export function printProjectHelp() {
-    console.log(vmzCliLocalize.t('cli.help.project'));
+    return buildProductCli({ mode: 'project' }).parse(['help']);
 }
 
 /** @deprecated use printProjectHelp / printGlobalHelp */
 export function printHelp() {
-    printProjectHelp();
+    return printProjectHelp();
 }
 
 /**
- * @param {{ helpId?: string }} [opts]
+ * @param {{ mode?: 'global' | 'project' }} [opts]
  */
 function buildProductCli(opts = {}) {
-    const helpId = opts.helpId || 'cli.help.project';
-    const cli = createCli('vmz').use(vmzCliLocalize).help(helpId);
+    const mode = opts.mode === 'global' ? 'global' : 'project';
+    const introId = mode === 'global' ? 'cli.intro.global' : 'cli.intro.project';
+    const cli = createCli('vmz').use(vmzCliLocalize).intro(introId);
+
+    // Global install: only version (help is derived). Project commands need a project bin.
+    if (mode === 'global') {
+        cli.command('version', 'cli.cmd.version').action(() => cmdVersion());
+        return cli;
+    }
 
     /** @param {import('@vmz/commander').Command} cmd */
     const withWorkspaceOpts = (cmd) =>
@@ -152,8 +159,6 @@ export async function runCli(argv, opts = {}) {
         thisPackageRoot: opts.thisPackageRoot,
     });
 
-    const helpId = inv.mode === 'global' ? 'cli.help.global' : 'cli.help.project';
-
     if (cmd && !isHelpToken(cmd) && cmd !== 'version' && cmd !== '-V' && cmd !== '--version' && !isGlobalAllowedCommand(cmd)) {
         const gated = await gateGlobalProjectCommand({
             argv,
@@ -169,7 +174,8 @@ export async function runCli(argv, opts = {}) {
     const normalized =
         cmd === '-V' || cmd === '--version' ? ['version', ...argv.slice(1)] : argv;
 
-    return buildProductCli({ helpId }).parse(normalized);
+    const mode = inv.mode === 'global' ? 'global' : 'project';
+    return buildProductCli({ mode }).parse(normalized);
 }
 
 function isHelpToken(token) {

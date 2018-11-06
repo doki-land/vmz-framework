@@ -200,7 +200,7 @@ describe('vmz invocation gate', () => {
         expect(codeMcp).toBe(1);
     });
 
-    it('global help mentions three modes without scaffold commands', async () => {
+    it('global help is derived intro + version only (no scaffold / project walls)', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-inv-help-'));
         const fakeGlobal = path.join(dir, 'npm-global', 'node_modules', '@vmz', 'vmz');
         fs.mkdirSync(fakeGlobal, { recursive: true });
@@ -219,13 +219,14 @@ describe('vmz invocation gate', () => {
                 thisPackageRoot: fakeGlobal,
             });
             expect(code).toBe(0);
-            expect(out.includes('Three install modes')).toBe(true);
-            expect(out.includes('developer')).toBe(true);
-            expect(out.includes('global mode')).toBe(true);
+            expect(out.includes('global install')).toBe(true);
             expect(out.includes('@vmz/vmz')).toBe(true);
+            expect(out.includes('version')).toBe(true);
             expect(out.includes('vmz new')).toBe(false);
             expect(out.includes('vmz lsp')).toBe(false);
+            expect(out.includes('cli.help.project')).toBe(false);
             expect(out.includes('vmz check [path]')).toBe(false);
+            expect(out.includes('  check ')).toBe(false);
         } finally {
             console.log = orig;
             fs.rmSync(dir, { recursive: true, force: true });
