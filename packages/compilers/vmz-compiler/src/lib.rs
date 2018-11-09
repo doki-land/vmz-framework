@@ -37,9 +37,9 @@ pub mod tooling;
 pub use parse::{analyze, offset_index, sfc, template, transpile};
 
 pub use pipeline::{
-    check, compile, dep_graph, emit, emit_direct, emit_ir, field_rw, method_compose, plan_build,
-    project, reactive_build, secrets, server_calls, server_slice, structural_build, virtual_server,
-    write_barrier,
+    check, compile, dep_graph, emit, emit_direct, emit_ir, expr_plan, field_rw, method_compose,
+    plan_build, project, reactive_build, secrets, server_calls, server_slice, structural_build,
+    virtual_server, write_barrier,
 };
 
 pub use style::designs;
@@ -130,6 +130,7 @@ pub use reactive_build::{
     build_reactive_module_from_semantic, collect_concrete_expr_errors, collect_template_expr_errors,
     TemplateExprError,
 };
+pub use expr_plan::{ExprPlan, plan_template_expr};
 pub use scss::{ScssCompiler, ScssCompilerHandle, ScssEmitRequest, ScssEmitResult};
 pub use session_graph::{SessionClientCall, SessionGraph, SessionGraphDocument, SessionUnit};
 pub use sfc::{

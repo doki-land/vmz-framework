@@ -49,6 +49,33 @@ pub fn template_parse_to_diagnostic(
     let path = path.into();
     let (start, end) = TemplateSpan::from_usize(err.offset, err.offset.saturating_add(1))
         .to_absolute(content_start as u32);
-    ReportedDiagnostic::error(&path, format!("template: {}", err.message))
-        .with_source_span(SourceSpan { path: path.to_string_lossy().into_owned(), start, end })
+    let mut diag = ReportedDiagnostic::error(&path, format!("template: {}", err.message))
+        .with_source_span(SourceSpan {
+            path: path.to_string_lossy().into_owned(),
+            start,
+            end,
+        });
+    if let Some(code) = template_error_code(&err.message) {
+        diag = diag.with_code(code);
+    }
+    diag
+}
+
+/// Stable diagnostic codes for structured template parse / semantic failures.
+fn template_error_code(message: &str) -> Option<&'static str> {
+    if message.contains("JSX") || message.contains("single-brace") {
+        return Some("vmz::template/jsx-rejected");
+    }
+    if message.contains("`v-model`") || message.contains("v-model") {
+        return Some("vmz::template/unsupported-directive");
+    }
+    if message.contains("`v-else")
+        || message.contains("v-else-if")
+        || message.contains("dynamic `v-bind`")
+        || message.contains("dynamic `v-on`")
+        || message.contains("dynamic argument")
+    {
+        return Some("vmz::template/illegal-directive");
+    }
+    None
 }

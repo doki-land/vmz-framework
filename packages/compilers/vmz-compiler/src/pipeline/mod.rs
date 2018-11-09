@@ -6,6 +6,7 @@ pub mod dep_graph;
 pub mod emit;
 pub mod emit_direct;
 pub mod emit_ir;
+pub mod expr_plan;
 pub mod field_rw;
 pub mod link;
 pub mod method_compose;
