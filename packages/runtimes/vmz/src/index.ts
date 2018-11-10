@@ -936,6 +936,11 @@ export type { LocalizePlugin } from './toolchain-dx.js';
 export {
     VMZ_CLI_CATALOG_EN_US,
     createVmzCliLocalize,
+    flattenCatalog,
+    loadCliCatalog,
+    loadCliLocalesManifest,
+    resolveCliLocalesRoot,
+    resolveVmzLocale,
     translateCatalog,
     vmzCliLocalize,
 } from './toolchain-dx.js';

@@ -75,6 +75,7 @@
     "files": [
         "bin",
         "dist",
+        "locales",
         "README.md"
     ],
     "scripts": {

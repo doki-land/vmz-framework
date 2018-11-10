@@ -1,8 +1,9 @@
 /**
  * Product wiring for `@vmz/commander` / `@vmz/diagnostic`.
  *
- * Official catalogs live in `cli-localize.ts` and plug in via `.use(vmzCliLocalize)`.
- * `runCli` builds the command tree with `createCli` — do not reintroduce a hand-rolled switch.
+ * Official catalogs live under `packages/runtimes/vmz/locales/` and load via
+ * `cli-localize.ts` → `.use(vmzCliLocalize)`. Help lists are derived from the
+ * command tree — do not reintroduce hand-rolled switches or catalog Usage walls.
  */
 
 export { createCli } from '@vmz/commander';
@@ -10,6 +11,11 @@ export type { LocalizePlugin } from '@vmz/commander';
 export {
     VMZ_CLI_CATALOG_EN_US,
     createVmzCliLocalize,
+    flattenCatalog,
+    loadCliCatalog,
+    loadCliLocalesManifest,
+    resolveCliLocalesRoot,
+    resolveVmzLocale,
     translateCatalog,
     vmzCliLocalize,
 } from './cli-localize.js';

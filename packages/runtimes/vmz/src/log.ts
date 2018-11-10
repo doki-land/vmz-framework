@@ -4,7 +4,7 @@
  */
 
 import { formatDiagnostic } from '@vmz/diagnostic';
-import { VMZ_CLI_CATALOG_EN_US, vmzCliLocalize } from './cli-localize.js';
+import { loadCliCatalog, resolveVmzLocale, vmzCliLocalize } from './cli-localize.js';
 
 /** @param {string} level */
 function stamp(level) {
@@ -37,6 +37,8 @@ export const log = {
         const severity =
             d.severity === 'warning' || d.severity === 'advice' || d.severity === 'error' ? d.severity : 'error';
         const code = d.code && String(d.code).length ? String(d.code) : 'diag.message';
+        const locale = resolveVmzLocale();
+        const catalog = loadCliCatalog(locale);
         const line = formatDiagnostic(
             {
                 path: d.path || '',
@@ -47,8 +49,8 @@ export const log = {
                 span: d.span,
             },
             {
-                locale: vmzCliLocalize.resolveLocale?.({ argv: [], env: process.env }) || 'en-US',
-                catalog: VMZ_CLI_CATALOG_EN_US,
+                locale,
+                catalog,
             },
         );
         console.error(stamp(severity === 'warning' ? 'warn' : severity === 'error' ? 'error' : 'diag'), line);

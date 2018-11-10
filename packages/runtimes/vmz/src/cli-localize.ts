@@ -1,134 +1,131 @@
 /**
  * Official CLI / diagnostic localization for `@vmz/vmz`.
  *
- * Catalog = **atomic** message ids only (`cli.cmd.*` / `cli.opt.*` / `cli.err.*` / short intros).
- * Full help text is **derived** by `@vmz/commander` from the registered command tree — do not
- * paste Usage/Commands/Options walls here.
+ * Natural-language tables live under `locales/` (same layout idea as app locales):
+ *   locales/locales.json          — manifest (defaultLocale + locale ids)
+ *   locales/<localeId>/*.json     — flat message-id catalogs (merged)
+ *
+ * Help lists are still **derived** by `@vmz/commander` from the command tree;
+ * this module only loads / resolves catalogs. Do not reintroduce TS prose walls.
  */
 
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { LocaleCatalog, LocalizePlugin } from '@vmz/commander';
 
-/** Product `en-US` table (atomic ids). */
-export const VMZ_CLI_CATALOG_EN_US: LocaleCatalog = {
-    // Help chrome (commander derives lists; these are section labels / short intros only)
-    'cli.ui.usage': 'Usage: {name} <command> [options]',
-    'cli.ui.commands': 'Commands:',
-    'cli.ui.options': 'Options:',
-    'cli.intro.project': 'vmz — Node toolchain host (`@vmz/vmz`, N-API)',
-    'cli.intro.global':
-        'vmz — global install (help/version only). Pin `@vmz/vmz` in the app (`pnpm add -D @vmz/vmz`) and run `pnpm exec vmz <command>`. A global `vmz` re-execs the nearest project bin when present.',
-
-    'cli.cmd.check': 'Check project via Workspace',
-    'cli.cmd.build': 'Build project via Workspace',
-    'cli.cmd.serve': 'Serve dist (optional --build)',
-    'cli.cmd.dev': 'Rebuild session',
-    'cli.cmd.format': 'Format .vmz via N-API',
-    'cli.cmd.lint': 'Lint (= check) via N-API',
-    'cli.cmd.test': 'Native test discover / report',
-    'cli.cmd.document': 'Project /documents domain',
-    'cli.cmd.document.check': 'Check locale tree + links/anchors + evidence',
-    'cli.cmd.document.build': 'Static HTML + view + evidence + designs CSS',
-    'cli.cmd.locale': 'Locale domain',
-    'cli.cmd.locale.check': 'Check locales.json5 + catalogs + param contracts',
-    'cli.cmd.locale.list': 'List LocaleIds',
-    'cli.cmd.locale.emit-types': 'Emit #locales/* .d.ts stubs',
-    'cli.cmd.locale.rename': 'MessageId rename plan',
-    'cli.cmd.locale.runtime-check': 'LocaleContext / FormatterContext / SSR parity',
-    'cli.cmd.locale.router-check': 'Route realization / canonical / hreflang',
-    'cli.cmd.locale.delivery-check': 'Multi-host LocaleDeliveryResolution',
-    'cli.cmd.locale.explain': 'Explain MessageId',
-    'cli.cmd.locale.diff': 'Diff two locales',
-    'cli.cmd.locale.extract': 'Hardcoded text sink check',
-    'cli.cmd.locale.pseudo': 'Pseudo-localize catalog',
-    'cli.cmd.locale.conformance': 'Cross-host MessageId/hash conformance',
-    'cli.cmd.application': 'Application Collection / Mount',
-    'cli.cmd.application.check': 'Validate descriptors + applications.config.json5',
-    'cli.cmd.application.list': 'List ApplicationIds / collections / mounts',
-    'cli.cmd.application.schemas': 'Print frozen protocol catalog JSON',
-    'cli.cmd.application.relocatable': 'ApplicationBase / non_relocatable_url proof',
-    'cli.cmd.application.relocate': 'Apply ApplicationBase to relocation manifest',
-    'cli.cmd.application.artifacts': 'ApplicationArtifact + MountTable boundary',
-    'cli.cmd.application.isolation': 'Isolation namespaces + failure containment',
-    'cli.cmd.application.composition': 'Catalog consumption + cross-app Link hrefs',
-    'cli.cmd.application.dev': 'Sessions / affected / proxy / mounted tests',
-    'cli.cmd.artifact': 'Release pack / publish / rollback / diff',
-    'cli.cmd.artifact.pack': 'Write dist/_vmz manifests + envelope',
-    'cli.cmd.artifact.publish': 'Pack + publish under dist/releases',
-    'cli.cmd.artifact.rollback': 'Restore PREVIOUS pointer',
-    'cli.cmd.artifact.current': 'Print CURRENT digest',
-    'cli.cmd.artifact.diff': 'Structured file digest diff',
-    'cli.cmd.refactor': 'DX rename plans / apply',
-    'cli.cmd.refactor.rename': 'Plan or apply a workspace rename',
-    'cli.cmd.explain': 'DX causal explain',
-    'cli.cmd.plan': 'Dump frozen Rust plans via N-API',
-    'cli.cmd.plan.locale': 'LocalePlan from locales/',
-    'cli.cmd.plan.document-route': 'DocumentRoutePlan from documents/',
-    'cli.cmd.version': 'Show host + native protocol versions',
-
-    'cli.opt.out-dir': 'Workspace output root (default: dist)',
-    'cli.opt.release': 'Release build (omit serve-host; pack minify; proof)',
-    'cli.opt.profile': 'Delivery profile id',
-    'cli.opt.target': 'browser | mini-program-wechat (or test affected alias)',
-    'cli.opt.origin': 'Site origin for web-static',
-    'cli.opt.host': 'Listen host',
-    'cli.opt.port': 'Listen port',
-    'cli.opt.poll-ms': 'Dev watch poll interval',
-    'cli.opt.build': 'Build before serve',
-    'cli.opt.check': 'Format check-only / extract fail on CJK',
-    'cli.opt.deny-warnings': 'Treat warnings as errors',
-    'cli.opt.json': 'Write JSON to stdout or file',
-    'cli.opt.root': 'Project root',
-    'cli.opt.out': 'Output directory',
-    'cli.opt.strict': 'Strict coverage / require defaultLocale',
-    'cli.opt.list': 'List discovered tests',
-    'cli.opt.mode': 'compile|logic|browser|ssr|resume|deployment|all',
-    'cli.opt.filter': 'Filter by test id or file',
-    'cli.opt.application': 'Run only tests for ApplicationId',
-    'cli.opt.mounted': 'Relocation + host-boundary tests for ApplicationId',
-    'cli.opt.affected': 'Select tests from dirty VPG units',
-    'cli.opt.locale': 'Requested locale id',
-    'cli.opt.delivery': 'Delivery id',
-    'cli.opt.timezone': 'Formatter time zone',
-    'cli.opt.production': 'Fail pseudo in production',
-    'cli.opt.base': 'ApplicationBase path',
-    'cli.opt.dirty': 'Dirty file path for affected planning (repeatable)',
-    'cli.opt.releases': 'Releases root directory',
-    'cli.opt.app-id': 'applicationId for envelope',
-    'cli.opt.refactor.kind': 'route_id|field|method|component|capability',
-    'cli.opt.refactor.from': 'Rename from id',
-    'cli.opt.refactor.to': 'Rename to id',
-    'cli.opt.refactor.scope': 'Optional chunk scope',
-    'cli.opt.apply': 'Apply workspace edit plan',
-    'cli.opt.explain': 'Include rename explain chain',
-    'cli.opt.explain.target': 'Generic Workspace.explain target',
-
-    'cli.err.unknown_command': 'unknown command `{cmd}`',
-    'cli.err.unknown_option': 'unknown option `{option}`',
-    'cli.err.missing_option_value': 'missing value for `{option}`',
-    'cli.err.unknown_plan_kind': 'unknown plan kind `{kind}` (locale | document-route)',
-    'cli.err.unknown_target': 'unknown --target {target} (browser | mini-program-wechat)',
-    'cli.err.document_build_aborted': 'document build aborted due to diagnostics',
-    'cli.err.locale_rename_usage': 'usage: vmz locale rename <from-message-id> <to-message-id>',
-    'cli.err.locale_explain_usage': 'usage: vmz locale explain <message-id> [project]',
-    'cli.err.locale_diff_usage': 'usage: vmz locale diff <base-locale> <target-locale> [project]',
-    'cli.err.locale_pseudo_usage': 'usage: vmz locale pseudo <source-locale> [project]',
-    'cli.err.application_relocate_manifest': 'relocate requires a relocation manifest JSON path',
-    'cli.err.application_relocate_base': 'relocate requires --base <ApplicationBase>',
-    'cli.err.artifact_diff_usage': 'artifact diff requires <aDigest> <bDigest>',
-    'cli.err.refactor_rename_usage': 'rename requires --kind, --from, and --to',
-    'cli.err.explain_style_usage': 'usage: vmz explain style <node> [path]',
-    'cli.err.explain_usage': 'usage: vmz explain style <node> [path] | vmz explain <target> [path]',
-    'cli.err.project_bin_missing': 'found project `vmz` / `@vmz/vmz` but bin/vmz.js is missing.',
-    'cli.err.global_needs_project':
-        'this `vmz` is a global install (mode=global); project commands need a project install.',
-    'cli.err.global_install_hint': 'Install in the app:  pnpm add -D @vmz/vmz',
-    'cli.err.global_run_hint': 'Then run:            pnpm exec vmz <command>',
-    'cli.err.global_developer_hint':
-        '(developer mode: run from vmz-framework packages/runtimes/vmz source — full CLI)',
-
-    /** Fallback when wire diagnostic has no code (args.message). */
-    'diag.message': '{message}',
+export type CliLocalesManifest = {
+    defaultLocale: string;
+    locales: Array<{ id: string; label?: string; direction?: string }>;
+    fallback?: Record<string, string[]>;
 };
+
+const LOCALES_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'locales');
+
+const catalogCache = new Map<string, LocaleCatalog>();
+let manifestCache: CliLocalesManifest | null = null;
+
+/** Package `locales/` root (shipped next to `dist/`). */
+export function resolveCliLocalesRoot(): string {
+    return LOCALES_ROOT;
+}
+
+export function loadCliLocalesManifest(root: string = LOCALES_ROOT): CliLocalesManifest {
+    if (manifestCache && root === LOCALES_ROOT) return manifestCache;
+    const file = path.join(root, 'locales.json');
+    if (!existsSync(file)) {
+        throw new Error(`@vmz/vmz: missing CLI locales manifest at ${file}`);
+    }
+    const raw = JSON.parse(readFileSync(file, 'utf8')) as CliLocalesManifest;
+    if (!raw?.defaultLocale || !Array.isArray(raw.locales) || !raw.locales.length) {
+        throw new Error(`@vmz/vmz: invalid CLI locales manifest ${file}`);
+    }
+    if (root === LOCALES_ROOT) manifestCache = raw;
+    return raw;
+}
+
+/**
+ * Flatten nested JSON (`{ cli: { cmd: { check: "…" } } }` → `cli.cmd.check`)
+ * or pass through already-flat catalogs (`{ "cli.cmd.check": "…" }`).
+ */
+export function flattenCatalog(node: unknown, prefix = ''): LocaleCatalog {
+    const out: LocaleCatalog = {};
+    if (node == null || typeof node !== 'object' || Array.isArray(node)) return out;
+    for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+        const id = prefix ? `${prefix}.${key}` : key;
+        if (typeof value === 'string') {
+            out[id] = value;
+        } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+            Object.assign(out, flattenCatalog(value, id));
+        }
+    }
+    return out;
+}
+
+function loadLocaleDir(root: string, localeId: string): LocaleCatalog {
+    const dir = path.join(root, localeId);
+    if (!existsSync(dir)) return {};
+    const out: LocaleCatalog = {};
+    for (const name of readdirSync(dir).sort()) {
+        if (!name.endsWith('.json')) continue;
+        const raw = JSON.parse(readFileSync(path.join(dir, name), 'utf8')) as unknown;
+        Object.assign(out, flattenCatalog(raw));
+    }
+    return out;
+}
+
+/**
+ * Load (and cache) a locale catalog. Missing locales fall back via manifest.fallback
+ * then `defaultLocale`.
+ */
+export function loadCliCatalog(locale: string, root: string = LOCALES_ROOT): LocaleCatalog {
+    const cacheKey = `${root}::${locale}`;
+    const hit = catalogCache.get(cacheKey);
+    if (hit) return hit;
+
+    const manifest = loadCliLocalesManifest(root);
+    const chain = [locale, ...(manifest.fallback?.[locale] ?? []), manifest.defaultLocale];
+    const merged: LocaleCatalog = {};
+    // Walk chain reverse so requested locale wins.
+    for (const id of [...new Set(chain)].reverse()) {
+        Object.assign(merged, loadLocaleDir(root, id));
+    }
+    if (!Object.keys(merged).length) {
+        throw new Error(`@vmz/vmz: empty CLI catalog for locale ${JSON.stringify(locale)} under ${root}`);
+    }
+    catalogCache.set(cacheKey, merged);
+    return merged;
+}
+
+/** @deprecated Prefer {@link loadCliCatalog}; kept for soft re-exports. */
+export function getVmzCliCatalogEnUs(): LocaleCatalog {
+    return loadCliCatalog('en-US');
+}
+
+/** Eager default table (en-US) for callers that still import a constant. */
+export const VMZ_CLI_CATALOG_EN_US: LocaleCatalog = loadCliCatalog('en-US');
+
+/**
+ * Resolve product locale from env (no separate i18n package).
+ */
+export function resolveVmzLocale(env: NodeJS.ProcessEnv = process.env): string {
+    const manifest = loadCliLocalesManifest();
+    const raw = String(env.VMZ_LOCALE || env.LANG || env.LC_ALL || '')
+        .split('.')[0]
+        ?.replace(/_/g, '-') || '';
+    if (!raw) return manifest.defaultLocale;
+    const lower = raw.toLowerCase();
+    const known = manifest.locales.map((l) => l.id);
+    const exact = known.find((id) => id.toLowerCase() === lower);
+    if (exact) return exact;
+    const prefix = known.find((id) => id.toLowerCase().startsWith(lower.split('-')[0]!));
+    if (prefix) return prefix;
+    if (lower === 'en' || lower.startsWith('en-')) {
+        const en = known.find((id) => id.toLowerCase().startsWith('en'));
+        if (en) return en;
+    }
+    return manifest.defaultLocale;
+}
 
 /**
  * Minimal `{arg}` substitution against a catalog table.
@@ -151,14 +148,18 @@ export function translateCatalog(
 /**
  * Build the official Localize plugin for `@vmz/vmz`.
  */
-export function createVmzCliLocalize(opts: { locale?: string; catalog?: LocaleCatalog } = {}): LocalizePlugin {
-    const locale = typeof opts.locale === 'string' && opts.locale ? opts.locale : 'en-US';
-    const catalog = opts.catalog ?? VMZ_CLI_CATALOG_EN_US;
+export function createVmzCliLocalize(
+    opts: { locale?: string; catalog?: LocaleCatalog; env?: NodeJS.ProcessEnv; localesRoot?: string } = {},
+): LocalizePlugin {
+    const env = opts.env ?? process.env;
+    const root = opts.localesRoot ?? LOCALES_ROOT;
+    const locale = typeof opts.locale === 'string' && opts.locale ? opts.locale : resolveVmzLocale(env);
+    const catalog = opts.catalog ?? loadCliCatalog(locale, root);
     return {
         resolveLocale: () => locale,
         t: (id, args) => translateCatalog(id, args, catalog),
     };
 }
 
-/** Default official plugin (`en-US`). */
+/** Default official plugin (locale from env; catalog from `locales/`). */
 export const vmzCliLocalize = createVmzCliLocalize();

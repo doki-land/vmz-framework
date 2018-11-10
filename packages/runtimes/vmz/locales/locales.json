@@ -1,0 +1,6 @@
+{
+  "defaultLocale": "en-US",
+  "locales": [
+    { "id": "en-US", "label": "English", "direction": "ltr" }
+  ]
+}
