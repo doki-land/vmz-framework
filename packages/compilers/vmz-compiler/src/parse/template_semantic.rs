@@ -154,6 +154,44 @@ pub fn lower_concrete_to_semantic(concrete: &ConcreteIr) -> Result<SemanticIr, T
     Ok(SemanticIr { roots: lower_siblings(&concrete.roots)? })
 }
 
+/// Tooling / compiler shared summary over one Semantic tree (no second template scan).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SemanticAstStats {
+    /// Number of [`SemanticNode::IfChain`] nodes.
+    pub if_chains: usize,
+    /// Total branches across all if-chains.
+    pub if_branches: usize,
+    /// Number of [`SemanticNode::ForNode`] nodes.
+    pub for_nodes: usize,
+}
+
+/// Walk Semantic AST for control-flow counts (LSP / check / rename can share this).
+pub fn semantic_ast_stats(semantic: &SemanticIr) -> SemanticAstStats {
+    let mut stats = SemanticAstStats::default();
+    walk_stats(&semantic.roots, &mut stats);
+    stats
+}
+
+fn walk_stats(nodes: &[SemanticNode], stats: &mut SemanticAstStats) {
+    for n in nodes {
+        match n {
+            SemanticNode::Text { .. } | SemanticNode::Interpolation { .. } => {}
+            SemanticNode::Element { children, .. } => walk_stats(children, stats),
+            SemanticNode::IfChain { branches, .. } => {
+                stats.if_chains += 1;
+                stats.if_branches += branches.len();
+                for b in branches {
+                    walk_stats(std::slice::from_ref(b.body.as_ref()), stats);
+                }
+            }
+            SemanticNode::ForNode { body, .. } => {
+                stats.for_nodes += 1;
+                walk_stats(std::slice::from_ref(body.as_ref()), stats);
+            }
+        }
+    }
+}
+
 fn lower_siblings(nodes: &[ConcreteNode]) -> Result<Vec<SemanticNode>, TemplateParseError> {
     let mut out = Vec::new();
     let mut i = 0;

@@ -15,8 +15,9 @@ use crate::server_calls::collect_server_class_calls;
 use crate::server_slice::ServerSliceProof;
 use crate::sfc::{ScriptKind, ScriptLanguage, parse_vmz};
 use crate::template::{
-    AttrValue, TemplateIr, TemplateNode, lower_concrete_to_ir, lower_concrete_to_semantic,
-    parse_template, parse_template_concrete, template_parse_to_diagnostic,
+    AttrValue, SemanticAstStats, TemplateIr, TemplateNode, lower_concrete_to_ir,
+    lower_concrete_to_semantic, parse_template, parse_template_concrete, semantic_ast_stats,
+    template_parse_to_diagnostic,
 };
 use crate::virtual_server;
 use vmz_protocol::SourceSpan;
@@ -40,6 +41,8 @@ pub struct CheckReport {
     pub diagnostics: Vec<ReportedDiagnostic>,
     /// Number of `.vmz` files visited.
     pub files_checked: usize,
+    /// Aggregated Semantic AST control-flow stats (shared with tooling; no second scan).
+    pub semantic_stats: SemanticAstStats,
 }
 
 impl CheckReport {
@@ -217,6 +220,10 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
             return;
         }
     };
+    let unit_stats = semantic_ast_stats(&semantic);
+    report.semantic_stats.if_chains += unit_stats.if_chains;
+    report.semantic_stats.if_branches += unit_stats.if_branches;
+    report.semantic_stats.for_nodes += unit_stats.for_nodes;
     let ir = match lower_concrete_to_ir(&concrete) {
         Ok(ir) => ir,
         Err(e) => {

@@ -98,3 +98,22 @@ fn invalid_template_expression_fails_oxc_ingress() {
     // Snippet is `<template>\n<p>{{ 1 + }}</p>\n</template>…` — mustache body is past content_start.
     assert!(span.start > 0, "absolute span must not be template-body-local 0");
 }
+
+#[test]
+fn check_consumes_same_semantic_ast_stats_as_tooling() {
+    use vmz_compiler::{parse_template_asts, semantic_ast_stats};
+
+    let template = r#"
+<p v-if="a">A</p>
+<p v-else-if="b">B</p>
+<p v-else>C</p>
+<li v-for="x in xs" :key="x">{{ x }}</li>
+"#;
+    let report = check_template_snippet(template);
+    let (semantic, _) = parse_template_asts(template).unwrap();
+    let tooling = semantic_ast_stats(&semantic);
+    assert_eq!(report.semantic_stats, tooling);
+    assert_eq!(tooling.if_chains, 1);
+    assert_eq!(tooling.if_branches, 3);
+    assert_eq!(tooling.for_nodes, 1);
+}

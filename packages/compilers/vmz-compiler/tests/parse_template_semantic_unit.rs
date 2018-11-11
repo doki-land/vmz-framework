@@ -2,7 +2,7 @@
 
 use vmz_compiler::{
     DirectiveArg, EventTarget, SemanticNode, SemanticProp, lower_concrete_to_semantic,
-    parse_template, parse_template_concrete,
+    parse_template, parse_template_asts, parse_template_concrete, semantic_ast_stats,
 };
 
 #[test]
@@ -217,4 +217,18 @@ fn bind_plan_keeps_modifiers() {
         },
         other => panic!("expected Element, got {other:?}"),
     }
+}
+
+#[test]
+fn tooling_and_parse_share_semantic_ast_stats() {
+    let src = r#"
+<p v-if="a">A</p>
+<p v-else>B</p>
+<li v-for="(item, i) in items" :key="item.id">{{ item }}</li>
+"#;
+    let (semantic, _ir) = parse_template_asts(src).unwrap();
+    let stats = semantic_ast_stats(&semantic);
+    assert_eq!(stats.if_chains, 1);
+    assert_eq!(stats.if_branches, 2);
+    assert_eq!(stats.for_nodes, 1);
 }
