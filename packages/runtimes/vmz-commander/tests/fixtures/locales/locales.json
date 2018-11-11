@@ -1,0 +1,5 @@
+{
+  "defaultLocale": "en-US",
+  "locales": [{ "id": "en-US" }, { "id": "zh-CN" }],
+  "fallback": { "zh-CN": ["en-US"] }
+}

@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "type": "module",
-    "description": "i18n-first TypeScript CLI framework for VMZ tooling",
+    "description": "i18n-first TypeScript CLI framework (command tree, locales loading, commander.* chrome)",
     "license": "MIT",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
@@ -21,7 +21,8 @@
         "node": ">=20"
     },
     "scripts": {
-        "build": "tsc -p tsconfig.json"
+        "build": "tsc -p tsconfig.json",
+        "test": "node --import ../../../scripts/test/resolve-ts-from-js.mjs --test --experimental-strip-types ./tests/locales.test.ts"
     },
     "devDependencies": {
         "@types/node": "^22.15.0",

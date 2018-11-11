@@ -1,0 +1,17 @@
+{
+  "cli": {
+    "intro": "my-cli demo",
+    "cmd": {
+      "build": "Build the project",
+      "ping": "Ping"
+    },
+    "opt": {
+      "out-dir": "Output directory"
+    }
+  },
+  "commander": {
+    "ui": {
+      "usage": "USAGE {name}"
+    }
+  }
+}
