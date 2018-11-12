@@ -1,7 +1,4 @@
 {
-  "cli.ui.usage": "Usage: {name} <command> [options]",
-  "cli.ui.commands": "Commands:",
-  "cli.ui.options": "Options:",
   "cli.intro.project": "vmz — Node toolchain host (`@vmz/vmz`, N-API)",
   "cli.intro.global": "vmz — global install (help/version only). Pin `@vmz/vmz` in the app (`pnpm add -D @vmz/vmz`) and run `pnpm exec vmz <command>`. A global `vmz` re-execs the nearest project bin when present.",
   "cli.cmd.check": "Check project via Workspace",
@@ -86,9 +83,6 @@
   "cli.opt.apply": "Apply workspace edit plan",
   "cli.opt.explain": "Include rename explain chain",
   "cli.opt.explain.target": "Generic Workspace.explain target",
-  "cli.err.unknown_command": "unknown command `{cmd}`",
-  "cli.err.unknown_option": "unknown option `{option}`",
-  "cli.err.missing_option_value": "missing value for `{option}`",
   "cli.err.unknown_plan_kind": "unknown plan kind `{kind}` (locale | document-route)",
   "cli.err.unknown_target": "unknown --target {target} (browser | mini-program-wechat)",
   "cli.err.document_build_aborted": "document build aborted due to diagnostics",

@@ -35,7 +35,7 @@ import { normalizeDeliveryAuthoring, resolveProfileArtifactDir, selectBuildProfi
 import { packFromDeploymentIr } from './pack.js';
 import { assembleDelivery, emitBuildProof } from './build-assemble.js';
 import { createCli } from '@vmz/commander';
-import { vmzCliLocalize } from './cli-localize.js';
+import { resolveCliLocalesRoot } from './cli-localize.js';
 
 /**
  * @param {string[]} argv
@@ -100,7 +100,11 @@ export function printHelp() {
 function buildProductCli(opts = {}) {
     const mode = opts.mode === 'global' ? 'global' : 'project';
     const introId = mode === 'global' ? 'cli.intro.global' : 'cli.intro.project';
-    const cli = createCli('vmz').use(vmzCliLocalize).intro(introId);
+    const cli = createCli('vmz')
+        .locales(resolveCliLocalesRoot(), {
+            envKeys: ['VMZ_LOCALE', 'LOCALE', 'LANG', 'LC_ALL'],
+        })
+        .intro(introId);
 
     // Global install: only version (help is derived). Project commands need a project bin.
     if (mode === 'global') {

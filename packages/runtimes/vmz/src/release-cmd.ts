@@ -87,7 +87,7 @@ export function runArtifact(sub, options, ctx = {}) {
             }
             return 0;
         }
-        log.errorId('cli.err.unknown_command', { cmd: `artifact ${sub}` });
+        log.errorId('commander.err.unknown_command', { cmd: `artifact ${sub}` });
         return 1;
     } catch (e) {
         log.error(String(e && e.message ? e.message : e));
