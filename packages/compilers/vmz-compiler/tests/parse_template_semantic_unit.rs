@@ -389,3 +389,37 @@ fn dynamic_bind_and_on_args_survive_semantic_and_ir() {
         other => panic!("expected Element, got {other:?}"),
     }
 }
+
+#[test]
+fn class_and_style_merge_into_plans() {
+    let src = r#"<div class="a b" :class="{ active }" style="color:red" :style="dyn">x</div>"#;
+    let concrete = parse_template_concrete(src).unwrap();
+    let sem = lower_concrete_to_semantic(&concrete).unwrap();
+    match &sem.roots[0] {
+        SemanticNode::Element { props, .. } => {
+            let class = props.iter().find_map(|p| match p {
+                SemanticProp::ClassPlan { static_classes, binds, .. } => {
+                    Some((static_classes.clone(), binds.clone()))
+                }
+                _ => None,
+            });
+            let (statics, binds) = class.expect("ClassPlan");
+            assert_eq!(statics, vec!["a".to_string(), "b".to_string()]);
+            assert_eq!(binds, vec!["{ active }".to_string()]);
+            let style = props.iter().find_map(|p| match p {
+                SemanticProp::StylePlan { static_style, binds, .. } => {
+                    Some((static_style.clone(), binds.clone()))
+                }
+                _ => None,
+            });
+            let (st, sb) = style.expect("StylePlan");
+            assert_eq!(st.as_deref(), Some("color:red"));
+            assert_eq!(sb, vec!["dyn".to_string()]);
+            assert!(!props.iter().any(|p| matches!(
+                p,
+                SemanticProp::Static { name, .. } if name == "class" || name == "style"
+            )));
+        }
+        other => panic!("expected Element, got {other:?}"),
+    }
+}

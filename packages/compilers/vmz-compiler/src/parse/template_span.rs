@@ -11,7 +11,7 @@
 //! - Do not precompute line/column in the parser.
 
 /// Inclusive-exclusive UTF-8 byte range into the template body string.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct TemplateSpan {
     /// Start byte offset (UTF-8, inclusive).
     pub start: u32,

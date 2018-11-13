@@ -173,6 +173,24 @@ pub enum SemanticProp {
         /// Attr span.
         span: TemplateSpan,
     },
+    /// Merged `class` + `:class` (static tokens + bind exprs, author order).
+    ClassPlan {
+        /// Tokens from static `class="…"`.
+        static_classes: Vec<String>,
+        /// `:class` / `v-bind:class` expressions (object/array/string still text).
+        binds: Vec<String>,
+        /// Span covering the first contributing attr through the last.
+        span: TemplateSpan,
+    },
+    /// Merged `style` + `:style`.
+    StylePlan {
+        /// Literal `style="…"` when present.
+        static_style: Option<String>,
+        /// `:style` bind expressions.
+        binds: Vec<String>,
+        /// Span covering contributing attrs.
+        span: TemplateSpan,
+    },
     /// Other directives kept structured from Concrete (show/html/custom).
     Directive {
         /// Concrete directive payload.
@@ -614,8 +632,25 @@ fn event_target_for_tag(tag: &str) -> EventTarget {
 fn lower_props(tag: &str, attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
     let target = event_target_for_tag(tag);
     let mut out = Vec::with_capacity(attrs.len());
+    let mut class_static: Vec<String> = Vec::new();
+    let mut class_binds: Vec<String> = Vec::new();
+    let mut class_span: Option<TemplateSpan> = None;
+    let mut style_static: Option<String> = None;
+    let mut style_binds: Vec<String> = Vec::new();
+    let mut style_span: Option<TemplateSpan> = None;
+
     for a in attrs {
         match a {
+            ConcreteAttr::Static { name, value, span } if name == "class" => {
+                for tok in value.split_whitespace() {
+                    class_static.push(tok.to_string());
+                }
+                class_span = Some(merge_span(class_span, *span));
+            }
+            ConcreteAttr::Static { name, value, span } if name == "style" => {
+                style_static = Some(value.clone());
+                style_span = Some(merge_span(style_span, *span));
+            }
             ConcreteAttr::Static { name, value, span } => {
                 out.push(SemanticProp::Static {
                     name: name.clone(),
@@ -624,6 +659,26 @@ fn lower_props(tag: &str, attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
                 });
             }
             ConcreteAttr::Directive { dir, span } => match dir {
+                Directive::Bind {
+                    arg: DirectiveArg::Static(n),
+                    expr,
+                    modifiers,
+                    ..
+                } if n == "class" => {
+                    let _ = modifiers;
+                    class_binds.push(expr.clone());
+                    class_span = Some(merge_span(class_span, *span));
+                }
+                Directive::Bind {
+                    arg: DirectiveArg::Static(n),
+                    expr,
+                    modifiers,
+                    ..
+                } if n == "style" => {
+                    let _ = modifiers;
+                    style_binds.push(expr.clone());
+                    style_span = Some(merge_span(style_span, *span));
+                }
                 Directive::Bind { arg, expr, modifiers } => {
                     out.push(SemanticProp::Bind {
                         arg: arg.clone(),
@@ -662,7 +717,6 @@ fn lower_props(tag: &str, attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
                     });
                 }
                 other => {
-                    // Slot / control-flow are lifted elsewhere; keep other dirs as opaque.
                     if matches!(
                         other,
                         Directive::Slot { .. }
@@ -681,5 +735,30 @@ fn lower_props(tag: &str, attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
             },
         }
     }
+
+    if !class_static.is_empty() || !class_binds.is_empty() {
+        out.push(SemanticProp::ClassPlan {
+            static_classes: class_static,
+            binds: class_binds,
+            span: class_span.unwrap_or_default(),
+        });
+    }
+    if style_static.is_some() || !style_binds.is_empty() {
+        out.push(SemanticProp::StylePlan {
+            static_style: style_static,
+            binds: style_binds,
+            span: style_span.unwrap_or_default(),
+        });
+    }
     out
+}
+
+fn merge_span(prev: Option<TemplateSpan>, next: TemplateSpan) -> TemplateSpan {
+    match prev {
+        None => next,
+        Some(p) => TemplateSpan {
+            start: p.start.min(next.start),
+            end: p.end.max(next.end),
+        },
+    }
 }

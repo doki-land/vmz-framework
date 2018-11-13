@@ -594,6 +594,34 @@ fn walk_semantic_prop_bindings(
                 Some(format!("@update:{prop}")),
             );
         }
+        SemanticProp::ClassPlan { binds, .. } => {
+            for expr in binds {
+                add_expr_binding(
+                    expr,
+                    BindingKind::Attr,
+                    Some("class".into()),
+                    fields,
+                    scope,
+                    each_frames,
+                    b,
+                    region,
+                );
+            }
+        }
+        SemanticProp::StylePlan { binds, .. } => {
+            for expr in binds {
+                add_expr_binding(
+                    expr,
+                    BindingKind::Attr,
+                    Some("style".into()),
+                    fields,
+                    scope,
+                    each_frames,
+                    b,
+                    region,
+                );
+            }
+        }
         SemanticProp::Directive { dir, .. } => match dir {
             Directive::Html { expr } | Directive::Show { expr } => {
                 let name = if matches!(dir, Directive::Html { .. }) {
