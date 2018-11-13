@@ -224,6 +224,8 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
     report.semantic_stats.if_chains += unit_stats.if_chains;
     report.semantic_stats.if_branches += unit_stats.if_branches;
     report.semantic_stats.for_nodes += unit_stats.for_nodes;
+    report.semantic_stats.slot_outlets += unit_stats.slot_outlets;
+    report.semantic_stats.slot_templates += unit_stats.slot_templates;
     let ir = match lower_concrete_to_ir(&concrete) {
         Ok(ir) => ir,
         Err(e) => {

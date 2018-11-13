@@ -68,6 +68,28 @@ pub enum SemanticNode {
         /// Span of the `v-for` element.
         span: TemplateSpan,
     },
+    /// `<slot>` outlet (provider hole; optional name + fallback children).
+    SlotOutlet {
+        /// Static slot name (`name` attr); `None` = default.
+        name: Option<String>,
+        /// Remaining props (binds that forward scoped slot data, etc.).
+        props: Vec<SemanticProp>,
+        /// Fallback content when the slot is not filled.
+        children: Vec<SemanticNode>,
+        /// Element span.
+        span: TemplateSpan,
+    },
+    /// `#name` / `v-slot` filler (`<template #x>` fragment or component slot).
+    SlotTemplate {
+        /// Slot name argument (static only in this peel; dynamic → structured error).
+        name: DirectiveArg,
+        /// Optional slot props binding (`#default="slotProps"`).
+        slot_props: Option<String>,
+        /// Filler body (fragment children or host element without the slot directive).
+        body: Box<SemanticNode>,
+        /// Span of the slot-bearing element / template.
+        span: TemplateSpan,
+    },
 }
 
 /// One branch of an [`SemanticNode::IfChain`].
@@ -163,6 +185,10 @@ pub struct SemanticAstStats {
     pub if_branches: usize,
     /// Number of [`SemanticNode::ForNode`] nodes.
     pub for_nodes: usize,
+    /// Number of [`SemanticNode::SlotOutlet`] nodes.
+    pub slot_outlets: usize,
+    /// Number of [`SemanticNode::SlotTemplate`] nodes.
+    pub slot_templates: usize,
 }
 
 /// Walk Semantic AST for control-flow counts (LSP / check / rename can share this).
@@ -186,6 +212,14 @@ fn walk_stats(nodes: &[SemanticNode], stats: &mut SemanticAstStats) {
             }
             SemanticNode::ForNode { body, .. } => {
                 stats.for_nodes += 1;
+                walk_stats(std::slice::from_ref(body.as_ref()), stats);
+            }
+            SemanticNode::SlotOutlet { children, .. } => {
+                stats.slot_outlets += 1;
+                walk_stats(children, stats);
+            }
+            SemanticNode::SlotTemplate { body, .. } => {
+                stats.slot_templates += 1;
                 walk_stats(std::slice::from_ref(body.as_ref()), stats);
             }
         }
@@ -454,12 +488,107 @@ fn lower_element_strip_control_flow(node: &ConcreteNode) -> Result<SemanticNode,
     if for_directive(&attrs).is_some() {
         return lower_for_from_parts(tag, &attrs, children, *span);
     }
+    if let Some((slot_name, slot_props, slot_span)) = slot_directive(&attrs) {
+        return lower_slot_template(tag, &attrs, children, *span, slot_name, slot_props, slot_span);
+    }
+    if tag == "slot" {
+        return lower_slot_outlet(&attrs, children, *span);
+    }
     let children = lower_siblings(children)?;
     Ok(SemanticNode::Element {
         tag: tag.clone(),
         props: lower_props(tag, &attrs),
         children,
         span: *span,
+    })
+}
+
+fn slot_directive(attrs: &[ConcreteAttr]) -> Option<(DirectiveArg, Option<String>, TemplateSpan)> {
+    for a in attrs {
+        if let ConcreteAttr::Directive {
+            dir: Directive::Slot { name, props },
+            span,
+        } = a
+        {
+            return Some((name.clone(), props.clone(), *span));
+        }
+    }
+    None
+}
+
+fn lower_slot_outlet(
+    attrs: &[ConcreteAttr],
+    children: &[ConcreteNode],
+    span: TemplateSpan,
+) -> Result<SemanticNode, TemplateParseError> {
+    let mut name = None;
+    let mut rest = Vec::new();
+    for a in attrs {
+        match a {
+            ConcreteAttr::Static { name: n, value, .. } if n == "name" => {
+                name = Some(value.clone());
+            }
+            other => rest.push(other.clone()),
+        }
+    }
+    // Prefer `:name` bind as static name when literal; dynamic name stays as Bind on props.
+    let props = lower_props("slot", &rest);
+    let children = lower_siblings(children)?;
+    Ok(SemanticNode::SlotOutlet { name, props, children, span })
+}
+
+fn lower_slot_template(
+    tag: &str,
+    attrs: &[ConcreteAttr],
+    children: &[ConcreteNode],
+    span: TemplateSpan,
+    slot_name: DirectiveArg,
+    slot_props: Option<String>,
+    slot_span: TemplateSpan,
+) -> Result<SemanticNode, TemplateParseError> {
+    if matches!(slot_name, DirectiveArg::Dynamic(_)) {
+        return Err(TemplateParseError {
+            message: "dynamic `v-slot` / `#` argument is not supported yet (`vmz::template/unsupported-dynamic-arg`)"
+                .into(),
+            offset: slot_span.start as usize,
+        });
+    }
+    let attrs_no_slot: Vec<ConcreteAttr> = attrs
+        .iter()
+        .filter(|a| {
+            !matches!(
+                a,
+                ConcreteAttr::Directive {
+                    dir: Directive::Slot { .. },
+                    ..
+                }
+            )
+        })
+        .cloned()
+        .collect();
+    let body = if tag == "template" {
+        // Fragment: slot filler is the lowered children only (single wrapper element).
+        let kids = lower_siblings(children)?;
+        SemanticNode::Element {
+            tag: "template".into(),
+            props: Vec::new(),
+            children: kids,
+            span,
+        }
+    } else {
+        let kids = lower_siblings(children)?;
+        SemanticNode::Element {
+            tag: tag.to_string(),
+            props: lower_props(tag, &attrs_no_slot),
+            children: kids,
+            span,
+        }
+    };
+    Ok(SemanticNode::SlotTemplate {
+        name: slot_name,
+        slot_props,
+        body: Box::new(body),
+        span,
     })
 }
 
@@ -514,6 +643,17 @@ fn lower_props(tag: &str, attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
                     });
                 }
                 other => {
+                    // Slot / Model / control-flow are lifted elsewhere; keep other dirs as opaque.
+                    if matches!(
+                        other,
+                        Directive::Slot { .. }
+                            | Directive::If { .. }
+                            | Directive::ElseIf { .. }
+                            | Directive::Else
+                            | Directive::For { .. }
+                    ) {
+                        continue;
+                    }
                     out.push(SemanticProp::Directive {
                         dir: other.clone(),
                         span: *span,

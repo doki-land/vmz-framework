@@ -307,6 +307,27 @@ fn walk_semantic_nodes(
             SemanticNode::Element { .. } => {
                 walk_semantic_element(node, fields, scope, each_frames, b, region);
             }
+            SemanticNode::SlotOutlet { children, props, .. } => {
+                for p in props {
+                    walk_semantic_prop_bindings(p, "slot", fields, scope, each_frames, b, region);
+                }
+                walk_semantic_nodes(children, fields, scope, each_frames, b, region);
+            }
+            SemanticNode::SlotTemplate { body, slot_props, .. } => {
+                if let Some(sp) = slot_props {
+                    // Slot props alias is a binding source for the filler body scope later;
+                    // still walk the body under the current scope for this peel.
+                    let _ = sp;
+                }
+                walk_semantic_nodes(
+                    std::slice::from_ref(body.as_ref()),
+                    fields,
+                    scope,
+                    each_frames,
+                    b,
+                    region,
+                );
+            }
         }
     }
 }
@@ -476,93 +497,96 @@ fn walk_semantic_element(
     };
 
     for p in props {
-        match p {
-            SemanticProp::Static { .. } => {}
-            SemanticProp::Bind { arg, expr, .. } => {
-                let name = match arg {
-                    DirectiveArg::Static(s) => s.clone(),
-                    DirectiveArg::Dynamic(_) => continue,
-                };
-                let kind = if is_component_tag(tag) {
-                    BindingKind::ComponentProp
-                } else {
-                    BindingKind::Attr
-                };
-                add_expr_binding(
-                    expr,
-                    kind,
-                    Some(name),
-                    fields,
-                    scope,
-                    each_frames,
-                    b,
-                    region,
-                );
-            }
-            SemanticProp::BindObject { expr, .. } => {
-                add_expr_binding(
-                    expr,
-                    BindingKind::Attr,
-                    Some("v-bind".into()),
-                    fields,
-                    scope,
-                    each_frames,
-                    b,
-                    region,
-                );
-            }
-            SemanticProp::On { arg, handler, .. } => {
-                let event = match arg {
-                    DirectiveArg::Static(s) => s.clone(),
-                    DirectiveArg::Dynamic(_) => continue,
-                };
-                let body = sanitize(handler);
-                let reads = expr_to_paths(b, &body, fields, scope, each_frames);
-                let expr = b.intern_expr(body);
-                b.add_binding(
-                    BindingKind::Event,
-                    reads,
-                    region,
-                    Some(expr),
-                    Some(format!("@{event}")),
-                );
-            }
-            SemanticProp::OnObject { expr, .. } => {
-                let body = sanitize(expr);
-                let reads = expr_to_paths(b, &body, fields, scope, each_frames);
-                let eid = b.intern_expr(body);
-                b.add_binding(
-                    BindingKind::Event,
-                    reads,
-                    region,
-                    Some(eid),
-                    Some("v-on".into()),
-                );
-            }
-            SemanticProp::Directive { dir, .. } => match dir {
-                Directive::Html { expr } | Directive::Show { expr } => {
-                    let name = if matches!(dir, Directive::Html { .. }) {
-                        "html"
-                    } else {
-                        "show"
-                    };
-                    add_expr_binding(
-                        expr,
-                        BindingKind::Attr,
-                        Some(name.into()),
-                        fields,
-                        scope,
-                        each_frames,
-                        b,
-                        region,
-                    );
-                }
-                _ => {}
-            },
-        }
+        walk_semantic_prop_bindings(p, tag, fields, scope, each_frames, b, region);
     }
 
     walk_semantic_nodes(children, fields, scope, each_frames, b, region);
+}
+
+fn walk_semantic_prop_bindings(
+    p: &SemanticProp,
+    tag: &str,
+    fields: &[String],
+    scope: &[String],
+    each_frames: &[EachFrame],
+    b: &mut ReactiveComponentBuilder,
+    region: Option<RegionId>,
+) {
+    match p {
+        SemanticProp::Static { .. } => {}
+        SemanticProp::Bind { arg, expr, .. } => {
+            let name = match arg {
+                DirectiveArg::Static(s) => s.clone(),
+                DirectiveArg::Dynamic(_) => return,
+            };
+            let kind = if is_component_tag(tag) {
+                BindingKind::ComponentProp
+            } else {
+                BindingKind::Attr
+            };
+            add_expr_binding(expr, kind, Some(name), fields, scope, each_frames, b, region);
+        }
+        SemanticProp::BindObject { expr, .. } => {
+            add_expr_binding(
+                expr,
+                BindingKind::Attr,
+                Some("v-bind".into()),
+                fields,
+                scope,
+                each_frames,
+                b,
+                region,
+            );
+        }
+        SemanticProp::On { arg, handler, .. } => {
+            let event = match arg {
+                DirectiveArg::Static(s) => s.clone(),
+                DirectiveArg::Dynamic(_) => return,
+            };
+            let body = sanitize(handler);
+            let reads = expr_to_paths(b, &body, fields, scope, each_frames);
+            let expr = b.intern_expr(body);
+            b.add_binding(
+                BindingKind::Event,
+                reads,
+                region,
+                Some(expr),
+                Some(format!("@{event}")),
+            );
+        }
+        SemanticProp::OnObject { expr, .. } => {
+            let body = sanitize(expr);
+            let reads = expr_to_paths(b, &body, fields, scope, each_frames);
+            let eid = b.intern_expr(body);
+            b.add_binding(
+                BindingKind::Event,
+                reads,
+                region,
+                Some(eid),
+                Some("v-on".into()),
+            );
+        }
+        SemanticProp::Directive { dir, .. } => match dir {
+            Directive::Html { expr } | Directive::Show { expr } => {
+                let name = if matches!(dir, Directive::Html { .. }) {
+                    "html"
+                } else {
+                    "show"
+                };
+                add_expr_binding(
+                    expr,
+                    BindingKind::Attr,
+                    Some(name.into()),
+                    fields,
+                    scope,
+                    each_frames,
+                    b,
+                    region,
+                );
+            }
+            _ => {}
+        },
+    }
 }
 
 fn walk_nodes(

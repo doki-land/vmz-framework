@@ -232,3 +232,98 @@ fn tooling_and_parse_share_semantic_ast_stats() {
     assert_eq!(stats.if_branches, 2);
     assert_eq!(stats.for_nodes, 1);
 }
+
+#[test]
+fn slot_outlet_and_named_fallback() {
+    let src = r#"
+<button>
+  <slot name="icon">fallback</slot>
+  <slot />
+</button>
+"#;
+    let concrete = parse_template_concrete(src).unwrap();
+    let sem = lower_concrete_to_semantic(&concrete).unwrap();
+    match &sem.roots[0] {
+        SemanticNode::Element { tag, children, .. } => {
+            assert_eq!(tag, "button");
+            assert_eq!(children.len(), 2);
+            match &children[0] {
+                SemanticNode::SlotOutlet { name, children, .. } => {
+                    assert_eq!(name.as_deref(), Some("icon"));
+                    assert!(!children.is_empty());
+                }
+                other => panic!("expected SlotOutlet, got {other:?}"),
+            }
+            match &children[1] {
+                SemanticNode::SlotOutlet { name, .. } => assert_eq!(name, &None),
+                other => panic!("expected default SlotOutlet, got {other:?}"),
+            }
+        }
+        other => panic!("expected Element, got {other:?}"),
+    }
+    assert_eq!(semantic_ast_stats(&sem).slot_outlets, 2);
+}
+
+#[test]
+fn template_hash_slot_becomes_slot_template() {
+    let src = r#"
+<Card>
+  <template #header="slotProps">
+    <h1>{{ slotProps.title }}</h1>
+  </template>
+  <template v-slot:footer>
+    <p>f</p>
+  </template>
+</Card>
+"#;
+    let concrete = parse_template_concrete(src).unwrap();
+    let sem = lower_concrete_to_semantic(&concrete).unwrap();
+    match &sem.roots[0] {
+        SemanticNode::Element { tag, children, .. } => {
+            assert_eq!(tag, "Card");
+            assert_eq!(children.len(), 2);
+            match &children[0] {
+                SemanticNode::SlotTemplate {
+                    name: DirectiveArg::Static(n),
+                    slot_props,
+                    body,
+                    ..
+                } => {
+                    assert_eq!(n, "header");
+                    assert_eq!(slot_props.as_deref(), Some("slotProps"));
+                    match body.as_ref() {
+                        SemanticNode::Element { tag, children, .. } => {
+                            assert_eq!(tag, "template");
+                            assert!(!children.is_empty());
+                        }
+                        other => panic!("expected template fragment body, got {other:?}"),
+                    }
+                }
+                other => panic!("expected SlotTemplate, got {other:?}"),
+            }
+            match &children[1] {
+                SemanticNode::SlotTemplate {
+                    name: DirectiveArg::Static(n),
+                    slot_props,
+                    ..
+                } => {
+                    assert_eq!(n, "footer");
+                    assert_eq!(slot_props, &None);
+                }
+                other => panic!("expected footer SlotTemplate, got {other:?}"),
+            }
+        }
+        other => panic!("expected Card element, got {other:?}"),
+    }
+    assert_eq!(semantic_ast_stats(&sem).slot_templates, 2);
+}
+
+#[test]
+fn dynamic_slot_arg_is_structured_error() {
+    let concrete = parse_template_concrete(r#"<Comp v-slot:[name]>x</Comp>"#).unwrap();
+    let err = lower_concrete_to_semantic(&concrete).unwrap_err();
+    assert!(
+        err.message.contains("dynamic") && err.message.contains("slot"),
+        "{err}"
+    );
+}
