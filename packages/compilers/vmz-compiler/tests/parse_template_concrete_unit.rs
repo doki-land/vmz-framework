@@ -148,7 +148,7 @@ fn rejects_jsx_on_concrete() {
 }
 
 #[test]
-fn v_model_concrete_ok_adapter_errors() {
+fn v_model_concrete_and_legacy_ir_lower() {
     let src = r#"<input v-model="query" />"#;
     let concrete = parse_template_concrete(src).unwrap();
     assert!(matches!(
@@ -162,18 +162,27 @@ fn v_model_concrete_ok_adapter_errors() {
                 } if expr == "query"
             )
     ));
-    let err = parse_template(src).unwrap_err();
-    assert!(err.message.contains("v-model"), "{err}");
+    let ir = parse_template(src).unwrap();
+    match &ir.roots[0] {
+        TemplateNode::Element { attrs, .. } => {
+            assert!(attrs.iter().any(|a| a.name == "modelValue"));
+            assert!(attrs.iter().any(|a| a.name == "@update:modelValue"));
+        }
+        other => panic!("expected Element, got {other:?}"),
+    }
 }
 
-/// Freeze gate: unsupported Vue forms must fail at Concrete→IR, not grow TemplateAttr.
+/// Freeze gate: `v-model` must lower via Model plan, not a TemplateAttr string special name.
 #[test]
-fn template_attr_string_model_rejects_v_model_instead_of_string_special() {
-    let err = parse_template(r#"<input v-model="q" />"#).unwrap_err();
-    assert!(
-        err.message.contains("v-model") && !err.message.is_empty(),
-        "expected explicit reject, got {err}"
-    );
+fn template_attr_has_no_raw_v_model_string_name() {
+    let ir = parse_template(r#"<input v-model="q" />"#).unwrap();
+    match &ir.roots[0] {
+        TemplateNode::Element { attrs, .. } => {
+            assert!(!attrs.iter().any(|a| a.name == "v-model" || a.name.starts_with("v-model:")));
+            assert!(attrs.iter().any(|a| a.name == "modelValue"));
+        }
+        other => panic!("expected Element, got {other:?}"),
+    }
 }
 
 #[test]

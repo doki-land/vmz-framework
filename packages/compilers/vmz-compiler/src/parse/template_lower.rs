@@ -94,13 +94,7 @@ fn lower_directive(
             let ir_name = match arg {
                 DirectiveArg::Static(s) if s == "key" => "key".to_string(),
                 DirectiveArg::Static(s) => s.clone(),
-                DirectiveArg::Dynamic(_) => {
-                    return Err(TemplateParseError {
-                        message: "dynamic `v-bind` argument is not supported in legacy IR adapter yet"
-                            .into(),
-                        offset,
-                    });
-                }
+                DirectiveArg::Dynamic(e) => format!("[{e}]"),
             };
             Ok(vec![TemplateAttr {
                 name: ir_name,
@@ -116,16 +110,10 @@ fn lower_directive(
             handler,
             modifiers: _,
         } => {
-            // Modifiers stay on Concrete only; IR event name is bare `@event`.
+            // Modifiers stay on Concrete only; IR event name is bare `@event` or `@[dyn]`.
             let event = match arg {
                 DirectiveArg::Static(s) => s.clone(),
-                DirectiveArg::Dynamic(_) => {
-                    return Err(TemplateParseError {
-                        message: "dynamic `v-on` argument is not supported in legacy IR adapter yet"
-                            .into(),
-                        offset,
-                    });
-                }
+                DirectiveArg::Dynamic(e) => format!("[{e}]"),
             };
             Ok(vec![TemplateAttr {
                 name: format!("@{event}"),
@@ -160,10 +148,21 @@ fn lower_directive(
             name: "show".into(),
             value: AttrValue::Interp(expr.clone()),
         }]),
-        Directive::Model { .. } => Err(TemplateParseError {
-            message: "`v-model` is recognized on Concrete AST but unsupported until semantic IR; rewrite to explicit `:value` + `@update` for now".into(),
-            offset,
-        }),
+        Directive::Model { arg, expr, modifiers: _ } => {
+            // Vue 3 contract: v-model → :modelValue + @update:modelValue;
+            // v-model:arg → :arg + @update:arg.
+            let prop = arg.clone().unwrap_or_else(|| "modelValue".into());
+            Ok(vec![
+                TemplateAttr {
+                    name: prop.clone(),
+                    value: AttrValue::Interp(expr.clone()),
+                },
+                TemplateAttr {
+                    name: format!("@update:{prop}"),
+                    value: AttrValue::Interp(format!("$event => (({expr}) = $event)")),
+                },
+            ])
+        }
         Directive::Custom {
             name,
             arg,

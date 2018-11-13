@@ -327,3 +327,65 @@ fn dynamic_slot_arg_is_structured_error() {
         "{err}"
     );
 }
+
+#[test]
+fn v_model_becomes_semantic_model_plan() {
+    let concrete = parse_template_concrete(r#"<input v-model.number="q" />"#).unwrap();
+    let sem = lower_concrete_to_semantic(&concrete).unwrap();
+    match &sem.roots[0] {
+        SemanticNode::Element { props, .. } => match &props[0] {
+            SemanticProp::Model {
+                arg,
+                expr,
+                modifiers,
+                ..
+            } => {
+                assert_eq!(arg, &None);
+                assert_eq!(expr, "q");
+                assert_eq!(modifiers, &["number".to_string()]);
+            }
+            other => panic!("expected Model, got {other:?}"),
+        },
+        other => panic!("expected Element, got {other:?}"),
+    }
+}
+
+#[test]
+fn v_model_arg_lower_uses_named_prop() {
+    let ir = parse_template(r#"<Comp v-model:title="t" />"#).unwrap();
+    match &ir.roots[0] {
+        vmz_compiler::TemplateNode::Element { attrs, .. } => {
+            assert!(attrs.iter().any(|a| a.name == "title"));
+            assert!(attrs.iter().any(|a| a.name == "@update:title"));
+        }
+        other => panic!("expected Element, got {other:?}"),
+    }
+}
+
+#[test]
+fn dynamic_bind_and_on_args_survive_semantic_and_ir() {
+    let src = r#"<button :[attrName]="val" @[eventName]="onEv">x</button>"#;
+    let concrete = parse_template_concrete(src).unwrap();
+    let sem = lower_concrete_to_semantic(&concrete).unwrap();
+    match &sem.roots[0] {
+        SemanticNode::Element { props, .. } => {
+            assert!(props.iter().any(|p| matches!(
+                p,
+                SemanticProp::Bind { arg: DirectiveArg::Dynamic(e), .. } if e == "attrName"
+            )));
+            assert!(props.iter().any(|p| matches!(
+                p,
+                SemanticProp::On { arg: DirectiveArg::Dynamic(e), .. } if e == "eventName"
+            )));
+        }
+        other => panic!("expected Element, got {other:?}"),
+    }
+    let ir = parse_template(src).unwrap();
+    match &ir.roots[0] {
+        vmz_compiler::TemplateNode::Element { attrs, .. } => {
+            assert!(attrs.iter().any(|a| a.name == "[attrName]"));
+            assert!(attrs.iter().any(|a| a.name == "@[eventName]"));
+        }
+        other => panic!("expected Element, got {other:?}"),
+    }
+}

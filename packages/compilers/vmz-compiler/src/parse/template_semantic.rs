@@ -162,7 +162,18 @@ pub enum SemanticProp {
         /// Attr span.
         span: TemplateSpan,
     },
-    /// Other directives kept structured from Concrete (slot/show/html/custom/model).
+    /// `v-model` / `v-model:arg` (ModelBinding plan).
+    Model {
+        /// Optional model argument (`title` in `v-model:title`); `None` → `modelValue`.
+        arg: Option<String>,
+        /// Model target expression.
+        expr: String,
+        /// Modifiers (`lazy`, `number`, …).
+        modifiers: Vec<String>,
+        /// Attr span.
+        span: TemplateSpan,
+    },
+    /// Other directives kept structured from Concrete (show/html/custom).
     Directive {
         /// Concrete directive payload.
         dir: Directive,
@@ -642,8 +653,16 @@ fn lower_props(tag: &str, attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
                         span: *span,
                     });
                 }
+                Directive::Model { arg, expr, modifiers } => {
+                    out.push(SemanticProp::Model {
+                        arg: arg.clone(),
+                        expr: expr.clone(),
+                        modifiers: modifiers.clone(),
+                        span: *span,
+                    });
+                }
                 other => {
-                    // Slot / Model / control-flow are lifted elsewhere; keep other dirs as opaque.
+                    // Slot / control-flow are lifted elsewhere; keep other dirs as opaque.
                     if matches!(
                         other,
                         Directive::Slot { .. }

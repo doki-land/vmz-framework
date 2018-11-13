@@ -2,7 +2,7 @@
 
 use vmz_compiler::pipeline::expr_plan::plan_template_expr;
 use vmz_compiler::{
-    lower_concrete_to_ir, lower_concrete_to_semantic, parse_template_concrete,
+    TemplateNode, lower_concrete_to_ir, lower_concrete_to_semantic, parse_template_concrete,
     template_parse_to_diagnostic,
 };
 use vmz_types::DepKey;
@@ -55,14 +55,16 @@ fn jsx_rejection_carries_structured_code() {
 }
 
 #[test]
-fn v_model_adapter_reject_carries_unsupported_directive_code() {
-    let concrete = parse_template_concrete(r#"<input v-model="q" />"#).unwrap();
-    let err = lower_concrete_to_ir(&concrete).unwrap_err();
-    let diag = template_parse_to_diagnostic("App.vmz", 0, &err);
-    assert_eq!(
-        diag.code_string().as_deref(),
-        Some("vmz::template/unsupported-directive")
-    );
+fn v_model_semantic_and_ir_follow_vue3_contract() {
+    let concrete = parse_template_concrete(r#"<Comp v-model:title="t" />"#).unwrap();
+    let ir = lower_concrete_to_ir(&concrete).unwrap();
+    match &ir.roots[0] {
+        TemplateNode::Element { attrs, .. } => {
+            assert!(attrs.iter().any(|a| a.name == "title"));
+            assert!(attrs.iter().any(|a| a.name == "@update:title"));
+        }
+        other => panic!("expected Element, got {other:?}"),
+    }
 }
 
 #[test]

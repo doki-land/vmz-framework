@@ -67,14 +67,12 @@ fn template_error_code(message: &str) -> Option<&'static str> {
     if message.contains("JSX") || message.contains("single-brace") {
         return Some("vmz::template/jsx-rejected");
     }
-    if message.contains("`v-model`") || message.contains("v-model") {
-        return Some("vmz::template/unsupported-directive");
-    }
     if message.contains("`v-else")
         || message.contains("v-else-if")
         || message.contains("dynamic `v-bind`")
         || message.contains("dynamic `v-on`")
         || message.contains("dynamic argument")
+        || message.contains("dynamic `v-slot`")
     {
         return Some("vmz::template/illegal-directive");
     }

@@ -517,7 +517,7 @@ fn walk_semantic_prop_bindings(
         SemanticProp::Bind { arg, expr, .. } => {
             let name = match arg {
                 DirectiveArg::Static(s) => s.clone(),
-                DirectiveArg::Dynamic(_) => return,
+                DirectiveArg::Dynamic(e) => format!("[{e}]"),
             };
             let kind = if is_component_tag(tag) {
                 BindingKind::ComponentProp
@@ -541,7 +541,7 @@ fn walk_semantic_prop_bindings(
         SemanticProp::On { arg, handler, .. } => {
             let event = match arg {
                 DirectiveArg::Static(s) => s.clone(),
-                DirectiveArg::Dynamic(_) => return,
+                DirectiveArg::Dynamic(e) => format!("[{e}]"),
             };
             let body = sanitize(handler);
             let reads = expr_to_paths(b, &body, fields, scope, each_frames);
@@ -564,6 +564,34 @@ fn walk_semantic_prop_bindings(
                 region,
                 Some(eid),
                 Some("v-on".into()),
+            );
+        }
+        SemanticProp::Model { arg, expr, .. } => {
+            let prop = arg.clone().unwrap_or_else(|| "modelValue".into());
+            add_expr_binding(
+                expr,
+                if is_component_tag(tag) {
+                    BindingKind::ComponentProp
+                } else {
+                    BindingKind::Attr
+                },
+                Some(prop.clone()),
+                fields,
+                scope,
+                each_frames,
+                b,
+                region,
+            );
+            let update = format!("$event => (({expr}) = $event)");
+            let body = sanitize(&update);
+            let reads = expr_to_paths(b, &body, fields, scope, each_frames);
+            let eid = b.intern_expr(body);
+            b.add_binding(
+                BindingKind::Event,
+                reads,
+                region,
+                Some(eid),
+                Some(format!("@update:{prop}")),
             );
         }
         SemanticProp::Directive { dir, .. } => match dir {
