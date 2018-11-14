@@ -1728,7 +1728,7 @@ async function proveConsoleComposition(page) {
         );
         btn?.click();
     });
-    await page.waitForSelector('[data-vmz-ui="bulk-actions"]', { timeout: 5000 });
+    await page.waitForSelector('[data-vmz-ui="bulk-actions"][data-open="true"]', { timeout: 5000 });
     await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="bulk-count"]')?.textContent?.includes('1 selected'), {
         timeout: 5000,
     });
@@ -1738,7 +1738,9 @@ async function proveConsoleComposition(page) {
         );
         btn?.click();
     });
-    await page.waitForFunction(() => !document.querySelector('[data-vmz-ui="bulk-actions"]'), { timeout: 5000 });
+    await page.waitForFunction(() => document.querySelector('[data-vmz-ui="bulk-actions"]')?.getAttribute('data-open') === 'false', {
+        timeout: 5000,
+    });
 
     await page.evaluate(() => {
         const btn = document.querySelector('[data-vmz-row-action="r1"]');
@@ -3150,7 +3152,7 @@ async function proveDataTable(page) {
             document.querySelector('[data-vmz-row="r2"]')?.getAttribute('data-selected') === 'true' &&
             document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent?.includes('selected:r2') &&
             document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent?.includes('count:1') &&
-            !!document.querySelector('[data-vmz-ui="bulk-actions"]'),
+            !!document.querySelector('[data-vmz-ui="bulk-actions"][data-open="true"]'),
         { timeout: 5000 },
     );
 
@@ -3163,8 +3165,10 @@ async function proveDataTable(page) {
     );
 
     await page.waitForFunction(
-        () => [...document.querySelectorAll('[data-vmz-fixture="datatable"] button')].some((b) => (b.textContent || '').includes('Clear')),
-        { timeout: 15000 },
+        () =>
+            document.querySelector('[data-vmz-ui="bulk-actions"][data-open="true"]') &&
+            [...document.querySelectorAll('[data-vmz-fixture="datatable"] button')].some((b) => (b.textContent || '').includes('Clear')),
+        { timeout: 10000 },
     );
     await page.evaluate(() => {
         const btn = [...document.querySelectorAll('[data-vmz-fixture="datatable"] button')].find((b) =>
@@ -3176,7 +3180,7 @@ async function proveDataTable(page) {
     await page.waitForFunction(
         () =>
             document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent?.includes('selected:none') &&
-            !document.querySelector('[data-vmz-ui="bulk-actions"]'),
+            document.querySelector('[data-vmz-ui="bulk-actions"]')?.getAttribute('data-open') === 'false',
         { timeout: 15000 },
     );
 

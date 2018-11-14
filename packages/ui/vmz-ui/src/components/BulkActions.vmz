@@ -1,10 +1,10 @@
 <template>
   <div
-      v-if="selectedCount"
       class="vmz-ui-bulk-actions"
       data-vmz-ui="bulk-actions"
       role="region"
       :aria-label="label"
+      :data-open="selectedCount ? 'true' : 'false'"
     >
       <p class="vmz-ui-bulk-actions__count" data-vmz-fixture="bulk-count">{{ countLabel }}</p>
       <div class="vmz-ui-bulk-actions__actions">
@@ -26,6 +26,11 @@
     background: transparent;
   }
 
+  /* Keep host+slot mounted so default slot projects at create time (not inside v-if). */
+  .vmz-ui-bulk-actions[data-open='false'] {
+    display: none;
+  }
+
   .vmz-ui-bulk-actions__count {
     margin: 0;
     font-weight: 700;
@@ -42,7 +47,7 @@
 <script client>
 /**
 * VMZ UI — BulkActions (Console composition).
-* Renders when selectedCount is truthy; parent owns selection count + label.
+* Hides when selectedCount is falsy but keeps the tree mounted so parent slot children project.
 */
 export default class BulkActions {
 	public label: string = "Bulk actions";

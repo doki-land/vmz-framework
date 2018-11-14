@@ -347,7 +347,7 @@ async function proveBrowser(dist) {
                         document.querySelector(`[data-vmz-row="${id}"]`)?.getAttribute('data-selected') === 'true' &&
                         state.includes(`selected:${id}`) &&
                         state.includes('count:1') &&
-                        !!document.querySelector('[data-vmz-ui="bulk-actions"]')
+                        !!document.querySelector('[data-vmz-ui="bulk-actions"][data-open="true"]')
                     );
                 },
                 { timeout: 5000 },
@@ -392,7 +392,10 @@ async function proveBrowser(dist) {
             await page.waitForFunction(
                 () => {
                     const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
-                    return state.includes('selected:none') && !document.querySelector('[data-vmz-ui="bulk-actions"]');
+                    return (
+                        state.includes('selected:none') &&
+                        document.querySelector('[data-vmz-ui="bulk-actions"]')?.getAttribute('data-open') === 'false'
+                    );
                 },
                 { timeout: 5000 },
             );
