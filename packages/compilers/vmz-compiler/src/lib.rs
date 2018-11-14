@@ -115,6 +115,7 @@ pub use designs::{
 };
 pub use diagnostic::{ReportedDiagnostic, Severity, parse_severity};
 pub use emit::{ServerBridge, bind_field_idents, emit_client_js, emit_client_js_with_ir};
+pub use expr_plan::{ExprPlan, plan_template_expr};
 pub use offset_index::OffsetIndex;
 pub use plugin::{
     ApplyContributionsReport, ContributionBatch, ContributionDiff, ContributionItem,
@@ -125,12 +126,11 @@ pub use plugin::{
 };
 pub use project::{VmzModuleKind, discover_vmz_files};
 pub use reactive_build::{
-    build_program_module, build_program_module_asts, build_program_module_with_server,
-    build_program_module_with_server_asts, build_reactive_module,
-    build_reactive_module_from_semantic, collect_concrete_expr_errors, collect_template_expr_errors,
-    TemplateExprError,
+    TemplateExprError, build_program_module, build_program_module_asts,
+    build_program_module_with_server, build_program_module_with_server_asts, build_reactive_module,
+    build_reactive_module_from_semantic, collect_concrete_expr_errors,
+    collect_template_expr_errors,
 };
-pub use expr_plan::{ExprPlan, plan_template_expr};
 pub use scss::{ScssCompiler, ScssCompilerHandle, ScssEmitRequest, ScssEmitResult};
 pub use session_graph::{SessionClientCall, SessionGraph, SessionGraphDocument, SessionUnit};
 pub use sfc::{

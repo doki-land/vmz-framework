@@ -437,19 +437,19 @@ fn semantic_if_chain_builds_control_region_without_flat_attr_guess() {
     let if_regions: Vec<_> = c
         .control_regions
         .iter()
-        .filter(|r| r.branches.len() == 2 && r.branches[0].cond.is_some() && r.branches[1].cond.is_none())
+        .filter(|r| {
+            r.branches.len() == 2 && r.branches[0].cond.is_some() && r.branches[1].cond.is_none()
+        })
         .collect();
-    assert_eq!(if_regions.len(), 1, "Semantic IfChain → one if/else region; got {:?}", c.control_regions.len());
-    assert!(
-        c.bindings.iter().any(|b| b.kind() == BindingKind::IfCond),
-        "IfCond binding required"
+    assert_eq!(
+        if_regions.len(),
+        1,
+        "Semantic IfChain → one if/else region; got {:?}",
+        c.control_regions.len()
     );
+    assert!(c.bindings.iter().any(|b| b.kind() == BindingKind::IfCond), "IfCond binding required");
     // Same branch count as legacy TemplateIr walk (compat during dual-path).
-    let legacy_if = legacy
-        .components[0]
-        .control_regions
-        .iter()
-        .filter(|r| r.branches.len() == 2)
-        .count();
+    let legacy_if =
+        legacy.components[0].control_regions.iter().filter(|r| r.branches.len() == 2).count();
     assert_eq!(if_regions.len(), legacy_if.max(1));
 }

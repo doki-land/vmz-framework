@@ -79,13 +79,7 @@ fn for_node_keeps_aliases_and_key() {
     assert_eq!(sem.roots.len(), 1);
     match &sem.roots[0] {
         SemanticNode::ForNode {
-            source,
-            value_alias,
-            key_alias,
-            index_alias,
-            key,
-            body,
-            ..
+            source, value_alias, key_alias, index_alias, key, body, ..
         } => {
             assert_eq!(source, "items");
             assert_eq!(value_alias, "item");
@@ -129,13 +123,7 @@ fn three_alias_for_retained() {
     let concrete = parse_template_concrete(src).unwrap();
     let sem = lower_concrete_to_semantic(&concrete).unwrap();
     match &sem.roots[0] {
-        SemanticNode::ForNode {
-            value_alias,
-            key_alias,
-            index_alias,
-            key,
-            ..
-        } => {
+        SemanticNode::ForNode { value_alias, key_alias, index_alias, key, .. } => {
             assert_eq!(value_alias, "v");
             assert_eq!(key_alias.as_deref(), Some("k"));
             assert_eq!(index_alias.as_deref(), Some("i"));
@@ -153,11 +141,7 @@ fn on_modifiers_survive_semantic_event_plan() {
     match &sem.roots[0] {
         SemanticNode::Element { props, .. } => match &props[0] {
             SemanticProp::On {
-                arg: DirectiveArg::Static(ev),
-                handler,
-                modifiers,
-                target,
-                ..
+                arg: DirectiveArg::Static(ev), handler, modifiers, target, ..
             } => {
                 assert_eq!(ev, "click");
                 assert_eq!(handler, "save");
@@ -203,12 +187,7 @@ fn bind_plan_keeps_modifiers() {
     let sem = lower_concrete_to_semantic(&concrete).unwrap();
     match &sem.roots[0] {
         SemanticNode::Element { props, .. } => match &props[0] {
-            SemanticProp::Bind {
-                arg: DirectiveArg::Static(name),
-                expr,
-                modifiers,
-                ..
-            } => {
+            SemanticProp::Bind { arg: DirectiveArg::Static(name), expr, modifiers, .. } => {
                 assert_eq!(name, "value");
                 assert_eq!(expr, "q");
                 assert_eq!(modifiers, &["sync".to_string()]);
@@ -303,9 +282,7 @@ fn template_hash_slot_becomes_slot_template() {
             }
             match &children[1] {
                 SemanticNode::SlotTemplate {
-                    name: DirectiveArg::Static(n),
-                    slot_props,
-                    ..
+                    name: DirectiveArg::Static(n), slot_props, ..
                 } => {
                     assert_eq!(n, "footer");
                     assert_eq!(slot_props, &None);
@@ -322,10 +299,7 @@ fn template_hash_slot_becomes_slot_template() {
 fn dynamic_slot_arg_is_structured_error() {
     let concrete = parse_template_concrete(r#"<Comp v-slot:[name]>x</Comp>"#).unwrap();
     let err = lower_concrete_to_semantic(&concrete).unwrap_err();
-    assert!(
-        err.message.contains("dynamic") && err.message.contains("slot"),
-        "{err}"
-    );
+    assert!(err.message.contains("dynamic") && err.message.contains("slot"), "{err}");
 }
 
 #[test]
@@ -334,12 +308,7 @@ fn v_model_becomes_semantic_model_plan() {
     let sem = lower_concrete_to_semantic(&concrete).unwrap();
     match &sem.roots[0] {
         SemanticNode::Element { props, .. } => match &props[0] {
-            SemanticProp::Model {
-                arg,
-                expr,
-                modifiers,
-                ..
-            } => {
+            SemanticProp::Model { arg, expr, modifiers, .. } => {
                 assert_eq!(arg, &None);
                 assert_eq!(expr, "q");
                 assert_eq!(modifiers, &["number".to_string()]);

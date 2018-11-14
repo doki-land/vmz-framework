@@ -3,6 +3,7 @@
 use vmz_compiler::{DataBlock, ParsedVmz, ScriptBlock, ScriptLanguage, StyleLanguage};
 
 use crate::editorconfig::EditorSettings;
+use crate::template_print::format_template_body;
 
 /// Reassemble a formatted SFC from parsed structure + formatted bodies.
 pub fn assemble_vmz(
@@ -11,7 +12,7 @@ pub fn assemble_vmz(
     server: Option<&str>,
     style: Option<&str>,
     settings: &EditorSettings,
-) -> String {
+) -> Result<String, String> {
     let nl = settings.newline();
     let mut parts: Vec<String> = Vec::new();
 
@@ -22,12 +23,10 @@ pub fn assemble_vmz(
         parts.push(emit_data_block("meta", meta, settings));
     }
 
-    parts.push(emit_tagged_block(
-        "template",
-        None,
-        &indent_block(&parsed.template.content, settings),
-        settings,
-    ));
+    let template_body = format_template_body(&parsed.template.content, settings)?;
+    // Envelope indent is EditorConfig-owned; AST print stays at depth 0 inside the body.
+    let template_body = indent_block(&template_body, settings);
+    parts.push(emit_tagged_block("template", None, &template_body, settings));
 
     if let (Some(style_body), Some(style_block)) = (style, parsed.style.as_ref()) {
         let lang_attr = match style_block.lang {
@@ -55,7 +54,7 @@ pub fn assemble_vmz(
             out.pop();
         }
     }
-    out
+    Ok(out)
 }
 
 fn emit_data_block(name: &str, block: &DataBlock, settings: &EditorSettings) -> String {

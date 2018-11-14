@@ -146,5 +146,5 @@ fn format_parsed(
     } else {
         None
     };
-    Ok(assemble_vmz(parsed, &client, server.as_deref(), style.as_deref(), settings))
+    assemble_vmz(parsed, &client, server.as_deref(), style.as_deref(), settings)
 }

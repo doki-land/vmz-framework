@@ -1,7 +1,7 @@
-//! VMZ authoring formatter: `.vmz` SFC + oxc IR formatter + EditorConfig.
+//! VMZ authoring formatter: `.vmz` SFC + EditorConfig.
 //!
-//! This crate is **not** an AST pretty-printer. Script/style bodies go through
-//! `oxc_formatter` / `oxc_formatter_css`. Codegen stays in `vmz-generator`.
+//! `<template>` is pretty-printed from the Semantic AST as Vue syntax (no JSX).
+//! Script/style bodies go through `oxc_formatter` / `oxc_formatter_css`.
 
 #![deny(missing_docs)]
 
@@ -10,5 +10,7 @@ mod editorconfig;
 mod path;
 mod script;
 mod style;
+mod template_print;
 
 pub use path::{FormatOptions, FormatReport, format_path};
+pub use template_print::format_template_body;

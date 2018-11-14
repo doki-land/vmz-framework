@@ -891,11 +891,7 @@ fn emit_file(
         report.diagnostics.push(
             ReportedDiagnostic::error(path, err.message)
                 .with_code("vmz::template/invalid-expr")
-                .with_source_span(SourceSpan {
-                    path: path_s,
-                    start,
-                    end,
-                }),
+                .with_source_span(SourceSpan { path: path_s, start, end }),
         );
     }
     if report

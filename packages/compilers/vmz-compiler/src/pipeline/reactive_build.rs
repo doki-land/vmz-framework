@@ -191,19 +191,14 @@ pub fn build_reactive_module(
     }
 }
 
-fn finish_effects(
-    b: &mut ReactiveComponentBuilder,
-    decl: &ComponentDecl,
-    fields: &[String],
-) {
+fn finish_effects(b: &mut ReactiveComponentBuilder, decl: &ComponentDecl, fields: &[String]) {
     let mut methods = decl.methods.clone();
     crate::method_compose::compose_cross_method_rw(&mut methods, fields);
     for m in &methods {
         if m.reads.is_empty() && m.writes.is_empty() && m.calls.is_empty() && !m.opaque_callee {
             continue;
         }
-        let reads: Vec<IrDepPath> =
-            m.reads.iter().filter_map(|s| stable_to_ir(b, s)).collect();
+        let reads: Vec<IrDepPath> = m.reads.iter().filter_map(|s| stable_to_ir(b, s)).collect();
         let writes: Vec<WritePath> = m
             .writes
             .iter()
@@ -387,9 +382,9 @@ fn walk_semantic_if_chain(
     }
     for ids in &body_binding_lists {
         for id in ids {
-            if b.binding_kind(*id).is_some_and(|k| {
-                matches!(k, BindingKind::EachList | BindingKind::EachKey)
-            }) {
+            if b.binding_kind(*id)
+                .is_some_and(|k| matches!(k, BindingKind::EachList | BindingKind::EachKey))
+            {
                 continue;
             }
             if b.binding_region(*id).is_some() {
@@ -408,15 +403,7 @@ fn walk_semantic_for(
     b: &mut ReactiveComponentBuilder,
     region: Option<RegionId>,
 ) {
-    let SemanticNode::ForNode {
-        source,
-        value_alias,
-        key_alias,
-        index_alias,
-        key,
-        body,
-        ..
-    } = node
+    let SemanticNode::ForNode { source, value_alias, key_alias, index_alias, key, body, .. } = node
     else {
         return;
     };
@@ -458,11 +445,7 @@ fn walk_semantic_for(
         if !value_alias.is_empty() {
             let mut item_frames = parent_frames;
             item_frames.push(ListItemFrame { via, key: key_id });
-            frames.push(EachFrame {
-                list,
-                frames: item_frames,
-                as_name: value_alias.clone(),
-            });
+            frames.push(EachFrame { list, frames: item_frames, as_name: value_alias.clone() });
         }
     }
 
@@ -474,14 +457,7 @@ fn walk_semantic_for(
     }
 
     let child_region = Some(each_region).or(region);
-    walk_semantic_nodes(
-        std::slice::from_ref(body.as_ref()),
-        fields,
-        &s,
-        &frames,
-        b,
-        child_region,
-    );
+    walk_semantic_nodes(std::slice::from_ref(body.as_ref()), fields, &s, &frames, b, child_region);
 }
 
 fn walk_semantic_element(
@@ -519,11 +495,8 @@ fn walk_semantic_prop_bindings(
                 DirectiveArg::Static(s) => s.clone(),
                 DirectiveArg::Dynamic(e) => format!("[{e}]"),
             };
-            let kind = if is_component_tag(tag) {
-                BindingKind::ComponentProp
-            } else {
-                BindingKind::Attr
-            };
+            let kind =
+                if is_component_tag(tag) { BindingKind::ComponentProp } else { BindingKind::Attr };
             add_expr_binding(expr, kind, Some(name), fields, scope, each_frames, b, region);
         }
         SemanticProp::BindObject { expr, .. } => {
@@ -546,35 +519,19 @@ fn walk_semantic_prop_bindings(
             let body = sanitize(handler);
             let reads = expr_to_paths(b, &body, fields, scope, each_frames);
             let expr = b.intern_expr(body);
-            b.add_binding(
-                BindingKind::Event,
-                reads,
-                region,
-                Some(expr),
-                Some(format!("@{event}")),
-            );
+            b.add_binding(BindingKind::Event, reads, region, Some(expr), Some(format!("@{event}")));
         }
         SemanticProp::OnObject { expr, .. } => {
             let body = sanitize(expr);
             let reads = expr_to_paths(b, &body, fields, scope, each_frames);
             let eid = b.intern_expr(body);
-            b.add_binding(
-                BindingKind::Event,
-                reads,
-                region,
-                Some(eid),
-                Some("v-on".into()),
-            );
+            b.add_binding(BindingKind::Event, reads, region, Some(eid), Some("v-on".into()));
         }
         SemanticProp::Model { arg, expr, .. } => {
             let prop = arg.clone().unwrap_or_else(|| "modelValue".into());
             add_expr_binding(
                 expr,
-                if is_component_tag(tag) {
-                    BindingKind::ComponentProp
-                } else {
-                    BindingKind::Attr
-                },
+                if is_component_tag(tag) { BindingKind::ComponentProp } else { BindingKind::Attr },
                 Some(prop.clone()),
                 fields,
                 scope,
@@ -624,11 +581,7 @@ fn walk_semantic_prop_bindings(
         }
         SemanticProp::Directive { dir, .. } => match dir {
             Directive::Html { expr } | Directive::Show { expr } => {
-                let name = if matches!(dir, Directive::Html { .. }) {
-                    "html"
-                } else {
-                    "show"
-                };
+                let name = if matches!(dir, Directive::Html { .. }) { "html" } else { "show" };
                 add_expr_binding(
                     expr,
                     BindingKind::Attr,

@@ -263,18 +263,12 @@ fn lower_siblings(nodes: &[ConcreteNode]) -> Result<Vec<SemanticNode>, TemplateP
             ConcreteNode::Comment { .. } => i += 1,
             ConcreteNode::Text { value, span } => {
                 if !value.trim().is_empty() {
-                    out.push(SemanticNode::Text {
-                        value: value.clone(),
-                        span: *span,
-                    });
+                    out.push(SemanticNode::Text { value: value.clone(), span: *span });
                 }
                 i += 1;
             }
             ConcreteNode::Interpolation { expr, span } => {
-                out.push(SemanticNode::Interpolation {
-                    expr: expr.clone(),
-                    span: *span,
-                });
+                out.push(SemanticNode::Interpolation { expr: expr.clone(), span: *span });
                 i += 1;
             }
             ConcreteNode::Element { attrs, span, .. } => match control_flow_kind(attrs) {
@@ -364,21 +358,15 @@ fn take_if_chain(nodes: &[ConcreteNode]) -> Result<(SemanticNode, usize), Templa
         };
 
         let body = lower_element_strip_control_flow(&nodes[i])?;
-        branches.push(IfBranch {
-            test,
-            body: Box::new(body),
-            span: *span,
-        });
+        branches.push(IfBranch { test, body: Box::new(body), span: *span });
         i += 1;
         if saw_else {
             break;
         }
     }
 
-    let span = TemplateSpan {
-        start: branches[0].span.start,
-        end: branches.last().unwrap().span.end,
-    };
+    let span =
+        TemplateSpan { start: branches[0].span.start, end: branches.last().unwrap().span.end };
     Ok((SemanticNode::IfChain { branches, span }, i))
 }
 
@@ -397,11 +385,7 @@ fn for_directive(attrs: &[ConcreteAttr]) -> Option<&Directive> {
 fn bind_key_expr(attrs: &[ConcreteAttr]) -> Option<String> {
     for a in attrs {
         if let ConcreteAttr::Directive {
-            dir: Directive::Bind {
-                arg: DirectiveArg::Static(name),
-                expr,
-                ..
-            },
+            dir: Directive::Bind { arg: DirectiveArg::Static(name), expr, .. },
             ..
         } = a
         {
@@ -414,17 +398,8 @@ fn bind_key_expr(attrs: &[ConcreteAttr]) -> Option<String> {
 }
 
 fn lower_for_element(node: &ConcreteNode) -> Result<SemanticNode, TemplateParseError> {
-    let ConcreteNode::Element {
-        tag,
-        attrs,
-        children,
-        span,
-    } = node
-    else {
-        return Err(TemplateParseError {
-            message: "internal: expected element".into(),
-            offset: 0,
-        });
+    let ConcreteNode::Element { tag, attrs, children, span } = node else {
+        return Err(TemplateParseError { message: "internal: expected element".into(), offset: 0 });
     };
     lower_for_from_parts(tag, attrs, children, *span)
 }
@@ -435,12 +410,8 @@ fn lower_for_from_parts(
     children: &[ConcreteNode],
     span: TemplateSpan,
 ) -> Result<SemanticNode, TemplateParseError> {
-    let Some(Directive::For {
-        source,
-        value_alias,
-        key_alias,
-        index_alias,
-    }) = for_directive(attrs).cloned()
+    let Some(Directive::For { source, value_alias, key_alias, index_alias }) =
+        for_directive(attrs).cloned()
     else {
         return Err(TemplateParseError {
             message: "internal: expected `v-for`".into(),
@@ -451,22 +422,17 @@ fn lower_for_from_parts(
     let body_attrs: Vec<ConcreteAttr> = attrs
         .iter()
         .filter(|a| {
-            !matches!(
-                a,
-                ConcreteAttr::Directive {
-                    dir: Directive::For { .. },
-                    ..
-                }
-            ) && !matches!(
-                a,
-                ConcreteAttr::Directive {
-                    dir: Directive::Bind {
-                        arg: DirectiveArg::Static(name),
+            !matches!(a, ConcreteAttr::Directive { dir: Directive::For { .. }, .. })
+                && !matches!(
+                    a,
+                    ConcreteAttr::Directive {
+                        dir: Directive::Bind {
+                            arg: DirectiveArg::Static(name),
+                            ..
+                        },
                         ..
-                    },
-                    ..
-                } if name == "key"
-            )
+                    } if name == "key"
+                )
         })
         .cloned()
         .collect();
@@ -488,18 +454,11 @@ fn lower_for_from_parts(
     })
 }
 
-fn lower_element_strip_control_flow(node: &ConcreteNode) -> Result<SemanticNode, TemplateParseError> {
-    let ConcreteNode::Element {
-        tag,
-        attrs,
-        children,
-        span,
-    } = node
-    else {
-        return Err(TemplateParseError {
-            message: "internal: expected element".into(),
-            offset: 0,
-        });
+fn lower_element_strip_control_flow(
+    node: &ConcreteNode,
+) -> Result<SemanticNode, TemplateParseError> {
+    let ConcreteNode::Element { tag, attrs, children, span } = node else {
+        return Err(TemplateParseError { message: "internal: expected element".into(), offset: 0 });
     };
     let attrs: Vec<ConcreteAttr> = attrs
         .iter()
@@ -534,11 +493,7 @@ fn lower_element_strip_control_flow(node: &ConcreteNode) -> Result<SemanticNode,
 
 fn slot_directive(attrs: &[ConcreteAttr]) -> Option<(DirectiveArg, Option<String>, TemplateSpan)> {
     for a in attrs {
-        if let ConcreteAttr::Directive {
-            dir: Directive::Slot { name, props },
-            span,
-        } = a
-        {
+        if let ConcreteAttr::Directive { dir: Directive::Slot { name, props }, span } = a {
             return Some((name.clone(), props.clone(), *span));
         }
     }
@@ -584,26 +539,13 @@ fn lower_slot_template(
     }
     let attrs_no_slot: Vec<ConcreteAttr> = attrs
         .iter()
-        .filter(|a| {
-            !matches!(
-                a,
-                ConcreteAttr::Directive {
-                    dir: Directive::Slot { .. },
-                    ..
-                }
-            )
-        })
+        .filter(|a| !matches!(a, ConcreteAttr::Directive { dir: Directive::Slot { .. }, .. }))
         .cloned()
         .collect();
     let body = if tag == "template" {
         // Fragment: slot filler is the lowered children only (single wrapper element).
         let kids = lower_siblings(children)?;
-        SemanticNode::Element {
-            tag: "template".into(),
-            props: Vec::new(),
-            children: kids,
-            span,
-        }
+        SemanticNode::Element { tag: "template".into(), props: Vec::new(), children: kids, span }
     } else {
         let kids = lower_siblings(children)?;
         SemanticNode::Element {
@@ -613,12 +555,7 @@ fn lower_slot_template(
             span,
         }
     };
-    Ok(SemanticNode::SlotTemplate {
-        name: slot_name,
-        slot_props,
-        body: Box::new(body),
-        span,
-    })
+    Ok(SemanticNode::SlotTemplate { name: slot_name, slot_props, body: Box::new(body), span })
 }
 
 fn event_target_for_tag(tag: &str) -> EventTarget {
@@ -659,22 +596,16 @@ fn lower_props(tag: &str, attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
                 });
             }
             ConcreteAttr::Directive { dir, span } => match dir {
-                Directive::Bind {
-                    arg: DirectiveArg::Static(n),
-                    expr,
-                    modifiers,
-                    ..
-                } if n == "class" => {
+                Directive::Bind { arg: DirectiveArg::Static(n), expr, modifiers, .. }
+                    if n == "class" =>
+                {
                     let _ = modifiers;
                     class_binds.push(expr.clone());
                     class_span = Some(merge_span(class_span, *span));
                 }
-                Directive::Bind {
-                    arg: DirectiveArg::Static(n),
-                    expr,
-                    modifiers,
-                    ..
-                } if n == "style" => {
+                Directive::Bind { arg: DirectiveArg::Static(n), expr, modifiers, .. }
+                    if n == "style" =>
+                {
                     let _ = modifiers;
                     style_binds.push(expr.clone());
                     style_span = Some(merge_span(style_span, *span));
@@ -688,10 +619,7 @@ fn lower_props(tag: &str, attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
                     });
                 }
                 Directive::BindObject { expr } => {
-                    out.push(SemanticProp::BindObject {
-                        expr: expr.clone(),
-                        span: *span,
-                    });
+                    out.push(SemanticProp::BindObject { expr: expr.clone(), span: *span });
                 }
                 Directive::On { arg, handler, modifiers } => {
                     out.push(SemanticProp::On {
@@ -703,10 +631,7 @@ fn lower_props(tag: &str, attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
                     });
                 }
                 Directive::OnObject { expr } => {
-                    out.push(SemanticProp::OnObject {
-                        expr: expr.clone(),
-                        span: *span,
-                    });
+                    out.push(SemanticProp::OnObject { expr: expr.clone(), span: *span });
                 }
                 Directive::Model { arg, expr, modifiers } => {
                     out.push(SemanticProp::Model {
@@ -727,10 +652,7 @@ fn lower_props(tag: &str, attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
                     ) {
                         continue;
                     }
-                    out.push(SemanticProp::Directive {
-                        dir: other.clone(),
-                        span: *span,
-                    });
+                    out.push(SemanticProp::Directive { dir: other.clone(), span: *span });
                 }
             },
         }
@@ -756,9 +678,6 @@ fn lower_props(tag: &str, attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
 fn merge_span(prev: Option<TemplateSpan>, next: TemplateSpan) -> TemplateSpan {
     match prev {
         None => next,
-        Some(p) => TemplateSpan {
-            start: p.start.min(next.start),
-            end: p.end.max(next.end),
-        },
+        Some(p) => TemplateSpan { start: p.start.min(next.start), end: p.end.max(next.end) },
     }
 }

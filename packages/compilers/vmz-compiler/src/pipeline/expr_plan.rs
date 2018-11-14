@@ -52,10 +52,5 @@ pub fn plan_template_expr(
             alias_prop_paths.push((alias.clone(), props));
         }
     }
-    Ok(ExprPlan {
-        source,
-        snippet_span,
-        reads,
-        alias_prop_paths,
-    })
+    Ok(ExprPlan { source, snippet_span, reads, alias_prop_paths })
 }
