@@ -26,9 +26,7 @@ export function defineSite(delivery) {
 export function normalizeSiteDelivery(
     raw: unknown,
     opts: { siteId?: string; projectRoot?: string } = {},
-):
-    | { ok: true; contract: Record<string, any> }
-    | { ok: false; diagnostics: Array<{ code: string; message: string }> } {
+): { ok: true; contract: Record<string, any> } | { ok: false; diagnostics: Array<{ code: string; message: string }> } {
     const diagnostics: Array<{ code: string; message: string }> = [];
     if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) {
         return {
@@ -115,7 +113,7 @@ export function normalizeSiteDelivery(
             message: `resolution.mode must be 'release' (got ${mode})`,
         });
     }
-    let fallback = Array.isArray(resolution.fallback) ? resolution.fallback.map(String) : sources.map((s) => s.sourceId);
+    const fallback = Array.isArray(resolution.fallback) ? resolution.fallback.map(String) : sources.map((s) => s.sourceId);
     for (const id of fallback) {
         if (!seen.has(id)) {
             diagnostics.push({

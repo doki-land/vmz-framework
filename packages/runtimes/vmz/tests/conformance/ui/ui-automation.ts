@@ -3162,8 +3162,12 @@ async function proveDataTable(page) {
         { timeout: 5000 },
     );
 
+    await page.waitForFunction(
+        () => [...document.querySelectorAll('[data-vmz-fixture="datatable"] button')].some((b) => (b.textContent || '').includes('Clear')),
+        { timeout: 15000 },
+    );
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="datatable"] button.vmz-ui-btn')].find((b) =>
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="datatable"] button')].find((b) =>
             (b.textContent || '').includes('Clear'),
         );
         if (!btn) throw new Error('DataTable: Clear button missing');
