@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Integrated DocumentMount — compile host chrome via DocumentLayout + createRenderHost.
  * Replaces the removed regex template lowering in document-host-chrome.ts.
@@ -9,18 +8,20 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createRenderHost } from '@vmz/core/render-host';
 
-/** @param {string} distDir */
-export function resolveDocumentLayoutChunkId(distDir) {
+declare global {
+    // Locale hint consumed by compiled DocumentLayout during SSR.
+    // eslint-disable-next-line no-var
+    var __vmzLocaleIdHint: string | undefined;
+}
+
+export function resolveDocumentLayoutChunkId(distDir: string): string | null {
     for (const chunkId of ['layouts/DocumentLayout', 'components/DocumentLayout']) {
         if (fs.existsSync(path.join(distDir, `${chunkId}.client.js`))) return chunkId;
     }
     return null;
 }
 
-/**
- * @param {string} distDir
- */
-export function assertIntegratedDistReady(distDir) {
+export function assertIntegratedDistReady(distDir: string): string {
     const dom = path.join(distDir, 'vmz-dom.js');
     if (!fs.existsSync(dom)) {
         throw new Error('integrated document mount requires vmz build output (vmz-dom.js in app dist). Run `vmz build` before document emit.');
@@ -32,10 +33,7 @@ export function assertIntegratedDistReady(distDir) {
     return chunkId;
 }
 
-/**
- * @param {string} html
- */
-export function assertCompiledShellHtml(html) {
+export function assertCompiledShellHtml(html: string): void {
     const header = html.match(/<header[^>]*data-vmz-fixture="site-header"[\s\S]*?<\/header>/i)?.[0] ?? '';
     const footer = html.match(/<footer[^>]*data-vmz-fixture="site-footer"[\s\S]*?<\/footer>/i)?.[0] ?? '';
     for (const part of [header, footer]) {
@@ -52,22 +50,13 @@ export function assertCompiledShellHtml(html) {
     }
 }
 
-/**
- * @param {string} distDir
- * @param {string} chunkId
- */
-async function loadCtor(distDir, chunkId) {
+async function loadCtor(distDir: string, chunkId: string): Promise<unknown> {
     const href = pathToFileURL(path.join(distDir, `${chunkId}.client.js`)).href;
     const mod = await import(`${href}?t=${Date.now()}`);
     return mod.default;
 }
 
-/**
- * @param {string} distDir
- * @param {string} localeId
- * @param {string} slotHtml
- */
-export async function renderCompiledDocumentLayout(distDir, localeId, slotHtml) {
+export async function renderCompiledDocumentLayout(distDir: string, localeId: string, slotHtml: string): Promise<string> {
     const chunkId = assertIntegratedDistReady(distDir);
     const prevHint = globalThis.__vmzLocaleIdHint;
     globalThis.__vmzLocaleIdHint = localeId;

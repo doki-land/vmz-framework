@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Locale tooling: explain · diff · extract · pseudo · cross-host conformance.
  */
@@ -20,20 +19,11 @@ import {
 import { resolveMessageVariant } from './locale-runtime.js';
 import { assertHostMessageInvariant, buildLocaleDeliveryResolution } from './locale-delivery.js';
 
-/**
- * Explain one MessageId: definition, params, variants, fallback, delivery reachability.
- * @param {{
- * messageId: string,
- * locale?: string|null,
- * deliveryId?: string|null,
- * checkReport: any,
- * }} input
- */
-export function explainLocaleMessage(input) {
-    /** @type {any[]} */
-    const diagnostics = [];
+/** Explain one MessageId: definition, params, variants, fallback, delivery reachability. */
+export function explainLocaleMessage(input: { messageId: string; locale?: string | null; deliveryId?: string | null; checkReport: any }) {
+    const diagnostics: Array<{ code: string; severity: string; message: string }> = [];
     const messages = input.checkReport?.messageCatalog?.messages || [];
-    const node = messages.find((m) => m.messageId === input.messageId);
+    const node = messages.find((m: { messageId: string }) => m.messageId === input.messageId);
     if (!node) {
         diagnostics.push({
             code: DIAG_LOCALE_EXPLAIN_UNKNOWN,
@@ -64,7 +54,7 @@ export function explainLocaleMessage(input) {
         host: 'web',
         applicationId: 'app.locales',
         deliveryId,
-        supportedLocales: (input.checkReport?.manifest?.locales || []).map((l) => l.id),
+        supportedLocales: (input.checkReport?.manifest?.locales || []).map((l: { id: string }) => l.id),
         defaultLocale,
         fallback,
         messages,
@@ -80,7 +70,10 @@ export function explainLocaleMessage(input) {
         catalogId: node.catalogId,
         params: base?.params || [],
         variants: Object.fromEntries(
-            Object.entries(node.variants || {}).map(([loc, v]) => [loc, { template: v.template, path: v.path, params: v.params }]),
+            Object.entries(node.variants || {}).map(([loc, v]) => {
+                const variant = v as { template?: string; path?: string; params?: unknown };
+                return [loc, { template: variant.template, path: variant.path, params: variant.params }];
+            }),
         ),
         requestedLocale: requested,
         resolvedLocale: resolution.resolvedLocale,
@@ -96,27 +89,21 @@ export function explainLocaleMessage(input) {
     };
 }
 
-/**
- * Diff two locales' catalogs.
- * @param {{
- * baseLocale: string,
- * targetLocale: string,
- * messages: Array<{ messageId: string, variants: Record<string, { template: string, params?: any[] }> }>,
- * }} input
- */
-export function diffLocaleCatalogs(input) {
+export interface MessageCatalogEntry {
+    messageId: string;
+    variants: Record<string, { template: string; params?: unknown[]; path?: string }>;
+}
+
+/** Diff two locales' catalogs. */
+export function diffLocaleCatalogs(input: { baseLocale: string; targetLocale: string; messages: MessageCatalogEntry[] }) {
     const base = input.baseLocale;
     const target = input.targetLocale;
-    /** @type {any[]} */
-    const missingInTarget = [];
-    /** @type {any[]} */
-    const missingInBase = [];
-    /** @type {any[]} */
-    const changed = [];
-    /** @type {any[]} */
-    const paramMismatches = [];
+    const missingInTarget: string[] = [];
+    const missingInBase: string[] = [];
+    const changed: Array<{ messageId: string; base: string; target: string }> = [];
+    const paramMismatches: Array<{ messageId: string; baseParams: unknown[]; targetParams: unknown[] }> = [];
 
-    const ids = new Set();
+    const ids = new Set<string>();
     for (const m of input.messages || []) ids.add(m.messageId);
 
     for (const messageId of [...ids].sort()) {
@@ -158,14 +145,10 @@ export function diffLocaleCatalogs(input) {
 /**
  * Scan source for likely hardcoded UI text sinks (extract --check).
  * Does not auto-generate MessageIds.
- * @param {string} projectRoot
- * @param {{ check?: boolean }} [opts]
  */
-export function extractHardcodedText(projectRoot, opts = {}) {
-    /** @type {any[]} */
-    const findings = [];
-    /** @type {any[]} */
-    const diagnostics = [];
+export function extractHardcodedText(projectRoot: string, opts: { check?: boolean } = {}) {
+    const findings: Array<{ path: string; kind: string; text: string; suggestion: string }> = [];
+    const diagnostics: Array<{ code: string; severity: string; message: string; path?: string }> = [];
     const srcRoot = path.join(projectRoot, 'src');
     if (!fs.existsSync(srcRoot)) {
         return {
@@ -176,9 +159,8 @@ export function extractHardcodedText(projectRoot, opts = {}) {
         };
     }
 
-    /** @type {string[]} */
-    const files = [];
-    const walk = (dir) => {
+    const files: string[] = [];
+    const walk = (dir: string) => {
         for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
             const p = path.join(dir, ent.name);
             if (ent.isDirectory()) {
@@ -269,15 +251,13 @@ export function extractHardcodedText(projectRoot, opts = {}) {
 /**
  * Pseudo-localize a source locale for layout/overflow testing.
  * Preserves ICU placeholders; marks provenance — never a production fallback.
- * @param {{
- * sourceLocale: string,
- * messages: Array<{ messageId: string, variants: Record<string, { template: string }> }>,
- * production?: boolean,
- * }} input
  */
-export function pseudoLocalizeCatalog(input) {
-    /** @type {any[]} */
-    const diagnostics = [];
+export function pseudoLocalizeCatalog(input: {
+    sourceLocale: string;
+    messages: Array<{ messageId: string; variants: Record<string, { template: string }> }>;
+    production?: boolean;
+}) {
+    const diagnostics: Array<{ code: string; severity: string; message: string }> = [];
     if (input.production) {
         diagnostics.push({
             code: DIAG_LOCALE_PSEUDO_PRODUCTION_FORBIDDEN,
@@ -286,8 +266,7 @@ export function pseudoLocalizeCatalog(input) {
         });
     }
 
-    /** @type {Record<string, string>} */
-    const catalog = {};
+    const catalog: Record<string, string> = {};
     for (const m of input.messages || []) {
         const src = m.variants?.[input.sourceLocale]?.template;
         if (src == null) continue;
@@ -314,17 +293,9 @@ export function pseudoLocalizeCatalog(input) {
     };
 }
 
-/**
- * Cross-host conformance: same MessageId set + catalog hashes + formatter version.
- * @param {{
- * manifest: any,
- * messages: any[],
- * routeIds?: string[],
- * }} input
- */
-export function checkLocaleConformance(input) {
-    /** @type {any[]} */
-    const diagnostics = [];
+/** Cross-host conformance: same MessageId set + catalog hashes + formatter version. */
+export function checkLocaleConformance(input: { manifest: any; messages: any[]; routeIds?: string[] }) {
+    const diagnostics: Array<{ code: string; severity: string; message: string }> = [];
     const supported = (input.manifest?.locales || []).map((l) => l.id);
     const defaultLocale = input.manifest?.defaultLocale;
     const messages = input.messages || [];

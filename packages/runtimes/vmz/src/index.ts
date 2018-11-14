@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * VMZ Node host: N-API workspace + npm CLI.
  * Coarse-grained only — no transform hooks / per-AST callbacks.
@@ -507,10 +506,25 @@ const require = createRequire(import.meta.url);
 const here = path.dirname(fileURLToPath(import.meta.url));
 const pkgRoot = path.join(here, '..');
 
-/**
- * @returns {{ hostProtocol: string, compilerProtocol: string, programIrSchema: string, pluginProtocol: string }}
- */
-export function expectedProtocol() {
+export interface ProtocolVersions {
+    hostProtocol: string;
+    compilerProtocol: string;
+    programIrSchema: string;
+    pluginProtocol: string;
+}
+
+export interface WorkspaceOptions {
+    root: string;
+    outDir?: string;
+    /** Absolute path to `@vmz/core` dist/; Node resolves when omitted. */
+    runtimeDist?: string;
+    protocol?: ProtocolVersions;
+}
+
+/** N-API addon surface — opaque blob with workspace / protocol entry points. */
+export type VmzNativeAddon = any;
+
+export function expectedProtocol(): ProtocolVersions {
     return {
         hostProtocol: HOST_PROTOCOL,
         compilerProtocol: COMPILER_PROTOCOL,
@@ -519,7 +533,7 @@ export function expectedProtocol() {
     };
 }
 
-function platformTriple() {
+function platformTriple(): string {
     const { platform, arch } = process;
     if (platform === 'win32' && arch === 'x64') return 'win32-x64-msvc';
     if (platform === 'win32' && arch === 'arm64') return 'win32-arm64-msvc';
@@ -531,7 +545,7 @@ function platformTriple() {
 }
 
 /** npm optionalDependency short id (@vmz/vmz-win32-x64) from cargo triple */
-function platformShort(triple = platformTriple()) {
+function platformShort(triple: string = platformTriple()): string {
     if (triple === 'win32-x64-msvc') return 'win32-x64';
     if (triple === 'win32-arm64-msvc') return 'win32-arm64';
     if (triple === 'linux-x64-gnu') return 'linux-x64';
@@ -542,14 +556,12 @@ function platformShort(triple = platformTriple()) {
 /**
  * Resolve native `.node` via the platform optionalDependency
  * (`@vmz/vmz-<short>`; transitional fallback `@vmz/vmz-<short>`).
- * @returns {string}
  */
-export function resolveNativePath() {
+export function resolveNativePath(): string {
     const triple = platformTriple();
     const short = platformShort(triple);
     const names = [`@vmz/vmz-${short}`, `@vmz/vmz-${short}`];
-    /** @type {string[]} */
-    const candidates = [];
+    const candidates: string[] = [];
     for (const name of names) {
         try {
             const resolved = require.resolve(`${name}/package.json`);
@@ -571,30 +583,16 @@ export function resolveNativePath() {
     );
 }
 
-let _native;
+let _native: VmzNativeAddon | undefined;
 
-/**
- * @returns {typeof import('./index.js') extends never ? any : any}
- */
-export function loadNative() {
+export function loadNative(): VmzNativeAddon {
     if (_native) return _native;
     const addonPath = resolveNativePath();
     _native = require(addonPath);
     return _native;
 }
 
-/**
- * @typedef {object} ProtocolVersions
- * @property {string} hostProtocol
- * @property {string} compilerProtocol
- * @property {string} programIrSchema
- * @property {string} pluginProtocol
- */
-
-/**
- * @returns {ProtocolVersions}
- */
-export function getProtocolVersions() {
+export function getProtocolVersions(): ProtocolVersions {
     const native = loadNative();
     const n = native.getProtocolVersions();
     return {
@@ -605,10 +603,7 @@ export function getProtocolVersions() {
     };
 }
 
-/**
- * @param {ProtocolVersions} [host]
- */
-export function handshake(host = expectedProtocol()) {
+export function handshake(host: ProtocolVersions = expectedProtocol()): void {
     const native = loadNative();
     native.handshakeProtocols({
         hostProtocol: host.hostProtocol,
@@ -618,11 +613,8 @@ export function handshake(host = expectedProtocol()) {
     });
 }
 
-/**
- * Resolve `@vmz/core` package `dist/` for runtime JS copies into app outDir.
- * @returns {string | null}
- */
-export function resolveCoreRuntimeDist() {
+/** Resolve `@vmz/core` package `dist/` for runtime JS copies into app outDir. */
+export function resolveCoreRuntimeDist(): string | null {
     try {
         // Prefer a real export subpath — `package.json` is often blocked by "exports".
         const serverJs = require.resolve('@vmz/core/server');
@@ -636,7 +628,7 @@ export function resolveCoreRuntimeDist() {
 }
 
 /** Runtime companions required by dist/vmz-serve-host.mjs relative imports. */
-export const SERVE_HOST_RUNTIME_FILES = [
+export const SERVE_HOST_RUNTIME_FILES: ReadonlyArray<readonly [string, string]> = [
     ['serve-host.mjs', 'vmz-serve-host.mjs'],
     ['native-addon.js', 'native-addon.js'],
     ['list-client-components.js', 'list-client-components.js'],
@@ -645,12 +637,8 @@ export const SERVE_HOST_RUNTIME_FILES = [
     ['route-layout-chain.js', 'route-layout-chain.js'],
 ];
 
-/**
- * Copy serve-host + registry bootstrap modules from `@vmz/core` into app outDir.
- * @param {string} outDir
- * @param {string} [coreDist]
- */
-export function materializeServeHostRuntime(outDir, coreDist = resolveCoreRuntimeDist()) {
+/** Copy serve-host + registry bootstrap modules from `@vmz/core` into app outDir. */
+export function materializeServeHostRuntime(outDir: string, coreDist: string | null = resolveCoreRuntimeDist()): void {
     if (!coreDist) {
         throw new Error('materializeServeHostRuntime: @vmz/core dist not found');
     }
@@ -664,19 +652,8 @@ export function materializeServeHostRuntime(outDir, coreDist = resolveCoreRuntim
     }
 }
 
-/**
- * @typedef {object} WorkspaceOptions
- * @property {string} root
- * @property {string} [outDir]
- * @property {string} [runtimeDist]
- * @property {ProtocolVersions} [protocol]
- */
-
-/**
- * Create a long-lived compile workspace .
- * @param {WorkspaceOptions} options
- */
-export function createWorkspace(options) {
+/** Create a long-lived compile workspace. */
+export function createWorkspace(options: WorkspaceOptions): VmzNativeAddon {
     const native = loadNative();
     const protocol = options.protocol ?? expectedProtocol();
     const runtimeDist = options.runtimeDist ?? resolveCoreRuntimeDist() ?? undefined;
@@ -710,68 +687,60 @@ export function createWorkspace(options) {
     }
 }
 
-/**
- * frozen application composition protocol catalog.
- * @returns {string}
- */
-export function queryApplicationProtocolCatalog() {
+/** frozen application composition protocol catalog. */
+export function queryApplicationProtocolCatalog(): string {
     const native = loadNative();
     return native.queryApplicationProtocolCatalog();
 }
 
-/**
- * check host applications.config.json5 against workspace package descriptors.
- * @param {string} hostRoot
- * @param {string[]} packageRoots
- * @returns {string} ApplicationCheckReport JSON
- */
-export function checkApplicationsJson(hostRoot, packageRoots) {
+/** check host applications.config.json5 against workspace package descriptors. */
+export function checkApplicationsJson(hostRoot: string, packageRoots: string[]): string {
     const native = loadNative();
     return native.checkApplicationsJson(hostRoot, packageRoots);
 }
 
-export function queryTargetProtocolCatalog() {
+export function queryTargetProtocolCatalog(): string {
     const native = loadNative();
     return native.queryTargetProtocolCatalog();
 }
 
-export function checkMiniprogramTargetContractJson(rootPath) {
+export function checkMiniprogramTargetContractJson(rootPath: string): string {
     const native = loadNative();
     return native.checkMiniprogramTargetContractJson(rootPath);
 }
 
-export function lowerMiniprogramStaticSliceJson(rootPath) {
+export function lowerMiniprogramStaticSliceJson(rootPath: string): string {
     const native = loadNative();
     return native.lowerMiniprogramStaticSliceJson(rootPath);
 }
 
-export function lowerMiniprogramBindingEventJson(rootPath) {
+export function lowerMiniprogramBindingEventJson(rootPath: string): string {
     const native = loadNative();
     return native.lowerMiniprogramBindingEventJson(rootPath);
 }
 
-export function lowerMiniprogramStructureJson(rootPath) {
+export function lowerMiniprogramStructureJson(rootPath: string): string {
     const native = loadNative();
     return native.lowerMiniprogramStructureJson(rootPath);
 }
 
-export function lowerMiniprogramRouteServerStyleJson(rootPath) {
+export function lowerMiniprogramRouteServerStyleJson(rootPath: string): string {
     const native = loadNative();
     return native.lowerMiniprogramRouteServerStyleJson(rootPath);
 }
 
-export function lowerMiniprogramToolingDeployJson(rootPath) {
+export function lowerMiniprogramToolingDeployJson(rootPath: string): string {
     const native = loadNative();
     return native.lowerMiniprogramToolingDeployJson(rootPath);
 }
 
-export function lowerMiniprogramWechatPackagingJson(rootPath) {
+export function lowerMiniprogramWechatPackagingJson(rootPath: string): string {
     const native = loadNative();
     materializeWechatPackaging(rootPath);
     return native.lowerMiniprogramWechatPackagingJson(rootPath);
 }
 
-export function lowerMiniprogramMultiAdapterJson(rootPath) {
+export function lowerMiniprogramMultiAdapterJson(rootPath: string): string {
     const native = loadNative();
     return native.lowerMiniprogramMultiAdapterJson(rootPath);
 }
@@ -779,144 +748,113 @@ export function lowerMiniprogramMultiAdapterJson(rootPath) {
 import { createMiniHost } from './mini-host.js';
 export { createMiniHost };
 
-export function queryProfileProtocolCatalog() {
+export function queryProfileProtocolCatalog(): string {
     const native = loadNative();
     return native.queryProfileProtocolCatalog();
 }
 
-export function checkHostProfileProtocolJson(rootPath) {
+export function checkHostProfileProtocolJson(rootPath: string): string {
     const native = loadNative();
     return native.checkHostProfileProtocolJson(rootPath);
 }
 
-export function checkProfileSolverJson(rootPath) {
+export function checkProfileSolverJson(rootPath: string): string {
     const native = loadNative();
     return native.checkProfileSolverJson(rootPath);
 }
 
-export function checkUnifiedExecutorJson(rootPath) {
+export function checkUnifiedExecutorJson(rootPath: string): string {
     const native = loadNative();
     return native.checkUnifiedExecutorJson(rootPath);
 }
 
-export function checkLifecycleRecoveryJson(rootPath) {
+export function checkLifecycleRecoveryJson(rootPath: string): string {
     const native = loadNative();
     return native.checkLifecycleRecoveryJson(rootPath);
 }
 
-export function checkDeliveryProofJson(rootPath) {
+export function checkDeliveryProofJson(rootPath: string): string {
     const native = loadNative();
     return native.checkDeliveryProofJson(rootPath);
 }
 
-export function checkCrossHostConformanceJson(rootPath) {
+export function checkCrossHostConformanceJson(rootPath: string): string {
     const native = loadNative();
     return native.checkCrossHostConformanceJson(rootPath);
 }
 
-export function queryNativeHostProtocolCatalog() {
+export function queryNativeHostProtocolCatalog(): string {
     const native = loadNative();
     return native.queryNativeHostProtocolCatalog();
 }
 
-export function checkNativeHostContractJson(rootPath) {
+export function checkNativeHostContractJson(rootPath: string): string {
     const native = loadNative();
     return native.checkNativeHostContractJson(rootPath);
 }
 
-export function checkNativeShellContractJson(rootPath) {
+export function checkNativeShellContractJson(rootPath: string): string {
     const native = loadNative();
     return native.checkNativeShellContractJson(rootPath);
 }
 
-export function checkNativeBridgeContractJson(rootPath) {
+export function checkNativeBridgeContractJson(rootPath: string): string {
     const native = loadNative();
     return native.checkNativeBridgeContractJson(rootPath);
 }
 
-export function checkNativeLifecycleContractJson(rootPath) {
+export function checkNativeLifecycleContractJson(rootPath: string): string {
     const native = loadNative();
     return native.checkNativeLifecycleContractJson(rootPath);
 }
 
-export function checkNativeFullstackContractJson(rootPath) {
+export function checkNativeFullstackContractJson(rootPath: string): string {
     const native = loadNative();
     return native.checkNativeFullstackContractJson(rootPath);
 }
 
-export function checkNativeSurfaceContractJson(rootPath) {
+export function checkNativeSurfaceContractJson(rootPath: string): string {
     const native = loadNative();
     return native.checkNativeSurfaceContractJson(rootPath);
 }
 
-export function checkMultiPlatformContractJson(rootPath) {
+export function checkMultiPlatformContractJson(rootPath: string): string {
     const native = loadNative();
     return native.checkMultiPlatformContractJson(rootPath);
 }
 
-/**
- * prove independent `/` + non-root ApplicationBase; scan non-relocatable URLs.
- * @param {string} packageRoot
- * @param {string} [relocateBase]
- * @returns {string}
- */
-export function checkApplicationRelocatableJson(packageRoot, relocateBase) {
+/** prove independent `/` + non-root ApplicationBase; scan non-relocatable URLs. */
+export function checkApplicationRelocatableJson(packageRoot: string, relocateBase?: string): string {
     const native = loadNative();
     return native.checkApplicationRelocatableJson(packageRoot, relocateBase ?? null);
 }
 
-/**
- * apply ApplicationBase to a logical relocation manifest.
- * @param {string} manifestJson
- * @param {string} base
- * @returns {string}
- */
-export function relocateApplicationManifestJson(manifestJson, base) {
+/** apply ApplicationBase to a logical relocation manifest. */
+export function relocateApplicationManifestJson(manifestJson: string, base: string): string {
     const native = loadNative();
     return native.relocateApplicationManifestJson(manifestJson, base);
 }
 
-/**
- * independent ApplicationArtifact + MountTable/Catalog boundary (refs only).
- * @param {string} hostRoot
- * @param {string[]} packageRoots
- * @returns {string}
- */
-export function checkApplicationArtifactBoundaryJson(hostRoot, packageRoots) {
+/** independent ApplicationArtifact + MountTable/Catalog boundary (refs only). */
+export function checkApplicationArtifactBoundaryJson(hostRoot: string, packageRoots: string[]): string {
     const native = loadNative();
     return native.checkApplicationArtifactBoundaryJson(hostRoot, packageRoots);
 }
 
-/**
- * absolute isolation namespaces + failure containment.
- * @param {string} hostRoot
- * @param {string[]} packageRoots
- * @returns {string}
- */
-export function checkApplicationIsolationJson(hostRoot, packageRoots) {
+/** absolute isolation namespaces + failure containment. */
+export function checkApplicationIsolationJson(hostRoot: string, packageRoots: string[]): string {
     const native = loadNative();
     return native.checkApplicationIsolationJson(hostRoot, packageRoots);
 }
 
-/**
- * host catalog consumption + cross-application Link resolution.
- * @param {string} hostRoot
- * @param {string[]} packageRoots
- * @returns {string}
- */
-export function checkApplicationHostCompositionJson(hostRoot, packageRoots) {
+/** host catalog consumption + cross-application Link resolution. */
+export function checkApplicationHostCompositionJson(hostRoot: string, packageRoots: string[]): string {
     const native = loadNative();
     return native.checkApplicationHostCompositionJson(hostRoot, packageRoots);
 }
 
-/**
- * multi-session affected rebuild + MountTable proxy + mounted tests + deploy adapter.
- * @param {string} hostRoot
- * @param {string[]} packageRoots
- * @param {string[]} [dirtyPaths]
- * @returns {string}
- */
-export function checkApplicationDevTestDeployJson(hostRoot, packageRoots, dirtyPaths = []) {
+/** multi-session affected rebuild + MountTable proxy + mounted tests + deploy adapter. */
+export function checkApplicationDevTestDeployJson(hostRoot: string, packageRoots: string[], dirtyPaths: string[] = []): string {
     const native = loadNative();
     return native.checkApplicationDevTestDeployJson(hostRoot, packageRoots, dirtyPaths);
 }
@@ -930,7 +868,7 @@ export {
     watchRootForSourceFile,
 } from './dev-watch-roots.js';
 export { findAvailablePort } from './port.js';
-export { runCli, parseArgs, printHelp, printGlobalHelp, printProjectHelp } from './cli.js';
+export { runCli, printHelp, printGlobalHelp, printProjectHelp } from './cli.js';
 export { createCli, formatDiagnostic, formatDiagnostics, t } from './toolchain-dx.js';
 export type { LocalizePlugin } from './toolchain-dx.js';
 export {
@@ -1263,14 +1201,6 @@ export default {
     PROFILE_CONFORMANCE_STATE_SNAPSHOT_SCHEMA,
     PROFILE_CONFORMANCE_TRACE_SCHEMA,
     PROFILE_CONFORMANCE_HOST_RUN_SCHEMA,
-    PROFILE_CONFORMANCE_SCENARIO_SCHEMA,
-    PROFILE_CONFORMANCE_CHECK_SCHEMA,
-    PROFILE_CONFORMANCE_SURFACE_ROLES,
-    PROFILE_DIAG_STABLE_ID_DIVERGENCE,
-    PROFILE_DIAG_STATE_RESULT_DIVERGENCE,
-    PROFILE_DIAG_TRACE_INVARIANT_BROKEN,
-    PROFILE_DIAG_CONFORMANCE_HOST_INCOMPLETE,
-    PROFILE_DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH,
     PROFILE_LIFECYCLE_SCENARIO_SCHEMA,
     PROFILE_LIFECYCLE_RECOVERY_CHECK_SCHEMA,
     PROFILE_LIFECYCLE_HOST_KINDS,
@@ -1285,28 +1215,9 @@ export default {
     PROFILE_DELIVERY_UPDATE_POLICY_SCHEMA,
     PROFILE_DELIVERY_ARTIFACT_MANIFEST_SCHEMA,
     PROFILE_DELIVERY_PROOF_MANIFEST_SCHEMA,
-    PROFILE_DELIVERY_PROOF_SCENARIO_SCHEMA,
-    PROFILE_DELIVERY_PROOF_CHECK_SCHEMA,
     PROFILE_DELIVERY_UPDATE_CHANNELS,
     PROFILE_DELIVERY_ASSET_STRATEGIES,
-    PROFILE_DIAG_DELIVERY_CONSTRAINT_EXCEEDED,
-    PROFILE_DIAG_HOST_PLAN_VERSION_MISMATCH,
     PROFILE_DIAG_PROOF_MANIFEST_INCOMPLETE,
-    PROFILE_DIAG_PROOF_COPIES_SEMANTIC_IR,
-    PROFILE_DIAG_UPDATE_WITHOUT_REPROOF,
-    PROFILE_DIAG_SECURITY_POLICY_INSECURE,
-    PROFILE_CONFORMANCE_FIXTURE_SCHEMA,
-    PROFILE_CONFORMANCE_STATE_SNAPSHOT_SCHEMA,
-    PROFILE_CONFORMANCE_TRACE_SCHEMA,
-    PROFILE_CONFORMANCE_HOST_RUN_SCHEMA,
-    PROFILE_CONFORMANCE_SCENARIO_SCHEMA,
-    PROFILE_CONFORMANCE_CHECK_SCHEMA,
-    PROFILE_CONFORMANCE_SURFACE_ROLES,
-    PROFILE_DIAG_STABLE_ID_DIVERGENCE,
-    PROFILE_DIAG_STATE_RESULT_DIVERGENCE,
-    PROFILE_DIAG_TRACE_INVARIANT_BROKEN,
-    PROFILE_DIAG_CONFORMANCE_HOST_INCOMPLETE,
-    PROFILE_DIAG_CONFORMANCE_SURFACE_ROLE_MISMATCH,
     PROFILE_SOLVER_CHECK_SCHEMA,
     PROFILE_HOST_RESOLUTION_MANIFEST_SCHEMA,
     PROFILE_EXECUTOR_CHECK_SCHEMA,
@@ -1334,22 +1245,6 @@ export default {
     PROFILE_SURFACE_KINDS,
     PROFILE_UNIFIED_LIFECYCLE_EVENTS,
     PROFILE_CORE_ID_PREFIX,
-    PROFILE_SOLVER_CHECK_SCHEMA,
-    PROFILE_HOST_RESOLUTION_MANIFEST_SCHEMA,
-    PROFILE_EXECUTOR_CHECK_SCHEMA,
-    PROFILE_EXECUTOR_SCENARIO_SCHEMA,
-    PROFILE_DIAG_SURFACE_NO_MATCH,
-    PROFILE_DIAG_SURFACE_AMBIGUOUS,
-    PROFILE_DIAG_CAPABILITY_UNRESOLVED,
-    PROFILE_DIAG_CAPABILITY_PERMISSION_UNDECLARED,
-    PROFILE_DIAG_ROUTE_UNREALIZABLE,
-    PROFILE_DIAG_STALE_GENERATION,
-    PROFILE_DIAG_MISSING_ENVELOPE_IDS,
-    PROFILE_DIAG_SURFACE_OWNS_STATE,
-    PROFILE_DIAG_PRIVATE_OBJECT_CROSSING,
-    PROFILE_DIAG_SPLIT_TRANSACTION,
-    PROFILE_DIAG_DISPOSE_NOT_AUTHORITATIVE,
-    PROFILE_DIAG_CANCEL_NOT_PROPAGATED,
     profileCatalog,
     localeCatalog,
     queryNativeHostProtocolCatalog,
@@ -1398,7 +1293,6 @@ export default {
     NATIVE_HOST_DEEP_LINK_SCHEMA,
     NATIVE_HOST_LOCAL_BUNDLE_SCHEMA,
     NATIVE_HOST_DIAG_MISSING_SHELL_HOOK,
-    NATIVE_HOST_DIAG_PLATFORM_SEMANTIC_FORK,
     NATIVE_HOST_DIAG_REMOTE_ENTRY_DEFAULT,
     NATIVE_HOST_DIAG_MISSING_ENTRY_ARTIFACT,
     NATIVE_HOST_REQUIRED_SHELL_HOOKS,

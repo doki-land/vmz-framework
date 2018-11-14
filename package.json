@@ -25,8 +25,10 @@
         "placeholder:trust": "node scripts/ci/publish-placeholder.mjs trust",
         "ci:status": "node scripts/ci/status.mjs",
         "lint": "biome check .",
-        "fmt": "biome format --write . && cargo fmt --all --manifest-path Cargo.toml",
-        "fmt:check": "biome format . && cargo fmt --all --check --manifest-path Cargo.toml",
+        "fmt": "node scripts/format.mjs --rust",
+        "fmt:check": "node scripts/format.mjs --check",
+        "fmt:rust": "node scripts/format.mjs --rust",
+        "fmt:rust:check": "node scripts/format.mjs --check --rust",
         "fmt:vmz": "pnpm vmz format .",
         "fmt:vmz:check": "pnpm vmz format --check .",
         "clean": "rimraf .turbo packages/examples/*/dist target"

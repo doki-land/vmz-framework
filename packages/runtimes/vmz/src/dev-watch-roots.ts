@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Dev watch helpers: coalesce multi-file bursts without dropping dirty set,
  * and derive extra watch roots from the compile graph (deployment unit sources).
@@ -8,17 +7,18 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { diffFingerprints, fileFingerprintMap } from './watch-diff.js';
 
-/**
- * @typedef {{ changed: string[], deleted: string[] }} DirtySet
- */
+export interface DirtySet {
+    changed: string[];
+    deleted: string[];
+}
 
-/**
- * Merge dirty sets: later change cancels delete and vice versa.
- * @param {DirtySet} a
- * @param {DirtySet} b
- * @returns {DirtySet}
- */
-export function mergeDirtySets(a, b) {
+interface CoalesceRootBurstOpts {
+    sleep?: (ms: number) => Promise<void>;
+    maxRounds?: number;
+    settleMs?: number;
+}
+
+export function mergeDirtySets(a: DirtySet, b: DirtySet): DirtySet {
     const changed = new Set(a?.changed || []);
     const deleted = new Set(a?.deleted || []);
     for (const f of b?.changed || []) {
@@ -42,7 +42,12 @@ export function mergeDirtySets(a, b) {
  * @param {{ sleep?: (ms: number) => Promise<void>, maxRounds?: number, settleMs?: number }} [opts]
  * @returns {Promise<DirtySet>}
  */
-export async function coalesceRootBurst(root, fingerprints, initial, opts = {}) {
+export async function coalesceRootBurst(
+    root: string,
+    fingerprints: Map<string, Map<string, string>>,
+    initial: DirtySet,
+    opts: CoalesceRootBurstOpts = {},
+) {
     const sleepFn = opts.sleep || ((ms) => new Promise((r) => setTimeout(r, ms)));
     const maxRounds = opts.maxRounds ?? 20;
     const settleMs = opts.settleMs ?? 220;
@@ -69,7 +74,7 @@ export async function coalesceRootBurst(root, fingerprints, initial, opts = {}) 
  * @param {string} file
  * @returns {string | null}
  */
-export function findPackageRoot(file) {
+export function findPackageRoot(file: string): string | null {
     let dir = path.dirname(path.resolve(file));
     for (let i = 0; i < 24; i++) {
         if (existsSync(path.join(dir, 'package.json'))) return dir;
@@ -85,7 +90,7 @@ export function findPackageRoot(file) {
  * @param {string} sourceFile
  * @returns {string | null}
  */
-export function watchRootForSourceFile(sourceFile) {
+export function watchRootForSourceFile(sourceFile: string): string | null {
     const abs = path.resolve(sourceFile);
     if (!existsSync(abs)) return null;
     const pkg = findPackageRoot(abs);
@@ -102,7 +107,7 @@ export function watchRootForSourceFile(sourceFile) {
  * @param {string} project
  * @returns {string[]}
  */
-export function localLinkDependencyRoots(project) {
+export function localLinkDependencyRoots(project: string): string[] {
     const pkgPath = path.join(path.resolve(project), 'package.json');
     if (!existsSync(pkgPath)) return [];
     /** @type {string[]} */
@@ -144,7 +149,16 @@ export function localLinkDependencyRoots(project) {
  * @param {{ project: string, outDir: string }} opts
  * @returns {{ roots: string[], dependencyRoots: string[], applicationRoots: string[] }}
  */
-export function collectDevWatchRoots(opts) {
+interface CollectDevWatchRootsOpts {
+    project: string;
+    outDir: string;
+}
+
+export function collectDevWatchRoots(opts: CollectDevWatchRootsOpts): {
+    roots: string[];
+    dependencyRoots: string[];
+    applicationRoots: string[];
+} {
     const project = path.resolve(opts.project);
     const outDir = path.resolve(opts.outDir);
     const src = path.join(project, 'src');
@@ -152,15 +166,13 @@ export function collectDevWatchRoots(opts) {
     const localesRoot = path.join(project, 'locales');
     const designsRoot = path.join(project, 'designs');
 
-    /** @type {string[]} */
-    const applicationRoots = [];
+    const applicationRoots: string[] = [];
     if (existsSync(src)) applicationRoots.push(src);
     if (existsSync(docsRoot)) applicationRoots.push(docsRoot);
     if (existsSync(localesRoot)) applicationRoots.push(localesRoot);
     if (existsSync(designsRoot)) applicationRoots.push(designsRoot);
 
-    /** @type {Set<string>} */
-    const depSet = new Set();
+    const depSet = new Set<string>();
 
     const depJson = path.join(outDir, 'vmz-deployment.json');
     if (existsSync(depJson)) {
@@ -214,7 +226,15 @@ export function collectDevWatchRoots(opts) {
  * }} ctx
  * @returns {'src' | 'locales' | 'docs' | 'designs' | 'dep' | 'other'}
  */
-export function classifyWatchRoot(root, ctx) {
+export interface ClassifyWatchRootCtx {
+    src: string;
+    docsRoot: string;
+    localesRoot: string;
+    designsRoot: string;
+    dependencyRoots: string[];
+}
+
+export function classifyWatchRoot(root: string, ctx: ClassifyWatchRootCtx): 'src' | 'locales' | 'docs' | 'designs' | 'dep' | 'other' {
     if (root === ctx.src) return 'src';
     if (root === ctx.localesRoot) return 'locales';
     if (root === ctx.docsRoot) return 'docs';
@@ -228,7 +248,7 @@ export function classifyWatchRoot(root, ctx) {
  * @param {string} file
  * @param {string[]} dependencyRoots
  */
-export function isDependencyPath(file, dependencyRoots) {
+export function isDependencyPath(file: string, dependencyRoots: string[]) {
     const abs = path.resolve(file);
     return (dependencyRoots || []).some((r) => abs === r || abs.startsWith(r + path.sep) || abs.startsWith(r + '/'));
 }

@@ -1,25 +1,18 @@
-// @ts-nocheck
 /**
  * `vmz application` — registered on `@vmz/commander`.
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import type { Command, ParsedOptions } from '@vmz/commander';
 import { loadNative } from './index.js';
 import { log } from './log.js';
 import { resolveWorkspacePackages } from './packages.js';
 import { resolveWorkspaceDirs } from './resolve.js';
 
-/**
- * @param {import('@vmz/commander').Command} parent
- */
-export function registerApplicationCommands(parent) {
-    /** @param {import('@vmz/commander').Command} cmd */
-    const withCommon = (cmd) =>
-        cmd
-            .option('--json [file]', 'cli.opt.json')
-            .option('--base <path>', 'cli.opt.base')
-            .option('--dirty <path>...', 'cli.opt.dirty');
+export function registerApplicationCommands(parent: Command): void {
+    const withCommon = (cmd: Command) =>
+        cmd.option('--json [file]', 'cli.opt.json').option('--base <path>', 'cli.opt.base').option('--dirty <path>...', 'cli.opt.dirty');
 
     withCommon(parent.command('check', 'cli.cmd.application.check')).action((o) => cmdCheck(o));
     withCommon(parent.command('list', 'cli.cmd.application.list')).action((o) => cmdList(o));
@@ -28,18 +21,11 @@ export function registerApplicationCommands(parent) {
     withCommon(parent.command('relocate', 'cli.cmd.application.relocate')).action((o) => cmdRelocate(o));
     withCommon(parent.command('artifacts', 'cli.cmd.application.artifacts')).action((o) => cmdArtifacts(o));
     withCommon(parent.command('isolation', 'cli.cmd.application.isolation')).action((o) => cmdIsolation(o));
-    withCommon(parent.command('composition|compose|host', 'cli.cmd.application.composition')).action((o) =>
-        cmdComposition(o),
-    );
+    withCommon(parent.command('composition|compose|host', 'cli.cmd.application.composition')).action((o) => cmdComposition(o));
     withCommon(parent.command('dev|sessions|m5', 'cli.cmd.application.dev')).action((o) => cmdDev(o));
 }
 
-/**
- * @param {{ json?: string | boolean }} args
- * @param {string} json
- * @param {(data: any) => void} [printHuman]
- */
-function emitJson(args, json, printHuman) {
+function emitJson(args: ParsedOptions, json: string, printHuman?: (data: any) => void): void {
     if (typeof args.json === 'string') {
         writeFileSync(args.json, `${json}\n`, 'utf8');
         return;
@@ -52,27 +38,25 @@ function emitJson(args, json, printHuman) {
     else console.log(json);
 }
 
-function cmdSchemas() {
+function cmdSchemas(): number {
     const native = loadNative();
     console.log(native.queryApplicationProtocolCatalog);
     return 0;
 }
 
-/** @param {import('@vmz/commander').ParsedOptions} args */
-function cmdCheck(args) {
+function cmdCheck(args: ParsedOptions): number {
     const report = runCheck(args._[0] ?? '.');
     emitJson(args, report.json, (data) => {
-        const errors = data.diagnostics.filter((d) => d.severity === 'error');
+        const errors = data.diagnostics.filter((d: any) => d.severity === 'error');
         log.info(
             `application check: descriptors=${data.descriptors.length} collections=${data.collections.length} mounts=${data.mounts.length} errors=${errors.length}`,
         );
         log.diagnostics(data.diagnostics ?? []);
     });
-    return report.data.diagnostics.some((d) => d.severity === 'error') ? 1 : 0;
+    return report.data.diagnostics.some((d: any) => d.severity === 'error') ? 1 : 0;
 }
 
-/** @param {import('@vmz/commander').ParsedOptions} args */
-function cmdList(args) {
+function cmdList(args: ParsedOptions): number {
     const report = runCheck(args._[0] ?? '.');
     emitJson(args, report.json, (data) => {
         for (const d of data.descriptors) {
@@ -82,15 +66,14 @@ function cmdList(args) {
             console.log(`mount ${m.application}\t${m.routeBase}`);
         }
         for (const c of data.collections) {
-            const apps = c.groups.flatMap((g) => g.applications).join(',');
+            const apps = c.groups.flatMap((g: any) => g.applications).join(',');
             console.log(`collection ${c.id}\t${apps}`);
         }
     });
-    return report.data.diagnostics.some((d) => d.severity === 'error') ? 1 : 0;
+    return report.data.diagnostics.some((d: any) => d.severity === 'error') ? 1 : 0;
 }
 
-/** @param {import('@vmz/commander').ParsedOptions} args */
-function cmdRelocatable(args) {
+function cmdRelocatable(args: ParsedOptions): number {
     const { project } = resolveWorkspaceDirs({ path: args._[0] ?? '.' });
     const native = loadNative();
     if (typeof native.checkApplicationRelocatableJson !== 'function') {
@@ -100,15 +83,14 @@ function cmdRelocatable(args) {
     const json = native.checkApplicationRelocatableJson(project, base);
     const data = JSON.parse(json);
     emitJson(args, json, () => {
-        const errors = data.diagnostics.filter((d) => d.severity === 'error');
+        const errors = data.diagnostics.filter((d: any) => d.severity === 'error');
         log.info(`application relocatable: entries=${data.manifest?.entries?.length ?? 0} errors=${errors.length}`);
         log.diagnostics(data.diagnostics ?? []);
     });
-    return data.diagnostics.some((d) => d.severity === 'error') ? 1 : 0;
+    return data.diagnostics.some((d: any) => d.severity === 'error') ? 1 : 0;
 }
 
-/** @param {import('@vmz/commander').ParsedOptions} args */
-function cmdRelocate(args) {
+function cmdRelocate(args: ParsedOptions): number {
     const manifestPath = args._[0];
     if (!manifestPath) {
         log.errorId('cli.err.application_relocate_manifest');
@@ -128,37 +110,34 @@ function cmdRelocate(args) {
     return 0;
 }
 
-/** @param {import('@vmz/commander').ParsedOptions} args */
-function cmdArtifacts(args) {
+function cmdArtifacts(args: ParsedOptions): number {
     const report = runHostPackageReport(args._[0] ?? '.', 'checkApplicationArtifactBoundaryJson');
     emitJson(args, report.json, (data) => {
-        const errors = data.diagnostics.filter((d) => d.severity === 'error');
+        const errors = data.diagnostics.filter((d: any) => d.severity === 'error');
         log.info(
             `application artifacts: artifacts=${data.artifacts?.length ?? 0} mounts=${data.mountTable?.mounts?.length ?? 0} errors=${errors.length}`,
         );
         log.diagnostics(data.diagnostics ?? []);
     });
-    return report.data.diagnostics.some((d) => d.severity === 'error') ? 1 : 0;
+    return report.data.diagnostics.some((d: any) => d.severity === 'error') ? 1 : 0;
 }
 
-/** @param {import('@vmz/commander').ParsedOptions} args */
-function cmdIsolation(args) {
+function cmdIsolation(args: ParsedOptions): number {
     const report = runHostPackageReport(args._[0] ?? '.', 'checkApplicationIsolationJson');
     emitJson(args, report.json, (data) => {
-        const errors = data.diagnostics.filter((d) => d.severity === 'error');
+        const errors = data.diagnostics.filter((d: any) => d.severity === 'error');
         log.info(
             `application isolation: namespaces=${data.namespaces?.length ?? 0} containment=${data.failureContainment?.length ?? 0} errors=${errors.length}`,
         );
         log.diagnostics(data.diagnostics ?? []);
     });
-    return report.data.diagnostics.some((d) => d.severity === 'error') ? 1 : 0;
+    return report.data.diagnostics.some((d: any) => d.severity === 'error') ? 1 : 0;
 }
 
-/** @param {import('@vmz/commander').ParsedOptions} args */
-function cmdComposition(args) {
+function cmdComposition(args: ParsedOptions): number {
     const report = runHostPackageReport(args._[0] ?? '.', 'checkApplicationHostCompositionJson');
     emitJson(args, report.json, (data) => {
-        const errors = data.diagnostics.filter((d) => d.severity === 'error');
+        const errors = data.diagnostics.filter((d: any) => d.severity === 'error');
         log.info(
             `application composition: catalog=${data.catalog?.applications?.length ?? 0} links=${data.crossApplicationLinks?.length ?? 0} errors=${errors.length}`,
         );
@@ -169,11 +148,10 @@ function cmdComposition(args) {
         }
         log.diagnostics(data.diagnostics ?? []);
     });
-    return report.data.diagnostics.some((d) => d.severity === 'error') ? 1 : 0;
+    return report.data.diagnostics.some((d: any) => d.severity === 'error') ? 1 : 0;
 }
 
-/** @param {import('@vmz/commander').ParsedOptions} args */
-function cmdDev(args) {
+function cmdDev(args: ParsedOptions): number {
     const pathArg = args._[0] ?? '.';
     const { project } = resolveWorkspaceDirs({ path: pathArg });
     const packages = resolveWorkspacePackages(project);
@@ -191,7 +169,7 @@ function cmdDev(args) {
         return 1;
     }
     const json = native.checkApplicationDevTestDeployJson(project, roots, dirty);
-    let data;
+    let data: any;
     try {
         data = JSON.parse(json);
     } catch (e) {
@@ -199,7 +177,7 @@ function cmdDev(args) {
         return 1;
     }
     emitJson(args, json, (report) => {
-        const errors = (report.diagnostics || []).filter((d) => d.severity === 'error');
+        const errors = (report.diagnostics || []).filter((d: any) => d.severity === 'error');
         log.info(
             `application dev: sessions=${report.sessions?.sessions?.length ?? 0} affected=${report.affected?.units?.length ?? 0} proxy=${report.proxy?.cases?.length ?? 0} errors=${errors.length}`,
         );
@@ -211,32 +189,25 @@ function cmdDev(args) {
         }
         log.diagnostics(report.diagnostics || []);
     });
-    return data.diagnostics.some((d) => d.severity === 'error') ? 1 : 0;
+    return data.diagnostics.some((d: any) => d.severity === 'error') ? 1 : 0;
 }
 
-/**
- * @param {string} pathArg
- * @param {string} nativeFn
- */
-function runHostPackageReport(pathArg, nativeFn) {
+function runHostPackageReport(pathArg: string, nativeFn: string): { project: string; json: string; data: any } {
     const { project } = resolveWorkspaceDirs({ path: pathArg });
     const packages = resolveWorkspacePackages(project);
     const roots = packages.map((p) => p.root);
     if (!roots.includes(project)) roots.unshift(project);
 
-    const native = loadNative();
+    const native = loadNative() as Record<string, unknown>;
     if (typeof native[nativeFn] !== 'function') {
         throw new Error(`${nativeFn} missing — rebuild native (pnpm napi:build)`);
     }
-    const json = native[nativeFn](project, roots);
+    const json = (native[nativeFn] as (project: string, roots: string[]) => string)(project, roots);
     const data = JSON.parse(json);
     return { project, json, data };
 }
 
-/**
- * @param {string} pathArg
- */
-export function runCheck(pathArg) {
+export function runCheck(pathArg: string): { project: string; json: string; data: any } {
     const { project } = resolveWorkspaceDirs({ path: pathArg });
     const packages = resolveWorkspacePackages(project);
     const roots = packages.map((p) => p.root);
@@ -251,10 +222,6 @@ export function runCheck(pathArg) {
     return { project, json, data };
 }
 
-/**
- * @param {string} hostRoot
- * @returns {boolean}
- */
-export function hasApplicationsConfig(hostRoot) {
+export function hasApplicationsConfig(hostRoot: string): boolean {
     return existsSync(path.join(hostRoot, 'applications.config.json5'));
 }

@@ -1,19 +1,24 @@
-// @ts-nocheck
 /**
  * Scan /documents tree → pages + locale dirs .
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { DIAG, DOCUMENT_RESERVED_TOP } from './document-schema.js';
+import { DIAG, DOCUMENT_RESERVED_TOP, type DocumentDiagnostic, type PageIdentity } from './document-schema.js';
 import { canonicalLocale, softNormalizeLocale, validateLocaleLiteral } from './document-locale.js';
 
-/**
- * @param {string} dir
- * @param {(rel: string) => void} visit
- * @param {string} [prefix]
- */
-function walkMd(dir, visit, prefix = '') {
+interface ScannedPage {
+    identity: PageIdentity;
+    sourcePath: string;
+}
+
+export interface ScanDocumentsTreeResult {
+    locales: string[];
+    pages: ScannedPage[];
+    diagnostics: DocumentDiagnostic[];
+}
+
+function walkMd(dir: string, visit: (rel: string) => void, prefix = ''): void {
     let entries;
     try {
         entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -32,11 +37,8 @@ function walkMd(dir, visit, prefix = '') {
     }
 }
 
-/**
- * PageKey from locale-relative markdown path (strip extension; index → parent or "index").
- * @param {string} relMd e.g. guide/install.md | index.md | guide/index.md
- */
-export function pageKeyFromRel(relMd) {
+/** PageKey from locale-relative markdown path (strip extension; index → parent or "index"). */
+export function pageKeyFromRel(relMd: string): string {
     const norm = relMd.replace(/\\/g, '/').replace(/^\.\//, '');
     let withoutExt = norm.replace(/\.md$/i, '');
     if (withoutExt.endsWith('/index')) {
@@ -47,21 +49,10 @@ export function pageKeyFromRel(relMd) {
     return withoutExt.replace(/^\/+|\/+$/g, '') || 'index';
 }
 
-/**
- * @param {string} documentsRoot absolute path to .../documents
- * @returns {{
- * locales: string[],
- * pages: Array<{ identity: { pageKey: string, locale: string }, sourcePath: string }>,
- * diagnostics: Array<{ code: string, severity: string, message: string, path?: string }>,
- * }}
- */
-export function scanDocumentsTree(documentsRoot) {
-    /** @type {Array<{ code: string, severity: string, message: string, path?: string }>} */
-    const diagnostics = [];
-    /** @type {string[]} */
-    const locales = [];
-    /** @type {Array<{ identity: { pageKey: string, locale: string }, sourcePath: string }>} */
-    const pages = [];
+export function scanDocumentsTree(documentsRoot: string): ScanDocumentsTreeResult {
+    const diagnostics: DocumentDiagnostic[] = [];
+    const locales: string[] = [];
+    const pages: ScannedPage[] = [];
 
     if (!fs.existsSync(documentsRoot) || !fs.statSync(documentsRoot).isDirectory()) {
         diagnostics.push({
@@ -73,8 +64,7 @@ export function scanDocumentsTree(documentsRoot) {
         return { locales, pages, diagnostics };
     }
 
-    /** @type {Map<string, string[]>} canonical → literals */
-    const byCanonical = new Map();
+    const byCanonical = new Map<string, string[]>();
 
     const top = fs.readdirSync(documentsRoot, { withFileTypes: true });
     for (const ent of top) {
@@ -95,7 +85,7 @@ export function scanDocumentsTree(documentsRoot) {
         if (!ent.isDirectory()) continue;
 
         const v = validateLocaleLiteral(ent.name);
-        if (!v.ok) {
+        if (v.ok === false) {
             diagnostics.push({
                 code: v.code,
                 severity: 'error',
@@ -116,7 +106,7 @@ export function scanDocumentsTree(documentsRoot) {
         byCanonical.set(v.canonical, list);
         locales.push(ent.name);
 
-        const seenKeys = new Set();
+        const seenKeys = new Set<string>();
         walkMd(full, (relMd) => {
             const pageKey = pageKeyFromRel(relMd);
             const sourcePath = path.join(ent.name, relMd).replace(/\\/g, '/');

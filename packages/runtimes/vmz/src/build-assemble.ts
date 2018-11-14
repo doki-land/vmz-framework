@@ -1,7 +1,6 @@
 /**
  * B5 Assemble dispatch + B6 build-proof (per-build semantic id slots).
  */
-// @ts-nocheck
 
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -17,14 +16,59 @@ import { writePrettyJsonFile } from './pretty-json.js';
 export const BUILD_PROOF_SCHEMA = 'vmz.build.proof.v0';
 export const ASSEMBLE_MANIFEST_SCHEMA = 'vmz.assemble.manifest.v0';
 
-/**
- * @param {string} outDir
- * @param {any} ctx
- */
-export async function assembleDelivery(outDir, ctx) {
-    const { selection, profile } = ctx;
+interface AssembleStep {
+    kind: string;
+    digest?: string;
+    status?: string;
+    note?: string;
+    reason?: string;
+    htmlFiles?: number;
+    skipped?: number;
+    publicRoutes?: number;
+    internalCapabilities?: number;
+    httpContractDigest?: string;
+    objectCount?: number;
+}
+
+interface AssembleManifest {
+    schema: string;
+    profileId: unknown;
+    assembly: unknown;
+    serverRuntime: unknown;
+    steps: AssembleStep[];
+    staticDelivery?: { digest: string; htmlFiles: unknown; skipped: unknown };
+    serverArtifact?: { digest: string; httpContractDigest: string; schema: string; selectedRuntime: string };
+    siteDelivery?: { digest: string; schema: string };
+    embeddedPackaging?: { digest: string; objectCount: number; schema: string };
+    packDigest?: string | null;
+    assembleDigest?: string;
+}
+
+interface BuildProofSlot {
+    status: string;
+    detail?: string;
+}
+
+interface BuildProofBody {
+    schema: string;
+    profileId: unknown;
+    assembly: unknown;
+    selectionDigest: unknown;
+    packDigest: string | null;
+    assembleDigest: string | null;
+    release: boolean;
+    semanticIds: string[];
+    slots: Record<string, BuildProofSlot>;
+    productionReadyClaim: boolean;
+    note: string;
+    proofDigest?: string;
+}
+
+export async function assembleDelivery(outDir: string, ctx: Record<string, unknown>) {
+    const selection = ctx.selection as Record<string, unknown>;
+    const profile = ctx.profile as Record<string, unknown>;
     const assembly = selection.assembly;
-    const result = {
+    const result: AssembleManifest = {
         schema: ASSEMBLE_MANIFEST_SCHEMA,
         profileId: selection.profileId,
         assembly,
@@ -34,8 +78,8 @@ export async function assembleDelivery(outDir, ctx) {
 
     if (assembly === 'web-static' || assembly === 'cdn+server') {
         const staticResult = await emitWebStatic(outDir, {
-            origin: ctx.origin,
-            projectRoot: ctx.projectRoot,
+            origin: ctx.origin as string,
+            projectRoot: ctx.projectRoot as string,
         });
         result.steps.push({
             kind: 'web-static',
@@ -50,8 +94,8 @@ export async function assembleDelivery(outDir, ctx) {
         };
     } else if (assembly === 'server-host' || assembly === 'local-static') {
         // SSR / local packs: favicon + opaque public/ for serve-host.
-        emitSiteFavicon(outDir, { projectRoot: ctx.projectRoot });
-        emitPublicStaticAssets(outDir, { projectRoot: ctx.projectRoot });
+        emitSiteFavicon(outDir, { projectRoot: ctx.projectRoot as string });
+        emitPublicStaticAssets(outDir, { projectRoot: ctx.projectRoot as string });
     }
 
     if (assembly === 'local-static') {
@@ -64,24 +108,25 @@ export async function assembleDelivery(outDir, ctx) {
 
     if (assembly === 'server-host' || assembly === 'cdn+server') {
         const server = emitServerArtifact(outDir, {
-            profileId: selection.profileId,
-            assembly,
-            serverRuntime: selection.serverRuntime || 'node',
-            packDigest: ctx.pack?.packDigest || null,
+            profileId: String(selection.profileId ?? ''),
+            assembly: String(assembly),
+            serverRuntime: String(selection.serverRuntime || 'node'),
+            packDigest: ((ctx.pack as Record<string, unknown> | undefined)?.packDigest as string | null | undefined) ?? null,
         });
+        const serverArtifact = server.artifact as unknown as Record<string, unknown>;
         result.steps.push({
             kind: 'server-host',
             status: 'emitted',
-            digest: server.artifact.artifactDigest,
-            publicRoutes: server.artifact.publicRoutes?.length ?? 0,
-            internalCapabilities: server.artifact.internalCapabilities?.length ?? 0,
+            digest: serverArtifact.artifactDigest as string,
+            publicRoutes: (serverArtifact.publicRoutes as unknown[] | undefined)?.length ?? 0,
+            internalCapabilities: (serverArtifact.internalCapabilities as unknown[] | undefined)?.length ?? 0,
             httpContractDigest: server.httpContractDigest,
         });
         result.serverArtifact = {
-            digest: server.artifact.artifactDigest,
+            digest: serverArtifact.artifactDigest as string,
             httpContractDigest: server.httpContractDigest,
-            schema: server.artifact.schema,
-            selectedRuntime: server.artifact.selectedRuntime,
+            schema: serverArtifact.schema as string,
+            selectedRuntime: serverArtifact.selectedRuntime as string,
         };
     }
 
@@ -93,36 +138,39 @@ export async function assembleDelivery(outDir, ctx) {
             );
         }
         const site = emitSiteDelivery(outDir, siteAuthoring, {
-            siteId: ctx.siteId,
+            siteId: ctx.siteId as string,
         });
+        const siteContract = site.contract as unknown as Record<string, unknown>;
         result.steps.push({
             kind: 'site-delivery',
-            digest: site.contract.contractDigest,
+            digest: siteContract.contractDigest as string,
         });
         result.siteDelivery = {
-            digest: site.contract.contractDigest,
-            schema: site.contract.schema,
+            digest: siteContract.contractDigest as string,
+            schema: siteContract.schema as string,
         };
 
         if (assembly === 'rust-embedded') {
             const pack = emitEmbeddedPackaging(outDir, {
-                siteId: ctx.siteId,
-                contractDigest: site.contract.contractDigest,
+                siteId: ctx.siteId as string,
+                contractDigest: siteContract.contractDigest as string,
             });
+            const packIndex = pack.index as unknown as Record<string, unknown>;
             result.steps.push({
                 kind: 'embedded-packaging',
-                digest: pack.index.indexDigest,
-                objectCount: pack.index.objectCount,
+                digest: packIndex.indexDigest as string,
+                objectCount: packIndex.objectCount as number,
             });
             result.embeddedPackaging = {
-                digest: pack.index.indexDigest,
-                objectCount: pack.index.objectCount,
-                schema: pack.index.schema,
+                digest: packIndex.indexDigest as string,
+                objectCount: packIndex.objectCount as number,
+                schema: packIndex.schema as string,
             };
         }
     }
 
-    result.packDigest = ctx.pack?.packDigest || null;
+    const packCtx = ctx.pack as Record<string, unknown> | undefined;
+    result.packDigest = (packCtx?.packDigest as string | null | undefined) || null;
     result.assembleDigest = sha256Hex(canonicalJson({ ...result, assembleDigest: undefined }));
 
     const vmzDir = path.join(outDir, '_vmz');
@@ -132,13 +180,12 @@ export async function assembleDelivery(outDir, ctx) {
     return { manifest: result, path: file };
 }
 
-/**
- * @param {string} outDir
- * @param {any} ctx
- */
-export function emitBuildProof(outDir, ctx) {
-    const semanticIds = semanticIdsForAssembly(ctx.selection.assembly);
-    const slots = {
+export function emitBuildProof(outDir: string, ctx: Record<string, unknown>) {
+    const selection = ctx.selection as Record<string, unknown>;
+    const assemble = ctx.assemble as AssembleManifest | undefined;
+    const packCtx = ctx.pack as Record<string, unknown> | undefined;
+    const semanticIds = semanticIdsForAssembly(selection.assembly as string);
+    const slots: Record<string, BuildProofSlot> = {
         'server-host': { status: 'not-applicable' },
         'static-delivery': { status: 'not-applicable' },
         'site-fallback': { status: 'not-applicable' },
@@ -146,13 +193,13 @@ export function emitBuildProof(outDir, ctx) {
     };
     for (const id of semanticIds) {
         if (id === 'static-delivery') {
-            const step = (ctx.assemble?.steps || []).find((s) => s.kind === 'web-static');
+            const step = (assemble?.steps || []).find((s) => s.kind === 'web-static');
             slots[id] = step
                 ? { status: 'emitted', detail: `digest=${String(step.digest).slice(0, 12)}` }
                 : { status: 'pending', detail: 'assembly requires static emit' };
         } else if (id === 'site-fallback') {
-            const siteStep = (ctx.assemble?.steps || []).find((s) => s.kind === 'site-delivery');
-            const packStep = (ctx.assemble?.steps || []).find((s) => s.kind === 'embedded-packaging');
+            const siteStep = (assemble?.steps || []).find((s) => s.kind === 'site-delivery');
+            const packStep = (assemble?.steps || []).find((s) => s.kind === 'embedded-packaging');
             if (siteStep && packStep) {
                 slots[id] = {
                     status: 'emitted',
@@ -167,7 +214,7 @@ export function emitBuildProof(outDir, ctx) {
                 slots[id] = { status: 'pending', detail: siteStep?.reason || 'no site sources' };
             }
         } else if (id === 'server-host') {
-            const step = (ctx.assemble?.steps || []).find((s) => s.kind === 'server-host');
+            const step = (assemble?.steps || []).find((s) => s.kind === 'server-host');
             slots[id] =
                 step && step.status === 'emitted'
                     ? {
@@ -180,21 +227,21 @@ export function emitBuildProof(outDir, ctx) {
                       };
         } else if (id === 'asset-graph') {
             slots[id] = {
-                status: ctx.pack?.packDigest ? 'pack-digest' : 'pending',
-                detail: ctx.pack?.packDigest
-                    ? `pack=${String(ctx.pack.packDigest).slice(0, 12)} units=${ctx.pack.unitCount ?? '?'}`
+                status: packCtx?.packDigest ? 'pack-digest' : 'pending',
+                detail: packCtx?.packDigest
+                    ? `pack=${String(packCtx.packDigest).slice(0, 12)} units=${packCtx.unitCount ?? '?'}`
                     : 'pack missing',
             };
         }
     }
 
-    const body = {
+    const body: BuildProofBody = {
         schema: BUILD_PROOF_SCHEMA,
-        profileId: ctx.selection.profileId,
-        assembly: ctx.selection.assembly,
-        selectionDigest: ctx.selection.digest || null,
-        packDigest: ctx.pack?.packDigest || null,
-        assembleDigest: ctx.assemble?.assembleDigest || null,
+        profileId: selection.profileId,
+        assembly: selection.assembly,
+        selectionDigest: selection.digest || null,
+        packDigest: (packCtx?.packDigest as string | null) || null,
+        assembleDigest: assemble?.assembleDigest || null,
         release: Boolean(ctx.release),
         semanticIds,
         slots,

@@ -7,7 +7,6 @@
  *
  * Not full oxc chunk-split/minify (`oxc-pending` remains for release minify).
  */
-// @ts-nocheck
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -22,7 +21,11 @@ const SKIP_PREFIXES = ['node:', 'nodejs:', 'cloudflare:', 'data:', 'http:', 'htt
  * @param {{ projectRoot?: string | null }} [opts]
  * @returns {{ rewrittenFiles: number, vendoredModules: string[], bareSpecs: string[] }}
  */
-export function packClientBareImports(outDir, opts = {}) {
+interface PackClientBareImportsOpts {
+    projectRoot?: string | null;
+}
+
+export function packClientBareImports(outDir: string, opts: PackClientBareImportsOpts = {}) {
     const projectRoot = opts.projectRoot ? path.resolve(opts.projectRoot) : path.dirname(path.resolve(outDir));
     /** @type {Map<string, string>} bareSpec → absolute vendored .js path */
     const bareToVendor = new Map();

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Emit RouteId × LocaleId realization (+ PageMeta / hreflang seed) into dist/_vmz.
  * Consumed by serve-host + static-emit; LocaleId stays out of stable RouteId.
@@ -13,12 +12,11 @@ import { listPublicPageUnits, unitBrowserPathPattern } from './route-path.js';
 
 export const LOCALE_ROUTE_REALIZATION_ARTIFACT_SCHEMA = 'vmz.locale.route_realization.v0';
 
-/**
- * @param {string} projectRoot
- * @param {string} distDir
- * @param {{ origin?: string }} [opts]
- */
-export function emitLocaleRouteRealization(projectRoot, distDir, opts = {}) {
+export interface EmitLocaleRouteRealizationOpts {
+    origin?: string;
+}
+
+export function emitLocaleRouteRealization(projectRoot: string, distDir: string, opts: EmitLocaleRouteRealizationOpts = {}) {
     const report = checkLocales({ projectRoot, checkUnused: false });
     if (localeHasErrors(report)) {
         return { ok: false, written: [], diagnostics: report.diagnostics || [], artifact: null };
@@ -61,8 +59,7 @@ export function emitLocaleRouteRealization(projectRoot, distDir, opts = {}) {
     }
 
     const origin = String(opts.origin || process.env.VMZ_SITE_ORIGIN || 'https://example.test').replace(/\/$/, '');
-    /** @type {any[]} */
-    const pageMetas = [];
+    const pageMetas: ReturnType<typeof buildLocalePageMeta>[] = [];
     for (const route of routes) {
         for (const loc of locales) {
             const meta = buildLocalePageMeta({

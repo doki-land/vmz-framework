@@ -3,7 +3,6 @@
  * Assembles real user-path scenarios for `pnpm verify -- production-test`.
  * Does not invent Vitest/Jest/Playwright semantics.
  */
-// @ts-nocheck
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -330,21 +329,35 @@ export function ciProfileDigest(profile) {
     return sha256Hex(canonicalJson(profile));
 }
 
+type ProductionScenarioResult = {
+    scenarioId: string;
+    status?: string;
+    reason?: string | null;
+    detail?: string | null;
+    artifacts?: unknown;
+    attempts?: number;
+    flaky?: boolean;
+};
+
 /**
  * Build a production test report from scenario results.
  * Quarantine entries must be status=`quarantined` (never `passed`).
- * @param {{ pack: Record<string, any>, profile: Record<string, any>, results: Array<Record<string, any>>, artifactsDir?: string }} input
  */
-export function buildProductionTestReport(input) {
+export function buildProductionTestReport(input: {
+    pack: Record<string, any>;
+    profile: Record<string, any>;
+    results: ProductionScenarioResult[];
+    artifactsDir?: string;
+}) {
     const pack = input.pack;
     const profile = input.profile;
     const byId = new Map((input.results || []).map((r) => [r.scenarioId, r]));
     const tests = [];
     /** @type {string[]} */
-    const errors = [];
+    const errors: string[] = [];
 
     for (const s of pack.scenarios) {
-        const r = byId.get(s.scenarioId);
+        const r: ProductionScenarioResult | undefined = byId.get(s.scenarioId);
         if (s.quarantine) {
             const status = r?.status === 'passed' ? 'illegal-passed' : r?.status || 'quarantined';
             if (status === 'illegal-passed' || status === 'passed') {

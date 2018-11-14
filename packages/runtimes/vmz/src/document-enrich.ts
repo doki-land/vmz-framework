@@ -1,17 +1,66 @@
-// @ts-nocheck
 /**
  * Document — enrich manifest with routes, anchors, nav; diagnose links.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { DIAG } from './document-schema.js';
-/**
- * @param {string} routeBase e.g. /docs
- * @param {string} locale
- * @param {string} pageKey
- * @param {{ strategy?: string }} [routing]
- */
-export function pageRoute(routeBase, locale, pageKey, routing = {}) {
+import { DIAG, type DocumentDiagnostic, type DocumentManifest } from './document-schema.js';
+
+export interface DocumentRoutingStrategy {
+    strategy?: string;
+}
+
+export interface DocumentHeading {
+    id: string;
+    level: number;
+    text: string;
+}
+
+export interface DocumentLink {
+    href?: string;
+}
+
+export interface AnalyzedMarkdown {
+    html: string;
+    headings: DocumentHeading[];
+    links?: DocumentLink[];
+    fences?: Array<{
+        info?: string;
+        content?: string;
+        lineStart?: number;
+        lineEnd?: number;
+    }>;
+}
+
+export interface EnrichedPageInfo {
+    html: string;
+    headings: DocumentHeading[];
+    links: DocumentLink[];
+    title: string;
+    route: string;
+    anchors: string[];
+}
+
+export interface DocumentNavItem {
+    pageKey: string;
+    title: string;
+    href: string;
+}
+
+export interface EnrichDocumentContentCtx {
+    analyzeMarkdown: (source: string) => AnalyzedMarkdown;
+    projectRoot: string;
+    designsCssHref?: string | null;
+    routing?: DocumentRoutingStrategy;
+}
+
+export interface EnrichDocumentContentResult {
+    byId: Map<string, EnrichedPageInfo>;
+    navByLocale: Record<string, DocumentNavItem[]>;
+    diagnostics: DocumentDiagnostic[];
+    routeBase: string;
+}
+
+export function pageRoute(routeBase: string, locale: string, pageKey: string, routing: DocumentRoutingStrategy = {}): string {
     const base = String(routeBase || '/').replace(/\/$/, '') || '';
     const key = pageKey === 'index' ? '' : pageKey.replace(/\\/g, '/');
     const strategy = routing.strategy || 'prefix';
@@ -22,32 +71,22 @@ export function pageRoute(routeBase, locale, pageKey, routing = {}) {
     const parts = [base.replace(/^\//, ''), locale, key].filter((p) => p !== '');
     return '/' + parts.join('/');
 }
-/**
- * Static file path relative to out dir (posix).
- * @param {string} routeBase
- * @param {string} locale
- * @param {string} pageKey
- */
-export function pageHtmlRel(routeBase, locale, pageKey) {
+
+/** Static file path relative to out dir (posix). */
+export function pageHtmlRel(routeBase: string, locale: string, pageKey: string): string {
     const base = String(routeBase || '/')
         .replace(/^\//, '')
         .replace(/\/$/, '');
     const file = pageKey === 'index' ? 'index.html' : `${pageKey.replace(/\\/g, '/')}.html`;
     return [base, locale, file].filter(Boolean).join('/');
 }
-/**
- * @param {import('./document-schema.js').DocumentManifest} manifest
- * @param {{ analyzeMarkdown: Function, projectRoot: string, designsCssHref?: string | null }} ctx
- */
-export function enrichDocumentContent(manifest, ctx) {
+
+export function enrichDocumentContent(manifest: DocumentManifest, ctx: EnrichDocumentContentCtx): EnrichDocumentContentResult {
     const routeBase = manifest.mounts?.[0]?.routeBase || '/docs';
     const routing = ctx.routing || { strategy: 'prefix' };
-    /** @type {Map<string, { html: string, headings: any[], links: any[], title: string, route: string, anchors: string[] }>} */
-    const byId = new Map();
-    /** @type {import('./document-schema.js').DocumentDiagnostic[]} */
-    const diagnostics = [...(manifest.diagnostics || [])];
-    /** @type {Map<string, string>} */
-    const routeOwners = new Map();
+    const byId = new Map<string, EnrichedPageInfo>();
+    const diagnostics: DocumentDiagnostic[] = [...(manifest.diagnostics || [])];
+    const routeOwners = new Map<string, string>();
     for (const page of manifest.pages) {
         const abs = path.isAbsolute(page.sourcePath) ? page.sourcePath : path.join(manifest.root, page.sourcePath);
         const source = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : '';
@@ -56,7 +95,7 @@ export function enrichDocumentContent(manifest, ctx) {
         const anchors = analyzed.headings.map((h) => h.id);
         const title = analyzed.headings.find((h) => h.level === 1)?.text || analyzed.headings[0]?.text || page.identity.pageKey;
         // Duplicate anchors on page
-        const seen = new Set();
+        const seen = new Set<string>();
         for (const id of anchors) {
             if (seen.has(id)) {
                 diagnostics.push({
@@ -87,15 +126,14 @@ export function enrichDocumentContent(manifest, ctx) {
         byId.set(`${page.identity.locale}:${page.identity.pageKey}`, {
             html: analyzed.html,
             headings: analyzed.headings,
-            links: analyzed.links,
+            links: analyzed.links || [],
             title,
             route,
             anchors,
         });
     }
     // Nav per locale (directory order: pageKey sorted)
-    /** @type {Record<string, Array<{ pageKey: string, title: string, href: string }>>} */
-    const navByLocale = {};
+    const navByLocale: Record<string, DocumentNavItem[]> = {};
     for (const loc of manifest.locales) {
         const pages = manifest.pages
             .filter((p) => p.identity.locale === loc)
@@ -104,13 +142,13 @@ export function enrichDocumentContent(manifest, ctx) {
         navByLocale[loc] = pages.map((p) => ({
             pageKey: p.identity.pageKey,
             title: p.title || p.identity.pageKey,
-            href: p.route,
+            href: p.route || '',
         }));
     }
     // Link checks
-    const pageKeySet = new Map(); // locale -> Set pageKey
+    const pageKeySet = new Map<string, Set<string>>(); // locale -> Set pageKey
     for (const p of manifest.pages) {
-        const set = pageKeySet.get(p.identity.locale) || new Set();
+        const set = pageKeySet.get(p.identity.locale) || new Set<string>();
         set.add(p.identity.pageKey);
         pageKeySet.set(p.identity.locale, set);
     }
@@ -139,7 +177,7 @@ export function enrichDocumentContent(manifest, ctx) {
                 continue;
             }
             const resolved = resolveDocHref(href, page.identity.pageKey, page.identity.locale, routeBase, pageKeySet);
-            if (!resolved.ok) {
+            if (resolved.ok === false) {
                 diagnostics.push({
                     code: DIAG.LINK_BROKEN,
                     severity: 'error',
@@ -162,16 +200,29 @@ export function enrichDocumentContent(manifest, ctx) {
     }
     return { byId, navByLocale, diagnostics, routeBase };
 }
-/**
- * @param {string} href
- * @param {string} fromPageKey
- * @param {string} locale
- * @param {string} routeBase
- * @param {Map<string, Set<string>>} pageKeySet
- */
-function resolveDocHref(href, fromPageKey, locale, routeBase, pageKeySet) {
+
+interface ResolveDocHrefOk {
+    ok: true;
+    locale: string;
+    pageKey: string;
+    anchor: string | null;
+    anchors: string[];
+}
+
+interface ResolveDocHrefErr {
+    ok: false;
+    reason: string;
+}
+
+function resolveDocHref(
+    href: string,
+    fromPageKey: string,
+    locale: string,
+    routeBase: string,
+    pageKeySet: Map<string, Set<string>>,
+): ResolveDocHrefOk | ResolveDocHrefErr {
     let pathPart = href;
-    let anchor = null;
+    let anchor: string | null = null;
     const hash = href.indexOf('#');
     if (hash >= 0) {
         pathPart = href.slice(0, hash);
@@ -181,7 +232,6 @@ function resolveDocHref(href, fromPageKey, locale, routeBase, pageKeySet) {
     if (pathPart.startsWith('/')) {
         // Absolute site path under mount: /docs/zh-hans/guide/install
         const want = pathPart.replace(/\/$/, '') || '/';
-        const prefix = pageRoute(routeBase, locale, 'index').replace(/\/$/, '');
         // Accept full route or locale-relative
         for (const [loc, keys] of pageKeySet) {
             for (const pk of keys) {
@@ -192,7 +242,7 @@ function resolveDocHref(href, fromPageKey, locale, routeBase, pageKeySet) {
             }
         }
         // Still ok if matches any known route shape for this locale
-        const keys = pageKeySet.get(locale) || new Set();
+        const keys = pageKeySet.get(locale) || new Set<string>();
         const stripped = want.replace(new RegExp(`^${escapeRe(routeBase.replace(/\/$/, ''))}/${escapeRe(locale)}/?`), '');
         const pk = stripped === '' ? 'index' : stripped;
         if (keys.has(pk)) return { ok: true, locale, pageKey: pk, anchor, anchors: [] };
@@ -203,7 +253,7 @@ function resolveDocHref(href, fromPageKey, locale, routeBase, pageKeySet) {
     const joined = path.posix.normalize(path.posix.join(fromDir || '.', pathPart));
     let pk = joined === '.' || joined === '' ? 'index' : joined.replace(/^\.\//, '');
     pk = normalizePageKey(pk);
-    const keys = pageKeySet.get(locale) || new Set();
+    const keys = pageKeySet.get(locale) || new Set<string>();
     if (!keys.has(pk)) {
         // A directory index and a leaf page share the same normalized PageKey shape.
         // Prefer the regular sibling resolution above, then retry relative to the
@@ -217,18 +267,20 @@ function resolveDocHref(href, fromPageKey, locale, routeBase, pageKeySet) {
     }
     return { ok: true, locale, pageKey: pk, anchor, anchors: [] };
 }
+
 /**
  * Directory used for relative Markdown links.
  * `index` → repo root; bare `guide` (from guide/index.md) → `guide`;
  * `guide/install` → `guide`.
  */
-function pageKeyDir(pageKey) {
+function pageKeyDir(pageKey: string): string {
     if (!pageKey || pageKey === 'index') return '';
     if (!pageKey.includes('/')) return pageKey;
     return pageKey.slice(0, pageKey.lastIndexOf('/'));
 }
+
 /** Strip trailing `/index` so guide/index.md links resolve to PageKey `guide`. */
-function normalizePageKey(pageKey) {
+function normalizePageKey(pageKey: string): string {
     let pk = String(pageKey || '')
         .replace(/\\/g, '/')
         .replace(/\/+$/, '');
@@ -239,6 +291,7 @@ function normalizePageKey(pageKey) {
     }
     return pk === '' || pk === '.' ? 'index' : pk;
 }
-function escapeRe(s) {
+
+function escapeRe(s: string): string {
     return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

@@ -27,8 +27,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Check TypeScript/JavaScript format
-        run: pnpm exec biome format --diagnostic-level=error .
+      - name: Check format (Biome; same as `pnpm fmt:check`)
+        run: pnpm fmt:check
 
   build:
     name: Build

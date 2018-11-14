@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Locale check + message contracts / typed module projection.
  *
@@ -6,7 +5,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadLocalePlan, mapPlanDiagnostics, parseAuthorInput } from './author-input.js';
+import { loadLocalePlan, mapPlanDiagnostics, parseAuthorInput, type LocalePlan } from './author-input.js';
 import {
     DIAG_CATALOG_CONFLICT,
     DIAG_CATALOG_PARSE,
@@ -34,10 +33,38 @@ import {
 import { requireNativeAddon } from './native-addon.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 
-/**
- * @param {string} literal
- */
-export function validateLocaleId(literal) {
+export interface LocaleDiagnostic {
+    code: string;
+    severity: string;
+    message: string;
+    path?: string;
+}
+
+export interface MessageParam {
+    name: string;
+    kind: string;
+}
+
+export interface MessageVariant {
+    template: string;
+    params: MessageParam[];
+    path: string;
+}
+
+export interface MessageNode {
+    messageId: string;
+    catalogId: string;
+    variants: Record<string, MessageVariant>;
+}
+
+/** Fields present on the locale plan wire beyond the minimal `LocalePlan` host type. */
+interface LocalePlanData extends LocalePlan {
+    locales?: Array<{ id: string; label?: string; direction?: string }>;
+    fallback?: Record<string, string[]>;
+    missing?: string;
+}
+
+export function validateLocaleId(literal: string): { ok: boolean; message?: string } {
     const name = String(literal || '');
     if (!name) return { ok: false, message: 'empty LocaleId' };
     if (name.includes('_')) {
@@ -58,15 +85,9 @@ export function validateLocaleId(literal) {
 /**
  * Flatten catalog object into MessageId → string template.
  * Arrays are forbidden.
- * @param {any} node
- * @param {string} prefix
- * @param {Array<{code:string,severity:string,message:string,path?:string}>} diagnostics
- * @param {string} sourcePath
- * @returns {Map<string, string>}
  */
-export function flattenCatalog(node, prefix, diagnostics, sourcePath) {
-    /** @type {Map<string, string>} */
-    const out = new Map();
+export function flattenCatalog(node: unknown, prefix: string, diagnostics: LocaleDiagnostic[], sourcePath: string): Map<string, string> {
+    const out = new Map<string, string>();
     if (node == null || typeof node !== 'object') {
         diagnostics.push({
             code: DIAG_CATALOG_PARSE,
@@ -85,7 +106,7 @@ export function flattenCatalog(node, prefix, diagnostics, sourcePath) {
         });
         return out;
     }
-    for (const [key, value] of Object.entries(node)) {
+    for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
         const id = prefix ? `${prefix}.${key}` : key;
         if (value != null && typeof value === 'object') {
             if (Array.isArray(value)) {
@@ -126,13 +147,14 @@ export function flattenCatalog(node, prefix, diagnostics, sourcePath) {
 
 /**
  * ICU MessageFormat compatible subset: extract argument names + kinds.
- * @param {string} template
- * @returns {{ ok: boolean, params: Array<{ name: string, kind: string }>, error?: string }}
  */
-export function extractMessageParams(template) {
+export function extractMessageParams(template: string): {
+    ok: boolean;
+    params: MessageParam[];
+    error?: string;
+} {
     const text = String(template ?? '');
-    /** @type {Map<string, string>} */
-    const params = new Map();
+    const params = new Map<string, string>();
     let i = 0;
     while (i < text.length) {
         const ch = text[i];
@@ -180,7 +202,7 @@ export function extractMessageParams(template) {
     };
 }
 
-function findMatchingBrace(text, openIdx) {
+function findMatchingBrace(text: string, openIdx: number): number {
     let depth = 0;
     for (let i = openIdx; i < text.length; i++) {
         if (text[i] === "'") {
@@ -202,9 +224,8 @@ function findMatchingBrace(text, openIdx) {
     return -1;
 }
 
-function splitTopLevel(text, sep) {
-    /** @type {string[]} */
-    const parts = [];
+function splitTopLevel(text: string, sep: string): string[] {
+    const parts: string[] = [];
     let depth = 0;
     let start = 0;
     for (let i = 0; i < text.length; i++) {
@@ -220,16 +241,10 @@ function splitTopLevel(text, sep) {
     return parts;
 }
 
-/**
- * Detect fallback cycles (explicit DAG).
- * @param {Record<string, string[]>} fallback
- * @param {Set<string>} known
- */
-export function findFallbackCycles(fallback, known) {
-    /** @type {string[]} */
-    const cycles = [];
-    /** @type {string[]} */
-    const unknown = [];
+/** Detect fallback cycles (explicit DAG). */
+export function findFallbackCycles(fallback: Record<string, string[]>, known: Set<string>) {
+    const cycles: string[] = [];
+    const unknown: string[] = [];
     for (const [from, tos] of Object.entries(fallback || {})) {
         if (!known.has(from)) unknown.push(from);
         for (const to of tos || []) {
@@ -237,11 +252,9 @@ export function findFallbackCycles(fallback, known) {
         }
     }
     for (const start of Object.keys(fallback || {})) {
-        /** @type {Set<string>} */
-        const stack = new Set();
-        /** @type {string[]} */
-        const path = [];
-        const visit = (node) => {
+        const stack = new Set<string>();
+        const path: string[] = [];
+        const visit = (node: string) => {
             if (stack.has(node)) {
                 cycles.push([...path, node].join(' -> '));
                 return;
@@ -258,16 +271,18 @@ export function findFallbackCycles(fallback, known) {
     return { cycles: [...new Set(cycles)], unknown: [...new Set(unknown)] };
 }
 
-/**
- * @param {{ projectRoot: string, strict?: boolean, checkUnused?: boolean }} opts
- */
-export function checkLocales(opts) {
+export interface CheckLocalesOpts {
+    projectRoot: string;
+    strict?: boolean;
+    checkUnused?: boolean;
+}
+
+export function checkLocales(opts: CheckLocalesOpts) {
     const projectRoot = path.resolve(opts.projectRoot);
     const localesRoot = path.join(projectRoot, 'locales');
-    /** @type {Array<{ code: string, severity: string, message: string, path?: string }>} */
-    const diagnostics = [];
+    const diagnostics: LocaleDiagnostic[] = [];
 
-    const plan = loadLocalePlan(projectRoot);
+    const plan = loadLocalePlan(projectRoot) as LocalePlanData;
     diagnostics.push(...mapPlanDiagnostics(plan.diagnostics));
 
     const missingManifest = (plan.diagnostics || []).some((d) => d.code === DIAG_MANIFEST_MISSING);
@@ -276,17 +291,14 @@ export function checkLocales(opts) {
     }
 
     const localeEntries = plan.locales || [];
-    /** @type {string[]} */
-    const orderedIds = localeEntries.map((e) => e.id);
-    /** @type {Set<string>} */
+    const orderedIds: string[] = localeEntries.map((e) => e.id);
     const seen = new Set(orderedIds);
     const defaultLocale = String(plan.defaultLocale || '');
-    const fallback = plan.fallback && typeof plan.fallback === 'object' ? plan.fallback : {};
+    const fallback: Record<string, string[]> = plan.fallback && typeof plan.fallback === 'object' ? plan.fallback : {};
     const missingPolicy = plan.missing || 'error';
     const routing = plan.routing || { strategy: 'prefix', defaultPrefix: 'include' };
 
-    /** @type {string[]} */
-    const diskLocales = [];
+    const diskLocales: string[] = [];
     if (fs.existsSync(localesRoot)) {
         for (const ent of fs.readdirSync(localesRoot, { withFileTypes: true })) {
             if (LOCALE_RESERVED_TOP.has(ent.name)) continue;
@@ -332,10 +344,8 @@ export function checkLocales(opts) {
         }
     }
 
-    /** @type {Map<string, { messageId: string, catalogId: string, variants: Record<string, { template: string, params: any[], path: string }> }>} */
-    const messages = new Map();
-    /** @type {string[]} */
-    const catalogIds = [];
+    const messages = new Map<string, MessageNode>();
+    const catalogIds: string[] = [];
 
     for (const locale of orderedIds) {
         const dir = path.join(localesRoot, locale);
@@ -344,8 +354,7 @@ export function checkLocales(opts) {
             const rel = path.relative(dir, fileAbs).replace(/\\/g, '/');
             const catalogId = rel.replace(/\.(json5|json|ya?ml)$/i, '').replace(/\//g, '.');
             if (!catalogIds.includes(catalogId)) catalogIds.push(catalogId);
-            /** @type {any} */
-            let parsed = null;
+            let parsed: unknown = null;
             try {
                 const text = fs.readFileSync(fileAbs, 'utf8');
                 if (/\.ya?ml$/i.test(fileAbs)) {
@@ -359,10 +368,11 @@ export function checkLocales(opts) {
                 }
                 parsed = parseAuthorInput(text);
             } catch (e) {
+                const msg = e instanceof Error ? e.message : String(e);
                 diagnostics.push({
                     code: DIAG_CATALOG_PARSE,
                     severity: 'error',
-                    message: `catalog parse failed: ${e.message || e}`,
+                    message: `catalog parse failed: ${msg}`,
                     path: path.relative(projectRoot, fileAbs).replace(/\\/g, '/'),
                 });
                 return;
@@ -442,16 +452,19 @@ export function checkLocales(opts) {
     }
 
     const used = scanLocaleUsages(projectRoot);
-    /** @type {any[]} */
-    const typedModules = [];
-    const byCatalog = new Map();
+    const typedModules: Array<{
+        schema: string;
+        module: string;
+        catalogId: string;
+        exports: Array<{ exportName: string; messageId: string; params: MessageParam[] }>;
+    }> = [];
+    const byCatalog = new Map<string, MessageNode[]>();
     for (const node of messages.values()) {
         if (!byCatalog.has(node.catalogId)) byCatalog.set(node.catalogId, []);
-        byCatalog.get(node.catalogId).push(node);
+        byCatalog.get(node.catalogId)!.push(node);
     }
     for (const [catalogId, nodes] of byCatalog) {
-        /** @type {Map<string, number>} */
-        const leafCount = new Map();
+        const leafCount = new Map<string, number>();
         for (const n of nodes) {
             const leaf = leafExportName(n.messageId);
             leafCount.set(leaf, (leafCount.get(leaf) || 0) + 1);
@@ -535,19 +548,19 @@ export function checkLocales(opts) {
     };
 }
 
-function leafExportName(messageId) {
+function leafExportName(messageId: string): string {
     const parts = String(messageId).split('.');
     return parts[parts.length - 1] || messageId;
 }
 
-function paramSignature(params) {
+function paramSignature(params: MessageParam[] | null | undefined): string {
     return (params || [])
         .map((p) => `${p.name}:${p.kind}`)
         .sort()
         .join(',');
 }
 
-function emptyReport(projectRoot, diagnostics) {
+function emptyReport(projectRoot: string, diagnostics: LocaleDiagnostic[]) {
     const hasErrors = (diagnostics || []).some((d) => d.severity === 'error');
     return {
         schema: LOCALE_CHECK_SCHEMA,
@@ -563,7 +576,7 @@ function emptyReport(projectRoot, diagnostics) {
     };
 }
 
-function walkCatalogFiles(dir, fn) {
+function walkCatalogFiles(dir: string, fn: (file: string) => void): void {
     for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, ent.name);
         if (ent.isDirectory()) walkCatalogFiles(full, fn);
@@ -575,13 +588,10 @@ function walkCatalogFiles(dir, fn) {
  * Scan src for `#locales/<catalog>` imports and `messageId` string literals after import.
  * First-slice heuristic — full VPG edges land with compiler deepen.
  */
-export function scanLocaleUsages(projectRoot) {
-    /** @type {Set<string>} */
-    const catalogs = new Set();
-    /** @type {Set<string>} */
-    const messageIds = new Set();
-    /** @type {Map<string, Set<string>>} */
-    const importedNames = new Map();
+export function scanLocaleUsages(projectRoot: string) {
+    const catalogs = new Set<string>();
+    const messageIds = new Set<string>();
+    const importedNames = new Map<string, Set<string>>();
     const src = path.join(projectRoot, 'src');
     if (!fs.existsSync(src)) return { catalogs, messageIds, importedNames };
     walkSource(src, (file) => {
@@ -600,7 +610,7 @@ export function scanLocaleUsages(projectRoot) {
                     .pop()
                     ?.trim();
                 if (name) {
-                    importedNames.get(catalogId).add(name);
+                    importedNames.get(catalogId)!.add(name);
                     messageIds.add(`${catalogId}.${name}`);
                 }
             }
@@ -609,7 +619,7 @@ export function scanLocaleUsages(projectRoot) {
     return { catalogs, messageIds, importedNames };
 }
 
-function walkSource(dir, fn) {
+function walkSource(dir: string, fn: (file: string) => void): void {
     for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, ent.name);
         if (ent.isDirectory()) walkSource(full, fn);
@@ -617,15 +627,10 @@ function walkSource(dir, fn) {
     }
 }
 
-/**
- * Emit typed module stubs for `#locales/*` ( surface).
- * @param {ReturnType<typeof checkLocales>} report
- * @param {string} outDir
- */
-export function emitLocaleTypedModules(report, outDir) {
+/** Emit typed module stubs for `#locales/*`. */
+export function emitLocaleTypedModules(report: ReturnType<typeof checkLocales>, outDir: string): string[] {
     fs.mkdirSync(outDir, { recursive: true });
-    /** @type {string[]} */
-    const written = [];
+    const written: string[] = [];
     const native = requireNativeAddon();
     if (typeof native.generateLocaleTypedModule !== 'function') {
         throw new Error('vmz native addon missing generateLocaleTypedModule — rebuild with `pnpm napi:build`');
@@ -656,12 +661,11 @@ export function emitLocaleTypedModules(report, outDir) {
  *
  * Variant pick reads `html[data-locale]` (else defaultLocale). Thin bridge until
  * host LocaleTransition reloads locale-scoped chunks (I2/I4).
- *
- * @param {string} projectRoot
- * @param {string} distDir
- * @returns {{ ok: boolean, written: string[], diagnostics: any[] }}
  */
-export function emitLocaleRuntimeModules(projectRoot, distDir) {
+export function emitLocaleRuntimeModules(
+    projectRoot: string,
+    distDir: string,
+): { ok: boolean; written: string[]; diagnostics: LocaleDiagnostic[] } {
     const report = checkLocales({ projectRoot, checkUnused: false });
     if (localeHasErrors(report)) {
         return { ok: false, written: [], diagnostics: report.diagnostics || [] };
@@ -672,19 +676,17 @@ export function emitLocaleRuntimeModules(projectRoot, distDir) {
     }
     const defaultLocale = report.manifest.defaultLocale || 'zh-hans';
     const byId = new Map((report.messageCatalog?.messages || []).map((m) => [m.messageId, m]));
-    /** @type {string[]} */
-    const written = [];
+    const written: string[] = [];
     const localesOut = path.join(distDir, 'locales');
     fs.mkdirSync(localesOut, { recursive: true });
 
     for (const mod of report.typedModules || []) {
-        const exports = [];
+        const exports: Array<{ exportName: string; variants: string[][]; hasParams: boolean }> = [];
         for (const exp of mod.exports || []) {
             const node = byId.get(exp.messageId);
-            /** @type {string[][]} */
-            const variants = [];
+            const variants: string[][] = [];
             if (node?.variants) {
-                for (const [loc, v] of Object.entries(node.variants)) {
+                for (const [loc, v] of Object.entries(node.variants) as Array<[string, { template: string }]>) {
                     variants.push([loc, v.template]);
                 }
             }
@@ -709,12 +711,8 @@ export function emitLocaleRuntimeModules(projectRoot, distDir) {
     return { ok: true, written, diagnostics: report.diagnostics || [] };
 }
 
-/**
- * @param {string} distDir
- */
-function rewriteLocaleImportsInDist(distDir) {
-    /** @type {string[]} */
-    const files = [];
+function rewriteLocaleImportsInDist(distDir: string): void {
+    const files: string[] = [];
     walkDistJs(distDir, (file) => files.push(file));
     for (const file of files) {
         const text = fs.readFileSync(file, 'utf8');
@@ -731,11 +729,7 @@ function rewriteLocaleImportsInDist(distDir) {
     }
 }
 
-/**
- * @param {string} dir
- * @param {(file: string) => void} fn
- */
-function walkDistJs(dir, fn) {
+function walkDistJs(dir: string, fn: (file: string) => void): void {
     if (!fs.existsSync(dir)) return;
     for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, ent.name);
@@ -748,13 +742,8 @@ function walkDistJs(dir, fn) {
     }
 }
 
-/**
- * MessageId rename plan — WorkspaceEdit-shaped, no parallel rename IR.
- * @param {ReturnType<typeof checkLocales>} report
- * @param {string} fromId
- * @param {string} toId
- */
-export function planLocaleRename(report, fromId, toId) {
+/** MessageId rename plan — WorkspaceEdit-shaped, no parallel rename IR. */
+export function planLocaleRename(report: ReturnType<typeof checkLocales>, fromId: string, toId: string) {
     const node = (report.messageCatalog?.messages || []).find((m) => m.messageId === fromId);
     if (!node) {
         return {
@@ -762,13 +751,12 @@ export function planLocaleRename(report, fromId, toId) {
             status: 'failed',
             fromId,
             toId,
-            edits: [],
+            edits: [] as Array<{ path: string; kind: string; from: string; to: string }>,
             error: `unknown MessageId ${fromId}`,
         };
     }
-    /** @type {Array<{ path: string, kind: string, from: string, to: string }>} */
-    const edits = [];
-    for (const variant of Object.values(node.variants || {})) {
+    const edits: Array<{ path: string; kind: string; from: string; to: string }> = [];
+    for (const variant of Object.values(node.variants || {}) as Array<{ path: string }>) {
         edits.push({
             path: variant.path,
             kind: 'catalog_key',
@@ -786,6 +774,6 @@ export function planLocaleRename(report, fromId, toId) {
     };
 }
 
-export function localeHasErrors(report) {
+export function localeHasErrors(report: { diagnostics?: Array<{ severity?: string }> }): boolean {
     return (report.diagnostics || []).some((d) => d.severity === 'error');
 }

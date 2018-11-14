@@ -1,16 +1,13 @@
-// @ts-nocheck
 /**
  * `vmz refactor` — registered on `@vmz/commander`.
  */
 
+import type { Command, ParsedOptions } from '@vmz/commander';
 import { createWorkspace } from './index.js';
 import { log } from './log.js';
 import { resolveWorkspaceDirs } from './resolve.js';
 
-/**
- * @param {import('@vmz/commander').Command} parent
- */
-export function registerRefactorCommands(parent) {
+export function registerRefactorCommands(parent: Command): void {
     parent
         .command('rename', 'cli.cmd.refactor.rename')
         .option('--kind <kind>', 'cli.opt.refactor.kind')
@@ -24,8 +21,7 @@ export function registerRefactorCommands(parent) {
         .action((options) => cmdRename(options));
 }
 
-/** @param {import('@vmz/commander').ParsedOptions} args */
-function cmdRename(args) {
+function cmdRename(args: ParsedOptions): number {
     const kind = typeof args.kind === 'string' ? args.kind : '';
     const from = typeof args.from === 'string' ? args.from : '';
     const to = typeof args.to === 'string' ? args.to : '';
@@ -60,7 +56,12 @@ function cmdRename(args) {
             return 1;
         }
         let planRaw = ws.planRename(JSON.stringify(intent));
-        let plan;
+        let plan: {
+            status?: string;
+            preconditions?: string[];
+            edits?: Array<{ path: string; start: number; end: number; newText: string }>;
+            diagnostics?: unknown[];
+        };
         try {
             plan = JSON.parse(planRaw);
         } catch (e) {
@@ -88,7 +89,7 @@ function cmdRename(args) {
                 console.log(JSON.stringify({ plan, explain: JSON.parse(explainRaw) }, null, 2));
                 return plan.status === 'rejected' ? 1 : 0;
             }
-            const explain = JSON.parse(explainRaw);
+            const explain = JSON.parse(explainRaw) as { chain?: unknown[] };
             log.info(`explain chain edges=${(explain.chain || []).length}`);
         }
 
@@ -102,7 +103,7 @@ function cmdRename(args) {
             for (const e of plan.edits || []) {
                 console.log(` edit ${e.path} @${e.start}..${e.end} → ${JSON.stringify(e.newText)}`);
             }
-            log.diagnostics(plan.diagnostics || []);
+            log.diagnostics((plan.diagnostics as Parameters<typeof log.diagnostics>[0]) || []);
             if ((plan.edits || []).length === 0) {
                 console.log(' edits: (none)');
             }

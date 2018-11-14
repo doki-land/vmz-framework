@@ -2,7 +2,6 @@
  * B0 — Delivery profile authoring normalize + CLI --profile resolve.
  * Pure data only; expands legacy site-delivery sugar into profiles[default].
  */
-// @ts-nocheck
 
 import crypto from 'node:crypto';
 import path from 'node:path';
@@ -14,6 +13,52 @@ export const BUILD_PROFILE_SELECTION_SCHEMA = 'vmz.build.profile_selection.v0';
 export const ASSEMBLIES = Object.freeze(['local-static', 'web-static', 'server-host', 'cdn+server', 'rust-embedded']);
 
 export const SERVER_RUNTIMES = Object.freeze(['node', 'worker', 'deno', 'bun', 'rust-host']);
+
+interface SiteAuthoring {
+    artifact: string;
+    sources: unknown;
+    siteId?: unknown;
+    resolution?: unknown;
+    activation?: unknown;
+    expectedCompatibility?: unknown;
+    failure?: unknown;
+    failurePolicy?: unknown;
+    update?: unknown;
+    updatePolicy?: unknown;
+    rollback?: unknown;
+    rollbackPolicy?: unknown;
+    security?: unknown;
+    securityPolicy?: unknown;
+}
+
+export interface WechatPackagingData {
+    appId?: string;
+    projectName?: string;
+    title?: string;
+}
+
+interface DeliveryAuthoringTable {
+    schema: string;
+    default: string;
+    profiles: Record<string, unknown>;
+    sugar: boolean;
+    packaging?: { wechat: WechatPackagingData };
+    digest?: string;
+}
+
+interface BuildProfileSelection {
+    schema: string;
+    profileId: string;
+    name: string;
+    nameExplicit: boolean;
+    host: string;
+    assembly: string;
+    serverRuntime: string | null;
+    hasSiteSources: boolean;
+    authoringDigest: string | undefined;
+    fromCli: boolean;
+    digest?: string;
+}
 
 /** Official built-in aliases when not overridden in config. */
 export const BUILTIN_PROFILES = Object.freeze({
@@ -79,7 +124,7 @@ export function pickSiteAuthoring(raw) {
     if (!isPlainObject(raw)) return null;
     if (!Array.isArray(raw.sources) || raw.sources.length < 1) return null;
     if (typeof raw.artifact !== 'string' || !String(raw.artifact).trim()) return null;
-    const site = {
+    const site: SiteAuthoring = {
         artifact: String(raw.artifact),
         sources: raw.sources,
     };
@@ -107,13 +152,17 @@ export function pickSiteAuthoring(raw) {
  * @param {unknown} raw
  * @param {Array<{ code: string, message: string }>} diagnostics
  */
-export function pickDeliveryPackaging(raw, diagnostics) {
-    if (!isPlainObject(raw) || raw.packaging == null) return null;
-    if (!isPlainObject(raw.packaging)) {
+export function pickDeliveryPackaging(
+    raw: unknown,
+    diagnostics: Array<{ code: string; message: string }>,
+): { wechat: WechatPackagingData } | null {
+    if (!isPlainObject(raw) || (raw as { packaging?: unknown }).packaging == null) return null;
+    const packagingRaw = (raw as { packaging: unknown }).packaging;
+    if (!isPlainObject(packagingRaw)) {
         diagnostics.push({ code: 'delivery.packaging', message: 'delivery.packaging must be an object' });
         return null;
     }
-    for (const key of Object.keys(raw.packaging)) {
+    for (const key of Object.keys(packagingRaw)) {
         if (key !== 'wechat') {
             diagnostics.push({
                 code: 'delivery.packaging.vendor',
@@ -121,8 +170,8 @@ export function pickDeliveryPackaging(raw, diagnostics) {
             });
         }
     }
-    const wechat = raw.packaging.wechat;
-    if (wechat == null) return {};
+    const wechat = (packagingRaw as { wechat?: unknown }).wechat;
+    if (wechat == null) return null;
     if (!isPlainObject(wechat)) {
         diagnostics.push({
             code: 'delivery.packaging.wechat',
@@ -130,7 +179,8 @@ export function pickDeliveryPackaging(raw, diagnostics) {
         });
         return null;
     }
-    for (const [k, v] of Object.entries(wechat)) {
+    const wechatObj = wechat as Record<string, unknown>;
+    for (const [k, v] of Object.entries(wechatObj)) {
         if (typeof v === 'function') {
             diagnostics.push({
                 code: 'delivery.packaging.executable',
@@ -150,12 +200,12 @@ export function pickDeliveryPackaging(raw, diagnostics) {
             });
         }
     }
-    const out = {};
-    if (typeof wechat.appId === 'string' && wechat.appId.trim()) out.appId = wechat.appId.trim();
-    if (typeof wechat.projectName === 'string' && wechat.projectName.trim()) {
-        out.projectName = wechat.projectName.trim();
+    const out: WechatPackagingData = {};
+    if (typeof wechatObj.appId === 'string' && wechatObj.appId.trim()) out.appId = wechatObj.appId.trim();
+    if (typeof wechatObj.projectName === 'string' && wechatObj.projectName.trim()) {
+        out.projectName = wechatObj.projectName.trim();
     }
-    if (typeof wechat.title === 'string' && wechat.title.trim()) out.title = wechat.title.trim();
+    if (typeof wechatObj.title === 'string' && wechatObj.title.trim()) out.title = wechatObj.title.trim();
     return { wechat: out };
 }
 
@@ -247,7 +297,7 @@ export function normalizeDeliveryAuthoring(raw) {
             const n = normalizeProfileEntry(entry, id, diagnostics);
             if (n) normalized[id] = n;
         }
-        const table = {
+        const table: DeliveryAuthoringTable = {
             schema: DELIVERY_PROFILE_AUTHORING_SCHEMA,
             default: 'web-ssr',
             profiles: normalized,
@@ -320,7 +370,7 @@ export function normalizeDeliveryAuthoring(raw) {
         };
     }
 
-    const profiles = {};
+    const profiles: Record<string, unknown> = {};
     for (const [id, entry] of Object.entries(profileInputs)) {
         const n = normalizeProfileEntry(entry, id, diagnostics);
         if (n) profiles[id] = n;
@@ -336,13 +386,13 @@ export function normalizeDeliveryAuthoring(raw) {
     const packaging = pickDeliveryPackaging(raw, diagnostics);
     if (diagnostics.length) return { ok: false, diagnostics };
 
-    const table = {
+    const table: DeliveryAuthoringTable = {
         schema: DELIVERY_PROFILE_AUTHORING_SCHEMA,
         default: defaultId,
         profiles,
         sugar,
-        ...(packaging ? { packaging } : {}),
     };
+    if (packaging) table.packaging = packaging;
     table.digest = sha256Hex(canonicalJson(table));
     return { ok: true, table };
 }
@@ -361,7 +411,7 @@ export function selectBuildProfile(table, cliProfile = '') {
             ],
         };
     }
-    const selection = {
+    const selection: BuildProfileSelection = {
         schema: BUILD_PROFILE_SELECTION_SCHEMA,
         profileId: id,
         name: profile.name,

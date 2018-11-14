@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Long-lived Node dev session (/session).
  *
@@ -21,24 +20,20 @@ import { log } from './log.js';
 import { coalesceRootBurst, collectDevWatchRoots, classifyWatchRoot, isDependencyPath, mergeDirtySets } from './dev-watch-roots.js';
 import { diffFingerprints, fileFingerprintMap } from './watch-diff.js';
 
-/**
- * @typedef {object} DevSessionOptions
- * @property {string} project
- * @property {string} outDir
- * @property {string} [host]
- * @property {number} [port]
- * @property {number} [pollMs]
- * @property {'browser' | 'mini-program-wechat'} [target]
- * @property {AbortSignal} [signal]
- * @property {typeof createWorkspace} [createWorkspaceFn]
- * @property {(opts: { project: string, outDir: string, host: string, port: number }) => import('node:child_process').ChildProcess} [spawnHostFn]
- * @property {(host: string, port: number, payload?: object) => Promise<void>} [softReloadFn]
- */
+interface DevSessionOptions {
+    project: string;
+    outDir: string;
+    host?: string;
+    port?: number;
+    pollMs?: number;
+    target?: 'browser' | 'mini-program-wechat';
+    signal?: AbortSignal;
+    createWorkspaceFn?: typeof createWorkspace;
+    spawnHostFn?: (opts: { project: string; outDir: string; host: string; port: number }) => import('node:child_process').ChildProcess;
+    softReloadFn?: (host: string, port: number, payload?: object) => Promise<void>;
+}
 
-/**
- * @param {DevSessionOptions} options
- */
-export function createDevSession(options) {
+export function createDevSession(options: DevSessionOptions) {
     const project = options.project;
     const outDir = options.outDir;
     const host = options.host ?? '127.0.0.1';
@@ -50,14 +45,10 @@ export function createDevSession(options) {
     const softReload = options.softReloadFn ?? defaultSoftReload;
 
     const ws = createWs({ root: project, outDir });
-    /** @type {import('node:child_process').ChildProcess | null} */
-    let child = null;
+    let child: import('node:child_process').ChildProcess | null = null;
     let stopped = false;
 
-    /**
-     * @param {Array<{ path: string, kind: 'update' | 'delete' }>} [changes]
-     */
-    function rebuild(changes) {
+    function rebuild(changes?: Array<{ path: string; kind: 'update' | 'delete' }>) {
         if (changes?.length) ws.updateFiles(changes);
         return ws.build();
     }
@@ -204,7 +195,7 @@ export function createDevSession(options) {
         /** @type {string[]} */
         const watchRoots = [...watched.roots];
         /** @type {string[]} */
-        let dependencyRoots = [...watched.dependencyRoots];
+        let dependencyRoots: string[] = [...watched.dependencyRoots];
         if (wechatPreview) {
             log.info(`dev → WeChat DevTools (watching ${watchRoots.join(', ')}; keep dist/wechat open)`);
         } else {

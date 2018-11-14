@@ -2,12 +2,11 @@
  * Materialize `defineConfig({ delivery: { packaging: { wechat } } })` for wechat_pack.
  * Pure data only. Writes `dist/_vmz/wechat-packaging.json` (not a second config entry).
  */
-// @ts-nocheck
 
 import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { createJiti } from 'jiti';
-import { pickDeliveryPackaging } from './delivery-profile.js';
+import { pickDeliveryPackaging, type WechatPackagingData } from './delivery-profile.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 
 export const WECHAT_PACKAGING_SCHEMA = 'vmz.target.wechat_packaging.v0';
@@ -32,12 +31,18 @@ function loadConfigSync(project) {
  * @param {unknown} delivery
  * @returns {{ schema: string, appId: string, projectName?: string, title?: string }}
  */
-export function wechatPackagingFromDelivery(delivery) {
-    const diagnostics = [];
+interface WechatPackagingSpec {
+    schema: string;
+    appId: string;
+    projectName?: string;
+    title?: string;
+}
+
+export function wechatPackagingFromDelivery(delivery: unknown): WechatPackagingSpec {
+    const diagnostics: Array<{ code: string; message: string }> = [];
     const packaging = pickDeliveryPackaging(delivery && typeof delivery === 'object' ? delivery : {}, diagnostics);
-    const wechat = packaging && packaging.wechat ? packaging.wechat : {};
-    /** @type {{ schema: string, appId: string, projectName?: string, title?: string }} */
-    const out = {
+    const wechat: WechatPackagingData = packaging && packaging.wechat ? packaging.wechat : {};
+    const out: WechatPackagingSpec = {
         schema: WECHAT_PACKAGING_SCHEMA,
         appId: typeof wechat.appId === 'string' && wechat.appId.trim() ? wechat.appId.trim() : 'touristappid',
     };

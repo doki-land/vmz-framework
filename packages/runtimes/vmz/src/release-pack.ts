@@ -5,7 +5,6 @@
  * `_vmz/*` manifests + content digests; publish retains previous release for rollback
  * without rebuild.
  */
-// @ts-nocheck
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -98,7 +97,25 @@ function listContentFiles(distDir) {
  * @param {string} distDir
  * @param {{ applicationId?: string }} [opts]
  */
-export function packRelease(distDir, opts = {}) {
+interface PackReleaseOpts {
+    applicationId?: string;
+}
+
+interface ApplicationArtifact {
+    schema: string;
+    applicationId: string;
+    deliveryProfile: string;
+    programDigest: string;
+    planDigest: string;
+    deploymentDigest: string;
+    styleDigest: string | null;
+    routeDigest: string;
+    fileDigests: Record<string, string>;
+    publicRouteContracts: string[];
+    integrity?: string;
+}
+
+export function packRelease(distDir: string, opts: PackReleaseOpts = {}) {
     const abs = path.resolve(distDir);
     if (!fs.existsSync(abs)) {
         throw new Error(`packRelease: missing dist ${abs}`);
@@ -138,7 +155,7 @@ export function packRelease(distDir, opts = {}) {
     const deploymentDigest = fileDigests['vmz-deployment.json'] || sha256File(deploymentPath);
 
     const applicationId = opts.applicationId || 'production-router';
-    const applicationArtifact = {
+    const applicationArtifact: ApplicationArtifact = {
         schema: APPLICATION_ARTIFACT_SCHEMA,
         applicationId,
         deliveryProfile: 'filesystem',

@@ -2,7 +2,6 @@
  * A3-static: emit per-route HTML + 404 + SEO head + StaticDeliveryManifest.
  * Reuses the same Direct SSR path as serve-host (no second SSG runtime).
  */
-// @ts-nocheck
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -22,15 +21,58 @@ import { emitSiteFavicon, readSiteFaviconHeadHtml } from './site-favicon.js';
 
 export const STATIC_DELIVERY_MANIFEST_SCHEMA = 'vmz.static.delivery_manifest.v0';
 
-/**
- * @param {string} distDir
- * @param {{
- *   origin?: string,
- *   applicationId?: string,
- *   staticParams?: Record<string, Array<Record<string, string>>>,
- * }} [opts]
- */
-export async function emitWebStatic(distDir, opts = {}) {
+export type EmitWebStaticOpts = {
+    origin?: string;
+    applicationId?: string;
+    staticParams?: Record<string, Array<Record<string, string>>>;
+    projectRoot?: string;
+};
+
+type PageMeta = {
+    title?: string;
+    description?: string;
+    canonical?: string;
+    robots?: string;
+    lang?: string;
+};
+
+type RouteGeneration = {
+    routeId: string;
+    path: string;
+    chunkId: string;
+    htmlPath: string;
+    classification: string;
+    title: string;
+    description: string;
+    canonical: string;
+    robots: string;
+    localeId?: string | null;
+    alternates?: unknown[];
+};
+
+type StaticDeliveryManifest = {
+    schema: string;
+    applicationId: unknown;
+    deliveryProfile: string;
+    origin: string;
+    generatedAt: string;
+    spaFallback: boolean;
+    errorDocuments: Array<{ status: number; path: string }>;
+    routes: unknown[];
+    skipped: unknown[];
+    seoArtifacts: { sitemap: string; robots: string };
+    publicAssets: {
+        schema: unknown;
+        status: unknown;
+        fileCount: number;
+        source: string | null;
+    };
+    manifestDigest?: string;
+    contentAddressedAssets?: Record<string, unknown>;
+    cdnPolicy?: unknown;
+};
+
+export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {}) {
     const origin = String(opts.origin || process.env.VMZ_SITE_ORIGIN || 'https://example.test').replace(/\/$/, '');
     const applicationId = opts.applicationId || path.basename(path.dirname(distDir));
 
@@ -45,20 +87,14 @@ export async function emitWebStatic(distDir, opts = {}) {
     const { renderToString, renderToStream } = host;
 
     const pageCatalog = listPageClientFiles(distDir);
-    /** @type {Array<{
-     *   routeId: string,
-     *   path: string,
-     *   chunkId: string,
-     *   htmlPath: string,
-     *   classification: string,
-     *   title: string,
-     *   description: string,
-     *   canonical: string,
-     *   robots: string,
-     * }>} */
-    const generations = [];
-    /** @type {Array<{ routeId: string, path: string, chunkId: string, classification: string, reason: string }>} */
-    const skipped = [];
+    const generations: RouteGeneration[] = [];
+    const skipped: Array<{
+        routeId: string;
+        path: string;
+        chunkId: string;
+        classification: string;
+        reason: string;
+    }> = [];
 
     for (const page of pageCatalog) {
         const pattern = page.pathPattern || patternFromSegs(page.segs);
@@ -210,7 +246,7 @@ export async function emitWebStatic(distDir, opts = {}) {
 
     const vmzDir = path.join(distDir, '_vmz');
     fs.mkdirSync(vmzDir, { recursive: true });
-    const manifest = {
+    const manifest: StaticDeliveryManifest = {
         schema: STATIC_DELIVERY_MANIFEST_SCHEMA,
         applicationId,
         deliveryProfile: 'static',
@@ -242,7 +278,7 @@ export async function emitWebStatic(distDir, opts = {}) {
             schema: publicAssets.schema,
             status: publicAssets.status,
             fileCount: publicAssets.fileCount ?? 0,
-            source: publicAssets.source || null,
+            source: 'source' in publicAssets && typeof publicAssets.source === 'string' ? publicAssets.source : null,
         },
     };
     const digest = sha256Hex(canonicalJson(manifest));
@@ -399,12 +435,20 @@ function guessRouteId(distDir, chunkId) {
     return chunkId.split('/').pop() || chunkId;
 }
 
-/**
- * @param {any} Page
- * @param {{ params: Record<string, string>, props: Record<string, unknown>, pathname: string, origin: string }} ctx
- */
-async function resolvePageMeta(Page, ctx) {
-    let raw = {};
+async function resolvePageMeta(
+    Page: {
+        meta?:
+            | PageMeta
+            | ((ctx: {
+                  params: Record<string, string>;
+                  props: Record<string, unknown>;
+                  pathname: string;
+                  origin: string;
+              }) => PageMeta | Promise<PageMeta>);
+    },
+    ctx: { params: Record<string, string>; props: Record<string, unknown>; pathname: string; origin: string },
+) {
+    let raw: PageMeta = {};
     if (typeof Page.meta === 'function') {
         raw = (await Page.meta(ctx)) || {};
     } else if (Page.meta && typeof Page.meta === 'object') {
@@ -415,7 +459,7 @@ async function resolvePageMeta(Page, ctx) {
     const canonical = String(raw.canonical || `${ctx.origin}${ctx.pathname === '/' ? '/' : ctx.pathname}`);
     const robots = String(raw.robots || 'index,follow');
     const lang = String(raw.lang || 'en');
-    return { title, description, canonical, robots, lang, alternates: [] };
+    return { title, description, canonical, robots, lang, alternates: [] as unknown[] };
 }
 
 /**

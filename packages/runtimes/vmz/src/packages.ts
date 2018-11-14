@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * npm / pnpm workspace package resolution helpers (session).
  */
@@ -6,27 +5,19 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
-/**
- * @typedef {object} ResolvedPackage
- * @property {string} name
- * @property {string} root
- * @property {boolean} [private]
- * @property {boolean} hasSrc
- * @property {string} [version]
- */
+export interface ResolvedPackage {
+    name: string;
+    root: string;
+    private?: boolean;
+    hasSrc: boolean;
+    version?: string;
+}
 
-/**
- * Resolve workspace packages under a project (package.json workspaces or pnpm-workspace.yaml).
- * Does not invent VMZ semantics — only filesystem / npm layout facts for plugins.
- *
- * @param {string} project
- * @returns {ResolvedPackage[]}
- */
-export function resolveWorkspacePackages(project) {
+/** Resolve workspace packages under a project (package.json workspaces or pnpm-workspace.yaml). */
+export function resolveWorkspacePackages(project: string): ResolvedPackage[] {
     const root = path.resolve(project);
     const patterns = readWorkspacePatterns(root);
-    /** @type {Map<string, ResolvedPackage>} */
-    const out = new Map();
+    const out = new Map<string, ResolvedPackage>();
 
     // Always include the project itself when it has package.json.
     const self = readPkg(root);
@@ -42,13 +33,7 @@ export function resolveWorkspacePackages(project) {
     return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * Resolve a package name to an absolute root (workspace first, then node_modules).
- * @param {string} project
- * @param {string} name
- * @returns {string | null}
- */
-export function resolvePackageRoot(project, name) {
+export function resolvePackageRoot(project: string, name: string): string | null {
     const hit = resolveWorkspacePackages(project).find((p) => p.name === name);
     if (hit) return hit.root;
     const nm = path.join(path.resolve(project), 'node_modules', ...name.split('/'));
@@ -56,11 +41,7 @@ export function resolvePackageRoot(project, name) {
     return null;
 }
 
-/**
- * @param {string} root
- * @returns {string[]}
- */
-function readWorkspacePatterns(root) {
+function readWorkspacePatterns(root: string): string[] {
     const patterns = [];
     const pkgPath = path.join(root, 'package.json');
     if (existsSync(pkgPath)) {
@@ -88,12 +69,7 @@ function readWorkspacePatterns(root) {
     return [...new Set(patterns)];
 }
 
-/**
- * Minimal glob: supports `packages/*`, `examples/*`, exact dirs. No `**`.
- * @param {string} root
- * @param {string} pattern
- */
-function expandWorkspacePattern(root, pattern) {
+function expandWorkspacePattern(root: string, pattern: string): string[] {
     const cleaned = pattern.replace(/\\/g, '/').replace(/\/$/, '');
     if (!cleaned.includes('*')) {
         const dir = path.join(root, cleaned);
@@ -105,8 +81,7 @@ function expandWorkspacePattern(root, pattern) {
     if (suffix.includes('*')) return [];
     const base = path.join(root, prefix);
     if (!existsSync(base)) return [];
-    /** @type {string[]} */
-    const dirs = [];
+    const dirs: string[] = [];
     for (const name of readdirSync(base, { withFileTypes: true })) {
         if (!name.isDirectory()) continue;
         const dir = path.join(base, name.name);
@@ -118,11 +93,7 @@ function expandWorkspacePattern(root, pattern) {
     return dirs;
 }
 
-/**
- * @param {string} dir
- * @returns {ResolvedPackage | null}
- */
-function readPkg(dir) {
+function readPkg(dir: string): ResolvedPackage | null {
     const pkgPath = path.join(dir, 'package.json');
     if (!existsSync(pkgPath)) return null;
     try {

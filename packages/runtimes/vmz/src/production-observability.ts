@@ -2,7 +2,6 @@
  * A5: Production observability — trace facets, redaction, CSP/security,
  * performance budgets, health/readiness, capability closure.
  */
-// @ts-nocheck
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -28,14 +27,44 @@ export const REQUIRED_TRACE_FACETS = Object.freeze([
     'artifact',
 ]);
 
+interface RedactionPolicy {
+    replaceWith?: string;
+    allowPublicProvenance?: boolean;
+    allowOperatorRaw?: boolean;
+}
+
+interface RedactSensitiveOpts {
+    privilege?: 'public' | 'operator';
+}
+
+interface ObservabilityContract {
+    schema: string;
+    id: string;
+    trace: Record<string, unknown>;
+    redaction: Record<string, unknown>;
+    security: Record<string, unknown>;
+    capability: Record<string, unknown>;
+    budgets: Record<string, unknown>;
+    health: Record<string, unknown>;
+    sampling: Record<string, unknown>;
+    digest?: string;
+}
+
+interface CoveringTraceMeta {
+    generation?: number;
+    applicationId?: string;
+    artifactDigest?: string | null;
+}
+
 const SENSITIVE_KEY_RE =
     /^(password|passwd|secret|token|authorization|cookie|set-cookie|api[_-]?key|private[_-]?key|session|refresh[_-]?token|access[_-]?token|client[_-]?secret)$/i;
 
-/**
- * Default Browser Production Profile observability contract.
- * @param {Record<string, unknown>} [overrides]
- */
-export function browserProductionObservability(overrides = {}) {
+interface EmitProductionObservabilityMeta {
+    applicationId?: string;
+    artifactDigest?: string;
+}
+
+export function browserProductionObservability(overrides: Record<string, unknown> = {}) {
     return normalizeObservability({
         schema: PRODUCTION_OBSERVABILITY_SCHEMA,
         id: 'browser-production.observability.v1',
@@ -92,27 +121,26 @@ export function browserProductionObservability(overrides = {}) {
     });
 }
 
-/**
- * @param {unknown} raw
- */
-export function normalizeObservability(raw) {
-    const d = raw && typeof raw === 'object' && !Array.isArray(raw) ? /** @type {Record<string, any>} */ (raw) : {};
-    const trace = d.trace && typeof d.trace === 'object' ? d.trace : {};
-    const redaction = d.redaction && typeof d.redaction === 'object' ? d.redaction : {};
-    const security = d.security && typeof d.security === 'object' ? d.security : {};
-    const capability = d.capability && typeof d.capability === 'object' ? d.capability : {};
-    const budgets = d.budgets && typeof d.budgets === 'object' ? d.budgets : {};
-    const health = d.health && typeof d.health === 'object' ? d.health : {};
-    const shutdown = health.gracefulShutdown && typeof health.gracefulShutdown === 'object' ? health.gracefulShutdown : {};
-    const sampling = d.sampling && typeof d.sampling === 'object' ? d.sampling : {};
-    const latency = sampling.latencyBudgetMs && typeof sampling.latencyBudgetMs === 'object' ? sampling.latencyBudgetMs : {};
+export function normalizeObservability(raw: unknown): ObservabilityContract {
+    const d = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+    const trace = d.trace && typeof d.trace === 'object' ? (d.trace as Record<string, unknown>) : {};
+    const redaction = d.redaction && typeof d.redaction === 'object' ? (d.redaction as Record<string, unknown>) : {};
+    const security = d.security && typeof d.security === 'object' ? (d.security as Record<string, unknown>) : {};
+    const capability = d.capability && typeof d.capability === 'object' ? (d.capability as Record<string, unknown>) : {};
+    const budgets = d.budgets && typeof d.budgets === 'object' ? (d.budgets as Record<string, unknown>) : {};
+    const health = d.health && typeof d.health === 'object' ? (d.health as Record<string, unknown>) : {};
+    const shutdown =
+        health.gracefulShutdown && typeof health.gracefulShutdown === 'object' ? (health.gracefulShutdown as Record<string, unknown>) : {};
+    const sampling = d.sampling && typeof d.sampling === 'object' ? (d.sampling as Record<string, unknown>) : {};
+    const latency =
+        sampling.latencyBudgetMs && typeof sampling.latencyBudgetMs === 'object' ? (sampling.latencyBudgetMs as Record<string, unknown>) : {};
 
     const facets = Array.isArray(trace.requiredFacets) ? trace.requiredFacets.map(String) : [...REQUIRED_TRACE_FACETS];
     for (const f of REQUIRED_TRACE_FACETS) {
         if (!facets.includes(f)) facets.push(f);
     }
 
-    const contract = {
+    const contract: ObservabilityContract = {
         schema: PRODUCTION_OBSERVABILITY_SCHEMA,
         id: typeof d.id === 'string' && d.id ? d.id : 'browser-production.observability.v1',
         trace: {
@@ -186,7 +214,7 @@ function clamp01(n) {
  * @param {Record<string, any>} [policy]
  * @param {{ privilege?: 'public' | 'operator' }} [opts]
  */
-export function redactSensitive(value, policy = {}, opts = {}) {
+export function redactSensitive(value: unknown, policy: RedactionPolicy = {}, opts: RedactSensitiveOpts = {}) {
     const replaceWith = typeof policy.replaceWith === 'string' ? policy.replaceWith : '[REDACTED]';
     const privilege = opts.privilege === 'operator' ? 'operator' : 'public';
     if (privilege === 'operator' && policy.allowPublicProvenance !== true) {
@@ -274,7 +302,7 @@ function mapKindToFacet(ev) {
  * Build a minimal valid production trace covering all required facets (for CI assembly).
  * @param {Record<string, unknown>} [meta]
  */
-export function buildCoveringProductionTrace(meta = {}) {
+export function buildCoveringProductionTrace(meta: { generation?: number; applicationId?: string; artifactDigest?: string | null } = {}) {
     const events = REQUIRED_TRACE_FACETS.map((facet, i) => ({
         facet,
         kind: 'observation',
@@ -455,7 +483,11 @@ export function measureDistBudgets(distDir) {
  * @param {Record<string, unknown>} [overrides]
  * @param {{ applicationId?: string, artifactDigest?: string }} [meta]
  */
-export function emitProductionObservability(distDir, overrides = {}, meta = {}) {
+export function emitProductionObservability(
+    distDir: string,
+    overrides: Record<string, unknown> = {},
+    meta: { applicationId?: string; artifactDigest?: string | null } = {},
+) {
     const contract = browserProductionObservability(overrides);
     const trace = buildCoveringProductionTrace({
         applicationId: meta.applicationId || contract.id,

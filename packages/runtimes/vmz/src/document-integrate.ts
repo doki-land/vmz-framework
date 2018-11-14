@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Integrated DocumentMount — build /documents into the host app dist so
  * routeBase (e.g. /d) is served as static HTML next to SSR pages.
@@ -8,25 +7,32 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { buildDocuments } from './document-build.js';
 import { resolveDocumentsRoot } from './document-check.js';
-import { loadLocalesRouting } from './document-routing-config.js';
 import { pageHtmlRel } from './document-enrich.js';
+import { loadLocalesRouting } from './document-routing-config.js';
+import type { DocumentManifest } from './document-schema.js';
 import { log } from './log.js';
 import { requireNativeAddon } from './native-addon.js';
 
-/**
- * @param {string} projectRoot
- */
-export function projectHasDocuments(projectRoot) {
+export function projectHasDocuments(projectRoot: string): boolean {
     const root = resolveDocumentsRoot(projectRoot);
     return fs.existsSync(root) && fs.statSync(root).isDirectory();
 }
 
-/**
- * Build integrated documents into the application outDir (URL-aligned).
- * @param {{ projectRoot: string, outDir: string, strict?: boolean }} opts
- * @returns {Promise<{ ok: boolean, skipped?: boolean, pages?: number, error?: string }>}
- */
-export async function buildIntegratedDocuments(opts) {
+export interface BuildIntegratedDocumentsOpts {
+    projectRoot: string;
+    outDir: string;
+    strict?: boolean;
+}
+
+export interface BuildIntegratedDocumentsResult {
+    ok: boolean;
+    skipped?: boolean;
+    pages?: number;
+    error?: string;
+}
+
+/** Build integrated documents into the application outDir (URL-aligned). */
+export async function buildIntegratedDocuments(opts: BuildIntegratedDocumentsOpts): Promise<BuildIntegratedDocumentsResult> {
     const projectRoot = path.resolve(opts.projectRoot);
     const outDir = path.resolve(opts.outDir);
     if (!projectHasDocuments(projectRoot)) {
@@ -60,11 +66,8 @@ export async function buildIntegratedDocuments(opts) {
  * Emit `{routeBase}/index.html` for integrated mounts.
  * `routing.strategy: none` → copy default-locale docs index (LocaleId is Host state).
  * prefix strategy → redirect HTML to `{routeBase}/{defaultLocale}/`.
- * @param {import('./document-schema.js').DocumentManifest} manifest
- * @param {string} outDir
- * @param {string} projectRoot
  */
-function writeMountRootRedirects(manifest, outDir, projectRoot) {
+function writeMountRootRedirects(manifest: DocumentManifest, outDir: string, projectRoot: string): void {
     const defaultLocale = manifest.defaultLocale || manifest.locales?.[0];
     if (!defaultLocale) return;
     const routing = loadLocalesRouting(projectRoot) || { strategy: 'prefix' };

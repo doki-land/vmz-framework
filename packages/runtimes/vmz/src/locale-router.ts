@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Locale router / PageMeta: route realization · canonical · hreflang ·
  * Link locale retain · locale-aware cache key.
@@ -21,23 +20,43 @@ import {
     LOCALE_ROUTER_CHECK_SCHEMA,
 } from './locale-schema.js';
 
-/**
- * @param {string} path
- */
-function normalizePath(path) {
+export interface LocaleRoutingOpts {
+    strategy?: string;
+    defaultPrefix?: string;
+    defaultLocale?: string;
+}
+
+export interface LocaleRouteEntry {
+    routeId: string;
+    path: string;
+}
+
+export interface LocaleRealization {
+    routeId: string;
+    localeId: string;
+    path: string;
+    pathPattern?: string;
+    prefixed?: boolean;
+    strategy?: string;
+    defaultPrefix?: string;
+    schema?: string;
+}
+
+export interface LocaleDiagnostic {
+    code: string;
+    severity: string;
+    message: string;
+}
+
+function normalizePath(path: string): string {
     let p = String(path || '/');
     if (!p.startsWith('/')) p = `/${p}`;
     if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
     return p || '/';
 }
 
-/**
- * Join locale prefix with a stable route path pattern.
- * @param {string} localeId
- * @param {string} pathPattern stable path without locale (e.g. /account/profile)
- * @param {{ strategy?: string, defaultPrefix?: string, defaultLocale?: string }} routing
- */
-export function realizeRoutePath(localeId, pathPattern, routing = {}) {
+/** Join locale prefix with a stable route path pattern. */
+export function realizeRoutePath(localeId: string, pathPattern: string, routing: LocaleRoutingOpts = {}) {
     const strategy = routing.strategy || 'prefix';
     const defaultPrefix = routing.defaultPrefix || 'include';
     const defaultLocale = routing.defaultLocale;
@@ -76,27 +95,21 @@ export function realizeRoutePath(localeId, pathPattern, routing = {}) {
     };
 }
 
-/**
- * Build RouteId × LocaleId realization table.
- * @param {{
- * routes: Array<{ routeId: string, path: string }>,
- * locales: string[],
- * defaultLocale: string,
- * routing?: { strategy?: string, defaultPrefix?: string },
- * }} input
- */
-export function buildLocaleRouteRealizationTable(input) {
+/** Build RouteId × LocaleId realization table. */
+export function buildLocaleRouteRealizationTable(input: {
+    routes: LocaleRouteEntry[];
+    locales: string[];
+    defaultLocale: string;
+    routing?: LocaleRoutingOpts;
+}) {
     const routing = {
         strategy: input.routing?.strategy || 'prefix',
         defaultPrefix: input.routing?.defaultPrefix || 'include',
         defaultLocale: input.defaultLocale,
     };
-    /** @type {any[]} */
-    const realizations = [];
-    /** @type {Map<string, string>} */
-    const pathOwners = new Map();
-    /** @type {any[]} */
-    const diagnostics = [];
+    const realizations: LocaleRealization[] = [];
+    const pathOwners = new Map<string, string>();
+    const diagnostics: LocaleDiagnostic[] = [];
 
     for (const route of input.routes || []) {
         for (const localeId of input.locales || []) {
@@ -145,36 +158,28 @@ export function buildLocaleRouteRealizationTable(input) {
     };
 }
 
-/**
- * Absolute URL helper.
- * @param {string} origin
- * @param {string} path
- */
-export function absoluteUrl(origin, path) {
+/** Absolute URL helper. */
+export function absoluteUrl(origin: string, path: string): string {
     const o = String(origin || '').replace(/\/$/, '');
     const p = normalizePath(path);
     return `${o}${p}`;
 }
 
-/**
- * Locale-aware PageMeta for one RouteId × LocaleId.
- * @param {{
- * routeId: string,
- * localeId: string,
- * direction?: string,
- * title: string,
- * description?: string,
- * origin: string,
- * realizations: Array<{ routeId: string, localeId: string, path: string }>,
- * locales: string[],
- * defaultLocale: string,
- * }} input
- */
-export function buildLocalePageMeta(input) {
+/** Locale-aware PageMeta for one RouteId × LocaleId. */
+export function buildLocalePageMeta(input: {
+    routeId: string;
+    localeId: string;
+    direction?: string;
+    title: string;
+    description?: string;
+    origin: string;
+    realizations: Array<{ routeId: string; localeId: string; path: string }>;
+    locales: string[];
+    defaultLocale: string;
+}) {
     const forRoute = (input.realizations || []).filter((r) => r.routeId === input.routeId);
     const self = forRoute.find((r) => r.localeId === input.localeId);
-    /** @type {any[]} */
-    const diagnostics = [];
+    const diagnostics: LocaleDiagnostic[] = [];
     if (!self?.path) {
         diagnostics.push({
             code: DIAG_LOCALE_CANONICAL_MISSING,
@@ -184,8 +189,7 @@ export function buildLocalePageMeta(input) {
     }
     const canonicalPath = self?.path || '/';
     const canonical = absoluteUrl(input.origin, canonicalPath);
-    /** @type {Array<{ localeId: string, hreflang: string, href: string }>} */
-    const alternates = [];
+    const alternates: Array<{ localeId: string; hreflang: string; href: string }> = [];
     for (const loc of input.locales || []) {
         const hit = forRoute.find((r) => r.localeId === loc);
         if (!hit) {
@@ -226,15 +230,12 @@ export function buildLocalePageMeta(input) {
     };
 }
 
-/**
- * `<Link to="routeId">` retains current locale — never hand-written localized paths.
- * @param {{
- * to: string,
- * currentLocale: string,
- * realizations: Array<{ routeId: string, localeId: string, path: string }>,
- * }} input
- */
-export function resolveLinkHref(input) {
+/** `<Link to="routeId">` retains current locale — never hand-written localized paths. */
+export function resolveLinkHref(input: {
+    to: string;
+    currentLocale: string;
+    realizations: Array<{ routeId: string; localeId: string; path: string }>;
+}) {
     const to = input.to;
     if (typeof to === 'string' && (to.startsWith('/') || /^https?:/i.test(to))) {
         const looksLocalized = /^\/[a-z]{2,3}(-[a-z0-9]+)?(\/|$)/.test(to);
@@ -283,12 +284,8 @@ export function resolveLinkHref(input) {
     };
 }
 
-/**
- * Parse locale prefix from a pathname under prefix strategy.
- * @param {string} pathname
- * @param {string[]} supportedLocales
- */
-export function parseLocaleFromPath(pathname, supportedLocales) {
+/** Parse locale prefix from a pathname under prefix strategy. */
+export function parseLocaleFromPath(pathname: string, supportedLocales: string[]) {
     const parts = normalizePath(pathname).split('/').filter(Boolean);
     if (!parts.length) return { localeId: null, restPath: '/' };
     if (supportedLocales.includes(parts[0])) {
@@ -298,18 +295,14 @@ export function parseLocaleFromPath(pathname, supportedLocales) {
     return { localeId: null, restPath: normalizePath(pathname) };
 }
 
-/**
- * Rewrite a same-app href to the given LocaleId via route realization.
- * Stable path (no locale) is recovered first, then re-realized — Link never hardcodes locale.
- * @param {string} href
- * @param {string} localeId
- * @param {{
- *   locales?: Array<{ id: string }|string>,
- *   defaultLocale?: string,
- *   routing?: { strategy?: string, defaultPrefix?: string, defaultLocale?: string },
- * }} artifact
- */
-export function localizeSameAppHref(href, localeId, artifact) {
+export interface LocaleHrefArtifact {
+    locales?: Array<{ id: string } | string>;
+    defaultLocale?: string;
+    routing?: LocaleRoutingOpts;
+}
+
+/** Rewrite a same-app href to the given LocaleId via route realization. */
+export function localizeSameAppHref(href: string, localeId: string, artifact: LocaleHrefArtifact) {
     if (!href || !localeId || !artifact) return href;
     if (href.startsWith('#') || /^(mailto|tel|javascript):/i.test(href)) return href;
     if (/^[a-z][a-z0-9+.-]*:/i.test(href) && !href.startsWith('/')) return href;
@@ -342,14 +335,13 @@ export function localizeSameAppHref(href, localeId, artifact) {
     return `${realized.path}${search}${hash}`;
 }
 
-/**
- * Rewrite `<a data-vmz-route href>` in HTML body to retain `localeId`.
- * @param {string} html
- * @param {string} localeId
- * @param {Parameters<typeof localizeSameAppHref>[2]} artifact
- * @param {(s: string) => string} [escapeAttr]
- */
-export function localizeBodyLinks(html, localeId, artifact, escapeAttr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')) {
+/** Rewrite `<a data-vmz-route href>` in HTML body to retain `localeId`. */
+export function localizeBodyLinks(
+    html: string,
+    localeId: string,
+    artifact: LocaleHrefArtifact,
+    escapeAttr: (s: string) => string = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;'),
+) {
     if (!html || !localeId || !artifact) return html;
     return String(html).replace(/<a\b([^>]*)>/gi, (full, attrs) => {
         if (!/\bdata-vmz-route\s*=/.test(attrs)) return full;
@@ -362,19 +354,16 @@ export function localizeBodyLinks(html, localeId, artifact, escapeAttr = (s) => 
     });
 }
 
-/**
- * Plan redirect / negotiation for an incoming URL (omit-prefix aware).
- * @param {{
- * pathname: string,
- * supportedLocales: string[],
- * defaultLocale: string,
- * routing?: { strategy?: string, defaultPrefix?: string },
- * hostCandidates?: string[],
- * preference?: string|null,
- * userChoice?: string|null,
- * }} input
- */
-export function planLocalePathNavigation(input) {
+/** Plan redirect / negotiation for an incoming URL (omit-prefix aware). */
+export function planLocalePathNavigation(input: {
+    pathname: string;
+    supportedLocales: string[];
+    defaultLocale: string;
+    routing?: LocaleRoutingOpts;
+    hostCandidates?: string[];
+    preference?: string | null;
+    userChoice?: string | null;
+}) {
     const routing = {
         strategy: input.routing?.strategy || 'prefix',
         defaultPrefix: input.routing?.defaultPrefix || 'include',
@@ -390,9 +379,8 @@ export function planLocalePathNavigation(input) {
         hostCandidates: input.hostCandidates,
     });
 
-    /** @type {any[]} */
-    const diagnostics = [];
-    let redirectTo = null;
+    const diagnostics: LocaleDiagnostic[] = [];
+    let redirectTo: string | null = null;
 
     if (routing.strategy === 'prefix' && routing.defaultPrefix === 'omit') {
         // Prefixed default locale must redirect to unprefixed canonical.
@@ -433,21 +421,14 @@ export function planLocalePathNavigation(input) {
     };
 }
 
-/**
- * Locale-aware cache key — must include LocaleId so Accept-Language cannot steal content.
- * @param {{ routeId: string, localeId: string, path: string }} input
- */
-export function localeAwareCacheKey(input) {
+/** Locale-aware cache key — must include LocaleId so Accept-Language cannot steal content. */
+export function localeAwareCacheKey(input: { routeId: string; localeId: string; path: string }): string {
     return `locale=${input.localeId}|route=${input.routeId}|path=${normalizePath(input.path)}`;
 }
 
-/**
- * Reject Vary: Accept-Language on a cache key that does not encode LocaleId.
- * @param {{ cacheKey: string, varyAcceptLanguage?: boolean, localeId?: string }} input
- */
-export function assertLocaleCacheKey(input) {
-    /** @type {any[]} */
-    const diagnostics = [];
+/** Reject Vary: Accept-Language on a cache key that does not encode LocaleId. */
+export function assertLocaleCacheKey(input: { cacheKey: string; varyAcceptLanguage?: boolean; localeId?: string }) {
+    const diagnostics: LocaleDiagnostic[] = [];
     const key = String(input.cacheKey || '');
     const hasLocale = /(?:^|[|&])locale=/.test(key) || (input.localeId && key.includes(input.localeId));
     if (input.varyAcceptLanguage && !hasLocale) {
@@ -460,19 +441,15 @@ export function assertLocaleCacheKey(input) {
     return { ok: diagnostics.length === 0, diagnostics };
 }
 
-/**
- * LocaleTransition must commit Route realization + PageMeta together.
- * @param {{
- * fromLocale: string,
- * toLocale: string,
- * routeId: string,
- * realizations: Array<{ routeId: string, localeId: string, path: string }>,
- * pageMetaByLocale: Record<string, { locale: string, canonical: string }>,
- * }} input
- */
-export function commitLocaleRouteMetaTransition(input) {
-    /** @type {any[]} */
-    const diagnostics = [];
+/** LocaleTransition must commit Route realization + PageMeta together. */
+export function commitLocaleRouteMetaTransition(input: {
+    fromLocale: string;
+    toLocale: string;
+    routeId: string;
+    realizations: Array<{ routeId: string; localeId: string; path: string }>;
+    pageMetaByLocale: Record<string, { locale: string; canonical: string }>;
+}) {
+    const diagnostics: LocaleDiagnostic[] = [];
     const fromPath = (input.realizations || []).find((r) => r.routeId === input.routeId && r.localeId === input.fromLocale)?.path;
     const toPath = (input.realizations || []).find((r) => r.routeId === input.routeId && r.localeId === input.toLocale)?.path;
     const meta = input.pageMetaByLocale?.[input.toLocale];
@@ -510,22 +487,18 @@ export function commitLocaleRouteMetaTransition(input) {
     };
 }
 
-/**
- * Aggregate router/meta proof.
- * @param {{
- * manifest: {
- * defaultLocale: string,
- * locales: Array<{ id: string, direction?: string }>,
- * routing?: { strategy?: string, defaultPrefix?: string },
- * },
- * routes: Array<{ routeId: string, path: string }>,
- * titles?: Record<string, Record<string, string>>,
- * origin?: string,
- * }} input
- */
-export function checkLocaleRouter(input) {
-    /** @type {any[]} */
-    const diagnostics = [];
+/** Aggregate router/meta proof. */
+export function checkLocaleRouter(input: {
+    manifest: {
+        defaultLocale: string;
+        locales: Array<{ id: string; direction?: string }>;
+        routing?: LocaleRoutingOpts;
+    };
+    routes: LocaleRouteEntry[];
+    titles?: Record<string, Record<string, string>>;
+    origin?: string;
+}) {
+    const diagnostics: LocaleDiagnostic[] = [];
     const locales = (input.manifest?.locales || []).map((l) => l.id);
     const directions = Object.fromEntries((input.manifest?.locales || []).map((l) => [l.id, l.direction || 'ltr']));
     const defaultLocale = input.manifest?.defaultLocale;
@@ -538,8 +511,7 @@ export function checkLocaleRouter(input) {
     diagnostics.push(...table.diagnostics);
 
     const origin = input.origin || 'https://example.test';
-    /** @type {any[]} */
-    const pageMetas = [];
+    const pageMetas: ReturnType<typeof buildLocalePageMeta>[] = [];
     for (const route of input.routes || []) {
         for (const loc of locales) {
             const title = input.titles?.[route.routeId]?.[loc] || input.titles?.[route.routeId]?.[defaultLocale] || route.routeId;

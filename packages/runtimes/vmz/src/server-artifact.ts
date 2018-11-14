@@ -2,7 +2,6 @@
  * P4 ServerArtifact — compiled route decision tree + public ServerRoute contracts
  * + internal capability units + selected runtime adapter. Web Standards Fetch entry.
  */
-// @ts-nocheck
 
 import crypto from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
@@ -25,7 +24,31 @@ const DEFAULT_RPC_PATH = '/__vmz/rpc';
  *   packDigest?: string | null,
  * }} [opts]
  */
-export function emitServerArtifact(outDir, opts = {}) {
+interface ServerArtifactOpts {
+    profileId?: string | null;
+    assembly?: string | null;
+    serverRuntime?: string | null;
+    packDigest?: string | null;
+}
+
+interface ServerArtifactBody {
+    schema: string;
+    profileId: string | null;
+    assembly: string | null;
+    selectedRuntime: string;
+    entry: { kind: string; standards: string[]; rpcPath: string };
+    httpContract: { schema: string; digest: string };
+    publicRoutes: Array<Record<string, unknown>>;
+    internalCapabilities: Array<Record<string, unknown>>;
+    middlewareUnits: unknown[];
+    routeDecisionTree: unknown[];
+    deploymentSchema: unknown;
+    packDigest: string | null;
+    adapters: Record<string, unknown>;
+    artifactDigest?: string;
+}
+
+export function emitServerArtifact(outDir: string, opts: ServerArtifactOpts = {}) {
     const deployment = readJson(path.join(outDir, 'vmz-deployment.json')) || { schema: null, units: [] };
     const routes = readJson(path.join(outDir, 'vmz-routes.json'));
     const routeRows = Array.isArray(routes) ? routes : [];
@@ -94,7 +117,7 @@ export function emitServerArtifact(outDir, opts = {}) {
     };
     const httpContractDigest = sha256Hex(canonicalJson(httpContractBody));
 
-    const artifact = {
+    const artifact: ServerArtifactBody = {
         schema: SERVER_ARTIFACT_SCHEMA,
         profileId: opts.profileId || null,
         assembly: opts.assembly || null,

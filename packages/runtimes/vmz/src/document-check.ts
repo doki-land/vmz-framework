@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Build DocumentManifest + run / --strict checks.
  *
@@ -7,45 +6,66 @@
  */
 
 import path from 'node:path';
-import { loadDocumentRoutePlan, mapPlanDiagnostics } from './author-input.js';
+import { loadDocumentRoutePlan, mapPlanDiagnostics, type DocumentRoutePlan } from './author-input.js';
 import { scanDocumentsTree } from './document-scan.js';
-import { DIAG, DOCUMENT_MANIFEST_SCHEMA } from './document-schema.js';
+import {
+    DIAG,
+    DOCUMENT_MANIFEST_SCHEMA,
+    type DocumentCollection,
+    type DocumentDiagnostic,
+    type DocumentManifest,
+    type DocumentMount,
+    type PageRecord,
+} from './document-schema.js';
 
-/**
- * Resolve project documents root.
- * @param {string} projectRoot
- */
-export function resolveDocumentsRoot(projectRoot) {
+export interface DocumentsConfigShape {
+    defaultLocale?: string;
+    locales: Record<string, { label: unknown }>;
+    collections: Record<string, { source: string; mount: string }>;
+    fallback?: boolean;
+}
+
+export interface LoadDocumentsConfigResult {
+    config: DocumentsConfigShape | null;
+    diagnostics: DocumentDiagnostic[];
+    configPath: string | null;
+    plan: DocumentRoutePlan;
+}
+
+export interface CheckDocumentsOpts {
+    projectRoot: string;
+    strict?: boolean;
+}
+
+/** Resolve project documents root. */
+export function resolveDocumentsRoot(projectRoot: string): string {
     return path.resolve(projectRoot, 'documents');
 }
 
-/**
- * Load normalized DocumentRoutePlan from Rust (author JSON5/JSON/declaration).
- * @param {string} projectRoot
- */
-export function loadDocumentsRoutePlan(projectRoot) {
+/** Load normalized DocumentRoutePlan from Rust (author JSON5/JSON/declaration). */
+export function loadDocumentsRoutePlan(projectRoot: string): DocumentRoutePlan {
     return loadDocumentRoutePlan(projectRoot);
 }
 
 /**
  * @deprecated Prefer loadDocumentsRoutePlan(projectRoot). Kept for call sites that
  * only need the plan-shaped config fields.
- * @param {string} documentsRoot
  */
-export function loadDocumentsConfig(documentsRoot) {
+export function loadDocumentsConfig(documentsRoot: string): LoadDocumentsConfigResult {
     const projectRoot = path.dirname(documentsRoot);
     const plan = loadDocumentRoutePlan(projectRoot);
-    const diagnostics = mapPlanDiagnostics(plan.diagnostics);
+    const diagnostics = toDocumentDiagnostics(mapPlanDiagnostics(plan.diagnostics));
     const configPath = plan.sourcePath ? path.join(projectRoot, plan.sourcePath) : null;
     const missing = diagnostics.some((d) => d.code === DIAG.CONFIG_MISSING);
     if (missing) {
         return { config: null, diagnostics, configPath, plan };
     }
-    /** @type {Record<string, any>} */
-    const config = {
+    const config: DocumentsConfigShape = {
         defaultLocale: plan.defaultLocale ?? undefined,
         locales: Object.fromEntries(Object.entries(plan.localeLabels || {}).map(([id, label]) => [id, { label }])),
-        collections: Object.fromEntries((plan.collections || []).map((c) => [c.id, { source: c.sourceRoot, mount: c.routeBase }])),
+        collections: Object.fromEntries(
+            (plan.collections || []).map((c) => [c.id, { source: c.sourceRoot || '.', mount: c.routeBase || '/docs' }]),
+        ),
     };
     if (plan.silentFallbackRequested) {
         config.fallback = true;
@@ -53,25 +73,18 @@ export function loadDocumentsConfig(documentsRoot) {
     return { config, diagnostics, configPath, plan };
 }
 
-/**
- * @param {object} opts
- * @param {string} opts.projectRoot
- * @param {boolean} [opts.strict]
- * @returns {import('./document-schema.js').DocumentManifest}
- */
-export function checkDocuments(opts) {
+export function checkDocuments(opts: CheckDocumentsOpts): DocumentManifest {
     const projectRoot = path.resolve(opts.projectRoot);
     const documentsRoot = resolveDocumentsRoot(projectRoot);
     const strict = Boolean(opts.strict);
 
-    /** @type {import('./document-schema.js').DocumentDiagnostic[]} */
-    const diagnostics = [];
+    const diagnostics: DocumentDiagnostic[] = [];
 
     const scanned = scanDocumentsTree(documentsRoot);
     diagnostics.push(...scanned.diagnostics);
 
     const plan = loadDocumentRoutePlan(projectRoot);
-    diagnostics.push(...mapPlanDiagnostics(plan.diagnostics));
+    diagnostics.push(...toDocumentDiagnostics(mapPlanDiagnostics(plan.diagnostics)));
 
     const configMissing = (plan.diagnostics || []).some((d) => d.code === DIAG.CONFIG_MISSING);
     const configPath = plan.sourcePath ? path.join(projectRoot, plan.sourcePath) : null;
@@ -88,13 +101,10 @@ export function checkDocuments(opts) {
         }
     }
 
-    /** @type {Record<string, string>} */
-    const localeLabels = { ...(plan.localeLabels || {}) };
+    const localeLabels: Record<string, string> = { ...(plan.localeLabels || {}) };
     const defaultLocale = plan.defaultLocale || null;
-    /** @type {import('./document-schema.js').DocumentCollection[]} */
-    const collections = [];
-    /** @type {import('./document-schema.js').DocumentMount[]} */
-    const mounts = [];
+    const collections: DocumentCollection[] = [];
+    const mounts: DocumentMount[] = [];
 
     for (const c of plan.collections || []) {
         const sourceRoot = c.sourceRoot || '.';
@@ -165,16 +175,16 @@ export function checkDocuments(opts) {
 
     // Coverage: default locale PageKeys are baseline; other locales missing/orphan under --strict
     if (defaultLocale && diskLocales.has(defaultLocale)) {
-        const byLocale = new Map();
+        const byLocale = new Map<string, Set<string>>();
         for (const p of scanned.pages) {
-            const set = byLocale.get(p.identity.locale) || new Set();
+            const set = byLocale.get(p.identity.locale) || new Set<string>();
             set.add(p.identity.pageKey);
             byLocale.set(p.identity.locale, set);
         }
-        const baseline = byLocale.get(defaultLocale) || new Set();
+        const baseline = byLocale.get(defaultLocale) || new Set<string>();
         for (const loc of scanned.locales) {
             if (loc === defaultLocale) continue;
-            const keys = byLocale.get(loc) || new Set();
+            const keys = byLocale.get(loc) || new Set<string>();
             for (const pk of baseline) {
                 if (!keys.has(pk)) {
                     diagnostics.push({
@@ -198,8 +208,7 @@ export function checkDocuments(opts) {
         }
     }
 
-    /** @type {import('./document-schema.js').PageRecord[]} */
-    const pages = scanned.pages.map((p) => ({
+    const pages: PageRecord[] = scanned.pages.map((p) => ({
         identity: p.identity,
         sourcePath: p.sourcePath,
         route: null,
@@ -219,9 +228,17 @@ export function checkDocuments(opts) {
     };
 }
 
-/**
- * @param {import('./document-schema.js').DocumentManifest} manifest
- */
-export function manifestHasErrors(manifest) {
+export function manifestHasErrors(manifest: DocumentManifest): boolean {
     return (manifest.diagnostics || []).some((d) => d.severity === 'error');
+}
+
+function toDocumentDiagnostics(
+    rows: Array<{ code: string; severity: string; message: string; path: string | undefined }>,
+): DocumentDiagnostic[] {
+    return rows.map((d) => ({
+        code: d.code,
+        severity: d.severity === 'warning' || d.severity === 'advice' ? 'warning' : 'error',
+        message: d.message,
+        path: d.path,
+    }));
 }

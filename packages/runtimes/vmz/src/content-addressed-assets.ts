@@ -5,7 +5,6 @@
  * JS under assets/ always rewrites ESM `./` → `../` so barrels (vmz-dom → dom-core)
  * resolve at dist root — never prefer hashed siblings for JS (second-hop 404).
  */
-// @ts-nocheck
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -14,6 +13,33 @@ import { canonicalJson, sha256Hex } from './release-pack.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 
 export const CONTENT_ADDRESSED_ASSETS_SCHEMA = 'vmz.content_addressed_assets.v0';
+
+interface ContentAddressedAssetObject {
+    logicalPath: string;
+    assetPath: string;
+    digest: string;
+    bytes: number;
+    immutable: boolean;
+}
+
+export interface ContentAddressedAssetsManifest {
+    schema: string;
+    layout: string;
+    immutable: boolean;
+    objectCount: number;
+    objects: ContentAddressedAssetObject[];
+    rewrittenHtml: number;
+    manifestDigest?: string;
+}
+
+interface EmitContentAddressedAssetsOpts {
+    candidates?: string[];
+    rewriteHtml?: boolean;
+}
+
+interface IngestCandidateOpts {
+    transform?: ((buf: Buffer) => Buffer) | null;
+}
 
 /** Immutable delivery candidates (client-facing bytes). */
 const DEFAULT_CANDIDATES = [
@@ -95,7 +121,7 @@ export function rewriteJsEntryRelativeImports(jsText, _rewrites = {}) {
  * @param {string} distDir
  * @param {{ candidates?: string[], rewriteHtml?: boolean }} [opts]
  */
-export function emitContentAddressedAssets(distDir, opts = {}) {
+export function emitContentAddressedAssets(distDir: string, opts: EmitContentAddressedAssetsOpts = {}) {
     const abs = path.resolve(distDir);
     if (!fs.existsSync(abs)) {
         throw new Error(`emitContentAddressedAssets: missing dist ${abs}`);
@@ -104,10 +130,8 @@ export function emitContentAddressedAssets(distDir, opts = {}) {
     fs.mkdirSync(assetsDir, { recursive: true });
 
     const candidates = Array.isArray(opts.candidates) ? opts.candidates : collectCandidates(abs);
-    /** @type {Array<Record<string, any>>} */
-    const objects = [];
-    /** @type {Record<string, string>} */
-    const rewrites = {};
+    const objects: ContentAddressedAssetObject[] = [];
+    const rewrites: Record<string, string> = {};
 
     const ordered = orderCandidates(candidates);
     for (const rel of ordered) {
@@ -164,7 +188,7 @@ export function emitContentAddressedAssets(distDir, opts = {}) {
         rewrittenHtml = rewriteHtmlReferences(abs, rewrites);
     }
 
-    const manifest = {
+    const manifest: ContentAddressedAssetsManifest = {
         schema: CONTENT_ADDRESSED_ASSETS_SCHEMA,
         layout: 'assets/<sha256>.<ext>',
         immutable: true,
@@ -185,10 +209,9 @@ export function emitContentAddressedAssets(distDir, opts = {}) {
 /**
  * @param {string[]} candidates
  */
-function orderCandidates(candidates) {
+function orderCandidates(candidates: string[]) {
     const set = new Set(candidates.map((c) => String(c).replace(/\\/g, '/').replace(/^\//, '')));
-    /** @type {string[]} */
-    const out = [];
+    const out: string[] = [];
     for (const name of DEFAULT_CANDIDATES) {
         if (set.has(name) && !CSS_AGGREGATORS.has(name) && !JS_ENTRY_AGGREGATORS.has(name)) out.push(name);
     }
@@ -208,7 +231,7 @@ function orderCandidates(candidates) {
  * @param {Array<Record<string, any>>} objects
  * @param {string} logical
  */
-function removeLogicalObject(objects, logical) {
+function removeLogicalObject(objects: ContentAddressedAssetObject[], logical: string) {
     const idx = objects.findIndex((o) => o.logicalPath === logical);
     if (idx >= 0) objects.splice(idx, 1);
 }
@@ -220,13 +243,19 @@ function removeLogicalObject(objects, logical) {
  * @param {Array<Record<string, any>>} objects
  * @param {{ transform?: ((buf: Buffer) => Buffer) | null }} opts
  */
-function ingestCandidate(absDist, rel, rewrites, objects, opts) {
+function ingestCandidate(
+    absDist: string,
+    rel: string,
+    rewrites: Record<string, string>,
+    objects: ContentAddressedAssetObject[],
+    opts: IngestCandidateOpts,
+) {
     const logical = String(rel).replace(/\\/g, '/').replace(/^\//, '');
     const src = path.join(absDist, ...logical.split('/'));
     if (!fs.existsSync(src) || !fs.statSync(src).isFile()) return;
-    let buf = fs.readFileSync(src);
+    let buf: Buffer = Buffer.from(fs.readFileSync(src));
     if (typeof opts.transform === 'function') {
-        buf = opts.transform(buf);
+        buf = Buffer.from(opts.transform(buf));
     }
     const digest = sha256Hex(buf);
     const ext = path.extname(logical) || '';
@@ -295,9 +324,8 @@ export function assertSharedAssetPath(distDir, a, b, ext = '.js') {
     return { ok: true, assetPath: rel, digest: da };
 }
 
-function collectCandidates(distDir) {
-    /** @type {string[]} */
-    const out = [];
+function collectCandidates(distDir: string) {
+    const out: string[] = [];
     for (const name of DEFAULT_CANDIDATES) {
         if (fs.existsSync(path.join(distDir, name))) out.push(name);
     }
@@ -307,7 +335,7 @@ function collectCandidates(distDir) {
     return [...new Set(out)].sort();
 }
 
-function walk(root, dir, onFile) {
+function walk(root: string, dir: string, onFile: (rel: string) => void) {
     for (const name of fs.readdirSync(dir)) {
         if (name === 'assets' || name === '_vmz' || name === 'node_modules') continue;
         const full = path.join(dir, name);
@@ -321,7 +349,7 @@ function walk(root, dir, onFile) {
  * @param {string} distDir
  * @param {Record<string, string>} rewrites map `/logical` → `/assets/hash.ext`
  */
-function rewriteHtmlReferences(distDir, rewrites) {
+function rewriteHtmlReferences(distDir: string, rewrites: Record<string, string>) {
     const pairs = Object.entries(rewrites)
         .filter(([from]) => from.startsWith('/'))
         .sort((a, b) => b[0].length - a[0].length);
@@ -341,7 +369,7 @@ function rewriteHtmlReferences(distDir, rewrites) {
     return count;
 }
 
-function walkHtml(dir, onFile) {
+function walkHtml(dir: string, onFile: (file: string) => void) {
     const stack = [dir];
     while (stack.length) {
         const cur = stack.pop();

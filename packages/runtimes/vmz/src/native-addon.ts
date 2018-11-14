@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Load the N-API `.node` addon without importing `index.js`
  * (avoids cycles with modules re-exported from the package entry).
@@ -10,14 +9,18 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 
-/** @type {any} */
-let cached;
+export interface NativeAddon {
+    generatePrettyJson?: (json: string) => string;
+    authorJson5ToCanonicalJson?: (source: string) => string;
+    loadLocalePlan?: (projectRoot: string) => string;
+    loadDocumentRoutePlan?: (projectRoot: string) => string;
+    [key: string]: unknown;
+}
 
-/**
- * Load the N-API addon or throw (production printers must not fall back to TS).
- * @returns {any}
- */
-export function requireNativeAddon() {
+let cached: NativeAddon | null | undefined;
+
+/** Load the N-API addon or throw (production printers must not fall back to TS). */
+export function requireNativeAddon(): NativeAddon {
     const native = tryLoadNativeAddon();
     if (!native) {
         throw new Error('vmz native addon missing — run `pnpm napi:build` (CodeGenerators live in vmz-generator via N-API)');
@@ -25,10 +28,7 @@ export function requireNativeAddon() {
     return native;
 }
 
-/**
- * @returns {any | null}
- */
-export function tryLoadNativeAddon() {
+export function tryLoadNativeAddon(): NativeAddon | null {
     if (cached !== undefined) return cached;
     try {
         const envPath = (typeof process.env.VMZ_NATIVE_NODE === 'string' && process.env.VMZ_NATIVE_NODE.trim()) || '';
@@ -56,8 +56,7 @@ export function tryLoadNativeAddon() {
                       : triple;
         const pkgRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
         const name = `@vmz/vmz-${short}`;
-        /** @type {string[]} */
-        const candidates = [];
+        const candidates: string[] = [];
         try {
             const resolved = require.resolve(`${name}/package.json`);
             const dir = path.dirname(resolved);

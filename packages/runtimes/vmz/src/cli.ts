@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Node CLI command implementations .
  */
@@ -6,6 +5,7 @@
 import { spawn } from 'node:child_process';
 import { copyFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
+import type { Cli, Command, ParsedOptions } from '@vmz/commander';
 import {
     HOST_PROTOCOL,
     createWorkspace,
@@ -37,67 +37,24 @@ import { assembleDelivery, emitBuildProof } from './build-assemble.js';
 import { createCli } from '@vmz/commander';
 import { resolveCliLocalesRoot } from './cli-localize.js';
 
-/**
- * @param {string[]} argv
- */
-export function parseArgs(argv) {
-    /** @type {Record<string, string | boolean> & { _: string[] }} */
-    const out = { _: [] };
-    for (let i = 0; i < argv.length; i++) {
-        const a = argv[i];
-        if (a === '--') {
-            out._.push(...argv.slice(i + 1));
-            break;
-        }
-        if (a.startsWith('--')) {
-            const eq = a.indexOf('=');
-            if (eq !== -1) {
-                out[a.slice(2, eq)] = a.slice(eq + 1);
-                continue;
-            }
-            const key = a.slice(2);
-            const next = argv[i + 1];
-            if (next && !next.startsWith('-')) {
-                out[key] = next;
-                i += 1;
-            } else {
-                out[key] = true;
-            }
-            continue;
-        }
-        if (a.startsWith('-') && a.length === 2) {
-            const key = a === '-o' ? 'out-dir' : a.slice(1);
-            const next = argv[i + 1];
-            if (next && !next.startsWith('-')) {
-                out[key] = next;
-                i += 1;
-            } else {
-                out[key] = true;
-            }
-            continue;
-        }
-        out._.push(a);
-    }
-    return out;
-}
-
-export function printGlobalHelp() {
+export function printGlobalHelp(): Promise<number> {
     return buildProductCli({ mode: 'global' }).parse(['help']);
 }
 
-export function printProjectHelp() {
+export function printProjectHelp(): Promise<number> {
     return buildProductCli({ mode: 'project' }).parse(['help']);
 }
 
 /** @deprecated use printProjectHelp / printGlobalHelp */
-export function printHelp() {
+export function printHelp(): Promise<number> {
     return printProjectHelp();
 }
 
-/**
- * @param {{ mode?: 'global' | 'project' }} [opts]
- */
-function buildProductCli(opts = {}) {
+type Diagnostic = { code?: string; path?: string; message?: string; severity?: string };
+
+type Workspace = ReturnType<typeof createWorkspace>;
+
+function buildProductCli(opts: { mode?: 'global' | 'project' } = {}): Cli {
     const mode = opts.mode === 'global' ? 'global' : 'project';
     const introId = mode === 'global' ? 'cli.intro.global' : 'cli.intro.project';
     const cli = createCli('vmz')
@@ -112,8 +69,7 @@ function buildProductCli(opts = {}) {
         return cli;
     }
 
-    /** @param {import('@vmz/commander').Command} cmd */
-    const withWorkspaceOpts = (cmd) =>
+    const withWorkspaceOpts = (cmd: Command) =>
         cmd
             .option('--out-dir, -o <dir>', 'cli.opt.out-dir')
             .option('--release', 'cli.opt.release')
@@ -147,16 +103,14 @@ function buildProductCli(opts = {}) {
     return cli;
 }
 
-/**
- * @param {string[]} argv
- * @param {{
- * cwd?: string,
- * thisPackageRoot?: string,
- * reexec?: (bin: string, argv: string[]) => Promise<number>,
- * }} [opts]
- * @returns {Promise<number>}
- */
-export async function runCli(argv, opts = {}) {
+export async function runCli(
+    argv: string[],
+    opts: {
+        cwd?: string;
+        thisPackageRoot?: string;
+        reexec?: (bin: string, argv: string[]) => Promise<number>;
+    } = {},
+): Promise<number> {
     const [cmd] = argv;
     const inv = getInvocationContext({
         cwd: opts.cwd,
@@ -175,18 +129,17 @@ export async function runCli(argv, opts = {}) {
     }
 
     // Normalize version aliases onto the registered `version` command.
-    const normalized =
-        cmd === '-V' || cmd === '--version' ? ['version', ...argv.slice(1)] : argv;
+    const normalized = cmd === '-V' || cmd === '--version' ? ['version', ...argv.slice(1)] : argv;
 
     const mode = inv.mode === 'global' ? 'global' : 'project';
     return buildProductCli({ mode }).parse(normalized);
 }
 
-function isHelpToken(token) {
+function isHelpToken(token: string): boolean {
     return token === 'help' || token === '-h' || token === '--help';
 }
 
-function cmdVersion() {
+function cmdVersion(): number {
     const native = getProtocolVersions();
     console.log(`vmz host ${HOST_PROTOCOL}`);
     console.log(
@@ -195,10 +148,7 @@ function cmdVersion() {
     return 0;
 }
 
-/**
- * @param {Record<string, string | boolean> & { _: string[] }} args
- */
-function cmdCheck(args) {
+async function cmdCheck(args: ParsedOptions): Promise<number> {
     const pathArg = args._[0] ?? '.';
     const { project, outDir } = resolveWorkspaceDirs({
         path: pathArg,
@@ -224,14 +174,10 @@ function cmdCheck(args) {
     }
 }
 
-/**
- * Dedupe locale/build diagnostics by code+path+message (runtime + route emit both report missing manifest).
- * @param {Array<{ code?: string, path?: string, message?: string, severity?: string }>} list
- */
-function dedupeDiagnostics(list) {
-    const seen = new Set();
-    /** @type {typeof list} */
-    const out = [];
+/** Dedupe locale/build diagnostics by code+path+message (runtime + route emit both report missing manifest). */
+function dedupeDiagnostics(list: Diagnostic[]): Diagnostic[] {
+    const seen = new Set<string>();
+    const out: Diagnostic[] = [];
     for (const d of list || []) {
         const key = `${d.code || ''}\0${d.path || ''}\0${d.message || ''}\0${d.severity || ''}`;
         if (seen.has(key)) continue;
@@ -241,13 +187,7 @@ function dedupeDiagnostics(list) {
     return out;
 }
 
-/**
- * @param {import('./index.js').Workspace} ws
- * @param {string} project
- * @param {string} outDir
- * @param {() => Promise<number> | number} fn
- */
-async function runWithPlugins(ws, project, outDir, fn) {
+async function runWithPlugins(ws: Workspace, project: string, outDir: string, fn: () => Promise<number> | number): Promise<number> {
     const { loadVmzConfig, applyPlugins } = await import('./plugin-host.js');
     const { plugins, engines } = await loadVmzConfig(project);
     if (plugins.length) {
@@ -256,10 +196,7 @@ async function runWithPlugins(ws, project, outDir, fn) {
     return await fn();
 }
 
-/**
- * @param {Record<string, string | boolean> & { _: string[] }} args
- */
-async function cmdBuild(args) {
+async function cmdBuild(args: ParsedOptions): Promise<number> {
     const pathArg = args._[0] ?? '.';
     const targetRaw = typeof args.target === 'string' ? args.target : 'browser';
     if (targetRaw !== 'browser' && targetRaw !== 'mini-program-wechat') {
@@ -388,7 +325,9 @@ async function cmdBuild(args) {
                 selection: selected.selection,
                 profile: {
                     ...selected.profile,
-                    sources: selected.profile.sources || (norm.table.sugar ? norm.table.profiles[norm.table.default]?.sources : null),
+                    sources:
+                        (selected.profile as { sources?: unknown }).sources ||
+                        (norm.table.sugar ? (norm.table.profiles[norm.table.default] as { sources?: unknown } | undefined)?.sources : null),
                 },
                 siteId: cfg.application?.id || undefined,
                 origin,
@@ -420,7 +359,7 @@ async function cmdBuild(args) {
     }
 }
 
-async function cmdServe(args) {
+async function cmdServe(args: ParsedOptions): Promise<number> {
     const pathArg = args._[0] ?? '.';
     if (args.build) {
         const code = await cmdBuild(args);
@@ -489,10 +428,7 @@ async function cmdServe(args) {
     });
 }
 
-/**
- * @param {Record<string, string | boolean> & { _: string[] }} args
- */
-async function cmdDev(args) {
+async function cmdDev(args: ParsedOptions): Promise<number> {
     const pathArg = args._[0] ?? '.';
     const { project, outDir: outDirRoot } = resolveWorkspaceDirs({
         path: pathArg,
@@ -568,10 +504,7 @@ async function cmdDev(args) {
     }
 }
 
-/**
- * @param {Record<string, string | boolean> & { _: string[] }} args
- */
-function cmdFormat(args) {
+function cmdFormat(args: ParsedOptions): number {
     const pathArg = args._[0] ?? '.';
     const { project, outDir } = resolveWorkspaceDirs({
         path: pathArg,
@@ -594,10 +527,7 @@ function cmdFormat(args) {
     }
 }
 
-/**
- * @param {Record<string, string | boolean> & { _: string[] }} args
- */
-function cmdLint(args) {
+function cmdLint(args: ParsedOptions): number {
     const pathArg = args._[0] ?? '.';
     const { project, outDir } = resolveWorkspaceDirs({
         path: pathArg,

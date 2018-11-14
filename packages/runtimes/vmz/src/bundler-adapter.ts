@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Bundler adapter (session) — consumes Deployment IR; does not invent VMZ semantics.
  *
@@ -8,33 +7,32 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-/**
- * @typedef {object} DeploymentUnit
- * @property {string} chunkId
- * @property {string} kind
- * @property {string} source
- * @property {string} clientEntry
- * @property {string} programIr
- * @property {string[]} [dependsOn]
- * @property {string[]} [dependedBy]
- * @property {boolean} [rebuilt]
- */
+export interface DeploymentUnit {
+    chunkId: string;
+    kind: string;
+    source: string;
+    clientEntry: string;
+    programIr: string;
+    dependsOn?: string[];
+    dependedBy?: string[];
+    rebuilt?: boolean;
+}
 
-/**
- * @typedef {object} DeploymentIr
- * @property {string} schema
- * @property {DeploymentUnit[]} units
- * @property {string[]} [affectedChunks]
- * @property {string[]} [seedChunks]
- * @property {boolean} [islandHmr]
- * @property {boolean} [full]
- */
+export interface DeploymentIr {
+    schema: string;
+    units: DeploymentUnit[];
+    affectedChunks?: string[];
+    seedChunks?: string[];
+    islandHmr?: boolean;
+    full?: boolean;
+}
 
-/**
- * @param {string} outDir
- * @returns {DeploymentIr}
- */
-export function loadDeploymentIr(outDir) {
+export interface VmzAdapterOptions {
+    outDir?: string;
+    root?: string;
+}
+
+export function loadDeploymentIr(outDir: string): DeploymentIr {
     const file = path.join(outDir, 'vmz-deployment.json');
     if (!existsSync(file)) {
         throw new Error(`Deployment IR missing: ${file} (run vmz build first)`);
@@ -46,12 +44,18 @@ export function loadDeploymentIr(outDir) {
     return ir;
 }
 
-/**
- * Map Deployment IR → bundler entry points (absolute paths under outDir).
- * @param {string} outDir
- * @param {DeploymentIr} [ir]
- */
-export function planBundleInputs(outDir, ir = loadDeploymentIr(outDir)) {
+/** Map Deployment IR → bundler entry points (absolute paths under outDir). */
+export function planBundleInputs(
+    outDir: string,
+    ir: DeploymentIr = loadDeploymentIr(outDir),
+): Array<{
+    chunkId: string;
+    kind: string;
+    entry: string;
+    programIr: string;
+    source: string;
+    rebuilt: boolean;
+}> {
     return (ir.units || []).map((u) => ({
         chunkId: u.chunkId,
         kind: u.kind,
@@ -62,21 +66,14 @@ export function planBundleInputs(outDir, ir = loadDeploymentIr(outDir)) {
     }));
 }
 
-/**
- * Entries that were rebuilt in the last emit (HMR / incremental pack).
- * @param {string} outDir
- * @param {DeploymentIr} [ir]
- */
-export function planAffectedBundleInputs(outDir, ir = loadDeploymentIr(outDir)) {
+/** Entries that were rebuilt in the last emit (HMR / incremental pack). */
+export function planAffectedBundleInputs(outDir: string, ir: DeploymentIr = loadDeploymentIr(outDir)) {
     const affected = new Set(ir.affectedChunks || []);
     return planBundleInputs(outDir, ir).filter((e) => e.rebuilt || affected.has(e.chunkId));
 }
 
-/**
- * Thin Vite plugin factory: only reads Deployment IR. No `.vmz` transform hooks.
- * @param {{ outDir?: string, root?: string }} [options]
- */
-export function createVitePluginVmzAdapter(options = {}) {
+/** Thin Vite plugin factory: only reads Deployment IR. No `.vmz` transform hooks. */
+export function createVitePluginVmzAdapter(options: VmzAdapterOptions = {}) {
     const outDir = options.outDir ?? 'dist';
     return {
         name: 'vmz-deployment-adapter',
@@ -96,11 +93,8 @@ export function createVitePluginVmzAdapter(options = {}) {
     };
 }
 
-/**
- * Thin Rolldown plugin factory (deployment) — same contract as Vite adapter: read Deployment IR only.
- * @param {{ outDir?: string, root?: string }} [options]
- */
-export function createRolldownPluginVmzAdapter(options = {}) {
+/** Thin Rolldown plugin factory (deployment) — same contract as Vite adapter: read Deployment IR only. */
+export function createRolldownPluginVmzAdapter(options: VmzAdapterOptions = {}) {
     const outDir = options.outDir ?? 'dist';
     return {
         name: 'vmz-deployment-adapter-rolldown',
@@ -111,7 +105,7 @@ export function createRolldownPluginVmzAdapter(options = {}) {
             }
         },
         // Rolldown may call `options` / `buildStart`; keep surface identical and semantic-free.
-        options(inputOptions) {
+        options(inputOptions: unknown) {
             return inputOptions;
         },
     };

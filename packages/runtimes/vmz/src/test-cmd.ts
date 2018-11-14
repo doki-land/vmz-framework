@@ -1,18 +1,33 @@
-// @ts-nocheck
 /**
  * `vmz test` command — discovery / build / filter / TestReport orchestration.
  * Semantics live in `@vmz/test` (optional peer — not installed with bare `@vmz/vmz`).
  */
 
 import path from 'node:path';
+import type { Cli, Command, ParsedOptions } from '@vmz/commander';
 import { createWorkspace } from './index.js';
 import { log } from './log.js';
 import { generatePrettyJson } from './pretty-json.js';
 
-/**
- * @param {import('@vmz/commander').Cli | import('@vmz/commander').Command} cli
- */
-export function registerTestCommand(cli) {
+type TestSelection = {
+    schema: string;
+    reason: string;
+    testIds: string[];
+    affectedChunkIds: string[];
+    status: string;
+};
+
+type TestEntry = {
+    testId: string;
+    file: string;
+    modes: string[];
+    programId: string | null;
+    planId: string | null;
+    status: string;
+    diagnostics: unknown[];
+};
+
+export function registerTestCommand(cli: Cli | Command): void {
     cli.command('test', 'cli.cmd.test')
         .option('--out-dir, -o <dir>', 'cli.opt.out-dir')
         .option('--list', 'cli.opt.list')
@@ -26,10 +41,7 @@ export function registerTestCommand(cli) {
         .action((options) => cmdTest(options));
 }
 
-/**
- * @returns {Promise<typeof import('@vmz/test')>}
- */
-async function loadTestPackage() {
+async function loadTestPackage(): Promise<typeof import('@vmz/test')> {
     try {
         return await import('@vmz/test');
     } catch (e) {
@@ -40,11 +52,7 @@ async function loadTestPackage() {
     }
 }
 
-/**
- * @param {Record<string, string | boolean> & { _: string[] }} args
- * @returns {Promise<number>}
- */
-export async function cmdTest(args) {
+export async function cmdTest(args: ParsedOptions): Promise<number> {
     let test;
     try {
         test = await loadTestPackage();
@@ -66,9 +74,9 @@ export async function cmdTest(args) {
     } = test;
 
     const project = path.resolve(String(args._[0] || '.'));
-    let modes;
+    let modes: string[];
     try {
-        modes = parseModes(/** @type {string|boolean|undefined} */ (args.mode));
+        modes = parseModes(args.mode as string | boolean | undefined);
     } catch (e) {
         log.error(e instanceof Error ? e.message : String(e));
         return 1;
@@ -122,8 +130,7 @@ export async function cmdTest(args) {
         });
     }
 
-    /** @type {null | { schema: string, reason: string, testIds: string[], affectedChunkIds: string[], status: string }} */
-    let testSelection = null;
+    let testSelection: TestSelection | null = null;
     if (wantAffected) {
         const outDir = outDirArg ? path.resolve(outDirArg) : path.join(project, 'dist');
         const ws = createWorkspace({ root: project, outDir });
@@ -168,16 +175,7 @@ export async function cmdTest(args) {
         selected = selected.filter((m) => Array.isArray(m.modes) && m.modes.some((x) => modes.includes(x)));
     }
 
-    /** @type {Array<{
-     * testId: string,
-     * file: string,
-     * modes: string[],
-     * programId: string|null,
-     * planId: string|null,
-     * status: string,
-     * diagnostics: unknown[],
-     * }>} */
-    let tests;
+    let tests: TestEntry[];
 
     if (wantList) {
         tests = selected.map((m) => {
@@ -194,7 +192,7 @@ export async function cmdTest(args) {
             };
         });
     } else {
-        const modeActive = (name) => modes.includes('all') || modes.includes(name);
+        const modeActive = (name: string) => modes.includes('all') || modes.includes(name);
         const needsBuild =
             selected.length > 0 &&
             selected.some((m) => {
@@ -209,12 +207,9 @@ export async function cmdTest(args) {
                 );
             });
 
-        /** @type {string|null} */
-        let buildOut = null;
-        /** @type {unknown[]} */
-        let buildDiags = [];
-        /** @type {string|null} */
-        let buildError = null;
+        let buildOut: string | null = null;
+        let buildDiags: unknown[] = [];
+        let buildError: string | null = null;
 
         if (needsBuild) {
             const built = buildForCompile(project, outDirArg ? path.resolve(outDirArg) : undefined, {
@@ -233,14 +228,14 @@ export async function cmdTest(args) {
             const program = m.program && typeof m.program === 'object' ? m.program : {};
             const plan = m.plan && typeof m.plan === 'object' ? m.plan : {};
             const mModes = Array.isArray(m.modes) ? m.modes.map(String) : [];
-            const base = {
+            const base: TestEntry = {
                 testId: String(m.id),
                 file: String(m.file),
                 modes: mModes,
                 programId: program.chunkId ? String(program.chunkId) : null,
                 planId: plan.ref ? String(plan.ref) : plan.schema ? String(plan.schema) : null,
                 status: 'skipped',
-                diagnostics: /** @type {unknown[]} */ ([]),
+                diagnostics: [],
             };
 
             const doCompile = mModes.includes('compile') && modeActive('compile');
@@ -269,10 +264,8 @@ export async function cmdTest(args) {
                 continue;
             }
 
-            /** @type {unknown[]} */
-            const diags = [];
-            /** @type {string[]} */
-            const statuses = [];
+            const diags: unknown[] = [];
+            const statuses: string[] = [];
 
             if (doCompile) {
                 const result = runCompileManifest(m, { outDir: buildOut });
@@ -386,10 +379,10 @@ export async function cmdTest(args) {
     for (const t of tests) {
         console.log(` ${t.status}\t${t.testId}\t${t.file}`);
         for (const d of t.diagnostics || []) {
-            if (d && typeof d === 'object' && d.severity === 'error') {
-                console.log(` ! ${d.message}`);
+            if (d && typeof d === 'object' && (d as any).severity === 'error') {
+                console.log(` ! ${(d as any).message}`);
                 if (process.env.GITHUB_ACTIONS === 'true') {
-                    const msg = String(d.message || 'error').replace(/[\r\n]+/g, ' ');
+                    const msg = String((d as any).message || 'error').replace(/[\r\n]+/g, ' ');
                     console.log(`::error title=vmz test ${t.testId}::${msg}`);
                 }
             }
@@ -397,7 +390,7 @@ export async function cmdTest(args) {
         if (
             process.env.GITHUB_ACTIONS === 'true' &&
             (t.status === 'failed' || t.status === 'error') &&
-            !(t.diagnostics || []).some((d) => d && typeof d === 'object' && d.severity === 'error')
+            !(t.diagnostics || []).some((d) => d && typeof d === 'object' && (d as any).severity === 'error')
         ) {
             console.log(`::error title=vmz test ${t.testId}::status=${t.status}`);
         }

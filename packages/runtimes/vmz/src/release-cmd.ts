@@ -1,22 +1,17 @@
-// @ts-nocheck
 /**
  * `vmz artifact` — pack / publish / rollback / diff; registered on `@vmz/commander`.
  */
 
 import path from 'node:path';
+import type { Command, ParsedOptions } from '@vmz/commander';
 import { log } from './log.js';
 import { diffArtifacts, loadReleaseEnvelope, packRelease, publishRelease, readPointer, rollbackRelease } from './release-pack.js';
 
-/**
- * @param {import('@vmz/commander').Command} parent
- */
-export function registerArtifactCommands(parent) {
-    /** @param {import('@vmz/commander').Command} cmd */
-    const withOpts = (cmd) =>
-        cmd
-            .option('--releases <dir>', 'cli.opt.releases')
-            .option('--app-id <id>', 'cli.opt.app-id')
-            .option('--json', 'cli.opt.json');
+export type ArtifactSub = 'pack' | 'publish' | 'rollback' | 'current' | 'diff';
+
+export function registerArtifactCommands(parent: Command): void {
+    const withOpts = (cmd: Command) =>
+        cmd.option('--releases <dir>', 'cli.opt.releases').option('--app-id <id>', 'cli.opt.app-id').option('--json', 'cli.opt.json');
 
     withOpts(parent.command('pack', 'cli.cmd.artifact.pack')).action((o) => runArtifact('pack', o));
     withOpts(parent.command('publish', 'cli.cmd.artifact.publish')).action((o) => runArtifact('publish', o));
@@ -25,18 +20,11 @@ export function registerArtifactCommands(parent) {
     withOpts(parent.command('diff', 'cli.cmd.artifact.diff')).action((o) => runArtifact('diff', o));
 }
 
-/**
- * @param {'pack'|'publish'|'rollback'|'current'|'diff'} sub
- * @param {import('@vmz/commander').ParsedOptions} options
- * @param {{ root?: string }} [ctx]
- */
-export function runArtifact(sub, options, ctx = {}) {
+export function runArtifact(sub: ArtifactSub, options: ParsedOptions, ctx: { root?: string } = {}): number {
     const cwd = path.resolve(ctx.root || process.cwd());
     const pos = options._ || [];
     const dist = path.resolve(cwd, pos[0] || 'dist');
-    const releases = path.resolve(
-        typeof options.releases === 'string' ? options.releases : path.join(cwd, 'dist', 'releases'),
-    );
+    const releases = path.resolve(typeof options.releases === 'string' ? options.releases : path.join(cwd, 'dist', 'releases'));
     const appId = typeof options['app-id'] === 'string' ? options['app-id'] : undefined;
     const asJson = Boolean(options.json);
 
@@ -90,7 +78,8 @@ export function runArtifact(sub, options, ctx = {}) {
         log.errorId('commander.err.unknown_command', { cmd: `artifact ${sub}` });
         return 1;
     } catch (e) {
-        log.error(String(e && e.message ? e.message : e));
+        const err = e as { message?: string } | null;
+        log.error(String(err && err.message ? err.message : e));
         return 1;
     }
 }

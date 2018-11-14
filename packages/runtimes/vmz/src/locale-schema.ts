@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Locale – schema constants & diagnostic codes.
  */

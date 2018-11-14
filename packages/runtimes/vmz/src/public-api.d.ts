@@ -481,8 +481,6 @@ export function resolvePackageRoot(project: string, name: string): string | null
 
 export function runCli(argv: string[]): Promise<number>;
 
-export function parseArgs(argv: string[]): Record<string, string | boolean> & { _: string[] };
-
 export function printHelp(): void;
 
 export const STATIC_DELIVERY_MANIFEST_SCHEMA: string;

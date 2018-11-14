@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Document — resolve engines.markdown via the official plugin runtime.
  */
@@ -11,10 +10,13 @@ import { importMaybeTs } from './plugin-host.js';
 
 const require = createRequire(import.meta.url);
 
-/**
- * @param {{ engines?: { markdown?: string } }} [opts]
- */
-export async function resolveMarkdownEngine(opts = {}) {
+export interface ResolveMarkdownEngineOpts {
+    engines?: { markdown?: string };
+    /** Reserved for engine resolution relative to the project (unused by markdown-it). */
+    projectRoot?: string;
+}
+
+export async function resolveMarkdownEngine(opts: ResolveMarkdownEngineOpts = {}) {
     const id = opts.engines?.markdown || 'markdown-it';
     if (id !== 'markdown-it') {
         throw new Error(`unsupported engines.markdown ${JSON.stringify(id)} (markdown-it only)`);

@@ -1,24 +1,24 @@
-// @ts-nocheck
 /**
  * Document — wire project `/designs` into static document assets.
  * Prefer compiled `vmz-designs.css` / `vmz.css`; else emit a minimal token CSS.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-/**
- * @param {string} projectRoot
- * @returns {{ css: string, source: string | null, href: string | null }}
- */
-export function resolveDocumentDesignsCss(projectRoot) {
+
+export interface DocumentDesignsCssResult {
+    css: string;
+    source: string | null;
+    href: string | null;
+}
+
+export function resolveDocumentDesignsCss(projectRoot: string): DocumentDesignsCssResult {
     const designsDir = path.join(projectRoot, 'designs');
     if (!fs.existsSync(designsDir) || !fs.statSync(designsDir).isDirectory()) {
         return { css: '', source: null, href: null };
     }
 
-    /** @type {string[]} */
-    const parts = [];
-    /** @type {string[]} */
-    const sources = [];
+    const parts: string[] = [];
+    const sources: string[] = [];
 
     // Layout first so @import (fonts) stays at stylesheet top; theme tokens follow.
     const layoutCandidates = [path.join(designsDir, 'document', 'chrome.css'), path.join(designsDir, 'styles', 'document.css')];
@@ -62,10 +62,8 @@ export function resolveDocumentDesignsCss(projectRoot) {
     }
     return { css: '', source: 'designs/', href: null };
 }
-/** @param {string} designsDir */
-function emitMinimalDesignsCss(designsDir) {
-    /** @type {Record<string, string>} */
-    const vars = {};
+function emitMinimalDesignsCss(designsDir: string): string | null {
+    const vars: Record<string, string> = {};
     const tokenDir = path.join(designsDir, 'tokens');
     if (fs.existsSync(tokenDir)) {
         walkJson(tokenDir, (obj, prefix) => {
@@ -91,20 +89,25 @@ function emitMinimalDesignsCss(designsDir) {
     const lines = keys.map((k) => `  ${cssVar(k)}: ${vars[k]};`);
     return `/* vmz.document designs from /designs */\n:root {\n${lines.join('\n')}\n}\nbody { font-family: var(--font-sans, system-ui, sans-serif); line-height: 1.5; margin: 0; color: var(--color-fg, #111); background: var(--color-bg, #fff); }\nmain { max-width: 48rem; margin: 0 auto; padding: 1.5rem; }\nnav { padding: 1rem 1.5rem; border-bottom: 1px solid var(--color-border, #ddd); }\n`;
 }
-function cssVar(key) {
+function cssVar(key: string): string {
     const name = String(key)
         .replace(/[^a-zA-Z0-9_-]+/g, '-')
         .replace(/^-|-$/g, '');
     return `--${name}`;
 }
-/**
- * Style Theme entries (`key.path` + `value`) → `vmz-*` CSS vars (same naming as application compile).
- * @param {unknown} obj
- * @param {Record<string, string>} out
- */
-function collectStyleThemeEntries(obj, out) {
+interface StyleThemeEntry {
+    key?: { path?: unknown };
+    value?: unknown;
+}
+
+interface StyleThemeObject {
+    entries?: StyleThemeEntry[];
+}
+
+/** Style Theme entries (`key.path` + `value`) → `vmz-*` CSS vars (same naming as application compile). */
+function collectStyleThemeEntries(obj: unknown, out: Record<string, string>): void {
     if (obj == null || typeof obj !== 'object' || Array.isArray(obj)) return;
-    const entries = /** @type {{ key?: { path?: unknown }, value?: unknown }[]} */ (/** @type {{ entries?: unknown }} */ (obj).entries);
+    const entries = (obj as StyleThemeObject).entries;
     if (!Array.isArray(entries)) return;
     for (const e of entries) {
         const pathParts = e?.key?.path;
@@ -114,7 +117,7 @@ function collectStyleThemeEntries(obj, out) {
         out[`vmz-${dotted}`] = String(e.value);
     }
 }
-function flattenTokens(obj, prefix, out) {
+function flattenTokens(obj: unknown, prefix: string, out: Record<string, string>): void {
     if (obj == null || typeof obj !== 'object' || Array.isArray(obj)) return;
     for (const [k, v] of Object.entries(obj)) {
         if (k === 'entries') continue;
@@ -130,7 +133,7 @@ function flattenTokens(obj, prefix, out) {
         }
     }
 }
-function walkJson(dir, fn) {
+function walkJson(dir: string, fn: (obj: unknown, prefix: string) => void): void {
     if (!fs.existsSync(dir)) return;
     for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, ent.name);

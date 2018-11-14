@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Track per-file fingerprints so dev rebuilds only dirty leaves (session).
  */
@@ -8,13 +7,8 @@ import path from 'node:path';
 
 const WATCH_EXT = new Set(['.vmz', '.ts', '.tsx', '.js', '.mjs', '.css', '.json']);
 
-/**
- * @param {string} srcDir
- * @returns {Map<string, string>}
- */
-export function fileFingerprintMap(srcDir) {
-    /** @type {Map<string, string>} */
-    const map = new Map();
+export function fileFingerprintMap(srcDir: string): Map<string, string> {
+    const map = new Map<string, string>();
     walk(srcDir, (file) => {
         const st = statSync(file);
         map.set(file, `${st.mtimeMs}|${st.size}`);
@@ -22,16 +16,9 @@ export function fileFingerprintMap(srcDir) {
     return map;
 }
 
-/**
- * @param {Map<string, string>} prev
- * @param {Map<string, string>} next
- * @returns {{ changed: string[], deleted: string[] }}
- */
-export function diffFingerprints(prev, next) {
-    /** @type {string[]} */
-    const changed = [];
-    /** @type {string[]} */
-    const deleted = [];
+export function diffFingerprints(prev: Map<string, string>, next: Map<string, string>): { changed: string[]; deleted: string[] } {
+    const changed: string[] = [];
+    const deleted: string[] = [];
     for (const [file, fp] of next) {
         if (prev.get(file) !== fp) changed.push(file);
     }
@@ -41,11 +28,7 @@ export function diffFingerprints(prev, next) {
     return { changed, deleted };
 }
 
-/**
- * @param {string} dir
- * @param {(file: string) => void} fn
- */
-function walk(dir, fn) {
+function walk(dir: string, fn: (file: string) => void): void {
     if (!existsSync(dir)) return;
     for (const name of readdirSync(dir)) {
         const full = path.join(dir, name);

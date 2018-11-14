@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Plugin protocol v1 helpers + typed config loading.
  */

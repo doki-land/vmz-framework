@@ -2,7 +2,6 @@
  * rust-embedded packaging adapter: resource index + baseline closure.
  * Packaging only — does not invent route / MIME / fallback semantics.
  */
-// @ts-nocheck
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -10,6 +9,20 @@ import path from 'node:path';
 import { writePrettyJsonFile } from './pretty-json.js';
 
 export const EMBEDDED_RESOURCE_INDEX_SCHEMA = 'vmz.embedded.resource_index.v0';
+
+interface EmbeddedPackagingOpts {
+    siteId?: string;
+    contractDigest?: string | null;
+}
+
+interface EmbeddedResourceIndex {
+    schema: string;
+    siteId: string | null;
+    contractDigest: string | null;
+    objectCount: number;
+    objects: Array<{ path: string; digest: string; blob: string; bytes: number }>;
+    indexDigest?: string;
+}
 
 /** Paths that must never enter the embedded baseline closure. */
 const SKIP_NAMES = new Set(['vmz-serve-host.mjs', 'vmz-serve-host.js', 'node_modules', '.git']);
@@ -20,7 +33,7 @@ const SKIP_NAMES = new Set(['vmz-serve-host.mjs', 'vmz-serve-host.js', 'node_mod
  * @param {string} outDir
  * @param {{ siteId?: string, contractDigest?: string | null }} [opts]
  */
-export function emitEmbeddedPackaging(outDir, opts = {}) {
+export function emitEmbeddedPackaging(outDir: string, opts: EmbeddedPackagingOpts = {}) {
     const vmzDir = path.join(outDir, '_vmz');
     const baselineDir = path.join(vmzDir, 'embedded-baseline');
     fs.mkdirSync(baselineDir, { recursive: true });
@@ -50,7 +63,7 @@ export function emitEmbeddedPackaging(outDir, opts = {}) {
     });
 
     objects.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
-    const index = {
+    const index: EmbeddedResourceIndex = {
         schema: EMBEDDED_RESOURCE_INDEX_SCHEMA,
         siteId: opts.siteId || null,
         contractDigest: opts.contractDigest || null,

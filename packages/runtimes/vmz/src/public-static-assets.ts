@@ -2,7 +2,6 @@
  * Opaque site-root static files: project `public/**` → deploy root (static / web-static).
  * Not dependency packaging (no node_modules / @dxo/* scanning).
  */
-// @ts-nocheck
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,7 +32,12 @@ const RESERVED_EXACT = new Set([
  * @param {string} distDir
  * @param {{ projectRoot?: string, publicDir?: string }} [opts]
  */
-export function emitPublicStaticAssets(distDir, opts = {}) {
+interface PublicStaticAssetsOpts {
+    projectRoot?: string;
+    publicDir?: string;
+}
+
+export function emitPublicStaticAssets(distDir: string, opts: PublicStaticAssetsOpts = {}) {
     const absDist = path.resolve(distDir);
     const projectRoot = opts.projectRoot ? path.resolve(opts.projectRoot) : null;
     const publicDir = opts.publicDir ? path.resolve(opts.publicDir) : projectRoot ? path.join(projectRoot, 'public') : null;

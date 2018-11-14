@@ -3,7 +3,6 @@
  * and lower browser-unreachable bare package imports to `dist/vendor/**`.
  * Full oxc minify/chunk-split lands progressively (`oxc-pending` on release minify).
  */
-// @ts-nocheck
 
 import crypto from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
@@ -46,7 +45,16 @@ export function ensureRuntimeCompanions(outDir, coreDist) {
  *   projectRoot?: string | null,
  * }} [opts]
  */
-export function packFromDeploymentIr(outDir, opts = {}) {
+interface PackFromDeploymentIrOpts {
+    release?: boolean;
+    profileId?: string;
+    assembly?: string;
+    preferredClientFace?: string;
+    coreDist?: string | null;
+    projectRoot?: string | null;
+}
+
+export function packFromDeploymentIr(outDir: string, opts: PackFromDeploymentIrOpts = {}) {
     ensureRuntimeCompanions(outDir, opts.coreDist);
 
     // Browser ESM cannot resolve bare npm specs — materialize reachable packages first
@@ -80,7 +88,21 @@ export function packFromDeploymentIr(outDir, opts = {}) {
         });
     }
 
-    const body = {
+    const body: {
+        schema: string;
+        profileId: string | null;
+        assembly: string | null;
+        release: boolean;
+        preferredClientFace: string;
+        deploymentSchema: unknown;
+        unitCount: number;
+        units: unknown[];
+        minify: string;
+        treeShakeBasis: string;
+        bundler: string;
+        clientPackageLowering: Record<string, unknown>;
+        packDigest?: string;
+    } = {
         schema: PACK_MANIFEST_SCHEMA,
         profileId: opts.profileId || null,
         assembly: opts.assembly || null,

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Unified CLI logging / diagnostics via `@vmz/diagnostic` + product catalog.
  */
@@ -6,36 +5,35 @@
 import { formatDiagnostic } from '@vmz/diagnostic';
 import { loadCliCatalog, resolveVmzLocale, vmzCliLocalize } from './cli-localize.js';
 
-/** @param {string} level */
-function stamp(level) {
+export type DiagnosticLike = {
+    severity?: string;
+    path?: string;
+    message?: string;
+    code?: string;
+    args?: Record<string, string>;
+    span?: { start: number; end: number };
+};
+
+function stamp(level: string): string {
     return `vmz ${level}`;
 }
 
 export const log = {
-    /** @param {...unknown} args */
-    info(...args) {
+    info(...args: unknown[]): void {
         console.error(stamp('info'), ...args);
     },
-    /** @param {...unknown} args */
-    warn(...args) {
+    warn(...args: unknown[]): void {
         console.error(stamp('warn'), ...args);
     },
-    /** @param {...unknown} args */
-    error(...args) {
+    error(...args: unknown[]): void {
         console.error(stamp('error'), ...args);
     },
-    /**
-     * Localized framework error (`cli.err.*`).
-     * @param {string} id
-     * @param {Record<string, string>} [args]
-     */
-    errorId(id, args) {
+    /** Localized framework error (`cli.err.*`). */
+    errorId(id: string, args?: Record<string, string>): void {
         console.error(stamp('error'), vmzCliLocalize.t(id, args));
     },
-    /** @param {{ severity?: string, path?: string, message?: string, code?: string, args?: Record<string, string>, span?: { start: number, end: number } }} d */
-    diagnostic(d) {
-        const severity =
-            d.severity === 'warning' || d.severity === 'advice' || d.severity === 'error' ? d.severity : 'error';
+    diagnostic(d: DiagnosticLike): void {
+        const severity = d.severity === 'warning' || d.severity === 'advice' || d.severity === 'error' ? d.severity : 'error';
         const code = d.code && String(d.code).length ? String(d.code) : 'diag.message';
         const locale = resolveVmzLocale();
         const catalog = loadCliCatalog(locale);
@@ -55,12 +53,8 @@ export const log = {
         );
         console.error(stamp(severity === 'warning' ? 'warn' : severity === 'error' ? 'error' : 'diag'), line);
     },
-    /**
-     * @param {Array<{ severity?: string, path?: string, message?: string, code?: string, args?: Record<string, string> }>} diagnostics
-     * @param {{ denyWarnings?: boolean }} [opts]
-     * @returns {number} failing count (errors, and warnings if denyWarnings)
-     */
-    diagnostics(diagnostics, opts = {}) {
+    /** Failing count: errors, and warnings when `denyWarnings`. */
+    diagnostics(diagnostics: DiagnosticLike[] | null | undefined, opts: { denyWarnings?: boolean } = {}): number {
         let failing = 0;
         for (const d of diagnostics ?? []) {
             this.diagnostic(d);

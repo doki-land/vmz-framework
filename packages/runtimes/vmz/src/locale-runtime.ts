@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Locale runtime: LocaleContext · FormatterContext · negotiation ·
  * atomic LocaleTransition · SSR/client parity.
@@ -24,21 +23,17 @@ import {
     LOCALE_TRANSITION_SCHEMA,
 } from './locale-schema.js';
 
-/**
- * Fixed negotiation priority (locale notes ). Host only supplies candidates.
- * @param {{
- * supportedLocales: string[],
- * defaultLocale: string,
- * routeLocale?: string|null,
- * userChoice?: string|null,
- * preference?: string|null,
- * hostCandidates?: string[],
- * }} input
- */
-export function negotiateLocale(input) {
+/** Fixed negotiation priority. Host only supplies candidates. */
+export function negotiateLocale(input: {
+    supportedLocales: string[];
+    defaultLocale: string;
+    routeLocale?: string | null;
+    userChoice?: string | null;
+    preference?: string | null;
+    hostCandidates?: string[];
+}): string {
     const supported = new Set(input.supportedLocales || []);
-    /** @param {string|null|undefined} id */
-    const accept = (id) => {
+    const accept = (id: string | null | undefined): string | null => {
         if (!id || typeof id !== 'string') return null;
         // Exact LocaleId only — no zh-TW → zh-hant guessing.
         return supported.has(id) ? id : null;
@@ -52,19 +47,18 @@ export function negotiateLocale(input) {
     );
 }
 
-/**
- * @param {{
- * applicationId: string,
- * deliveryId: string,
- * localeId: string,
- * timeZone: string,
- * calendar?: string,
- * numberingSystem?: string,
- * direction?: string,
- * generation?: number,
- * }} opts
- */
-export function buildApplicationContext(opts) {
+export interface ApplicationContextOpts {
+    applicationId: string;
+    deliveryId: string;
+    localeId: string;
+    timeZone: string;
+    calendar?: string;
+    numberingSystem?: string;
+    direction?: string;
+    generation?: number;
+}
+
+export function buildApplicationContext(opts: ApplicationContextOpts) {
     return {
         schema: LOCALE_APPLICATION_CONTEXT_SCHEMA,
         applicationId: opts.applicationId,
@@ -78,11 +72,13 @@ export function buildApplicationContext(opts) {
     };
 }
 
-/**
- * @param {ReturnType<typeof buildApplicationContext>} app
- * @param {{ currency?: string }} [opts]
- */
-export function buildFormatterContext(app, opts = {}) {
+export type ApplicationContext = ReturnType<typeof buildApplicationContext>;
+
+export interface FormatterContextOpts {
+    currency?: string;
+}
+
+export function buildFormatterContext(app: ApplicationContext, opts: FormatterContextOpts = {}) {
     return {
         schema: LOCALE_FORMATTER_CONTEXT_SCHEMA,
         localeId: app.localeId,
@@ -94,11 +90,10 @@ export function buildFormatterContext(app, opts = {}) {
     };
 }
 
-/**
- * Stable digest for Resume / SSR↔client parity.
- * @param {ReturnType<typeof buildFormatterContext>} formatter
- */
-export function formatterContextDigest(formatter) {
+export type FormatterContext = ReturnType<typeof buildFormatterContext>;
+
+/** Stable digest for Resume / SSR↔client parity. */
+export function formatterContextDigest(formatter: FormatterContext): string {
     const canonical = {
         schema: formatter.schema,
         localeId: formatter.localeId,
@@ -111,14 +106,19 @@ export function formatterContextDigest(formatter) {
     return createHash('sha256').update(JSON.stringify(canonical)).digest('hex').slice(0, 32);
 }
 
-/**
- * Server must not read machine locale/timezone defaults.
- * @param {ReturnType<typeof buildFormatterContext>} formatter
- * @param {{ allowMachineDefault?: boolean }} [opts]
- */
-export function validateFormatterContext(formatter, opts = {}) {
-    /** @type {Array<{code:string,severity:string,message:string}>} */
-    const diagnostics = [];
+export interface ValidateFormatterContextOpts {
+    allowMachineDefault?: boolean;
+}
+
+export interface LocaleDiagnostic {
+    code: string;
+    severity: string;
+    message: string;
+}
+
+/** Server must not read machine locale/timezone defaults. */
+export function validateFormatterContext(formatter: FormatterContext, opts: ValidateFormatterContextOpts = {}) {
+    const diagnostics: LocaleDiagnostic[] = [];
     if (!formatter?.localeId || !formatter?.timeZone) {
         diagnostics.push({
             code: DIAG_FORMATTER_CONTEXT_INCOMPLETE,
@@ -156,16 +156,17 @@ export function validateFormatterContext(formatter, opts = {}) {
     };
 }
 
-/**
- * Resolve one MessageBinding to a single locale variant (whole-message, no mix).
- * @param {{
- * messageId: string,
- * requestedLocale: string,
- * variants: Record<string, { template: string }>,
- * fallback?: Record<string, string[]>,
- * }} input
- */
-export function resolveMessageVariant(input) {
+export interface MessageVariantInput {
+    template: string;
+}
+
+/** Resolve one MessageBinding to a single locale variant (whole-message, no mix). */
+export function resolveMessageVariant(input: {
+    messageId: string;
+    requestedLocale: string;
+    variants: Record<string, MessageVariantInput>;
+    fallback?: Record<string, string[]>;
+}) {
     const fallback = input.fallback || {};
     const chain = [input.requestedLocale, ...(fallback[input.requestedLocale] || [])];
     for (const loc of chain) {
@@ -195,10 +196,8 @@ export function resolveMessageVariant(input) {
 
 /**
  * Minimal ICU MessageFormat subset for parity proofs (params + plural + #).
- * @param {string} template
- * @param {Record<string, any>} [args]
  */
-export function formatMessageTemplate(template, args = {}) {
+export function formatMessageTemplate(template: string, args: Record<string, unknown> = {}): string {
     let text = String(template || '');
     // plural / selectordinal / select blocks first
     text = text.replace(/\{(\w+),\s*(plural|selectordinal|select)\s*,\s*((?:[^={}]+\{[^{}]*\}\s*)+)\}/g, (_m, name, _kind, body) => {
@@ -224,27 +223,31 @@ export function formatMessageTemplate(template, args = {}) {
     return text;
 }
 
-/**
- * @param {{
- * applicationId: string,
- * deliveryId: string,
- * supportedLocales: string[],
- * defaultLocale: string,
- * fallback?: Record<string, string[]>,
- * directions?: Record<string, string>,
- * messages: Record<string, { variants: Record<string, { template: string }> }>,
- * initialLocaleId: string,
- * timeZone: string,
- * generation?: number,
- * loadedChunks?: Set<string>|string[],
- * }} opts
- */
-export function createLocaleSession(opts) {
+export interface LocaleSessionOpts {
+    applicationId: string;
+    deliveryId: string;
+    supportedLocales: string[];
+    defaultLocale: string;
+    fallback?: Record<string, string[]>;
+    directions?: Record<string, string>;
+    messages: Record<string, { variants: Record<string, { template: string }> }>;
+    initialLocaleId: string;
+    timeZone: string;
+    generation?: number;
+    loadedChunks?: Set<string> | string[];
+}
+
+export interface LocaleTransitionOpts {
+    generation?: number;
+    loadChunk?: (localeId: string) => boolean | Promise<boolean>;
+    timeZone?: string;
+}
+
+export function createLocaleSession(opts: LocaleSessionOpts) {
     const supported = new Set(opts.supportedLocales);
     const directions = opts.directions || {};
     const fallback = opts.fallback || {};
     let generation = opts.generation ?? 1;
-    /** @type {Set<string>} */
     const loaded = new Set(opts.loadedChunks || [opts.initialLocaleId]);
     let app = buildApplicationContext({
         applicationId: opts.applicationId,
@@ -267,15 +270,10 @@ export function createLocaleSession(opts) {
         };
     }
 
-    /**
-     * Render all known messages under current locale (atomic surface proof).
-     * @param {Record<string, Record<string, any>>} [argMap]
-     */
-    function renderAll(argMap = {}) {
-        /** @type {Record<string, { text: string, resolvedLocale: string }>} */
-        const out = {};
-        /** @type {string[]} */
-        const resolvedLocales = [];
+    /** Render all known messages under current locale (atomic surface proof). */
+    function renderAll(argMap: Record<string, Record<string, unknown>> = {}) {
+        const out: Record<string, { text: string; resolvedLocale: string }> = {};
+        const resolvedLocales: string[] = [];
         for (const [messageId, node] of Object.entries(opts.messages)) {
             const res = resolveMessageVariant({
                 messageId,
@@ -294,16 +292,8 @@ export function createLocaleSession(opts) {
         return { bindings: out, resolvedLocales: unique };
     }
 
-    /**
-     * Atomic LocaleTransition (locale notes ).
-     * @param {string} targetLocaleId
-     * @param {{
-     * generation?: number,
-     * loadChunk?: (localeId: string) => boolean|Promise<boolean>,
-     * timeZone?: string,
-     * }} [transitionOpts]
-     */
-    async function transition(targetLocaleId, transitionOpts = {}) {
+    /** Atomic LocaleTransition. */
+    async function transition(targetLocaleId: string, transitionOpts: LocaleTransitionOpts = {}) {
         const fromLocale = app.localeId;
         const expectedGen = transitionOpts.generation ?? generation;
         if (expectedGen !== generation) {
@@ -389,8 +379,7 @@ export function createLocaleSession(opts) {
         // After commit, every binding must resolve under the new requested locale
         // (or its explicit fallback chain) — never a mix of independent "half pages".
         const foreign = rendered.resolvedLocales.filter((loc) => loc !== targetLocaleId && !(fallback[targetLocaleId] || []).includes(loc));
-        /** @type {any[]} */
-        const diagnostics = [];
+        const diagnostics: LocaleDiagnostic[] = [];
         if (foreign.length) {
             diagnostics.push({
                 code: DIAG_MESSAGE_MIXED_LOCALE,
@@ -433,16 +422,22 @@ export function createLocaleSession(opts) {
     };
 }
 
-/**
- * SSR and client must share the same resolved FormatterContext digest and texts.
- * @param {{
- * ssr: { localeId: string, formatterDigest: string, formatterDataVersion?: string, texts: Record<string, string> },
- * client: { localeId: string, formatterDigest: string, formatterDataVersion?: string, texts: Record<string, string> },
- * }} input
- */
-export function checkSsrClientParity(input) {
-    /** @type {Array<{code:string,severity:string,message:string}>} */
-    const diagnostics = [];
+/** SSR and client must share the same resolved FormatterContext digest and texts. */
+export function checkSsrClientParity(input: {
+    ssr: {
+        localeId: string;
+        formatterDigest: string;
+        formatterDataVersion?: string;
+        texts: Record<string, string>;
+    };
+    client: {
+        localeId: string;
+        formatterDigest: string;
+        formatterDataVersion?: string;
+        texts: Record<string, string>;
+    };
+}) {
+    const diagnostics: LocaleDiagnostic[] = [];
     const { ssr, client } = input;
     if (ssr.localeId !== client.localeId) {
         diagnostics.push({
@@ -485,25 +480,24 @@ export function checkSsrClientParity(input) {
     };
 }
 
-/**
- * Aggregate runtime proof for a project check report + explicit contexts.
- * @param {{
- * manifest: { defaultLocale: string, locales: Array<{id:string,direction?:string}>, fallback?: Record<string,string[]> },
- * messages: Array<{ messageId: string, variants: Record<string, { template: string }> }>,
- * applicationId?: string,
- * deliveryId?: string,
- * timeZone?: string,
- * }} input
- */
-export function checkLocaleRuntime(input) {
-    /** @type {any[]} */
-    const diagnostics = [];
+/** Aggregate runtime proof for a project check report + explicit contexts. */
+export function checkLocaleRuntime(input: {
+    manifest: {
+        defaultLocale: string;
+        locales: Array<{ id: string; direction?: string }>;
+        fallback?: Record<string, string[]>;
+    };
+    messages: Array<{ messageId: string; variants: Record<string, { template: string }> }>;
+    applicationId?: string;
+    deliveryId?: string;
+    timeZone?: string;
+}) {
+    const diagnostics: LocaleDiagnostic[] = [];
     const supported = (input.manifest?.locales || []).map((l) => l.id);
     const defaultLocale = input.manifest?.defaultLocale;
     const fallback = input.manifest?.fallback || {};
     const directions = Object.fromEntries((input.manifest?.locales || []).map((l) => [l.id, l.direction || 'ltr']));
-    /** @type {Record<string, { variants: Record<string, { template: string }> }>} */
-    const messages = {};
+    const messages: Record<string, { variants: Record<string, { template: string }> }> = {};
     for (const m of input.messages || []) {
         messages[m.messageId] = { variants: m.variants };
     }

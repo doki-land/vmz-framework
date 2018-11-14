@@ -2,7 +2,6 @@
  * A3-cdn: vendor-neutral CDN policy (cache / redirect / error) + local static host.
  * Provider adapters only project the same contract — they must not change RouteId/canonical/CSP.
  */
-// @ts-nocheck
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -19,20 +18,51 @@ export const CACHE_HTML = 'public, max-age=0, must-revalidate';
 export const CACHE_ASSET_IMMUTABLE = 'public, max-age=31536000, immutable';
 export const CACHE_META = 'public, max-age=3600';
 
-/**
- * Build CDNPolicyManifest from StaticDeliveryManifest (+ optional redirects / locale artifact).
- * Locale-prefixed HTML gets LocaleId-encoded cache keys; Accept-Language must not steal body.
- * @param {Record<string, any>} staticManifest
- * @param {{
- *   redirects?: Array<{ from: string, to: string, status?: number, reason?: string }>,
- *   localeArtifact?: Record<string, any> | null,
- * }} [opts]
- */
-export function buildCdnPolicyManifest(staticManifest, opts = {}) {
+export interface CdnRedirect {
+    from: string;
+    to: string;
+    status?: number;
+    reason?: string;
+}
+
+interface BuildCdnPolicyOpts {
+    redirects?: CdnRedirect[];
+    localeArtifact?: Record<string, unknown> | null;
+}
+
+export interface CdnPolicyManifest {
+    schema: string;
+    applicationId: unknown;
+    deliveryProfile: string;
+    origin: string;
+    spaFallback: boolean;
+    staticManifestDigest: unknown;
+    redirects: CdnRedirect[];
+    headers: Array<{ match: string; headers: Record<string, string | undefined> }>;
+    errorDocuments: unknown[];
+    routes: unknown[];
+    localeCache: Record<string, unknown>;
+    policyDigest?: string;
+}
+
+interface EmitCdnPolicyOpts {
+    redirects?: CdnRedirect[];
+}
+
+interface LocalStaticHostOpts {
+    host?: string;
+    port?: number;
+}
+
+export function buildCdnPolicyManifest(staticManifest: Record<string, unknown>, opts: BuildCdnPolicyOpts = {}) {
     const origin = String(staticManifest.origin || '');
     const localeArt = opts.localeArtifact || null;
     const localeRedirects = buildOmitPrefixRedirects(staticManifest, localeArt);
-    const redirects = [{ from: '/home', to: '/', status: 301, reason: 'canonical-alias' }, ...localeRedirects, ...(opts.redirects || [])];
+    const redirects: CdnRedirect[] = [
+        { from: '/home', to: '/', status: 301, reason: 'canonical-alias' },
+        ...localeRedirects,
+        ...(opts.redirects || []),
+    ];
     const headers = [
         { match: '**/*.html', headers: { 'cache-control': CACHE_HTML } },
         {
@@ -51,7 +81,8 @@ export function buildCdnPolicyManifest(staticManifest, opts = {}) {
     const routes = [];
     /** @type {any[]} */
     const cacheKeyDiagnostics = [];
-    for (const r of staticManifest.routes || []) {
+    const staticRoutes = Array.isArray(staticManifest.routes) ? (staticManifest.routes as any[]) : [];
+    for (const r of staticRoutes) {
         const localeId = r.localeId || null;
         const alternates = Array.isArray(r.seo?.alternates) ? r.seo.alternates : [];
         const cacheKey = localeId
@@ -89,7 +120,7 @@ export function buildCdnPolicyManifest(staticManifest, opts = {}) {
     }
 
     const localeRoutes = routes.filter((r) => r.localeId);
-    const body = {
+    const body: CdnPolicyManifest = {
         schema: CDN_POLICY_MANIFEST_SCHEMA,
         applicationId: staticManifest.applicationId || null,
         deliveryProfile: 'static',
@@ -117,14 +148,13 @@ export function buildCdnPolicyManifest(staticManifest, opts = {}) {
  * @param {Record<string, any>} staticManifest
  * @param {Record<string, any> | null} localeArt
  */
-function buildOmitPrefixRedirects(staticManifest, localeArt) {
-    const routing = localeArt?.routing || {};
+function buildOmitPrefixRedirects(staticManifest: Record<string, unknown>, localeArt: Record<string, unknown> | null) {
+    const routing = (localeArt?.routing || {}) as Record<string, unknown>;
     const defaultLocale = localeArt?.defaultLocale || routing.defaultLocale;
     if (!defaultLocale || routing.defaultPrefix !== 'omit') return [];
-    /** @type {Array<{ from: string, to: string, status: number, reason: string }>} */
-    const out = [];
+    const out: CdnRedirect[] = [];
     const seen = new Set();
-    for (const r of staticManifest.routes || []) {
+    for (const r of (staticManifest.routes || []) as Array<Record<string, unknown>>) {
         if (r.localeId !== defaultLocale) continue;
         const canonical = String(r.path || '/');
         const from = canonical === '/' ? `/${defaultLocale}` : `/${defaultLocale}${canonical.startsWith('/') ? canonical : `/${canonical}`}`;
@@ -146,7 +176,7 @@ function buildOmitPrefixRedirects(staticManifest, localeArt) {
  * @param {Record<string, any>} staticManifest
  * @param {{ redirects?: Array<{ from: string, to: string, status?: number, reason?: string }> }} [opts]
  */
-export function emitCdnPolicy(distDir, staticManifest, opts = {}) {
+export function emitCdnPolicy(distDir: string, staticManifest: Record<string, unknown>, opts: EmitCdnPolicyOpts = {}) {
     const localeArtifact = loadLocaleArtifact(distDir);
     const policy = buildCdnPolicyManifest(staticManifest, { ...opts, localeArtifact });
     const vmzDir = path.join(distDir, '_vmz');
@@ -169,7 +199,7 @@ export function emitCdnPolicy(distDir, staticManifest, opts = {}) {
 /**
  * @param {string} distDir
  */
-function loadLocaleArtifact(distDir) {
+function loadLocaleArtifact(distDir: string): Record<string, unknown> | null {
     const p = path.join(distDir, '_vmz', 'locale-route-realization.json');
     if (!fs.existsSync(p)) return null;
     try {
@@ -184,7 +214,7 @@ function loadLocaleArtifact(distDir) {
  * @param {Record<string, any>} policy
  * @param {'local-static' | 'netlify'} adapterId
  */
-export function projectCdnAdapter(policy, adapterId) {
+export function projectCdnAdapter(policy: CdnPolicyManifest, adapterId: 'local-static' | 'netlify') {
     if (policy.spaFallback) {
         throw new Error('projectCdnAdapter: spaFallback=true is forbidden');
     }
@@ -244,7 +274,7 @@ export function projectCdnAdapter(policy, adapterId) {
  * @param {{ host?: string, port?: number }} [opts]
  * @returns {Promise<{ host: string, port: number, baseUrl: string, close: () => Promise<void> }>}
  */
-export function listenLocalStaticHost(distDir, policy, opts = {}) {
+export function listenLocalStaticHost(distDir: string, policy: Record<string, unknown>, opts: LocalStaticHostOpts = {}) {
     const host = opts.host || '127.0.0.1';
     const port = Number(opts.port || 0);
     const handler = createLocalStaticHandler(distDir, policy);
@@ -258,8 +288,8 @@ export function listenLocalStaticHost(distDir, policy, opts = {}) {
                 port: actualPort,
                 baseUrl: `http://${host}:${actualPort}`,
                 close: () =>
-                    new Promise((res, rej) => {
-                        server.close((err) => (err ? rej(err) : res()));
+                    new Promise<void>((res, rej) => {
+                        server.close((err) => (err ? rej(err) : res(undefined)));
                     }),
             });
         });

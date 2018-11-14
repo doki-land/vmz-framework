@@ -1,9 +1,9 @@
-// @ts-nocheck
 /**
  * `vmz locale` — registered on `@vmz/commander`.
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import type { Command, ParsedOptions } from '@vmz/commander';
 import { parseAuthorInput } from './author-input.js';
 import { checkLocales, emitLocaleTypedModules, localeHasErrors, planLocaleRename } from './locale-check.js';
 import { checkLocaleDelivery } from './locale-delivery.js';
@@ -19,12 +19,8 @@ import {
 import { log } from './log.js';
 import { emitPrettyJson, generatePrettyJson } from './pretty-json.js';
 
-/**
- * @param {import('@vmz/commander').Command} parent
- */
-export function registerLocaleCommands(parent) {
-    /** @param {import('@vmz/commander').Command} cmd */
-    const withCommon = (cmd) =>
+export function registerLocaleCommands(parent: Command): void {
+    const withCommon = (cmd: Command) =>
         cmd
             .option('--root <dir>', 'cli.opt.root')
             .option('--out <dir>', 'cli.opt.out')
@@ -42,9 +38,7 @@ export function registerLocaleCommands(parent) {
     withCommon(parent.command('rename', 'cli.cmd.locale.rename')).action((o) => cmdLocaleRename(o));
     withCommon(parent.command('runtime-check', 'cli.cmd.locale.runtime-check')).action((o) => cmdLocaleRuntimeCheck(o));
     withCommon(parent.command('router-check', 'cli.cmd.locale.router-check')).action((o) => cmdLocaleRouterCheck(o));
-    withCommon(parent.command('delivery-check', 'cli.cmd.locale.delivery-check')).action((o) =>
-        cmdLocaleDeliveryCheck(o),
-    );
+    withCommon(parent.command('delivery-check', 'cli.cmd.locale.delivery-check')).action((o) => cmdLocaleDeliveryCheck(o));
     withCommon(parent.command('explain', 'cli.cmd.locale.explain')).action((o) => cmdLocaleExplain(o));
     withCommon(parent.command('diff', 'cli.cmd.locale.diff')).action((o) => cmdLocaleDiff(o));
     withCommon(parent.command('extract', 'cli.cmd.locale.extract')).action((o) => cmdLocaleExtract(o));
@@ -52,21 +46,26 @@ export function registerLocaleCommands(parent) {
     withCommon(parent.command('conformance', 'cli.cmd.locale.conformance')).action((o) => cmdLocaleConformance(o));
 }
 
-function resolveProject(args) {
+function resolveProject(args: ParsedOptions): string {
     const project = (typeof args.root === 'string' && args.root) || (typeof args._[0] === 'string' && args._[0]) || '.';
     return path.resolve(project);
 }
 
-function emitJson(args, report) {
-    emitPrettyJson(args.json, report, {
+function asJsonTarget(value: string | boolean | string[] | undefined): string | boolean | undefined {
+    if (Array.isArray(value)) return true;
+    return value;
+}
+
+function emitJson(args: ParsedOptions, report: unknown): void {
+    emitPrettyJson(asJsonTarget(args.json), report, {
         logWrote: (p) => log.info(`wrote ${p}`),
     });
 }
 
-function cmdLocaleCheck(args) {
+function cmdLocaleCheck(args: ParsedOptions): number {
     const projectRoot = resolveProject(args);
     const report = checkLocales({ projectRoot, strict: Boolean(args.strict) });
-    const jsonOut = args.json;
+    const jsonOut = asJsonTarget(args.json);
     if (jsonOut) {
         emitPrettyJson(jsonOut, report, { logWrote: (p) => log.info(`wrote ${p}`) });
     } else {
@@ -79,7 +78,7 @@ function cmdLocaleCheck(args) {
     return localeHasErrors(report) ? 1 : 0;
 }
 
-function cmdLocaleList(args) {
+function cmdLocaleList(args: ParsedOptions): number {
     const projectRoot = resolveProject(args);
     const report = checkLocales({ projectRoot, checkUnused: false });
     if (!report.manifest) {
@@ -93,7 +92,7 @@ function cmdLocaleList(args) {
     return localeHasErrors(report) ? 1 : 0;
 }
 
-function cmdLocaleEmitTypes(args) {
+function cmdLocaleEmitTypes(args: ParsedOptions): number {
     const projectRoot = resolveProject(args);
     const outDir = (typeof args.out === 'string' && args.out) || path.join(projectRoot, 'dist', 'locales-types');
     const report = checkLocales({ projectRoot, strict: Boolean(args.strict) });
@@ -106,7 +105,7 @@ function cmdLocaleEmitTypes(args) {
     return 0;
 }
 
-function cmdLocaleRename(args) {
+function cmdLocaleRename(args: ParsedOptions): number {
     const fromId = typeof args._[0] === 'string' ? args._[0] : '';
     const toId = typeof args._[1] === 'string' ? args._[1] : '';
     if (!fromId || !toId) {
@@ -117,7 +116,7 @@ function cmdLocaleRename(args) {
     const report = checkLocales({ projectRoot, checkUnused: false });
     const plan = planLocaleRename(report, fromId, toId);
     if (args.json) {
-        emitPrettyJson(args.json, plan);
+        emitPrettyJson(asJsonTarget(args.json), plan);
     } else if (plan.status !== 'ready') {
         log.error(plan.error || 'rename failed');
     } else {
@@ -127,7 +126,7 @@ function cmdLocaleRename(args) {
     return plan.status === 'ready' ? 0 : 1;
 }
 
-function cmdLocaleRuntimeCheck(args) {
+function cmdLocaleRuntimeCheck(args: ParsedOptions): number {
     const projectRoot = resolveProject(args);
     const base = checkLocales({ projectRoot, checkUnused: false });
     if (localeHasErrors(base) || !base.manifest) {
@@ -153,11 +152,22 @@ function cmdLocaleRuntimeCheck(args) {
     return report.status === 'ready' ? 0 : 1;
 }
 
-function loadRoutesFixture(projectRoot) {
+function loadRoutesFixture(projectRoot: string): {
+    routes: Array<{ routeId: string; path: string }>;
+    origin?: string;
+    titles?: Record<string, Record<string, string>>;
+} {
     const candidates = [path.join(projectRoot, 'locale-routes.json5'), path.join(projectRoot, 'locale-routes.json')];
     for (const p of candidates) {
         if (fs.existsSync(p)) {
-            return parseAuthorInput(fs.readFileSync(p, 'utf8'));
+            const parsed = parseAuthorInput(fs.readFileSync(p, 'utf8'));
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                return parsed as {
+                    routes: Array<{ routeId: string; path: string }>;
+                    origin?: string;
+                    titles?: Record<string, Record<string, string>>;
+                };
+            }
         }
     }
     return {
@@ -167,7 +177,7 @@ function loadRoutesFixture(projectRoot) {
     };
 }
 
-function cmdLocaleRouterCheck(args) {
+function cmdLocaleRouterCheck(args: ParsedOptions): number {
     const projectRoot = resolveProject(args);
     const base = checkLocales({ projectRoot, checkUnused: false });
     if (localeHasErrors(base) || !base.manifest) {
@@ -191,7 +201,7 @@ function cmdLocaleRouterCheck(args) {
     return report.status === 'ready' ? 0 : 1;
 }
 
-function cmdLocaleDeliveryCheck(args) {
+function cmdLocaleDeliveryCheck(args: ParsedOptions): number {
     const projectRoot = resolveProject(args);
     const base = checkLocales({ projectRoot, checkUnused: false });
     if (localeHasErrors(base) || !base.manifest) {
@@ -214,7 +224,7 @@ function cmdLocaleDeliveryCheck(args) {
     return report.status === 'ready' ? 0 : 1;
 }
 
-function cmdLocaleExplain(args) {
+function cmdLocaleExplain(args: ParsedOptions): number {
     const messageId = typeof args._[0] === 'string' ? args._[0] : '';
     if (!messageId) {
         log.errorId('cli.err.locale_explain_usage');
@@ -246,7 +256,7 @@ function cmdLocaleExplain(args) {
     return report.status === 'ready' ? 0 : 1;
 }
 
-function cmdLocaleDiff(args) {
+function cmdLocaleDiff(args: ParsedOptions): number {
     const baseLocale = typeof args._[0] === 'string' ? args._[0] : '';
     const targetLocale = typeof args._[1] === 'string' ? args._[1] : '';
     if (!baseLocale || !targetLocale) {
@@ -272,7 +282,7 @@ function cmdLocaleDiff(args) {
     return 0;
 }
 
-function cmdLocaleExtract(args) {
+function cmdLocaleExtract(args: ParsedOptions): number {
     const projectRoot = resolveProject(args);
     const report = extractHardcodedText(projectRoot, { check: Boolean(args.check) });
     if (args.json) emitJson(args, report);
@@ -283,7 +293,7 @@ function cmdLocaleExtract(args) {
     return report.status === 'ready' ? 0 : 1;
 }
 
-function cmdLocalePseudo(args) {
+function cmdLocalePseudo(args: ParsedOptions): number {
     const sourceLocale = typeof args._[0] === 'string' ? args._[0] : '';
     if (!sourceLocale) {
         log.errorId('cli.err.locale_pseudo_usage');
@@ -310,16 +320,19 @@ function cmdLocalePseudo(args) {
     return report.status === 'ready' ? 0 : 1;
 }
 
-function cmdLocaleConformance(args) {
+function cmdLocaleConformance(args: ParsedOptions): number {
     const projectRoot = resolveProject(args);
     const base = checkLocales({ projectRoot, checkUnused: false });
     if (localeHasErrors(base) || !base.manifest) return 1;
-    let routeIds = [];
+    let routeIds: string[] = [];
     const routesPath = path.join(projectRoot, 'locale-routes.json5');
     if (fs.existsSync(routesPath)) {
         try {
             const routesFile = parseAuthorInput(fs.readFileSync(routesPath, 'utf8'));
-            routeIds = (routesFile.routes || []).map((r) => r.routeId);
+            if (routesFile && typeof routesFile === 'object' && !Array.isArray(routesFile) && 'routes' in routesFile) {
+                const routes = (routesFile as { routes?: Array<{ routeId?: string }> }).routes || [];
+                routeIds = routes.map((r) => String(r.routeId || '')).filter(Boolean);
+            }
         } catch {
             /* ignore */
         }

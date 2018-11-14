@@ -102,11 +102,7 @@ export function clearLocalesCache(): void {
     manifestCache.clear();
 }
 
-export function translate(
-    id: string,
-    args: Record<string, string> | undefined,
-    catalog: LocaleCatalog,
-): string {
+export function translate(id: string, args: Record<string, string> | undefined, catalog: LocaleCatalog): string {
     const template = catalog[id];
     if (template == null) return `{{${id}}}`;
     return template.replace(/\{([a-zA-Z0-9_.-]+)\}/g, (_m, name: string) => {
@@ -165,11 +161,7 @@ export function resolveLocale(opts: {
 /**
  * Catalog lookup with commander framework English fallbacks.
  */
-export function translateWithFallback(
-    id: string,
-    args: Record<string, string> | undefined,
-    catalog: LocaleCatalog,
-): string {
+export function translateWithFallback(id: string, args: Record<string, string> | undefined, catalog: LocaleCatalog): string {
     if (Object.prototype.hasOwnProperty.call(catalog, id)) {
         return translate(id, args, catalog);
     }
@@ -196,10 +188,7 @@ export function createLocalizeFromLocales(opts: CreateLocalizeFromLocalesOptions
     const env = opts.env ?? process.env;
     const argv = opts.argv ?? [];
     const manifest = loadLocalesManifest(opts.root);
-    const locale =
-        typeof opts.locale === 'string' && opts.locale
-            ? opts.locale
-            : resolveLocale({ argv, env, manifest, envKeys: opts.envKeys });
+    const locale = typeof opts.locale === 'string' && opts.locale ? opts.locale : resolveLocale({ argv, env, manifest, envKeys: opts.envKeys });
     const catalog = opts.catalog ?? loadCatalog(locale, opts.root);
     return {
         resolveLocale: () => locale,

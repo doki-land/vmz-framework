@@ -2,7 +2,6 @@
  * A3-site: SiteDeliveryContract — embedded | filesystem | remote selection + release fallback.
  * Authoring via defineConfig({ delivery }) / defineSite(...); pure data only.
  */
-// @ts-nocheck
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -23,20 +22,21 @@ export function defineSite(delivery) {
 
 /**
  * Normalize authoring delivery → frozen SiteDeliveryContract.
- * @param {unknown} raw
- * @param {{ siteId?: string, projectRoot?: string }} [opts]
- * @returns {{ ok: true, contract: Record<string, any> } | { ok: false, diagnostics: Array<{ code: string, message: string }> }}
  */
-export function normalizeSiteDelivery(raw, opts = {}) {
-    /** @type {Array<{ code: string, message: string }>} */
-    const diagnostics = [];
+export function normalizeSiteDelivery(
+    raw: unknown,
+    opts: { siteId?: string; projectRoot?: string } = {},
+):
+    | { ok: true; contract: Record<string, any> }
+    | { ok: false; diagnostics: Array<{ code: string; message: string }> } {
+    const diagnostics: Array<{ code: string; message: string }> = [];
     if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) {
         return {
             ok: false,
             diagnostics: [{ code: 'site.delivery.invalid', message: 'delivery must be a plain object' }],
         };
     }
-    const d = /** @type {Record<string, any>} */ (raw);
+    const d = raw as Record<string, any>;
     if (typeof d.artifact !== 'string' || !d.artifact.trim()) {
         diagnostics.push({ code: 'site.delivery.artifact', message: 'delivery.artifact is required' });
     }
@@ -135,7 +135,21 @@ export function normalizeSiteDelivery(raw, opts = {}) {
 
     if (diagnostics.length) return { ok: false, diagnostics };
 
-    const contractBody = {
+    const contractBody: {
+        schema: string;
+        schemaVersion: string;
+        siteId: unknown;
+        artifact: string;
+        expectedCompatibility: unknown;
+        sources: unknown[];
+        resolutionPolicy: { mode: string; fallback: unknown; fileLevelMix: boolean };
+        failurePolicy: unknown;
+        updatePolicy: unknown;
+        rollbackPolicy: unknown;
+        securityPolicy: unknown;
+        activation: string;
+        contractDigest?: string;
+    } = {
         schema: SITE_DELIVERY_CONTRACT_SCHEMA,
         schemaVersion: '0',
         siteId: opts.siteId || d.siteId || d.artifact,
@@ -172,7 +186,17 @@ export function normalizeSiteDelivery(raw, opts = {}) {
  *   error?: string | null,
  * }} [probe]
  */
-export function normalizeSourceProbe(probe = {}) {
+export function normalizeSourceProbe(
+    probe: {
+        available?: boolean;
+        artifactDigest?: string | null;
+        integrityOk?: boolean;
+        signatureOk?: boolean;
+        objectClosureOk?: boolean;
+        mixedDigestObjects?: boolean;
+        error?: string | null;
+    } = {},
+) {
     return {
         available: probe.available !== false,
         artifactDigest: probe.artifactDigest ?? null,
@@ -189,12 +213,12 @@ export function normalizeSourceProbe(probe = {}) {
  * @param {Record<string, any>} contract
  * @param {Record<string, ReturnType<typeof normalizeSourceProbe>>} probes by sourceId
  */
-export function resolveSiteRelease(contract, probes = {}) {
-    const attempted = [];
-    const fallback = contract.resolutionPolicy?.fallback || contract.sources.map((s) => s.sourceId);
+export function resolveSiteRelease(contract: Record<string, any>, probes: Record<string, ReturnType<typeof normalizeSourceProbe>> = {}) {
+    const attempted: Array<{ sourceId: string; result: string; reason: string | null }> = [];
+    const fallback = contract.resolutionPolicy?.fallback || contract.sources.map((s: any) => s.sourceId);
 
     for (const sourceId of fallback) {
-        const source = (contract.sources || []).find((s) => s.sourceId === sourceId);
+        const source = (contract.sources || []).find((s: any) => s.sourceId === sourceId);
         if (!source) {
             attempted.push({ sourceId, result: 'skip', reason: 'unknown-source' });
             continue;
@@ -230,7 +254,19 @@ export function resolveSiteRelease(contract, probes = {}) {
         }
 
         attempted.push({ sourceId, result: 'accept', reason: null });
-        const resolution = {
+        const resolution: {
+            schema: string;
+            status: string;
+            selectedSourceId: string;
+            selectedKind: unknown;
+            selectedDigest: string | null;
+            fallbackReason: string | null;
+            attempted: typeof attempted;
+            fileLevelMix: boolean;
+            activation: string;
+            contractDigest: unknown;
+            resolutionDigest?: string;
+        } = {
             schema: SITE_DELIVERY_RESOLUTION_SCHEMA,
             status: 'activated',
             selectedSourceId: sourceId,
@@ -324,9 +360,13 @@ export function probeReleaseDirectory(releaseDir) {
  * @param {unknown} deliveryRaw
  * @param {{ siteId?: string, probes?: Record<string, any> }} [opts]
  */
-export function emitSiteDelivery(outDir, deliveryRaw, opts = {}) {
+export function emitSiteDelivery(
+    outDir: string,
+    deliveryRaw: unknown,
+    opts: { siteId?: string; probes?: Record<string, ReturnType<typeof normalizeSourceProbe>> } = {},
+) {
     const norm = normalizeSiteDelivery(deliveryRaw, { siteId: opts.siteId });
-    if (!norm.ok) {
+    if (norm.ok === false) {
         throw new Error(`emitSiteDelivery: ${norm.diagnostics.map((d) => d.message).join('; ')}`);
     }
     const vmzDir = path.join(outDir, '_vmz');

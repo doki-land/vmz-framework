@@ -2,7 +2,6 @@
  * Site favicon: author SVG → PNG + ICO + `_vmz/site-favicon.json` head links.
  * Convention: `assets/favicon.svg` (or `favicon.svg`) under project / already in dist.
  */
-// @ts-nocheck
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,7 +16,12 @@ const ICO_SIZES = [16, 32, 48];
  * @param {string} distDir
  * @param {{ projectRoot?: string, skipNative?: boolean }} [opts]
  */
-export function emitSiteFavicon(distDir, opts = {}) {
+interface SiteFaviconOpts {
+    projectRoot?: string;
+    skipNative?: boolean;
+}
+
+export function emitSiteFavicon(distDir: string, opts: SiteFaviconOpts = {}) {
     const absDist = path.resolve(distDir);
     const projectRoot = opts.projectRoot ? path.resolve(opts.projectRoot) : null;
     const src = discoverFaviconSvg(absDist, projectRoot);

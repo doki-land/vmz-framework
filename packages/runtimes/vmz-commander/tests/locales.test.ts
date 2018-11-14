@@ -105,9 +105,7 @@ describe('@vmz/commander locales + parse', () => {
     it('createLocalizeFromLocales + assertCatalogCoverage', () => {
         const plugin = createLocalizeFromLocales({ root: fixturesRoot, locale: 'en-US' });
         expect(plugin.t('cli.cmd.build')).toBe('Build the project');
-        expect(plugin.t('commander.err.unknown_option', { option: '--x' })).toBe(
-            'unknown option `--x`',
-        );
+        expect(plugin.t('commander.err.unknown_option', { option: '--x' })).toBe('unknown option `--x`');
 
         const cli = createCli('cov').locales(fixturesRoot).intro('cli.intro');
         cli.command('build', 'cli.cmd.build')
@@ -115,8 +113,6 @@ describe('@vmz/commander locales + parse', () => {
             .action(() => 0);
         assertCatalogCoverage(cli, loadCatalog('en-US', fixturesRoot));
 
-        expect(() =>
-            assertCatalogCoverage(cli, { 'cli.intro': 'x', 'cli.cmd.build': 'y' }),
-        ).toThrow(/catalog missing help ids/);
+        expect(() => assertCatalogCoverage(cli, { 'cli.intro': 'x', 'cli.cmd.build': 'y' })).toThrow(/catalog missing help ids/);
     });
 });

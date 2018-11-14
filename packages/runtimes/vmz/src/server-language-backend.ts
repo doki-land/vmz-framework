@@ -2,14 +2,12 @@
  * Server Language DSL backends (lang on `<script server>`).
  * Author surface is a VMZ DSL flavor — not full target-language source.
  */
-// @ts-nocheck
 
-/** @typedef {'ts' | 'rust' | 'python' | 'java'} ServerLangId */
+export type ServerLangId = 'ts' | 'rust' | 'python' | 'java';
 
-export const SERVER_LANG_IDS = Object.freeze(['ts', 'rust', 'python', 'java']);
+export const SERVER_LANG_IDS = Object.freeze(['ts', 'rust', 'python', 'java'] as const);
 
-/** @type {Record<string, ServerLangId>} */
-export const SERVER_LANG_ALIASES = Object.freeze({
+export const SERVER_LANG_ALIASES: Record<string, ServerLangId> = Object.freeze({
     ts: 'ts',
     typescript: 'ts',
     rust: 'rust',
@@ -17,18 +15,15 @@ export const SERVER_LANG_ALIASES = Object.freeze({
     java: 'java',
 });
 
-/**
- * @typedef {{
- *   langId: ServerLangId,
- *   aliases: string[],
- *   compatibleRuntimes: string[],
- *   implemented: boolean,
- *   artifactRoot: string,
- * }} ServerLanguageBackendMeta
- */
+export interface ServerLanguageBackendMeta {
+    langId: ServerLangId;
+    aliases: string[];
+    compatibleRuntimes: string[];
+    implemented: boolean;
+    artifactRoot: string;
+}
 
-/** @type {Record<ServerLangId, ServerLanguageBackendMeta>} */
-export const SERVER_LANGUAGE_BACKENDS = Object.freeze({
+export const SERVER_LANGUAGE_BACKENDS: Record<ServerLangId, ServerLanguageBackendMeta> = Object.freeze({
     ts: {
         langId: 'ts',
         aliases: ['ts', 'typescript'],
@@ -59,16 +54,11 @@ export const SERVER_LANGUAGE_BACKENDS = Object.freeze({
     },
 });
 
-/**
- * Resolve author `lang` attr (or null/undefined for default TS).
- * @param {string | null | undefined} raw
- * @returns {{
- *   ok: true, langId: ServerLangId, backend: ServerLanguageBackendMeta
- * } | {
- *   ok: false, code: string, message: string
- * }}
- */
-export function resolveServerLanguage(raw) {
+export type ResolveServerLanguageResult =
+    | { ok: true; langId: ServerLangId; backend: ServerLanguageBackendMeta }
+    | { ok: false; code: string; message: string };
+
+export function resolveServerLanguage(raw: string | null | undefined): ResolveServerLanguageResult {
     const trimmed = raw == null ? '' : String(raw).trim();
     if (!trimmed) {
         return { ok: true, langId: 'ts', backend: SERVER_LANGUAGE_BACKENDS.ts };
@@ -92,11 +82,10 @@ export function resolveServerLanguage(raw) {
     return { ok: true, langId, backend };
 }
 
-/**
- * @param {ServerLangId} langId
- * @param {string | null | undefined} serverRuntime
- */
-export function assertLangRuntimePair(langId, serverRuntime) {
+export function assertLangRuntimePair(
+    langId: ServerLangId,
+    serverRuntime: string | null | undefined,
+): { ok: true } | { ok: false; code: string; message: string } {
     const backend = SERVER_LANGUAGE_BACKENDS[langId];
     if (!backend) {
         return {

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Document Static + Interactive artifacts.
  */
@@ -6,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { checkDocuments, manifestHasErrors } from './document-check.js';
 import { resolveDocumentDesignsCss } from './document-designs.js';
-import { enrichDocumentContent, pageHtmlRel } from './document-enrich.js';
+import { enrichDocumentContent, pageHtmlRel, type AnalyzedMarkdown, type DocumentHeading, type DocumentNavItem } from './document-enrich.js';
 import { enrichDocumentEvidence } from './document-evidence.js';
 import {
     artifactHrefFromHtml,
@@ -17,21 +16,41 @@ import {
 } from './document-interactive.js';
 import { assertIntegratedDistReady, renderCompiledDocumentLayout } from './document-layout-render.js';
 import { resolveMarkdownEngine } from './document-markdown.js';
-import { loadLocalesRouting } from './document-routing-config.js';
-import { DOCUMENT_VIEW_SCHEMA } from './document-schema.js';
+import { loadLocalesRouting, type LocalesRouting } from './document-routing-config.js';
+import { DOCUMENT_VIEW_SCHEMA, type DocumentManifest } from './document-schema.js';
 import { createWorkspace } from './index.js';
 import { requireNativeAddon } from './native-addon.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 
-/**
- * @param {{ projectRoot: string, outDir?: string, appDistDir?: string, strict?: boolean, engines?: { markdown?: string } }} opts
- */
-export async function buildDocuments(opts) {
+export interface BuildDocumentsOpts {
+    projectRoot: string;
+    outDir?: string;
+    appDistDir?: string;
+    strict?: boolean;
+    engines?: { markdown?: string };
+}
+
+export interface BuildDocumentsPageResult {
+    route: string;
+    htmlPath: string;
+    viewPath: string;
+}
+
+export interface BuildDocumentsResult {
+    ok: boolean;
+    manifest: DocumentManifest;
+    outDir: string;
+    pages: BuildDocumentsPageResult[];
+    search?: ReturnType<typeof buildDocumentSearch>;
+    islands?: ReturnType<typeof buildDocumentIslands>;
+}
+
+export async function buildDocuments(opts: BuildDocumentsOpts): Promise<BuildDocumentsResult> {
     const projectRoot = path.resolve(opts.projectRoot);
     const outDir = path.resolve(opts.outDir || path.join(projectRoot, 'dist', 'documents'));
     const strict = Boolean(opts.strict);
     const manifest = checkDocuments({ projectRoot, strict });
-    const routing = loadLocalesRouting(projectRoot) || { strategy: 'prefix' };
+    const routing: LocalesRouting = loadLocalesRouting(projectRoot) || { strategy: 'prefix' };
     const engine = await resolveMarkdownEngine({ engines: opts.engines, projectRoot });
     const enriched = enrichDocumentContent(manifest, {
         analyzeMarkdown: engine.analyzeMarkdown,
@@ -50,13 +69,12 @@ export async function buildDocuments(opts) {
         return { ok: false, manifest, outDir, pages: [] };
     }
 
-    /** @type {Map<string, any>} */
-    const analyzedByPageId = new Map();
+    const analyzedByPageId = new Map<string, AnalyzedMarkdown>();
     for (const page of manifest.pages) {
         const abs = path.isAbsolute(page.sourcePath) ? page.sourcePath : path.join(manifest.root, page.sourcePath);
         const source = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : '';
         const id = `${page.identity.locale}:${page.identity.pageKey}`;
-        analyzedByPageId.set(id, engine.analyzeMarkdown(source));
+        analyzedByPageId.set(id, engine.analyzeMarkdown(source) as AnalyzedMarkdown);
     }
     const fenceBodies = collectFenceBodies(analyzedByPageId, manifest.pages);
     const search = buildDocumentSearch({
@@ -82,8 +100,7 @@ export async function buildDocuments(opts) {
 
     fs.mkdirSync(outDir, { recursive: true });
     const designs = resolveDocumentDesignsCss(projectRoot);
-    /** @type {string | null} */
-    let designsHref = null;
+    let designsHref: string | null = null;
     if (designs.css && designs.href) {
         const cssPath = path.join(outDir, designs.href);
         fs.mkdirSync(path.dirname(cssPath), { recursive: true });
@@ -92,8 +109,7 @@ export async function buildDocuments(opts) {
     }
     const viewsDir = path.join(outDir, 'views');
     fs.mkdirSync(viewsDir, { recursive: true });
-    /** @type {Array<{ route: string, htmlPath: string, viewPath: string }>} */
-    const written = [];
+    const written: BuildDocumentsPageResult[] = [];
     for (const page of manifest.pages) {
         const id = `${page.identity.locale}:${page.identity.pageKey}`;
         const info = enriched.byId.get(id);
@@ -119,8 +135,8 @@ export async function buildDocuments(opts) {
             searchShellHtml: shells.searchHtml,
             playgroundShellHtml: shells.playgroundHtml,
         });
-        let compiledLayoutHtml = null;
-        if (useCompiledShell) {
+        let compiledLayoutHtml: string | null = null;
+        if (useCompiledShell && appDistDir) {
             compiledLayoutHtml = await renderCompiledDocumentLayout(appDistDir, page.identity.locale, slotHtml);
         }
         const view = {
@@ -174,7 +190,7 @@ export async function buildDocuments(opts) {
         fs.writeFileSync(htmlAbs, html, 'utf8');
         written.push({ route: info.route, htmlPath: htmlRel, viewPath: viewRel });
     }
-    const manifestOut = {
+    const manifestOut: DocumentManifest = {
         ...manifest,
         schema: manifest.schema,
         evidence: evidence.evidence,
@@ -199,11 +215,7 @@ export async function buildDocuments(opts) {
     return { ok: true, manifest: manifestOut, outDir, pages: written, search, islands };
 }
 
-/**
- * @param {{ appDistDir?: string }} opts
- * @param {string} outDir
- */
-function resolveAppDistDir(opts, outDir) {
+function resolveAppDistDir(opts: Pick<BuildDocumentsOpts, 'appDistDir'>, outDir: string): string | null {
     if (opts.appDistDir) {
         const p = path.resolve(opts.appDistDir);
         return fs.existsSync(path.join(p, 'vmz-dom.js')) ? p : null;
@@ -211,11 +223,29 @@ function resolveAppDistDir(opts, outDir) {
     return fs.existsSync(path.join(outDir, 'vmz-dom.js')) ? outDir : null;
 }
 
-/**
- * Document main column + sidebar (injected into DocumentLayout slot).
- */
-function buildDocumentSlotHtml({ nav, bodyHtml, headings, htmlRel, route, routing, searchShellHtml = '', playgroundShellHtml = '' }) {
-    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+interface DocumentSlotHtmlOpts {
+    nav: DocumentNavItem[];
+    bodyHtml: string;
+    headings: DocumentHeading[];
+    htmlRel: string;
+    route: string;
+    routing: LocalesRouting;
+    searchShellHtml?: string;
+    playgroundShellHtml?: string;
+}
+
+/** Document main column + sidebar (injected into DocumentLayout slot). */
+function buildDocumentSlotHtml({
+    nav,
+    bodyHtml,
+    headings,
+    htmlRel,
+    route,
+    routing,
+    searchShellHtml = '',
+    playgroundShellHtml = '',
+}: DocumentSlotHtmlOpts): string {
+    const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const navItems = nav
         .map((n) => {
             const href = routing.strategy === 'none' || routing.strategy === 'domain' ? n.href : relativeHref(htmlRel, n.href, route);
@@ -246,6 +276,22 @@ ${playgroundShellHtml}
     </div>`;
 }
 
+interface RenderStaticHtmlOpts {
+    title: string;
+    locale: string;
+    route: string;
+    nav: DocumentNavItem[];
+    bodyHtml: string;
+    headings: DocumentHeading[];
+    designsHref: string | null;
+    htmlRel: string;
+    searchShellHtml?: string;
+    playgroundShellHtml?: string;
+    routing?: LocalesRouting;
+    compiledLayoutHtml?: string | null;
+    useCompiledShell?: boolean;
+}
+
 /**
  * No-JS readable static HTML: nav + main landmarks, Island shells without scripts.
  * Integrated mounts wrap content in compiled DocumentLayout (SiteHeader/SiteFooter SSR).
@@ -264,21 +310,19 @@ function renderStaticHtml({
     routing = { strategy: 'prefix' },
     compiledLayoutHtml,
     useCompiledShell = false,
-}) {
-    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}: RenderStaticHtmlOpts): string {
+    const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const depth = htmlRel.split('/').length - 1;
     const prefix = depth > 0 ? '../'.repeat(depth) : './';
-    /** @type {string[]} */
-    const cssHrefs = [];
+    const cssHrefs: string[] = [];
     if (useCompiledShell) {
         cssHrefs.push('/vmz.css');
     }
     if (designsHref) cssHrefs.push(useCompiledShell ? `/${designsHref}` : prefix + designsHref);
 
-    /** @type {string} */
-    let bodyInner;
+    let bodyInner: string;
     if (useCompiledShell) {
-        bodyInner = compiledLayoutHtml;
+        bodyInner = compiledLayoutHtml || '';
     } else {
         const navItems = nav
             .map((n) => {
@@ -320,9 +364,9 @@ ${playgroundShellHtml}
     });
 }
 
-function relativeHref(fromHtmlRel, toRoute, _fromRoute) {
+function relativeHref(fromHtmlRel: string, toRoute: string, _fromRoute: string): string {
     const toParts = String(toRoute).replace(/^\//, '').split('/').filter(Boolean);
-    let toRel;
+    let toRel: string;
     if (toParts.length <= 2) {
         toRel = [...toParts, 'index.html'].join('/');
     } else {

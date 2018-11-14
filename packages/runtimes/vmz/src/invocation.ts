@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * `vmz` CLI invocation modes (JS gate for `@vmz/vmz` only).
  *
@@ -8,7 +7,6 @@
  * - **developer**: monorepo source checkout (`packages/runtimes/vmz`, not under node_modules)
  * - **project**: app's nearest `node_modules/vmz` or `node_modules/@vmz/vmz`
  * - **global**: npm/pnpm global (or any install under node_modules that is not the nearest project one)
- *
  */
 
 import { spawn } from 'node:child_process';
@@ -17,22 +15,16 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { vmzCliLocalize } from './cli-localize.js';
 
-/** @typedef {'developer' | 'project' | 'global'} InvocationMode */
+export type InvocationMode = 'developer' | 'project' | 'global';
 
-const PROJECT_PKG_SEGMENTS = [['@vmz', 'vmz'], ['vmz']];
+const PROJECT_PKG_SEGMENTS = [['@vmz', 'vmz'], ['vmz']] as const;
 
-/**
- * Package root of the running `vmz` / `@vmz/vmz` install.
- * @param {string} [fromUrl]
- */
-export function resolveThisPackageRoot(fromUrl = import.meta.url) {
+/** Package root of the running `vmz` / `@vmz/vmz` install. */
+export function resolveThisPackageRoot(fromUrl: string = import.meta.url): string {
     return path.resolve(path.dirname(fileURLToPath(fromUrl)), '..');
 }
 
-/**
- * @param {string} p
- */
-function tryRealpath(p) {
+function tryRealpath(p: string): string {
     try {
         return realpathSync(p);
     } catch {
@@ -40,12 +32,8 @@ function tryRealpath(p) {
     }
 }
 
-/**
- * Walk from `startDir` for nearest project CLI package root.
- * @param {string} startDir
- * @returns {string | null}
- */
-export function findNearestProjectVmz(startDir) {
+/** Walk from `startDir` for nearest project CLI package root. */
+export function findNearestProjectVmz(startDir: string): string | null {
     let dir = path.resolve(startDir);
     for (;;) {
         for (const segments of PROJECT_PKG_SEGMENTS) {
@@ -61,40 +49,37 @@ export function findNearestProjectVmz(startDir) {
     }
 }
 
-/**
- * Resolve CLI entry (`bin/vmz.js`).
- * @param {string} packageRoot
- * @returns {string | null}
- */
-export function resolveVmzBin(packageRoot) {
+/** Resolve CLI entry (`bin/vmz.js`). */
+export function resolveVmzBin(packageRoot: string): string | null {
     const bin = path.join(packageRoot, 'bin', 'vmz.js');
     if (existsSync(bin)) return tryRealpath(bin);
     return null;
 }
 
-/**
- * @param {string} packageRoot
- */
-export function isUnderNodeModules(packageRoot) {
+export function isUnderNodeModules(packageRoot: string): boolean {
     const norm = path.normalize(packageRoot);
     const parts = norm.split(path.sep);
     return parts.includes('node_modules');
 }
 
-/**
- * @param {{
- * cwd?: string,
- * thisPackageRoot?: string,
- * }} [opts]
- */
-export function getInvocationContext(opts = {}) {
+export type InvocationContext = {
+    mode: InvocationMode;
+    cwd: string;
+    thisPackageRoot: string;
+    nearestProjectVmz: string | null;
+    isDeveloper: boolean;
+    isProjectLocal: boolean;
+    /** @deprecated prefer `mode === 'global'`; kept for call sites */
+    isGlobalLike: boolean;
+};
+
+export function getInvocationContext(opts: { cwd?: string; thisPackageRoot?: string } = {}): InvocationContext {
     const cwd = path.resolve(opts.cwd ?? process.cwd());
     const thisPackageRoot = tryRealpath(opts.thisPackageRoot ?? resolveThisPackageRoot());
     const nearestProjectVmz = findNearestProjectVmz(cwd);
     const underNm = isUnderNodeModules(thisPackageRoot);
 
-    /** @type {InvocationMode} */
-    let mode;
+    let mode: InvocationMode;
     if (!underNm) {
         mode = 'developer';
     } else if (nearestProjectVmz != null && nearestProjectVmz === thisPackageRoot) {
@@ -110,25 +95,16 @@ export function getInvocationContext(opts = {}) {
         nearestProjectVmz,
         isDeveloper: mode === 'developer',
         isProjectLocal: mode === 'project',
-        /** @deprecated prefer `mode === 'global'`; kept for call sites */
         isGlobalLike: mode === 'global',
     };
 }
 
-/**
- * @param {string | undefined} cmd
- */
-export function isGlobalAllowedCommand(cmd) {
+export function isGlobalAllowedCommand(cmd: string | undefined): boolean {
     if (!cmd) return true;
     return cmd === 'help' || cmd === '-h' || cmd === '--help' || cmd === 'version' || cmd === '-V' || cmd === '--version';
 }
 
-/**
- * @param {string} bin
- * @param {string[]} argv
- * @returns {Promise<number>}
- */
-export function reexecProjectVmz(bin, argv) {
+export function reexecProjectVmz(bin: string, argv: string[]): Promise<number> {
     return new Promise((resolve) => {
         const child = spawn(process.execPath, [bin, ...argv], {
             stdio: 'inherit',
@@ -142,10 +118,15 @@ export function reexecProjectVmz(bin, argv) {
     });
 }
 
-/**
- * @returns {Promise<{ action: 'proceed' } | { action: 'exit', code: number }>}
- */
-export async function gateGlobalProjectCommand(opts) {
+export type GateResult = { action: 'proceed' } | { action: 'exit'; code: number };
+
+export async function gateGlobalProjectCommand(opts: {
+    argv: string[];
+    cwd?: string;
+    thisPackageRoot?: string;
+    reexec?: (bin: string, argv: string[]) => Promise<number>;
+    logError?: (msg: string) => void;
+}): Promise<GateResult> {
     const { argv, cwd = process.cwd(), thisPackageRoot, reexec = reexecProjectVmz, logError = (msg) => console.error(msg) } = opts;
     const ctx = getInvocationContext({ cwd, thisPackageRoot });
     if (ctx.mode !== 'global') {

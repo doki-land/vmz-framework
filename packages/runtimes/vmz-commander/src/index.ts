@@ -26,21 +26,13 @@ export {
 export type { CreateLocalizeFromLocalesOptions, LocalesManifest } from './locales.js';
 
 import type { CatalogLoader, LocaleCatalog, LocalizePlugin } from './types.js';
-import {
-    COMMANDER_FALLBACK_EN_US,
-    createLocalizeFromLocales,
-    translate,
-    translateWithFallback,
-} from './locales.js';
+import { COMMANDER_FALLBACK_EN_US, createLocalizeFromLocales, translate, translateWithFallback } from './locales.js';
 
 /** Options bag passed to actions (`_` = positionals). */
 export type ParsedOptions = Record<string, string | boolean | string[]> & { _: string[] };
 
 /** Command action after argv is parsed. */
-export type ActionHandler = (
-    options: ParsedOptions,
-    ...args: string[]
-) => void | number | Promise<void | number>;
+export type ActionHandler = (options: ParsedOptions, ...args: string[]) => void | number | Promise<void | number>;
 
 /** Registered option (structure only). */
 export type OptionDef = {
@@ -172,9 +164,7 @@ class CliBuilder implements Cli {
             t: (id, args) => {
                 const table = loader('en-US');
                 if (table && typeof (table as Promise<LocaleCatalog>).then === 'function') {
-                    throw new Error(
-                        '@vmz/commander: async CatalogLoader via .catalog() is not supported; use .use({ t })',
-                    );
+                    throw new Error('@vmz/commander: async CatalogLoader via .catalog() is not supported; use .use({ t })');
                 }
                 return translateWithFallback(id, args, table as LocaleCatalog);
             },
@@ -191,9 +181,7 @@ class CliBuilder implements Cli {
             this.rootOptions.push(parseOptionDef('--locale <id>', 'commander.opt.locale'));
         }
         // Eager plugin so missing-manifest fails early; parse rebuilds with argv.
-        this.localize = wrapWithCommanderFallback(
-            createLocalizeFromLocales({ root, envKeys: opts.envKeys }),
-        );
+        this.localize = wrapWithCommanderFallback(createLocalizeFromLocales({ root, envKeys: opts.envKeys }));
         return this;
     }
 
@@ -239,10 +227,7 @@ class CliBuilder implements Cli {
 
         let localize = this.localize;
         if (this.localesRoot) {
-            const localeFlag =
-                typeof globalOpts.locale === 'string' && globalOpts.locale
-                    ? globalOpts.locale
-                    : undefined;
+            const localeFlag = typeof globalOpts.locale === 'string' && globalOpts.locale ? globalOpts.locale : undefined;
             localize = wrapWithCommanderFallback(
                 createLocalizeFromLocales({
                     root: this.localesRoot,
@@ -254,9 +239,7 @@ class CliBuilder implements Cli {
             );
         }
         if (!localize) {
-            throw new Error(
-                translate('commander.err.localize_required', undefined, COMMANDER_FALLBACK_EN_US),
-            );
+            throw new Error(translate('commander.err.localize_required', undefined, COMMANDER_FALLBACK_EN_US));
         }
         const t = localize.t.bind(localize);
 
@@ -288,9 +271,7 @@ class CliBuilder implements Cli {
         }
         const opts = [
             ...this.rootOptions,
-            ...collectRootOptions(this.roots.map((c) => c.def)).filter(
-                (o) => !this.rootOptions.some((r) => r.key === o.key),
-            ),
+            ...collectRootOptions(this.roots.map((c) => c.def)).filter((o) => !this.rootOptions.some((r) => r.key === o.key)),
         ];
         if (opts.length) {
             lines.push('', t('commander.ui.options'));
@@ -320,9 +301,7 @@ class CliBuilder implements Cli {
                 return await this.dispatch(child, rest.slice(1), t, [...path, childTok], globalOpts);
             }
             if (!def.action) {
-                console.error(
-                    t('commander.err.unknown_command', { cmd: [...path, childTok].join(' ') }),
-                );
+                console.error(t('commander.err.unknown_command', { cmd: [...path, childTok].join(' ') }));
                 console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
                 return 1;
             }
@@ -335,15 +314,11 @@ class CliBuilder implements Cli {
 
         let options: ParsedOptions;
         try {
-            options = def.passthrough
-                ? { _: rest.slice() }
-                : parseOptions(rest, def.options);
+            options = def.passthrough ? { _: rest.slice() } : parseOptions(rest, def.options);
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             if (msg.startsWith('unknown_option:')) {
-                console.error(
-                    t('commander.err.unknown_option', { option: msg.slice('unknown_option:'.length) }),
-                );
+                console.error(t('commander.err.unknown_option', { option: msg.slice('unknown_option:'.length) }));
             } else if (msg.startsWith('missing_value:')) {
                 console.error(
                     t('commander.err.missing_option_value', {
@@ -384,10 +359,7 @@ export function formatCommandHelp(
         }
         lines.push('');
     }
-    const opts = [
-        ...rootOptions,
-        ...def.options.filter((o) => !rootOptions.some((r) => r.key === o.key)),
-    ];
+    const opts = [...rootOptions, ...def.options.filter((o) => !rootOptions.some((r) => r.key === o.key))];
     if (opts.length) {
         lines.push(t('commander.ui.options'));
         for (const o of opts) {
@@ -425,19 +397,12 @@ export function createCli(name: string): Cli {
  * Dev/CI: every registered helpId must exist in `catalog` or commander English fallbacks.
  */
 export function assertCatalogCoverage(cli: Cli, catalog: LocaleCatalog): void {
-    const ids =
-        typeof (cli as CliBuilder).collectHelpIds === 'function'
-            ? (cli as CliBuilder).collectHelpIds()
-            : [];
+    const ids = typeof (cli as CliBuilder).collectHelpIds === 'function' ? (cli as CliBuilder).collectHelpIds() : [];
     const missing = ids.filter(
-        (id) =>
-            !Object.prototype.hasOwnProperty.call(catalog, id) &&
-            !Object.prototype.hasOwnProperty.call(COMMANDER_FALLBACK_EN_US, id),
+        (id) => !Object.prototype.hasOwnProperty.call(catalog, id) && !Object.prototype.hasOwnProperty.call(COMMANDER_FALLBACK_EN_US, id),
     );
     if (missing.length) {
-        throw new Error(
-            `@vmz/commander: catalog missing help ids:\n  ${missing.sort().join('\n  ')}`,
-        );
+        throw new Error(`@vmz/commander: catalog missing help ids:\n  ${missing.sort().join('\n  ')}`);
     }
 }
 
@@ -459,10 +424,7 @@ function wrapWithCommanderFallback(plugin: LocalizePlugin): LocalizePlugin {
  * Consume known root options; leave unknown flags and positionals in `rest`
  * (unlike {@link parseOptions}, which throws on unknown options).
  */
-export function peelKnownOptions(
-    argv: string[],
-    optionDefs: OptionDef[],
-): { options: ParsedOptions; rest: string[] } {
+export function peelKnownOptions(argv: string[], optionDefs: OptionDef[]): { options: ParsedOptions; rest: string[] } {
     const byAlias = new Map<string, OptionDef>();
     for (const def of optionDefs) {
         for (const a of def.aliases) byAlias.set(a, def);
@@ -562,9 +524,7 @@ function assertHelpId(helpId: string, kind: string): void {
         throw new Error(`@vmz/commander: ${kind} helpId must be a non-empty catalog key`);
     }
     if (/\s/.test(helpId)) {
-        throw new Error(
-            `@vmz/commander: ${kind} helpId must be a catalog key (no spaces); got ${JSON.stringify(helpId)}`,
-        );
+        throw new Error(`@vmz/commander: ${kind} helpId must be a catalog key (no spaces); got ${JSON.stringify(helpId)}`);
     }
 }
 

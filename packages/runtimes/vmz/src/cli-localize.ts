@@ -47,10 +47,7 @@ export function getVmzCliCatalogEnUs(): LocaleCatalog {
 export const VMZ_CLI_CATALOG_EN_US: LocaleCatalog = loadCatalog('en-US', LOCALES_ROOT);
 
 /** Resolve product locale (`VMZ_LOCALE` first). */
-export function resolveVmzLocale(
-    env: NodeJS.ProcessEnv = process.env,
-    argv: string[] = [],
-): string {
+export function resolveVmzLocale(env: NodeJS.ProcessEnv = process.env, argv: string[] = []): string {
     return resolveLocale({
         argv,
         env,
@@ -60,11 +57,7 @@ export function resolveVmzLocale(
 }
 
 /** @deprecated Prefer `translate` / `translateWithFallback` from `@vmz/commander`. */
-export function translateCatalog(
-    id: string,
-    args: Record<string, string> | undefined,
-    catalog: LocaleCatalog,
-): string {
+export function translateCatalog(id: string, args: Record<string, string> | undefined, catalog: LocaleCatalog): string {
     return translate(id, args, catalog);
 }
 
@@ -74,13 +67,7 @@ export { flattenCatalog };
  * Build the official Localize plugin for `@vmz/vmz`.
  */
 export function createVmzCliLocalize(
-    opts: {
-        locale?: string;
-        catalog?: LocaleCatalog;
-        env?: NodeJS.ProcessEnv;
-        argv?: string[];
-        localesRoot?: string;
-    } = {},
+    opts: { locale?: string; catalog?: LocaleCatalog; env?: NodeJS.ProcessEnv; argv?: string[]; localesRoot?: string } = {},
 ): LocalizePlugin {
     return createLocalizeFromLocales({
         root: opts.localesRoot ?? LOCALES_ROOT,

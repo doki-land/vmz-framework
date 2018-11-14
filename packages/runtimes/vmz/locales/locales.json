@@ -1,6 +1,4 @@
 {
-  "defaultLocale": "en-US",
-  "locales": [
-    { "id": "en-US", "label": "English", "direction": "ltr" }
-  ]
+    "defaultLocale": "en-US",
+    "locales": [{ "id": "en-US", "label": "English", "direction": "ltr" }]
 }

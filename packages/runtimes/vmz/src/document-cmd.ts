@@ -1,9 +1,9 @@
-// @ts-nocheck
 /**
  * `vmz document` / `vmz docs` — registered on `@vmz/commander`.
  */
 
 import path from 'node:path';
+import type { Command, ParsedOptions } from '@vmz/commander';
 import { buildDocuments } from './document-build.js';
 import { checkDocuments, manifestHasErrors } from './document-check.js';
 import { enrichDocumentContent } from './document-enrich.js';
@@ -13,11 +13,8 @@ import { createWorkspace } from './index.js';
 import { log } from './log.js';
 import { emitPrettyJson } from './pretty-json.js';
 
-/**
- * @param {import('@vmz/commander').Command} parent
- */
-export function registerDocumentCommands(parent) {
-    const withOpts = (cmd) =>
+export function registerDocumentCommands(parent: Command): void {
+    const withOpts = (cmd: Command) =>
         cmd
             .option('--root <dir>', 'cli.opt.root')
             .option('--out <dir>', 'cli.opt.out')
@@ -28,8 +25,7 @@ export function registerDocumentCommands(parent) {
     withOpts(parent.command('build', 'cli.cmd.document.build')).action((options) => cmdDocumentBuild(options));
 }
 
-/** @param {import('@vmz/commander').ParsedOptions} args */
-async function cmdDocumentCheck(args) {
+async function cmdDocumentCheck(args: ParsedOptions): Promise<number> {
     const project = (typeof args.root === 'string' && args.root) || (typeof args._[0] === 'string' && args._[0]) || '.';
     const projectRoot = path.resolve(project);
     const strict = Boolean(args.strict);
@@ -50,12 +46,15 @@ async function cmdDocumentCheck(args) {
         manifest.diagnostics = evidence.diagnostics;
         manifest.evidence = evidence.evidence;
     } catch (e) {
-        log.warn(`document check: markdown/evidence unavailable (${e.message}); skipping enrich`);
+        const msg = e instanceof Error ? e.message : String(e);
+        log.warn(`document check: markdown/evidence unavailable (${msg}); skipping enrich`);
     }
 
     const jsonOut = args.json;
     if (jsonOut) {
-        emitPrettyJson(jsonOut, manifest, { logWrote: (p) => log.info(`wrote ${p}`) });
+        emitPrettyJson(typeof jsonOut === 'string' ? jsonOut : true, manifest, {
+            logWrote: (p) => log.info(`wrote ${p}`),
+        });
     } else {
         log.diagnostics(manifest.diagnostics ?? []);
         log.info(
@@ -66,8 +65,7 @@ async function cmdDocumentCheck(args) {
     return manifestHasErrors(manifest) ? 1 : 0;
 }
 
-/** @param {import('@vmz/commander').ParsedOptions} args */
-async function cmdDocumentBuild(args) {
+async function cmdDocumentBuild(args: ParsedOptions): Promise<number> {
     const project = (typeof args.root === 'string' && args.root) || (typeof args._[0] === 'string' && args._[0]) || '.';
     const projectRoot = path.resolve(project);
     const outDir = (typeof args.out === 'string' && args.out) || path.join(projectRoot, 'dist', 'documents');
@@ -77,7 +75,8 @@ async function cmdDocumentBuild(args) {
     try {
         result = await buildDocuments({ projectRoot, outDir, strict });
     } catch (e) {
-        log.error(`document build failed: ${e.message || e}`);
+        const msg = e instanceof Error ? e.message : String(e);
+        log.error(`document build failed: ${msg}`);
         return 1;
     }
 

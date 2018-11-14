@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Shared project path resolution for the Node CLI host .
  */
@@ -6,11 +5,18 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-/**
- * @param {string} startDir
- * @returns {string | null}
- */
-export function findPackageJson(startDir) {
+export interface ResolveWorkspaceDirsOpts {
+    cwd?: string;
+    path?: string;
+    outDir?: string;
+}
+
+export interface PackageMeta {
+    name?: string;
+    private?: boolean;
+}
+
+export function findPackageJson(startDir: string): string | null {
     let dir = path.resolve(startDir);
     for (;;) {
         const candidate = path.join(dir, 'package.json');
@@ -21,13 +27,12 @@ export function findPackageJson(startDir) {
     }
 }
 
-/**
- * Resolve project root + out dir from CLI args / cwd.
- * Prefers an explicit path; otherwise walks up for package.json with `src/`.
- *
- * @param {{ cwd?: string, path?: string, outDir?: string }} opts
- */
-export function resolveWorkspaceDirs(opts = {}) {
+/** Resolve project root + out dir from CLI args / cwd. Prefers an explicit path; otherwise walks up for package.json with `src/`. */
+export function resolveWorkspaceDirs(opts: ResolveWorkspaceDirsOpts = {}): {
+    project: string;
+    outDir: string;
+    cwd: string;
+} {
     const cwd = opts.cwd ?? process.cwd();
     const input = path.resolve(cwd, opts.path ?? '.');
 
@@ -42,11 +47,7 @@ export function resolveWorkspaceDirs(opts = {}) {
     return { project, outDir, cwd };
 }
 
-/**
- * @param {string} projectRoot
- * @returns {{ name?: string, private?: boolean } | null}
- */
-export function readPackageMeta(projectRoot) {
+export function readPackageMeta(projectRoot: string): PackageMeta | null {
     const pkgPath = path.join(projectRoot, 'package.json');
     if (!existsSync(pkgPath)) return null;
     try {

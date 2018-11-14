@@ -1,18 +1,25 @@
-// @ts-nocheck
 /**
  * Document Interactive — search index + Island-only resume plan.
  *
  * Not a Doc IR: build artifacts + ResumeEntry-shaped island hosts.
  * Static HTML stays no-JS readable; islands resume later, never full-page hydrate.
  */
-import { DOCUMENT_ISLANDS_SCHEMA, DOCUMENT_SEARCH_SCHEMA } from './document-schema.js';
 import { parseFenceInfo } from './document-evidence.js';
+import type { EnrichDocumentContentResult } from './document-enrich.js';
+import {
+    DOCUMENT_ISLANDS_SCHEMA,
+    DOCUMENT_SEARCH_SCHEMA,
+    type DocumentEvidence,
+    type DocumentIsland,
+    type DocumentIslandsPlan,
+    type DocumentManifest,
+    type DocumentSearchIndex,
+    type DocumentSearchRecord,
+    type PageRecord,
+} from './document-schema.js';
 
-/**
- * Strip tags / collapse whitespace for search body text.
- * @param {string} html
- */
-export function htmlToSearchText(html) {
+/** Strip tags / collapse whitespace for search body text. */
+export function htmlToSearchText(html: string): string {
     return String(html || '')
         .replace(/<script[\s\S]*?<\/script>/gi, ' ')
         .replace(/<style[\s\S]*?<\/style>/gi, ' ')
@@ -26,19 +33,17 @@ export function htmlToSearchText(html) {
         .trim();
 }
 
-/**
- * @param {{
- * manifest: any,
- * enriched: { byId: Map<string, any> },
- * evidence: any,
- * version?: string | null,
- * }} opts
- */
-export function buildDocumentSearch(opts) {
+export interface BuildDocumentSearchOpts {
+    manifest: DocumentManifest;
+    enriched: Pick<EnrichDocumentContentResult, 'byId'>;
+    evidence: DocumentEvidence;
+    version?: string | null;
+}
+
+export function buildDocumentSearch(opts: BuildDocumentSearchOpts): DocumentSearchIndex {
     const { manifest, enriched, evidence } = opts;
     const version = opts.version ?? null;
-    /** @type {any[]} */
-    const records = [];
+    const records: DocumentSearchRecord[] = [];
 
     for (const page of manifest.pages || []) {
         const id = `${page.identity.locale}:${page.identity.pageKey}`;
@@ -57,7 +62,7 @@ export function buildDocumentSearch(opts) {
         const apiSymbolIds = (evidence?.apiRefs || [])
             .filter((r) => r.locale === locale && r.pageKey === pageKey && r.status === 'ok')
             .flatMap((r) => (r.matches || []).map((m) => m.chunkId || m.name))
-            .filter(Boolean);
+            .filter((x): x is string => Boolean(x));
 
         records.push({
             kind: 'page',
@@ -116,18 +121,16 @@ export function buildDocumentSearch(opts) {
     };
 }
 
-/**
- * Island-only resume plan for document surfaces.
- * @param {{
- * evidence: any,
- * searchHref?: string,
- * fenceBodies?: Map<string, string>,
- * }} opts
- */
-export function buildDocumentIslands(opts) {
+export interface BuildDocumentIslandsOpts {
+    evidence: DocumentEvidence;
+    searchHref?: string;
+    fenceBodies?: Map<string, string>;
+}
+
+/** Island-only resume plan for document surfaces. */
+export function buildDocumentIslands(opts: BuildDocumentIslandsOpts): DocumentIslandsPlan {
     const searchHref = opts.searchHref || 'document.search.json';
-    /** @type {any[]} */
-    const islands = [
+    const islands: DocumentIsland[] = [
         {
             name: 'DocumentSearch',
             kind: 'search',
@@ -175,33 +178,28 @@ export function buildDocumentIslands(opts) {
     };
 }
 
-/**
- * Relative href from an HTML page to a root artifact (posix).
- * @param {string} htmlRel
- * @param {string} artifactName
- */
-export function artifactHrefFromHtml(htmlRel, artifactName) {
+/** Relative href from an HTML page to a root artifact (posix). */
+export function artifactHrefFromHtml(htmlRel: string, artifactName: string): string {
     const depth = String(htmlRel).replace(/\\/g, '/').split('/').length - 1;
     const prefix = depth > 0 ? '../'.repeat(depth) : './';
     return prefix + artifactName;
 }
 
-/**
- * Stable map key for fence body lookup.
- * @param {{ locale: string, pageKey: string, lineStart: number }} f
- */
-export function fenceBodyKey(f) {
+/** Stable map key for fence body lookup. */
+export function fenceBodyKey(f: { locale: string; pageKey: string; lineStart: number }): string {
     return `${f.locale}:${f.pageKey}:${f.lineStart}`;
 }
 
-/**
- * Collect fence bodies from analyzeMarkdown results for playground islands.
- * @param {Map<string, { fences?: any[] }>} analyzedByPageId locale:pageKey → analyze result
- * @param {any[]} pages manifest.pages
- */
-export function collectFenceBodies(analyzedByPageId, pages) {
-    /** @type {Map<string, string>} */
-    const out = new Map();
+export interface AnalyzedFence {
+    info?: string;
+    content?: string;
+    lineStart?: number;
+    lineEnd?: number;
+}
+
+/** Collect fence bodies from analyzeMarkdown results for playground islands. */
+export function collectFenceBodies(analyzedByPageId: Map<string, { fences?: AnalyzedFence[] }>, pages: PageRecord[]): Map<string, string> {
+    const out = new Map<string, string>();
     for (const page of pages || []) {
         const id = `${page.identity.locale}:${page.identity.pageKey}`;
         const analyzed = analyzedByPageId.get(id);
@@ -213,7 +211,7 @@ export function collectFenceBodies(analyzedByPageId, pages) {
                 fenceBodyKey({
                     locale: page.identity.locale,
                     pageKey: page.identity.pageKey,
-                    lineStart: fence.lineStart,
+                    lineStart: fence.lineStart ?? 0,
                 }),
                 String(fence.content || '').trim(),
             );
@@ -222,17 +220,16 @@ export function collectFenceBodies(analyzedByPageId, pages) {
     return out;
 }
 
-/**
- * Render SSR island shells (no script — resume later).
- * @param {{
- * islands: any,
- * searchIndexHref: string,
- * pageKey: string,
- * locale: string,
- * }} opts
- */
-export function renderIslandShellsHtml(opts) {
-    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+export interface RenderIslandShellsOpts {
+    islands: DocumentIslandsPlan;
+    searchIndexHref: string;
+    pageKey: string;
+    locale: string;
+}
+
+/** Render SSR island shells (no script — resume later). */
+export function renderIslandShellsHtml(opts: RenderIslandShellsOpts): { searchHtml: string; playgroundHtml: string } {
+    const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const search = `
   <div
     data-vmz-island="DocumentSearch"

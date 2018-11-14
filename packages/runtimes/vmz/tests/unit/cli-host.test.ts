@@ -7,19 +7,12 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { describe, it } from 'node:test';
 import { expect } from '../../../../../scripts/test/expect.mjs';
-import { createDevSession, createWorkspace, parseArgs, resolveWorkspaceDirs, runCli, srcFingerprint } from 'vmz';
+import { createDevSession, createWorkspace, resolveWorkspaceDirs, runCli, srcFingerprint } from 'vmz';
 
 describe('vmz Node CLI host (N2)', () => {
-    it('parseArgs handles flags and positionals', () => {
-        const a = parseArgs(['.', '--out-dir', 'dist-x', '--port', '4000', '--release']);
-        expect(a._).toEqual(['.']);
-        expect(a['out-dir']).toBe('dist-x');
-        expect(a.port).toBe('4000');
-        expect(a.release).toBe(true);
-        expect(Object.prototype.hasOwnProperty.call(a, 'port')).toBe(true);
-        expect(Object.prototype.hasOwnProperty.call(parseArgs(['.']), 'port')).toBe(false);
-        const t = parseArgs(['.', '--target', 'mini-program-wechat']);
-        expect(t.target).toBe('mini-program-wechat');
+    it('runCli routes argv through @vmz/commander (unknown command exits 1)', async () => {
+        const code = await runCli(['no-such-command']);
+        expect(code).toBe(1);
     });
 
     it('resolveWorkspaceDirs joins relative out-dir', () => {

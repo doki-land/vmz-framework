@@ -1,16 +1,13 @@
-// @ts-nocheck
 /**
  * `vmz explain` — DX causal explain; registered on `@vmz/commander`.
  */
 
+import type { Cli, ParsedOptions } from '@vmz/commander';
 import { createWorkspace } from './index.js';
 import { log } from './log.js';
 import { resolveWorkspaceDirs } from './resolve.js';
 
-/**
- * @param {import('@vmz/commander').Cli} cli
- */
-export function registerExplainCommand(cli) {
+export function registerExplainCommand(cli: Cli): void {
     cli.command('explain', 'cli.cmd.explain')
         .option('--json', 'cli.opt.json')
         .option('--out-dir, -o <dir>', 'cli.opt.out-dir')
@@ -19,12 +16,8 @@ export function registerExplainCommand(cli) {
         .action((options) => cmdExplain(options));
 }
 
-/**
- * @param {import('@vmz/commander').ParsedOptions} args
- * @returns {number}
- */
-export function cmdExplain(args) {
-    let target;
+export function cmdExplain(args: ParsedOptions): number {
+    let target: string | undefined;
     let pathArg = '.';
     if (args._[0] === 'style') {
         const node = args._[1];
@@ -59,7 +52,16 @@ export function cmdExplain(args) {
         console.log(raw);
         return 0;
     }
-    let doc;
+    let doc: {
+        kind?: string;
+        target?: string;
+        notes?: string;
+        chain?: Array<{
+            from?: { kind?: string; id?: string };
+            to?: { kind?: string; id?: string };
+            reason?: string;
+        }>;
+    };
     try {
         doc = JSON.parse(raw);
     } catch {

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Locale multi-host delivery: Web chunks · Mini packages · Native packs ·
  * Server error envelope / formatter resources.
@@ -25,33 +24,26 @@ import {
     LOCALE_SERVER_ERROR_ENVELOPE_SCHEMA,
 } from './locale-schema.js';
 
-/**
- * @param {unknown} value
- */
-function stableHash(value) {
+function stableHash(value: unknown): string {
     return createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 32);
 }
 
-/**
- * @param {Record<string, string[]>} [fallback]
- */
-export function fallbackDigest(fallback = {}) {
+export function fallbackDigest(fallback: Record<string, string[]> = {}): string {
     const keys = Object.keys(fallback).sort();
-    const normalized = {};
+    const normalized: Record<string, string[]> = {};
     for (const k of keys) normalized[k] = [...(fallback[k] || [])];
     return stableHash(normalized);
 }
 
-/**
- * Hash reachable message variants for one locale.
- * @param {Array<{ messageId: string, variants: Record<string, { template: string }> }>} messages
- * @param {string} localeId
- * @param {string[]} [reachableIds]
- */
-export function messageCatalogHash(messages, localeId, reachableIds) {
+export interface DeliveryMessage {
+    messageId: string;
+    variants: Record<string, { template: string }>;
+}
+
+/** Hash reachable message variants for one locale. */
+export function messageCatalogHash(messages: DeliveryMessage[], localeId: string, reachableIds?: string[]): string {
     const allow = reachableIds ? new Set(reachableIds) : null;
-    /** @type {Record<string, string>} */
-    const slice = {};
+    const slice: Record<string, string> = {};
     for (const m of messages || []) {
         if (allow && !allow.has(m.messageId)) continue;
         const t = m.variants?.[localeId]?.template;
@@ -63,26 +55,24 @@ export function messageCatalogHash(messages, localeId, reachableIds) {
     return stableHash(ordered);
 }
 
-/**
- * Build LocaleDeliveryResolution for one Host surface.
- * @param {{
- * host: 'web'|'mini'|'native'|'server',
- * applicationId: string,
- * deliveryId: string,
- * planVersion?: string,
- * supportedLocales: string[],
- * defaultLocale: string,
- * fallback?: Record<string, string[]>,
- * routingRealization?: unknown,
- * messages: Array<{ messageId: string, variants: Record<string, { template: string }> }>,
- * reachableMessageIds?: string[],
- * bundledLocales?: string[],
- * allowFullClientBundle?: boolean,
- * }} input
- */
-export function buildLocaleDeliveryResolution(input) {
-    /** @type {any[]} */
-    const diagnostics = [];
+export interface LocaleDeliveryInput {
+    host: 'web' | 'mini' | 'native' | 'server';
+    applicationId: string;
+    deliveryId: string;
+    planVersion?: string;
+    supportedLocales: string[];
+    defaultLocale: string;
+    fallback?: Record<string, string[]>;
+    routingRealization?: unknown;
+    messages: DeliveryMessage[];
+    reachableMessageIds?: string[];
+    bundledLocales?: string[];
+    allowFullClientBundle?: boolean;
+}
+
+/** Build LocaleDeliveryResolution for one Host surface. */
+export function buildLocaleDeliveryResolution(input: LocaleDeliveryInput) {
+    const diagnostics: Array<{ code: string; severity: string; message: string }> = [];
     const supported = [...(input.supportedLocales || [])];
     const defaultLocale = input.defaultLocale;
     const reachable = input.reachableMessageIds || (input.messages || []).map((m) => m.messageId);
@@ -102,14 +92,19 @@ export function buildLocaleDeliveryResolution(input) {
         });
     }
 
-    /** @type {Record<string, string>} */
-    const messageCatalogHashes = {};
+    const messageCatalogHashes: Record<string, string> = {};
     for (const loc of supported) {
         messageCatalogHashes[loc] = messageCatalogHash(input.messages, loc, reachable);
     }
 
-    /** @type {any[]} */
-    const lazyLocaleChunks = [];
+    const lazyLocaleChunks: Array<{
+        schema: string;
+        localeId: string;
+        host: string;
+        messageIds: string[];
+        hash: string;
+        kind: string;
+    }> = [];
     for (const loc of supported) {
         if (bundled.includes(loc)) continue;
         lazyLocaleChunks.push({
@@ -152,28 +147,24 @@ export function buildLocaleDeliveryResolution(input) {
     };
 }
 
-/**
- * Validate a Native optional locale pack (signed, no JS, bound to app/plan/schema).
- * @param {{
- * pack: {
- * schema?: string,
- * applicationId: string,
- * planVersion: string,
- * localeId: string,
- * signature?: string,
- * catalog?: Record<string, string>,
- * formatterDataVersion?: string,
- * entries?: Array<{ path: string, kind?: string }>,
- * executable?: boolean,
- * },
- * expectedApplicationId: string,
- * expectedPlanVersion: string,
- * }} input
- */
-export function validateNativeLocalePack(input) {
-    /** @type {any[]} */
-    const diagnostics = [];
-    const pack = input.pack || {};
+/** Validate a Native optional locale pack (signed, no JS, bound to app/plan/schema). */
+export function validateNativeLocalePack(input: {
+    pack: {
+        schema?: string;
+        applicationId: string;
+        planVersion: string;
+        localeId: string;
+        signature?: string;
+        catalog?: Record<string, string>;
+        formatterDataVersion?: string;
+        entries?: Array<{ path: string; kind?: string }>;
+        executable?: boolean;
+    };
+    expectedApplicationId: string;
+    expectedPlanVersion: string;
+}) {
+    const diagnostics: Array<{ code: string; severity: string; message: string }> = [];
+    const pack = input.pack || ({} as typeof input.pack);
     if (!pack.signature) {
         diagnostics.push({
             code: DIAG_LOCALE_NATIVE_PACK_UNSIGNED,
@@ -238,23 +229,17 @@ export function validateNativeLocalePack(input) {
     };
 }
 
-/**
- * Mini cross-subpackage message dependencies must be proven.
- * @param {{
- * packages: Array<{ id: string, messageIds: string[] }>,
- * edges: Array<{ fromPackage: string, toPackage: string, messageId: string }>,
- * }} input
- */
-export function proveMiniPackageMessages(input) {
-    /** @type {any[]} */
-    const diagnostics = [];
-    /** @type {Map<string, Set<string>>} */
-    const owned = new Map();
+/** Mini cross-subpackage message dependencies must be proven. */
+export function proveMiniPackageMessages(input: {
+    packages: Array<{ id: string; messageIds: string[] }>;
+    edges: Array<{ fromPackage: string; toPackage: string; messageId: string }>;
+}) {
+    const diagnostics: Array<{ code: string; severity: string; message: string }> = [];
+    const owned = new Map<string, Set<string>>();
     for (const p of input.packages || []) {
         owned.set(p.id, new Set(p.messageIds || []));
     }
-    /** @type {any[]} */
-    const proven = [];
+    const proven: Array<{ fromPackage: string; toPackage: string; messageId: string }> = [];
     for (const edge of input.edges || []) {
         const target = owned.get(edge.toPackage);
         if (!target || !target.has(edge.messageId)) {
@@ -279,13 +264,9 @@ export function proveMiniPackageMessages(input) {
     };
 }
 
-/**
- * Server/client boundary: ErrorCode + params only (no translated strings).
- * @param {any} payload
- */
-export function assertServerErrorEnvelope(payload) {
-    /** @type {any[]} */
-    const diagnostics = [];
+/** Server/client boundary: ErrorCode + params only (no translated strings). */
+export function assertServerErrorEnvelope(payload: any) {
+    const diagnostics: Array<{ code: string; severity: string; message: string }> = [];
     if (payload == null || typeof payload !== 'object') {
         diagnostics.push({
             code: DIAG_LOCALE_SERVER_TRANSLATED_ERROR,
@@ -320,13 +301,9 @@ export function assertServerErrorEnvelope(payload) {
     };
 }
 
-/**
- * Final-user server formatting (mail/export/push) requires explicit LocaleContext.
- * @param {{ localeContext?: { localeId?: string, timeZone?: string }|null, purpose: string }} input
- */
-export function assertServerFormatContext(input) {
-    /** @type {any[]} */
-    const diagnostics = [];
+/** Final-user server formatting (mail/export/push) requires explicit LocaleContext. */
+export function assertServerFormatContext(input: { localeContext?: { localeId?: string; timeZone?: string } | null; purpose: string }) {
+    const diagnostics: Array<{ code: string; severity: string; message: string }> = [];
     const ctx = input.localeContext;
     if (!ctx?.localeId || !ctx?.timeZone) {
         diagnostics.push({
@@ -338,13 +315,9 @@ export function assertServerFormatContext(input) {
     return { ok: diagnostics.length === 0, diagnostics };
 }
 
-/**
- * Same MessageId / catalog hashes must agree across Host projections.
- * @param {Array<ReturnType<typeof buildLocaleDeliveryResolution>>} resolutions
- */
-export function assertHostMessageInvariant(resolutions) {
-    /** @type {any[]} */
-    const diagnostics = [];
+/** Same MessageId / catalog hashes must agree across Host projections. */
+export function assertHostMessageInvariant(resolutions: Array<ReturnType<typeof buildLocaleDeliveryResolution>>) {
+    const diagnostics: Array<{ code: string; severity: string; message: string }> = [];
     if (!resolutions?.length) return { ok: true, diagnostics };
     const base = resolutions[0];
     for (const r of resolutions.slice(1)) {
@@ -375,24 +348,20 @@ export function assertHostMessageInvariant(resolutions) {
     return { ok: diagnostics.length === 0, diagnostics };
 }
 
-/**
- * Aggregate delivery proof for fixture / CLI.
- * @param {{
- * manifest: {
- * defaultLocale: string,
- * locales: Array<{ id: string }>,
- * fallback?: Record<string, string[]>,
- * routing?: unknown,
- * },
- * messages: Array<{ messageId: string, variants: Record<string, { template: string }> }>,
- * applicationId?: string,
- * planVersion?: string,
- * reachableMessageIds?: string[],
- * }} input
- */
-export function checkLocaleDelivery(input) {
-    /** @type {any[]} */
-    const diagnostics = [];
+/** Aggregate delivery proof for fixture / CLI. */
+export function checkLocaleDelivery(input: {
+    manifest: {
+        defaultLocale: string;
+        locales: Array<{ id: string }>;
+        fallback?: Record<string, string[]>;
+        routing?: unknown;
+    };
+    messages: DeliveryMessage[];
+    applicationId?: string;
+    planVersion?: string;
+    reachableMessageIds?: string[];
+}) {
+    const diagnostics: Array<{ code: string; severity: string; message: string }> = [];
     const supported = (input.manifest?.locales || []).map((l) => l.id);
     const defaultLocale = input.manifest?.defaultLocale;
     const messages = input.messages || [];

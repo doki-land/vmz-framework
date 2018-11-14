@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Locale key validation & canonicalization .
  */
@@ -8,32 +7,24 @@ import { LOCALE_ALIASES } from './document-schema.js';
 /** Literal must be lowercase ASCII BCP 47-ish with `-` separators only. */
 const LOCALE_LITERAL_RE = /^[a-z]{2,3}(-[a-z0-9]+)*$/;
 
-/**
- * Soft-normalize for alias / conflict detection (does not validate).
- * @param {string} raw
- */
-export function softNormalizeLocale(raw) {
+export type ValidateLocaleResult = { ok: true; soft: string; canonical: string } | { ok: false; code: string; message: string };
+
+/** Soft-normalize for alias / conflict detection (does not validate). */
+export function softNormalizeLocale(raw: string): string {
     return String(raw || '')
         .trim()
         .toLowerCase()
         .replace(/_/g, '-');
 }
 
-/**
- * Map soft-normalized key through alias table.
- * @param {string} soft
- */
-export function canonicalLocale(soft) {
+/** Map soft-normalized key through alias table. */
+export function canonicalLocale(soft: string): string {
     const s = softNormalizeLocale(soft);
     return LOCALE_ALIASES[s] || s;
 }
 
-/**
- * Validate a top-level locale directory name.
- * @param {string} literal
- * @returns {{ ok: true, soft: string, canonical: string } | { ok: false, code: string, message: string }}
- */
-export function validateLocaleLiteral(literal) {
+/** Validate a top-level locale directory name. */
+export function validateLocaleLiteral(literal: string): ValidateLocaleResult {
     const name = String(literal || '');
     if (!name) {
         return { ok: false, code: 'document::locale::invalid', message: 'empty locale key' };

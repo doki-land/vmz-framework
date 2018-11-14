@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Document Evidence — fence check + API refs from Program Graph.
  *
@@ -8,24 +7,33 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { DIAG, DOCUMENT_EVIDENCE_SCHEMA } from './document-schema.js';
+import {
+    DIAG,
+    DOCUMENT_EVIDENCE_SCHEMA,
+    type DocumentDiagnostic,
+    type DocumentEvidence,
+    type DocumentManifest,
+    type PageRecord,
+} from './document-schema.js';
+import type { AnalyzedMarkdown } from './document-enrich.js';
 
 const require = createRequire(import.meta.url);
 
-/**
- * @param {string} info
- * @returns {{ lang: string, run: string | null, source: string | null, playground: boolean }}
- */
-export function parseFenceInfo(info) {
+export interface FenceInfoMeta {
+    lang: string;
+    run: string | null;
+    source: string | null;
+    playground: boolean;
+}
+
+export function parseFenceInfo(info: string | undefined | null): FenceInfoMeta {
     const parts = String(info || '')
         .trim()
         .split(/\s+/)
         .filter(Boolean);
     const lang = (parts[0] || '').toLowerCase();
-    /** @type {string | null} */
-    let run = null;
-    /** @type {string | null} */
-    let source = null;
+    let run: string | null = null;
+    let source: string | null = null;
     let playground = false;
     for (const p of parts.slice(1)) {
         if (p === 'run') run = 'compile';
@@ -36,25 +44,25 @@ export function parseFenceInfo(info) {
     return { lang, run, source, playground };
 }
 
-/**
- * @param {string} href
- * @returns {string | null} symbol query (chunkId or name)
- */
-export function parseApiHref(href) {
+/** Symbol query (chunkId or name). */
+export function parseApiHref(href: string | undefined | null): string | null {
     const h = String(href || '').trim();
     if (h.startsWith('vmz-api:')) return h.slice('vmz-api:'.length).replace(/^\/+/, '');
     if (h.startsWith('api:')) return h.slice('api:'.length).replace(/^\/+/, '');
     return null;
 }
 
-/**
- * @param {string} projectRoot
- * @returns {Array<{ chunkId: string, name: string, path: string, capabilities: string[], programPath: string }>}
- */
-export function loadProgramApiIndex(projectRoot) {
+export interface ProgramApiIndexRow {
+    chunkId: string;
+    name: string;
+    path: string;
+    capabilities: string[];
+    programPath: string;
+}
+
+export function loadProgramApiIndex(projectRoot: string): ProgramApiIndexRow[] {
     const outDir = path.join(projectRoot, 'dist');
-    /** @type {Array<{ chunkId: string, name: string, path: string, capabilities: string[], programPath: string }>} */
-    const rows = [];
+    const rows: ProgramApiIndexRow[] = [];
     if (!fs.existsSync(outDir)) return rows;
     walkFiles(outDir, (file) => {
         if (!file.endsWith('.program.json')) return;
@@ -87,12 +95,11 @@ export function loadProgramApiIndex(projectRoot) {
     return rows;
 }
 
-/**
- * Resolve API symbol against Program Graph index.
- * @param {ReturnType<typeof loadProgramApiIndex>} index
- * @param {string} query
- */
-export function resolveApiSymbol(index, query) {
+/** Resolve API symbol against Program Graph index. */
+export function resolveApiSymbol(
+    index: ProgramApiIndexRow[],
+    query: string,
+): { status: 'ok' | 'missing' | 'ambiguous'; matches: ProgramApiIndexRow[] } {
     const q = String(query || '').trim();
     if (!q) return { status: 'missing', matches: [] };
     const exact = index.filter((r) => r.chunkId === q || r.name === q);
@@ -104,29 +111,29 @@ export function resolveApiSymbol(index, query) {
     return { status: 'missing', matches: [] };
 }
 
-/**
- * @param {import('./document-schema.js').DocumentManifest} manifest
- * @param {{
- * analyzeMarkdown: Function,
- * projectRoot: string,
- * createWorkspace?: Function,
- * ensureProgramGraph?: boolean,
- * }} ctx
- */
-export async function enrichDocumentEvidence(manifest, ctx) {
+export interface EnrichDocumentEvidenceCtx {
+    analyzeMarkdown: (source: string) => AnalyzedMarkdown;
+    projectRoot: string;
+    createWorkspace?: (opts: { root: string; outDir: string }) => {
+        check: (strict?: boolean) => { diagnostics?: Array<{ severity?: string; message?: string }> };
+        build: (strict?: boolean) => { diagnostics?: Array<{ severity?: string; message?: string }> };
+        dispose?: () => void;
+    };
+    ensureProgramGraph?: boolean;
+}
+
+export async function enrichDocumentEvidence(
+    manifest: DocumentManifest,
+    ctx: EnrichDocumentEvidenceCtx,
+): Promise<{ diagnostics: DocumentDiagnostic[]; evidence: DocumentEvidence }> {
     const projectRoot = path.resolve(ctx.projectRoot || manifest.root);
-    /** @type {import('./document-schema.js').DocumentDiagnostic[]} */
-    const diagnostics = [...(manifest.diagnostics || [])];
-    /** @type {any[]} */
-    const fenceRecords = [];
-    /** @type {any[]} */
-    const apiRefs = [];
-    /** @type {any[]} */
-    const testSelections = [];
+    const diagnostics: DocumentDiagnostic[] = [...(manifest.diagnostics || [])];
+    const fenceRecords: DocumentEvidence['fences'] = [];
+    const apiRefs: DocumentEvidence['apiRefs'] = [];
+    const testSelections: unknown[] = [];
 
     // Collect fences + api links from pages.
-    /** @type {Array<{ page: any, fences: any[], apiQueries: string[], sourcePath: string }>} */
-    const pages = [];
+    const pages: Array<{ page: PageRecord; fences: NonNullable<AnalyzedMarkdown['fences']>; apiQueries: string[]; sourcePath: string }> = [];
     for (const page of manifest.pages) {
         const abs = path.isAbsolute(page.sourcePath) ? page.sourcePath : path.join(manifest.root, page.sourcePath);
         const source = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : '';
@@ -150,7 +157,7 @@ export async function enrichDocumentEvidence(manifest, ctx) {
             diagnostics.push({
                 code: DIAG.FENCE_CHECK,
                 severity: 'error',
-                message: `project build for evidence failed: ${e.message || e}`,
+                message: `project build for evidence failed: ${e instanceof Error ? e.message : String(e)}`,
                 path: projectRoot,
             });
         }
@@ -256,7 +263,7 @@ export async function enrichDocumentEvidence(manifest, ctx) {
     }
 
     const hasErrors = diagnostics.some((d) => d.severity === 'error');
-    const evidence = {
+    const evidence: DocumentEvidence = {
         schema: DOCUMENT_EVIDENCE_SCHEMA,
         fences: fenceRecords,
         apiRefs,
@@ -266,12 +273,16 @@ export async function enrichDocumentEvidence(manifest, ctx) {
     return { diagnostics, evidence };
 }
 
-/**
- * @param {{ projectRoot: string, fence: any, meta: any, createWorkspace?: Function, sourcePath: string }} opts
- */
-async function checkVmzFence(opts) {
-    /** @type {import('./document-schema.js').DocumentDiagnostic[]} */
-    const diagnostics = [];
+interface CheckVmzFenceOpts {
+    projectRoot: string;
+    fence: NonNullable<AnalyzedMarkdown['fences']>[number];
+    meta: FenceInfoMeta;
+    createWorkspace?: EnrichDocumentEvidenceCtx['createWorkspace'];
+    sourcePath: string;
+}
+
+async function checkVmzFence(opts: CheckVmzFenceOpts) {
+    const diagnostics: DocumentDiagnostic[] = [];
     const { fence, meta, projectRoot, sourcePath } = opts;
     let body = fence.content;
     let label = `inline@${sourcePath}:${fence.lineStart}`;
@@ -328,8 +339,7 @@ async function checkVmzFence(opts) {
             return { record: { status: 'failed', detail: 'check' }, diagnostics, testSelection: null };
         }
 
-        /** @type {any} */
-        let testSelection = null;
+        let testSelection: unknown = null;
         if (meta.run) {
             const mode = meta.run === 'logic' || meta.run === 'browser' ? meta.run : 'compile';
             const build = ws.build(false);
@@ -378,7 +388,7 @@ async function checkVmzFence(opts) {
     }
 }
 
-function wrapVmzFragment(body) {
+function wrapVmzFragment(body: string): string {
     const trimmed = String(body || '').trim();
     if (trimmed.startsWith('<')) {
         return `<template>\n${trimmed}\n</template>\n<script client>\nexport default class FenceExample {}\n</script>\n`;
@@ -386,16 +396,22 @@ function wrapVmzFragment(body) {
     return `<template><p>ok</p></template>\n<script client>\n${trimmed}\n</script>\n`;
 }
 
-function pageKeySafe(p) {
+function pageKeySafe(p: string): string {
     return String(p || 'page').replace(/[^\w.-]+/g, '_');
 }
 
-/**
- * TS/JS fence: oxc-aligned surface via TypeScript parse (syntax only; no execute).
- */
-function checkScriptFence({ fence, meta, sourcePath, page }) {
-    /** @type {import('./document-schema.js').DocumentDiagnostic[]} */
-    const diagnostics = [];
+/** TS/JS fence: oxc-aligned surface via TypeScript parse (syntax only; no execute). */
+function checkScriptFence({
+    fence,
+    meta,
+    sourcePath,
+}: {
+    fence: NonNullable<AnalyzedMarkdown['fences']>[number];
+    meta: FenceInfoMeta;
+    sourcePath: string;
+    page?: PageRecord;
+}) {
+    const diagnostics: DocumentDiagnostic[] = [];
     try {
         const ts = require('typescript');
         const isTs = meta.lang === 'ts' || meta.lang === 'typescript';
@@ -436,7 +452,7 @@ function checkScriptFence({ fence, meta, sourcePath, page }) {
         return { record: { status: 'ok' }, diagnostics };
     } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (/Cannot find module ['\"]typescript['\"]/i.test(msg) || e?.code === 'MODULE_NOT_FOUND') {
+        if (/Cannot find module ['\"]typescript['\"]/i.test(msg) || (e as { code?: string })?.code === 'MODULE_NOT_FOUND') {
             diagnostics.push({
                 code: DIAG.FENCE_CHECK,
                 severity: 'error',
@@ -455,7 +471,7 @@ function checkScriptFence({ fence, meta, sourcePath, page }) {
     }
 }
 
-function walkFiles(dir, fn) {
+function walkFiles(dir: string, fn: (file: string) => void): void {
     if (!fs.existsSync(dir)) return;
     for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, ent.name);
@@ -468,7 +484,11 @@ function walkFiles(dir, fn) {
  * Build only project src .vmz files into dist for API Program Graph queries.
  * Avoids coupling document evidence to site /designs theme diagnostics.
  */
-async function ensureSrcProgramGraph(projectRoot, createWorkspace, diagnostics) {
+async function ensureSrcProgramGraph(
+    projectRoot: string,
+    createWorkspace: NonNullable<EnrichDocumentEvidenceCtx['createWorkspace']>,
+    diagnostics: DocumentDiagnostic[],
+): Promise<void> {
     const srcDir = path.join(projectRoot, 'src');
     if (!fs.existsSync(srcDir)) return;
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-d2-api-'));
@@ -497,7 +517,7 @@ async function ensureSrcProgramGraph(projectRoot, createWorkspace, diagnostics) 
     }
 }
 
-function copyDir(from, to) {
+function copyDir(from: string, to: string): void {
     fs.mkdirSync(to, { recursive: true });
     for (const ent of fs.readdirSync(from, { withFileTypes: true })) {
         const src = path.join(from, ent.name);
