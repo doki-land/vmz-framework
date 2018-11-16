@@ -102,6 +102,12 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: publish-native-${{ matrix.short }}
+          cache-on-failure: true
+
       - name: Install pnpm
         uses: pnpm/action-setup@v6
 
@@ -169,9 +175,6 @@ jobs:
           fi
           echo "publishing ${{ needs.provenance.outputs.tag }} @ $head"
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Install pnpm
         uses: pnpm/action-setup@v6
 
@@ -189,12 +192,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install
-
-      - name: Build JS runtimes + tools
-        run: pnpm build:runtimes
-
-      - name: Assert @vmz/vmz dist pack contract
-        run: node scripts/ci/assert-vmz-pack.mjs
 
       - name: Download native artifacts
         uses: actions/download-artifact@v8
@@ -215,6 +212,19 @@ jobs:
             cp -r "$d"/. "dist/native-flat/$short/" || true
           done
           find dist/native-flat -type f -print
+          # Fail early if a matrix platform is missing.
+          for short in win32-x64 linux-x64 darwin-arm64; do
+            if ! find "dist/native-flat/$short" -name 'vmz.*.node' -type f | grep -q .; then
+              echo "missing native binary for $short under dist/native-flat" >&2
+              exit 1
+            fi
+          done
+
+      - name: Build JS runtimes only (natives from matrix artifacts)
+        run: pnpm build:runtimes:js
+
+      - name: Assert @vmz/vmz dist pack contract
+        run: node scripts/ci/assert-vmz-pack.mjs
 
       - name: Strip token-style npmrc (OIDC only)
         shell: bash

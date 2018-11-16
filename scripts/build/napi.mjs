@@ -6,6 +6,7 @@
  * optionalDependencies / `require.resolve('@vmz/vmz-<short>')` only — loaded by `@vmz/vmz`.
  *
  * Usage: node scripts/build/napi.mjs [--release]
+ * Skip:  VMZ_SKIP_NAPI=1  (publish job already has matrix artifacts)
  */
 
 import { spawnSync } from 'node:child_process';
@@ -16,6 +17,11 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const release = process.argv.includes('--release');
 const profile = release ? 'release' : 'debug';
+
+if (process.env.VMZ_SKIP_NAPI === '1' || process.env.VMZ_SKIP_NAPI === 'true') {
+    console.log('napi: skip (VMZ_SKIP_NAPI)');
+    process.exit(0);
+}
 
 /** @returns {{ triple: string, short: string, os: string[], cpu: string[] }} */
 function platformInfo() {

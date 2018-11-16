@@ -7,7 +7,8 @@
  * - 工作流合同：file=publish-npm.yml env=NPM_PUBLISH repo=doki-land/vmz-framework
  *   （npm Trusted Publisher 每包只能配一个；本仓唯一可信文件即 publish-npm.yml）
  *
- * 前置：JS 已 build；native 产物在 dist/<short>/ 下（见 publish-npm.yml → VMZ_NATIVE_ARTIFACTS）。
+ * 前置：JS 已 build（`pnpm build:runtimes:js`）；native 产物在 dist/<short>/ 下
+ *（publish-npm.yml matrix → artifacts → VMZ_NATIVE_ARTIFACTS）。发包 job 不再编 native。
  */
 
 import { spawnSync } from 'node:child_process';
