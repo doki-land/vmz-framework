@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { resolveDeliveryServeRoot } from './delivery-serve-root.js';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repoRootGuess = path.resolve(packageRoot, '../../..');
@@ -20,11 +21,17 @@ export type CreateWorkspaceFn = (opts: { root: string; outDir: string }) => {
 export type BuildOptions = {
     createWorkspace?: CreateWorkspaceFn;
     repoRoot?: string;
+    /** Hint for nested `profiles.*.name` when resolving the serve/artifact root. */
+    deliveryName?: string | null;
 };
 
 export type BuildResult =
     | { ok: true; outDir: string; diagnostics: unknown[] }
     | { ok: false; outDir: string; diagnostics: unknown[]; error: string };
+
+function finishBuildOutDir(dist: string, deliveryName?: string | null): string {
+    return resolveDeliveryServeRoot(dist, deliveryName);
+}
 
 /** Build project for compile/logic evidence. Prefers N-API `createWorkspace`, else Node `@vmz/vmz`. */
 export function buildForCompile(project: string, outDir?: string, options: BuildOptions = {}): BuildResult {
@@ -49,7 +56,7 @@ export function buildForCompile(project: string, outDir?: string, options: Build
                         error: 'workspace build reported errors',
                     };
                 }
-                return { ok: true, outDir: dist, diagnostics: diags };
+                return { ok: true, outDir: finishBuildOutDir(dist, options.deliveryName), diagnostics: diags };
             } finally {
                 ws.dispose();
             }
@@ -69,7 +76,7 @@ export function buildForCompile(project: string, outDir?: string, options: Build
             encoding: 'utf8',
         });
         if (run.status === 0) {
-            return { ok: true, outDir: dist, diagnostics: [] };
+            return { ok: true, outDir: finishBuildOutDir(dist, options.deliveryName), diagnostics: [] };
         }
         return {
             ok: false,

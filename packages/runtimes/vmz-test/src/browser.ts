@@ -21,6 +21,7 @@ import { resolveComponentEntries } from '@vmz/core/component-registry';
 import { resolveChunkArtifacts } from './compile.js';
 import { createArtifactsDir, writeFailureEvidence, writeTimingOnly, type BrowserTiming, type StepTiming } from './browser-evidence.js';
 import { isServeHostManifest, resolveRoutePath, startServeHost, type ServeHostHandle } from './browser-serve.js';
+import { resolveDeliveryServeRoot } from './delivery-serve-root.js';
 import {
     defaultClickLocator,
     parseActionLocator,
@@ -205,12 +206,17 @@ export async function runBrowserManifest(
     manifest: Record<string, unknown>,
     ctx: {
         outDir: string;
+        /** Optional `profiles.*.name` hint when resolving nested delivery roots. */
+        deliveryName?: string | null;
     },
 ): Promise<BrowserResult> {
     const diagnostics: Diag[] = [];
     const fail = (message: string, extra: Record<string, unknown> = {}) => {
         diagnostics.push({ severity: 'error', message, ...extra });
     };
+
+    // `--out-dir` root may nest under `profiles.*.name` (e.g. dist/cdn). Serve that root.
+    const outDir = resolveDeliveryServeRoot(ctx.outDir, ctx.deliveryName);
 
     const program = manifest.program && typeof manifest.program === 'object' ? (manifest.program as Record<string, unknown>) : {};
     const chunkId = String(program.chunkId || '');
@@ -227,13 +233,13 @@ export async function runBrowserManifest(
     }
 
     if (!useServe) {
-        const arts = resolveChunkArtifacts(ctx.outDir, chunkId);
+        const arts = resolveChunkArtifacts(outDir, chunkId);
         if (!arts.clientPath) {
             fail(`missing ${chunkId}.client.js`);
             return { status: 'failed', diagnostics, planId: null, programId };
         }
-    } else if (!fs.existsSync(path.join(ctx.outDir, 'vmz-serve-host.mjs'))) {
-        fail(`serve host: missing vmz-serve-host.mjs under ${ctx.outDir}`);
+    } else if (!fs.existsSync(path.join(outDir, 'vmz-serve-host.mjs'))) {
+        fail(`serve host: missing vmz-serve-host.mjs under ${outDir}`);
         return { status: 'failed', diagnostics, planId: null, programId };
     }
 
@@ -253,7 +259,7 @@ export async function runBrowserManifest(
     const runStarted = Date.now();
     const consoleErrors: string[] = [];
     const failedRequests: string[] = [];
-    const artifactsDir = createArtifactsDir(ctx.outDir, testId);
+    const artifactsDir = createArtifactsDir(outDir, testId);
 
     const recordStep = (phase: StepTiming['phase'], kind: string, started: number, ok: boolean, detail?: string) => {
         stepTimings.push({ phase, kind, ms: Date.now() - started, ok, detail });
@@ -263,10 +269,10 @@ export async function runBrowserManifest(
         const puppeteer = await loadPuppeteerCore();
         let origin: string;
         if (useServe) {
-            serveHost = await startServeHost(ctx.outDir);
+            serveHost = await startServeHost(outDir);
             origin = serveHost.origin;
         } else {
-            server = await startStaticServer(ctx.outDir);
+            server = await startStaticServer(outDir);
             origin = `http://127.0.0.1:${server.port}`;
         }
 
@@ -374,7 +380,7 @@ export async function runBrowserManifest(
             const explicitComponents =
                 program.components && typeof program.components === 'object' ? (program.components as Record<string, string>) : undefined;
             const registryStrict = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
-            const registryEntries = await resolveComponentEntries(ctx.outDir, explicitComponents, {
+            const registryEntries = await resolveComponentEntries(outDir, explicitComponents, {
                 strict: registryStrict,
                 closureRoots: [chunkId.replace(/\\/g, '/')],
             });
@@ -432,7 +438,7 @@ export async function runBrowserManifest(
             let stepOk = true;
             try {
                 if (kind === 'open' || kind === 'navigate') {
-                    const pathname = resolveRoutePath(ctx.outDir, {
+                    const pathname = resolveRoutePath(outDir, {
                         routeId: a.routeId != null ? String(a.routeId) : undefined,
                         path: a.path != null ? String(a.path) : undefined,
                         params:
@@ -611,7 +617,7 @@ export async function runBrowserManifest(
                             }, wantRouteId);
                             if (!hit && loc.path) {
                                 try {
-                                    const resolved = resolveRoutePath(ctx.outDir, { routeId: wantRouteId });
+                                    const resolved = resolveRoutePath(outDir, { routeId: wantRouteId });
                                     if (loc.path !== resolved && !loc.path.endsWith(resolved)) ok = false;
                                     else ok = true;
                                 } catch {

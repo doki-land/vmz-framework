@@ -3,9 +3,11 @@
  * Semantics live in `@vmz/test` (optional peer — not installed with bare `@vmz/vmz`).
  */
 
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type { Cli, Command, ParsedOptions } from '@vmz/commander';
-import { createWorkspace } from './index.js';
+import { createWorkspace, loadVmzConfig, normalizeDeliveryAuthoring, resolveProfileArtifactDir, selectBuildProfile } from './index.js';
 import { log } from './log.js';
 import { generatePrettyJson } from './pretty-json.js';
 
@@ -71,6 +73,7 @@ export async function cmdTest(args: ParsedOptions): Promise<number> {
         runResumeManifest,
         runBrowserManifest,
         runDeploymentManifest,
+        resolveDeliveryServeRoot,
     } = test;
 
     const project = path.resolve(String(args._[0] || '.'));
@@ -210,12 +213,32 @@ export async function cmdTest(args: ParsedOptions): Promise<number> {
         let buildOut: string | null = null;
         let buildDiags: unknown[] = [];
         let buildError: string | null = null;
+        let deliveryName: string | null = null;
 
         if (needsBuild) {
-            const built = buildForCompile(project, outDirArg ? path.resolve(outDirArg) : undefined, {
+            // Align with `vmz build` / `vmz serve`: artifacts live under
+            // `<out-dir>/<profiles.*.name>` (default name = profile id).
+            const outDirRoot = outDirArg ? path.resolve(outDirArg) : fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-test-'));
+            let buildTarget = outDirRoot;
+            try {
+                const cfg = await loadVmzConfig(project);
+                const norm = normalizeDeliveryAuthoring(cfg.delivery ?? null);
+                if (norm.ok) {
+                    const selected = selectBuildProfile(norm.table, '');
+                    if (selected.ok) {
+                        deliveryName = String(selected.profile.name || selected.selection.profileId || '');
+                        buildTarget = resolveProfileArtifactDir(outDirRoot, selected.profile);
+                    }
+                }
+            } catch (e) {
+                log.warn(`delivery profile resolve skipped: ${e instanceof Error ? e.message : String(e)}`);
+            }
+            fs.mkdirSync(buildTarget, { recursive: true });
+            const built = buildForCompile(project, buildTarget, {
                 createWorkspace,
+                deliveryName,
             });
-            buildOut = built.outDir;
+            buildOut = resolveDeliveryServeRoot(built.outDir, deliveryName);
             buildDiags = built.diagnostics || [];
             if (!built.ok) {
                 buildError = built.error || 'build failed';
@@ -308,7 +331,10 @@ export async function cmdTest(args: ParsedOptions): Promise<number> {
             }
 
             if (doBrowser) {
-                const result = await runBrowserManifest(m, { outDir: buildOut });
+                const result = await runBrowserManifest(m, {
+                    outDir: buildOut,
+                    deliveryName,
+                });
                 statuses.push(result.status);
                 diags.push(...result.diagnostics);
                 base.programId = result.programId ?? base.programId;

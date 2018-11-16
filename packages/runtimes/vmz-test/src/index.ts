@@ -30,6 +30,10 @@ export {
     type BrowserResult,
 } from './browser.js';
 export {
+    isDeliveryServeRoot,
+    resolveDeliveryServeRoot,
+} from './delivery-serve-root.js';
+export {
     BROWSER_LOCATOR_KINDS,
     defaultClickLocator,
     parseActionLocator,
