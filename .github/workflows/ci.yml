@@ -30,8 +30,9 @@ jobs:
       - name: Check format (Biome; same as `pnpm fmt:check`)
         run: pnpm fmt:check
 
-  build:
-    name: Build
+  # One runner: build runtimes once, then examples + tests (no second cargo/JS rebuild).
+  build-test:
+    name: Build and Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -48,6 +49,12 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-build-test
+          cache-on-failure: true
 
       - name: Install dependencies
         run: pnpm install
@@ -59,35 +66,7 @@ jobs:
         run: node scripts/ci/assert-vmz-pack.mjs
 
       - name: Build tools + examples
-        run: pnpm build
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: '24'
-          package-manager-cache: false
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Build runtimes (native + JS)
-        run: pnpm build:runtimes
-
-      - name: Assert @vmz/vmz dist pack contract
-        run: node scripts/ci/assert-vmz-pack.mjs
+        run: pnpm build:examples
 
       - name: Install Chromium (browser host / CDP)
         uses: browser-actions/setup-chrome@v2
@@ -96,7 +75,7 @@ jobs:
           install-dependencies: true
 
       - name: Unit tests (textmate / shared packages)
-        run: pnpm test:unit
+        run: pnpm test:unit:only
 
       - name: Verify Chromium
         env:
