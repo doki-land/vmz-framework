@@ -9,7 +9,11 @@ use crate::parse::template_semantic::{SemanticIr, SemanticNode, SemanticProp};
 use crate::parse::template_span::TemplateSpan;
 
 /// Collect body-local `[start, end)` spans where `name` appears as a field/expr ident.
-pub fn semantic_field_spans(semantic: &SemanticIr, template: &str, name: &str) -> Vec<(usize, usize)> {
+pub fn semantic_field_spans(
+    semantic: &SemanticIr,
+    template: &str,
+    name: &str,
+) -> Vec<(usize, usize)> {
     let mut out = Vec::new();
     walk_field(&semantic.roots, template, name, &mut out);
     out.sort_unstable();
@@ -116,7 +120,9 @@ fn walk_handler(nodes: &[SemanticNode], template: &str, name: &str, out: &mut Ve
             SemanticNode::ForNode { body, .. } => {
                 walk_handler(std::slice::from_ref(body.as_ref()), template, name, out);
             }
-            SemanticNode::SlotOutlet { children, .. } => walk_handler(children, template, name, out),
+            SemanticNode::SlotOutlet { children, .. } => {
+                walk_handler(children, template, name, out)
+            }
             SemanticNode::SlotTemplate { body, .. } => {
                 walk_handler(std::slice::from_ref(body.as_ref()), template, name, out);
             }
@@ -184,7 +190,8 @@ fn prop_exprs(p: &SemanticProp) -> Vec<(&str, TemplateSpan)> {
         SemanticProp::On { .. } => vec![], // handlers use walk_handler
         SemanticProp::OnObject { expr, span } => vec![(expr.as_str(), *span)],
         SemanticProp::Model { expr, span, .. } => vec![(expr.as_str(), *span)],
-        SemanticProp::ClassPlan { binds, span, .. } | SemanticProp::StylePlan { binds, span, .. } => {
+        SemanticProp::ClassPlan { binds, span, .. }
+        | SemanticProp::StylePlan { binds, span, .. } => {
             binds.iter().map(|b| (b.as_str(), *span)).collect()
         }
         SemanticProp::Directive { dir, span } => match dir {
@@ -247,7 +254,12 @@ fn push_handler_ident(
     push_ident_in_span(template, span, handler, name, out);
 }
 
-fn push_tag_name_spans(template: &str, span: TemplateSpan, tag: &str, out: &mut Vec<(usize, usize)>) {
+fn push_tag_name_spans(
+    template: &str,
+    span: TemplateSpan,
+    tag: &str,
+    out: &mut Vec<(usize, usize)>,
+) {
     let start = span.start as usize;
     let end = (span.end as usize).min(template.len());
     if start >= end {

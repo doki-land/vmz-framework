@@ -16,7 +16,7 @@ use vmz_protocol::{
 
 use crate::analyze::analyze_script;
 use crate::sfc::{ScriptKind, parse_vmz};
-use crate::template::{parse_template_asts};
+use crate::template::parse_template_asts;
 use crate::tooling::template_symbols::{
     semantic_component_tags, semantic_field_spans, semantic_handler_spans, semantic_tag_spans,
 };
@@ -166,28 +166,28 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
                 continue;
             };
             for (ts, te) in semantic_field_spans(&semantic, &parsed.template.content, &name) {
-                    let tspan = SourceSpan {
+                let tspan = SourceSpan {
+                    path: rel.clone(),
+                    start: (parsed.template.content_start + ts) as u32,
+                    end: (parsed.template.content_start + te) as u32,
+                };
+                references.push(Reference {
+                    schema: REFERENCE_SCHEMA.into(),
+                    from: StableId::new(StableIdKind::Template, rel.clone()),
+                    to: StableId::new(StableIdKind::Field, format!("{class_name}.{name}")),
+                    span: Some(tspan.clone()),
+                });
+                if let Some(ss) = &script_span {
+                    source_map.push(TemplateScriptMapEntry {
+                        schema: SOURCE_MAP_SCHEMA.into(),
                         path: rel.clone(),
-                        start: (parsed.template.content_start + ts) as u32,
-                        end: (parsed.template.content_start + te) as u32,
-                    };
-                    references.push(Reference {
-                        schema: REFERENCE_SCHEMA.into(),
-                        from: StableId::new(StableIdKind::Template, rel.clone()),
-                        to: StableId::new(StableIdKind::Field, format!("{class_name}.{name}")),
-                        span: Some(tspan.clone()),
+                        symbol_kind: StableIdKind::Field,
+                        name: name.clone(),
+                        template_span: tspan,
+                        script_span: ss.clone(),
                     });
-                    if let Some(ss) = &script_span {
-                        source_map.push(TemplateScriptMapEntry {
-                            schema: SOURCE_MAP_SCHEMA.into(),
-                            path: rel.clone(),
-                            symbol_kind: StableIdKind::Field,
-                            name: name.clone(),
-                            template_span: tspan,
-                            script_span: ss.clone(),
-                        });
-                    }
                 }
+            }
         }
 
         // Methods
@@ -211,28 +211,28 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
                 continue;
             };
             for (ts, te) in semantic_handler_spans(&semantic, &parsed.template.content, &name) {
-                    let tspan = SourceSpan {
+                let tspan = SourceSpan {
+                    path: rel.clone(),
+                    start: (parsed.template.content_start + ts) as u32,
+                    end: (parsed.template.content_start + te) as u32,
+                };
+                references.push(Reference {
+                    schema: REFERENCE_SCHEMA.into(),
+                    from: StableId::new(StableIdKind::Template, rel.clone()),
+                    to: StableId::new(StableIdKind::Method, format!("{class_name}.{name}")),
+                    span: Some(tspan.clone()),
+                });
+                if let Some(ss) = &script_span {
+                    source_map.push(TemplateScriptMapEntry {
+                        schema: SOURCE_MAP_SCHEMA.into(),
                         path: rel.clone(),
-                        start: (parsed.template.content_start + ts) as u32,
-                        end: (parsed.template.content_start + te) as u32,
-                    };
-                    references.push(Reference {
-                        schema: REFERENCE_SCHEMA.into(),
-                        from: StableId::new(StableIdKind::Template, rel.clone()),
-                        to: StableId::new(StableIdKind::Method, format!("{class_name}.{name}")),
-                        span: Some(tspan.clone()),
+                        symbol_kind: StableIdKind::Method,
+                        name: name.clone(),
+                        template_span: tspan,
+                        script_span: ss.clone(),
                     });
-                    if let Some(ss) = &script_span {
-                        source_map.push(TemplateScriptMapEntry {
-                            schema: SOURCE_MAP_SCHEMA.into(),
-                            path: rel.clone(),
-                            symbol_kind: StableIdKind::Method,
-                            name: name.clone(),
-                            template_span: tspan,
-                            script_span: ss.clone(),
-                        });
-                    }
                 }
+            }
         }
 
         // Server capabilities
