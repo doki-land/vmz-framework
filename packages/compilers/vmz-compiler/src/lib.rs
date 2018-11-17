@@ -63,6 +63,7 @@ pub use session::workspace;
 pub use tooling::cross_sfc;
 pub use tooling::deployment_proof;
 pub use tooling::rename;
+pub use tooling::template_symbols;
 pub use tooling::transaction;
 pub use vmz_debugger::causal_replay;
 

@@ -5,4 +5,5 @@
 pub mod cross_sfc;
 pub mod deployment_proof;
 pub mod rename;
+pub mod template_symbols;
 pub mod transaction;

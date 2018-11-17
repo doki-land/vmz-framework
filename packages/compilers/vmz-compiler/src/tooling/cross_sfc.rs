@@ -16,7 +16,10 @@ use vmz_protocol::{
 
 use crate::analyze::analyze_script;
 use crate::sfc::{ScriptKind, parse_vmz};
-use crate::template::{AttrValue, TemplateNode, parse_template};
+use crate::template::{parse_template_asts};
+use crate::tooling::template_symbols::{
+    semantic_component_tags, semantic_field_spans, semantic_handler_spans, semantic_tag_spans,
+};
 
 /// Schema id for template↔script source-map documents.
 pub const SOURCE_MAP_SCHEMA: &str = "vmz.dx.source_map.v0";
@@ -159,11 +162,10 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
                 owners: vec![StableId::new(StableIdKind::Component, class_name.clone())],
                 tags: vec!["x2".into()],
             });
-            let Ok(ir) = parse_template(&parsed.template.content) else {
+            let Ok((semantic, _)) = parse_template_asts(&parsed.template.content) else {
                 continue;
             };
-            if true {
-                for (ts, te) in template_name_spans(&ir, &parsed.template.content, &name) {
+            for (ts, te) in semantic_field_spans(&semantic, &parsed.template.content, &name) {
                     let tspan = SourceSpan {
                         path: rel.clone(),
                         start: (parsed.template.content_start + ts) as u32,
@@ -186,7 +188,6 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
                         });
                     }
                 }
-            }
         }
 
         // Methods
@@ -206,11 +207,10 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
                 owners: vec![StableId::new(StableIdKind::Component, class_name.clone())],
                 tags: vec!["x2".into()],
             });
-            let Ok(ir) = parse_template(&parsed.template.content) else {
+            let Ok((semantic, _)) = parse_template_asts(&parsed.template.content) else {
                 continue;
             };
-            if true {
-                for (ts, te) in template_handler_spans(&ir, &parsed.template.content, &name) {
+            for (ts, te) in semantic_handler_spans(&semantic, &parsed.template.content, &name) {
                     let tspan = SourceSpan {
                         path: rel.clone(),
                         start: (parsed.template.content_start + ts) as u32,
@@ -233,7 +233,6 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
                         });
                     }
                 }
-            }
         }
 
         // Server capabilities
@@ -296,15 +295,15 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
         let Ok(parsed) = parse_vmz(&abs, source) else {
             continue;
         };
-        let Ok(ir) = parse_template(&parsed.template.content) else {
+        let Ok((semantic, _)) = parse_template_asts(&parsed.template.content) else {
             continue;
         };
-        for tag in collect_component_tags(&ir) {
+        for tag in semantic_component_tags(&semantic) {
             if let Some(def_rel) = by_stem.get(&tag) {
                 if def_rel == &rel {
                     continue;
                 }
-                for (ts, te) in tag_spans_in_template(&parsed.template.content, &tag) {
+                for (ts, te) in semantic_tag_spans(&semantic, &parsed.template.content, &tag) {
                     references.push(Reference {
                         schema: REFERENCE_SCHEMA.into(),
                         from: StableId::new(StableIdKind::File, rel.clone()),
@@ -461,19 +460,17 @@ fn collect_method_edits(
             });
             refs += 1;
         }
-        let Ok(ir) = parse_template(&parsed.template.content) else {
+        let Ok((semantic, _)) = parse_template_asts(&parsed.template.content) else {
             continue;
         };
-        if true {
-            for (ts, te) in template_handler_spans(&ir, &parsed.template.content, from) {
-                edits.push(TextEdit {
-                    path: rel.clone(),
-                    start: (parsed.template.content_start + ts) as u32,
-                    end: (parsed.template.content_start + te) as u32,
-                    new_text: to.into(),
-                });
-                refs += 1;
-            }
+        for (ts, te) in semantic_handler_spans(&semantic, &parsed.template.content, from) {
+            edits.push(TextEdit {
+                path: rel.clone(),
+                start: (parsed.template.content_start + ts) as u32,
+                end: (parsed.template.content_start + te) as u32,
+                new_text: to.into(),
+            });
+            refs += 1;
         }
     }
     edits.sort_by(|a, b| (&a.path, a.start).cmp(&(&b.path, b.start)));
@@ -517,22 +514,20 @@ fn collect_component_edits(
                 }
             }
         }
-        // Usages: <From ...>
-        let Ok(ir) = parse_template(&parsed.template.content) else {
+        // Usages: <From ...> via Semantic AST (not whole-template string scan).
+        let Ok((semantic, _)) = parse_template_asts(&parsed.template.content) else {
             continue;
         };
-        if true {
-            let tags = collect_component_tags(&ir);
-            if tags.iter().any(|t| t == from) {
-                for (ts, te) in tag_spans_in_template(&parsed.template.content, from) {
-                    edits.push(TextEdit {
-                        path: rel.clone(),
-                        start: (parsed.template.content_start + ts) as u32,
-                        end: (parsed.template.content_start + te) as u32,
-                        new_text: to.into(),
-                    });
-                    refs += 1;
-                }
+        let tags = semantic_component_tags(&semantic);
+        if tags.iter().any(|t| t == from) {
+            for (ts, te) in semantic_tag_spans(&semantic, &parsed.template.content, from) {
+                edits.push(TextEdit {
+                    path: rel.clone(),
+                    start: (parsed.template.content_start + ts) as u32,
+                    end: (parsed.template.content_start + te) as u32,
+                    new_text: to.into(),
+                });
+                refs += 1;
             }
         }
     }
@@ -662,136 +657,4 @@ fn is_ident_boundary(text: &str, start: usize, end: usize) -> bool {
     let after_ok = end >= bytes.len()
         || (!bytes[end].is_ascii_alphanumeric() && bytes[end] != b'_' && bytes[end] != b'$');
     before_ok && after_ok
-}
-
-fn collect_component_tags(ir: &crate::template::TemplateIr) -> Vec<String> {
-    let mut out = Vec::new();
-    fn walk(nodes: &[TemplateNode], out: &mut Vec<String>) {
-        for n in nodes {
-            if let TemplateNode::Element { tag, children, .. } = n {
-                if tag.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
-                    out.push(tag.clone());
-                }
-                walk(children, out);
-            }
-        }
-    }
-    walk(&ir.roots, &mut out);
-    out.sort();
-    out.dedup();
-    out
-}
-
-fn tag_spans_in_template(template: &str, tag: &str) -> Vec<(usize, usize)> {
-    let mut out = Vec::new();
-    for prefix in ["<", "</"] {
-        let pat = format!("{prefix}{tag}");
-        let mut from = 0;
-        while let Some(i) = template[from..].find(&pat) {
-            let abs = from + i + prefix.len();
-            let end = abs + tag.len();
-            let next = template.as_bytes().get(end).copied().unwrap_or(b' ');
-            if next == b'>' || next == b'/' || next == b' ' || next == b'\n' || next == b'\r' {
-                out.push((abs, end));
-            }
-            from = end;
-        }
-    }
-    out
-}
-
-fn template_name_spans(
-    ir: &crate::template::TemplateIr,
-    template: &str,
-    name: &str,
-) -> Vec<(usize, usize)> {
-    let _ = ir;
-    let mut out = Vec::new();
-    let brace = format!("{{{name}}}");
-    let mut from = 0;
-    while let Some(i) = template[from..].find(&brace) {
-        let abs = from + i + 1;
-        out.push((abs, abs + name.len()));
-        from = abs + name.len();
-    }
-    for prefix in ["if={", "each={", "show={", "hide={"] {
-        let pat = format!("{prefix}{name}");
-        from = 0;
-        while let Some(i) = template[from..].find(&pat) {
-            let abs = from + i + prefix.len();
-            let end = abs + name.len();
-            out.push((abs, end));
-            from = end;
-        }
-    }
-    out
-}
-
-fn template_handler_spans(
-    ir: &crate::template::TemplateIr,
-    template: &str,
-    name: &str,
-) -> Vec<(usize, usize)> {
-    let mut out = Vec::new();
-    fn walk(nodes: &[TemplateNode], name: &str, template: &str, out: &mut Vec<(usize, usize)>) {
-        for n in nodes {
-            if let TemplateNode::Element { attrs, children, .. } = n {
-                for a in attrs {
-                    let is_event = a.name.starts_with('@') || a.name.starts_with("on");
-                    if !is_event {
-                        continue;
-                    }
-                    match &a.value {
-                        AttrValue::Interp(expr)
-                            if expr.trim() == name || expr.trim() == format!("this.{name}") =>
-                        {
-                            // Find in template text near attribute.
-                            let needle = if expr.contains("this.") {
-                                format!("this.{name}")
-                            } else {
-                                name.to_string()
-                            };
-                            if template.contains(&needle) {
-                                // Prefer occurrence after attr name --take all for rename accuracy with dedup.
-                                let mut from = 0;
-                                while let Some(j) = template[from..].find(&needle) {
-                                    let abs = from + j;
-                                    if needle.starts_with("this.") {
-                                        let start = abs + "this.".len();
-                                        out.push((start, start + name.len()));
-                                    } else if is_ident_boundary(template, abs, abs + name.len()) {
-                                        out.push((abs, abs + name.len()));
-                                    }
-                                    from = abs + needle.len();
-                                }
-                            }
-                        }
-                        AttrValue::Static(s) if s.trim() == name => {
-                            if let Some(i) = template.find(name) {
-                                out.push((i, i + name.len()));
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                walk(children, name, template, out);
-            }
-        }
-    }
-    walk(&ir.roots, name, template, &mut out);
-    // Also `@click={name}` string scan fallback.
-    for prefix in ["={", "=\"", "='"] {
-        for event in ["@click", "@input", "@change", "onclick", "oninput"] {
-            let pat = format!("{event}{prefix}{name}");
-            let mut from = 0;
-            while let Some(i) = template[from..].find(&pat) {
-                let abs = from + i + event.len() + prefix.len();
-                out.push((abs, abs + name.len()));
-                from = abs + name.len();
-            }
-        }
-    }
-    out.sort();
-    out.dedup();
-    out
 }

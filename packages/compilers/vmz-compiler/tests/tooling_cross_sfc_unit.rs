@@ -22,7 +22,7 @@ fn method_and_component_rename_cross_sfc() {
     fs::write(
         root.join("src/components/Card.vmz"),
         r#"<template>
-  <button @click={increment}>{n}</button>
+  <button @click="increment">{{ n }}</button>
 </template>
 <script client>
 export default class Card {
