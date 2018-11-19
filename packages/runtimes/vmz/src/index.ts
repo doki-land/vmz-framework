@@ -1006,6 +1006,11 @@ export {
     emitBuildProof,
 } from './build-assemble.js';
 export {
+    buildProjectToOutDirRoot,
+    type BuildProjectOptions,
+    type BuildProjectResult,
+} from './project-build.js';
+export {
     PRODUCTION_SCENARIO_PACK_SCHEMA,
     PRODUCTION_CI_PROFILE_SCHEMA,
     PRODUCTION_TEST_REPORT_SCHEMA,

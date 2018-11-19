@@ -676,6 +676,35 @@ export const ASSEMBLE_MANIFEST_SCHEMA: string;
 export function assembleDelivery(outDir: string, ctx: Record<string, unknown>): Promise<{ manifest: Record<string, unknown>; path: string }>;
 export function emitBuildProof(outDir: string, ctx: Record<string, unknown>): { proof: Record<string, unknown>; path: string };
 
+export function buildProjectToOutDirRoot(
+    project: string,
+    outDirRoot: string,
+    opts?: {
+        profile?: string;
+        release?: boolean;
+        origin?: string;
+        quiet?: boolean;
+    },
+): Promise<
+    | {
+          ok: true;
+          outDirRoot: string;
+          artifactDir: string;
+          deliveryName: string;
+          profileId: string;
+          assembly: string;
+          diagnostics: unknown[];
+      }
+    | {
+          ok: false;
+          outDirRoot: string;
+          artifactDir: string | null;
+          deliveryName: string | null;
+          diagnostics: unknown[];
+          error: string;
+      }
+>;
+
 export const PRODUCTION_SCENARIO_PACK_SCHEMA: string;
 export const PRODUCTION_CI_PROFILE_SCHEMA: string;
 export const PRODUCTION_TEST_REPORT_SCHEMA: string;
