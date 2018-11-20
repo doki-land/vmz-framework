@@ -5,13 +5,13 @@
  */
 
 import path from 'node:path';
-import { loadVmzConfig } from './plugin-host.js';
-import { normalizeDeliveryAuthoring, resolveProfileArtifactDir, selectBuildProfile } from './delivery-profile.js';
-import { packFromDeploymentIr } from './pack.js';
 import { assembleDelivery, emitBuildProof } from './build-assemble.js';
+import { normalizeDeliveryAuthoring, resolveProfileArtifactDir, selectBuildProfile } from './delivery-profile.js';
+import { buildIntegratedDocuments, projectHasDocuments } from './document-integrate.js';
 import { emitLocaleRuntimeModules, localeHasErrors } from './locale-check.js';
 import { emitLocaleRouteRealization } from './locale-route-emit.js';
-import { buildIntegratedDocuments, projectHasDocuments } from './document-integrate.js';
+import { packFromDeploymentIr } from './pack.js';
+import { loadVmzConfig } from './plugin-host.js';
 
 export type BuildProjectOptions = {
     /** `--profile` id; empty → delivery default. */
@@ -58,7 +58,9 @@ function dedupeDiagnostics(list: Diagnostic[]): Diagnostic[] {
 }
 
 async function runWithPlugins(
-    ws: { /* opaque workspace */ },
+    ws: {
+        /* opaque workspace */
+    },
     project: string,
     outDir: string,
     fn: () => Promise<number> | number,
@@ -136,9 +138,7 @@ export async function buildProjectToOutDirRoot(
             const report = ws.build(Boolean(opts.release));
             const diags = report.diagnostics ?? [];
             diagnostics.push(...diags);
-            const errors = diags.filter(
-                (d: { severity?: string; level?: string }) => d && (d.severity === 'error' || d.level === 'error'),
-            );
+            const errors = diags.filter((d: { severity?: string; level?: string }) => d && (d.severity === 'error' || d.level === 'error'));
             return errors.length ? 1 : 0;
         });
         if (code !== 0) {
@@ -223,9 +223,7 @@ export async function buildProjectToOutDirRoot(
                     ...selected.profile,
                     sources:
                         (selected.profile as { sources?: unknown }).sources ||
-                        (norm.table.sugar
-                            ? (norm.table.profiles[norm.table.default] as { sources?: unknown } | undefined)?.sources
-                            : null),
+                        (norm.table.sugar ? (norm.table.profiles[norm.table.default] as { sources?: unknown } | undefined)?.sources : null),
                 },
                 siteId: cfg.application?.id || undefined,
                 origin: opts.origin,

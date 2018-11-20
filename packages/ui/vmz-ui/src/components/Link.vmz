@@ -41,6 +41,7 @@
 * Navigation / inline text link; tokens only, no brand hex.
 */
 export default class Link {
+	static __vmzHostBox = 'contents';
 	public href: string = "#";
 	public target: string = "";
 	public rel: string = "";

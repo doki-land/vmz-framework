@@ -1,5 +1,5 @@
 <template>
-  <div class="site landing-page landing-v2 landing-brand">
+  <div class="site landing-page landing-v2">
     <SiteHeader />
     <main>
       <section class="v2-hero" aria-labelledby="landing-title" data-vmz-fixture="landing-brand">

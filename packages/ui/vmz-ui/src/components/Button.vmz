@@ -136,6 +136,8 @@
 * Variants: primary | secondary | ghost | danger
 */
 export default class Button {
+	/** @type {'contents'} Direct host: no layout box (`ui-direct-host-box`). */
+	static __vmzHostBox = 'contents';
 	public type: string = "button";
 	public variant: string = "primary";
 	public disabled: boolean = false;

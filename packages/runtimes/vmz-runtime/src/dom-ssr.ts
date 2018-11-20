@@ -24,6 +24,7 @@ import {
     snapshotInstanceState,
     stripFns,
 } from './dom-core.js';
+import { applyDirectHostBox, directHostBoxStyleAttr } from './direct-host-box.js';
 
 /** @type {Error | null} last linkedom resolve failure (for clear SSR errors) */
 let _ssrDocumentLastError = null;
@@ -753,6 +754,8 @@ const serializeApi = {
                 'data-vmz-props': JSON.stringify(stripFns(resolved)),
                 'data-vmz-resume': JSON.stringify(resume),
             };
+            const boxStyle = directHostBoxStyleAttr(name, Ctor);
+            if (boxStyle) attrs.style = boxStyle;
             if (isEventEntryStrategy(String(client))) {
                 attrs['data-vmz-entry'] = 'event';
             }
@@ -774,13 +777,8 @@ const serializeApi = {
                 const node = Ctor.__vmzCreate.call(child, serializeApi);
                 /** @type {Record<string, string>} */
                 const attrs = { 'data-vmz': name };
-                const hostBox = Ctor.__vmzHostBox;
-                if (
-                    hostBox === 'contents' ||
-                    (hostBox == null && (name === 'Button' || name === 'Badge' || name === 'Link' || name === 'Tag' || name === 'Icon'))
-                ) {
-                    attrs.style = 'display:contents';
-                }
+                const boxStyle = directHostBoxStyleAttr(name, Ctor);
+                if (boxStyle) attrs.style = boxStyle;
                 return {
                     __kind: 'el',
                     tag: 'div',
@@ -852,6 +850,9 @@ export async function resume(Component, container, slice = null) {
         destroy(container.__vmzInst);
         container.__vmzInst = null;
     }
+
+    const hostName = container.getAttribute('data-vmz') || container.getAttribute('data-vmz-island') || Component.name || '';
+    applyDirectHostBox(container, hostName, Component);
 
     const props = parsed.props || {};
     const inst = createInstance(Component, props);

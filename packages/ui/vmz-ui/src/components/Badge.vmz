@@ -58,6 +58,7 @@
 * Compact status / label chip; tones share status.* + action tokens.
 */
 export default class Badge {
+	static __vmzHostBox = 'contents';
 	public tone: string = "brand";
 }
 </script>

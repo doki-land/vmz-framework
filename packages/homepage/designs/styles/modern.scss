@@ -11,6 +11,14 @@
 }
 
 body { background: #fff; color: var(--v2-ink); }
+.site {
+  display: flex !important;
+  flex-direction: column;
+  width: 100%;
+  min-height: 100vh;
+  font: 400 14px/1.5715 var(--vmz-font-sans) !important;
+}
+.site > [data-vmz="SiteFooter"] { display: block; width: 100%; flex: 0 0 auto; }
 .site > div:has(> .site-header) { display: contents; }
 
 .site-header {
@@ -56,7 +64,14 @@ body { background: #fff; color: var(--v2-ink); }
 .site-language__menu button[aria-current="true"] { color: #1677ff; background: #e6f4ff; }
 .site-language__menu button:hover { background: #f1f3f5; }
 
-.landing-v2 main { overflow: hidden; }
+.landing-v2 main {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.landing-v2 [id] { scroll-margin-top: 5.5rem; }
 .v2-hero { display: grid; justify-items: center; width: 100%; min-height: 43rem; margin: 0; padding: 7rem max(1.5rem, calc((100% - var(--v2-content)) / 2)) 4.5rem; text-align: center; background: #f7faff; border-bottom: 1px solid #e5edf8; }
 .v2-kicker, .v2-index { margin: 0; color: var(--v2-muted); font: 500 .73rem/1.2 var(--vmz-font-mono); letter-spacing: 0; text-transform: uppercase; }
 .v2-kicker { display: flex; align-items: center; gap: .6rem; color: #4d535b; }
@@ -131,7 +146,7 @@ body { background: #fff; color: var(--v2-ink); }
 .v2-product__side > small { margin-top: auto; padding: .75rem .2rem; color: #718096; font: .68rem var(--vmz-font-mono); }
 .v2-product__work { min-width: 0; background: #f7f9fc; }
 .v2-product__bar { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.2rem; border-bottom: 1px solid var(--v2-line); }
-.v2-product__bar > div { display: grid; gap: .25rem; }
+.v2-product__bar > div:not([data-vmz]) { display: grid; gap: .25rem; }
 .v2-product__bar > div span { color: #7a8493; font-size: .75rem; }
 .v2-product__logo { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 6px; color: #fff; background: var(--v2-ink); font-weight: 700; }
 .v2-product .vmz-ui-tabs { max-width: none; }

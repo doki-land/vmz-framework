@@ -190,6 +190,10 @@ export const CHECKS: Record<string, CheckEntry> = {
     // style/ + ui/
     'style-theme': { file: 'style/style-theme.ts' },
     'ui-automation': { file: 'ui/ui-automation.ts' },
+    'ui-direct-host-box': {
+        file: 'ui/ui-direct-host-box.ts',
+        description: 'Direct chip hosts display:contents (ui-direct-host-box) + Notification stays block',
+    },
     'ui-data-grid': {
         file: 'ui/ui-data-grid.ts',
         description: '@vmz/ui-data-grid thin gate — virtualization + pinned column + homepage /datagrid',
@@ -382,6 +386,7 @@ export const CHECK_ALL = [
     'application-dev',
     'style-theme',
     'ui-automation',
+    'ui-direct-host-box',
     'ui-data-grid',
     'ui-icons',
     'ui7',

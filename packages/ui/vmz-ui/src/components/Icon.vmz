@@ -48,6 +48,7 @@
 * Parent picks `name`; no useIcon/createIcon. Unknown names render fallback glyph.
 */
 export default class Icon {
+	static __vmzHostBox = 'contents';
 	public name: string = "info";
 	public size: string = "md";
 	public label: string = "";
