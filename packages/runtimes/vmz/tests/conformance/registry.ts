@@ -194,6 +194,10 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'ui/ui-direct-host-box.ts',
         description: 'Direct chip hosts display:contents (ui-direct-host-box) + Notification stays block',
     },
+    'ssr-unknown-component-error-node': {
+        file: 'ui/ssr-unknown-component-error-node.ts',
+        description: 'Unknown Direct leaf → data-vmz-error node; document SSR does not throw',
+    },
     'ui-data-grid': {
         file: 'ui/ui-data-grid.ts',
         description: '@vmz/ui-data-grid thin gate — virtualization + pinned column + homepage /datagrid',
@@ -387,6 +391,7 @@ export const CHECK_ALL = [
     'style-theme',
     'ui-automation',
     'ui-direct-host-box',
+    'ssr-unknown-component-error-node',
     'ui-data-grid',
     'ui-icons',
     'ui7',

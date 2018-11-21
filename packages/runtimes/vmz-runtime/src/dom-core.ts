@@ -9,8 +9,15 @@
  */
 
 import { applyDirectHostBox } from './direct-host-box.js';
+import { createUnknownComponentElement } from './unknown-component.js';
 
 export { applyDirectHostBox, INLINE_HOST_CONTENTS, resolveDirectHostBox } from './direct-host-box.js';
+export {
+    createUnknownComponentElement,
+    markUnknownComponentHost,
+    serializeUnknownComponentNode,
+    UNKNOWN_COMPONENT_ERROR,
+} from './unknown-component.js';
 
 /** @type {Record<string, new (props?: object) => any>} */
 const components = Object.create(null);
@@ -472,13 +479,20 @@ export const directApi = {
             // resume: resume on schedule; EventEntry may lazy-load chunk via __vmzLoadComponent.
             scheduleClientOn(host, String(client), async () => {
                 const Ctor = await resolveComponent(name);
-                if (!Ctor) throw new Error(`vmz:dom unknown component <${name} />`);
+                if (!Ctor) {
+                    // Replace placeholder island with leaf error node (do not throw page).
+                    const err = createUnknownComponentElement(name, 'island');
+                    host.replaceWith(err);
+                    return;
+                }
                 await resume(Ctor, host, { props: resolved, state: {} });
             });
             return host;
         }
         const Ctor = components[name];
-        if (!Ctor) throw new Error(`vmz:dom unknown component <${name} />`);
+        if (!Ctor) {
+            return createUnknownComponentElement(name, 'client');
+        }
         // Inline chips → `display: contents` (`ui-direct-host-box`). Block surfaces
         // keep a real box (DataTable select timed out when defaulting everything).
         applyDirectHostBox(host, name, Ctor);

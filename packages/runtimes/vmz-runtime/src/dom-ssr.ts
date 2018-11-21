@@ -4,6 +4,7 @@
  * Imports client DOM primitives from ./dom-core.js for tree-shakeable browser entry.
  */
 
+import { applyDirectHostBox, directHostBoxStyleAttr } from './direct-host-box.js';
 import {
     applyDomAttr,
     applyPreservedState,
@@ -24,7 +25,7 @@ import {
     snapshotInstanceState,
     stripFns,
 } from './dom-core.js';
-import { applyDirectHostBox, directHostBoxStyleAttr } from './direct-host-box.js';
+import { createUnknownComponentElement, markUnknownComponentHost, serializeUnknownComponentNode } from './unknown-component.js';
 
 /** @type {Error | null} last linkedom resolve failure (for clear SSR errors) */
 let _ssrDocumentLastError = null;
@@ -713,7 +714,9 @@ const serializeApi = {
     },
     component(hostInst, name, props, client) {
         const Ctor = getRegisteredComponent(name);
-        if (!Ctor) throw new Error(`vmz:dom unknown component <${name} />`);
+        if (!Ctor) {
+            return serializeUnknownComponentNode(name);
+        }
         /** @type {Record<string, any>} */
         const resolved = {};
         for (const [k, v] of Object.entries(props || {})) {
@@ -895,7 +898,7 @@ export function resumeIslands(root = globalThis.document) {
         scheduleClientOn(el, strategy, async () => {
             const Ctor = await resolveComponent(name);
             if (!Ctor) {
-                console.error(`vmz:dom resume: unknown component ${name}`);
+                markUnknownComponentHost(el, name, 'resume');
                 return;
             }
             await resume(Ctor, el);
@@ -921,7 +924,7 @@ export function attachEventEntries(root = globalThis.document) {
         scheduleClientOn(el, strategy, async () => {
             const Ctor = await resolveComponent(name);
             if (!Ctor) {
-                console.error(`vmz:dom EventEntry: unknown component ${name}`);
+                markUnknownComponentHost(el, name, 'event-entry');
                 return;
             }
             await resume(Ctor, el);
