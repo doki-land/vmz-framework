@@ -661,6 +661,10 @@ export function emitLocaleTypedModules(report: ReturnType<typeof checkLocales>, 
  *
  * Variant pick reads `html[data-locale]` (else defaultLocale). Thin bridge until
  * host LocaleTransition reloads locale-scoped chunks (I2/I4).
+ *
+ * Contract: after this returns `ok`, `distDir` must not contain bare `#locales/`
+ * import specifiers (document SSR / Node import would otherwise require a fake
+ * `package.json#imports` map).
  */
 export function emitLocaleRuntimeModules(
     projectRoot: string,
@@ -672,6 +676,21 @@ export function emitLocaleRuntimeModules(
     }
     // Missing locales.json5 is warning-only for now — surface diagnostics, skip emit.
     if (!report.manifest) {
+        const leftover = findBareLocaleImports(distDir);
+        if (leftover.length) {
+            return {
+                ok: false,
+                written: [],
+                diagnostics: [
+                    ...(report.diagnostics || []),
+                    {
+                        severity: 'error',
+                        code: 'locale::dist_bare_import',
+                        message: `dist still has #locales/* imports but locales manifest is missing: ${leftover.slice(0, 4).join(', ')}`,
+                    },
+                ],
+            };
+        }
         return { ok: true, written: [], diagnostics: report.diagnostics || [] };
     }
     const defaultLocale = report.manifest.defaultLocale || 'zh-hans';
@@ -707,13 +726,55 @@ export function emitLocaleRuntimeModules(
         written.push(file);
     }
 
-    rewriteLocaleImportsInDist(distDir);
+    const ensured = ensureLocaleImportsRewritten(distDir);
+    if (!ensured.ok) {
+        return {
+            ok: false,
+            written,
+            diagnostics: [
+                ...(report.diagnostics || []),
+                {
+                    severity: 'error',
+                    code: 'locale::dist_bare_import',
+                    message: ensured.error || 'bare #locales/* imports remain in dist',
+                },
+            ],
+        };
+    }
     return { ok: true, written, diagnostics: report.diagnostics || [] };
 }
 
-function rewriteLocaleImportsInDist(distDir: string): void {
+/**
+ * Rewrite `#locales/*` → relative `locales/*.js` and assert none remain.
+ * Call before document SSR (`createRenderHost`) or any Node import of app dist.
+ */
+export function ensureLocaleImportsRewritten(distDir: string): { ok: boolean; rewritten: number; error?: string } {
+    const rewritten = rewriteLocaleImportsInDist(distDir);
+    const leftover = findBareLocaleImports(distDir);
+    if (leftover.length) {
+        return {
+            ok: false,
+            rewritten,
+            error: `bare #locales/* remain after rewrite: ${leftover.slice(0, 6).join(', ')}`,
+        };
+    }
+    return { ok: true, rewritten };
+}
+
+function findBareLocaleImports(distDir: string): string[] {
+    const hits: string[] = [];
+    walkDistJs(distDir, (file) => {
+        const text = fs.readFileSync(file, 'utf8');
+        if (!text.includes('#locales/')) return;
+        hits.push(path.relative(distDir, file).replace(/\\/g, '/'));
+    });
+    return hits;
+}
+
+function rewriteLocaleImportsInDist(distDir: string): number {
     const files: string[] = [];
     walkDistJs(distDir, (file) => files.push(file));
+    let rewritten = 0;
     for (const file of files) {
         const text = fs.readFileSync(file, 'utf8');
         if (!text.includes('#locales/')) continue;
@@ -725,8 +786,12 @@ function rewriteLocaleImportsInDist(distDir: string): void {
             if (!rel.startsWith('.')) rel = `./${rel}`;
             return `from ${quote}${rel}${quote}`;
         });
-        if (next !== text) fs.writeFileSync(file, next, 'utf8');
+        if (next !== text) {
+            fs.writeFileSync(file, next, 'utf8');
+            rewritten += 1;
+        }
     }
+    return rewritten;
 }
 
 function walkDistJs(dir: string, fn: (file: string) => void): void {

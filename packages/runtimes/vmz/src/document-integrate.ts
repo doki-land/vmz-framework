@@ -10,6 +10,7 @@ import { resolveDocumentsRoot } from './document-check.js';
 import { pageHtmlRel } from './document-enrich.js';
 import { loadLocalesRouting } from './document-routing-config.js';
 import type { DocumentManifest } from './document-schema.js';
+import { ensureLocaleImportsRewritten } from './locale-check.js';
 import { log } from './log.js';
 import { requireNativeAddon } from './native-addon.js';
 
@@ -39,6 +40,13 @@ export async function buildIntegratedDocuments(opts: BuildIntegratedDocumentsOpt
         return { ok: true, skipped: true };
     }
     try {
+        // Node dynamic import of compiled chrome forbids bare `#locales/*`
+        // (no package.json imports). Rewrite must be complete before mount.
+        const locales = ensureLocaleImportsRewritten(outDir);
+        if (!locales.ok) {
+            log.error(locales.error || 'locale import rewrite incomplete');
+            return { ok: false, error: locales.error || 'locale rewrite', pages: 0 };
+        }
         const result = await buildDocuments({
             projectRoot,
             outDir,

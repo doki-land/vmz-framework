@@ -19,6 +19,7 @@ const files = [
     'port.test.ts',
     'delivery-profile.test.ts',
     'test-delivery-static-html.test.ts',
+    'locale-import-rewrite.test.ts',
     'layout-slot-inject.test.ts',
     'rowkernel-ssr.test.ts',
     'locale-none-host.test.ts',
