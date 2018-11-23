@@ -140,9 +140,14 @@ export default definePlugin({
         expect(fs.existsSync(path.join(dir, 'src', 'components', 'Code.vmz'))).toBe(true);
         const math = fs.readFileSync(path.join(dir, 'src', 'components', 'Math.vmz'), 'utf8');
         expect(math).toContain('<Katex');
+        expect(math).toContain('v-if=');
         expect(math).toContain('katex');
         const code = fs.readFileSync(path.join(dir, 'src', 'components', 'Code.vmz'), 'utf8');
         expect(code).toContain('<Shiki');
+        expect(code).toContain('v-if=');
+        expect(code).toContain("|| 'shiki'");
+        expect(code).not.toContain('if={');
+        expect(code).not.toMatch(/v-if="[^"]*"[^"]*"/); // no nested " inside attr value
         ws.dispose();
         fs.rmSync(dir, { recursive: true, force: true });
     });

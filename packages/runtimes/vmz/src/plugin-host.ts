@@ -282,13 +282,13 @@ function sourceItem(id, path, content) {
  * @param {string[]} engines
  */
 function buildMathFacade(defaultEngine, engines) {
-    const defaultLit = JSON.stringify(defaultEngine);
+    const defaultLit = jsSingleQuoted(defaultEngine);
     const branches = engines
         .map((eng, i) => {
             const tag = engineToTag(eng);
-            const kw = i === 0 ? 'if' : 'else-if';
-            const engLit = JSON.stringify(eng);
-            return `  <${tag} ${kw}={(engine || ${defaultLit}) === ${engLit}} tex={tex} display={display} />`;
+            const kw = i === 0 ? 'v-if' : 'v-else-if';
+            const engLit = jsSingleQuoted(eng);
+            return `  <${tag} ${kw}="(engine || ${defaultLit}) === ${engLit}" :tex="tex" :display="display" />`;
         })
         .join('\n');
     return `<template>
@@ -310,13 +310,13 @@ export default class Math {
  * @param {string[]} engines
  */
 function buildCodeFacade(defaultEngine, engines) {
-    const defaultLit = JSON.stringify(defaultEngine);
+    const defaultLit = jsSingleQuoted(defaultEngine);
     const branches = engines
         .map((eng, i) => {
             const tag = engineToTag(eng);
-            const kw = i === 0 ? 'if' : 'else-if';
-            const engLit = JSON.stringify(eng);
-            return `  <${tag} ${kw}={(engine || ${defaultLit}) === ${engLit}} code={code} lang={lang} theme={theme} />`;
+            const kw = i === 0 ? 'v-if' : 'v-else-if';
+            const engLit = jsSingleQuoted(eng);
+            return `  <${tag} ${kw}="(engine || ${defaultLit}) === ${engLit}" :code="code" :lang="lang" :theme="theme" />`;
         })
         .join('\n');
     return `<template>
@@ -339,13 +339,13 @@ export default class Code {
  * @param {string[]} engines
  */
 function buildMarkdownFacade(defaultEngine, engines) {
-    const defaultLit = JSON.stringify(defaultEngine);
+    const defaultLit = jsSingleQuoted(defaultEngine);
     const branches = engines
         .map((eng, i) => {
             const tag = engineToTag(eng);
-            const kw = i === 0 ? 'if' : 'else-if';
-            const engLit = JSON.stringify(eng);
-            return `  <${tag} ${kw}={(engine || ${defaultLit}) === ${engLit}} source={source} />`;
+            const kw = i === 0 ? 'v-if' : 'v-else-if';
+            const engLit = jsSingleQuoted(eng);
+            return `  <${tag} ${kw}="(engine || ${defaultLit}) === ${engLit}" :source="source" />`;
         })
         .join('\n');
     return `<template>
@@ -359,6 +359,11 @@ export default class Markdown {
 }
 </script>
 `;
+}
+
+/** Embed a JS string literal inside a double-quoted Vue attribute. */
+function jsSingleQuoted(value) {
+    return `'${String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 }
 
 /** @param {string} engine */

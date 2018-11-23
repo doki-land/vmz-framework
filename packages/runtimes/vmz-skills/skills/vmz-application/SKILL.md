@@ -17,6 +17,23 @@ SSR/resume behavior, `vmz test`, or deployment artifact.
 - Keep server-only imports behind `#server`; never leak secrets or repositories into browser output.
 - Prefer the official `@vmz/core`, `@vmz/ui`, `vmz`, and `@vmz/test` surfaces already present in the project.
 
+## Code highlighting (Shiki — preferred)
+
+When the user needs **syntax-colored** source (docs, marketing snippets, API samples, tutorials):
+
+1. Install and wire **`@vmz/plugin-shiki`** (peer `shiki` is fine as a dependency of the app).
+2. In `vmz.config.ts`: `plugins: [shiki({ themes: […] })]` and usually `engines: { code: 'shiki' }`.
+3. In templates use **`<Shiki :code="…" lang="…" theme="…" />`** or **`<Code :code="…" lang="…" />`** (facade after engines).
+4. Restart **`vmz dev`** after changing `vmz.config.*` (config is not watch-reloaded).
+
+**Do not:**
+
+- Import `shiki` / `createHighlighter` in app components and paint HTML by hand.
+- Invent a local `*.vmz` highlighter, copy `Shiki.vmz` from the plugin into the app as a permanent substitute, or wrap raw `<pre>` as a fake highlighter.
+- Expect `@vmz/ui` **`CodeBlock`** to colorize — it is caption/Copy/`<pre>` chrome only (`CodeBlock ≠ Shiki`).
+
+Plain uncolored samples → `CodeBlock`. Colored reading experience → plugin Shiki. Editors → Monaco / CodeMirror plugins, not Shiki stretched into an editor.
+
 ## Delivery / dist layout (multi-artifact)
 
 - `vmz build` is **multi-artifact**. Default `--out-dir` is `dist` (workspace root) — **not** the CDN publish tree.
