@@ -11,7 +11,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { buildIntegratedDocuments, projectHasDocuments } from './document-integrate.js';
 import { createWorkspace, resolveNativePath } from './index.js';
@@ -19,6 +19,9 @@ import { emitLocaleRuntimeModules, localeHasErrors } from './locale-check.js';
 import { log } from './log.js';
 import { coalesceRootBurst, collectDevWatchRoots, classifyWatchRoot, isDependencyPath, mergeDirtySets } from './dev-watch-roots.js';
 import { diffFingerprints, fileFingerprintMap } from './watch-diff.js';
+
+/** Track serve-host so a failed/killed launcher cannot leave an orphan port. */
+const DEV_HOST_PID = '.vmz-dev-host.pid';
 
 interface DevSessionOptions {
     project: string;
@@ -160,11 +163,25 @@ export function createDevSession(options: DevSessionOptions) {
             throw new Error(`vmz dev: missing src/ under ${project}`);
         }
 
+        // Same as `vmz build`: materialize plugin sources (e.g. `<Shiki>`) before compile.
+        // Soft rebuilds reuse the workspace; config/plugin changes still need a process restart
+        // until `vmz.config.*` is watched.
+        {
+            const { loadVmzConfig, applyPlugins } = await import('./plugin-host.js');
+            const { plugins, engines } = await loadVmzConfig(project);
+            if (plugins.length) {
+                await applyPlugins(ws, plugins, { project, outDir, engines });
+            }
+        }
+
         log.info('initial build (N-API workspace, full)…');
         const initial = rebuild();
         if (!printReport(initial, 'build')) {
             throw new Error('vmz dev: initial build failed');
         }
+
+        // Reclaim orphan serve-host from a previous crashed launcher (same outDir).
+        reclaimStaleDevHost(outDir);
 
         if (projectHasDocuments(project)) {
             const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
@@ -529,6 +546,7 @@ export function createDevSession(options: DevSessionOptions) {
         stopped = true;
         killChild(child);
         child = null;
+        clearDevHostPid(outDir, null);
         try {
             ws.dispose();
         } catch {
@@ -560,7 +578,7 @@ export function listWatchedFiles(srcDir) {
 function defaultSpawnHost(opts) {
     const hostJs = path.join(opts.outDir, 'vmz-serve-host.mjs');
     const node = process.env.VMZ_NODE || process.execPath;
-    return spawn(node, [hostJs], {
+    const child = spawn(node, [hostJs], {
         cwd: opts.project,
         env: {
             ...process.env,
@@ -572,7 +590,13 @@ function defaultSpawnHost(opts) {
             VMZ_NATIVE_NODE: resolveNativePath(),
         },
         stdio: ['ignore', 'inherit', 'inherit'],
+        // Keep child in the same process group so launcher exit can reclaim it.
+        detached: false,
+        windowsHide: true,
     });
+    writeDevHostPid(opts.outDir, child.pid);
+    child.once('exit', () => clearDevHostPid(opts.outDir, child.pid));
+    return child;
 }
 
 /**
@@ -595,11 +619,93 @@ async function defaultSoftReload(host, port, payload = {}) {
 
 function killChild(child) {
     if (!child || child.killed) return;
+    const pid = child.pid;
     try {
-        child.kill();
+        if (process.platform === 'win32' && pid) {
+            // Tree-kill so orphaned grandchildren (if any) do not keep the port.
+            spawn('taskkill', ['/pid', String(pid), '/T', '/F'], {
+                stdio: 'ignore',
+                windowsHide: true,
+            });
+        } else {
+            child.kill('SIGTERM');
+        }
+    } catch {
+        try {
+            child.kill();
+        } catch {
+            /* ignore */
+        }
+    }
+}
+
+function devHostPidPath(outDir) {
+    return path.join(outDir, DEV_HOST_PID);
+}
+
+function writeDevHostPid(outDir, pid) {
+    if (!outDir || !pid) return;
+    try {
+        writeFileSync(devHostPidPath(outDir), `${pid}\n`, 'utf8');
     } catch {
         /* ignore */
     }
+}
+
+function clearDevHostPid(outDir, pid) {
+    if (!outDir) return;
+    try {
+        const p = devHostPidPath(outDir);
+        if (!existsSync(p)) return;
+        if (pid != null) {
+            const cur = Number(readFileSync(p, 'utf8').trim());
+            if (Number.isFinite(cur) && cur !== pid) return;
+        }
+        unlinkSync(p);
+    } catch {
+        /* ignore */
+    }
+}
+
+/** Kill leftover serve-host recorded for this outDir (previous crashed `vmz dev`). */
+function reclaimStaleDevHost(outDir) {
+    const p = devHostPidPath(outDir);
+    if (!existsSync(p)) return;
+    let pid = 0;
+    try {
+        pid = Number(readFileSync(p, 'utf8').trim());
+    } catch {
+        clearDevHostPid(outDir, null);
+        return;
+    }
+    if (!Number.isFinite(pid) || pid <= 0) {
+        clearDevHostPid(outDir, null);
+        return;
+    }
+    if (pid === process.pid) {
+        clearDevHostPid(outDir, null);
+        return;
+    }
+    try {
+        process.kill(pid, 0);
+    } catch {
+        clearDevHostPid(outDir, null);
+        return;
+    }
+    log.warn(`reclaiming stale serve-host pid=${pid} (prior vmz dev left an orphan)`);
+    try {
+        if (process.platform === 'win32') {
+            spawn('taskkill', ['/pid', String(pid), '/T', '/F'], {
+                stdio: 'ignore',
+                windowsHide: true,
+            });
+        } else {
+            process.kill(pid, 'SIGTERM');
+        }
+    } catch {
+        /* ignore */
+    }
+    clearDevHostPid(outDir, null);
 }
 
 function sleep(ms) {
