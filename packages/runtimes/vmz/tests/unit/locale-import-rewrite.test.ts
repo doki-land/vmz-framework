@@ -29,12 +29,16 @@ describe('ensureLocaleImportsRewritten', () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-locale-bare-'));
         fs.mkdirSync(path.join(dir, 'components'), { recursive: true });
         // Dynamic form not covered by static rewrite — must surface as leftover.
-        fs.writeFileSync(
-            path.join(dir, 'components', 'Odd.client.js'),
-            `const id = 'common'; import('#locales/' + id);\n`,
-        );
+        fs.writeFileSync(path.join(dir, 'components', 'Odd.client.js'), `const id = 'common'; import('#locales/' + id);\n`);
         const r = ensureLocaleImportsRewritten(dir);
         expect(r.ok).toBe(false);
         expect(String(r.error || '').includes('#locales')).toBe(true);
+    });
+
+    it('ignores #locales/ mentions inside comments', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-locale-comment-'));
+        fs.writeFileSync(path.join(dir, 'vmz-client-nav.js'), `// so #locales/* re-resolve\nexport {}\n`);
+        const r = ensureLocaleImportsRewritten(dir);
+        expect(r.ok).toBe(true);
     });
 });

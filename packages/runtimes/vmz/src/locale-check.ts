@@ -761,11 +761,14 @@ export function ensureLocaleImportsRewritten(distDir: string): { ok: boolean; re
     return { ok: true, rewritten };
 }
 
+/** True import / dynamic-import of `#locales/…` (not comments mentioning the prefix). */
+const BARE_LOCALE_IMPORT_RE = /(?:from\s*|import\s*\()\s*['"`]#locales\//;
+
 function findBareLocaleImports(distDir: string): string[] {
     const hits: string[] = [];
     walkDistJs(distDir, (file) => {
         const text = fs.readFileSync(file, 'utf8');
-        if (!text.includes('#locales/')) return;
+        if (!BARE_LOCALE_IMPORT_RE.test(text)) return;
         hits.push(path.relative(distDir, file).replace(/\\/g, '/'));
     });
     return hits;
