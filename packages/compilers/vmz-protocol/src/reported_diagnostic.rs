@@ -1,11 +1,11 @@
 //! Host path + [`OxcDiagnostic`] — the only diagnostic row type.
 //!
 //! No parallel DX DTO: `vmz.dx.*` JSON is the serde projection of this type
-//! (`path` / `severity` / `message` / `code` / `args` / `span`).
+//! (`path` / `severity` / `code` / `args` / `span`; optional empty `message`).
 //!
-//! `0.1.18` freezes the structured shape `code + args + span`. Natural-language
-//! `message` remains on the wire until `0.1.21` localization strips Rust as the
-//! user-facing truth source.
+//! `0.1.21`: wire truth is `code + args + span`. Natural-language copy lives in
+//! TypeScript catalogs (`@vmz/vmz` locales). Rust must not emit user-facing prose
+//! as protocol identity — oxc's internal message field stays empty.
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -24,12 +24,13 @@ use crate::severity::{Severity, severity_wire};
 /// Path + [`OxcDiagnostic`]. Not a second diagnostic algebra.
 ///
 /// Wire shape for `vmz.dx.*` documents:
-/// `{ "path", "severity", "message", "code"?, "args"?, "span"? }`.
+/// `{ "path", "severity", "code", "args"?, "span"?, "message"? }`.
+/// `message` is omitted when empty (legacy deserializers may still send it).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReportedDiagnostic {
     /// Workspace or absolute source path (empty = workspace-global).
     pub path: PathBuf,
-    /// Underlying oxc diagnostic (severity, message, labels, code).
+    /// Underlying oxc diagnostic (severity, labels, code). Message text is empty.
     pub diagnostic: OxcDiagnostic,
     /// Structured message arguments (`code` + `args` + `span` contract).
     ///
@@ -44,67 +45,58 @@ struct ReportedDiagnosticWire {
     #[serde(with = "severity_wire")]
     #[schemars(with = "String")]
     severity: Severity,
-    message: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    code: Option<String>,
+    /// Stable diagnostic id (catalog key). Required on new rows.
+    code: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     args: Option<BTreeMap<String, String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     span: Option<SourceSpan>,
+    /// Legacy / transitional prose. Omitted when empty; not catalog truth.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    message: String,
 }
 
 impl ReportedDiagnostic {
-    /// Error without a source span.
-    pub fn error(path: impl Into<PathBuf>, message: impl Into<String>) -> Self {
-        Self {
-            path: path.into(),
-            diagnostic: OxcDiagnostic::error(message.into()).with_error_code_scope("vmz"),
-            args: None,
-        }
+    fn bare(path: PathBuf, severity: Severity, code: String) -> Self {
+        let mut diagnostic = match severity {
+            Severity::Error => OxcDiagnostic::error(""),
+            Severity::Warning => OxcDiagnostic::warn(""),
+            Severity::Advice => OxcDiagnostic::error("").with_severity(Severity::Advice),
+        };
+        diagnostic.code.scope = Some(Cow::Owned(code));
+        diagnostic.code.number = None;
+        Self { path, diagnostic, args: None }
+    }
+
+    /// Error without a source span. `code` is the stable identity.
+    pub fn error(path: impl Into<PathBuf>, code: impl Into<String>) -> Self {
+        Self::bare(path.into(), Severity::Error, code.into())
     }
 
     /// Warning without a source span.
-    pub fn warning(path: impl Into<PathBuf>, message: impl Into<String>) -> Self {
-        Self {
-            path: path.into(),
-            diagnostic: OxcDiagnostic::warn(message.into()).with_error_code_scope("vmz"),
-            args: None,
-        }
+    pub fn warning(path: impl Into<PathBuf>, code: impl Into<String>) -> Self {
+        Self::bare(path.into(), Severity::Warning, code.into())
     }
 
     /// Advice without a source span.
-    pub fn advice(path: impl Into<PathBuf>, message: impl Into<String>) -> Self {
-        Self {
-            path: path.into(),
-            diagnostic: OxcDiagnostic::error(message.into())
-                .with_error_code_scope("vmz")
-                .with_severity(Severity::Advice),
-            args: None,
-        }
+    pub fn advice(path: impl Into<PathBuf>, code: impl Into<String>) -> Self {
+        Self::bare(path.into(), Severity::Advice, code.into())
     }
 
     /// Build from an explicit oxc [`Severity`].
     pub fn with_severity(
         path: impl Into<PathBuf>,
         severity: Severity,
-        message: impl Into<String>,
+        code: impl Into<String>,
     ) -> Self {
-        match severity {
-            Severity::Error => Self::error(path, message),
-            Severity::Warning => Self::warning(path, message),
-            Severity::Advice => Self::advice(path, message),
-        }
+        Self::bare(path.into(), severity, code.into())
     }
 
     /// Error with an oxc byte [`Span`] label.
-    pub fn error_at(path: impl Into<PathBuf>, message: impl Into<String>, span: Span) -> Self {
-        Self {
-            path: path.into(),
-            diagnostic: OxcDiagnostic::error(message.into())
-                .with_error_code_scope("vmz")
-                .with_label(span),
-            args: None,
-        }
+    pub fn error_at(path: impl Into<PathBuf>, code: impl Into<String>, span: Span) -> Self {
+        let mut row = Self::error(path, code);
+        row.diagnostic = row.diagnostic.with_label(span);
+        row
     }
 
     /// Replace the diagnostic code (DX stable ids are free-form scope strings).
@@ -117,6 +109,14 @@ impl ReportedDiagnostic {
     /// Attach structured catalog arguments (empty map clears to `None` on the wire).
     pub fn with_args(mut self, args: BTreeMap<String, String>) -> Self {
         self.args = if args.is_empty() { None } else { Some(args) };
+        self
+    }
+
+    /// Convenience: one catalog argument.
+    pub fn with_arg(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        let mut map = self.args.take().unwrap_or_default();
+        map.insert(key.into(), value.into());
+        self.args = Some(map);
         self
     }
 
@@ -139,7 +139,7 @@ impl ReportedDiagnostic {
         self.diagnostic.severity
     }
 
-    /// Human message text.
+    /// Oxc internal message (empty under the `0.1.21` contract).
     pub fn message(&self) -> &str {
         self.diagnostic.message.as_ref()
     }
@@ -159,6 +159,11 @@ impl ReportedDiagnostic {
         self.diagnostic.code.is_some().then(|| self.diagnostic.code.to_string())
     }
 
+    /// Required code for the language-neutral contract (`""` only if unset).
+    pub fn code(&self) -> String {
+        self.code_string().unwrap_or_default()
+    }
+
     /// First label as a DX [`SourceSpan`], when present.
     pub fn source_span(&self) -> Option<SourceSpan> {
         let label = self.diagnostic.labels.first()?;
@@ -171,32 +176,34 @@ impl ReportedDiagnostic {
         ReportedDiagnosticWire {
             path: self.path.to_string_lossy().into_owned(),
             severity: self.diagnostic.severity,
-            message: self.diagnostic.message.to_string(),
-            code: self.code_string(),
+            code: self.code(),
             args: self.args.clone(),
             span: self.source_span(),
+            message: String::new(),
         }
     }
 
     fn from_wire(wire: ReportedDiagnosticWire) -> Self {
-        let mut diagnostic = match wire.severity {
-            Severity::Error => OxcDiagnostic::error(wire.message),
-            Severity::Warning => OxcDiagnostic::warn(wire.message),
-            Severity::Advice => OxcDiagnostic::error(wire.message).with_severity(Severity::Advice),
+        let code = if wire.code.is_empty() {
+            // Legacy rows that only carried prose: keep a sentinel so hosts still see a code.
+            "vmz::unknown".into()
+        } else {
+            wire.code
         };
-        if let Some(code) = wire.code {
-            diagnostic.code.scope = Some(Cow::Owned(code));
-            diagnostic.code.number = None;
+        let mut row = Self::bare(PathBuf::from(wire.path), wire.severity, code);
+        // Preserve legacy message only inside oxc for round-trip of old fixtures;
+        // new emitters leave it empty.
+        if !wire.message.is_empty() {
+            row.diagnostic.message = Cow::Owned(wire.message);
         }
-        let mut path = PathBuf::from(wire.path);
         if let Some(span) = wire.span {
-            if path.as_os_str().is_empty() {
-                path = PathBuf::from(&span.path);
+            if row.path.as_os_str().is_empty() {
+                row.path = PathBuf::from(&span.path);
             }
-            diagnostic = diagnostic.with_label(Span::new(span.start, span.end));
+            row.diagnostic = row.diagnostic.with_label(Span::new(span.start, span.end));
         }
-        let args = wire.args.filter(|m| !m.is_empty());
-        Self { path, diagnostic, args }
+        row.args = wire.args.filter(|m| !m.is_empty());
+        row
     }
 }
 
@@ -230,37 +237,26 @@ impl fmt::Display for ReportedDiagnostic {
             Severity::Warning => "warning",
             Severity::Advice => "advice",
         };
-        write!(f, "{level}: {}: {}", self.path.display(), self.diagnostic.message)
+        let code = self.code();
+        write!(f, "{level}[{code}]: {}", self.path.display())
     }
 }
 
-/// Infallible constructor used when a typed build path must not fail serde.
+/// Aliases kept for call sites that already say `coded_*`.
 impl ReportedDiagnostic {
     /// Error row with an explicit code (empty path = workspace-global).
-    pub fn coded_error(
-        path: impl Into<PathBuf>,
-        message: impl Into<String>,
-        code: impl Into<String>,
-    ) -> Self {
-        Self::error(path, message).with_code(code)
+    pub fn coded_error(path: impl Into<PathBuf>, code: impl Into<String>) -> Self {
+        Self::error(path, code)
     }
 
     /// Warning row with an explicit code.
-    pub fn coded_warning(
-        path: impl Into<PathBuf>,
-        message: impl Into<String>,
-        code: impl Into<String>,
-    ) -> Self {
-        Self::warning(path, message).with_code(code)
+    pub fn coded_warning(path: impl Into<PathBuf>, code: impl Into<String>) -> Self {
+        Self::warning(path, code)
     }
 
     /// Advice row with an explicit code.
-    pub fn coded_advice(
-        path: impl Into<PathBuf>,
-        message: impl Into<String>,
-        code: impl Into<String>,
-    ) -> Self {
-        Self::advice(path, message).with_code(code)
+    pub fn coded_advice(path: impl Into<PathBuf>, code: impl Into<String>) -> Self {
+        Self::advice(path, code)
     }
 }
 
