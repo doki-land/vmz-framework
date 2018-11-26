@@ -57,26 +57,22 @@ pub fn plan_rename_edits(
 
     if plan.edits.is_empty() {
         plan.status = vmz_protocol::WorkspaceEditStatus::Rejected;
-        plan.diagnostics.push(ReportedDiagnostic::coded_error("", format!(
+        plan.diagnostics.push(ReportedDiagnostic::coded_error("", "dx.rename.no_references").with_arg("detail", format!(
                 "no proven references for {kind} `{from}` under workspace (Symbol/Reference index empty for this rename)"
-            ), "dx.rename.no_references"));
+            )));
         return plan;
     }
 
     plan.status = vmz_protocol::WorkspaceEditStatus::Ready;
-    plan.diagnostics.push(ReportedDiagnostic::coded_advice("", format!(
+    plan.diagnostics.push(ReportedDiagnostic::coded_advice("", "dx.rename.ready").with_arg("detail", format!(
             "rename ready: {kind} `{from}` -> `{to}` ({} edit(s), {} reference(s), causal={causal})",
             plan.edits.len(),
             references.len(),
             causal = causal
-        ), "dx.rename.ready"));
+        )));
     // Provenance breadcrumbs for gate / explain.
     for sym in &symbols {
-        let mut d = ReportedDiagnostic::coded_advice(
-            sym.span.as_ref().map(|s| s.path.clone()).unwrap_or_default(),
-            format!("symbol {}::{}", sym.stable_id.kind(), sym.stable_id.id()),
-            SYMBOL_SCHEMA,
-        );
+        let mut d = ReportedDiagnostic::coded_advice(sym.span.as_ref().map(|s| s.path.clone()).unwrap_or_default(), SYMBOL_SCHEMA).with_arg("detail", format!("symbol {}::{}", sym.stable_id.kind(), sym.stable_id.id()));
         if let Some(span) = sym.span.clone() {
             d = d.with_source_span(span);
         }
@@ -85,11 +81,7 @@ pub fn plan_rename_edits(
     for r in &references {
         let path = r.span.as_ref().map(|s| s.path.clone()).unwrap_or_default();
         let (start, end) = r.span.as_ref().map(|s| (s.start, s.end)).unwrap_or((0, 0));
-        let mut d = ReportedDiagnostic::coded_advice(
-            path,
-            format!("reference {} @{}..{}", r.kind(), start, end),
-            REFERENCE_SCHEMA,
-        );
+        let mut d = ReportedDiagnostic::coded_advice(path, REFERENCE_SCHEMA).with_arg("detail", format!("reference {} @{}..{}", r.kind(), start, end));
         if let Some(span) = r.span.clone() {
             d = d.with_source_span(span);
         }
@@ -171,11 +163,7 @@ pub fn apply_workspace_edits(root: &Path, plan: &WorkspaceEditPlan) -> Workspace
 
     let mut applied = plan.clone();
     applied.status = vmz_protocol::WorkspaceEditStatus::Applied;
-    applied.diagnostics.push(ReportedDiagnostic::coded_advice(
-        "",
-        format!("applied {} TextEdit(s) atomically", plan.edits.len()),
-        "dx.rename.applied",
-    ));
+    applied.diagnostics.push(ReportedDiagnostic::coded_advice("", "dx.rename.applied").with_arg("detail", format!("applied {} TextEdit(s) atomically", plan.edits.len())));
     applied
 }
 

@@ -394,13 +394,19 @@ fn build_project_route_table(
         let Ok(source) = fs::read_to_string(&path) else {
             report
                 .diagnostics
-                .push(ReportedDiagnostic::error(&path, "failed to read page for RouteTable"));
+                .push(ReportedDiagnostic::error(
+                    &path,
+                    "vmz::io::read_failed",
+                ).with_arg("detail", "failed to read page for RouteTable"));
             continue;
         };
         let parsed = match parse_vmz(&path, source) {
             Ok(p) => p,
             Err(e) => {
-                report.diagnostics.push(ReportedDiagnostic::error(&path, e.to_string()));
+                report.diagnostics.push(
+                    ReportedDiagnostic::error(&path, "vmz::sfc::parse_failed")
+                        .with_arg("detail", e.to_string()),
+                );
                 continue;
             }
         };
@@ -412,7 +418,10 @@ fn build_project_route_table(
         Ok(table) => Some(table),
         Err(errs) => {
             for e in errs {
-                report.diagnostics.push(ReportedDiagnostic::error(root, e));
+                report.diagnostics.push(
+                    ReportedDiagnostic::error(root, "vmz::router::route_table_invalid")
+                        .with_arg("detail", e),
+                );
             }
             None
         }
@@ -428,13 +437,11 @@ fn advise_browser_path_deviations(
         if entry.path_pattern == file {
             continue;
         }
-        report.diagnostics.push(ReportedDiagnostic::advice(
-            &entry.source,
-            format!(
-                "explicit path {:?} differs from file route {file}; Browser uses the explicit HTTP path, Mini page stem still follows chunk id",
-                entry.path_pattern
-            ),
-        ));
+        report.diagnostics.push(
+            ReportedDiagnostic::advice(&entry.source, "vmz::router::path_deviation")
+                .with_arg("explicit", entry.path_pattern.clone())
+                .with_arg("file", file),
+        );
     }
 }
 
@@ -669,13 +676,11 @@ fn emit_runtime_js(options: &CompileOptions, report: &mut CompileReport) -> crat
     for (src_name, out_name) in copies {
         let runtime_src = runtime_root.join(src_name);
         if !runtime_src.is_file() {
-            report.diagnostics.push(ReportedDiagnostic::error(
-                &runtime_src,
-                format!(
-                    "vmz runtime missing ({src_name}); expected under {} (pass runtime_dist from Node via @vmz/core)",
-                    runtime_root.display()
-                ),
-            ));
+            report.diagnostics.push(
+                ReportedDiagnostic::error(&runtime_src, "vmz::runtime::missing")
+                    .with_arg("name", src_name.to_string())
+                    .with_arg("root", runtime_root.display().to_string()),
+            );
             continue;
         }
         let out = options.out_dir.join(out_name);
@@ -731,7 +736,10 @@ fn emit_server_tree(
             Err(e) => {
                 report
                     .diagnostics
-                    .push(ReportedDiagnostic::error(path, format!("#server emit failed: {e}")));
+                    .push(
+                        ReportedDiagnostic::error(path, "vmz::emit::server_tree_failed")
+                            .with_arg("error", e.to_string()),
+                    );
             }
         }
     }
@@ -791,10 +799,10 @@ fn emit_client_modules(
                     printed.code
                 }
                 Err(e) => {
-                    report.diagnostics.push(ReportedDiagnostic::error(
-                        path,
-                        format!("client module emit failed: {e}"),
-                    ));
+                    report.diagnostics.push(
+                        ReportedDiagnostic::error(path, "vmz::emit::client_module_failed")
+                            .with_arg("error", e.to_string()),
+                    );
                     continue;
                 }
             }
@@ -813,10 +821,10 @@ fn emit_client_modules(
                     printed.code
                 }
                 Err(e) => {
-                    report.diagnostics.push(ReportedDiagnostic::error(
-                        path,
-                        format!("client js print failed: {e}"),
-                    ));
+                    report.diagnostics.push(
+                        ReportedDiagnostic::error(path, "vmz::emit::client_js_print_failed")
+                            .with_arg("error", e.to_string()),
+                    );
                     continue;
                 }
             }
@@ -844,11 +852,10 @@ fn emit_file(
     register_tw_from_parsed(&parsed, &mut report.tw_registrations);
     let client = analyze_script(ScriptKind::Client, &parsed.client.content);
     for finding in crate::secrets::collect_client_boundary_findings(&parsed.client.content) {
-        report.diagnostics.push(ReportedDiagnostic::error_at(
-            path,
-            format!("{}: {}", finding.code, finding.message),
-            finding.span,
-        ));
+        report.diagnostics.push(
+            ReportedDiagnostic::error_at(path, finding.code, finding.span)
+                .with_arg("detail", finding.message.clone()),
+        );
     }
     let server = parsed.server.as_ref().map(|s| analyze_script(ScriptKind::Server, &s.content));
     let concrete = match parse_template_concrete(&parsed.template.content) {
@@ -889,15 +896,15 @@ fn emit_file(
         let (start, end) = err.body_span.to_absolute(content_start);
         let path_s = path.to_string_lossy().into_owned();
         report.diagnostics.push(
-            ReportedDiagnostic::error(path, err.message)
-                .with_code("vmz::template/invalid-expr")
+            ReportedDiagnostic::error(path, "vmz::template::invalid_expr")
+                .with_arg("detail", err.message)
                 .with_source_span(SourceSpan { path: path_s, start, end }),
         );
     }
     if report
         .diagnostics
         .iter()
-        .any(|d| d.is_error() && d.message().starts_with("invalid template expression"))
+        .any(|d| d.is_error() && d.code() == "vmz::template::invalid_expr")
     {
         return Ok(());
     }
@@ -998,7 +1005,10 @@ fn emit_file(
         Err(e) => {
             report
                 .diagnostics
-                .push(ReportedDiagnostic::error(path, format!("client emit failed: {e}")));
+                .push(
+                    ReportedDiagnostic::error(path, "vmz::emit::client_failed")
+                        .with_arg("error", e.to_string()),
+                );
             return Ok(());
         }
     };
@@ -1034,7 +1044,10 @@ fn emit_file(
         Err(e) => {
             report
                 .diagnostics
-                .push(ReportedDiagnostic::error(path, format!("client js print failed: {e}")));
+                .push(
+                    ReportedDiagnostic::error(path, "vmz::emit::client_js_print_failed")
+                        .with_arg("error", e.to_string()),
+                );
             return Ok(());
         }
     };
@@ -1068,7 +1081,10 @@ fn emit_file(
             Err(e) => {
                 report
                     .diagnostics
-                    .push(ReportedDiagnostic::error(path, format!("server emit failed: {e}")));
+                    .push(
+                        ReportedDiagnostic::error(path, "vmz::emit::server_failed")
+                            .with_arg("error", e.to_string()),
+                    );
                 return Ok(());
             }
         };

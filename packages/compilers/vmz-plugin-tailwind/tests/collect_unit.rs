@@ -31,5 +31,5 @@ fn collects_style_tw_and_at_tailwind() {
     assert!(col.sites.iter().any(|s| s.kind == TwTokenKind::AtTailwind), "{:?}", col.sites);
     assert!(col.static_tokens.iter().any(|t| t == "px-4"));
     assert!(col.static_tokens.iter().any(|t| t == "font-bold"));
-    assert!(diags.iter().any(|d| d.message().contains("dynamic boundary")), "{diags:?}");
+    assert!(diags.iter().any(|d| d.code() == "vmz::tw::dynamic_style_tw"), "{diags:?}");
 }

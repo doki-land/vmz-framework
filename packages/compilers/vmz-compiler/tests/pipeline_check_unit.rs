@@ -26,12 +26,11 @@ fn check_template_snippet(template: &str) -> CheckReport {
 fn warns_each_without_key() {
     let report = check_template_snippet(r#"<li v-for="tag in tags">{{ tag }}</li>"#);
     assert!(
-        report
-            .diagnostics
-            .iter()
-            .any(|d| d.severity() == Severity::Warning && d.message().contains("no `key`")),
+        report.diagnostics.iter().any(|d| {
+            d.severity() == Severity::Warning && d.code().contains("key")
+        }),
         "{:?}",
-        report.diagnostics
+        report.diagnostics.iter().map(|d| d.code()).collect::<Vec<_>>()
     );
 }
 
@@ -39,12 +38,11 @@ fn warns_each_without_key() {
 fn errors_constant_key() {
     let report = check_template_snippet(r#"<li v-for="tag in tags" :key="'x'">{{ tag }}</li>"#);
     assert!(
-        report
-            .diagnostics
-            .iter()
-            .any(|d| d.severity() == Severity::Error && d.message().contains("constant")),
+        report.diagnostics.iter().any(|d| {
+            d.severity() == Severity::Error && d.code().contains("key")
+        }),
         "{:?}",
-        report.diagnostics
+        report.diagnostics.iter().map(|d| d.code()).collect::<Vec<_>>()
     );
 }
 
@@ -53,9 +51,9 @@ fn ok_property_key() {
     let report =
         check_template_snippet(r#"<li v-for="tag in tags" :key="tag.id">{{ tag.label }}</li>"#);
     assert!(
-        !report.diagnostics.iter().any(|d| d.message().contains("each")),
+        !report.diagnostics.iter().any(|d| d.code().contains("key") && d.is_error()),
         "{:?}",
-        report.diagnostics
+        report.diagnostics.iter().map(|d| d.code()).collect::<Vec<_>>()
     );
 }
 
@@ -75,12 +73,12 @@ fn template_parse_error_carries_absolute_source_span() {
     let diag = report
         .diagnostics
         .iter()
-        .find(|d| d.message().contains("template:"))
+        .find(|d| d.code() == "vmz::template::jsx_rejected" || d.code().starts_with("vmz::template::"))
         .expect("template diagnostic");
     let span = diag.source_span().expect("SourceSpan on template diagnostic");
     assert!(span.start >= 11, "expected absolute offset past `<template>\\n`, got {}", span.start);
     assert!(span.end > span.start, "end-exclusive span");
-    assert!(!diag.message().contains("(offset"), "offset must not be message-only");
+    assert!(diag.message().is_empty(), "0.1.21: no NL message truth");
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -90,9 +88,9 @@ fn invalid_template_expression_fails_oxc_ingress() {
     let diag = report
         .diagnostics
         .iter()
-        .find(|d| d.is_error() && d.message().contains("invalid template expression"))
+        .find(|d| d.is_error() && d.code() == "vmz::template::invalid_expr")
         .unwrap_or_else(|| panic!("missing invalid-expr diagnostic: {:?}", report.diagnostics));
-    assert_eq!(diag.code_string().as_deref(), Some("vmz::template/invalid-expr"));
+    assert_eq!(diag.code_string().as_deref(), Some("vmz::template::invalid_expr"));
     let span = diag.source_span().expect("invalid-expr must carry SourceSpan");
     assert!(span.end > span.start, "span={span:?}");
     // Snippet is `<template>\n<p>{{ 1 + }}</p>\n</template>…` — mustache body is past content_start.

@@ -47,23 +47,28 @@ fn emit_project_impl(req: &ScssEmitRequest) -> ScssEmitResult {
                 parts.push(format!("/* {} */\n{}", path.display(), css.trim_end()));
             }
             Ok(_) => {}
-            Err(msg) => diagnostics.push(ReportedDiagnostic::error(&path, msg)),
+            Err(msg) => diagnostics.push(
+                ReportedDiagnostic::error(&path, "vmz::scss::compile_failed").with_arg("detail", msg),
+            ),
         }
     }
 
     for source in &req.sources {
         let Ok(text) = std::fs::read_to_string(source) else {
-            diagnostics.push(ReportedDiagnostic::warning(
-                source,
-                format!("scss: cannot read {}", source.display()),
-            ));
+            diagnostics.push(
+                ReportedDiagnostic::warning(source, "vmz::io::read_failed")
+                    .with_arg("path", source.display().to_string()),
+            );
             continue;
         };
         let parsed = match parse_vmz(source, text) {
             Ok(p) => p,
             Err(e) => {
                 diagnostics
-                    .push(ReportedDiagnostic::warning(source, format!("scss: parse failed: {e}")));
+                    .push(
+                        ReportedDiagnostic::warning(source, "vmz::sfc::parse_failed")
+                            .with_arg("detail", e.to_string()),
+                    );
                 continue;
             }
         };
@@ -79,7 +84,10 @@ fn emit_project_impl(req: &ScssEmitRequest) -> ScssEmitResult {
                 parts.push(format!("/* {} */\n{}", source.display(), css.trim_end()));
             }
             Ok(_) => {}
-            Err(msg) => diagnostics.push(ReportedDiagnostic::error(source, msg)),
+            Err(msg) => diagnostics.push(
+                ReportedDiagnostic::error(source, "vmz::scss::compile_failed")
+                    .with_arg("detail", msg),
+            ),
         }
     }
 

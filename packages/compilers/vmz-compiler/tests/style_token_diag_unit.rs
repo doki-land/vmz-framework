@@ -54,7 +54,12 @@ fn known_token_ok_unknown_errors() {
         "a { color: var(--vmz-colors-action); background: var(--vmz-colors-nope); }",
     );
     assert_eq!(diags.len(), 1);
-    assert!(diags[0].message().contains(DIAG_UNKNOWN_DESIGN_TOKEN));
+    assert_eq!(diags[0].code(), DIAG_UNKNOWN_DESIGN_TOKEN);
+    assert!(
+        diags[0].args().is_some_and(|a| a.get("name").is_some_and(|n| n.contains("nope"))),
+        "args={:?}",
+        diags[0].args()
+    );
 }
 
 #[test]
@@ -77,7 +82,12 @@ export default class X {}
     let parsed = parse_vmz(PathBuf::from("pages/x.vmz"), source.to_string()).unwrap();
     let diags = validate_style_tw_design_token_refs(&theme, &parsed);
     assert_eq!(diags.len(), 1, "{diags:?}");
-    assert!(diags[0].message().contains("bg-nope"));
+    assert_eq!(diags[0].code(), DIAG_UNKNOWN_DESIGN_TOKEN);
+    assert!(
+        diags[0].args().is_some_and(|a| a.get("token").is_some_and(|t| t.contains("bg-nope"))),
+        "args={:?}",
+        diags[0].args()
+    );
 }
 
 #[test]
@@ -109,7 +119,10 @@ fn unused_design_token_warns() {
         diagnostics: vec![],
     };
     let diags = validate_unused_design_tokens(Path::new("."), &designs);
-    assert!(diags.iter().any(|d| d.message().contains("colors.orphan")));
+    assert!(diags.iter().any(|d| {
+        d.code() == DIAG_UNUSED_DESIGN_TOKEN
+            && d.args().is_some_and(|a| a.get("name").is_some_and(|n| n.contains("orphan")))
+    }));
     assert!(diags.iter().all(|d| !d.is_error()));
 }
 
@@ -140,8 +153,17 @@ fn unreferenced_global_style_warns() {
     };
     let diags = validate_unreferenced_global_styles(&designs);
     assert_eq!(diags.len(), 1, "{diags:?}");
-    assert!(diags[0].message().contains(DIAG_UNREFERENCED_GLOBAL_STYLE));
-    assert!(diags[0].message().contains("orphan"));
+    assert_eq!(diags[0].code(), DIAG_UNREFERENCED_GLOBAL_STYLE);
+    assert!(
+        diags[0].args().is_some_and(|a| {
+            a.values().any(|v| v.contains("orphan"))
+                || a.get("rel").is_some_and(|r| r.contains("orphan"))
+                || a.get("path").is_some_and(|r| r.contains("orphan"))
+                || a.get("detail").is_some_and(|r| r.contains("orphan"))
+        }),
+        "args={:?}",
+        diags[0].args()
+    );
     let _ = std::fs::remove_dir_all(dir.parent().unwrap());
 }
 

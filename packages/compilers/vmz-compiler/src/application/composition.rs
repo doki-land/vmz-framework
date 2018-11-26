@@ -166,22 +166,14 @@ fn load_declared_links(
     let text = match fs::read_to_string(&path) {
         Ok(t) => t,
         Err(e) => {
-            diagnostics.push(ApplicationDiagnostic::coded_error(
-                path.display().to_string(),
-                format!("read cross-links.json failed: {e}"),
-                DIAG_UNKNOWN_REFERENCE,
-            ));
+            diagnostics.push(ApplicationDiagnostic::coded_error(path.display().to_string(), DIAG_UNKNOWN_REFERENCE).with_arg("detail", format!("read cross-links.json failed: {e}")));
             return Vec::new();
         }
     };
     let value: serde_json::Value = match serde_json::from_str(&text) {
         Ok(v) => v,
         Err(e) => {
-            diagnostics.push(ApplicationDiagnostic::coded_error(
-                path.display().to_string(),
-                format!("cross-links.json is not JSON: {e}"),
-                DIAG_UNKNOWN_REFERENCE,
-            ));
+            diagnostics.push(ApplicationDiagnostic::coded_error(path.display().to_string(), DIAG_UNKNOWN_REFERENCE).with_arg("detail", format!("cross-links.json is not JSON: {e}")));
             return Vec::new();
         }
     };
@@ -226,29 +218,21 @@ fn resolve_links(
         let path = link.path.clone().unwrap_or_else(|| "<host>".into());
 
         let Some(artifact) = artifact_by_id.get(app) else {
-            diagnostics.push(ApplicationDiagnostic::coded_error(
-                path.clone(),
-                format!("cross-application Link references unknown ApplicationId `{app}`"),
-                DIAG_UNKNOWN_REFERENCE,
-            ));
+            diagnostics.push(ApplicationDiagnostic::coded_error(path.clone(), DIAG_UNKNOWN_REFERENCE).with_arg("detail", format!("cross-application Link references unknown ApplicationId `{app}`")));
             continue;
         };
 
         if !artifact.public_route_contracts.iter().any(|r| r == route_id) {
-            diagnostics.push(ApplicationDiagnostic::coded_error(
-                path.clone(),
-                format!(
+            diagnostics.push(ApplicationDiagnostic::coded_error(path.clone(), DIAG_ROUTE_NOT_PUBLIC).with_arg("detail", format!(
                     "RouteId `{route_id}` is not a public route contract of ApplicationId `{app}`"
-                ),
-                DIAG_ROUTE_NOT_PUBLIC,
-            ));
+                )));
             continue;
         }
 
         let Some(route_base) = mount_by_id.get(app).copied() else {
-            diagnostics.push(ApplicationDiagnostic::coded_error(path.clone(), format!(
+            diagnostics.push(ApplicationDiagnostic::coded_error(path.clone(), DIAG_MOUNT_UNREACHABLE).with_arg("detail", format!(
                     "ApplicationId `{app}` has no mount in this deployment profile; cross-app Link href cannot be resolved"
-                ), DIAG_MOUNT_UNREACHABLE));
+                )));
             continue;
         };
 
@@ -256,13 +240,9 @@ fn resolve_links(
         {
             Some(p) => p,
             None => {
-                diagnostics.push(ApplicationDiagnostic::coded_error(
-                    path.clone(),
-                    format!(
+                diagnostics.push(ApplicationDiagnostic::coded_error(path.clone(), DIAG_ROUTE_NOT_PUBLIC).with_arg("detail", format!(
                         "cannot derive logical path for public RouteId `{route_id}` on `{app}`"
-                    ),
-                    DIAG_ROUTE_NOT_PUBLIC,
-                ));
+                    )));
                 continue;
             }
         };
@@ -270,11 +250,7 @@ fn resolve_links(
         let href = match join_application_base(route_base, &logical) {
             Ok(h) => h,
             Err(msg) => {
-                diagnostics.push(ApplicationDiagnostic::coded_error(
-                    path.clone(),
-                    format!("Link href join failed for `{app}`: {msg}"),
-                    DIAG_MOUNT_UNREACHABLE,
-                ));
+                diagnostics.push(ApplicationDiagnostic::coded_error(path.clone(), DIAG_MOUNT_UNREACHABLE).with_arg("detail", format!("Link href join failed for `{app}`: {msg}")));
                 continue;
             }
         };

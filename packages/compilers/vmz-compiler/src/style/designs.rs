@@ -252,7 +252,10 @@ pub fn load_designs(project_root: &Path) -> DesignsBundle {
     for path in list_json(&root.join("tokens")) {
         match load_flat_json(&path) {
             Ok(entries) => default_entries.extend(entries),
-            Err(msg) => diagnostics.push(ReportedDiagnostic::error(&path, msg)),
+            Err(msg) => diagnostics.push(
+                ReportedDiagnostic::error(&path, "vmz::style::token_json_invalid")
+                    .with_arg("detail", msg),
+            ),
         }
     }
 
@@ -262,10 +265,10 @@ pub fn load_designs(project_root: &Path) -> DesignsBundle {
     for path in list_json(&root.join("themes")) {
         let id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("theme").to_string();
         if id == default_id {
-            diagnostics.push(ReportedDiagnostic::warning(
-                &path,
-                format!("theme id `{id}` collides with default theme id; overlay still applied"),
-            ));
+            diagnostics.push(
+                ReportedDiagnostic::warning(&path, "vmz::style::theme_id_collision")
+                    .with_arg("id", id.clone()),
+            );
         }
         match load_flat_json(&path) {
             Ok(entries) => {
@@ -275,7 +278,10 @@ pub fn load_designs(project_root: &Path) -> DesignsBundle {
                     tables.push(StyleThemeTable { id, entries });
                 }
             }
-            Err(msg) => diagnostics.push(ReportedDiagnostic::error(&path, msg)),
+            Err(msg) => diagnostics.push(
+                ReportedDiagnostic::error(&path, "vmz::style::token_json_invalid")
+                    .with_arg("detail", msg),
+            ),
         }
     }
 
@@ -321,11 +327,11 @@ fn load_theme_meta(
         return (default_id, activation, prefers);
     }
     let Ok(text) = std::fs::read_to_string(path) else {
-        diagnostics.push(ReportedDiagnostic::warning(path, "cannot read theme.json"));
+        diagnostics.push(ReportedDiagnostic::warning(path, "vmz::style::theme_json_unreadable"));
         return (default_id, activation, prefers);
     };
     let Ok(meta) = serde_json::from_str::<ThemeMetaFile>(&text) else {
-        diagnostics.push(ReportedDiagnostic::error(path, "invalid theme.json"));
+        diagnostics.push(ReportedDiagnostic::error(path, "vmz::style::theme_json_invalid"));
         return (default_id, activation, prefers);
     };
     let id = meta.default.filter(|s| !s.is_empty()).unwrap_or_else(|| DEFAULT_THEME_ID.to_string());
@@ -336,10 +342,10 @@ fn load_theme_meta(
     let mut prefers_map = BTreeMap::new();
     for (scheme, tid) in meta.prefers_color_scheme {
         if tid.trim().is_empty() {
-            diagnostics.push(ReportedDiagnostic::warning(
-                path,
-                format!("prefersColorScheme.{scheme} must be a non-empty theme id string"),
-            ));
+            diagnostics.push(
+                ReportedDiagnostic::warning(path, "vmz::style::prefers_scheme_empty")
+                    .with_arg("scheme", scheme),
+            );
         } else {
             prefers_map.insert(scheme, tid);
         }

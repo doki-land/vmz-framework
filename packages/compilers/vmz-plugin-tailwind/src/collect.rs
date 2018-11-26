@@ -86,7 +86,10 @@ pub fn collect_from_vmz(parsed: &ParsedVmz) -> (TwCollection, Vec<ReportedDiagno
     let ir = match parse_template(&parsed.template.content) {
         Ok(ir) => ir,
         Err(e) => {
-            diagnostics.push(ReportedDiagnostic::error(&parsed.path, format!("template: {e}")));
+            diagnostics.push(
+                ReportedDiagnostic::error(&parsed.path, "vmz::template::parse_failed")
+                    .with_arg("detail", e.to_string()),
+            );
             return (
                 TwCollection { path: parsed.path.clone(), sites, static_tokens: Vec::new() },
                 diagnostics,
@@ -161,12 +164,13 @@ fn walk_nodes(
                             .unwrap_or_else(|| {
                                 Span::new(template_start as u32, template_start as u32)
                             });
-                        diagnostics.push(ReportedDiagnostic::advice(
-                            path,
-                            format!(
-                                "style:tw with interpolation `{{{expr}}}` is a dynamic boundary; TW engine only answers static tokens (experimental adapter)"
-                            ),
-                        ));
+                        diagnostics.push(
+                            ReportedDiagnostic::advice(
+                                path,
+                                "vmz::tw::dynamic_style_tw",
+                            )
+                            .with_arg("expr", expr.clone()),
+                        );
                         // Attach span via error_at-style advice isn't available — use warning_at pattern:
                         // ReportedDiagnostic::advice has no span; upgrade to warning with label.
                         let _ = span;
@@ -208,7 +212,7 @@ fn collect_at_tailwind(
                 None => {
                     diagnostics.push(ReportedDiagnostic::error_at(
                         path,
-                        "unbalanced `@tailwind { … }` block",
+                        "vmz::tw::unbalanced_at_tailwind",
                         Span::new(name_start as u32, (name_start + 9) as u32),
                     ));
                     return;

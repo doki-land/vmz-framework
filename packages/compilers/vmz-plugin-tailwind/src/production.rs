@@ -79,10 +79,10 @@ fn theme_from_request(
     match load_theme_from_designs(&designs) {
         Ok(t) => t,
         Err(e) => {
-            diagnostics.push(ReportedDiagnostic::warning(
-                &req.project_root,
-                format!("designs theme load: {e}"),
-            ));
+            diagnostics.push(
+                ReportedDiagnostic::warning(&req.project_root, "vmz::tw::theme_load_failed")
+                    .with_arg("detail", e.to_string()),
+            );
             ThemeInput::default()
         }
     }

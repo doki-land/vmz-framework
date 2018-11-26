@@ -48,11 +48,11 @@ fn lint_warns_layout_without_suffix() {
     assert!(
         report.diagnostics.iter().any(|d| {
             d.severity() == Severity::Warning
-                && d.message().contains("*Layout")
+                && d.code() == "vmz::convention::layout_suffix"
                 && d.path().ends_with("Account.vmz")
         }),
         "{:?}",
-        report.diagnostics
+        report.diagnostics.iter().map(|d| d.code()).collect::<Vec<_>>()
     );
     let _ = fs::remove_dir_all(&root);
 }
@@ -71,9 +71,9 @@ fn check_skips_layout_suffix_lint() {
     .unwrap();
 
     assert!(
-        !report.diagnostics.iter().any(|d| d.message().contains("*Layout")),
+        !report.diagnostics.iter().any(|d| d.code() == "vmz::convention::layout_suffix"),
         "{:?}",
-        report.diagnostics
+        report.diagnostics.iter().map(|d| d.code()).collect::<Vec<_>>()
     );
     let _ = fs::remove_dir_all(&root);
 }
@@ -92,9 +92,9 @@ fn lint_accepts_account_layout() {
     .unwrap();
 
     assert!(
-        !report.diagnostics.iter().any(|d| d.message().contains("*Layout")),
+        !report.diagnostics.iter().any(|d| d.code() == "vmz::convention::layout_suffix"),
         "{:?}",
-        report.diagnostics
+        report.diagnostics.iter().map(|d| d.code()).collect::<Vec<_>>()
     );
     let _ = fs::remove_dir_all(&root);
 }

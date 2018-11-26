@@ -43,10 +43,10 @@ pub fn run_pipeline(parsed: &vmz_compiler::ParsedVmz, options: &PipelineOptions)
     let theme = match load_theme_from_designs(&designs) {
         Ok(t) => t,
         Err(e) => {
-            diagnostics.push(ReportedDiagnostic::warning(
-                &collection.path,
-                format!("designs theme load: {e}"),
-            ));
+            diagnostics.push(
+                ReportedDiagnostic::warning(&collection.path, "vmz::tw::theme_load_failed")
+                    .with_arg("detail", e.to_string()),
+            );
             ThemeInput::default()
         }
     };

@@ -51,7 +51,7 @@ fn invalid_expr_plan_fails_oxc_ingress() {
 fn jsx_rejection_carries_structured_code() {
     let err = parse_template_concrete("<h2>{user.name}</h2>").unwrap_err();
     let diag = template_parse_to_diagnostic("App.vmz", 11, &err);
-    assert_eq!(diag.code_string().as_deref(), Some("vmz::template/jsx-rejected"));
+    assert_eq!(diag.code_string().as_deref(), Some("vmz::template::jsx_rejected"));
 }
 
 #[test]
@@ -72,5 +72,5 @@ fn orphan_else_carries_illegal_directive_code() {
     let concrete = parse_template_concrete(r#"<p v-else>x</p>"#).unwrap();
     let err = lower_concrete_to_semantic(&concrete).unwrap_err();
     let diag = template_parse_to_diagnostic("App.vmz", 0, &err);
-    assert_eq!(diag.code_string().as_deref(), Some("vmz::template/illegal-directive"));
+    assert_eq!(diag.code_string().as_deref(), Some("vmz::template::illegal_directive"));
 }

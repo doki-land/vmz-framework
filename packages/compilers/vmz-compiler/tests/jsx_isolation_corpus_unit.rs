@@ -114,7 +114,7 @@ fn isolation_corpus_snippets_are_rejected_by_parser() {
         let diag = template_parse_to_diagnostic("corpus.vmz", 0, &err);
         assert_eq!(
             diag.code_string().as_deref(),
-            Some("vmz::template/jsx-rejected"),
+            Some("vmz::template::jsx_rejected"),
             "{name}: {err}"
         );
     }

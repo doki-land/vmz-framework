@@ -20,7 +20,7 @@ use crate::template::{
     template_parse_to_diagnostic,
 };
 use crate::virtual_server;
-use vmz_protocol::SourceSpan;
+use vmz_protocol::{DIAG_SERVER_SLICE_NOT_BROWSER_SAFE, SourceSpan};
 use vmz_types::{ComponentDecl, ServerAttach};
 
 /// Options for [`check_path`] / [`check_project`].
@@ -105,15 +105,19 @@ pub fn check_project(root: impl AsRef<Path>, options: &CheckOptions) -> crate::R
                     }
                 };
                 for err in crate::pipeline::link::check_template_links(&ir, &table) {
-                    report
-                        .diagnostics
-                        .push(ReportedDiagnostic::error(path, format!("<Link>: {err}")));
+                    report.diagnostics.push(
+                        ReportedDiagnostic::error(path, "vmz::router::link_invalid")
+                            .with_arg("detail", err),
+                    );
                 }
             }
         }
         Err(errs) => {
             for e in errs {
-                report.diagnostics.push(ReportedDiagnostic::error(root, e));
+                report.diagnostics.push(
+                    ReportedDiagnostic::error(root, "vmz::router::route_table_invalid")
+                        .with_arg("detail", e),
+                );
             }
         }
     }
@@ -131,7 +135,9 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
     let source = match fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) => {
-            report.diagnostics.push(ReportedDiagnostic::error(path, format!("read failed: {e}")));
+            report.diagnostics.push(
+                ReportedDiagnostic::error(path, "vmz::io::read_failed").with_arg("error", e.to_string()),
+            );
             return;
         }
     };
@@ -139,25 +145,31 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
     let parsed = match parse_vmz(path, source) {
         Ok(p) => p,
         Err(e) => {
-            report.diagnostics.push(ReportedDiagnostic::error(path, e.to_string()));
+            report.diagnostics.push(
+                ReportedDiagnostic::error(path, "vmz::sfc::parse_failed")
+                    .with_arg("detail", e.to_string()),
+            );
             return;
         }
     };
 
     let client = analyze_script(ScriptKind::Client, &parsed.client.content);
     for err in &client.parse_errors {
-        report.diagnostics.push(ReportedDiagnostic::error(path, format!("client script: {err}")));
+        report.diagnostics.push(
+            ReportedDiagnostic::error(path, "vmz::script::client_parse_failed")
+                .with_arg("detail", err.clone()),
+        );
     }
     if client.decl.name == "Anonymous" && client.parse_errors.is_empty() {
         report
             .diagnostics
-            .push(ReportedDiagnostic::error(path, "`<script client>` must `export default class`"));
+            .push(ReportedDiagnostic::error(path, "vmz::script::client_export_required"));
     }
     for factory in &client.forbidden_factories {
-        report.diagnostics.push(ReportedDiagnostic::error(
-            path,
-            format!("forbidden state factory `{}()` ?use class fields", factory.name),
-        ));
+        report.diagnostics.push(
+            ReportedDiagnostic::error(path, "vmz::script::forbidden_factory")
+                .with_arg("name", factory.name.clone()),
+        );
     }
 
     if let Some(server) = &parsed.server {
@@ -177,25 +189,25 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
         for err in &analyzed.parse_errors {
             report
                 .diagnostics
-                .push(ReportedDiagnostic::error(path, format!("server script: {err}")));
+                .push(
+                    ReportedDiagnostic::error(path, "vmz::script::server_parse_failed")
+                        .with_arg("detail", err.clone()),
+                );
         }
         if analyzed.decl.name == "Anonymous" && analyzed.parse_errors.is_empty() {
-            let msg = match server.lang {
-                ScriptLanguage::Rust => {
-                    "rust `<script server>` must declare `pub struct TypeName;`"
-                }
-                _ => "`<script server>` must `export default class`",
+            let code = match server.lang {
+                ScriptLanguage::Rust => "vmz::script::server_struct_required",
+                _ => "vmz::script::server_export_required",
             };
-            report.diagnostics.push(ReportedDiagnostic::error(path, msg));
+            report.diagnostics.push(ReportedDiagnostic::error(path, code));
         }
     }
 
     for finding in collect_client_boundary_findings(&parsed.client.content) {
-        report.diagnostics.push(ReportedDiagnostic::error_at(
-            path,
-            format!("{}: {}", finding.code, finding.message),
-            finding.span,
-        ));
+        report.diagnostics.push(
+            ReportedDiagnostic::error_at(path, finding.code, finding.span)
+                .with_arg("detail", finding.message.clone()),
+        );
     }
 
     let concrete = match parse_template_concrete(&parsed.template.content) {
@@ -242,15 +254,15 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
         let (start, end) = err.body_span.to_absolute(content_start);
         let path_s = path.to_string_lossy().into_owned();
         report.diagnostics.push(
-            ReportedDiagnostic::error(path, err.message)
-                .with_code("vmz::template/invalid-expr")
+            ReportedDiagnostic::error(path, "vmz::template::invalid_expr")
+                .with_arg("detail", err.message)
                 .with_source_span(SourceSpan { path: path_s, start, end }),
         );
     }
     if report
         .diagnostics
         .iter()
-        .any(|d| d.is_error() && d.message().starts_with("invalid template expression"))
+        .any(|d| d.is_error() && d.code() == "vmz::template::invalid_expr")
     {
         return;
     }
@@ -290,18 +302,20 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
     );
     for unit in &program.units {
         for u in &unit.graph.unknowns {
-            report.diagnostics.push(ReportedDiagnostic::advice(
-                path,
-                format!(
-                    "Program IR Unknown widen: field `{}` via {} ({}) — conservative field-root deps",
-                    u.field, u.via, u.reason
-                ),
-            ));
+            report.diagnostics.push(
+                ReportedDiagnostic::advice(path, "vmz::program::unknown_widen")
+                    .with_arg("field", u.field.clone())
+                    .with_arg("via", u.via.clone())
+                    .with_arg("reason", u.reason.clone()),
+            );
         }
         if options.require_browser_safe_server_slices {
             let proof = ServerSliceProof::prove(&unit.server);
             if let Some(msg) = proof.sink_refusal_message(unit.server.class_name.as_deref()) {
-                report.diagnostics.push(ReportedDiagnostic::error(path, msg));
+                report.diagnostics.push(
+                    ReportedDiagnostic::error(path, DIAG_SERVER_SLICE_NOT_BROWSER_SAFE)
+                        .with_arg("detail", msg),
+                );
             }
         }
     }
@@ -327,39 +341,37 @@ fn walk_each_keys(path: &Path, nodes: &[TemplateNode], report: &mut CheckReport)
             let key = attrs.iter().find(|a| a.name == "key");
             match key {
                 None => {
-                    report.diagnostics.push(ReportedDiagnostic::warning(
-                        path,
-                        format!(
-                            "<{tag} each={{}}> has no `key` ?index identity is unstable on insert/reorder"
-                        ),
-                    ));
+                    report.diagnostics.push(
+                        ReportedDiagnostic::warning(path, "vmz::template::each_missing_key")
+                            .with_arg("tag", tag.clone()),
+                    );
                 }
                 Some(k) => match &k.value {
                     AttrValue::Static(s) => {
-                        report.diagnostics.push(ReportedDiagnostic::error(
-                            path,
-                            format!(
-                                "<{tag} each> `key=\"{s}\"` is identical for every item ?use a per-item expression like `key={{item.id}}`"
-                            ),
-                        ));
+                        report.diagnostics.push(
+                            ReportedDiagnostic::error(path, "vmz::template::each_static_key")
+                                .with_arg("tag", tag.clone())
+                                .with_arg("key", s.clone()),
+                        );
                     }
                     AttrValue::Interp(expr) => {
                         let e = expr.trim();
                         if is_literal_key(e) {
-                            report.diagnostics.push(ReportedDiagnostic::error(
-                                path,
-                                format!(
-                                    "<{tag} each> `key={{{e}}}` is a constant ?duplicate keys for every item"
-                                ),
-                            ));
+                            report.diagnostics.push(
+                                ReportedDiagnostic::error(path, "vmz::template::each_literal_key")
+                                    .with_arg("tag", tag.clone())
+                                    .with_arg("key", e.to_string()),
+                            );
                         } else if let Some(as_name) = as_name {
                             if e == as_name {
-                                report.diagnostics.push(ReportedDiagnostic::warning(
-                                    path,
-                                    format!(
-                                        "<{tag} each> `key={{{as_name}}}` uses the item itself ?prefer a primitive field (e.g. `{as_name}.id`); object keys are unstable"
-                                    ),
-                                ));
+                                report.diagnostics.push(
+                                    ReportedDiagnostic::warning(
+                                        path,
+                                        "vmz::template::each_object_key",
+                                    )
+                                    .with_arg("tag", tag.clone())
+                                    .with_arg("as", as_name.to_string()),
+                                );
                             }
                         }
                     }

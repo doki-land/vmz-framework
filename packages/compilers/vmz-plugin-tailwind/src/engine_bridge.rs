@@ -1,6 +1,5 @@
 //! Bridge to `tailwind-rs` (git `dev`): Canonical Style Module + reference CSS.
 
-use oxc_diagnostics::OxcDiagnostic;
 use oxc_span::Span;
 use serde::{Deserialize, Serialize};
 use tailwind::{
@@ -8,6 +7,7 @@ use tailwind::{
 };
 use tailwind_css::serialize_module;
 use vmz_compiler::ReportedDiagnostic;
+use vmz_compiler::Severity;
 
 use crate::TwCollection;
 
@@ -70,23 +70,24 @@ pub fn map_engine_diagnostics(
     let mut out = Vec::new();
     for d in &lowering.response.diagnostics {
         let span = d.candidate_key.as_ref().and_then(|key| span_for_token(collection, key));
-        let msg = format!("[{}] {}", d.code.as_str(), d.message);
-        let mut diag = match d.severity {
-            tailwind::Severity::Error => OxcDiagnostic::error(msg),
-            tailwind::Severity::Warning => OxcDiagnostic::warn(msg),
-            tailwind::Severity::Info => {
-                OxcDiagnostic::error(msg).with_severity(oxc_diagnostics::Severity::Advice)
-            }
+        let severity = match d.severity {
+            tailwind::Severity::Error => Severity::Error,
+            tailwind::Severity::Warning => Severity::Warning,
+            tailwind::Severity::Info => Severity::Advice,
         };
-        diag = diag.with_error_code_scope("vmz.tw");
-        if let Some(span) = span {
-            diag = diag.with_label(span);
+        let mut diag = ReportedDiagnostic::with_severity(
+            collection.path.clone(),
+            severity,
+            format!("vmz::tw::{}", d.code.as_str()),
+        )
+        .with_arg("detail", d.message.clone());
+        if let Some(key) = &d.candidate_key {
+            diag = diag.with_arg("token", key.clone());
         }
-        out.push(ReportedDiagnostic {
-            path: collection.path.clone(),
-            diagnostic: diag,
-            args: None,
-        });
+        if let Some(span) = span {
+            diag.diagnostic = diag.diagnostic.with_label(span);
+        }
+        out.push(diag);
     }
     out
 }

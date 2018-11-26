@@ -109,22 +109,14 @@ fn build_sessions(
         let key = format!("{}::{}", s.role, s.package_root);
         if let Some(prev) = seen.insert(key.clone(), s.application_id.as_str().into()) {
             if prev != s.application_id.as_str() {
-                diagnostics.push(ApplicationDiagnostic::coded_error(
-                    s.package_root.clone(),
-                    format!(
+                diagnostics.push(ApplicationDiagnostic::coded_error(s.package_root.clone(), DIAG_SESSION_SHARED).with_arg("detail", format!(
                         "dev session package root shared by `{prev}` and `{}`",
                         s.application_id.as_str()
-                    ),
-                    DIAG_SESSION_SHARED,
-                ));
+                    )));
             }
         }
         if !s.independent {
-            diagnostics.push(ApplicationDiagnostic::coded_error(
-                s.application_id.as_str(),
-                "dev session must be independent (no shared Program Graph/runtime)",
-                DIAG_SESSION_SHARED,
-            ));
+            diagnostics.push(ApplicationDiagnostic::coded_error(s.application_id.as_str(), DIAG_SESSION_SHARED).with_arg("detail", "dev session must be independent (no shared Program Graph/runtime)"));
         }
     }
 
@@ -274,14 +266,10 @@ fn plan_affected(
                         && u.reason == ApplicationAffectedReason::ChildSource
                 })
             {
-                diagnostics.push(ApplicationDiagnostic::coded_error(
-                    dirty_paths[0].display().to_string(),
-                    format!(
+                diagnostics.push(ApplicationDiagnostic::coded_error(dirty_paths[0].display().to_string(), DIAG_AFFECTED_LEAK).with_arg("detail", format!(
                         "child_source change under `{}` leaked rebuild to sibling applications",
                         id.as_str()
-                    ),
-                    DIAG_AFFECTED_LEAK,
-                ));
+                    )));
             }
         }
     }
@@ -367,9 +355,9 @@ fn build_proxy_dispatch(
                 && f.host_survives
         });
         if !ok && !failure_containment.is_empty() {
-            diagnostics.push(ApplicationDiagnostic::coded_error(id.clone(), format!(
+            diagnostics.push(ApplicationDiagnostic::coded_error(id.clone(), DIAG_PROXY_MISROUTE).with_arg("detail", format!(
                     "unavailable ApplicationId `{id}` lacks failure-containment 503 application_unavailable proof"
-                ), DIAG_PROXY_MISROUTE));
+                )));
         }
     }
 
@@ -380,14 +368,14 @@ fn build_proxy_dispatch(
             || expected.application_id.as_ref().map(|a| a.as_str())
                 != case.application_id.as_ref().map(|a| a.as_str())
         {
-            diagnostics.push(ApplicationDiagnostic::coded_error(case.url.clone(), format!(
+            diagnostics.push(ApplicationDiagnostic::coded_error(case.url.clone(), DIAG_PROXY_MISROUTE).with_arg("detail", format!(
                     "proxy case mismatch for `{}`: expected status={} app={:?}, got status={} app={:?}",
                     case.url,
                     expected.status,
                     expected.application_id.as_ref().map(|a| a.as_str()),
                     case.status,
                     case.application_id.as_ref().map(|a| a.as_str())
-                ), DIAG_PROXY_MISROUTE));
+                )));
         }
     }
 
@@ -506,11 +494,7 @@ fn build_deploy_proof(
         && !table_json.contains("\"program\"")
         && !table_json.contains("executableModule");
     if !refs_only {
-        diagnostics.push(ApplicationDiagnostic::coded_error(
-            "ApplicationMountTable",
-            "deploy adapter proof: MountTable must remain refs-only",
-            DIAG_PROXY_MISROUTE,
-        ));
+        diagnostics.push(ApplicationDiagnostic::coded_error("ApplicationMountTable", DIAG_PROXY_MISROUTE).with_arg("detail", "deploy adapter proof: MountTable must remain refs-only"));
     }
 
     let per_app = artifacts.iter().all(|a| !a.server_deployment_ref.hash.is_empty());

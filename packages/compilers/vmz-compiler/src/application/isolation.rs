@@ -55,11 +55,7 @@ fn build_namespaces(
     for a in artifacts {
         let id = a.application_id.as_str();
         if id.is_empty() || id == "unknown" {
-            diagnostics.push(ApplicationDiagnostic::coded_error(
-                a.package_root.clone().unwrap_or_default(),
-                "isolation requires an explicit ApplicationId",
-                DIAG_ISOLATION_UNPROVEN,
-            ));
+            diagnostics.push(ApplicationDiagnostic::coded_error(a.package_root.clone().unwrap_or_default(), DIAG_ISOLATION_UNPROVEN).with_arg("detail", "isolation requires an explicit ApplicationId"));
             continue;
         }
         out.push(ApplicationIsolationNamespace {
@@ -99,9 +95,9 @@ fn validate_namespace_uniqueness(
             let map = buckets.entry(surface).or_default();
             if let Some(prev) = map.insert(value, id) {
                 if prev != id {
-                    diagnostics.push(ApplicationDiagnostic::coded_error(id, format!(
+                    diagnostics.push(ApplicationDiagnostic::coded_error(id, DIAG_ISOLATION_UNPROVEN).with_arg("detail", format!(
                             "{surface} namespace `{value}` shared by `{prev}` and `{id}` (runtime semantics must not be shared)"
-                        ), DIAG_ISOLATION_UNPROVEN));
+                        )));
                 }
             }
         }
@@ -128,9 +124,9 @@ fn validate_namespace_prefixes(
             let ok =
                 if surface == "runtime" { value.starts_with(&prefix) } else { value == prefix };
             if !ok {
-                diagnostics.push(ApplicationDiagnostic::coded_error(id, format!(
+                diagnostics.push(ApplicationDiagnostic::coded_error(id, DIAG_ISOLATION_UNPROVEN).with_arg("detail", format!(
                         "{surface} namespace `{value}` is not ApplicationId-scoped (want `{prefix}`)"
-                    ), DIAG_ISOLATION_UNPROVEN));
+                    )));
             }
         }
     }
@@ -146,11 +142,7 @@ fn validate_no_cross_executable(
         let id = a.application_id.as_str();
         if let Some(prev) = by_exec.insert(exec, id) {
             if prev != id {
-                diagnostics.push(ApplicationDiagnostic::coded_error(
-                    a.package_root.clone().unwrap_or_default(),
-                    format!("executable `{exec}` appears in both `{prev}` and `{id}`"),
-                    DIAG_CROSS_RUNTIME_REFERENCE,
-                ));
+                diagnostics.push(ApplicationDiagnostic::coded_error(a.package_root.clone().unwrap_or_default(), DIAG_CROSS_RUNTIME_REFERENCE).with_arg("detail", format!("executable `{exec}` appears in both `{prev}` and `{id}`")));
             }
         }
     }
@@ -173,11 +165,7 @@ fn build_failure_containment(
         artifacts.iter().filter(|a| mount_by_id.contains_key(a.application_id.as_str())).collect();
 
     if mounted.is_empty() && !mount_table.mounts.is_empty() {
-        diagnostics.push(ApplicationDiagnostic::coded_error(
-            "ApplicationMountTable",
-            "mounts present but no matching ApplicationArtifacts for failure containment",
-            DIAG_FAILURE_CONTAINMENT,
-        ));
+        diagnostics.push(ApplicationDiagnostic::coded_error("ApplicationMountTable", DIAG_FAILURE_CONTAINMENT).with_arg("detail", "mounts present but no matching ApplicationArtifacts for failure containment"));
     }
 
     for a in &mounted {
@@ -209,37 +197,21 @@ fn validate_failure_containment(
     for p in proofs {
         let failed = p.failed_application_id.as_str();
         if !p.host_survives {
-            diagnostics.push(ApplicationDiagnostic::coded_error(
-                failed,
-                format!("host must survive failure of `{failed}`"),
-                DIAG_FAILURE_CONTAINMENT,
-            ));
+            diagnostics.push(ApplicationDiagnostic::coded_error(failed, DIAG_FAILURE_CONTAINMENT).with_arg("detail", format!("host must survive failure of `{failed}`")));
         }
         if p.unavailable.status != 503 || p.unavailable.reason != "application_unavailable" {
-            diagnostics.push(ApplicationDiagnostic::coded_error(
-                failed,
-                "failed mount must return structured unavailable (503 application_unavailable)",
-                DIAG_FAILURE_CONTAINMENT,
-            ));
+            diagnostics.push(ApplicationDiagnostic::coded_error(failed, DIAG_FAILURE_CONTAINMENT).with_arg("detail", "failed mount must return structured unavailable (503 application_unavailable)"));
         }
         let sibling_set: HashSet<&str> = p.siblings_survive.iter().map(|id| id.as_str()).collect();
         if sibling_set.contains(failed) {
-            diagnostics.push(ApplicationDiagnostic::coded_error(
-                failed,
-                "failed application listed as surviving sibling",
-                DIAG_FAILURE_CONTAINMENT,
-            ));
+            diagnostics.push(ApplicationDiagnostic::coded_error(failed, DIAG_FAILURE_CONTAINMENT).with_arg("detail", "failed application listed as surviving sibling"));
         }
         for id in &all {
             if *id == failed {
                 continue;
             }
             if !sibling_set.contains(id) {
-                diagnostics.push(ApplicationDiagnostic::coded_error(
-                    failed,
-                    format!("sibling `{id}` must survive failure of `{failed}`"),
-                    DIAG_FAILURE_CONTAINMENT,
-                ));
+                diagnostics.push(ApplicationDiagnostic::coded_error(failed, DIAG_FAILURE_CONTAINMENT).with_arg("detail", format!("sibling `{id}` must survive failure of `{failed}`")));
             }
         }
     }

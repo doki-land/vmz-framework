@@ -95,7 +95,9 @@ fn format_file(
     let source = match fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) => {
-            report.diagnostics.push(ReportedDiagnostic::error(path, format!("read failed: {e}")));
+            report.diagnostics.push(
+                ReportedDiagnostic::error(path, "vmz::io::read_failed").with_arg("error", e.to_string()),
+            );
             return Ok(());
         }
     };
@@ -103,7 +105,10 @@ fn format_file(
     let parsed = match parse_vmz(path, source.clone()) {
         Ok(p) => p,
         Err(e) => {
-            report.diagnostics.push(ReportedDiagnostic::error(path, e.to_string()));
+            report.diagnostics.push(
+                ReportedDiagnostic::error(path, "vmz::sfc::parse_failed")
+                    .with_arg("detail", e.to_string()),
+            );
             return Ok(());
         }
     };
@@ -111,7 +116,9 @@ fn format_file(
     let formatted = match format_parsed(&parsed, &settings) {
         Ok(s) => s,
         Err(e) => {
-            report.diagnostics.push(ReportedDiagnostic::error(path, e));
+            report.diagnostics.push(
+                ReportedDiagnostic::error(path, "vmz::format::failed").with_arg("detail", e),
+            );
             return Ok(());
         }
     };
@@ -123,7 +130,7 @@ fn format_file(
     if options.check {
         report
             .diagnostics
-            .push(ReportedDiagnostic::error(path, "would reformat (run without --check)"));
+            .push(ReportedDiagnostic::error(path, "vmz::format::would_reformat"));
         return Ok(());
     }
     fs::write(path, formatted)?;

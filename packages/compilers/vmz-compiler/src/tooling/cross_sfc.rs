@@ -358,22 +358,14 @@ pub fn plan_x2_rename(root: &Path, intent: &RenameIntent, kind: StableIdKind) ->
     }
     if plan.edits.is_empty() {
         plan.status = vmz_protocol::WorkspaceEditStatus::Rejected;
-        plan.diagnostics.push(ReportedDiagnostic::coded_error(
-            "",
-            format!("no proven references for {kind} `{from}`"),
-            "dx.x2.rename.no_references",
-        ));
+        plan.diagnostics.push(ReportedDiagnostic::coded_error("", "dx.x2.rename.no_references").with_arg("detail", format!("no proven references for {kind} `{from}`")));
         return plan;
     }
     plan.status = vmz_protocol::WorkspaceEditStatus::Ready;
-    plan.diagnostics.push(ReportedDiagnostic::coded_advice(
-        "",
-        format!(
+    plan.diagnostics.push(ReportedDiagnostic::coded_advice("", "dx.x2.rename.ready").with_arg("detail", format!(
             "rename ready: {kind} `{from}` -> `{to}` ({} edit(s), {refs_n} ref(s))",
             plan.edits.len()
-        ),
-        "dx.x2.rename.ready",
-    ));
+        )));
     plan
 }
 
@@ -398,14 +390,10 @@ fn collect_safe_fixes(root: &Path, diagnostics: &mut Vec<ReportedDiagnostic>) ->
         let start = (parsed.client.content_start + s) as u32;
         let end = (parsed.client.content_start + e) as u32;
         diagnostics.push(
-            ReportedDiagnostic::coded_warning(
-                rel.clone(),
-                format!(
+            ReportedDiagnostic::coded_warning(rel.clone(), DIAG_CLASS_NAME_MISMATCH).with_arg("detail", format!(
                     "export default class `{}` does not match file stem `{stem}`",
                     analyzed.decl.name
-                ),
-                DIAG_CLASS_NAME_MISMATCH,
-            )
+                ))
             .with_source_span(SourceSpan { path: rel.clone(), start, end }),
         );
         let mut edit = WorkspaceEditPlan::empty_preview();

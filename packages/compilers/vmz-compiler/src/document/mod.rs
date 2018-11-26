@@ -78,11 +78,7 @@ pub fn load_document_route_plan(project_root: impl AsRef<Path>) -> DocumentRoute
             collections: default_collections(),
             mounts: default_mounts(),
             silent_fallback_requested: false,
-            diagnostics: vec![ReportedDiagnostic::coded_warning(
-                rel,
-                "documents.config.json|json5|ts|js missing under /documents",
-                DIAG_DOCUMENT_CONFIG_MISSING,
-            )],
+            diagnostics: vec![ReportedDiagnostic::coded_warning(rel, DIAG_DOCUMENT_CONFIG_MISSING).with_arg("detail", "documents.config.json|json5|ts|js missing under /documents")],
         };
     };
 
@@ -103,11 +99,7 @@ pub fn load_document_route_plan(project_root: impl AsRef<Path>) -> DocumentRoute
                 collections: Vec::new(),
                 mounts: Vec::new(),
                 silent_fallback_requested: false,
-                diagnostics: vec![ReportedDiagnostic::coded_error(
-                    rel,
-                    format!("read documents config failed: {e}"),
-                    DIAG_DOCUMENT_CONFIG_INVALID,
-                )],
+                diagnostics: vec![ReportedDiagnostic::coded_error(rel, DIAG_DOCUMENT_CONFIG_INVALID).with_arg("detail", format!("read documents config failed: {e}"))],
             };
         }
     };
@@ -136,11 +128,7 @@ pub fn load_document_route_plan_from_source(
                 collections: Vec::new(),
                 mounts: Vec::new(),
                 silent_fallback_requested: false,
-                diagnostics: vec![ReportedDiagnostic::coded_error(
-                    source_path,
-                    msg,
-                    DIAG_DOCUMENT_CONFIG_INVALID,
-                )],
+                diagnostics: vec![ReportedDiagnostic::coded_error(source_path, DIAG_DOCUMENT_CONFIG_INVALID).with_arg("detail", msg)],
             };
         }
     };
@@ -156,11 +144,7 @@ pub fn load_document_route_plan_from_source(
                 collections: Vec::new(),
                 mounts: Vec::new(),
                 silent_fallback_requested: false,
-                diagnostics: vec![ReportedDiagnostic::coded_error(
-                    source_path,
-                    format!("documents config shape invalid: {e}"),
-                    DIAG_DOCUMENT_CONFIG_INVALID,
-                )],
+                diagnostics: vec![ReportedDiagnostic::coded_error(source_path, DIAG_DOCUMENT_CONFIG_INVALID).with_arg("detail", format!("documents config shape invalid: {e}"))],
             };
         }
     };
@@ -228,21 +212,13 @@ fn normalize_document_config(file: DocumentConfigFile, source_path: String) -> D
     let default_locale = file.default_locale.filter(|s| !s.is_empty());
     if let Some(ref d) = default_locale {
         if !locale_labels.is_empty() && !locale_labels.contains_key(d) {
-            diagnostics.push(ReportedDiagnostic::coded_error(
-                source_path.clone(),
-                format!("defaultLocale {d} missing from locales"),
-                DIAG_DOCUMENT_CONFIG_DEFAULT_LOCALE,
-            ));
+            diagnostics.push(ReportedDiagnostic::coded_error(source_path.clone(), DIAG_DOCUMENT_CONFIG_DEFAULT_LOCALE).with_arg("detail", format!("defaultLocale {d} missing from locales")));
         }
     }
 
     let silent_fallback_requested = matches!(&file.fallback, Some(serde_json::Value::Bool(true)));
     if silent_fallback_requested {
-        diagnostics.push(ReportedDiagnostic::coded_error(
-            source_path.clone(),
-            "silent whole-page fallback is forbidden; allow only explicit nav/metadata or per-page fallback",
-            DIAG_DOCUMENT_FALLBACK_SILENT,
-        ));
+        diagnostics.push(ReportedDiagnostic::coded_error(source_path.clone(), DIAG_DOCUMENT_FALLBACK_SILENT).with_arg("detail", "silent whole-page fallback is forbidden; allow only explicit nav/metadata or per-page fallback"));
     }
 
     let mut collections = Vec::new();

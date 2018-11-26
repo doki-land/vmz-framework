@@ -327,8 +327,12 @@ impl ContributionStore {
         let mut out = Vec::new();
         for stored in self.items.values() {
             if let ContributionKind::Analyzer { path, severity, message, .. } = &stored.item.kind {
-                let msg = format!("[plugin {}:{}] {message}", stored.plugin.name, stored.item.id);
-                out.push(ReportedDiagnostic::with_severity(path, *severity, msg));
+                out.push(
+                    ReportedDiagnostic::with_severity(path, *severity, "vmz::plugin::analyzer")
+                        .with_arg("plugin", stored.plugin.name.clone())
+                        .with_arg("id", stored.item.id.clone())
+                        .with_arg("detail", message.clone()),
+                );
             }
         }
         out

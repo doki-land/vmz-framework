@@ -52,7 +52,7 @@ fn lint_legacy_root_shell(path: &Path, name: &str, rel: &str, report: &mut Check
     if is_rootish && !name.eq_ignore_ascii_case("application.vmz") {
         report.diagnostics.push(ReportedDiagnostic::warning(
             path,
-            "prefer canonical root shell `Application.vmz` / `class Application` (legacy `App.vmz`/`app.vmz`)",
+            "vmz::convention::prefer_application_shell",
         ));
     }
 }
@@ -64,7 +64,7 @@ fn lint_page_index_case(path: &Path, kind: VmzModuleKind, name: &str, report: &m
     if name == "index.vmz" {
         report.diagnostics.push(ReportedDiagnostic::warning(
             path,
-            "prefer PascalCase page file `Index.vmz` (URL still `/`)",
+            "vmz::convention::prefer_pascal_index",
         ));
     }
 }
@@ -84,12 +84,10 @@ fn lint_named_layout_suffix(path: &Path, name: &str, rel: &str, report: &mut Che
     if layout_suffix_stem(stem) {
         return;
     }
-    report.diagnostics.push(ReportedDiagnostic::warning(
-        path,
-        format!(
-            "named layout `{stem}` should use `*Layout` suffix (e.g. `{stem}Layout.vmz`); lint only, not a build error"
-        ),
-    ));
+    report.diagnostics.push(
+        ReportedDiagnostic::warning(path, "vmz::convention::layout_suffix")
+            .with_arg("stem", stem.to_string()),
+    );
 }
 
 /// `AccountLayout` / `DocsLayout` / bare `Layout` → true.
@@ -118,13 +116,11 @@ fn lint_non_pascal_component(
         return;
     }
     // Soft under lint: hard PascalCase enforcement for check is separate / future.
-    report.diagnostics.push(ReportedDiagnostic::warning(
-        path,
-        format!(
-            "component/page file `{name}` should be PascalCase (e.g. `{}`)",
-            to_pascal_hint(stem)
-        ),
-    ));
+    report.diagnostics.push(
+        ReportedDiagnostic::warning(path, "vmz::convention::pascal_case_file")
+            .with_arg("name", name.to_string())
+            .with_arg("hint", to_pascal_hint(stem)),
+    );
 }
 
 fn is_pascal_case_stem(stem: &str) -> bool {

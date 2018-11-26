@@ -87,12 +87,11 @@ pub fn validate_vmz_css_var_refs(
         if known.contains(&name) || !seen.insert(name.clone()) {
             continue;
         }
-        out.push(ReportedDiagnostic::error(
-            path,
-            format!(
-                "[{DIAG_UNKNOWN_DESIGN_TOKEN}] unknown design token `{name}` (no Style Theme leaf)"
-            ),
-        ));
+        out.push(
+            ReportedDiagnostic::error(path, DIAG_UNKNOWN_DESIGN_TOKEN)
+                .with_arg("name", name)
+                .with_arg("detail", "no Style Theme leaf"),
+        );
     }
     out
 }
@@ -140,15 +139,16 @@ fn validate_tw_registrations(
         if !seen.insert(dedupe) {
             continue;
         }
-        let msg = format!(
-            "[{DIAG_UNKNOWN_DESIGN_TOKEN}] unknown design token `{ns}.{key}` via `{}` (no Style Theme leaf)",
-            reg.token
-        );
-        if let Some(span) = locate_token_span(source, &reg.token) {
-            out.push(ReportedDiagnostic::error_at(&reg.path, msg, span));
+        let mut diag = if let Some(span) = locate_token_span(source, &reg.token) {
+            ReportedDiagnostic::error_at(&reg.path, DIAG_UNKNOWN_DESIGN_TOKEN, span)
         } else {
-            out.push(ReportedDiagnostic::error(&reg.path, msg));
-        }
+            ReportedDiagnostic::error(&reg.path, DIAG_UNKNOWN_DESIGN_TOKEN)
+        };
+        diag = diag
+            .with_arg("name", format!("{ns}.{key}"))
+            .with_arg("token", reg.token.clone())
+            .with_arg("detail", "no Style Theme leaf");
+        out.push(diag);
     }
     out
 }
@@ -179,12 +179,11 @@ pub fn validate_unreferenced_global_styles(designs: &DesignsBundle) -> Vec<Repor
             .display()
             .to_string()
             .replace('\\', "/");
-        out.push(ReportedDiagnostic::warning(
-            path,
-            format!(
-                "[{DIAG_UNREFERENCED_GLOBAL_STYLE}] unreferenced global style `{rel}` — not imported from designs/styles entry (only the entry is compiled)"
-            ),
-        ));
+        out.push(
+            ReportedDiagnostic::warning(path, DIAG_UNREFERENCED_GLOBAL_STYLE)
+                .with_arg("path", rel)
+                .with_arg("detail", "not imported from designs/styles entry"),
+        );
     }
     out
 }
@@ -319,12 +318,12 @@ pub fn validate_unused_design_tokens(
                 continue;
             }
             let leaf = e.path.join(".");
-            out.push(ReportedDiagnostic::warning(
-                &designs.root,
-                format!(
-                    "[{DIAG_UNUSED_DESIGN_TOKEN}] unused design token `{leaf}` (`{var}`) — not referenced by var(--vmz-…) or style:tw"
-                ),
-            ));
+            out.push(
+                ReportedDiagnostic::warning(&designs.root, DIAG_UNUSED_DESIGN_TOKEN)
+                    .with_arg("name", leaf)
+                    .with_arg("var", var)
+                    .with_arg("detail", "not referenced by var(--vmz-…) or style:tw"),
+            );
         }
     }
     out

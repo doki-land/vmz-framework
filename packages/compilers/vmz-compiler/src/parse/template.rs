@@ -50,18 +50,16 @@ pub fn template_parse_to_diagnostic(
     let path = path.into();
     let (start, end) = TemplateSpan::from_usize(err.offset, err.offset.saturating_add(1))
         .to_absolute(content_start as u32);
-    let mut diag = ReportedDiagnostic::error(&path, format!("template: {}", err.message))
-        .with_source_span(SourceSpan { path: path.to_string_lossy().into_owned(), start, end });
-    if let Some(code) = template_error_code(&err.message) {
-        diag = diag.with_code(code);
-    }
-    diag
+    let code = template_error_code(&err.message).unwrap_or("vmz::template::parse_failed");
+    ReportedDiagnostic::error(&path, code)
+        .with_arg("detail", err.message.clone())
+        .with_source_span(SourceSpan { path: path.to_string_lossy().into_owned(), start, end })
 }
 
 /// Stable diagnostic codes for structured template parse / semantic failures.
 fn template_error_code(message: &str) -> Option<&'static str> {
     if message.contains("JSX") || message.contains("single-brace") {
-        return Some("vmz::template/jsx-rejected");
+        return Some("vmz::template::jsx_rejected");
     }
     if message.contains("`v-else")
         || message.contains("v-else-if")
@@ -70,7 +68,7 @@ fn template_error_code(message: &str) -> Option<&'static str> {
         || message.contains("dynamic argument")
         || message.contains("dynamic `v-slot`")
     {
-        return Some("vmz::template/illegal-directive");
+        return Some("vmz::template::illegal_directive");
     }
     None
 }
