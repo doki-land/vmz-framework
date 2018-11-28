@@ -117,7 +117,7 @@ pub use designs::{
 pub use diagnostic::{ReportedDiagnostic, Severity, parse_severity};
 pub use emit::{ServerBridge, bind_field_idents, emit_client_js, emit_client_js_with_ir};
 pub use expr_plan::{ExprPlan, plan_template_expr};
-pub use offset_index::OffsetIndex;
+pub use offset_index::{LspPosition, OffsetIndex};
 pub use plugin::{
     ApplyContributionsReport, ContributionBatch, ContributionDiff, ContributionItem,
     ContributionKind, ContributionStore, ExplainContributionRow, ExplainContributionSurface,
