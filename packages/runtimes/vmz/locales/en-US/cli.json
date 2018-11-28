@@ -100,6 +100,5 @@
     "cli.err.global_needs_project": "this `vmz` is a global install (mode=global); project commands need a project install.",
     "cli.err.global_install_hint": "Install in the app:  pnpm add -D @vmz/vmz",
     "cli.err.global_run_hint": "Then run:            pnpm exec vmz <command>",
-    "cli.err.global_developer_hint": "(developer mode: run from vmz-framework packages/runtimes/vmz source — full CLI)",
-    "diag.message": "{message}"
+    "cli.err.global_developer_hint": "(developer mode: run from vmz-framework packages/runtimes/vmz source — full CLI)"
 }

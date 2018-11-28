@@ -34,7 +34,9 @@ export const log = {
     },
     diagnostic(d: DiagnosticLike): void {
         const severity = d.severity === 'warning' || d.severity === 'advice' || d.severity === 'error' ? d.severity : 'error';
-        const code = d.code && String(d.code).length ? String(d.code) : 'diag.message';
+        // Only invent transitional `diag.message` when wire has no code; never remap a real code.
+        const hasCode = Boolean(d.code && String(d.code).length);
+        const code = hasCode ? String(d.code) : 'diag.message';
         const locale = resolveVmzLocale();
         const catalog = loadCliCatalog(locale);
         const line = formatDiagnostic(
@@ -42,7 +44,7 @@ export const log = {
                 path: d.path || '',
                 severity,
                 code,
-                args: d.args || (d.message ? { message: String(d.message) } : undefined),
+                args: d.args ?? (!hasCode && d.message ? { message: String(d.message) } : undefined),
                 message: d.message,
                 span: d.span,
             },
