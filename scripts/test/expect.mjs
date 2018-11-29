@@ -100,6 +100,10 @@ export function expect(actual, message) {
                         assert.ok(!String(actual).includes(String(part)), msg(`string unexpectedly has ${JSON.stringify(part)}`));
                     }
                 },
+                toMatch(re) {
+                    const pattern = re instanceof RegExp ? re : new RegExp(re);
+                    assert.ok(!pattern.test(String(actual)), msg(`string unexpectedly matched ${pattern}`));
+                },
                 toThrow() {
                     assert.doesNotThrow(/** @type {() => unknown} */ (actual), undefined, message);
                 },

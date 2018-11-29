@@ -147,7 +147,10 @@ export default definePlugin({
         expect(code).toContain('v-if=');
         expect(code).toContain("|| 'shiki'");
         expect(code).not.toContain('if={');
-        expect(code).not.toMatch(/v-if="[^"]*"[^"]*"/); // no nested " inside attr value
+        // Attr values must not embed raw `"` (facades use `'…'` JS literals inside `"…"` attrs).
+        for (const m of code.matchAll(/\bv-(?:else-)?if="([^"]*)"/g)) {
+            expect(m[1].includes('"')).toBe(false);
+        }
         ws.dispose();
         fs.rmSync(dir, { recursive: true, force: true });
     });
