@@ -658,6 +658,8 @@ fn emit_runtime_js(options: &CompileOptions, report: &mut CompileReport) -> crat
         // Companions required by `dom.js` / `dom.client.js` re-exports (same out dir names).
         ("dom-core.js", "dom-core.js"),
         ("dom-ssr.js", "dom-ssr.js"),
+        ("direct-host-box.js", "direct-host-box.js"),
+        ("unknown-component.js", "unknown-component.js"),
         ("http.js", "vmz-http.js"),
         ("client-nav.js", "vmz-client-nav.js"),
     ];

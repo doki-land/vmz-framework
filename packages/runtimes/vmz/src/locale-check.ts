@@ -802,7 +802,8 @@ function walkDistJs(dir: string, fn: (file: string) => void): void {
     for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, ent.name);
         if (ent.isDirectory()) {
-            if (ent.name === 'node_modules') continue;
+            // Skip package trees and pack vendor — only app emit must clear `#locales/*`.
+            if (ent.name === 'node_modules' || ent.name === 'vendor') continue;
             walkDistJs(full, fn);
         } else if (ent.name.endsWith('.js') || ent.name.endsWith('.mjs')) {
             fn(full);
