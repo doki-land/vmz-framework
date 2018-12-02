@@ -180,6 +180,13 @@ export function createDevSession(options: DevSessionOptions) {
             throw new Error('vmz dev: initial build failed');
         }
 
+        // `vmz build` assemble copies `public/**` → outDir; soft `ws.build()` does not.
+        // Without this, marketing images and other opaque assets 404 under `vmz dev`.
+        {
+            const { emitPublicStaticAssets } = await import('./public-static-assets.js');
+            emitPublicStaticAssets(outDir, { projectRoot: project });
+        }
+
         // Reclaim orphan serve-host from a previous crashed launcher (same outDir).
         reclaimStaleDevHost(outDir);
 

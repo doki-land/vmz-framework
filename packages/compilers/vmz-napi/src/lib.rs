@@ -40,15 +40,32 @@ pub struct JsFileChange {
     pub kind: String,
 }
 
-/// Single diagnostic surfaced to JS (path + severity + message).
+/// Single diagnostic surfaced to JS (`code + args + span`; message optional/empty).
 #[napi(object)]
 pub struct JsDiagnostic {
     /// Source path associated with the diagnostic (may be synthetic).
     pub path: String,
     /// `"error"` | `"warning"` | `"advice"`.
     pub severity: String,
-    /// Human-readable diagnostic text.
+    /// Stable diagnostic id (catalog key). Empty only for legacy rows.
+    pub code: String,
+    /// Catalog argument map (stringified values).
+    pub args: Option<std::collections::BTreeMap<String, String>>,
+    /// UTF-8 byte offsets when a primary label exists.
+    pub span: Option<JsSourceSpan>,
+    /// Legacy / transitional prose. Empty under the `0.1.21` contract.
     pub message: String,
+}
+
+/// UTF-8 byte span for [`JsDiagnostic`].
+#[napi(object)]
+pub struct JsSourceSpan {
+    /// Path echoed from the diagnostic (may match [`JsDiagnostic::path`]).
+    pub path: String,
+    /// Inclusive start offset.
+    pub start: u32,
+    /// Exclusive end offset.
+    pub end: u32,
 }
 
 /// Result of [`JsWorkspace::check`] / [`JsWorkspace::lint`].
@@ -226,9 +243,17 @@ fn map_diag(d: &vmz_compiler::ReportedDiagnostic) -> JsDiagnostic {
         vmz_compiler::Severity::Warning => "warning",
         vmz_compiler::Severity::Advice => "advice",
     };
+    let span = d.source_span().map(|s| JsSourceSpan {
+        path: s.path,
+        start: s.start,
+        end: s.end,
+    });
     JsDiagnostic {
         path: d.path().display().to_string(),
         severity: severity.into(),
+        code: d.code(),
+        args: d.args().cloned(),
+        span,
         message: d.message().to_string(),
     }
 }

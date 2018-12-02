@@ -88,7 +88,14 @@ export interface FileChange {
 export interface Diagnostic {
     path: string;
     severity: string;
-    message: string;
+    /** Stable id (`vmz::…`). Required for language-neutral rows. */
+    code?: string;
+    /** Catalog placeholders. */
+    args?: Record<string, string>;
+    /** UTF-8 byte offsets. */
+    span?: { path?: string; start: number; end: number };
+    /** Legacy / empty under language-neutral diagnostics. */
+    message?: string;
 }
 
 export interface CheckReport {
