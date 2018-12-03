@@ -5,7 +5,6 @@
  */
 
 import fs from 'node:fs';
-import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { loadNativeAddon, requireNativeFn } from './native-addon.js';
@@ -134,34 +133,12 @@ export async function loadComponentEntries(distDir, opts = {}) {
             const closure = collectDependsOnClosure(deployment, opts.closureRoots);
             entries = entries.filter((e) => closure.has(e.chunkId));
         }
-    } else if (!strict) {
-        entries = await listComponentEntriesFromDirectory(distDir);
+    } else if (strict) {
+        throw new Error(`vmz: missing vmz-deployment.json under ${distDir} (plan-only host)`);
     }
+    // No directory scan fallback — component closure comes from Deployment Plan only.
     entries = mergeExplicitComponentEntries(entries, opts.explicit);
     return dedupeComponentEntriesByTag(entries, { strict });
-}
-
-/**
- * @param {string} distDir
- * @returns {Promise<Array<{ chunkId: string, name: string, entry: string }>>}
- */
-async function listComponentEntriesFromDirectory(distDir) {
-    const folder = path.join(distDir, 'components');
-    /** @type {string[]} */
-    let files = [];
-    try {
-        files = await readdir(folder);
-    } catch {
-        return [];
-    }
-    return files
-        .filter((name) => name.endsWith('.client.js'))
-        .map((f) => {
-            const name = f.replace(/\.client\.js$/, '');
-            const chunkId = `components/${name}`;
-            return { chunkId, name, entry: `components/${name}.client.js` };
-        })
-        .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
@@ -194,7 +171,7 @@ export async function importAndRegisterComponentEntries(distDir, entries, regist
 }
 
 /**
- * Bootstrap component registry from deployment (all, closure, or directory fallback).
+ * Bootstrap component registry from deployment (all or closure — no directory fallback).
  * @param {string} distDir
  * @param {(map: Record<string, unknown>) => void} registerComponents
  * @param {{

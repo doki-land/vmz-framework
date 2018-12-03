@@ -59,7 +59,7 @@ fn classify(root: &Path, path: &Path) -> VmzModuleKind {
     let rel = path.strip_prefix(root).unwrap_or(path);
     let s = rel.to_string_lossy().replace('\\', "/");
     if is_application_shell(&s) {
-        VmzModuleKind::App
+        VmzModuleKind::Application
     } else if s.contains("/pages/") {
         VmzModuleKind::Page
     } else if s.contains("/components/") {

@@ -18,11 +18,12 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import { createRequire, registerHooks } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { localizeBodyLinks } from './localize-body-links.js';
 import { createRenderHost } from './render-host.js';
 import { listClientComponents } from './list-client-components.js';
 import { loadNativeAddon } from './native-addon.js';
@@ -144,7 +145,7 @@ let reloadToken = Date.now();
 let ssrRenderHost = null;
 /** @type {string | null} Correlatable build id from vmz dev (Living §12.8). */
 let lastDevBuildId = null;
-/** @type {Array<{ chunkId: string, pageRel: string, segs: ReturnType<typeof parseChunkSegments> }>} */
+/** @type {Array<{ chunkId: string, pageRel: string, segs: ReturnType<typeof parsePathPattern> }>} */
 let pageCatalog = [];
 /** @type {Map<string, any>} */
 const pageCtors = new Map();
@@ -610,7 +611,7 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
         }
         // Locale discipline: same-app Links retain current LocaleId (realization authority).
         if (localeArtifact && localeId) {
-            bodyHtml = localizeBodyLinksInHost(bodyHtml, localeId, localeArtifact);
+            bodyHtml = localizeBodyLinks(bodyHtml, localeId, localeArtifact);
         }
     } finally {
         if (prevLocaleHint === undefined) delete globalThis.__vmzLocaleIdHint;
@@ -807,9 +808,7 @@ async function softReload(opts = {}) {
             cacheBust: nextToken,
         });
         const nextCatalog = await listPageClientFiles(distDir);
-        if (!nextCatalog.length) {
-            throw new Error(`vmz serve: no pages/**/*.client.js in ${distDir}`);
-        }
+        // empty catalog throws inside listPageClientFiles
 
         /** @type {Map<string, any>} */
         const nextCtors = new Map();
@@ -1078,69 +1077,6 @@ function resolveLocalePath(pathname, cookieHeader) {
 }
 
 /**
- * Realize href for current LocaleId (prefix strategy). Kept local so serve-host
- * stays free of CLI package imports.
- * @param {string} href
- * @param {string} localeId
- * @param {any} artifact
- */
-function localizeSameAppHrefHost(href, localeId, artifact) {
-    if (!href || !localeId || !artifact) return href;
-    if (href.startsWith('#') || /^(mailto|tel|javascript):/i.test(href)) return href;
-    if (/^[a-z][a-z0-9+.-]*:/i.test(href) && !href.startsWith('/')) return href;
-    let pathname = String(href);
-    let search = '';
-    let hash = '';
-    const hashIdx = pathname.indexOf('#');
-    if (hashIdx >= 0) {
-        hash = pathname.slice(hashIdx);
-        pathname = pathname.slice(0, hashIdx);
-    }
-    const qIdx = pathname.indexOf('?');
-    if (qIdx >= 0) {
-        search = pathname.slice(qIdx);
-        pathname = pathname.slice(0, qIdx);
-    }
-    if (!pathname) pathname = '/';
-    const supported = (artifact.locales || []).map((l) => l.id).filter(Boolean);
-    const defaultLocale = artifact.defaultLocale || artifact.routing?.defaultLocale;
-    const routing = artifact.routing || {};
-    const strategy = routing.strategy || 'prefix';
-    const defaultPrefix = routing.defaultPrefix || 'include';
-    const parts = pathname.split('/').filter(Boolean);
-    let rest = pathname;
-    if (parts.length && supported.includes(parts[0])) {
-        const r = parts.slice(1);
-        rest = r.length ? `/${r.join('/')}` : '/';
-    }
-    if (rest.length > 1 && rest.endsWith('/')) rest = rest.slice(0, -1);
-    if (!rest.startsWith('/')) rest = `/${rest}`;
-    if (strategy === 'none' || strategy === 'domain') return `${rest}${search}${hash}`;
-    const omitDefault = defaultPrefix === 'omit' && localeId === defaultLocale;
-    if (omitDefault) return `${rest}${search}${hash}`;
-    const pathOut = rest === '/' ? `/${localeId}` : `/${localeId}${rest}`;
-    return `${pathOut}${search}${hash}`;
-}
-
-/**
- * @param {string} html
- * @param {string} localeId
- * @param {any} artifact
- */
-function localizeBodyLinksInHost(html, localeId, artifact) {
-    if (!html || !localeId || !artifact) return html;
-    return String(html).replace(/<a\b([^>]*)>/gi, (full, attrs) => {
-        if (!/\bdata-vmz-route\s*=/.test(attrs)) return full;
-        const hm = attrs.match(/\bhref\s*=\s*"([^"]*)"/i);
-        if (!hm) return full;
-        const next = localizeSameAppHrefHost(hm[1], localeId, artifact);
-        if (next === hm[1]) return full;
-        const newAttrs = attrs.replace(/\bhref\s*=\s*"[^"]*"/i, `href="${escapeAttr(next)}"`);
-        return `<a${newAttrs}>`;
-    });
-}
-
-/**
  * @param {string} chunkId
  * @param {string} localeId
  */
@@ -1169,47 +1105,25 @@ async function loadPageCtor(chunkId) {
 }
 
 /**
- * Discover compiled page modules. Prefer Route Graph `pathPattern` from
- * `vmz-deployment.json`; fall back to walking `pages/**` (file-route only).
+ * Discover compiled page modules from Route Graph `pathPattern` in
+ * `vmz-deployment.json` only (plan-only host — no `pages/**` walk).
  * @param {string} dir
  */
 async function listPageClientFiles(dir) {
     const fromDep = await listPagesFromDeployment(dir);
-    if (fromDep.length) return fromDep;
-    const root = path.join(dir, 'pages');
-    /** @type {Array<{ chunkId: string, pageRel: string, segs: ReturnType<typeof parseChunkSegments> }>} */
-    const out = [];
-    async function walk(abs, relParts) {
-        let ents;
-        try {
-            ents = await readdir(abs, { withFileTypes: true });
-        } catch {
-            return;
-        }
-        for (const e of ents) {
-            if (e.isDirectory()) {
-                await walk(path.join(abs, e.name), [...relParts, e.name]);
-            } else if (e.isFile() && e.name.endsWith('.client.js')) {
-                const stem = e.name.replace(/\.client\.js$/, '');
-                if (isRouteBoundaryStem(stem)) continue;
-                const chunkId = ['pages', ...relParts, stem].join('/');
-                out.push({
-                    chunkId,
-                    pageRel: `${chunkId}.client.js`,
-                    segs: parseChunkSegments(chunkId),
-                });
-            }
-        }
+    if (!fromDep.length) {
+        throw new Error(
+            `vmz serve: no page units with pathPattern in ${path.join(dir, 'vmz-deployment.json')} (plan-only host)`,
+        );
     }
-    await walk(root, []);
-    return out;
+    return fromDep;
 }
 
 /**
  * @param {string} dir
  */
 async function listPagesFromDeployment(dir) {
-    /** @type {Array<{ chunkId: string, pageRel: string, segs: ReturnType<typeof parseChunkSegments> }>} */
+    /** @type {Array<{ chunkId: string, pageRel: string, segs: ReturnType<typeof parsePathPattern> }>} */
     const out = [];
     try {
         const raw = await readFile(path.join(dir, 'vmz-deployment.json'), 'utf8');
@@ -1220,37 +1134,24 @@ async function listPagesFromDeployment(dir) {
             if (!chunkId.startsWith('pages/')) continue;
             const stem = chunkId.split('/').pop() || '';
             if (isRouteBoundaryStem(stem)) continue;
-            const pageRel = String(unit.clientEntry || `${chunkId}.client.js`).replace(/\\/g, '/');
             const pattern = String(unit.pathPattern || '').trim();
+            if (!pattern) {
+                throw new Error(
+                    `vmz serve: page unit ${chunkId} missing pathPattern in vmz-deployment.json (plan-only host)`,
+                );
+            }
+            const pageRel = String(unit.clientEntry || `${chunkId}.client.js`).replace(/\\/g, '/');
             out.push({
                 chunkId,
                 pageRel,
-                segs: pattern ? parsePathPattern(pattern) : parseChunkSegments(chunkId),
+                segs: parsePathPattern(pattern),
             });
         }
-    } catch {
+    } catch (err) {
+        if (err && typeof err.message === 'string' && err.message.includes('plan-only host')) throw err;
         return [];
     }
     return out;
-}
-
-/**
- * File-route segments from chunk id (`pages/Install` → `/install`).
- * Skips URL-invisible `(group)` dirs; boundary stems never reach here.
- * @param {string} chunkId
- */
-function parseChunkSegments(chunkId) {
-    const rel = chunkId.replace(/^pages\//, '');
-    const parts = rel.split('/').filter(Boolean);
-    /** @type {Array<{ kind: 'static' | 'param' | 'catch', value?: string, name?: string }>} */
-    const segs = [];
-    for (let i = 0; i < parts.length; i++) {
-        const p = parts[i];
-        if (isRouteGroupDir(p)) continue;
-        if (p === 'index' && i === parts.length - 1) continue;
-        segs.push(parsePathSegment(p));
-    }
-    return segs;
 }
 
 /**
@@ -1316,7 +1217,7 @@ function matchFileRoute(pathname, catalog) {
 }
 
 /**
- * @param {ReturnType<typeof parseChunkSegments>} segs
+ * @param {ReturnType<typeof parsePathPattern>} segs
  * @param {string} pathname
  * @returns {Record<string, string>}
  */
@@ -1344,7 +1245,7 @@ function extractRouteParams(segs, pathname) {
 }
 
 /**
- * @param {ReturnType<typeof parseChunkSegments>} segs
+ * @param {ReturnType<typeof parsePathPattern>} segs
  * @param {string[]} pathParts
  * @returns {number | null}
  */

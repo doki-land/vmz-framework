@@ -23,7 +23,7 @@ pub fn lint_file(path: &Path, report: &mut CheckReport) {
 fn classify_loose(path: &Path) -> VmzModuleKind {
     let s = path.to_string_lossy().replace('\\', "/");
     if s.ends_with("/Application.vmz") {
-        VmzModuleKind::App
+        VmzModuleKind::Application
     } else if s.contains("/pages/") {
         VmzModuleKind::Page
     } else if s.contains("/components/") {

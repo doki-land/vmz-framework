@@ -13,7 +13,7 @@ export function isRouteGroupDir(seg: string): boolean {
 
 /**
  * File-route fallback (`pages/home` → `/home`, `pages/index` → `/`).
- * Used only when a deployment unit has no `pathPattern`.
+ * Kept for tooling diagnostics only — production hosts must use Plan `pathPattern`.
  */
 export function filePathPatternFromChunk(chunkId: string): string {
     const rel = String(chunkId || '').replace(/^pages\//, '');
@@ -38,11 +38,16 @@ export type DeploymentPageUnit = {
     routeId?: string;
 };
 
-/** Canonical Browser HTTP pattern for a page unit. Mini must not read this. */
+/** Canonical Browser HTTP pattern for a page unit. Mini must not read this. Requires Plan `pathPattern`. */
 export function unitBrowserPathPattern(unit: DeploymentPageUnit | null | undefined): string {
     const explicit = String(unit?.pathPattern || '').trim();
-    if (explicit) return explicit.startsWith('/') ? explicit : `/${explicit}`;
-    return filePathPatternFromChunk(String(unit?.chunkId || ''));
+    if (!explicit) {
+        const chunkId = String(unit?.chunkId || '');
+        throw new Error(
+            `unitBrowserPathPattern: page unit ${chunkId || '(unknown)'} missing pathPattern (plan-only host)`,
+        );
+    }
+    return explicit.startsWith('/') ? explicit : `/${explicit}`;
 }
 
 export type PathSeg = { kind: 'static'; value: string } | { kind: 'param'; name: string } | { kind: 'catch'; name: string };

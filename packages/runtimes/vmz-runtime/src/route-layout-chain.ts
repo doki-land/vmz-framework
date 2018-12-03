@@ -1,46 +1,43 @@
 /**
- * File-route layout chain: Application shell (outermost) + nested page Layout components.
+ * Layout chain from Deployment Plan only (plan-only host).
  */
 
-import { existsSync } from 'node:fs';
-import path from 'node:path';
+import { readDeploymentDocument } from './deployment-registry.js';
 
 /** Chunk id for `src/Application.vmz` emit (`Application.client.js`). */
 export const APPLICATION_SHELL_CHUNK = 'Application';
 
 /**
- * True when the compile output includes a root Application shell.
+ * True when Deployment Plan lists an Application shell unit.
  */
 export function hasApplicationShell(distDir: string): boolean {
-    return existsSync(path.join(distDir, `${APPLICATION_SHELL_CHUNK}.client.js`));
+    const deployment = readDeploymentDocument(distDir, { strict: false });
+    const units = Array.isArray(deployment?.units) ? deployment.units : [];
+    return units.some((u: { chunkId?: string }) => String(u?.chunkId || '') === APPLICATION_SHELL_CHUNK);
 }
 
 /**
- * Nearest page Layout.client.js walking up from the page chunk (outer to inner).
- * Does not include Application — use resolveRouteLayoutChain.
+ * Nested layout ids from Plan for a page (excludes Application).
+ * Prefer `resolveRouteLayoutChain` for SSR / hydrate.
  */
 export function resolveNestedLayoutChain(distDir: string, pageChunkId: string): string[] {
-    const rel = pageChunkId.replace(/^pages\//, '');
-    const parts = rel.split('/').filter(Boolean);
-    parts.pop();
-    const chain: string[] = [];
-    for (let i = parts.length; i >= 0; i--) {
-        const dirParts = parts.slice(0, i);
-        const layoutChunk = ['pages', ...dirParts, 'Layout'].join('/');
-        if (existsSync(path.join(distDir, `${layoutChunk}.client.js`))) {
-            chain.unshift(layoutChunk);
-        }
-    }
-    return chain;
+    return resolveRouteLayoutChain(distDir, pageChunkId).filter((id) => id !== APPLICATION_SHELL_CHUNK);
 }
 
 /**
- * Full SSR / hydrate layout chain: optional Application shell, then nested page layouts.
+ * Full SSR / hydrate layout chain from Deployment Plan `layoutChain`.
  */
 export function resolveRouteLayoutChain(distDir: string, pageChunkId: string): string[] {
-    const chain = resolveNestedLayoutChain(distDir, pageChunkId);
-    if (hasApplicationShell(distDir)) {
-        chain.unshift(APPLICATION_SHELL_CHUNK);
+    const deployment = readDeploymentDocument(distDir, { strict: true });
+    const units = Array.isArray(deployment?.units) ? deployment.units : [];
+    const unit = units.find((u: { chunkId?: string }) => String(u?.chunkId || '').replace(/\\/g, '/') === pageChunkId);
+    if (!unit) {
+        throw new Error(`resolveRouteLayoutChain: no deployment unit for ${pageChunkId} (plan-only host)`);
     }
-    return chain;
+    if (!Array.isArray(unit.layoutChain)) {
+        throw new Error(
+            `resolveRouteLayoutChain: page unit ${pageChunkId} missing layoutChain (plan-only host)`,
+        );
+    }
+    return unit.layoutChain.map((id: string) => String(id));
 }

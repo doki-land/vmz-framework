@@ -1,11 +1,9 @@
 // @ts-nocheck
 /**
- * Discover compiled client component modules from dist (deployment graph or components/).
- * Shared by serve-host SSR, static emit, and test hosts.
+ * Discover compiled client component modules from Deployment Plan only.
+ * Shared by serve-host SSR, static emit, and test hosts (plan-only host).
  */
 
-import fs from 'node:fs';
-import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
@@ -54,23 +52,9 @@ export async function listClientComponents(dir, opts = {}) {
         }));
     }
     if (strict) {
-        throw new Error(`vmz: missing vmz-deployment.json under ${dir} (strict deployment mode)`);
+        throw new Error(`vmz: missing vmz-deployment.json under ${dir} (plan-only host)`);
     }
-    const folder = path.join(dir, 'components');
-    /** @type {string[]} */
-    let files = [];
-    try {
-        files = await readdir(folder);
-    } catch {
-        return [];
-    }
-    return files
-        .filter((name) => name.endsWith('.client.js'))
-        .map((f) => {
-            const name = f.replace(/\.client\.js$/, '');
-            return { name, entry: `components/${name}.client.js`, chunkId: `components/${name}` };
-        })
-        .sort((a, b) => a.name.localeCompare(b.name));
+    return [];
 }
 
 /**
@@ -98,23 +82,9 @@ export function listClientComponentsSync(dir, opts = {}) {
         }));
     }
     if (strict) {
-        throw new Error(`vmz: missing vmz-deployment.json under ${dir} (strict deployment mode)`);
+        throw new Error(`vmz: missing vmz-deployment.json under ${dir} (plan-only host)`);
     }
-    const folder = path.join(dir, 'components');
-    /** @type {string[]} */
-    let files = [];
-    try {
-        files = fs.readdirSync(folder);
-    } catch {
-        return [];
-    }
-    return files
-        .filter((name) => name.endsWith('.client.js'))
-        .map((f) => {
-            const name = f.replace(/\.client\.js$/, '');
-            return { name, entry: `components/${name}.client.js`, chunkId: `components/${name}` };
-        })
-        .sort((a, b) => a.name.localeCompare(b.name));
+    return [];
 }
 
 /**

@@ -148,6 +148,10 @@ pub struct DeploymentUnitWire {
     /// Stable RouteId when this unit is a page.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub route_id: String,
+    /// SSR / hydrate layout chunk ids outer→inner (Application shell then nested Layout).
+    /// Always emitted on page units (may be empty) so hosts do not re-walk the filesystem.
+    #[serde(default)]
+    pub layout_chain: Vec<String>,
     /// True when this unit was rebuilt in the current plan.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub rebuilt: bool,
@@ -1165,6 +1169,8 @@ fn emit_deployment_json(
     let (_src, graph, catalog) = crate::affected::component_graph_for(root);
 
     let mut units = Vec::with_capacity(catalog.len());
+    let known_chunks: std::collections::BTreeSet<String> =
+        catalog.iter().map(|(_, _, chunk_id)| chunk_id.clone()).collect();
     for (source, kind, chunk_id) in &catalog {
         let client_entry = format!("{chunk_id}.client.js");
         let program_ir = format!("{chunk_id}.program.json");
@@ -1173,6 +1179,12 @@ fn emit_deployment_json(
         let depended_by = graph.reverse.get(chunk_id).cloned().unwrap_or_default();
         let extras = read_program_deployment_extras(&options.out_dir.join(&program_ir));
         let route = route_table.get_by_chunk(chunk_id);
+        let layout_chain = if chunk_id.starts_with("pages/") && !crate::pipeline::link::is_route_boundary_chunk(chunk_id)
+        {
+            crate::pipeline::link::layout_chain_for_page(chunk_id, &known_chunks)
+        } else {
+            Vec::new()
+        };
         units.push(DeploymentUnitWire {
             chunk_id: chunk_id.clone(),
             kind: *kind,
@@ -1199,6 +1211,7 @@ fn emit_deployment_json(
                 .collect(),
             path_pattern: route.map(|e| e.path_pattern.clone()).unwrap_or_default(),
             route_id: route.map(|e| e.route_id.clone()).unwrap_or_default(),
+            layout_chain,
             rebuilt,
         });
     }

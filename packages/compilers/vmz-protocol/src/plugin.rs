@@ -101,8 +101,8 @@ impl ExplainContributionSurface {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum VmzModuleKind {
-    /// Application root module.
-    App,
+    /// Application root module (`Application.vmz`).
+    Application,
     /// Routable page module.
     Page,
     /// Shared / local component module.
@@ -116,7 +116,7 @@ impl VmzModuleKind {
     /// Wire / JSON label (`kebab-case`).
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::App => "app",
+            Self::Application => "application",
             Self::Page => "page",
             Self::Component => "component",
             Self::Other => "other",
@@ -126,7 +126,7 @@ impl VmzModuleKind {
     /// Parse kebab-case labels.
     pub fn parse(s: &str) -> Option<Self> {
         match s.trim().to_ascii_lowercase().as_str() {
-            "app" => Some(Self::App),
+            "application" => Some(Self::Application),
             "page" => Some(Self::Page),
             "component" => Some(Self::Component),
             "other" => Some(Self::Other),

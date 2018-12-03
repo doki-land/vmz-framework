@@ -375,7 +375,7 @@ fn collect_program_json(root: &Path) -> Vec<PathBuf> {
 }
 
 fn is_page_or_app(unit: &ProgramUnit) -> bool {
-    matches!(unit.deployment.unit_kind, Some(VmzModuleKind::Page) | Some(VmzModuleKind::App))
+    matches!(unit.deployment.unit_kind, Some(VmzModuleKind::Page) | Some(VmzModuleKind::Application))
         || unit
             .deployment
             .chunk_id

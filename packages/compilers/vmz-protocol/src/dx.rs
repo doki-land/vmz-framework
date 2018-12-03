@@ -950,7 +950,7 @@ pub struct ExplainDeploymentUnit {
     /// Chunk id when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chunk_id: Option<String>,
-    /// Closed module kind when known (`app` | `page` | `component` | `other`).
+    /// Closed module kind when known (`application` | `page` | `component` | `other`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kind: Option<crate::VmzModuleKind>,
     /// Workspace-relative source path.
@@ -1148,7 +1148,7 @@ pub struct AffectedDocument {
 pub struct AffectedUnitDoc {
     /// Source path or module key that changed.
     pub source: String,
-    /// Closed module kind (`app` | `page` | `component` | `other`).
+    /// Closed module kind (`application` | `page` | `component` | `other`).
     pub kind: crate::VmzModuleKind,
     /// Chunk id to rebuild or invalidate.
     pub chunk_id: String,

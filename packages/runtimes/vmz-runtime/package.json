@@ -40,6 +40,10 @@
         "./route-layout-chain": {
             "types": "./dist/route-layout-chain.d.ts",
             "default": "./dist/route-layout-chain.js"
+        },
+        "./localize-body-links": {
+            "types": "./dist/localize-body-links.d.ts",
+            "default": "./dist/localize-body-links.js"
         }
     },
     "files": [

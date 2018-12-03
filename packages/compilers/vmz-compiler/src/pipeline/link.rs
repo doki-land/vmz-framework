@@ -250,6 +250,39 @@ pub fn path_pattern_from_chunk(chunk_id: &str) -> String {
     if segs.is_empty() { "/".into() } else { format!("/{}", segs.join("/")) }
 }
 
+/// Plan-only layout chain for a page chunk: optional `Application` shell, then nested
+/// `pages/**/Layout` ancestors that exist in `known_chunks` (outer → inner).
+pub fn layout_chain_for_page(page_chunk_id: &str, known_chunks: &std::collections::BTreeSet<String>) -> Vec<String> {
+    let mut chain = nested_layout_chain(page_chunk_id, known_chunks);
+    if known_chunks.contains("Application") {
+        chain.insert(0, "Application".into());
+    }
+    chain
+}
+
+fn nested_layout_chain(page_chunk_id: &str, known_chunks: &std::collections::BTreeSet<String>) -> Vec<String> {
+    let rel = page_chunk_id.strip_prefix("pages/").unwrap_or(page_chunk_id);
+    let mut parts: Vec<&str> = rel.split('/').filter(|p| !p.is_empty()).collect();
+    if !parts.is_empty() {
+        parts.pop();
+    }
+    let mut chain = Vec::new();
+    // i = parts.len() … 0 → walk from page dir up to pages/
+    for i in (0..=parts.len()).rev() {
+        let dir_parts = &parts[..i.min(parts.len())];
+        let layout_chunk = if dir_parts.is_empty() {
+            "pages/Layout".to_string()
+        } else {
+            format!("pages/{}/Layout", dir_parts.join("/"))
+        };
+        if known_chunks.contains(&layout_chunk) {
+            chain.push(layout_chunk);
+        }
+    }
+    chain.reverse();
+    chain
+}
+
 /// Collision key for Browser HTTP paths (`:id` and `[id]` are the same slot).
 pub fn path_collision_key(pattern: &str) -> Result<String, String> {
     let pat = pattern.trim();
@@ -543,4 +576,36 @@ fn link_resolve_error(
         },
     };
     resolve_link_href(to, &params, table).err()
+}
+
+#[cfg(test)]
+mod layout_chain_tests {
+    use super::*;
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn layout_chain_outer_to_inner_with_application() {
+        let known: BTreeSet<String> = ["Application", "pages/Layout", "pages/shop/Layout", "pages/shop/offer"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        assert_eq!(
+            layout_chain_for_page("pages/shop/offer", &known),
+            vec![
+                "Application".to_string(),
+                "pages/Layout".to_string(),
+                "pages/shop/Layout".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn layout_chain_skips_missing_ancestors() {
+        let known: BTreeSet<String> =
+            ["pages/shop/Layout", "pages/shop/offer"].into_iter().map(String::from).collect();
+        assert_eq!(
+            layout_chain_for_page("pages/shop/offer", &known),
+            vec!["pages/shop/Layout".to_string()]
+        );
+    }
 }

@@ -16,7 +16,7 @@ import { absoluteUrl, buildLocalePageMeta, localizeBodyLinks } from './locale-ro
 import { requireNativeAddon } from './native-addon.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 import { emitPublicStaticAssets } from './public-static-assets.js';
-import { filePathPatternFromChunk, isRouteBoundaryStem, listPublicPageUnits, parsePathPattern, unitBrowserPathPattern } from './route-path.js';
+import { listPublicPageUnits, parsePathPattern, unitBrowserPathPattern } from './route-path.js';
 import { emitSiteFavicon, readSiteFaviconHeadHtml } from './site-favicon.js';
 
 export const STATIC_DELIVERY_MANIFEST_SCHEMA = 'vmz.static.delivery_manifest.v0';
@@ -343,30 +343,12 @@ function sortKeys(value) {
  */
 function listPageClientFiles(distDir) {
     const fromDep = listPagesFromDeployment(distDir);
-    if (fromDep.length) return fromDep;
-    const root = path.join(distDir, 'pages');
-    /** @type {Array<{ chunkId: string, segs: ReturnType<typeof parsePathPattern>, pathPattern: string }>} */
-    const out = [];
-    function walk(abs, relParts) {
-        let ents;
-        try {
-            ents = fs.readdirSync(abs, { withFileTypes: true });
-        } catch {
-            return;
-        }
-        for (const e of ents) {
-            if (e.isDirectory()) walk(path.join(abs, e.name), [...relParts, e.name]);
-            else if (e.isFile() && e.name.endsWith('.client.js')) {
-                const stem = e.name.replace(/\.client\.js$/, '');
-                if (isRouteBoundaryStem(stem)) continue;
-                const chunkId = ['pages', ...relParts, stem].join('/');
-                const pathPattern = filePathPatternFromChunk(chunkId);
-                out.push({ chunkId, pathPattern, segs: parsePathPattern(pathPattern) });
-            }
-        }
+    if (!fromDep.length) {
+        throw new Error(
+            `emitWebStatic: no page units with pathPattern in ${path.join(distDir, 'vmz-deployment.json')} (plan-only host)`,
+        );
     }
-    walk(root, []);
-    return out;
+    return fromDep;
 }
 
 /**
@@ -374,17 +356,15 @@ function listPageClientFiles(distDir) {
  */
 function listPagesFromDeployment(distDir) {
     const deploymentPath = path.join(distDir, 'vmz-deployment.json');
-    if (!fs.existsSync(deploymentPath)) return [];
-    try {
-        const deployment = JSON.parse(fs.readFileSync(deploymentPath, 'utf8'));
-        return listPublicPageUnits(deployment).map((u) => {
-            const chunkId = String(u.chunkId || '').replace(/\\/g, '/');
-            const pathPattern = unitBrowserPathPattern(u);
-            return { chunkId, pathPattern, segs: parsePathPattern(pathPattern) };
-        });
-    } catch {
-        return [];
+    if (!fs.existsSync(deploymentPath)) {
+        throw new Error(`emitWebStatic: missing ${deploymentPath} (plan-only host)`);
     }
+    const deployment = JSON.parse(fs.readFileSync(deploymentPath, 'utf8'));
+    return listPublicPageUnits(deployment).map((u) => {
+        const chunkId = String(u.chunkId || '').replace(/\\/g, '/');
+        const pathPattern = unitBrowserPathPattern(u);
+        return { chunkId, pathPattern, segs: parsePathPattern(pathPattern) };
+    });
 }
 
 /**

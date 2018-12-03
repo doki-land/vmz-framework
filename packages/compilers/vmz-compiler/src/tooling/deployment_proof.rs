@@ -366,7 +366,7 @@ fn load_deployment_units(out_dir: &Path) -> Option<Vec<DepUnit>> {
 }
 
 fn is_root_kind(kind: crate::project::VmzModuleKind) -> bool {
-    matches!(kind, crate::project::VmzModuleKind::Page | crate::project::VmzModuleKind::App)
+    matches!(kind, crate::project::VmzModuleKind::Page | crate::project::VmzModuleKind::Application)
 }
 
 /// Route / resume / rpc / action boundary entries from deployment.

@@ -295,64 +295,10 @@ export function parseLocaleFromPath(pathname: string, supportedLocales: string[]
     return { localeId: null, restPath: normalizePath(pathname) };
 }
 
-export interface LocaleHrefArtifact {
-    locales?: Array<{ id: string } | string>;
-    defaultLocale?: string;
-    routing?: LocaleRoutingOpts;
-}
+export type { LocaleHrefArtifact } from '@vmz/core/localize-body-links';
 
-/** Rewrite a same-app href to the given LocaleId via route realization. */
-export function localizeSameAppHref(href: string, localeId: string, artifact: LocaleHrefArtifact) {
-    if (!href || !localeId || !artifact) return href;
-    if (href.startsWith('#') || /^(mailto|tel|javascript):/i.test(href)) return href;
-    if (/^[a-z][a-z0-9+.-]*:/i.test(href) && !href.startsWith('/')) return href;
-
-    let pathname = String(href);
-    let search = '';
-    let hash = '';
-    const hashIdx = pathname.indexOf('#');
-    if (hashIdx >= 0) {
-        hash = pathname.slice(hashIdx);
-        pathname = pathname.slice(0, hashIdx);
-    }
-    const qIdx = pathname.indexOf('?');
-    if (qIdx >= 0) {
-        search = pathname.slice(qIdx);
-        pathname = pathname.slice(0, qIdx);
-    }
-    if (!pathname) pathname = '/';
-
-    const supported = (artifact.locales || []).map((l) => (typeof l === 'string' ? l : l.id)).filter(Boolean);
-    const defaultLocale = artifact.defaultLocale || artifact.routing?.defaultLocale;
-    const routing = {
-        strategy: artifact.routing?.strategy || 'prefix',
-        defaultPrefix: artifact.routing?.defaultPrefix || 'include',
-        defaultLocale,
-    };
-    const parsed = parseLocaleFromPath(pathname, supported);
-    const rest = parsed.restPath || '/';
-    const realized = realizeRoutePath(localeId, rest, routing);
-    return `${realized.path}${search}${hash}`;
-}
-
-/** Rewrite `<a data-vmz-route href>` in HTML body to retain `localeId`. */
-export function localizeBodyLinks(
-    html: string,
-    localeId: string,
-    artifact: LocaleHrefArtifact,
-    escapeAttr: (s: string) => string = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;'),
-) {
-    if (!html || !localeId || !artifact) return html;
-    return String(html).replace(/<a\b([^>]*)>/gi, (full, attrs) => {
-        if (!/\bdata-vmz-route\s*=/.test(attrs)) return full;
-        const hm = attrs.match(/\bhref\s*=\s*"([^"]*)"/i);
-        if (!hm) return full;
-        const next = localizeSameAppHref(hm[1], localeId, artifact);
-        if (next === hm[1]) return full;
-        const newAttrs = attrs.replace(/\bhref\s*=\s*"[^"]*"/i, `href="${escapeAttr(next)}"`);
-        return `<a${newAttrs}>`;
-    });
-}
+/** Rewrite a same-app href — single implementation in `@vmz/core/localize-body-links`. */
+export { localizeBodyLinks, localizeSameAppHref } from '@vmz/core/localize-body-links';
 
 /** Plan redirect / negotiation for an incoming URL (omit-prefix aware). */
 export function planLocalePathNavigation(input: {
