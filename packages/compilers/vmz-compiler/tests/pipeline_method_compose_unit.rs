@@ -27,6 +27,7 @@ fn method_opaque(
         opaque_callee: opaque,
         star_reasons: Vec::new(),
         span: Span::default(),
+        name_span: Span::default(),
     }
 }
 

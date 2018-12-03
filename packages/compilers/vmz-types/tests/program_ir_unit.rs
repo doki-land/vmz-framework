@@ -61,6 +61,7 @@ fn resource_and_call_edges_from_server_attach() {
             opaque_callee: false,
             star_reasons: Vec::new(),
             span: SPAN,
+            name_span: SPAN,
         }],
         client_calls: vec![ClientServerCall {
             server_method: "fetchUser".into(),

@@ -130,12 +130,11 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
         let file_stem = abs.file_stem().and_then(|s| s.to_str()).unwrap_or("Anonymous").to_string();
 
         // Component symbol (definition = class name in script).
-        let class_span =
-            span_of_class_name(&parsed.client.content, &class_name).map(|(s, e)| SourceSpan {
-                path: rel.clone(),
-                start: (parsed.client.content_start + s) as u32,
-                end: (parsed.client.content_start + e) as u32,
-            });
+        let class_span = Some(SourceSpan {
+            path: rel.clone(),
+            start: parsed.client.content_start as u32 + analyzed.decl.name_span.start,
+            end: parsed.client.content_start as u32 + analyzed.decl.name_span.end,
+        });
         symbols.push(Symbol {
             schema: SYMBOL_SCHEMA.into(),
             stable_id: StableId::new(StableIdKind::Component, class_name.clone()),
@@ -148,11 +147,10 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
         // Fields
         for f in &analyzed.decl.fields {
             let name = f.name.clone();
-            let script_local = span_of_ident(&parsed.client.content, &name);
-            let script_span = script_local.map(|(s, e)| SourceSpan {
+            let script_span = Some(SourceSpan {
                 path: rel.clone(),
-                start: (parsed.client.content_start + s) as u32,
-                end: (parsed.client.content_start + e) as u32,
+                start: parsed.client.content_start as u32 + f.name_span.start,
+                end: parsed.client.content_start as u32 + f.name_span.end,
             });
             symbols.push(Symbol {
                 schema: SYMBOL_SCHEMA.into(),
@@ -193,11 +191,10 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
         // Methods
         for m in &analyzed.decl.methods {
             let name = m.name.clone();
-            let script_local = span_of_ident(&parsed.client.content, &name);
-            let script_span = script_local.map(|(s, e)| SourceSpan {
+            let script_span = Some(SourceSpan {
                 path: rel.clone(),
-                start: (parsed.client.content_start + s) as u32,
-                end: (parsed.client.content_start + e) as u32,
+                start: parsed.client.content_start as u32 + m.name_span.start,
+                end: parsed.client.content_start as u32 + m.name_span.end,
             });
             symbols.push(Symbol {
                 schema: SYMBOL_SCHEMA.into(),
@@ -242,11 +239,10 @@ pub fn build_symbol_index(root: &Path) -> SymbolIndexDocument {
             for m in &s_analyzed.decl.methods {
                 let name = m.name.clone();
                 let cap_id = format!("{server_id}.{name}");
-                let script_local = span_of_ident(&server.content, &name);
-                let script_span = script_local.map(|(s, e)| SourceSpan {
+                let script_span = Some(SourceSpan {
                     path: rel.clone(),
-                    start: (server.content_start + s) as u32,
-                    end: (server.content_start + e) as u32,
+                    start: server.content_start as u32 + m.name_span.start,
+                    end: server.content_start as u32 + m.name_span.end,
                 });
                 symbols.push(Symbol {
                     schema: SYMBOL_SCHEMA.into(),
@@ -384,11 +380,8 @@ fn collect_safe_fixes(root: &Path, diagnostics: &mut Vec<ReportedDiagnostic>) ->
             continue;
         }
         // Safe fix: align export default class name with file stem.
-        let Some((s, e)) = span_of_class_name(&parsed.client.content, &analyzed.decl.name) else {
-            continue;
-        };
-        let start = (parsed.client.content_start + s) as u32;
-        let end = (parsed.client.content_start + e) as u32;
+        let start = parsed.client.content_start as u32 + analyzed.decl.name_span.start;
+        let end = parsed.client.content_start as u32 + analyzed.decl.name_span.end;
         diagnostics.push(
             ReportedDiagnostic::coded_warning(rel.clone(), DIAG_CLASS_NAME_MISMATCH).with_arg("detail", format!(
                     "export default class `{}` does not match file stem `{stem}`",
@@ -435,19 +428,17 @@ fn collect_method_edits(
             continue;
         };
         let analyzed = analyze_script(ScriptKind::Client, &parsed.client.content);
-        if !analyzed.decl.methods.iter().any(|m| m.name == from) {
+        let Some(method) = analyzed.decl.methods.iter().find(|m| m.name == from) else {
             continue;
-        }
+        };
         // Script method name
-        if let Some((s, e)) = span_of_method_decl(&parsed.client.content, from) {
-            edits.push(TextEdit {
-                path: rel.clone(),
-                start: (parsed.client.content_start + s) as u32,
-                end: (parsed.client.content_start + e) as u32,
-                new_text: to.into(),
-            });
-            refs += 1;
-        }
+        edits.push(TextEdit {
+            path: rel.clone(),
+            start: parsed.client.content_start as u32 + method.name_span.start,
+            end: parsed.client.content_start as u32 + method.name_span.end,
+            new_text: to.into(),
+        });
+        refs += 1;
         let Ok((semantic, _)) = parse_template_asts(&parsed.template.content) else {
             continue;
         };
@@ -489,18 +480,14 @@ fn collect_component_edits(
         let analyzed = analyze_script(ScriptKind::Client, &parsed.client.content);
         let is_def =
             analyzed.decl.name == from || abs.file_stem().and_then(|s| s.to_str()) == Some(from);
-        if is_def {
-            if let Some((s, e)) = span_of_class_name(&parsed.client.content, &analyzed.decl.name) {
-                if analyzed.decl.name == from {
-                    edits.push(TextEdit {
-                        path: rel.clone(),
-                        start: (parsed.client.content_start + s) as u32,
-                        end: (parsed.client.content_start + e) as u32,
-                        new_text: to.into(),
-                    });
-                    refs += 1;
-                }
-            }
+        if is_def && analyzed.decl.name == from {
+            edits.push(TextEdit {
+                path: rel.clone(),
+                start: parsed.client.content_start as u32 + analyzed.decl.name_span.start,
+                end: parsed.client.content_start as u32 + analyzed.decl.name_span.end,
+                new_text: to.into(),
+            });
+            refs += 1;
         }
         // Usages: <From ...> via Semantic AST (not whole-template string scan).
         let Ok((semantic, _)) = parse_template_asts(&parsed.template.content) else {
@@ -548,16 +535,14 @@ fn collect_capability_edits(
         };
         if let Some(server) = &parsed.server {
             let s_analyzed = analyze_script(ScriptKind::Server, &server.content);
-            if s_analyzed.decl.methods.iter().any(|m| m.name == method) {
-                if let Some((s, e)) = span_of_method_decl(&server.content, method) {
-                    edits.push(TextEdit {
-                        path: rel.clone(),
-                        start: (server.content_start + s) as u32,
-                        end: (server.content_start + e) as u32,
-                        new_text: to.into(),
-                    });
-                    refs += 1;
-                }
+            if let Some(m) = s_analyzed.decl.methods.iter().find(|m| m.name == method) {
+                edits.push(TextEdit {
+                    path: rel.clone(),
+                    start: server.content_start as u32 + m.name_span.start,
+                    end: server.content_start as u32 + m.name_span.end,
+                    new_text: to.into(),
+                });
+                refs += 1;
                 let client_class = s_analyzed.decl.name.clone();
                 let call = format!("{client_class}.{method}(");
                 let mut from_i = 0;
@@ -599,50 +584,3 @@ fn list_vmz_files(root: &Path) -> Vec<(String, PathBuf)> {
     out
 }
 
-fn span_of_ident(script: &str, name: &str) -> Option<(usize, usize)> {
-    let mut from = 0;
-    while let Some(i) = script[from..].find(name) {
-        let abs = from + i;
-        let end = abs + name.len();
-        if is_ident_boundary(script, abs, end) {
-            return Some((abs, end));
-        }
-        from = abs + 1;
-    }
-    None
-}
-
-fn span_of_class_name(script: &str, name: &str) -> Option<(usize, usize)> {
-    let pat = format!("class {name}");
-    if let Some(i) = script.find(&pat) {
-        let start = i + "class ".len();
-        return Some((start, start + name.len()));
-    }
-    None
-}
-
-fn span_of_method_decl(script: &str, name: &str) -> Option<(usize, usize)> {
-    // Prefer `name(` method declaration form.
-    let pat = format!("{name}(");
-    let mut from = 0;
-    while let Some(i) = script[from..].find(&pat) {
-        let abs = from + i;
-        if is_ident_boundary(script, abs, abs + name.len()) {
-            // Skip call sites that are `this.name(` --still ok for rename.
-            return Some((abs, abs + name.len()));
-        }
-        from = abs + 1;
-    }
-    None
-}
-
-fn is_ident_boundary(text: &str, start: usize, end: usize) -> bool {
-    let bytes = text.as_bytes();
-    let before_ok = start == 0
-        || (!bytes[start - 1].is_ascii_alphanumeric()
-            && bytes[start - 1] != b'_'
-            && bytes[start - 1] != b'$');
-    let after_ok = end >= bytes.len()
-        || (!bytes[end].is_ascii_alphanumeric() && bytes[end] != b'_' && bytes[end] != b'$');
-    before_ok && after_ok
-}

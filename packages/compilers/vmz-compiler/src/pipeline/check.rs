@@ -178,7 +178,11 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
             ScriptLanguage::Rust => analyze_rust_server_dsl(&server.content),
             other => AnalyzedScript {
                 kind: ScriptKind::Server,
-                decl: ComponentDecl::new("Anonymous", oxc_span::Span::default()),
+                decl: ComponentDecl::new(
+                    "Anonymous",
+                    oxc_span::Span::default(),
+                    oxc_span::Span::default(),
+                ),
                 parse_errors: vec![format!(
                     "`<script server lang=\"{}\">` is registered but not implemented yet",
                     other.as_str()

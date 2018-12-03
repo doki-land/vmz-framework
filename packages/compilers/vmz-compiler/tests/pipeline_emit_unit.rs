@@ -36,6 +36,7 @@ this.user = await UserCardServer.fetchUser();
             opaque_callee: false,
             star_reasons: Vec::new(),
             span: oxc_span::Span::default(),
+            name_span: oxc_span::Span::default(),
         }],
     };
     let js = emit_client_js(src, &client, &ir, Some(&bridge)).unwrap();

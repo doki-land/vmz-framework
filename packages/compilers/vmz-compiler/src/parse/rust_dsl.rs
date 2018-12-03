@@ -45,7 +45,7 @@ pub fn analyze_rust_server_dsl(source: &str) -> AnalyzedScript {
         );
     }
 
-    let mut decl = ComponentDecl::new(type_name, Span::default());
+    let mut decl = ComponentDecl::new(type_name, Span::default(), Span::default());
     decl.methods = methods;
 
     AnalyzedScript { kind: ScriptKind::Server, decl, parse_errors, forbidden_factories: Vec::new() }
@@ -109,6 +109,7 @@ fn extract_capability_methods(source: &str) -> Vec<MethodDecl> {
             opaque_callee: false,
             star_reasons: Vec::new(),
             span: Span::default(),
+            name_span: Span::default(),
         });
     }
     out

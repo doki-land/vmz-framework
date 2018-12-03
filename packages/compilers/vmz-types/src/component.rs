@@ -65,6 +65,8 @@ pub struct FieldDecl {
     pub visibility: Visibility,
     /// Source span of the field declaration.
     pub span: Span,
+    /// Source span of the field **name** (rename / xref target).
+    pub name_span: Span,
 }
 
 /// REST surface from `@Get` / `@Post` / ... on a server method.
@@ -106,6 +108,8 @@ pub struct MethodDecl {
     pub star_reasons: Vec<(String, String)>,
     /// Source span of the method declaration.
     pub span: Span,
+    /// Source span of the method **name** (rename / xref target).
+    pub name_span: Span,
 }
 
 /// Non-default class declared in the same `.vmz` file (helper, not a component).
@@ -115,6 +119,8 @@ pub struct InternalClassDecl {
     pub name: String,
     /// Source span of the class declaration.
     pub span: Span,
+    /// Source span of the class **name**.
+    pub name_span: Span,
 }
 
 /// Default-exported component class extracted from one `.vmz` file.
@@ -132,11 +138,13 @@ pub struct ComponentDecl {
     pub internal_classes: Vec<InternalClassDecl>,
     /// Source span of the class declaration.
     pub span: Span,
+    /// Source span of the class **name** (rename / xref target).
+    pub name_span: Span,
 }
 
 impl ComponentDecl {
-    /// Empty component shell with a name and span; lists filled by analyze.
-    pub fn new(name: impl Into<String>, span: Span) -> Self {
+    /// Empty component shell with a name and spans; lists filled by analyze.
+    pub fn new(name: impl Into<String>, span: Span, name_span: Span) -> Self {
         Self {
             name: name.into(),
             properties: Vec::new(),
@@ -144,6 +152,7 @@ impl ComponentDecl {
             methods: Vec::new(),
             internal_classes: Vec::new(),
             span,
+            name_span,
         }
     }
 }

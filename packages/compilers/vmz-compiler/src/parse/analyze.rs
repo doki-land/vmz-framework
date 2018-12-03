@@ -37,7 +37,7 @@ pub fn analyze_script(kind: ScriptKind, source: &str) -> AnalyzedScript {
 
     let parse_errors: Vec<String> = ret.diagnostics.iter().map(|e| e.to_string()).collect();
 
-    let mut decl = ComponentDecl::new("Anonymous", Span::default());
+    let mut decl = ComponentDecl::new("Anonymous", Span::default(), Span::default());
     let mut found_default = false;
     let mut internal = Vec::new();
     let mut forbidden_factories = Vec::new();
@@ -83,14 +83,20 @@ pub fn analyze_script(kind: ScriptKind, source: &str) -> AnalyzedScript {
 
 fn push_internal(internal: &mut Vec<InternalClassDecl>, class: &Class<'_>) {
     if let Some(id) = &class.id {
-        internal.push(InternalClassDecl { name: id.name.to_string(), span: class.span });
+        internal.push(InternalClassDecl {
+            name: id.name.to_string(),
+            span: class.span,
+            name_span: id.span,
+        });
     }
 }
 
 fn class_to_decl(class: &Class<'_>, source: &str) -> (ComponentDecl, Vec<ForbiddenFactory>) {
-    let name =
-        class.id.as_ref().map(|id| id.name.to_string()).unwrap_or_else(|| "Default".to_string());
-    let mut decl = ComponentDecl::new(name, class.span);
+    let (name, name_span) = match &class.id {
+        Some(id) => (id.name.to_string(), id.span),
+        None => ("Default".to_string(), class.span),
+    };
+    let mut decl = ComponentDecl::new(name, class.span, name_span);
     let forbidden = fill_members(&mut decl, &class.body.body, source);
     (decl, forbidden)
 }
@@ -120,7 +126,7 @@ fn fill_members(
                 if prop.r#static {
                     continue;
                 }
-                let Some(name) = prop_key_name(&prop.key) else {
+                let Some((name, name_span)) = prop_key_name_span(&prop.key) else {
                     continue;
                 };
 
@@ -154,8 +160,15 @@ fn fill_members(
                     forbidden.extend(rw.forbidden);
                 }
 
-                let field =
-                    FieldDecl { name, type_text, init_text, kind, visibility, span: prop.span };
+                let field = FieldDecl {
+                    name,
+                    type_text,
+                    init_text,
+                    kind,
+                    visibility,
+                    span: prop.span,
+                    name_span,
+                };
 
                 match kind {
                     FieldKind::Prop => decl.properties.push(field),
@@ -163,7 +176,7 @@ fn fill_members(
                 }
             }
             ClassElement::MethodDefinition(method) => {
-                let Some(name) = prop_key_name(&method.key) else {
+                let Some((name, name_span)) = prop_key_name_span(&method.key) else {
                     continue;
                 };
                 let is_private = name.starts_with('#')
@@ -189,6 +202,7 @@ fn fill_members(
                     opaque_callee: rw.opaque_callee,
                     star_reasons: rw.star_reasons,
                     span: method.span,
+                    name_span,
                 });
             }
             _ => {}
@@ -258,11 +272,15 @@ fn arg_string_literal(arg: &Argument<'_>) -> Option<String> {
 }
 
 fn prop_key_name(key: &PropertyKey<'_>) -> Option<String> {
+    prop_key_name_span(key).map(|(name, _)| name)
+}
+
+fn prop_key_name_span(key: &PropertyKey<'_>) -> Option<(String, oxc_span::Span)> {
     match key {
-        PropertyKey::StaticIdentifier(id) => Some(id.name.to_string()),
-        PropertyKey::PrivateIdentifier(id) => Some(format!("#{}", id.name)),
-        PropertyKey::Identifier(id) => Some(id.name.to_string()),
-        PropertyKey::StringLiteral(lit) => Some(lit.value.to_string()),
+        PropertyKey::StaticIdentifier(id) => Some((id.name.to_string(), id.span)),
+        PropertyKey::PrivateIdentifier(id) => Some((format!("#{}", id.name), id.span)),
+        PropertyKey::Identifier(id) => Some((id.name.to_string(), id.span)),
+        PropertyKey::StringLiteral(lit) => Some((lit.value.to_string(), lit.span)),
         _ => None,
     }
 }
