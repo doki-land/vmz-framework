@@ -30,7 +30,12 @@ export type DiagnosticInput = {
     span?: SourceSpan;
 };
 
-/** Optional offset → line/col context (aligned with compiler OffsetIndex later). */
+/**
+ * Optional offset → line/col context.
+ * Hosts back this with compiler `OffsetIndex` via the N-API helper
+ * (`offsetIndexLineCol` / `@vmz/core/position-context`); this package stays
+ * free of a native dependency.
+ */
 export type PositionContext = {
     lineCol(offset: number): { line: number; column: number };
 };

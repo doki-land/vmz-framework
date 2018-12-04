@@ -1520,6 +1520,82 @@ pub struct JsComponentEntry {
     pub source: String,
 }
 
+/// LSP `Position`: 0-based line, 0-based UTF-16 code-unit character.
+#[napi(object)]
+pub struct JsLspPosition {
+    /// 0-based line index.
+    pub line: u32,
+    /// 0-based UTF-16 code-unit offset within the line.
+    pub character: u32,
+}
+
+/// OffsetIndex line/col + LSP position for one UTF-8 byte offset.
+#[napi(object)]
+pub struct JsOffsetIndexLineCol {
+    /// 1-based line (UTF-8 scalar view).
+    pub line: u32,
+    /// 1-based Unicode scalar column.
+    pub column: u32,
+    /// 0-based LSP position (UTF-16 within the line).
+    pub lsp_position: JsLspPosition,
+}
+
+/// Convert a UTF-8 byte `offset` via compiler [`vmz_compiler::OffsetIndex`].
+#[napi]
+pub fn offset_index_line_col(source: String, offset: u32) -> JsOffsetIndexLineCol {
+    let idx = vmz_compiler::OffsetIndex::new(&source);
+    let (line, column) = idx.line_col(&source, offset);
+    let lsp = idx.lsp_position(&source, offset);
+    JsOffsetIndexLineCol {
+        line,
+        column,
+        lsp_position: JsLspPosition { line: lsp.line, character: lsp.character },
+    }
+}
+
+/// Optional fields for [`normalize_server_artifact_json`].
+#[napi(object)]
+pub struct JsServerArtifactOpts {
+    /// Delivery profile id.
+    pub profile_id: Option<String>,
+    /// Assembly id under the profile.
+    pub assembly: Option<String>,
+    /// Selected server runtime (`node` / `worker` / …).
+    pub server_runtime: Option<String>,
+    /// Optional pack digest from release packing.
+    pub pack_digest: Option<String>,
+}
+
+/// Normalize ServerArtifact JSON (deployment + routes → artifact body string).
+#[napi]
+pub fn normalize_server_artifact_json(
+    deployment_json: String,
+    routes_json: String,
+    opts: Option<JsServerArtifactOpts>,
+) -> Result<String> {
+    let o = opts.unwrap_or(JsServerArtifactOpts {
+        profile_id: None,
+        assembly: None,
+        server_runtime: None,
+        pack_digest: None,
+    });
+    let rust_opts = vmz_artifacts::ServerArtifactOpts {
+        profile_id: o.profile_id,
+        assembly: o.assembly,
+        server_runtime: o.server_runtime,
+        pack_digest: o.pack_digest,
+    };
+    vmz_artifacts::normalize_server_artifact_json(&deployment_json, &routes_json, &rust_opts)
+        .map_err(|e| Error::from_reason(e.to_string()))
+}
+
+/// Project a runtime adapter row from a normalized ServerArtifact JSON string.
+#[napi]
+pub fn project_server_runtime_adapter_json(artifact_json: String, adapter_id: String) -> Result<String> {
+    vmz_artifacts::project_server_runtime_adapter_json(&artifact_json, &adapter_id)
+        .map_err(|e| Error::from_reason(e.to_string()))
+}
+
 /// Validate `vmz-deployment.json` body (schema + serde shape).
 #[napi]
 pub fn deployment_validate(json_text: String) -> Result<()> {

@@ -9,4 +9,7 @@ pub enum ArtifactError {
     /// `schema` field is not [`vmz_compiler::DEPLOYMENT_SCHEMA`].
     #[error("unsupported deployment schema {0}")]
     Schema(String),
+    /// Semantic / normalize failure with a stable message.
+    #[error("{0}")]
+    Message(String),
 }

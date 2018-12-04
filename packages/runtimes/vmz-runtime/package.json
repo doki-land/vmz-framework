@@ -44,6 +44,10 @@
         "./localize-body-links": {
             "types": "./dist/localize-body-links.d.ts",
             "default": "./dist/localize-body-links.js"
+        },
+        "./position-context": {
+            "types": "./dist/position-context.d.ts",
+            "default": "./dist/position-context.js"
         }
     },
     "files": [
