@@ -344,9 +344,7 @@ function sortKeys(value) {
 function listPageClientFiles(distDir) {
     const fromDep = listPagesFromDeployment(distDir);
     if (!fromDep.length) {
-        throw new Error(
-            `emitWebStatic: no page units with pathPattern in ${path.join(distDir, 'vmz-deployment.json')} (plan-only host)`,
-        );
+        throw new Error(`emitWebStatic: no page units with pathPattern in ${path.join(distDir, 'vmz-deployment.json')} (plan-only host)`);
     }
     return fromDep;
 }

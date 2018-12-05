@@ -16,10 +16,7 @@ export type PositionContext = {
  */
 export function createPositionContext(sourceText: string): PositionContext {
     const source = String(sourceText ?? '');
-    const lineColFn = requireNativeFn('offsetIndexLineCol') as (
-        src: string,
-        offset: number,
-    ) => { line: number; column: number };
+    const lineColFn = requireNativeFn('offsetIndexLineCol') as (src: string, offset: number) => { line: number; column: number };
     return {
         lineCol(offset: number): LineCol {
             const off = Math.max(0, Number(offset) || 0);

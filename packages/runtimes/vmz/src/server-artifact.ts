@@ -83,11 +83,7 @@ export function emitServerArtifact(outDir: string, opts: ServerArtifactOpts = {}
 export function projectServerRuntimeAdapter(artifact: Record<string, unknown>, adapterId: string) {
     const native = requireNativeAddon();
     if (typeof native.projectServerRuntimeAdapterJson !== 'function') {
-        throw new Error(
-            'vmz native addon missing projectServerRuntimeAdapterJson — rebuild with `pnpm napi:build`',
-        );
+        throw new Error('vmz native addon missing projectServerRuntimeAdapterJson — rebuild with `pnpm napi:build`');
     }
-    return JSON.parse(
-        native.projectServerRuntimeAdapterJson(JSON.stringify(artifact), String(adapterId || '').trim()),
-    );
+    return JSON.parse(native.projectServerRuntimeAdapterJson(JSON.stringify(artifact), String(adapterId || '').trim()));
 }

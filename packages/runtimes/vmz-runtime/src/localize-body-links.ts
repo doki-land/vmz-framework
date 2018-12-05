@@ -69,9 +69,7 @@ export function localizeSameAppHref(href: string, localeId: string, artifact: Lo
     }
     if (!pathname) pathname = '/';
 
-    const supported = (artifact.locales || [])
-        .map((l) => (typeof l === 'string' ? l : l.id))
-        .filter(Boolean);
+    const supported = (artifact.locales || []).map((l) => (typeof l === 'string' ? l : l.id)).filter(Boolean);
     const defaultLocale = artifact.defaultLocale || artifact.routing?.defaultLocale;
     const routing = {
         strategy: artifact.routing?.strategy || 'prefix',

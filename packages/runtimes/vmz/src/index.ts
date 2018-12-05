@@ -635,6 +635,7 @@ export const SERVE_HOST_RUNTIME_FILES: ReadonlyArray<readonly [string, string]> 
     ['deployment-registry.js', 'deployment-registry.js'],
     ['render-host.js', 'render-host.js'],
     ['route-layout-chain.js', 'route-layout-chain.js'],
+    ['localize-body-links.js', 'localize-body-links.js'],
 ];
 
 /** Copy serve-host + registry bootstrap modules from `@vmz/core` into app outDir. */

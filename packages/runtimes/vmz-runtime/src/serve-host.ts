@@ -1112,9 +1112,7 @@ async function loadPageCtor(chunkId) {
 async function listPageClientFiles(dir) {
     const fromDep = await listPagesFromDeployment(dir);
     if (!fromDep.length) {
-        throw new Error(
-            `vmz serve: no page units with pathPattern in ${path.join(dir, 'vmz-deployment.json')} (plan-only host)`,
-        );
+        throw new Error(`vmz serve: no page units with pathPattern in ${path.join(dir, 'vmz-deployment.json')} (plan-only host)`);
     }
     return fromDep;
 }
@@ -1136,9 +1134,7 @@ async function listPagesFromDeployment(dir) {
             if (isRouteBoundaryStem(stem)) continue;
             const pattern = String(unit.pathPattern || '').trim();
             if (!pattern) {
-                throw new Error(
-                    `vmz serve: page unit ${chunkId} missing pathPattern in vmz-deployment.json (plan-only host)`,
-                );
+                throw new Error(`vmz serve: page unit ${chunkId} missing pathPattern in vmz-deployment.json (plan-only host)`);
             }
             const pageRel = String(unit.clientEntry || `${chunkId}.client.js`).replace(/\\/g, '/');
             out.push({

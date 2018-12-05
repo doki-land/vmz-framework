@@ -35,9 +35,7 @@ export function resolveRouteLayoutChain(distDir: string, pageChunkId: string): s
         throw new Error(`resolveRouteLayoutChain: no deployment unit for ${pageChunkId} (plan-only host)`);
     }
     if (!Array.isArray(unit.layoutChain)) {
-        throw new Error(
-            `resolveRouteLayoutChain: page unit ${pageChunkId} missing layoutChain (plan-only host)`,
-        );
+        throw new Error(`resolveRouteLayoutChain: page unit ${pageChunkId} missing layoutChain (plan-only host)`);
     }
     return unit.layoutChain.map((id: string) => String(id));
 }

@@ -13,10 +13,7 @@ import {
     resolveRouteLayoutChain,
 } from '../../../vmz-runtime/src/route-layout-chain.ts';
 
-function writeDeployment(
-    dist: string,
-    units: Array<{ chunkId: string; kind?: string; layoutChain?: string[] }>,
-) {
+function writeDeployment(dist: string, units: Array<{ chunkId: string; kind?: string; layoutChain?: string[] }>) {
     fs.writeFileSync(
         path.join(dist, 'vmz-deployment.json'),
         JSON.stringify({
@@ -46,10 +43,7 @@ describe('route-layout-chain (plan-only)', () => {
         ]);
 
         expect(resolveNestedLayoutChain(dist, 'pages/shop/index')).toEqual(['pages/shop/Layout']);
-        expect(resolveRouteLayoutChain(dist, 'pages/shop/index')).toEqual([
-            APPLICATION_SHELL_CHUNK,
-            'pages/shop/Layout',
-        ]);
+        expect(resolveRouteLayoutChain(dist, 'pages/shop/index')).toEqual([APPLICATION_SHELL_CHUNK, 'pages/shop/Layout']);
         expect(hasApplicationShell(dist)).toBe(true);
 
         fs.rmSync(dist, { recursive: true, force: true });

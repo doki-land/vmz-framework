@@ -43,9 +43,7 @@ export function unitBrowserPathPattern(unit: DeploymentPageUnit | null | undefin
     const explicit = String(unit?.pathPattern || '').trim();
     if (!explicit) {
         const chunkId = String(unit?.chunkId || '');
-        throw new Error(
-            `unitBrowserPathPattern: page unit ${chunkId || '(unknown)'} missing pathPattern (plan-only host)`,
-        );
+        throw new Error(`unitBrowserPathPattern: page unit ${chunkId || '(unknown)'} missing pathPattern (plan-only host)`);
     }
     return explicit.startsWith('/') ? explicit : `/${explicit}`;
 }

@@ -29,6 +29,27 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'toolchain/deployment-artifacts.ts',
         description: 'Rust vmz-artifacts N-API and @vmz/core deployment host wiring',
     },
+    'deployment-parity': {
+        file: 'toolchain/deployment-parity.ts',
+        description: '0.1.22: deployment N-API ≡ host (wraps deployment-artifacts)',
+    },
+    'plan-only-host': {
+        file: 'toolchain/plan-only-host.ts',
+        description: '0.1.22: hosts require Plan pathPattern/layoutChain and N-API ServerArtifact',
+    },
+    'template-ast-single-source': {
+        file: 'toolchain/template-ast-single-source.ts',
+        description: '0.1.22: cross_sfc uses name_span not string span_of_*',
+    },
+    'span-context-conversion': {
+        file: 'toolchain/span-context-conversion.ts',
+        description: '0.1.22: OffsetIndex N-API → PositionContext',
+        pre: ['build:runtimes'],
+    },
+    'no-duplicate-manifest-parse': {
+        file: 'toolchain/no-duplicate-manifest-parse.ts',
+        description: '0.1.22: locale/document policy only via N-API Plan loaders',
+    },
     'node-cli': { file: 'toolchain/node-cli.ts', description: 'Node CLI / Workspace host' },
     plugin: {
         file: 'toolchain/plugin.ts',
@@ -326,6 +347,11 @@ export const CHECKS: Record<string, CheckEntry> = {
 export const CHECK_ALL = [
     'program-ir',
     'deployment-artifacts',
+    'deployment-parity',
+    'plan-only-host',
+    'template-ast-single-source',
+    'span-context-conversion',
+    'no-duplicate-manifest-parse',
     'node-cli',
     'plugin',
     'plugin-shiki',
