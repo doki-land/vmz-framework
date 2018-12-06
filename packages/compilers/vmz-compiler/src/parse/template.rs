@@ -58,9 +58,6 @@ pub fn template_parse_to_diagnostic(
 
 /// Stable diagnostic codes for structured template parse / semantic failures.
 fn template_error_code(message: &str) -> Option<&'static str> {
-    if message.contains("JSX") || message.contains("single-brace") {
-        return Some("vmz::template::jsx_rejected");
-    }
     if message.contains("`v-else")
         || message.contains("v-else-if")
         || message.contains("dynamic `v-bind`")

@@ -142,9 +142,9 @@ fn comment_on_concrete_dropped_from_ir() {
 }
 
 #[test]
-fn rejects_jsx_on_concrete() {
+fn rejects_single_brace_on_concrete() {
     let err = parse_template_concrete("<h2>{user.name}</h2>").unwrap_err();
-    assert!(err.message.contains("JSX") || err.message.contains("single-brace"), "{err}");
+    assert!(err.message.contains("single-brace"), "{err}");
 }
 
 #[test]

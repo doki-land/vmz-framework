@@ -2,7 +2,6 @@
     "diag.message": "{message}",
     "diag.detail": "{detail}",
 
-    "vmz::template::jsx_rejected": "JSX / single-brace expressions are rejected in `<template>`: {detail}",
     "vmz::template::illegal_directive": "Illegal or unsupported directive in `<template>`: {detail}",
     "vmz::template::parse_failed": "Failed to parse `<template>`: {detail}",
     "vmz::template::invalid_expr": "Invalid template expression: {detail}",

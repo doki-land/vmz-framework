@@ -1,4 +1,4 @@
-//! Vue template syntax unit tests (syntax ≡ Vue; JSX hard-rejected).
+//! Vue template syntax unit tests (Vue-only author surface).
 
 use vmz_compiler::parse::template::*;
 
@@ -86,15 +86,18 @@ fn parses_event_shorthand() {
 }
 
 #[test]
-fn rejects_jsx_text_interp() {
+fn rejects_single_brace_text_interp() {
     let err = parse_template("<h2>{user.name}</h2>").unwrap_err();
-    assert!(err.message.contains("JSX") || err.message.contains("single-brace"), "{err}");
+    assert!(err.message.contains("single-brace"), "{err}");
 }
 
 #[test]
-fn rejects_jsx_attr_bind() {
+fn rejects_unquoted_brace_attr_bind() {
     let err = parse_template(r#"<Button onClick={increment} />"#).unwrap_err();
-    assert!(err.message.contains("JSX"), "{err}");
+    assert!(
+        err.message.contains("unquoted") || err.message.contains("single-brace") || err.message.contains("quoted"),
+        "{err}"
+    );
 }
 
 #[test]

@@ -59,10 +59,10 @@ fn reported_diagnostic_omits_empty_args_on_wire() {
 #[test]
 fn reported_diagnostic_code_args_span_locale_invariant() {
     // Simulates two hosts formatting different locales: structured fields must match.
-    let a = ReportedDiagnostic::error("x.vmz", "vmz::template::jsx_rejected")
+    let a = ReportedDiagnostic::error("x.vmz", "vmz::template::parse_failed")
         .with_arg("detail", "attr={expr}")
         .with_source_span(SourceSpan { path: "x.vmz".into(), start: 4, end: 12 });
-    let b = ReportedDiagnostic::error("x.vmz", "vmz::template::jsx_rejected")
+    let b = ReportedDiagnostic::error("x.vmz", "vmz::template::parse_failed")
         .with_arg("detail", "attr={expr}")
         .with_source_span(SourceSpan { path: "x.vmz".into(), start: 4, end: 12 });
     let va = serde_json::to_value(&a).unwrap();
