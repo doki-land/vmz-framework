@@ -17,22 +17,23 @@ SSR/resume behavior, `vmz test`, or deployment artifact.
 - Keep server-only imports behind `#server`; never leak secrets or repositories into browser output.
 - Prefer the official `@vmz/core`, `@vmz/ui`, `vmz`, and `@vmz/test` surfaces already present in the project.
 
-## Code highlighting (Shiki — preferred)
+## Code highlighting (`default`)
 
-When the user needs **syntax-colored** source (docs, marketing snippets, API samples, tutorials):
+When the user needs syntax-colored source:
 
-1. Install and wire **`@vmz/plugin-shiki`** (peer `shiki` is fine as a dependency of the app).
-2. In `vmz.config.ts`: `plugins: [shiki({ themes: […] })]` and usually `engines: { code: 'shiki' }`.
-3. In templates use **`<Shiki :code="…" lang="…" theme="…" />`** or **`<Code :code="…" lang="…" />`** (facade after engines).
-4. Restart **`vmz dev`** after changing `vmz.config.*` (config is not watch-reloaded).
+1. Use the `default` code highlighting contract.
+2. For build, SSR, and static export, consume the Rust-generated `NativeCodeArtifact`.
+3. For runtime highlighting, use **`@vmz/highlighter`** and install **`@vmz/highlighter-unknown-wasm`** when unknown-language fallback is needed.
+4. For non-VMZ applications, prefer the **`vmz-highlighter`** Custom Element. It does not require the VMZ runtime.
 
 **Do not:**
 
-- Import `shiki` / `createHighlighter` in app components and paint HTML by hand.
-- Invent a local `*.vmz` highlighter, copy `Shiki.vmz` from the plugin into the app as a permanent substitute, or wrap raw `<pre>` as a fake highlighter.
-- Expect `@vmz/ui` **`CodeBlock`** to colorize — it is caption/Copy/`<pre>` chrome only (`CodeBlock ≠ Shiki`).
+- Import a native renderer or WASM implementation directly into application components.
+- Paint highlighted HTML by hand or create a second VMZ-local highlighter surface.
+- Put native rendering dependencies in browser runtime or client chunks.
+- Expect `@vmz/ui` **`CodeBlock`** to execute a highlighter. It consumes static artifacts or plain text and provides presentation chrome.
 
-Plain uncolored samples → `CodeBlock`. Colored reading experience → plugin Shiki. Editors → Monaco / CodeMirror plugins, not Shiki stretched into an editor.
+Plain uncolored samples → `CodeBlock`. Runtime colored reading → `@vmz/highlighter`. Editors remain a separate editor integration, not a highlighter stretched into an editor.
 
 ## Delivery / dist layout (multi-artifact)
 

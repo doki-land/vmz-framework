@@ -3,7 +3,7 @@
 Core **compile pipeline** for `.vmz`: SFC split, oxc analysis, Unified Program Graph / Execution Plan construction,
 Direct emit, and the long-lived **`Workspace`** session façade (N1).
 
-Template authoring aims at Vue template isomorphism (JSX rejected). Parse lands a **Concrete AST** with
+Template authoring is Vue template only (no dual-track author surface). Parse lands a **Concrete AST** with
 structured directives and UTF-8 byte spans; emit still bridges through legacy `TemplateIr` /
 `TemplateAttr`. Do **not** extend the string attr model — new directive semantics go through Concrete
 first. Expressions are validated via shared oxc snippet parse; CLI diagnostics convert offsets to

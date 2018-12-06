@@ -1,6 +1,6 @@
 # VMZ
 
-## A full-stack application compiler for TypeScript ✨
+## ✨ A full-stack application compiler for TypeScript
 
 VMZ is a new kind of web framework: a full-stack application compiler. You write readable `.vmz` components and ordinary
 TypeScript; VMZ understands the application as a whole and compiles it into direct browser updates, server work, SSR
@@ -21,13 +21,12 @@ the update and execution boundaries.
 
 <template>
     <article>
-        <h1>{heading}</h1>
-        <p if={!user}>Loading profile...</p>
-        <section else>
-            <h2>{user.name}</h2>
-            <p>{user.bio}</p>
-            <button type="button" onClick={()
-            => refresh()}>Refresh</button>
+        <h1>{{ heading }}</h1>
+        <p v-if="!user">Loading profile...</p>
+        <section v-else>
+            <h2>{{ user.name }}</h2>
+            <p>{{ user.bio }}</p>
+            <button type="button" @click="refresh">Refresh</button>
         </section>
     </article>
 </template>
@@ -153,7 +152,7 @@ code client-side?”, “why is this Island here?”, and “what blocks a small
 - **Debug decisions, not guesses.** The compiler model is designed to expose the provenance behind updates, output, and
   conservative fallbacks.
 
-## A closer look at the features 🚀
+## 🚀 A closer look at the features
 
 ### Reactive by language, not by ritual
 
