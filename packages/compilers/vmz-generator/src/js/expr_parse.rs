@@ -107,6 +107,39 @@ pub fn template_expr_root_span(expr: &str) -> Option<SnippetSpan> {
     Some(map_wrapped_span_to_snippet(es.expression.span(), snippet_len))
 }
 
+/// Canonical-print a template expression via oxc parse + codegen (no string replay).
+///
+/// Empty / whitespace-only input yields an empty string. Invalid expressions return `Err`.
+pub fn print_template_expr(expr: &str) -> Result<String, String> {
+    use oxc_ast::ast::Expression;
+    use oxc_codegen::Codegen;
+
+    let trimmed = expr.trim();
+    if trimmed.is_empty() {
+        return Ok(String::new());
+    }
+    let src = wrap_template_expr_source(trimmed);
+    let allocator = Allocator::default();
+    let ret = Parser::new(&allocator, &src, SourceType::ts()).parse();
+    if ret.panicked {
+        return Err("oxc panicked while printing template expression".into());
+    }
+    if let Some(diag) = ret.diagnostics.first() {
+        return Err(diag.message.to_string());
+    }
+    let body = ret.program.body.first().ok_or_else(|| "empty template expression".to_string())?;
+    let Statement::ExpressionStatement(es) = body else {
+        return Err("expected expression statement from template wrap".into());
+    };
+    let inner = match &es.expression {
+        Expression::ParenthesizedExpression(p) => &p.expression,
+        other => other,
+    };
+    let mut codegen = Codegen::new();
+    codegen.print_expression(inner);
+    Ok(codegen.into_source_text().trim().to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -147,5 +180,13 @@ mod tests {
             map_wrapped_span_to_snippet(Span::new(1, 5), 4),
             SnippetSpan { start: 0, end: 4 }
         );
+    }
+
+    #[test]
+    fn print_template_expr_is_idempotent_canonical() {
+        let once = print_template_expr("a+b").expect("print");
+        let twice = print_template_expr(&once).expect("reprint");
+        assert_eq!(once, twice);
+        assert!(!once.is_empty());
     }
 }
