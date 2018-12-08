@@ -18,6 +18,8 @@ vmz-compiler     parse · analyze · graph · emit · Workspace façade
 vmz-napi  ────────────────────┴── Node session bridge
                                   Product CLI = `@vmz/vmz` (TS + N-API), not a Rust clap bin
 
+vmz-github ── GitHub Actions monitor (octocrab) → N-API → `vmz github-actions`
+
 vmz-plugin-tailwind ──┐
 vmz-plugin-sasso ─────┴── style engines (hook into compiler; never reverse-dep)
 ```
@@ -30,6 +32,7 @@ vmz-plugin-sasso ─────┴── style engines (hook into compiler; nev
 | [`vmz-inspector`](./vmz-inspector/)             | Static correctness (`check` / `lint`)         |
 | [`vmz-debugger`](./vmz-debugger/)               | Causal explain + LSP/MCP **library** (no bin) |
 | [`vmz-napi`](./vmz-napi/)                       | N-API cdylib for Node                         |
+| [`vmz-github`](./vmz-github/)                   | GitHub Actions monitor via octocrab           |
 | [`vmz-plugin-tailwind`](./vmz-plugin-tailwind/) | Tailwind style engine                         |
 | [`vmz-plugin-sasso`](./vmz-plugin-sasso/)       | SCSS style engine (sasso)                     |
 

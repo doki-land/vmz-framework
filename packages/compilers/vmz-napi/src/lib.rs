@@ -1684,3 +1684,15 @@ pub fn load_document_route_plan_from_source(
 pub fn author_json5_to_canonical_json(source: String) -> Result<String> {
     vmz_compiler::locale::author_json5_to_canonical_json(&source).map_err(Error::from_reason)
 }
+
+/// Monitor GitHub Actions via `vmz-github` (octocrab). Request/result are JSON strings.
+///
+/// Never spawns the `gh` CLI. See `MonitorRequest` / `MonitorResult` in `vmz-github`.
+#[napi(js_name = "githubActionsMonitorJson")]
+pub fn github_actions_monitor_json(request_json: String) -> Result<String> {
+    let request: vmz_github::MonitorRequest = serde_json::from_str(&request_json)
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+    let result = vmz_github::monitor_blocking(request)
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+    serde_json::to_string(&result).map_err(|e| Error::from_reason(e.to_string()))
+}
