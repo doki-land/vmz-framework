@@ -55,14 +55,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG_SHA: ${{ steps.bind.outputs.sha }}
-        run: |
-          set -euo pipefail
-          conclusion="$(gh run list --repo "${{ github.repository }}" --commit "${TAG_SHA}" --workflow ci.yml --json conclusion -q '.[0].conclusion // empty')"
-          if [[ "$conclusion" != "success" ]]; then
-            echo "Refusing npm publish: CI on ${TAG_SHA} is '${conclusion:-missing}' (need success)" >&2
-            exit 1
-          fi
-          echo "CI success confirmed for ${TAG_SHA}"
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/ci/require-ci-success.mjs --sha=${{ steps.bind.outputs.sha }}
 
   build-native:
     name: Native ${{ matrix.short }}
@@ -224,6 +218,8 @@ jobs:
         run: pnpm build:runtimes:js
 
       - name: Assert @vmz/vmz dist pack contract
+        env:
+          VMZ_NATIVE_ARTIFACTS: ${{ github.workspace }}/dist/native-flat
         run: node scripts/ci/assert-vmz-pack.mjs
 
       - name: Strip token-style npmrc (OIDC only)

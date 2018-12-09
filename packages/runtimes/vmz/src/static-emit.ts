@@ -11,7 +11,7 @@ import { createRenderHost } from '@vmz/core/render-host';
 import { resolveRouteLayoutChain } from '@vmz/core/route-layout-chain';
 import { listClientComponentsSync } from '@vmz/core/component-registry';
 import { emitCdnPolicy } from './cdn-policy.js';
-import { emitContentAddressedAssets } from './content-addressed-assets.js';
+import { emitContentAddressedAssets, hashedAssetHref } from './content-addressed-assets.js';
 import { absoluteUrl, buildLocalePageMeta, localizeBodyLinks } from './locale-router.js';
 import { requireNativeAddon } from './native-addon.js';
 import { writePrettyJsonFile } from './pretty-json.js';
@@ -95,6 +95,14 @@ export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {
         classification: string;
         reason: string;
     }> = [];
+
+    // Hash immutable assets before any HTML write so shell slots carry final URLs
+    // (no post-emit HTML split/join rewrite).
+    emitStaticClientEntries(distDir, pageCatalog);
+    const assets = emitContentAddressedAssets(distDir);
+    const cssLogical = readCssEntry(distDir);
+    const cssEntry = hashedAssetHref(assets.rewrites, cssLogical) || hashedAssetHref(assets.rewrites, 'vmz.css');
+    const moduleScriptSrc = hashedAssetHref(assets.rewrites, 'entry-client.js') || '/entry-client.js';
 
     for (const page of pageCatalog) {
         const pattern = page.pathPattern || patternFromSegs(page.segs);
@@ -186,7 +194,8 @@ export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {
                 layoutChain,
                 props,
                 meta: gen.meta,
-                cssEntry: readCssEntry(distDir),
+                cssEntry,
+                moduleScriptSrc,
                 headExtraHtml: faviconHead,
             });
             fs.writeFileSync(absHtml, html, 'utf8');
@@ -218,7 +227,8 @@ export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {
             robots: 'noindex,nofollow',
             lang: 'en',
         },
-        cssEntry: readCssEntry(distDir),
+        cssEntry,
+        moduleScriptSrc: '',
         isErrorDocument: true,
         headExtraHtml: faviconHead,
     });
@@ -280,23 +290,15 @@ export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {
             fileCount: publicAssets.fileCount ?? 0,
             source: 'source' in publicAssets && typeof publicAssets.source === 'string' ? publicAssets.source : null,
         },
+        contentAddressedAssets: {
+            schema: assets.manifest.schema,
+            manifestDigest: assets.manifest.manifestDigest,
+            objectCount: assets.manifest.objectCount,
+            layout: assets.manifest.layout,
+        },
     };
     const digest = sha256Hex(canonicalJson(manifest));
     manifest.manifestDigest = digest;
-    writePrettyJsonFile(path.join(vmzDir, 'static-delivery-manifest.json'), manifest);
-
-    emitStaticClientEntries(distDir, pageCatalog);
-
-    const assets = emitContentAddressedAssets(distDir);
-    manifest.contentAddressedAssets = {
-        schema: assets.manifest.schema,
-        manifestDigest: assets.manifest.manifestDigest,
-        objectCount: assets.manifest.objectCount,
-        layout: assets.manifest.layout,
-    };
-    // Re-stamp static manifest after linking asset digest (HTML already rewritten on disk).
-    delete manifest.manifestDigest;
-    manifest.manifestDigest = sha256Hex(canonicalJson(manifest));
     writePrettyJsonFile(path.join(vmzDir, 'static-delivery-manifest.json'), manifest);
 
     const cdn = emitCdnPolicy(distDir, manifest);
@@ -556,6 +558,7 @@ function readCssEntry(distDir) {
  *   props: Record<string, unknown>,
  *   meta: { title: string, description: string, canonical: string, robots: string, lang: string, dir?: string, alternates?: Array<{ hreflang: string, href: string }> },
  *   cssEntry: string | null,
+ *   moduleScriptSrc?: string,
  *   isErrorDocument?: boolean,
  *   headExtraHtml?: string,
  * }} input
@@ -586,6 +589,7 @@ function wrapDocument(input) {
         ...(input.cssEntry ? { cssEntry: String(input.cssEntry) } : {}),
         isErrorDocument: !!input.isErrorDocument,
         ...(input.headExtraHtml ? { headExtraHtml: String(input.headExtraHtml) } : {}),
+        ...(input.moduleScriptSrc !== undefined ? { moduleScriptSrc: String(input.moduleScriptSrc) } : {}),
     });
 }
 

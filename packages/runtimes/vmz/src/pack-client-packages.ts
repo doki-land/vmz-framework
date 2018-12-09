@@ -336,11 +336,11 @@ export function rewriteRelativeTsSpecs(js, exactMap = null) {
     if (typeof native.rewriteModuleSpecifiers !== 'function') {
         throw new Error('native missing rewriteModuleSpecifiers — run `pnpm napi:build`');
     }
-    const exactJson =
-        exactMap && typeof exactMap === 'object' && Object.keys(exactMap).length
-            ? JSON.stringify(exactMap)
-            : null;
-    return native.rewriteModuleSpecifiers(String(js ?? ''), exactJson);
+    const rules = {
+        tsExtToJs: true,
+        exact: exactMap && typeof exactMap === 'object' ? exactMap : {},
+    };
+    return native.rewriteModuleSpecifiers(String(js ?? ''), JSON.stringify(rules));
 }
 
 function resolveRelativeSource(fromDir, rel) {

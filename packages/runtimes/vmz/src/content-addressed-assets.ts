@@ -1,14 +1,16 @@
 /**
  * A3: content-addressed assets/<hash> layout for immutable CDN objects.
- * Logical paths stay available for serve/dev; static HTML rewrites to hashed URLs.
- * CSS aggregators (vmz.css) rewrite `@import` to hashed sibling paths under assets/.
- * JS under assets/ always rewrites ESM `./` → `../` so barrels (vmz-dom → dom-core)
- * resolve at dist root — never prefer hashed siblings for JS (second-hop 404).
+ * Logical paths stay available for serve/dev. Static HTML must receive hashed
+ * `cssEntry` / `moduleScriptSrc` at shell emit time — this module does **not**
+ * post-rewrite HTML. CSS aggregators rewrite `@import` before hash. JS under
+ * `assets/` rewrites ESM `./` → `../` via oxc (plus dynamic `import("./"+)` form)
+ * so barrels resolve at dist root.
  */
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { requireNativeAddon } from './native-addon.js';
 import { canonicalJson, sha256Hex } from './release-pack.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 
@@ -34,7 +36,6 @@ export interface ContentAddressedAssetsManifest {
 
 interface EmitContentAddressedAssetsOpts {
     candidates?: string[];
-    rewriteHtml?: boolean;
 }
 
 interface IngestCandidateOpts {
@@ -92,34 +93,31 @@ export function rewriteCssImports(cssText, rewrites) {
  * @param {Record<string, string>} [_rewrites]
  */
 export function rewriteJsEntryRelativeImports(jsText, _rewrites = {}) {
-    let out = String(jsText || '');
-    // Dynamic: import("./" + id) → import("../" + id)
+    const native = requireNativeAddon();
+    if (typeof native.rewriteModuleSpecifiers !== 'function') {
+        throw new Error('native missing rewriteModuleSpecifiers — run `pnpm napi:build`');
+    }
+    // Static import/export specs via oxc AST (`./x` → `../x`). Dynamic
+    // `import("./"+id)` is not a literal specifier — rewrite that codegen form only.
+    let out = String(
+        native.rewriteModuleSpecifiers(
+            String(jsText ?? ''),
+            JSON.stringify({
+                tsExtToJs: false,
+                dotSlashToParent: true,
+            }),
+        ),
+    );
     out = out.replace(/import\(\s*"\.\/"\s*\+/g, 'import("../"+');
     out = out.replace(/import\(\s*'\.\/'\s*\+/g, "import('../'+");
-
-    const rewriteSpec = (spec) => {
-        const logical = String(spec || '').replace(/^\.\//, '');
-        if (!logical || logical.startsWith('../') || logical.startsWith('/')) return spec;
-        return `../${logical}`;
-    };
-
-    // import/export … from "./x"  |  import("./x")
-    out = out.replace(
-        /\b((?:import|export)\s+[^'"\n]*?\s+from\s+|import\s*\(\s*)(['"])(\.\/[^'"]+)\2/g,
-        (match, prefix, quote, spec) => `${prefix}${quote}${rewriteSpec(spec)}${quote}`,
-    );
-    // side-effect: import "./x.js"
-    out = out.replace(
-        /(^|[;\s])(import\s*)(['"])(\.\/[^'"]+)\3/gm,
-        (match, lead, kw, quote, spec) => `${lead}${kw}${quote}${rewriteSpec(spec)}${quote}`,
-    );
     return out;
 }
 
 /**
- * Emit `assets/<sha256>.<ext>` copies and rewrite HTML href/src to hashed URLs.
+ * Emit `assets/<sha256>.<ext>` copies and return logical→hashed rewrites.
+ * Callers must pass hashed URLs into `generatePageShell` — HTML is never rewritten here.
  * @param {string} distDir
- * @param {{ candidates?: string[], rewriteHtml?: boolean }} [opts]
+ * @param {{ candidates?: string[] }} [opts]
  */
 export function emitContentAddressedAssets(distDir: string, opts: EmitContentAddressedAssetsOpts = {}) {
     const abs = path.resolve(distDir);
@@ -183,18 +181,13 @@ export function emitContentAddressedAssets(distDir: string, opts: EmitContentAdd
 
     objects.sort((a, b) => (a.logicalPath < b.logicalPath ? -1 : a.logicalPath > b.logicalPath ? 1 : 0));
 
-    let rewrittenHtml = 0;
-    if (opts.rewriteHtml !== false) {
-        rewrittenHtml = rewriteHtmlReferences(abs, rewrites);
-    }
-
     const manifest: ContentAddressedAssetsManifest = {
         schema: CONTENT_ADDRESSED_ASSETS_SCHEMA,
         layout: 'assets/<sha256>.<ext>',
         immutable: true,
         objectCount: objects.length,
         objects,
-        rewrittenHtml,
+        rewrittenHtml: 0,
     };
     manifest.manifestDigest = sha256Hex(canonicalJson({ ...manifest, manifestDigest: undefined }));
 
@@ -345,42 +338,14 @@ function walk(root: string, dir: string, onFile: (rel: string) => void) {
     }
 }
 
-/**
- * @param {string} distDir
- * @param {Record<string, string>} rewrites map `/logical` → `/assets/hash.ext`
- */
-function rewriteHtmlReferences(distDir: string, rewrites: Record<string, string>) {
-    const pairs = Object.entries(rewrites)
-        .filter(([from]) => from.startsWith('/'))
-        .sort((a, b) => b[0].length - a[0].length);
-    if (!pairs.length) return 0;
-    let count = 0;
-    walkHtml(distDir, (file) => {
-        let text = fs.readFileSync(file, 'utf8');
-        let next = text;
-        for (const [from, to] of pairs) {
-            next = next.split(from).join(to);
-        }
-        if (next !== text) {
-            fs.writeFileSync(file, next, 'utf8');
-            count += 1;
-        }
-    });
-    return count;
-}
-
-function walkHtml(dir: string, onFile: (file: string) => void) {
-    const stack = [dir];
-    while (stack.length) {
-        const cur = stack.pop();
-        for (const name of fs.readdirSync(cur)) {
-            if (name === 'assets' || name === '_vmz' || name === 'node_modules') continue;
-            const full = path.join(cur, name);
-            const st = fs.statSync(full);
-            if (st.isDirectory()) stack.push(full);
-            else if (name.endsWith('.html')) onFile(full);
-        }
-    }
+/** Resolve `/logical` → hashed href from emit rewrites (`/assets/<sha>.ext`). */
+export function hashedAssetHref(rewrites: Record<string, string>, logical: string | null | undefined): string | null {
+    if (!logical) return null;
+    const raw = String(logical).replace(/\\/g, '/');
+    const key = raw.startsWith('/') ? raw : `/${raw.replace(/^\.\//, '')}`;
+    const hit = rewrites[key] || rewrites[key.slice(1)];
+    if (!hit) return key.startsWith('/') ? key : `/${key}`;
+    return hit.startsWith('/') ? hit : `/${hit}`;
 }
 
 export function contentAddressedAssetsDigest(manifest) {

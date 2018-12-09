@@ -31,7 +31,7 @@ assert.doesNotMatch(hashed, /from "\.\/abc123\.js"/);
 assert.doesNotMatch(hashed, /from "\.\/vmz-dom\.js"/);
 
 const barrel = rewriteJsEntryRelativeImports(`export * from './dom-core.js';\nexport * from "./dom-ssr.js";\n`, {});
-assert.match(barrel, /from '\.\.\/dom-core\.js'/);
-assert.match(barrel, /from "\.\.\/dom-ssr\.js"/);
+assert.match(barrel, /from ["']\.\.\/dom-core\.js["']/);
+assert.match(barrel, /from ["']\.\.\/dom-ssr\.js["']/);
 
 console.log('content-addressed-js-entry-import unit: PASS');
