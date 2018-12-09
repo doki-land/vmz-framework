@@ -94,7 +94,8 @@ fn format_file(
         Ok(s) => s,
         Err(e) => {
             report.diagnostics.push(
-                ReportedDiagnostic::error(path, "vmz::io::read_failed").with_arg("error", e.to_string()),
+                ReportedDiagnostic::error(path, "vmz::io::read_failed")
+                    .with_arg("error", e.to_string()),
             );
             return Ok(());
         }
@@ -114,9 +115,9 @@ fn format_file(
     let formatted = match format_parsed(&parsed, &settings) {
         Ok(s) => s,
         Err(e) => {
-            report.diagnostics.push(
-                ReportedDiagnostic::error(path, "vmz::format::failed").with_arg("detail", e),
-            );
+            report
+                .diagnostics
+                .push(ReportedDiagnostic::error(path, "vmz::format::failed").with_arg("detail", e));
             return Ok(());
         }
     };
@@ -126,9 +127,7 @@ fn format_file(
     }
     report.files_need_write += 1;
     if options.check {
-        report
-            .diagnostics
-            .push(ReportedDiagnostic::error(path, "vmz::format::would_reformat"));
+        report.diagnostics.push(ReportedDiagnostic::error(path, "vmz::format::would_reformat"));
         return Ok(());
     }
     fs::write(path, formatted)?;

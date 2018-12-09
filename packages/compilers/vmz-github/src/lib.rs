@@ -2,8 +2,8 @@
 
 use std::time::{Duration, Instant};
 
-use octocrab::models::RunId;
 use octocrab::Octocrab;
+use octocrab::models::RunId;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -112,12 +112,7 @@ pub async fn monitor(request: MonitorRequest) -> Result<MonitorResult, MonitorEr
     }
 
     let required = request.required_conclusion.trim().to_ascii_lowercase();
-    let actual = run
-        .conclusion
-        .as_deref()
-        .unwrap_or("")
-        .trim()
-        .to_ascii_lowercase();
+    let actual = run.conclusion.as_deref().unwrap_or("").trim().to_ascii_lowercase();
     if actual != required {
         return Err(MonitorError::msg(format!(
             "run {} conclusion={:?} (required {:?}) — {}",
@@ -152,28 +147,16 @@ async fn resolve_run(
     let workflows = crab.workflows(&request.owner, &request.repo);
     let mut builder = workflows.list_runs(workflow).per_page(30u8);
 
-    if let Some(branch) = request
-        .branch
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-    {
+    if let Some(branch) = request.branch.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         builder = builder.branch(branch);
     }
 
     let page = builder.send().await?;
     let mut runs = page.items;
-    if let Some(sha) = request
-        .head_sha
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-    {
+    if let Some(sha) = request.head_sha.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         let sha_lower = sha.to_ascii_lowercase();
         runs.retain(|r| {
-            r.head_sha
-                .to_ascii_lowercase()
-                .starts_with(&sha_lower)
+            r.head_sha.to_ascii_lowercase().starts_with(&sha_lower)
                 || sha_lower.starts_with(&r.head_sha.to_ascii_lowercase())
         });
     }
@@ -192,10 +175,7 @@ async fn fetch_run(
     repo: &str,
     run_id: u64,
 ) -> Result<MonitorResult, MonitorError> {
-    let run = crab
-        .workflows(owner, repo)
-        .get(RunId(run_id))
-        .await?;
+    let run = crab.workflows(owner, repo).get(RunId(run_id)).await?;
     Ok(map_workflow_run(&run))
 }
 

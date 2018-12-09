@@ -601,8 +601,8 @@ fn error(
 ) -> ApplicationDiagnostic {
     let path = path.as_ref();
     let path_s = path.display().to_string();
-    let mut d = ApplicationDiagnostic::coded_error(path_s.clone(), code)
-        .with_arg("detail", message.into());
+    let mut d =
+        ApplicationDiagnostic::coded_error(path_s.clone(), code).with_arg("detail", message.into());
     if let Some((start, end)) = span {
         d = d.with_source_span(ApplicationSourceSpan { path: path_s, start, end });
     }

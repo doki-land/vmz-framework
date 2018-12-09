@@ -3,7 +3,8 @@
  *
  * Bare npm/workspace imports are legal on the author surface (01/04).
  * Browser ESM cannot resolve them. Pack materializes reachable package
- * modules under `dist/vendor/<pkg>/…` and rewrites importers to relative paths.
+ * modules under `dist/vendor/<pkg>/…` and rewrites importers to relative paths
+ * via oxc AST (N-API `rewriteModuleSpecifiers`) — no import-text regex.
  *
  * Not full oxc chunk-split/minify (`oxc-pending` remains for release minify).
  */
@@ -12,6 +13,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { resolvePackageRoot } from './packages.js';
+import { requireNativeAddon } from './native-addon.js';
 
 const VENDOR_DIR = 'vendor';
 const SKIP_PREFIXES = ['node:', 'nodejs:', 'cloudflare:', 'data:', 'http:', 'https:', 'vmz:', '#'];
@@ -322,17 +324,23 @@ function transpileTs(source, filename) {
 }
 
 function rewriteTsExt(p) {
+    // Path basename only (output layout) — not ESM source rewrite.
     return String(p)
         .replace(/\.tsx$/i, '.js')
         .replace(/\.ts$/i, '.js');
 }
 
-export function rewriteRelativeTsSpecs(js) {
-    return js
-        .replace(/(from\s+['"])(\.[^'"]+)\.tsx(['"])/g, '$1$2.js$3')
-        .replace(/(from\s+['"])(\.[^'"]+)\.ts(['"])/g, '$1$2.js$3')
-        .replace(/(import\s*\(\s*['"])(\.[^'"]+)\.tsx(['"]\s*\))/g, '$1$2.js$3')
-        .replace(/(import\s*\(\s*['"])(\.[^'"]+)\.ts(['"]\s*\))/g, '$1$2.js$3');
+/** oxc AST module specifier rewrite (`.ts`→`.js` + optional exact map). */
+export function rewriteRelativeTsSpecs(js, exactMap = null) {
+    const native = requireNativeAddon();
+    if (typeof native.rewriteModuleSpecifiers !== 'function') {
+        throw new Error('native missing rewriteModuleSpecifiers — run `pnpm napi:build`');
+    }
+    const exactJson =
+        exactMap && typeof exactMap === 'object' && Object.keys(exactMap).length
+            ? JSON.stringify(exactMap)
+            : null;
+    return native.rewriteModuleSpecifiers(String(js ?? ''), exactJson);
 }
 
 function resolveRelativeSource(fromDir, rel) {
@@ -357,28 +365,13 @@ function resolveRelativeSource(fromDir, rel) {
 }
 
 function rewriteBareImports(js, fromFile, bareToVendor) {
-    const toRel = (spec) => {
-        const dest = bareToVendor.get(spec);
-        if (!dest) return null;
+    /** @type {Record<string, string>} */
+    const exact = {};
+    for (const [spec, dest] of bareToVendor.entries()) {
+        if (isRelativeOrAbsolute(spec) || shouldSkipBare(spec)) continue;
         let rel = path.relative(path.dirname(fromFile), dest).replace(/\\/g, '/');
         if (!rel.startsWith('.')) rel = `./${rel}`;
-        return rel;
-    };
-    let out = js;
-    out = out.replace(/\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g, (full, quote, spec) => {
-        if (isRelativeOrAbsolute(spec) || shouldSkipBare(spec)) return full;
-        const rel = toRel(spec);
-        return rel ? `import(${quote}${rel}${quote})` : full;
-    });
-    out = out.replace(/\bfrom\s+(['"])([^'"]+)\1/g, (full, quote, spec) => {
-        if (isRelativeOrAbsolute(spec) || shouldSkipBare(spec)) return full;
-        const rel = toRel(spec);
-        return rel ? `from ${quote}${rel}${quote}` : full;
-    });
-    out = out.replace(/\bimport\s+(['"])([^'"]+)\1/g, (full, quote, spec) => {
-        if (isRelativeOrAbsolute(spec) || shouldSkipBare(spec)) return full;
-        const rel = toRel(spec);
-        return rel ? `import ${quote}${rel}${quote}` : full;
-    });
-    return out;
+        exact[spec] = rel;
+    }
+    return rewriteRelativeTsSpecs(js, exact);
 }

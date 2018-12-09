@@ -11,6 +11,7 @@ pub mod expr_parse;
 /// Shared expression / attr helpers (also used by `vmz-compiler` structural build).
 pub mod helpers;
 mod locale;
+mod module_rewrite;
 mod print;
 mod row_kernel;
 mod transpile;
@@ -37,6 +38,7 @@ pub use locale::{
     LocaleExport, LocaleTypedExport, LocaleTypedParam, emit_locale_runtime_module,
     emit_locale_typed_module,
 };
+pub use module_rewrite::{rewrite_module_specifiers, rewrite_module_specifiers_required};
 pub use print::{EmittedJs, JsPrintOptions, print_js_program, print_js_source};
 pub use row_kernel::try_emit_row_kernel_js;
 pub use transpile::{transpile_ts, transpile_ts_printed, transpile_ts_with_map};

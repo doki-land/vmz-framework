@@ -72,7 +72,11 @@ pub fn plan_rename_edits(
         )));
     // Provenance breadcrumbs for gate / explain.
     for sym in &symbols {
-        let mut d = ReportedDiagnostic::coded_advice(sym.span.as_ref().map(|s| s.path.clone()).unwrap_or_default(), SYMBOL_SCHEMA).with_arg("detail", format!("symbol {}::{}", sym.stable_id.kind(), sym.stable_id.id()));
+        let mut d = ReportedDiagnostic::coded_advice(
+            sym.span.as_ref().map(|s| s.path.clone()).unwrap_or_default(),
+            SYMBOL_SCHEMA,
+        )
+        .with_arg("detail", format!("symbol {}::{}", sym.stable_id.kind(), sym.stable_id.id()));
         if let Some(span) = sym.span.clone() {
             d = d.with_source_span(span);
         }
@@ -81,7 +85,8 @@ pub fn plan_rename_edits(
     for r in &references {
         let path = r.span.as_ref().map(|s| s.path.clone()).unwrap_or_default();
         let (start, end) = r.span.as_ref().map(|s| (s.start, s.end)).unwrap_or((0, 0));
-        let mut d = ReportedDiagnostic::coded_advice(path, REFERENCE_SCHEMA).with_arg("detail", format!("reference {} @{}..{}", r.kind(), start, end));
+        let mut d = ReportedDiagnostic::coded_advice(path, REFERENCE_SCHEMA)
+            .with_arg("detail", format!("reference {} @{}..{}", r.kind(), start, end));
         if let Some(span) = r.span.clone() {
             d = d.with_source_span(span);
         }
@@ -163,7 +168,10 @@ pub fn apply_workspace_edits(root: &Path, plan: &WorkspaceEditPlan) -> Workspace
 
     let mut applied = plan.clone();
     applied.status = vmz_protocol::WorkspaceEditStatus::Applied;
-    applied.diagnostics.push(ReportedDiagnostic::coded_advice("", "dx.rename.applied").with_arg("detail", format!("applied {} TextEdit(s) atomically", plan.edits.len())));
+    applied.diagnostics.push(
+        ReportedDiagnostic::coded_advice("", "dx.rename.applied")
+            .with_arg("detail", format!("applied {} TextEdit(s) atomically", plan.edits.len())),
+    );
     applied
 }
 

@@ -396,12 +396,10 @@ fn build_project_route_table(
             continue;
         }
         let Ok(source) = fs::read_to_string(&path) else {
-            report
-                .diagnostics
-                .push(ReportedDiagnostic::error(
-                    &path,
-                    "vmz::io::read_failed",
-                ).with_arg("detail", "failed to read page for RouteTable"));
+            report.diagnostics.push(
+                ReportedDiagnostic::error(&path, "vmz::io::read_failed")
+                    .with_arg("detail", "failed to read page for RouteTable"),
+            );
             continue;
         };
         let parsed = match parse_vmz(&path, source) {
@@ -741,12 +739,10 @@ fn emit_server_tree(
                 report.emitted.push(out);
             }
             Err(e) => {
-                report
-                    .diagnostics
-                    .push(
-                        ReportedDiagnostic::error(path, "vmz::emit::server_tree_failed")
-                            .with_arg("error", e.to_string()),
-                    );
+                report.diagnostics.push(
+                    ReportedDiagnostic::error(path, "vmz::emit::server_tree_failed")
+                        .with_arg("error", e.to_string()),
+                );
             }
         }
     }
@@ -908,10 +904,7 @@ fn emit_file(
                 .with_source_span(SourceSpan { path: path_s, start, end }),
         );
     }
-    if report
-        .diagnostics
-        .iter()
-        .any(|d| d.is_error() && d.code() == "vmz::template::invalid_expr")
+    if report.diagnostics.iter().any(|d| d.is_error() && d.code() == "vmz::template::invalid_expr")
     {
         return Ok(());
     }
@@ -1010,12 +1003,10 @@ fn emit_file(
     ) {
         Ok(pair) => pair,
         Err(e) => {
-            report
-                .diagnostics
-                .push(
-                    ReportedDiagnostic::error(path, "vmz::emit::client_failed")
-                        .with_arg("error", e.to_string()),
-                );
+            report.diagnostics.push(
+                ReportedDiagnostic::error(path, "vmz::emit::client_failed")
+                    .with_arg("error", e.to_string()),
+            );
             return Ok(());
         }
     };
@@ -1049,12 +1040,10 @@ fn emit_file(
     ) {
         Ok(p) => p,
         Err(e) => {
-            report
-                .diagnostics
-                .push(
-                    ReportedDiagnostic::error(path, "vmz::emit::client_js_print_failed")
-                        .with_arg("error", e.to_string()),
-                );
+            report.diagnostics.push(
+                ReportedDiagnostic::error(path, "vmz::emit::client_js_print_failed")
+                    .with_arg("error", e.to_string()),
+            );
             return Ok(());
         }
     };
@@ -1086,12 +1075,10 @@ fn emit_file(
                 }
             }
             Err(e) => {
-                report
-                    .diagnostics
-                    .push(
-                        ReportedDiagnostic::error(path, "vmz::emit::server_failed")
-                            .with_arg("error", e.to_string()),
-                    );
+                report.diagnostics.push(
+                    ReportedDiagnostic::error(path, "vmz::emit::server_failed")
+                        .with_arg("error", e.to_string()),
+                );
                 return Ok(());
             }
         };
@@ -1180,7 +1167,8 @@ fn emit_deployment_json(
         let depended_by = graph.reverse.get(chunk_id).cloned().unwrap_or_default();
         let extras = read_program_deployment_extras(&options.out_dir.join(&program_ir));
         let route = route_table.get_by_chunk(chunk_id);
-        let layout_chain = if chunk_id.starts_with("pages/") && !crate::pipeline::link::is_route_boundary_chunk(chunk_id)
+        let layout_chain = if chunk_id.starts_with("pages/")
+            && !crate::pipeline::link::is_route_boundary_chunk(chunk_id)
         {
             crate::pipeline::link::layout_chain_for_page(chunk_id, &known_chunks)
         } else {

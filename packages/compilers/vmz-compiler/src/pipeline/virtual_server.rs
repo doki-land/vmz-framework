@@ -64,33 +64,14 @@ fn pathdiff_fallback(from_dir: &Path, target: &Path) -> String {
     if out.is_empty() { ".".into() } else { out.join("/") }
 }
 
-/// Rewrite `from '#server/...'` / `"#server/..."` to relative paths for Node ESM.
+/// Rewrite `from '#server/...'` / `"#server/..."` to relative paths for Node ESM (oxc AST).
 pub fn rewrite_imports_to_relative(js: &str, from_module_id: &str) -> String {
-    let mut out = js.to_string();
-    // Collect unique #server ids referenced in quotes.
-    let mut ids = Vec::new();
-    for (quote, rest) in [('"', js), ('\'', js)] {
-        let _ = rest;
-        let pattern_prefix = format!("{quote}{PREFIX}/");
-        let mut search = js;
-        while let Some(start) = search.find(&pattern_prefix) {
-            let abs_start = js.len() - search.len() + start;
-            let after = &js[abs_start + 1..];
-            if let Some(end) = after.find(quote) {
-                let id = &after[..end];
-                if id.starts_with(PREFIX) && !ids.iter().any(|x: &String| x == id) {
-                    ids.push(id.to_string());
-                }
-                search = &after[end + 1..];
-            } else {
-                break;
-            }
-        }
-    }
-    for id in ids {
-        let rel = relative_import(from_module_id, &id);
-        out = out.replace(&format!("\"{id}\""), &format!("\"{rel}\""));
-        out = out.replace(&format!("'{id}'"), &format!("'{rel}'"));
-    }
-    out
+    let from = from_module_id.to_string();
+    vmz_generator::js::rewrite_module_specifiers_required(
+        js,
+        |spec| {
+            if spec.starts_with(PREFIX) { Some(relative_import(&from, spec)) } else { None }
+        },
+        "virtual_server::rewrite_imports_to_relative",
+    )
 }

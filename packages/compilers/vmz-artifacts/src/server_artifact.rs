@@ -108,7 +108,9 @@ pub fn normalize_server_artifact(
             continue;
         }
         let caps: Vec<String> = match u.get("capabilities") {
-            Some(Value::Array(a)) => a.iter().map(|c| c.as_str().unwrap_or("").to_string()).collect(),
+            Some(Value::Array(a)) => {
+                a.iter().map(|c| c.as_str().unwrap_or("").to_string()).collect()
+            }
             _ => vec![],
         };
         let chunk_id = str_field(u, "chunkId", "");
@@ -295,10 +297,7 @@ pub fn project_server_runtime_adapter(
     }
 
     let artifact_digest = artifact.get("artifactDigest").cloned().unwrap_or(Value::Null);
-    let http_digest = artifact
-        .pointer("/httpContract/digest")
-        .cloned()
-        .unwrap_or(Value::Null);
+    let http_digest = artifact.pointer("/httpContract/digest").cloned().unwrap_or(Value::Null);
     let public_count = match artifact.get("publicRoutes") {
         Some(Value::Array(a)) => a.len(),
         _ => 0,
@@ -383,11 +382,7 @@ pub fn project_server_runtime_adapter_json(
 
 fn normalize_runtime(raw: Option<&str>) -> String {
     let v = raw.unwrap_or("node").trim();
-    if SERVER_RUNTIMES.contains(&v) {
-        v.to_string()
-    } else {
-        "node".into()
-    }
+    if SERVER_RUNTIMES.contains(&v) { v.to_string() } else { "node".into() }
 }
 
 fn str_field(v: &Value, key: &str, default: &str) -> String {
@@ -472,7 +467,8 @@ mod tests {
 
     #[test]
     fn empty_inputs_produce_artifact_digest() {
-        let art = normalize_server_artifact("{}", "[]", &ServerArtifactOpts::default()).expect("ok");
+        let art =
+            normalize_server_artifact("{}", "[]", &ServerArtifactOpts::default()).expect("ok");
         assert_eq!(art["schema"], SERVER_ARTIFACT_SCHEMA);
         assert_eq!(art["selectedRuntime"], "node");
         assert!(art["artifactDigest"].as_str().unwrap().len() == 64);
@@ -506,7 +502,8 @@ mod tests {
 
     #[test]
     fn adapter_projection_worker() {
-        let art = normalize_server_artifact("{}", "[]", &ServerArtifactOpts::default()).expect("ok");
+        let art =
+            normalize_server_artifact("{}", "[]", &ServerArtifactOpts::default()).expect("ok");
         let proj = project_server_runtime_adapter(&art, "worker").expect("proj");
         assert_eq!(proj["schema"], SERVER_RUNTIME_ADAPTER_SCHEMA);
         assert_eq!(proj["host"], "fetch");

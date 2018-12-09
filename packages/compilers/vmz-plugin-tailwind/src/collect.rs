@@ -165,11 +165,8 @@ fn walk_nodes(
                                 Span::new(template_start as u32, template_start as u32)
                             });
                         diagnostics.push(
-                            ReportedDiagnostic::advice(
-                                path,
-                                "vmz::tw::dynamic_style_tw",
-                            )
-                            .with_arg("expr", expr.clone()),
+                            ReportedDiagnostic::advice(path, "vmz::tw::dynamic_style_tw")
+                                .with_arg("expr", expr.clone()),
                         );
                         // Attach span via error_at-style advice isn't available — use warning_at pattern:
                         // ReportedDiagnostic::advice has no span; upgrade to warning with label.

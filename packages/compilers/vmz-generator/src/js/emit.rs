@@ -365,7 +365,7 @@ fn emit_server_client_stub(bridge: &ServerBridge) -> String {
     oxc_reprint_module_required(&raw, "server client stub")
 }
 
-/// Rewrite virtual import specs (`vmz:runtime`, `vmz:dom`) to relative paths.
+/// Rewrite virtual import specs (`vmz:runtime`, `vmz:dom`) to relative paths via oxc AST.
 pub fn rewrite_virtual_import(
     js: &str,
     from_file: &Path,
@@ -375,29 +375,28 @@ pub fn rewrite_virtual_import(
     let from_dir = from_file.parent().unwrap_or(Path::new("."));
     let rel = pathdiff_string(from_dir, target);
     let spec = if rel.starts_with('.') { rel } else { format!("./{rel}") };
-    js.replace(&format!("\"{virtual_spec}\""), &format!("\"{spec}\""))
-        .replace(&format!("'{virtual_spec}'"), &format!("'{spec}'"))
+    let want = virtual_spec.to_string();
+    super::module_rewrite::rewrite_module_specifiers_required(
+        js,
+        |s| if s == want { Some(spec.clone()) } else { None },
+        "rewrite_virtual_import",
+    )
 }
 
-/// Author may write `from './foo.ts'`; Node ESM under `dist/` needs `.js`.
+/// Author may write `from './foo.ts'`; Node ESM under `dist/` needs `.js` (oxc AST).
 pub fn rewrite_ts_spec_imports(js: &str) -> String {
-    let mut out = String::new();
-    for line in js.lines() {
-        let trimmed = line.trim_start();
-        if trimmed.starts_with("import ") || trimmed.starts_with("export ") {
-            out.push_str(
-                &line
-                    .replace(".tsx\"", ".js\"")
-                    .replace(".tsx'", ".js'")
-                    .replace(".ts\"", ".js\"")
-                    .replace(".ts'", ".js'"),
-            );
-        } else {
-            out.push_str(line);
-        }
-        out.push('\n');
-    }
-    out
+    super::module_rewrite::rewrite_module_specifiers_required(
+        js,
+        |spec| {
+            if let Some(stem) = spec.strip_suffix(".tsx").or_else(|| spec.strip_suffix(".ts")) {
+                // Keep absolute / protocol / query forms; only rewrite extension.
+                Some(format!("{stem}.js"))
+            } else {
+                None
+            }
+        },
+        "rewrite_ts_spec_imports",
+    )
 }
 
 /// Eager/lazy entry module for serve / static hosts.

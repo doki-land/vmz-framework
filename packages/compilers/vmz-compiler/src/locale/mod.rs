@@ -53,7 +53,10 @@ pub fn load_locale_plan(project_root: impl AsRef<Path>) -> LocalePlan {
                 fallback: BTreeMap::new(),
                 routing: default_routing(),
                 missing: "error".into(),
-                diagnostics: vec![ReportedDiagnostic::coded_error(rel, DIAG_CATALOG_PARSE).with_arg("detail", format!("read locales manifest failed: {e}"))],
+                diagnostics: vec![
+                    ReportedDiagnostic::coded_error(rel, DIAG_CATALOG_PARSE)
+                        .with_arg("detail", format!("read locales manifest failed: {e}")),
+                ],
             };
         }
     };
@@ -76,7 +79,10 @@ pub fn load_locale_plan_from_source(source: &str, source_path: impl Into<String>
                 fallback: BTreeMap::new(),
                 routing: default_routing(),
                 missing: "error".into(),
-                diagnostics: vec![ReportedDiagnostic::coded_error(source_path, DIAG_CATALOG_PARSE).with_arg("detail", format!("locales.json5 parse failed: {e}"))],
+                diagnostics: vec![
+                    ReportedDiagnostic::coded_error(source_path, DIAG_CATALOG_PARSE)
+                        .with_arg("detail", format!("locales.json5 parse failed: {e}")),
+                ],
             };
         }
     };
@@ -93,7 +99,10 @@ pub fn load_locale_plan_from_source(source: &str, source_path: impl Into<String>
                 fallback: BTreeMap::new(),
                 routing: default_routing(),
                 missing: "error".into(),
-                diagnostics: vec![ReportedDiagnostic::coded_error(source_path, DIAG_CATALOG_PARSE).with_arg("detail", format!("locales.json5 shape invalid: {e}"))],
+                diagnostics: vec![
+                    ReportedDiagnostic::coded_error(source_path, DIAG_CATALOG_PARSE)
+                        .with_arg("detail", format!("locales.json5 shape invalid: {e}")),
+                ],
             };
         }
     };
@@ -124,12 +133,18 @@ fn normalize_locale_manifest(file: LocaleManifestFile, source_path: String) -> L
         match validate_locale_id(&id) {
             Ok(()) => {}
             Err(msg) => {
-                diagnostics.push(ReportedDiagnostic::coded_error(source_path.clone(), DIAG_LOCALE_ID_INVALID).with_arg("detail", msg));
+                diagnostics.push(
+                    ReportedDiagnostic::coded_error(source_path.clone(), DIAG_LOCALE_ID_INVALID)
+                        .with_arg("detail", msg),
+                );
                 continue;
             }
         }
         if !seen.insert(id.clone()) {
-            diagnostics.push(ReportedDiagnostic::coded_error(source_path.clone(), DIAG_LOCALE_ID_COLLISION).with_arg("detail", format!("duplicate LocaleId {id} in locales[]")));
+            diagnostics.push(
+                ReportedDiagnostic::coded_error(source_path.clone(), DIAG_LOCALE_ID_COLLISION)
+                    .with_arg("detail", format!("duplicate LocaleId {id} in locales[]")),
+            );
             continue;
         }
         let direction = if entry.direction.is_empty() { "ltr".into() } else { entry.direction };
@@ -138,22 +153,37 @@ fn normalize_locale_manifest(file: LocaleManifestFile, source_path: String) -> L
 
     let default_locale = file.default_locale;
     if default_locale.is_empty() || !seen.contains(&default_locale) {
-        diagnostics.push(ReportedDiagnostic::coded_error(source_path.clone(), DIAG_LOCALE_DEFAULT_MISSING).with_arg("detail", format!(
-                "defaultLocale {} missing from locales[]",
-                serde_json::to_string(&default_locale).unwrap_or_else(|_| "\"\"".into())
-            )));
+        diagnostics.push(
+            ReportedDiagnostic::coded_error(source_path.clone(), DIAG_LOCALE_DEFAULT_MISSING)
+                .with_arg(
+                    "detail",
+                    format!(
+                        "defaultLocale {} missing from locales[]",
+                        serde_json::to_string(&default_locale).unwrap_or_else(|_| "\"\"".into())
+                    ),
+                ),
+        );
     }
 
     let mut fallback = BTreeMap::new();
     for (from, chain) in file.fallback {
         if !seen.contains(&from) {
-            diagnostics.push(ReportedDiagnostic::coded_error(source_path.clone(), DIAG_LOCALE_FALLBACK_UNKNOWN).with_arg("detail", format!("fallback key {from} is not a declared LocaleId")));
+            diagnostics.push(
+                ReportedDiagnostic::coded_error(source_path.clone(), DIAG_LOCALE_FALLBACK_UNKNOWN)
+                    .with_arg("detail", format!("fallback key {from} is not a declared LocaleId")),
+            );
             continue;
         }
         let mut cleaned = Vec::new();
         for next in chain {
             if !seen.contains(&next) {
-                diagnostics.push(ReportedDiagnostic::coded_error(source_path.clone(), DIAG_LOCALE_FALLBACK_UNKNOWN).with_arg("detail", format!("fallback {from} → unknown LocaleId {next}")));
+                diagnostics.push(
+                    ReportedDiagnostic::coded_error(
+                        source_path.clone(),
+                        DIAG_LOCALE_FALLBACK_UNKNOWN,
+                    )
+                    .with_arg("detail", format!("fallback {from} → unknown LocaleId {next}")),
+                );
                 continue;
             }
             cleaned.push(next);
@@ -162,7 +192,10 @@ fn normalize_locale_manifest(file: LocaleManifestFile, source_path: String) -> L
     }
 
     if let Some(cycle) = detect_fallback_cycle(&fallback) {
-        diagnostics.push(ReportedDiagnostic::coded_error(source_path.clone(), DIAG_LOCALE_FALLBACK_CYCLE).with_arg("detail", format!("fallback cycle: {}", cycle.join(" → "))));
+        diagnostics.push(
+            ReportedDiagnostic::coded_error(source_path.clone(), DIAG_LOCALE_FALLBACK_CYCLE)
+                .with_arg("detail", format!("fallback cycle: {}", cycle.join(" → "))),
+        );
     }
 
     let routing = file.routing.unwrap_or_else(default_routing);

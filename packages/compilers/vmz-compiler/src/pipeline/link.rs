@@ -252,7 +252,10 @@ pub fn path_pattern_from_chunk(chunk_id: &str) -> String {
 
 /// Plan-only layout chain for a page chunk: optional `Application` shell, then nested
 /// `pages/**/Layout` ancestors that exist in `known_chunks` (outer → inner).
-pub fn layout_chain_for_page(page_chunk_id: &str, known_chunks: &std::collections::BTreeSet<String>) -> Vec<String> {
+pub fn layout_chain_for_page(
+    page_chunk_id: &str,
+    known_chunks: &std::collections::BTreeSet<String>,
+) -> Vec<String> {
     let mut chain = nested_layout_chain(page_chunk_id, known_chunks);
     if known_chunks.contains("Application") {
         chain.insert(0, "Application".into());
@@ -260,7 +263,10 @@ pub fn layout_chain_for_page(page_chunk_id: &str, known_chunks: &std::collection
     chain
 }
 
-fn nested_layout_chain(page_chunk_id: &str, known_chunks: &std::collections::BTreeSet<String>) -> Vec<String> {
+fn nested_layout_chain(
+    page_chunk_id: &str,
+    known_chunks: &std::collections::BTreeSet<String>,
+) -> Vec<String> {
     let rel = page_chunk_id.strip_prefix("pages/").unwrap_or(page_chunk_id);
     let mut parts: Vec<&str> = rel.split('/').filter(|p| !p.is_empty()).collect();
     if !parts.is_empty() {
@@ -585,10 +591,11 @@ mod layout_chain_tests {
 
     #[test]
     fn layout_chain_outer_to_inner_with_application() {
-        let known: BTreeSet<String> = ["Application", "pages/Layout", "pages/shop/Layout", "pages/shop/offer"]
-            .into_iter()
-            .map(String::from)
-            .collect();
+        let known: BTreeSet<String> =
+            ["Application", "pages/Layout", "pages/shop/Layout", "pages/shop/offer"]
+                .into_iter()
+                .map(String::from)
+                .collect();
         assert_eq!(
             layout_chain_for_page("pages/shop/offer", &known),
             vec![

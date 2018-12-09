@@ -48,7 +48,8 @@ fn emit_project_impl(req: &ScssEmitRequest) -> ScssEmitResult {
             }
             Ok(_) => {}
             Err(msg) => diagnostics.push(
-                ReportedDiagnostic::error(&path, "vmz::scss::compile_failed").with_arg("detail", msg),
+                ReportedDiagnostic::error(&path, "vmz::scss::compile_failed")
+                    .with_arg("detail", msg),
             ),
         }
     }
@@ -64,11 +65,10 @@ fn emit_project_impl(req: &ScssEmitRequest) -> ScssEmitResult {
         let parsed = match parse_vmz(source, text) {
             Ok(p) => p,
             Err(e) => {
-                diagnostics
-                    .push(
-                        ReportedDiagnostic::warning(source, "vmz::sfc::parse_failed")
-                            .with_arg("detail", e.to_string()),
-                    );
+                diagnostics.push(
+                    ReportedDiagnostic::warning(source, "vmz::sfc::parse_failed")
+                        .with_arg("detail", e.to_string()),
+                );
                 continue;
             }
         };

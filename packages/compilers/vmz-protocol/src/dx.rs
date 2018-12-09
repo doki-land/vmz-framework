@@ -1085,7 +1085,9 @@ impl WorkspaceEditPlan {
             preconditions: vec![],
             edits: vec![],
             affected_program_ids: vec![],
-            diagnostics: vec![ReportedDiagnostic::coded_error("", code).with_arg("detail", message)],
+            diagnostics: vec![
+                ReportedDiagnostic::coded_error("", code).with_arg("detail", message),
+            ],
             status: WorkspaceEditStatus::Rejected,
         }
     }
@@ -1369,7 +1371,9 @@ impl SemanticTransactionDocument {
             id,
             status: SemanticTransactionStatus::Rejected,
             edits: vec![],
-            diagnostics: vec![ReportedDiagnostic::coded_error("", code).with_arg("detail", message)],
+            diagnostics: vec![
+                ReportedDiagnostic::coded_error("", code).with_arg("detail", message),
+            ],
             dirty_paths: vec![],
         }
     }

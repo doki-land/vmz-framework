@@ -243,11 +243,7 @@ fn map_diag(d: &vmz_compiler::ReportedDiagnostic) -> JsDiagnostic {
         vmz_compiler::Severity::Warning => "warning",
         vmz_compiler::Severity::Advice => "advice",
     };
-    let span = d.source_span().map(|s| JsSourceSpan {
-        path: s.path,
-        start: s.start,
-        end: s.end,
-    });
+    let span = d.source_span().map(|s| JsSourceSpan { path: s.path, start: s.start, end: s.end });
     JsDiagnostic {
         path: d.path().display().to_string(),
         severity: severity.into(),
@@ -1499,6 +1495,53 @@ pub fn generate_pretty_json(json_text: String) -> Result<String> {
         .map_err(|e| Error::from_reason(format!("generatePrettyJson: {e}")))
 }
 
+/// Rewrite ESM module specifiers via oxc AST.
+///
+/// `rules_json` is optional JSON:
+/// `{ "exact": Record<string,string>, "tsExtToJs": bool, "dotSlashToParent": bool }`.
+/// Defaults: `tsExtToJs` true when rules omitted or empty; other flags false.
+#[napi]
+pub fn rewrite_module_specifiers(source: String, rules_json: Option<String>) -> Result<String> {
+    #[derive(Default, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Rules {
+        #[serde(default)]
+        exact: std::collections::HashMap<String, String>,
+        #[serde(default)]
+        ts_ext_to_js: Option<bool>,
+        #[serde(default)]
+        dot_slash_to_parent: bool,
+    }
+
+    let rules: Rules = match rules_json.as_deref() {
+        None | Some("") => Rules { ts_ext_to_js: Some(true), ..Rules::default() },
+        Some(raw) => serde_json::from_str(raw).map_err(|e| {
+            Error::from_reason(format!("rewriteModuleSpecifiers: invalid rules JSON: {e}"))
+        })?,
+    };
+    let ts_ext = rules.ts_ext_to_js.unwrap_or(true);
+    let exact = rules.exact;
+    let dot_parent = rules.dot_slash_to_parent;
+
+    vmz_generator::js::rewrite_module_specifiers(&source, |spec| {
+        if let Some(next) = exact.get(spec) {
+            return Some(next.clone());
+        }
+        if dot_parent && let Some(rest) = spec.strip_prefix("./") {
+            if !rest.is_empty() && !rest.starts_with('/') {
+                return Some(format!("../{rest}"));
+            }
+        }
+        if ts_ext {
+            if let Some(stem) = spec.strip_suffix(".tsx").or_else(|| spec.strip_suffix(".ts")) {
+                return Some(format!("{stem}.js"));
+            }
+        }
+        None
+    })
+    .ok_or_else(|| Error::from_reason("rewriteModuleSpecifiers: oxc failed to parse module"))
+}
+
 /// Compact JSON via JsonCodeGenerator (same parse → print contract as pretty).
 #[napi]
 pub fn generate_json(json_text: String) -> Result<String> {
@@ -1591,7 +1634,10 @@ pub fn normalize_server_artifact_json(
 
 /// Project a runtime adapter row from a normalized ServerArtifact JSON string.
 #[napi]
-pub fn project_server_runtime_adapter_json(artifact_json: String, adapter_id: String) -> Result<String> {
+pub fn project_server_runtime_adapter_json(
+    artifact_json: String,
+    adapter_id: String,
+) -> Result<String> {
     vmz_artifacts::project_server_runtime_adapter_json(&artifact_json, &adapter_id)
         .map_err(|e| Error::from_reason(e.to_string()))
 }
@@ -1690,9 +1736,9 @@ pub fn author_json5_to_canonical_json(source: String) -> Result<String> {
 /// Never spawns the `gh` CLI. See `MonitorRequest` / `MonitorResult` in `vmz-github`.
 #[napi(js_name = "githubActionsMonitorJson")]
 pub fn github_actions_monitor_json(request_json: String) -> Result<String> {
-    let request: vmz_github::MonitorRequest = serde_json::from_str(&request_json)
-        .map_err(|e| Error::from_reason(e.to_string()))?;
-    let result = vmz_github::monitor_blocking(request)
-        .map_err(|e| Error::from_reason(e.to_string()))?;
+    let request: vmz_github::MonitorRequest =
+        serde_json::from_str(&request_json).map_err(|e| Error::from_reason(e.to_string()))?;
+    let result =
+        vmz_github::monitor_blocking(request).map_err(|e| Error::from_reason(e.to_string()))?;
     serde_json::to_string(&result).map_err(|e| Error::from_reason(e.to_string()))
 }
