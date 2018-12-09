@@ -1,5 +1,6 @@
-# Dogfood — official tool collection `vmz-tools` (engineering bypass).
-# Primary tool: monitor GitHub Actions via Octokit (not the gh CLI).
+# Dogfood — official downstream template `vmz-tools` (engineering bypass).
+# Uses workspace-latest `vmz` (not a published registry pin).
+# Primary tool: monitor GitHub Actions via `vmz github-actions` → Rust octocrab.
 
 name: Dogfood VMZ Tools
 
@@ -9,11 +10,17 @@ on:
     paths:
       - '.github/actions/vmz-tools/**'
       - '.github/workflows/dogfood-vmz-tools.yml'
+      - 'packages/compilers/vmz-github/**'
+      - 'packages/compilers/vmz-napi/**'
+      - 'packages/runtimes/vmz/src/github-actions-cmd.ts'
+      - 'packages/runtimes/vmz/src/cli.ts'
   pull_request:
     branches: [dev]
     paths:
       - '.github/actions/vmz-tools/**'
       - '.github/workflows/dogfood-vmz-tools.yml'
+      - 'packages/compilers/vmz-github/**'
+      - 'packages/runtimes/vmz/src/github-actions-cmd.ts'
   workflow_dispatch:
 
 permissions:
@@ -22,17 +29,26 @@ permissions:
 
 jobs:
   monitor-status:
-    name: github-actions status smoke
+    name: github-actions status smoke (workspace vmz)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
           node-version: '20'
           package-manager-cache: false
+
+      - name: Install workspace
+        run: pnpm install
+
+      - name: Build runtimes (native + JS)
+        run: pnpm build:runtimes
 
       - name: Monitor CI (one-shot status)
         id: monitor
@@ -42,6 +58,8 @@ jobs:
           mode: status
           workflow: ci.yml
           branch: ${{ github.event.repository.default_branch }}
+          vmz-command: node ${{ github.workspace }}/packages/runtimes/vmz/bin/vmz.js
+          working-directory: ${{ github.workspace }}
 
       - name: Assert outputs
         shell: bash
