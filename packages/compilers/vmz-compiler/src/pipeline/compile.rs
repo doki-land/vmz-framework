@@ -251,6 +251,12 @@ pub struct CompileReport {
     pub style_bundle_hash: Option<String>,
     /// TW tokens registered while emitting units.
     pub tw_registrations: Vec<crate::tw::TwRegistration>,
+    /// Relative paths under `out_dir` written this round (generation write-set).
+    pub written_outputs: Vec<String>,
+    /// Stable digest of deployment, routes, and written artifact bytes (dev artifact diff).
+    pub output_revision: String,
+    /// Whether browsers should soft-reload after this build (dev convergence).
+    pub reload_required: bool,
 }
 
 /// Compile a single `.vmz` file or a project root directory.
@@ -275,6 +281,9 @@ pub fn compile_path(
             style_theme: None,
             style_bundle_hash: None,
             tw_registrations: Vec::new(),
+            written_outputs: Vec::new(),
+            output_revision: String::new(),
+            reload_required: false,
         });
     }
 
@@ -331,6 +340,9 @@ pub fn compile_project_with_dirty(
             style_theme: None,
             style_bundle_hash: None,
             tw_registrations: Vec::new(),
+            written_outputs: Vec::new(),
+            output_revision: String::new(),
+            reload_required: false,
         });
     }
 
@@ -355,7 +367,7 @@ pub fn compile_project_with_dirty(
         emit_server_tree(&src_root, options, &mut report)?;
     }
     // Plain `src/**/*.{ts,js}` helpers (not `#server`, not `.vmz`) → `dist/**/*.js`.
-    emit_client_modules(&src_root, options, &mut report)?;
+    emit_client_modules(&src_root, options, &mut report, dirty, plan.full)?;
 
     // Full RouteTable from all pages (Link resolve must not depend on dirty set / filesystem probes).
     let route_table = match build_project_route_table(root, &src_root, &mut report) {
@@ -382,6 +394,7 @@ pub fn compile_project_with_dirty(
     }
     emit_stylesheets(root, options, &mut report)?;
     emit_deployment_json(root, &src_root, options, &plan, &route_table, &mut report)?;
+    finalize_output_revision(options, dirty, &mut report);
     Ok(report)
 }
 
@@ -754,10 +767,16 @@ fn emit_client_modules(
     src_root: &Path,
     options: &CompileOptions,
     report: &mut CompileReport,
+    dirty: &[PathBuf],
+    full: bool,
 ) -> crate::Result<()> {
     if !src_root.is_dir() {
         return Ok(());
     }
+    let dirty_set: std::collections::BTreeSet<PathBuf> = dirty
+        .iter()
+        .map(|p| std::fs::canonicalize(p).unwrap_or_else(|_| p.clone()))
+        .collect();
     let server_root = src_root.join("server");
     for entry in WalkDir::new(src_root).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
@@ -766,6 +785,12 @@ fn emit_client_modules(
         }
         if path.strip_prefix(&server_root).is_ok() {
             continue;
+        }
+        if !full {
+            let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+            if !dirty_set.contains(&canonical) {
+                continue;
+            }
         }
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         if ext != "ts" && ext != "js" && ext != "mjs" {
@@ -839,6 +864,43 @@ fn emit_client_modules(
         report.emitted.push(out);
     }
     Ok(())
+}
+
+fn finalize_output_revision(options: &CompileOptions, dirty: &[PathBuf], report: &mut CompileReport) {
+    use crate::session::plugin::sha256_hex;
+    use serde_json::json;
+
+    let mut parts: Vec<serde_json::Value> = Vec::new();
+    if let Ok(bytes) = fs::read(options.out_dir.join("vmz-deployment.json")) {
+        parts.push(json!({"deployment": sha256_hex(&bytes)}));
+    }
+    if let Ok(bytes) = fs::read(options.out_dir.join("vmz-routes.json")) {
+        parts.push(json!({"routes": sha256_hex(&bytes)}));
+    }
+
+    let mut written: Vec<String> = report
+        .emitted
+        .iter()
+        .filter_map(|p| {
+            p.strip_prefix(&options.out_dir)
+                .ok()
+                .map(|r| r.to_string_lossy().replace('\\', "/"))
+        })
+        .collect();
+    written.sort();
+    written.dedup();
+
+    for rel in &written {
+        if let Ok(bytes) = fs::read(options.out_dir.join(rel)) {
+            parts.push(json!({rel.clone(): sha256_hex(&bytes)}));
+        }
+    }
+    report.written_outputs = written;
+    let body = serde_json::to_string(&parts).unwrap_or_default();
+    report.output_revision = sha256_hex(body.as_bytes());
+    report.reload_required = !dirty.is_empty()
+        && report.diagnostics.iter().all(|d| !d.is_error())
+        && (!report.affected_chunks.is_empty() || report.full || report.island_hmr);
 }
 
 fn emit_file(
