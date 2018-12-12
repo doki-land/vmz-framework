@@ -118,15 +118,32 @@ describe('dev-watch coalesce + roots (v0.1.5)', () => {
         fs.rmSync(root, { recursive: true, force: true });
     });
 
-    it('classifyWatchRoot routes designs/ to designs bucket (VMZ-8)', () => {
+    it('collectDevWatchRoots includes public/ when present', () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-watch-public-'));
+        const app = path.join(root, 'app');
+        fs.mkdirSync(path.join(app, 'src', 'pages'), { recursive: true });
+        fs.mkdirSync(path.join(app, 'public', 'images'), { recursive: true });
+        fs.writeFileSync(path.join(app, 'public', 'images', 'logo.png'), 'x');
+        fs.writeFileSync(path.join(app, 'src', 'pages', 'index.vmz'), '<template><div /></template>\n');
+        fs.mkdirSync(path.join(app, 'dist'), { recursive: true });
+        fs.writeFileSync(path.join(app, 'dist', 'vmz-deployment.json'), JSON.stringify({ schema: 'vmz.deployment.v0', units: [] }));
+        const watched = collectDevWatchRoots({ project: app, outDir: path.join(app, 'dist') });
+        expect(watched.publicRoot).toBe(path.join(app, 'public'));
+        expect(watched.roots).toContain(watched.publicRoot);
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it('classifyWatchRoot routes public/ to public bucket', () => {
         const project = '/tmp/app';
         const ctx = {
             src: path.join(project, 'src'),
             docsRoot: path.join(project, 'documents'),
             localesRoot: path.join(project, 'locales'),
             designsRoot: path.join(project, 'designs'),
+            publicRoot: path.join(project, 'public'),
             dependencyRoots: [path.join(project, 'node_modules', '@pkg', 'ui', 'src')],
         };
+        expect(classifyWatchRoot(ctx.publicRoot, ctx)).toBe('public');
         expect(classifyWatchRoot(ctx.designsRoot, ctx)).toBe('designs');
         expect(classifyWatchRoot(ctx.src, ctx)).toBe('src');
         expect(classifyWatchRoot(ctx.docsRoot, ctx)).toBe('docs');

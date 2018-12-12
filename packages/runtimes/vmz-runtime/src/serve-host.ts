@@ -782,11 +782,13 @@ async function softReload(opts = {}) {
     const emitted = opts.payload?.emitted ?? [];
     const full = opts.payload?.full;
     const islandHmr = Boolean(opts.payload?.islandHmr);
+    const rerunLoaders = opts.payload?.rerunLoaders ?? [];
+    const skipEntryRewrite = Boolean(opts.payload?.skipEntryRewrite);
     const buildId = opts.payload?.buildId != null ? String(opts.payload.buildId) : null;
     const sourceRevision = opts.payload?.sourceRevision != null ? String(opts.payload.sourceRevision) : null;
     const bundleRevision = opts.payload?.bundleRevision != null ? String(opts.payload.bundleRevision) : null;
     if (buildId) lastDevBuildId = buildId;
-    const reloadAllPages = shouldReloadAllPages({ full, affected, emitted, islandHmr });
+    const reloadAllPages = shouldReloadAllPages({ full, affected, emitted, islandHmr, rerunLoaders });
 
     try {
         try {
@@ -814,7 +816,13 @@ async function softReload(opts = {}) {
         const nextCtors = new Map();
 
         if (!islandHmr) {
-            const pagesToLoad = reloadAllPages ? nextCatalog : nextCatalog.filter((p) => pageNeedsReload(p.chunkId, affected));
+            const reloadSet =
+                rerunLoaders.length > 0
+                    ? rerunLoaders
+                    : reloadAllPages
+                      ? nextCatalog.map((p) => p.chunkId)
+                      : nextCatalog.filter((p) => pageNeedsReload(p.chunkId, affected)).map((p) => p.chunkId);
+            const pagesToLoad = nextCatalog.filter((p) => reloadSet.includes(p.chunkId));
             for (const p of pagesToLoad) {
                 const pageRel = `${p.chunkId}.client.js`;
                 const href = bustUrl(pathToFileURL(path.join(distDir, pageRel)).href);
@@ -855,14 +863,14 @@ async function softReload(opts = {}) {
             emitEntryClient(
                 componentEntries.filter((e) => !lazySet.has(e.name)),
                 componentEntries.filter((e) => lazySet.has(e.name)),
-                reloadToken,
+                skipEntryRewrite ? reloadToken : nextToken,
             ),
             'utf8',
         );
 
         const strategies = resumeEntries.map((e) => e.strategy);
         const eventOnlyShell = isEventOnlyShell(strategies);
-        await writeFile(path.join(distDir, 'entry-event.js'), emitEntryEvent(reloadToken), 'utf8');
+        await writeFile(path.join(distDir, 'entry-event.js'), emitEntryEvent(skipEntryRewrite ? reloadToken : nextToken), 'utf8');
 
         lastDevError = null;
         const mode = islandHmr ? 'island' : eventOnlyShell ? 'event-shell' : 'full';
@@ -925,6 +933,7 @@ async function softReload(opts = {}) {
 function shouldReloadAllPages(opts) {
     if (opts.islandHmr) return false;
     if (opts.full) return true;
+    if (Array.isArray(opts.rerunLoaders) && opts.rerunLoaders.length > 0) return false;
     if (!opts.affected.length) return true;
     for (const f of opts.emitted) {
         const n = String(f).replace(/\\/g, '/');
@@ -1112,6 +1121,10 @@ async function loadPageCtor(chunkId) {
 async function listPageClientFiles(dir) {
     const fromDep = await listPagesFromDeployment(dir);
     if (!fromDep.length) {
+        if (isDev) {
+            console.warn(`vmz dev: no page units with pathPattern in ${path.join(dir, 'vmz-deployment.json')}`);
+            return [];
+        }
         throw new Error(`vmz serve: no page units with pathPattern in ${path.join(dir, 'vmz-deployment.json')} (plan-only host)`);
     }
     return fromDep;

@@ -113,6 +113,9 @@ export interface BuildReport {
     affectedChunks?: string[];
     seedChunks?: string[];
     islandHmr?: boolean;
+    writtenOutputs?: string[];
+    outputRevision?: string;
+    reloadRequired?: boolean;
 }
 
 export interface FormatReport {

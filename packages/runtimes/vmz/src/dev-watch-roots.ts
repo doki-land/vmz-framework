@@ -1,11 +1,39 @@
 /**
  * Dev watch helpers: coalesce multi-file bursts without dropping dirty set,
  * and derive extra watch roots from the compile graph (deployment unit sources).
+ *
+ * DevInput layers (0.1.24): author · dependency · public · devControl.
+ * Never watch `dist/`, generated indexes, or generation write-set paths.
  */
 
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { diffFingerprints, fileFingerprintMap } from './watch-diff.js';
+
+/** Author-facing vs generated dev input bucket. */
+export type DevInputKind = 'author' | 'dependency' | 'public' | 'devControl' | 'locales' | 'docs' | 'designs' | 'other';
+
+const CONFIG_BASENAMES = ['vmz.config.ts', 'vmz.config.js', 'vmz.config.mjs', 'vmz.config.cjs'] as const;
+
+/** `vmz.config.*` at project root (devControl). */
+export function collectDevConfigPaths(project: string): string[] {
+    const root = path.resolve(project);
+    return CONFIG_BASENAMES.map((name) => path.join(root, name)).filter((p) => existsSync(p));
+}
+
+/** Fingerprint map for explicit config files (not directory walks). */
+export function configFingerprintMap(configPaths: string[]): Map<string, string> {
+    const map = new Map<string, string>();
+    for (const p of configPaths) {
+        try {
+            const st = statSync(p);
+            map.set(p, `${st.mtimeMs}:${st.size}`);
+        } catch {
+            /* ignore */
+        }
+    }
+    return map;
+}
 
 export interface DirtySet {
     changed: string[];
@@ -158,19 +186,26 @@ export function collectDevWatchRoots(opts: CollectDevWatchRootsOpts): {
     roots: string[];
     dependencyRoots: string[];
     applicationRoots: string[];
+    publicRoot: string | null;
+    configPaths: string[];
 } {
     const project = path.resolve(opts.project);
     const outDir = path.resolve(opts.outDir);
+    void outDir;
     const src = path.join(project, 'src');
     const docsRoot = path.join(project, 'documents');
     const localesRoot = path.join(project, 'locales');
     const designsRoot = path.join(project, 'designs');
+    const publicRootPath = path.join(project, 'public');
+    const publicRoot = existsSync(publicRootPath) && statSync(publicRootPath).isDirectory() ? publicRootPath : null;
+    const configPaths = collectDevConfigPaths(project);
 
     const applicationRoots: string[] = [];
     if (existsSync(src)) applicationRoots.push(src);
     if (existsSync(docsRoot)) applicationRoots.push(docsRoot);
     if (existsSync(localesRoot)) applicationRoots.push(localesRoot);
     if (existsSync(designsRoot)) applicationRoots.push(designsRoot);
+    if (publicRoot) applicationRoots.push(publicRoot);
 
     const depSet = new Set<string>();
 
@@ -211,7 +246,18 @@ export function collectDevWatchRoots(opts: CollectDevWatchRootsOpts): {
         if (!roots.includes(r)) roots.push(r);
     }
 
-    return { roots, dependencyRoots, applicationRoots };
+    return { roots, dependencyRoots, applicationRoots, publicRoot, configPaths };
+}
+
+/** Map watch bucket to DevInput layer. */
+export function devInputKindForWatchBucket(bucket: ReturnType<typeof classifyWatchRoot>): DevInputKind {
+    if (bucket === 'src') return 'author';
+    if (bucket === 'dep') return 'dependency';
+    if (bucket === 'public') return 'public';
+    if (bucket === 'locales') return 'locales';
+    if (bucket === 'docs') return 'docs';
+    if (bucket === 'designs') return 'designs';
+    return 'other';
 }
 
 /**
@@ -231,11 +277,16 @@ export interface ClassifyWatchRootCtx {
     docsRoot: string;
     localesRoot: string;
     designsRoot: string;
+    publicRoot?: string | null;
     dependencyRoots: string[];
 }
 
-export function classifyWatchRoot(root: string, ctx: ClassifyWatchRootCtx): 'src' | 'locales' | 'docs' | 'designs' | 'dep' | 'other' {
+export function classifyWatchRoot(
+    root: string,
+    ctx: ClassifyWatchRootCtx,
+): 'src' | 'locales' | 'docs' | 'designs' | 'dep' | 'public' | 'other' {
     if (root === ctx.src) return 'src';
+    if (ctx.publicRoot && root === ctx.publicRoot) return 'public';
     if (root === ctx.localesRoot) return 'locales';
     if (root === ctx.docsRoot) return 'docs';
     if (root === ctx.designsRoot) return 'designs';
