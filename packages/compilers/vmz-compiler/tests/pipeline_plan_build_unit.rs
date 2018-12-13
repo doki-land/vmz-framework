@@ -3,7 +3,7 @@
 use vmz_types::{PlanNodeKind, PlanStatus};
 
 use vmz_compiler::pipeline::plan_build::*;
-use vmz_types::{ViewIfBranch, ViewNode, ViewStatus, ViewView};
+use vmz_types::{ViewEach, ViewIfBranch, ViewNode, ViewStatus, ViewView};
 
 #[test]
 fn builds_if_and_dispose_region() {
@@ -38,4 +38,37 @@ fn builds_if_and_dispose_region() {
         "missing dispose-region: {:?}",
         plan.nodes
     );
+}
+
+#[test]
+fn builds_each_with_key_binding_and_slot_projection_id() {
+    let view = ViewView {
+        status: ViewStatus::Native,
+        binding_ids: vec![],
+        region_ids: vec![],
+        roots: vec![ViewNode::Element {
+            tag: "ul".into(),
+            attrs: vec![],
+            children: vec![ViewNode::Element {
+                tag: "li".into(),
+                attrs: vec![],
+                children: vec![ViewNode::Text { value: "x".into() }],
+                each: Some(ViewEach {
+                    list_expr: "items".into(),
+                    as_name: "item".into(),
+                    key_expr: Some("item.id".into()),
+                    list_binding: Some(vmz_types::BindingId(2)),
+                    key_binding: Some(vmz_types::BindingId(3)),
+                    region: Some(vmz_types::RegionId(1)),
+                }),
+            }],
+            each: None,
+        }],
+    };
+    let plan = build_execution_plan(&view);
+    assert_eq!(plan.status, PlanStatus::Partial);
+    let each = plan.nodes.iter().find(|n| n.kind() == PlanNodeKind::Each).expect("each node");
+    assert_eq!(each.binding(), Some(2));
+    assert_eq!(each.key_binding(), Some(3));
+    assert_eq!(each.region(), Some(1));
 }

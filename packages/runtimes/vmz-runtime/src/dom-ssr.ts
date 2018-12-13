@@ -1031,14 +1031,9 @@ export async function hydrate(Component, container, props = {}, opts = {}) {
             container.appendChild(node);
         }
     } else {
-        // Interim: shallow resume leaves if/each binders unbound. Recreate against live
-        // DOM so patches attach. Leaf nodeIdentity (same Element) remains TODO for deep adopt.
-        container.replaceChildren();
-        const node = runDirectCreate(Component, inst);
-        if (node) {
-            inst.__vmzDomRoot = node;
-            container.appendChild(node);
-        }
+        // Deep adopt: reuse SSR DOM via the same Direct schedule as resume (binders attach in-place).
+        const node = runDirectResume(Component, inst, container);
+        if (node) inst.__vmzDomRoot = node;
     }
     await settlePendingChildMounts(inst);
     container.__vmzInst = inst;
