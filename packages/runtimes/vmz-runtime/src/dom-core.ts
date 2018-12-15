@@ -294,11 +294,15 @@ export const directApi = {
      * }}
      */
     _eachCtx: null,
+    /** @type {null | { el: (tag: string) => Element, text: (value?: any) => Text, componentHost?: (name: string) => HTMLElement | null }} */
+    _resumeAdopt: null,
     el(tag) {
+        if (directApi._resumeAdopt) return directApi._resumeAdopt.el(tag);
         noteDomCreate();
         return document.createElement(tag || 'div');
     },
     text(value) {
+        if (directApi._resumeAdopt) return directApi._resumeAdopt.text(value);
         noteDomCreate();
         return document.createTextNode(value == null ? '' : String(value));
     },
@@ -458,9 +462,16 @@ export const directApi = {
      * @param {string | null} client
      */
     component(hostInst, name, props, client) {
-        noteDomCreate();
-        const host = document.createElement('div');
-        host.setAttribute('data-vmz', name);
+        /** @type {HTMLElement | null} */
+        let host = null;
+        if (directApi._resumeAdopt && typeof directApi._resumeAdopt.componentHost === 'function') {
+            host = directApi._resumeAdopt.componentHost(name);
+        }
+        if (!host) {
+            noteDomCreate();
+            host = document.createElement('div');
+            host.setAttribute('data-vmz', name);
+        }
         /** @type {Record<string, any>} */
         const resolved = {};
         for (const [k, v] of Object.entries(props || {})) {
@@ -500,6 +511,7 @@ export const directApi = {
         if (!(Ctor.__vmzDirect && typeof Ctor.__vmzCreate === 'function')) {
             throw new Error(`vmz:dom direct component <${name}> requires __vmzCreate (rebuild child with Direct)`);
         }
+        // Nested resume: keep parent `_resumeAdopt` so child reclaim parked SSR nodes.
         const node = runDirectCreate(Ctor, child);
         if (node) {
             child.__vmzDomRoot = node;
