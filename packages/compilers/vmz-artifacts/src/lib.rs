@@ -8,6 +8,7 @@
 mod deployment;
 mod error;
 mod server_artifact;
+mod static_delivery;
 
 pub use deployment::{
     ComponentEntry, collect_depends_on_closure, component_entries, parse_deployment_json,
@@ -20,4 +21,13 @@ pub use server_artifact::{
     normalize_server_artifact_json, project_server_runtime_adapter,
     project_server_runtime_adapter_json, sort_keys,
 };
+pub use static_delivery::{
+    parse_asset_plan, parse_content_addressed_assets, parse_static_delivery_manifest,
+    parse_static_emit_plan, validate_asset_plan, validate_content_addressed_assets,
+    validate_static_delivery_manifest, validate_static_emit_plan,
+};
 pub use vmz_compiler::{DEPLOYMENT_SCHEMA, DeploymentDocument};
+pub use vmz_protocol::{
+    ASSET_PLAN_SCHEMA, CONTENT_ADDRESSED_ASSETS_SCHEMA, STATIC_DELIVERY_MANIFEST_SCHEMA,
+    STATIC_EMIT_PLAN_SCHEMA,
+};

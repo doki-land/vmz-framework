@@ -6,8 +6,8 @@ pub enum ArtifactError {
     /// JSON could not be deserialized.
     #[error("invalid deployment JSON: {0}")]
     Json(#[from] serde_json::Error),
-    /// `schema` field is not [`vmz_compiler::DEPLOYMENT_SCHEMA`].
-    #[error("unsupported deployment schema {0}")]
+    /// `schema` field is not the expected wire id.
+    #[error("unsupported artifact schema {0}")]
     Schema(String),
     /// Semantic / normalize failure with a stable message.
     #[error("{0}")]

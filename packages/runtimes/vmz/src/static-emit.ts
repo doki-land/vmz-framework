@@ -12,7 +12,7 @@ import { resolveRouteLayoutChain } from '@vmz/core/route-layout-chain';
 import { listClientComponentsSync } from '@vmz/core/component-registry';
 import { emitCdnPolicy } from './cdn-policy.js';
 import { emitContentAddressedAssets, hashedAssetHref } from './content-addressed-assets.js';
-import { absoluteUrl, buildLocalePageMeta, localizeBodyLinks } from './locale-router.js';
+import { absoluteUrl, buildLocalePageMeta, buildLocaleLinkPlan, applyLocaleLinkPlan } from './locale-router.js';
 import { requireNativeAddon } from './native-addon.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 import { emitPublicStaticAssets } from './public-static-assets.js';
@@ -20,6 +20,7 @@ import { listPublicPageUnits, parsePathPattern, unitBrowserPathPattern } from '.
 import { emitSiteFavicon, readSiteFaviconHeadHtml } from './site-favicon.js';
 
 export const STATIC_DELIVERY_MANIFEST_SCHEMA = 'vmz.static.delivery_manifest.v0';
+export const STATIC_EMIT_PLAN_SCHEMA = 'vmz.static.emit_plan.v0';
 
 export type EmitWebStaticOpts = {
     origin?: string;
@@ -103,6 +104,8 @@ export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {
     const cssLogical = readCssEntry(distDir);
     const cssEntry = hashedAssetHref(assets.rewrites, cssLogical) || hashedAssetHref(assets.rewrites, 'vmz.css');
     const moduleScriptSrc = hashedAssetHref(assets.rewrites, 'entry-client.js') || '/entry-client.js';
+    const localeArt = loadLocaleArtifact(distDir);
+    const localeLinkPlan = buildLocaleLinkPlan(localeArt);
 
     for (const page of pageCatalog) {
         const pattern = page.pathPattern || patternFromSegs(page.segs);
@@ -172,8 +175,6 @@ export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {
             bodyHtml = await renderToString(Layout, {}, { slotHtml: bodyHtml });
         }
 
-        const localeArt = loadLocaleArtifact(distDir);
-        // Locale artifact routeId is chunkId (`pages/about`), not the page class name.
         const localeWrites = expandLocaleStaticGenerations({
             localeArt,
             routeId: page.chunkId,
@@ -187,7 +188,10 @@ export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {
             const absHtml = path.join(distDir, gen.htmlPath);
             fs.mkdirSync(path.dirname(absHtml), { recursive: true });
             // Each LocaleId HTML must retain locale on same-app Links (realization authority).
-            const localizedBody = gen.localeId && localeArt ? localizeBodyLinks(bodyHtml, gen.localeId, localeArt) : bodyHtml;
+            const localizedBody =
+                gen.localeId && localeLinkPlan.rows.length
+                    ? applyLocaleLinkPlan(bodyHtml, gen.localeId, localeLinkPlan)
+                    : bodyHtml;
             const html = wrapDocument({
                 bodyHtml: localizedBody,
                 chunkId: page.chunkId,
@@ -300,6 +304,23 @@ export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {
     const digest = sha256Hex(canonicalJson(manifest));
     manifest.manifestDigest = digest;
     writePrettyJsonFile(path.join(vmzDir, 'static-delivery-manifest.json'), manifest);
+
+    writePrettyJsonFile(path.join(vmzDir, 'static-emit-plan.json'), {
+        schema: STATIC_EMIT_PLAN_SCHEMA,
+        applicationId,
+        deliveryProfile: 'static',
+        origin,
+        localeLinks: localeLinkPlan,
+        assetPlanPath: '_vmz/asset-plan.json',
+        routes: generations.map((g) => ({
+            routeId: g.routeId,
+            path: g.path,
+            chunkId: g.chunkId,
+            htmlPath: g.htmlPath,
+            classification: g.classification,
+            localeId: g.localeId || null,
+        })),
+    });
 
     const cdn = emitCdnPolicy(distDir, manifest);
 

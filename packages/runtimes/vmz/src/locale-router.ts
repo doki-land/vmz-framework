@@ -298,7 +298,7 @@ export function parseLocaleFromPath(pathname: string, supportedLocales: string[]
 export type { LocaleHrefArtifact } from '@vmz/core/localize-body-links';
 
 /** Rewrite a same-app href — single implementation in `@vmz/core/localize-body-links`. */
-export { localizeBodyLinks, localizeSameAppHref } from '@vmz/core/localize-body-links';
+export { localizeBodyLinks, localizeSameAppHref, buildLocaleLinkPlan, applyLocaleLinkPlan } from '@vmz/core/localize-body-links';
 
 /** Plan redirect / negotiation for an incoming URL (omit-prefix aware). */
 export function planLocalePathNavigation(input: {

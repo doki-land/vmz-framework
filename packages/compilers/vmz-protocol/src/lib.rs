@@ -26,6 +26,7 @@ mod program;
 mod reported_diagnostic;
 mod server;
 mod severity;
+mod static_delivery;
 mod target;
 mod test;
 
@@ -222,6 +223,12 @@ pub use server::{
     ServerProtocolCatalog,
 };
 pub use severity::{Severity, parse_severity, severity_wire};
+pub use static_delivery::{
+    ASSET_PLAN_SCHEMA, CONTENT_ADDRESSED_ASSETS_SCHEMA, ContentAddressedAssetObject,
+    ContentAddressedAssetsManifest, LOCALE_LINK_PLAN_SCHEMA, LocaleLinkPlan, LocaleLinkPlanRow,
+    STATIC_DELIVERY_MANIFEST_SCHEMA, STATIC_EMIT_PLAN_SCHEMA, StaticDeliveryContentAddressedRef,
+    StaticDeliveryManifest, StaticEmitPlan, StaticEmitRouteRow, AssetPlan,
+};
 pub use target::{
     CapabilityVerdict, DIAG_ARTIFACT_INVALID, DIAG_DOM_LEAK_IN_PLAN, DIAG_PLATFORM_UNSUPPORTED,
     DIAG_PROFILE_INVALID, DIAG_UNKNOWN_VIEW_OP, MINI_PROGRAM_ARTIFACT_SCHEMA, MiniProgramArtifact,
