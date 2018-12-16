@@ -273,9 +273,10 @@ writeProof(proof, root);
 // Nested @vmz/ui: official homepage static assemble (component registry preload).
 console.log('static-delivery: homepage @vmz/ui static assemble…');
 const homepage = path.join(root, 'packages/homepage');
-const homepageOutRoot = path.join(homepage, 'dist-static-conformance');
-if (fs.existsSync(homepageOutRoot)) {
-    fs.rmSync(homepageOutRoot, { recursive: true, force: true });
+const homepageOutRoot = path.join(homepage, 'dist');
+const homepageStatic = path.join(homepageOutRoot, 'static');
+if (fs.existsSync(homepageStatic)) {
+    fs.rmSync(homepageStatic, { recursive: true, force: true });
 }
 const hpBuild = spawnSync(
     process.execPath,

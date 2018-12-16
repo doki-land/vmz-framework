@@ -1217,10 +1217,8 @@ fn recompute_depended_by(units: &mut [DeploymentUnitWire]) {
         }
     }
     for u in units.iter_mut() {
-        u.depended_by = rev
-            .get(&u.chunk_id)
-            .map(|s| s.iter().cloned().collect::<Vec<_>>())
-            .unwrap_or_default();
+        u.depended_by =
+            rev.get(&u.chunk_id).map(|s| s.iter().cloned().collect::<Vec<_>>()).unwrap_or_default();
     }
 }
 
@@ -1252,7 +1250,8 @@ fn emit_deployment_json(
         } else {
             Vec::new()
         };
-        let depends_on = crate::pipeline::link::merge_depends_on_with_layout(depends_on, &layout_chain);
+        let depends_on =
+            crate::pipeline::link::merge_depends_on_with_layout(depends_on, &layout_chain);
         units.push(DeploymentUnitWire {
             chunk_id: chunk_id.clone(),
             kind: *kind,

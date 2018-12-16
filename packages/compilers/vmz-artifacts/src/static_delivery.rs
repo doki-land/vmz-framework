@@ -42,14 +42,18 @@ pub fn validate_asset_plan(doc: &vmz_protocol::AssetPlan) -> Result<(), Artifact
 }
 
 /// Parse and validate `_vmz/content-addressed-assets.json`.
-pub fn parse_content_addressed_assets(text: &str) -> Result<ContentAddressedAssetsManifest, ArtifactError> {
+pub fn parse_content_addressed_assets(
+    text: &str,
+) -> Result<ContentAddressedAssetsManifest, ArtifactError> {
     let doc: ContentAddressedAssetsManifest = serde_json::from_str(text)?;
     validate_content_addressed_assets(&doc)?;
     Ok(doc)
 }
 
 /// Validate content-addressed manifest schema id.
-pub fn validate_content_addressed_assets(doc: &ContentAddressedAssetsManifest) -> Result<(), ArtifactError> {
+pub fn validate_content_addressed_assets(
+    doc: &ContentAddressedAssetsManifest,
+) -> Result<(), ArtifactError> {
     if doc.schema != CONTENT_ADDRESSED_ASSETS_SCHEMA {
         return Err(ArtifactError::Schema(doc.schema.clone()));
     }
@@ -64,7 +68,9 @@ pub fn parse_static_delivery_manifest(text: &str) -> Result<StaticDeliveryManife
 }
 
 /// Validate static delivery manifest schema id and content-addressed link.
-pub fn validate_static_delivery_manifest(doc: &StaticDeliveryManifest) -> Result<(), ArtifactError> {
+pub fn validate_static_delivery_manifest(
+    doc: &StaticDeliveryManifest,
+) -> Result<(), ArtifactError> {
     if doc.schema != STATIC_DELIVERY_MANIFEST_SCHEMA {
         return Err(ArtifactError::Schema(doc.schema.clone()));
     }
@@ -159,7 +165,8 @@ mod tests {
     #[test]
     fn static_delivery_manifest_requires_asset_link() {
         parse_static_delivery_manifest(DELIVERY_MANIFEST).expect("delivery manifest");
-        let bad = DELIVERY_MANIFEST.replace("\"manifestDigest\": \"deadbeef\"", "\"manifestDigest\": \"\"");
+        let bad = DELIVERY_MANIFEST
+            .replace("\"manifestDigest\": \"deadbeef\"", "\"manifestDigest\": \"\"");
         assert!(parse_static_delivery_manifest(&bad).is_err());
     }
 }

@@ -24,16 +24,21 @@ class IfFixture {
     static __vmzCreate(api) {
         const rootEl = api.el('div');
         api.attr(rootEl, 'data-fixture', 'ui-v-if-dom');
-        const block = api.ifBlock(this, null, ['show'], [
-            {
-                cond: () => this.show,
-                create: (api) => {
-                    const header = api.el('header');
-                    header.appendChild(api.text('visible'));
-                    return header;
+        const block = api.ifBlock(
+            this,
+            null,
+            ['show'],
+            [
+                {
+                    cond: () => this.show,
+                    create: (api) => {
+                        const header = api.el('header');
+                        header.appendChild(api.text('visible'));
+                        return header;
+                    },
                 },
-            },
-        ]);
+            ],
+        );
         rootEl.appendChild(block);
         return rootEl;
     }

@@ -24,19 +24,13 @@ export type LocaleLinkPlan = {
 };
 
 /** Build RouteId × LocaleId → href rows from locale route realization artifact. */
-export function buildLocaleLinkPlan(
-    artifact: LocaleHrefArtifact | null | undefined,
-): LocaleLinkPlan {
+export function buildLocaleLinkPlan(artifact: LocaleHrefArtifact | null | undefined): LocaleLinkPlan {
     const rows: LocaleLinkPlanRow[] = [];
     for (const r of artifact?.realizations || []) {
         if (!r?.routeId || !r?.localeId || !r?.path) continue;
         rows.push({ routeId: String(r.routeId), localeId: String(r.localeId), href: String(r.path) });
     }
-    rows.sort((a, b) =>
-        a.routeId === b.routeId
-            ? a.localeId.localeCompare(b.localeId)
-            : a.routeId.localeCompare(b.routeId),
-    );
+    rows.sort((a, b) => (a.routeId === b.routeId ? a.localeId.localeCompare(b.localeId) : a.routeId.localeCompare(b.routeId)));
     return { schema: LOCALE_LINK_PLAN_SCHEMA, rows };
 }
 
@@ -60,20 +54,13 @@ export function applyLocaleLinkPlan(
         if (!href) return full;
         const hm = attrs.match(/\bhref\s*=\s*"([^"]*)"/i);
         if (hm && hm[1] === href) return full;
-        const newAttrs = hm
-            ? attrs.replace(/\bhref\s*=\s*"[^"]*"/i, `href="${escapeAttr(href)}"`)
-            : ` href="${escapeAttr(href)}"${attrs}`;
+        const newAttrs = hm ? attrs.replace(/\bhref\s*=\s*"[^"]*"/i, `href="${escapeAttr(href)}"`) : ` href="${escapeAttr(href)}"${attrs}`;
         return `<a${newAttrs}>`;
     });
 }
 
 /** Rewrite `<a data-vmz-route href>` using locale realization plan (Plan-native). */
-export function localizeBodyLinks(
-    html: string,
-    localeId: string,
-    artifact: LocaleHrefArtifact,
-    escapeAttr?: (s: string) => string,
-): string {
+export function localizeBodyLinks(html: string, localeId: string, artifact: LocaleHrefArtifact, escapeAttr?: (s: string) => string): string {
     if (!html || !localeId || !artifact) return html;
     return applyLocaleLinkPlan(html, localeId, buildLocaleLinkPlan(artifact), escapeAttr);
 }

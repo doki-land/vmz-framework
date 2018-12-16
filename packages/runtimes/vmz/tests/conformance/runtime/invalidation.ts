@@ -35,15 +35,9 @@ function runProject(rel, filter, wantIds) {
 }
 
 console.log('invalidation: fullstack if/each lifetime logic…');
-runProject('packages/examples/fullstack', '^l4\\.logic\\.(each|if)', [
-    'l4.logic.each.dispose',
-    'l4.logic.if.region',
-]);
+runProject('packages/examples/fullstack', '^l4\\.logic\\.(each|if)', ['l4.logic.each.dispose', 'l4.logic.if.region']);
 
-const programPath = path.join(
-    root,
-    'packages/examples/fullstack/dist/web-ssr/components/UserCard.program.json',
-);
+const programPath = path.join(root, 'packages/examples/fullstack/dist/web-ssr/components/UserCard.program.json');
 if (!fs.existsSync(programPath)) {
     const build = spawnSync(process.execPath, [vmzBin, 'build', path.join(root, 'packages/examples/fullstack')], {
         cwd: root,

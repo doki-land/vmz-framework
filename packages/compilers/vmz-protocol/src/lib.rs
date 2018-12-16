@@ -224,10 +224,10 @@ pub use server::{
 };
 pub use severity::{Severity, parse_severity, severity_wire};
 pub use static_delivery::{
-    ASSET_PLAN_SCHEMA, CONTENT_ADDRESSED_ASSETS_SCHEMA, ContentAddressedAssetObject,
+    ASSET_PLAN_SCHEMA, AssetPlan, CONTENT_ADDRESSED_ASSETS_SCHEMA, ContentAddressedAssetObject,
     ContentAddressedAssetsManifest, LOCALE_LINK_PLAN_SCHEMA, LocaleLinkPlan, LocaleLinkPlanRow,
     STATIC_DELIVERY_MANIFEST_SCHEMA, STATIC_EMIT_PLAN_SCHEMA, StaticDeliveryContentAddressedRef,
-    StaticDeliveryManifest, StaticEmitPlan, StaticEmitRouteRow, AssetPlan,
+    StaticDeliveryManifest, StaticEmitPlan, StaticEmitRouteRow,
 };
 pub use target::{
     CapabilityVerdict, DIAG_ARTIFACT_INVALID, DIAG_DOM_LEAK_IN_PLAN, DIAG_PLATFORM_UNSUPPORTED,
