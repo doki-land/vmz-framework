@@ -99,9 +99,10 @@
 
       <Card title="Workspace" description="Empty → success feedback stays inside the same composition.">
         <div v-if="showEmpty">
-          <Empty title="No projects yet" description="Create a project to see it listed here.">
-            <Button type="button" @click="() => this.createProject()">Create project</Button>
-          </Empty>
+          <Empty title="No projects yet" description="Create a project to see it listed here." />
+          <Button type="button" data-vmz-fixture="commercial-create" @click="() => this.createProject()">
+            Create project
+          </Button>
         </div>
         <div v-if="!showEmpty">
           <Alert
@@ -111,7 +112,9 @@
             description="Empty state dismissed — composition continues with feedback."
           />
         </div>
-        <Button type="button" variant="secondary" @click="() => (drawerOpen = true)">Open details</Button>
+        <Button type="button" variant="secondary" data-vmz-fixture="commercial-drawer-open" @click="() => (drawerOpen = true)">
+          Open details
+        </Button>
         <Drawer
           :open="drawerOpen"
           title="Project details"
