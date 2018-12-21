@@ -1,17 +1,6 @@
 <template>
   <div data-vmz-fixture="commercial">
     <AppShell brand="VMZ" home-href="/" nav-label="Commercial" :nav="navItems">
-      <div v-if="notifyOpen" data-vmz-fixture="commercial-notify">
-        <Notification
-          tone="success"
-          role-name="status"
-          title="Message queued"
-          description="We will reply to your work email within one business day."
-        >
-          <Button type="button" variant="ghost" @click="() => (notifyOpen = false)">Dismiss</Button>
-        </Notification>
-      </div>
-
       <section class="vmz-commercial-hero" data-vmz-fixture="commercial-hero" aria-labelledby="commercial-hero-title">
         <Badge tone="brand">Official UI</Badge>
         <h1 id="commercial-hero-title" class="vmz-commercial-hero__title">VMZ</h1>
@@ -104,7 +93,17 @@
             <Button type="button" @click="() => this.createProject()">Create project</Button>
           </div>
         </div>
-        <div v-if="!showEmpty">
+        <div v-else data-vmz-fixture="commercial-ready">
+          <div data-vmz-fixture="commercial-notify">
+            <Notification
+              tone="success"
+              role-name="status"
+              title="Message queued"
+              description="We will reply to your work email within one business day."
+            >
+              <Button type="button" variant="ghost" @click="() => this.resetWorkspace()">Dismiss</Button>
+            </Notification>
+          </div>
           <Alert
             tone="success"
             role-name="status"
@@ -211,7 +210,6 @@ export default class CommercialPage {
   dialogOpen = false;
   drawerOpen = false;
   showEmpty = true;
-  notifyOpen = false;
   submitting = false;
   navItems = [
     { id: 'ui', title: 'UI lab', href: '/ui' },
@@ -259,7 +257,10 @@ export default class CommercialPage {
 
   createProject() {
     this.showEmpty = false;
-    this.notifyOpen = true;
+  }
+
+  resetWorkspace() {
+    this.showEmpty = true;
   }
 
   resetContact() {
@@ -270,7 +271,6 @@ export default class CommercialPage {
     this.contactSummary = '';
     this.contactDescribedBy = '';
     this.dialogOpen = false;
-    this.notifyOpen = false;
   }
 }
 </script>
