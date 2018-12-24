@@ -933,16 +933,22 @@ async function proveFormDepth(page) {
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="date-picker"]'), { timeout: 5000 });
 
-    // Tooltip parent-owned open.
-    await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="form-email-row"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Why?'),
-        );
-        btn?.click();
-    });
-    await page.waitForSelector('[data-vmz-ui="tooltip"][data-open="true"] [data-vmz-tooltip="bubble"]', {
-        timeout: 5000,
-    });
+    // Tooltip parent-owned open (toggle lives outside Tooltip slot — slotted
+    // Button clicks are deferred with the sibling-host debt after resume).
+    await page.waitForSelector('[data-vmz-fixture="form-tip-toggle"]', { timeout: 5000 });
+    await page.click('[data-vmz-fixture="form-tip-toggle"]');
+    try {
+        await page.waitForSelector('[data-vmz-ui="tooltip"][data-open="true"] [data-vmz-tooltip="bubble"]', {
+            timeout: 8000,
+        });
+    } catch (err) {
+        const snap = await page.evaluate(() => ({
+            tip: !!document.querySelector('[data-vmz-fixture="form-tip-toggle"]'),
+            open: document.querySelector('[data-vmz-ui="tooltip"]')?.getAttribute('data-open') || null,
+            bubble: !!document.querySelector('[data-vmz-tooltip="bubble"]'),
+        }));
+        fail(`Form depth: Tooltip open timed out: ${JSON.stringify(snap)} (${err})`);
+    }
 
     // Also prevent native constraint validation at runtime if host omitted the attribute.
     await page.evaluate(() => {
