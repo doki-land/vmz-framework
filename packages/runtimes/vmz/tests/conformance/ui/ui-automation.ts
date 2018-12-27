@@ -839,9 +839,14 @@ async function proveCommercialComposition(page) {
         fail(`Commercial: Empty→Alert/Notification timed out: ${JSON.stringify(snap)} (${err})`);
     }
 
-    // Drawer open/Escape is covered by UI1/UI2. Workspace if/else switch after
-    // resume currently drops some Card siblings (Drawer host); keep composition
-    // dogfood in the page, but do not gate this peel on sibling survival.
+    // Workspace if/else switch must keep Drawer sibling host (scoped resume adopt).
+    await page.waitForSelector('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn', { timeout: 5000 });
+    await page.click('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn');
+    await page.waitForSelector('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]', { timeout: 8000 });
+    await page.focus('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="drawer"]'), { timeout: 8000 });
+
     console.log('ui-automation: Commercial composition PASS');
     await proveFormDepth(page);
     await proveConsoleComposition(page);
