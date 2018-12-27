@@ -819,6 +819,14 @@ async function proveCommercialComposition(page) {
     await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="dialog"]'), { timeout: 5000 });
 
     // Empty → success Alert + Notification.
+    const drawerBefore = await page.evaluate(() => ({
+        fixture: !!document.querySelector('[data-vmz-fixture="commercial-drawer-open"]'),
+        btn: !!document.querySelector('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn'),
+        drawerHost: !!document.querySelector('[data-vmz="Drawer"], [data-vmz-ui="drawer"]'),
+    }));
+    if (!drawerBefore.fixture || !drawerBefore.btn) {
+        fail(`Commercial: Drawer opener missing before Empty switch: ${JSON.stringify(drawerBefore)}`);
+    }
     await page.waitForSelector('[data-vmz-fixture="commercial-create"] button.vmz-ui-btn', { timeout: 5000 });
     await page.click('[data-vmz-fixture="commercial-create"] button.vmz-ui-btn');
     try {
@@ -835,12 +843,27 @@ async function proveCommercialComposition(page) {
             successAlert: !!document.querySelector('[data-vmz-ui="alert"][data-tone="success"]'),
             notify: !!document.querySelector('[data-vmz-fixture="commercial-notify"] [data-vmz-ui="notification"]'),
             create: !!document.querySelector('[data-vmz-fixture="commercial-create"]'),
+            drawer: {
+                fixture: !!document.querySelector('[data-vmz-fixture="commercial-drawer-open"]'),
+                btn: !!document.querySelector('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn'),
+            },
         }));
         fail(`Commercial: Empty→Alert/Notification timed out: ${JSON.stringify(snap)} (${err})`);
     }
 
     // Workspace if/else switch must keep Drawer sibling host (scoped resume adopt).
-    await page.waitForSelector('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn', { timeout: 5000 });
+    try {
+        await page.waitForSelector('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn', { timeout: 5000 });
+    } catch (err) {
+        const snap = await page.evaluate(() => ({
+            fixture: !!document.querySelector('[data-vmz-fixture="commercial-drawer-open"]'),
+            btn: !!document.querySelector('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn'),
+            ready: !!document.querySelector('[data-vmz-fixture="commercial-ready"]'),
+            empty: !!document.querySelector('[data-vmz-ui="empty"]'),
+            workspaceHtml: document.querySelector('[data-vmz-fixture="commercial-ready"]')?.parentElement?.innerHTML?.slice(0, 500) || null,
+        }));
+        fail(`Commercial: Drawer opener missing after Empty switch: ${JSON.stringify(snap)} (${err})`);
+    }
     await page.click('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn');
     await page.waitForSelector('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]', { timeout: 8000 });
     await page.focus('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]');
