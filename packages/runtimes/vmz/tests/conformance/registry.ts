@@ -174,6 +174,11 @@ export const CHECKS: Record<string, CheckEntry> = {
     },
     resume: { file: 'runtime/resume.ts', pre: ['build:vmz-test'] },
     'runtime-identity': { file: 'runtime/runtime-identity.ts', pre: ['build:vmz-test'] },
+    'resume-composition': {
+        file: 'runtime/resume-composition.ts',
+        description: 'SSR resume if/else must not steal parent sibling hosts',
+        pre: ['build:runtimes'],
+    },
     'keyed-list': { file: 'runtime/keyed-list.ts' },
     'slot-projection': { file: 'runtime/slot-projection.ts' },
     invalidation: { file: 'runtime/invalidation.ts' },
@@ -341,8 +346,8 @@ export const CHECKS: Record<string, CheckEntry> = {
     },
     // M-PR0: public semantic ids as composites over existing evidence (no parallel fake gates).
     'resume-lazy': {
-        description: 'P3 Resume/lazy — resume + runtime-identity + event-flow + browser-core',
-        composite: ['resume', 'runtime-identity', 'event-flow', 'browser-core'],
+        description: 'P3 Resume/lazy — resume + runtime-identity + resume-composition + event-flow + browser-core',
+        composite: ['resume', 'runtime-identity', 'resume-composition', 'event-flow', 'browser-core'],
     },
     'asset-graph': {
         description: 'P5 Asset Graph v0 — content-addressed assets + static SEO seed (image variants still open)',
@@ -425,6 +430,7 @@ export const CHECK_ALL = [
     'motion-ir',
     'resume',
     'runtime-identity',
+    'resume-composition',
     'keyed-list',
     'slot-projection',
     'invalidation',

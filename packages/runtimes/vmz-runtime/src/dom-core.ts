@@ -294,7 +294,16 @@ export const directApi = {
      * }}
      */
     _eachCtx: null,
-    /** @type {null | { el: (tag: string) => Element, text: (value?: any) => Text, componentHost?: (name: string) => HTMLElement | null }} */
+    /** @type {null | {
+     * el: (tag: string) => Element,
+     * text: (value?: any) => Text,
+     * componentHost?: (name: string) => HTMLElement | null,
+     * enter?: (node: Element) => boolean,
+     * leave?: () => void,
+     * scopeDepth?: () => number,
+     * rewindScope?: (depth: number) => void,
+     * beginBranchScope?: () => () => void,
+     * }} */
     _resumeAdopt: null,
     el(tag) {
         if (directApi._resumeAdopt) return directApi._resumeAdopt.el(tag);
@@ -305,6 +314,16 @@ export const directApi = {
         if (directApi._resumeAdopt) return directApi._resumeAdopt.text(value);
         noteDomCreate();
         return document.createTextNode(value == null ? '' : String(value));
+    },
+    /** Push adopted node's private resume pool for depth-first child create. */
+    adoptEnter(node) {
+        const adopt = directApi._resumeAdopt;
+        if (adopt && typeof adopt.enter === 'function') return adopt.enter(node);
+        return false;
+    },
+    adoptLeave() {
+        const adopt = directApi._resumeAdopt;
+        if (adopt && typeof adopt.leave === 'function') adopt.leave();
     },
     frag() {
         noteDomCreate();
@@ -512,7 +531,15 @@ export const directApi = {
             throw new Error(`vmz:dom direct component <${name}> requires __vmzCreate (rebuild child with Direct)`);
         }
         // Nested resume: keep parent `_resumeAdopt` so child reclaim parked SSR nodes.
-        const node = runDirectCreate(Ctor, child);
+        // Enter the host's private child pool so nested create cannot see uncle siblings.
+        const adopt = directApi._resumeAdopt;
+        const entered = adopt && typeof adopt.enter === 'function' ? adopt.enter(host) : false;
+        let node;
+        try {
+            node = runDirectCreate(Ctor, child);
+        } finally {
+            if (entered && adopt && typeof adopt.leave === 'function') adopt.leave();
+        }
         if (node) {
             child.__vmzDomRoot = node;
             host.appendChild(node);
@@ -660,9 +687,12 @@ export const directApi = {
                 directApi._branchBinds = binds;
                 directApi._inst = inst;
                 let created = null;
+                const adopt = directApi._resumeAdopt;
+                const endBranch = adopt && typeof adopt.beginBranchScope === 'function' ? adopt.beginBranchScope() : null;
                 try {
                     created = branches[next].create.call(inst, directApi);
                 } finally {
+                    if (typeof endBranch === 'function') endBranch();
                     directApi._branchBinds = prevSink;
                     directApi._inst = prevInst;
                 }

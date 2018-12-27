@@ -582,6 +582,12 @@ const serializeApi = {
     onMethod() {
         /* named method events are also attached only during client resume */
     },
+    adoptEnter() {
+        return false;
+    },
+    adoptLeave() {
+        /* resume scope only */
+    },
     bindText(inst, bindingId, deps, get, textNode) {
         let raw = '';
         try {
@@ -936,37 +942,22 @@ export function attachEventEntries(root = globalThis.document) {
  * Adopt parked SSR/Island nodes while `__vmzCreate` rebuilds the live tree.
  * Children of `rootEl` are moved into `pool` first so the create schedule never
  * leaves orphan SSR siblings beside if/each markers (duplicate h2 / stale text).
+ *
+ * Scope rules (sibling-host invariant):
+ * - Candidates are **direct children** of the current scope pool only (no deep
+ *   walk into other parked siblings).
+ * - Adopting a node parks its children into a **private** `__vmzResumePool`.
+ * - `enter(node)` / `leave()` push that private pool for depth-first child create.
+ * - `beginBranchScope()` moves one top-level SSR node into an isolated pool so
+ *   ifBlock branch create cannot steal parent siblings (Drawer / Button hosts).
+ *
  * @param {DocumentFragment} pool
  * @param {Element} rootEl
  */
 function createResumeAdopt(pool, rootEl) {
     const used = new WeakSet();
-    /** @type {Element[]} */
-    const adopted = [];
-
-    const markElement = (n) => {
-        used.add(n);
-        adopted.push(n);
-        if (typeof n.getAttribute === 'function') {
-            const k = n.getAttribute('data-vmz-key');
-            if (k != null && n.__vmzKey == null) n.__vmzKey = k;
-        }
-        // Park descendants so create can rebuild if/each without orphan SSR siblings.
-        while (n.firstChild) pool.appendChild(n.firstChild);
-        return n;
-    };
-
-    /**
-     * linkedom lacks `NodeFilter` — walk manually.
-     * @param {Node} root
-     * @param {(n: Element) => void} visit
-     */
-    const walkElements = (root, visit) => {
-        if (!root || root.nodeType !== 1) return;
-        const el = /** @type {Element} */ (root);
-        visit(el);
-        for (let c = el.firstChild; c; c = c.nextSibling) walkElements(c, visit);
-    };
+    /** @type {DocumentFragment[]} */
+    const scopeStack = [pool];
 
     /**
      * @param {Node} root
@@ -982,44 +973,43 @@ function createResumeAdopt(pool, rootEl) {
         for (let c = root.firstChild; c; c = c.nextSibling) walkTexts(c, visit);
     };
 
+    const currentScope = () => scopeStack[scopeStack.length - 1] || pool;
+
+    const markElement = (n) => {
+        used.add(n);
+        if (typeof n.getAttribute === 'function') {
+            const k = n.getAttribute('data-vmz-key');
+            if (k != null && n.__vmzKey == null) n.__vmzKey = k;
+        }
+        // Private child pool — never dump into the parent/global pool (that let
+        // if branches reclaim Drawer/sibling hosts parked as uncles).
+        const childPool = document.createDocumentFragment();
+        while (n.firstChild) childPool.appendChild(n.firstChild);
+        n.__vmzResumePool = childPool;
+        return n;
+    };
+
     /** @returns {Generator<Element>} */
     function* elementCandidates() {
-        if (!used.has(rootEl)) yield rootEl;
-        for (const n of pool.childNodes) {
-            if (n.nodeType !== 1) continue;
-            /** @type {Element[]} */
-            const found = [];
-            walkElements(n, (el) => {
-                if (!used.has(el)) found.push(el);
-            });
-            for (const el of found) yield el;
-        }
-        for (const a of adopted) {
-            /** @type {Element[]} */
-            const found = [];
-            for (let c = a.firstChild; c; c = c.nextSibling) {
-                walkElements(c, (el) => {
-                    if (!used.has(el)) found.push(el);
-                });
+        const scope = currentScope();
+        if (scope === pool && rootEl && !used.has(rootEl)) yield rootEl;
+        // Snapshot — adopt may move nodes out of scope while iterating.
+        const kids = [...scope.childNodes];
+        for (const n of kids) {
+            if (n.nodeType === 1 && !used.has(/** @type {Element} */ (n))) {
+                yield/** @type {Element} */ (n);
             }
-            for (const el of found) yield el;
         }
     }
 
     /** @returns {Generator<Text>} */
     function* textCandidates() {
-        for (const n of pool.childNodes) {
+        const scope = currentScope();
+        const kids = [...scope.childNodes];
+        for (const n of kids) {
             /** @type {Text[]} */
             const found = [];
             walkTexts(n, (t) => {
-                if (!used.has(t)) found.push(t);
-            });
-            for (const t of found) yield t;
-        }
-        for (const a of adopted) {
-            /** @type {Text[]} */
-            const found = [];
-            walkTexts(a, (t) => {
                 if (!used.has(t)) found.push(t);
             });
             for (const t of found) yield t;
@@ -1056,10 +1046,55 @@ function createResumeAdopt(pool, rootEl) {
         return null;
     };
 
+    const enter = (node) => {
+        if (!node || !node.__vmzResumePool) return false;
+        scopeStack.push(node.__vmzResumePool);
+        return true;
+    };
+
+    const leave = () => {
+        if (scopeStack.length <= 1) return;
+        scopeStack.pop();
+    };
+
+    const scopeDepth = () => scopeStack.length;
+
+    const rewindScope = (depth) => {
+        const d = Math.max(1, Number(depth) || 1);
+        while (scopeStack.length > d) scopeStack.pop();
+    };
+
+    /**
+     * Isolate the next top-level SSR sibling as the only candidates for an
+     * if/else branch create (commercial Card: Empty branch must not adopt Drawer).
+     * @returns {() => void} end callback
+     */
+    const beginBranchScope = () => {
+        const parent = currentScope();
+        const branchPool = document.createDocumentFragment();
+        for (const n of [...parent.childNodes]) {
+            if (n.nodeType === 1 && !used.has(/** @type {Element} */ (n))) {
+                branchPool.appendChild(n);
+                break;
+            }
+        }
+        scopeStack.push(branchPool);
+        const depth = scopeStack.length;
+        return () => {
+            while (branchPool.firstChild) branchPool.removeChild(branchPool.firstChild);
+            rewindScope(depth - 1);
+        };
+    };
+
     return {
         el: adoptElement,
         text: adoptText,
         componentHost,
+        enter,
+        leave,
+        scopeDepth,
+        rewindScope,
+        beginBranchScope,
     };
 }
 
