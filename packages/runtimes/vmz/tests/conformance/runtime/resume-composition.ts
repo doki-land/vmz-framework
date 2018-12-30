@@ -367,3 +367,89 @@ if (!appSteal.querySelector('[data-fixture="nested-sibling"]')) {
 }
 
 console.log('resume-composition GATE PASS: nested label slot does not steal Card siblings');
+
+console.log('resume-composition: ifBlock-rooted Button keeps projected label…');
+
+/** Mirrors `@vmz/ui` Button: create returns ifBlock fragment (a vs button). */
+class IfRootButton {
+    static __vmzDirect = true;
+    static __vmzHostBox = 'contents';
+    href = '';
+    static __vmzCreate(api) {
+        return api.ifBlock(
+            this,
+            null,
+            ['href'],
+            [
+                {
+                    cond: function () {
+                        return this.href;
+                    },
+                    create: (api) => {
+                        const a = api.el('a');
+                        api.attr(a, 'class', 'vmz-ui-btn');
+                        api.attr(a, 'data-vmz-ui', 'button');
+                        const slot = api.el('slot');
+                        a.appendChild(slot);
+                        return a;
+                    },
+                },
+                {
+                    create: (api) => {
+                        const btn = api.el('button');
+                        api.attr(btn, 'type', 'submit');
+                        api.attr(btn, 'class', 'vmz-ui-btn');
+                        api.attr(btn, 'data-vmz-ui', 'button');
+                        const slot = api.el('slot');
+                        btn.appendChild(slot);
+                        return btn;
+                    },
+                },
+            ],
+        );
+    }
+}
+
+class IfRootButtonPage {
+    static __vmzDirect = true;
+    static __vmzCreate(api) {
+        const rootEl = api.el('div');
+        api.attr(rootEl, 'data-fixture', 'if-root-button-page');
+        const wrap = api.el('div');
+        api.attr(wrap, 'data-fixture', 'if-root-actions');
+        const host = api.component(this, 'IfRootButton', {}, null);
+        api.adoptEnter(host);
+        api.projectDefaultSlot(host, api.text('Confirm'));
+        api.adoptLeave();
+        wrap.appendChild(host);
+        rootEl.appendChild(wrap);
+        return rootEl;
+    }
+}
+
+registerComponents({ IfRootButton, IfRootButtonPage });
+
+const htmlBtn = await renderToString(IfRootButtonPage, { props: {} });
+if (!htmlBtn.includes('Confirm')) fail(`SSR if-root Button missing label: ${htmlBtn}`);
+const { window: liveBtn } = parseHTML(`<!DOCTYPE html><html><body><div id="app">${htmlBtn}</div></body></html>`);
+globalThis.window = liveBtn;
+globalThis.document = liveBtn.document;
+globalThis.HTMLElement = liveBtn.HTMLElement;
+globalThis.Node = liveBtn.Node;
+globalThis.DocumentFragment = liveBtn.DocumentFragment;
+globalThis.Text = liveBtn.Text;
+globalThis.Comment = liveBtn.Comment;
+const appBtn = liveBtn.document.getElementById('app');
+await hydrate(IfRootButtonPage, appBtn);
+const confirmBtn = [...appBtn.querySelectorAll('[data-fixture="if-root-actions"] button.vmz-ui-btn')].find((b) =>
+    (b.textContent || '').includes('Confirm'),
+);
+if (!confirmBtn) {
+    const snap = {
+        html: appBtn.innerHTML.slice(0, 500),
+        buttons: [...appBtn.querySelectorAll('button')].map((b) => (b.textContent || '').trim()),
+    };
+    fail(`if-root Button label lost after hydrate (fragment __vmzDomRoot): ${JSON.stringify(snap)}`);
+}
+
+console.log('resume-composition GATE PASS: ifBlock-rooted Button keeps projected label');

@@ -574,7 +574,10 @@ export const directApi = {
             if (entered && adopt && typeof adopt.leave === 'function') adopt.leave();
         }
         if (node) {
-            child.__vmzDomRoot = node;
+            // ifBlock/eachBlock roots are DocumentFragments: appendChild moves
+            // children into `host` and empties the fragment. Keep a live Element
+            // root so projectDefaultSlot can find `<slot>` (Button v-if/v-else).
+            child.__vmzDomRoot = node.nodeType === 11 ? host : node;
             host.appendChild(node);
         }
         host.__vmzInst = child;
@@ -628,7 +631,9 @@ export const directApi = {
     projectDefaultSlot(hostEl, node) {
         if (!hostEl || node == null) return;
         const child = hostEl.__vmzInst;
-        const root = (child && child.__vmzDomRoot) || hostEl;
+        let root = (child && child.__vmzDomRoot) || hostEl;
+        // Emptied DocumentFragment after append must not receive slot kids.
+        if (!root || root.nodeType !== 1) root = hostEl;
         /** @type {Element | null} */
         let slot = null;
         if (root && root.nodeType === 1) {
@@ -638,7 +643,7 @@ export const directApi = {
             slot.replaceWith(node);
             return;
         }
-        if (root && typeof root.appendChild === 'function') root.appendChild(node);
+        if (root && root.nodeType === 1 && typeof root.appendChild === 'function') root.appendChild(node);
         else hostEl.appendChild(node);
     },
     /**
