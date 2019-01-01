@@ -3,7 +3,7 @@
     <SiteHeader />
     <main>
       <section class="v2-hero" aria-labelledby="landing-title" data-vmz-fixture="landing-brand">
-        <p class="v2-kicker" data-vmz-fixture="landing-hero-kicker"><span></span> {{ heroKickerLabel }}</p>
+        <p class="v2-kicker" data-vmz-fixture="landing-hero-kicker">{{ heroKickerLabel }}</p>
         <h1 id="landing-title" data-vmz-fixture="landing-hero-title">{{ heroTitleLeadLabel }}<br /><em>{{ heroTitleEmLabel }}</em></h1>
         <p class="v2-lede" data-vmz-fixture="landing-hero-lede">{{ heroLedeLabel }}</p>
         <div class="v2-actions">
@@ -176,6 +176,21 @@ export default class IndexPage {
   }
 
   refreshCopy() {
+    // Force dirty writes: soft-nav / resume can leave text nodes empty while the
+    // next catalog string equals the previous reactive value (e.g. shared kickers).
+    this.heroKickerLabel = '\u200b';
+    this.heroTitleLeadLabel = '\u200b';
+    this.heroTitleEmLabel = '\u200b';
+    this.heroLedeLabel = '\u200b';
+    this.statementTitleLeadLabel = '\u200b';
+    this.statementTitleEmLabel = '\u200b';
+    this.statementBodyLabel = '\u200b';
+    this.startTitleLabel = '\u200b';
+    this.startLedeLabel = '\u200b';
+    this.buildLabel = '\u200b';
+    this.readDocsLabel = '\u200b';
+    this.startLabel = '\u200b';
+    this.deployPlannerLabel = '\u200b';
     this.heroKickerLabel = heroKicker();
     this.heroTitleLeadLabel = heroTitleLead();
     this.heroTitleEmLabel = heroTitleEm();

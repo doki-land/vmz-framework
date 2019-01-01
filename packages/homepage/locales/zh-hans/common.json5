@@ -16,7 +16,7 @@
   footerTag: '让编译器理解整套应用，并为 Web、SSR、Native 与 Edge 生成精确的交付结果。',
   productNav: '产品',
   resourcesNav: '资源',
-  heroKicker: 'Full-stack application compiler',
+  heroKicker: '全栈应用编译器',
   heroTitleLead: '编译整套应用，',
   heroTitleEm: '不只是一棵组件树。',
   heroLede: 'VMZ 从组件、状态和服务端边界中建立程序图。开发时只重编译受影响的区域，交付时为 Web、SSR、Native 和 Edge 生成各自需要的结果。',
