@@ -575,6 +575,9 @@ const serializeApi = {
     adoptLeave() {
         /* resume scope only */
     },
+    onComponentEvent() {
+        /* component events attach only on the client */
+    },
     bindText(inst, bindingId, deps, get, textNode) {
         let raw = '';
         try {

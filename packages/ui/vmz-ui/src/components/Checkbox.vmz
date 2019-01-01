@@ -7,7 +7,7 @@
         :checked="checked"
         :disabled="disabled"
         :aria-describedby="describedBy"
-        @click="onToggle"
+        @click="this.onToggle"
       />
       <span class="vmz-ui-checkbox__label">{{ label }}</span>
     </label>
@@ -64,8 +64,10 @@ export default class Checkbox {
 		if (this.disabled) return;
 		if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
 		const next = !this.checked;
+		const payload = { target: { checked: next } };
+		this.emit("change", payload);
 		if (typeof this.onChange === "function") {
-			this.onChange({ target: { checked: next } });
+			this.onChange(payload);
 		}
 	}
 }

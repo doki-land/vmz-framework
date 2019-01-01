@@ -7,7 +7,7 @@
       :data-selected-count="selectedCount"
     >
       <table class="vmz-ui-datatable">
-        <thead @click="onHeadClick">
+        <thead @click="this.onHeadClick">
           <tr>
             <th scope="col" class="vmz-ui-datatable__check">
               <input
@@ -26,7 +26,7 @@
             <th v-if="hasRowAction" scope="col">{{ actionTitle }}</th>
           </tr>
         </thead>
-        <tbody @click="onBodyClick">
+        <tbody @click="this.onBodyClick">
           <tr
             v-for="row in rows"
             :key="row.id"

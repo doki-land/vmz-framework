@@ -227,32 +227,68 @@ export default class IndexPage {
 }
 
 #[test]
-fn wraps_bare_method_ref_on_component_event_prop() {
+fn wraps_explicit_this_method_ref_on_component_prop() {
     let src = r#"
 export default class Page {
   onSelect(_id) {}
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let ir = parse_template(r#"<Select :onChange="onSelect" />"#).unwrap();
+    let ir = parse_template(r#"<Select :onChange="this.onSelect" />"#).unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
     assert!(js.contains(r#""onChange": (ev) => this.onSelect(ev)"#), "{js}");
 }
 
 #[test]
-fn maps_component_at_click_to_on_click_wire_prop() {
+fn maps_component_at_click_to_component_event_subscribe() {
     let src = r#"
 export default class Page {
   bump() {}
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let ir = parse_template(r#"<CounterButton @click="bump" :copy-label="'Copy'" />"#).unwrap();
+    let ir = parse_template(r#"<CounterButton @click="this.bump" :copy-label="'Copy'" />"#).unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
-    assert!(js.contains(r#""onClick": (ev) => this.bump(ev)"#), "{js}");
+    assert!(
+        js.contains("api.onComponentEvent(") && js.contains("\"click\""),
+        "{js}"
+    );
+    assert!(js.contains("(ev) => this.bump(ev)"), "{js}");
     assert!(js.contains(r#""copyLabel":"#) || js.contains(r#""copyLabel": "#), "{js}");
+    assert!(!js.contains(r#""onClick""#), "{js}");
     assert!(!js.contains(r#""@click""#), "{js}");
     assert!(!js.contains(r#""copy-label""#), "{js}");
+}
+
+#[test]
+fn maps_component_on_submit_prop_orthogonal_to_at_submit() {
+    let src = r#"
+export default class Page {
+  confirm() {}
+  viaProp() {}
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let ir = parse_template(r#"<Form @submit="this.confirm" :on-submit="this.viaProp" />"#).unwrap();
+    let js = emit_client_js(src, &client, &ir, None).unwrap();
+    assert!(js.contains("api.onComponentEvent(") && js.contains("\"submit\""), "{js}");
+    assert!(js.contains(r#""onSubmit":"#) || js.contains(r#""onSubmit": "#), "{js}");
+    assert!(js.contains("viaProp"), "{js}");
+    assert!(!js.contains(r#""@submit""#), "{js}");
+}
+
+#[test]
+fn does_not_guess_bare_ident_as_instance_method() {
+    let src = r#"
+export default class Page {
+  bump() {}
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let ir = parse_template(r#"<button @click="bump" />"#).unwrap();
+    let js = emit_client_js(src, &client, &ir, None).unwrap();
+    // Bare `bump` must not become `(ev) => this.bump(ev)` via silent guess.
+    assert!(!js.contains("(ev) => this.bump(ev)"), "{js}");
 }
 
 #[test]

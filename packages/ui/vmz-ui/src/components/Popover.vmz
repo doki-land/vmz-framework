@@ -16,7 +16,7 @@
           class="vmz-ui-popover__backdrop"
           data-vmz-overlay-layer="backdrop"
           aria-label="Dismiss popover"
-          @click="dismiss"
+          @click="this.dismiss"
         ></button>
         <div
           class="vmz-ui-popover__panel"
@@ -26,14 +26,14 @@
           tabindex="-1"
           data-vmz-overlay-layer="panel"
           data-vmz-focus="enter"
-          :onKeyDown="onPanelKeyDown"
+          :onKeyDown="this.onPanelKeyDown"
         >
           <h2 :id="titleId" class="vmz-ui-popover__title">{{ title }}</h2>
           <div class="vmz-ui-popover__body">
             <slot />
           </div>
           <div class="vmz-ui-popover__actions">
-            <button type="button" class="vmz-ui-popover__close" data-vmz-focus="close" @click="dismiss">
+            <button type="button" class="vmz-ui-popover__close" data-vmz-focus="close" @click="this.dismiss">
               Close
             </button>
           </div>
@@ -162,6 +162,7 @@ export default class Popover {
 		this._restoreFocus = null;
 	}
 	dismiss() {
+		this.emit("close");
 		if (typeof this.onClose === "function") this.onClose();
 	}
 	_stackValue() {

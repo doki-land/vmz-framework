@@ -49,7 +49,7 @@ pub use program_ir::{
     ResumeEntryDecl, ResumeStrategy, RouteTabDecl, SecretRequirement, SemanticField,
     SemanticMethod, SemanticView, ServerAttach, ServerCallEdge, ServerCapability, ServerView,
     StubStatus, UnitId, UnknownRecord, ViewAttr, ViewAttrValue, ViewEach, ViewIfBranch, ViewNode,
-    ViewStatus, ViewView,
+    ViewStatus, ViewView, ComponentEventPlan,
 };
 pub use reactive_ir::{
     Binding, BindingId, BindingKind, ControlBranch, ControlRegion, DynamicStep, Effect, EffectId,

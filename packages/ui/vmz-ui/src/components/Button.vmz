@@ -11,7 +11,7 @@
       :href="href"
       :target="target"
       :rel="rel"
-      @click="onClick"
+      @click="this.onDomClick"
     >
       <span v-if="loading" class="vmz-ui-btn__spinner" aria-hidden="true"></span>
       <slot />
@@ -29,7 +29,7 @@
       :data-loading="loading ? 'true' : 'false'"
       :disabled="disabled"
       :aria-busy="loading ? 'true' : 'false'"
-      @click="onClick"
+      @click="this.onDomClick"
     >
       <span v-if="loading" class="vmz-ui-btn__spinner" aria-hidden="true"></span>
       <slot />
@@ -166,5 +166,9 @@ export default class Button {
 	public target: string = "";
 	public rel: string = "";
 	public onClick: ((e: Event) => void) | null = null;
+	onDomClick(e: Event) {
+		this.emit("click", e);
+		if (typeof this.onClick === "function") this.onClick(e);
+	}
 }
 </script>

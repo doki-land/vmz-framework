@@ -16,7 +16,7 @@
           class="vmz-ui-drawer__backdrop"
           data-vmz-overlay-layer="backdrop"
           aria-label="Dismiss drawer"
-          @click="dismiss"
+          @click="this.dismiss"
         ></button>
         <div
           class="vmz-ui-drawer__panel"
@@ -28,14 +28,14 @@
           data-vmz-focus="enter"
           data-vmz-motion="overlay-enter"
           data-vmz-motion-token="motion.overlay"
-          :onKeyDown="onPanelKeyDown"
+          :onKeyDown="this.onPanelKeyDown"
         >
           <h2 :id="titleId" class="vmz-ui-drawer__title">{{ title }}</h2>
           <div class="vmz-ui-drawer__body">
             <slot />
           </div>
           <div class="vmz-ui-drawer__actions">
-            <button type="button" class="vmz-ui-drawer__close" data-vmz-focus="close" @click="dismiss">
+            <button type="button" class="vmz-ui-drawer__close" data-vmz-focus="close" @click="this.dismiss">
               Close
             </button>
           </div>
@@ -267,10 +267,12 @@ export default class Drawer {
 				this._exitTimer = null;
 				if (!this._exiting || exitGen !== this._motionGen) return;
 				this._exiting = false;
+				this.emit("close");
 				if (typeof this.onClose === "function") this.onClose();
 			}, ms);
 			return;
 		}
+		this.emit("close");
 		if (typeof this.onClose === "function") this.onClose();
 	}
 	_cancelExit(reason) {

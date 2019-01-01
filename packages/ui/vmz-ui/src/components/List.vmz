@@ -6,8 +6,8 @@
         role="listbox"
         :aria-labelledby="labelId"
         :aria-label="label"
-        @click="onListClick"
-        :onKeyDown="onListKeyDown"
+        @click="this.onListClick"
+        :onKeyDown="this.onListKeyDown"
       >
         <li
           v-for="item in items"

@@ -16,8 +16,8 @@
         :aria-controls="panelId"
         :aria-invalid="error ? 'true' : 'false'"
         :aria-describedby="describedBy"
-        @click="toggle"
-        :onKeyDown="onTriggerKeyDown"
+        @click="this.toggle"
+        :onKeyDown="this.onTriggerKeyDown"
       >
         <span class="vmz-ui-date-picker__value" data-vmz-date="value">{{ displayLabel }}</span>
         <span class="vmz-ui-date-picker__chev" aria-hidden="true"></span>
@@ -34,7 +34,7 @@
         data-vmz-overlay-owner="date-picker"
         data-vmz-focus="enter"
         data-vmz-date="panel"
-        :onKeyDown="onPanelKeyDown"
+        :onKeyDown="this.onPanelKeyDown"
       >
         <div class="vmz-ui-date-picker__monthbar">
           <button
@@ -42,7 +42,7 @@
             class="vmz-ui-date-picker__nav"
             data-vmz-date="prev"
             aria-label="Previous month"
-            @click="prevMonth"
+            @click="this.prevMonth"
           >‹</button>
           <p class="vmz-ui-date-picker__month" data-vmz-date="month">{{ monthLabel }}</p>
           <button
@@ -50,7 +50,7 @@
             class="vmz-ui-date-picker__nav"
             data-vmz-date="next"
             aria-label="Next month"
-            @click="nextMonth"
+            @click="this.nextMonth"
           >›</button>
         </div>
         <div class="vmz-ui-date-picker__weekdays" aria-hidden="true">
@@ -72,7 +72,7 @@
             :aria-selected="day.selected ? 'true' : 'false'"
             :aria-disabled="day.disabled ? 'true' : 'false'"
             :disabled="day.disabled"
-            @click="onDayClick"
+            @click="this.onDayClick"
           >{{ day.label }}</button>
         </div>
       </div>
@@ -431,6 +431,8 @@ export default class DatePicker {
 				start,
 				end
 			} };
+			this.emit("change", ev);
+			this.emit("input", ev);
 			if (typeof this.onChange === "function") this.onChange(ev);
 			if (typeof this.onInput === "function") this.onInput(ev);
 			return;
@@ -442,6 +444,8 @@ export default class DatePicker {
 			start: iso,
 			end: iso
 		} };
+		this.emit("change", ev);
+		this.emit("input", ev);
 		if (typeof this.onChange === "function") this.onChange(ev);
 		if (typeof this.onInput === "function") this.onInput(ev);
 	}

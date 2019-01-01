@@ -10,7 +10,7 @@
         :readonly="readonly"
         :aria-invalid="error ? 'true' : 'false'"
         :aria-describedby="describedBy"
-        @input="onInput"
+        @input="this.onDomInput"
       ></textarea>
       <p v-if="description" :id="descriptionId" class="vmz-ui-textarea__description">{{ description }}</p>
       <p v-if="error" :id="errorId" class="vmz-ui-textarea__error" role="alert">{{ error }}</p>
@@ -114,5 +114,9 @@ export default class TextArea {
 	public errorId: string = "vmz-textarea-err";
 	public describedBy: string = "";
 	public onInput: ((e: Event) => void) | null = null;
+	onDomInput(e: Event) {
+		this.emit("input", e);
+		if (typeof this.onInput === "function") this.onInput(e);
+	}
 }
 </script>

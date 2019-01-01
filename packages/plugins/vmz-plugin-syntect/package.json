@@ -1,0 +1,35 @@
+{
+    "name": "@vmz/plugin-syntect",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Thin replaceable highlighter plugin shape (registers plain via @vmz/highlighter — documents third-party registration, not a real syntect binary)",
+    "license": "MIT",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json"
+    },
+    "dependencies": {
+        "@vmz/highlighter": "workspace:*"
+    },
+    "devDependencies": {
+        "typescript": "^5.8.3"
+    },
+    "keywords": [
+        "vmz",
+        "plugin",
+        "highlighter",
+        "syntect"
+    ]
+}

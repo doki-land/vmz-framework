@@ -161,7 +161,7 @@ export default class IndexPage {
   guideHref = '/d/zh-hans/guide/';
   _unwatchLocale = null;
   showcaseTabs = [{ id: 'overview', title: '概览', controls: 'landing-showcase-panel' }, { id: 'source', title: '源码', controls: 'landing-showcase-panel' }, { id: 'activity', title: '活动', controls: 'landing-showcase-panel' }];
-  codeSample = '<template>\n  <Button @click="increment">\n    Count {{ count }}\n  </Button>\n</template>';
+  codeSample = '<template>\n  <Button @click="this.increment">\n    Count {{ count }}\n  </Button>\n</template>';
   surfaceColumns = [{ id: 'surface', title: '目标' }, { id: 'result', title: '交付结果' }, { id: 'status', title: '状态' }];
   surfaceRows = [{ id: 'browser', cells: ['Browser', 'Direct DOM update', 'Ready'] }, { id: 'ssr', cells: ['SSR', 'HTML + resume', 'Ready'] }, { id: 'native', cells: ['Native', 'Host operations', 'Ready'] }, { id: 'edge', cells: ['Edge', 'Server capabilities', 'Ready'] }];
 

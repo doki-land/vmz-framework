@@ -12,7 +12,7 @@
         :disabled="disabled"
         :aria-invalid="error ? 'true' : 'false'"
         :aria-describedby="describedBy"
-        @input="onInput"
+        @input="this.onDomInput"
       />
       <p v-if="description" :id="descriptionId" class="vmz-ui-field__description">{{ description }}</p>
       <p v-if="error" :id="errorId" class="vmz-ui-field__error" role="alert">{{ error }}</p>
@@ -113,5 +113,9 @@ export default class Field {
 	public errorId: string = "vmz-field-err";
 	public describedBy: string = "";
 	public onInput: ((e: Event) => void) | null = null;
+	onDomInput(e: Event) {
+		this.emit("input", e);
+		if (typeof this.onInput === "function") this.onInput(e);
+	}
 }
 </script>

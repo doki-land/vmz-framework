@@ -4,7 +4,7 @@
       data-vmz-ui="query-form"
       data-dense="true"
       :aria-label="label"
-      @submit="onSubmitGuard"
+      @submit="this.onSubmitGuard"
     >
       <slot />
     </form>
@@ -32,6 +32,7 @@ export default class QueryForm {
 	public onSubmit: (() => void) | null = null;
 	onSubmitGuard(ev) {
 		if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
+		this.emit("submit");
 		if (typeof this.onSubmit === "function") this.onSubmit();
 	}
 }
