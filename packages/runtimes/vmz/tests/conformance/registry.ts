@@ -247,7 +247,7 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'Alias — ui-direct-host-box',
         composite: ['ui-direct-host-box'],
     },
-    'upload': {
+    upload: {
         description: 'Upload thin gate — covered by ui-automation Form depth + official-homepage',
         composite: ['ui-automation', 'official-homepage'],
     },

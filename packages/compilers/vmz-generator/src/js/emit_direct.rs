@@ -10,10 +10,9 @@
 use super::ast_util::{js_string_literal, print_one_stmt};
 use super::emit_ir::IrDepCursor;
 use super::helpers::{
-    bind_field_idents, collect_deps_oxc, component_event_name, component_prop_wire_name, event_dom_type,
-    is_component_event_attr, is_event_attr,
-    is_html_attr, looks_like_ternary, parse_this_method_call_arrow, sanitize_interp,
-    split_ternary_parts, wrap_event_handler_body,
+    bind_field_idents, collect_deps_oxc, component_event_name, component_prop_wire_name,
+    event_dom_type, is_component_event_attr, is_event_attr, is_html_attr, looks_like_ternary,
+    parse_this_method_call_arrow, sanitize_interp, split_ternary_parts, wrap_event_handler_body,
 };
 use vmz_types::{BindingId, ViewAttr, ViewAttrValue, ViewEach, ViewNode, ViewStatus, ViewView};
 
@@ -469,7 +468,10 @@ fn emit_component(
                 // `:on-submit` / function props — wrap bare method refs like events.
                 let body = bind_field_idents(e, fields, scope, aliases);
                 let wire = component_prop_wire_name(&a.name);
-                if wire.starts_with("on") && wire.len() > 2 && wire.as_bytes()[2].is_ascii_uppercase() {
+                if wire.starts_with("on")
+                    && wire.len() > 2
+                    && wire.as_bytes()[2].is_ascii_uppercase()
+                {
                     wrap_event_handler_body(&body)
                 } else {
                     body
@@ -492,7 +494,10 @@ fn emit_component(
     // Live prop binders: any interp with field deps stays in sync (not @events).
     if client.is_none() && aliases.is_empty() {
         for a in attrs {
-            if a.name == "style:tw" || a.name.starts_with("client:") || is_component_event_attr(&a.name) {
+            if a.name == "style:tw"
+                || a.name.starts_with("client:")
+                || is_component_event_attr(&a.name)
+            {
                 continue;
             }
             let ViewAttrValue::Interp { expr: e } = &a.value else {

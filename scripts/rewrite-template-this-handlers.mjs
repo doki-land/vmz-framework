@@ -14,15 +14,10 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const TARGETS = [
-    path.join(root, 'packages', 'ui'),
-    path.join(root, 'packages', 'homepage'),
-    path.join(root, 'packages', 'examples'),
-];
+const TARGETS = [path.join(root, 'packages', 'ui'), path.join(root, 'packages', 'homepage'), path.join(root, 'packages', 'examples')];
 
 /** Attrs that bind handlers / function props (value may be bare method ref). */
-const ATTR_RE =
-    /(@[\w.:-]+|:on[\w-]*)\s*=\s*(["'])(?!this\.)([A-Za-z_$][\w$]*)\2/g;
+const ATTR_RE = /(@[\w.:-]+|:on[\w-]*)\s*=\s*(["'])(?!this\.)([A-Za-z_$][\w$]*)\2/g;
 
 function rewriteTemplateSection(templateInner) {
     return templateInner.replace(ATTR_RE, (_m, attr, q, ident) => {

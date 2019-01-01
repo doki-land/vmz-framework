@@ -4,12 +4,7 @@
  * No real .wasm binary is shipped here.
  */
 
-import {
-    createPlainHighlighter,
-    type HighlightOptions,
-    type HighlightResult,
-    type Highlighter,
-} from '@vmz/highlighter';
+import { createPlainHighlighter, type HighlightOptions, type HighlightResult, type Highlighter } from '@vmz/highlighter';
 
 export function createUnknownWasm32Highlighter(id = 'unknown-wasm32'): Highlighter {
     const plain = createPlainHighlighter(`${id}:plain`);
@@ -20,10 +15,7 @@ export function createUnknownWasm32Highlighter(id = 'unknown-wasm32'): Highlight
             const result = await plain.highlight(code, options);
             return {
                 ...result,
-                html: result.html.replace(
-                    'class="vmz-highlight"',
-                    'class="vmz-highlight vmz-highlight--wasm32"',
-                ),
+                html: result.html.replace('class="vmz-highlight"', 'class="vmz-highlight vmz-highlight--wasm32"'),
             };
         },
     };

@@ -6,11 +6,7 @@
  * Compiler core must NOT hard-depend on syntect/comrak/shiki filenames.
  */
 
-import {
-    createPlainHighlighter,
-    registerHighlighter,
-    type Highlighter,
-} from '@vmz/highlighter';
+import { createPlainHighlighter, registerHighlighter, type Highlighter } from '@vmz/highlighter';
 
 export type SyntectPluginOptions = {
     /** Display id for the registered highlighter (default `syntect`). */

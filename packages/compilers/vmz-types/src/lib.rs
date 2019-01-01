@@ -41,15 +41,15 @@ pub use component::{
 };
 pub use dep_key::{DepKey, DepPath, PathSegment, WriteNotice};
 pub use program_ir::{
-    AnalysisStats, CapabilityId, ClientServerCall, DeploymentClientCall, DeploymentView,
-    DisposeRegionSource, ExecutionPlan, GraphView, LifetimeRegionDecl, LifetimeRegionKind,
-    LifetimeView, MotionTransitionDecl, MotionTransitionKind, MotionTransitionState, MotionTrigger,
-    MotionView, PlanNode, PlanNodeKind, PlanStatus, ProgramEdge, ProgramEdgeKind, ProgramModule,
-    ProgramUnit, ProgramUnitKind, ReducedMotionPolicy, ResourceDecl, ResourceKind, ResourceView,
-    ResumeEntryDecl, ResumeStrategy, RouteTabDecl, SecretRequirement, SemanticField,
-    SemanticMethod, SemanticView, ServerAttach, ServerCallEdge, ServerCapability, ServerView,
-    StubStatus, UnitId, UnknownRecord, ViewAttr, ViewAttrValue, ViewEach, ViewIfBranch, ViewNode,
-    ViewStatus, ViewView, ComponentEventPlan,
+    AnalysisStats, CapabilityId, ClientServerCall, ComponentEventPlan, DeploymentClientCall,
+    DeploymentView, DisposeRegionSource, ExecutionPlan, GraphView, LifetimeRegionDecl,
+    LifetimeRegionKind, LifetimeView, MotionTransitionDecl, MotionTransitionKind,
+    MotionTransitionState, MotionTrigger, MotionView, PlanNode, PlanNodeKind, PlanStatus,
+    ProgramEdge, ProgramEdgeKind, ProgramModule, ProgramUnit, ProgramUnitKind, ReducedMotionPolicy,
+    ResourceDecl, ResourceKind, ResourceView, ResumeEntryDecl, ResumeStrategy, RouteTabDecl,
+    SecretRequirement, SemanticField, SemanticMethod, SemanticView, ServerAttach, ServerCallEdge,
+    ServerCapability, ServerView, StubStatus, UnitId, UnknownRecord, ViewAttr, ViewAttrValue,
+    ViewEach, ViewIfBranch, ViewNode, ViewStatus, ViewView,
 };
 pub use reactive_ir::{
     Binding, BindingId, BindingKind, ControlBranch, ControlRegion, DynamicStep, Effect, EffectId,

@@ -51,12 +51,7 @@ if (!fs.existsSync(path.join(wasmRoot, 'dist', 'index.js'))) {
 
 console.log('highlighter-wasm: plain highlight…');
 const hl = await import(pathToFileURL(path.join(hlRoot, 'dist', 'index.js')).href);
-const {
-    createPlainHighlighter,
-    registerHighlighter,
-    getHighlighter,
-    resetHighlighterForTests,
-} = hl;
+const { createPlainHighlighter, registerHighlighter, getHighlighter, resetHighlighterForTests } = hl;
 resetHighlighterForTests?.();
 const plain = createPlainHighlighter();
 const result = await plain.highlight('const x = 1 < 2;', { language: 'ts' });
