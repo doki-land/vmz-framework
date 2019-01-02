@@ -128,3 +128,11 @@ jobs:
           PUPPETEER_EXECUTABLE_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
           CI: 'true'
         run: pnpm verify -- ui-automation
+
+      - name: Browser production evidence (0.1.27 aggregate)
+        env:
+          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          VMZ_BROWSER: ${{ steps.setup-chrome.outputs.chrome-path }}
+          PUPPETEER_EXECUTABLE_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          CI: 'true'
+        run: pnpm verify -- browser-production

@@ -37,13 +37,12 @@ TypeScript drivers under **domain folders** — not a flat dump:
       quarantine）
     - `pnpm verify -- production-observability` — **A5**：trace facets + redaction + CSP + budgets + health/ready（fixture
       fault injection / sampling 仪表仍开）
-    - `pnpm verify -- official-homepage` — **Official homepage**：homepage SSR + documents + production-inspector + `@vmz/ui`
+    - `pnpm verify -- browser-artifact-boundary` — **0.1.27**：记录 delivery dist 模块边界 + interpreter signals（`dist/vmz.browser-artifact-boundary.json`；**不**关 thin runtime）
+    - `pnpm verify -- official-homepage` / `official-dogfood` — **Official homepage**：homepage SSR + documents + production-inspector + `@vmz/ui`
       Button/Field/Dialog（sibling panel / focus-loop 仍开）
-    - `pnpm verify -- browser-production` — aggregate **薄绿**（proof 未关前不宣称 production-ready；也尚未进入默认
-      `pnpm verify`）
-    - Proof: `dist/vmz.production.proof.json`
-- **Default `pnpm verify`:** does **not** yet include `browser-production` / `browser-core` / `router-production` (keep
-  contract suite green while A* land).
+    - `pnpm verify -- browser-production` — **0.1.27** aggregate **薄绿**（`productionReadyClaim` / thin runtime **仍 false**；已进入默认 `pnpm verify` / CI）
+    - Proof: `dist/vmz.production.proof.json` + boundary record above
+- **Default `pnpm verify`:** includes `browser-production`（0.1.27 Production Evidence Baseline）。聚合绿 ≠ `production-ready` / thin runtime。
 - **Long-term:** migrate into `vmz test` manifests / `cargo test`; this tree is the transitional Node driver home.
 - **Source language:** TypeScript only (no `.mjs` drivers).
 

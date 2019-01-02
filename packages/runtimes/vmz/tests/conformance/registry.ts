@@ -297,7 +297,11 @@ export const CHECKS: Record<string, CheckEntry> = {
     },
     'event-flow-core': { file: 'runtime/event-flow.ts' },
 
-    // production/ — Browser Production Profile (not in default verify-all until green)
+    // production/ — Browser Production Profile (0.1.27: enter default verify-all when green)
+    'browser-artifact-boundary': {
+        file: 'production/browser-artifact-boundary.ts',
+        description: '0.1.27: record browser delivery module boundary (not thin-runtime close)',
+    },
     'browser-core': {
         file: 'production/browser-core.ts',
         description: 'A1 catalog: compile+logic+ssr+resume+browser+async + no-render',
@@ -393,8 +397,9 @@ export const CHECKS: Record<string, CheckEntry> = {
         composite: ['motion-ir', 'ui7', 'official-homepage'],
     },
     'browser-production': {
-        description: 'Browser Production Profile v1 aggregate',
+        description: 'Browser Production Profile v1 aggregate (0.1.27 evidence baseline; ≠ thin runtime)',
         composite: [
+            'browser-artifact-boundary',
             'browser-core',
             'router-production',
             'server-host',
@@ -501,4 +506,6 @@ export const CHECK_ALL = [
     'ui-data-grid',
     'ui-icons',
     'ui7',
+    // 0.1.27 Production Evidence Baseline — aggregate (includes official-dogfood via official-homepage)
+    'browser-production',
 ];

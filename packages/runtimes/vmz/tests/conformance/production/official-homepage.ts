@@ -27,6 +27,25 @@ function fail(msg: string): never {
     process.exit(1);
 }
 
+async function stopServeChild(child: ReturnType<typeof spawn> | null | undefined): Promise<void> {
+    if (!child || child.exitCode != null || child.killed) return;
+    const pid = child.pid;
+    await new Promise<void>((resolve) => {
+        const done = () => resolve();
+        child.once('exit', done);
+        try {
+            if (process.platform === 'win32' && pid) {
+                spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
+            } else {
+                child.kill('SIGTERM');
+            }
+        } catch {
+            /* ignore */
+        }
+        setTimeout(done, 3000);
+    });
+}
+
 const errors: string[] = [];
 
 function existsRel(...parts: string[]): boolean {
@@ -454,11 +473,7 @@ if (homeBuild.status === 0) {
         } catch (e) {
             homeSsrDetail = e instanceof Error ? e.message : String(e);
         } finally {
-            try {
-                child.kill('SIGTERM');
-            } catch {
-                /* ignore */
-            }
+            await stopServeChild(child);
         }
     }
 }

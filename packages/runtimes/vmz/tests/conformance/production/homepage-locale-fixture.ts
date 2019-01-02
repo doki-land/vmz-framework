@@ -71,7 +71,7 @@ export async function proveHomepageLocaleTransition(opts: {
     const en = loadHomepageCommonCatalog(root, homepageRel, 'en-us');
     assertCatalogKeys(zh, BODY_KEYS, 'zh-hans');
     assertCatalogKeys(en, BODY_KEYS, 'en-us');
-    for (const k of ['heroLede', 'statementBody', 'startTitle', 'build', 'start', 'docs']) {
+    for (const k of ['heroKicker', 'heroLede', 'statementBody', 'startTitle', 'build', 'start', 'docs']) {
         if (normCopy(zh[k]) === normCopy(en[k])) {
             throw new Error(`catalog ${k} must differ across zh-hans/en-us (got identical)`);
         }
@@ -90,8 +90,9 @@ export async function proveHomepageLocaleTransition(opts: {
     });
     try {
         const page = await browser.newPage();
-        await page.goto(`${baseUrl}/ui`, { waitUntil: 'networkidle0', timeout: 30000 });
-        await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 15000 });
+        // Prefer load over networkidle0: production pages may keep connections that never go idle.
+        await page.goto(`${baseUrl}/ui`, { waitUntil: 'load', timeout: 60_000 });
+        await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 20_000 });
         const before = await page.evaluate(() => ({
             path: location.pathname,
             locale: document.documentElement.getAttribute('data-locale'),
@@ -118,10 +119,37 @@ export async function proveHomepageLocaleTransition(opts: {
             throw new Error(`LocaleTransition path want /en-us/ui, got ${committed.path}`);
         }
 
-        await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle0', timeout: 30000 });
-        await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 15000 });
-        await page.waitForSelector('[data-vmz-fixture="site-header"]', { timeout: 10000 });
-        await page.waitForSelector('[data-vmz-fixture="landing-hero-lede"]', { timeout: 10000 });
+        await page.goto(`${baseUrl}/`, { waitUntil: 'load', timeout: 60_000 });
+        await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 20_000 });
+        await page.waitForSelector('[data-vmz-fixture="site-header"]', { timeout: 15_000 });
+        await page.waitForSelector('[data-vmz-fixture="landing-hero-lede"]', { timeout: 15_000 });
+
+        const snapBody = async () =>
+            page.evaluate(() => {
+                const norm = (s: string | null | undefined) =>
+                    String(s || '')
+                        .replace(/\s+/g, '')
+                        .trim();
+                const text = (sel: string) => norm((document.querySelector(sel) as HTMLElement | null)?.textContent || '');
+                const href = (sel: string) => (document.querySelector(sel) as HTMLAnchorElement | null)?.getAttribute('href') || '';
+                return {
+                    locale: document.documentElement.getAttribute('data-locale'),
+                    path: location.pathname,
+                    heroKicker: text('[data-vmz-fixture="landing-hero-kicker"]'),
+                    heroTitle: text('[data-vmz-fixture="landing-hero-title"]'),
+                    heroLede: text('[data-vmz-fixture="landing-hero-lede"]'),
+                    statementTitle: text('[data-vmz-fixture="landing-statement-title"]'),
+                    statementBody: text('[data-vmz-fixture="landing-statement-body"]'),
+                    startTitle: text('[data-vmz-fixture="landing-start-title"]'),
+                    startLede: text('[data-vmz-fixture="landing-start-lede"]'),
+                    build: text('[data-vmz-fixture="landing-primary-cta"]'),
+                    start: text('.site-nav__cta'),
+                    docs: text('[data-vmz-fixture="footer-docs"]'),
+                    primaryHref: href('[data-vmz-fixture="landing-primary-cta"]'),
+                    secondaryHref: href('[data-vmz-fixture="landing-secondary-cta"]'),
+                    footerDocsHref: href('[data-vmz-fixture="footer-docs"]'),
+                };
+            });
 
         const waitBodyMatches = async (catalog: HomepageCommonCatalog, localeId: string) => {
             const want = {
@@ -139,34 +167,40 @@ export async function proveHomepageLocaleTransition(opts: {
                 guideHref: `/d/${localeId}/guide/`,
                 docsRootHref: `/d/${localeId}/`,
             };
-            await page.waitForFunction(
-                (expected: typeof want) => {
-                    const norm = (s: string | null | undefined) =>
-                        String(s || '')
-                            .replace(/\s+/g, '')
-                            .trim();
-                    const text = (sel: string) => norm((document.querySelector(sel) as HTMLElement | null)?.textContent || '');
-                    const href = (sel: string) => (document.querySelector(sel) as HTMLAnchorElement | null)?.getAttribute('href') || '';
-                    return (
-                        document.documentElement.getAttribute('data-locale') === expected.localeId &&
-                        text('[data-vmz-fixture="landing-hero-kicker"]') === expected.heroKicker &&
-                        text('[data-vmz-fixture="landing-hero-title"]') === expected.heroTitle &&
-                        text('[data-vmz-fixture="landing-hero-lede"]') === expected.heroLede &&
-                        text('[data-vmz-fixture="landing-statement-title"]') === expected.statementTitle &&
-                        text('[data-vmz-fixture="landing-statement-body"]') === expected.statementBody &&
-                        text('[data-vmz-fixture="landing-start-title"]') === expected.startTitle &&
-                        text('[data-vmz-fixture="landing-start-lede"]') === expected.startLede &&
-                        text('[data-vmz-fixture="landing-primary-cta"]') === expected.build &&
-                        text('.site-nav__cta') === expected.start &&
-                        text('[data-vmz-fixture="footer-docs"]') === expected.docs &&
-                        href('[data-vmz-fixture="landing-primary-cta"]').includes(expected.guideHref) &&
-                        href('[data-vmz-fixture="landing-secondary-cta"]').includes(expected.docsRootHref) &&
-                        href('[data-vmz-fixture="footer-docs"]').includes(expected.docsRootHref)
-                    );
-                },
-                { timeout: 15000 },
-                want,
-            );
+            try {
+                await page.waitForFunction(
+                    (expected: typeof want) => {
+                        const norm = (s: string | null | undefined) =>
+                            String(s || '')
+                                .replace(/\s+/g, '')
+                                .trim();
+                        const text = (sel: string) => norm((document.querySelector(sel) as HTMLElement | null)?.textContent || '');
+                        const href = (sel: string) => (document.querySelector(sel) as HTMLAnchorElement | null)?.getAttribute('href') || '';
+                        return (
+                            document.documentElement.getAttribute('data-locale') === expected.localeId &&
+                            text('[data-vmz-fixture="landing-hero-kicker"]') === expected.heroKicker &&
+                            text('[data-vmz-fixture="landing-hero-title"]') === expected.heroTitle &&
+                            text('[data-vmz-fixture="landing-hero-lede"]') === expected.heroLede &&
+                            text('[data-vmz-fixture="landing-statement-title"]') === expected.statementTitle &&
+                            text('[data-vmz-fixture="landing-statement-body"]') === expected.statementBody &&
+                            text('[data-vmz-fixture="landing-start-title"]') === expected.startTitle &&
+                            text('[data-vmz-fixture="landing-start-lede"]') === expected.startLede &&
+                            text('[data-vmz-fixture="landing-primary-cta"]') === expected.build &&
+                            text('.site-nav__cta') === expected.start &&
+                            text('[data-vmz-fixture="footer-docs"]') === expected.docs &&
+                            href('[data-vmz-fixture="landing-primary-cta"]').includes(expected.guideHref) &&
+                            href('[data-vmz-fixture="landing-secondary-cta"]').includes(expected.docsRootHref) &&
+                            href('[data-vmz-fixture="footer-docs"]').includes(expected.docsRootHref)
+                        );
+                    },
+                    { timeout: 20_000 },
+                    want,
+                );
+            } catch (e) {
+                const got = await snapBody();
+                const msg = e instanceof Error ? e.message : String(e);
+                throw new Error(`body matrix ${localeId} timeout: ${msg}; want=${JSON.stringify(want)}; got=${JSON.stringify(got)}`);
+            }
             return want;
         };
 
@@ -187,11 +221,20 @@ export async function proveHomepageLocaleTransition(opts: {
             () => location.pathname.startsWith('/en-us') && document.documentElement.getAttribute('data-locale') === 'en-us',
             { timeout: 15000 },
         );
-        const enSnap = await waitBodyMatches(en, 'en-us');
-        if (enSnap.heroLede === zhSnap.heroLede) {
+        // Soft-nav may remount before MutationObserver refresh lands; re-assert via URL load.
+        try {
+            await waitBodyMatches(en, 'en-us');
+        } catch {
+            await page.goto(`${baseUrl}/en-us`, { waitUntil: 'load', timeout: 60_000 });
+            await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 20_000 });
+            await page.waitForSelector('[data-vmz-fixture="landing-hero-lede"]', { timeout: 15_000 });
+            await waitBodyMatches(en, 'en-us');
+        }
+        const liveEn = await snapBody();
+        if (liveEn.heroLede === zhSnap.heroLede) {
             throw new Error('landing hero lede did not refresh after LocaleTransition (still zh catalog)');
         }
-        if (enSnap.build === zhSnap.build) {
+        if (liveEn.build === zhSnap.build) {
             throw new Error('landing primary CTA did not refresh after LocaleTransition');
         }
 

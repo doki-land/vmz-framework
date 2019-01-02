@@ -3,9 +3,9 @@
  * Writes `dist/vmz.production.proof.json` at the repo root (never invents green status).
  */
 
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { repoRoot, vmzBin } from './repo-root.ts';
 
 export type CheckStatus = 'passed' | 'failed' | 'skipped' | 'not-implemented';
@@ -36,6 +36,8 @@ export type ProductionProof = {
     securityChecks: ProductionCheck[];
     checks: ProductionCheck[];
     knownLimitations: string[];
+    /** Path relative to repo root; written by `browser-artifact-boundary` (0.1.27 record-only). */
+    browserArtifactBoundaryPath?: string | null;
     updatedAt: string;
 };
 
@@ -64,6 +66,7 @@ export function emptyProof(): ProductionProof {
         securityChecks: [],
         checks: [],
         knownLimitations: [],
+        browserArtifactBoundaryPath: null,
         updatedAt: new Date().toISOString(),
     };
 }

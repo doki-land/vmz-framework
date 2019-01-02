@@ -7,10 +7,10 @@
  * No Vitest/Jest/Playwright.
  */
 
-import { spawn } from 'node:child_process';
-import { createRequire } from 'node:module';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -34,15 +34,17 @@ import {
     rollbackRelease,
     scenarioPackDigest,
 } from 'vmz';
-import { repoRoot } from '../_lib/repo-root.ts';
 import { addLimitation, readProof, runVmzBuild, runVmzTest, upsertCheck, writeProof } from '../_lib/production-proof.ts';
+import { repoRoot } from '../_lib/repo-root.ts';
 import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
 
 const root = repoRoot(import.meta.url);
 const ROUTER = 'packages/examples/production-router';
 const INSPECTOR = 'packages/examples/production-inspector';
-const PORT = 18781;
-const PORT_UI = 18782;
+/** Dedicated ports — avoid clash with `ui-automation` (18781/18782) leftovers. */
+const PORT = 18881;
+const PORT_UI = 18882;
+const NAV_TIMEOUT_MS = 60_000;
 const DIAG_UNKNOWN = 'vmz::style::unknown_design_token';
 
 function fail(msg: string): never {
@@ -188,16 +190,6 @@ if (build.status !== 0) {
     const hostJs = path.join(dist, 'vmz-serve-host.mjs');
     if (!fs.existsSync(hostJs)) fail(`missing serve-host: ${hostJs}`);
     let child: ReturnType<typeof spawn> | null = null;
-    const killChild = () => {
-        if (child && !child.killed) {
-            try {
-                child.kill('SIGTERM');
-            } catch {
-                /* ignore */
-            }
-            child = null;
-        }
-    };
     try {
         child = spawn(process.execPath, [hostJs], {
             cwd: dist,
@@ -266,7 +258,8 @@ if (build.status !== 0) {
         record({ scenarioId: 'production.router.access', status: 'failed', detail: msg, attempts: 1 });
         record({ scenarioId: 'production.router.action', status: 'failed', detail: msg, attempts: 1 });
     } finally {
-        killChild();
+        await stopChildProcess(child);
+        child = null;
     }
 
     // --- loader cancel / stale generation ---
@@ -517,7 +510,26 @@ async function loadPuppeteerCore(): Promise<any> {
     }
 }
 
-async function startServeHost(distDir: string, port: number): Promise<{ kill: () => void }> {
+async function stopChildProcess(child: ReturnType<typeof spawn> | null | undefined): Promise<void> {
+    if (!child || child.exitCode != null || child.killed) return;
+    const pid = child.pid;
+    await new Promise<void>((resolve) => {
+        const done = () => resolve();
+        child.once('exit', done);
+        try {
+            if (process.platform === 'win32' && pid) {
+                spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
+            } else {
+                child.kill('SIGTERM');
+            }
+        } catch {
+            /* ignore */
+        }
+        setTimeout(done, 3000);
+    });
+}
+
+async function startServeHost(distDir: string, port: number): Promise<{ kill: () => Promise<void> }> {
     const hostJs = path.join(distDir, 'vmz-serve-host.mjs');
     if (!fs.existsSync(hostJs)) throw new Error(`missing serve-host in ${distDir}`);
     const child = spawn(process.execPath, [hostJs], {
@@ -525,12 +537,8 @@ async function startServeHost(distDir: string, port: number): Promise<{ kill: ()
         env: serveHostChildEnv({ VMZ_DIST: distDir, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(port) }),
         stdio: ['ignore', 'pipe', 'pipe'],
     });
-    const kill = () => {
-        try {
-            child.kill('SIGTERM');
-        } catch {
-            /* ignore */
-        }
+    const kill = async () => {
+        await stopChildProcess(child);
     };
     await new Promise<void>((resolve, reject) => {
         const t = setTimeout(() => reject(new Error(`serve timeout :${port}`)), 8000);
@@ -569,8 +577,9 @@ async function proveLocaleTransition(routerDist: string): Promise<string> {
         });
         try {
             const page = await browser.newPage();
-            await page.goto(`http://127.0.0.1:${PORT}/about`, { waitUntil: 'networkidle0', timeout: 20000 });
-            await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 10000 });
+            // Prefer load over networkidle0: production pages may keep connections that never go idle.
+            await page.goto(`http://127.0.0.1:${PORT}/about`, { waitUntil: 'load', timeout: NAV_TIMEOUT_MS });
+            await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 15000 });
             const committed = await page.evaluate(async () => {
                 const r = await (window as any).__vmzTransitionLocale('zh-hans');
                 return {
@@ -587,7 +596,7 @@ async function proveLocaleTransition(routerDist: string): Promise<string> {
             await browser.close();
         }
     } finally {
-        host.kill();
+        await host.kill();
     }
 }
 
@@ -607,8 +616,8 @@ async function proveInspectorFieldDialogRtl(distDir: string): Promise<{ field: s
         });
         try {
             const page = await browser.newPage();
-            await page.goto(`http://127.0.0.1:${PORT_UI}/`, { waitUntil: 'networkidle0', timeout: 20000 });
-            await page.waitForSelector('#inspector-query', { timeout: 10000 });
+            await page.goto(`http://127.0.0.1:${PORT_UI}/`, { waitUntil: 'load', timeout: NAV_TIMEOUT_MS });
+            await page.waitForSelector('#inspector-query', { timeout: 15000 });
 
             // Controlled Field: keystrokes so onInput binding updates page state.
             await page.click('#inspector-query');
@@ -690,7 +699,7 @@ async function proveInspectorFieldDialogRtl(distDir: string): Promise<{ field: s
             await browser.close();
         }
     } finally {
-        host.kill();
+        await host.kill();
     }
 }
 
