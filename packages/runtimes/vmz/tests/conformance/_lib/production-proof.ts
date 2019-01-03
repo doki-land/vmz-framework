@@ -38,6 +38,8 @@ export type ProductionProof = {
     knownLimitations: string[];
     /** Path relative to repo root; written by `browser-artifact-boundary` (0.1.27 record-only). */
     browserArtifactBoundaryPath?: string | null;
+    /** Path relative to repo root; written by 0.1.28 runtime inventory gates. */
+    runtimeInventoryPath?: string | null;
     updatedAt: string;
 };
 
@@ -67,6 +69,7 @@ export function emptyProof(): ProductionProof {
         checks: [],
         knownLimitations: [],
         browserArtifactBoundaryPath: null,
+        runtimeInventoryPath: null,
         updatedAt: new Date().toISOString(),
     };
 }
