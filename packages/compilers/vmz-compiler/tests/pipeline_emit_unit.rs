@@ -220,7 +220,10 @@ export default class IndexPage {
     assert!(js.contains("\"CounterButton\""), "{js}");
     assert!(js.contains("api.on(") || js.contains("api.on(e"), "{js}");
     assert!(js.contains("this.count++"), "{js}");
-    assert!(js.contains("api.bindText(this,"), "{js}");
+    assert!(
+        js.contains("api.specFieldText(this,") || js.contains("api.bindText(this,"),
+        "{js}"
+    );
     assert!(js.contains("\"count\""), "{js}");
     assert!(!js.contains("this.() =>"));
     assert!(!js.contains("prototype.render"), "{js}");
@@ -277,7 +280,7 @@ export default class Page {
 }
 
 #[test]
-fn does_not_guess_bare_ident_as_instance_method() {
+fn resolves_bare_class_method_as_instance_call() {
     let src = r#"
 export default class Page {
   bump() {}
@@ -286,8 +289,59 @@ export default class Page {
     let client = analyze_script(ScriptKind::Client, src);
     let ir = parse_template(r#"<button @click="bump" />"#).unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
-    // Bare `bump` must not become `(ev) => this.bump(ev)` via silent guess.
-    assert!(!js.contains("(ev) => this.bump(ev)"), "{js}");
+    assert!(
+        js.contains("api.onMethod(") && js.contains("\"bump\""),
+        "{js}"
+    );
+}
+
+#[test]
+fn resolves_bare_method_on_component_event() {
+    let src = r#"
+export default class Page {
+  confirm() {}
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let ir = parse_template(r#"<Form @submit="confirm" />"#).unwrap();
+    let js = emit_client_js(src, &client, &ir, None).unwrap();
+    assert!(js.contains("api.onComponentEvent(") && js.contains("\"submit\""), "{js}");
+    assert!(js.contains("(ev) => this.confirm(ev)"), "{js}");
+}
+
+#[test]
+fn emits_spec_field_text_for_single_field() {
+    let src = "export default class Page { title = 'x'; }";
+    let client = analyze_script(ScriptKind::Client, src);
+    let ir = parse_template("<p>{{ title }}</p>").unwrap();
+    let js = emit_client_js(src, &client, &ir, None).unwrap();
+    assert!(js.contains("api.specFieldText(this,") && js.contains("\"title\""), "{js}");
+}
+
+#[test]
+fn emits_on_method_for_explicit_this_handler() {
+    let src = r#"
+export default class Page {
+  bump() {}
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let ir = parse_template(r#"<button @click="this.bump" />"#).unwrap();
+    let js = emit_client_js(src, &client, &ir, None).unwrap();
+    assert!(js.contains("api.onMethod(") && js.contains("\"bump\""), "{js}");
+}
+
+#[test]
+fn rejects_unresolved_bare_handler() {
+    let src = r#"
+export default class Page {
+  bump() {}
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let ir = parse_template(r#"<button @click="missing" />"#).unwrap();
+    let err = emit_client_js(src, &client, &ir, None).unwrap_err();
+    assert!(err.contains("unresolved event handler"), "{err}");
 }
 
 #[test]

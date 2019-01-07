@@ -482,6 +482,53 @@ export const directApi = {
             cf,
         );
     },
+    /**
+     * Specialized single-field attr bind (0.1.29): compile-time field name, no generic get closure in artifact.
+     * @param {object} inst
+     * @param {number|string|null} bindingId
+     * @param {string} fieldName
+     * @param {Element} el
+     * @param {string} name
+     */
+    specFieldAttr(inst, bindingId, fieldName, el, name) {
+        wireDirectBind(
+            inst,
+            bindingId,
+            [fieldName],
+            function specFieldAttrGet() {
+                return this[fieldName];
+            },
+            (raw) => {
+                if (name === 'class' || name === 'className') {
+                    const s = String(raw ?? '');
+                    if (s) el.setAttribute('class', s);
+                    else if (el.hasAttribute('class')) el.removeAttribute('class');
+                } else {
+                    applyDomAttr(el, name, raw);
+                }
+            },
+        );
+    },
+    /**
+     * Specialized single-field text bind (0.1.29): compile-time field name in generated artifact.
+     * @param {object} inst
+     * @param {number|string|null} bindingId
+     * @param {string} fieldName
+     * @param {Text} textNode
+     */
+    specFieldText(inst, bindingId, fieldName, textNode) {
+        wireDirectBind(
+            inst,
+            bindingId,
+            [fieldName],
+            function specFieldTextGet() {
+                return this[fieldName];
+            },
+            (raw) => {
+                textNode.textContent = String(raw ?? '');
+            },
+        );
+    },
     setHtml(el, value) {
         el.innerHTML = value == null ? '' : String(value);
     },

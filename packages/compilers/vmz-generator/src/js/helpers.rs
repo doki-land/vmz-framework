@@ -67,23 +67,73 @@ pub fn component_prop_wire_name(attr: &str) -> String {
     attr.to_string()
 }
 
-/// Wrap **explicit** `this.methodName` handlers as `(ev) => this.method(ev)`.
-/// Bare identifiers are **not** silently guessed as instance methods (Living `01`).
-pub fn wrap_event_handler_body(body: &str) -> String {
+/// Vue expression scope for event handler resolution (class methods / props / template locals).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct HandlerResolution<'a> {
+    /// Public instance method names on the authoring class.
+    pub methods: &'a [String],
+    /// Public prop names on the authoring class.
+    pub props: &'a [String],
+    /// Template-local bindings (`v-for` alias, slot scope, etc.).
+    pub locals: &'a [String],
+}
+
+fn is_simple_ident(name: &str) -> bool {
+    !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
+}
+
+/// Wrap handler expressions for DOM / component event subscription.
+///
+/// Resolves bare class method references to `(ev) => this.method(ev)` when Rust scope
+/// confirms an instance method. Unknown bare identifiers fail at compile time when
+/// `resolution` is provided with method/prop tables.
+pub fn wrap_event_handler_body(
+    body: &str,
+    resolution: HandlerResolution<'_>,
+) -> Result<String, String> {
     let body = body.trim();
     if let Some(method) = parse_this_method_call_arrow(body) {
-        return format!("(ev) => this.{method}(ev)");
+        return Ok(format!("(ev) => this.{method}(ev)"));
     }
-    // Only `this.method` — never bare `method`.
     if let Some(rest) = body.strip_prefix("this.") {
-        let is_method_ref = !rest.is_empty()
-            && rest.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
-            && !rest.contains('(');
+        let is_method_ref =
+            is_simple_ident(rest) && !rest.contains('(') && !rest.contains('.');
         if is_method_ref {
-            return format!("(ev) => this.{rest}(ev)");
+            return Ok(format!("(ev) => this.{rest}(ev)"));
         }
     }
-    body.to_string()
+    if is_simple_ident(body) && !body.contains('.') && !body.contains('(') {
+        if resolution.locals.iter().any(|l| l == body) {
+            return Ok(body.to_string());
+        }
+        if resolution.methods.iter().any(|m| m == body) {
+            return Ok(format!("(ev) => this.{body}(ev)"));
+        }
+        if resolution.props.iter().any(|p| p == body) {
+            return Ok(body.to_string());
+        }
+        if !resolution.methods.is_empty() || !resolution.props.is_empty() {
+            return Err(format!(
+                "vmz: unresolved event handler `{body}` (not a template local, class method, or prop)"
+            ));
+        }
+    }
+    Ok(body.to_string())
+}
+
+/// When an interp expression lowers to exactly `this.<field>`, return the field name.
+pub fn single_field_binding_target(
+    expr: &str,
+    fields: &[String],
+    scope: &[String],
+    aliases: &[(String, String)],
+) -> Option<String> {
+    let bound = bind_field_idents(expr, fields, scope, aliases);
+    let field = bound.strip_prefix("this.")?;
+    if field.contains('.') || field.contains('(') || !is_simple_ident(field) {
+        return None;
+    }
+    Some(field.to_string())
 }
 
 /// `() => this.foo()` / `(ev) => this.foo(ev)` → `Some("foo")`.
@@ -475,6 +525,7 @@ mod tests {
     use super::{
         bind_field_idents, component_event_name, component_prop_wire_name, event_dom_type,
         is_component_event_attr, is_event_attr, kebab_to_camel, wrap_event_handler_body,
+        HandlerResolution,
     };
 
     #[test]
@@ -485,10 +536,36 @@ mod tests {
     }
 
     #[test]
-    fn wrap_event_handler_requires_explicit_this() {
-        assert_eq!(wrap_event_handler_body("this.bump"), "(ev) => this.bump(ev)");
-        assert_eq!(wrap_event_handler_body("bump"), "bump");
-        assert_eq!(wrap_event_handler_body("() => this.bump()"), "(ev) => this.bump(ev)");
+    fn wrap_event_handler_resolves_bare_class_method() {
+        let methods = vec!["bump".into()];
+        let res = HandlerResolution { methods: &methods, props: &[], locals: &[] };
+        assert_eq!(
+            wrap_event_handler_body("this.bump", res).unwrap(),
+            "(ev) => this.bump(ev)"
+        );
+        assert_eq!(
+            wrap_event_handler_body("bump", res).unwrap(),
+            "(ev) => this.bump(ev)"
+        );
+        assert_eq!(
+            wrap_event_handler_body("() => this.bump()", res).unwrap(),
+            "(ev) => this.bump(ev)"
+        );
+    }
+
+    #[test]
+    fn wrap_event_handler_local_shadows_method() {
+        let methods = vec!["bump".into()];
+        let locals = vec!["bump".into()];
+        let res = HandlerResolution { methods: &methods, props: &[], locals: &locals };
+        assert_eq!(wrap_event_handler_body("bump", res).unwrap(), "bump");
+    }
+
+    #[test]
+    fn wrap_event_handler_unknown_bare_fails() {
+        let methods = vec!["bump".into()];
+        let res = HandlerResolution { methods: &methods, props: &[], locals: &[] };
+        assert!(wrap_event_handler_body("missing", res).is_err());
     }
 
     #[test]

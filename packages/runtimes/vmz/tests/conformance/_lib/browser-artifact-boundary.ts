@@ -47,6 +47,16 @@ const INTERPRETER_SIGNAL_PATTERNS: Array<{ id: string; re: RegExp }> = [
     { id: 'ifBlock', re: /\bifBlock\b/ },
 ];
 
+/** Specialized Direct emit signals in generated artifacts (0.1.29). */
+export const SPECIALIZED_EMIT_PATTERNS: Array<{ id: string; re: RegExp }> = [
+    { id: 'specFieldText', re: /\bspecFieldText\b/ },
+    { id: 'specFieldAttr', re: /\bspecFieldAttr\b/ },
+    { id: 'onMethod', re: /\bonMethod\b/ },
+    { id: 'bindComponentProp', re: /\bbindComponentProp\b/ },
+    { id: 'vmzCreate', re: /__vmzCreate\b/ },
+    { id: 'vmzDirect', re: /__vmzDirect\b/ },
+];
+
 export type BrowserArtifactBoundary = {
     schema: typeof BROWSER_ARTIFACT_BOUNDARY_SCHEMA;
     sourceRevision: string | null;
@@ -68,6 +78,7 @@ export type BrowserArtifactBoundary = {
         unclassifiedJs: string[];
     };
     interpreterSignals: Array<{ id: string; files: string[] }>;
+    specializedEmitSignals: Array<{ id: string; files: string[] }>;
     totals: {
         generatedBytes: number;
         runtimeSharedBytes: number;
@@ -143,7 +154,9 @@ function readPack(distDir: string): {
 function classifyRel(rel: string, generatedSet: Set<string>): 'generated' | 'runtime' | 'host' | 'unclassified' {
     const norm = rel.replace(/\\/g, '/');
     const base = path.posix.basename(norm);
-    if (generatedSet.has(norm) || /\.client\.js$/.test(norm)) return 'generated';
+    if (RUNTIME_SHARED_NAMES.has(base)) return 'runtime';
+    if (generatedSet.has(norm)) return 'generated';
+    if (/\.client\.js$/.test(norm)) return 'generated';
     if (RUNTIME_SHARED_NAMES.has(base)) return 'runtime';
     if (HOST_OR_NODE_SUSPECT_NAMES.has(base)) return 'host';
     return 'unclassified';
@@ -177,6 +190,8 @@ export function recordBrowserArtifactBoundary(opts: {
 
     const signalHits = new Map<string, Set<string>>();
     for (const sig of INTERPRETER_SIGNAL_PATTERNS) signalHits.set(sig.id, new Set());
+    const specializedHits = new Map<string, Set<string>>();
+    for (const sig of SPECIALIZED_EMIT_PATTERNS) specializedHits.set(sig.id, new Set());
 
     for (const full of jsFiles) {
         const rel = path.relative(distDir, full).replace(/\\/g, '/');
@@ -196,9 +211,15 @@ export function recordBrowserArtifactBoundary(opts: {
             unclassifiedBytes += bytes;
         }
 
+        const text = fs.readFileSync(full, 'utf8');
+        if (kind === 'generated') {
+            for (const sig of SPECIALIZED_EMIT_PATTERNS) {
+                if (sig.re.test(text)) specializedHits.get(sig.id)!.add(rel);
+            }
+        }
+
         // Scan runtime + host + unclassified for interpreter debt; skip tiny generated Direct create.
         if (kind === 'generated' && bytes < 8_000) continue;
-        const text = fs.readFileSync(full, 'utf8');
         for (const sig of INTERPRETER_SIGNAL_PATTERNS) {
             if (sig.re.test(text)) signalHits.get(sig.id)!.add(rel);
         }
@@ -207,6 +228,11 @@ export function recordBrowserArtifactBoundary(opts: {
     const interpreterSignals = INTERPRETER_SIGNAL_PATTERNS.map((sig) => ({
         id: sig.id,
         files: [...signalHits.get(sig.id)!].sort(),
+    })).filter((row) => row.files.length > 0);
+
+    const specializedEmitSignals = SPECIALIZED_EMIT_PATTERNS.map((sig) => ({
+        id: sig.id,
+        files: [...specializedHits.get(sig.id)!].sort(),
     })).filter((row) => row.files.length > 0);
 
     const distRel = path.relative(root, distDir).replace(/\\/g, '/');
@@ -231,6 +257,7 @@ export function recordBrowserArtifactBoundary(opts: {
             unclassifiedJs: unclassifiedJs.sort(),
         },
         interpreterSignals,
+        specializedEmitSignals,
         totals: {
             generatedBytes,
             runtimeSharedBytes,
