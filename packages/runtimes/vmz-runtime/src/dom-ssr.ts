@@ -587,10 +587,28 @@ const serializeApi = {
         }
         textNode.value = String(raw ?? '');
     },
+    specFieldText(inst, _bindingId, fieldName, textNode) {
+        let raw;
+        try {
+            raw = inst[fieldName];
+        } catch {
+            raw = '';
+        }
+        textNode.value = String(raw ?? '');
+    },
     bindAttr(inst, bindingId, deps, get, el, name) {
         let raw;
         try {
             raw = get.call(inst);
+        } catch {
+            raw = null;
+        }
+        applySerializeAttr(el, name, raw);
+    },
+    specFieldAttr(inst, _bindingId, fieldName, el, name) {
+        let raw;
+        try {
+            raw = inst[fieldName];
         } catch {
             raw = null;
         }

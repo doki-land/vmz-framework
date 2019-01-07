@@ -1118,10 +1118,8 @@ async function proveFormDepth(page) {
         }
         throw new Error('failed to reach August 2026');
     });
-    await page.evaluate(() => {
-        const day = document.querySelector('[data-vmz-date-iso="2026-08-13"]:not(.is-outside)');
-        if (day instanceof HTMLElement) day.click();
-    });
+    // Real pointer click — evaluate HTMLElement#click often misses Direct onMethod bindings in CI.
+    await page.click('[data-vmz-date-iso="2026-08-13"]:not(.is-outside)');
     try {
         await page.waitForFunction(() => (document.querySelector('[data-vmz-date="value"]')?.textContent || '').includes('2026-08-13'), {
             timeout: 5000,

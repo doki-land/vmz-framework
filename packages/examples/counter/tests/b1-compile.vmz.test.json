@@ -20,7 +20,7 @@
                 "direct": true,
                 "create": true,
                 "noRender": true,
-                "includes": "api.bindText(this,"
+                "includes": "api.specFieldText(this,"
             }
         }
     ]
