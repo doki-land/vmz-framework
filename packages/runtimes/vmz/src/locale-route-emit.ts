@@ -5,12 +5,15 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { buildLocaleLinkPlan, LOCALE_LINK_PLAN_SCHEMA, linkRouteAliasesFromUnits } from '@vmz/core/localize-body-links';
 import { checkLocales, localeHasErrors } from './locale-check.js';
 import { buildLocalePageMeta, buildLocaleRouteRealizationTable } from './locale-router.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 import { listPublicPageUnits, unitBrowserPathPattern } from './route-path.js';
 
 export const LOCALE_ROUTE_REALIZATION_ARTIFACT_SCHEMA = 'vmz.locale.route_realization.v0';
+export const LOCALE_LINK_PLAN_REL = '_vmz/locale-link-plan.json';
+export { LOCALE_LINK_PLAN_SCHEMA };
 
 export interface EmitLocaleRouteRealizationOpts {
     origin?: string;
@@ -93,6 +96,7 @@ export function emitLocaleRouteRealization(projectRoot: string, distDir: string,
         routes,
         realizations: table.realizations,
         pageMetas,
+        linkRouteAliases: linkRouteAliasesFromUnits(pages),
     };
 
     const vmzDir = path.join(distDir, '_vmz');
@@ -108,9 +112,15 @@ export function emitLocaleRouteRealization(projectRoot: string, distDir: string,
         routing: artifact.routing,
     });
 
+    const linkPlan = buildLocaleLinkPlan(artifact);
+    writePrettyJsonFile(path.join(distDir, ...LOCALE_LINK_PLAN_REL.split('/')), {
+        schema: LOCALE_LINK_PLAN_SCHEMA,
+        rows: linkPlan.rows,
+    });
+
     return {
         ok: true,
-        written: ['_vmz/locale-route-realization.json', '_vmz/locale-manifest.json'],
+        written: ['_vmz/locale-route-realization.json', '_vmz/locale-manifest.json', LOCALE_LINK_PLAN_REL],
         artifact,
         diagnostics: [],
     };

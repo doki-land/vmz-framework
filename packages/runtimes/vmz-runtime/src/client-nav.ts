@@ -356,8 +356,8 @@ export function installClientNavigation(opts = {}) {
         if (a.hasAttribute('download') || a.getAttribute('target') === '_blank') return;
 
         ev.preventDefault();
-        // Retain current LocaleId on same-app Link (realization) — never trust a stale unprefixed href.
-        const realized = localizeClickHref(u.pathname + u.search + u.hash);
+        // Prefer frozen RouteId×LocaleId href table (0.1.30); fall back only when table missing.
+        const realized = localizeClickHref(u.pathname + u.search + u.hash, a.getAttribute('data-vmz-route'));
         void transitionTo(realized, {
             replace: a.getAttribute('data-vmz-replace') === 'true',
         });
@@ -365,12 +365,32 @@ export function installClientNavigation(opts = {}) {
 
     /**
      * @param {string} href
+     * @param {string | null} [routeId]
      */
-    function localizeClickHref(href) {
+    function localizeClickHref(href, routeId) {
         if (!doc?.documentElement) return href;
         const locale = doc.documentElement.getAttribute('data-locale');
+        if (!locale) return href;
+
+        const frozen = lookupFrozenLocaleHref(routeId, locale);
+        if (frozen) {
+            let search = '';
+            let hash = '';
+            const hashIdx = href.indexOf('#');
+            let pathPart = href;
+            if (hashIdx >= 0) {
+                hash = pathPart.slice(hashIdx);
+                pathPart = pathPart.slice(0, hashIdx);
+            }
+            const qIdx = pathPart.indexOf('?');
+            if (qIdx >= 0) {
+                search = pathPart.slice(qIdx);
+            }
+            return `${frozen}${search}${hash}`;
+        }
+
         const raw = doc.documentElement.getAttribute('data-vmz-locale-routing');
-        if (!locale || !raw) return href;
+        if (!raw) return href;
         let routing;
         try {
             routing = JSON.parse(raw);
@@ -594,7 +614,7 @@ export function installClientNavigation(opts = {}) {
     }
 
     /**
-     * Re-realize current URL under target LocaleId (stable path stays; LocaleId is projection).
+     * Re-realize current URL under target LocaleId via frozen href table when present.
      * @param {string} href
      * @param {string} localeId
      * @param {{ strategy?: string, defaultPrefix?: string, defaultLocale?: string, locales?: string[] }} routing
@@ -614,6 +634,15 @@ export function installClientNavigation(opts = {}) {
             pathname = pathname.slice(0, qIdx);
         }
         if (!pathname) pathname = '/';
+
+        const fromLocale = doc.documentElement?.getAttribute('data-locale') || null;
+        const routeId =
+            doc.documentElement?.getAttribute('data-vmz-route') ||
+            doc.querySelector?.('[data-vmz-app][data-vmz-route]')?.getAttribute?.('data-vmz-route') ||
+            resolveRouteIdFromHrefTable(pathname, fromLocale);
+        const frozen = lookupFrozenLocaleHref(routeId, localeId);
+        if (frozen) return `${frozen}${search}${hash}`;
+
         const supported = Array.isArray(routing.locales) ? routing.locales : [];
         const parts = pathname.split('/').filter(Boolean);
         let rest = pathname;
@@ -630,6 +659,49 @@ export function installClientNavigation(opts = {}) {
         if (defaultPrefix === 'omit' && localeId === defaultLocale) return `${rest}${search}${hash}`;
         const pathOut = rest === '/' ? `/${localeId}` : `/${localeId}${rest}`;
         return `${pathOut}${search}${hash}`;
+    }
+
+    /**
+     * @returns {Record<string, Record<string, string>> | null}
+     */
+    function readLocaleHrefTable() {
+        const raw = doc.documentElement?.getAttribute('data-vmz-locale-hrefs');
+        if (!raw) return null;
+        try {
+            const table = JSON.parse(raw);
+            return table && typeof table === 'object' ? table : null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * @param {string | null | undefined} routeId
+     * @param {string} localeId
+     */
+    function lookupFrozenLocaleHref(routeId, localeId) {
+        if (!routeId || !localeId) return null;
+        const table = readLocaleHrefTable();
+        const href = table?.[routeId]?.[localeId];
+        return typeof href === 'string' && href && !/\[[^\]]+\]/.test(href) && !/\/:[^/]+/.test(href) ? href : null;
+    }
+
+    /**
+     * Reverse-lookup RouteId from frozen table when html lacks data-vmz-route.
+     * @param {string} pathname
+     * @param {string | null} localeId
+     */
+    function resolveRouteIdFromHrefTable(pathname, localeId) {
+        const table = readLocaleHrefTable();
+        if (!table || !localeId) return null;
+        const norm = pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname || '/';
+        for (const [routeId, byLocale] of Object.entries(table)) {
+            const href = byLocale?.[localeId];
+            if (typeof href !== 'string') continue;
+            const h = href.length > 1 && href.endsWith('/') ? href.slice(0, -1) : href;
+            if (h === norm) return routeId;
+        }
+        return null;
     }
 
     if (win) {

@@ -132,21 +132,23 @@ const OWNER_SEED: Array<{
     },
     {
         id: 'pageCatalog',
-        owner: 'browser-runtime',
+        owner: 'generated-artifact',
         debtTarget: '0.1.30',
-        evidencePaths: ['packages/runtimes/vmz-runtime/src/serve-host.ts'],
-        note: 'Runtime page catalog selection (also used by serve-host)',
+        evidencePaths: ['packages/runtimes/vmz/src/route-catalog-emit.ts', 'packages/runtimes/vmz-runtime/src/serve-host.ts'],
+        note: 'Host loads `_vmz/route-catalog.json`; no live deployment pathPattern catalog',
     },
     {
         id: 'routeLocaleDocument',
-        owner: 'node-host',
+        owner: 'generated-artifact',
         debtTarget: '0.1.30',
         evidencePaths: [
+            'packages/runtimes/vmz/src/locale-route-emit.ts',
             'packages/runtimes/vmz-runtime/src/localize-body-links.ts',
             'packages/runtimes/vmz/src/static-emit.ts',
             'packages/runtimes/vmz-runtime/src/serve-host.ts',
+            'packages/runtimes/vmz-runtime/src/client-nav.ts',
         ],
-        note: 'SSR/static locale link rewrite + RouteId alias bridge; compiled refs hang 0.1.30',
+        note: 'Authority in locale-link-plan + data-vmz-locale-hrefs; host/client only apply frozen rows',
     },
     {
         id: 'cacheBust',

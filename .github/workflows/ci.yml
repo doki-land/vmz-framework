@@ -146,3 +146,8 @@ jobs:
         env:
           CI: 'true'
         run: pnpm verify -- specialized-component-artifact
+
+      - name: Compiled delivery artifact (0.1.30 Slim)
+        env:
+          CI: 'true'
+        run: pnpm verify -- compiled-delivery-artifact

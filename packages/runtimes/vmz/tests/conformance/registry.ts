@@ -345,6 +345,36 @@ export const CHECKS: Record<string, CheckEntry> = {
             'resume-composition',
         ],
     },
+    'compiled-route-artifact': {
+        file: 'production/compiled-route-artifact.ts',
+        description: '0.1.30: `_vmz/route-catalog.json` freezes page catalog',
+    },
+    'compiled-locale-artifact': {
+        file: 'production/compiled-locale-artifact.ts',
+        description: '0.1.30: locale realization + `_vmz/locale-link-plan.json`',
+    },
+    'compiled-asset-artifact': {
+        file: 'production/compiled-asset-artifact.ts',
+        description: '0.1.30: asset-plan + content-addressed with rewrittenHtml: 0',
+    },
+    'no-runtime-manifest-interpretation': {
+        file: 'production/no-runtime-manifest-interpretation.ts',
+        description: '0.1.30: host/client consume frozen catalog/hrefs (no live deployment catalog)',
+    },
+    'no-post-emit-semantic-rewrite': {
+        file: 'production/no-post-emit-semantic-rewrite.ts',
+        description: '0.1.30: forbid post-hash HTML semantic rewrite',
+    },
+    'compiled-delivery-artifact': {
+        description: '0.1.30 Slim composite: compiled route/locale/asset + no manifest/rewrite (≠ thin runtime)',
+        composite: [
+            'compiled-route-artifact',
+            'compiled-locale-artifact',
+            'compiled-asset-artifact',
+            'no-runtime-manifest-interpretation',
+            'no-post-emit-semantic-rewrite',
+        ],
+    },
     'browser-core': {
         file: 'production/browser-core.ts',
         description: 'A1 catalog: compile+logic+ssr+resume+browser+async + no-render',
@@ -555,4 +585,6 @@ export const CHECK_ALL = [
     'runtime-boundary',
     // 0.1.29 Specialized component artifact (not part of browser-production)
     'specialized-component-artifact',
+    // 0.1.30 Compiled delivery / navigation artifacts (not part of browser-production)
+    'compiled-delivery-artifact',
 ];
