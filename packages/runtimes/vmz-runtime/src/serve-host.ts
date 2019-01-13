@@ -36,7 +36,18 @@ const LOCALE_LINK_PLAN_REL = '_vmz/locale-link-plan.json';
 
 const require = createRequire(import.meta.url);
 
-const distDir = process.env.VMZ_DIST ? path.resolve(process.env.VMZ_DIST) : path.dirname(fileURLToPath(import.meta.url));
+/** App delivery root. Host companions may live under `_vmz/host/` (0.1.31). */
+function resolveServeDistDir() {
+    if (process.env.VMZ_DIST) return path.resolve(process.env.VMZ_DIST);
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const norm = here.replace(/\\/g, '/');
+    const marker = '/_vmz/host';
+    const idx = norm.toLowerCase().lastIndexOf(marker);
+    if (idx >= 0) return path.resolve(here.slice(0, idx));
+    return here;
+}
+
+const distDir = resolveServeDistDir();
 
 /** App project root for bare import / JSON resolve (dev SSR ≡ build node_modules). */
 function projectRootForResolve() {
@@ -516,7 +527,7 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
       hideOverlay();
       if (msg.mode === "island") {
         try {
-          const { registerComponents, hydrate } = await import("/vmz-dom.js?t=" + msg.token);
+          const { registerComponents, hydrate } = await import("/dom.browser.js?t=" + msg.token);
           const names = (msg.affectedChunks || [])
             .map((c) => String(c))
             .filter((c) => c.startsWith("components/") || !c.includes("/"))
@@ -807,7 +818,6 @@ async function softReload(opts = {}) {
     reloadToken = nextToken;
     const affected = opts.payload?.affectedChunks ?? [];
     const seeds = opts.payload?.seedChunks ?? [];
-    const emitted = opts.payload?.emitted ?? [];
     const full = opts.payload?.full;
     const islandHmr = Boolean(opts.payload?.islandHmr);
     const rerunLoaders = opts.payload?.rerunLoaders ?? [];
@@ -816,7 +826,8 @@ async function softReload(opts = {}) {
     const sourceRevision = opts.payload?.sourceRevision != null ? String(opts.payload.sourceRevision) : null;
     const bundleRevision = opts.payload?.bundleRevision != null ? String(opts.payload.bundleRevision) : null;
     if (buildId) lastDevBuildId = buildId;
-    const reloadAllPages = shouldReloadAllPages({ full, affected, emitted, islandHmr, rerunLoaders });
+    // 0.1.31: payload-only scope. `reloadToken` is opaque cache-bust — never invent full/affected here.
+    const reloadAllPages = Boolean(full) || (!islandHmr && rerunLoaders.length === 0 && affected.length === 0);
 
     try {
         try {
@@ -958,25 +969,6 @@ async function softReload(opts = {}) {
         lastDevError = normalizeDevError(err);
         throw err;
     }
-}
-
-/**
- * Shared lib / full rebuild / missing affected list → refresh every page ctor.
- * Otherwise only re-import the dirty page chunks (Vite-like module graph).
- * @param {{ full?: boolean, affected: string[], emitted: string[], islandHmr: boolean }} opts
- */
-function shouldReloadAllPages(opts) {
-    if (opts.islandHmr) return false;
-    if (opts.full) return true;
-    if (Array.isArray(opts.rerunLoaders) && opts.rerunLoaders.length > 0) return false;
-    if (!opts.affected.length) return true;
-    for (const f of opts.emitted) {
-        const n = String(f).replace(/\\/g, '/');
-        if (n.includes('/lib/') || /\/Application\.client\.js$/.test(n) || /\/vmz-(dom|runtime|http|client-nav)\.js$/.test(n)) {
-            return true;
-        }
-    }
-    return false;
 }
 
 /** @param {string} chunkId @param {string[]} affected */

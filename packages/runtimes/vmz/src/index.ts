@@ -4,7 +4,7 @@
  */
 
 import { createRequire } from 'node:module';
-import { copyFileSync, existsSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { materializeWechatPackaging } from './wechat-packaging.js';
@@ -627,18 +627,18 @@ export function resolveCoreRuntimeDist(): string | null {
     return null;
 }
 
-/** Runtime companions required by dist/vmz-serve-host.mjs relative imports. */
+/** Runtime companions required by dist/_vmz/host/vmz-serve-host.mjs relative imports. */
 export const SERVE_HOST_RUNTIME_FILES: ReadonlyArray<readonly [string, string]> = [
-    ['serve-host.mjs', 'vmz-serve-host.mjs'],
-    ['native-addon.js', 'native-addon.js'],
-    ['list-client-components.js', 'list-client-components.js'],
-    ['deployment-registry.js', 'deployment-registry.js'],
-    ['render-host.js', 'render-host.js'],
-    ['route-layout-chain.js', 'route-layout-chain.js'],
-    ['localize-body-links.js', 'localize-body-links.js'],
+    ['serve-host.mjs', '_vmz/host/vmz-serve-host.mjs'],
+    ['native-addon.js', '_vmz/host/native-addon.js'],
+    ['list-client-components.js', '_vmz/host/list-client-components.js'],
+    ['deployment-registry.js', '_vmz/host/deployment-registry.js'],
+    ['render-host.js', '_vmz/host/render-host.js'],
+    ['route-layout-chain.js', '_vmz/host/route-layout-chain.js'],
+    ['localize-body-links.js', '_vmz/host/localize-body-links.js'],
 ];
 
-/** Copy serve-host + registry bootstrap modules from `@vmz/core` into app outDir. */
+/** Copy serve-host + registry bootstrap modules from `@vmz/core` into `_vmz/host/`. */
 export function materializeServeHostRuntime(outDir: string, coreDist: string | null = resolveCoreRuntimeDist()): void {
     if (!coreDist) {
         throw new Error('materializeServeHostRuntime: @vmz/core dist not found');
@@ -649,8 +649,21 @@ export function materializeServeHostRuntime(outDir: string, coreDist: string | n
         if (!existsSync(src)) {
             throw new Error(`materializeServeHostRuntime: missing ${src}`);
         }
-        copyFileSync(src, dst);
+        mkdirSync(path.dirname(dst), { recursive: true });
+        if (srcName === 'serve-host.mjs') {
+            // Nested under `_vmz/host/`: delivery-root `vmz-runtime.js` is two levels up.
+            const text = readFileSync(src, 'utf8').replace(/from\s+(['"])\.\/vmz-runtime\.js\1/g, 'from $1../../vmz-runtime.js$1');
+            writeFileSync(dst, text, 'utf8');
+        } else {
+            copyFileSync(src, dst);
+        }
     }
+    const stub = path.join(outDir, 'vmz-serve-host.mjs');
+    writeFileSync(
+        stub,
+        "// Generated launcher — host companions live under `_vmz/host/` (0.1.31).\nimport './_vmz/host/vmz-serve-host.mjs';\n",
+        'utf8',
+    );
 }
 
 /** Create a long-lived compile workspace. */

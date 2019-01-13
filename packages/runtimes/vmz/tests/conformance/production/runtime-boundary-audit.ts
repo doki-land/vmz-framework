@@ -4,7 +4,7 @@
  */
 
 import path from 'node:path';
-import { addLimitation, readProof, upsertCheck, writeProof } from '../_lib/production-proof.ts';
+import { readProof, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 import { repoRoot } from '../_lib/repo-root.ts';
 import type { RuntimeInventory } from '../_lib/runtime-inventory.ts';
 import { assertBoundaryAudit, buildAndRecordInventory } from '../_lib/runtime-inventory-gate.ts';
@@ -33,12 +33,6 @@ upsertCheck(proof, {
     status: 'passed',
     detail: `entry=${inventory.browserClosure.entry}; modules=${inventory.browserClosure.modules.length}; hostOutDirOnly=${inventory.hostInOutDirNotInClosure.length}; forbidden=${inventory.forbiddenImports.length}`,
 });
-if (inventory.hostInOutDirNotInClosure.length) {
-    addLimitation(
-        proof,
-        `0.1.28: host modules still in outDir but outside browser closure (${inventory.hostInOutDirNotInClosure.join(', ')}); delete hang 0.1.31`,
-    );
-}
 writeProof(proof, root);
 
 console.log(

@@ -375,6 +375,26 @@ export const CHECKS: Record<string, CheckEntry> = {
             'no-post-emit-semantic-rewrite',
         ],
     },
+    'thin-runtime-imports': {
+        file: 'production/thin-runtime-imports.ts',
+        description: '0.1.31: browser entry/components use dom.browser / dom-core (not SSR barrel)',
+    },
+    'host-runtime-boundary': {
+        file: 'production/host-runtime-boundary.ts',
+        description: '0.1.31: host companions nest under `_vmz/host/`',
+    },
+    'single-revision-owner': {
+        file: 'production/single-revision-owner.ts',
+        description: '0.1.31: outputRevision + payload sole reload decision',
+    },
+    'no-browser-plan-dispatch': {
+        file: 'production/no-browser-plan-dispatch.ts',
+        description: '0.1.31: browser must not invent reload/plan scope',
+    },
+    'thin-runtime-host-boundary': {
+        description: '0.1.31 Slim composite: thin imports + host nest + revision owner (≠ thin runtime)',
+        composite: ['thin-runtime-imports', 'host-runtime-boundary', 'single-revision-owner', 'no-browser-plan-dispatch'],
+    },
     'browser-core': {
         file: 'production/browser-core.ts',
         description: 'A1 catalog: compile+logic+ssr+resume+browser+async + no-render',
@@ -587,4 +607,6 @@ export const CHECK_ALL = [
     'specialized-component-artifact',
     // 0.1.30 Compiled delivery / navigation artifacts (not part of browser-production)
     'compiled-delivery-artifact',
+    // 0.1.31 Thin runtime host boundary (not part of browser-production)
+    'thin-runtime-host-boundary',
 ];
