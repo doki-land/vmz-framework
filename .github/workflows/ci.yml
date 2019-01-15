@@ -156,3 +156,8 @@ jobs:
         env:
           CI: 'true'
         run: pnpm verify -- thin-runtime-host-boundary
+
+      - name: Thin runtime production proof (0.1.32 Slim)
+        env:
+          CI: 'true'
+        run: pnpm verify -- thin-runtime-production-proof

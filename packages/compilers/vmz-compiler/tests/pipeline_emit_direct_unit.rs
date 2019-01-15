@@ -27,9 +27,15 @@ export default class CounterButton {
     assert!(is_direct_eligible(view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
     assert!(js.contains("__vmzDirect = true"), "{js}");
-    assert!(js.contains("function __vmzCreate(api)"), "expected __vmzCreate factory: {js}");
-    assert!(js.contains("api.bindText(this,"), "{js}");
-    assert!(js.contains("api.bindText(this, 1,"), "{js}");
+    assert!(js.contains("__vmzCreate"), "expected __vmzCreate factory: {js}");
+    assert!(
+        js.contains("api.specFieldText(this,") || js.contains("api.bindText(this,"),
+        "{js}"
+    );
+    assert!(
+        js.contains("api.specFieldText(this, 1,") || js.contains("api.bindText(this, 1,"),
+        "{js}"
+    );
     assert!(!js.contains("prototype.render"), "{js}");
 }
 
@@ -193,8 +199,16 @@ export default class CatalogList {
     let roots = &tpl.roots;
     assert_eq!(roots.len(), 1, "button must parse as one element, not text/@click split");
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
-    assert!(js.contains("api.on("), "{js}");
+    assert!(
+        js.contains("api.on(") || js.contains("api.onMethod("),
+        "{js}"
+    );
     assert!(js.contains("\"click\""), "{js}");
-    assert!(js.contains("this.selectFirst") || js.contains("selectFirst(ev)"), "{js}");
+    assert!(
+        js.contains("this.selectFirst")
+            || js.contains("selectFirst(ev)")
+            || js.contains("api.onMethod(") && js.contains("\"selectFirst\""),
+        "{js}"
+    );
     assert!(!js.contains("api.text(\"@click=\")"), "{js}");
 }

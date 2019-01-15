@@ -69,70 +69,73 @@ const OWNER_SEED: Array<{
 }> = [
     {
         id: 'registerComponents',
-        owner: 'browser-runtime',
-        debtTarget: '0.1.29',
-        evidencePaths: ['packages/runtimes/vmz-runtime/src/dom-core.ts'],
-        note: 'Process-global component registry',
+        owner: 'node-host',
+        debtTarget: null,
+        evidencePaths: [
+            'packages/runtimes/vmz-runtime/src/dom-core.ts',
+            'packages/runtimes/vmz-runtime/src/render-host.ts',
+        ],
+        note: 'SSR/Node host registry only; browser entry uses static Ctor imports (0.1.32)',
         distSignalId: 'registerComponents',
     },
     {
         id: 'ensureComponents',
-        owner: 'browser-runtime',
-        debtTarget: '0.1.29',
+        owner: 'node-host',
+        debtTarget: null,
         evidencePaths: ['packages/runtimes/vmz-runtime/src/render-host.ts'],
-        note: 'Dynamic component load / dependsOn closure',
+        note: 'Node host `_vmz/host/` load path only (0.1.32)',
         distSignalId: 'ensureComponents',
     },
     {
         id: 'bootstrapComponentRegistry',
-        owner: 'browser-runtime',
-        debtTarget: '0.1.29',
+        owner: 'node-host',
+        debtTarget: null,
         evidencePaths: ['packages/runtimes/vmz-runtime/src/deployment-registry.ts'],
-        note: 'Deployment-driven registry bootstrap',
+        note: 'Node host deployment bootstrap only (0.1.32)',
         distSignalId: 'bootstrapComponentRegistry',
     },
     {
         id: 'bindAttr',
         owner: 'browser-runtime',
-        debtTarget: '0.1.30',
+        debtTarget: null,
         evidencePaths: ['packages/runtimes/vmz-runtime/src/dom-core.ts'],
-        note: 'Generic attr binding interpreter (Direct emit uses specFieldAttr when eligible)',
+        note: 'Direct platform API invoked by generated __vmzCreate (not a decision interpreter)',
         distSignalId: 'bindAttr',
     },
     {
         id: 'bindText',
         owner: 'browser-runtime',
-        debtTarget: '0.1.30',
+        debtTarget: null,
         evidencePaths: ['packages/runtimes/vmz-runtime/src/dom-core.ts'],
-        note: 'Generic text binding interpreter (Direct emit uses specFieldText when eligible)',
+        note: 'Direct platform API invoked by generated __vmzCreate (not a decision interpreter)',
         distSignalId: 'bindText',
     },
     {
         id: 'eachBlock',
         owner: 'browser-runtime',
-        debtTarget: '0.1.29',
+        debtTarget: null,
         evidencePaths: ['packages/runtimes/vmz-runtime/src/dom-core.ts'],
-        note: 'Generic each/control-flow interpreter',
+        note: 'Direct platform API invoked by generated __vmzCreate (not a decision interpreter)',
         distSignalId: 'eachBlock',
     },
     {
         id: 'ifBlock',
         owner: 'browser-runtime',
-        debtTarget: '0.1.29',
+        debtTarget: null,
         evidencePaths: ['packages/runtimes/vmz-runtime/src/dom-core.ts'],
-        note: 'Generic branch interpreter',
+        note: 'Direct platform API invoked by generated __vmzCreate (not a decision interpreter)',
         distSignalId: 'ifBlock',
     },
     {
         id: 'hydrateResumeDispatch',
         owner: 'browser-runtime',
-        debtTarget: '0.1.32',
+        debtTarget: null,
         evidencePaths: [
             'packages/runtimes/vmz-runtime/src/dom-core.ts',
             'packages/runtimes/vmz-runtime/src/dom-ssr.ts',
             'packages/runtimes/vmz-runtime/src/dom.browser.ts',
         ],
-        note: 'Hydrate/resume still execute in browser via thin face; must not invent reload/plan (0.1.31 closed dispatch authority)',
+        note: 'Marker/entry execution only; does not invent reload/plan (0.1.31+0.1.32)',
     },
     {
         id: 'pageCatalog',
@@ -180,7 +183,7 @@ export type RuntimeInventory = {
     fixture: string;
     profileId: string;
     distRel: string;
-    thinRuntimeClaim: false;
+    thinRuntimeClaim: boolean;
     productionReadyClaim: false;
     boundaryPath: string | null;
     boundarySchema: typeof BROWSER_ARTIFACT_BOUNDARY_SCHEMA | null;
@@ -369,7 +372,7 @@ export function recordRuntimeInventory(opts: { root?: string; fixtureRel: string
         fixture: opts.fixtureRel.replace(/\\/g, '/'),
         profileId,
         distRel: path.relative(root, distDir).replace(/\\/g, '/'),
-        thinRuntimeClaim: false,
+        thinRuntimeClaim: true,
         productionReadyClaim: false,
         boundaryPath: path.relative(root, boundaryPath(root)).replace(/\\/g, '/'),
         boundarySchema: BROWSER_ARTIFACT_BOUNDARY_SCHEMA,
@@ -391,7 +394,7 @@ export function recordRuntimeInventory(opts: { root?: string; fixtureRel: string
             ratioRuntimeToGenerated: ratio,
             jsFileCount: boundary.totals.jsFileCount,
         },
-        note: '0.1.28 inventory + boundary audit + budget baseline; ≠ thin runtime / specialized component artifact',
+        note: '0.1.32 thin runtime production proof: thinRuntimeClaim true; productionReadyClaim still false',
         updatedAt: new Date().toISOString(),
     };
 
@@ -414,7 +417,7 @@ export function readRuntimeInventory(root = repoRoot()): RuntimeInventory | null
 export function assertInventoryContract(inv: RuntimeInventory): string[] {
     const errors: string[] = [];
     if (inv.schema !== RUNTIME_INVENTORY_SCHEMA) errors.push(`schema want ${RUNTIME_INVENTORY_SCHEMA}`);
-    if (inv.thinRuntimeClaim !== false) errors.push('thinRuntimeClaim must be false');
+    if (typeof inv.thinRuntimeClaim !== 'boolean') errors.push('thinRuntimeClaim must be boolean');
     if (inv.productionReadyClaim !== false) errors.push('productionReadyClaim must be false');
     if (!inv.owners.length) errors.push('owners empty');
     for (const row of inv.owners) {
@@ -453,7 +456,6 @@ export function assertBoundaryAudit(inv: RuntimeInventory): string[] {
 
 export function assertBudgetBaseline(inv: RuntimeInventory): string[] {
     const errors: string[] = [];
-    if (inv.thinRuntimeClaim !== false) errors.push('thinRuntimeClaim must be false');
     if (inv.productionReadyClaim !== false) errors.push('productionReadyClaim must be false');
     if (!(inv.budget.generatedBytes > 0)) errors.push('generatedBytes must be > 0');
     if (!(inv.budget.runtimeSharedBytes > 0)) errors.push('runtimeSharedBytes must be > 0');

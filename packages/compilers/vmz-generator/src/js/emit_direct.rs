@@ -15,6 +15,8 @@ use super::helpers::{
     parse_this_method_call_arrow, sanitize_interp, single_field_binding_target,
     split_ternary_parts, wrap_event_handler_body, HandlerResolution,
 };
+use std::collections::HashMap;
+
 use vmz_types::{BindingId, ViewAttr, ViewAttrValue, ViewEach, ViewNode, ViewStatus, ViewView};
 
 fn q(s: &str) -> String {
@@ -76,6 +78,7 @@ pub fn emit_direct_create(
     fields: &[String],
     handler_ctx: ComponentHandlerCtx<'_>,
     ir: &mut IrDepCursor<'_>,
+    child_ctors: &HashMap<String, String>,
 ) -> Result<String, String> {
     use super::ast_util::JsAst;
     use oxc_allocator::{Allocator, ArenaVec, CloneIn};
@@ -93,6 +96,7 @@ pub fn emit_direct_create(
         handler_ctx,
         ir,
         &mut next_id,
+        child_ctors,
     )?;
     let fn_src = format!("(function __vmzCreate(api) {{\n{body}}})");
 
@@ -113,6 +117,7 @@ pub fn emit_direct_create(
     let stmts = ArenaVec::from_iter_in(
         [
             b.assign_member_stmt(name, "__vmzDirect", b.bool_lit(true)),
+            b.assign_member_stmt(name, "__vmzTag", b.str_lit(name)),
             b.assign_member_stmt(name, "__vmzCreate", create_expr),
             b.assign_member_stmt(name, "__vmzSerialize", b.member(name, "__vmzCreate")),
         ],
@@ -221,6 +226,7 @@ fn emit_create_body(
     handler_ctx: ComponentHandlerCtx<'_>,
     ir: &mut IrDepCursor<'_>,
     next_id: &mut u32,
+    child_ctors: &HashMap<String, String>,
 ) -> Result<String, String> {
     let mut stmts = Vec::new();
     let roots = emit_nodes(
@@ -233,7 +239,8 @@ fn emit_create_body(
         ir,
         &mut stmts,
         next_id,
-    )?;
+            child_ctors,
+        )?;
     let return_expr = match roots.len() {
         0 => "null".to_string(),
         1 => roots[0].clone(),
@@ -289,6 +296,7 @@ fn emit_nodes(
     ir: &mut IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
+    child_ctors: &HashMap<String, String>,
 ) -> Result<Vec<String>, String> {
     let mut out = Vec::new();
     for node in nodes {
@@ -302,6 +310,7 @@ fn emit_nodes(
             ir,
             stmts,
             next_id,
+            child_ctors,
         )?);
     }
     Ok(out)
@@ -317,6 +326,7 @@ fn emit_node(
     ir: &mut IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
+    child_ctors: &HashMap<String, String>,
 ) -> Result<String, String> {
     match node {
         ViewNode::Text { value: t } => {
@@ -348,6 +358,7 @@ fn emit_node(
             ir,
             stmts,
             next_id,
+            child_ctors,
         ),
         ViewNode::If { .. } => emit_if_block(
             node,
@@ -359,6 +370,7 @@ fn emit_node(
             ir,
             stmts,
             next_id,
+            child_ctors,
         ),
         ViewNode::Component { tag, attrs, children } => emit_component(
             tag,
@@ -372,6 +384,7 @@ fn emit_node(
             ir,
             stmts,
             next_id,
+            child_ctors,
         ),
         ViewNode::Slot { name, attrs, children } => {
             let mut attrs = attrs.clone();
@@ -399,6 +412,7 @@ fn emit_node(
                 ir,
                 stmts,
                 next_id,
+            child_ctors,
             )
         }
     }
@@ -414,6 +428,7 @@ fn emit_if_block(
     ir: &mut IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
+    child_ctors: &HashMap<String, String>,
 ) -> Result<String, String> {
     let ViewNode::If { binding, branches, region } = node else {
         return Ok("null".to_string());
@@ -434,6 +449,7 @@ fn emit_if_block(
             handler_ctx,
             ir,
             next_id,
+            child_ctors,
         )?;
         match &br.cond {
             Some(c) => {
@@ -464,6 +480,7 @@ fn emit_branch_create_fn(
     handler_ctx: ComponentHandlerCtx<'_>,
     ir: &mut IrDepCursor<'_>,
     next_id: &mut u32,
+    child_ctors: &HashMap<String, String>,
 ) -> Result<String, String> {
     let mut stmts = Vec::new();
     let root = emit_node(
@@ -476,7 +493,8 @@ fn emit_branch_create_fn(
         ir,
         &mut stmts,
         next_id,
-    )?;
+            child_ctors,
+        )?;
     Ok(format!(
         "function(api) {{\n{}  return {root};\n}}",
         indent_block(&stmts.join("\n"))
@@ -493,6 +511,7 @@ fn emit_element(
     ir: &mut IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
+    child_ctors: &HashMap<String, String>,
 ) -> Result<String, String> {
     let ViewNode::Element { tag, attrs, children, each } = node else {
         return Ok("null".to_string());
@@ -511,6 +530,7 @@ fn emit_element(
             ir,
             stmts,
             next_id,
+            child_ctors,
         );
     }
     emit_plain_element(
@@ -525,6 +545,7 @@ fn emit_element(
         ir,
         stmts,
         next_id,
+            child_ctors,
     )
 }
 
@@ -540,6 +561,7 @@ fn emit_plain_element(
     ir: &mut IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
+    child_ctors: &HashMap<String, String>,
 ) -> Result<String, String> {
     let el = fresh("e", next_id);
     let tag_owned = tag.to_string();
@@ -609,7 +631,8 @@ fn emit_plain_element(
         ir,
         stmts,
         next_id,
-    )? {
+            child_ctors,
+        )? {
         stmts.push(print_one_stmt(|b| {
             b.expr_stmt(b.call(b.member(&el, "appendChild"), vec![b.ident(&child)]))
         }));
@@ -630,6 +653,7 @@ fn emit_component(
     ir: &mut IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
+    child_ctors: &HashMap<String, String>,
 ) -> Result<String, String> {
     let mut client: Option<String> = None;
     let mut prop_parts = Vec::new();
@@ -676,7 +700,17 @@ fn emit_component(
         None => "null".into(),
     };
     let v = fresh("c", next_id);
-    stmts.push(format!("var {v} = api.component(this, {}, {props}, {client_arg});", q(tag)));
+    let ctor_arg = if child_ctors.contains_key(tag) {
+        tag.to_string()
+    } else if child_ctors.is_empty() {
+        // Unit / no-graph path: keep string tag for registry lookup.
+        q(tag)
+    } else {
+        return Err(format!(
+            "vmz: unknown component tag `{tag}` (not in ComponentGraph.by_tag)"
+        ));
+    };
+    stmts.push(format!("var {v} = api.component(this, {ctor_arg}, {props}, {client_arg});"));
     for (ev, handler) in &event_parts {
         stmts.push(format!("api.onComponentEvent({v}, {}, {handler});", q(ev)));
     }
@@ -716,6 +750,7 @@ fn emit_component(
             ir,
             stmts,
             next_id,
+            child_ctors,
         )?;
         for kid in kids {
             stmts.push(format!("api.projectDefaultSlot({v}, {kid});"));
@@ -804,6 +839,7 @@ fn emit_each_block(
     ir: &mut IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
+    child_ctors: &HashMap<String, String>,
 ) -> Result<String, String> {
     let depth = each_depth + 1;
     let box_id = format!("box{depth}");
@@ -860,6 +896,7 @@ fn emit_each_block(
             ir,
             &mut item_stmts,
             next_id,
+            child_ctors,
         )?;
         Ok(format!(
             "function(api, {box_id}) {{\n{}  return {item_root};\n}}",

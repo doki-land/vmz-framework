@@ -527,26 +527,11 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
       hideOverlay();
       if (msg.mode === "island") {
         try {
-          const { registerComponents, hydrate } = await import("/dom.browser.js?t=" + msg.token);
-          const names = (msg.affectedChunks || [])
-            .map((c) => String(c))
-            .filter((c) => c.startsWith("components/") || !c.includes("/"))
-            .map((c) => c.split("/").pop())
-            .filter(Boolean);
-          const map = {};
-          for (const name of names) {
-            let mod;
-            try {
-              mod = await import("/components/" + name + ".client.js?t=" + msg.token);
-            } catch {
-              mod = await import("/" + name + ".client.js?t=" + msg.token);
-            }
-            map[name] = mod.default;
-          }
-          if (Object.keys(map).length) registerComponents(map);
+          const { hydrate } = await import("/dom.browser.js?t=" + msg.token);
           const root = document.getElementById("app");
           const pageChunk = root && root.getAttribute("data-vmz-page");
           if (root && pageChunk) {
+            // Child Ctors come from page static imports after reload with cache token.
             const pageMod = await import("/" + pageChunk + ".client.js?t=" + msg.token);
             let hmrProps = {};
             try {

@@ -39,7 +39,7 @@ try {
 const outPath = boundaryPath(root);
 if (!fs.existsSync(outPath)) fail(`missing ${path.relative(root, outPath)}`);
 if (boundary.schema !== BROWSER_ARTIFACT_BOUNDARY_SCHEMA) fail('schema mismatch');
-if (boundary.thinRuntimeClaim !== false) fail('thinRuntimeClaim must stay false');
+if (boundary.thinRuntimeClaim !== true) fail('thinRuntimeClaim must be true (0.1.32 proof)');
 if (boundary.productionReadyClaim !== false) fail('productionReadyClaim must stay false');
 if (!boundary.modules.generatedComponents.length) fail('expected generated *.client.js entries');
 if (!boundary.modules.runtimeShared.length) fail('expected runtimeShared modules in delivery dist');

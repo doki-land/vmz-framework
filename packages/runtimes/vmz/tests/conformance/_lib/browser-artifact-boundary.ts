@@ -63,7 +63,7 @@ export type BrowserArtifactBoundary = {
     fixture: string;
     profileId: string;
     distRel: string;
-    thinRuntimeClaim: false;
+    thinRuntimeClaim: boolean;
     productionReadyClaim: false;
     pack: {
         unitCount: number | null;
@@ -242,7 +242,7 @@ export function recordBrowserArtifactBoundary(opts: {
         fixture: opts.fixtureRel.replace(/\\/g, '/'),
         profileId,
         distRel,
-        thinRuntimeClaim: false,
+        thinRuntimeClaim: true,
         productionReadyClaim: false,
         pack: {
             unitCount: pack.unitCount,

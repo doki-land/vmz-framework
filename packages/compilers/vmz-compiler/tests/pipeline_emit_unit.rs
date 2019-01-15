@@ -87,7 +87,7 @@ fn emit_consumes_shared_reactive_view_deps() {
     let tpl = parse_template("<h2>{{ user.name }}</h2><p>{{ user.bio }}</p>").unwrap();
     let reactive = build_reactive_module("Card.vmz", &client.decl, &tpl);
     let comp = &reactive.components[0];
-    let js = emit_client_js_with_ir(src, &client, &tpl, None, Some(comp), None, None).unwrap();
+    let js = emit_client_js_with_ir(src, &client, &tpl, None, Some(comp), None, None, None).unwrap();
     assert!(js.contains("\"user.name\"") || js.contains("'user.name'"), "{js}");
     assert!(js.contains("\"user.bio\"") || js.contains("'user.bio'"), "{js}");
     // IR BindingId must be emitted on Direct binds (hot path keys).

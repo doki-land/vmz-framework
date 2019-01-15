@@ -567,11 +567,15 @@ export const directApi = {
     /**
      * Nested component (sync Direct child or island schedule).
      * @param {object} hostInst
-     * @param {string} name
+     * @param {string | Function} nameOrCtor — PascalCase tag string, or static Ctor import
      * @param {Record<string, any>} props
      * @param {string | null} client
      */
-    component(hostInst, name, props, client) {
+    component(hostInst, nameOrCtor, props, client) {
+        const name =
+            typeof nameOrCtor === 'function'
+                ? nameOrCtor.__vmzTag || nameOrCtor.name || 'Component'
+                : nameOrCtor;
         /** @type {HTMLElement | null} */
         let host = null;
         if (directApi._resumeAdopt && typeof directApi._resumeAdopt.componentHost === 'function') {
@@ -601,7 +605,10 @@ export const directApi = {
             }
             // resume: resume on schedule; EventEntry may lazy-load chunk via __vmzLoadComponent.
             scheduleClientOn(host, String(client), async () => {
-                const Ctor = await resolveComponent(name);
+                const Ctor =
+                    typeof nameOrCtor === 'function'
+                        ? nameOrCtor
+                        : await resolveComponent(name);
                 if (!Ctor) {
                     // Replace placeholder island with leaf error node (do not throw page).
                     const err = createUnknownComponentElement(name, 'island');
@@ -612,7 +619,8 @@ export const directApi = {
             });
             return host;
         }
-        const Ctor = components[name];
+        // Static Ctor import path: use Function directly (no registry lookup).
+        const Ctor = typeof nameOrCtor === 'function' ? nameOrCtor : components[name];
         if (!Ctor) {
             return createUnknownComponentElement(name, 'client');
         }

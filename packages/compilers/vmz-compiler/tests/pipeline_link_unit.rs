@@ -253,7 +253,7 @@ export default class IndexPage {}
     let reactive = &program.units[0].reactive;
     let plan = &program.units[0].plan;
     let js =
-        emit_client_js_with_ir(src, &client, &tpl, None, Some(reactive), Some(view), Some(plan))
+        emit_client_js_with_ir(src, &client, &tpl, None, Some(reactive), Some(view), Some(plan), None)
             .unwrap();
     assert!(js.contains("api.el(\"a\")"), "{js}");
     assert!(js.contains("/about"), "{js}");
