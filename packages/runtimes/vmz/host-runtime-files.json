@@ -1,0 +1,17 @@
+{
+    "schema": "vmz.host-runtime-files.v0",
+    "note": "Single source for Node host companions copied into dist/_vmz/host/. Consumed by vmz-compiler emit_runtime_js and materializeServeHostRuntime.",
+    "files": [
+        { "src": "host/serve-host.mjs", "out": "_vmz/host/vmz-serve-host.mjs", "rewriteVmzRuntimeImport": true },
+        { "src": "host/native-addon.js", "out": "_vmz/host/native-addon.js" },
+        { "src": "host/list-client-components.js", "out": "_vmz/host/list-client-components.js" },
+        { "src": "host/deployment-registry.js", "out": "_vmz/host/deployment-registry.js" },
+        { "src": "host/render-host.js", "out": "_vmz/host/render-host.js" },
+        { "src": "host/route-layout-chain.js", "out": "_vmz/host/route-layout-chain.js" },
+        { "src": "host/localize-body-links.js", "out": "_vmz/host/localize-body-links.js" }
+    ],
+    "launcherStub": {
+        "out": "vmz-serve-host.mjs",
+        "body": "// Generated launcher — host companions live under `_vmz/host/` (0.1.31).\nimport './_vmz/host/vmz-serve-host.mjs';\n"
+    }
+}
