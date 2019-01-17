@@ -1,10 +1,9 @@
-// @ts-nocheck
 /**
- * VMZ DOM SSR / hydrate / resume — precise patches, no VDOM diff.
+ * VMZ DOM SSR / hydrate / resume ??precise patches, no VDOM diff.
  * Imports client DOM primitives from ./dom-core.js for tree-shakeable browser entry.
  */
 
-import { applyDirectHostBox, directHostBoxStyleAttr } from './direct-host-box.js';
+import { applyDirectHostBox, directHostBoxStyleAttr } from '../browser/direct-host-box.js';
 import {
     applyDomAttr,
     applyPreservedState,
@@ -25,10 +24,9 @@ import {
     settlePendingChildMounts,
     snapshotInstanceState,
     stripFns,
-} from './dom-core.js';
-import { createUnknownComponentElement, markUnknownComponentHost, serializeUnknownComponentNode } from './unknown-component.js';
+} from '../browser/dom-core.js';
+import { createUnknownComponentElement, markUnknownComponentHost, serializeUnknownComponentNode } from '../browser/unknown-component.js';
 
-/** @type {Error | null} last linkedom resolve failure (for clear SSR errors) */
 let _ssrDocumentLastError = null;
 
 /**
@@ -39,7 +37,7 @@ let _ssrDocumentLastError = null;
  * and browser hosts load that barrel.
  *
  * When this file is copied into an app `dist/`, `createRequire(import.meta.url)` cannot
- * see `@vmz/core`'s dependency tree — resolve linkedom from cwd / `@vmz/core` as well.
+ * see `@vmz/core`'s dependency tree ??resolve linkedom from cwd / `@vmz/core` as well.
  */
 function ensureSsrDocument() {
     if (typeof globalThis.document !== 'undefined' && typeof globalThis.document.createElement === 'function') {
@@ -59,13 +57,13 @@ function ensureSsrDocument() {
         }
         const pathMod = typeof proc.getBuiltinModule === 'function' ? proc.getBuiltinModule('path') : null;
         const createRequire = mod.createRequire;
-        /** @type {string[]} */
+
         const bases = [];
         bases.push(import.meta.url);
         if (pathMod && typeof proc.cwd === 'function') {
             bases.push(pathMod.join(proc.cwd(), 'package.json'));
         }
-        /** @type {string[]} */
+
         const errors = [];
         let parseHTML = null;
         for (const base of bases) {
@@ -80,7 +78,7 @@ function ensureSsrDocument() {
                 parseHTML = req('linkedom').parseHTML;
                 break;
             } catch (e) {
-                errors.push(`${base} → linkedom: ${e && e.message ? e.message : e}`);
+                errors.push(`${base} ??linkedom: ${e && e.message ? e.message : e}`);
             }
             // Walk into @vmz/core's dependency tree (linkedom is declared there).
             for (const coreId of ['@vmz/core', '@vmz/core/dom', '@vmz/core/server']) {
@@ -89,7 +87,7 @@ function ensureSsrDocument() {
                     parseHTML = createRequire(coreEntry)('linkedom').parseHTML;
                     break;
                 } catch (e) {
-                    errors.push(`${base} → ${coreId}/linkedom: ${e && e.message ? e.message : e}`);
+                    errors.push(`${base} ??${coreId}/linkedom: ${e && e.message ? e.message : e}`);
                 }
             }
             if (parseHTML) break;
@@ -109,7 +107,7 @@ function ensureSsrDocument() {
     }
 }
 
-export async function renderToString(Component, props = {}, opts = {}) {
+export async function renderToString(Component, props: any = {}, opts: any = {}) {
     ensureSsrDocument();
     const signal = opts && opts.signal;
     if (signal && signal.aborted) return '';
@@ -118,7 +116,7 @@ export async function renderToString(Component, props = {}, opts = {}) {
         await inst.onMount();
     }
     if (signal && signal.aborted) return '';
-    // production Direct emit: SSR only via Direct serialize schedule — never `render`.
+    // production Direct emit: SSR only via Direct serialize schedule ??never `render`.
     if (!(Component && Component.__vmzDirect && typeof Component.__vmzCreate === 'function')) {
         throw new Error(`vmz:dom renderToString() requires __vmzCreate (Direct); blueprint render() removed (production Direct emit)`);
     }
@@ -129,14 +127,10 @@ export async function renderToString(Component, props = {}, opts = {}) {
 
 /**
  * Stream SSR via the same Direct serialize schedule as `renderToString`.
- * Yields HTML chunks (open tag → children → close). Joining chunks equals `renderToString`.
+ * Yields HTML chunks (open tag ??children ??close). Joining chunks equals `renderToString`.
  * Supports AbortSignal for cancel; consumers should respect backpressure (await between chunks).
- * @param {new (props?: object) => any} Component
- * @param {object} [props]
- * @param {{ signal?: AbortSignal, slotHtml?: string }} [opts]
- * @returns {AsyncGenerator<string, void, void>}
  */
-export async function* renderToStream(Component, props = {}, opts = {}) {
+export async function* renderToStream(Component, props: any = {}, opts: any = {}) {
     ensureSsrDocument();
     const signal = opts && opts.signal;
     const aborted = () => Boolean(signal && signal.aborted);
@@ -167,11 +161,9 @@ export async function* renderToStream(Component, props = {}, opts = {}) {
 
 /**
  * Fill the layout-owned default `<slot>` with pre-rendered HTML (layout SSR wrap).
- * Skips nested component hosts (`data-vmz`) — their slots are for child projection
- * (e.g. Button label), not the page outlet. Without this, DFS hits LocaleToggle→Button
+ * Skips nested component hosts (`data-vmz`) ??their slots are for child projection
+ * (e.g. Button label), not the page outlet. Without this, DFS hits LocaleToggle?Button
  * before Layout's `<main><slot>`, and the entire page HTML lands inside a button.
- * @param {any} node
- * @param {string} html
  */
 function injectDefaultSlotHtml(node, html) {
     if (!node || typeof node !== 'object') return false;
@@ -180,7 +172,7 @@ function injectDefaultSlotHtml(node, html) {
         node.children = [];
         return true;
     }
-    // Nested Direct component wrapper from serializeApi.component — do not search inside.
+    // Nested Direct component wrapper from serializeApi.component ??do not search inside.
     if (node.__kind === 'el' && node.attrs && node.attrs['data-vmz'] != null) {
         return false;
     }
@@ -197,21 +189,14 @@ function injectDefaultSlotHtml(node, html) {
  * Live-DOM counterpart: first default `<slot>` owned by this tree, not by a nested
  * `[data-vmz]` component (Button/Link labels, etc.).
  * Re-exported from dom-core (single implementation).
- * @param {Element | null | undefined} root
- * @returns {Element | null}
  */
 export { findOwnedDefaultSlot };
 
 /**
- * Hydrate/mount a file-route page inside an optional layout chain (outer → inner).
+ * Hydrate/mount a file-route page inside an optional layout chain (outer ??inner).
  * Mirrors SSR `slotHtml` wrapping: each layout's owned default slot becomes the
  * outlet for the next layout or the page. Retains layout instances on `container`
  * so SPA transitions can dispose only the page host.
- * @param {new (props?: object) => any} Page
- * @param {Element} container
- * @param {object} [props]
- * @param {Array<new (props?: object) => any>} [layoutCtors] outer → inner
- * @param {{ preserveState?: boolean | Record<string, unknown>, skipOnMount?: boolean }} [opts]
  */
 export async function hydrateRoute(Page, container, props = {}, layoutCtors = [], opts = {}) {
     if (typeof document === 'undefined') {
@@ -224,7 +209,6 @@ export async function hydrateRoute(Page, container, props = {}, layoutCtors = []
     container.__vmzPageHost = null;
     container.__vmzLayoutInsts = null;
 
-    /** @type {object[]} */
     const layoutInsts = [];
     let host = container;
     const ctors = Array.isArray(layoutCtors) ? layoutCtors.filter(Boolean) : [];
@@ -255,12 +239,8 @@ export async function hydrateRoute(Page, container, props = {}, layoutCtors = []
 /**
  * SPA same-layout transition: dispose only the page host, keep layout instances.
  * Callers must verify `data-vmz-layout` is unchanged before using this.
- * @param {new (props?: object) => any} Page
- * @param {Element} container `#app` that already has `__vmzPageHost` / `__vmzLayoutInsts`
- * @param {object} [props]
- * @param {{ preserveState?: boolean | Record<string, unknown>, skipOnMount?: boolean }} [opts]
  */
-export async function hydrateRoutePage(Page, container, props = {}, opts = {}) {
+export async function hydrateRoutePage(Page, container, props: any = {}, opts: any = {}) {
     if (typeof document === 'undefined') {
         throw new Error('vmz:dom hydrateRoutePage() requires a document (browser)');
     }
@@ -280,8 +260,6 @@ export async function hydrateRoutePage(Page, container, props = {}, opts = {}) {
 
 /**
  * SSR: run the same __vmzCreate schedule against a serialize host (no render).
- * @param {new (props?: object) => any} Component
- * @param {object} inst
  */
 function runDirectSerializeTree(Component, inst) {
     serializeApi._inst = inst;
@@ -294,14 +272,11 @@ function runDirectSerializeTree(Component, inst) {
 
 /**
  * SSR child onMount: sync `__vmzCreate` cannot await nested mounts.
- * Expand rounds — reuse prior child instances, await newly discovered onMounts, re-emit.
- * @param {new (props?: object) => any} Component
- * @param {object} inst
+ * Expand rounds ??reuse prior child instances, await newly discovered onMounts, re-emit.
  */
 async function runDirectSerializeTreeWithMounts(Component, inst) {
-    /** @type {object[]} */
     let preMounted = [];
-    /** @type {any} */
+
     let tree = null;
     for (let round = 0; round < 32; round++) {
         serializeApi._ssrPreMounted = preMounted;
@@ -340,6 +315,7 @@ function flattenSerializeNode(node) {
     if (node == null || node === false) return '';
     if (typeof node === 'string' || typeof node === 'number') return escapeHtml(node);
     if (node.__kind === 'text') return escapeHtml(node.value);
+    if (node.__kind === 'comment') return '';
     if (node.__kind === 'frag') {
         if (node.__rawHtml != null) return String(node.__rawHtml);
         return (node.children || []).map(flattenSerializeNode).join('');
@@ -364,8 +340,6 @@ function flattenSerializeNode(node) {
 
 /**
  * Progressive HTML chunks from a serialize tree (same nodes as flattenSerializeNode).
- * @param {any} node
- * @returns {Generator<string, void, void>}
  */
 function* streamSerializeChunks(node) {
     if (node == null || node === false) return;
@@ -377,6 +351,7 @@ function* streamSerializeChunks(node) {
         yield escapeHtml(node.value);
         return;
     }
+    if (node.__kind === 'comment') return;
     if (node.__kind === 'frag') {
         if (node.__rawHtml != null) {
             yield String(node.__rawHtml);
@@ -413,18 +388,14 @@ function* streamSerializeChunks(node) {
 /**
  * Document-free rowKernel SSR fill (transitional / pre-0.1.7 emit only).
  * Prefer `serializeItem` (IR schedule). Do not treat this as the long-term contract.
- * @param {{ html: string, textSlots?: Record<string, number>, hostFields?: string[] }} rk
- * @param {any} item
- * @param {any} key
- * @returns {string | null} filled outer HTML, or null if shape is not fillable
  */
 function fillRowKernelHtml(rk, item, key) {
     const slots = rk.textSlots;
     if (!slots || typeof slots !== 'object') return null;
-    /** @type {string[]} */
+
     const fields = Object.entries(slots)
         .filter(([, i]) => typeof i === 'number' && Number.isFinite(i))
-        .sort((a, b) => /** @type {number} */ (a[1]) - /** @type {number} */ (b[1]))
+        .sort((a, b) => Number(a[1]) - Number(b[1]))
         .map(([f]) => f);
     if (!fields.length) return null;
     let slotI = 0;
@@ -447,10 +418,6 @@ function fillRowKernelHtml(rk, item, key) {
  * SSR row when `createItem` was omitted (rowKernel client emit).
  * Prefer document-free fill from `html` + `textSlots`; fall back to linkedom + hydrate
  * when host class ternaries need live DOM, or when placeholders cannot be string-filled.
- * @param {object} inst
- * @param {{ html: string, hydrate?: Function, textSlots?: Record<string, number>, hostFields?: string[] }} rk
- * @param {{ item: any, index: number }} box
- * @param {any} key
  */
 function serializeRowFromKernel(inst, rk, box, key) {
     const item = box.item;
@@ -509,24 +476,75 @@ function serializeRowFromKernel(inst, rk, box, key) {
     };
 }
 
-/** Serialize host mirroring directApi — returns virtual nodes, not DOM. */
+function virtualLink(parent, child) {
+    if (child != null && typeof child === 'object') child.parentNode = parent;
+}
+
+function virtualAppend(parent, child) {
+    if (parent == null || child == null) return;
+    if (!Array.isArray(parent.children)) parent.children = [];
+    parent.children.push(child);
+    virtualLink(parent, child);
+}
+
+function virtualInsertBefore(parent, node, ref) {
+    if (parent == null || node == null) return;
+    if (!Array.isArray(parent.children)) parent.children = [];
+    if (ref == null) {
+        virtualAppend(parent, node);
+        return;
+    }
+    const idx = parent.children.indexOf(ref);
+    if (idx < 0) virtualAppend(parent, node);
+    else {
+        parent.children.splice(idx, 0, node);
+        virtualLink(parent, node);
+    }
+}
+
+function virtualRemove(node) {
+    const p = node && node.parentNode;
+    if (!p || !Array.isArray(p.children)) return;
+    const idx = p.children.indexOf(node);
+    if (idx >= 0) p.children.splice(idx, 1);
+    node.parentNode = null;
+}
+
+function makeVirtualEl(tag) {
+    return {
+        __kind: 'el',
+        tag: tag || 'div',
+        attrs: {},
+        children: [],
+        style: {},
+        parentNode: null,
+        setAttribute(name, value) {
+            applySerializeAttr(this, name, value);
+        },
+        appendChild(c) {
+            virtualAppend(this, c);
+        },
+        insertBefore(node, ref) {
+            virtualInsertBefore(this, node, ref);
+        },
+    };
+}
+
 const serializeApi = {
-    /** @type {object | null} */
     _inst: null,
-    /** @type {null} */
+
     _branchBinds: null,
-    /** @type {null} */
+
     _itemPatches: null,
-    /** @type {object[] | null} reused child instances from prior SSR mount rounds */
+
+    _eachCtx: null,
+
     _ssrPreMounted: null,
-    /** @type {number} */
+
     _ssrPreIdx: 0,
-    /** @type {object[] | null} newly created child instances this round */
+
     _ssrCollected: null,
-    /**
-     * @param {new (props?: object) => any} Ctor
-     * @param {object} resolved
-     */
+
     _ssrChildInstance(Ctor, resolved) {
         const pre = serializeApi._ssrPreMounted;
         if (pre && serializeApi._ssrPreIdx < pre.length) {
@@ -537,27 +555,68 @@ const serializeApi = {
         return child;
     },
     el(tag) {
-        return {
-            __kind: 'el',
-            tag: tag || 'div',
-            attrs: {},
-            children: [],
-            appendChild(c) {
-                if (c != null) this.children.push(c);
-            },
-        };
+        return makeVirtualEl(tag);
     },
     text(value) {
-        return { __kind: 'text', value: value == null ? '' : String(value) };
+        return { __kind: 'text', value: value == null ? '' : String(value), parentNode: null };
+    },
+    comment(value) {
+        return { __kind: 'comment', value: value == null ? '' : String(value), parentNode: null };
     },
     frag() {
         return {
             __kind: 'frag',
             children: [],
+            parentNode: null,
             appendChild(c) {
-                if (c != null) this.children.push(c);
+                virtualAppend(this, c);
+            },
+            insertBefore(node, ref) {
+                virtualInsertBefore(this, node, ref);
             },
         };
+    },
+    insertBefore(parent, node, ref) {
+        virtualInsertBefore(parent, node, ref);
+    },
+    removeNode(node) {
+        virtualRemove(node);
+    },
+    trackPatch(inst, deps, patch, bindingId = null) {
+        if (typeof patch !== 'function') return;
+        if (serializeApi._branchBinds) {
+            serializeApi._branchBinds.push({ deps: deps || [], fn: patch, bindingId });
+            try {
+                patch.call(inst);
+            } catch (err) {
+                console.error('vmz:ssr trackPatch branch', err);
+            }
+            return;
+        }
+        if (serializeApi._itemPatches) {
+            patch.__vmzItemLocal = true;
+            serializeApi._itemPatches.push(patch);
+            if (serializeApi._eachCtx) {
+                serializeApi._eachCtx.noteItemBind(bindingId, deps || [], patch);
+            }
+            try {
+                patch.call(inst);
+            } catch (err) {
+                console.error('vmz:ssr trackPatch item', err);
+            }
+            return;
+        }
+        try {
+            patch.call(inst);
+        } catch (err) {
+            console.error('vmz:ssr trackPatch', err);
+        }
+    },
+    untrackPatch() {
+        /* SSR one-shot schedule ??no reactive unregister */
+    },
+    disposeTree() {
+        /* SSR one-shot schedule */
     },
     attr(el, name, value) {
         if (!el || el.__kind !== 'el') return;
@@ -578,15 +637,6 @@ const serializeApi = {
     onComponentEvent() {
         /* component events attach only on the client */
     },
-    bindText(inst, bindingId, deps, get, textNode) {
-        let raw = '';
-        try {
-            raw = get.call(inst);
-        } catch {
-            raw = '';
-        }
-        textNode.value = String(raw ?? '');
-    },
     specFieldText(inst, _bindingId, fieldName, textNode) {
         let raw;
         try {
@@ -595,15 +645,6 @@ const serializeApi = {
             raw = '';
         }
         textNode.value = String(raw ?? '');
-    },
-    bindAttr(inst, bindingId, deps, get, el, name) {
-        let raw;
-        try {
-            raw = get.call(inst);
-        } catch {
-            raw = null;
-        }
-        applySerializeAttr(el, name, raw);
     },
     specFieldAttr(inst, _bindingId, fieldName, el, name) {
         let raw;
@@ -644,7 +685,7 @@ const serializeApi = {
         if (slot) {
             slot.__rawHtml = null;
             if (!Array.isArray(slot.children)) slot.children = [];
-            // Append — multiple projectDefaultSlot calls must accumulate (SSR).
+            // Append ??multiple projectDefaultSlot calls must accumulate (SSR).
             // Client path replaces the live <slot> then appends siblings; serialize must push.
             slot.children.push(node);
             return;
@@ -657,88 +698,28 @@ const serializeApi = {
         el.children = [];
     },
     bindHtml(inst, bindingId, deps, get, el) {
-        let raw = '';
-        try {
-            raw = get.call(inst);
-        } catch {
-            raw = '';
-        }
-        el.__rawHtml = raw == null ? '' : String(raw);
-        el.children = [];
-    },
-    ifBlock(inst, bindingId, deps, branches) {
-        // No empty `span[data-vmz-if]` box (`ui-vif-dom`): false → empty frag.
-        const frag = serializeApi.frag();
-        let idx = -1;
-        for (let i = 0; i < branches.length; i++) {
-            const b = branches[i];
-            if (!b.cond) {
-                idx = i;
-                break;
-            }
-            try {
-                if (b.cond.call(inst)) {
-                    idx = i;
-                    break;
-                }
-            } catch {
-                /* continue */
-            }
-        }
-        if (idx >= 0 && branches[idx].create) {
-            const created = branches[idx].create.call(inst, serializeApi);
-            if (created) frag.appendChild(created);
-        }
-        return frag;
-    },
-    eachBlock(inst, bindingId, deps, spec) {
-        const frag = serializeApi.frag();
-        let list = [];
-        try {
-            list = spec.list.call(inst) || [];
-        } catch {
-            list = [];
-        }
-        if (!Array.isArray(list)) list = [...list];
-        for (let i = 0; i < list.length; i++) {
-            const box = { item: list[i], index: i };
-            let k = i;
-            if (typeof spec.key === 'function') {
+        serializeApi.trackPatch(
+            inst,
+            deps || [],
+            function bindHtmlPatch() {
+                let raw;
                 try {
-                    k = spec.key.call(inst, box);
+                    raw = get.call(inst);
                 } catch {
-                    k = i;
+                    raw = '';
                 }
-            }
-            let dom = null;
-            if (typeof spec.createItem === 'function') {
-                dom = spec.createItem.call(inst, serializeApi, box);
-            } else if (typeof spec.serializeItem === 'function') {
-                // IR-homologous schedule (v0.1.7): same Direct body as fat createItem.
-                dom = spec.serializeItem.call(inst, serializeApi, box);
-            } else if (spec.rowKernel && typeof spec.rowKernel.html === 'string') {
-                // Transitional only: pre-0.1.7 emit without serializeItem.
-                dom = serializeRowFromKernel(inst, spec.rowKernel, box, k);
-            }
-            if (dom) {
-                // SSR only: serialize key into HTML for hydrate/debug. Direct client does not write this attr.
-                if (dom.__kind === 'el' && !dom.__rawOuter) serializeApi.attr(dom, 'data-vmz-key', String(k));
-                frag.appendChild(dom);
-            }
-        }
-        return frag;
+                serializeApi.setHtml(el, raw);
+            },
+            bindingId,
+        );
     },
     component(hostInst, nameOrCtor, props, client) {
-        const name =
-            typeof nameOrCtor === 'function'
-                ? nameOrCtor.__vmzTag || nameOrCtor.name || 'Component'
-                : nameOrCtor;
-        const Ctor =
-            typeof nameOrCtor === 'function' ? nameOrCtor : getRegisteredComponent(name);
+        const name = typeof nameOrCtor === 'function' ? nameOrCtor.__vmzTag || nameOrCtor.name || 'Component' : nameOrCtor;
+        const Ctor = typeof nameOrCtor === 'function' ? nameOrCtor : getRegisteredComponent(name);
         if (!Ctor) {
             return serializeUnknownComponentNode(name);
         }
-        /** @type {Record<string, any>} */
+
         const resolved = {};
         for (const [k, v] of Object.entries(props || {})) {
             const onKey = typeof v === 'function' ? eventPropHandlerName(k) : null;
@@ -770,8 +751,7 @@ const serializeApi = {
                 planSchema: plan?.schema || null,
                 planRootIds: plan?.root_ids || [],
             };
-            /** @type {Record<string, string>} */
-            const attrs = {
+            const attrs: Record<string, string> = {
                 'data-vmz': name,
                 'data-vmz-island': name,
                 'data-vmz-client': String(client),
@@ -799,8 +779,7 @@ const serializeApi = {
             serializeApi._inst = child;
             try {
                 const node = Ctor.__vmzCreate.call(child, serializeApi);
-                /** @type {Record<string, string>} */
-                const attrs = { 'data-vmz': name };
+                const attrs: Record<string, string> = { 'data-vmz': name };
                 const boxStyle = directHostBoxStyleAttr(name, Ctor);
                 if (boxStyle) attrs.style = boxStyle;
                 return {
@@ -822,9 +801,6 @@ const serializeApi = {
 
 /**
  * Serialize-tree attr write (SSR).
- * @param {any} el
- * @param {string} name
- * @param {any} value
  */
 function applySerializeAttr(el, name, value) {
     if (!el || el.__kind !== 'el') return;
@@ -841,9 +817,6 @@ function applySerializeAttr(el, name, value) {
 /**
  * resume: attach to existing Island DOM without re-running construct structure or onMount.
  * Consumes ResumeEntry product (`data-vmz-resume`) derived from the same Execution Plan.
- * @param {new (props?: object) => any} Component
- * @param {HTMLElement} container
- * @param {{ props?: object, state?: Record<string, unknown>, strategy?: string } | null} [slice]
  */
 export async function resume(Component, container, slice = null) {
     if (typeof document === 'undefined') {
@@ -881,7 +854,7 @@ export async function resume(Component, container, slice = null) {
     const props = parsed.props || {};
     const inst = createInstance(Component, props);
     if (parsed.state) applyPreservedState(inst, parsed.state);
-    // Intentionally never call onMount — SSR already completed that work.
+    // Intentionally never call onMount ??SSR already completed that work.
 
     if (Component.__vmzDirect && typeof Component.__vmzCreate === 'function') {
         if (!hasMeaningfulChild(container)) {
@@ -906,7 +879,6 @@ export async function resume(Component, container, slice = null) {
 /**
  * Resume all `[data-vmz-island]` hosts (prefer ResumeEntry / EventEntry over mount).
  * Event strategy islands wait for the DOM event before attach (lazy EventEntry).
- * @param {ParentNode} [root]
  */
 export function resumeIslands(root = globalThis.document) {
     if (!root || typeof root.querySelectorAll !== 'function') {
@@ -919,7 +891,7 @@ export function resumeIslands(root = globalThis.document) {
         scheduleClientOn(el, strategy, async () => {
             const Ctor = await resolveComponent(name);
             if (!Ctor) {
-                markUnknownComponentHost(el, name, 'resume');
+                markUnknownComponentHost(el as HTMLElement, name, 'resume');
                 return;
             }
             await resume(Ctor, el);
@@ -930,7 +902,6 @@ export function resumeIslands(root = globalThis.document) {
 /**
  * EventEntry attach: only wire `client:event` / `client:event:*` islands.
  * Idle/load/visible ResumeEntries are left alone (static shell can defer framework work).
- * @param {ParentNode} [root]
  */
 export function attachEventEntries(root = globalThis.document) {
     if (!root || typeof root.querySelectorAll !== 'function') {
@@ -945,7 +916,7 @@ export function attachEventEntries(root = globalThis.document) {
         scheduleClientOn(el, strategy, async () => {
             const Ctor = await resolveComponent(name);
             if (!Ctor) {
-                markUnknownComponentHost(el, name, 'event-entry');
+                markUnknownComponentHost(el as HTMLElement, name, 'event-entry');
                 return;
             }
             await resume(Ctor, el);
@@ -966,22 +937,16 @@ export function attachEventEntries(root = globalThis.document) {
  * - `beginBranchScope()` moves one top-level SSR node into an isolated pool so
  *   ifBlock branch create cannot steal parent siblings (Drawer / Button hosts).
  *
- * @param {DocumentFragment} pool
- * @param {Element} rootEl
  */
 function createResumeAdopt(pool, rootEl) {
     const used = new WeakSet();
-    /** @type {DocumentFragment[]} */
+
     const scopeStack = [pool];
 
-    /**
-     * @param {Node} root
-     * @param {(n: Text) => void} visit
-     */
     const walkTexts = (root, visit) => {
         if (!root) return;
         if (root.nodeType === 3) {
-            visit(/** @type {Text} */ (root));
+            visit(root);
             return;
         }
         if (root.nodeType !== 1) return;
@@ -996,7 +961,7 @@ function createResumeAdopt(pool, rootEl) {
             const k = n.getAttribute('data-vmz-key');
             if (k != null && n.__vmzKey == null) n.__vmzKey = k;
         }
-        // Private child pool — never dump into the parent/global pool (that let
+        // Private child pool ??never dump into the parent/global pool (that let
         // if branches reclaim Drawer/sibling hosts parked as uncles).
         const childPool = document.createDocumentFragment();
         while (n.firstChild) childPool.appendChild(n.firstChild);
@@ -1004,25 +969,22 @@ function createResumeAdopt(pool, rootEl) {
         return n;
     };
 
-    /** @returns {Generator<Element>} */
     function* elementCandidates() {
         const scope = currentScope();
         if (scope === pool && rootEl && !used.has(rootEl)) yield rootEl;
-        // Snapshot — adopt may move nodes out of scope while iterating.
+        // Snapshot ??adopt may move nodes out of scope while iterating.
         const kids = [...scope.childNodes];
         for (const n of kids) {
-            if (n.nodeType === 1 && !used.has(/** @type {Element} */ (n))) {
-                yield/** @type {Element} */ (n);
+            if (n.nodeType === 1 && !used.has(n)) {
+                yield n;
             }
         }
     }
 
-    /** @returns {Generator<Text>} */
     function* textCandidates() {
         const scope = currentScope();
         const kids = [...scope.childNodes];
         for (const n of kids) {
-            /** @type {Text[]} */
             const found = [];
             walkTexts(n, (t) => {
                 if (!used.has(t)) found.push(t);
@@ -1050,7 +1012,6 @@ function createResumeAdopt(pool, rootEl) {
         return document.createTextNode(value == null ? '' : String(value));
     };
 
-    /** Reclaim SSR `<div data-vmz="Name">` hosts for nested Direct components. */
     const componentHost = (name) => {
         const want = String(name || '');
         for (const el of elementCandidates()) {
@@ -1082,13 +1043,12 @@ function createResumeAdopt(pool, rootEl) {
     /**
      * Isolate the next top-level SSR sibling as the only candidates for an
      * if/else branch create (commercial Card: Empty branch must not adopt Drawer).
-     * @returns {() => void} end callback
      */
     const beginBranchScope = () => {
         const parent = currentScope();
         const branchPool = document.createDocumentFragment();
         for (const n of [...parent.childNodes]) {
-            if (n.nodeType === 1 && !used.has(/** @type {Element} */ (n))) {
+            if (n.nodeType === 1 && !used.has(n)) {
                 branchPool.appendChild(n);
                 break;
             }
@@ -1115,9 +1075,6 @@ function createResumeAdopt(pool, rootEl) {
 
 /**
  * Adopt existing Island DOM while running the same `__vmzCreate` schedule (resume).
- * @param {new (props?: object) => any} Component
- * @param {object} inst
- * @param {Element} container
  */
 function runDirectResume(Component, inst, container) {
     const rootEl = [...container.childNodes].find((n) => n.nodeType === 1 || (n.nodeType === 3 && String(n.textContent).trim() !== ''));
@@ -1151,18 +1108,11 @@ function runDirectResume(Component, inst, container) {
     }
 }
 
-/**
- * @param {new (props?: object) => any} Component
- * @param {HTMLElement} container
- * @param {object} [props]
- * @param {{ preserveState?: boolean | Record<string, unknown>, skipOnMount?: boolean }} [opts]
- */
-export async function hydrate(Component, container, props = {}, opts = {}) {
+export async function hydrate(Component, container, props: any = {}, opts: any = {}) {
     if (typeof document === 'undefined') {
         throw new Error('vmz:dom hydrate() requires a document (browser)');
     }
 
-    /** @type {Record<string, unknown> | null} */
     let preserved = null;
     if (opts.preserveState && typeof opts.preserveState === 'object') {
         preserved = opts.preserveState;
@@ -1208,9 +1158,6 @@ export async function hydrate(Component, container, props = {}, opts = {}) {
     return inst;
 }
 
-/**
- * @param {ParentNode} [root]
- */
 export function hydrateIslands(root = globalThis.document) {
     // resume: hydrateIslands is an alias for resumeIslands (same Plan attach).
     return resumeIslands(root);

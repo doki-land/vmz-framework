@@ -3,7 +3,7 @@
  * `@vmz/diagnostic` stays free of a native dependency — hosts wire this helper.
  */
 
-import { requireNativeFn } from './native-addon.js';
+import { requireNativeFn } from '../host/native-addon.js';
 
 export type LineCol = { line: number; column: number };
 

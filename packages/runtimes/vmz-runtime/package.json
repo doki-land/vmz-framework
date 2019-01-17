@@ -6,52 +6,52 @@
     "description": "VMZ production runtime core — DOM / SSR / HTTP / WriteBarrier (no compiler)",
     "exports": {
         ".": {
-            "types": "./dist/index.d.ts",
-            "default": "./dist/server.js"
+            "types": "./dist/faces/index.d.ts",
+            "default": "./dist/faces/server.js"
         },
         "./dom": {
-            "types": "./dist/dom.d.ts",
-            "default": "./dist/dom.js"
+            "types": "./dist/faces/dom.d.ts",
+            "default": "./dist/faces/dom.js"
         },
         "./dom/client": {
-            "types": "./dist/dom.client.d.ts",
-            "default": "./dist/dom.client.js"
+            "types": "./dist/faces/dom.client.d.ts",
+            "default": "./dist/faces/dom.client.js"
         },
         "./dom/browser": {
-            "types": "./dist/dom.browser.d.ts",
-            "default": "./dist/dom.browser.js"
+            "types": "./dist/faces/dom.browser.d.ts",
+            "default": "./dist/faces/dom.browser.js"
         },
         "./server": {
-            "types": "./dist/server.d.ts",
-            "default": "./dist/server.js"
+            "types": "./dist/faces/server.d.ts",
+            "default": "./dist/faces/server.js"
         },
         "./http": {
-            "types": "./dist/http.d.ts",
-            "default": "./dist/http.js"
+            "types": "./dist/faces/http.d.ts",
+            "default": "./dist/faces/http.js"
         },
         "./client-nav": {
-            "types": "./dist/client-nav.d.ts",
-            "default": "./dist/client-nav.js"
+            "types": "./dist/browser/client-nav.d.ts",
+            "default": "./dist/browser/client-nav.js"
         },
         "./component-registry": {
-            "types": "./dist/list-client-components.d.ts",
-            "default": "./dist/list-client-components.js"
+            "types": "./dist/host/list-client-components.d.ts",
+            "default": "./dist/host/list-client-components.js"
         },
         "./render-host": {
-            "types": "./dist/render-host.d.ts",
-            "default": "./dist/render-host.js"
+            "types": "./dist/host/render-host.d.ts",
+            "default": "./dist/host/render-host.js"
         },
         "./route-layout-chain": {
-            "types": "./dist/route-layout-chain.d.ts",
-            "default": "./dist/route-layout-chain.js"
+            "types": "./dist/host/route-layout-chain.d.ts",
+            "default": "./dist/host/route-layout-chain.js"
         },
         "./localize-body-links": {
-            "types": "./dist/localize-body-links.d.ts",
-            "default": "./dist/localize-body-links.js"
+            "types": "./dist/host/localize-body-links.d.ts",
+            "default": "./dist/host/localize-body-links.js"
         },
         "./position-context": {
-            "types": "./dist/position-context.d.ts",
-            "default": "./dist/position-context.js"
+            "types": "./dist/browser/position-context.d.ts",
+            "default": "./dist/browser/position-context.js"
         }
     },
     "files": [
@@ -62,10 +62,10 @@
         "vmz",
         "runtime"
     ],
-    "main": "./dist/server.js",
-    "types": "./dist/index.d.ts",
+    "main": "./dist/faces/server.js",
+    "types": "./dist/faces/index.d.ts",
     "scripts": {
-        "build": "tsc -p tsconfig.json && node ../../../scripts/build/copy-serve-host-mjs.mjs"
+        "build": "node ../../../scripts/build/clean-package-dist.mjs packages/runtimes/vmz-runtime/dist && tsc -p tsconfig.json && node ../../../scripts/build/copy-serve-host-mjs.mjs"
     },
     "dependencies": {
         "linkedom": "^0.18.13"

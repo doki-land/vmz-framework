@@ -1,31 +1,30 @@
-// @ts-nocheck
 /**
- * Deployment graph → component registry bootstrap (shared by all SSR/DOM hosts).
+ * Deployment graph — component registry bootstrap (shared by all SSR/DOM hosts).
  * Parse/validate and graph queries delegate to Rust vmz-artifacts via N-API.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type {
+    BootstrapComponentRegistryOpts,
+    ComponentEntry,
+    ComponentRegistryMap,
+    DedupeComponentEntriesOpts,
+    DeploymentDocument,
+    ImportComponentEntriesOpts,
+    LoadComponentEntriesOpts,
+} from '../shared/host.types.js';
 import { loadNativeAddon, requireNativeFn } from './native-addon.js';
 
 export const DEPLOYMENT_SCHEMA = 'vmz.deployment.v0';
 
-/**
- * @param {string} jsonText
- * @returns {any}
- */
-function parseDeploymentJson(jsonText) {
+function parseDeploymentJson(jsonText: string): DeploymentDocument {
     requireNativeFn('deploymentValidate')(jsonText);
-    return JSON.parse(jsonText);
+    return JSON.parse(jsonText) as DeploymentDocument;
 }
 
-/**
- * @param {string} distDir
- * @param {{ strict?: boolean }} [opts]
- * @returns {any | null}
- */
-export function readDeploymentDocument(distDir, opts = {}) {
+export function readDeploymentDocument(distDir: string, opts: { strict?: boolean } = {}): DeploymentDocument | null {
     const strict = opts.strict === true;
     const filePath = path.join(distDir, 'vmz-deployment.json');
     if (!fs.existsSync(filePath)) {
@@ -34,7 +33,7 @@ export function readDeploymentDocument(distDir, opts = {}) {
         }
         return null;
     }
-    let raw;
+    let raw: string;
     try {
         raw = fs.readFileSync(filePath, 'utf8');
     } catch (e) {
@@ -49,36 +48,20 @@ export function readDeploymentDocument(distDir, opts = {}) {
     }
 }
 
-/**
- * @param {any} deployment
- * @returns {Array<{ chunkId: string, name: string, entry: string, source: string }>}
- */
-export function componentEntriesFromDeployment(deployment) {
+export function componentEntriesFromDeployment(deployment: DeploymentDocument): ComponentEntry[] {
     const json = JSON.stringify(deployment);
-    return requireNativeFn('deploymentComponentEntries')(json);
+    return requireNativeFn('deploymentComponentEntries')(json) as ComponentEntry[];
 }
 
-/**
- * @param {any} deployment
- * @param {string[]} rootChunkIds
- * @returns {Set<string>}
- */
-export function collectDependsOnClosure(deployment, rootChunkIds) {
+export function collectDependsOnClosure(deployment: DeploymentDocument, rootChunkIds: string[]): Set<string> {
     const json = JSON.stringify(deployment);
-    const ids = requireNativeFn('deploymentDependsOnClosure')(json, rootChunkIds);
+    const ids = requireNativeFn('deploymentDependsOnClosure')(json, rootChunkIds) as string[];
     return new Set(ids);
 }
 
-/**
- * Resolve tag conflicts; strict mode throws, dev mode warns and keeps last chunkId.
- * @param {Array<{ chunkId: string, name: string, entry: string, source?: string }>} entries
- * @param {{ strict?: boolean }} [opts]
- * @returns {Array<{ chunkId: string, name: string, entry: string, source?: string }>}
- */
-export function dedupeComponentEntriesByTag(entries, opts = {}) {
+export function dedupeComponentEntriesByTag(entries: ComponentEntry[], opts: DedupeComponentEntriesOpts = {}): ComponentEntry[] {
     const strict = opts.strict === true;
-    /** @type {Map<string, { chunkId: string, name: string, entry: string, source?: string }>} */
-    const byTag = new Map();
+    const byTag = new Map<string, ComponentEntry>();
     for (const e of entries) {
         const prev = byTag.get(e.name);
         if (prev && prev.chunkId !== e.chunkId) {
@@ -91,14 +74,8 @@ export function dedupeComponentEntriesByTag(entries, opts = {}) {
     return [...byTag.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * @param {Array<{ chunkId: string, name: string, entry: string, source?: string }>} entries
- * @param {Record<string, string> | undefined} explicit name → chunkId (no .client.js)
- * @returns {Array<{ chunkId: string, name: string, entry: string, source?: string }>}
- */
-export function mergeExplicitComponentEntries(entries, explicit) {
-    /** @type {Map<string, { chunkId: string, name: string, entry: string, source?: string }>} */
-    const byTag = new Map(entries.map((e) => [e.name, e]));
+export function mergeExplicitComponentEntries(entries: ComponentEntry[], explicit?: Record<string, string>): ComponentEntry[] {
+    const byTag = new Map<string, ComponentEntry>(entries.map((e) => [e.name, e]));
     if (explicit) {
         for (const [name, chunk] of Object.entries(explicit)) {
             const chunkId = String(chunk).replace(/\\/g, '/');
@@ -113,20 +90,10 @@ export function mergeExplicitComponentEntries(entries, explicit) {
     return [...byTag.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * @param {string} distDir
- * @param {{
- *   strict?: boolean,
- *   closureRoots?: string[],
- *   explicit?: Record<string, string>,
- * }} [opts]
- * @returns {Promise<Array<{ chunkId: string, name: string, entry: string, source?: string }>>}
- */
-export async function loadComponentEntries(distDir, opts = {}) {
+export async function loadComponentEntries(distDir: string, opts: LoadComponentEntriesOpts = {}): Promise<ComponentEntry[]> {
     const strict = opts.strict === true;
     const deployment = readDeploymentDocument(distDir, { strict });
-    /** @type {Array<{ chunkId: string, name: string, entry: string, source?: string }>} */
-    let entries = [];
+    let entries: ComponentEntry[] = [];
     if (deployment) {
         entries = componentEntriesFromDeployment(deployment);
         if (opts.closureRoots?.length) {
@@ -136,24 +103,17 @@ export async function loadComponentEntries(distDir, opts = {}) {
     } else if (strict) {
         throw new Error(`vmz: missing vmz-deployment.json under ${distDir} (plan-only host)`);
     }
-    // No directory scan fallback — component closure comes from Deployment Plan only.
     entries = mergeExplicitComponentEntries(entries, opts.explicit);
     return dedupeComponentEntriesByTag(entries, { strict });
 }
 
-/**
- * @param {string} distDir
- * @param {Array<{ chunkId: string, name: string, entry: string }>} entries
- * @param {(map: Record<string, unknown>) => void} registerComponents
- * @param {{
- *   cacheBust?: string | number,
- *   loaded?: Set<string>,
- * }} [opts]
- * @returns {Promise<Record<string, unknown>>}
- */
-export async function importAndRegisterComponentEntries(distDir, entries, registerComponents, opts = {}) {
-    /** @type {Record<string, unknown>} */
-    const map = {};
+export async function importAndRegisterComponentEntries(
+    distDir: string,
+    entries: ComponentEntry[],
+    registerComponents: (map: ComponentRegistryMap) => void,
+    opts: ImportComponentEntriesOpts = {},
+): Promise<ComponentRegistryMap> {
+    const map: ComponentRegistryMap = {};
     const loaded = opts.loaded ?? null;
     for (const entry of entries) {
         if (loaded && loaded.has(entry.chunkId)) continue;
@@ -170,23 +130,14 @@ export async function importAndRegisterComponentEntries(distDir, entries, regist
     return map;
 }
 
-/**
- * Bootstrap component registry from deployment (all or closure — no directory fallback).
- * @param {string} distDir
- * @param {(map: Record<string, unknown>) => void} registerComponents
- * @param {{
- *   strict?: boolean,
- *   closureRoots?: string[],
- *   explicit?: Record<string, string>,
- *   cacheBust?: string | number,
- *   loaded?: Set<string>,
- *   preload?: 'all' | 'closure' | 'none',
- * }} [opts]
- */
-export async function bootstrapComponentRegistry(distDir, registerComponents, opts = {}) {
+export async function bootstrapComponentRegistry(
+    distDir: string,
+    registerComponents: (map: ComponentRegistryMap) => void,
+    opts: BootstrapComponentRegistryOpts = {},
+): Promise<ComponentRegistryMap> {
     const preload = opts.preload ?? (opts.closureRoots?.length ? 'closure' : 'all');
     if (preload === 'none') return {};
-    const loadOpts = {
+    const loadOpts: LoadComponentEntriesOpts = {
         strict: opts.strict,
         explicit: opts.explicit,
         closureRoots: preload === 'closure' ? opts.closureRoots : undefined,

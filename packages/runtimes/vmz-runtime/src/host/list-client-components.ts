@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Discover compiled client component modules from Deployment Plan only.
  * Shared by serve-host SSR, static emit, and test hosts (plan-only host).
@@ -6,6 +5,12 @@
 
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type {
+    ClientComponentListEntry,
+    ComponentRegistryMap,
+    ListClientComponentsOpts,
+    PreloadComponentRegistryOpts,
+} from '../shared/host.types.js';
 import {
     bootstrapComponentRegistry,
     componentEntriesFromDeployment,
@@ -28,12 +33,7 @@ export {
 
 export { createRenderHost } from './render-host.js';
 
-/**
- * @param {string} dir
- * @param {{ strict?: boolean }} [opts]
- * @returns {Promise<Array<{ name: string, entry: string, chunkId?: string }>>}
- */
-export async function listClientComponents(dir, opts = {}) {
+export async function listClientComponents(dir: string, opts: ListClientComponentsOpts = {}): Promise<ClientComponentListEntry[]> {
     const strict = opts.strict === true;
     const deployment = readDeploymentDocument(dir, { strict });
     if (deployment) {
@@ -57,13 +57,7 @@ export async function listClientComponents(dir, opts = {}) {
     return [];
 }
 
-/**
- * Sync variant for callers that already use fs sync (legacy static-emit helpers).
- * @param {string} dir
- * @param {{ strict?: boolean }} [opts]
- * @returns {Array<{ name: string, entry: string, chunkId?: string }>}
- */
-export function listClientComponentsSync(dir, opts = {}) {
+export function listClientComponentsSync(dir: string, opts: ListClientComponentsOpts = {}): ClientComponentListEntry[] {
     const strict = opts.strict === true;
     const deployment = readDeploymentDocument(dir, { strict });
     if (deployment) {
@@ -87,12 +81,7 @@ export function listClientComponentsSync(dir, opts = {}) {
     return [];
 }
 
-/**
- * @param {Array<{ name: string, entry: string, chunkId?: string }>} entries
- * @param {Record<string, string> | undefined} explicit
- * @returns {Array<{ name: string, entry: string, chunkId?: string }>}
- */
-export function mergeComponentEntries(entries, explicit) {
+export function mergeComponentEntries(entries: ClientComponentListEntry[], explicit?: Record<string, string>): ClientComponentListEntry[] {
     const normalized = entries.map((e) => ({
         chunkId: e.chunkId || `components/${e.name}`,
         name: e.name,
@@ -105,13 +94,11 @@ export function mergeComponentEntries(entries, explicit) {
     }));
 }
 
-/**
- * @param {string} distDir
- * @param {Record<string, string> | undefined} [explicit]
- * @param {{ strict?: boolean, closureRoots?: string[] }} [opts]
- * @returns {Promise<Array<{ name: string, entry: string, chunkId?: string }>>}
- */
-export async function resolveComponentEntries(distDir, explicit, opts = {}) {
+export async function resolveComponentEntries(
+    distDir: string,
+    explicit?: Record<string, string>,
+    opts: ListClientComponentsOpts & { closureRoots?: string[] } = {},
+): Promise<ClientComponentListEntry[]> {
     const { loadComponentEntries } = await import('./deployment-registry.js');
     const entries = await loadComponentEntries(distDir, {
         strict: opts.strict,
@@ -121,27 +108,17 @@ export async function resolveComponentEntries(distDir, explicit, opts = {}) {
     return entries.map((e) => ({ name: e.name, entry: e.entry, chunkId: e.chunkId }));
 }
 
-/**
- * Import all (or filtered) client components and register for SSR / static emit / test hosts.
- * @param {string} distDir
- * @param {(map: Record<string, unknown>) => void} registerComponents
- * @param {{
- *   cacheBust?: string | number,
- *   include?: (entry: { name: string, entry: string, chunkId?: string }) => boolean,
- *   explicit?: Record<string, string>,
- *   strict?: boolean,
- *   closureRoots?: string[],
- *   preload?: 'all' | 'closure' | 'none',
- * }} [opts]
- */
-export async function preloadComponentRegistry(distDir, registerComponents, opts = {}) {
+export async function preloadComponentRegistry(
+    distDir: string,
+    registerComponents: (map: ComponentRegistryMap) => void,
+    opts: PreloadComponentRegistryOpts = {},
+): Promise<ComponentRegistryMap> {
     let entries = await resolveComponentEntries(distDir, opts.explicit, {
         strict: opts.strict,
         closureRoots: opts.closureRoots,
     });
-    if (opts.include) entries = entries.filter((e) => opts.include(e));
-    /** @type {Record<string, unknown>} */
-    const map = {};
+    if (opts.include) entries = entries.filter((e) => opts.include!(e));
+    const map: ComponentRegistryMap = {};
     for (const entry of entries) {
         const abs = path.join(distDir, entry.entry);
         let href = pathToFileURL(abs).href;
