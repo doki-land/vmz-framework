@@ -12,7 +12,7 @@
         :disabled="disabled"
         :aria-invalid="error ? 'true' : 'false'"
         :aria-describedby="describedBy"
-        @input="this.onDomInput"
+        @input="onDomInput"
       />
       <p v-if="description" :id="descriptionId" class="vmz-ui-field__description">{{ description }}</p>
       <p v-if="error" :id="errorId" class="vmz-ui-field__error" role="alert">{{ error }}</p>

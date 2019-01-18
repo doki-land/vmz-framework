@@ -10,10 +10,10 @@
       :data-invalid="invalidAttr"
       :data-vmz-upload-status="status"
       :data-progress="progress"
-      :onDragEnter="this.onDragEnter"
-      :onDragOver="this.onDragOver"
-      :onDragLeave="this.onDragLeave"
-      :onDrop="this.onDrop"
+      :onDragEnter="onDragEnter"
+      :onDragOver="onDragOver"
+      :onDragLeave="onDragLeave"
+      :onDrop="onDrop"
     >
       <label v-if="label" class="vmz-ui-upload__label" :for="controlId">{{ label }}</label>
 
@@ -28,7 +28,7 @@
           :aria-invalid="error ? 'true' : 'false'"
           :aria-describedby="describedBy"
           :data-vmz-upload-directory="directoryAttr"
-          @change="this.onPick"
+          @change="onPick"
         />
         <p class="vmz-ui-upload__hint" data-vmz-upload="hint">{{ zoneHint }}</p>
       </div>
@@ -58,10 +58,10 @@
       <p v-if="resultText" class="vmz-ui-upload__result" data-vmz-upload="result">{{ resultText }}</p>
 
       <div v-if="showActions" class="vmz-ui-upload__actions" data-vmz-upload="actions">
-        <button v-if="canCancel" type="button" class="vmz-ui-upload__cancel" data-vmz-upload="cancel" @click="this.onCancelClick">
+        <button v-if="canCancel" type="button" class="vmz-ui-upload__cancel" data-vmz-upload="cancel" @click="onCancelClick">
           {{ cancelLabel }}
         </button>
-        <button v-if="canResume" type="button" class="vmz-ui-upload__resume" data-vmz-upload="resume" @click="this.onResumeClick">
+        <button v-if="canResume" type="button" class="vmz-ui-upload__resume" data-vmz-upload="resume" @click="onResumeClick">
           {{ resumeLabel }}
         </button>
       </div>

@@ -17,15 +17,15 @@
           label="FAQ"
           :open-id="faqOpen"
           :items="faqItems"
-          :on-toggle="(id) => this.onFaqToggle(id)"
+          :on-toggle="onFaqToggle"
         />
       </Card>
 
       <Card title="Steps" description="Parent owns current id and status flags.">
         <Steps label="Onboarding" :current="stepCurrent" :items="stepItems" />
         <div class="vmz-structure-actions">
-          <Button type="button" variant="secondary" @click="() => this.stepBack()">Back</Button>
-          <Button type="button" @click="() => this.stepNext()">Next</Button>
+          <Button type="button" variant="secondary" @click="stepBack">Back</Button>
+          <Button type="button" @click="stepNext">Next</Button>
         </div>
       </Card>
 
@@ -35,7 +35,7 @@
           label-id="home-structure-list-label"
           :selected="listSelected"
           :items="listItems"
-          :on-select="(id) => this.onListSelect(id)"
+          :on-select="onListSelect"
         />
       </Card>
 
@@ -45,8 +45,8 @@
           label-id="home-structure-tree-label"
           :selected="treeSelected"
           :items="treeItems"
-          :on-select="(id) => this.onTreeSelect(id)"
-          :on-toggle="(id) => this.onTreeToggle(id)"
+          :on-select="onTreeSelect"
+          :on-toggle="onTreeToggle"
         />
       </Card>
     </AppShell>

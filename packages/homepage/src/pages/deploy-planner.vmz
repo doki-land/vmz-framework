@@ -19,67 +19,67 @@
           <fieldset class="planner__field">
             <legend>T.secrets · 密钥 / 会话是否必须留在可信服务器？</legend>
             <div class="planner__chips" role="group">
-              <button type="button" :class="secretsNoneClass" @click="() => this.setSecrets('none')">无（公开内容）</button>
-              <button type="button" :class="secretsYesClass" @click="() => this.setSecrets('yes')">是（需可信 server）</button>
+              <button type="button" :class="secretsNoneClass" @click="() => setSecrets('none')">无（公开内容）</button>
+              <button type="button" :class="secretsYesClass" @click="() => setSecrets('yes')">是（需可信 server）</button>
             </div>
           </fieldset>
 
           <fieldset class="planner__field">
             <legend>T.html · 首屏 HTML 从哪来？</legend>
             <div class="planner__chips" role="group">
-              <button type="button" :class="htmlCdnClass" @click="() => this.setHtml('cdn-prebuild')">CDN 预生成</button>
-              <button type="button" :class="htmlSsrClass" @click="() => this.setHtml('request-ssr')">请求时 SSR</button>
-              <button type="button" :class="htmlBrowserClass" @click="() => this.setHtml('browser-only')">纯浏览器</button>
+              <button type="button" :class="htmlCdnClass" @click="() => setHtml('cdn-prebuild')">CDN 预生成</button>
+              <button type="button" :class="htmlSsrClass" @click="() => setHtml('request-ssr')">请求时 SSR</button>
+              <button type="button" :class="htmlBrowserClass" @click="() => setHtml('browser-only')">纯浏览器</button>
             </div>
           </fieldset>
 
           <fieldset class="planner__field">
             <legend>T.assets · 静态资源放哪？</legend>
             <div class="planner__chips" role="group">
-              <button type="button" :class="assetsSameClass" @click="() => this.setAssets('same-host')">同机</button>
-              <button type="button" :class="assetsCdnClass" @click="() => this.setAssets('cdn')">CDN</button>
-              <button type="button" :class="assetsEmbedClass" @click="() => this.setAssets('embedded-binary')">嵌进二进制</button>
+              <button type="button" :class="assetsSameClass" @click="() => setAssets('same-host')">同机</button>
+              <button type="button" :class="assetsCdnClass" @click="() => setAssets('cdn')">CDN</button>
+              <button type="button" :class="assetsEmbedClass" @click="() => setAssets('embedded-binary')">嵌进二进制</button>
             </div>
           </fieldset>
 
           <fieldset class="planner__field">
             <legend>T.server · 服务端进程？</legend>
             <div class="planner__chips" role="group">
-              <button type="button" :class="serverNoneClass" @click="() => this.setServer('none')">无</button>
-              <button type="button" :class="serverNodeClass" @click="() => this.setServer('node')">Node</button>
-              <button type="button" :class="serverWorkerClass" @click="() => this.setServer('worker')">Worker</button>
-              <button type="button" :class="serverRustClass" @click="() => this.setServer('rust-host')">Rust</button>
+              <button type="button" :class="serverNoneClass" @click="() => setServer('none')">无</button>
+              <button type="button" :class="serverNodeClass" @click="() => setServer('node')">Node</button>
+              <button type="button" :class="serverWorkerClass" @click="() => setServer('worker')">Worker</button>
+              <button type="button" :class="serverRustClass" @click="() => setServer('rust-host')">Rust</button>
             </div>
           </fieldset>
 
           <fieldset class="planner__field">
             <legend>T.update · 嵌入基线 + 远程整包更新？</legend>
             <div class="planner__chips" role="group">
-              <button type="button" :class="updateNoClass" @click="() => this.setUpdate('no')">否</button>
-              <button type="button" :class="updateYesClass" @click="() => this.setUpdate('release-fallback')">是（release-fallback）</button>
+              <button type="button" :class="updateNoClass" @click="() => setUpdate('no')">否</button>
+              <button type="button" :class="updateYesClass" @click="() => setUpdate('release-fallback')">是（release-fallback）</button>
             </div>
           </fieldset>
 
           <fieldset class="planner__field">
             <legend>T.ship · 怎么发布？（与平台正交）</legend>
             <div class="planner__chips" role="group">
-              <button type="button" :class="shipCiClass" @click="() => this.setShip('git-ci')">Git CI（配流水线 + push）</button>
-              <button type="button" :class="shipUploadClass" @click="() => this.setShip('direct-upload')">本机直传</button>
+              <button type="button" :class="shipCiClass" @click="() => setShip('git-ci')">Git CI（配流水线 + push）</button>
+              <button type="button" :class="shipUploadClass" @click="() => setShip('direct-upload')">本机直传</button>
             </div>
           </fieldset>
 
           <fieldset class="planner__field">
             <legend>T.vendor · 外部托管平台（可多选）</legend>
             <div class="planner__chips planner__chips--wrap" role="group">
-              <button type="button" :class="vendorPagesClass" @click="() => this.toggleVendor('cloudflare-pages')">Cloudflare Pages</button>
-              <button type="button" :class="vendorGhPagesClass" @click="() => this.toggleVendor('github-pages')">GitHub Pages</button>
-              <button type="button" :class="vendorVercelClass" @click="() => this.toggleVendor('vercel')">Vercel</button>
-              <button type="button" :class="vendorNetlifyClass" @click="() => this.toggleVendor('netlify')">Netlify</button>
-              <button type="button" :class="vendorEdgeoneClass" @click="() => this.toggleVendor('tencent-edgeone')">腾讯 EdgeOne</button>
-              <button type="button" :class="vendorWorkersClass" @click="() => this.toggleVendor('cloudflare-workers')">CF Workers</button>
-              <button type="button" :class="vendorS3Class" @click="() => this.toggleVendor('s3-cloudfront')">S3 + CloudFront</button>
-              <button type="button" :class="vendorNodeClass" @click="() => this.toggleVendor('node-vps')">自建 Node</button>
-              <button type="button" :class="vendorRustClass" @click="() => this.toggleVendor('rust-bin')">Rust 二进制</button>
+              <button type="button" :class="vendorPagesClass" @click="() => toggleVendor('cloudflare-pages')">Cloudflare Pages</button>
+              <button type="button" :class="vendorGhPagesClass" @click="() => toggleVendor('github-pages')">GitHub Pages</button>
+              <button type="button" :class="vendorVercelClass" @click="() => toggleVendor('vercel')">Vercel</button>
+              <button type="button" :class="vendorNetlifyClass" @click="() => toggleVendor('netlify')">Netlify</button>
+              <button type="button" :class="vendorEdgeoneClass" @click="() => toggleVendor('tencent-edgeone')">腾讯 EdgeOne</button>
+              <button type="button" :class="vendorWorkersClass" @click="() => toggleVendor('cloudflare-workers')">CF Workers</button>
+              <button type="button" :class="vendorS3Class" @click="() => toggleVendor('s3-cloudfront')">S3 + CloudFront</button>
+              <button type="button" :class="vendorNodeClass" @click="() => toggleVendor('node-vps')">自建 Node</button>
+              <button type="button" :class="vendorRustClass" @click="() => toggleVendor('rust-bin')">Rust 二进制</button>
             </div>
           </fieldset>
         </section>
@@ -88,7 +88,7 @@
           <div class="planner__result-head">
             <h2 id="plan-title">Agent 提示词</h2>
             <div class="planner__copy-row">
-              <Button type="button" variant="secondary" @click="() => this.copyPrompt()">{{ copyLabel }}</Button>
+              <Button type="button" variant="secondary" @click="copyPrompt">{{ copyLabel }}</Button>
             </div>
           </div>
 

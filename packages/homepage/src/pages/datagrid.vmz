@@ -20,13 +20,13 @@
 
       <div data-vmz-fixture="datagrid-modes">
         <span data-vmz-fixture="mode-group">
-          <Button type="button" variant="secondary" @click="() => this.setMode('group')">Group mode</Button>
+          <Button type="button" variant="secondary" @click="() => setMode('group')">Group mode</Button>
         </span>
         <span data-vmz-fixture="mode-tree">
-          <Button type="button" variant="secondary" @click="() => this.setMode('tree')">Tree mode</Button>
+          <Button type="button" variant="secondary" @click="() => setMode('tree')">Tree mode</Button>
         </span>
         <span data-vmz-fixture="mode-pivot">
-          <Button type="button" variant="secondary" @click="() => this.setMode('pivot')">Pivot mode</Button>
+          <Button type="button" variant="secondary" @click="() => setMode('pivot')">Pivot mode</Button>
         </span>
       </div>
 
@@ -38,12 +38,12 @@
           error-id="datagrid-edit-draft-err"
           description="Parent-owned draft mirrored via @vmz/ui Field — DataGrid does not ship Field."
           :value="editDraft"
-          @input="(e) => this.onFieldDraft(e)"
+          @input="onFieldDraft"
         />
       </div>
 
       <BulkActions label="Bulk actions" :selected-count="selectedCount" :count-label="bulkLabel">
-        <Button type="button" variant="secondary" @click="() => this.clearSelection()">Clear</Button>
+        <Button type="button" variant="secondary" @click="clearSelection">Clear</Button>
       </BulkActions>
 
       <DataGrid
@@ -67,16 +67,16 @@
         :canvas-style="canvasStyle"
         :pad-top-style="padTopStyle"
         :pad-bottom-style="padBottomStyle"
-        :on-scroll="(top) => this.onScroll(top)"
-        :on-sort="(id) => this.sortBy(id)"
-        :on-toggle-row="(id) => this.toggleRow(id)"
-        :on-toggle-all="() => this.toggleAll()"
-        :on-toggle-group="(key) => this.toggleGroup(key)"
-        :on-toggle-tree="(id) => this.toggleTree(id)"
-        :on-start-edit="(key) => this.startEdit(key)"
-        :on-edit-input="(v) => this.onEditInput(v)"
-        :on-commit-edit="() => this.commitEdit()"
-        :on-cancel-edit="() => this.cancelEdit()"
+        :on-scroll="onScroll"
+        :on-sort="sortBy"
+        :on-toggle-row="toggleRow"
+        :on-toggle-all="toggleAll"
+        :on-toggle-group="toggleGroup"
+        :on-toggle-tree="toggleTree"
+        :on-start-edit="startEdit"
+        :on-edit-input="onEditInput"
+        :on-commit-edit="commitEdit"
+        :on-cancel-edit="cancelEdit"
       />
     </ConsoleShell>
   </div>

@@ -11,7 +11,7 @@
       :href="href"
       :target="target"
       :rel="rel"
-      @click="this.onDomClick"
+      @click="onDomClick"
     >
       <span v-if="loading" class="vmz-ui-btn__spinner" aria-hidden="true"></span>
       <slot />
@@ -29,7 +29,7 @@
       :data-loading="loading ? 'true' : 'false'"
       :disabled="disabled"
       :aria-busy="loading ? 'true' : 'false'"
-      @click="this.onDomClick"
+      @click="onDomClick"
     >
       <span v-if="loading" class="vmz-ui-btn__spinner" aria-hidden="true"></span>
       <slot />

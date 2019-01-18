@@ -4,7 +4,7 @@
         type="button"
         class="vmz-ui-pagination__btn"
         :disabled="prevDisabled"
-        @click="this.onPrevClick"
+        @click="onPrevClick"
       >
         Previous
       </button>
@@ -13,7 +13,7 @@
         type="button"
         class="vmz-ui-pagination__btn"
         :disabled="nextDisabled"
-        @click="this.onNextClick"
+        @click="onNextClick"
       >
         Next
       </button>

@@ -33,12 +33,12 @@
       <p data-vmz-fixture="motion-interrupt-state">
         interrupt-dialog:{{ interruptDialogOpen ? 'open' : 'closed' }}
       </p>
-      <Button type="button" @click="() => this.openInterruptDialog()">Open interrupt dialog</Button>
+      <Button type="button" @click="openInterruptDialog">Open interrupt dialog</Button>
       <Dialog
         :open="interruptDialogOpen"
         title="Interrupt dialog"
         title-id="home-motion-interrupt-dialog-title"
-        :on-close="() => this.onInterruptDialogClose()"
+        :on-close="onInterruptDialogClose"
       >
         <p data-vmz-fixture="motion-interrupt-body">
           Escape starts exit; Escape again cancels exit (motion generation / cancel edge).
@@ -60,8 +60,8 @@
     </section>
 
     <section data-vmz-fixture="motion-list">
-      <Button type="button" @click="() => this.filterAlpha()">Filter Alpha</Button>
-      <Button type="button" @click="() => this.resetRows()">Reset rows</Button>
+      <Button type="button" @click="filterAlpha">Filter Alpha</Button>
+      <Button type="button" @click="resetRows">Reset rows</Button>
       <Table :columns="columns" :rows="rows" :has-row-action="rowAction" />
       <p data-vmz-fixture="motion-row-count">rows:{{ rowCount }}</p>
     </section>

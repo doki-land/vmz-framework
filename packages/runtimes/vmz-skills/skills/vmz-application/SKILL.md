@@ -17,6 +17,22 @@ SSR/resume behavior, `vmz test`, or deployment artifact.
 - Keep server-only imports behind `#server`; never leak secrets or repositories into browser output.
 - Prefer the official `@vmz/core`, `@vmz/ui`, `vmz`, and `@vmz/test` surfaces already present in the project.
 
+## Event authoring (0.2.0)
+
+Use one recommended handler surface in templates, examples, and skills:
+
+| Template | Meaning |
+|----------|---------|
+| `@submit="onSubmitGuard"` | **Recommended** — bare class method; compiler resolves to instance method |
+| `@submit.prevent="onSubmitGuard"` | DOM native listener with modifier |
+| `@custom="onChildEvent"` | Component event subscription (`onMethod` channel) |
+| `:on-submit="handlerProp"` | Function prop (orthogonal to `@submit`) |
+| `@submit="this.onSubmitGuard"` | Legal but discouraged in official UI / homepage / examples |
+| `@click="() => switchLocale('en-us')"` | Bare method call inside arrow; compiler rewrites to `this.switchLocale(...)` |
+| Unknown bare ident | **Compile error** (`handler-symbol-resolution`) |
+
+Do not teach dual authoring (`this.method` as default) in new samples or skills.
+
 ## Code highlighting (`default`)
 
 When the user needs syntax-colored source:

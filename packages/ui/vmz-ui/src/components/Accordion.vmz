@@ -9,7 +9,7 @@
             :data-vmz-accordion-trigger="item.id"
             :aria-expanded="openId === item.id ? 'true' : 'false'"
             :aria-controls="item.panelId"
-            @click="() => this.toggle(item.id)"
+            @click="() => toggle(item.id)"
           >
             {{ item.title }}
           </button>

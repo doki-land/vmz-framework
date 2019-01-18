@@ -18,7 +18,7 @@
             type="button"
             data-vmz-fixture="locale-zh-hans"
             :aria-current="localeId === 'zh-hans' ? 'true' : null"
-            @click="() => this.switchLocale('zh-hans')"
+            @click="() => switchLocale('zh-hans')"
           >
             {{ langZhFullLabel }}
           </button>
@@ -26,7 +26,7 @@
             type="button"
             data-vmz-fixture="locale-en-us"
             :aria-current="localeId === 'en-us' ? 'true' : null"
-            @click="() => this.switchLocale('en-us')"
+            @click="() => switchLocale('en-us')"
           >
             {{ langEnLabel }}
           </button>

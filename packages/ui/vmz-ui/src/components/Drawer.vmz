@@ -16,7 +16,7 @@
           class="vmz-ui-drawer__backdrop"
           data-vmz-overlay-layer="backdrop"
           aria-label="Dismiss drawer"
-          @click="this.dismiss"
+          @click="dismiss"
         ></button>
         <div
           class="vmz-ui-drawer__panel"
@@ -28,14 +28,14 @@
           data-vmz-focus="enter"
           data-vmz-motion="overlay-enter"
           data-vmz-motion-token="motion.overlay"
-          :onKeyDown="this.onPanelKeyDown"
+          :onKeyDown="onPanelKeyDown"
         >
           <h2 :id="titleId" class="vmz-ui-drawer__title">{{ title }}</h2>
           <div class="vmz-ui-drawer__body">
             <slot />
           </div>
           <div class="vmz-ui-drawer__actions">
-            <button type="button" class="vmz-ui-drawer__close" data-vmz-focus="close" @click="this.dismiss">
+            <button type="button" class="vmz-ui-drawer__close" data-vmz-focus="close" @click="dismiss">
               Close
             </button>
           </div>

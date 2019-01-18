@@ -17,8 +17,8 @@
           :value="query"
           @input="(e) => (query = e.target.value)"
         />
-        <Button type="button" @click="() => this.applyFilter()">Apply</Button>
-        <Button type="button" @click="() => this.selectVisible()">Select visible</Button>
+        <Button type="button" @click="applyFilter">Apply</Button>
+        <Button type="button" @click="selectVisible">Select visible</Button>
       </FilterBar>
 
       <p data-vmz-fixture="console-query">query:{{ query }}</p>
@@ -36,7 +36,7 @@
         :has-row-action="rowAction"
         action-title="Detail"
         action-label="Open"
-        :on-row-action="(id) => this.openDetail(id)"
+        :on-row-action="openDetail"
       />
 
       <Pagination
@@ -44,8 +44,8 @@
         :status="pageStatus"
         :prev-disabled="prevDisabled"
         :next-disabled="nextDisabled"
-        :on-prev="() => this.goPrev()"
-        :on-next="() => this.goNext()"
+        :on-prev="goPrev"
+        :on-next="goNext"
       />
 
       <Drawer

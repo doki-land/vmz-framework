@@ -19,7 +19,7 @@
       </p>
 
       <BulkActions label="Bulk actions" :selected-count="selectedCount" :count-label="bulkLabel">
-        <Button type="button" variant="secondary" @click="() => this.clearSelection()">Clear</Button>
+        <Button type="button" variant="secondary" @click="clearSelection">Clear</Button>
       </BulkActions>
 
       <DataTable
@@ -33,10 +33,10 @@
         :selected-count="selectedCountLabel"
         :all-selected="allSelected"
         select-all-label="Select all visible rows"
-        :on-sort="(id) => this.sortBy(id)"
-        :on-toggle-row="(id) => this.toggleRow(id)"
-        :on-toggle-all="() => this.toggleAll()"
-        :on-row-action="(id) => this.openDetail(id)"
+        :on-sort="sortBy"
+        :on-toggle-row="toggleRow"
+        :on-toggle-all="toggleAll"
+        :on-row-action="openDetail"
       />
 
       <Drawer

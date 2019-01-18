@@ -74,8 +74,13 @@ describe('fullstack host', () => {
                         throw new Error(`bad html ${html.slice(0, 240)}`);
                     }
                     const js = await (await fetch(`${base}/entry-client.js`)).text();
-                    if (!js.includes('hydrate') || !js.includes('UserCard')) {
-                        throw new Error(`bad entry ${js.slice(0, 200)}`);
+                    // Thin entry: hydrateRoute + dynamic page import; no registry / eager UserCard.
+                    if (!js.includes('hydrateRoute') || js.includes('registerComponents')) {
+                        throw new Error(`bad entry ${js.slice(0, 240)}`);
+                    }
+                    const pageJs = await (await fetch(`${base}/pages/index.client.js`)).text();
+                    if (!pageJs.includes('UserCard') || !pageJs.includes('api.component')) {
+                        throw new Error(`bad page ${pageJs.slice(0, 240)}`);
                     }
                     const body = await (
                         await fetch(`${base}/__vmz/rpc`, {

@@ -7,7 +7,7 @@
         :checked="checked"
         :disabled="disabled"
         :aria-describedby="describedBy"
-        @click="this.onToggle"
+        @click="onToggle"
       />
       <span class="vmz-ui-checkbox__label">{{ label }}</span>
     </label>

@@ -15,7 +15,7 @@
           label="Density"
           :value="segment"
           :options="segmentOptions"
-          :on-change="(v) => this.onSegment(v)"
+          :on-change="onSegment"
         />
       </Card>
 
