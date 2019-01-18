@@ -21,9 +21,7 @@ pub use emit::{
     ServerBridge, emit_client_module, emit_entry_client, emit_server_module,
     rewrite_ts_spec_imports, rewrite_virtual_import,
 };
-pub use emit_direct::{
-    emit_direct_create, emit_vmz_plan, is_direct_eligible, ComponentHandlerCtx,
-};
+pub use emit_direct::{ComponentHandlerCtx, emit_direct_create, emit_vmz_plan, is_direct_eligible};
 pub use emit_ir::{IrDepCursor, TakenBinding, TakenCfBranch, TakenControlFlow};
 pub use entry::{EntryComponent, emit_serve_entry_client, emit_serve_entry_event};
 pub use expr_parse::{
@@ -32,9 +30,9 @@ pub use expr_parse::{
     wrap_template_expr_source,
 };
 pub use helpers::{
-    bind_field_idents, collect_deps_oxc, event_dom_type, is_component_tag, is_event_attr,
-    is_html_attr, looks_like_ternary, parse_this_method_call_arrow, sanitize_interp,
-    single_field_binding_target, split_ternary_parts, wrap_event_handler_body, HandlerResolution,
+    HandlerResolution, bind_field_idents, collect_deps_oxc, event_dom_type, is_component_tag,
+    is_event_attr, is_html_attr, looks_like_ternary, parse_this_method_call_arrow, sanitize_interp,
+    single_field_binding_target, split_ternary_parts, wrap_event_handler_body,
 };
 pub use locale::{
     LocaleExport, LocaleTypedExport, LocaleTypedParam, emit_locale_runtime_module,

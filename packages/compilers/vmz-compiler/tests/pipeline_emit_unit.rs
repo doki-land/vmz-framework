@@ -51,7 +51,7 @@ this.user = await UserCardServer.fetchUser();
     assert!(js.contains("constructor(props = {})"));
     assert!(js.contains("__vmzCtorAppliesProps = true"));
     assert!(js.contains("__vmzDirect = true"));
-    assert!(js.contains("api.bindText(this,"));
+    assert!(js.contains("api.trackPatch(this,") || js.contains("api.specFieldText(this,"), "{js}");
     assert!(js.contains("\"user.name\""));
     assert!(js.contains("__vmzMethodRw"));
     assert!(js.contains("\"onMount\""));
@@ -87,7 +87,8 @@ fn emit_consumes_shared_reactive_view_deps() {
     let tpl = parse_template("<h2>{{ user.name }}</h2><p>{{ user.bio }}</p>").unwrap();
     let reactive = build_reactive_module("Card.vmz", &client.decl, &tpl);
     let comp = &reactive.components[0];
-    let js = emit_client_js_with_ir(src, &client, &tpl, None, Some(comp), None, None, None).unwrap();
+    let js =
+        emit_client_js_with_ir(src, &client, &tpl, None, Some(comp), None, None, None).unwrap();
     assert!(js.contains("\"user.name\"") || js.contains("'user.name'"), "{js}");
     assert!(js.contains("\"user.bio\"") || js.contains("'user.bio'"), "{js}");
     // IR BindingId must be emitted on Direct binds (hot path keys).
@@ -112,11 +113,13 @@ fn emit_consumes_shared_reactive_view_deps() {
         .map(|b| b.id().0)
         .expect("user.bio binding");
     assert!(
-        js.contains(&format!("api.bindText(this, {name_id},")),
+        js.contains(&format!("api.trackPatch(this, [{name_id}]"))
+            || js.contains(&format!("api.specFieldText(this, {name_id},")),
         "missing bindingId {name_id}: {js}"
     );
     assert!(
-        js.contains(&format!("api.bindText(this, {bio_id},")),
+        js.contains(&format!("api.trackPatch(this, [{bio_id}]"))
+            || js.contains(&format!("api.specFieldText(this, {bio_id},")),
         "missing bindingId {bio_id}: {js}"
     );
 }
@@ -128,7 +131,11 @@ fn emits_if_directive() {
     let ir = parse_template(r#"<p v-if="!user">Loading</p><div v-if="user">{{ user.name }}</div>"#)
         .unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
-    assert!(js.contains("api.ifBlock(this,"), "{js}");
+    assert!(
+        js.contains("api.comment('vmz-if')") || js.contains(r#"api.comment("vmz-if")"#),
+        "{js}"
+    );
+    assert!(js.contains("api.trackPatch(this,"), "{js}");
     assert!(js.contains("!this.user") || js.contains("!(this.user)"), "{js}");
     assert!(js.contains("\"user\""), "{js}");
     assert!(!js.contains("prototype.render"), "{js}");
@@ -140,8 +147,8 @@ fn emits_conditional_bind_cf() {
     let client = analyze_script(ScriptKind::Client, src);
     let ir = parse_template(r#"{{ enabled ? user.name : account.name }}"#).unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
-    assert!(js.contains("api.bindText(this,"), "{js}");
-    assert!(js.contains("stable:"), "{js}");
+    assert!(js.contains("api.trackPatch(this,"), "{js}");
+    assert!(js.contains("stable:") || js.contains("__cf"), "{js}");
     assert!(js.contains("branches:"), "{js}");
     assert!(js.contains("user.name"), "{js}");
     assert!(js.contains("account.name"), "{js}");
@@ -158,7 +165,7 @@ fn if_deps_come_from_control_region_only() {
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
     // Structural if deps = stable cond only (show), not body texts.
     assert!(
-        js.contains("api.ifBlock(this,") && js.contains("[\"show\"]"),
+        js.contains("api.comment('vmz-if')") && js.contains("[\"show\"]"),
         "if deps must be region stable only: {js}"
     );
     assert!(!js.contains("prototype.render"), "{js}");
@@ -178,9 +185,14 @@ export default class Card {
         r#"<p v-if="!user">Loading</p><p v-else-if="error">{{ error }}</p><div v-else><li v-for="tag in tags" :key="tag">{{ tag }}</li></div>"#,
     ).unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
-    assert!(js.contains("api.ifBlock(this,"), "{js}");
-    assert!(js.contains("this.error") || js.contains("(this.error)"), "{js}");
-    assert!(js.contains("api.eachBlock(this,"), "{js}");
+    assert!(
+        js.contains("api.comment('vmz-if')") || js.contains(r#"api.comment("vmz-if")"#),
+        "{js}"
+    );
+    assert!(
+        js.contains("api.comment('vmz-each:") || js.contains(r#"api.comment("vmz-each:"#),
+        "{js}"
+    );
     assert!(js.contains("createItem:") || js.contains("createItem"), "{js}");
     assert!(js.contains("box") && js.contains(".item"), "{js}");
     assert!(!js.contains("prototype.render"), "{js}");
@@ -220,10 +232,7 @@ export default class IndexPage {
     assert!(js.contains("\"CounterButton\""), "{js}");
     assert!(js.contains("api.on(") || js.contains("api.on(e"), "{js}");
     assert!(js.contains("this.count++"), "{js}");
-    assert!(
-        js.contains("api.specFieldText(this,") || js.contains("api.bindText(this,"),
-        "{js}"
-    );
+    assert!(js.contains("api.specFieldText(this,") || js.contains("api.trackPatch(this,"), "{js}");
     assert!(js.contains("\"count\""), "{js}");
     assert!(!js.contains("this.() =>"));
     assert!(!js.contains("prototype.render"), "{js}");
@@ -289,10 +298,7 @@ export default class Page {
     let client = analyze_script(ScriptKind::Client, src);
     let ir = parse_template(r#"<button @click="bump" />"#).unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
-    assert!(
-        js.contains("api.onMethod(") && js.contains("\"bump\""),
-        "{js}"
-    );
+    assert!(js.contains("api.onMethod(") && js.contains("\"bump\""), "{js}");
 }
 
 #[test]

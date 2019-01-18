@@ -77,11 +77,7 @@ pub fn emit_client_module(
         let Some(rel) = child_ctors.get(tag) else {
             continue;
         };
-        let spec = if rel.starts_with('.') {
-            rel.clone()
-        } else {
-            format!("./{rel}")
-        };
+        let spec = if rel.starts_with('.') { rel.clone() } else { format!("./{rel}") };
         child_imports.push_str(&format!("import {tag} from \"{spec}\";\n"));
     }
     if !child_imports.is_empty() {
@@ -100,10 +96,8 @@ pub fn emit_client_module(
         .map(|m| m.name.clone())
         .collect();
     let prop_names: Vec<String> = decl.properties.iter().map(|f| f.name.clone()).collect();
-    let handler_ctx = super::emit_direct::ComponentHandlerCtx {
-        methods: &method_names,
-        props: &prop_names,
-    };
+    let handler_ctx =
+        super::emit_direct::ComponentHandlerCtx { methods: &method_names, props: &prop_names };
 
     if !is_direct_eligible(view) {
         return Err(format!(
