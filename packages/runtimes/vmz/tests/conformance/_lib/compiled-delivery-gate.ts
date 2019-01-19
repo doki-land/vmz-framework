@@ -125,7 +125,7 @@ export function assertCompiledAssetArtifact(scan: CompiledDeliveryScan): string[
 export function assertNoRuntimeManifestInterpretation(scan: CompiledDeliveryScan, root = repoRoot(import.meta.url)): string[] {
     const errors: string[] = [...assertCompiledRouteArtifact(scan), ...assertCompiledLocaleArtifact(scan)];
     // Serve-host must load compiled catalog (source contract).
-    const serveHost = fs.readFileSync(path.join(root, 'packages/runtimes/vmz-runtime/src/serve-host.ts'), 'utf8');
+    const serveHost = fs.readFileSync(path.join(root, 'packages/runtimes/vmz-runtime/src/host/serve-host.ts'), 'utf8');
     if (/listPagesFromDeployment/.test(serveHost)) {
         errors.push('serve-host still defines listPagesFromDeployment (must consume route-catalog)');
     }
@@ -133,7 +133,7 @@ export function assertNoRuntimeManifestInterpretation(scan: CompiledDeliveryScan
         errors.push('serve-host missing route-catalog consumption');
     }
     // Client-nav must prefer frozen href table.
-    const clientNav = fs.readFileSync(path.join(root, 'packages/runtimes/vmz-runtime/src/client-nav.ts'), 'utf8');
+    const clientNav = fs.readFileSync(path.join(root, 'packages/runtimes/vmz-runtime/src/browser/client-nav.ts'), 'utf8');
     if (!/data-vmz-locale-hrefs/.test(clientNav) || !/lookupFrozenLocaleHref/.test(clientNav)) {
         errors.push('client-nav missing frozen locale href table lookup');
     }
@@ -146,12 +146,12 @@ export function assertNoRuntimeManifestInterpretation(scan: CompiledDeliveryScan
 
 export function assertNoPostEmitSemanticRewrite(scan: CompiledDeliveryScan, root = repoRoot(import.meta.url)): string[] {
     const errors: string[] = [...assertCompiledAssetArtifact(scan)];
-    const caModule = fs.readFileSync(path.join(root, 'packages/runtimes/vmz/src/content-addressed-assets.ts'), 'utf8');
+    const caModule = fs.readFileSync(path.join(root, 'packages/runtimes/vmz/src/workspace/content-addressed-assets.ts'), 'utf8');
     if (!/rewrittenHtml:\s*0/.test(caModule)) {
         errors.push('content-addressed-assets must record rewrittenHtml: 0');
     }
     // localizeBodyLinks must apply plan rows, not invent path algebra inside apply.
-    const localize = fs.readFileSync(path.join(root, 'packages/runtimes/vmz-runtime/src/localize-body-links.ts'), 'utf8');
+    const localize = fs.readFileSync(path.join(root, 'packages/runtimes/vmz-runtime/src/host/localize-body-links.ts'), 'utf8');
     if (!/applyLocaleLinkPlan/.test(localize) || !/LOCALE_LINK_PLAN_SCHEMA/.test(localize)) {
         errors.push('localize-body-links must center on locale link plan rows');
     }

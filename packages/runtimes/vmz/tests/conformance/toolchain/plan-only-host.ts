@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { unitBrowserPathPattern } from '../../../src/route-path.ts';
-import { resolveRouteLayoutChain } from '../../../../vmz-runtime/src/route-layout-chain.ts';
+import { resolveRouteLayoutChain } from '../../../../vmz-runtime/src/host/route-layout-chain.ts';
 import { repoRoot } from '../_lib/repo-root.ts';
 
 function fail(msg: string): never {
@@ -19,12 +19,12 @@ const root = repoRoot(import.meta.url);
 
 console.log('plan-only-host: no directory-scan fallback symbols…');
 const hotPaths = [
-    'packages/runtimes/vmz-runtime/src/deployment-registry.ts',
-    'packages/runtimes/vmz-runtime/src/list-client-components.ts',
-    'packages/runtimes/vmz-runtime/src/route-layout-chain.ts',
-    'packages/runtimes/vmz/src/route-path.ts',
-    'packages/runtimes/vmz/src/static-emit.ts',
-    'packages/runtimes/vmz/src/server-artifact.ts',
+    'packages/runtimes/vmz-runtime/src/host/deployment-registry.ts',
+    'packages/runtimes/vmz-runtime/src/host/list-client-components.ts',
+    'packages/runtimes/vmz-runtime/src/host/route-layout-chain.ts',
+    'packages/runtimes/vmz/src/workspace/route-path.ts',
+    'packages/runtimes/vmz/src/workspace/static-emit.ts',
+    'packages/runtimes/vmz/src/workspace/server-artifact.ts',
 ];
 for (const rel of hotPaths) {
     const text = fs.readFileSync(path.join(root, rel), 'utf8');
@@ -32,7 +32,7 @@ for (const rel of hotPaths) {
         fail(`${rel} still references listComponentEntriesFromDirectory`);
     }
 }
-const serverArtifact = fs.readFileSync(path.join(root, 'packages/runtimes/vmz/src/server-artifact.ts'), 'utf8');
+const serverArtifact = fs.readFileSync(path.join(root, 'packages/runtimes/vmz/src/workspace/server-artifact.ts'), 'utf8');
 if (!serverArtifact.includes('normalizeServerArtifactJson')) {
     fail('server-artifact.ts must call N-API normalizeServerArtifactJson (thin host)');
 }

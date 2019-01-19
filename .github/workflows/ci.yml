@@ -161,3 +161,8 @@ jobs:
         env:
           CI: 'true'
         run: pnpm verify -- thin-runtime-production-proof
+
+      - name: Runtime quality baseline (0.2.0 pre-tag)
+        env:
+          CI: 'true'
+        run: pnpm verify -- runtime-quality-baseline

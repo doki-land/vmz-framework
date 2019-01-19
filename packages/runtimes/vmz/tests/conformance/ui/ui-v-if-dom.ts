@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { createDirectIfBlock } from '../_lib/direct-inline-if.ts';
 import { repoRoot } from '../_lib/repo-root.ts';
 
 const root = repoRoot(import.meta.url);
@@ -24,9 +25,9 @@ class IfFixture {
     static __vmzCreate(api) {
         const rootEl = api.el('div');
         api.attr(rootEl, 'data-fixture', 'ui-v-if-dom');
-        const block = api.ifBlock(
+        const block = createDirectIfBlock(
+            api,
             this,
-            null,
             ['show'],
             [
                 {

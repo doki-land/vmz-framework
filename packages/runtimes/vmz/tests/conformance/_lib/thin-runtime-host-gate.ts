@@ -152,7 +152,7 @@ export function assertHostRuntimeBoundary(scan: ThinHostScan): string[] {
 
 export function assertSingleRevisionOwner(root = repoRoot(import.meta.url)): string[] {
     const errors: string[] = [];
-    const serveHost = fs.readFileSync(path.join(root, 'packages/runtimes/vmz-runtime/src/serve-host.ts'), 'utf8');
+    const serveHost = fs.readFileSync(path.join(root, 'packages/runtimes/vmz-runtime/src/host/serve-host.ts'), 'utf8');
     if (/function shouldReloadAllPages/.test(serveHost)) {
         errors.push('serve-host must not define shouldReloadAllPages (payload-only reload)');
     }
@@ -162,7 +162,7 @@ export function assertSingleRevisionOwner(root = repoRoot(import.meta.url)): str
     if (!/Boolean\(full\)/.test(serveHost) && !/opts\.payload\?\.full/.test(serveHost)) {
         errors.push('serve-host softReload must honor payload.full');
     }
-    const incremental = fs.readFileSync(path.join(root, 'packages/runtimes/vmz/src/dev-incremental.ts'), 'utf8');
+    const incremental = fs.readFileSync(path.join(root, 'packages/runtimes/vmz/src/dev/dev-incremental.ts'), 'utf8');
     if (!/shouldSoftReload/.test(incremental) || !/outputRevision/.test(incremental)) {
         errors.push('dev-incremental must own shouldSoftReload(outputRevision)');
     }
@@ -171,7 +171,7 @@ export function assertSingleRevisionOwner(root = repoRoot(import.meta.url)): str
 
 export function assertNoBrowserPlanDispatch(root = repoRoot(import.meta.url), scan?: ThinHostScan): string[] {
     const errors: string[] = [...assertSingleRevisionOwner(root)];
-    const clientNav = fs.readFileSync(path.join(root, 'packages/runtimes/vmz-runtime/src/client-nav.ts'), 'utf8');
+    const clientNav = fs.readFileSync(path.join(root, 'packages/runtimes/vmz-runtime/src/browser/client-nav.ts'), 'utf8');
     if (/shouldReloadAllPages|affectedChunks\s*=/.test(clientNav)) {
         errors.push('client-nav must not invent reload scope');
     }

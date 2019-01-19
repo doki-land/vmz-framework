@@ -417,6 +417,47 @@ export const CHECKS: Record<string, CheckEntry> = {
             'official-homepage',
         ],
     },
+    'no-type-check-suppression': {
+        file: 'production/no-type-check-suppression.ts',
+        description: '0.2.0: forbid @ts-nocheck/@ts-ignore in vmz-runtime/src',
+    },
+    'no-jsdoc-pseudo-types': {
+        file: 'production/no-jsdoc-pseudo-types.ts',
+        description: '0.2.0: forbid JSDoc brace types in vmz-runtime/src',
+    },
+    'authoring-surface-lint': {
+        file: 'production/authoring-surface-lint.ts',
+        description: '0.2.0: official templates use bare handler authoring',
+    },
+    'host-runtime-manifest': {
+        file: 'production/host-runtime-manifest.ts',
+        description: '0.2.0: sole host-runtime-files.json for compile + materialize',
+    },
+    'package-layout-core': {
+        file: 'production/package-layout-core.ts',
+        description: '0.2.0: @vmz/core src browser/ssr/host/faces/shared',
+    },
+    'package-layout-cli': {
+        file: 'production/package-layout-cli.ts',
+        description: '0.2.0: vmz CLI src domain folders + thin index',
+    },
+    'package-layout-hygiene': {
+        description: '0.2.0 Package Layout Hygiene composite',
+        composite: ['package-layout-core', 'package-layout-cli', 'host-runtime-manifest'],
+    },
+    'runtime-quality-baseline': {
+        description: '0.2.0 composite: quality + package layout + thin proof',
+        composite: [
+            'no-type-check-suppression',
+            'no-jsdoc-pseudo-types',
+            'no-generic-component-interpreter',
+            'specialized-bindings',
+            'authoring-surface-lint',
+            'handler-symbol-resolution',
+            'package-layout-hygiene',
+            'thin-runtime-production-proof',
+        ],
+    },
     'browser-core': {
         file: 'production/browser-core.ts',
         description: 'A1 catalog: compile+logic+ssr+resume+browser+async + no-render',
@@ -633,4 +674,6 @@ export const CHECK_ALL = [
     'thin-runtime-host-boundary',
     // 0.1.32 Thin runtime production proof (Slim final — still ≠ production-ready)
     'thin-runtime-production-proof',
+    // 0.2.0 Runtime Quality Baseline + Package Layout Hygiene (tag gate)
+    'runtime-quality-baseline',
 ];

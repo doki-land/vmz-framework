@@ -36,15 +36,13 @@ const HOST_OR_NODE_SUSPECT_NAMES = new Set([
     'route-layout-chain.js',
 ]);
 
-/** Interpreter / plan-dispatch signals still owned by TS runtime (slim debt). */
+/** Host registry / plan-dispatch signals (must not appear in browser entry). */
 const INTERPRETER_SIGNAL_PATTERNS: Array<{ id: string; re: RegExp }> = [
     { id: 'registerComponents', re: /\bregisterComponents\b/ },
     { id: 'ensureComponents', re: /\bensureComponents\b/ },
     { id: 'bootstrapComponentRegistry', re: /\bbootstrapComponentRegistry\b/ },
-    { id: 'bindAttr', re: /\bbindAttr\b/ },
-    { id: 'bindText', re: /\bbindText\b/ },
-    { id: 'eachBlock', re: /\beachBlock\b/ },
-    { id: 'ifBlock', re: /\bifBlock\b/ },
+    { id: 'trackPatch', re: /\btrackPatch\b/ },
+    { id: 'untrackPatch', re: /\buntrackPatch\b/ },
 ];
 
 /** Specialized Direct emit signals in generated artifacts (0.1.29). */
@@ -53,6 +51,7 @@ export const SPECIALIZED_EMIT_PATTERNS: Array<{ id: string; re: RegExp }> = [
     { id: 'specFieldAttr', re: /\bspecFieldAttr\b/ },
     { id: 'onMethod', re: /\bonMethod\b/ },
     { id: 'bindComponentProp', re: /\bbindComponentProp\b/ },
+    { id: 'trackPatch', re: /\btrackPatch\b/ },
     { id: 'vmzCreate', re: /__vmzCreate\b/ },
     { id: 'vmzDirect', re: /__vmzDirect\b/ },
 ];

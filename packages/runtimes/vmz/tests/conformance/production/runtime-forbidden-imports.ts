@@ -3,7 +3,7 @@
  * verify id: runtime-forbidden-imports
  */
 
-import { addLimitation, readProof, upsertCheck, writeProof } from '../_lib/production-proof.ts';
+import { readProof, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 import { repoRoot } from '../_lib/repo-root.ts';
 import { assertRuntimeForbiddenImports, buildThinProductionFixture } from '../_lib/thin-runtime-production-gate.ts';
 
@@ -31,7 +31,6 @@ upsertCheck(proof, {
     status: 'passed',
     detail: `forbiddenImports=${scan.inventory.forbiddenImports.length}; staticEntry=ok`,
 });
-addLimitation(proof, '0.1.32: bind*/eachBlock/ifBlock remain Direct platform APIs in dom-core');
 writeProof(proof, root);
 
 console.log(`runtime-forbidden-imports PASS: modules=${scan.inventory.browserClosure.modules.length}`);

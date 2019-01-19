@@ -5,11 +5,7 @@
 
 import { addLimitation, readProof, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 import { repoRoot } from '../_lib/repo-root.ts';
-import {
-    assertBrowserArtifactSize,
-    buildThinProductionFixture,
-    THIN_RUNTIME_BUDGET,
-} from '../_lib/thin-runtime-production-gate.ts';
+import { assertBrowserArtifactSize, buildThinProductionFixture, THIN_RUNTIME_BUDGET } from '../_lib/thin-runtime-production-gate.ts';
 
 const root = repoRoot(import.meta.url);
 
@@ -39,6 +35,4 @@ upsertCheck(proof, {
 addLimitation(proof, '0.1.32: hard size gate on browser import closure (not package dir volume)');
 writeProof(proof, root);
 
-console.log(
-    `browser-artifact-size PASS: closure=${b.browserClosureBytes} ratio=${b.ratioRuntimeToGenerated}`,
-);
+console.log(`browser-artifact-size PASS: closure=${b.browserClosureBytes} ratio=${b.ratioRuntimeToGenerated}`);

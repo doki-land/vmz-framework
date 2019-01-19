@@ -6,8 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { expect } from '../../../../../scripts/test/expect.mjs';
-import { coalesceRootBurst, collectDevWatchRoots, classifyWatchRoot, mergeDirtySets } from '../../src/dev-watch-roots.ts';
-import { fileFingerprintMap } from '../../src/watch-diff.ts';
+import { coalesceRootBurst, collectDevWatchRoots, classifyWatchRoot, mergeDirtySets } from '../../src/dev/dev-watch-roots.ts';
+import { fileFingerprintMap } from '../../src/workspace/watch-diff.ts';
 
 describe('dev-watch coalesce + roots (v0.1.5)', () => {
     it('mergeDirtySets prefers later change over delete and vice versa', () => {
