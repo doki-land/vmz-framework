@@ -180,10 +180,16 @@ export function resolveLocatorInPage(locator: BrowserLocator, opts: BrowserActio
         }
         if (locator.name != null && String(locator.name).length) {
             const want = normalize(locator.name);
+            const wantLower = want.toLowerCase();
             found = pool.filter((el) => {
                 const n = nameOf(el);
+                const nLower = n.toLowerCase();
                 const optVal = el.getAttribute('data-vmz-option') || (el instanceof HTMLOptionElement ? el.value : '');
-                return locator.exact ? n === want || optVal === want : n.includes(want) || String(optVal).includes(want);
+                const optLower = String(optVal).toLowerCase();
+                if (locator.exact) {
+                    return nLower === wantLower || optLower === wantLower;
+                }
+                return nLower.includes(wantLower) || optLower.includes(wantLower);
             });
         } else {
             found = pool;
