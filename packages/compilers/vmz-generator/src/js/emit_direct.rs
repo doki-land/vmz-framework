@@ -1048,6 +1048,85 @@ fn emit_each_block(
         let serialize_fn = item_fn(ir, next_id)?;
         ("null".to_string(), format!("serializeItem: {serialize_fn}, "))
     };
+    let row_tpl_helper = if row_kernel.is_empty() {
+        String::new()
+    } else {
+        "  var rowTpl = null;\n  function rowTplNode() {\n    if (rowTpl) return rowTpl;\n    var wrap = document.createElement('template');\n    wrap.innerHTML = spec.rowKernel.html;\n    rowTpl = wrap.content.firstElementChild;\n    if (!rowTpl) throw new Error('vmz:rowKernel html produced no element');\n    return rowTpl;\n  }\n".to_string()
+    };
+    let apply_body = if row_kernel.is_empty() {
+        r#"    var nextKeys = new Set();
+    var i;
+    for (i = 0; i < list.length; i++) nextKeys.add(keyOf(list[i], i));
+    for (var k of keyed.keys()) {
+      if (!nextKeys.has(k)) {
+        var old = keyed.get(k);
+        if (old && old.dom && old.dom.parentNode) api.removeNode(old.dom);
+        keyed.delete(k);
+      }
+    }
+    for (i = 0; i < list.length; i++) {
+      var item = list[i];
+      var key = keyOf(item, i);
+      var entry = keyed.get(key);
+      if (!entry) {
+        var box = { item: item, index: i };
+        var prevEach = api._eachCtx;
+        var prevInst = api._inst;
+        var itemPatches = [];
+        api._eachCtx = {
+          noteItemBind: function(bId, d, fn) { fn.__vmzItemDeps = d; itemPatches.push(fn); },
+          needDelegate: function() {}
+        };
+        api._inst = inst;
+        api._itemPatches = itemPatches;
+        var dom = spec.createItem.call(inst, api, box);
+        api._eachCtx = prevEach;
+        api._inst = prevInst;
+        api._itemPatches = null;
+        entry = { box: box, dom: dom, patches: itemPatches };
+        keyed.set(key, entry);
+        if (dom && end.parentNode) end.parentNode.insertBefore(dom, end);
+        for (var p = 0; p < itemPatches.length; p++) {
+          try { itemPatches[p].call(inst); } catch {}
+        }
+      } else {
+        entry.box.item = item;
+        entry.box.index = i;
+      }
+    }"#
+            .to_string()
+    } else {
+        r#"    var rk = spec.rowKernel;
+    var nextKeys = new Set();
+    var i;
+    for (i = 0; i < list.length; i++) nextKeys.add(keyOf(list[i], i));
+    for (var k of keyed.keys()) {
+      if (!nextKeys.has(k)) {
+        var old = keyed.get(k);
+        if (old && old.parentNode) api.removeNode(old);
+        keyed.delete(k);
+      }
+    }
+    var parent = end.parentNode;
+    if (!parent) return;
+    var firstNew = list.length;
+    for (i = 0; i < list.length; i++) {
+      var item = list[i];
+      var key = keyOf(item, i);
+      var root = keyed.get(key);
+      if (root) {
+        root.__vmzBox = item;
+        rk.apply.call(inst, root, item);
+      } else {
+        firstNew = i;
+        break;
+      }
+    }
+    if (firstNew < list.length) {
+      rk.create.call(inst, list, firstNew, rowTplNode(), keyed, parent, end, keyOf, null);
+    }"#
+            .to_string()
+    };
     let v = fresh("k", next_id);
     let region_arg = each.region.map(|r| r.0.to_string()).unwrap_or_else(|| "null".into());
     stmts.push(format!(
@@ -1079,54 +1158,17 @@ fn emit_each_block(
     if (!Array.isArray(list)) list = Array.from(list);
     return list;
   }}
-  function apply() {{
+{row_tpl_helper}  function apply() {{
     if (inst.__vmzDestroyed) return;
     var list = readList();
-    var nextKeys = new Set();
-    var i;
-    for (i = 0; i < list.length; i++) nextKeys.add(keyOf(list[i], i));
-    for (var k of keyed.keys()) {{
-      if (!nextKeys.has(k)) {{
-        var old = keyed.get(k);
-        if (old && old.dom && old.dom.parentNode) api.removeNode(old.dom);
-        keyed.delete(k);
-      }}
-    }}
-    for (i = 0; i < list.length; i++) {{
-      var item = list[i];
-      var key = keyOf(item, i);
-      var entry = keyed.get(key);
-      if (!entry) {{
-        var box = {{ item: item, index: i }};
-        var prevEach = api._eachCtx;
-        var prevInst = api._inst;
-        var itemPatches = [];
-        api._eachCtx = {{
-          noteItemBind: function(bId, d, fn) {{ fn.__vmzItemDeps = d; itemPatches.push(fn); }},
-          needDelegate: function() {{}}
-        }};
-        api._inst = inst;
-        api._itemPatches = itemPatches;
-        var dom = spec.createItem.call(inst, api, box);
-        api._eachCtx = prevEach;
-        api._inst = prevInst;
-        api._itemPatches = null;
-        entry = {{ box: box, dom: dom, patches: itemPatches }};
-        keyed.set(key, entry);
-        if (dom && end.parentNode) end.parentNode.insertBefore(dom, end);
-        for (var p = 0; p < itemPatches.length; p++) {{
-          try {{ itemPatches[p].call(inst); }} catch {{}}
-        }}
-      }} else {{
-        entry.box.item = item;
-        entry.box.index = i;
-      }}
-    }}
+{apply_body}
   }}
   api.trackPatch(inst, [{deps}], apply, {id_arg});
   apply();
   return frag;
 }}).call(this);",
+        row_tpl_helper = row_tpl_helper,
+        apply_body = apply_body,
         v = v,
         list_body = list_body,
         key_field = key_field,
