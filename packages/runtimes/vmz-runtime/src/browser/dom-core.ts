@@ -1418,10 +1418,9 @@ export function __vmzArrayItemCompoundStride(inst, root, leaf, op, rhs, start, s
 }
 
 /**
- * During event flush, apply a leaf via eachBlock hook (vanillajs-style mutate+DOM).
+ * Apply a list-item leaf via eachBlock rowKernel hook when installed.
  */
 function tryInlineLeafApply(inst, root, idx, leaf, item) {
-    if (!((inst.__vmzEventDepth || 0) > 0 || inst.__vmzFlushSync)) return false;
     const hook = inst.__vmzEachApplyLeaf && inst.__vmzEachApplyLeaf[root];
     if (typeof hook !== 'function') return false;
     return hook(+idx, leaf, item) === true;
