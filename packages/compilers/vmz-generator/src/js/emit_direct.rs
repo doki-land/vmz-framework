@@ -1123,7 +1123,11 @@ fn emit_each_block(
         if (!entry) {
           var box = { item: item, index: i };
           var dom = spec.serializeItem.call(inst, api, box);
-          if (dom && dom.__kind === 'el') dom.__vmzKey = key;
+          if (dom && dom.__kind === 'el') {
+            dom.__vmzKey = key;
+            if (!dom.attrs) dom.attrs = Object.create(null);
+            dom.attrs['data-vmz-key'] = String(key);
+          }
           entry = { box: box, dom: dom, patches: [] };
           keyed.set(key, entry);
           if (dom && end.parentNode) end.parentNode.insertBefore(dom, end);

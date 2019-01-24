@@ -141,9 +141,18 @@ export function __vmzPrecisionSnapshot() {
 
 function runPatch(inst, fn, depKey = null, bindingId = null) {
     if (precision.enabled) {
+        // Specialized trackPatch runs are both patch execs and binding evals (0.2.0).
         precision.patchExecs++;
-        if (depKey) bumpMap(precision.patchesByDep, depKey);
-        if (bindingId != null) bumpMap(precision.patchesByBinding, String(bindingId));
+        precision.bindingEvals++;
+        if (depKey) {
+            bumpMap(precision.patchesByDep, depKey);
+            bumpMap(precision.bindingEvalsByDep, depKey);
+        }
+        if (bindingId != null) {
+            const id = String(bindingId);
+            bumpMap(precision.patchesByBinding, id);
+            bumpMap(precision.bindingEvalsByBinding, id);
+        }
     }
     if (bindingId != null) {
         pushTrace('patch', 'binding', bindingId, depKey);
