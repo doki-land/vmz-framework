@@ -74,9 +74,9 @@ describe('fullstack each / batch / race', () => {
 
         let patchRuns = 0;
         const wrap = (orig: (...args: unknown[]) => unknown) => {
-            return (...args: unknown[]) => {
+            return function wrappedPatch(this: unknown, ...args: unknown[]) {
                 patchRuns++;
-                return orig(...args);
+                return orig.apply(this, args);
             };
         };
         // Count BindingId patches (hot path); string binders are transitional only.
