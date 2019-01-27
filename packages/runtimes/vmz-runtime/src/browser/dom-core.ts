@@ -366,6 +366,10 @@ export const directApi = {
             if (directApi._eachCtx) {
                 directApi._eachCtx.noteItemBind(bindingId, deps || [], patch);
             }
+            // Also register on the instance so outer field writes (`selected` in
+            // `selected === item.id`) wake item patches — keyed-each only re-runs
+            // create/apply on list deps, not host fields referenced inside items.
+            registerBind(inst, deps || [], patch, bindingId);
             try {
                 patch.call(inst);
             } catch (err) {

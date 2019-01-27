@@ -1064,7 +1064,14 @@ fn emit_each_block(
     for (var k of keyed.keys()) {
       if (!nextKeys.has(k)) {
         var old = keyed.get(k);
-        if (old && old.dom && old.dom.parentNode) api.removeNode(old.dom);
+        if (old) {
+          var oldPatches = old.patches || [];
+          for (var op = 0; op < oldPatches.length; op++) {
+            var pfn = oldPatches[op];
+            api.untrackPatch(inst, pfn.__vmzItemDeps || [], pfn, null);
+          }
+          if (old.dom && old.dom.parentNode) api.removeNode(old.dom);
+        }
         keyed.delete(k);
       }
     }
@@ -1078,7 +1085,7 @@ fn emit_each_block(
         var prevInst = api._inst;
         var itemPatches = [];
         api._eachCtx = {
-          noteItemBind: function(bId, d, fn) { fn.__vmzItemDeps = d; itemPatches.push(fn); },
+          noteItemBind: function(bId, d, fn) { fn.__vmzItemDeps = d; },
           needDelegate: function() {}
         };
         api._inst = inst;
@@ -1096,6 +1103,10 @@ fn emit_each_block(
       } else {
         entry.box.item = item;
         entry.box.index = i;
+        var patches = entry.patches || [];
+        for (var p = 0; p < patches.length; p++) {
+          try { patches[p].call(inst); } catch {}
+        }
       }
     }"#
             .to_string()
@@ -1162,7 +1173,7 @@ fn emit_each_block(
         String::new()
     } else {
         format!(
-            "  if (spec.rowKernel && spec.rowKernel.applyByField) {{\n    if (!inst.__vmzEachApplyLeaf) inst.__vmzEachApplyLeaf = Object.create(null);\n    inst.__vmzEachApplyLeaf[{list_root_q}] = function(idx, leaf, item) {{\n      var k = keyOf(item, idx);\n      var root = keyed.get(k);\n      if (!root) return false;\n      var fn = spec.rowKernel.applyByField[leaf];\n      if (typeof fn !== 'function') return false;\n      fn.call(inst, root, item);\n      return true;\n    }};\n    inst.__vmzDrainLeafDirty = function __vmzDrainLeafDirty() {{\n      var ld = inst.__vmzLeafDirty;\n      if (!ld || ld.root !== {list_root_q}) return;\n      var field = ld.field;\n      var fn = spec.rowKernel.applyByField[field];\n      if (typeof fn !== 'function') return;\n      var arr = inst[{list_root_q}];\n      for (var j = 0; j < ld.idxs.length; j++) {{\n        var ix = ld.idxs[j];\n        var it = arr && arr[ix];\n        if (!it) continue;\n        var k = keyOf(it, ix);\n        var root = keyed.get(k);\n        if (root) fn.call(inst, root, it);\n      }}\n      inst.__vmzLeafDirty = null;\n    }};\n  }}\n",
+            "  if (spec.rowKernel && spec.rowKernel.applyByField) {{\n    if (!inst.__vmzEachApplyLeaf) inst.__vmzEachApplyLeaf = Object.create(null);\n    inst.__vmzEachApplyLeaf[{list_root_q}] = function(idx, leaf, item) {{\n      var k = keyOf(item, idx);\n      var root = keyed.get(k);\n      if (!root) return false;\n      var fn = spec.rowKernel.applyByField[leaf];\n      if (typeof fn !== 'function') return false;\n      fn.call(inst, root, item);\n      return true;\n    }};\n    inst.__vmzDrainLeafDirty = function __vmzDrainLeafDirty() {{\n      var ld = inst.__vmzLeafDirty;\n      if (!ld || ld.root !== {list_root_q}) return;\n      var field = ld.field;\n      var fn = spec.rowKernel.applyByField[field];\n      if (typeof fn !== 'function') return;\n      var arr = inst[{list_root_q}];\n      for (var j = 0; j < ld.idxs.length; j++) {{\n        var ix = ld.idxs[j];\n        var it = arr && arr[ix];\n        if (!it) continue;\n        var k = keyOf(it, ix);\n        var root = keyed.get(k);\n        if (root) fn.call(inst, root, it);\n      }}\n      inst.__vmzLeafDirty = null;\n    }};\n  }}\n  if (spec.rowKernel && Array.isArray(spec.rowKernel.hostFields)) {{\n    for (var __hf = 0; __hf < spec.rowKernel.hostFields.length; __hf++) {{\n      (function(hostField) {{\n        api.trackPatch(inst, [hostField], function() {{\n          if (inst.__vmzDestroyed) return;\n          var list = readList();\n          var applyHost = spec.rowKernel.applyByField && spec.rowKernel.applyByField[hostField];\n          for (var i = 0; i < list.length; i++) {{\n            var item = list[i];\n            var key = keyOf(item, i);\n            var root = keyed.get(key);\n            if (!root) continue;\n            if (typeof applyHost === 'function') applyHost.call(inst, root, item);\n            else if (typeof spec.rowKernel.apply === 'function') spec.rowKernel.apply.call(inst, root, item);\n          }}\n        }}, null);\n      }})(spec.rowKernel.hostFields[__hf]);\n    }}\n  }}\n",
             list_root_q = q(&list_root),
         )
     };
