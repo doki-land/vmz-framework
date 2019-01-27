@@ -875,9 +875,13 @@ fn emit_bind_attr(
     var __br = __cf.branches[__next];
     var __nd = [].concat(__cf.stable || []).concat((__br && __br.deps) || []);
     __nd = Array.from(new Set(__nd));
-    api.untrackPatch(this, __liveDeps, {patch_name}, {id_arg});
-    __liveDeps = __nd;
-    api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
+    var __same = __nd.length === __liveDeps.length;
+    if (__same) for (var __j = 0; __j < __nd.length; __j++) if (__nd[__j] !== __liveDeps[__j]) {{ __same = false; break; }}
+    if (!__same) {{
+      api.untrackPatch(this, __liveDeps, {patch_name}, {id_arg});
+      __liveDeps = __nd;
+      api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
+    }}
   }}
   api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
 }}).call(this);",
@@ -940,9 +944,13 @@ fn emit_bind_html(
     var __br = __cf.branches[__next];
     var __nd = [].concat(__cf.stable || []).concat((__br && __br.deps) || []);
     __nd = Array.from(new Set(__nd));
-    api.untrackPatch(this, __liveDeps, {patch_name}, {id_arg});
-    __liveDeps = __nd;
-    api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
+    var __same = __nd.length === __liveDeps.length;
+    if (__same) for (var __j = 0; __j < __nd.length; __j++) if (__nd[__j] !== __liveDeps[__j]) {{ __same = false; break; }}
+    if (!__same) {{
+      api.untrackPatch(this, __liveDeps, {patch_name}, {id_arg});
+      __liveDeps = __nd;
+      api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
+    }}
   }}
   api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
 }}).call(this);",
@@ -1109,7 +1117,7 @@ fn emit_each_block(
         }
       }
     }"#
-            .to_string()
+        .to_string()
     } else {
         r#"    var rk = spec.rowKernel;
     var ssrEach = spec.serializeItem && api.text && api.text('').__kind === 'text';
@@ -1167,7 +1175,7 @@ fn emit_each_block(
     if (firstNew < list.length) {
       rk.create.call(inst, list, firstNew, rowTplNode(), keyed, parent, end, keyOf, null);
     }"#
-            .to_string()
+        .to_string()
     };
     let row_kernel_hooks = if row_kernel.is_empty() {
         String::new()
@@ -1281,9 +1289,13 @@ fn emit_bind_text(
     var __br = __cf.branches[__next];
     var __nd = [].concat(__cf.stable || []).concat((__br && __br.deps) || []);
     __nd = Array.from(new Set(__nd));
-    api.untrackPatch(this, __liveDeps, {patch_name}, {id_arg});
-    __liveDeps = __nd;
-    api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
+    var __same = __nd.length === __liveDeps.length;
+    if (__same) for (var __j = 0; __j < __nd.length; __j++) if (__nd[__j] !== __liveDeps[__j]) {{ __same = false; break; }}
+    if (!__same) {{
+      api.untrackPatch(this, __liveDeps, {patch_name}, {id_arg});
+      __liveDeps = __nd;
+      api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
+    }}
   }}
   api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
 }}).call(this);",

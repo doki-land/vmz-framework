@@ -362,7 +362,9 @@ export const directApi = {
         }
         if (directApi._itemPatches) {
             patch.__vmzItemLocal = true;
-            directApi._itemPatches.push(patch);
+            if (!directApi._itemPatches.includes(patch)) {
+                directApi._itemPatches.push(patch);
+            }
             if (directApi._eachCtx) {
                 directApi._eachCtx.noteItemBind(bindingId, deps || [], patch);
             }
@@ -2102,7 +2104,10 @@ function refreshBinding(inst, bindingId, dirtyTrie = null) {
     const depKey = (entry.deps && entry.deps[0]) || null;
     const trie = dirtyTrie || inst.__vmzDirtyTrie;
     const allowIdx = itemIndicesAllowedForDeps(trie, entry.deps);
-    for (const fn of entry.patches) {
+    // Snapshot: keyed-each items share IR BindingIds; cf patches may untrack/retrack
+    // mid-flush and mutate `entry.patches` (would skip sibling item attrs like aria-selected).
+    const patches = entry.patches.slice();
+    for (const fn of patches) {
         if (allowIdx && !patchMatchesDirtyIndex(fn, allowIdx)) continue;
         try {
             const ret = runPatch(inst, fn, depKey, bindingId);
@@ -2227,7 +2232,9 @@ function refreshField(inst, field) {
     if (!inst || inst.__vmzDestroyed || !field || !binders || !binders[field]) {
         return jobs;
     }
-    for (const fn of binders[field]) {
+    // Snapshot: patches may untrack/retrack and mutate the binder list mid-loop.
+    const list = binders[field].slice();
+    for (const fn of list) {
         try {
             const ret = runPatch(inst, fn, field, null);
             if (ret && typeof ret.then === 'function') jobs.push(ret);
@@ -2249,7 +2256,8 @@ function refreshFieldBinderOnly(inst, field) {
     if (!inst || inst.__vmzDestroyed || !field || !binders || !binders[field]) {
         return jobs;
     }
-    for (const fn of binders[field]) {
+    const list = binders[field].slice();
+    for (const fn of list) {
         if (patchHasBindingId(inst, fn)) continue;
         try {
             const ret = runPatch(inst, fn, field, null);
@@ -2285,7 +2293,8 @@ function registerBind(inst, deps, fn, bindingId = null) {
     if (!inst.__vmzBinders) inst.__vmzBinders = Object.create(null);
     for (const dep of deps || []) {
         if (!inst.__vmzBinders[dep]) inst.__vmzBinders[dep] = [];
-        inst.__vmzBinders[dep].push(fn);
+        // Dedup: cf untrack/retrack with identical deps must not grow the binder list.
+        if (!inst.__vmzBinders[dep].includes(fn)) inst.__vmzBinders[dep].push(fn);
     }
     if (bindingId == null) return;
     if (!inst.__vmzBindings) inst.__vmzBindings = Object.create(null);

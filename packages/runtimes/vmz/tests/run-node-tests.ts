@@ -12,6 +12,7 @@ const files = [
     'workspace.test.ts',
     'affected.test.ts',
     'html-binding.test.ts',
+    'each-shared-binding-flush.test.ts',
     'cli-host.test.ts',
     'dev-watch-roots.test.ts',
     'invocation.test.ts',
