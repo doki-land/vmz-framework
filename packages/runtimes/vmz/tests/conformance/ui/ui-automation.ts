@@ -902,7 +902,7 @@ async function proveFormDepth(page) {
     if (!/destination="client"/.test(formSrcText) || !/destination="object"/.test(formSrcText)) {
         fail('Form depth: form.vmz must compose Upload destination=client and destination=object');
     }
-    if (!/:on-presign="\(file\) => this\.presignObject\(file\)"/.test(formSrcText) || !/\/api\/form\/presign/.test(formSrcText)) {
+    if (!/:on-presign="presignObject"/.test(formSrcText) || !/\/api\/form\/presign/.test(formSrcText)) {
         fail('Form depth: form.vmz must bind Upload onPresign via #server /api/form/presign');
     }
     if (!/:on-value="/.test(formSrcText)) {

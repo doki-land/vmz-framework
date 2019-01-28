@@ -37,7 +37,7 @@ if (!src.includes('api.el("a"') && !src.includes("api.el('a'")) {
 if (!src.includes('href')) fail('Button.client.js missing href binding');
 
 console.log('ui-nav-button: SSR anchor with href…');
-const domHref = pathToFileURL(path.join(root, 'packages', 'runtimes', 'vmz-runtime', 'dist', 'dom.js')).href;
+const domHref = pathToFileURL(path.join(root, 'packages', 'runtimes', 'vmz-runtime', 'dist', 'faces', 'dom.js')).href;
 const { registerComponents, renderToString } = await import(domHref);
 const { default: Button } = await import(pathToFileURL(buttonJs).href);
 registerComponents({ Button });

@@ -14,8 +14,8 @@ function fail(msg) {
     process.exit(1);
 }
 
-const distDom = path.join(root, 'packages', 'runtimes', 'vmz-runtime', 'dist', 'dom.js');
-const distUnknown = path.join(root, 'packages', 'runtimes', 'vmz-runtime', 'dist', 'unknown-component.js');
+const distDom = path.join(root, 'packages', 'runtimes', 'vmz-runtime', 'dist', 'faces', 'dom.js');
+const distUnknown = path.join(root, 'packages', 'runtimes', 'vmz-runtime', 'dist', 'browser', 'unknown-component.js');
 if (!fs.existsSync(distDom) || !fs.existsSync(distUnknown)) {
     fail('missing @vmz/core dist — run pnpm --filter @vmz/core build');
 }
