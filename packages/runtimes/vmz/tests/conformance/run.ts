@@ -22,11 +22,10 @@ const root = repoRoot(import.meta.url);
 const resolveHook = pathToFileURL(path.join(root, 'scripts/test/resolve-ts-from-js.mjs')).href;
 
 const PRESETS: Record<string, [string, string[]]> = {
-    // When CI restored a runtime artifact, skip cargo/napi (VMZ_SKIP_NATIVE_BUILD=1).
-    'build:runtimes':
-        process.env.VMZ_SKIP_NATIVE_BUILD === '1'
-            ? ['node', ['-e', "console.log('verify: pre build:runtimes skipped (VMZ_SKIP_NATIVE_BUILD=1)')"]]
-            : ['pnpm', ['build:runtimes']],
+    // When CI restored a runtime artifact, `runPre` short-circuits `build:runtimes`
+    // under `VMZ_SKIP_NATIVE_BUILD=1` (do not spawn a shell no-op — Linux `/bin/sh`
+    // breaks on `node -e` strings with parentheses when `shell: true`).
+    'build:runtimes': ['pnpm', ['build:runtimes']],
     'build:plugin-shiki': ['pnpm', ['--filter', '@vmz/plugin-shiki', 'run', 'build']],
     'build:vmz-test': ['pnpm', ['build:vmz-test']],
     'build:protocol-vmz':
@@ -68,6 +67,10 @@ function noteFailure(opts: RunOpts, msg: string) {
 }
 
 function runPre(preId: string, opts: RunOpts): boolean {
+    if (preId === 'build:runtimes' && process.env.VMZ_SKIP_NATIVE_BUILD === '1') {
+        console.log(`» pre ${preId}: skipped (VMZ_SKIP_NATIVE_BUILD=1, artifact restore)`);
+        return true;
+    }
     const spec = PRESETS[preId];
     if (!spec) failHard(`unknown pre step: ${preId}`);
     const [cmd, args] = spec;
