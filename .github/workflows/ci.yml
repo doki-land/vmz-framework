@@ -12,6 +12,7 @@ on:
 #   ui-browser     — ui-automation + browser-production (Chrome)
 #   runtime-gates  — Slim + runtime-quality-baseline
 # Downstream jobs set VMZ_SKIP_NATIVE_BUILD=1 so verify `pre: build:runtimes` is a no-op.
+# After artifact restore, each consumer runs `pnpm verify -- skip-native-pre` first.
 
 jobs:
   fmt:
@@ -135,6 +136,9 @@ jobs:
           test -f packages/runtimes/vmz-runtime/dist/faces/server.js
           ls packages/runtimes/vmz-linux-x64/vmz.*.node
 
+      - name: Assert skip-native-pre contract
+        run: pnpm verify -- skip-native-pre
+
       - name: Build tools + examples
         run: pnpm build:examples
 
@@ -227,6 +231,9 @@ jobs:
           test -f packages/runtimes/vmz/dist/cli/cli.js
           ls packages/runtimes/vmz-linux-x64/vmz.*.node
 
+      - name: Assert skip-native-pre contract
+        run: pnpm verify -- skip-native-pre
+
       - name: Install Chromium (browser host / CDP)
         uses: browser-actions/setup-chrome@v2
         id: setup-chrome
@@ -276,6 +283,9 @@ jobs:
           tar -xzf runtime-build.tar.gz
           test -f packages/runtimes/vmz/dist/cli/cli.js
           ls packages/runtimes/vmz-linux-x64/vmz.*.node
+
+      - name: Assert skip-native-pre contract
+        run: pnpm verify -- skip-native-pre
 
       - name: Slim + runtime-quality-baseline (keep-going)
         env:
