@@ -173,6 +173,50 @@ export default class BranchDemo {
 }
 
 #[test]
+fn class_static_and_bind_emit_merge_class() {
+    let src = r#"
+export default class ClassMergeDemo {
+  gameRootClass = "game theme-factory-idle";
+  rowClass = "ready";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<div class="game theme-factory-idle" :class="gameRootClass"><button class="bp-build" :class="{ ready: true }"></button></div>"#,
+    )
+    .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(
+        js.contains("api.mergeClass("),
+        "expected merged class emit, got: {js}"
+    );
+    assert!(
+        !js.contains("[object Object]"),
+        "emit must not stringify object bindings: {js}"
+    );
+    assert!(
+        js.contains("game theme-factory-idle"),
+        "static class tokens must survive merge emit: {js}"
+    );
+}
+
+#[test]
+fn style_static_and_object_bind_emit_merge_style() {
+    let src = r#"
+export default class StyleMergeDemo {
+  lockFillStyle = "width: 40%";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<div style="color: red" :style="lockFillStyle"></div>"#).unwrap();
+    let _program = build_program_module("t.vmz", &client.decl, &tpl);
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains("api.mergeStyle("), "{js}");
+}
+
+#[test]
 fn html_attr_emits_bind_html() {
     let src = r#"
 export default class HtmlDemo {

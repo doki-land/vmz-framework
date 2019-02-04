@@ -5,7 +5,18 @@
  * Node/SSR request handlers so client bundles can `import { callServer }`.
  */
 
-import type { NodeRequestOptions, Route, RpcRequest, ServerModuleResolver } from '../shared/server.types.js';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import type {
+    DistStaticResolveOpts,
+    MultipartFields,
+    MultipartFieldValue,
+    NodePathModule,
+    NodeRequestOptions,
+    Route,
+    RpcRequest,
+    ServerModuleResolver,
+    StatFn,
+} from '../shared/server.types.js';
 
 const DEFAULT_RPC_PATH = '/__vmz/rpc';
 
@@ -14,8 +25,8 @@ let resolveServerModule: ServerModuleResolver | null = null;
 let routes: Route[] = [];
 
 /**
- * Map `#server/foo` �?filesystem / URL the host can `import`.
- * Only set this in Node/SSR hosts �?browser bundles must omit it so RPC goes HTTP.
+ * Map `#server/foo` → filesystem / URL the host can `import`.
+ * Only set this in Node/SSR hosts → browser bundles must omit it so RPC goes HTTP.
  */
 export function setServerModuleResolver(fn: ServerModuleResolver): void {
     resolveServerModule = fn;
@@ -27,33 +38,34 @@ export function setRoutes(next: Route[]): void {
 
 export async function callServer(moduleId: string, method: string, args: unknown[] = []): Promise<unknown> {
     // Browser (or tests forcing HTTP): never touch server modules in-process.
-    // Node SSR / smokes set a resolver and leave __VMZ_USE_HTTP_RPC unset �?local.
+    // Node SSR / smokes set a resolver and leave __VMZ_USE_HTTP_RPC unset → local.
     if (globalThis.__VMZ_USE_HTTP_RPC || !resolveServerModule) {
         return callServerHttp(moduleId, method, args);
     }
     return callServerLocal(moduleId, method, args);
 }
 
-async function callServerLocal(moduleId, method, args) {
+async function callServerLocal(moduleId: string, method: string, args: unknown[]): Promise<unknown> {
     if (!resolveServerModule) {
         throw new Error(`vmz:runtime callServer(${moduleId}): setServerModuleResolver() required in Node`);
     }
     const spec = resolveServerModule(moduleId);
-    const mod = await import(typeof spec === 'string' ? spec : spec.href);
-    const Ctor = mod.default ?? mod[exportGuess(moduleId)];
-    if (typeof Ctor !== 'function') {
+    const mod = (await import(typeof spec === 'string' ? spec : spec.href)) as Record<string, unknown>;
+    const exported = mod.default ?? mod[exportGuess(moduleId)];
+    if (typeof exported !== 'function') {
         throw new Error(`vmz:runtime: no class export for ${moduleId}`);
     }
+    const Ctor = exported as new () => Record<string, unknown>;
     const instance = new Ctor();
     const fn = instance[method];
     if (typeof fn !== 'function') {
         throw new Error(`vmz:runtime: ${moduleId}.${method} is not a function`);
     }
-    return fn.apply(instance, args);
+    return (fn as (...callArgs: unknown[]) => unknown).apply(instance, args);
 }
 
-async function callServerHttp(moduleId, method, args) {
-    let rpcPath = (typeof globalThis !== 'undefined' && globalThis.__VMZ_RPC_PATH) || DEFAULT_RPC_PATH;
+async function callServerHttp(moduleId: string, method: string, args: unknown[]): Promise<unknown> {
+    let rpcPath: string = (typeof globalThis !== 'undefined' && globalThis.__VMZ_RPC_PATH) || DEFAULT_RPC_PATH;
     // Node undici `fetch` rejects relative URLs; browsers accept path-only.
     if (typeof rpcPath === 'string' && !/^https?:\/\//i.test(rpcPath)) {
         const origin =
@@ -79,31 +91,31 @@ async function callServerHttp(moduleId, method, args) {
     return res.json();
 }
 
-function exportGuess(moduleId) {
+function exportGuess(moduleId: string): string {
     const base = moduleId.split('/').pop() || 'Server';
     return `${base}Server`;
 }
 
-export async function handleRpc(body) {
+export async function handleRpc(body: RpcRequest): Promise<unknown> {
     return callServerLocal(body.moduleId, body.method, body.args ?? []);
 }
 
 /**
  * Match REST route from `vmz-routes.json`.
  */
-export function matchRoute(verb, pathname) {
+export function matchRoute(verb: string, pathname: string): Route | null {
     const v = verb.toUpperCase();
     return routes.find((r) => r.verb.toUpperCase() === v && r.path === pathname) ?? null;
 }
 
 /**
  * Build `callServerLocal` args from a Fetch Request for REST routes.
- * GET/HEAD �?`[]`. JSON POST/PUT/PATCH �?`[body]`. form-urlencoded �?`[record]`.
- * Multipart �?`[record]` where File/Blob parts stay as File/Blob (tool-site binary upload).
+ * GET/HEAD → `[]`. JSON POST/PUT/PATCH → `[body]`. form-urlencoded → `[record]`.
+ * Multipart → `[record]` where File/Blob parts stay as File/Blob (tool-site binary upload).
  * Octet-stream PUT also forwards Upload resumable chunk headers (upload-id / chunk-index / chunk-total).
  * Extra args are ignored by zero-parameter server methods (JS).
  */
-async function routeArgsFromRequest(request, verb) {
+async function routeArgsFromRequest(request: Request, verb: string): Promise<unknown[]> {
     const v = String(verb || 'GET').toUpperCase();
     if (v === 'GET' || v === 'HEAD' || v === 'OPTIONS') return [];
     const ctype = String(request.headers.get('content-type') || '');
@@ -111,18 +123,18 @@ async function routeArgsFromRequest(request, verb) {
         const text = await request.text();
         if (!text || !String(text).trim()) return [{}];
         try {
-            return [JSON.parse(text)];
-        } catch (err) {
+            return [JSON.parse(text) as unknown];
+        } catch (err: unknown) {
             throw new Error(`invalid JSON body: ${err instanceof Error ? err.message : String(err)}`);
         }
     }
     if (ctype.includes('multipart/form-data')) {
-        // Parse from raw bytes �?undici Request.formData() can UTF-8-mangle high bytes in file parts
-        // (0xFF/0xFE �?U+FFFD), which breaks Upload binary / tool-site intakes.
+        // Parse from raw bytes → undici Request.formData() can UTF-8-mangle high bytes in file parts
+        // (0xFF/0xFE → U+FFFD), which breaks Upload binary / tool-site intakes.
         const buf = Buffer.from(await request.arrayBuffer());
         return [parseMultipartBuffer(buf, ctype)];
     }
-    // Object-store PUT / resumable chunk PUT �?keep bytes (never request.text()).
+    // Object-store PUT / resumable chunk PUT → keep bytes (never request.text()).
     if (
         ctype.includes('application/octet-stream') ||
         ((v === 'PUT' || v === 'PATCH') && !ctype.includes('json') && !ctype.includes('x-www-form-urlencoded'))
@@ -154,12 +166,12 @@ async function routeArgsFromRequest(request, verb) {
  * Web Standards Fetch entry for ServerArtifact hosts (Node adapter, worker/edge parity).
  * Handles RPC + public ServerRoute only; static/SSR stay on Node host options.
  */
-export async function handleFetchRequest(request) {
+export async function handleFetchRequest(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const verb = (request.method || 'GET').toUpperCase();
     try {
         if (verb === 'POST' && url.pathname === DEFAULT_RPC_PATH) {
-            const body = await request.json();
+            const body = (await request.json()) as RpcRequest;
             const result = await handleRpc(body);
             return Response.json(result);
         }
@@ -172,7 +184,7 @@ export async function handleFetchRequest(request) {
         }
 
         return Response.json({ error: 'not found', path: url.pathname }, { status: 404 });
-    } catch (err) {
+    } catch (err: unknown) {
         return Response.json(
             {
                 error: err instanceof Error ? err.message : String(err),
@@ -186,7 +198,7 @@ export async function handleFetchRequest(request) {
  * Node `http.createServer` listener: RPC + REST + optional static / SSR index.
  * RPC/REST go through {@link handleFetchRequest} so Node and Fetch hosts share one core.
  */
-export async function handleNodeRequest(req, res, opts: any = {}) {
+export async function handleNodeRequest(req: IncomingMessage, res: ServerResponse, opts: NodeRequestOptions = {}): Promise<void> {
     const host = req.headers.host || '127.0.0.1';
     const url = new URL(req.url || '/', `http://${host}`);
     const verb = (req.method || 'GET').toUpperCase();
@@ -200,12 +212,13 @@ export async function handleNodeRequest(req, res, opts: any = {}) {
             return await writeFetchResponse(res, response);
         }
 
-        // Static first for assets + DocumentMount (`/d/�`) so docs aren't swallowed by SSR 404 shells.
-        // static route HTML (`index.html`, `about/index.html`, �? is a CDN/deploy projection only �?        // when Server Host SSR is active, those files must not shadow live render (local/dev �?SSR truth).
+        // Static first for assets + DocumentMount (`/d/…`) so docs aren't swallowed by SSR 404 shells.
+        // static route HTML (`index.html`, `about/index.html`, …) is a CDN/deploy projection only —
+        // when Server Host SSR is active, those files must not shadow live render (local/dev → SSR truth).
         if (verb === 'GET' && opts.distDir) {
-            const nodePath = await import('node:path');
+            const nodePath = (await import('node:path')) as NodePathModule;
             const { readFile, stat } = await import('node:fs/promises');
-            const file = await resolveDistStatic(opts.distDir, url.pathname, nodePath, stat, {
+            const file = await resolveDistStatic(opts.distDir, url.pathname, nodePath, stat as StatFn, {
                 cookieHeader: String(req.headers.cookie || ''),
             });
             const hasSsr =
@@ -217,8 +230,9 @@ export async function handleNodeRequest(req, res, opts: any = {}) {
                 try {
                     const body = await readFile(file);
                     return sendBytes(res, 200, body, contentType(file, nodePath));
-                } catch (err) {
-                    if (err && (err.code === 'ENOENT' || err.code === 'EISDIR')) {
+                } catch (err: unknown) {
+                    const code = err && typeof err === 'object' && 'code' in err ? (err as { code: unknown }).code : undefined;
+                    if (code === 'ENOENT' || code === 'EISDIR') {
                         /* fall through */
                     } else {
                         throw err;
@@ -236,7 +250,7 @@ export async function handleNodeRequest(req, res, opts: any = {}) {
                     /* ignore */
                 }
             };
-            // Do not abort on IncomingMessage `close` �?that fires after a POST body is
+            // Do not abort on IncomingMessage `close` — that fires after a POST body is
             // fully read (normal), which would cancel SSR before the first chunk.
             req.on('aborted', onClientGone);
             res.on('close', () => {
@@ -244,7 +258,7 @@ export async function handleNodeRequest(req, res, opts: any = {}) {
             });
             try {
                 if (typeof opts.renderPageStream === 'function') {
-                    let body;
+                    let body: unknown;
                     if (verb === 'POST') {
                         const ctype = String(req.headers['content-type'] || '');
                         if (ctype.includes('application/json')) {
@@ -262,9 +276,9 @@ export async function handleNodeRequest(req, res, opts: any = {}) {
                         body,
                     });
                     if (rendered) {
-                        if (typeof rendered === 'object' && rendered.redirect) {
+                        if (typeof rendered === 'object' && 'redirect' in rendered && rendered.redirect) {
                             const status = Number(rendered.status) || 302;
-                            const headers = {
+                            const headers: Record<string, string> = {
                                 Location: String(rendered.redirect),
                                 ...(rendered.headers && typeof rendered.headers === 'object' ? rendered.headers : {}),
                             };
@@ -273,8 +287,9 @@ export async function handleNodeRequest(req, res, opts: any = {}) {
                             return;
                         }
                         const status = rendered && typeof rendered === 'object' && 'status' in rendered ? Number(rendered.status) || 200 : 200;
-                        const stream = rendered && typeof rendered === 'object' && rendered.stream ? rendered.stream : rendered;
-                        return await sendHtmlStream(res, status, stream, ac.signal);
+                        const stream =
+                            rendered && typeof rendered === 'object' && 'stream' in rendered && rendered.stream ? rendered.stream : rendered;
+                        return await sendHtmlStream(res, status, stream as AsyncIterable<unknown>, ac.signal);
                     }
                 } else if (verb === 'GET' && typeof opts.renderPage === 'function') {
                     const html = await opts.renderPage(url.pathname);
@@ -302,7 +317,7 @@ export async function handleNodeRequest(req, res, opts: any = {}) {
                 sendJson(res, 404, { error: 'not found', path: url.pathname });
             }
         }
-    } catch (err) {
+    } catch (err: unknown) {
         if (res.headersSent || res.writableEnded || res.destroyed) {
             console.error('vmz serve: request failed after headers', err);
             try {
@@ -322,10 +337,10 @@ export async function handleNodeRequest(req, res, opts: any = {}) {
     }
 }
 
-async function incomingToRequest(req, url) {
+async function incomingToRequest(req: IncomingMessage, url: URL): Promise<Request> {
     const method = (req.method || 'GET').toUpperCase();
 
-    const headers = {};
+    const headers: Record<string, string> = {};
     for (const [k, v] of Object.entries(req.headers)) {
         if (v == null) continue;
         headers[k] = Array.isArray(v) ? v.join(', ') : String(v);
@@ -338,9 +353,9 @@ async function incomingToRequest(req, url) {
     return new Request(url, { method, headers, body: raw as BodyInit, duplex: 'half' } as RequestInit);
 }
 
-async function writeFetchResponse(res, response) {
-    const headers = {};
-    response.headers.forEach((value, key) => {
+async function writeFetchResponse(res: ServerResponse, response: Response): Promise<void> {
+    const headers: Record<string, string> = {};
+    response.headers.forEach((value: string, key: string) => {
         headers[key] = value;
     });
     const buf = Buffer.from(await response.arrayBuffer());
@@ -354,7 +369,7 @@ async function writeFetchResponse(res, response) {
 /**
  * Resolve a path under distDir; reject `..` escapes.
  */
-function safeDistFile(distDir, pathname, nodePath) {
+function safeDistFile(distDir: string, pathname: string, nodePath: NodePathModule): string | null {
     let rel = decodeURIComponent(pathname.split('?')[0] || '/');
     if (rel === '/' || rel === '') return null;
     if (rel.startsWith('/')) rel = rel.slice(1);
@@ -367,23 +382,29 @@ function safeDistFile(distDir, pathname, nodePath) {
 
 /**
  * static profile emits per-route HTML beside client assets. That HTML is for CDN / local-static
- * delivery hosts �?not for Server Host when SSR is available. DocumentMount stays static.
+ * delivery hosts — not for Server Host when SSR is available. DocumentMount stays static.
  */
-function isWebStaticHtmlShadow(file, pathname, nodePath) {
+function isWebStaticHtmlShadow(file: string, pathname: string, nodePath: NodePathModule): boolean {
     const ext = nodePath.extname(file).toLowerCase();
     if (ext !== '.html' && ext !== '.htm') return false;
     let rel = decodeURIComponent(String(pathname || '').split('?')[0] || '/');
     if (!rel.startsWith('/')) rel = `/${rel}`;
-    // Integrated DocumentMount �?keep static-first (see resolveDistStatic comment).
+    // Integrated DocumentMount — keep static-first (see resolveDistStatic comment).
     if (rel === '/d' || rel.startsWith('/d/')) return false;
     return true;
 }
 
 /**
  * Static resolve for app assets + integrated document mounts:
- * `/d/` �?`d/index.html`, `/d/zh-hans/guide` �?`d/zh-hans/guide.html`.
+ * `/d/` → `d/index.html`, `/d/zh-hans/guide` → `d/zh-hans/guide.html`.
  */
-async function resolveDistStatic(distDir, pathname, nodePath, stat, _opts: { cookieHeader?: string } = {}) {
+async function resolveDistStatic(
+    distDir: string,
+    pathname: string,
+    nodePath: NodePathModule,
+    stat: StatFn,
+    _opts: DistStaticResolveOpts = {},
+): Promise<string | null> {
     const candidates = staticPathCandidates(pathname);
     for (const candidate of candidates) {
         const full = safeDistFile(distDir, candidate, nodePath);
@@ -403,12 +424,12 @@ async function resolveDistStatic(distDir, pathname, nodePath, stat, _opts: { coo
     return null;
 }
 
-function staticPathCandidates(pathname) {
+function staticPathCandidates(pathname: string): string[] {
     let rel = decodeURIComponent(pathname.split('?')[0] || '/');
     if (!rel.startsWith('/')) rel = `/${rel}`;
 
-    const out = [];
-    const push = (p) => {
+    const out: string[] = [];
+    const push = (p: string) => {
         if (p && !out.includes(p)) out.push(p);
     };
     push(rel);
@@ -429,13 +450,13 @@ function staticPathCandidates(pathname) {
     return out;
 }
 
-function nodePathExt(p) {
+function nodePathExt(p: string): string {
     const base = p.split('/').pop() || '';
     const i = base.lastIndexOf('.');
     return i > 0 ? base.slice(i) : '';
 }
 
-function contentType(filePath, nodePath) {
+function contentType(filePath: string, nodePath: NodePathModule): string {
     const ext = nodePath.extname(filePath).toLowerCase();
     switch (ext) {
         case '.html':
@@ -456,15 +477,17 @@ function contentType(filePath, nodePath) {
     }
 }
 
-function readJson(req) {
+function readJson(req: IncomingMessage): Promise<unknown> {
     return new Promise((resolve, reject) => {
-        const chunks = [];
-        req.on('data', (c) => chunks.push(c));
+        const chunks: Buffer[] = [];
+        req.on('data', (c: Buffer | string) => {
+            chunks.push(typeof c === 'string' ? Buffer.from(c) : c);
+        });
         req.on('end', () => {
             try {
                 const raw = Buffer.concat(chunks).toString('utf8') || '{}';
-                resolve(JSON.parse(raw));
-            } catch (e) {
+                resolve(JSON.parse(raw) as unknown);
+            } catch (e: unknown) {
                 reject(e);
             }
         });
@@ -472,11 +495,13 @@ function readJson(req) {
     });
 }
 
-function readRawBody(req) {
+function readRawBody(req: IncomingMessage): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-        const chunks = [];
-        req.on('data', (c) => chunks.push(c));
-        // Buffer �?never utf8-string: multipart File bytes must survive (Upload binary gate).
+        const chunks: Buffer[] = [];
+        req.on('data', (c: Buffer | string) => {
+            chunks.push(typeof c === 'string' ? Buffer.from(c) : c);
+        });
+        // Buffer — never utf8-string: multipart File bytes must survive (Upload binary gate).
         req.on('end', () => resolve(Buffer.concat(chunks)));
         req.on('error', reject);
     });
@@ -485,7 +510,7 @@ function readRawBody(req) {
 /**
  * Buffer-safe multipart/form-data parser (file parts stay binary).
  */
-function parseMultipartBuffer(buf, contentType) {
+function parseMultipartBuffer(buf: Buffer, contentType: string): MultipartFields {
     const bm = /boundary=(?:"([^"]+)"|([^;\s]+))/i.exec(String(contentType || ''));
     const boundary = bm ? bm[1] || bm[2] : '';
     if (!boundary) {
@@ -493,7 +518,7 @@ function parseMultipartBuffer(buf, contentType) {
     }
     const sep = Buffer.from(`--${boundary}`);
 
-    const out = {};
+    const out: MultipartFields = {};
     let start = indexOfBuffer(buf, sep, 0);
     if (start < 0) return out;
     start += sep.length;
@@ -520,7 +545,7 @@ function parseMultipartBuffer(buf, contentType) {
                 if (fileM) {
                     const filename = fileM[1] || 'upload.bin';
                     const type = typeM ? String(typeM[1]).trim() : 'application/octet-stream';
-                    // Copy body �?File may outlive the request buffer.
+                    // Copy body — File may outlive the request buffer.
                     const copy = Buffer.from(body);
                     const file = new File([copy], filename, { type });
                     const prev = out[key];
@@ -529,7 +554,7 @@ function parseMultipartBuffer(buf, contentType) {
                     } else if (Array.isArray(prev)) {
                         prev.push(file);
                     } else {
-                        out[key] = [prev, file];
+                        out[key] = [prev, file] as MultipartFieldValue;
                     }
                 } else {
                     out[key] = body.toString('utf8');
@@ -542,7 +567,7 @@ function parseMultipartBuffer(buf, contentType) {
     return out;
 }
 
-function indexOfBuffer(hay, needle, from) {
+function indexOfBuffer(hay: Buffer, needle: Buffer, from: number): number {
     if (!needle.length) return from;
     outer: for (let i = Math.max(0, from); i <= hay.length - needle.length; i++) {
         for (let j = 0; j < needle.length; j++) {
@@ -553,21 +578,22 @@ function indexOfBuffer(hay, needle, from) {
     return -1;
 }
 
-function parseFormBody(raw, contentType) {
-    if (!raw) return {};
+function parseFormBody(raw: string | Buffer, contentType: string): unknown {
+    const text: string = typeof raw === 'string' ? raw : raw.toString('utf8');
+    if (!text) return {};
     if (contentType.includes('application/x-www-form-urlencoded')) {
-        const out = {};
-        for (const [k, v] of new URLSearchParams(raw)) out[k] = v;
+        const out: Record<string, string> = {};
+        for (const [k, v] of new URLSearchParams(text)) out[k] = v;
         return out;
     }
     try {
-        return JSON.parse(raw);
+        return JSON.parse(text) as unknown;
     } catch {
-        return { raw };
+        return { raw: text };
     }
 }
 
-function wantsBrowserHtml(req) {
+function wantsBrowserHtml(req: IncomingMessage): boolean {
     const accept = String(req.headers?.accept || '');
     const method = String(req.method || 'GET').toUpperCase();
     if (method !== 'GET' && method !== 'HEAD') return false;
@@ -593,10 +619,10 @@ function wantsBrowserHtml(req) {
 
 /**
  * Browser-facing error document (no N-API). Used when SSR returns null or throws
- * on a document navigation �?must not fall back to API-shaped JSON.
+ * on a document navigation — must not fall back to API-shaped JSON.
  */
-function browserErrorHtml(status, title, message, stack) {
-    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function browserErrorHtml(status: number, title: string, message: string, stack: string | undefined): string {
+    const esc = (s: unknown) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const stackBlock = stack ? `<pre class="stack">${esc(stack)}</pre>` : '';
     return `<!DOCTYPE html>
 <html lang="en">
@@ -620,14 +646,14 @@ function browserErrorHtml(status, title, message, stack) {
     <h1>${esc(title)}</h1>
     <pre>${esc(message)}</pre>
     ${stackBlock}
-    <p class="hint">Document navigation returns HTML errors �?not API JSON.</p>
+    <p class="hint">Document navigation returns HTML errors — not API JSON.</p>
   </main>
 </body>
 </html>
 `;
 }
 
-function sendJson(res, status, body) {
+function sendJson(res: ServerResponse, status: number, body: unknown): void {
     const payload = JSON.stringify(body);
     res.writeHead(status, {
         'content-type': 'application/json; charset=utf-8',
@@ -636,7 +662,7 @@ function sendJson(res, status, body) {
     res.end(payload);
 }
 
-function sendHtml(res, status, html) {
+function sendHtml(res: ServerResponse, status: number, html: string | unknown): void {
     const payload = typeof html === 'string' ? html : String(html);
     res.writeHead(status, {
         'content-type': 'text/html; charset=utf-8',
@@ -649,15 +675,15 @@ function sendHtml(res, status, html) {
  * Stream HTML without buffering the full document (event-flow / stream SSR host).
  * Honors AbortSignal + response destroy for cancel; awaits drain for backpressure.
  */
-async function sendHtmlStream(res, status, source, signal) {
+async function sendHtmlStream(res: ServerResponse, status: number, source: AsyncIterable<unknown>, signal?: AbortSignal): Promise<void> {
     const aborted = () => Boolean(signal?.aborted || res.destroyed || res.writableEnded || !res.writable);
-    const headers = {
+    const headers: Record<string, string> = {
         'content-type': 'text/html; charset=utf-8',
         'transfer-encoding': 'chunked',
         'cache-control': 'no-cache',
     };
-    // Defer writeHead until the first successful chunk so SSR throw �?clean 500
-    // (not headersSent + destroy �?ERR_EMPTY_RESPONSE).
+    // Defer writeHead until the first successful chunk so SSR throw → clean 500
+    // (not headersSent + destroy → ERR_EMPTY_RESPONSE).
     let started = false;
     try {
         for await (const chunk of source) {
@@ -686,9 +712,9 @@ async function sendHtmlStream(res, status, source, signal) {
             res.writeHead(status, headers);
             started = true;
         }
-    } catch (err) {
+    } catch (err: unknown) {
         if (aborted()) return;
-        // Before headers: let outer handler sendJson(500). After headers: rethrow �?destroy.
+        // Before headers: let outer handler sendJson(500). After headers: rethrow → destroy.
         throw err;
     }
     if (started && !res.writableEnded && !res.destroyed) {
@@ -696,12 +722,12 @@ async function sendHtmlStream(res, status, source, signal) {
     }
 }
 
-function sendBytes(res, status, body, type) {
-    const headers = {
+function sendBytes(res: ServerResponse, status: number, body: Buffer, type: string): void {
+    const headers: Record<string, string | number> = {
         'content-type': type,
         'content-length': body.byteLength,
     };
-    // Dev: stylesheets are rebuilt in-place �?never cache @import siblings (VMZ-8).
+    // Dev: stylesheets are rebuilt in-place — never cache @import siblings (VMZ-8).
     if (process.env.VMZ_DEV === '1' && typeof type === 'string' && type.startsWith('text/css')) {
         headers['cache-control'] = 'no-store';
     }

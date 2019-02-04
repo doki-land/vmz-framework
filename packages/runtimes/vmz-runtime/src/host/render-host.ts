@@ -9,9 +9,9 @@ import type { BootstrapComponentRegistryOpts } from '../shared/host.types.js';
 import {
     bootstrapComponentRegistry,
     collectDependsOnClosure,
+    importAndRegisterComponentEntries,
     loadComponentEntries,
     readDeploymentDocument,
-    importAndRegisterComponentEntries,
 } from './deployment-registry.js';
 
 export async function createRenderHost(distDir: string, opts: Record<string, unknown> = {}) {
@@ -38,7 +38,7 @@ export async function createRenderHost(distDir: string, opts: Record<string, unk
     /**
      * Load component closure for root chunk ids (page + layouts + fixture).
      */
-    async function ensureComponents(rootChunkIds) {
+    async function ensureComponents(rootChunkIds?: string[] | null) {
         if (!rootChunkIds?.length) return {};
         const entries = await loadComponentEntries(distDir, {
             strict,
@@ -54,7 +54,7 @@ export async function createRenderHost(distDir: string, opts: Record<string, unk
     /**
      * Union closure chunk ids (pages + layouts) without importing yet.
      */
-    function closureChunkIds(rootChunkIds) {
+    function closureChunkIds(rootChunkIds?: string[] | null) {
         if (!deployment || !rootChunkIds?.length) return new Set(rootChunkIds || []);
         return collectDependsOnClosure(deployment, rootChunkIds);
     }

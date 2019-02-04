@@ -7,9 +7,9 @@
  * Field writes only run registered dep patches ??never re-create structure.
  */
 
-import { applyDirectHostBox } from './direct-host-box.js';
-import { createUnknownComponentElement } from './unknown-component.js';
+import { mergeClassParts, mergeStyleParts } from '../shared/dom-attr-normalize.js';
 import type { BindingId, DirectInstance, PatchFn } from './direct-api.types.js';
+import { applyDirectHostBox } from './direct-host-box.js';
 import type {
     ComponentCtor,
     EachCtx,
@@ -21,7 +21,9 @@ import type {
     VmzDomElement,
     VmzDomNode,
 } from './dom-core.types.js';
+import { createUnknownComponentElement } from './unknown-component.js';
 
+export { mergeClassParts, mergeStyleParts } from '../shared/dom-attr-normalize.js';
 export { applyDirectHostBox, INLINE_HOST_CONTENTS, resolveDirectHostBox } from './direct-host-box.js';
 export {
     createUnknownComponentElement,
@@ -186,7 +188,7 @@ export function getRegisteredComponent(name) {
 export async function resolveComponent(name) {
     let Ctor = components[name];
     if (!Ctor && typeof globalThis.__vmzLoadComponent === 'function') {
-        Ctor = await globalThis.__vmzLoadComponent(name);
+        Ctor = (await globalThis.__vmzLoadComponent(name)) as ComponentCtor | null | undefined;
         if (Ctor) registerComponents({ [name]: Ctor });
     }
     return Ctor || null;
@@ -396,6 +398,12 @@ export const directApi = {
     attr(el, name, value) {
         applyDomAttr(el, name, value);
     },
+    mergeClass(...parts) {
+        return mergeClassParts(...parts);
+    },
+    mergeStyle(...parts) {
+        return mergeStyleParts(...parts);
+    },
     on(el, type, handler) {
         const inst = directApi._inst;
         if (directApi._eachCtx && typeof handler === 'function') {
@@ -499,9 +507,13 @@ export const directApi = {
             function specFieldAttrPatch() {
                 const raw = this[fieldName];
                 if (name === 'class' || name === 'className') {
-                    const s = String(raw ?? '');
+                    const s = mergeClassParts(raw);
                     if (s) el.setAttribute('class', s);
                     else if (el.hasAttribute('class')) el.removeAttribute('class');
+                } else if (name === 'style') {
+                    const s = mergeStyleParts(raw);
+                    if (s) el.setAttribute('style', s);
+                    else if (el.hasAttribute('style')) el.removeAttribute('style');
                 } else {
                     applyDomAttr(el, name, raw);
                 }
@@ -752,6 +764,18 @@ export const BOOLEAN_HTML_ATTRS = new Set([
 
 export function applyDomAttr(el, name, value) {
     const key = name === 'className' ? 'class' : name;
+    if (key === 'class') {
+        const s = mergeClassParts(value);
+        if (s) el.setAttribute('class', s);
+        else el.removeAttribute('class');
+        return;
+    }
+    if (key === 'style') {
+        const s = mergeStyleParts(value);
+        if (s) el.setAttribute('style', s);
+        else el.removeAttribute('style');
+        return;
+    }
     if (BOOLEAN_HTML_ATTRS.has(String(key).toLowerCase())) {
         if (value === false || value == null || value === '') {
             el.removeAttribute(key);

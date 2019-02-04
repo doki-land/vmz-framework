@@ -16,6 +16,8 @@ import {
     getRegisteredComponent,
     hasMeaningfulChild,
     isEventEntryStrategy,
+    mergeClassParts,
+    mergeStyleParts,
     mount,
     noteDomCreate,
     resolveComponent,
@@ -634,6 +636,12 @@ const serializeApi = {
         if (!el || el.__kind !== 'el') return;
         applySerializeAttr(el, name, value);
     },
+    mergeClass(...parts) {
+        return mergeClassParts(...parts);
+    },
+    mergeStyle(...parts) {
+        return mergeStyleParts(...parts);
+    },
     on() {
         /* events are no-ops during SSR */
     },
@@ -664,6 +672,14 @@ const serializeApi = {
             raw = inst[fieldName];
         } catch {
             raw = null;
+        }
+        if (name === 'class' || name === 'className') {
+            applySerializeAttr(el, 'class', mergeClassParts(raw));
+            return;
+        }
+        if (name === 'style') {
+            applySerializeAttr(el, 'style', mergeStyleParts(raw));
+            return;
         }
         applySerializeAttr(el, name, raw);
     },
@@ -817,6 +833,18 @@ const serializeApi = {
 function applySerializeAttr(el, name, value) {
     if (!el || el.__kind !== 'el') return;
     const key = name === 'className' ? 'class' : name;
+    if (key === 'class') {
+        const s = mergeClassParts(value);
+        if (s) el.attrs[key] = s;
+        else delete el.attrs[key];
+        return;
+    }
+    if (key === 'style') {
+        const s = mergeStyleParts(value);
+        if (s) el.attrs[key] = s;
+        else delete el.attrs[key];
+        return;
+    }
     if (BOOLEAN_HTML_ATTRS.has(String(key).toLowerCase())) {
         if (value === false || value == null || value === '') delete el.attrs[key];
         else el.attrs[key] = value === true ? '' : String(value);

@@ -2,24 +2,11 @@
  * Internal types for `@vmz/core` browser DOM runtime (`dom-core.ts`).
  */
 
-import type { DirectApi, DirectInstance, PatchFn, BindingId } from './direct-api.types.js';
+import type { BindingId, ComponentCtorLike, DirectApi, DirectInstance, PatchFn, VmzPlan } from './direct-api.types.js';
 
-export type { DirectApi, DirectInstance, PatchFn, BindingId };
+export type { BindingId, DirectApi, DirectInstance, PatchFn, VmzPlan };
 
-export type ComponentCtor = (new (
-    props?: object,
-) => DirectInstance) & {
-    __vmzDirect?: boolean;
-    __vmzCreate?: (this: DirectInstance, api: DirectApi) => Node;
-    __vmzSerialize?: (this: DirectInstance, api: DirectApi) => unknown;
-    __vmzPlan?: unknown;
-    __vmzHostBox?: string;
-    __vmzTag?: string;
-    __vmzState?: string[];
-    __vmzProps?: string[];
-    __vmzWBInstalled?: boolean;
-    __vmzCtorAppliesProps?: boolean;
-    name?: string;
+export type ComponentCtor = ComponentCtorLike & {
     [key: string]: unknown;
 };
 

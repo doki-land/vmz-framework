@@ -274,6 +274,10 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'ui/ui-v-if-dom.ts',
         description: 'False v-if omits empty data-vmz-if layout shell in SSR',
     },
+    'class-style-bindings': {
+        file: 'ui/class-style-bindings.ts',
+        description: '0.1.33: static + dynamic :class/:style merge in Direct SSR and client',
+    },
     'ui-nav-button': {
         file: 'ui/ui-nav-button.ts',
         description: 'Button href renders single navigable anchor',
@@ -666,6 +670,7 @@ export const CHECK_ALL = [
     'markdown-wasm32',
     'replaceable-content-plugin',
     'ui-v-if-dom',
+    'class-style-bindings',
     'ui-nav-button',
     'ssr-unknown-component-error-node',
     'ui-data-grid',

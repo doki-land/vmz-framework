@@ -35,8 +35,7 @@ export function noteUnknownComponent(name: string, via = 'ssr'): void {
         if (!Array.isArray(g.__VMZ_COMPONENT_ERRORS__)) {
             g.__VMZ_COMPONENT_ERRORS__ = [];
         }
-        const bag = g.__VMZ_COMPONENT_ERRORS__ as UnknownComponentErrorDetail[];
-        bag.push(detail);
+        g.__VMZ_COMPONENT_ERRORS__.push(detail);
     } catch {
         /* ignore */
     }

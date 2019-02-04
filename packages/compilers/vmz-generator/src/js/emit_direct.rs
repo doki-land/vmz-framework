@@ -27,6 +27,142 @@ fn deps_js(deps: &[String]) -> String {
     deps.iter().map(|d| q(d)).collect::<Vec<_>>().join(", ")
 }
 
+struct MergeAttrPlan {
+    class_static: Option<String>,
+    class_binds: Vec<(String, Option<BindingId>)>,
+    style_static: Option<String>,
+    style_binds: Vec<(String, Option<BindingId>)>,
+}
+
+fn norm_attr_name(name: &str) -> &str {
+    if name == "className" { "class" } else { name }
+}
+
+fn append_class_static(existing: &mut Option<String>, add: &str) {
+    if add.is_empty() {
+        return;
+    }
+    match existing {
+        None => *existing = Some(add.to_string()),
+        Some(s) => {
+            if !s.is_empty() {
+                s.push(' ');
+            }
+            s.push_str(add);
+        }
+    }
+}
+
+fn collect_merge_attr_plan(attrs: &[ViewAttr]) -> MergeAttrPlan {
+    let mut plan = MergeAttrPlan {
+        class_static: None,
+        class_binds: Vec::new(),
+        style_static: None,
+        style_binds: Vec::new(),
+    };
+    for a in attrs {
+        if a.name == "style:tw" {
+            continue;
+        }
+        let name = norm_attr_name(&a.name);
+        match (name, &a.value) {
+            ("class", ViewAttrValue::Static { value }) => {
+                append_class_static(&mut plan.class_static, value)
+            }
+            ("class", ViewAttrValue::Interp { expr }) => {
+                plan.class_binds.push((sanitize_interp(expr), a.binding));
+            }
+            ("style", ViewAttrValue::Static { value }) => match &mut plan.style_static {
+                None => plan.style_static = Some(value.clone()),
+                Some(s) => {
+                    if !s.is_empty() {
+                        s.push(';');
+                    }
+                    s.push_str(value);
+                }
+            },
+            ("style", ViewAttrValue::Interp { expr }) => {
+                plan.style_binds.push((sanitize_interp(expr), a.binding));
+            }
+            _ => {}
+        }
+    }
+    plan
+}
+
+fn is_merge_attr(name: &str) -> bool {
+    matches!(norm_attr_name(name), "class" | "style")
+}
+
+fn emit_merge_attr(
+    attr_name: &str,
+    merge_api: &str,
+    static_base: Option<&str>,
+    binds: &[(String, Option<BindingId>)],
+    el: &str,
+    fields: &[String],
+    scope: &[String],
+    aliases: &[(String, String)],
+    ir: &IrDepCursor<'_>,
+    stmts: &mut Vec<String>,
+) {
+    if binds.is_empty() {
+        if let Some(s) = static_base.filter(|s| !s.is_empty()) {
+            stmts.push(format!("api.attr({el}, {}, {});", q(attr_name), q(s)));
+        }
+        return;
+    }
+
+    let static_arg =
+        static_base.filter(|s| !s.is_empty()).map(q).unwrap_or_else(|| "null".to_string());
+    let mut all_deps: Vec<String> = Vec::new();
+    let mut bind_bodies: Vec<String> = Vec::new();
+    let mut binding_id: Option<u32> = None;
+    for (expr, binding) in binds {
+        let (bid, deps, _) = bind_payload(expr, *binding, fields, scope, aliases, ir);
+        for d in deps {
+            if !all_deps.iter().any(|x| x == &d) {
+                all_deps.push(d);
+            }
+        }
+        bind_bodies.push(bind_field_idents(expr, fields, scope, aliases));
+        if binding_id.is_none() {
+            binding_id = bid;
+        }
+    }
+    let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
+    let deps_js = deps_js(&all_deps);
+    let name_q = q(attr_name);
+
+    if bind_bodies.len() == 1
+        && static_base.is_none()
+        && let Some(field) = single_field_binding_target(&binds[0].0, fields, scope, aliases)
+    {
+        stmts.push(format!("api.specFieldAttr(this, {id_arg}, {}, {el}, {});", q(&field), name_q));
+        return;
+    }
+
+    if bind_bodies.len() == 1 {
+        let body = &bind_bodies[0];
+        stmts.push(format!(
+            "api.trackPatch(this, [{deps_js}], function() {{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} api.attr({el}, {name_q}, api.{merge_api}({static_arg}, __v)); }}, {id_arg});"
+        ));
+        return;
+    }
+
+    let mut eval_stmts = String::new();
+    let mut merge_args = static_arg;
+    for (i, body) in bind_bodies.iter().enumerate() {
+        eval_stmts.push_str(&format!(
+            "var __v{i}; try {{ __v{i} = {body}; }} catch {{ __v{i} = null; }} "
+        ));
+        merge_args.push_str(&format!(", __v{i}"));
+    }
+    stmts.push(format!(
+        "api.trackPatch(this, [{deps_js}], function() {{ {eval_stmts}api.attr({el}, {name_q}, api.{merge_api}({merge_args})); }}, {id_arg});"
+    ));
+}
+
 /// True when the Native View can be compiled to `__vmzCreate`.
 pub fn is_direct_eligible(view: &ViewView) -> bool {
     view.status == ViewStatus::Native && nodes_eligible(&view.roots)
@@ -643,8 +779,9 @@ fn emit_plain_element(
     let tag_owned = tag.to_string();
     stmts.push(print_one_stmt(|b| b.var_stmt(&el, b.api_call("el", vec![b.str_lit(&tag_owned)]))));
     stmts.push(print_one_stmt(|b| b.expr_stmt(b.api_call("adoptEnter", vec![b.ident(&el)]))));
+    let merge_plan = collect_merge_attr_plan(attrs);
     for a in attrs {
-        if a.name == "style:tw" {
+        if a.name == "style:tw" || is_merge_attr(&a.name) {
             continue;
         }
         match &a.value {
@@ -691,6 +828,30 @@ fn emit_plain_element(
             }
         }
     }
+    emit_merge_attr(
+        "class",
+        "mergeClass",
+        merge_plan.class_static.as_deref(),
+        &merge_plan.class_binds,
+        &el,
+        fields,
+        scope,
+        aliases,
+        ir,
+        stmts,
+    );
+    emit_merge_attr(
+        "style",
+        "mergeStyle",
+        merge_plan.style_static.as_deref(),
+        &merge_plan.style_binds,
+        &el,
+        fields,
+        scope,
+        aliases,
+        ir,
+        stmts,
+    );
     for child in emit_nodes(
         children,
         fields,

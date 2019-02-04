@@ -33,7 +33,30 @@ export type ClosedAccessResult =
 
 export type SseClient = Pick<ServerResponse, 'write' | 'end'>;
 
-export type DeploymentDocument = Record<string, unknown>;
+/** Deployment graph document (`vmz.deployment.v0`). */
+export type DeploymentUnit = {
+    chunkId?: string;
+    name?: string;
+    entry?: string;
+    source?: string;
+    dependsOn?: string[];
+    [key: string]: unknown;
+};
+
+export type DeploymentLayoutChain = {
+    routeId?: string;
+    layouts?: string[];
+    page?: string;
+    [key: string]: unknown;
+};
+
+export type DeploymentDocument = {
+    schema?: string;
+    units?: DeploymentUnit[];
+    layoutChain?: DeploymentLayoutChain[] | Record<string, unknown>;
+    dependsOn?: Record<string, string[]>;
+    [key: string]: unknown;
+};
 
 export type ComponentRegistryMap = Record<string, unknown>;
 
@@ -76,3 +99,32 @@ export type PreloadComponentRegistryOpts = ListClientComponentsOpts & {
 };
 
 export type NativeAddon = Record<string, unknown>;
+
+export type ServeHostOpts = {
+    distDir?: string;
+    port?: number;
+    host?: string;
+    signal?: AbortSignal;
+    [key: string]: unknown;
+};
+
+export type SoftReloadOpts = {
+    reason?: string;
+    signal?: AbortSignal;
+    [key: string]: unknown;
+};
+
+export type RenderPageStreamOpts = HostRequestOpts & {
+    localeId?: string;
+    [key: string]: unknown;
+};
+
+export type RenderHostOpts = {
+    strict?: boolean;
+    closureRoots?: string[];
+    explicit?: Record<string, string>;
+    preload?: 'all' | 'closure' | 'none';
+    cacheBust?: string | number;
+    rootChunkIds?: string[] | null;
+    [key: string]: unknown;
+};
