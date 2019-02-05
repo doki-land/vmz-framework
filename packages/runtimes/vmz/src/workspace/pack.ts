@@ -5,13 +5,34 @@
  */
 
 import crypto from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadDeploymentIr, planBundleInputs } from './bundler-adapter.js';
 import { packClientBareImports } from './pack-client-packages.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 
 export const PACK_MANIFEST_SCHEMA = 'vmz.pack.manifest.v0';
+
+/** Keep in sync with `rewrite_flat_delivery_imports` in vmz-compiler compile.rs. */
+function rewriteFlatDeliveryImports(text: string): string {
+    let out = text;
+    const pairs: Array<[string, string]> = [
+        ['../browser/dom-core.js', './dom-core.js'],
+        ['../browser/direct-host-box.js', './direct-host-box.js'],
+        ['../browser/unknown-component.js', './unknown-component.js'],
+        ['../shared/dom-attr-normalize.js', './dom-attr-normalize.js'],
+        ['../browser/client-nav.js', './vmz-client-nav.js'],
+        ['../ssr/dom-ssr.js', './dom-ssr.js'],
+        ['../faces/server.js', './vmz-runtime.js'],
+        ['../faces/vmz-runtime.js', './vmz-runtime.js'],
+        ['../faces/http.js', './vmz-http.js'],
+    ];
+    for (const [from, to] of pairs) {
+        out = out.replaceAll(`'${from}'`, `'${to}'`);
+        out = out.replaceAll(`"${from}"`, `"${to}"`);
+    }
+    return out;
+}
 
 /**
  * Ensure dom split companions sit next to vmz-dom.js (barrel imports ./dom-core.js).
@@ -22,14 +43,24 @@ export const PACK_MANIFEST_SCHEMA = 'vmz.pack.manifest.v0';
  */
 export function ensureRuntimeCompanions(outDir, coreDist) {
     if (!coreDist) return [];
-    const names = ['dom-core.js', 'dom-ssr.js', 'dom.client.js', 'dom.browser.js', 'direct-host-box.js', 'unknown-component.js'];
+    const companions: Array<[string, string]> = [
+        ['browser/dom-core.js', 'dom-core.js'],
+        ['ssr/dom-ssr.js', 'dom-ssr.js'],
+        ['faces/dom.client.js', 'dom.client.js'],
+        ['faces/dom.browser.js', 'dom.browser.js'],
+        ['browser/direct-host-box.js', 'direct-host-box.js'],
+        ['browser/unknown-component.js', 'unknown-component.js'],
+        ['shared/dom-attr-normalize.js', 'dom-attr-normalize.js'],
+    ];
     const copied = [];
-    for (const name of names) {
-        const src = path.join(coreDist, name);
+    for (const [srcRel, outName] of companions) {
+        const src = path.join(coreDist, srcRel);
         if (!existsSync(src)) continue;
-        const dest = path.join(outDir, name);
-        copyFileSync(src, dest);
-        copied.push(name);
+        const dest = path.join(outDir, outName);
+        const text = rewriteFlatDeliveryImports(readFileSync(src, 'utf8'));
+        mkdirSync(path.dirname(dest), { recursive: true });
+        writeFileSync(dest, text);
+        copied.push(outName);
     }
     return copied;
 }

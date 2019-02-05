@@ -682,6 +682,7 @@ fn emit_runtime_js(options: &CompileOptions, report: &mut CompileReport) -> crat
         ("faces/dom.browser.js", "dom.browser.js"),
         ("browser/direct-host-box.js", "direct-host-box.js"),
         ("browser/unknown-component.js", "unknown-component.js"),
+        ("shared/dom-attr-normalize.js", "dom-attr-normalize.js"),
         ("faces/http.js", "vmz-http.js"),
         ("browser/client-nav.js", "vmz-client-nav.js"),
     ];
@@ -758,6 +759,7 @@ fn rewrite_flat_delivery_imports(text: &str) -> String {
         ("../browser/dom-core.js", "./dom-core.js"),
         ("../browser/direct-host-box.js", "./direct-host-box.js"),
         ("../browser/unknown-component.js", "./unknown-component.js"),
+        ("../shared/dom-attr-normalize.js", "./dom-attr-normalize.js"),
         ("../browser/client-nav.js", "./vmz-client-nav.js"),
         ("../ssr/dom-ssr.js", "./dom-ssr.js"),
         ("../faces/server.js", "./vmz-runtime.js"),

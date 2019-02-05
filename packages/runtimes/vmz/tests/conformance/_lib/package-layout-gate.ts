@@ -95,6 +95,7 @@ const FLAT_CORE_DIST_BASENAMES = new Set([
     'client-nav.js',
     'direct-host-box.js',
     'unknown-component.js',
+    'dom-attr-normalize.js',
     'direct-api.types.js',
     'position-context.js',
     'render-host.js',
