@@ -27,16 +27,16 @@ class ClassStyleFixture {
 
     static __vmzCreate(api) {
         const root = api.el('div');
-        api.attr(root, 'class', api.mergeClass('game theme-fixture', ClassStyleFixture.gameRootClass, ClassStyleFixture.overloadOn && 'boost'));
+        api.attr(root, 'class', api.mergeClass('game theme-fixture', this.gameRootClass, this.overloadOn && 'boost'));
         const gauge = api.el('div');
-        api.attr(gauge, 'class', api.mergeClass('gauge heat', ClassStyleFixture.overloadOn && 'alarm'));
+        api.attr(gauge, 'class', api.mergeClass('gauge heat', this.overloadOn && 'alarm'));
         root.appendChild(gauge);
         const lock = api.el('div');
         api.attr(lock, 'class', 'lock-fill');
-        api.attr(lock, 'style', api.mergeStyle('opacity: 1', ClassStyleFixture.lockFillStyle));
+        api.attr(lock, 'style', api.mergeStyle('opacity: 1', this.lockFillStyle));
         root.appendChild(lock);
         const btn = api.el('button');
-        api.attr(btn, 'class', api.mergeClass('bp-build', { ready: ClassStyleFixture.rowClass === 'ready' }));
+        api.attr(btn, 'class', api.mergeClass('bp-build', { ready: this.rowClass === 'ready' }));
         root.appendChild(btn);
         return root;
     }
