@@ -1,5 +1,4 @@
-# Align with biome.json (JetBrains / VS Code / Cursor).
-# Without this file, IDEs keep rewriting indentation against biome.
+# Align with biome.json formatter keys consumed by `nifty format` (JetBrains / VS Code / Cursor).
 
 root = true
 
