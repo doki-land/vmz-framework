@@ -59,9 +59,7 @@ function dedupeDiagnostics(list: Diagnostic[]): Diagnostic[] {
 }
 
 async function runWithPlugins(
-    ws: {
-        /* opaque workspace */
-    },
+    ws: {/* opaque workspace */},
     project: string,
     outDir: string,
     fn: () => Promise<number> | number,

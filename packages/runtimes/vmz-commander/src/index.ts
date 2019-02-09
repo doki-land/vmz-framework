@@ -6,11 +6,7 @@
  * `commander.*` with tiny English fallbacks — no product language packs here.
  */
 
-export type {
-    CatalogLoader,
-    LocaleCatalog,
-    LocalizePlugin,
-} from './types.js';
+export type { CatalogLoader, LocaleCatalog, LocalizePlugin } from './types.js';
 
 export {
     COMMANDER_FALLBACK_EN_US,

@@ -12,10 +12,7 @@ import { resolveCoreRuntimeDist } from './runtime-dist.js';
 import { materializeWechatPackaging } from './wechat-packaging.js';
 
 export { resolveCoreRuntimeDist } from './runtime-dist.js';
-export {
-    loadHostRuntimeFilesManifest,
-    serveHostRuntimeFilePairs,
-} from '../host-materialize/host-runtime-files.js';
+export { loadHostRuntimeFilesManifest, serveHostRuntimeFilePairs } from '../host-materialize/host-runtime-files.js';
 export { materializeServeHostRuntime, SERVE_HOST_RUNTIME_FILES } from '../host-materialize/serve-host-runtime.js';
 
 export {
@@ -884,10 +881,7 @@ export {
 } from './release-pack.js';
 // APPLICATION_ARTIFACT_SCHEMA lives in @vmz/protocol (already re-exported above);
 // release-pack keeps a local constant for envelope writes — do not dual-export the name.
-export {
-    STATIC_DELIVERY_MANIFEST_SCHEMA,
-    emitWebStatic,
-} from './static-emit.js';
+export { STATIC_DELIVERY_MANIFEST_SCHEMA, emitWebStatic } from './static-emit.js';
 export {
     CONTENT_ADDRESSED_ASSETS_SCHEMA,
     emitContentAddressedAssets,
@@ -897,16 +891,8 @@ export {
     rewriteCssImports,
     rewriteJsEntryRelativeImports,
 } from './content-addressed-assets.js';
-export {
-    SITE_FAVICON_SCHEMA,
-    emitSiteFavicon,
-    readSiteFaviconHeadHtml,
-    packPngsIntoIco,
-} from './site-favicon.js';
-export {
-    PUBLIC_STATIC_ASSETS_SCHEMA,
-    emitPublicStaticAssets,
-} from './public-static-assets.js';
+export { SITE_FAVICON_SCHEMA, emitSiteFavicon, readSiteFaviconHeadHtml, packPngsIntoIco } from './site-favicon.js';
+export { PUBLIC_STATIC_ASSETS_SCHEMA, emitPublicStaticAssets } from './public-static-assets.js';
 export {
     CDN_POLICY_MANIFEST_SCHEMA,
     CDN_ADAPTER_PROJECTION_SCHEMA,
@@ -930,10 +916,7 @@ export {
     probeReleaseDirectory,
     emitSiteDelivery,
 } from './site-delivery.js';
-export {
-    EMBEDDED_RESOURCE_INDEX_SCHEMA,
-    emitEmbeddedPackaging,
-} from './embedded-packaging.js';
+export { EMBEDDED_RESOURCE_INDEX_SCHEMA, emitEmbeddedPackaging } from './embedded-packaging.js';
 export {
     SERVER_LANG_IDS,
     SERVER_LANG_ALIASES,
@@ -941,12 +924,7 @@ export {
     resolveServerLanguage,
     assertLangRuntimePair,
 } from './server-language-backend.js';
-export {
-    WECHAT_PACKAGING_SCHEMA,
-    WECHAT_PACKAGING_REL,
-    wechatPackagingFromDelivery,
-    materializeWechatPackaging,
-} from './wechat-packaging.js';
+export { WECHAT_PACKAGING_SCHEMA, WECHAT_PACKAGING_REL, wechatPackagingFromDelivery, materializeWechatPackaging } from './wechat-packaging.js';
 export {
     DELIVERY_PROFILE_AUTHORING_SCHEMA,
     BUILD_PROFILE_SELECTION_SCHEMA,
@@ -969,17 +947,8 @@ export {
     emitServerArtifact,
     projectServerRuntimeAdapter,
 } from './server-artifact.js';
-export {
-    BUILD_PROOF_SCHEMA,
-    ASSEMBLE_MANIFEST_SCHEMA,
-    assembleDelivery,
-    emitBuildProof,
-} from './build-assemble.js';
-export {
-    buildProjectToOutDirRoot,
-    type BuildProjectOptions,
-    type BuildProjectResult,
-} from './project-build.js';
+export { BUILD_PROOF_SCHEMA, ASSEMBLE_MANIFEST_SCHEMA, assembleDelivery, emitBuildProof } from './build-assemble.js';
+export { buildProjectToOutDirRoot, type BuildProjectOptions, type BuildProjectResult } from './project-build.js';
 export {
     PRODUCTION_SCENARIO_PACK_SCHEMA,
     PRODUCTION_CI_PROFILE_SCHEMA,
@@ -1038,10 +1007,7 @@ export {
     realizeRoutePath,
     resolveLinkHref,
 } from '../locale/locale-router.js';
-export {
-    LOCALE_ROUTE_REALIZATION_ARTIFACT_SCHEMA,
-    emitLocaleRouteRealization,
-} from '../locale/locale-route-emit.js';
+export { LOCALE_ROUTE_REALIZATION_ARTIFACT_SCHEMA, emitLocaleRouteRealization } from '../locale/locale-route-emit.js';
 export {
     assertHostMessageInvariant,
     assertServerErrorEnvelope,
@@ -1060,13 +1026,7 @@ export {
     extractHardcodedText,
     pseudoLocalizeCatalog,
 } from '../locale/locale-tooling.js';
-export {
-    applyPlugins,
-    contentHash,
-    defineConfig,
-    definePlugin,
-    loadVmzConfig,
-} from './plugin-host.js';
+export { applyPlugins, contentHash, defineConfig, definePlugin, loadVmzConfig } from './plugin-host.js';
 export {
     createRolldownPluginVmzAdapter,
     createVitePluginVmzAdapter,

@@ -19,8 +19,4 @@ export {
     translateCatalog,
     vmzCliLocalize,
 } from './cli-localize.js';
-export {
-    formatDiagnostic,
-    formatDiagnostics,
-    t,
-} from '@vmz/diagnostic';
+export { formatDiagnostic, formatDiagnostics, t } from '@vmz/diagnostic';

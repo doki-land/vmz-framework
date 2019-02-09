@@ -84,9 +84,7 @@ export type DirectInstance = {
     onDestroy?: () => void | Promise<void>;
 };
 
-export type ComponentCtorLike = (new (
-    props?: object,
-) => DirectInstance) & {
+export type ComponentCtorLike = (new (props?: object) => DirectInstance) & {
     __vmzDirect?: boolean;
     __vmzCreate?: (this: DirectInstance, api: DirectApi) => Node;
     __vmzSerialize?: (this: DirectInstance, api: DirectApi) => unknown;

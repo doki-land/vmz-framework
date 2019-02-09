@@ -4,12 +4,4 @@
  * Full barrel remains `@vmz/core/dom` (`dom.js` / dist `vmz-dom.js`) for Node host.
  */
 export * from '../browser/dom-core.js';
-export {
-    attachEventEntries,
-    hydrate,
-    hydrateIslands,
-    hydrateRoute,
-    hydrateRoutePage,
-    resume,
-    resumeIslands,
-} from '../ssr/dom-ssr.js';
+export { attachEventEntries, hydrate, hydrateIslands, hydrateRoute, hydrateRoutePage, resume, resumeIslands } from '../ssr/dom-ssr.js';

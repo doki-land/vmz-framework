@@ -188,14 +188,8 @@ export default class ClassMergeDemo {
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
-    assert!(
-        js.contains("api.mergeClass("),
-        "expected merged class emit, got: {js}"
-    );
-    assert!(
-        !js.contains("[object Object]"),
-        "emit must not stringify object bindings: {js}"
-    );
+    assert!(js.contains("api.mergeClass("), "expected merged class emit, got: {js}");
+    assert!(!js.contains("[object Object]"), "emit must not stringify object bindings: {js}");
     assert!(
         js.contains("game theme-factory-idle"),
         "static class tokens must survive merge emit: {js}"
