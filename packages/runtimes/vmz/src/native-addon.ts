@@ -14,6 +14,20 @@ const require = createRequire(import.meta.url);
 let cached;
 
 /**
+ * Load the N-API addon or throw (production printers must not fall back to TS).
+ * @returns {any}
+ */
+export function requireNativeAddon() {
+    const native = tryLoadNativeAddon();
+    if (!native) {
+        throw new Error(
+            'vmz native addon missing — run `pnpm napi:build` (CodeGenerators live in vmz-generator via N-API)',
+        );
+    }
+    return native;
+}
+
+/**
  * @returns {any | null}
  */
 export function tryLoadNativeAddon() {
