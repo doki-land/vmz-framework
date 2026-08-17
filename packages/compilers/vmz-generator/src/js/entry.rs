@@ -1,5 +1,7 @@
 //! Serve / static host entry modules (JsCodeGenerator).
 
+use std::collections::BTreeMap;
+
 use super::ast_util::{js_string_literal, oxc_reprint_module};
 use super::emit::EmittedJs;
 
@@ -38,11 +40,11 @@ pub fn emit_serve_entry_client(
             eager.iter().map(|e| e.name.as_str()).collect::<Vec<_>>().join(", ")
         )
     };
-    let mut entry_by_name = serde_json::Map::new();
+    let mut entry_by_name = BTreeMap::new();
     for e in eager.iter().chain(lazy.iter()) {
-        entry_by_name.insert(e.name.clone(), serde_json::Value::String(e.entry.clone()));
+        entry_by_name.insert(e.name.clone(), e.entry.clone());
     }
-    let entry_json = serde_json::Value::Object(entry_by_name).to_string();
+    let entry_json = crate::to_json(&entry_by_name).unwrap_or_else(|_| "{}".into());
     let loader = if lazy.is_empty() {
         String::new()
     } else {
