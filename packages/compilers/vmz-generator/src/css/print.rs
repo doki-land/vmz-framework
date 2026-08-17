@@ -52,15 +52,32 @@ pub fn validate_css(css: &str) -> Result<()> {
     }
 }
 
-/// Canonical CSS print: trim + trailing newline.
+/// Canonical CSS print via `oxc_formatter_css` when the body is pure CSS.
 ///
-/// When `oxc_formatter_css` is crates.io-available at our oxc pin, route through
-/// that formatter after validation for pure CSS layers.
+/// Falls back to trim + trailing newline when the formatter rejects the input
+/// (TW/`@tailwind` / SCSS intermediates that are not yet pure CSS).
 pub fn format_css(css: &str) -> String {
-    let mut body = css.trim().to_string();
-    if body.is_empty() {
+    let trimmed = css.trim();
+    if trimmed.is_empty() {
         return String::new();
     }
+
+    let allocator = oxc_allocator::Allocator::new();
+    let options = oxc_formatter_css::CssFormatOptions {
+        variant: oxc_formatter_css::CssVariant::Css,
+        ..oxc_formatter_css::CssFormatOptions::default()
+    };
+    if let Ok(formatted) = oxc_formatter_css::format(&allocator, trimmed, options)
+        && let Ok(printed) = formatted.print()
+    {
+        let mut body = printed.into_code();
+        if !body.ends_with('\n') {
+            body.push('\n');
+        }
+        return body;
+    }
+
+    let mut body = trimmed.to_string();
     if !body.ends_with('\n') {
         body.push('\n');
     }
