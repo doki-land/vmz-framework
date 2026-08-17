@@ -5,7 +5,9 @@
  * Not an I18n IR: filesystem + MessageCatalogManifest projection into VPG-shaped views.
  */
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import JSON5 from 'json5';
 import {
     DIAG_CATALOG_CONFLICT,
@@ -755,58 +757,32 @@ export function emitLocaleRuntimeModules(projectRoot, distDir) {
     fs.mkdirSync(localesOut, { recursive: true });
 
     for (const mod of report.typedModules || []) {
-        const lines = [
-            `/** Generated ${mod.module} — runtime LocalizedText (defaultLocale=${defaultLocale}) */`,
-            `const __vmzDefaultLocale = ${JSON.stringify(defaultLocale)};`,
-            `function __vmzLocaleId() {`,
-            `  if (typeof globalThis !== "undefined" && globalThis.__vmzLocaleIdHint) {`,
-            `    return String(globalThis.__vmzLocaleIdHint);`,
-            `  }`,
-            `  if (typeof document !== "undefined") {`,
-            `    const d = document.documentElement?.getAttribute("data-locale");`,
-            `    if (d) return d;`,
-            `    const lang = document.documentElement?.lang;`,
-            `    if (lang === "en" || lang === "en-US" || lang === "en-us") return "en-us";`,
-            `    if (lang === "zh" || lang === "zh-CN" || lang === "zh-Hans" || lang === "zh-hans") return "zh-hans";`,
-            `  }`,
-            `  try {`,
-            `    const stored = localStorage.getItem("vmz.locale");`,
-            `    if (stored) return stored;`,
-            `  } catch {}`,
-            `  return __vmzDefaultLocale;`,
-            `}`,
-            `function __vmzFormat(template, args) {`,
-            `  if (!args) return String(template ?? "");`,
-            `  return String(template ?? "").replace(/\\{(\\w+)(?:,\\s*\\w+)?\\}/g, (m, name) =>`,
-            `    Object.prototype.hasOwnProperty.call(args, name) ? String(args[name]) : m`,
-            `  );`,
-            `}`,
-            `function __vmzPick(variants, args) {`,
-            `  const id = __vmzLocaleId();`,
-            `  const template = variants[id] ?? variants[__vmzDefaultLocale] ?? "";`,
-            `  return __vmzFormat(template, args);`,
-            `}`,
-            '',
-        ];
+        const exports = [];
         for (const exp of mod.exports || []) {
             const node = byId.get(exp.messageId);
-            const variants = {};
+            /** @type {string[][]} */
+            const variants = [];
             if (node?.variants) {
                 for (const [loc, v] of Object.entries(node.variants)) {
-                    variants[loc] = v.template;
+                    variants.push([loc, v.template]);
                 }
             }
-            const lit = JSON.stringify(variants);
-            if ((exp.params || []).length) {
-                lines.push(`export function ${exp.exportName}(args) { return __vmzPick(${lit}, args); }`);
-            } else {
-                lines.push(`export function ${exp.exportName}() { return __vmzPick(${lit}); }`);
-            }
+            exports.push({
+                exportName: exp.exportName,
+                variants,
+                hasParams: (exp.params || []).length > 0,
+            });
         }
-        lines.push('');
+        const native = tryNativeLocaleGenerator();
+        let code;
+        if (native?.generateLocaleRuntimeModule) {
+            code = native.generateLocaleRuntimeModule(defaultLocale, exports);
+        } else {
+            code = emitLocaleRuntimeModuleFallback(defaultLocale, exports);
+        }
         const file = path.join(localesOut, `${mod.catalogId}.js`);
         fs.mkdirSync(path.dirname(file), { recursive: true });
-        fs.writeFileSync(file, lines.join('\n'), 'utf8');
+        fs.writeFileSync(file, code, 'utf8');
         written.push(file);
     }
 
@@ -851,6 +827,118 @@ function walkDistJs(dir, fn) {
             fn(full);
         }
     }
+}
+
+const require = createRequire(import.meta.url);
+
+/** @type {any} */
+let _nativeLocaleGen;
+
+function tryNativeLocaleGenerator() {
+    if (_nativeLocaleGen !== undefined) return _nativeLocaleGen;
+    try {
+        const envPath =
+            (typeof process.env.VMZ_NATIVE_NODE === 'string' && process.env.VMZ_NATIVE_NODE.trim()) ||
+            '';
+        if (envPath) {
+            _nativeLocaleGen = require(path.resolve(envPath));
+            return _nativeLocaleGen;
+        }
+        const { platform, arch } = process;
+        let triple = `${platform}-${arch}`;
+        if (platform === 'win32' && arch === 'x64') triple = 'win32-x64-msvc';
+        else if (platform === 'win32' && arch === 'arm64') triple = 'win32-arm64-msvc';
+        else if (platform === 'darwin' && arch === 'arm64') triple = 'darwin-arm64';
+        else if (platform === 'darwin' && arch === 'x64') triple = 'darwin-x64';
+        else if (platform === 'linux' && arch === 'x64') triple = 'linux-x64-gnu';
+        else if (platform === 'linux' && arch === 'arm64') triple = 'linux-arm64-gnu';
+        const short =
+            triple === 'win32-x64-msvc'
+                ? 'win32-x64'
+                : triple === 'win32-arm64-msvc'
+                  ? 'win32-arm64'
+                  : triple === 'linux-x64-gnu'
+                    ? 'linux-x64'
+                    : triple === 'linux-arm64-gnu'
+                      ? 'linux-arm64'
+                      : triple;
+        const pkgRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+        const name = `@vmz/vmz-${short}`;
+        /** @type {string[]} */
+        const candidates = [];
+        try {
+            const resolved = require.resolve(`${name}/package.json`);
+            const dir = path.dirname(resolved);
+            candidates.push(path.join(dir, `vmz.${triple}.node`), path.join(dir, 'vmz.node'));
+        } catch {
+            /* optional */
+        }
+        candidates.push(
+            path.join(pkgRoot, 'node_modules', name, `vmz.${triple}.node`),
+            path.join(pkgRoot, 'node_modules', name, 'vmz.node'),
+        );
+        for (const p of candidates) {
+            if (fs.existsSync(p)) {
+                _nativeLocaleGen = require(p);
+                return _nativeLocaleGen;
+            }
+        }
+        _nativeLocaleGen = null;
+    } catch {
+        _nativeLocaleGen = null;
+    }
+    return _nativeLocaleGen;
+}
+
+/**
+ * @param {string} defaultLocale
+ * @param {Array<{ exportName: string, variants: string[][], hasParams: boolean }>} exports
+ */
+function emitLocaleRuntimeModuleFallback(defaultLocale, exports) {
+    const lines = [
+        `/** Generated by vmz (fallback) — locale runtime module. */`,
+        `const __vmzDefaultLocale = ${JSON.stringify(defaultLocale)};`,
+        `function __vmzLocaleId() {`,
+        `  if (typeof globalThis !== "undefined" && globalThis.__vmzLocaleIdHint) {`,
+        `    return String(globalThis.__vmzLocaleIdHint);`,
+        `  }`,
+        `  if (typeof document !== "undefined") {`,
+        `    const d = document.documentElement?.getAttribute("data-locale");`,
+        `    if (d) return d;`,
+        `    const lang = document.documentElement?.lang;`,
+        `    if (lang === "en" || lang === "en-US" || lang === "en-us") return "en-us";`,
+        `    if (lang === "zh" || lang === "zh-CN" || lang === "zh-Hans" || lang === "zh-hans") return "zh-hans";`,
+        `  }`,
+        `  try {`,
+        `    const stored = localStorage.getItem("vmz.locale");`,
+        `    if (stored) return stored;`,
+        `  } catch {}`,
+        `  return __vmzDefaultLocale;`,
+        `}`,
+        `function __vmzFormat(template, args) {`,
+        `  if (!args) return String(template ?? "");`,
+        `  return String(template ?? "").replace(/\\{(\\w+)(?:,\\s*\\w+)?\\}/g, (m, name) =>`,
+        `    Object.prototype.hasOwnProperty.call(args, name) ? String(args[name]) : m`,
+        `  );`,
+        `}`,
+        `function __vmzPick(variants, args) {`,
+        `  const id = __vmzLocaleId();`,
+        `  const template = variants[id] ?? variants[__vmzDefaultLocale] ?? "";`,
+        `  return __vmzFormat(template, args);`,
+        `}`,
+        '',
+    ];
+    for (const exp of exports) {
+        const obj = Object.fromEntries(exp.variants.map(([k, v]) => [k, v]));
+        const lit = JSON.stringify(obj);
+        if (exp.hasParams) {
+            lines.push(`export function ${exp.exportName}(args) { return __vmzPick(${lit}, args); }`);
+        } else {
+            lines.push(`export function ${exp.exportName}() { return __vmzPick(${lit}); }`);
+        }
+    }
+    lines.push('');
+    return lines.join('\n');
 }
 
 /**
