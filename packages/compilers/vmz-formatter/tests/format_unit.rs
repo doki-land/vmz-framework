@@ -107,6 +107,25 @@ fn editorconfig_indent_size_affects_template_envelope() {
 }
 
 #[test]
+fn editorconfig_end_of_line_crlf() {
+    let dir = temp_dir("crlf");
+    write(
+        &dir.join(".editorconfig"),
+        "root = true\n[*]\nindent_size = 2\nend_of_line = crlf\ninsert_final_newline = true\n",
+    );
+    let file = dir.join("C.vmz");
+    write(
+        &file,
+        "<template>\n  <div/>\n</template>\n\n<script client>\nexport default class C {}\n</script>\n",
+    );
+
+    format_path(&file, &FormatOptions { check: false }).unwrap();
+    let out = fs::read_to_string(&file).unwrap();
+    assert!(out.contains("\r\n"), "expected CRLF from EditorConfig: {out:?}");
+    assert!(!out.replace("\r\n", "").contains('\n'), "unexpected bare LF: {out:?}");
+}
+
+#[test]
 fn check_mode_does_not_write() {
     let dir = temp_dir("check");
     write(
