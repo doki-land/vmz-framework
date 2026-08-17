@@ -1,9 +1,11 @@
-//! Compile-time each row kernel — oxc/Native View analysis → static HTML + hydrate/apply.
+//! Compile-time each row kernel - oxc/Native View analysis -> static HTML + hydrate/apply.
 //!
 //! When the item template is a fixed element tree (no nested each/if/component) and
-//! dynamics are only item-field texts, a `this.<host> === item.<field> ? … : …` class
+//! dynamics are only item-field texts, a `this.<host> === item.<field> ? ... : ...` class
 //! ternary, and `this.m(item.<field>)` clicks, emit a `rowKernel` so runtime skips
 //! first-row blueprint recording. Field names come from the author expression.
+
+#![allow(clippy::too_many_arguments)]
 
 use vmz_types::{ViewAttr, ViewAttrValue, ViewNode};
 
@@ -35,7 +37,7 @@ pub fn try_emit_row_kernel_js(
     tag: &str,
     attrs: &[ViewAttr],
     children: &[ViewNode],
-    as_name: &str,
+    _as_name: &str,
     box_id: &str,
     fields: &[String],
     scope: &[String],
@@ -49,7 +51,6 @@ pub fn try_emit_row_kernel_js(
         attrs,
         children,
         &[],
-        as_name,
         &item_prefix,
         fields,
         scope,
@@ -84,8 +85,8 @@ pub fn try_emit_row_kernel_js(
         }
     }
 
-    // Fixed-structure rows: 1–4 item-field texts + optional host/item class ternary + actions.
-    if text_slots.len() < 1 || text_slots.len() > 4 {
+    // Fixed-structure rows: 1-4 item-field texts + optional host/item class ternary + actions.
+    if text_slots.is_empty() || text_slots.len() > 4 {
         return None;
     }
 
@@ -103,7 +104,7 @@ pub fn try_emit_row_kernel_js(
     let hydrate = emit_hydrate_js(&text_slots, class_slot.as_ref(), &acts);
     let (apply, apply_by_field) = emit_apply_js(&text_slots, class_slot.as_ref());
     let key_field = key_bound.and_then(|k| parse_item_field(k.trim(), &item_prefix));
-    // Create is inlined (local path vars + parent.insertBefore) — does not call hydrate
+    // Create is inlined (local path vars + parent.insertBefore) - does not call hydrate
     // (vanillajs-style; Fragment mid-hop is slower than live insertBefore on this bench).
     let create = emit_create_js(&text_slots, class_slot.as_ref(), &acts, key_field.as_deref());
     let events: Vec<String> = {
@@ -140,14 +141,14 @@ pub fn try_emit_row_kernel_js(
         format!(", itemFields: [{inner}]")
     };
 
-    // Class item field → when that item field is slotted, also refresh class (same Map entry).
+    // Class item field -> when that item field is slotted, also refresh class (same Map entry).
     let class_item_js = if let Some((_, _, _, _, item_f)) = &class_slot {
         format!(", classItemField: {:?}", item_f)
     } else {
         String::new()
     };
 
-    // Text field → slot index (stride / leaf DOM can write nodeValue without applyByField call).
+    // Text field -> slot index (stride / leaf DOM can write nodeValue without applyByField call).
     let text_slots_js = if text_slots.is_empty() {
         String::new()
     } else {
@@ -172,7 +173,6 @@ fn emit_html_element(
     attrs: &[ViewAttr],
     children: &[ViewNode],
     path: &[u32],
-    as_name: &str,
     item_prefix: &str,
     fields: &[String],
     scope: &[String],
@@ -202,7 +202,7 @@ fn emit_html_element(
                 let (method, arg_field) = parse_item_field_action(&body, item_prefix)?;
                 let event = event_dom_type(&a.name);
                 // Client: bake data-vmz-act into HTML so cloneNode carries it (no per-row JS assign).
-                // Delegate caches attr → `__vmzAct` expando on first click.
+                // Delegate caches attr -> `__vmzAct` expando on first click.
                 open.push_str(" data-vmz-act=\"");
                 open.push_str(&escape_attr(&method));
                 open.push('"');
@@ -251,7 +251,7 @@ fn emit_html_element(
                 let field = parse_item_field(&body, item_prefix)?;
                 let mut p = path.to_vec();
                 // Text node is a child; path points at the text node index among children.
-                // For hydrate we walk element children then .firstChild for text — see emit_hydrate.
+                // For hydrate we walk element children then .firstChild for text - see emit_hydrate.
                 // We store path to the *parent element that contains the text as firstChild*,
                 // or path including text index when mixed. Simplest: path to text's parent + note.
                 // Convention: path is childNodes indices from row root to the Text node.
@@ -272,7 +272,6 @@ fn emit_html_element(
                     attrs,
                     children,
                     &p,
-                    as_name,
                     item_prefix,
                     fields,
                     scope,
@@ -372,7 +371,7 @@ struct PathLocals {
     class_name: Option<String>,
 }
 
-/// Emit `var pN = …` with common-subexpression reuse across text/class/act paths.
+/// Emit `var pN = ...` with common-subexpression reuse across text/class/act paths.
 fn emit_path_locals(
     root: &str,
     texts: &[(Vec<u32>, String)],
@@ -409,7 +408,7 @@ fn emit_path_locals(
             }
             let name = format!("p{next_tmp}");
             *next_tmp += 1;
-            // Sibling CSE: path[…, k] via previous sibling path[…, k-1].nextSibling
+            // Sibling CSE: path[..., k] via previous sibling path[..., k-1].nextSibling
             // (avoids re-walking `root.firstChild` for consecutive children).
             let step = if idx > 0 {
                 let mut prev_path = cur.clone();
@@ -462,7 +461,7 @@ fn emit_path_locals(
 }
 
 /// Returns `(apply_full, applyByField_object)`.
-/// `applyByField` entries are monomorphic `(root, item) => …` — no slot branching —
+/// `applyByField` entries are monomorphic `(root, item) => ...` - no slot branching -
 /// so leaf updates (`rows.i.label`) stay one IC type in V8.
 /// Create/hydrate seed `root.__vmzT{i}` (Text); applyByField uses `nodeValue`.
 fn emit_apply_js(
@@ -498,7 +497,7 @@ fn emit_apply_js(
 
     let apply_by_field = format!("{{ {} }}", by_field_entries.join(", "));
 
-    // Full apply: no slot chain (unknown slot / identity change → call this).
+    // Full apply: no slot chain (unknown slot / identity change -> call this).
     let mut full = String::new();
     if !texts.is_empty() {
         full.push_str("if (!root.__vmzT0) {\n");
@@ -564,10 +563,15 @@ fn parse_item_field(body: &str, item_prefix: &str) -> Option<String> {
 }
 
 fn parse_item_field_action(body: &str, item_prefix: &str) -> Option<(String, String)> {
-    // () => this.select(box1.item.id)  OR  this.remove(box1.item.key)
-    let b = body.trim();
-    let b = b.strip_prefix("() =>").unwrap_or(b).trim();
-    let b = b.strip_prefix("(ev) =>").unwrap_or(b).trim();
+    // () => this.select(box1.item.id)  OR  (() => this.select(...))  OR  this.remove(box1.item.key)
+    let b = unwrap_outer_parens(body.trim());
+    let b = b
+        .strip_prefix("()=>")
+        .or_else(|| b.strip_prefix("() =>"))
+        .or_else(|| b.strip_prefix("(ev)=>"))
+        .or_else(|| b.strip_prefix("(ev) =>"))
+        .unwrap_or(b)
+        .trim();
     let b = b.strip_prefix("this.").unwrap_or(b);
     let open = b.find('(')?;
     let method = b[..open].trim();
@@ -579,6 +583,42 @@ fn parse_item_field_action(body: &str, item_prefix: &str) -> Option<(String, Str
         return None;
     }
     Some((method.to_string(), arg_field))
+}
+
+/// Strip matched outer `(...)` wrappers (oxc prints arrow exprs as `( () => ... )`).
+fn unwrap_outer_parens(s: &str) -> &str {
+    let mut s = s.trim();
+    loop {
+        if !(s.starts_with('(') && s.ends_with(')')) {
+            return s;
+        }
+        // Outer pair is a real wrap only if depth returns to 0 at the final `)`.
+        let bytes = s.as_bytes();
+        let mut depth = 0i32;
+        let mut wraps_all = false;
+        for (i, &b) in bytes.iter().enumerate() {
+            match b {
+                b'(' => depth += 1,
+                b')' => {
+                    depth -= 1;
+                    if depth < 0 {
+                        return s;
+                    }
+                    if depth == 0 {
+                        wraps_all = i + 1 == bytes.len();
+                        if !wraps_all {
+                            return s;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        if !wraps_all || depth != 0 {
+            return s;
+        }
+        s = s[1..s.len() - 1].trim();
+    }
 }
 
 fn parse_host_item_class_ternary(

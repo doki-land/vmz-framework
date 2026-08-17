@@ -1,9 +1,9 @@
-//! Style Theme → CSS custom-property CodeGenerator.
+//! Style Theme -> CSS custom-property CodeGenerator.
 
-use crate::core::escape_css_string;
 use super::print::format_css;
+use crate::core::escape_css_string;
 
-/// One CSS custom-property declaration (`--vmz-…: value`).
+/// One CSS custom-property declaration (`--vmz-...: value`).
 #[derive(Debug, Clone)]
 pub struct ThemeDecl {
     /// Full custom-property name including `--` (e.g. `--vmz-color-bg`).
@@ -22,16 +22,16 @@ pub enum ThemeRule {
         /// Declarations inside the block.
         decls: Vec<ThemeDecl>,
     },
-    /// `@media (prefers-color-scheme: …) { nested blocks }`
+    /// `@media (prefers-color-scheme: ...) { nested blocks }`
     PrefersColorScheme {
-        /// `light` / `dark` / …
+        /// `light` / `dark` / ...
         scheme: String,
-        /// Nested rule blocks (typically `  :root { … }`).
+        /// Nested rule blocks (typically `  :root { ... }`).
         nested: Vec<ThemeRule>,
     },
 }
 
-/// Map a theme leaf path to its `--vmz-…` CSS custom-property name.
+/// Map a theme leaf path to its `--vmz-...` CSS custom-property name.
 pub fn css_var_name(path: &[String]) -> String {
     let mut s = String::from("--vmz");
     for p in path {
@@ -110,17 +110,11 @@ mod tests {
         let rules = vec![
             ThemeRule::Block {
                 selector: ":root".into(),
-                decls: vec![ThemeDecl {
-                    property: "--vmz-color-bg".into(),
-                    value: "#fff".into(),
-                }],
+                decls: vec![ThemeDecl { property: "--vmz-color-bg".into(), value: "#fff".into() }],
             },
             ThemeRule::Block {
                 selector: theme_attr_selector("data-theme", "a\"b"),
-                decls: vec![ThemeDecl {
-                    property: "--vmz-color-bg".into(),
-                    value: "#000".into(),
-                }],
+                decls: vec![ThemeDecl { property: "--vmz-color-bg".into(), value: "#000".into() }],
             },
         ];
         let css = emit_theme_css(&rules);

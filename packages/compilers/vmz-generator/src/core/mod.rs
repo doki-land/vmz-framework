@@ -1,7 +1,7 @@
 //! Shared CodeGenerator primitives: artifacts, escape, digest, provenance.
 
-mod escape;
 mod artifact;
+mod escape;
 
 pub use artifact::{ContentType, EmittedArtifact, Provenance, sha256_hex};
 pub use escape::{

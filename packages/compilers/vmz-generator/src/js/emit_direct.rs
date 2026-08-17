@@ -5,6 +5,8 @@
 //! Coverage: element / text / attr / event / if / each / ternary / component / slot.
 //! Production products do **not** emit blueprint `render` (production Direct emit full close).
 
+#![allow(clippy::too_many_arguments)]
+
 use super::ast_util::{js_string_literal, oxc_reprint_module};
 use super::emit_ir::IrDepCursor;
 use super::helpers::{
@@ -55,8 +57,7 @@ fn node_eligible(node: &ViewNode) -> bool {
 /// Body statements are still lowered as text; the whole Direct block is then
 /// parsed and re-printed by oxc so the shell is consistently formatted and
 /// unparseable escapes fail loudly (fallback keeps prior text).
-// SSR reuses the same create function with a serialize host API .
-
+/// SSR reuses the same create function with a serialize host API.
 pub fn emit_direct_create(
     name: &str,
     view: &ViewView,
@@ -668,15 +669,14 @@ fn parse_this_method_call_arrow(body: &str) -> Option<String> {
     // Strip optional arrow params: () => | (ev) => | (_event) =>
     let after_arrow = if let Some(rest) = b.strip_prefix("()") {
         rest
-    } else if let Some(i) = b.find("=>") {
+    } else {
+        let i = b.find("=>")?;
         // (ev) => ...
         if b.as_bytes().first() == Some(&b'(') {
             &b[i..]
         } else {
             return None;
         }
-    } else {
-        return None;
     };
     let after_arrow = after_arrow.trim().strip_prefix("=>")?.trim();
     // this.foo() or this.foo(ev) -- single call expression

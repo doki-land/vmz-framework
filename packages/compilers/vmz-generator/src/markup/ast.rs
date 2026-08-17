@@ -19,7 +19,7 @@ pub enum MarkupNode {
     Element {
         /// Tag name.
         tag: String,
-        /// Attribute list `(name, value)`. Empty value ⇒ boolean/bare attr in HTML.
+        /// Attribute list `(name, value)`. Empty value => boolean/bare attr in HTML.
         attrs: Vec<(String, String)>,
         /// Child nodes.
         children: Vec<MarkupNode>,

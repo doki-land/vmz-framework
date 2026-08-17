@@ -60,13 +60,8 @@ pub fn transpile_ts_with_map(
     let transformer = Transformer::new(&allocator, Path::new(filename), &options);
     let _ = transformer.build_with_scoping(semantic_ret.semantic.into_scoping(), &mut program);
 
-    let path = source_map_path
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| PathBuf::from(filename));
-    let codegen_opts = CodegenOptions {
-        source_map_path: Some(path),
-        ..CodegenOptions::default()
-    };
+    let path = source_map_path.map(|p| p.to_path_buf()).unwrap_or_else(|| PathBuf::from(filename));
+    let codegen_opts = CodegenOptions { source_map_path: Some(path), ..CodegenOptions::default() };
     let CodegenReturn { code, map, .. } = Codegen::new().with_options(codegen_opts).build(&program);
     let map = map.map(|m| m.to_json_string());
     Ok(TranspileOutput { code, map })

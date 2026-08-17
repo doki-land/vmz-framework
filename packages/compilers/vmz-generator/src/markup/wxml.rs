@@ -9,11 +9,7 @@ use super::ast::{MarkupDialect, MarkupDocument, MarkupNode, emit_markup};
 /// Emit Mini `vmz.mini.template.v0` markup from Native View roots.
 pub fn emit_mini_template(roots: &[ViewNode]) -> String {
     let kids: Vec<MarkupNode> = roots.iter().map(view_to_markup).collect();
-    let doc = MarkupDocument {
-        doctype: None,
-        dialect: MarkupDialect::Xml,
-        roots: kids,
-    };
+    let doc = MarkupDocument { doctype: None, dialect: MarkupDialect::Xml, roots: kids };
     emit_markup(&doc)
 }
 
@@ -25,11 +21,11 @@ fn view_to_markup(node: &ViewNode) -> MarkupNode {
             MarkupNode::Raw(format!("{{{{b.B_{id}}}}}"))
         }
         ViewNode::Element { tag, attrs, children, .. } => {
-            let mut m_attrs = attrs_to_pairs(attrs);
+            let m_attrs = attrs_to_pairs(attrs);
             let kids: Vec<_> = children.iter().map(view_to_markup).collect();
             MarkupNode::Element {
                 tag: tag.clone(),
-                attrs: m_attrs.drain(..).collect(),
+                attrs: m_attrs,
                 children: kids,
                 void: false,
             }
