@@ -1,18 +1,23 @@
-//! Emit JS modules for client / server — oxc transpile + `#server` stubs +
-//! Direct `__vmzCreate` / `__vmzSerialize` / `__vmzPlan` (production Direct emit: no production `render`).
+//! Client / server JS emit — orchestration only; printers live in `vmz-generator`.
 
 use std::path::Path;
 
+use vmz_generator::js::{
+    EmittedJs, ServerBridge as GenServerBridge, emit_client_module, emit_server_module,
+};
 use vmz_types::{MethodDecl, ReactiveComponent, ViewView};
 
 use crate::analyze::AnalyzedScript;
-use crate::emit_direct::{emit_direct_create, emit_vmz_plan, is_direct_eligible};
-use crate::emit_ir::IrDepCursor;
 use crate::plan_build::build_execution_plan;
 use crate::reactive_build::build_reactive_module;
 use crate::structural_build::build_native_view;
 use crate::template::{AttrValue, TemplateAttr, TemplateIr};
-use crate::transpile::transpile_ts;
+
+pub use vmz_generator::js::{
+    bind_field_idents, collect_deps_oxc, emit_direct_create, emit_vmz_plan, event_dom_type,
+    is_component_tag, is_direct_eligible, is_event_attr, is_html_attr, looks_like_ternary,
+    rewrite_ts_spec_imports, rewrite_virtual_import, sanitize_interp, split_ternary_parts,
+};
 
 /// Options when co-located `<script server>` is compiled into a client-facing stub.
 #[derive(Debug, Clone)]
@@ -25,6 +30,16 @@ pub struct ServerBridge {
     pub methods: Vec<MethodDecl>,
 }
 
+impl From<&ServerBridge> for GenServerBridge {
+    fn from(b: &ServerBridge) -> Self {
+        GenServerBridge {
+            module_id: b.module_id.clone(),
+            class_name: b.class_name.clone(),
+            methods: b.methods.clone(),
+        }
+    }
+}
+
 /// Emit client JS from analyzed script + template (no Reactive / View / Plan IR).
 pub fn emit_client_js(
     client_source: &str,
@@ -35,11 +50,9 @@ pub fn emit_client_js(
     emit_client_js_with_ir(client_source, client, template, server, None, None, None)
 }
 
-/// Emit client JS; when `reactive` is provided, Direct bind deps come from that view.
-/// When `view` is provided (Native View), Direct create consumes it.
-// When `plan` is provided, `__vmzPlan` matches `*.program.json` .
-/// production Direct emit: production products never emit `prototype.render` / blueprint.
-pub fn emit_client_js_with_ir(
+/// Emit client JS; when `reactive` / `view` / `plan` are provided, Direct emit consumes them.
+/// Returns `(js, optional source map JSON)`.
+pub fn emit_client_js_with_ir_mapped(
     client_source: &str,
     client: &AnalyzedScript,
     template: &TemplateIr,
@@ -47,9 +60,13 @@ pub fn emit_client_js_with_ir(
     reactive: Option<&ReactiveComponent>,
     view: Option<&ViewView>,
     plan: Option<&vmz_types::ExecutionPlan>,
-) -> Result<String, String> {
+) -> Result<(String, Option<String>), String> {
     let owned = if reactive.is_none() {
-        Some(build_reactive_module(&format!("{}.client", client.decl.name), &client.decl, template))
+        Some(build_reactive_module(
+            &format!("{}.client", client.decl.name),
+            &client.decl,
+            template,
+        ))
     } else {
         None
     };
@@ -70,335 +87,74 @@ pub fn emit_client_js_with_ir(
         .map(|f| f.name.clone())
         .collect();
     let barrier = crate::write_barrier::rewrite_static_path_writes(client_source, &owned_fields);
-    let mut js = transpile_ts(&barrier.source, &format!("{}.client.ts", client.decl.name))?;
-    let has_source_constructor =
-        client.decl.methods.iter().any(|method| method.name == "constructor");
-    js = inject_props_constructor(&js, &client.decl.name, has_source_constructor);
 
-    if let Some(bridge) = server {
-        js = strip_imports_from_module(&js, &bridge.module_id);
-        let stub = emit_server_client_stub(bridge);
-        js = format!("{stub}\n{js}");
-    }
+    let bridge = server.map(GenServerBridge::from);
 
-    let mut field_names: Vec<String> = client
-        .decl
-        .properties
-        .iter()
-        .chain(client.decl.fields.iter())
-        .map(|f| f.name.clone())
-        .collect();
-    field_names.sort();
-    field_names.dedup();
-
-    // production Direct emit: production emit is Direct-only — no blueprint `render`.
-    if !is_direct_eligible(view) {
-        return Err(format!(
-            "vmz: component `{}` is not Direct-eligible; production blueprint render() was removed (production Direct emit)",
-            client.decl.name
-        ));
-    }
-    {
-        let mut ir_direct = IrDepCursor::new(comp);
-        js.push_str(&emit_direct_create(&client.decl.name, view, &field_names, &mut ir_direct));
-        let owned_plan;
-        let plan_ref = match plan {
-            Some(p) => p,
-            None => {
-                owned_plan = build_execution_plan(view);
-                &owned_plan
-            }
-        };
-        if plan_ref.status != vmz_types::PlanStatus::Empty {
-            // Production client omit by default (size). Set VMZ_EMIT_PLAN=1 for debug/gates.
-            let emit_plan = std::env::var("VMZ_EMIT_PLAN")
-                .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-                .unwrap_or(false);
-            if emit_plan {
-                js.push_str(&emit_vmz_plan(&client.decl.name, plan_ref));
-            }
+    let owned_plan;
+    let plan_ref = match plan {
+        Some(p) => Some(p),
+        None => {
+            owned_plan = build_execution_plan(view);
+            Some(&owned_plan)
         }
-    }
-    js.push_str(&emit_props_runtime(&client.decl, !has_source_constructor));
-    js.push_str(&emit_method_rw(&client.decl));
-    let async_wraps = emit_async_task_wraps(&client.decl);
-    if !async_wraps.is_empty() {
-        if !js.contains("import { __vmzRunTask }") && !js.contains("import {__vmzRunTask}") {
-            js = format!("import {{ __vmzRunTask }} from \"vmz:dom\";\n{js}");
-        }
-        js.push_str(&async_wraps);
-    }
-    // Barrier when we rewrote nested writes, or author already used __vmzWritePath*
-    // (e.g. jfb Main) — skip Proxy wrap of large list assigns.
-    let already_barrier =
-        barrier.source.contains("__vmzWritePath") || barrier.source.contains("__vmzArrayMutate");
-    if barrier.rewritten > 0 || already_barrier {
-        js.push_str(&format!("\n{}.__vmzWriteBarrier = true;\n", client.decl.name));
-    }
-    if !js.contains("export default") {
-        js.push_str(&format!("\nexport default {};\n", client.decl.name));
-    }
-    Ok(js)
-}
-
-fn emit_method_rw(decl: &vmz_types::ComponentDecl) -> String {
-    if decl.methods.is_empty() {
-        return String::new();
-    }
-    let mut entries = Vec::new();
-    for m in &decl.methods {
-        if m.reads.is_empty() && m.writes.is_empty() && m.calls.is_empty() && !m.opaque_callee {
-            continue;
-        }
-        let reads = m.reads.iter().map(|r| format!("{r:?}")).collect::<Vec<_>>().join(", ");
-        let writes = m.writes.iter().map(|w| format!("{w:?}")).collect::<Vec<_>>().join(", ");
-        let calls = m.calls.iter().map(|c| format!("{c:?}")).collect::<Vec<_>>().join(", ");
-        entries.push(format!(
-            "  {name:?}: {{ reads: [{reads}], writes: [{writes}], calls: [{calls}], opaque: {opaque}, async: {async_} }}",
-            name = m.name,
-            opaque = if m.opaque_callee { "true" } else { "false" },
-            async_ = if m.is_async { "true" } else { "false" },
-        ));
-    }
-    if entries.is_empty() {
-        return String::new();
-    }
-    format!(
-        "\n{name}.__vmzMethodRw = {{\n{entries}\n}};\n",
-        name = decl.name,
-        entries = entries.join(",\n")
-    )
-}
-
-/// Lift async effects into `__vmzRunTask` (AsyncTask graph first slice).
-/// Matches resource projection: `is_async` methods that become reactive effects.
-fn emit_async_task_wraps(decl: &vmz_types::ComponentDecl) -> String {
-    let mut out = String::new();
-    for m in &decl.methods {
-        if !m.is_async {
-            continue;
-        }
-        if m.reads.is_empty() && m.writes.is_empty() && m.calls.is_empty() && !m.opaque_callee {
-            continue;
-        }
-        // Prototype wrap keeps method body AST untouched; signal is available to future lifts.
-        out.push_str(&format!(
-            "\n{{\n  const __m = {comp}.prototype.{method};\n  {comp}.prototype.{method} = function (...args) {{\n    return __vmzRunTask(this, {key:?}, (_signal, _meta) => __m.apply(this, args));\n  }};\n}}\n",
-            comp = decl.name,
-            method = m.name,
-            key = m.name,
-        ));
-    }
-    out
-}
-
-/// Apply props after `new` (field inits run before constructor body; props must win + re-init state).
-fn emit_props_runtime(decl: &vmz_types::ComponentDecl, ctor_applies_props: bool) -> String {
-    let prop_names: Vec<_> = decl.properties.iter().map(|p| format!("{:?}", p.name)).collect();
-    let state_names: Vec<_> = decl
-        .fields
-        .iter()
-        .filter(|f| !f.name.starts_with('#'))
-        .map(|f| format!("{:?}", f.name))
-        .collect();
-
-    let mut body = String::new();
-    for p in &decl.properties {
-        if let Some(init) = &p.init_text {
-            body.push_str(&format!(
-                "  this.{name} = props.{name} !== undefined ? props.{name} : {init};\n",
-                name = p.name,
-                init = init.trim(),
-            ));
-        } else {
-            body.push_str(&format!(
-                "  if (props.{name} !== undefined) this.{name} = props.{name};\n",
-                name = p.name,
-            ));
-        }
-    }
-    for f in &decl.fields {
-        if f.name.starts_with('#') {
-            continue;
-        }
-        if let Some(init) = &f.init_text {
-            body.push_str(
-                &format!("  this.{name} = {init};\n", name = f.name, init = init.trim(),),
-            );
-        }
-    }
-
-    format!(
-        "\n{name}.__vmzProps = [{props}];\n{name}.__vmzState = [{state}];\n{name}.__vmzCtorAppliesProps = {ctor_applies_props};\n{name}.prototype.__vmzApplyProps = function __vmzApplyProps(props = {{}}) {{\n{body}}};\n",
-        name = decl.name,
-        props = prop_names.join(", "),
-        state = state_names.join(", "),
-        body = body,
-    )
-}
-
-/// Insert `constructor(props)` that calls `__vmzApplyProps` (fields run before body).
-fn inject_props_constructor(js: &str, class_name: &str, has_source_constructor: bool) -> String {
-    if has_source_constructor {
-        return js.to_string();
-    }
-    let needle = format!("class {class_name}");
-    let Some(idx) = js.find(&needle) else {
-        return js.to_string();
     };
-    let after_name = idx + needle.len();
-    let rest = &js[after_name..];
-    let Some(rel) = rest.find('{') else {
-        return js.to_string();
-    };
-    let body_start = after_name + rel + 1;
-    let ctor = "\n\tconstructor(props = {}) {\n\t\tif (typeof this.__vmzApplyProps === \"function\") this.__vmzApplyProps(props);\n\t}\n";
-    let mut out = String::with_capacity(js.len() + ctor.len());
-    out.push_str(&js[..body_start]);
-    out.push_str(ctor);
-    out.push_str(&js[body_start..]);
-    out
+
+    let mut emitted = emit_client_module(
+        &barrier.source,
+        &client.decl,
+        bridge.as_ref(),
+        comp,
+        view,
+        plan_ref,
+    )?;
+    if barrier.rewritten > 0 && !emitted.code.contains("__vmzWriteBarrier") {
+        emitted
+            .code
+            .push_str(&format!("\n{}.__vmzWriteBarrier = true;\n", client.decl.name));
+    }
+    Ok((emitted.code, emitted.map))
 }
 
-/// Emit server JS: strip HTTP surface, transpile, rewrite `#server` imports.
+/// Emit client JS; when `reactive` / `view` / `plan` are provided, Direct emit consumes them.
+pub fn emit_client_js_with_ir(
+    client_source: &str,
+    client: &AnalyzedScript,
+    template: &TemplateIr,
+    server: Option<&ServerBridge>,
+    reactive: Option<&ReactiveComponent>,
+    view: Option<&ViewView>,
+    plan: Option<&vmz_types::ExecutionPlan>,
+) -> Result<String, String> {
+    Ok(emit_client_js_with_ir_mapped(
+        client_source,
+        client,
+        template,
+        server,
+        reactive,
+        view,
+        plan,
+    )?
+    .0)
+}
+
+/// Emit server JS via generator (+ virtual `#server` import rewrite).
 pub fn emit_server_js(
     server_source: &str,
     server: &AnalyzedScript,
     module_id: &str,
 ) -> Result<String, String> {
-    // Decorators are compile-time route metadata; strip before JS emit (Node has no @Get).
-    let stripped = strip_http_surface(server_source);
-    let mut js = transpile_ts(&stripped, &format!("{}.server.ts", server.decl.name))?;
-    js = crate::virtual_server::rewrite_imports_to_relative(&js, module_id);
-    js = format!("// virtual: {module_id}\n{js}");
-    if !js.contains("export default") {
-        js.push_str(&format!("\nexport default {};\n", server.decl.name));
-    }
-    Ok(js)
-}
-
-/// Remove `vmz:http` imports and `@Get(...)` / `@Post(...)` decorators from server source.
-fn strip_http_surface(source: &str) -> String {
-    let mut out = String::new();
-    for line in source.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("import ")
-            && (trimmed.contains("\"vmz:http\"") || trimmed.contains("'vmz:http'"))
-        {
-            continue;
-        }
-        if trimmed.starts_with('@')
-            && ["Get", "Post", "Put", "Delete", "Patch"].iter().any(|v| trimmed[1..].starts_with(v))
-        {
-            continue;
-        }
-        out.push_str(line);
-        out.push('\n');
-    }
-    out
-}
-
-/// Client-side surface for `XxxServer.method` ?static methods ? `callServer`.
-fn emit_server_client_stub(bridge: &ServerBridge) -> String {
-    let mut methods = String::new();
-    for m in &bridge.methods {
-        if m.is_private || m.name == "constructor" {
-            continue;
-        }
-        methods.push_str(&format!(
-            "  static {name}(...args) {{\n    return callServer({id:?}, {name:?}, args);\n  }}\n",
-            name = m.name,
-            id = bridge.module_id,
-        ));
-    }
-    format!(
-        "import {{ callServer }} from \"vmz:runtime\";\n\nexport class {name} {{\n{methods}}}\n",
-        name = bridge.class_name,
-        methods = methods,
-    )
-}
-
-/// Rewrite virtual import specs (`vmz:runtime`, `vmz:dom`) to relative paths.
-pub fn rewrite_virtual_import(
-    js: &str,
-    from_file: &Path,
-    virtual_spec: &str,
-    target: &Path,
-) -> String {
-    let from_dir = from_file.parent().unwrap_or(Path::new("."));
-    let rel = pathdiff_string(from_dir, target);
-    let spec = if rel.starts_with('.') { rel } else { format!("./{rel}") };
-    js.replace(&format!("\"{virtual_spec}\""), &format!("\"{spec}\""))
-        .replace(&format!("'{virtual_spec}'"), &format!("'{spec}'"))
+    let EmittedJs { code, .. } = emit_server_module(
+        server_source,
+        &server.decl,
+        module_id,
+        |js, id| crate::virtual_server::rewrite_imports_to_relative(js, id),
+    )?;
+    Ok(code)
 }
 
 /// Convenience: rewrite `vmz:runtime` only.
 pub fn rewrite_runtime_import(js: &str, from_file: &Path, runtime_file: &Path) -> String {
     rewrite_virtual_import(js, from_file, "vmz:runtime", runtime_file)
-}
-
-/// Author may write `from './foo.ts'`; Node ESM under `dist/` needs `.js`.
-pub fn rewrite_ts_spec_imports(js: &str) -> String {
-    let mut out = String::new();
-    for line in js.lines() {
-        let trimmed = line.trim_start();
-        if trimmed.starts_with("import ") || trimmed.starts_with("export ") {
-            out.push_str(
-                &line
-                    .replace(".tsx\"", ".js\"")
-                    .replace(".tsx'", ".js'")
-                    .replace(".ts\"", ".js\"")
-                    .replace(".ts'", ".js'"),
-            );
-        } else {
-            out.push_str(line);
-        }
-        out.push('\n');
-    }
-    out
-}
-
-fn pathdiff_string(from_dir: &Path, target: &Path) -> String {
-    use std::path::Component;
-    let from_parts: Vec<_> =
-        from_dir.components().filter(|c| !matches!(c, Component::CurDir)).collect();
-    let to_parts: Vec<_> = target.components().collect();
-    // Prefer simple string join with / for ESM.
-    let from_s: Vec<String> = from_parts
-        .iter()
-        .map(|c| c.as_os_str().to_string_lossy().replace('\\', "/"))
-        .filter(|s| !s.is_empty())
-        .collect();
-    let to_s: Vec<String> =
-        to_parts.iter().map(|c| c.as_os_str().to_string_lossy().replace('\\', "/")).collect();
-    let mut i = 0;
-    while i < from_s.len() && i < to_s.len() && from_s[i] == to_s[i] {
-        i += 1;
-    }
-    let mut out = Vec::new();
-    for _ in i..from_s.len() {
-        out.push("..".to_string());
-    }
-    for p in &to_s[i..] {
-        out.push(p.clone());
-    }
-    if out.is_empty() { ".".into() } else { out.join("/") }
-}
-
-fn strip_imports_from_module(js: &str, module_id: &str) -> String {
-    let mut out = String::new();
-    for line in js.lines() {
-        let trimmed = line.trim();
-        let is_import = trimmed.starts_with("import ")
-            && (trimmed.contains(&format!("\"{module_id}\""))
-                || trimmed.contains(&format!("'{module_id}'")));
-        if is_import {
-            continue;
-        }
-        out.push_str(line);
-        out.push('\n');
-    }
-    out
 }
 
 pub(crate) fn attr_interp(attrs: &[TemplateAttr], name: &str) -> Option<String> {
@@ -425,161 +181,4 @@ pub(crate) fn attr_static(attrs: &[TemplateAttr], name: &str) -> Option<String> 
 
 pub(crate) fn has_bare_attr(attrs: &[TemplateAttr], name: &str) -> bool {
     attrs.iter().any(|a| a.name == name && matches!(&a.value, AttrValue::Static(s) if s.is_empty()))
-}
-
-pub(crate) fn collect_deps_oxc(expr: &str, fields: &[String], scope: &[String]) -> Vec<String> {
-    crate::field_rw::collect_template_deps(expr, fields, scope)
-}
-
-/// Top-level `a ? b : c` → (test, consequent, alternate).
-pub(crate) fn split_ternary_parts(expr: &str) -> Option<(String, String, String)> {
-    use oxc_span::GetSpan;
-
-    let src = format!("({expr})");
-    let allocator = oxc_allocator::Allocator::default();
-    let ret = oxc_parser::Parser::new(&allocator, &src, oxc_span::SourceType::ts()).parse();
-    if !ret.diagnostics.is_empty() {
-        return None;
-    }
-    let body = ret.program.body.first()?;
-    let oxc_ast::ast::Statement::ExpressionStatement(es) = body else {
-        return None;
-    };
-    let mut top = &es.expression;
-    while let oxc_ast::ast::Expression::ParenthesizedExpression(p) = top {
-        top = &p.expression;
-    }
-    let oxc_ast::ast::Expression::ConditionalExpression(cond) = top else {
-        return None;
-    };
-    let slice = |span: oxc_span::Span| -> Option<String> {
-        let s = span.start as usize;
-        let e = span.end as usize;
-        if s < e && e <= src.len() { Some(src[s..e].trim().to_string()) } else { None }
-    };
-    let test = slice(cond.test.span())?;
-    let cons = slice(cond.consequent.span())?;
-    let alt = slice(cond.alternate.span())?;
-    if test.is_empty() || cons.is_empty() || alt.is_empty() {
-        return None;
-    }
-    Some((test, cons, alt))
-}
-
-pub(crate) fn looks_like_ternary(expr: &str) -> bool {
-    let chars: Vec<char> = expr.chars().collect();
-    for i in 0..chars.len() {
-        if chars[i] == '?' && (i + 1 >= chars.len() || chars[i + 1] != '.') {
-            return true;
-        }
-    }
-    false
-}
-
-pub(crate) fn is_component_tag(tag: &str) -> bool {
-    tag.chars().next().is_some_and(|c| c.is_ascii_uppercase())
-}
-
-pub(crate) fn is_event_attr(name: &str) -> bool {
-    if name.starts_with('@') {
-        return name.len() > 1;
-    }
-    let bytes = name.as_bytes();
-    bytes.len() >= 3 && bytes[..2].eq_ignore_ascii_case(b"on") && bytes[2].is_ascii_uppercase()
-}
-
-/// DOM event type from `onClick` / `@click` / `@click.stop` / `on:click`.
-pub(crate) fn event_dom_type(name: &str) -> String {
-    let raw = if let Some(rest) = name.strip_prefix('@') {
-        rest
-    } else if let Some(rest) = name.strip_prefix("on:") {
-        rest
-    } else if name.len() >= 3 && name.as_bytes()[..2].eq_ignore_ascii_case(b"on") {
-        &name[2..]
-    } else {
-        name
-    };
-    raw.split('.').next().unwrap_or(raw).to_ascii_lowercase()
-}
-
-/// Trusted raw HTML binding (`html={expr}`) — not a DOM attribute.
-pub(crate) fn is_html_attr(name: &str) -> bool {
-    name == "html"
-}
-
-pub(crate) fn sanitize_interp(expr: &str) -> String {
-    let e = expr.trim();
-    e.strip_prefix("this.").unwrap_or(e).to_string()
-}
-
-/// Rewrite bare field idents to `this.field`.
-/// Skips string / template literal contents so `'is-open'` is not rewritten to `'is-this.open'`.
-pub fn bind_field_idents(
-    expr: &str,
-    fields: &[String],
-    scope: &[String],
-    aliases: &[(String, String)],
-) -> String {
-    if fields.is_empty() && scope.is_empty() && aliases.is_empty() {
-        return expr.trim().to_string();
-    }
-    let mut out = String::new();
-    let chars: Vec<char> = expr.chars().collect();
-    let mut i = 0;
-    while i < chars.len() {
-        let c = chars[i];
-        // Preserve string / template literal spans verbatim (incl. escapes).
-        if c == '\'' || c == '"' || c == '`' {
-            let quote = c;
-            out.push(c);
-            i += 1;
-            while i < chars.len() {
-                let ch = chars[i];
-                out.push(ch);
-                i += 1;
-                if ch == '\\' && i < chars.len() {
-                    out.push(chars[i]);
-                    i += 1;
-                    continue;
-                }
-                if ch == quote {
-                    break;
-                }
-            }
-            continue;
-        }
-        if c.is_ascii_alphabetic() || c == '_' || c == '$' {
-            let start = i;
-            i += 1;
-            while i < chars.len()
-                && (chars[i].is_ascii_alphanumeric() || chars[i] == '_' || chars[i] == '$')
-            {
-                i += 1;
-            }
-            let ident: String = chars[start..i].iter().collect();
-            let preceded_by_this = start >= 5 && {
-                let prev: String = chars[start.saturating_sub(5)..start].iter().collect();
-                prev.ends_with("this.")
-            };
-            // Member access (`opt.value`, `item.label`) must not rewrite the property
-            // name through `this.` just because the component also has a same-named field.
-            let preceded_by_dot = start > 0 && chars[start - 1] == '.';
-            if let Some((_, to)) = aliases.iter().find(|(from, _)| from == &ident) {
-                out.push_str(to);
-            } else if !preceded_by_this
-                && !preceded_by_dot
-                && !scope.iter().any(|s| s == &ident)
-                && fields.iter().any(|f| f == &ident)
-            {
-                out.push_str("this.");
-                out.push_str(&ident);
-            } else {
-                out.push_str(&ident);
-            }
-        } else {
-            out.push(c);
-            i += 1;
-        }
-    }
-    out
 }

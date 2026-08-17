@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "packages/compilers/vmz-protocol",
     "packages/compilers/vmz-types",
+    "packages/compilers/vmz-generator",
     "packages/compilers/vmz-compiler",
     "packages/compilers/vmz-debugger",
     "packages/compilers/vmz-inspector",
@@ -24,6 +25,7 @@ rust-version = "1.85"
 [workspace.dependencies]
 vmz-protocol = { path = "packages/compilers/vmz-protocol" }
 vmz-types = { path = "packages/compilers/vmz-types" }
+vmz-generator = { path = "packages/compilers/vmz-generator" }
 vmz-compiler = { path = "packages/compilers/vmz-compiler" }
 vmz-debugger = { path = "packages/compilers/vmz-debugger" }
 vmz-inspector = { path = "packages/compilers/vmz-inspector" }
@@ -33,13 +35,15 @@ vmz-plugin-sasso = { path = "packages/compilers/vmz-plugin-sasso" }
 oxc_allocator = "0.144.0"
 oxc_ast = "0.144.0"
 oxc_ast_visit = "0.144.0"
-oxc_codegen = "0.144.0"
+oxc_codegen = { version = "0.144.0", features = ["sourcemap"] }
 oxc_diagnostics = "0.144.0"
 oxc_parser = "0.144.0"
 oxc_semantic = "0.144.0"
+oxc_sourcemap = "8.1.2"
 oxc_span = "0.144.0"
 oxc_syntax = "0.144.0"
 oxc_transformer = "0.144.0"
+oxc-css-parser = "0.0.11"
 
 clap = { version = "4.6.6", features = ["derive"] }
 serde = { version = "1.0.229", features = ["derive"] }

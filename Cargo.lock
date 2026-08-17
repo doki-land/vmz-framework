@@ -661,6 +661,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "oxc-css-parser"
+version = "0.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c68989474118e8cfb760b85615bb07f91cf5a85e04632d1dce3aab2785f4fb88"
+dependencies = [
+ "oxc_allocator",
+]
+
+[[package]]
 name = "oxc-miette"
 version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1489,6 +1498,7 @@ dependencies = [
  "sha2",
  "thiserror",
  "vmz-debugger",
+ "vmz-generator",
  "vmz-protocol",
  "vmz-types",
  "walkdir",
@@ -1501,6 +1511,29 @@ dependencies = [
  "serde",
  "serde_json",
  "vmz-protocol",
+]
+
+[[package]]
+name = "vmz-generator"
+version = "0.1.0"
+dependencies = [
+ "oxc-css-parser",
+ "oxc_allocator",
+ "oxc_ast",
+ "oxc_ast_visit",
+ "oxc_codegen",
+ "oxc_parser",
+ "oxc_semantic",
+ "oxc_sourcemap",
+ "oxc_span",
+ "oxc_syntax",
+ "oxc_transformer",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "vmz-protocol",
+ "vmz-types",
 ]
 
 [[package]]
