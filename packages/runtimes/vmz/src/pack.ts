@@ -6,7 +6,7 @@
 // @ts-nocheck
 
 import crypto from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadDeploymentIr, planBundleInputs } from './bundler-adapter.js';
 import { packClientBareImports } from './pack-client-packages.js';

@@ -3,7 +3,7 @@
  */
 // @ts-nocheck
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { semanticIdsForAssembly, sha256Hex, canonicalJson } from './delivery-profile.js';
 import { emitServerArtifact } from './server-artifact.js';
