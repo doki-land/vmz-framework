@@ -141,7 +141,7 @@ fn motion_view_from_overlay_markers_and_cancel_method() {
     assert_eq!(unit.motion.status, StubStatus::Partial);
     assert!(unit.motion.transitions.iter().any(|t| {
         t.kind == MotionTransitionKind::OverlayEnter
-            && t.trigger == "open"
+            && t.trigger == MotionTrigger::Open
             && t.cancelable
             && t.generation
             && t.region == Some(0)
@@ -149,7 +149,7 @@ fn motion_view_from_overlay_markers_and_cancel_method() {
     }));
     assert!(unit.motion.transitions.iter().any(|t| {
         t.kind == MotionTransitionKind::OverlayExit
-            && t.trigger == "dismiss"
+            && t.trigger == MotionTrigger::Dismiss
             && t.cancelable
             && t.generation
     }));

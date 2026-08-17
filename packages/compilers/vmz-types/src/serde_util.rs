@@ -23,7 +23,10 @@ pub fn is_empty_str(s: &str) -> bool {
 }
 
 /// True when the owned string is empty (skip `""` on the wire).
+///
+/// Takes `&String` (not `&str`) so it matches serde `skip_serializing_if` on `String` fields.
 #[inline]
+#[allow(clippy::ptr_arg)]
 pub fn is_empty_string(s: &String) -> bool {
     s.is_empty()
 }
@@ -31,5 +34,5 @@ pub fn is_empty_string(s: &String) -> bool {
 /// True when the optional string is missing or empty.
 #[inline]
 pub fn is_none_or_empty_string(s: &Option<String>) -> bool {
-    s.as_ref().map_or(true, |v| v.is_empty())
+    s.as_ref().is_none_or(|v| v.is_empty())
 }

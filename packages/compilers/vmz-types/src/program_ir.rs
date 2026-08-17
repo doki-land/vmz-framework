@@ -1871,14 +1871,13 @@ fn append_motion_plan_nodes(unit: &mut ProgramUnit) {
     if unit.motion.transitions.is_empty() {
         return;
     }
-    let mut next_id = unit.plan.nodes.iter().map(|n| n.id()).max().map(|m| m + 1).unwrap_or(0);
-    for t in &unit.motion.transitions {
+    let start_id = unit.plan.nodes.iter().map(|n| n.id()).max().map(|m| m + 1).unwrap_or(0);
+    for (id, t) in (start_id..).zip(&unit.motion.transitions) {
         unit.plan.nodes.push(PlanNode::MotionTransition {
-            id: next_id,
+            id,
             region: t.region,
             tag: Some(t.name.clone()),
         });
-        next_id += 1;
     }
     if unit.plan.status == PlanStatus::Empty {
         unit.plan.status = PlanStatus::Partial;

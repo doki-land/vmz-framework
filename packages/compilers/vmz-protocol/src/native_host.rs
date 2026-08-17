@@ -320,10 +320,11 @@ impl std::fmt::Display for ShellLogLevel {
 ///
 /// **Closed** unit enum (`kebab-case`). Distinct from [`AssetMode`] (`local` |
 /// `hybrid` | `remote`) which names WebView shell packaging, not SSR/CDN.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum ContentDeliveryMode {
     /// Content shipped inside the host / package.
+    #[default]
     Bundled,
     /// Content fetched remotely (requires integrity).
     Remote,
@@ -342,12 +343,6 @@ impl ContentDeliveryMode {
             Self::Remote => "remote",
             Self::Hybrid => "hybrid",
         }
-    }
-}
-
-impl Default for ContentDeliveryMode {
-    fn default() -> Self {
-        Self::Bundled
     }
 }
 
@@ -725,10 +720,11 @@ impl std::fmt::Display for ShellAdapterKind {
 /// Closed host package update channel (shared by Delivery + Native update policy).
 ///
 /// **Closed** unit enum (`kebab-case`): `rebuild` | `store` | `hot` | `hybrid`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum UpdateChannel {
     /// Full rebuild delivery channel.
+    #[default]
     Rebuild,
     /// Store / package-manager channel.
     Store,
@@ -753,12 +749,6 @@ impl UpdateChannel {
     }
 }
 
-impl Default for UpdateChannel {
-    fn default() -> Self {
-        Self::Rebuild
-    }
-}
-
 impl std::fmt::Display for UpdateChannel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
@@ -766,10 +756,11 @@ impl std::fmt::Display for UpdateChannel {
 }
 
 /// Closed rollback strategy token for update policies.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum UpdateRollback {
     /// Roll back to the previous signed bundle.
+    #[default]
     PreviousBundle,
 }
 
@@ -779,12 +770,6 @@ impl UpdateRollback {
         match self {
             Self::PreviousBundle => "previous-bundle",
         }
-    }
-}
-
-impl Default for UpdateRollback {
-    fn default() -> Self {
-        Self::PreviousBundle
     }
 }
 

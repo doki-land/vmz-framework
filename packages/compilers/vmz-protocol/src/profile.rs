@@ -532,9 +532,10 @@ impl std::fmt::Display for LifecycleHostKind {
 /// Closed deep-link acceptance policy for [`NavigationBinding`].
 ///
 /// Wire labels keep host vocabulary (`url`, `mini-path`, `app-url`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub enum DeepLinkPolicy {
     /// Browser / history URL deep links.
+    #[default]
     #[serde(rename = "url")]
     Url,
     /// Mini Program path deep links.
@@ -559,12 +560,6 @@ impl DeepLinkPolicy {
     }
 }
 
-impl Default for DeepLinkPolicy {
-    fn default() -> Self {
-        Self::Url
-    }
-}
-
 impl std::fmt::Display for DeepLinkPolicy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
@@ -575,10 +570,11 @@ impl std::fmt::Display for DeepLinkPolicy {
 ///
 /// Compound / host-API labels use explicit renames (`history.back`,
 /// `navigateBack`, `native.back`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, JsonSchema)]
 pub enum BackNavigationPolicy {
     /// Browser `history.back`.
     #[serde(rename = "history.back")]
+    #[default]
     HistoryBack,
     /// Mini Program `navigateBack`.
     #[serde(rename = "navigateBack")]
@@ -602,12 +598,6 @@ impl BackNavigationPolicy {
     }
 }
 
-impl Default for BackNavigationPolicy {
-    fn default() -> Self {
-        Self::HistoryBack
-    }
-}
-
 impl std::fmt::Display for BackNavigationPolicy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
@@ -618,10 +608,11 @@ impl std::fmt::Display for BackNavigationPolicy {
 ///
 /// Compound labels keep `+` (`bfcache+resume`, `page-data+resume`,
 /// `snapshot+reattach`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, JsonSchema)]
 pub enum StateRestorationPolicy {
     /// Browser bfcache plus resume entries.
     #[serde(rename = "bfcache+resume")]
+    #[default]
     BfcacheResume,
     /// Mini page-data plus resume entries.
     #[serde(rename = "page-data+resume")]
@@ -642,12 +633,6 @@ impl StateRestorationPolicy {
             Self::PageDataResume => "page-data+resume",
             Self::SnapshotReattach => "snapshot+reattach",
         }
-    }
-}
-
-impl Default for StateRestorationPolicy {
-    fn default() -> Self {
-        Self::BfcacheResume
     }
 }
 
@@ -877,10 +862,11 @@ impl std::fmt::Display for SurfaceRejectReason {
 /// Closed DeliveryProfile security-policy token.
 ///
 /// Wire keeps `+` in compound labels (`origin+csp`, `app-sandbox+integrity`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, JsonSchema)]
 pub enum DeliverySecurityToken {
     /// Browser origin + CSP policy.
     #[serde(rename = "origin+csp")]
+    #[default]
     OriginCsp,
     /// Mini Program sandbox policy.
     #[serde(rename = "mini-sandbox")]
@@ -901,12 +887,6 @@ impl DeliverySecurityToken {
     }
 }
 
-impl Default for DeliverySecurityToken {
-    fn default() -> Self {
-        Self::OriginCsp
-    }
-}
-
 impl std::fmt::Display for DeliverySecurityToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
@@ -914,10 +894,11 @@ impl std::fmt::Display for DeliverySecurityToken {
 }
 
 /// Closed CSP / sandbox profile for [`DeliverySecurityPolicy`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum CspProfile {
     /// Strict browser CSP.
+    #[default]
     Strict,
     /// Mini Program sandbox profile.
     Mini,
@@ -933,12 +914,6 @@ impl CspProfile {
             Self::Mini => "mini",
             Self::App => "app",
         }
-    }
-}
-
-impl Default for CspProfile {
-    fn default() -> Self {
-        Self::Strict
     }
 }
 
@@ -1661,10 +1636,11 @@ impl HostProfile {
 /// Closed digest algorithm for [`ResolutionDigest`].
 ///
 /// Algebraic fixtures currently freeze a single wire label `sha256`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum DigestAlgorithm {
     /// SHA-256 hex digest (algebraic; not packaging crypto).
+    #[default]
     Sha256,
 }
 
@@ -1677,12 +1653,6 @@ impl DigestAlgorithm {
         match self {
             Self::Sha256 => "sha256",
         }
-    }
-}
-
-impl Default for DigestAlgorithm {
-    fn default() -> Self {
-        Self::Sha256
     }
 }
 
@@ -2517,11 +2487,11 @@ impl LifecycleMappingTable {
                     schema: LIFECYCLE_MAPPING_ENTRY_SCHEMA.into(),
                     host_id: host.host_id.clone(),
                     host_event: b.host_event.clone(),
-                    vmz_lifecycle: b.vmz_lifecycle.clone(),
+                    vmz_lifecycle: b.vmz_lifecycle,
                     may_repeat: b.may_repeat,
                     guaranteed: b.guaranteed,
                     may_be_missing_after_crash: b.may_be_missing_after_crash,
-                    persistence_window: b.persistence_window.clone(),
+                    persistence_window: b.persistence_window,
                     cancels_capabilities: b.cancels_capabilities,
                 });
             }
@@ -3099,6 +3069,7 @@ pub struct ConformanceScenario {
 }
 
 impl ConformanceScenario {
+    #[allow(clippy::too_many_arguments)]
     fn run_for(
         host_kind: LifecycleHostKind,
         surface_role: ConformanceSurfaceRole,
