@@ -13,7 +13,7 @@ pub struct Args {
     #[command(flatten)]
     pub paths: PathArgs,
 
-    /// Check formatting without writing changes
+    /// Check formatting without writing (like `cargo fmt --check`)
     #[arg(long)]
     pub check: bool,
 }
