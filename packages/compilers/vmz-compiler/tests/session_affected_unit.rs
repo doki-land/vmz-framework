@@ -1,6 +1,5 @@
 //! Moved from `src/session/affected.rs` (cargo-cry: tests next to Cargo.toml).
 
-use std::path::PathBuf;
 
 use std::fs;
 use vmz_compiler::session::affected::*;
@@ -22,7 +21,7 @@ fn leaf_vmz_dirt_affects_only_that_unit_without_importers() {
         "<template><p>b</p></template>\n<script client>\nexport default class B {}\n</script>\n",
     )
     .unwrap();
-    let plan = plan_affected(&dir, &[a.clone()]);
+    let plan = plan_affected(&dir, std::slice::from_ref(&a));
     assert!(!plan.full);
     assert_eq!(plan.units.len(), 1);
     assert!(paths_eq(&plan.units[0].source, &a));
@@ -48,7 +47,7 @@ fn dirty_component_rebuilds_importing_page() {
         "<template><Card /></template>\n<script client>\nexport default class Index {}\n</script>\n",
     )
     .unwrap();
-    let plan = plan_affected(&dir, &[card.clone()]);
+    let plan = plan_affected(&dir, std::slice::from_ref(&card));
     assert!(!plan.full);
     let chunks: Vec<_> = plan.units.iter().map(|u| u.chunk_id.as_str()).collect();
     assert!(chunks.contains(&"components/Card"));
@@ -72,7 +71,7 @@ fn dirty_designs_forces_full_rebuild() {
     .unwrap();
     let token = dir.join("designs/tokens/colors.json");
     fs::write(&token, "{\"colors\":{\"action\":\"#3366ff\"}}").unwrap();
-    let plan = plan_affected(&dir, &[token.clone()]);
+    let plan = plan_affected(&dir, std::slice::from_ref(&token));
     assert!(plan.full, "designs dirt must be full");
     let _ = fs::remove_dir_all(&dir);
 }

@@ -53,7 +53,7 @@ fn resolves_explicit_ids_not_directory_names() {
     )
     .unwrap();
 
-    let report = check_applications(&host, &[child.clone()]);
+    let report = check_applications(&host, std::slice::from_ref(&child));
     assert!(!report.has_errors(), "{:?}", report.diagnostics);
     assert_eq!(report.descriptors[0].id.as_str(), "counter");
     assert_eq!(report.catalog.applications[0].id.as_str(), "counter");

@@ -319,7 +319,7 @@ fn build_proxy_dispatch(
         .iter()
         .map(|m| (normalize_base(&m.route_base), m.application_id.clone()))
         .collect();
-    mounts.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+    mounts.sort_by_key(|m| std::cmp::Reverse(m.0.len()));
 
     for (base, id) in &mounts {
         let status = if unavailable.contains(id.as_str()) { 503 } else { 200 };

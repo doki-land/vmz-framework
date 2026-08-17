@@ -57,9 +57,7 @@ fn pathdiff_fallback(from_dir: &Path, target: &Path) -> String {
         i += 1;
     }
     let mut out = Vec::new();
-    for _ in i..from_parts.len() {
-        out.push("..");
-    }
+    out.extend(std::iter::repeat_n("..", from_parts.len() - i));
     for p in &to_parts[i..] {
         out.push(*p);
     }

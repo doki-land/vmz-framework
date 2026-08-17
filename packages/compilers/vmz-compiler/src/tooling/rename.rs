@@ -137,7 +137,7 @@ pub fn apply_workspace_edits(root: &Path, plan: &WorkspaceEditPlan) -> Workspace
         };
         let bytes = original.as_bytes();
         let mut ordered = edits.clone();
-        ordered.sort_by(|a, b| b.start.cmp(&a.start));
+        ordered.sort_by_key(|e| std::cmp::Reverse(e.start));
         let mut out = original.clone();
         for e in ordered {
             let start = e.start as usize;

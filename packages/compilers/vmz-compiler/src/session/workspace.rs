@@ -823,7 +823,8 @@ impl Workspace {
 
     /// miniprogram: TemplateSurface static slice (neutral template + logic data).
     pub fn lower_miniprogram_static_slice(&self) -> String {
-        crate::miniprogram_static_slice::lower_miniprogram_static_slices(&self.options.root).to_json()
+        crate::miniprogram_static_slice::lower_miniprogram_static_slices(&self.options.root)
+            .to_json()
     }
 
     /// miniprogram: BindingId patch table + event table.
@@ -834,7 +835,8 @@ impl Workspace {
 
     /// miniprogram: structure (if/each/component/slot) + lifecycle/dispose tables.
     pub fn lower_miniprogram_structure(&self) -> String {
-        crate::miniprogram_structure::lower_miniprogram_structure_slices(&self.options.root).to_json()
+        crate::miniprogram_structure::lower_miniprogram_structure_slices(&self.options.root)
+            .to_json()
     }
 
     /// miniprogram: Route realization + `#server` stubs + Canonical Style.
@@ -853,7 +855,8 @@ impl Workspace {
 
     /// miniprogram: multi-adapter (≥2 packaging stubs) conformance.
     pub fn lower_miniprogram_multi_adapter(&self) -> String {
-        crate::miniprogram_multi_adapter::lower_miniprogram_multi_adapter(&self.options.root).to_json()
+        crate::miniprogram_multi_adapter::lower_miniprogram_multi_adapter(&self.options.root)
+            .to_json()
     }
 
     /// HostProfile / DeliveryProfile protocol check.

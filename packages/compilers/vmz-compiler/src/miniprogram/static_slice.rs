@@ -13,12 +13,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use walkdir::WalkDir;
 
 use vmz_protocol::{
-    CheckReportStatus, DIAG_ARTIFACT_INVALID, DIAG_PLATFORM_UNSUPPORTED, MINI_PROGRAM_ARTIFACT_SCHEMA,
-    MiniProgramArtifact, Severity, TargetDiagnostic, VmzModuleKind,
+    CheckReportStatus, DIAG_ARTIFACT_INVALID, DIAG_PLATFORM_UNSUPPORTED,
+    MINI_PROGRAM_ARTIFACT_SCHEMA, MiniProgramArtifact, Severity, TargetDiagnostic, VmzModuleKind,
 };
 use vmz_types::{ProgramModule, ViewAttrValue, ViewNode, ViewStatus, ViewView};
 
@@ -68,7 +68,12 @@ impl MiniStaticSliceReport {
     }
 }
 
-fn diag(path: &str, severity: Severity, message: impl Into<String>, code: &str) -> TargetDiagnostic {
+fn diag(
+    path: &str,
+    severity: Severity,
+    message: impl Into<String>,
+    code: &str,
+) -> TargetDiagnostic {
     TargetDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
@@ -294,11 +299,8 @@ pub fn lower_miniprogram_static_slices(root: &Path) -> MiniStaticSliceReport {
     let _ = fs::create_dir_all(&out_mini);
 
     for prog_path in &programs {
-        let rel = prog_path
-            .strip_prefix(root)
-            .unwrap_or(prog_path)
-            .to_string_lossy()
-            .replace('\\', "/");
+        let rel =
+            prog_path.strip_prefix(root).unwrap_or(prog_path).to_string_lossy().replace('\\', "/");
         let text = match fs::read_to_string(prog_path) {
             Ok(t) => t,
             Err(e) => {
@@ -325,23 +327,22 @@ pub fn lower_miniprogram_static_slices(root: &Path) -> MiniStaticSliceReport {
         };
         for unit in &module.units {
             let is_page = matches!(unit.deployment.unit_kind, Some(VmzModuleKind::Page))
-                || unit.deployment.chunk_id.as_deref().is_some_and(|c| {
-                    c == "pages/index" || c.starts_with("pages/")
-                });
+                || unit
+                    .deployment
+                    .chunk_id
+                    .as_deref()
+                    .is_some_and(|c| c == "pages/index" || c.starts_with("pages/"));
             if !is_page {
                 continue;
             }
-            let chunk = unit
-                .deployment
-                .chunk_id
-                .clone()
-                .unwrap_or_else(|| unit.name.clone());
+            let chunk = unit.deployment.chunk_id.clone().unwrap_or_else(|| unit.name.clone());
             match lower_view_static_slice("mini-program", &unit.view, &rel) {
                 Ok((artifact, mut unit_diags)) => {
                     diagnostics.append(&mut unit_diags);
                     let file_name = format!("{}.mini.json", chunk.replace('/', "__"));
                     let abs = out_mini.join(&file_name);
-                    let body = serde_json::to_string_pretty(&artifact).unwrap_or_else(|_| "{}".into());
+                    let body =
+                        serde_json::to_string_pretty(&artifact).unwrap_or_else(|_| "{}".into());
                     if let Err(e) = fs::write(&abs, format!("{body}\n")) {
                         diagnostics.push(diag(
                             &rel,
@@ -351,11 +352,8 @@ pub fn lower_miniprogram_static_slices(root: &Path) -> MiniStaticSliceReport {
                         ));
                         continue;
                     }
-                    let artifact_rel = abs
-                        .strip_prefix(root)
-                        .unwrap_or(&abs)
-                        .to_string_lossy()
-                        .replace('\\', "/");
+                    let artifact_rel =
+                        abs.strip_prefix(root).unwrap_or(&abs).to_string_lossy().replace('\\', "/");
                     artifacts.push(MiniStaticSliceUnitResult {
                         chunk_id: chunk,
                         unit_name: unit.name.clone(),

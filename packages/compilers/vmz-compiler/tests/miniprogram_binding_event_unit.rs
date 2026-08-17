@@ -1,7 +1,7 @@
 //! Binding/event table unit tests (TemplateSurface).
 
 use vmz_compiler::miniprogram::binding_event::{
-    lower_view_binding_event, MINI_DATA_PATCH_TABLE_SCHEMA, MINI_EVENT_TABLE_SCHEMA,
+    MINI_DATA_PATCH_TABLE_SCHEMA, MINI_EVENT_TABLE_SCHEMA, lower_view_binding_event,
 };
 use vmz_types::{
     Binding, BindingId, Effect, EffectId, ExprId, FieldId, FieldKind, IrDepPath, ReactiveComponent,
@@ -20,20 +20,13 @@ fn counter_fixture() -> (ViewView, ReactiveComponent) {
                 value: ViewAttrValue::Interp { expr: "increment".into() },
                 binding: Some(BindingId(0)),
             }],
-            children: vec![ViewNode::Interp {
-                expr: "n".into(),
-                binding: Some(BindingId(1)),
-            }],
+            children: vec![ViewNode::Interp { expr: "n".into(), binding: Some(BindingId(1)) }],
             each: None,
         }],
     };
     let reactive = ReactiveComponent {
         name: "IndexPage".into(),
-        state_slots: vec![StateSlot {
-            id: FieldId(0),
-            name: "n".into(),
-            kind: FieldKind::State,
-        }],
+        state_slots: vec![StateSlot { id: FieldId(0), name: "n".into(), kind: FieldKind::State }],
         properties: vec![],
         bindings: vec![
             Binding::Event {
@@ -91,7 +84,9 @@ fn counter_emits_handler_and_affected_text_binding() {
         serde_json::from_str(art.data_patch_table.as_deref().unwrap()).unwrap();
     assert_eq!(patch["schema"], MINI_DATA_PATCH_TABLE_SCHEMA);
     assert!(patch["bindings"].as_array().unwrap().iter().any(|b| b["bindingId"] == 1));
-    assert!(patch["fields"].as_array().unwrap().iter().any(|f| {
-        f["fieldId"] == 0 && f["affects"].as_array().unwrap().iter().any(|a| a == 1)
-    }));
+    assert!(
+        patch["fields"].as_array().unwrap().iter().any(|f| {
+            f["fieldId"] == 0 && f["affects"].as_array().unwrap().iter().any(|a| a == 1)
+        })
+    );
 }

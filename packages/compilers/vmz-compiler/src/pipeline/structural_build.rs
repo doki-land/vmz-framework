@@ -343,9 +343,7 @@ fn build_attrs(
                     }
                     value_text.push_str(&tw_tokens.join(" "));
                 }
-                let value = if value_text.is_empty() && a.name == "else" {
-                    ViewAttrValue::Bare
-                } else if value_text.is_empty() {
+                let value = if value_text.is_empty() {
                     ViewAttrValue::Bare
                 } else {
                     ViewAttrValue::Static { value: value_text }

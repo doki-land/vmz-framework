@@ -134,6 +134,7 @@ fn artifact_ref(kind: ArtifactSliceKind, material: &str) -> ArtifactRef {
     ArtifactRef { kind, hash: sha256_hex_bytes(material.as_bytes()) }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn compute_artifact_integrity(
     application_id: &str,
     descriptor_hash: &str,

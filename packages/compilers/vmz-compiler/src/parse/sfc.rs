@@ -371,7 +371,7 @@ fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> 
         if bytes[i] != b'<' {
             return Err(err(
                 path,
-                &format!("unexpected content at byte {i}; expected a SFC block tag"),
+                format!("unexpected content at byte {i}; expected a SFC block tag"),
             ));
         }
 
@@ -390,7 +390,7 @@ fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> 
             i += 1;
         }
         if i >= bytes.len() {
-            return Err(err(path, &format!("unclosed tag starting at byte {tag_start}")));
+            return Err(err(path, format!("unclosed tag starting at byte {tag_start}")));
         }
         i += 1; // '>'
         let content_start = i;
@@ -416,14 +416,14 @@ fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> 
                 }
             }
             other => {
-                return Err(err(path, &format!("unknown SFC tag `<{other}>`")));
+                return Err(err(path, format!("unknown SFC tag `<{other}>`")));
             }
         };
 
         if self_closing && !matches!(role, BlockRole::Router | BlockRole::Meta) {
             return Err(err(
                 path,
-                &format!("self-closing `<{name} />` is only allowed for `<router>` / `<meta>`"),
+                format!("self-closing `<{name} />` is only allowed for `<router>` / `<meta>`"),
             ));
         }
 
@@ -431,7 +431,7 @@ fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> 
             (String::new(), content_start)
         } else {
             let Some(rel) = source[content_start..].find(close) else {
-                return Err(err(path, &format!("missing closing `{close}`")));
+                return Err(err(path, format!("missing closing `{close}`")));
             };
             let content_end = content_start + rel;
             let content = source[content_start..content_end].to_string();

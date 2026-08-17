@@ -9,11 +9,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use walkdir::WalkDir;
 
 use vmz_protocol::{
-    CheckReportStatus, DIAG_ARTIFACT_INVALID, MiniProgramArtifact, MINI_PROGRAM_ARTIFACT_SCHEMA,
+    CheckReportStatus, DIAG_ARTIFACT_INVALID, MINI_PROGRAM_ARTIFACT_SCHEMA, MiniProgramArtifact,
     PLAN_SCHEMA, Severity, TargetDiagnostic, VmzModuleKind,
 };
 use vmz_types::{
@@ -67,7 +67,12 @@ impl MiniStructureReport {
     }
 }
 
-fn diag(path: &str, severity: Severity, message: impl Into<String>, code: &str) -> TargetDiagnostic {
+fn diag(
+    path: &str,
+    severity: Severity,
+    message: impl Into<String>,
+    code: &str,
+) -> TargetDiagnostic {
     TargetDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
@@ -240,7 +245,10 @@ fn build_lifecycle_table(unit: &ProgramUnit) -> Value {
     })
 }
 
-fn build_data_patch_table(reactive: &ReactiveComponent, patch_bindings: &BTreeMap<u32, ()>) -> Value {
+fn build_data_patch_table(
+    reactive: &ReactiveComponent,
+    patch_bindings: &BTreeMap<u32, ()>,
+) -> Value {
     let mut bindings_out = Vec::new();
     let mut field_affects: BTreeMap<u32, BTreeSet<u32>> = BTreeMap::new();
 
@@ -358,17 +366,16 @@ fn emit_node(
                     patch_bindings.insert(list_b.0, ());
                     attr_s.push_str(&format!(" data-vmz-each=\"b.B_{}\"", list_b.0));
                 } else {
-                    attr_s.push_str(&format!(
-                        " data-vmz-each=\"{}\"",
-                        escape_xml_attr(&e.list_expr)
-                    ));
+                    attr_s
+                        .push_str(&format!(" data-vmz-each=\"{}\"", escape_xml_attr(&e.list_expr)));
                 }
                 attr_s.push_str(&format!(" data-vmz-as=\"{}\"", escape_xml_attr(&e.as_name)));
                 if let Some(key_b) = e.key_binding {
                     patch_bindings.insert(key_b.0, ());
                     attr_s.push_str(&format!(" data-vmz-key=\"b.B_{}\"", key_b.0));
                 } else if let Some(key_expr) = &e.key_expr {
-                    attr_s.push_str(&format!(" data-vmz-key-expr=\"{}\"", escape_xml_attr(key_expr)));
+                    attr_s
+                        .push_str(&format!(" data-vmz-key-expr=\"{}\"", escape_xml_attr(key_expr)));
                 }
                 if let Some(r) = e.region {
                     attr_s.push_str(&format!(" data-vmz-region=\"{}\"", r.0));
@@ -588,14 +595,12 @@ fn collect_program_json(root: &Path) -> Vec<PathBuf> {
 }
 
 fn is_page_or_app(unit: &ProgramUnit) -> bool {
-    matches!(
-        unit.deployment.unit_kind,
-        Some(VmzModuleKind::Page) | Some(VmzModuleKind::App)
-    ) || unit
-        .deployment
-        .chunk_id
-        .as_deref()
-        .is_some_and(|c| c.starts_with("pages/") || c == "Application")
+    matches!(unit.deployment.unit_kind, Some(VmzModuleKind::Page) | Some(VmzModuleKind::App))
+        || unit
+            .deployment
+            .chunk_id
+            .as_deref()
+            .is_some_and(|c| c.starts_with("pages/") || c == "Application")
 }
 
 /// Lower page + app units with structure/lifecycle; write `_vmz/mini/*.mini.json`.
@@ -623,11 +628,8 @@ pub fn lower_miniprogram_structure_slices(root: &Path) -> MiniStructureReport {
     let _ = fs::create_dir_all(&out_mini);
 
     for prog_path in &programs {
-        let rel = prog_path
-            .strip_prefix(root)
-            .unwrap_or(prog_path)
-            .to_string_lossy()
-            .replace('\\', "/");
+        let rel =
+            prog_path.strip_prefix(root).unwrap_or(prog_path).to_string_lossy().replace('\\', "/");
         let text = match fs::read_to_string(prog_path) {
             Ok(t) => t,
             Err(e) => {
@@ -656,17 +658,14 @@ pub fn lower_miniprogram_structure_slices(root: &Path) -> MiniStructureReport {
             if !is_page_or_app(unit) {
                 continue;
             }
-            let chunk = unit
-                .deployment
-                .chunk_id
-                .clone()
-                .unwrap_or_else(|| unit.name.clone());
+            let chunk = unit.deployment.chunk_id.clone().unwrap_or_else(|| unit.name.clone());
             match lower_unit_structure("mini-program", unit, &rel) {
                 Ok((artifact, mut unit_diags)) => {
                     diagnostics.append(&mut unit_diags);
                     let file_name = format!("{}.mini.json", chunk.replace('/', "__"));
                     let abs = out_mini.join(&file_name);
-                    let body = serde_json::to_string_pretty(&artifact).unwrap_or_else(|_| "{}".into());
+                    let body =
+                        serde_json::to_string_pretty(&artifact).unwrap_or_else(|_| "{}".into());
                     if let Err(e) = fs::write(&abs, format!("{body}\n")) {
                         diagnostics.push(diag(
                             &rel,
@@ -676,11 +675,8 @@ pub fn lower_miniprogram_structure_slices(root: &Path) -> MiniStructureReport {
                         ));
                         continue;
                     }
-                    let artifact_rel = abs
-                        .strip_prefix(root)
-                        .unwrap_or(&abs)
-                        .to_string_lossy()
-                        .replace('\\', "/");
+                    let artifact_rel =
+                        abs.strip_prefix(root).unwrap_or(&abs).to_string_lossy().replace('\\', "/");
                     artifacts.push(MiniStructureUnitResult {
                         chunk_id: chunk,
                         unit_name: unit.name.clone(),

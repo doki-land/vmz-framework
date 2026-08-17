@@ -1,7 +1,7 @@
 //! Static-slice unit tests (TemplateSurface lowering).
 
 use vmz_compiler::miniprogram::static_slice::{
-    lower_view_static_slice, MINI_LOGIC_SCHEMA, MINI_TEMPLATE_DIALECT,
+    MINI_LOGIC_SCHEMA, MINI_TEMPLATE_DIALECT, lower_view_static_slice,
 };
 use vmz_protocol::DIAG_PLATFORM_UNSUPPORTED;
 use vmz_types::{BindingId, ViewNode, ViewStatus, ViewView};
@@ -22,10 +22,7 @@ fn lowers_hello_counter_static_view() {
             ViewNode::Element {
                 tag: "button".into(),
                 attrs: vec![],
-                children: vec![ViewNode::Interp {
-                    expr: "n".into(),
-                    binding: Some(BindingId(0)),
-                }],
+                children: vec![ViewNode::Interp { expr: "n".into(), binding: Some(BindingId(0)) }],
                 each: None,
             },
         ],
@@ -50,11 +47,7 @@ fn rejects_if_in_static_slice() {
         status: ViewStatus::Native,
         binding_ids: vec![],
         region_ids: vec![],
-        roots: vec![ViewNode::If {
-            region: None,
-            binding: None,
-            branches: vec![],
-        }],
+        roots: vec![ViewNode::If { region: None, binding: None, branches: vec![] }],
     };
     let err = lower_view_static_slice("mini-program", &view, "fixture").unwrap_err();
     assert!(err.iter().any(|d| d.code_string().as_deref() == Some(DIAG_PLATFORM_UNSUPPORTED)));

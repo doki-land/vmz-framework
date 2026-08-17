@@ -266,7 +266,7 @@ pub fn solve_capabilities(
         resolutions.push(CapabilityResolution {
             capability_id: binding.capability_id.clone(),
             provider_id: binding.provider_id.clone(),
-            execution_domain: binding.execution_domain.clone(),
+            execution_domain: binding.execution_domain,
             transport_id: binding.transport_id.clone(),
             region_id: req.region_id.clone(),
         });
@@ -341,7 +341,7 @@ pub fn solve_routes(
         realizations.push(RouteRealization {
             route_id: route.route_id.clone(),
             route_realizer_id: nav.route_realizer_id.clone(),
-            stack_model: nav.stack_model.clone(),
+            stack_model: nav.stack_model,
             owning_lifetime_region: owning,
             surface_ids,
         });

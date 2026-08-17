@@ -106,10 +106,7 @@ fn resolve_descriptors(
             continue;
         };
         let package_name = value.get("name").and_then(|n| n.as_str()).map(str::to_string);
-        match parse_descriptor(app, root, package_name.as_deref(), &pkg_path, &text, diagnostics) {
-            Some(d) => out.push(d),
-            None => {}
-        }
+        if let Some(d) = parse_descriptor(app, root, package_name.as_deref(), &pkg_path, &text, diagnostics) { out.push(d) }
     }
     out
 }

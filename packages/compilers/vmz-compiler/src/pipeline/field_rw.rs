@@ -640,7 +640,7 @@ pub fn is_forbidden_factory(name: &str) -> bool {
         "createComment",
         "createRange",
     ];
-    if ALLOW_CREATE.iter().any(|a| *a == name) {
+    if ALLOW_CREATE.contains(&name) {
         return false;
     }
     // `useX` — always forbidden as a state API surface.
@@ -667,7 +667,7 @@ pub fn is_forbidden_factory(name: &str) -> bool {
         "createSharedState",
         "createGlobalState",
     ];
-    FORBIDDEN_CREATE.iter().any(|a| *a == name)
+    FORBIDDEN_CREATE.contains(&name)
 }
 
 /// Collect reads of `this.<field>` from an expression (e.g. field initializer).

@@ -9,12 +9,12 @@ use std::fs;
 use std::path::Path;
 
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use vmz_protocol::{CheckReportStatus, DIAG_ARTIFACT_INVALID, Severity, TargetDiagnostic};
 
 use super::route_server_style::{
-    lower_miniprogram_route_server_style_slices, MiniRouteServerStyleReport,
+    MiniRouteServerStyleReport, lower_miniprogram_route_server_style_slices,
 };
 use super::static_slice::MINI_TEMPLATE_DIALECT;
 
@@ -60,16 +60,17 @@ impl MiniToolingDeployReport {
     }
 }
 
-fn diag(path: &str, severity: Severity, message: impl Into<String>, code: &str) -> TargetDiagnostic {
+fn diag(
+    path: &str,
+    severity: Severity,
+    message: impl Into<String>,
+    code: &str,
+) -> TargetDiagnostic {
     TargetDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
 fn build_deploy_package(rss: &MiniRouteServerStyleReport) -> Value {
-    let pages = rss
-        .route_table
-        .get("pages")
-        .cloned()
-        .unwrap_or_else(|| json!([]));
+    let pages = rss.route_table.get("pages").cloned().unwrap_or_else(|| json!([]));
     let artifacts: Vec<Value> = rss
         .artifacts
         .iter()
@@ -88,9 +89,8 @@ fn build_deploy_package(rss: &MiniRouteServerStyleReport) -> Value {
     for a in &rss.artifacts {
         if let Some(man_raw) = &a.artifact.manifest {
             if let Ok(man) = serde_json::from_str::<Value>(man_raw) {
-                if let Some(caps) = man
-                    .pointer("/serverTransport/capabilities")
-                    .and_then(|v| v.as_array())
+                if let Some(caps) =
+                    man.pointer("/serverTransport/capabilities").and_then(|v| v.as_array())
                 {
                     for c in caps {
                         let mut row = c.clone();
@@ -224,11 +224,7 @@ pub fn lower_miniprogram_tooling_deploy(root: &Path) -> MiniToolingDeployReport 
     }
 
     // Host harness sidecar for Node test / dev discovery (same constraints as package.host).
-    let harness_abs = root
-        .join("dist")
-        .join("_vmz")
-        .join("mini-deploy")
-        .join("host-harness.json");
+    let harness_abs = root.join("dist").join("_vmz").join("mini-deploy").join("host-harness.json");
     let harness = json!({
         "schema": MINI_HOST_SCHEMA,
         "packagePath": package_rel,
@@ -237,10 +233,7 @@ pub fn lower_miniprogram_tooling_deploy(root: &Path) -> MiniToolingDeployReport 
     });
     let _ = fs::write(
         &harness_abs,
-        format!(
-            "{}\n",
-            serde_json::to_string_pretty(&harness).unwrap_or_else(|_| "{}".into())
-        ),
+        format!("{}\n", serde_json::to_string_pretty(&harness).unwrap_or_else(|_| "{}".into())),
     );
 
     let failed = diagnostics.iter().any(|d| d.is_error());
