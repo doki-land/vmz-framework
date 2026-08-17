@@ -94,7 +94,8 @@ pub fn emit_client_module(
         js.push_str(&print_member_assign(&decl.name, "__vmzWriteBarrier", |b| b.bool_lit(true)));
     }
     if !js.contains("export default") {
-        js.push_str(&format!("\nexport default {};\n", decl.name));
+        use super::ast_util::print_export_default;
+        js.push_str(&format!("\n{}", print_export_default(&decl.name)));
     }
     if transpiled.map.is_some() {
         js.push_str(&format!("\n//# sourceMappingURL={map_name}\n"));
@@ -145,6 +146,8 @@ fn emit_method_rw(decl: &ComponentDecl) -> String {
 }
 
 fn emit_async_task_wraps(decl: &ComponentDecl) -> String {
+    use super::ast_util::{js_string_literal, oxc_reprint_module};
+
     let mut out = String::new();
     for m in &decl.methods {
         if !m.is_async {
@@ -153,14 +156,17 @@ fn emit_async_task_wraps(decl: &ComponentDecl) -> String {
         if m.reads.is_empty() && m.writes.is_empty() && m.calls.is_empty() && !m.opaque_callee {
             continue;
         }
+        let key = js_string_literal(&m.name);
         out.push_str(&format!(
-            "\n{{\n  const __m = {comp}.prototype.{method};\n  {comp}.prototype.{method} = function (...args) {{\n    return __vmzRunTask(this, {key:?}, (_signal, _meta) => __m.apply(this, args));\n  }};\n}}\n",
+            "\n{{\n  const __m = {comp}.prototype.{method};\n  {comp}.prototype.{method} = function (...args) {{\n    return __vmzRunTask(this, {key}, (_signal, _meta) => __m.apply(this, args));\n  }};\n}}\n",
             comp = decl.name,
             method = m.name,
-            key = m.name,
         ));
     }
-    out
+    if out.is_empty() {
+        return out;
+    }
+    oxc_reprint_module(out.trim_start()).map(|c| format!("\n{c}")).unwrap_or(out)
 }
 
 fn emit_props_runtime(decl: &ComponentDecl, ctor_applies_props: bool) -> String {
@@ -260,7 +266,8 @@ pub fn emit_server_module(
     js = rewrite_imports(&js, module_id);
     js = format!("// virtual: {module_id}\n{js}");
     if !js.contains("export default") {
-        js.push_str(&format!("\nexport default {};\n", decl.name));
+        use super::ast_util::print_export_default;
+        js.push_str(&format!("\n{}", print_export_default(&decl.name)));
     }
     Ok(EmittedJs { code: js, map: None })
 }
@@ -286,22 +293,26 @@ fn strip_http_surface(source: &str) -> String {
 }
 
 fn emit_server_client_stub(bridge: &ServerBridge) -> String {
+    use super::ast_util::{js_string_literal, oxc_reprint_module};
+
     let mut methods = String::new();
     for m in &bridge.methods {
         if m.is_private || m.name == "constructor" {
             continue;
         }
+        let id = js_string_literal(&bridge.module_id);
+        let name = js_string_literal(&m.name);
         methods.push_str(&format!(
-            "  static {name}(...args) {{\n    return callServer({id:?}, {name:?}, args);\n  }}\n",
-            name = m.name,
-            id = bridge.module_id,
+            "  static {method}(...args) {{\n    return callServer({id}, {name}, args);\n  }}\n",
+            method = m.name,
         ));
     }
-    format!(
+    let raw = format!(
         "import {{ callServer }} from \"vmz:runtime\";\n\nexport class {name} {{\n{methods}}}\n",
         name = bridge.class_name,
         methods = methods,
-    )
+    );
+    oxc_reprint_module(&raw).unwrap_or(raw)
 }
 
 /// Rewrite virtual import specs (`vmz:runtime`, `vmz:dom`) to relative paths.
