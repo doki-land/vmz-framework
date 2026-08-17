@@ -1377,6 +1377,53 @@ pub fn generate_locale_runtime_module(
     vmz_generator::js::emit_locale_runtime_module(&default_locale, &exports).code
 }
 
+/// Generate static-delivery `robots.txt`.
+#[napi]
+pub fn generate_robots_txt(sitemap_absolute_url: String) -> String {
+    vmz_generator::emit_robots_txt(&sitemap_absolute_url)
+}
+
+/// One typed-module param for [`generate_locale_typed_module`].
+#[napi(object)]
+pub struct JsLocaleTypedParam {
+    /// Parameter name.
+    pub name: String,
+    /// `plural` / `number` / other.
+    pub kind: String,
+}
+
+/// One export for [`generate_locale_typed_module`].
+#[napi(object)]
+pub struct JsLocaleTypedExport {
+    /// Export function name.
+    pub export_name: String,
+    /// Message params.
+    pub params: Vec<JsLocaleTypedParam>,
+}
+
+/// Generate `#locales/{catalog}.d.ts` via JsCodeGenerator.
+#[napi]
+pub fn generate_locale_typed_module(
+    module_label: String,
+    exports: Vec<JsLocaleTypedExport>,
+) -> String {
+    let exports: Vec<_> = exports
+        .into_iter()
+        .map(|e| vmz_generator::js::LocaleTypedExport {
+            export_name: e.export_name,
+            params: e
+                .params
+                .into_iter()
+                .map(|p| vmz_generator::js::LocaleTypedParam {
+                    name: p.name,
+                    kind: p.kind,
+                })
+                .collect(),
+        })
+        .collect();
+    vmz_generator::js::emit_locale_typed_module(&module_label, &exports)
+}
+
 /// Pretty-print a JSON document via JsonCodeGenerator.
 ///
 /// `json_text` must be valid compact or pretty JSON (typically `JSON.stringify(value)`).

@@ -177,7 +177,11 @@ export async function emitWebStatic(distDir, opts = {}) {
 
     const sitemap = buildSitemap(origin, generations);
     fs.writeFileSync(path.join(distDir, 'sitemap.xml'), sitemap, 'utf8');
-    const robots = `User-agent: *\nAllow: /\nDisallow: /404\nSitemap: ${origin}/sitemap.xml\n`;
+    const nativeRobots = requireNativeAddon();
+    if (typeof nativeRobots.generateRobotsTxt !== 'function') {
+        throw new Error('vmz native addon missing generateRobotsTxt — rebuild with `pnpm napi:build`');
+    }
+    const robots = nativeRobots.generateRobotsTxt(`${origin}/sitemap.xml`);
     fs.writeFileSync(path.join(distDir, 'robots.txt'), robots, 'utf8');
 
     // Hard rule: no SPA fallback shim in artifact.
