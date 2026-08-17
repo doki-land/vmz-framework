@@ -23,8 +23,9 @@ pub use js::{
     is_direct_eligible, transpile_ts, transpile_ts_with_map,
 };
 pub use css::{
-    StyleContribution, StyleEmitReport, StyleLayer, emit_style_bundle, format_css, validate_css,
+    StyleContribution, StyleEmitReport, StyleLayer, ThemeDecl, ThemeRule, css_var_name,
+    emit_style_bundle, emit_theme_css, format_css, theme_attr_selector, validate_css,
 };
-pub use json::to_pretty_json;
+pub use json::{to_json, to_pretty_json};
 pub use markup::{MarkupDocument, MarkupNode, emit_html_document, emit_markup};
 pub use lang::emit_rust_server_unit;

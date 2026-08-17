@@ -351,54 +351,62 @@ fn load_theme_meta(
 ///
 /// Order: `:root` default, then `@media (prefers-color-scheme: ...)`, then
 /// `[activationAttr]` (explicit attribute wins over OS preference).
+/// Printing is delegated to [`vmz_generator::emit_theme_css`].
 pub fn emit_style_theme_css(theme: &StyleTheme) -> String {
     if theme.is_empty() {
         return String::new();
     }
     let attr = &theme.activation_attr;
-    let mut out = String::new();
+    let mut rules = Vec::new();
 
-    fn push_block(out: &mut String, selector: &str, entries: &[StyleTokenLeaf]) {
-        if entries.is_empty() {
-            return;
-        }
-        out.push_str(selector);
-        out.push_str(" {\n");
-        for t in entries {
-            out.push_str(&format!("  {}: {};\n", css_var_name(&t.path), t.value));
-        }
-        out.push_str("}\n");
+    fn decls_from(entries: &[StyleTokenLeaf]) -> Vec<vmz_generator::ThemeDecl> {
+        entries
+            .iter()
+            .map(|t| vmz_generator::ThemeDecl {
+                property: css_var_name(&t.path),
+                value: t.value.clone(),
+            })
+            .collect()
     }
 
     if let Some(base) = theme.table(&theme.default_id) {
-        push_block(&mut out, ":root", &base.entries);
+        let decls = decls_from(&base.entries);
+        if !decls.is_empty() {
+            rules.push(vmz_generator::ThemeRule::Block {
+                selector: ":root".into(),
+                decls,
+            });
+        }
     }
 
     for (scheme, theme_id) in &theme.prefers_color_scheme {
         let resolved = theme.resolve(theme_id);
-        if resolved.is_empty() {
+        let decls = decls_from(&resolved);
+        if decls.is_empty() {
             continue;
         }
-        if !out.is_empty() {
-            out.push('\n');
-        }
-        out.push_str(&format!("@media (prefers-color-scheme: {scheme}) {{\n"));
-        push_block(&mut out, "  :root", &resolved);
-        out.push_str("}\n");
+        rules.push(vmz_generator::ThemeRule::PrefersColorScheme {
+            scheme: scheme.clone(),
+            nested: vec![vmz_generator::ThemeRule::Block {
+                selector: ":root".into(),
+                decls,
+            }],
+        });
     }
 
     // Explicit activation (including default) so cookie/toggle can override OS preference.
     for id in theme.theme_ids() {
         let resolved = theme.resolve(&id);
-        if resolved.is_empty() {
+        let decls = decls_from(&resolved);
+        if decls.is_empty() {
             continue;
         }
-        if !out.is_empty() {
-            out.push('\n');
-        }
-        push_block(&mut out, &format!("[{attr}=\"{id}\"]"), &resolved);
+        rules.push(vmz_generator::ThemeRule::Block {
+            selector: vmz_generator::theme_attr_selector(attr, &id),
+            decls,
+        });
     }
-    out
+    vmz_generator::emit_theme_css(&rules)
 }
 
 /// Back-compat wrapper around [`emit_style_theme_css`] for a loaded bundle.
@@ -408,12 +416,7 @@ pub fn emit_designs_css(bundle: &DesignsBundle) -> String {
 
 /// Map a theme leaf path to its `--vmz-...` CSS custom-property name.
 pub fn css_var_name(path: &[String]) -> String {
-    let mut s = String::from("--vmz");
-    for p in path {
-        s.push('-');
-        s.push_str(&p.replace('_', "-"));
-    }
-    s
+    vmz_generator::css_var_name(path)
 }
 
 fn load_flat_json(path: &Path) -> Result<Vec<StyleTokenLeaf>, String> {
