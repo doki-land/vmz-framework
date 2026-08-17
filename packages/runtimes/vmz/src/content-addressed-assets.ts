@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { canonicalJson, sha256Hex } from './release-pack.js';
+import { writePrettyJsonFile } from './pretty-json.js';
 
 export const CONTENT_ADDRESSED_ASSETS_SCHEMA = 'vmz.content_addressed_assets.v0';
 
@@ -93,7 +94,7 @@ export function emitContentAddressedAssets(distDir, opts = {}) {
     const vmzDir = path.join(abs, '_vmz');
     fs.mkdirSync(vmzDir, { recursive: true });
     const outPath = path.join(vmzDir, 'content-addressed-assets.json');
-    fs.writeFileSync(outPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+    writePrettyJsonFile(outPath, manifest);
 
     return { manifest, assetsDir, rewrites, manifestPath: outPath };
 }

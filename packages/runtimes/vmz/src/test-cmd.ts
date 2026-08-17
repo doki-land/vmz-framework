@@ -7,6 +7,7 @@
 import path from 'node:path';
 import { createWorkspace } from './index.js';
 import { log } from './log.js';
+import { generatePrettyJson } from './pretty-json.js';
 
 /**
  * @returns {Promise<typeof import('@vmz/test')>}
@@ -349,7 +350,7 @@ export async function cmdTest(args) {
     }
 
     if (wantJson) {
-        const text = `${JSON.stringify(report, null, 2)}\n`;
+        const text = `${generatePrettyJson(report)}\n`;
         if (typeof args.json === 'string' && args.json !== 'true') {
             const { writeFileSync } = await import('node:fs');
             writeFileSync(path.resolve(String(args.json)), text);

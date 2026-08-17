@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { canonicalJson, sha256Hex } from './release-pack.js';
+import { writePrettyJsonFile } from './pretty-json.js';
 
 export const PRODUCTION_OBSERVABILITY_SCHEMA = 'vmz.production.observability.v0';
 export const PRODUCTION_TRACE_SCHEMA = 'vmz.production.trace.v0';
@@ -464,8 +465,8 @@ export function emitProductionObservability(distDir, overrides = {}, meta = {}) 
     fs.mkdirSync(vmzDir, { recursive: true });
     const contractPath = path.join(vmzDir, 'production-observability.json');
     const tracePath = path.join(vmzDir, 'production-trace.sample.json');
-    fs.writeFileSync(contractPath, `${JSON.stringify(contract, null, 2)}\n`, 'utf8');
-    fs.writeFileSync(tracePath, `${JSON.stringify(trace, null, 2)}\n`, 'utf8');
+    writePrettyJsonFile(contractPath, contract);
+    writePrettyJsonFile(tracePath, trace);
     return { contract, trace, contractPath, tracePath };
 }
 

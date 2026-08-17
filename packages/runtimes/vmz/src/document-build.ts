@@ -19,6 +19,7 @@ import { resolveMarkdownEngine } from './document-markdown.js';
 import { DOCUMENT_VIEW_SCHEMA } from './document-schema.js';
 import { createWorkspace } from './index.js';
 import { requireNativeAddon } from './native-addon.js';
+import { writePrettyJsonFile } from './pretty-json.js';
 
 /**
  * @param {{ projectRoot: string, outDir?: string, strict?: boolean, engines?: { markdown?: string } }} opts
@@ -132,7 +133,7 @@ export async function buildDocuments(opts) {
         );
         const viewAbs = path.join(outDir, viewRel);
         fs.mkdirSync(path.dirname(viewAbs), { recursive: true });
-        fs.writeFileSync(viewAbs, JSON.stringify(view, null, 2) + '\n', 'utf8');
+        writePrettyJsonFile(viewAbs, view);
         const html = renderStaticHtml({
             title: info.title,
             locale: page.identity.locale,
@@ -166,10 +167,10 @@ export async function buildDocuments(opts) {
             islands: 'document.islands.json',
         },
     };
-    fs.writeFileSync(path.join(outDir, 'document.manifest.json'), JSON.stringify(manifestOut, null, 2) + '\n', 'utf8');
-    fs.writeFileSync(path.join(outDir, 'document.evidence.json'), JSON.stringify(evidence.evidence, null, 2) + '\n', 'utf8');
-    fs.writeFileSync(path.join(outDir, 'document.search.json'), JSON.stringify(search, null, 2) + '\n', 'utf8');
-    fs.writeFileSync(path.join(outDir, 'document.islands.json'), JSON.stringify(islands, null, 2) + '\n', 'utf8');
+    writePrettyJsonFile(path.join(outDir, 'document.manifest.json'), manifestOut);
+    writePrettyJsonFile(path.join(outDir, 'document.evidence.json'), evidence.evidence);
+    writePrettyJsonFile(path.join(outDir, 'document.search.json'), search);
+    writePrettyJsonFile(path.join(outDir, 'document.islands.json'), islands);
     return { ok: true, manifest: manifestOut, outDir, pages: written, search, islands };
 }
 

@@ -10,6 +10,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import path from 'node:path';
 import { loadDeploymentIr, planBundleInputs } from './bundler-adapter.js';
 import { packClientBareImports } from './pack-client-packages.js';
+import { writePrettyJsonFile } from './pretty-json.js';
 
 export const PACK_MANIFEST_SCHEMA = 'vmz.pack.manifest.v0';
 
@@ -106,7 +107,7 @@ export function packFromDeploymentIr(outDir, opts = {}) {
     const vmzDir = path.join(outDir, '_vmz');
     mkdirSync(vmzDir, { recursive: true });
     const file = path.join(vmzDir, 'pack-manifest.json');
-    writeFileSync(file, `${JSON.stringify(body, null, 2)}\n`, 'utf8');
+    writePrettyJsonFile(file, body);
     return { manifest: body, path: file, clientPackages };
 }
 

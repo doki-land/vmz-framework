@@ -12,6 +12,7 @@ import { emitCdnPolicy } from './cdn-policy.js';
 import { emitContentAddressedAssets } from './content-addressed-assets.js';
 import { absoluteUrl, buildLocalePageMeta, localizeBodyLinks } from './locale-router.js';
 import { requireNativeAddon } from './native-addon.js';
+import { writePrettyJsonFile } from './pretty-json.js';
 
 export const STATIC_DELIVERY_MANIFEST_SCHEMA = 'vmz.static.delivery_manifest.v0';
 
@@ -223,7 +224,7 @@ export async function emitWebStatic(distDir, opts = {}) {
     };
     const digest = sha256Hex(canonicalJson(manifest));
     manifest.manifestDigest = digest;
-    fs.writeFileSync(path.join(vmzDir, 'static-delivery-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+    writePrettyJsonFile(path.join(vmzDir, 'static-delivery-manifest.json'), manifest);
 
     const assets = emitContentAddressedAssets(distDir);
     manifest.contentAddressedAssets = {
@@ -235,7 +236,7 @@ export async function emitWebStatic(distDir, opts = {}) {
     // Re-stamp static manifest after linking asset digest (HTML already rewritten on disk).
     delete manifest.manifestDigest;
     manifest.manifestDigest = sha256Hex(canonicalJson(manifest));
-    fs.writeFileSync(path.join(vmzDir, 'static-delivery-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+    writePrettyJsonFile(path.join(vmzDir, 'static-delivery-manifest.json'), manifest);
 
     const cdn = emitCdnPolicy(distDir, manifest);
 

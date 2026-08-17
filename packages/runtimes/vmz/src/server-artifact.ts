@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { SERVER_RUNTIMES } from './delivery-profile.js';
+import { writePrettyJsonFile } from './pretty-json.js';
 
 export const SERVER_ARTIFACT_SCHEMA = 'vmz.server.artifact.v0';
 export const HTTP_CONTRACT_SCHEMA = 'vmz.http.contract.v0';
@@ -126,7 +127,7 @@ export function emitServerArtifact(outDir, opts = {}) {
     const vmzDir = path.join(outDir, '_vmz');
     mkdirSync(vmzDir, { recursive: true });
     const file = path.join(vmzDir, 'server-artifact.json');
-    writeFileSync(file, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
+    writePrettyJsonFile(file, artifact);
 
     const adapterDir = path.join(vmzDir, 'adapters');
     mkdirSync(adapterDir, { recursive: true });
@@ -134,7 +135,7 @@ export function emitServerArtifact(outDir, opts = {}) {
         const projection = projectServerRuntimeAdapter(artifact, adapterId);
         const dir = path.join(adapterDir, adapterId);
         mkdirSync(dir, { recursive: true });
-        writeFileSync(path.join(dir, 'adapter.json'), `${JSON.stringify(projection, null, 2)}\n`, 'utf8');
+        writePrettyJsonFile(path.join(dir, 'adapter.json'), projection);
     }
 
     return { artifact, path: file, httpContractDigest };
