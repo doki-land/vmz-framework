@@ -20,9 +20,17 @@ pub enum GeneratorError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
-    /// JSON encode.
+    /// Strict JSON encode/decode.
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+
+    /// JSON5 encode/decode.
+    #[error(transparent)]
+    Json5(#[from] json5::Error),
+
+    /// YAML encode/decode.
+    #[error(transparent)]
+    Yaml(#[from] yaml_serde::Error),
 
     /// Language / CSS parse or print failure.
     #[error("{0}")]

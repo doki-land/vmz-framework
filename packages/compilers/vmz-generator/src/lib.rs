@@ -26,7 +26,9 @@ pub use js::{
     EmittedJs, ServerBridge, bind_field_idents, emit_client_module, emit_server_module,
     is_direct_eligible, transpile_ts, transpile_ts_with_map,
 };
-pub use json::{to_json, to_pretty_json};
+pub use json::{
+    DataFormat, emit_data, emit_data_artifact, to_json, to_json5, to_pretty_json, to_yaml,
+};
 pub use lang::emit_rust_server_unit;
 pub use markup::{
     HreflangAlternate, MarkupDocument, MarkupNode, PageShellInput, PageShellMeta, SitemapUrl,

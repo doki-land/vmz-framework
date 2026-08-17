@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 rust-version.workspace = true
-description = "VMZ CodeGenerators: JS/CSS/Markup/JSON/Lang artifact printers (oxc where available)"
+description = "VMZ CodeGenerators: JS/CSS/Markup/JSON/JSON5/YAML/Lang artifact printers"
 publish = false
 
 [dependencies]
@@ -23,7 +23,12 @@ oxc_transformer.workspace = true
 oxc-css-parser.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+json5.workspace = true
+yaml_serde.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 vmz-protocol.workspace = true
 vmz-types.workspace = true
+
+[dev-dependencies]
+serde = { workspace = true, features = ["derive"] }
