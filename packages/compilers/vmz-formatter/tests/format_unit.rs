@@ -107,6 +107,27 @@ fn editorconfig_indent_size_affects_template_envelope() {
 }
 
 #[test]
+fn editorconfig_vmz_glob_overrides_star() {
+    let dir = temp_dir("vmz-glob");
+    write(
+        &dir.join(".editorconfig"),
+        "root = true\n[*]\nindent_size = 2\nend_of_line = lf\ninsert_final_newline = true\n\n[*.vmz]\nindent_size = 4\n",
+    );
+    let file = dir.join("G.vmz");
+    write(
+        &file,
+        "<template>\n<div/>\n</template>\n\n<script client>\nexport default class G {}\n</script>\n",
+    );
+
+    format_path(&file, &FormatOptions { check: false }).unwrap();
+    let out = fs::read_to_string(&file).unwrap();
+    assert!(
+        out.contains("\n    <div"),
+        "expected [*.vmz] indent_size=4 to win over [*]: {out:?}"
+    );
+}
+
+#[test]
 fn editorconfig_end_of_line_crlf() {
     let dir = temp_dir("crlf");
     write(
