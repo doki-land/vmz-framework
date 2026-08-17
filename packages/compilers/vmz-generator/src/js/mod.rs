@@ -1,5 +1,6 @@
 //! JavaScript CodeGenerator (oxc parse / transform / codegen).
 
+mod ast_util;
 mod deps;
 mod emit;
 mod emit_direct;
