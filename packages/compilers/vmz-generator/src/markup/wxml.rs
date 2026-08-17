@@ -6,9 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::Serialize;
-use vmz_types::{
-    BindingKind, IrDepPath, ReactiveComponent, ViewAttr, ViewAttrValue, ViewNode,
-};
+use vmz_types::{BindingKind, IrDepPath, ReactiveComponent, ViewAttr, ViewAttrValue, ViewNode};
 
 use crate::core::{escape_xml_attr, escape_xml_text};
 
@@ -111,11 +109,7 @@ pub fn emit_mini_template_profile(
         format!("<!-- {MINI_TEMPLATE_DIALECT} -->\n<view class=\"vmz-root\">\n{body}</view>\n")
     };
 
-    Ok(MiniTemplateEmit {
-        template,
-        patch_bindings,
-        handlers: ctx.handlers,
-    })
+    Ok(MiniTemplateEmit { template, patch_bindings, handlers: ctx.handlers })
 }
 
 /// Convenience: Structure profile without event wiring (no reactive).
@@ -136,10 +130,7 @@ struct EmitCtx<'a> {
 }
 
 fn push_err(ctx: &mut EmitCtx<'_>, kind: MiniEmitErrorKind, message: impl Into<String>) {
-    ctx.errors.push(MiniEmitError {
-        kind,
-        message: message.into(),
-    });
+    ctx.errors.push(MiniEmitError { kind, message: message.into() });
     ctx.failed = true;
 }
 
@@ -152,7 +143,11 @@ fn emit_node(
         ViewNode::Text { value } => Ok(escape_xml_text(value)),
         ViewNode::Interp { binding, .. } => {
             let Some(b) = binding else {
-                push_err(ctx, MiniEmitErrorKind::ArtifactInvalid, "mini template: interp without BindingId");
+                push_err(
+                    ctx,
+                    MiniEmitErrorKind::ArtifactInvalid,
+                    "mini template: interp without BindingId",
+                );
                 return Err(());
             };
             patch_bindings.insert(b.0, ());
@@ -173,20 +168,16 @@ fn emit_node(
                     patch_bindings.insert(list_b.0, ());
                     attr_s.push_str(&format!(" data-vmz-each=\"b.B_{}\"", list_b.0));
                 } else {
-                    attr_s.push_str(&format!(
-                        " data-vmz-each=\"{}\"",
-                        escape_xml_attr(&e.list_expr)
-                    ));
+                    attr_s
+                        .push_str(&format!(" data-vmz-each=\"{}\"", escape_xml_attr(&e.list_expr)));
                 }
                 attr_s.push_str(&format!(" data-vmz-as=\"{}\"", escape_xml_attr(&e.as_name)));
                 if let Some(key_b) = e.key_binding {
                     patch_bindings.insert(key_b.0, ());
                     attr_s.push_str(&format!(" data-vmz-key=\"b.B_{}\"", key_b.0));
                 } else if let Some(key_expr) = &e.key_expr {
-                    attr_s.push_str(&format!(
-                        " data-vmz-key-expr=\"{}\"",
-                        escape_xml_attr(key_expr)
-                    ));
+                    attr_s
+                        .push_str(&format!(" data-vmz-key-expr=\"{}\"", escape_xml_attr(key_expr)));
                 }
                 if let Some(r) = e.region {
                     attr_s.push_str(&format!(" data-vmz-region=\"{}\"", r.0));
@@ -233,18 +224,12 @@ fn emit_node(
                     if let Some(b) = binding {
                         open.push_str(&format!(" data-vmz-if=\"b.B_{}\"", b.0));
                     } else if let Some(cond) = &br.cond {
-                        open.push_str(&format!(
-                            " data-vmz-if-expr=\"{}\"",
-                            escape_xml_attr(cond)
-                        ));
+                        open.push_str(&format!(" data-vmz-if-expr=\"{}\"", escape_xml_attr(cond)));
                     }
                 } else if br.cond.is_none() {
                     open.push_str(" data-vmz-else");
                 } else if let Some(cond) = &br.cond {
-                    open.push_str(&format!(
-                        " data-vmz-elif-expr=\"{}\"",
-                        escape_xml_attr(cond)
-                    ));
+                    open.push_str(&format!(" data-vmz-elif-expr=\"{}\"", escape_xml_attr(cond)));
                 }
                 if let Some(r) = region {
                     open.push_str(&format!(" data-vmz-region=\"{}\"", r.0));
@@ -315,10 +300,11 @@ fn emit_node(
                 return Err(());
             }
             let mut attr_s = String::new();
-            if let Some(n) = name {
-                if !n.is_empty() && n != "slot" {
-                    attr_s.push_str(&format!(" name=\"{}\"", escape_xml_attr(n)));
-                }
+            if let Some(n) = name
+                && !n.is_empty()
+                && n != "slot"
+            {
+                attr_s.push_str(&format!(" name=\"{}\"", escape_xml_attr(n)));
             }
             for a in attrs {
                 if is_event_attr(&a.name) {
@@ -341,21 +327,11 @@ fn emit_node(
 
 fn sanitize_prop(name: &str) -> String {
     name.chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '_' || c == '-' {
-                c
-            } else {
-                '-'
-            }
-        })
+        .map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '-' })
         .collect()
 }
 
-fn emit_plain_attr(
-    a: &ViewAttr,
-    attr_s: &mut String,
-    patch_bindings: &mut BTreeMap<u32, ()>,
-) {
+fn emit_plain_attr(a: &ViewAttr, attr_s: &mut String, patch_bindings: &mut BTreeMap<u32, ()>) {
     match &a.value {
         ViewAttrValue::Static { value } => {
             attr_s.push_str(&format!(" {}=\"{}\"", a.name, escape_xml_attr(value)));
@@ -465,10 +441,10 @@ fn normalize_event_kind(attr: &str) -> String {
     if let Some(rest) = n.strip_prefix('@') {
         return rest.to_ascii_lowercase();
     }
-    if let Some(rest) = n.strip_prefix("on") {
-        if !rest.is_empty() {
-            return rest.to_ascii_lowercase();
-        }
+    if let Some(rest) = n.strip_prefix("on")
+        && !rest.is_empty()
+    {
+        return rest.to_ascii_lowercase();
     }
     n.to_ascii_lowercase()
 }
@@ -498,7 +474,8 @@ mod tests {
                 region: None,
             }),
         }];
-        let err = emit_mini_template_profile(&roots, MiniTemplateProfile::Static, None).unwrap_err();
+        let err =
+            emit_mini_template_profile(&roots, MiniTemplateProfile::Static, None).unwrap_err();
         assert!(err.iter().any(|e| e.kind == MiniEmitErrorKind::Unsupported));
     }
 

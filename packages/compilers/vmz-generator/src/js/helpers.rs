@@ -384,13 +384,10 @@ mod tests {
     fn binds_row_kernel_class_shape() {
         let fields = vec!["rows".into(), "selected".into()];
         let scope = vec!["row".into(), "index".into()];
-        let aliases = vec![("row".into(), "box1.item".into()), ("index".into(), "box1.index".into())];
-        let out = bind_field_idents(
-            "selected === row.id ? \"danger\" : \"\"",
-            &fields,
-            &scope,
-            &aliases,
-        );
+        let aliases =
+            vec![("row".into(), "box1.item".into()), ("index".into(), "box1.index".into())];
+        let out =
+            bind_field_idents("selected === row.id ? \"danger\" : \"\"", &fields, &scope, &aliases);
         assert!(
             out.starts_with("this.selected") || out.contains("this.selected ==="),
             "unexpected shape: {out}"
