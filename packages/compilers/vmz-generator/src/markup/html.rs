@@ -43,10 +43,18 @@ pub struct PageShellInput {
     pub props_json: String,
     /// Head meta.
     pub meta: PageShellMeta,
-    /// Optional CSS entry href without leading slash (e.g. `vmz.css`).
+    /// Optional CSS entry href without leading slash (may include `?query`).
     pub css_entry: Option<String>,
-    /// When true, omit `entry-client.js` script (error documents).
+    /// When true, omit the hydrate module script (error documents).
     pub is_error_document: bool,
+    /// Extra attributes on `<html>` after `lang` / `data-locale` / `dir`.
+    pub html_extra_attrs: Vec<(String, String)>,
+    /// Trusted raw HTML appended inside `<head>` (theme boot, hreflang already handled via meta).
+    pub head_extra_html: String,
+    /// Override module script `src` (e.g. `/entry-event.js?t=1`). `None` → `/entry-client.js`.
+    pub module_script_src: Option<String>,
+    /// Trusted raw HTML after the module script (dev live reload / overlay).
+    pub body_tail_html: String,
 }
 
 fn el(tag: &str, attrs: Vec<(String, String)>, children: Vec<MarkupNode>) -> MarkupNode {
@@ -187,13 +195,26 @@ pub fn emit_page_shell(input: &PageShellInput) -> String {
             vec![attr("name", "viewport"), attr("content", "width=device-width, initial-scale=1")],
         ),
         el("title", vec![], vec![MarkupNode::Text(input.meta.title.clone())]),
-        void_el(
+    ];
+
+    if !input.meta.description.is_empty() {
+        head_kids.push(void_el(
             "meta",
             vec![attr("name", "description"), attr("content", input.meta.description.clone())],
-        ),
-        void_el("meta", vec![attr("name", "robots"), attr("content", input.meta.robots.clone())]),
-        void_el("link", vec![attr("rel", "canonical"), attr("href", input.meta.canonical.clone())]),
-    ];
+        ));
+    }
+    if !input.meta.robots.is_empty() {
+        head_kids.push(void_el(
+            "meta",
+            vec![attr("name", "robots"), attr("content", input.meta.robots.clone())],
+        ));
+    }
+    if !input.meta.canonical.is_empty() {
+        head_kids.push(void_el(
+            "link",
+            vec![attr("rel", "canonical"), attr("href", input.meta.canonical.clone())],
+        ));
+    }
 
     for a in &input.meta.alternates {
         head_kids.push(void_el(
@@ -206,22 +227,37 @@ pub fn emit_page_shell(input: &PageShellInput) -> String {
         ));
     }
 
-    head_kids.push(void_el(
-        "meta",
-        vec![attr("property", "og:title"), attr("content", input.meta.title.clone())],
-    ));
-    head_kids.push(void_el(
-        "meta",
-        vec![attr("property", "og:description"), attr("content", input.meta.description.clone())],
-    ));
-    head_kids.push(void_el(
-        "meta",
-        vec![attr("property", "og:url"), attr("content", input.meta.canonical.clone())],
-    ));
+    if !input.meta.canonical.is_empty() {
+        head_kids.push(void_el(
+            "meta",
+            vec![attr("property", "og:title"), attr("content", input.meta.title.clone())],
+        ));
+        if !input.meta.description.is_empty() {
+            head_kids.push(void_el(
+                "meta",
+                vec![
+                    attr("property", "og:description"),
+                    attr("content", input.meta.description.clone()),
+                ],
+            ));
+        }
+        head_kids.push(void_el(
+            "meta",
+            vec![attr("property", "og:url"), attr("content", input.meta.canonical.clone())],
+        ));
+    }
 
     if let Some(css) = &input.css_entry {
-        let href = format!("/{}", css.trim_start_matches('/'));
+        let href = if css.starts_with('/') {
+            css.clone()
+        } else {
+            format!("/{}", css.trim_start_matches('/'))
+        };
         head_kids.push(void_el("link", vec![attr("rel", "stylesheet"), attr("href", href)]));
+    }
+
+    if !input.head_extra_html.is_empty() {
+        head_kids.push(MarkupNode::Raw(input.head_extra_html.clone()));
     }
 
     let mut app_attrs = vec![attr("id", "app")];
@@ -243,19 +279,28 @@ pub fn emit_page_shell(input: &PageShellInput) -> String {
     }];
 
     if !input.is_error_document {
-        body_kids.push(el(
-            "script",
-            vec![attr("type", "module"), attr("src", "/entry-client.js")],
-            vec![],
-        ));
+        let src = input
+            .module_script_src
+            .clone()
+            .unwrap_or_else(|| "/entry-client.js".into());
+        if !src.is_empty() {
+            body_kids.push(el("script", vec![attr("type", "module"), attr("src", src)], vec![]));
+        }
     }
+
+    if !input.body_tail_html.is_empty() {
+        body_kids.push(MarkupNode::Raw(input.body_tail_html.clone()));
+    }
+
+    let mut html_attrs = vec![attr("lang", locale_id), attr("data-locale", locale_id), attr("dir", dir)];
+    html_attrs.extend(input.html_extra_attrs.iter().cloned());
 
     let doc = MarkupDocument {
         doctype: Some("html".into()),
         dialect: MarkupDialect::Html5,
         roots: vec![el(
             "html",
-            vec![attr("lang", locale_id), attr("data-locale", locale_id), attr("dir", dir)],
+            html_attrs,
             vec![el("head", vec![], head_kids), el("body", vec![], body_kids)],
         )],
     };
@@ -329,6 +374,10 @@ mod tests {
             },
             css_entry: Some("vmz.css".into()),
             is_error_document: false,
+            html_extra_attrs: vec![],
+            head_extra_html: String::new(),
+            module_script_src: None,
+            body_tail_html: String::new(),
         });
         assert!(html.contains("<!DOCTYPE html>"));
         assert!(html.contains("A &lt; B &amp; C"));
