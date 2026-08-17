@@ -12,12 +12,13 @@ debugger façades—to the npm `vmz` package.
 ## Features
 
 - Long-lived incremental compile session over N-API
-- Forwards `check` / `lint`, build, affected, explain, rename, X* / NW* / P* gate helpers as JS-callable methods
+- Forwards `check` / `lint` / **`format`** (`vmz-formatter`), build, affected, explain, rename helpers as JS-callable methods
 - Protocol handshake aligned with `vmz-protocol` host/compiler versions
 
 ## Non-goals
 
-- Re-implementing analysis or explain heuristics in JavaScript
+- Re-implementing analysis, author format, or explain heuristics in JavaScript
+- Calling Node `oxfmt` / Biome for `.vmz` (format stays in Rust [`vmz-formatter`](../vmz-formatter/))
 - Replacing `vmz lsp` / `vmz mcp` stdio hosting ([`vmz-tools`](../vmz-tools/); protocol lib in [
   `vmz-debugger`](../vmz-debugger/))
 - Owning semantic IR
