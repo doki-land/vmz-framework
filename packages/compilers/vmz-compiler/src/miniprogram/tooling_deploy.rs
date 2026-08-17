@@ -56,7 +56,7 @@ pub struct MiniToolingDeployReport {
 impl MiniToolingDeployReport {
     /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
+        vmz_generator::to_pretty_json(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
@@ -213,7 +213,7 @@ pub fn lower_miniprogram_tooling_deploy(root: &Path) -> MiniToolingDeployReport 
     if let Some(parent) = package_abs.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    let body = serde_json::to_string_pretty(&package).unwrap_or_else(|_| "{}".into());
+    let body = vmz_generator::to_pretty_json(&package).unwrap_or_else(|_| "{}".into());
     if let Err(e) = fs::write(&package_abs, format!("{body}\n")) {
         diagnostics.push(diag(
             package_rel,
@@ -233,7 +233,7 @@ pub fn lower_miniprogram_tooling_deploy(root: &Path) -> MiniToolingDeployReport 
     });
     let _ = fs::write(
         &harness_abs,
-        format!("{}\n", serde_json::to_string_pretty(&harness).unwrap_or_else(|_| "{}".into())),
+        format!("{}\n", vmz_generator::to_pretty_json(&harness).unwrap_or_else(|_| "{}".into())),
     );
 
     let failed = diagnostics.iter().any(|d| d.is_error());

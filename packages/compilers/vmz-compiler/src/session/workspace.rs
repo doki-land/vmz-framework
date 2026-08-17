@@ -667,13 +667,13 @@ impl Workspace {
             .into_iter()
             .filter(|r| r.to.kind() == kind && r.to.id() == id)
             .collect();
-        serde_json::to_string_pretty(&refs).unwrap_or_else(|_| "[]".into())
+        vmz_generator::to_pretty_json(&refs).unwrap_or_else(|_| "[]".into())
     }
 
     /// list CodeActions (safe_fix first).
     pub fn list_code_actions(&self) -> String {
         let report = crate::cross_sfc::check_cross_sfc(&self.options.root);
-        serde_json::to_string_pretty(&report.code_actions).unwrap_or_else(|_| "[]".into())
+        vmz_generator::to_pretty_json(&report.code_actions).unwrap_or_else(|_| "[]".into())
     }
 
     /// apply atomic TextEdit batch (`vmz.dx.semantic_transaction.v0`).

@@ -67,7 +67,7 @@ pub struct MiniBindingEventReport {
 impl MiniBindingEventReport {
     /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
+        vmz_generator::to_pretty_json(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
@@ -189,9 +189,9 @@ pub fn lower_view_binding_event(
         platform_id: platform_id.into(),
         template: Some(template),
         style: None,
-        logic: Some(logic.to_string()),
-        event_table: Some(event_table.to_string()),
-        data_patch_table: Some(data_patch.to_string()),
+        logic: Some(crate::miniprogram::compact_json(&logic)),
+        event_table: Some(crate::miniprogram::compact_json(&event_table)),
+        data_patch_table: Some(crate::miniprogram::compact_json(&data_patch)),
         manifest: None,
         plan_schema: PLAN_SCHEMA.into(),
     };
@@ -536,7 +536,7 @@ pub fn lower_miniprogram_binding_event_slices(root: &Path) -> MiniBindingEventRe
                     let file_name = format!("{}.mini.json", chunk.replace('/', "__"));
                     let abs = out_mini.join(&file_name);
                     let body =
-                        serde_json::to_string_pretty(&artifact).unwrap_or_else(|_| "{}".into());
+                        vmz_generator::to_pretty_json(&artifact).unwrap_or_else(|_| "{}".into());
                     if let Err(e) = fs::write(&abs, format!("{body}\n")) {
                         diagnostics.push(diag(
                             &rel,

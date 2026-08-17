@@ -146,7 +146,7 @@ impl SessionGraph {
             affected_chunks: self.affected_chunks.clone(),
             units,
         };
-        format!("{}\n", serde_json::to_string_pretty(&doc).unwrap_or_else(|_| "{}".into()))
+        format!("{}\n", vmz_generator::to_pretty_json(&doc).unwrap_or_else(|_| "{}".into()))
     }
 }
 

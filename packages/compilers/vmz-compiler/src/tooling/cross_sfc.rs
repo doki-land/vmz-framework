@@ -85,7 +85,7 @@ pub struct CrossSfcCheckReport {
 impl CrossSfcCheckReport {
     /// Serialize this report as pretty-printed JSON (`"{}"` on serialize failure).
     pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
+        vmz_generator::to_pretty_json(self).unwrap_or_else(|_| "{}".into())
     }
 
     /// True when any diagnostic in the report is an error.
@@ -97,7 +97,7 @@ impl CrossSfcCheckReport {
 impl SymbolIndexDocument {
     /// Serialize this index as pretty-printed JSON (`"{}"` on serialize failure).
     pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
+        vmz_generator::to_pretty_json(self).unwrap_or_else(|_| "{}".into())
     }
 }
 

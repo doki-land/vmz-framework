@@ -65,7 +65,7 @@ pub struct MiniMultiAdapterReport {
 impl MiniMultiAdapterReport {
     /// Pretty-printed JSON for N-API / CLI dump.
     pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".into())
+        vmz_generator::to_pretty_json(self).unwrap_or_else(|_| "{}".into())
     }
 }
 
@@ -380,7 +380,7 @@ pub fn lower_miniprogram_multi_adapter(root: &Path) -> MiniMultiAdapterReport {
     if let Some(parent) = package_abs.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    let pkg_body = serde_json::to_string_pretty(&package).unwrap_or_else(|_| "{}".into());
+    let pkg_body = vmz_generator::to_pretty_json(&package).unwrap_or_else(|_| "{}".into());
     if let Err(e) = fs::write(&package_abs, format!("{pkg_body}\n")) {
         diagnostics.push(diag(
             &deploy.package_path,
@@ -396,7 +396,7 @@ pub fn lower_miniprogram_multi_adapter(root: &Path) -> MiniMultiAdapterReport {
     if let Some(parent) = manifest_abs.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    let man_body = serde_json::to_string_pretty(&manifest).unwrap_or_else(|_| "{}".into());
+    let man_body = vmz_generator::to_pretty_json(&manifest).unwrap_or_else(|_| "{}".into());
     if let Err(e) = fs::write(&manifest_abs, format!("{man_body}\n")) {
         diagnostics.push(diag(
             manifest_rel,
