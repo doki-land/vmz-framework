@@ -94,8 +94,11 @@ pub fn collect_deps_oxc(expr: &str, fields: &[String], scope: &[String]) -> Vec<
     super::deps::collect_template_deps(expr, fields, scope)
 }
 
-/// Rewrite bare field idents to `this.field`.
-/// Skips string / template literal contents so `'is-open'` is not rewritten to `'is-this.open'`.
+/// Rewrite bare field idents to `this.field` via oxc parse + VisitMut + codegen.
+///
+/// String / template literals are untouched by the AST walk (unlike the old
+/// char scanner). Falls back to the legacy scanner only when the expression
+/// fails to parse.
 pub fn bind_field_idents(
     expr: &str,
     fields: &[String],
@@ -105,6 +108,161 @@ pub fn bind_field_idents(
     if fields.is_empty() && scope.is_empty() && aliases.is_empty() {
         return expr.trim().to_string();
     }
+    match bind_field_idents_oxc(expr, fields, scope, aliases) {
+        Some(s) => s,
+        None => bind_field_idents_legacy(expr, fields, scope, aliases),
+    }
+}
+
+fn bind_field_idents_oxc(
+    expr: &str,
+    fields: &[String],
+    scope: &[String],
+    aliases: &[(String, String)],
+) -> Option<String> {
+    use std::collections::HashSet;
+
+    use oxc_allocator::Allocator;
+    use oxc_ast::ast::{Expression, IdentifierName, MemberExpression, Statement};
+    use oxc_ast_visit::{
+        VisitMut,
+        walk_mut::{walk_expression},
+    };
+    use oxc_codegen::{Codegen, CodegenOptions};
+    use oxc_parser::Parser;
+    use oxc_span::{SPAN, SourceType};
+    use oxc_str::Ident;
+
+    use super::ast_util::JsAst;
+
+    let src = format!("({expr})");
+    let allocator = Allocator::default();
+    let mut program = {
+        let ret = Parser::new(&allocator, &src, SourceType::ts()).parse();
+        if ret.panicked {
+            return None;
+        }
+        ret.program
+    };
+    let Statement::ExpressionStatement(es) = program.body.first_mut()? else {
+        return None;
+    };
+
+    let field_set: HashSet<&str> = fields.iter().map(|s| s.as_str()).collect();
+    let scope_set: HashSet<&str> = scope.iter().map(|s| s.as_str()).collect();
+    let alias_map: std::collections::HashMap<&str, &str> =
+        aliases.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+
+    struct Binder<'a, 'b> {
+        ast: JsAst<'a>,
+        fields: &'b HashSet<&'b str>,
+        scope: &'b HashSet<&'b str>,
+        aliases: &'b std::collections::HashMap<&'b str, &'b str>,
+    }
+
+    impl<'a, 'b> VisitMut<'a> for Binder<'a, 'b> {
+        fn visit_expression(&mut self, expr: &mut Expression<'a>) {
+            match expr {
+                Expression::Identifier(id) => {
+                    let name = id.name.as_str();
+                    if let Some(to) = self.aliases.get(name) {
+                        if let Some(replacement) = parse_alias_expr(&self.ast, to) {
+                            *expr = replacement;
+                        }
+                        return;
+                    }
+                    if self.fields.contains(name) && !self.scope.contains(name) {
+                        *expr = Expression::new_static_member_expression(
+                            SPAN,
+                            self.ast.ident("this"),
+                            IdentifierName::new(
+                                SPAN,
+                                Ident::from_str_in(name, &self.ast.ast),
+                                &self.ast.ast,
+                            ),
+                            false,
+                            &self.ast.ast,
+                        );
+                        return;
+                    }
+                }
+                Expression::StaticMemberExpression(mem) => {
+                    self.visit_expression(&mut mem.object);
+                    return;
+                }
+                Expression::PrivateFieldExpression(mem) => {
+                    self.visit_expression(&mut mem.object);
+                    return;
+                }
+                _ => {}
+            }
+            walk_expression(self, expr);
+        }
+
+        fn visit_member_expression(&mut self, expr: &mut MemberExpression<'a>) {
+            match expr {
+                MemberExpression::StaticMemberExpression(mem) => {
+                    self.visit_expression(&mut mem.object);
+                }
+                MemberExpression::PrivateFieldExpression(mem) => {
+                    self.visit_expression(&mut mem.object);
+                }
+                MemberExpression::ComputedMemberExpression(mem) => {
+                    self.visit_expression(&mut mem.object);
+                    self.visit_expression(&mut mem.expression);
+                }
+            }
+        }
+    }
+
+    fn parse_alias_expr<'a>(b: &JsAst<'a>, alias: &str) -> Option<Expression<'a>> {
+        let parts: Vec<&str> = alias.split('.').collect();
+        if parts.is_empty() || parts.iter().any(|p| p.is_empty()) {
+            return None;
+        }
+        let mut expr = b.ident(parts[0]);
+        for part in &parts[1..] {
+            expr = Expression::new_static_member_expression(
+                SPAN,
+                expr,
+                IdentifierName::new(SPAN, Ident::from_str_in(part, &b.ast), &b.ast),
+                false,
+                &b.ast,
+            );
+        }
+        Some(expr)
+    }
+
+    let ast = JsAst::new(&allocator);
+    let mut binder = Binder {
+        ast,
+        fields: &field_set,
+        scope: &scope_set,
+        aliases: &alias_map,
+    };
+    binder.visit_expression(&mut es.expression);
+
+    let mut top = &es.expression;
+    while let Expression::ParenthesizedExpression(p) = top {
+        top = &p.expression;
+    }
+    let mut codegen = Codegen::new().with_options(CodegenOptions {
+        single_quote: true,
+        ..CodegenOptions::default()
+    });
+    codegen.print_expression(top);
+    let out = codegen.into_source_text();
+    let out = out.trim().trim_end_matches(';').trim().to_string();
+    if out.is_empty() { None } else { Some(out) }
+}
+
+/// Legacy char scanner (fallback when oxc parse fails).
+fn bind_field_idents_legacy(
+    expr: &str,
+    fields: &[String],
+    scope: &[String],
+    aliases: &[(String, String)],
+) -> String {
     let mut out = String::new();
     let chars: Vec<char> = expr.chars().collect();
     let mut i = 0;
