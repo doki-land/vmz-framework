@@ -1,0 +1,12 @@
+<template><div class="vmz-ui-flex" data-vmz-ui="flex" data-vertical={vertical?'true':'false'} data-wrap={wrap?'true':'false'}><slot /></div></template>
+<style>
+.vmz-ui-flex{display:flex;align-items:center;justify-content:flex-start;gap:.75rem;min-width:0}
+.vmz-ui-flex[data-vertical='true']{flex-direction:column;align-items:stretch}
+.vmz-ui-flex[data-wrap='true']{flex-wrap:wrap}
+</style>
+<script client>
+export default class Flex {
+  public vertical: boolean = false;
+  public wrap: boolean = false;
+}
+</script>

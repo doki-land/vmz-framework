@@ -1,11 +1,11 @@
 <template>
   <button type="button" onClick={() => (open = !open)}>
-    chip:{open ? 'on' : 'off'}
-  </button>
+      chip:{open ? 'on' : 'off'}
+    </button>
 </template>
 
 <script client>
 export default class CatalogChip {
-  open = false;
+	open = false;
 }
 </script>

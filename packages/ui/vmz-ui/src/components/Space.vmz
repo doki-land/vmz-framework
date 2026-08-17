@@ -1,0 +1,15 @@
+<template><div class="vmz-ui-space" data-vmz-ui="space" data-direction={direction} data-size={size} data-wrap={wrap?'true':'false'}><slot /></div></template>
+<style>
+.vmz-ui-space{display:flex;gap:var(--vmz-density-control-gap,.75rem)}
+.vmz-ui-space[data-direction='vertical']{flex-direction:column}
+.vmz-ui-space[data-wrap='true']{flex-wrap:wrap}
+.vmz-ui-space[data-size='small']{gap:.5rem}
+.vmz-ui-space[data-size='large']{gap:1.5rem}
+</style>
+<script client>
+export default class Space {
+  public direction: string = 'horizontal';
+  public size: string = 'middle';
+  public wrap: boolean = false;
+}
+</script>

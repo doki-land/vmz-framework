@@ -1,1235 +1,1212 @@
 <template>
   <div
-    class={'vmz-ui-upload' + (dragOver ? ' is-dragover' : '')}
-    data-vmz-ui="upload"
-    data-vmz-upload-destination={destination}
-    data-vmz-upload-mode={selectionMode}
-    data-vmz-upload-directory={directoryAttr}
-    data-vmz-upload-chunk={chunkAttr}
-    data-vmz-upload-session={sessionAttr}
-    data-invalid={invalidAttr}
-    data-vmz-upload-status={status}
-    data-progress={progress}
-    onDragEnter={onDragEnter}
-    onDragOver={onDragOver}
-    onDragLeave={onDragLeave}
-    onDrop={onDrop}
-  >
-    <label if={label} class="vmz-ui-upload__label" for={controlId}>{label}</label>
+      class={'vmz-ui-upload' + (dragOver ? ' is-dragover' : '')}
+      data-vmz-ui="upload"
+      data-vmz-upload-destination={destination}
+      data-vmz-upload-mode={selectionMode}
+      data-vmz-upload-directory={directoryAttr}
+      data-vmz-upload-chunk={chunkAttr}
+      data-vmz-upload-session={sessionAttr}
+      data-invalid={invalidAttr}
+      data-vmz-upload-status={status}
+      data-progress={progress}
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      <label if={label} class="vmz-ui-upload__label" for={controlId}>{label}</label>
 
-    <div class="vmz-ui-upload__zone" data-vmz-upload="zone">
-      <input
-        id={controlId}
-        class="vmz-ui-upload__control"
-        type="file"
-        accept={accept}
-        multiple={multiple}
-        disabled={inputDisabled}
-        aria-invalid={error ? 'true' : 'false'}
-        aria-describedby={describedBy}
-        data-vmz-upload-directory={directoryAttr}
-        onChange={onPick}
-      />
-      <p class="vmz-ui-upload__hint" data-vmz-upload="hint">{zoneHint}</p>
+      <div class="vmz-ui-upload__zone" data-vmz-upload="zone">
+        <input
+          id={controlId}
+          class="vmz-ui-upload__control"
+          type="file"
+          accept={accept}
+          multiple={multiple}
+          disabled={inputDisabled}
+          aria-invalid={error ? 'true' : 'false'}
+          aria-describedby={describedBy}
+          data-vmz-upload-directory={directoryAttr}
+          onChange={onPick}
+        />
+        <p class="vmz-ui-upload__hint" data-vmz-upload="hint">{zoneHint}</p>
+      </div>
+
+      <ul if={hasItems} class="vmz-ui-upload__queue" data-vmz-upload="queue">
+        <li
+          each={queue}
+          as="item"
+          key={item.key}
+          class="vmz-ui-upload__item"
+          data-vmz-upload-item={item.key}
+          data-status={item.status}
+        >
+          <span class="vmz-ui-upload__item-name" data-vmz-upload="file">{item.name}</span>
+          <span class="vmz-ui-upload__item-meta">{item.meta}</span>
+          <span if={item.showBar} class="vmz-ui-upload__item-bar" style={item.barStyle} aria-hidden="true"></span>
+        </li>
+      </ul>
+
+      <p if={emptyHint} class="vmz-ui-upload__empty" data-vmz-upload="empty">{emptyText}</p>
+
+      <div if={showProgress} class="vmz-ui-upload__progress" data-vmz-upload="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progress} aria-label={progressLabel}>
+        <div class="vmz-ui-upload__bar" style={progressStyle}></div>
+        <span class="vmz-ui-upload__pct" data-vmz-upload="pct">{progressLabel}</span>
+      </div>
+
+      <p if={statusText} class="vmz-ui-upload__status" data-vmz-upload="status">{statusText}</p>
+      <p if={resultText} class="vmz-ui-upload__result" data-vmz-upload="result">{resultText}</p>
+
+      <div if={showActions} class="vmz-ui-upload__actions" data-vmz-upload="actions">
+        <button if={canCancel} type="button" class="vmz-ui-upload__cancel" data-vmz-upload="cancel" onClick={onCancelClick}>
+          {cancelLabel}
+        </button>
+        <button if={canResume} type="button" class="vmz-ui-upload__resume" data-vmz-upload="resume" onClick={onResumeClick}>
+          {resumeLabel}
+        </button>
+      </div>
+
+      <p if={description} id={descriptionId} class="vmz-ui-upload__description">{description}</p>
+      <p if={error} id={errorId} class="vmz-ui-upload__error" role="alert">{error}</p>
     </div>
-
-    <ul if={hasItems} class="vmz-ui-upload__queue" data-vmz-upload="queue">
-      <li
-        each={queue}
-        as="item"
-        key={item.key}
-        class="vmz-ui-upload__item"
-        data-vmz-upload-item={item.key}
-        data-status={item.status}
-      >
-        <span class="vmz-ui-upload__item-name" data-vmz-upload="file">{item.name}</span>
-        <span class="vmz-ui-upload__item-meta">{item.meta}</span>
-        <span if={item.showBar} class="vmz-ui-upload__item-bar" style={item.barStyle} aria-hidden="true"></span>
-      </li>
-    </ul>
-
-    <p if={emptyHint} class="vmz-ui-upload__empty" data-vmz-upload="empty">{emptyText}</p>
-
-    <div if={showProgress} class="vmz-ui-upload__progress" data-vmz-upload="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progress} aria-label={progressLabel}>
-      <div class="vmz-ui-upload__bar" style={progressStyle}></div>
-      <span class="vmz-ui-upload__pct" data-vmz-upload="pct">{progressLabel}</span>
-    </div>
-
-    <p if={statusText} class="vmz-ui-upload__status" data-vmz-upload="status">{statusText}</p>
-    <p if={resultText} class="vmz-ui-upload__result" data-vmz-upload="result">{resultText}</p>
-
-    <div if={showActions} class="vmz-ui-upload__actions" data-vmz-upload="actions">
-      <button if={canCancel} type="button" class="vmz-ui-upload__cancel" data-vmz-upload="cancel" onClick={onCancelClick}>
-        {cancelLabel}
-      </button>
-      <button if={canResume} type="button" class="vmz-ui-upload__resume" data-vmz-upload="resume" onClick={onResumeClick}>
-        {resumeLabel}
-      </button>
-    </div>
-
-    <p if={description} id={descriptionId} class="vmz-ui-upload__description">{description}</p>
-    <p if={error} id={errorId} class="vmz-ui-upload__error" role="alert">{error}</p>
-  </div>
 </template>
 
 <style>
-.vmz-ui-upload {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  max-width: 28rem;
-}
-
-.vmz-ui-upload__label {
-  font: inherit;
-  font-weight: 600;
-}
-
-.vmz-ui-upload__zone {
-  position: relative;
-  border: 1px dashed var(--vmz-line-default);
-  border-radius: 2px;
-  background: var(--vmz-surface-paper);
-  padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
-}
-
-.vmz-ui-upload.is-dragover .vmz-ui-upload__zone {
-  border-color: var(--vmz-action-primary-background);
-  background: color-mix(in srgb, var(--vmz-action-primary-background) 8%, var(--vmz-surface-paper));
-}
-
-.vmz-ui-upload__control {
-  font: inherit;
-  width: 100%;
-  padding: 0.15rem 0;
-  color: inherit;
-  outline: none;
-}
-
-.vmz-ui-upload__control:focus-visible {
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-}
-
-.vmz-ui-upload__control:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.vmz-ui-upload__hint {
-  margin: 0.35rem 0 0;
-  font-size: 0.88rem;
-  color: var(--vmz-text-steel);
-}
-
-.vmz-ui-upload__queue {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.vmz-ui-upload__item {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.15rem 0.75rem;
-  padding: 0.35rem 0.45rem;
-  border: 1px solid var(--vmz-line-default);
-  border-radius: 2px;
-  background: var(--vmz-surface-paper);
-}
-
-.vmz-ui-upload__item-name {
-  font-family: var(--vmz-font-mono);
-  font-size: 0.88rem;
-  color: var(--vmz-text-ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vmz-ui-upload__item-meta {
-  font-size: 0.8rem;
-  color: var(--vmz-text-steel);
-  white-space: nowrap;
-}
-
-.vmz-ui-upload__item-bar {
-  grid-column: 1 / -1;
-  height: 0.35rem;
-  border-radius: 2px;
-  background: var(--vmz-action-primary-background);
-  min-width: 0.25rem;
-  transition: width var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
-}
-
-.vmz-ui-upload[data-invalid='true'] .vmz-ui-upload__label {
-  color: var(--vmz-status-danger-foreground);
-}
-
-.vmz-ui-upload__empty {
-  margin: 0;
-  color: var(--vmz-text-steel);
-  font-size: 0.9em;
-}
-
-.vmz-ui-upload__progress {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.35rem 0;
-}
-
-.vmz-ui-upload__bar {
-  height: 0.45rem;
-  border-radius: 2px;
-  background: var(--vmz-action-primary-background);
-  min-width: 0.25rem;
-  transition: width var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
-}
-
-.vmz-ui-upload__pct {
-  font-family: var(--vmz-font-mono);
-  font-size: 0.8rem;
-  color: var(--vmz-text-steel);
-  white-space: nowrap;
-}
-
-.vmz-ui-upload__status {
-  margin: 0;
-  font-size: 0.9em;
-  color: var(--vmz-text-steel);
-}
-
-.vmz-ui-upload[data-vmz-upload-status='done'] .vmz-ui-upload__status,
-.vmz-ui-upload[data-vmz-upload-status='done'] .vmz-ui-upload__result {
-  color: var(--vmz-status-success-foreground);
-}
-
-.vmz-ui-upload[data-vmz-upload-status='error'] .vmz-ui-upload__status {
-  color: var(--vmz-status-danger-foreground);
-}
-
-.vmz-ui-upload__result {
-  margin: 0;
-  font-family: var(--vmz-font-mono);
-  font-size: 0.88rem;
-  color: var(--vmz-text-ink);
-}
-
-.vmz-ui-upload__actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.vmz-ui-upload__cancel,
-.vmz-ui-upload__resume {
-  font: inherit;
-  padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
-  border: 1px solid var(--vmz-line-default);
-  border-radius: 2px;
-  background: var(--vmz-surface-paper);
-  color: var(--vmz-text-ink);
-  cursor: pointer;
-  outline: none;
-}
-
-.vmz-ui-upload__cancel:focus-visible,
-.vmz-ui-upload__resume:focus-visible {
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-}
-
-.vmz-ui-upload__resume {
-  border-color: var(--vmz-action-primary-background);
-  color: var(--vmz-action-primary-background);
-}
-
-.vmz-ui-upload__description {
-  margin: 0;
-  opacity: 0.75;
-  font-size: 0.9em;
-}
-
-.vmz-ui-upload__error {
-  margin: 0;
-  color: var(--vmz-status-danger-foreground);
-  font-size: 0.9em;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .vmz-ui-upload__bar,
-  .vmz-ui-upload__item-bar {
-    transition: none;
+  .vmz-ui-upload {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    max-width: 28rem;
   }
-}
+
+  .vmz-ui-upload__label {
+    font: inherit;
+    font-weight: 600;
+  }
+
+  .vmz-ui-upload__zone {
+    position: relative;
+    border: 1px dashed var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-surface-paper);
+    padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
+  }
+
+  .vmz-ui-upload.is-dragover .vmz-ui-upload__zone {
+    border-color: var(--vmz-action-primary-background);
+    background: color-mix(in srgb, var(--vmz-action-primary-background) 8%, var(--vmz-surface-paper));
+  }
+
+  .vmz-ui-upload__control {
+    font: inherit;
+    width: 100%;
+    padding: 0.15rem 0;
+    color: inherit;
+    outline: none;
+  }
+
+  .vmz-ui-upload__control:focus-visible {
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+  }
+
+  .vmz-ui-upload__control:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .vmz-ui-upload__hint {
+    margin: 0.35rem 0 0;
+    font-size: 0.88rem;
+    color: var(--vmz-text-steel);
+  }
+
+  .vmz-ui-upload__queue {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .vmz-ui-upload__item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.15rem 0.75rem;
+    padding: 0.35rem 0.45rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-surface-paper);
+  }
+
+  .vmz-ui-upload__item-name {
+    font-family: var(--vmz-font-mono);
+    font-size: 0.88rem;
+    color: var(--vmz-text-ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .vmz-ui-upload__item-meta {
+    font-size: 0.8rem;
+    color: var(--vmz-text-steel);
+    white-space: nowrap;
+  }
+
+  .vmz-ui-upload__item-bar {
+    grid-column: 1 / -1;
+    height: 0.35rem;
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-action-primary-background);
+    min-width: 0.25rem;
+    transition: width var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+  }
+
+  .vmz-ui-upload[data-invalid='true'] .vmz-ui-upload__label {
+    color: var(--vmz-status-danger-foreground);
+  }
+
+  .vmz-ui-upload__empty {
+    margin: 0;
+    color: var(--vmz-text-steel);
+    font-size: 0.9em;
+  }
+
+  .vmz-ui-upload__progress {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0;
+  }
+
+  .vmz-ui-upload__bar {
+    height: 0.45rem;
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-action-primary-background);
+    min-width: 0.25rem;
+    transition: width var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+  }
+
+  .vmz-ui-upload__pct {
+    font-family: var(--vmz-font-mono);
+    font-size: 0.8rem;
+    color: var(--vmz-text-steel);
+    white-space: nowrap;
+  }
+
+  .vmz-ui-upload__status {
+    margin: 0;
+    font-size: 0.9em;
+    color: var(--vmz-text-steel);
+  }
+
+  .vmz-ui-upload[data-vmz-upload-status='done'] .vmz-ui-upload__status,
+  .vmz-ui-upload[data-vmz-upload-status='done'] .vmz-ui-upload__result {
+    color: var(--vmz-status-success-foreground);
+  }
+
+  .vmz-ui-upload[data-vmz-upload-status='error'] .vmz-ui-upload__status {
+    color: var(--vmz-status-danger-foreground);
+  }
+
+  .vmz-ui-upload__result {
+    margin: 0;
+    font-family: var(--vmz-font-mono);
+    font-size: 0.88rem;
+    color: var(--vmz-text-ink);
+  }
+
+  .vmz-ui-upload__actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .vmz-ui-upload__cancel,
+  .vmz-ui-upload__resume {
+    font: inherit;
+    padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
+    cursor: pointer;
+    outline: none;
+  }
+
+  .vmz-ui-upload__cancel:focus-visible,
+  .vmz-ui-upload__resume:focus-visible {
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+  }
+
+  .vmz-ui-upload__resume {
+    border-color: var(--vmz-action-primary-background);
+    color: var(--vmz-action-primary-background);
+  }
+
+  .vmz-ui-upload__description {
+    margin: 0;
+    opacity: 0.75;
+    font-size: 0.9em;
+  }
+
+  .vmz-ui-upload__error {
+    margin: 0;
+    color: var(--vmz-status-danger-foreground);
+    font-size: 0.9em;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .vmz-ui-upload__bar,
+    .vmz-ui-upload__item-bar {
+      transition: none;
+    }
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — Upload (all-in-one).
- * Owns selection UI, constraints, queue, progress/cancel, and destination transport
- * (client | server | object). Parent owns result value + destination config only.
- * No useUpload / createUpload; no cloud SDK inside @vmz/ui.
- * destination=server + chunkSize>0 → init / chunk PUT / complete + same-session pause/resume.
- *
- * Only destination config + result callbacks are `public` props.
- * Presentation/queue/xhr state stay private so parent re-renders cannot wipe them.
- */
+* VMZ UI — Upload (all-in-one).
+* Owns selection UI, constraints, queue, progress/cancel, and destination transport
+* (client | server | object). Parent owns result value + destination config only.
+* No useUpload / createUpload; no cloud SDK inside @vmz/ui.
+* destination=server + chunkSize>0 → init / chunk PUT / complete + same-session pause/resume.
+*
+* Only destination config + result callbacks are `public` props.
+* Presentation/queue/xhr state stay private so parent re-renders cannot wipe them.
+*/
 export default class Upload {
-  public label: string = '';
-  public description: string = '';
-  /** Form-level validation message from parent. */
-  public error: string = '';
-  public emptyText: string = 'No file selected';
-  public accept: string = '';
-  public disabled: boolean = false;
-  public invalidAttr: string = 'false';
-  public controlId: string = 'vmz-upload';
-  public descriptionId: string = 'vmz-upload-desc';
-  public errorId: string = 'vmz-upload-err';
-  public describedBy: string = '';
-  /** client | server | object */
-  public destination: string = 'server';
-  /** ServerRoute / URL for destination=server (multipart) or resumable prefix (chunkSize>0) */
-  public action: string = '';
-  /** multipart field name */
-  public fieldName: string = 'file';
-  public multiple: boolean = false;
-  public directory: boolean = false;
-  public maxCount: number = 1;
-  public maxBytes: number = 0;
-  /**
-   * When >0 and destination=server: chunked resumable transport against action prefix
-   * (`/init`, `/chunk`, `/status`, `/complete`). Thin gate is single-file same-session.
-   */
-  public chunkSize: number = 0;
-  /**
-   * object destination: (file) => Promise<{ uploadUrl, headers?, objectKey? }>
-   * Must bind #server-issued short-lived credentials only.
-   */
-  public onPresign: ((file: File) => Promise<{ uploadUrl: string; headers?: Record<string, string>; objectKey?: string }>) | null =
-    null;
-  /** Parent receives serializable results (no File handles required). */
-  public onValue: ((items: UploadValueItem[]) => void) | null = null;
-  /** Parent mirrors overall status for form dogfood / submit gates. */
-  public onStatus: ((status: string) => void) | null = null;
-  public cancelLabel: string = 'Cancel upload';
-  public resumeLabel: string = 'Resume upload';
-
-  // presentation (component-owned — NOT public props)
-  status: string = 'idle';
-  progress: string = '0';
-  progressLabel: string = '';
-  progressStyle: string = 'width:0%';
-  showProgress: boolean = false;
-  statusText: string = '';
-  resultText: string = '';
-  canCancel: boolean = false;
-  canResume: boolean = false;
-  showActions: boolean = false;
-  emptyHint: boolean = true;
-  hasItems: boolean = false;
-  inputDisabled: boolean = false;
-  dragOver: boolean = false;
-  selectionMode: string = 'single';
-  directoryAttr: string = 'false';
-  chunkAttr: string = '0';
-  sessionAttr: string = '';
-  zoneHint: string = 'Choose a file or drop it here';
-  /** @type {{ key: string, name: string, meta: string, status: string, showBar: boolean, barStyle: string }[]} */
-  queue: {
-    key: string;
-    name: string;
-    meta: string;
-    status: string;
-    showBar: boolean;
-    barStyle: string;
-  }[] = [];
-
-  _seenClearToken = 0;
-  _clearToken = 0;
-
-  /** Parent increments to clear internal queue (form reset). Binder assignment must clear immediately. */
-  get clearToken() {
-    return this._clearToken;
-  }
-  set clearToken(v) {
-    const n = Number(v) || 0;
-    this._clearToken = n;
-    if (n !== this._seenClearToken) {
-      this._seenClearToken = n;
-      this.clearInternal(true);
-    }
-  }
-  /** @type {XMLHttpRequest | null} */
-  _xhr = null;
-  /** @type {File[]} */
-  _files = [];
-  /** @type {UploadValueItem[]} */
-  _values = [];
-  _gen = 0;
-  /** Resumable session (same File handle / same page). */
-  _uploadId = '';
-  _chunkTotal = 0;
-  /** @type {number[]} */
-  _received = [];
-  _activeChunkSize = 0;
-
-  onMount() {
-    this.applyDirectoryAttr();
-    this.syncChunkAttr();
-  }
-
-  onPick(ev) {
-    this.syncClearToken();
-    this.applyDirectoryAttr();
-    const input = ev && ev.target;
-    const list = input && input.files ? input.files : null;
-    // Ignore empty change (including the synthetic event from clearing input.value
-    // after a successful pick) — otherwise in-flight uploads get abort/cleared.
-    if (!list || !list.length) return;
-    this.ingestFileList(list);
-    // Allow re-selecting the same path without retaining the FileList on the input.
-    if (input) input.value = '';
-  }
-
-  onDragEnter(ev) {
-    if (this.inputDisabled || this.disabled) return;
-    if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
-    this.dragOver = true;
-  }
-
-  onDragOver(ev) {
-    if (this.inputDisabled || this.disabled) return;
-    if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
-    this.dragOver = true;
-  }
-
-  onDragLeave() {
-    this.dragOver = false;
-  }
-
-  onDrop(ev) {
-    if (this.inputDisabled || this.disabled) return;
-    if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
-    this.dragOver = false;
-    const list = ev && ev.dataTransfer ? ev.dataTransfer.files : null;
-    this.ingestFileList(list);
-  }
-
-  onCancelClick() {
-    this.cancelActive(true);
-  }
-
-  onResumeClick() {
-    if (this.status !== 'paused' || !this._uploadId || !this._files.length) return;
-    this._gen += 1;
-    const gen = this._gen;
-    this.runDestination(gen);
-  }
-
-  syncClearToken() {
-    const token = Number(this.clearToken) || 0;
-    if (token !== this._seenClearToken) {
-      this._seenClearToken = token;
-      this.clearInternal(false);
-    }
-  }
-
-  syncChunkAttr() {
-    const n = Math.max(0, Number(this.chunkSize) || 0);
-    this.chunkAttr = String(n);
-    this.sessionAttr = this._uploadId
-      ? `${this._received.length}/${this._chunkTotal || 0}:${this._uploadId}`
-      : '';
-  }
-
-  applyDirectoryAttr() {
-    this.directoryAttr = this.directory ? 'true' : 'false';
-    this.selectionMode = this.directory ? 'directory' : this.multiple ? 'multiple' : 'single';
-    this.zoneHint = this.directory
-      ? 'Choose a folder or drop files here'
-      : this.multiple
-        ? 'Choose files or drop them here'
-        : 'Choose a file or drop it here';
-    // Native directory picker (UA-specific).
-    const el = typeof document !== 'undefined' ? document.getElementById(this.controlId) : null;
-    if (el && 'webkitdirectory' in el) {
-      try {
-        el.webkitdirectory = !!this.directory;
-        el.multiple = !!(this.multiple || this.directory);
-      } catch {
-        /* ignore */
-      }
-    }
-  }
-
-  /**
-   * @param {FileList | File[] | null} list
-   */
-  ingestFileList(list) {
-    this.syncClearToken();
-    this.applyDirectoryAttr();
-    this.syncChunkAttr();
-    if (this.disabled) return;
-    const files = listToFiles(list);
-    if (!files.length) {
-      this.clearInternal(false);
-      this.emitValue([]);
-      return;
-    }
-
-    const maxCount = Math.max(1, Number(this.maxCount) || 1);
-    const capped = this.multiple || this.directory ? files.slice(0, maxCount) : files.slice(0, 1);
-    if ((this.multiple || this.directory) && files.length > maxCount) {
-      this.failAll(`At most ${maxCount} file(s)`);
-      return;
-    }
-
-    const maxBytes = Number(this.maxBytes) || 0;
-    for (const f of capped) {
-      const acceptErr = acceptError(f, this.accept);
-      if (acceptErr) {
-        this.failAll(acceptErr);
-        return;
-      }
-      if (maxBytes > 0 && Number(f.size) > maxBytes) {
-        this.failAll(`File too large (max ${maxBytes} bytes)`);
-        return;
-      }
-    }
-
-    const chunkSize = Math.max(0, Number(this.chunkSize) || 0);
-    if (chunkSize > 0 && capped.length !== 1) {
-      this.failAll('Resumable chunk upload supports one file per session');
-      return;
-    }
-
-    this.cancelActive(false);
-    this.resetSession();
-    this._files = capped;
-    this._gen += 1;
-    const gen = this._gen;
-    this._values = [];
-    this.queue = capped.map((f, i) => ({
-      key: `f-${gen}-${i}`,
-      name: String(f.name || `file-${i}`),
-      meta: formatBytes(f.size),
-      status: 'pending',
-      showBar: false,
-      barStyle: 'width:0%',
-    }));
-    this.hasItems = this.queue.length > 0;
-    this.emptyHint = false;
-    this.inputDisabled = true;
-    this.canResume = false;
-    this.showActions = false;
-    this.runDestination(gen);
-  }
-
-  /**
-   * @param {number} gen
-   */
-  async runDestination(gen) {
-    const dest = String(this.destination || 'server').toLowerCase();
-    if (dest === 'client') {
-      await this.runClient(gen);
-      return;
-    }
-    if (dest === 'object') {
-      await this.runObject(gen);
-      return;
-    }
-    const chunkSize = Math.max(0, Number(this.chunkSize) || 0);
-    if (chunkSize > 0) {
-      await this.runServerResumable(gen, chunkSize);
-      return;
-    }
-    await this.runServer(gen);
-  }
-
-  /**
-   * @param {number} gen
-   */
-  async runClient(gen) {
-    if (gen !== this._gen) return;
-    this.setOverall('uploading', 'Preparing…', true, false);
-    const values = [];
-    for (let i = 0; i < this._files.length; i++) {
-      if (gen !== this._gen) return;
-      const file = this._files[i];
-      const pct = Math.round(((i + 1) / this._files.length) * 100);
-      this.patchItem(i, { status: 'done', showBar: true, barStyle: `width:${pct}%`, meta: `${formatBytes(file.size)} · local` });
-      this.setProgress(pct);
-      values.push({
-        name: String(file.name || ''),
-        size: Number(file.size) || 0,
-        type: String(file.type || ''),
-        destination: 'client',
-        id: `client-${gen}-${i}`,
-        bytes: Number(file.size) || 0,
-        /** Local File handle for in-tab tools (checksum, etc.). Not serialized. */
-        file,
-      });
-    }
-    if (gen !== this._gen) return;
-    this._values = values;
-    this.finishOk(values);
-  }
-
-  /**
-   * @param {number} gen
-   */
-  async runServer(gen) {
-    if (gen !== this._gen) return;
-    const action = String(this.action || '').trim();
-    if (!action) {
-      this.failAll('Upload action URL required');
-      return;
-    }
-    // Sequential single-XHR for thin gate; multi-file appends all parts then one request.
-    this.setOverall('uploading', 'Uploading…', true, true);
-    this.setProgress(0);
-    for (let i = 0; i < this.queue.length; i++) {
-      this.patchItem(i, { status: 'uploading', showBar: true, barStyle: 'width:0%' });
-    }
-
-    const form = new FormData();
-    const field = String(this.fieldName || 'file');
-    if (this._files.length === 1) {
-      const file = this._files[0];
-      form.append(field, file, file.name);
-      form.append('name', file.name);
-    } else {
-      for (const file of this._files) {
-        form.append(field, file, file.name);
-      }
-    }
-
-    const xhr = new XMLHttpRequest();
-    this._xhr = xhr;
-    const result = await xhrSend(xhr, 'POST', action, form, (pct) => {
-      if (gen !== this._gen) return;
-      this.setProgress(pct);
-      for (let i = 0; i < this.queue.length; i++) {
-        this.patchItem(i, { barStyle: `width:${pct}%` });
-      }
-    });
-    if (gen !== this._gen) return;
-    this._xhr = null;
-
-    if (result.aborted) {
-      this.markCancelled();
-      return;
-    }
-    if (result.error) {
-      this.failAll(result.error);
-      return;
-    }
-
-    const body = result.body;
-    if (!(result.status >= 200 && result.status < 300) || !body || !body.ok) {
-      this.failAll((body && body.error) || `Upload failed (${result.status || 'network'})`);
-      return;
-    }
-
-    // Single-file shape { ok, id, bytes, name } or multi { ok, items: [...] }
-    const values = [];
-    if (Array.isArray(body.items)) {
-      for (let i = 0; i < body.items.length; i++) {
-        const it = body.items[i] || {};
-        values.push({
-          name: String(it.name || (this._files[i] && this._files[i].name) || ''),
-          size: Number(it.bytes || it.size || (this._files[i] && this._files[i].size) || 0),
-          type: String(it.contentType || ''),
-          destination: 'server',
-          id: String(it.id || ''),
-          bytes: Number(it.bytes || it.size || 0),
-          headHex: it.headHex ? String(it.headHex) : '',
-        });
-      }
-    } else {
-      values.push({
-        name: String(body.name || (this._files[0] && this._files[0].name) || ''),
-        size: Number(body.bytes || body.reportedSize || (this._files[0] && this._files[0].size) || 0),
-        type: String(body.contentType || ''),
-        destination: 'server',
-        id: String(body.id || ''),
-        bytes: Number(body.bytes || 0),
-        headHex: body.headHex ? String(body.headHex) : '',
-      });
-    }
-    for (let i = 0; i < this.queue.length; i++) {
-      this.patchItem(i, { status: 'done', showBar: true, barStyle: 'width:100%', meta: `${formatBytes(values[i] && values[i].bytes)} · uploaded` });
-    }
-    this._values = values;
-    this.finishOk(values);
-  }
-
-  /**
-   * Chunked server upload: POST init → PUT chunk(s) → POST complete.
-   * Cancel → paused (keeps uploadId + received); Resume continues missing indexes.
-   * @param {number} gen
-   * @param {number} chunkSize
-   */
-  async runServerResumable(gen, chunkSize) {
-    if (gen !== this._gen) return;
-    const base = String(this.action || '').trim().replace(/\/+$/, '');
-    if (!base) {
-      this.failAll('Upload action URL required');
-      return;
-    }
-    const file = this._files[0];
-    if (!file) {
-      this.failAll('No file for resumable upload');
-      return;
-    }
-
-    this._activeChunkSize = chunkSize;
-    this.setOverall('uploading', this._uploadId ? 'Resuming…' : 'Uploading…', true, true);
-    this.canResume = false;
-    this.showActions = true;
-    this.patchItem(0, { status: 'uploading', showBar: true, barStyle: 'width:0%' });
-
-    if (!this._uploadId) {
-      const initXhr = new XMLHttpRequest();
-      this._xhr = initXhr;
-      const initResult = await xhrSendJson(initXhr, 'POST', `${base}/init`, {
-        name: String(file.name || ''),
-        size: Number(file.size) || 0,
-        type: String(file.type || ''),
-        chunkSize,
-      });
-      if (gen !== this._gen) return;
-      this._xhr = null;
-      if (initResult.aborted) {
-        this.markPaused();
-        return;
-      }
-      if (initResult.error || !(initResult.status >= 200 && initResult.status < 300) || !initResult.body || !initResult.body.ok) {
-        this.failAll((initResult.body && initResult.body.error) || initResult.error || `Init failed (${initResult.status || 'network'})`);
-        return;
-      }
-      this._uploadId = String(initResult.body.uploadId || '');
-      this._chunkTotal = Number(initResult.body.chunkTotal) || Math.ceil((Number(file.size) || 0) / chunkSize) || 1;
-      this._received = [];
-      this.syncChunkAttr();
-      if (!this._uploadId) {
-        this.failAll('Init returned no uploadId');
-        return;
-      }
-    } else {
-      const statusXhr = new XMLHttpRequest();
-      this._xhr = statusXhr;
-      const statusResult = await xhrSendJson(statusXhr, 'POST', `${base}/status`, { uploadId: this._uploadId });
-      if (gen !== this._gen) return;
-      this._xhr = null;
-      if (statusResult.aborted) {
-        this.markPaused();
-        return;
-      }
-      if (statusResult.error || !(statusResult.status >= 200 && statusResult.status < 300) || !statusResult.body || !statusResult.body.ok) {
-        this.failAll((statusResult.body && statusResult.body.error) || statusResult.error || `Status failed (${statusResult.status || 'network'})`);
-        return;
-      }
-      this._received = Array.isArray(statusResult.body.received)
-        ? statusResult.body.received.map((n) => Number(n)).filter((n) => Number.isFinite(n))
-        : [];
-      this._chunkTotal = Number(statusResult.body.chunkTotal) || this._chunkTotal;
-      this.syncChunkAttr();
-    }
-
-    const total = Math.max(1, this._chunkTotal || Math.ceil((Number(file.size) || 0) / chunkSize) || 1);
-    this._chunkTotal = total;
-    const receivedSet = new Set(this._received);
-    this.setProgress(Math.round((receivedSet.size / total) * 100));
-    this.patchItem(0, {
-      barStyle: `width:${Math.round((receivedSet.size / total) * 100)}%`,
-      meta: `${receivedSet.size}/${total} chunks`,
-    });
-
-    for (let index = 0; index < total; index++) {
-      if (gen !== this._gen) return;
-      if (receivedSet.has(index)) continue;
-      const start = index * chunkSize;
-      const end = Math.min(Number(file.size) || 0, start + chunkSize);
-      const blob = file.slice(start, end);
-      const xhr = new XMLHttpRequest();
-      this._xhr = xhr;
-      const result = await xhrSend(
-        xhr,
-        'PUT',
-        `${base}/chunk`,
-        blob,
-        (pct) => {
-          if (gen !== this._gen) return;
-          const overall = Math.round(((receivedSet.size + pct / 100) / total) * 100);
-          this.setProgress(overall);
-          this.patchItem(0, { barStyle: `width:${overall}%` });
-        },
-        {
-          'content-type': 'application/octet-stream',
-          'x-vmz-upload-id': this._uploadId,
-          'x-vmz-chunk-index': String(index),
-          'x-vmz-chunk-total': String(total),
-        },
-      );
-      if (gen !== this._gen) return;
-      this._xhr = null;
-      if (result.aborted) {
-        this.markPaused();
-        return;
-      }
-      if (result.error || !(result.status >= 200 && result.status < 300) || !result.body || !result.body.ok) {
-        this.failAll((result.body && result.body.error) || result.error || `Chunk ${index} failed (${result.status || 'network'})`);
-        return;
-      }
-      this._received = Array.isArray(result.body.received)
-        ? result.body.received.map((n) => Number(n)).filter((n) => Number.isFinite(n))
-        : this._received.concat([index]);
-      receivedSet.add(index);
-      for (const n of this._received) receivedSet.add(n);
-      this.syncChunkAttr();
-      const pct = Math.round((receivedSet.size / total) * 100);
-      this.setProgress(pct);
-      this.patchItem(0, { barStyle: `width:${pct}%`, meta: `${receivedSet.size}/${total} chunks` });
-    }
-
-    if (gen !== this._gen) return;
-    const completeXhr = new XMLHttpRequest();
-    this._xhr = completeXhr;
-    const completeResult = await xhrSendJson(completeXhr, 'POST', `${base}/complete`, { uploadId: this._uploadId });
-    if (gen !== this._gen) return;
-    this._xhr = null;
-    if (completeResult.aborted) {
-      this.markPaused();
-      return;
-    }
-    if (
-      completeResult.error ||
-      !(completeResult.status >= 200 && completeResult.status < 300) ||
-      !completeResult.body ||
-      !completeResult.body.ok
-    ) {
-      this.failAll(
-        (completeResult.body && completeResult.body.error) ||
-          completeResult.error ||
-          `Complete failed (${completeResult.status || 'network'})`,
-      );
-      return;
-    }
-
-    const body = completeResult.body;
-    const values = [
-      {
-        name: String(body.name || file.name || ''),
-        size: Number(body.bytes || body.size || file.size || 0),
-        type: String(body.contentType || file.type || ''),
-        destination: 'server',
-        id: String(body.id || ''),
-        bytes: Number(body.bytes || body.size || 0),
-        headHex: body.headHex ? String(body.headHex) : '',
-        uploadId: this._uploadId,
-        chunks: total,
-      },
-    ];
-    this.patchItem(0, {
-      status: 'done',
-      showBar: true,
-      barStyle: 'width:100%',
-      meta: `${formatBytes(values[0].bytes)} · ${total} chunks`,
-    });
-    this.resetSession();
-    this._values = values;
-    this.finishOk(values);
-  }
-
-  /**
-   * @param {number} gen
-   */
-  async runObject(gen) {
-    if (gen !== this._gen) return;
-    if (typeof this.onPresign !== 'function') {
-      this.failAll('onPresign callback required for object destination');
-      return;
-    }
-    this.setOverall('uploading', 'Uploading…', true, true);
-    const values = [];
-    for (let i = 0; i < this._files.length; i++) {
-      if (gen !== this._gen) return;
-      const file = this._files[i];
-      this.patchItem(i, { status: 'uploading', showBar: true, barStyle: 'width:0%' });
-      let signed;
-      try {
-        signed = await this.onPresign(file);
-      } catch (err) {
-        this.failAll(err instanceof Error ? err.message : String(err || 'presign failed'));
-        return;
-      }
-      if (gen !== this._gen) return;
-      const url = signed && signed.uploadUrl ? String(signed.uploadUrl) : '';
-      if (!url) {
-        this.failAll('presign returned no uploadUrl');
-        return;
-      }
-      const xhr = new XMLHttpRequest();
-      this._xhr = xhr;
-      const headers = (signed && signed.headers) || {};
-      const result = await xhrSend(xhr, 'PUT', url, file, (pct) => {
-        if (gen !== this._gen) return;
-        const overall = Math.round(((i + pct / 100) / this._files.length) * 100);
-        this.setProgress(overall);
-        this.patchItem(i, { barStyle: `width:${pct}%` });
-      }, headers);
-      if (gen !== this._gen) return;
-      this._xhr = null;
-      if (result.aborted) {
-        this.markCancelled();
-        return;
-      }
-      if (result.error || !(result.status >= 200 && result.status < 300)) {
-        this.failAll(result.error || `Object upload failed (${result.status || 'network'})`);
-        return;
-      }
-      const objectKey = String((signed && signed.objectKey) || file.name || '');
-      values.push({
-        name: String(file.name || ''),
-        size: Number(file.size) || 0,
-        type: String(file.type || ''),
-        destination: 'object',
-        id: objectKey,
-        bytes: Number(file.size) || 0,
-        objectKey,
-      });
-      this.patchItem(i, { status: 'done', showBar: true, barStyle: 'width:100%', meta: `${formatBytes(file.size)} · object` });
-    }
-    this._values = values;
-    this.finishOk(values);
-  }
-
-  /**
-   * @param {UploadValueItem[]} values
-   */
-  finishOk(values) {
-    this.setProgress(100);
-    this.status = 'done';
-    this.statusText = 'Upload complete';
-    this.showProgress = true;
-    this.canCancel = false;
-    this.canResume = false;
-    this.showActions = false;
-    this.inputDisabled = false;
-    const first = values[0];
-    if (values.length === 1 && first) {
-      const prefix = first.destination === 'client' ? 'client' : first.destination === 'object' ? 'object' : 'attachment';
-      const head = first.headHex ? ` head:${first.headHex}` : '';
-      const chunkNote = first.chunks ? ` chunks:${first.chunks}` : '';
-      this.resultText = `${prefix}:${first.id} (${first.bytes || 0} bytes)${head}${chunkNote}`;
-    } else {
-      this.resultText = `${values.length} file(s) ready`;
-    }
-    this.emitStatus();
-    this.emitValue(values);
-  }
-
-  /**
-   * @param {string} message
-   */
-  failAll(message) {
-    this.cancelActive(false);
-    this.resetSession();
-    this.status = 'error';
-    this.statusText = message || 'Upload failed';
-    this.showProgress = false;
-    this.canCancel = false;
-    this.canResume = false;
-    this.showActions = false;
-    this.inputDisabled = false;
-    this.resultText = '';
-    this._values = [];
-    for (let i = 0; i < this.queue.length; i++) {
-      this.patchItem(i, { status: 'error', showBar: false });
-    }
-    this.emitStatus();
-    this.emitValue([]);
-  }
-
-  markCancelled() {
-    this.status = 'cancelled';
-    this.statusText = 'Upload cancelled';
-    this.showProgress = false;
-    this.canCancel = false;
-    this.canResume = false;
-    this.showActions = false;
-    this.inputDisabled = false;
-    this.resultText = '';
-    this._values = [];
-    this.resetSession();
-    this.emitStatus();
-    this.emitValue([]);
-  }
-
-  markPaused() {
-    this.status = 'paused';
-    this.statusText = 'Upload paused — resume to continue';
-    this.showProgress = true;
-    this.canCancel = false;
-    this.canResume = !!this._uploadId;
-    this.showActions = this.canResume;
-    this.inputDisabled = false;
-    this.resultText = '';
-    this._values = [];
-    this.syncChunkAttr();
-    this.patchItem(0, {
-      status: 'paused',
-      meta: `${this._received.length}/${this._chunkTotal || 0} chunks`,
-    });
-    this.emitStatus();
-    this.emitValue([]);
-  }
-
-  resetSession() {
-    this._uploadId = '';
-    this._chunkTotal = 0;
-    this._received = [];
-    this._activeChunkSize = 0;
-    this.syncChunkAttr();
-  }
-
-  /**
-   * @param {boolean} mark
-   */
-  cancelActive(mark) {
-    const xhr = this._xhr;
-    this._xhr = null;
-    this._gen += 1;
-    if (xhr) {
-      try {
-        xhr.abort();
-      } catch {
-        /* ignore */
-      }
-    }
-    if (mark && this.status === 'uploading') {
-      if (this._uploadId && this._activeChunkSize > 0) {
-        this.markPaused();
-      } else {
-        this.markCancelled();
-      }
-    }
-  }
-
-  /**
-   * @param {boolean} emit
-   */
-  clearInternal(emit) {
-    this.cancelActive(false);
-    this.resetSession();
-    this._files = [];
-    this._values = [];
-    this.queue = [];
-    this.hasItems = false;
-    this.emptyHint = true;
-    this.status = 'idle';
-    this.statusText = '';
-    this.resultText = '';
-    this.showProgress = false;
-    this.canCancel = false;
-    this.canResume = false;
-    this.showActions = false;
-    this.inputDisabled = !!this.disabled;
-    this.setProgress(0);
-    this.dragOver = false;
-    this.applyDirectoryAttr();
-    this.emitStatus();
-    if (emit) this.emitValue([]);
-  }
-
-  /**
-   * @param {string} status
-   * @param {string} text
-   * @param {boolean} showProgress
-   * @param {boolean} canCancel
-   */
-  setOverall(status, text, showProgress, canCancel) {
-    this.status = status;
-    this.statusText = text;
-    this.showProgress = showProgress;
-    this.canCancel = canCancel;
-    this.canResume = false;
-    this.showActions = canCancel;
-    this.inputDisabled = status === 'uploading' || !!this.disabled;
-    this.emitStatus();
-  }
-
-  /**
-   * @param {number} pct
-   */
-  setProgress(pct) {
-    const n = Math.max(0, Math.min(100, Number(pct) || 0));
-    this.progress = String(n);
-    this.progressLabel = `${n}%`;
-    this.progressStyle = `width:${n}%`;
-  }
-
-  /**
-   * @param {number} index
-   * @param {Partial<{ status: string, meta: string, showBar: boolean, barStyle: string }>} patch
-   */
-  patchItem(index, patch) {
-    const cur = this.queue[index];
-    if (!cur) return;
-    const next = Object.assign({}, cur, patch);
-    const copy = this.queue.slice();
-    copy[index] = next;
-    this.queue = copy;
-  }
-
-  /**
-   * @param {UploadValueItem[]} items
-   */
-  emitValue(items) {
-    if (typeof this.onValue === 'function') this.onValue(items);
-  }
-
-  emitStatus() {
-    if (typeof this.onStatus === 'function') this.onStatus(this.status);
-  }
+	public label: string = "";
+	public description: string = "";
+	/** Form-level validation message from parent. */
+	public error: string = "";
+	public emptyText: string = "No file selected";
+	public accept: string = "";
+	public disabled: boolean = false;
+	public invalidAttr: string = "false";
+	public controlId: string = "vmz-upload";
+	public descriptionId: string = "vmz-upload-desc";
+	public errorId: string = "vmz-upload-err";
+	public describedBy: string = "";
+	/** client | server | object */
+	public destination: string = "server";
+	/** ServerRoute / URL for destination=server (multipart) or resumable prefix (chunkSize>0) */
+	public action: string = "";
+	/** multipart field name */
+	public fieldName: string = "file";
+	public multiple: boolean = false;
+	public directory: boolean = false;
+	public maxCount: number = 1;
+	public maxBytes: number = 0;
+	/**
+	* When >0 and destination=server: chunked resumable transport against action prefix
+	* (`/init`, `/chunk`, `/status`, `/complete`). Thin gate is single-file same-session.
+	*/
+	public chunkSize: number = 0;
+	/**
+	* object destination: (file) => Promise<{ uploadUrl, headers?, objectKey? }>
+	* Must bind #server-issued short-lived credentials only.
+	*/
+	public onPresign: ((file: File) => Promise<{
+		uploadUrl: string;
+		headers?: Record<string, string>;
+		objectKey?: string;
+	}>) | null = null;
+	/** Parent receives serializable results (no File handles required). */
+	public onValue: ((items: UploadValueItem[]) => void) | null = null;
+	/** Parent mirrors overall status for form dogfood / submit gates. */
+	public onStatus: ((status: string) => void) | null = null;
+	public cancelLabel: string = "Cancel upload";
+	public resumeLabel: string = "Resume upload";
+	// presentation (component-owned — NOT public props)
+	status: string = "idle";
+	progress: string = "0";
+	progressLabel: string = "";
+	progressStyle: string = "width:0%";
+	showProgress: boolean = false;
+	statusText: string = "";
+	resultText: string = "";
+	canCancel: boolean = false;
+	canResume: boolean = false;
+	showActions: boolean = false;
+	emptyHint: boolean = true;
+	hasItems: boolean = false;
+	inputDisabled: boolean = false;
+	dragOver: boolean = false;
+	selectionMode: string = "single";
+	directoryAttr: string = "false";
+	chunkAttr: string = "0";
+	sessionAttr: string = "";
+	zoneHint: string = "Choose a file or drop it here";
+	/** @type {{ key: string, name: string, meta: string, status: string, showBar: boolean, barStyle: string }[]} */
+	queue: {
+		key: string;
+		name: string;
+		meta: string;
+		status: string;
+		showBar: boolean;
+		barStyle: string;
+	}[] = [];
+	_seenClearToken = 0;
+	_clearToken = 0;
+	/** Parent increments to clear internal queue (form reset). Binder assignment must clear immediately. */
+	get clearToken() {
+		return this._clearToken;
+	}
+	set clearToken(v) {
+		const n = Number(v) || 0;
+		this._clearToken = n;
+		if (n !== this._seenClearToken) {
+			this._seenClearToken = n;
+			this.clearInternal(true);
+		}
+	}
+	/** @type {XMLHttpRequest | null} */
+	_xhr = null;
+	/** @type {File[]} */
+	_files = [];
+	/** @type {UploadValueItem[]} */
+	_values = [];
+	_gen = 0;
+	/** Resumable session (same File handle / same page). */
+	_uploadId = "";
+	_chunkTotal = 0;
+	/** @type {number[]} */
+	_received = [];
+	_activeChunkSize = 0;
+	onMount() {
+		this.applyDirectoryAttr();
+		this.syncChunkAttr();
+	}
+	onPick(ev) {
+		this.syncClearToken();
+		this.applyDirectoryAttr();
+		const input = ev && ev.target;
+		const list = input && input.files ? input.files : null;
+		// Ignore empty change (including the synthetic event from clearing input.value
+		// after a successful pick) — otherwise in-flight uploads get abort/cleared.
+		if (!list || !list.length) return;
+		this.ingestFileList(list);
+		// Allow re-selecting the same path without retaining the FileList on the input.
+		if (input) input.value = "";
+	}
+	onDragEnter(ev) {
+		if (this.inputDisabled || this.disabled) return;
+		if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
+		this.dragOver = true;
+	}
+	onDragOver(ev) {
+		if (this.inputDisabled || this.disabled) return;
+		if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
+		this.dragOver = true;
+	}
+	onDragLeave() {
+		this.dragOver = false;
+	}
+	onDrop(ev) {
+		if (this.inputDisabled || this.disabled) return;
+		if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
+		this.dragOver = false;
+		const list = ev && ev.dataTransfer ? ev.dataTransfer.files : null;
+		this.ingestFileList(list);
+	}
+	onCancelClick() {
+		this.cancelActive(true);
+	}
+	onResumeClick() {
+		if (this.status !== "paused" || !this._uploadId || !this._files.length) return;
+		this._gen += 1;
+		const gen = this._gen;
+		this.runDestination(gen);
+	}
+	syncClearToken() {
+		const token = Number(this.clearToken) || 0;
+		if (token !== this._seenClearToken) {
+			this._seenClearToken = token;
+			this.clearInternal(false);
+		}
+	}
+	syncChunkAttr() {
+		const n = Math.max(0, Number(this.chunkSize) || 0);
+		this.chunkAttr = String(n);
+		this.sessionAttr = this._uploadId ? `${this._received.length}/${this._chunkTotal || 0}:${this._uploadId}` : "";
+	}
+	applyDirectoryAttr() {
+		this.directoryAttr = this.directory ? "true" : "false";
+		this.selectionMode = this.directory ? "directory" : this.multiple ? "multiple" : "single";
+		this.zoneHint = this.directory ? "Choose a folder or drop files here" : this.multiple ? "Choose files or drop them here" : "Choose a file or drop it here";
+		// Native directory picker (UA-specific).
+		const el = typeof document !== "undefined" ? document.getElementById(this.controlId) : null;
+		if (el && "webkitdirectory" in el) {
+			try {
+				el.webkitdirectory = !!this.directory;
+				el.multiple = !!(this.multiple || this.directory);
+			} catch {}
+		}
+	}
+	/**
+	* @param {FileList | File[] | null} list
+	*/
+	ingestFileList(list) {
+		this.syncClearToken();
+		this.applyDirectoryAttr();
+		this.syncChunkAttr();
+		if (this.disabled) return;
+		const files = listToFiles(list);
+		if (!files.length) {
+			this.clearInternal(false);
+			this.emitValue([]);
+			return;
+		}
+		const maxCount = Math.max(1, Number(this.maxCount) || 1);
+		const capped = this.multiple || this.directory ? files.slice(0, maxCount) : files.slice(0, 1);
+		if ((this.multiple || this.directory) && files.length > maxCount) {
+			this.failAll(`At most ${maxCount} file(s)`);
+			return;
+		}
+		const maxBytes = Number(this.maxBytes) || 0;
+		for (const f of capped) {
+			const acceptErr = acceptError(f, this.accept);
+			if (acceptErr) {
+				this.failAll(acceptErr);
+				return;
+			}
+			if (maxBytes > 0 && Number(f.size) > maxBytes) {
+				this.failAll(`File too large (max ${maxBytes} bytes)`);
+				return;
+			}
+		}
+		const chunkSize = Math.max(0, Number(this.chunkSize) || 0);
+		if (chunkSize > 0 && capped.length !== 1) {
+			this.failAll("Resumable chunk upload supports one file per session");
+			return;
+		}
+		this.cancelActive(false);
+		this.resetSession();
+		this._files = capped;
+		this._gen += 1;
+		const gen = this._gen;
+		this._values = [];
+		this.queue = capped.map((f, i) => ({
+			key: `f-${gen}-${i}`,
+			name: String(f.name || `file-${i}`),
+			meta: formatBytes(f.size),
+			status: "pending",
+			showBar: false,
+			barStyle: "width:0%"
+		}));
+		this.hasItems = this.queue.length > 0;
+		this.emptyHint = false;
+		this.inputDisabled = true;
+		this.canResume = false;
+		this.showActions = false;
+		this.runDestination(gen);
+	}
+	/**
+	* @param {number} gen
+	*/
+	async runDestination(gen) {
+		const dest = String(this.destination || "server").toLowerCase();
+		if (dest === "client") {
+			await this.runClient(gen);
+			return;
+		}
+		if (dest === "object") {
+			await this.runObject(gen);
+			return;
+		}
+		const chunkSize = Math.max(0, Number(this.chunkSize) || 0);
+		if (chunkSize > 0) {
+			await this.runServerResumable(gen, chunkSize);
+			return;
+		}
+		await this.runServer(gen);
+	}
+	/**
+	* @param {number} gen
+	*/
+	async runClient(gen) {
+		if (gen !== this._gen) return;
+		this.setOverall("uploading", "Preparing…", true, false);
+		const values = [];
+		for (let i = 0; i < this._files.length; i++) {
+			if (gen !== this._gen) return;
+			const file = this._files[i];
+			const pct = Math.round((i + 1) / this._files.length * 100);
+			this.patchItem(i, {
+				status: "done",
+				showBar: true,
+				barStyle: `width:${pct}%`,
+				meta: `${formatBytes(file.size)} · local`
+			});
+			this.setProgress(pct);
+			values.push({
+				name: String(file.name || ""),
+				size: Number(file.size) || 0,
+				type: String(file.type || ""),
+				destination: "client",
+				id: `client-${gen}-${i}`,
+				bytes: Number(file.size) || 0,
+				/** Local File handle for in-tab tools (checksum, etc.). Not serialized. */
+				file
+			});
+		}
+		if (gen !== this._gen) return;
+		this._values = values;
+		this.finishOk(values);
+	}
+	/**
+	* @param {number} gen
+	*/
+	async runServer(gen) {
+		if (gen !== this._gen) return;
+		const action = String(this.action || "").trim();
+		if (!action) {
+			this.failAll("Upload action URL required");
+			return;
+		}
+		// Sequential single-XHR for thin gate; multi-file appends all parts then one request.
+		this.setOverall("uploading", "Uploading…", true, true);
+		this.setProgress(0);
+		for (let i = 0; i < this.queue.length; i++) {
+			this.patchItem(i, {
+				status: "uploading",
+				showBar: true,
+				barStyle: "width:0%"
+			});
+		}
+		const form = new FormData();
+		const field = String(this.fieldName || "file");
+		if (this._files.length === 1) {
+			const file = this._files[0];
+			form.append(field, file, file.name);
+			form.append("name", file.name);
+		} else {
+			for (const file of this._files) {
+				form.append(field, file, file.name);
+			}
+		}
+		const xhr = new XMLHttpRequest();
+		this._xhr = xhr;
+		const result = await xhrSend(xhr, "POST", action, form, (pct) => {
+			if (gen !== this._gen) return;
+			this.setProgress(pct);
+			for (let i = 0; i < this.queue.length; i++) {
+				this.patchItem(i, { barStyle: `width:${pct}%` });
+			}
+		});
+		if (gen !== this._gen) return;
+		this._xhr = null;
+		if (result.aborted) {
+			this.markCancelled();
+			return;
+		}
+		if (result.error) {
+			this.failAll(result.error);
+			return;
+		}
+		const body = result.body;
+		if (!(result.status >= 200 && result.status < 300) || !body || !body.ok) {
+			this.failAll(body && body.error || `Upload failed (${result.status || "network"})`);
+			return;
+		}
+		// Single-file shape { ok, id, bytes, name } or multi { ok, items: [...] }
+		const values = [];
+		if (Array.isArray(body.items)) {
+			for (let i = 0; i < body.items.length; i++) {
+				const it = body.items[i] || {};
+				values.push({
+					name: String(it.name || this._files[i] && this._files[i].name || ""),
+					size: Number(it.bytes || it.size || this._files[i] && this._files[i].size || 0),
+					type: String(it.contentType || ""),
+					destination: "server",
+					id: String(it.id || ""),
+					bytes: Number(it.bytes || it.size || 0),
+					headHex: it.headHex ? String(it.headHex) : ""
+				});
+			}
+		} else {
+			values.push({
+				name: String(body.name || this._files[0] && this._files[0].name || ""),
+				size: Number(body.bytes || body.reportedSize || this._files[0] && this._files[0].size || 0),
+				type: String(body.contentType || ""),
+				destination: "server",
+				id: String(body.id || ""),
+				bytes: Number(body.bytes || 0),
+				headHex: body.headHex ? String(body.headHex) : ""
+			});
+		}
+		for (let i = 0; i < this.queue.length; i++) {
+			this.patchItem(i, {
+				status: "done",
+				showBar: true,
+				barStyle: "width:100%",
+				meta: `${formatBytes(values[i] && values[i].bytes)} · uploaded`
+			});
+		}
+		this._values = values;
+		this.finishOk(values);
+	}
+	/**
+	* Chunked server upload: POST init → PUT chunk(s) → POST complete.
+	* Cancel → paused (keeps uploadId + received); Resume continues missing indexes.
+	* @param {number} gen
+	* @param {number} chunkSize
+	*/
+	async runServerResumable(gen, chunkSize) {
+		if (gen !== this._gen) return;
+		const base = String(this.action || "").trim().replace(/\/+$/, "");
+		if (!base) {
+			this.failAll("Upload action URL required");
+			return;
+		}
+		const file = this._files[0];
+		if (!file) {
+			this.failAll("No file for resumable upload");
+			return;
+		}
+		this._activeChunkSize = chunkSize;
+		this.setOverall("uploading", this._uploadId ? "Resuming…" : "Uploading…", true, true);
+		this.canResume = false;
+		this.showActions = true;
+		this.patchItem(0, {
+			status: "uploading",
+			showBar: true,
+			barStyle: "width:0%"
+		});
+		if (!this._uploadId) {
+			const initXhr = new XMLHttpRequest();
+			this._xhr = initXhr;
+			const initResult = await xhrSendJson(initXhr, "POST", `${base}/init`, {
+				name: String(file.name || ""),
+				size: Number(file.size) || 0,
+				type: String(file.type || ""),
+				chunkSize
+			});
+			if (gen !== this._gen) return;
+			this._xhr = null;
+			if (initResult.aborted) {
+				this.markPaused();
+				return;
+			}
+			if (initResult.error || !(initResult.status >= 200 && initResult.status < 300) || !initResult.body || !initResult.body.ok) {
+				this.failAll(initResult.body && initResult.body.error || initResult.error || `Init failed (${initResult.status || "network"})`);
+				return;
+			}
+			this._uploadId = String(initResult.body.uploadId || "");
+			this._chunkTotal = Number(initResult.body.chunkTotal) || Math.ceil((Number(file.size) || 0) / chunkSize) || 1;
+			this._received = [];
+			this.syncChunkAttr();
+			if (!this._uploadId) {
+				this.failAll("Init returned no uploadId");
+				return;
+			}
+		} else {
+			const statusXhr = new XMLHttpRequest();
+			this._xhr = statusXhr;
+			const statusResult = await xhrSendJson(statusXhr, "POST", `${base}/status`, { uploadId: this._uploadId });
+			if (gen !== this._gen) return;
+			this._xhr = null;
+			if (statusResult.aborted) {
+				this.markPaused();
+				return;
+			}
+			if (statusResult.error || !(statusResult.status >= 200 && statusResult.status < 300) || !statusResult.body || !statusResult.body.ok) {
+				this.failAll(statusResult.body && statusResult.body.error || statusResult.error || `Status failed (${statusResult.status || "network"})`);
+				return;
+			}
+			this._received = Array.isArray(statusResult.body.received) ? statusResult.body.received.map((n) => Number(n)).filter((n) => Number.isFinite(n)) : [];
+			this._chunkTotal = Number(statusResult.body.chunkTotal) || this._chunkTotal;
+			this.syncChunkAttr();
+		}
+		const total = Math.max(1, this._chunkTotal || Math.ceil((Number(file.size) || 0) / chunkSize) || 1);
+		this._chunkTotal = total;
+		const receivedSet = new Set(this._received);
+		this.setProgress(Math.round(receivedSet.size / total * 100));
+		this.patchItem(0, {
+			barStyle: `width:${Math.round(receivedSet.size / total * 100)}%`,
+			meta: `${receivedSet.size}/${total} chunks`
+		});
+		for (let index = 0; index < total; index++) {
+			if (gen !== this._gen) return;
+			if (receivedSet.has(index)) continue;
+			const start = index * chunkSize;
+			const end = Math.min(Number(file.size) || 0, start + chunkSize);
+			const blob = file.slice(start, end);
+			const xhr = new XMLHttpRequest();
+			this._xhr = xhr;
+			const result = await xhrSend(xhr, "PUT", `${base}/chunk`, blob, (pct) => {
+				if (gen !== this._gen) return;
+				const overall = Math.round((receivedSet.size + pct / 100) / total * 100);
+				this.setProgress(overall);
+				this.patchItem(0, { barStyle: `width:${overall}%` });
+			}, {
+				"content-type": "application/octet-stream",
+				"x-vmz-upload-id": this._uploadId,
+				"x-vmz-chunk-index": String(index),
+				"x-vmz-chunk-total": String(total)
+			});
+			if (gen !== this._gen) return;
+			this._xhr = null;
+			if (result.aborted) {
+				this.markPaused();
+				return;
+			}
+			if (result.error || !(result.status >= 200 && result.status < 300) || !result.body || !result.body.ok) {
+				this.failAll(result.body && result.body.error || result.error || `Chunk ${index} failed (${result.status || "network"})`);
+				return;
+			}
+			this._received = Array.isArray(result.body.received) ? result.body.received.map((n) => Number(n)).filter((n) => Number.isFinite(n)) : this._received.concat([index]);
+			receivedSet.add(index);
+			for (const n of this._received) receivedSet.add(n);
+			this.syncChunkAttr();
+			const pct = Math.round(receivedSet.size / total * 100);
+			this.setProgress(pct);
+			this.patchItem(0, {
+				barStyle: `width:${pct}%`,
+				meta: `${receivedSet.size}/${total} chunks`
+			});
+		}
+		if (gen !== this._gen) return;
+		const completeXhr = new XMLHttpRequest();
+		this._xhr = completeXhr;
+		const completeResult = await xhrSendJson(completeXhr, "POST", `${base}/complete`, { uploadId: this._uploadId });
+		if (gen !== this._gen) return;
+		this._xhr = null;
+		if (completeResult.aborted) {
+			this.markPaused();
+			return;
+		}
+		if (completeResult.error || !(completeResult.status >= 200 && completeResult.status < 300) || !completeResult.body || !completeResult.body.ok) {
+			this.failAll(completeResult.body && completeResult.body.error || completeResult.error || `Complete failed (${completeResult.status || "network"})`);
+			return;
+		}
+		const body = completeResult.body;
+		const values = [{
+			name: String(body.name || file.name || ""),
+			size: Number(body.bytes || body.size || file.size || 0),
+			type: String(body.contentType || file.type || ""),
+			destination: "server",
+			id: String(body.id || ""),
+			bytes: Number(body.bytes || body.size || 0),
+			headHex: body.headHex ? String(body.headHex) : "",
+			uploadId: this._uploadId,
+			chunks: total
+		}];
+		this.patchItem(0, {
+			status: "done",
+			showBar: true,
+			barStyle: "width:100%",
+			meta: `${formatBytes(values[0].bytes)} · ${total} chunks`
+		});
+		this.resetSession();
+		this._values = values;
+		this.finishOk(values);
+	}
+	/**
+	* @param {number} gen
+	*/
+	async runObject(gen) {
+		if (gen !== this._gen) return;
+		if (typeof this.onPresign !== "function") {
+			this.failAll("onPresign callback required for object destination");
+			return;
+		}
+		this.setOverall("uploading", "Uploading…", true, true);
+		const values = [];
+		for (let i = 0; i < this._files.length; i++) {
+			if (gen !== this._gen) return;
+			const file = this._files[i];
+			this.patchItem(i, {
+				status: "uploading",
+				showBar: true,
+				barStyle: "width:0%"
+			});
+			let signed;
+			try {
+				signed = await this.onPresign(file);
+			} catch (err) {
+				this.failAll(err instanceof Error ? err.message : String(err || "presign failed"));
+				return;
+			}
+			if (gen !== this._gen) return;
+			const url = signed && signed.uploadUrl ? String(signed.uploadUrl) : "";
+			if (!url) {
+				this.failAll("presign returned no uploadUrl");
+				return;
+			}
+			const xhr = new XMLHttpRequest();
+			this._xhr = xhr;
+			const headers = signed && signed.headers || {};
+			const result = await xhrSend(xhr, "PUT", url, file, (pct) => {
+				if (gen !== this._gen) return;
+				const overall = Math.round((i + pct / 100) / this._files.length * 100);
+				this.setProgress(overall);
+				this.patchItem(i, { barStyle: `width:${pct}%` });
+			}, headers);
+			if (gen !== this._gen) return;
+			this._xhr = null;
+			if (result.aborted) {
+				this.markCancelled();
+				return;
+			}
+			if (result.error || !(result.status >= 200 && result.status < 300)) {
+				this.failAll(result.error || `Object upload failed (${result.status || "network"})`);
+				return;
+			}
+			const objectKey = String(signed && signed.objectKey || file.name || "");
+			values.push({
+				name: String(file.name || ""),
+				size: Number(file.size) || 0,
+				type: String(file.type || ""),
+				destination: "object",
+				id: objectKey,
+				bytes: Number(file.size) || 0,
+				objectKey
+			});
+			this.patchItem(i, {
+				status: "done",
+				showBar: true,
+				barStyle: "width:100%",
+				meta: `${formatBytes(file.size)} · object`
+			});
+		}
+		this._values = values;
+		this.finishOk(values);
+	}
+	/**
+	* @param {UploadValueItem[]} values
+	*/
+	finishOk(values) {
+		this.setProgress(100);
+		this.status = "done";
+		this.statusText = "Upload complete";
+		this.showProgress = true;
+		this.canCancel = false;
+		this.canResume = false;
+		this.showActions = false;
+		this.inputDisabled = false;
+		const first = values[0];
+		if (values.length === 1 && first) {
+			const prefix = first.destination === "client" ? "client" : first.destination === "object" ? "object" : "attachment";
+			const head = first.headHex ? ` head:${first.headHex}` : "";
+			const chunkNote = first.chunks ? ` chunks:${first.chunks}` : "";
+			this.resultText = `${prefix}:${first.id} (${first.bytes || 0} bytes)${head}${chunkNote}`;
+		} else {
+			this.resultText = `${values.length} file(s) ready`;
+		}
+		this.emitStatus();
+		this.emitValue(values);
+	}
+	/**
+	* @param {string} message
+	*/
+	failAll(message) {
+		this.cancelActive(false);
+		this.resetSession();
+		this.status = "error";
+		this.statusText = message || "Upload failed";
+		this.showProgress = false;
+		this.canCancel = false;
+		this.canResume = false;
+		this.showActions = false;
+		this.inputDisabled = false;
+		this.resultText = "";
+		this._values = [];
+		for (let i = 0; i < this.queue.length; i++) {
+			this.patchItem(i, {
+				status: "error",
+				showBar: false
+			});
+		}
+		this.emitStatus();
+		this.emitValue([]);
+	}
+	markCancelled() {
+		this.status = "cancelled";
+		this.statusText = "Upload cancelled";
+		this.showProgress = false;
+		this.canCancel = false;
+		this.canResume = false;
+		this.showActions = false;
+		this.inputDisabled = false;
+		this.resultText = "";
+		this._values = [];
+		this.resetSession();
+		this.emitStatus();
+		this.emitValue([]);
+	}
+	markPaused() {
+		this.status = "paused";
+		this.statusText = "Upload paused — resume to continue";
+		this.showProgress = true;
+		this.canCancel = false;
+		this.canResume = !!this._uploadId;
+		this.showActions = this.canResume;
+		this.inputDisabled = false;
+		this.resultText = "";
+		this._values = [];
+		this.syncChunkAttr();
+		this.patchItem(0, {
+			status: "paused",
+			meta: `${this._received.length}/${this._chunkTotal || 0} chunks`
+		});
+		this.emitStatus();
+		this.emitValue([]);
+	}
+	resetSession() {
+		this._uploadId = "";
+		this._chunkTotal = 0;
+		this._received = [];
+		this._activeChunkSize = 0;
+		this.syncChunkAttr();
+	}
+	/**
+	* @param {boolean} mark
+	*/
+	cancelActive(mark) {
+		const xhr = this._xhr;
+		this._xhr = null;
+		this._gen += 1;
+		if (xhr) {
+			try {
+				xhr.abort();
+			} catch {}
+		}
+		if (mark && this.status === "uploading") {
+			if (this._uploadId && this._activeChunkSize > 0) {
+				this.markPaused();
+			} else {
+				this.markCancelled();
+			}
+		}
+	}
+	/**
+	* @param {boolean} emit
+	*/
+	clearInternal(emit) {
+		this.cancelActive(false);
+		this.resetSession();
+		this._files = [];
+		this._values = [];
+		this.queue = [];
+		this.hasItems = false;
+		this.emptyHint = true;
+		this.status = "idle";
+		this.statusText = "";
+		this.resultText = "";
+		this.showProgress = false;
+		this.canCancel = false;
+		this.canResume = false;
+		this.showActions = false;
+		this.inputDisabled = !!this.disabled;
+		this.setProgress(0);
+		this.dragOver = false;
+		this.applyDirectoryAttr();
+		this.emitStatus();
+		if (emit) this.emitValue([]);
+	}
+	/**
+	* @param {string} status
+	* @param {string} text
+	* @param {boolean} showProgress
+	* @param {boolean} canCancel
+	*/
+	setOverall(status, text, showProgress, canCancel) {
+		this.status = status;
+		this.statusText = text;
+		this.showProgress = showProgress;
+		this.canCancel = canCancel;
+		this.canResume = false;
+		this.showActions = canCancel;
+		this.inputDisabled = status === "uploading" || !!this.disabled;
+		this.emitStatus();
+	}
+	/**
+	* @param {number} pct
+	*/
+	setProgress(pct) {
+		const n = Math.max(0, Math.min(100, Number(pct) || 0));
+		this.progress = String(n);
+		this.progressLabel = `${n}%`;
+		this.progressStyle = `width:${n}%`;
+	}
+	/**
+	* @param {number} index
+	* @param {Partial<{ status: string, meta: string, showBar: boolean, barStyle: string }>} patch
+	*/
+	patchItem(index, patch) {
+		const cur = this.queue[index];
+		if (!cur) return;
+		const next = Object.assign({}, cur, patch);
+		const copy = this.queue.slice();
+		copy[index] = next;
+		this.queue = copy;
+	}
+	/**
+	* @param {UploadValueItem[]} items
+	*/
+	emitValue(items) {
+		if (typeof this.onValue === "function") this.onValue(items);
+	}
+	emitStatus() {
+		if (typeof this.onStatus === "function") this.onStatus(this.status);
+	}
 }
-
 /**
- * @typedef {{
- *   name: string,
- *   size: number,
- *   type: string,
- *   destination: string,
- *   id: string,
- *   bytes: number,
- *   objectKey?: string,
- *   headHex?: string,
- *   uploadId?: string,
- *   chunks?: number
- * }} UploadValueItem
- */
-
+* @typedef {{
+*   name: string,
+*   size: number,
+*   type: string,
+*   destination: string,
+*   id: string,
+*   bytes: number,
+*   objectKey?: string,
+*   headHex?: string,
+*   uploadId?: string,
+*   chunks?: number
+* }} UploadValueItem
+*/
 /**
- * @param {FileList | File[] | null | undefined} list
- * @returns {File[]}
- */
+* @param {FileList | File[] | null | undefined} list
+* @returns {File[]}
+*/
 function listToFiles(list) {
-  if (!list) return [];
-  if (Array.isArray(list)) return list.filter(Boolean);
-  const out = [];
-  for (let i = 0; i < list.length; i++) out.push(list[i]);
-  return out;
+	if (!list) return [];
+	if (Array.isArray(list)) return list.filter(Boolean);
+	const out = [];
+	for (let i = 0; i < list.length; i++) out.push(list[i]);
+	return out;
 }
-
 /**
- * @param {File} file
- * @param {string} accept
- */
+* @param {File} file
+* @param {string} accept
+*/
 function acceptError(file, accept) {
-  const raw = String(accept || '').trim();
-  if (!raw) return '';
-  const name = String(file.name || '').toLowerCase();
-  const type = String(file.type || '').toLowerCase();
-  const parts = raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
-  for (const p of parts) {
-    if (p.startsWith('.')) {
-      if (name.endsWith(p)) return '';
-    } else if (p.endsWith('/*')) {
-      const prefix = p.slice(0, -1);
-      if (type.startsWith(prefix)) return '';
-    } else if (p === type) {
-      return '';
-    }
-  }
-  return `File type not allowed (${raw})`;
+	const raw = String(accept || "").trim();
+	if (!raw) return "";
+	const name = String(file.name || "").toLowerCase();
+	const type = String(file.type || "").toLowerCase();
+	const parts = raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+	for (const p of parts) {
+		if (p.startsWith(".")) {
+			if (name.endsWith(p)) return "";
+		} else if (p.endsWith("/*")) {
+			const prefix = p.slice(0, -1);
+			if (type.startsWith(prefix)) return "";
+		} else if (p === type) {
+			return "";
+		}
+	}
+	return `File type not allowed (${raw})`;
 }
-
 /**
- * @param {number} n
- */
+* @param {number} n
+*/
 function formatBytes(n) {
-  const v = Number(n) || 0;
-  if (v < 1024) return `${v} B`;
-  if (v < 1024 * 1024) return `${(v / 1024).toFixed(1)} KB`;
-  return `${(v / (1024 * 1024)).toFixed(1)} MB`;
+	const v = Number(n) || 0;
+	if (v < 1024) return `${v} B`;
+	if (v < 1024 * 1024) return `${(v / 1024).toFixed(1)} KB`;
+	return `${(v / (1024 * 1024)).toFixed(1)} MB`;
 }
-
 /**
- * @param {XMLHttpRequest} xhr
- * @param {string} method
- * @param {string} url
- * @param {FormData | Blob | File} body
- * @param {(pct: number) => void} onProgress
- * @param {Record<string, string>} [headers]
- */
+* @param {XMLHttpRequest} xhr
+* @param {string} method
+* @param {string} url
+* @param {FormData | Blob | File} body
+* @param {(pct: number) => void} onProgress
+* @param {Record<string, string>} [headers]
+*/
 function xhrSend(xhr, method, url, body, onProgress, headers) {
-  return new Promise((resolve) => {
-    xhr.open(method, url);
-    if (headers) {
-      for (const k of Object.keys(headers)) {
-        try {
-          xhr.setRequestHeader(k, headers[k]);
-        } catch {
-          /* ignore */
-        }
-      }
-    }
-    xhr.upload.onprogress = (ev) => {
-      if (!ev || !ev.lengthComputable || !ev.total) return;
-      onProgress(Math.round((100 * ev.loaded) / ev.total));
-    };
-    xhr.onabort = () => resolve({ aborted: true, status: 0, body: null, error: '' });
-    xhr.onerror = () => resolve({ aborted: false, status: 0, body: null, error: 'Network upload failed' });
-    xhr.onload = () => {
-      let parsed = null;
-      const text = String(xhr.responseText || '');
-      if (text) {
-        try {
-          parsed = JSON.parse(text);
-        } catch {
-          parsed = null;
-        }
-      }
-      resolve({ aborted: false, status: xhr.status, body: parsed, error: '' });
-    };
-    xhr.send(body);
-  });
+	return new Promise((resolve) => {
+		xhr.open(method, url);
+		if (headers) {
+			for (const k of Object.keys(headers)) {
+				try {
+					xhr.setRequestHeader(k, headers[k]);
+				} catch {}
+			}
+		}
+		xhr.upload.onprogress = (ev) => {
+			if (!ev || !ev.lengthComputable || !ev.total) return;
+			onProgress(Math.round(100 * ev.loaded / ev.total));
+		};
+		xhr.onabort = () => resolve({
+			aborted: true,
+			status: 0,
+			body: null,
+			error: ""
+		});
+		xhr.onerror = () => resolve({
+			aborted: false,
+			status: 0,
+			body: null,
+			error: "Network upload failed"
+		});
+		xhr.onload = () => {
+			let parsed = null;
+			const text = String(xhr.responseText || "");
+			if (text) {
+				try {
+					parsed = JSON.parse(text);
+				} catch {
+					parsed = null;
+				}
+			}
+			resolve({
+				aborted: false,
+				status: xhr.status,
+				body: parsed,
+				error: ""
+			});
+		};
+		xhr.send(body);
+	});
 }
-
 /**
- * @param {XMLHttpRequest} xhr
- * @param {string} method
- * @param {string} url
- * @param {Record<string, unknown>} payload
- */
+* @param {XMLHttpRequest} xhr
+* @param {string} method
+* @param {string} url
+* @param {Record<string, unknown>} payload
+*/
 function xhrSendJson(xhr, method, url, payload) {
-  return new Promise((resolve) => {
-    xhr.open(method, url);
-    try {
-      xhr.setRequestHeader('content-type', 'application/json');
-    } catch {
-      /* ignore */
-    }
-    xhr.onabort = () => resolve({ aborted: true, status: 0, body: null, error: '' });
-    xhr.onerror = () => resolve({ aborted: false, status: 0, body: null, error: 'Network upload failed' });
-    xhr.onload = () => {
-      let parsed = null;
-      const text = String(xhr.responseText || '');
-      if (text) {
-        try {
-          parsed = JSON.parse(text);
-        } catch {
-          parsed = null;
-        }
-      }
-      resolve({ aborted: false, status: xhr.status, body: parsed, error: '' });
-    };
-    xhr.send(JSON.stringify(payload || {}));
-  });
+	return new Promise((resolve) => {
+		xhr.open(method, url);
+		try {
+			xhr.setRequestHeader("content-type", "application/json");
+		} catch {}
+		xhr.onabort = () => resolve({
+			aborted: true,
+			status: 0,
+			body: null,
+			error: ""
+		});
+		xhr.onerror = () => resolve({
+			aborted: false,
+			status: 0,
+			body: null,
+			error: "Network upload failed"
+		});
+		xhr.onload = () => {
+			let parsed = null;
+			const text = String(xhr.responseText || "");
+			if (text) {
+				try {
+					parsed = JSON.parse(text);
+				} catch {
+					parsed = null;
+				}
+			}
+			resolve({
+				aborted: false,
+				status: xhr.status,
+				body: parsed,
+				error: ""
+			});
+		};
+		xhr.send(JSON.stringify(payload || {}));
+	});
 }
 </script>

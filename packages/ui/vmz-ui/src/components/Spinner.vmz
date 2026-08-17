@@ -1,45 +1,45 @@
 <template>
   <span
-    class="vmz-ui-spinner"
-    data-vmz-ui="spinner"
-    role="status"
-    aria-label={label}
-  ></span>
+      class="vmz-ui-spinner"
+      data-vmz-ui="spinner"
+      role="status"
+      aria-label={label}
+    ></span>
 </template>
 
 <style>
-.vmz-ui-spinner {
-  display: inline-block;
-  width: 1rem;
-  height: 1rem;
-  border: 2px solid color-mix(in srgb, var(--vmz-action-primary-background) 25%, transparent);
-  border-top-color: var(--vmz-action-primary-background);
-  border-radius: 50%;
-  vertical-align: -0.15em;
-  animation: vmz-ui-spin var(--vmz-motion-overlay-duration) var(--vmz-motion-overlay-easing) infinite;
-}
-
-@keyframes vmz-ui-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
   .vmz-ui-spinner {
-    animation: none;
-    border-color: var(--vmz-action-primary-background);
-    opacity: 0.55;
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid color-mix(in srgb, var(--vmz-action-primary-background) 25%, transparent);
+    border-top-color: var(--vmz-action-primary-background);
+    border-radius: 50%;
+    vertical-align: -0.15em;
+    animation: vmz-ui-spin var(--vmz-motion-overlay-duration) var(--vmz-motion-overlay-easing) infinite;
   }
-}
+
+  @keyframes vmz-ui-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .vmz-ui-spinner {
+      animation: none;
+      border-color: var(--vmz-action-primary-background);
+      opacity: 0.55;
+    }
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — Spinner (Foundation).
- * Loading indicator; reduced-motion keeps static feedback.
- */
+* VMZ UI — Spinner (Foundation).
+* Loading indicator; reduced-motion keeps static feedback.
+*/
 export default class Spinner {
-  public label: string = 'Loading';
+	public label: string = "Loading";
 }
 </script>

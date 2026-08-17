@@ -93,6 +93,12 @@ let shuttingDown = false;
 let ready = false;
 /** @type {{ message: string, stack?: string, at: number } | null} */
 let lastDevError = null;
+/**
+ * Native CodeGenerators handle — must be declared before top-level `await softReload()`
+ * (TDZ: requireNativeGenerator may run during that await).
+ * @type {any}
+ */
+let _nativeGen;
 
 setServerModuleResolver((moduleId) => {
     const rel = moduleId.replace(/^#server\//, '') + '.js';
@@ -1270,9 +1276,6 @@ function emitEntryEvent(token) {
     }
     return native.generateServeEntryEvent(q);
 }
-
-/** @type {any} */
-let _nativeGen;
 
 /**
  * Load vmz N-API CodeGenerators (same discovery as `@vmz/vmz` native-addon).

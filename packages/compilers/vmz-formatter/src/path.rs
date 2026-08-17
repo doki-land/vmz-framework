@@ -1,11 +1,12 @@
 //! Format path entry: discover `.vmz`, format, write or `--check`.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use vmz_compiler::{ReportedDiagnostic, discover_vmz_files, parse_vmz};
+use vmz_compiler::{ReportedDiagnostic, parse_vmz};
+use walkdir::WalkDir;
 
 use crate::assemble::assemble_vmz;
 use crate::editorconfig::{EditorSettings, resolve_for_path};
@@ -41,6 +42,9 @@ impl FormatReport {
 }
 
 /// Format a single `.vmz` file or every `.vmz` under a directory.
+///
+/// Directory walks stay local to `path` (skip `node_modules` / `dist` / …).
+/// Unlike compile discovery, author format does **not** rewrite dependency packages.
 pub fn format_path(path: impl AsRef<Path>, options: &FormatOptions) -> vmz_compiler::Result<FormatReport> {
     let path = path.as_ref();
     let mut report = FormatReport::default();
@@ -48,10 +52,35 @@ pub fn format_path(path: impl AsRef<Path>, options: &FormatOptions) -> vmz_compi
         format_file(path, options, &mut report)?;
         return Ok(report);
     }
-    for (file, _) in discover_vmz_files(path) {
+    for file in discover_local_vmz_files(path) {
         format_file(&file, options, &mut report)?;
     }
     Ok(report)
+}
+
+fn discover_local_vmz_files(root: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    for entry in WalkDir::new(root)
+        .into_iter()
+        .filter_entry(|e| !should_skip_dir(e.path()))
+        .filter_map(|e| e.ok())
+    {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        if path.extension().and_then(|e| e.to_str()) != Some("vmz") {
+            continue;
+        }
+        out.push(path.to_path_buf());
+    }
+    out.sort();
+    out
+}
+
+fn should_skip_dir(path: &Path) -> bool {
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    matches!(name, "node_modules" | "dist" | "target" | ".git" | ".turbo" | "coverage")
 }
 
 fn format_file(

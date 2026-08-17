@@ -55,6 +55,7 @@ for (const id of [
     'counter.browser.destroy',
     'counter.browser.u1',
     'counter.browser.select',
+    'counter.browser.select.ui',
 ]) {
     const hit = (counterReport.tests || []).find((t) => t.testId === id);
     if (!hit || hit.status !== 'passed') fail(`${id} not passed`);
@@ -79,4 +80,4 @@ if (!u2 || u2.status !== 'passed') fail('router.browser.u2 not passed');
 console.log(` ${u2.testId} → ok`);
 
 console.log('-BROWSER GATE PASS');
-console.log(' U0–U1 + select + timing + U2 serve-host RouteId on real Chrome');
+console.log(' U0–U2 + native/UI select + timing evidence on real Chrome');

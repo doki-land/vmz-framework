@@ -106,7 +106,11 @@ fn resolve_descriptors(
             continue;
         };
         let package_name = value.get("name").and_then(|n| n.as_str()).map(str::to_string);
-        if let Some(d) = parse_descriptor(app, root, package_name.as_deref(), &pkg_path, &text, diagnostics) { out.push(d) }
+        if let Some(d) =
+            parse_descriptor(app, root, package_name.as_deref(), &pkg_path, &text, diagnostics)
+        {
+            out.push(d)
+        }
     }
     out
 }

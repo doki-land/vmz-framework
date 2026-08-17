@@ -1,77 +1,81 @@
 <template>
   <aside class="vmz-ui-toc" data-vmz-ui="toc" aria-label={label}>
-    <p class="vmz-ui-toc__title">{label}</p>
-    <nav class="vmz-ui-toc__nav">
-      <a
-        each={items}
-        as="item"
-        key={item.id}
-        class="vmz-ui-toc__link"
-        href={item.href}
-        data-vmz-toc={item.id}
-      >
-        {item.title}
-      </a>
-    </nav>
-  </aside>
+      <p class="vmz-ui-toc__title">{label}</p>
+      <nav class="vmz-ui-toc__nav">
+        <a
+          each={items}
+          as="item"
+          key={item.id}
+          class="vmz-ui-toc__link"
+          href={item.href}
+          data-vmz-toc={item.id}
+        >
+          {item.title}
+        </a>
+      </nav>
+    </aside>
 </template>
 
 <style>
-.vmz-ui-toc {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  min-width: 11rem;
-  padding: 0.85rem 0.75rem;
-  border: 1px solid var(--vmz-line-default);
-  border-radius: 2px;
-  background: var(--vmz-surface-mist);
-  color: var(--vmz-text-ink);
-}
+  .vmz-ui-toc {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-width: 11rem;
+    padding: 0.85rem 0.75rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-surface-mist);
+    color: var(--vmz-text-ink);
+  }
 
-.vmz-ui-toc__title {
-  margin: 0;
-  font-family: var(--vmz-font-display);
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--vmz-text-steel);
-}
+  .vmz-ui-toc__title {
+    margin: 0;
+    font-family: var(--vmz-font-display);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--vmz-text-steel);
+  }
 
-.vmz-ui-toc__nav {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
+  .vmz-ui-toc__nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
 
-.vmz-ui-toc__link {
-  font: inherit;
-  font-weight: 600;
-  font-size: 0.92rem;
-  text-decoration: none;
-  color: var(--vmz-action-primary-active);
-  outline: none;
-}
+  .vmz-ui-toc__link {
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.92rem;
+    text-decoration: none;
+    color: var(--vmz-action-primary-active);
+    outline: none;
+  }
 
-.vmz-ui-toc__link:hover {
-  color: var(--vmz-action-primary-background);
-}
+  .vmz-ui-toc__link:hover {
+    color: var(--vmz-action-primary-background);
+  }
 
-.vmz-ui-toc__link:focus-visible {
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-  border-radius: 2px;
-}
+  .vmz-ui-toc__link:focus-visible {
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    border-radius: var(--vmz-radius-md, 6px);
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — Toc (Document/Product composition).
- * In-page outline; parent supplies items. Readable without JS.
- */
+* VMZ UI — Toc (Document/Product composition).
+* In-page outline; parent supplies items. Readable without JS.
+*/
 export default class Toc {
-  public label: string = 'On this page';
-  /** @type {{ id: string, title: string, href: string }[]} */
-  public items: { id: string; title: string; href: string }[] = [];
+	public label: string = "On this page";
+	/** @type {{ id: string, title: string, href: string }[]} */
+	public items: {
+		id: string;
+		title: string;
+		href: string;
+	}[] = [];
 }
 </script>

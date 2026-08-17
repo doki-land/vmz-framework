@@ -1,15 +1,14 @@
 <template>
   <section>
-    <p>{data.label}</p>
-  </section>
+      <p>{data.label}</p>
+    </section>
 </template>
 
 <script client>
 export default class WriteBarrierCrossDemo {
-  data = { label: "x" };
-
-  setLabel(n: string) {
-    this.data.label = n;
-  }
+	data = { label: "x" };
+	setLabel(n: string) {
+		this.data.label = n;
+	}
 }
 </script>

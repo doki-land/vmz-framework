@@ -1,11 +1,11 @@
 <template>
   <article>
-    <header>
-      <h1>Static shell</h1>
-      <p>No framework JS until EventEntry fires.</p>
-    </header>
-    <EventButton client:event label="Go" />
-  </article>
+      <header>
+        <h1>Static shell</h1>
+        <p>No framework JS until EventEntry fires.</p>
+      </header>
+      <EventButton client:event label="Go" />
+    </article>
 </template>
 
 <script client>

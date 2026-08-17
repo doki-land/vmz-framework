@@ -2,7 +2,6 @@
 
 use std::fs;
 
-
 use std::time::{SystemTime, UNIX_EPOCH};
 use vmz_compiler::platform::solver::*;
 use vmz_protocol::{

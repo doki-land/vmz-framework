@@ -1,127 +1,131 @@
 <template>
   <div class="vmz-ui-console-shell" data-vmz-ui="console-shell">
-    <aside class="vmz-ui-console-shell__sidebar" data-vmz-shell="sidebar" aria-label={navLabel}>
-      <a class="vmz-ui-console-shell__brand" href={homeHref}>{brand}</a>
-      <nav class="vmz-ui-console-shell__nav">
-        <a each={nav} as="item" key={item.id} href={item.href} data-vmz-nav={item.id}>
-          {item.title}
-        </a>
-      </nav>
-    </aside>
-    <div class="vmz-ui-console-shell__body">
-      <header class="vmz-ui-console-shell__header" data-vmz-shell="header">
-        <h1 class="vmz-ui-console-shell__title">{title}</h1>
-      </header>
-      <main class="vmz-ui-console-shell__main" data-vmz-shell="main">
-        <slot />
-      </main>
+      <aside class="vmz-ui-console-shell__sidebar" data-vmz-shell="sidebar" aria-label={navLabel}>
+        <a class="vmz-ui-console-shell__brand" href={homeHref}>{brand}</a>
+        <nav class="vmz-ui-console-shell__nav">
+          <a each={nav} as="item" key={item.id} href={item.href} data-vmz-nav={item.id}>
+            {item.title}
+          </a>
+        </nav>
+      </aside>
+      <div class="vmz-ui-console-shell__body">
+        <header class="vmz-ui-console-shell__header" data-vmz-shell="header">
+          <h1 class="vmz-ui-console-shell__title">{title}</h1>
+        </header>
+        <main class="vmz-ui-console-shell__main" data-vmz-shell="main">
+          <slot />
+        </main>
+      </div>
     </div>
-  </div>
 </template>
 
 <style>
-.vmz-ui-console-shell {
-  display: grid;
-  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr);
-  min-height: 100%;
-  color: inherit;
-}
-
-.vmz-ui-console-shell__sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  padding: 1rem 0.9rem;
-  border-right: 1px solid var(--vmz-action-primary-background);
-}
-
-.vmz-ui-console-shell__brand {
-  font: inherit;
-  font-weight: 700;
-  font-size: 1.05rem;
-  letter-spacing: 0.04em;
-  text-decoration: none;
-  color: var(--vmz-action-primary-background);
-}
-
-.vmz-ui-console-shell__brand:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-}
-
-.vmz-ui-console-shell__nav {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-}
-
-.vmz-ui-console-shell__nav a {
-  font: inherit;
-  font-weight: 600;
-  text-decoration: none;
-  color: var(--vmz-action-primary-active);
-  padding: 0.35rem 0.4rem;
-}
-
-.vmz-ui-console-shell__nav a:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-}
-
-.vmz-ui-console-shell__body {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.vmz-ui-console-shell__header {
-  padding: 0.85rem 1.1rem;
-  border-bottom: 1px solid var(--vmz-action-primary-background);
-}
-
-.vmz-ui-console-shell__title {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: var(--vmz-action-primary-active);
-}
-
-.vmz-ui-console-shell__main {
-  flex: 1;
-  padding: 1rem 1.1rem 1.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-}
-
-@media (max-width: 40rem) {
   .vmz-ui-console-shell {
-    grid-template-columns: 1fr;
+    display: grid;
+    grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr);
+    min-height: 100%;
+    color: inherit;
   }
 
   .vmz-ui-console-shell__sidebar {
-    border-right: 0;
-    border-bottom: 1px solid var(--vmz-action-primary-background);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem 0.9rem;
+    border-right: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
+  }
+
+  .vmz-ui-console-shell__brand {
+    font: inherit;
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    color: var(--vmz-action-primary-background);
+  }
+
+  .vmz-ui-console-shell__brand:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
   }
 
   .vmz-ui-console-shell__nav {
-    flex-direction: row;
-    flex-wrap: wrap;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
   }
-}
+
+  .vmz-ui-console-shell__nav a {
+    font: inherit;
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--vmz-action-primary-active);
+    padding: 0.35rem 0.4rem;
+  }
+
+  .vmz-ui-console-shell__nav a:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+  }
+
+  .vmz-ui-console-shell__body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .vmz-ui-console-shell__header {
+    padding: 0.85rem 1.1rem;
+    border-bottom: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
+  }
+
+  .vmz-ui-console-shell__title {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--vmz-action-primary-active);
+  }
+
+  .vmz-ui-console-shell__main {
+    flex: 1;
+    padding: 1rem 1.1rem 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  @media (max-width: 40rem) {
+    .vmz-ui-console-shell {
+      grid-template-columns: 1fr;
+    }
+
+    .vmz-ui-console-shell__sidebar {
+      border-right: 0;
+      border-bottom: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
+    }
+
+    .vmz-ui-console-shell__nav {
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — ConsoleShell (Console composition).
- * Sidebar + header landmarks + main slot. Parent supplies nav; no private theme.
- */
+* VMZ UI — ConsoleShell (Console composition).
+* Sidebar + header landmarks + main slot. Parent supplies nav; no private theme.
+*/
 export default class ConsoleShell {
-  public brand: string = 'VMZ';
-  public homeHref: string = '/';
-  public title: string = 'Console';
-  public navLabel: string = 'Console';
-  /** @type {{ id: string, title: string, href: string }[]} */
-  public nav: { id: string; title: string; href: string }[] = [];
+	public brand: string = "VMZ";
+	public homeHref: string = "/";
+	public title: string = "Console";
+	public navLabel: string = "Console";
+	/** @type {{ id: string, title: string, href: string }[]} */
+	public nav: {
+		id: string;
+		title: string;
+		href: string;
+	}[] = [];
 }
 </script>

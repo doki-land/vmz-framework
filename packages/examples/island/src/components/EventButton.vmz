@@ -1,13 +1,12 @@
 <template>
   <button type="button" onClick={() => (armed = !armed)}>
-    {label}: {armed ? 'ON' : 'OFF'}
-  </button>
+      {label}: {armed ? 'ON' : 'OFF'}
+    </button>
 </template>
 
 <script client>
 export default class EventButton {
-  public label: string = 'Event';
-
-  armed = false;
+	public label: string = "Event";
+	armed = false;
 }
 </script>

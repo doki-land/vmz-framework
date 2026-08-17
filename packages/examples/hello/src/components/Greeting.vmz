@@ -6,6 +6,6 @@
 // File name `Greeting.vmz` → template tag <Greeting />.
 // `public` fields are props.
 export default class Greeting {
-  public name: string;
+	public name: string;
 }
 </script>

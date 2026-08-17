@@ -1,0 +1,9 @@
+<template><div class="vmz-ui-typography" data-vmz-ui="typography" data-variant={variant}><slot /></div></template>
+<style>
+.vmz-ui-typography{margin:0;color:var(--vmz-text-ink);font:inherit;line-height:1.6}
+.vmz-ui-typography[data-variant='title']{font-family:var(--vmz-font-display,var(--vmz-font-sans));font-size:1.5rem;font-weight:650;line-height:1.3}
+.vmz-ui-typography[data-variant='secondary']{color:var(--vmz-text-steel)}
+.vmz-ui-typography[data-variant='caption']{color:var(--vmz-text-steel);font-size:.875rem}
+.vmz-ui-typography[data-variant='code']{font-family:var(--vmz-font-mono,monospace);font-size:.92em}
+</style>
+<script client>export default class Typography { public variant: string = 'body'; }</script>

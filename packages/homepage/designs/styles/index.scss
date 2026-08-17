@@ -2,7 +2,7 @@
  * Tokens: designs/tokens/brand.json (Style Theme CSS custom properties)
  */
 
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
 
 *,
 *::before,
@@ -19,11 +19,10 @@ body {
   margin: 0;
   min-height: 100%;
   font-family: var(--vmz-font-sans);
+  font-size: 14px;
+  line-height: 1.5715;
   color: var(--vmz-text-ink);
-  background:
-    radial-gradient(120% 80% at 100% -10%, var(--vmz-scale-100) 0%, transparent 55%),
-    radial-gradient(90% 60% at -10% 100%, color-mix(in srgb, var(--vmz-brand-energy) 12%, transparent) 0%, transparent 50%),
-    linear-gradient(180deg, var(--vmz-surface-paper) 0%, var(--vmz-surface-mist) 100%);
+  background: var(--vmz-surface-page, var(--vmz-surface-mist, #f5f5f5));
 }
 
 #app {
@@ -73,11 +72,10 @@ code {
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
-  padding: 0.95rem clamp(1.25rem, 4vw, 2.75rem);
-  border-bottom: 1px solid var(--vmz-line-default);
-  box-shadow: inset 0 -2px 0 var(--vmz-brand-primary);
-  background: color-mix(in srgb, var(--vmz-surface-paper) 92%, transparent);
-  backdrop-filter: blur(10px);
+  min-height: 3rem;
+  padding: 0 clamp(1.25rem, 4vw, 2.75rem);
+  border-bottom: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
+  background: var(--vmz-surface-paper);
 }
 
 .site-brand {
@@ -528,9 +526,9 @@ code {
 
 .proof-pane {
   padding: 1.25rem 1.2rem 1.35rem;
-  border: 1px solid var(--vmz-line-default);
-  border-left: 3px solid var(--vmz-brand-primary);
-  background: var(--vmz-surface-mist);
+  border: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
+  border-radius: var(--vmz-radius-lg, 8px);
+  background: var(--vmz-surface-paper);
 }
 
 .proof-pane__title {

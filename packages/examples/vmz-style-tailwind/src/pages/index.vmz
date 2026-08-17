@@ -1,56 +1,51 @@
 <template>
   <main>
-    <h1 class="title">TW + SCSS + designs</h1>
-    <p class="hint">Theme: {themeLabel}</p>
-    <button type="button" class="save-button" style:tw="px-4 py-2 rounded bg-action" onClick={() => save()}>
-      Save
-    </button>
-    <button type="button" class="theme-toggle" style:tw="px-4 py-2 rounded bg-action" onClick={() => toggleTheme()}>
-      Toggle theme
-    </button>
-  </main>
+      <h1 class="title">TW + SCSS + designs</h1>
+      <p class="hint">Theme: {themeLabel}</p>
+      <button type="button" class="save-button" style:tw="px-4 py-2 rounded bg-action" onClick={() => save()}>
+        Save
+      </button>
+      <button type="button" class="theme-toggle" style:tw="px-4 py-2 rounded bg-action" onClick={() => toggleTheme()}>
+        Toggle theme
+      </button>
+    </main>
 </template>
 
 <style>
-.title {
-  font-size: 1.5rem;
-  letter-spacing: 0.02em;
-  color: var(--vmz-colors-action);
-}
-.hint {
-  color: var(--vmz-colors-action-hover);
-}
-.save-button,
-.theme-toggle {
-  font-weight: 600;
-  margin-right: 0.5rem;
-  &:hover {
-    opacity: 0.9;
+  .title {
+    font-size: 1.5rem;
+    letter-spacing: 0.02em;
+    color: var(--vmz-colors-action);
   }
-}
+  .hint {
+    color: var(--vmz-colors-action-hover);
+  }
+  .save-button,
+  .theme-toggle {
+    font-weight: 600;
+    margin-right: 0.5rem;
+    &:hover {
+      opacity: 0.9;
+    }
+  }
 </style>
 
 <script client>
 export default class IndexPage {
-  themeLabel =
-    typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark'
-      ? 'dark'
-      : 'default';
-
-  toggleTheme() {
-    const root = document.documentElement;
-    const attr = 'data-theme';
-    const key = 'vmz-theme';
-    // Explicit default must keep data-theme="default" so it overrides prefers-color-scheme.
-    const next = root.getAttribute(attr) === 'dark' ? 'default' : 'dark';
-    root.setAttribute(attr, next);
-    this.themeLabel = next;
-    try {
-      localStorage.setItem(key, next);
-    } catch (_) {}
-    document.cookie = key + '=' + encodeURIComponent(next) + '; path=/; max-age=31536000; SameSite=Lax';
-  }
-
-  save() {}
+	themeLabel = typeof document !== "undefined" && document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "default";
+	toggleTheme() {
+		const root = document.documentElement;
+		const attr = "data-theme";
+		const key = "vmz-theme";
+		// Explicit default must keep data-theme="default" so it overrides prefers-color-scheme.
+		const next = root.getAttribute(attr) === "dark" ? "default" : "dark";
+		root.setAttribute(attr, next);
+		this.themeLabel = next;
+		try {
+			localStorage.setItem(key, next);
+		} catch (_) {}
+		document.cookie = key + "=" + encodeURIComponent(next) + "; path=/; max-age=31536000; SameSite=Lax";
+	}
+	save() {}
 }
 </script>

@@ -1,591 +1,668 @@
 <template>
   <div
-    class={'vmz-ui-date-picker' + (open ? ' is-opened' : '')}
-    data-vmz-ui="date-picker"
-    data-invalid={invalidAttr}
-  >
-    <label if={label} class="vmz-ui-date-picker__label" for={controlId}>{label}</label>
-    <button
-      type="button"
-      id={controlId}
-      class="vmz-ui-date-picker__control"
-      disabled={disabled}
-      aria-haspopup="dialog"
-      aria-expanded={open ? 'true' : 'false'}
-      aria-controls={panelId}
-      aria-invalid={error ? 'true' : 'false'}
-      aria-describedby={describedBy}
-      onClick={toggle}
-      onKeyDown={onTriggerKeyDown}
+      class={'vmz-ui-date-picker' + (open ? ' is-opened' : '')}
+      data-vmz-ui="date-picker"
+      data-mode={mode}
+      data-invalid={invalidAttr}
     >
-      <span class="vmz-ui-date-picker__value" data-vmz-date="value">{displayLabel}</span>
-      <span class="vmz-ui-date-picker__chev" aria-hidden="true"></span>
-    </button>
-    <div
-      if={open}
-      id={panelId}
-      class="vmz-ui-date-picker__panel"
-      role="dialog"
-      aria-modal="false"
-      aria-label={panelLabel}
-      tabindex="-1"
-      data-vmz-overlay="date-picker"
-      data-vmz-overlay-owner="date-picker"
-      data-vmz-focus="enter"
-      data-vmz-date="panel"
-      onKeyDown={onPanelKeyDown}
-    >
-      <div class="vmz-ui-date-picker__monthbar">
-        <button
-          type="button"
-          class="vmz-ui-date-picker__nav"
-          data-vmz-date="prev"
-          aria-label="Previous month"
-          onClick={prevMonth}
-        >‹</button>
-        <p class="vmz-ui-date-picker__month" data-vmz-date="month">{monthLabel}</p>
-        <button
-          type="button"
-          class="vmz-ui-date-picker__nav"
-          data-vmz-date="next"
-          aria-label="Next month"
-          onClick={nextMonth}
-        >›</button>
+      <label if={label} class="vmz-ui-date-picker__label" for={controlId}>{label}</label>
+      <button
+        type="button"
+        id={controlId}
+        class="vmz-ui-date-picker__control"
+        disabled={disabled}
+        aria-haspopup="dialog"
+        aria-expanded={open ? 'true' : 'false'}
+        aria-controls={panelId}
+        aria-invalid={error ? 'true' : 'false'}
+        aria-describedby={describedBy}
+        onClick={toggle}
+        onKeyDown={onTriggerKeyDown}
+      >
+        <span class="vmz-ui-date-picker__value" data-vmz-date="value">{displayLabel}</span>
+        <span class="vmz-ui-date-picker__chev" aria-hidden="true"></span>
+      </button>
+      <div
+        if={open}
+        id={panelId}
+        class="vmz-ui-date-picker__panel"
+        role="dialog"
+        aria-modal="false"
+        aria-label={panelLabel}
+        tabindex="-1"
+        data-vmz-overlay="date-picker"
+        data-vmz-overlay-owner="date-picker"
+        data-vmz-focus="enter"
+        data-vmz-date="panel"
+        onKeyDown={onPanelKeyDown}
+      >
+        <div class="vmz-ui-date-picker__monthbar">
+          <button
+            type="button"
+            class="vmz-ui-date-picker__nav"
+            data-vmz-date="prev"
+            aria-label="Previous month"
+            onClick={prevMonth}
+          >‹</button>
+          <p class="vmz-ui-date-picker__month" data-vmz-date="month">{monthLabel}</p>
+          <button
+            type="button"
+            class="vmz-ui-date-picker__nav"
+            data-vmz-date="next"
+            aria-label="Next month"
+            onClick={nextMonth}
+          >›</button>
+        </div>
+        <div class="vmz-ui-date-picker__weekdays" aria-hidden="true">
+          <span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span>
+        </div>
+        <div class="vmz-ui-date-picker__grid" role="grid" aria-labelledby={panelId}>
+          <button
+            each={days}
+            as="day"
+            key={day.key}
+            type="button"
+            role="gridcell"
+            class={
+              'vmz-ui-date-picker__day' +
+              (day.inMonth ? '' : ' is-outside') +
+              (day.selected ? ' is-on' : '') +
+              (day.inRange ? ' is-in-range' : '') +
+              (day.rangeEdge ? ' is-range-edge' : '') +
+              (day.disabled ? ' is-disabled' : '')
+            }
+            data-vmz-date-iso={day.iso}
+            aria-selected={day.selected ? 'true' : 'false'}
+            aria-disabled={day.disabled ? 'true' : 'false'}
+            disabled={day.disabled}
+            onClick={onDayClick}
+          >{day.label}</button>
+        </div>
       </div>
-      <div class="vmz-ui-date-picker__weekdays" aria-hidden="true">
-        <span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span>
-      </div>
-      <div class="vmz-ui-date-picker__grid" role="grid" aria-labelledby={panelId}>
-        <button
-          each={days}
-          as="day"
-          key={day.key}
-          type="button"
-          role="gridcell"
-          class={
-            'vmz-ui-date-picker__day' +
-            (day.inMonth ? '' : ' is-outside') +
-            (day.selected ? ' is-on' : '') +
-            (day.disabled ? ' is-disabled' : '')
-          }
-          data-vmz-date-iso={day.iso}
-          aria-selected={day.selected ? 'true' : 'false'}
-          aria-disabled={day.disabled ? 'true' : 'false'}
-          disabled={day.disabled}
-          onClick={onDayClick}
-        >{day.label}</button>
-      </div>
+      <p if={description} id={descriptionId} class="vmz-ui-date-picker__description">{description}</p>
+      <p if={error} id={errorId} class="vmz-ui-date-picker__error" role="alert">{error}</p>
     </div>
-    <p if={description} id={descriptionId} class="vmz-ui-date-picker__description">{description}</p>
-    <p if={error} id={errorId} class="vmz-ui-date-picker__error" role="alert">{error}</p>
-  </div>
 </template>
 
 <style>
-.vmz-ui-date-picker {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  max-width: 28rem;
-}
+  .vmz-ui-date-picker {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    max-width: 28rem;
+  }
 
-.vmz-ui-date-picker__label {
-  font: inherit;
-  font-weight: 600;
-}
+  .vmz-ui-date-picker__label {
+    font: inherit;
+    font-weight: 600;
+  }
 
-.vmz-ui-date-picker__control {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.55rem;
-  width: 100%;
-  box-sizing: border-box;
-  font: inherit;
-  text-align: left;
-  padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
-  border: 1px solid var(--vmz-action-primary-background);
-  border-radius: 2px;
-  background: var(--vmz-surface-paper, transparent);
-  color: inherit;
-  outline: none;
-  cursor: pointer;
-}
+  .vmz-ui-date-picker__control {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.55rem;
+    width: 100%;
+    box-sizing: border-box;
+    font: inherit;
+    text-align: left;
+    padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-surface-paper, transparent);
+    color: inherit;
+    outline: none;
+    cursor: pointer;
+  }
 
-.vmz-ui-date-picker[data-invalid='true'] .vmz-ui-date-picker__control {
-  border-color: var(--vmz-status-danger-accent);
-}
+  .vmz-ui-date-picker[data-invalid='true'] .vmz-ui-date-picker__control {
+    border-color: var(--vmz-status-danger-accent);
+  }
 
-.vmz-ui-date-picker__control:focus-visible,
-.vmz-ui-date-picker.is-opened .vmz-ui-date-picker__control {
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-}
+  .vmz-ui-date-picker__control:focus-visible,
+  .vmz-ui-date-picker.is-opened .vmz-ui-date-picker__control {
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+  }
 
-.vmz-ui-date-picker__control:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
+  .vmz-ui-date-picker__control:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
 
-.vmz-ui-date-picker__value {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+  .vmz-ui-date-picker__value {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
-.vmz-ui-date-picker__chev {
-  flex: 0 0 auto;
-  width: 0.45rem;
-  height: 0.45rem;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: rotate(45deg) translate(-1px, -2px);
-  opacity: 0.7;
-}
+  .vmz-ui-date-picker__chev {
+    flex: 0 0 auto;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg) translate(-1px, -2px);
+    opacity: 0.7;
+  }
 
-.vmz-ui-date-picker.is-opened .vmz-ui-date-picker__chev {
-  transform: rotate(225deg) translate(-1px, -1px);
-}
+  .vmz-ui-date-picker.is-opened .vmz-ui-date-picker__chev {
+    transform: rotate(225deg) translate(-1px, -1px);
+  }
 
-.vmz-ui-date-picker__panel {
-  position: absolute;
-  z-index: 40;
-  top: calc(100% + 0.25rem);
-  left: 0;
-  right: 0;
-  box-sizing: border-box;
-  padding: 0.65rem 0.75rem 0.75rem;
-  border: 1px solid var(--vmz-action-primary-background);
-  border-radius: 2px;
-  background: var(--vmz-surface-paper, #fff);
-  color: inherit;
-  box-shadow: 0 10px 24px color-mix(in srgb, #000 16%, transparent);
-  outline: none;
-}
+  .vmz-ui-date-picker__panel {
+    position: absolute;
+    z-index: 40;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    right: 0;
+    box-sizing: border-box;
+    padding: 0.65rem 0.75rem 0.75rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-surface-paper, #fff);
+    color: inherit;
+    box-shadow: 0 10px 24px color-mix(in srgb, #000 16%, transparent);
+    outline: none;
+  }
 
-.vmz-ui-date-picker__monthbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.55rem;
-}
+  .vmz-ui-date-picker__monthbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.55rem;
+  }
 
-.vmz-ui-date-picker__month {
-  margin: 0;
-  font: inherit;
-  font-weight: 600;
-  text-align: center;
-  flex: 1 1 auto;
-}
+  .vmz-ui-date-picker__month {
+    margin: 0;
+    font: inherit;
+    font-weight: 600;
+    text-align: center;
+    flex: 1 1 auto;
+  }
 
-.vmz-ui-date-picker__nav {
-  flex: 0 0 auto;
-  width: 2rem;
-  height: 2rem;
-  font: inherit;
-  font-size: 1.15rem;
-  line-height: 1;
-  border: 1px solid transparent;
-  border-radius: 2px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  outline: none;
-}
+  .vmz-ui-date-picker__nav {
+    flex: 0 0 auto;
+    width: 2rem;
+    height: 2rem;
+    font: inherit;
+    font-size: 1.15rem;
+    line-height: 1;
+    border: 1px solid transparent;
+    border-radius: var(--vmz-radius-md, 6px);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    outline: none;
+  }
 
-.vmz-ui-date-picker__nav:hover,
-.vmz-ui-date-picker__nav:focus-visible {
-  border-color: var(--vmz-action-primary-background);
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-}
+  .vmz-ui-date-picker__nav:hover,
+  .vmz-ui-date-picker__nav:focus-visible {
+    border-color: var(--vmz-action-primary-background);
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+  }
 
-.vmz-ui-date-picker__weekdays {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 0.15rem;
-  margin-bottom: 0.25rem;
-  font-size: 0.75rem;
-  opacity: 0.7;
-  text-align: center;
-}
+  .vmz-ui-date-picker__weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.15rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+    opacity: 0.7;
+    text-align: center;
+  }
 
-.vmz-ui-date-picker__grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 0.15rem;
-}
+  .vmz-ui-date-picker__grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.15rem;
+  }
 
-.vmz-ui-date-picker__day {
-  aspect-ratio: 1;
-  min-height: 2rem;
-  font: inherit;
-  font-size: 0.9rem;
-  border: 0;
-  border-radius: 2px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  outline: none;
-}
+  .vmz-ui-date-picker__day {
+    aspect-ratio: 1;
+    min-height: 2rem;
+    font: inherit;
+    font-size: 0.9rem;
+    border: 0;
+    border-radius: var(--vmz-radius-md, 6px);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    outline: none;
+  }
 
-.vmz-ui-date-picker__day:hover,
-.vmz-ui-date-picker__day:focus-visible {
-  background: color-mix(in srgb, var(--vmz-action-primary-background) 18%, transparent);
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-}
+  .vmz-ui-date-picker__day:hover,
+  .vmz-ui-date-picker__day:focus-visible {
+    background: color-mix(in srgb, var(--vmz-action-primary-background) 18%, transparent);
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+  }
 
-.vmz-ui-date-picker__day.is-outside {
-  opacity: 0.4;
-}
+  .vmz-ui-date-picker__day.is-outside {
+    opacity: 0.4;
+  }
 
-.vmz-ui-date-picker__day.is-on {
-  background: color-mix(in srgb, var(--vmz-action-primary-background) 28%, transparent);
-  font-weight: 600;
-}
+  .vmz-ui-date-picker__day.is-on {
+    background: color-mix(in srgb, var(--vmz-action-primary-background) 28%, transparent);
+    font-weight: 600;
+  }
 
-.vmz-ui-date-picker__day.is-disabled,
-.vmz-ui-date-picker__day:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-  box-shadow: none;
-}
+  .vmz-ui-date-picker__day.is-in-range {
+    background: color-mix(in srgb, var(--vmz-action-primary-background) 14%, transparent);
+  }
 
-.vmz-ui-date-picker__description {
-  margin: 0;
-  opacity: 0.75;
-  font-size: 0.9em;
-}
+  .vmz-ui-date-picker__day.is-range-edge {
+    background: color-mix(in srgb, var(--vmz-action-primary-background) 36%, transparent);
+    font-weight: 600;
+  }
 
-.vmz-ui-date-picker__error {
-  margin: 0;
-  color: var(--vmz-status-danger-foreground);
-  font-size: 0.9em;
-}
+  .vmz-ui-date-picker__day.is-disabled,
+  .vmz-ui-date-picker__day:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .vmz-ui-date-picker__description {
+    margin: 0;
+    opacity: 0.75;
+    font-size: 0.9em;
+  }
+
+  .vmz-ui-date-picker__error {
+    margin: 0;
+    color: var(--vmz-status-danger-foreground);
+    font-size: 0.9em;
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — DatePicker.
- * Owned calendar overlay (trigger + dialog grid). Never native <input type="date"> popup:
- * OS date UI cannot carry Style Theme / density / overlay ownership.
- * Parent owns ISO value (YYYY-MM-DD) via onChange Event-like { target: { value } }.
- * Not @vmz/ui-scheduler — month grid only; no recurrence / resource layout.
- */
+* VMZ UI — DatePicker.
+* Owned calendar overlay (trigger + dialog grid). Never native <input type="date"> popup.
+* Parent owns ISO value (YYYY-MM-DD) via onChange Event-like { target: { value } }.
+* mode=range: parent owns rangeStart + rangeEnd; onChange { target: { value, start, end } }.
+* Not @vmz/ui-scheduler — month grid only; no time / recurrence / resource layout.
+*/
 export default class DatePicker {
-  public label: string = '';
-  public description: string = '';
-  public error: string = '';
-  public value: string = '';
-  public min: string = '';
-  public max: string = '';
-  public disabled: boolean = false;
-  public invalidAttr: string = 'false';
-  public controlId: string = 'vmz-date';
-  public descriptionId: string = 'vmz-date-desc';
-  public errorId: string = 'vmz-date-err';
-  public describedBy: string = '';
-  public onInput: ((e: { target: { value: string } }) => void) | null = null;
-  public onChange: ((e: { target: { value: string } }) => void) | null = null;
-
-  open = false;
-  displayLabel = '—';
-  panelId = 'vmz-date-panel';
-  panelLabel = 'Choose date';
-  monthLabel = '';
-  viewYear = 0;
-  viewMonth = 0;
-  days: Array<{
-    key: string;
-    iso: string;
-    label: string;
-    inMonth: boolean;
-    selected: boolean;
-    disabled: boolean;
-  }> = [];
-
-  _docKeyHandler = null;
-  _docPointerHandler = null;
-  _observer = null;
-
-  onMount() {
-    this.panelId = `${this.controlId}-panel`;
-    this.syncFromValue(true);
-    if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return;
-    const root = this.__vmzDomRoot;
-    if (!root || typeof root.querySelector !== 'function') return;
-    this._observer = new MutationObserver(() => this._syncOverlay());
-    this._observer.observe(root, { childList: true, subtree: true });
-  }
-
-  onDestroy() {
-    if (this._observer) {
-      this._observer.disconnect();
-      this._observer = null;
-    }
-    this._teardownDoc();
-  }
-
-  syncFromValue(resetView: boolean) {
-    const parsed = this._parseIso(this.value);
-    this.displayLabel = parsed ? this.value : '—';
-    if (resetView) {
-      const base = parsed || this._todayParts();
-      this.viewYear = base.y;
-      this.viewMonth = base.m;
-    }
-    this._rebuildDays();
-  }
-
-  toggle() {
-    if (this.disabled) return;
-    if (this.open) this.close();
-    else this.openPanel();
-  }
-
-  openPanel() {
-    this.syncFromValue(true);
-    this.open = true;
-  }
-
-  close() {
-    this.open = false;
-  }
-
-  prevMonth() {
-    if (this.viewMonth <= 1) {
-      this.viewYear -= 1;
-      this.viewMonth = 12;
-    } else {
-      this.viewMonth -= 1;
-    }
-    this._rebuildDays();
-  }
-
-  nextMonth() {
-    if (this.viewMonth >= 12) {
-      this.viewYear += 1;
-      this.viewMonth = 1;
-    } else {
-      this.viewMonth += 1;
-    }
-    this._rebuildDays();
-  }
-
-  choose(iso: string) {
-    if (!iso || this._isOutOfRange(iso)) return;
-    this.close();
-    if (iso === this.value) return;
-    const ev = { target: { value: iso } };
-    if (typeof this.onChange === 'function') this.onChange(ev);
-    if (typeof this.onInput === 'function') this.onInput(ev);
-  }
-
-  onDayClick(ev: Event) {
-    const t = ev?.target as HTMLElement | null;
-    const el =
-      t && typeof t.closest === 'function'
-        ? (t.closest('[data-vmz-date-iso]') as HTMLElement | null)
-        : ((ev?.currentTarget as HTMLElement | null) ?? null);
-    const iso = el && typeof el.getAttribute === 'function' ? el.getAttribute('data-vmz-date-iso') : null;
-    if (iso) this.choose(iso);
-  }
-
-  onTriggerKeyDown(ev: KeyboardEvent) {
-    if (!ev || this.disabled) return;
-    if ((ev.key === 'ArrowDown' || ev.key === 'Enter' || ev.key === ' ') && !this.open) {
-      ev.preventDefault();
-      this.openPanel();
-    } else if (ev.key === 'Escape' && this.open) {
-      ev.preventDefault();
-      this.close();
-    }
-  }
-
-  onPanelKeyDown(ev: KeyboardEvent) {
-    if (!ev) return;
-    if (ev.key === 'Escape') {
-      ev.preventDefault();
-      this.close();
-      return;
-    }
-    const root = this.__vmzDomRoot;
-    const panel =
-      root && typeof root.querySelector === 'function'
-        ? root.querySelector('[data-vmz-overlay="date-picker"]')
-        : null;
-    if (!panel) return;
-    const nodes = [...panel.querySelectorAll('[data-vmz-date-iso]')].filter(
-      (n) => n instanceof HTMLElement && !(n as HTMLButtonElement).disabled,
-    );
-    if (!nodes.length) return;
-    const idx = nodes.indexOf(document.activeElement as Element);
-    if (ev.key === 'ArrowRight') {
-      ev.preventDefault();
-      (nodes[(idx + 1 + nodes.length) % nodes.length] as HTMLElement).focus();
-    } else if (ev.key === 'ArrowLeft') {
-      ev.preventDefault();
-      (nodes[(idx - 1 + nodes.length) % nodes.length] as HTMLElement).focus();
-    } else if (ev.key === 'ArrowDown') {
-      ev.preventDefault();
-      (nodes[Math.min(idx + 7, nodes.length - 1)] as HTMLElement).focus();
-    } else if (ev.key === 'ArrowUp') {
-      ev.preventDefault();
-      (nodes[Math.max(idx - 7, 0)] as HTMLElement).focus();
-    } else if (ev.key === 'Home') {
-      ev.preventDefault();
-      (nodes[0] as HTMLElement).focus();
-    } else if (ev.key === 'End') {
-      ev.preventDefault();
-      (nodes[nodes.length - 1] as HTMLElement).focus();
-    } else if (ev.key === 'Enter' || ev.key === ' ') {
-      const active = document.activeElement as HTMLElement | null;
-      const iso = active?.getAttribute?.('data-vmz-date-iso');
-      if (iso) {
-        ev.preventDefault();
-        this.choose(iso);
-      }
-    }
-  }
-
-  _rebuildDays() {
-    const y = this.viewYear || this._todayParts().y;
-    const m = this.viewMonth || this._todayParts().m;
-    this.viewYear = y;
-    this.viewMonth = m;
-    this.monthLabel = `${this._monthName(m)} ${y}`;
-    this.panelLabel = `Choose date — ${this.monthLabel}`;
-
-    const firstDow = (new Date(y, m - 1, 1).getDay() + 6) % 7; // Mon=0
-    const dim = new Date(y, m, 0).getDate();
-    const prevDim = new Date(y, m - 1, 0).getDate();
-    const cells: typeof this.days = [];
-
-    for (let i = 0; i < 42; i++) {
-      let cy = y;
-      let cm = m;
-      let cd = 0;
-      let inMonth = true;
-      if (i < firstDow) {
-        inMonth = false;
-        cd = prevDim - firstDow + i + 1;
-        cm = m === 1 ? 12 : m - 1;
-        cy = m === 1 ? y - 1 : y;
-      } else if (i >= firstDow + dim) {
-        inMonth = false;
-        cd = i - firstDow - dim + 1;
-        cm = m === 12 ? 1 : m + 1;
-        cy = m === 12 ? y + 1 : y;
-      } else {
-        cd = i - firstDow + 1;
-      }
-      const iso = this._toIso(cy, cm, cd);
-      cells.push({
-        key: iso,
-        iso,
-        label: String(cd),
-        inMonth,
-        selected: iso === this.value,
-        disabled: this._isOutOfRange(iso),
-      });
-    }
-    this.days = cells;
-    this.displayLabel = this._parseIso(this.value) ? this.value : '—';
-  }
-
-  _parseIso(iso: string) {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
-    if (!m) return null;
-    const y = Number(m[1]);
-    const mo = Number(m[2]);
-    const d = Number(m[3]);
-    if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
-    return { y, m: mo, d };
-  }
-
-  _toIso(y: number, m: number, d: number) {
-    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-  }
-
-  _todayParts() {
-    const now = new Date();
-    return { y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() };
-  }
-
-  _monthName(m: number) {
-    const names = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    return names[m - 1] || String(m);
-  }
-
-  _isOutOfRange(iso: string) {
-    if (this.min && iso < this.min) return true;
-    if (this.max && iso > this.max) return true;
-    return false;
-  }
-
-  _syncOverlay() {
-    const root = this.__vmzDomRoot;
-    const panel =
-      root && typeof root.querySelector === 'function'
-        ? root.querySelector('[data-vmz-overlay="date-picker"][data-vmz-focus="enter"]')
-        : null;
-    if (panel && this.open) this._bindDoc(panel as HTMLElement);
-    else if (!panel) this._teardownDoc();
-    this.displayLabel = this._parseIso(this.value) ? this.value : '—';
-  }
-
-  _bindDoc(panel: HTMLElement) {
-    if (typeof document === 'undefined') return;
-    if (!this._docKeyHandler) {
-      this._docKeyHandler = (ev: KeyboardEvent) => {
-        if (ev.key === 'Escape') {
-          ev.preventDefault();
-          this.close();
-        }
-      };
-      document.addEventListener('keydown', this._docKeyHandler);
-    }
-    if (!this._docPointerHandler) {
-      const root = this.__vmzDomRoot;
-      this._docPointerHandler = (ev: Event) => {
-        const t = ev.target;
-        if (!(t instanceof Node)) return;
-        if (root && typeof root.contains === 'function' && root.contains(t)) return;
-        this.close();
-      };
-      document.addEventListener('pointerdown', this._docPointerHandler, true);
-    }
-    const selected = panel.querySelector('[data-vmz-date-iso][aria-selected="true"]:not([disabled])');
-    const first = panel.querySelector('[data-vmz-date-iso]:not([disabled])');
-    const focusTarget = (selected || first) as HTMLElement | null;
-    if (focusTarget) focusTarget.focus();
-    else panel.focus();
-  }
-
-  _teardownDoc() {
-    if (typeof document !== 'undefined') {
-      if (this._docKeyHandler) document.removeEventListener('keydown', this._docKeyHandler);
-      if (this._docPointerHandler) {
-        document.removeEventListener('pointerdown', this._docPointerHandler, true);
-      }
-    }
-    this._docKeyHandler = null;
-    this._docPointerHandler = null;
-  }
+	public label: string = "";
+	public description: string = "";
+	public error: string = "";
+	public value: string = "";
+	/** "date" | "range" */
+	public mode: string = "date";
+	public rangeStart: string = "";
+	public rangeEnd: string = "";
+	public min: string = "";
+	public max: string = "";
+	public disabled: boolean = false;
+	public invalidAttr: string = "false";
+	public controlId: string = "vmz-date";
+	public descriptionId: string = "vmz-date-desc";
+	public errorId: string = "vmz-date-err";
+	public describedBy: string = "";
+	public onInput: ((e: {
+		target: {
+			value: string;
+			start: string;
+			end: string;
+		};
+	}) => void) | null = null;
+	public onChange: ((e: {
+		target: {
+			value: string;
+			start: string;
+			end: string;
+		};
+	}) => void) | null = null;
+	open = false;
+	displayLabel = "—";
+	panelId = "vmz-date-panel";
+	panelLabel = "Choose date";
+	monthLabel = "";
+	viewYear = 0;
+	viewMonth = 0;
+	/** Internal first click while completing a range. */
+	draftStart = "";
+	days: Array<{
+		key: string;
+		iso: string;
+		label: string;
+		inMonth: boolean;
+		selected: boolean;
+		inRange: boolean;
+		rangeEdge: boolean;
+		disabled: boolean;
+	}> = [];
+	_docKeyHandler = null;
+	_docPointerHandler = null;
+	_observer = null;
+	onMount() {
+		this.panelId = `${this.controlId}-panel`;
+		this.syncFromValue(true);
+		if (typeof document === "undefined" || typeof MutationObserver === "undefined") return;
+		const root = this.__vmzDomRoot;
+		if (!root || typeof root.querySelector !== "function") return;
+		this._observer = new MutationObserver(() => this._syncOverlay());
+		this._observer.observe(root, {
+			childList: true,
+			subtree: true
+		});
+	}
+	onDestroy() {
+		if (this._observer) {
+			this._observer.disconnect();
+			this._observer = null;
+		}
+		this._teardownDoc();
+	}
+	syncFromValue(resetView: boolean) {
+		const isRange = String(this.mode) === "range";
+		const parsed = this._parseIso(isRange ? this.rangeStart || this.rangeEnd || this.value : this.value);
+		this._syncDisplay();
+		if (resetView) {
+			const base = parsed || this._todayParts();
+			this.viewYear = base.y;
+			this.viewMonth = base.m;
+		}
+		this._rebuildDays();
+	}
+	_syncDisplay() {
+		if (String(this.mode) === "range") {
+			const a = this._parseIso(this.rangeStart) ? this.rangeStart : "";
+			const b = this._parseIso(this.rangeEnd) ? this.rangeEnd : "";
+			if (a && b) this.displayLabel = `${a} → ${b}`;
+			else if (a) this.displayLabel = `${a} → …`;
+			else this.displayLabel = "—";
+			return;
+		}
+		this.displayLabel = this._parseIso(this.value) ? this.value : "—";
+	}
+	openPanel() {
+		this.draftStart = "";
+		this.syncFromValue(true);
+		this.open = true;
+	}
+	toggle() {
+		if (this.disabled) return;
+		if (this.open) this.close();
+		else this.openPanel();
+	}
+	close() {
+		this.open = false;
+		this.draftStart = "";
+	}
+	prevMonth() {
+		if (this.viewMonth <= 1) {
+			this.viewYear -= 1;
+			this.viewMonth = 12;
+		} else {
+			this.viewMonth -= 1;
+		}
+		this._rebuildDays();
+	}
+	nextMonth() {
+		if (this.viewMonth >= 12) {
+			this.viewYear += 1;
+			this.viewMonth = 1;
+		} else {
+			this.viewMonth += 1;
+		}
+		this._rebuildDays();
+	}
+	choose(iso: string) {
+		if (!iso || this._isOutOfRange(iso)) return;
+		if (String(this.mode) === "range") {
+			if (!this.draftStart) {
+				this.draftStart = iso;
+				this._rebuildDays();
+				return;
+			}
+			let start = this.draftStart;
+			let end = iso;
+			if (end < start) {
+				const t = start;
+				start = end;
+				end = t;
+			}
+			this.draftStart = "";
+			this.close();
+			const ev = { target: {
+				value: `${start}/${end}`,
+				start,
+				end
+			} };
+			if (typeof this.onChange === "function") this.onChange(ev);
+			if (typeof this.onInput === "function") this.onInput(ev);
+			return;
+		}
+		this.close();
+		if (iso === this.value) return;
+		const ev = { target: {
+			value: iso,
+			start: iso,
+			end: iso
+		} };
+		if (typeof this.onChange === "function") this.onChange(ev);
+		if (typeof this.onInput === "function") this.onInput(ev);
+	}
+	onDayClick(ev: Event) {
+		const t = ev?.target as HTMLElement | null;
+		const el = t && typeof t.closest === "function" ? t.closest("[data-vmz-date-iso]") as HTMLElement | null : ev?.currentTarget as HTMLElement | null ?? null;
+		const iso = el && typeof el.getAttribute === "function" ? el.getAttribute("data-vmz-date-iso") : null;
+		if (iso) this.choose(iso);
+	}
+	onTriggerKeyDown(ev: KeyboardEvent) {
+		if (!ev || this.disabled) return;
+		if ((ev.key === "ArrowDown" || ev.key === "Enter" || ev.key === " ") && !this.open) {
+			ev.preventDefault();
+			this.openPanel();
+		} else if (ev.key === "Escape" && this.open) {
+			ev.preventDefault();
+			this.close();
+		}
+	}
+	onPanelKeyDown(ev: KeyboardEvent) {
+		if (!ev) return;
+		if (ev.key === "Escape") {
+			ev.preventDefault();
+			this.close();
+			return;
+		}
+		const root = this.__vmzDomRoot;
+		const panel = root && typeof root.querySelector === "function" ? root.querySelector("[data-vmz-overlay=\"date-picker\"]") : null;
+		if (!panel) return;
+		const nodes = [...panel.querySelectorAll("[data-vmz-date-iso]")].filter((n) => n instanceof HTMLElement && !(n as HTMLButtonElement).disabled);
+		if (!nodes.length) return;
+		const idx = nodes.indexOf(document.activeElement as Element);
+		if (ev.key === "ArrowRight") {
+			ev.preventDefault();
+			(nodes[(idx + 1 + nodes.length) % nodes.length] as HTMLElement).focus();
+		} else if (ev.key === "ArrowLeft") {
+			ev.preventDefault();
+			(nodes[(idx - 1 + nodes.length) % nodes.length] as HTMLElement).focus();
+		} else if (ev.key === "ArrowDown") {
+			ev.preventDefault();
+			(nodes[Math.min(idx + 7, nodes.length - 1)] as HTMLElement).focus();
+		} else if (ev.key === "ArrowUp") {
+			ev.preventDefault();
+			(nodes[Math.max(idx - 7, 0)] as HTMLElement).focus();
+		} else if (ev.key === "Home") {
+			ev.preventDefault();
+			(nodes[0] as HTMLElement).focus();
+		} else if (ev.key === "End") {
+			ev.preventDefault();
+			(nodes[nodes.length - 1] as HTMLElement).focus();
+		} else if (ev.key === "Enter" || ev.key === " ") {
+			const active = document.activeElement as HTMLElement | null;
+			const iso = active?.getAttribute?.("data-vmz-date-iso");
+			if (iso) {
+				ev.preventDefault();
+				this.choose(iso);
+			}
+		}
+	}
+	_rebuildDays() {
+		const y = this.viewYear || this._todayParts().y;
+		const m = this.viewMonth || this._todayParts().m;
+		this.viewYear = y;
+		this.viewMonth = m;
+		this.monthLabel = `${this._monthName(m)} ${y}`;
+		this.panelLabel = String(this.mode) === "range" ? `Choose date range — ${this.monthLabel}` : `Choose date — ${this.monthLabel}`;
+		const firstDow = (new Date(y, m - 1, 1).getDay() + 6) % 7;
+		const dim = new Date(y, m, 0).getDate();
+		const prevDim = new Date(y, m - 1, 0).getDate();
+		const cells: typeof this.days = [];
+		const isRange = String(this.mode) === "range";
+		let start = "";
+		let end = "";
+		if (isRange) {
+			if (this.draftStart) {
+				start = this.draftStart;
+				end = this.draftStart;
+			} else {
+				start = this._parseIso(this.rangeStart) ? this.rangeStart : "";
+				end = this._parseIso(this.rangeEnd) ? this.rangeEnd : "";
+			}
+		}
+		for (let i = 0; i < 42; i++) {
+			let cy = y;
+			let cm = m;
+			let cd = 0;
+			let inMonth = true;
+			if (i < firstDow) {
+				inMonth = false;
+				cd = prevDim - firstDow + i + 1;
+				cm = m === 1 ? 12 : m - 1;
+				cy = m === 1 ? y - 1 : y;
+			} else if (i >= firstDow + dim) {
+				inMonth = false;
+				cd = i - firstDow - dim + 1;
+				cm = m === 12 ? 1 : m + 1;
+				cy = m === 12 ? y + 1 : y;
+			} else {
+				cd = i - firstDow + 1;
+			}
+			const iso = this._toIso(cy, cm, cd);
+			let selected = iso === this.value;
+			let inRange = false;
+			let rangeEdge = false;
+			if (isRange) {
+				selected = false;
+				if (start && end) {
+					rangeEdge = iso === start || iso === end;
+					inRange = iso >= start && iso <= end;
+					selected = rangeEdge;
+				} else if (start) {
+					rangeEdge = iso === start;
+					selected = rangeEdge;
+				}
+			}
+			cells.push({
+				key: iso,
+				iso,
+				label: String(cd),
+				inMonth,
+				selected,
+				inRange: inRange && !rangeEdge,
+				rangeEdge,
+				disabled: this._isOutOfRange(iso)
+			});
+		}
+		this.days = cells;
+		this._syncDisplay();
+	}
+	_parseIso(iso: string) {
+		const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+		if (!m) return null;
+		const y = Number(m[1]);
+		const mo = Number(m[2]);
+		const d = Number(m[3]);
+		if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+		return {
+			y,
+			m: mo,
+			d
+		};
+	}
+	_toIso(y: number, m: number, d: number) {
+		return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+	}
+	_todayParts() {
+		const now = new Date();
+		return {
+			y: now.getFullYear(),
+			m: now.getMonth() + 1,
+			d: now.getDate()
+		};
+	}
+	_monthName(m: number) {
+		const names = [
+			"January",
+			"February",
+			"March",
+			"April",
+			"May",
+			"June",
+			"July",
+			"August",
+			"September",
+			"October",
+			"November",
+			"December"
+		];
+		return names[m - 1] || String(m);
+	}
+	_isOutOfRange(iso: string) {
+		if (this.min && iso < this.min) return true;
+		if (this.max && iso > this.max) return true;
+		return false;
+	}
+	_syncOverlay() {
+		const root = this.__vmzDomRoot;
+		const panel = root && typeof root.querySelector === "function" ? root.querySelector("[data-vmz-overlay=\"date-picker\"][data-vmz-focus=\"enter\"]") : null;
+		if (panel && this.open) this._bindDoc(panel as HTMLElement);
+		else if (!panel) this._teardownDoc();
+		this._syncDisplay();
+	}
+	_bindDoc(panel: HTMLElement) {
+		if (typeof document === "undefined") return;
+		if (!this._docKeyHandler) {
+			this._docKeyHandler = (ev: KeyboardEvent) => {
+				if (ev.key === "Escape") {
+					ev.preventDefault();
+					this.close();
+				}
+			};
+			document.addEventListener("keydown", this._docKeyHandler);
+		}
+		if (!this._docPointerHandler) {
+			const root = this.__vmzDomRoot;
+			this._docPointerHandler = (ev: Event) => {
+				const t = ev.target;
+				if (!(t instanceof Node)) return;
+				if (root && typeof root.contains === "function" && root.contains(t)) return;
+				this.close();
+			};
+			document.addEventListener("pointerdown", this._docPointerHandler, true);
+		}
+		const selected = panel.querySelector("[data-vmz-date-iso][aria-selected=\"true\"]:not([disabled])");
+		const first = panel.querySelector("[data-vmz-date-iso]:not([disabled])");
+		const focusTarget = (selected || first) as HTMLElement | null;
+		if (focusTarget) focusTarget.focus();
+		else panel.focus();
+	}
+	_teardownDoc() {
+		if (typeof document !== "undefined") {
+			if (this._docKeyHandler) document.removeEventListener("keydown", this._docKeyHandler);
+			if (this._docPointerHandler) {
+				document.removeEventListener("pointerdown", this._docPointerHandler, true);
+			}
+		}
+		this._docKeyHandler = null;
+		this._docPointerHandler = null;
+	}
 }
 </script>

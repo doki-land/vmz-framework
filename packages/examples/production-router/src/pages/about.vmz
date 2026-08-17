@@ -1,18 +1,18 @@
 <template>
   <main data-vmz-focus="about-main">
-    <h1>About</h1>
-    <p>route-about</p>
-    <Link to="IndexPage">Home</Link>
-  </main>
+      <h1>About</h1>
+      <p>route-about</p>
+      <Link to="IndexPage">Home</Link>
+    </main>
 </template>
 
 <script client>
 export default class AboutPage {
-  static meta() {
-    return {
-      title: 'About · Production Router',
-      description: 'About the VMZ production-router fixture',
-    };
-  }
+	static meta() {
+		return {
+			title: "About · Production Router",
+			description: "About the VMZ production-router fixture"
+		};
+	}
 }
 </script>

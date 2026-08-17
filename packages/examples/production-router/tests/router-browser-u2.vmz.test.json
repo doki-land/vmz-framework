@@ -45,7 +45,8 @@
             "schema": "vmz.test.assertion.v0",
             "kind": "route",
             "expect": {
-                "path": "/about"
+                "path": "/about",
+                "routeId": "AboutPage"
             }
         },
         {

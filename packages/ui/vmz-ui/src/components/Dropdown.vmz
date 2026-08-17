@@ -1,0 +1,22 @@
+<template>
+  <details class="vmz-ui-dropdown" data-vmz-ui="dropdown">
+    <summary>{label}</summary>
+    <div class="vmz-ui-dropdown__menu">
+      <a each={items} as="item" key={item.id} href={item.href}>{item.title}</a>
+    </div>
+  </details>
+</template>
+<style>
+.vmz-ui-dropdown{position:relative;display:inline-block}
+.vmz-ui-dropdown summary{list-style:none;min-height:2.5rem;display:inline-flex;align-items:center;padding:0 .85rem;border:1px solid var(--vmz-line-default);border-radius:var(--vmz-radius-md,6px);background:var(--vmz-surface-paper);cursor:pointer;font-weight:550}
+.vmz-ui-dropdown summary::-webkit-details-marker{display:none}
+.vmz-ui-dropdown__menu{position:absolute;top:calc(100% + .35rem);right:0;z-index:50;min-width:11rem;padding:.3rem;border:1px solid var(--vmz-line-default);border-radius:var(--vmz-radius-lg,8px);background:var(--vmz-surface-paper);box-shadow:var(--vmz-shadow-popup)}
+.vmz-ui-dropdown__menu a{display:block;padding:.55rem .7rem;border-radius:var(--vmz-radius-sm,2px);color:var(--vmz-text-ink);text-decoration:none}
+.vmz-ui-dropdown__menu a:hover{background:var(--vmz-surface-mist)}
+</style>
+<script client>
+export default class Dropdown {
+  public label: string = 'Menu';
+  public items: Array<{ id: string; title: string; href: string }> = [];
+}
+</script>

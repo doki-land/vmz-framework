@@ -1,54 +1,53 @@
 <template>
   <section>
-    <p if={!user}>Loading...</p>
-    <div else>
-      <h2>{user.name}</h2>
-      <p>{user.bio}</p>
-      <ul>
-        <li each={tags} as="tag" key={tag.id}>{tag.label}</li>
-      </ul>
-    </div>
-  </section>
+      <p if={!user}>Loading...</p>
+      <div else>
+        <h2>{user.name}</h2>
+        <p>{user.bio}</p>
+        <ul>
+          <li each={tags} as="tag" key={tag.id}>{tag.label}</li>
+        </ul>
+      </div>
+    </section>
 </template>
 
 <script client>
-import type { User } from '#server/db/users';
-import { UserCardServer } from '#server/components/UserCard';
-
-export type Tag = { id: string; label: string };
-
+import type { User } from "#server/db/users";
+import { UserCardServer } from "#server/components/UserCard";
+export type Tag = {
+	id: string;
+	label: string;
+};
 export default class UserCard {
-  user!: User;
-  tags: Tag[] = [];
-
-  async onMount() {
-    this.user = await UserCardServer.fetchUser();
-    this.tags = [
-      { id: 'vmz', label: 'vmz' },
-      { id: 'oxc', label: 'oxc' },
-    ];
-  }
+	user!: User;
+	tags: Tag[] = [];
+	async onMount() {
+		this.user = await UserCardServer.fetchUser();
+		this.tags = [{
+			id: "vmz",
+			label: "vmz"
+		}, {
+			id: "oxc",
+			label: "oxc"
+		}];
+	}
 }
 </script>
 
 <script server>
-import type { User } from '#server/db/users';
-import { UsersRepository } from '#server/db/users';
-import { ProfileClient } from '#server/integrations/profile';
-import { Get } from 'vmz:http';
-
+import type { User } from "#server/db/users";
+import { UsersRepository } from "#server/db/users";
+import { ProfileClient } from "#server/integrations/profile";
+import { Get } from "vmz:http";
 export default class UserCardServer {
-  #users = new UsersRepository();
-  #profile = new ProfileClient();
-
-  async fetchUser(): Promise<User> {
-    const row = await this.#users.findDefault();
-    return this.#profile.enrich(row);
-  }
-
-  @Get('/api/users/me')
-  async getMe(): Promise<User> {
-    return this.fetchUser();
-  }
+	#users = new UsersRepository();
+	#profile = new ProfileClient();
+	async fetchUser(): Promise<User> {
+		const row = await this.#users.findDefault();
+		return this.#profile.enrich(row);
+	}
+	@Get("/api/users/me") async getMe(): Promise<User> {
+		return this.fetchUser();
+	}
 }
 </script>

@@ -1,176 +1,177 @@
 <template>
   <div
-    class="vmz-ui-autocomplete"
-    data-vmz-ui="autocomplete"
-    data-invalid={invalidAttr}
-    data-open={openAttr}
-  >
-    <label if={label} class="vmz-ui-autocomplete__label" for={controlId}>{label}</label>
-    <input
-      id={controlId}
-      class="vmz-ui-autocomplete__control"
-      type="text"
-      role="combobox"
-      autocomplete="off"
-      aria-autocomplete="list"
-      aria-expanded={openAttr}
-      aria-controls={listId}
-      aria-invalid={error ? 'true' : 'false'}
-      aria-describedby={describedBy}
-      value={value}
-      disabled={disabled}
-      onInput={onInput}
-      onKeyDown={onKeyDown}
-    />
-    <ul
-      if={listOpen}
-      id={listId}
-      class="vmz-ui-autocomplete__list"
-      role="listbox"
-      data-vmz-autocomplete="list"
-      onClick={onListClick}
+      class="vmz-ui-autocomplete"
+      data-vmz-ui="autocomplete"
+      data-invalid={invalidAttr}
+      data-open={openAttr}
     >
-      <li
-        each={options}
-        as="opt"
-        key={opt.value}
-        class="vmz-ui-autocomplete__option"
-        role="option"
-        data-vmz-option={opt.value}
-        tabindex="-1"
+      <label if={label} class="vmz-ui-autocomplete__label" for={controlId}>{label}</label>
+      <input
+        id={controlId}
+        class="vmz-ui-autocomplete__control"
+        type="text"
+        role="combobox"
+        autocomplete="off"
+        aria-autocomplete="list"
+        aria-expanded={openAttr}
+        aria-controls={listId}
+        aria-invalid={error ? 'true' : 'false'}
+        aria-describedby={describedBy}
+        value={value}
+        disabled={disabled}
+        onInput={onInput}
+        onKeyDown={onKeyDown}
+      />
+      <ul
+        if={listOpen}
+        id={listId}
+        class="vmz-ui-autocomplete__list"
+        role="listbox"
+        data-vmz-autocomplete="list"
+        onClick={onListClick}
       >
-        {opt.label}
-      </li>
-    </ul>
-    <p if={showEmpty} class="vmz-ui-autocomplete__empty" data-vmz-autocomplete="empty">{emptyText}</p>
-    <p if={description} id={descriptionId} class="vmz-ui-autocomplete__description">{description}</p>
-    <p if={error} id={errorId} class="vmz-ui-autocomplete__error" role="alert">{error}</p>
-  </div>
+        <li
+          each={options}
+          as="opt"
+          key={opt.value}
+          class="vmz-ui-autocomplete__option"
+          role="option"
+          data-vmz-option={opt.value}
+          tabindex="-1"
+        >
+          {opt.label}
+        </li>
+      </ul>
+      <p if={showEmpty} class="vmz-ui-autocomplete__empty" data-vmz-autocomplete="empty">{emptyText}</p>
+      <p if={description} id={descriptionId} class="vmz-ui-autocomplete__description">{description}</p>
+      <p if={error} id={errorId} class="vmz-ui-autocomplete__error" role="alert">{error}</p>
+    </div>
 </template>
 
 <style>
-.vmz-ui-autocomplete {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  max-width: 28rem;
-}
+  .vmz-ui-autocomplete {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    max-width: 28rem;
+  }
 
-.vmz-ui-autocomplete__label {
-  font: inherit;
-  font-weight: 600;
-}
+  .vmz-ui-autocomplete__label {
+    font: inherit;
+    font-weight: 600;
+  }
 
-.vmz-ui-autocomplete__control {
-  font: inherit;
-  padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
-  border: 1px solid var(--vmz-action-primary-background);
-  border-radius: 2px;
-  background: transparent;
-  color: inherit;
-  outline: none;
-}
+  .vmz-ui-autocomplete__control {
+    font: inherit;
+    padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: transparent;
+    color: inherit;
+    outline: none;
+  }
 
-.vmz-ui-autocomplete[data-invalid='true'] .vmz-ui-autocomplete__control {
-  border-color: var(--vmz-status-danger-accent);
-}
+  .vmz-ui-autocomplete[data-invalid='true'] .vmz-ui-autocomplete__control {
+    border-color: var(--vmz-status-danger-accent);
+  }
 
-.vmz-ui-autocomplete__control:focus-visible {
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-}
+  .vmz-ui-autocomplete__control:focus-visible {
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+  }
 
-.vmz-ui-autocomplete__control:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
+  .vmz-ui-autocomplete__control:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
 
-.vmz-ui-autocomplete__list {
-  list-style: none;
-  margin: 0;
-  padding: 0.25rem 0;
-  border: 1px solid var(--vmz-line-default);
-  border-radius: 2px;
-  background: var(--vmz-surface-paper);
-  max-height: 12rem;
-  overflow: auto;
-}
+  .vmz-ui-autocomplete__list {
+    list-style: none;
+    margin: 0;
+    padding: 0.25rem 0;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-surface-paper);
+    max-height: 12rem;
+    overflow: auto;
+  }
 
-.vmz-ui-autocomplete__option {
-  margin: 0;
-  padding: 0.45rem 0.75rem;
-  cursor: pointer;
-  font-weight: 600;
-  color: var(--vmz-text-ink);
-}
+  .vmz-ui-autocomplete__option {
+    margin: 0;
+    padding: 0.45rem 0.75rem;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--vmz-text-ink);
+  }
 
-.vmz-ui-autocomplete__option:hover,
-.vmz-ui-autocomplete__option:focus {
-  background: var(--vmz-surface-mist);
-  outline: none;
-}
+  .vmz-ui-autocomplete__option:hover,
+  .vmz-ui-autocomplete__option:focus {
+    background: var(--vmz-surface-mist);
+    outline: none;
+  }
 
-.vmz-ui-autocomplete__empty {
-  margin: 0;
-  color: var(--vmz-text-steel);
-  font-size: 0.9em;
-}
+  .vmz-ui-autocomplete__empty {
+    margin: 0;
+    color: var(--vmz-text-steel);
+    font-size: 0.9em;
+  }
 
-.vmz-ui-autocomplete__description {
-  margin: 0;
-  opacity: 0.75;
-  font-size: 0.9em;
-}
+  .vmz-ui-autocomplete__description {
+    margin: 0;
+    opacity: 0.75;
+    font-size: 0.9em;
+  }
 
-.vmz-ui-autocomplete__error {
-  margin: 0;
-  color: var(--vmz-status-danger-foreground);
-  font-size: 0.9em;
-}
+  .vmz-ui-autocomplete__error {
+    margin: 0;
+    color: var(--vmz-status-danger-foreground);
+    font-size: 0.9em;
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — Autocomplete.
- * Parent owns value, listOpen, and filtered options — no parallel query/store.
- * Selection notifies via onSelect(value); Escape closes via onClose.
- */
+* VMZ UI — Autocomplete.
+* Parent owns value, listOpen, and filtered options — no parallel query/store.
+* Selection notifies via onSelect(value); Escape closes via onClose.
+*/
 export default class Autocomplete {
-  public label: string = '';
-  public description: string = '';
-  public error: string = '';
-  public value: string = '';
-  public options: Array<{ value: string; label: string }> = [];
-  public listOpen: boolean = false;
-  public openAttr: string = 'false';
-  public showEmpty: boolean = false;
-  public emptyText: string = 'No matches';
-  public disabled: boolean = false;
-  public invalidAttr: string = 'false';
-  public controlId: string = 'vmz-autocomplete';
-  public listId: string = 'vmz-autocomplete-list';
-  public descriptionId: string = 'vmz-autocomplete-desc';
-  public errorId: string = 'vmz-autocomplete-err';
-  public describedBy: string = '';
-  public onInput: ((e: Event) => void) | null = null;
-  public onSelect: ((value: string) => void) | null = null;
-  public onClose: (() => void) | null = null;
-
-  onListClick(ev) {
-    if (this.disabled) return;
-    const t = ev && ev.target;
-    if (!t || typeof t.closest !== 'function') return;
-    const opt = t.closest('[data-vmz-option]');
-    if (!opt) return;
-    const next = opt.getAttribute('data-vmz-option') || '';
-    if (!next) return;
-    if (typeof this.onSelect === 'function') this.onSelect(next);
-  }
-
-  onKeyDown(ev) {
-    if (!ev || ev.key !== 'Escape') return;
-    ev.preventDefault();
-    if (typeof this.onClose === 'function') this.onClose();
-  }
+	public label: string = "";
+	public description: string = "";
+	public error: string = "";
+	public value: string = "";
+	public options: Array<{
+		value: string;
+		label: string;
+	}> = [];
+	public listOpen: boolean = false;
+	public openAttr: string = "false";
+	public showEmpty: boolean = false;
+	public emptyText: string = "No matches";
+	public disabled: boolean = false;
+	public invalidAttr: string = "false";
+	public controlId: string = "vmz-autocomplete";
+	public listId: string = "vmz-autocomplete-list";
+	public descriptionId: string = "vmz-autocomplete-desc";
+	public errorId: string = "vmz-autocomplete-err";
+	public describedBy: string = "";
+	public onInput: ((e: Event) => void) | null = null;
+	public onSelect: ((value: string) => void) | null = null;
+	public onClose: (() => void) | null = null;
+	onListClick(ev) {
+		if (this.disabled) return;
+		const t = ev && ev.target;
+		if (!t || typeof t.closest !== "function") return;
+		const opt = t.closest("[data-vmz-option]");
+		if (!opt) return;
+		const next = opt.getAttribute("data-vmz-option") || "";
+		if (!next) return;
+		if (typeof this.onSelect === "function") this.onSelect(next);
+	}
+	onKeyDown(ev) {
+		if (!ev || ev.key !== "Escape") return;
+		ev.preventDefault();
+		if (typeof this.onClose === "function") this.onClose();
+	}
 }
 </script>

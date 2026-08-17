@@ -1,11 +1,11 @@
 <template>
   <main class="catalog">
-    <h1>Production catalog</h1>
-    <CatalogChip client:idle />
-    <CatalogShell>
-      <CatalogList />
-    </CatalogShell>
-  </main>
+      <h1>Production catalog</h1>
+      <CatalogChip client:idle />
+      <CatalogShell>
+        <CatalogList />
+      </CatalogShell>
+    </main>
 </template>
 
 <script client>

@@ -4,6 +4,6 @@
 
 <script client>
 export default class ProductRow {
-  public title: string = '';
+	public title: string = "";
 }
 </script>

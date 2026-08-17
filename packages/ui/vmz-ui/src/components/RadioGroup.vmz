@@ -1,135 +1,138 @@
 <template>
   <fieldset
-    class="vmz-ui-radio-group"
-    data-vmz-ui="radio-group"
-    data-invalid={invalidAttr}
-    aria-describedby={describedBy}
-    disabled={disabled}
-  >
-    <legend class="vmz-ui-radio-group__legend">{label}</legend>
-    <div class="vmz-ui-radio-group__list" role="radiogroup" aria-label={label} onClick={onListClick}>
-      <label
-        each={items}
-        as="item"
-        key={item.value}
-        class="vmz-ui-radio-group__option"
-        for={item.id}
-      >
-        <input
-          id={item.id}
-          class="vmz-ui-radio-group__input"
-          type="radio"
-          name={name}
-          value={item.value}
-          checked={value === item.value}
-          disabled={disabled}
-          data-vmz-radio={item.value}
-        />
-        <span class="vmz-ui-radio-group__text">{item.label}</span>
-      </label>
-    </div>
-    <p if={description} id={descriptionId} class="vmz-ui-radio-group__description">{description}</p>
-    <p if={error} id={errorId} class="vmz-ui-radio-group__error" role="alert">{error}</p>
-  </fieldset>
+      class="vmz-ui-radio-group"
+      data-vmz-ui="radio-group"
+      data-invalid={invalidAttr}
+      aria-describedby={describedBy}
+      disabled={disabled}
+    >
+      <legend class="vmz-ui-radio-group__legend">{label}</legend>
+      <div class="vmz-ui-radio-group__list" role="radiogroup" aria-label={label} onClick={onListClick}>
+        <label
+          each={items}
+          as="item"
+          key={item.value}
+          class="vmz-ui-radio-group__option"
+          for={item.id}
+        >
+          <input
+            id={item.id}
+            class="vmz-ui-radio-group__input"
+            type="radio"
+            name={name}
+            value={item.value}
+            checked={value === item.value}
+            disabled={disabled}
+            data-vmz-radio={item.value}
+          />
+          <span class="vmz-ui-radio-group__text">{item.label}</span>
+        </label>
+      </div>
+      <p if={description} id={descriptionId} class="vmz-ui-radio-group__description">{description}</p>
+      <p if={error} id={errorId} class="vmz-ui-radio-group__error" role="alert">{error}</p>
+    </fieldset>
 </template>
 
 <style>
-.vmz-ui-radio-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  max-width: 28rem;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  min-width: 0;
-}
+  .vmz-ui-radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    max-width: 28rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
 
-.vmz-ui-radio-group__legend {
-  padding: 0;
-  font: inherit;
-  font-weight: 600;
-}
+  .vmz-ui-radio-group__legend {
+    padding: 0;
+    font: inherit;
+    font-weight: 600;
+  }
 
-.vmz-ui-radio-group__list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
+  .vmz-ui-radio-group__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
 
-.vmz-ui-radio-group__option {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  font: inherit;
-  cursor: pointer;
-}
+  .vmz-ui-radio-group__option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font: inherit;
+    cursor: pointer;
+  }
 
-.vmz-ui-radio-group__input {
-  width: 1rem;
-  height: 1rem;
-  accent-color: var(--vmz-action-primary-background);
-  outline: none;
-}
+  .vmz-ui-radio-group__input {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--vmz-action-primary-background);
+    outline: none;
+  }
 
-.vmz-ui-radio-group__input:focus-visible {
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-}
+  .vmz-ui-radio-group__input:focus-visible {
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+  }
 
-.vmz-ui-radio-group__input:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
+  .vmz-ui-radio-group__input:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
 
-.vmz-ui-radio-group__text {
-  font-weight: 600;
-}
+  .vmz-ui-radio-group__text {
+    font-weight: 600;
+  }
 
-.vmz-ui-radio-group__description {
-  margin: 0;
-  opacity: 0.75;
-  font-size: 0.9em;
-}
+  .vmz-ui-radio-group__description {
+    margin: 0;
+    opacity: 0.75;
+    font-size: 0.9em;
+  }
 
-.vmz-ui-radio-group__error {
-  margin: 0;
-  color: var(--vmz-status-danger-foreground);
-  font-size: 0.9em;
-}
+  .vmz-ui-radio-group__error {
+    margin: 0;
+    color: var(--vmz-status-danger-foreground);
+    font-size: 0.9em;
+  }
 
-.vmz-ui-radio-group[data-invalid='true'] .vmz-ui-radio-group__legend {
-  color: var(--vmz-status-danger-foreground);
-}
+  .vmz-ui-radio-group[data-invalid='true'] .vmz-ui-radio-group__legend {
+    color: var(--vmz-status-danger-foreground);
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — RadioGroup.
- * Parent owns selected value; click path updates via onChange (live prop remains authoritative).
- */
+* VMZ UI — RadioGroup.
+* Parent owns selected value; click path updates via onChange (live prop remains authoritative).
+*/
 export default class RadioGroup {
-  public label: string = '';
-  public description: string = '';
-  public error: string = '';
-  public name: string = 'vmz-radio';
-  public value: string = '';
-  public items: Array<{ id: string; value: string; label: string }> = [];
-  public disabled: boolean = false;
-  public invalidAttr: string = 'false';
-  public descriptionId: string = 'vmz-radio-desc';
-  public errorId: string = 'vmz-radio-err';
-  public describedBy: string = '';
-  public onChange: ((value: string) => void) | null = null;
-
-  onListClick(ev) {
-    if (this.disabled) return;
-    const t = ev && ev.target;
-    if (!t || typeof t.closest !== 'function') return;
-    const input = t.closest('input[data-vmz-radio]');
-    if (!input) return;
-    const next = input.getAttribute('data-vmz-radio') || input.value || '';
-    if (!next || next === this.value) return;
-    if (typeof this.onChange === 'function') this.onChange(next);
-  }
+	public label: string = "";
+	public description: string = "";
+	public error: string = "";
+	public name: string = "vmz-radio";
+	public value: string = "";
+	public items: Array<{
+		id: string;
+		value: string;
+		label: string;
+	}> = [];
+	public disabled: boolean = false;
+	public invalidAttr: string = "false";
+	public descriptionId: string = "vmz-radio-desc";
+	public errorId: string = "vmz-radio-err";
+	public describedBy: string = "";
+	public onChange: ((value: string) => void) | null = null;
+	onListClick(ev) {
+		if (this.disabled) return;
+		const t = ev && ev.target;
+		if (!t || typeof t.closest !== "function") return;
+		const input = t.closest("input[data-vmz-radio]");
+		if (!input) return;
+		const next = input.getAttribute("data-vmz-radio") || input.value || "";
+		if (!next || next === this.value) return;
+		if (typeof this.onChange === "function") this.onChange(next);
+	}
 }
 </script>

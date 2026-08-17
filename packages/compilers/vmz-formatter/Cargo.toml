@@ -18,3 +18,4 @@ oxc_span.workspace = true
 schemars.workspace = true
 serde.workspace = true
 vmz-compiler.workspace = true
+walkdir.workspace = true

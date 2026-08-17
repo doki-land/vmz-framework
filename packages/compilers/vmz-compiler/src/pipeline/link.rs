@@ -352,7 +352,9 @@ fn walk_links(nodes: &[TemplateNode], table: &RouteTable, out: &mut Vec<String>)
         if tag == "Link" {
             let has_app = attrs.iter().any(|a| a.name == "application");
             if !has_app {
-                if let Some(err) = link_resolve_error(attrs, table) { out.push(err) }
+                if let Some(err) = link_resolve_error(attrs, table) {
+                    out.push(err)
+                }
             }
         }
         walk_links(children, table, out);

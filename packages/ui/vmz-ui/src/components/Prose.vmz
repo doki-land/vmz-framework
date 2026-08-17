@@ -1,83 +1,83 @@
 <template>
   <article class="vmz-ui-prose" data-vmz-ui="prose">
-    <slot />
-  </article>
+      <slot />
+    </article>
 </template>
 
 <style>
-.vmz-ui-prose {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  max-width: 42rem;
-  color: var(--vmz-text-ink);
-  font-family: var(--vmz-font-sans);
-  line-height: 1.65;
-}
+  .vmz-ui-prose {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 42rem;
+    color: var(--vmz-text-ink);
+    font-family: var(--vmz-font-sans);
+    line-height: 1.65;
+  }
 
-.vmz-ui-prose :where(h1, h2, h3) {
-  margin: 0;
-  font-family: var(--vmz-font-display);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-  color: var(--vmz-text-ink);
-  scroll-margin-top: 1.25rem;
-}
+  .vmz-ui-prose :where(h1, h2, h3) {
+    margin: 0;
+    font-family: var(--vmz-font-display);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: var(--vmz-text-ink);
+    scroll-margin-top: 1.25rem;
+  }
 
-.vmz-ui-prose :where(h1) {
-  font-size: clamp(1.85rem, 4vw, 2.35rem);
-}
+  .vmz-ui-prose :where(h1) {
+    font-size: clamp(1.85rem, 4vw, 2.35rem);
+  }
 
-.vmz-ui-prose :where(h2) {
-  font-size: 1.35rem;
-  margin-top: 0.5rem;
-}
+  .vmz-ui-prose :where(h2) {
+    font-size: 1.35rem;
+    margin-top: 0.5rem;
+  }
 
-.vmz-ui-prose :where(h3) {
-  font-size: 1.1rem;
-}
+  .vmz-ui-prose :where(h3) {
+    font-size: 1.1rem;
+  }
 
-.vmz-ui-prose :where(p) {
-  margin: 0;
-  color: var(--vmz-text-ink);
-}
+  .vmz-ui-prose :where(p) {
+    margin: 0;
+    color: var(--vmz-text-ink);
+  }
 
-.vmz-ui-prose :where(p.lead) {
-  font-size: 1.05rem;
-  color: var(--vmz-text-steel);
-}
+  .vmz-ui-prose :where(p.lead) {
+    font-size: 1.05rem;
+    color: var(--vmz-text-steel);
+  }
 
-.vmz-ui-prose :where(ul, ol) {
-  margin: 0;
-  padding-left: 1.25rem;
-  color: var(--vmz-text-ink);
-}
+  .vmz-ui-prose :where(ul, ol) {
+    margin: 0;
+    padding-left: 1.25rem;
+    color: var(--vmz-text-ink);
+  }
 
-.vmz-ui-prose :where(li + li) {
-  margin-top: 0.35rem;
-}
+  .vmz-ui-prose :where(li + li) {
+    margin-top: 0.35rem;
+  }
 
-.vmz-ui-prose :where(a) {
-  color: var(--vmz-action-primary-background);
-  text-underline-offset: 0.15em;
-}
+  .vmz-ui-prose :where(a) {
+    color: var(--vmz-action-primary-background);
+    text-underline-offset: 0.15em;
+  }
 
-.vmz-ui-prose :where(a:hover) {
-  color: var(--vmz-action-primary-hover);
-}
+  .vmz-ui-prose :where(a:hover) {
+    color: var(--vmz-action-primary-hover);
+  }
 
-.vmz-ui-prose :where(hr) {
-  border: 0;
-  border-top: 1px solid var(--vmz-line-default);
-  margin: 0.5rem 0;
-}
+  .vmz-ui-prose :where(hr) {
+    border: 0;
+    border-top: 1px solid var(--vmz-line-default);
+    margin: 0.5rem 0;
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — Prose (Document/Product composition).
- * Typography measure for long-form content; values from Style Theme only.
- */
+* VMZ UI — Prose (Document/Product composition).
+* Typography measure for long-form content; values from Style Theme only.
+*/
 export default class Prose {}
 </script>

@@ -1,220 +1,221 @@
 <template>
   <div
-    class="vmz-ui-datatable-wrap"
-    data-vmz-ui="data-table"
-    data-sort-key={sortKey}
-    data-sort-dir={sortDir}
-    data-selected-count={selectedCount}
-  >
-    <table class="vmz-ui-datatable">
-      <thead onClick={onHeadClick}>
-        <tr>
-          <th scope="col" class="vmz-ui-datatable__check">
-            <input
-              type="checkbox"
-              class="vmz-ui-datatable__box"
-              data-vmz-select-all="true"
-              aria-label={selectAllLabel}
-              checked={allSelected}
-            />
-          </th>
-          <th each={columns} as="col" key={col.id} scope="col" data-vmz-col={col.id}>
-            <button type="button" class="vmz-ui-datatable__sort" data-vmz-sort={col.id}>
-              {col.title}
-            </button>
-          </th>
-          <th if={hasRowAction} scope="col">{actionTitle}</th>
-        </tr>
-      </thead>
-      <tbody onClick={onBodyClick}>
-        <tr
-          each={rows}
-          as="row"
-          key={row.id}
-          data-vmz-row={row.id}
-          data-selected={row.selectedAttr}
-        >
-          <td class="vmz-ui-datatable__check">
-            <input
-              type="checkbox"
-              class="vmz-ui-datatable__box"
-              data-vmz-select={row.id}
-              aria-label={row.selectLabel}
-              checked={row.selected}
-            />
-          </td>
-          <td each={row.cells} as="cell">{cell}</td>
-          <td if={hasRowAction}>
-            <button
-              type="button"
-              class="vmz-ui-datatable__row-action"
-              data-vmz-row-action={row.id}
-              disabled={rowActionDisabled}
-            >
-              {actionLabel}
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+      class="vmz-ui-datatable-wrap"
+      data-vmz-ui="data-table"
+      data-sort-key={sortKey}
+      data-sort-dir={sortDir}
+      data-selected-count={selectedCount}
+    >
+      <table class="vmz-ui-datatable">
+        <thead onClick={onHeadClick}>
+          <tr>
+            <th scope="col" class="vmz-ui-datatable__check">
+              <input
+                type="checkbox"
+                class="vmz-ui-datatable__box"
+                data-vmz-select-all="true"
+                aria-label={selectAllLabel}
+                checked={allSelected}
+              />
+            </th>
+            <th each={columns} as="col" key={col.id} scope="col" data-vmz-col={col.id}>
+              <button type="button" class="vmz-ui-datatable__sort" data-vmz-sort={col.id}>
+                {col.title}
+              </button>
+            </th>
+            <th if={hasRowAction} scope="col">{actionTitle}</th>
+          </tr>
+        </thead>
+        <tbody onClick={onBodyClick}>
+          <tr
+            each={rows}
+            as="row"
+            key={row.id}
+            data-vmz-row={row.id}
+            data-selected={row.selectedAttr}
+          >
+            <td class="vmz-ui-datatable__check">
+              <input
+                type="checkbox"
+                class="vmz-ui-datatable__box"
+                data-vmz-select={row.id}
+                aria-label={row.selectLabel}
+                checked={row.selected}
+              />
+            </td>
+            <td each={row.cells} as="cell">{cell}</td>
+            <td if={hasRowAction}>
+              <button
+                type="button"
+                class="vmz-ui-datatable__row-action"
+                data-vmz-row-action={row.id}
+                disabled={rowActionDisabled}
+              >
+                {actionLabel}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 </template>
 
 <style>
-.vmz-ui-datatable-wrap {
-  max-height: 16rem;
-  overflow: auto;
-  border: 1px solid var(--vmz-line-default);
-  border-radius: 2px;
-  background: var(--vmz-surface-paper);
-  color: var(--vmz-text-ink);
-}
+  .vmz-ui-datatable-wrap {
+    max-height: 16rem;
+    overflow: auto;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
+  }
 
-.vmz-ui-datatable {
-  width: 100%;
-  border-collapse: collapse;
-  font: inherit;
-}
+  .vmz-ui-datatable {
+    width: 100%;
+    border-collapse: collapse;
+    font: inherit;
+  }
 
-.vmz-ui-datatable th,
-.vmz-ui-datatable td {
-  padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
-  text-align: left;
-  border-bottom: 1px solid var(--vmz-line-default);
-  vertical-align: middle;
-}
+  .vmz-ui-datatable th,
+  .vmz-ui-datatable td {
+    padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+    text-align: left;
+    border-bottom: 1px solid var(--vmz-line-default);
+    vertical-align: middle;
+  }
 
-.vmz-ui-datatable thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  font-weight: 700;
-  color: var(--vmz-action-primary-active);
-  background: var(--vmz-surface-mist);
-  box-shadow: 0 1px 0 var(--vmz-line-default);
-}
+  .vmz-ui-datatable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    font-weight: 700;
+    color: var(--vmz-action-primary-active);
+    background: var(--vmz-surface-mist);
+    box-shadow: 0 1px 0 var(--vmz-line-default);
+  }
 
-.vmz-ui-datatable__check {
-  width: 2.25rem;
-}
+  .vmz-ui-datatable__check {
+    width: 2.25rem;
+  }
 
-.vmz-ui-datatable__box {
-  width: 1rem;
-  height: 1rem;
-  accent-color: var(--vmz-action-primary-background);
-  outline: none;
-}
+  .vmz-ui-datatable__box {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--vmz-action-primary-background);
+    outline: none;
+  }
 
-.vmz-ui-datatable__box:focus-visible {
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-}
+  .vmz-ui-datatable__box:focus-visible {
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+  }
 
-.vmz-ui-datatable tr[data-selected='true'] {
-  background: color-mix(in srgb, var(--vmz-action-primary-background) 12%, transparent);
-}
+  .vmz-ui-datatable tr[data-selected='true'] {
+    background: color-mix(in srgb, var(--vmz-action-primary-background) 12%, transparent);
+  }
 
-.vmz-ui-datatable__sort {
-  font: inherit;
-  font-weight: 700;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  outline: none;
-}
+  .vmz-ui-datatable__sort {
+    font: inherit;
+    font-weight: 700;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    outline: none;
+  }
 
-.vmz-ui-datatable__sort:focus-visible {
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-}
+  .vmz-ui-datatable__sort:focus-visible {
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+  }
 
-.vmz-ui-datatable__row-action {
-  font: inherit;
-  font-weight: 600;
-  padding: 0.3rem 0.55rem;
-  border: 1px solid var(--vmz-action-primary-background);
-  border-radius: 2px;
-  background: transparent;
-  color: var(--vmz-action-primary-active);
-  cursor: pointer;
-  outline: none;
-}
+  .vmz-ui-datatable__row-action {
+    font: inherit;
+    font-weight: 600;
+    padding: 0.3rem 0.55rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: transparent;
+    color: var(--vmz-action-primary-active);
+    cursor: pointer;
+    outline: none;
+  }
 
-.vmz-ui-datatable__row-action:focus-visible {
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-}
+  .vmz-ui-datatable__row-action:focus-visible {
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+  }
 
-.vmz-ui-datatable__row-action:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
+  .vmz-ui-datatable__row-action:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
 </style>
 
 <script client>
 /**
- * VMZ UI — DataTable (ordinary Console table).
- * Parent owns rows + selection + sort. Sticky header.
- * Large-grid features live outside this package.
- */
+* VMZ UI — DataTable (ordinary Console table).
+* Parent owns rows + selection + sort. Sticky header.
+* Large-grid features live outside this package.
+*/
 export default class DataTable {
-  /** @type {{ id: string, title: string }[]} */
-  public columns: { id: string; title: string }[] = [];
-  /**
-   * @type {{
-   *   id: string,
-   *   cells: string[],
-   *   selected: boolean,
-   *   selectedAttr: string,
-   *   selectLabel: string
-   * }[]}
-   */
-  public rows: {
-    id: string;
-    cells: string[];
-    selected: boolean;
-    selectedAttr: string;
-    selectLabel: string;
-  }[] = [];
-  public hasRowAction: boolean = false;
-  public rowActionDisabled: boolean = false;
-  public actionTitle: string = 'Action';
-  public actionLabel: string = 'Open';
-  public sortKey: string = '';
-  public sortDir: string = 'asc';
-  public selectedCount: string = '0';
-  public allSelected: boolean = false;
-  public selectAllLabel: string = 'Select all rows';
-  public onRowAction: ((rowId: string) => void) | null = null;
-  public onSort: ((columnId: string) => void) | null = null;
-  public onToggleRow: ((rowId: string) => void) | null = null;
-  public onToggleAll: (() => void) | null = null;
-
-  onBodyClick(ev) {
-    const t = ev && ev.target;
-    if (!t || typeof t.closest !== 'function') return;
-    const select = t.closest('[data-vmz-select]');
-    if (select) {
-      const id = select.getAttribute('data-vmz-select');
-      if (id && typeof this.onToggleRow === 'function') this.onToggleRow(id);
-      return;
-    }
-    const action = t.closest('[data-vmz-row-action]');
-    if (!action || action.disabled) return;
-    const id = action.getAttribute('data-vmz-row-action');
-    if (id && typeof this.onRowAction === 'function') this.onRowAction(id);
-  }
-
-  onHeadClick(ev) {
-    const t = ev && ev.target;
-    if (!t || typeof t.closest !== 'function') return;
-    if (t.closest('[data-vmz-select-all]')) {
-      if (typeof this.onToggleAll === 'function') this.onToggleAll();
-      return;
-    }
-    const sort = t.closest('[data-vmz-sort]');
-    if (!sort) return;
-    const id = sort.getAttribute('data-vmz-sort');
-    if (id && typeof this.onSort === 'function') this.onSort(id);
-  }
+	/** @type {{ id: string, title: string }[]} */
+	public columns: {
+		id: string;
+		title: string;
+	}[] = [];
+	/**
+	* @type {{
+	*   id: string,
+	*   cells: string[],
+	*   selected: boolean,
+	*   selectedAttr: string,
+	*   selectLabel: string
+	* }[]}
+	*/
+	public rows: {
+		id: string;
+		cells: string[];
+		selected: boolean;
+		selectedAttr: string;
+		selectLabel: string;
+	}[] = [];
+	public hasRowAction: boolean = false;
+	public rowActionDisabled: boolean = false;
+	public actionTitle: string = "Action";
+	public actionLabel: string = "Open";
+	public sortKey: string = "";
+	public sortDir: string = "asc";
+	public selectedCount: string = "0";
+	public allSelected: boolean = false;
+	public selectAllLabel: string = "Select all rows";
+	public onRowAction: ((rowId: string) => void) | null = null;
+	public onSort: ((columnId: string) => void) | null = null;
+	public onToggleRow: ((rowId: string) => void) | null = null;
+	public onToggleAll: (() => void) | null = null;
+	onBodyClick(ev) {
+		const t = ev && ev.target;
+		if (!t || typeof t.closest !== "function") return;
+		const select = t.closest("[data-vmz-select]");
+		if (select) {
+			const id = select.getAttribute("data-vmz-select");
+			if (id && typeof this.onToggleRow === "function") this.onToggleRow(id);
+			return;
+		}
+		const action = t.closest("[data-vmz-row-action]");
+		if (!action || action.disabled) return;
+		const id = action.getAttribute("data-vmz-row-action");
+		if (id && typeof this.onRowAction === "function") this.onRowAction(id);
+	}
+	onHeadClick(ev) {
+		const t = ev && ev.target;
+		if (!t || typeof t.closest !== "function") return;
+		if (t.closest("[data-vmz-select-all]")) {
+			if (typeof this.onToggleAll === "function") this.onToggleAll();
+			return;
+		}
+		const sort = t.closest("[data-vmz-sort]");
+		if (!sort) return;
+		const id = sort.getAttribute("data-vmz-sort");
+		if (id && typeof this.onSort === "function") this.onSort(id);
+	}
 }
 </script>

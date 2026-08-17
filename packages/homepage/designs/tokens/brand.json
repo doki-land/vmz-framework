@@ -1,47 +1,49 @@
 {
     "brand": {
-        "primary": "#176BFF",
-        "energy": "#FFB000"
+        "primary": "#1677FF",
+        "energy": "#FAAD14"
     },
     "scale": {
-        "50": "#EDF5FF",
-        "100": "#D8E9FF",
-        "200": "#B5D4FF",
-        "300": "#82B5FF",
-        "400": "#4A91FF",
-        "500": "#176BFF",
-        "600": "#0D57DB",
-        "700": "#1047AD",
-        "800": "#123C87",
-        "900": "#102F63",
-        "950": "#091C3E"
+        "50": "#E6F4FF",
+        "100": "#BAE0FF",
+        "200": "#91CAFF",
+        "300": "#69B1FF",
+        "400": "#4096FF",
+        "500": "#1677FF",
+        "600": "#0958D9",
+        "700": "#003EB3",
+        "800": "#002C8C",
+        "900": "#001D66",
+        "950": "#000D33"
     },
     "surface": {
         "paper": "#FFFFFF",
-        "mist": "#F4F6F8",
-        "ink": "#121416",
-        "graphite": "#292D31"
+        "mist": "#F5F5F5",
+        "page": "#F5F5F5",
+        "ink": "#141414",
+        "graphite": "#434343"
     },
     "text": {
-        "ink": "#121416",
-        "steel": "#66707A",
+        "ink": "#141414",
+        "steel": "#8C8C8C",
         "on-brand": "#FFFFFF",
-        "on-ink": "#F4F6F8"
+        "on-ink": "#FAFAFA"
     },
     "line": {
-        "default": "#D9DEE3",
-        "strong": "#292D31"
+        "default": "#D9D9D9",
+        "subtle": "#F0F0F0",
+        "strong": "#424242"
     },
     "status": {
-        "success": "#00A86B",
-        "warning": "#D97706",
-        "error": "#E5484D",
-        "analysis": "#8B5CF6",
-        "runtime": "#00A6C8"
+        "success": "#52C41A",
+        "warning": "#FAAD14",
+        "error": "#FF4D4F",
+        "analysis": "#722ED1",
+        "runtime": "#13C2C2"
     },
     "font": {
-        "sans": "\"IBM Plex Sans\", \"Segoe UI\", sans-serif",
-        "mono": "\"IBM Plex Mono\", ui-monospace, monospace",
-        "display": "\"Space Grotesk\", \"IBM Plex Sans\", sans-serif"
+        "sans": "\"IBM Plex Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+        "mono": "\"IBM Plex Mono\", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+        "display": "\"IBM Plex Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
     }
 }

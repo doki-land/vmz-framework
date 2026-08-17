@@ -1,0 +1,20 @@
+<template>
+  <div class="vmz-ui-collapse" data-vmz-ui="collapse">
+    <details each={items} as="item" key={item.id}>
+      <summary>{item.title}</summary>
+      <div class="vmz-ui-collapse__body">{item.body}</div>
+    </details>
+  </div>
+</template>
+<style>
+.vmz-ui-collapse{border:1px solid var(--vmz-line-default);border-radius:var(--vmz-radius-lg,8px);background:var(--vmz-surface-paper);overflow:hidden}
+.vmz-ui-collapse details+details{border-top:1px solid var(--vmz-line-default)}
+.vmz-ui-collapse summary{padding:.85rem 1rem;font-weight:600;cursor:pointer;background:var(--vmz-surface-paper)}
+.vmz-ui-collapse summary:hover{background:var(--vmz-surface-mist)}
+.vmz-ui-collapse__body{padding:0 1rem 1rem;color:var(--vmz-text-steel);line-height:1.6}
+</style>
+<script client>
+export default class Collapse {
+  public items: Array<{ id: string; title: string; body: string }> = [];
+}
+</script>

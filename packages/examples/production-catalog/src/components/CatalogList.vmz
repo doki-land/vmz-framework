@@ -1,45 +1,53 @@
 <template>
   <section>
-    <ul>
-      <li each={items} as="item" key={item.id}>
-        <ProductRow title={item.title} />
-      </li>
-    </ul>
-    <p if={selected}>selected: {selected}</p>
-    <p else>none selected</p>
-    <p>async: {asyncLabel}</p>
-    <button type="button" @click={selectFirst}>select</button>
-    <button type="button" @click={clear}>clear</button>
-  </section>
+      <ul>
+        <li each={items} as="item" key={item.id}>
+          <ProductRow title={item.title} />
+        </li>
+      </ul>
+      <p if={selected}>selected: {selected}</p>
+      <p else>none selected</p>
+      <p>async: {asyncLabel}</p>
+      <button type="button" @click={selectFirst}>select</button>
+      <button type="button" @click={clear}>clear</button>
+    </section>
 </template>
 
 <script client>
-type Item = { id: string; title: string };
-
+type Item = {
+	id: string;
+	title: string;
+};
 export default class CatalogList {
-  items: Item[] = [
-    { id: 'a', title: 'Alpha' },
-    { id: 'b', title: 'Beta' },
-    { id: 'c', title: 'Gamma' },
-  ];
-  selected: string | null = null;
-  asyncLabel: string = 'idle';
-
-  selectFirst() {
-    this.selected = this.items[0]?.title ?? null;
-  }
-
-  clear() {
-    this.selected = null;
-  }
-
-  // AsyncTask: destroy / newer generation must not apply stale writes.
-  async softLoad() {
-    this.asyncLabel = 'loading';
-    await new Promise((r) => setTimeout(r, 40));
-    if (this.__vmzDestroyed) return;
-    this.asyncLabel = 'done';
-    this.selected = this.items[0]?.title ?? null;
-  }
+	items: Item[] = [
+		{
+			id: "a",
+			title: "Alpha"
+		},
+		{
+			id: "b",
+			title: "Beta"
+		},
+		{
+			id: "c",
+			title: "Gamma"
+		}
+	];
+	selected: string | null = null;
+	asyncLabel: string = "idle";
+	selectFirst() {
+		this.selected = this.items[0]?.title ?? null;
+	}
+	clear() {
+		this.selected = null;
+	}
+	// AsyncTask: destroy / newer generation must not apply stale writes.
+	async softLoad() {
+		this.asyncLabel = "loading";
+		await new Promise((r) => setTimeout(r, 40));
+		if (this.__vmzDestroyed) return;
+		this.asyncLabel = "done";
+		this.selected = this.items[0]?.title ?? null;
+	}
 }
 </script>

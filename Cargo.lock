@@ -1707,6 +1707,7 @@ dependencies = [
  "schemars",
  "serde",
  "vmz-compiler",
+ "walkdir",
 ]
 
 [[package]]
@@ -1751,6 +1752,7 @@ dependencies = [
  "napi-derive",
  "serde_json",
  "vmz-compiler",
+ "vmz-formatter",
  "vmz-generator",
  "vmz-inspector",
  "vmz-plugin-sasso",
@@ -1799,6 +1801,7 @@ dependencies = [
  "serde_json",
  "vmz-compiler",
  "vmz-debugger",
+ "vmz-formatter",
  "vmz-inspector",
  "vmz-plugin-sasso",
  "vmz-plugin-tailwind",

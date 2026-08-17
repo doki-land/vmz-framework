@@ -197,7 +197,9 @@ fn list_style_files(dir: &Path) -> Vec<PathBuf> {
         if !p.is_file() {
             continue;
         }
-        if let Some("scss" | "css" | "sass") = p.extension().and_then(|e| e.to_str()) { out.push(p) }
+        if let Some("scss" | "css" | "sass") = p.extension().and_then(|e| e.to_str()) {
+            out.push(p)
+        }
     }
     out
 }

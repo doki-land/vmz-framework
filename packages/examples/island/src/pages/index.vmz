@@ -1,20 +1,20 @@
 <template>
   <article>
-    <header>
-      <h1>{title}</h1>
-      <p>Static shell - islands opt in with client:* directives.</p>
-    </header>
+      <header>
+        <h1>{title}</h1>
+        <p>Static shell - islands opt in with client:* directives.</p>
+      </header>
 
-    <!-- components/LikeButton.vmz - ResumeEntry idle -->
-    <LikeButton client:idle label="Like" />
+      <!-- components/LikeButton.vmz - ResumeEntry idle -->
+      <LikeButton client:idle label="Like" />
 
-    <!-- components/EventButton.vmz - EventEntry: resume only on click -->
-    <EventButton client:event label="Go" />
-  </article>
+      <!-- components/EventButton.vmz - EventEntry: resume only on click -->
+      <EventButton client:event label="Go" />
+    </article>
 </template>
 
 <script client>
 export default class IndexPage {
-  public title: string = 'Island demo';
+	public title: string = "Island demo";
 }
 </script>

@@ -1,17 +1,16 @@
 <template>
   <div class="shop-layout">
-    <p>layout-shop</p>
-    <p>layout-ticks:{ticks}</p>
-    <slot />
-  </div>
+      <p>layout-shop</p>
+      <p>layout-ticks:{ticks}</p>
+      <slot />
+    </div>
 </template>
 
 <script client>
 export default class ShopLayout {
-  public ticks: number = 0;
-
-  bump() {
-    this.ticks = (this.ticks || 0) + 1;
-  }
+	public ticks: number = 0;
+	bump() {
+		this.ticks = (this.ticks || 0) + 1;
+	}
 }
 </script>

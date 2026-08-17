@@ -1,0 +1,8 @@
+<template><span class="vmz-ui-tag" data-vmz-ui="tag" data-status={status||undefined}><slot /></span></template>
+<style>
+.vmz-ui-tag{display:inline-flex;align-items:center;min-height:1.5rem;padding:0 .45rem;border:1px solid var(--vmz-line-default);border-radius:var(--vmz-radius-sm,2px);background:var(--vmz-surface-mist);color:var(--vmz-text-steel);font-size:.75rem;line-height:1}
+.vmz-ui-tag[data-status='success']{color:var(--vmz-status-success-foreground);background:color-mix(in srgb,var(--vmz-status-success-accent) 12%,var(--vmz-surface-paper));border-color:color-mix(in srgb,var(--vmz-status-success-accent) 45%,var(--vmz-line-default))}
+.vmz-ui-tag[data-status='warning']{color:var(--vmz-status-warning-foreground);background:color-mix(in srgb,var(--vmz-status-warning-accent) 12%,var(--vmz-surface-paper));border-color:color-mix(in srgb,var(--vmz-status-warning-accent) 45%,var(--vmz-line-default))}
+.vmz-ui-tag[data-status='error']{color:var(--vmz-status-danger-foreground);background:color-mix(in srgb,var(--vmz-status-danger-accent) 12%,var(--vmz-surface-paper));border-color:color-mix(in srgb,var(--vmz-status-danger-accent) 45%,var(--vmz-line-default))}
+</style>
+<script client>export default class Tag { public status: string = ''; }</script>

@@ -41,3 +41,11 @@ pnpm verify -- official-dogfood
 Still open relative to Browser Production Profile v1: `browser-production` aggregate core gaps,
 `@vmz/ui-data-grid` deep capabilities, Upload cross-page session / multi-file parallel chunks,
 `@vmz/test` Browser Host U0–U1, sibling `vmz-panel` product app.
+
+## Commercial default surface
+
+Default web surface targets modern commercial console density: flat 32px-class controls,
+quiet borders, restrained radii, layered page/paper surfaces without Bootstrap-era inset
+fields, accent bars, or card lift. Applications replace every semantic value through `/designs`.
+Additional general-purpose components include layout primitives, typography, segmented controls,
+tags, avatars, dropdowns, collapse panels and progress indicators.

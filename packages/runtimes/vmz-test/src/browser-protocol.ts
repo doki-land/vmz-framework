@@ -106,12 +106,13 @@ export function resolveLocatorInPage(locator: BrowserLocator, opts: BrowserActio
     const nameOf = (el: Element) => {
         const labelled = el.getAttribute('aria-label');
         if (labelled) return normalize(labelled);
+        const id = el.id;
+        if (id) {
+            const lab = root.querySelector(`label[for="${CSS.escape(id)}"]`);
+            if (lab) return normalize(lab.textContent || '');
+        }
         if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-            const id = el.id;
-            if (id) {
-                const lab = root.querySelector(`label[for="${CSS.escape(id)}"]`);
-                if (lab) return normalize(lab.textContent || '');
-            }
+            // already covered by id+for above; keep text fallback below
         }
         return normalize((el as HTMLElement).innerText || el.textContent || '');
     };

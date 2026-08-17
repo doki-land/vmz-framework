@@ -15,12 +15,12 @@ use serde::Serialize;
 use serde_json::{Value, json};
 use walkdir::WalkDir;
 
+use vmz_generator::MiniTemplateProfile;
 use vmz_protocol::{
-    CheckReportStatus, DIAG_ARTIFACT_INVALID, MiniProgramArtifact, MINI_PROGRAM_ARTIFACT_SCHEMA,
+    CheckReportStatus, DIAG_ARTIFACT_INVALID, MINI_PROGRAM_ARTIFACT_SCHEMA, MiniProgramArtifact,
     Severity, TargetDiagnostic, VmzModuleKind,
 };
 use vmz_types::{ProgramModule, ViewStatus, ViewView};
-use vmz_generator::MiniTemplateProfile;
 
 /// Report schema for MP1 static-slice lowering.
 pub const MINI_STATIC_SLICE_REPORT_SCHEMA: &str = "vmz.target.mini_static_slice.v0";

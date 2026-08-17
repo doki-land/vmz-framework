@@ -1,13 +1,12 @@
 <template>
   <button type="button" onClick={() => (liked = !liked)}>
-    {label}: {liked ? '♥' : '♡'}
-  </button>
+      {label}: {liked ? '♥' : '♡'}
+    </button>
 </template>
 
 <script client>
 export default class LikeButton {
-  public label: string = 'Like';
-
-  liked = false;
+	public label: string = "Like";
+	liked = false;
 }
 </script>

@@ -1,50 +1,48 @@
 <template>
   <div data-testid="counter-root">
-    <label>
-      Note
-      <input
-        type="text"
-        data-testid="counter-note"
-        value={note}
-        onInput={(e) => (note = e.target.value)}
-      />
-    </label>
-    <button
-      type="button"
-      aria-label="Increment counter"
-      data-testid="counter-inc"
-      onClick={() => count++}
-    >
-      count: {count}
-    </button>
-    <label>
-      Plan
-      <select
-        data-testid="counter-plan"
-        value={plan}
-        onChange={(e) => (plan = e.target.value)}
+      <label>
+        Note
+        <input
+          type="text"
+          data-testid="counter-note"
+          value={note}
+          onInput={(e) => (note = e.target.value)}
+        />
+      </label>
+      <button
+        type="button"
+        aria-label="Increment counter"
+        data-testid="counter-inc"
+        onClick={() => count++}
       >
-        <option value="">—</option>
-        <option value="ops">Ops</option>
-        <option value="dev">Dev</option>
-      </select>
-    </label>
-  </div>
+        count: {count}
+      </button>
+      <label>
+        Plan
+        <select
+          data-testid="counter-plan"
+          value={plan}
+          onChange={(e) => (plan = e.target.value)}
+        >
+          <option value="">—</option>
+          <option value="ops">Ops</option>
+          <option value="dev">Dev</option>
+        </select>
+      </label>
+    </div>
 </template>
 
 <script client>
 export default class CounterButton {
-  public initial: number = 0;
-
-  count = this.initial;
-  note = '';
-  plan = '';
-
-  // AsyncTask fixture for gate:l4-async-graph (compiler lifts to RunTask).
-  async softLoad() {
-    await new Promise((r) => setTimeout(r, 40));
-    if (this.__vmzDestroyed) return;
-    this.count = 7;
-  }
+	public initial: number = 0;
+	count = this.initial;
+	note = "";
+	plan = "";
+	// AsyncTask fixture for gate:l4-async-graph (compiler lifts to RunTask).
+	async softLoad() {
+		await new Promise((r) => setTimeout(r, 40));
+		if (this.__vmzDestroyed) return;
+		this.count = 7;
+	}
 }
 </script>
