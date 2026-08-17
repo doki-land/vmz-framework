@@ -27,7 +27,9 @@ fn scaffolds_minimal_app() {
     assert!(root.join("src/Application.vmz").exists());
     assert!(root.join("src/pages/index.vmz").exists());
     let pkg = fs::read_to_string(root.join("package.json")).unwrap();
-    assert!(pkg.contains("\"vmz\":"));
+    // Runtime heart (`@vmz/core`) ≠ CLI (`@vmz/vmz`).
+    assert!(pkg.contains("\"@vmz/core\":"), "runtime dependency missing:\n{pkg}");
+    assert!(pkg.contains("\"@vmz/vmz\":"), "CLI devDependency missing:\n{pkg}");
     assert!(pkg.contains("\"name\": \"demo-app\""));
     let _ = fs::remove_dir_all(parent);
 }

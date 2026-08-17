@@ -1,12 +1,12 @@
 //! Moved from `src/lib.rs` (cargo-cry: tests next to Cargo.toml).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use std::fs;
 use vmz_compiler::Severity;
 use vmz_inspector::*;
 
-fn tmp_project(name: &str) -> std::path::PathBuf {
+fn tmp_project(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "vmz-inspector-{name}-{}-{}",
         std::process::id(),

@@ -8,4 +8,6 @@
 
 mod production;
 
-pub use production::{ProductionScssCompiler, default_scss_compiler};
+pub use production::{
+    ProductionScssCompiler, compile_source, default_scss_compiler, strip_at_tailwind,
+};

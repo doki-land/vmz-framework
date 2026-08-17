@@ -298,10 +298,7 @@ pub fn dispatch(session: &McpSession, request: &Value) -> Option<Value> {
     let method = request.get("method").and_then(|m| m.as_str()).unwrap_or("");
     let params = request.get("params").cloned().unwrap_or(Value::Null);
 
-    if id.is_none() {
-        return None;
-    }
-    let id = id.unwrap();
+    let id = id?;
 
     let result = match method {
         "initialize" => initialize_result(),

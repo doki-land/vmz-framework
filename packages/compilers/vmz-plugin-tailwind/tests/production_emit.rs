@@ -1,6 +1,6 @@
-//! Production TwCompiler: Style Theme projection → CSS.
+//! Production TwCompiler: Style Theme projection -> CSS.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use vmz_compiler::{
@@ -13,7 +13,7 @@ fn fixture_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
 }
 
-fn theme_from_fixture(root: &PathBuf) -> StyleTheme {
+fn theme_from_fixture(root: &Path) -> StyleTheme {
     // Prefer compiler-loaded theme; for unit tests build a minimal Style Theme
     // that mirrors designs/tokens colors.action.
     let designs = vmz_compiler::load_designs(root);
