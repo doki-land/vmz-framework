@@ -13,13 +13,13 @@ use serde_json::{Value, json};
 use walkdir::WalkDir;
 
 use vmz_protocol::{
-    CheckReportStatus, DIAG_ARTIFACT_INVALID, MINI_PROGRAM_ARTIFACT_SCHEMA, MiniProgramArtifact,
+    CheckReportStatus, DIAG_ARTIFACT_INVALID, MiniProgramArtifact, MINI_PROGRAM_ARTIFACT_SCHEMA,
     PLAN_SCHEMA, Severity, TargetDiagnostic, VmzModuleKind,
 };
 use vmz_types::{
-    BindingKind, IrDepPath, PlanNode, ProgramModule, ProgramUnit, ReactiveComponent, ViewAttrValue,
-    ViewNode, ViewStatus,
+    BindingKind, IrDepPath, PlanNode, ProgramModule, ProgramUnit, ReactiveComponent, ViewStatus,
 };
+use vmz_generator::MiniTemplateProfile;
 
 use super::binding_event::{MINI_DATA_PATCH_TABLE_SCHEMA, MINI_EVENT_TABLE_SCHEMA};
 use super::static_slice::{MINI_LOGIC_SCHEMA, MINI_TEMPLATE_DIALECT};
@@ -76,28 +76,6 @@ fn diag(
     TargetDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct EventHandlerRow {
-    handler_id: String,
-    event_kind: String,
-    method: String,
-    effect_id: u32,
-    written_fields: Vec<u32>,
-    affected_bindings: Vec<u32>,
-    patch_paths: Vec<String>,
-}
-
-#[derive(Debug)]
-struct EmitCtx<'a> {
-    reactive: &'a ReactiveComponent,
-    next_handler: u32,
-    handlers: Vec<EventHandlerRow>,
-    path: &'a str,
-    diags: Vec<TargetDiagnostic>,
-    failed: bool,
-}
-
 /// Lower one ProgramUnit (page or app) with structure + lifecycle.
 pub fn lower_unit_structure(
     platform_id: &str,
@@ -124,39 +102,17 @@ pub fn lower_unit_structure(
         return Err(diagnostics);
     }
 
-    let mut patch_bindings: BTreeMap<u32, ()> = BTreeMap::new();
-    let mut ev = EmitCtx {
-        reactive: &unit.reactive,
-        next_handler: 0,
-        handlers: Vec::new(),
-        path: path_for_diag,
-        diags: Vec::new(),
-        failed: false,
-    };
-
-    let mut body = String::new();
-    for root in &unit.view.roots {
-        match emit_node(root, &mut patch_bindings, &mut ev) {
-            Ok(chunk) => body.push_str(&chunk),
-            Err(()) => {
-                diagnostics.append(&mut ev.diags);
-                return Err(diagnostics);
-            }
-        }
-    }
-    diagnostics.append(&mut ev.diags);
-    if ev.failed || diagnostics.iter().any(|d| d.is_error()) {
-        return Err(diagnostics);
-    }
-
-    let template = if unit.view.roots.len() == 1 {
-        format!("<!-- {MINI_TEMPLATE_DIALECT} -->\n{body}")
-    } else {
-        format!("<!-- {MINI_TEMPLATE_DIALECT} -->\n<view class=\"vmz-root\">\n{body}</view>\n")
+    let emit = match vmz_generator::emit_mini_template_profile(
+        &unit.view.roots,
+        MiniTemplateProfile::Structure,
+        Some(&unit.reactive),
+    ) {
+        Ok(e) => e,
+        Err(errs) => return Err(crate::miniprogram::map_mini_emit_errors(path_for_diag, errs)),
     };
 
     let mut b_obj = serde_json::Map::new();
-    for id in patch_bindings.keys() {
+    for id in emit.patch_bindings.keys() {
         b_obj.insert(format!("B_{id}"), Value::String(String::new()));
     }
     let logic = json!({
@@ -164,13 +120,13 @@ pub fn lower_unit_structure(
         "initialData": { "b": b_obj },
     });
 
-    let data_patch = build_data_patch_table(&unit.reactive, &patch_bindings);
-    let event_table = if ev.handlers.is_empty() {
+    let data_patch = build_data_patch_table(&unit.reactive, &emit.patch_bindings);
+    let event_table = if emit.handlers.is_empty() {
         None
     } else {
         Some(crate::miniprogram::compact_json(&json!({
             "schema": MINI_EVENT_TABLE_SCHEMA,
-            "handlers": ev.handlers,
+            "handlers": emit.handlers,
         })))
     };
 
@@ -179,7 +135,7 @@ pub fn lower_unit_structure(
     let artifact = MiniProgramArtifact {
         schema: MINI_PROGRAM_ARTIFACT_SCHEMA.into(),
         platform_id: platform_id.into(),
-        template: Some(template),
+        template: Some(emit.template),
         style: None,
         logic: Some(crate::miniprogram::compact_json(&logic)),
         event_table,
@@ -298,277 +254,6 @@ fn field_root_id(path: &IrDepPath) -> Option<u32> {
         IrDepPath::StaticPath { root, .. } | IrDepPath::DynamicPath { root, .. } => Some(root.0),
         IrDepPath::ListItem { list, .. } => Some(list.0),
     }
-}
-
-fn written_field_ids(reactive: &ReactiveComponent, method: &str) -> Option<(u32, Vec<u32>)> {
-    let effect = reactive.effects.iter().find(|e| e.name == method)?;
-    let fields: Vec<u32> = effect.writes.iter().filter_map(|w| field_root_id(&w.path)).collect();
-    Some((effect.id.0, fields))
-}
-
-fn affected_binding_ids(reactive: &ReactiveComponent, written: &[u32]) -> Vec<u32> {
-    let written: BTreeSet<u32> = written.iter().copied().collect();
-    let mut out = Vec::new();
-    for b in &reactive.bindings {
-        if b.kind() == BindingKind::Event {
-            continue;
-        }
-        let hits = b.reads().iter().any(|r| field_root_id(r).is_some_and(|f| written.contains(&f)));
-        if hits {
-            out.push(b.id().0);
-        }
-    }
-    out.sort_unstable();
-    out.dedup();
-    out
-}
-
-fn normalize_event_kind(attr: &str) -> String {
-    let n = attr.trim();
-    if let Some(rest) = n.strip_prefix('@') {
-        return rest.to_ascii_lowercase();
-    }
-    if let Some(rest) = n.strip_prefix("on") {
-        if !rest.is_empty() {
-            return rest.to_ascii_lowercase();
-        }
-    }
-    n.to_ascii_lowercase()
-}
-
-fn is_event_attr(name: &str) -> bool {
-    let n = name.trim();
-    n.starts_with('@') || (n.starts_with("on") && n.len() > 2)
-}
-
-fn emit_node(
-    node: &ViewNode,
-    patch_bindings: &mut BTreeMap<u32, ()>,
-    ev: &mut EmitCtx<'_>,
-) -> Result<String, ()> {
-    match node {
-        ViewNode::Text { value } => Ok(escape_xml(value)),
-        ViewNode::Interp { binding, .. } => {
-            let Some(b) = binding else {
-                push_err(ev, "structure: interp without BindingId");
-                return Err(());
-            };
-            patch_bindings.insert(b.0, ());
-            Ok(format!("{{{{b.B_{}}}}}", b.0))
-        }
-        ViewNode::Element { tag, attrs, children, each } => {
-            let mut attr_s = String::new();
-            if let Some(e) = each {
-                if let Some(list_b) = e.list_binding {
-                    patch_bindings.insert(list_b.0, ());
-                    attr_s.push_str(&format!(" data-vmz-each=\"b.B_{}\"", list_b.0));
-                } else {
-                    attr_s
-                        .push_str(&format!(" data-vmz-each=\"{}\"", escape_xml_attr(&e.list_expr)));
-                }
-                attr_s.push_str(&format!(" data-vmz-as=\"{}\"", escape_xml_attr(&e.as_name)));
-                if let Some(key_b) = e.key_binding {
-                    patch_bindings.insert(key_b.0, ());
-                    attr_s.push_str(&format!(" data-vmz-key=\"b.B_{}\"", key_b.0));
-                } else if let Some(key_expr) = &e.key_expr {
-                    attr_s
-                        .push_str(&format!(" data-vmz-key-expr=\"{}\"", escape_xml_attr(key_expr)));
-                }
-                if let Some(r) = e.region {
-                    attr_s.push_str(&format!(" data-vmz-region=\"{}\"", r.0));
-                }
-            }
-            for a in attrs {
-                if is_event_attr(&a.name) {
-                    wire_event(a, &mut attr_s, ev)?;
-                    continue;
-                }
-                emit_plain_attr(a, &mut attr_s, patch_bindings);
-            }
-            let mut inner = String::new();
-            for c in children {
-                inner.push_str(&emit_node(c, patch_bindings, ev)?);
-            }
-            if inner.is_empty() {
-                Ok(format!("<{tag}{attr_s} />"))
-            } else {
-                Ok(format!("<{tag}{attr_s}>{inner}</{tag}>"))
-            }
-        }
-        ViewNode::If { region, binding, branches } => {
-            if let Some(b) = binding {
-                patch_bindings.insert(b.0, ());
-            }
-            let mut out = String::new();
-            for (i, br) in branches.iter().enumerate() {
-                let mut open = String::from("<block");
-                if i == 0 {
-                    if let Some(b) = binding {
-                        open.push_str(&format!(" data-vmz-if=\"b.B_{}\"", b.0));
-                    } else if let Some(cond) = &br.cond {
-                        open.push_str(&format!(" data-vmz-if-expr=\"{}\"", escape_xml_attr(cond)));
-                    }
-                } else if br.cond.is_none() {
-                    open.push_str(" data-vmz-else");
-                } else if let Some(cond) = &br.cond {
-                    open.push_str(&format!(" data-vmz-elif-expr=\"{}\"", escape_xml_attr(cond)));
-                }
-                if let Some(r) = region {
-                    open.push_str(&format!(" data-vmz-region=\"{}\"", r.0));
-                }
-                open.push('>');
-                let body = emit_node(&br.body, patch_bindings, ev)?;
-                out.push_str(&open);
-                out.push_str(&body);
-                out.push_str("</block>");
-            }
-            Ok(out)
-        }
-        ViewNode::Component { tag, attrs, children } => {
-            let mut attr_s = format!(" name=\"{}\"", escape_xml_attr(tag));
-            for a in attrs {
-                if is_event_attr(&a.name) {
-                    wire_event(a, &mut attr_s, ev)?;
-                    continue;
-                }
-                match &a.value {
-                    ViewAttrValue::Static { value } => {
-                        attr_s.push_str(&format!(
-                            " data-vmz-prop-{}=\"{}\"",
-                            sanitize_prop(&a.name),
-                            escape_xml_attr(value)
-                        ));
-                    }
-                    ViewAttrValue::Bare => {
-                        attr_s.push_str(&format!(" data-vmz-prop-{}", sanitize_prop(&a.name)));
-                    }
-                    ViewAttrValue::Interp { .. } => {
-                        if let Some(b) = a.binding {
-                            patch_bindings.insert(b.0, ());
-                            attr_s.push_str(&format!(
-                                " data-vmz-prop-{}=\"{{{{b.B_{}}}}}\"",
-                                sanitize_prop(&a.name),
-                                b.0
-                            ));
-                        }
-                    }
-                }
-            }
-            let mut inner = String::new();
-            for c in children {
-                inner.push_str(&emit_node(c, patch_bindings, ev)?);
-            }
-            if inner.is_empty() {
-                Ok(format!("<vmz-component{attr_s} />"))
-            } else {
-                Ok(format!("<vmz-component{attr_s}>{inner}</vmz-component>"))
-            }
-        }
-        ViewNode::Slot { name, attrs, children } => {
-            let mut attr_s = String::new();
-            if let Some(n) = name {
-                if !n.is_empty() && n != "slot" {
-                    attr_s.push_str(&format!(" name=\"{}\"", escape_xml_attr(n)));
-                }
-            }
-            for a in attrs {
-                if is_event_attr(&a.name) {
-                    continue;
-                }
-                emit_plain_attr(a, &mut attr_s, patch_bindings);
-            }
-            let mut inner = String::new();
-            for c in children {
-                inner.push_str(&emit_node(c, patch_bindings, ev)?);
-            }
-            if inner.is_empty() {
-                Ok(format!("<slot{attr_s} />"))
-            } else {
-                Ok(format!("<slot{attr_s}>{inner}</slot>"))
-            }
-        }
-    }
-}
-
-fn sanitize_prop(name: &str) -> String {
-    name.chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '-' })
-        .collect()
-}
-
-fn emit_plain_attr(
-    a: &vmz_types::ViewAttr,
-    attr_s: &mut String,
-    patch_bindings: &mut BTreeMap<u32, ()>,
-) {
-    match &a.value {
-        ViewAttrValue::Static { value } => {
-            attr_s.push_str(&format!(" {}=\"{}\"", a.name, escape_xml_attr(value)));
-        }
-        ViewAttrValue::Bare => {
-            attr_s.push(' ');
-            attr_s.push_str(&a.name);
-        }
-        ViewAttrValue::Interp { .. } => {
-            if let Some(b) = a.binding {
-                patch_bindings.insert(b.0, ());
-                attr_s.push_str(&format!(" {}=\"{{{{b.B_{}}}}}\"", a.name, b.0));
-            } else {
-                attr_s.push_str(&format!(" {}=\"{{{{b.pending}}}}\"", a.name));
-            }
-        }
-    }
-}
-
-fn wire_event(
-    a: &vmz_types::ViewAttr,
-    attr_s: &mut String,
-    ev: &mut EmitCtx<'_>,
-) -> Result<(), ()> {
-    let method = match &a.value {
-        ViewAttrValue::Interp { expr } => expr.trim(),
-        ViewAttrValue::Static { value } => value.trim(),
-        ViewAttrValue::Bare => {
-            push_err(ev, &format!("structure: bare event attr {}", a.name));
-            return Err(());
-        }
-    };
-    if method.is_empty() {
-        push_err(ev, &format!("structure: empty handler on {}", a.name));
-        return Err(());
-    }
-    let Some((effect_id, written)) = written_field_ids(ev.reactive, method) else {
-        push_err(ev, &format!("structure: no Reactive effect for method `{method}`"));
-        return Err(());
-    };
-    let affected = affected_binding_ids(ev.reactive, &written);
-    let handler_id = format!("h{}", ev.next_handler);
-    ev.next_handler += 1;
-    let patch_paths: Vec<String> = affected.iter().map(|id| format!("b.B_{id}")).collect();
-    attr_s.push_str(&format!(" data-vmz-on=\"{handler_id}\""));
-    ev.handlers.push(EventHandlerRow {
-        handler_id,
-        event_kind: normalize_event_kind(&a.name),
-        method: method.to_string(),
-        effect_id,
-        written_fields: written,
-        affected_bindings: affected,
-        patch_paths,
-    });
-    Ok(())
-}
-
-fn push_err(ev: &mut EmitCtx<'_>, message: &str) {
-    ev.diags.push(diag(ev.path, Severity::Error, message, DIAG_ARTIFACT_INVALID));
-    ev.failed = true;
-}
-
-fn escape_xml(s: &str) -> String {
-    vmz_generator::escape_xml_text(s)
-}
-
-fn escape_xml_attr(s: &str) -> String {
-    vmz_generator::escape_xml_attr(s)
 }
 
 fn collect_program_json(root: &Path) -> Vec<PathBuf> {

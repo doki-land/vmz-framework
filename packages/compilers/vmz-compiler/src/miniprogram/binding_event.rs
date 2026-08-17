@@ -14,14 +14,13 @@ use serde_json::{Value, json};
 use walkdir::WalkDir;
 
 use vmz_protocol::{
-    CheckReportStatus, DIAG_ARTIFACT_INVALID, DIAG_PLATFORM_UNSUPPORTED,
-    MINI_PROGRAM_ARTIFACT_SCHEMA, MiniProgramArtifact, PLAN_SCHEMA, Severity, TargetDiagnostic,
-    VmzModuleKind,
+    CheckReportStatus, DIAG_ARTIFACT_INVALID, MiniProgramArtifact, MINI_PROGRAM_ARTIFACT_SCHEMA,
+    PLAN_SCHEMA, Severity, TargetDiagnostic, VmzModuleKind,
 };
 use vmz_types::{
-    BindingKind, IrDepPath, ProgramModule, ProgramUnit, ReactiveComponent, ViewAttrValue, ViewNode,
-    ViewStatus, ViewView,
+    BindingKind, IrDepPath, ProgramModule, ProgramUnit, ReactiveComponent, ViewStatus, ViewView,
 };
+use vmz_generator::MiniTemplateProfile;
 
 use super::static_slice::{MINI_LOGIC_SCHEMA, MINI_TEMPLATE_DIALECT};
 
@@ -80,28 +79,6 @@ fn diag(
     TargetDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct EventHandlerRow {
-    handler_id: String,
-    event_kind: String,
-    method: String,
-    effect_id: u32,
-    written_fields: Vec<u32>,
-    affected_bindings: Vec<u32>,
-    patch_paths: Vec<String>,
-}
-
-#[derive(Debug)]
-struct EventEmitCtx<'a> {
-    reactive: &'a ReactiveComponent,
-    next_handler: u32,
-    handlers: Vec<EventHandlerRow>,
-    path: &'a str,
-    diags: Vec<TargetDiagnostic>,
-    failed: bool,
-}
-
 /// Lower Native View + Reactive into template/logic/event/data-patch tables.
 pub fn lower_unit_binding_event(
     platform_id: &str,
@@ -138,39 +115,17 @@ pub fn lower_view_binding_event(
         return Err(diagnostics);
     }
 
-    let mut patch_bindings: BTreeMap<u32, ()> = BTreeMap::new();
-    let mut ev = EventEmitCtx {
-        reactive,
-        next_handler: 0,
-        handlers: Vec::new(),
-        path: path_for_diag,
-        diags: Vec::new(),
-        failed: false,
-    };
-
-    let mut body = String::new();
-    for root in &view.roots {
-        match emit_node(root, &mut patch_bindings, &mut ev) {
-            Ok(chunk) => body.push_str(&chunk),
-            Err(()) => {
-                diagnostics.append(&mut ev.diags);
-                return Err(diagnostics);
-            }
-        }
-    }
-    diagnostics.append(&mut ev.diags);
-    if ev.failed || diagnostics.iter().any(|d| d.is_error()) {
-        return Err(diagnostics);
-    }
-
-    let template = if view.roots.len() == 1 {
-        format!("<!-- {MINI_TEMPLATE_DIALECT} -->\n{body}")
-    } else {
-        format!("<!-- {MINI_TEMPLATE_DIALECT} -->\n<view class=\"vmz-root\">\n{body}</view>\n")
+    let emit = match vmz_generator::emit_mini_template_profile(
+        &view.roots,
+        MiniTemplateProfile::BindingEvent,
+        Some(reactive),
+    ) {
+        Ok(e) => e,
+        Err(errs) => return Err(crate::miniprogram::map_mini_emit_errors(path_for_diag, errs)),
     };
 
     let mut b_obj = serde_json::Map::new();
-    for id in patch_bindings.keys() {
+    for id in emit.patch_bindings.keys() {
         b_obj.insert(format!("B_{id}"), Value::String(String::new()));
     }
     let logic = json!({
@@ -178,16 +133,16 @@ pub fn lower_view_binding_event(
         "initialData": { "b": b_obj },
     });
 
-    let data_patch = build_data_patch_table(reactive, &patch_bindings);
+    let data_patch = build_data_patch_table(reactive, &emit.patch_bindings);
     let event_table = json!({
         "schema": MINI_EVENT_TABLE_SCHEMA,
-        "handlers": ev.handlers,
+        "handlers": emit.handlers,
     });
 
     let artifact = MiniProgramArtifact {
         schema: MINI_PROGRAM_ARTIFACT_SCHEMA.into(),
         platform_id: platform_id.into(),
-        template: Some(template),
+        template: Some(emit.template),
         style: None,
         logic: Some(crate::miniprogram::compact_json(&logic)),
         event_table: Some(crate::miniprogram::compact_json(&event_table)),
@@ -254,202 +209,6 @@ fn field_root_id(path: &IrDepPath) -> Option<u32> {
         IrDepPath::StaticPath { root, .. } | IrDepPath::DynamicPath { root, .. } => Some(root.0),
         IrDepPath::ListItem { list, .. } => Some(list.0),
     }
-}
-
-fn written_field_ids(reactive: &ReactiveComponent, method: &str) -> Option<(u32, Vec<u32>)> {
-    let effect = reactive.effects.iter().find(|e| e.name == method)?;
-    let fields: Vec<u32> = effect.writes.iter().filter_map(|w| field_root_id(&w.path)).collect();
-    Some((effect.id.0, fields))
-}
-
-fn affected_binding_ids(reactive: &ReactiveComponent, written: &[u32]) -> Vec<u32> {
-    let written: BTreeSet<u32> = written.iter().copied().collect();
-    let mut out = Vec::new();
-    for b in &reactive.bindings {
-        if b.kind() == BindingKind::Event {
-            continue;
-        }
-        let hits = b.reads().iter().any(|r| field_root_id(r).is_some_and(|f| written.contains(&f)));
-        if hits {
-            out.push(b.id().0);
-        }
-    }
-    out.sort_unstable();
-    out.dedup();
-    out
-}
-
-fn normalize_event_kind(attr: &str) -> String {
-    let n = attr.trim();
-    if let Some(rest) = n.strip_prefix('@') {
-        return rest.to_ascii_lowercase();
-    }
-    if let Some(rest) = n.strip_prefix("on") {
-        if !rest.is_empty() {
-            return rest.to_ascii_lowercase();
-        }
-    }
-    n.to_ascii_lowercase()
-}
-
-fn is_event_attr(name: &str) -> bool {
-    let n = name.trim();
-    n.starts_with('@') || (n.starts_with("on") && n.len() > 2)
-}
-
-fn emit_node(
-    node: &ViewNode,
-    patch_bindings: &mut BTreeMap<u32, ()>,
-    ev: &mut EventEmitCtx<'_>,
-) -> Result<String, ()> {
-    match node {
-        ViewNode::Text { value } => Ok(escape_xml(value)),
-        ViewNode::Interp { binding, .. } => {
-            let Some(b) = binding else {
-                ev.diags.push(diag(
-                    ev.path,
-                    Severity::Error,
-                    "binding/event: interp without BindingId",
-                    DIAG_ARTIFACT_INVALID,
-                ));
-                ev.failed = true;
-                return Err(());
-            };
-            patch_bindings.insert(b.0, ());
-            Ok(format!("{{{{b.B_{}}}}}", b.0))
-        }
-        ViewNode::Element { tag, attrs, children, each } => {
-            if each.is_some() {
-                ev.diags.push(diag(
-                    ev.path,
-                    Severity::Error,
-                    format!("binding/event does not lower `each` on <{tag}> (structure deferred)"),
-                    DIAG_PLATFORM_UNSUPPORTED,
-                ));
-                ev.failed = true;
-                return Err(());
-            }
-            let mut attr_s = String::new();
-            for a in attrs {
-                if is_event_attr(&a.name) {
-                    let method = match &a.value {
-                        ViewAttrValue::Interp { expr } => expr.trim(),
-                        ViewAttrValue::Static { value } => value.trim(),
-                        ViewAttrValue::Bare => {
-                            ev.diags.push(diag(
-                                ev.path,
-                                Severity::Error,
-                                format!("binding/event: bare event attr {}", a.name),
-                                DIAG_ARTIFACT_INVALID,
-                            ));
-                            ev.failed = true;
-                            return Err(());
-                        }
-                    };
-                    if method.is_empty() {
-                        ev.diags.push(diag(
-                            ev.path,
-                            Severity::Error,
-                            format!("binding/event: empty handler on {}", a.name),
-                            DIAG_ARTIFACT_INVALID,
-                        ));
-                        ev.failed = true;
-                        return Err(());
-                    }
-                    let Some((effect_id, written)) = written_field_ids(ev.reactive, method) else {
-                        ev.diags.push(diag(
-                            ev.path,
-                            Severity::Error,
-                            format!("binding/event: no Reactive effect for method `{method}`"),
-                            DIAG_ARTIFACT_INVALID,
-                        ));
-                        ev.failed = true;
-                        return Err(());
-                    };
-                    let affected = affected_binding_ids(ev.reactive, &written);
-                    let handler_id = format!("h{}", ev.next_handler);
-                    ev.next_handler += 1;
-                    let patch_paths: Vec<String> =
-                        affected.iter().map(|id| format!("b.B_{id}")).collect();
-                    attr_s.push_str(&format!(" data-vmz-on=\"{handler_id}\""));
-                    ev.handlers.push(EventHandlerRow {
-                        handler_id,
-                        event_kind: normalize_event_kind(&a.name),
-                        method: method.to_string(),
-                        effect_id,
-                        written_fields: written,
-                        affected_bindings: affected,
-                        patch_paths,
-                    });
-                    continue;
-                }
-                match &a.value {
-                    ViewAttrValue::Static { value } => {
-                        attr_s.push_str(&format!(" {}=\"{}\"", a.name, escape_xml_attr(value)));
-                    }
-                    ViewAttrValue::Bare => {
-                        attr_s.push(' ');
-                        attr_s.push_str(&a.name);
-                    }
-                    ViewAttrValue::Interp { .. } => {
-                        if let Some(b) = a.binding {
-                            patch_bindings.insert(b.0, ());
-                            attr_s.push_str(&format!(" {}=\"{{{{b.B_{}}}}}\"", a.name, b.0));
-                        } else {
-                            attr_s.push_str(&format!(" {}=\"{{{{b.pending}}}}\"", a.name));
-                        }
-                    }
-                }
-            }
-            let mut inner = String::new();
-            for c in children {
-                inner.push_str(&emit_node(c, patch_bindings, ev)?);
-            }
-            if inner.is_empty() {
-                Ok(format!("<{tag}{attr_s} />"))
-            } else {
-                Ok(format!("<{tag}{attr_s}>{inner}</{tag}>"))
-            }
-        }
-        ViewNode::If { .. } => {
-            ev.diags.push(diag(
-                ev.path,
-                Severity::Error,
-                "binding/event does not lower `if` (structure deferred)",
-                DIAG_PLATFORM_UNSUPPORTED,
-            ));
-            ev.failed = true;
-            Err(())
-        }
-        ViewNode::Component { tag, .. } => {
-            ev.diags.push(diag(
-                ev.path,
-                Severity::Error,
-                format!("binding/event does not lower component <{tag}> (structure deferred)"),
-                DIAG_PLATFORM_UNSUPPORTED,
-            ));
-            ev.failed = true;
-            Err(())
-        }
-        ViewNode::Slot { .. } => {
-            ev.diags.push(diag(
-                ev.path,
-                Severity::Error,
-                "binding/event does not lower `slot` (structure deferred)",
-                DIAG_PLATFORM_UNSUPPORTED,
-            ));
-            ev.failed = true;
-            Err(())
-        }
-    }
-}
-
-fn escape_xml(s: &str) -> String {
-    vmz_generator::escape_xml_text(s)
-}
-
-fn escape_xml_attr(s: &str) -> String {
-    vmz_generator::escape_xml_attr(s)
 }
 
 fn collect_program_json(root: &Path) -> Vec<PathBuf> {
