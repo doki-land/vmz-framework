@@ -1279,6 +1279,66 @@ pub fn generate_sitemap_xml(urls: Vec<JsSitemapUrl>) -> String {
     vmz_generator::emit_sitemap_xml(&urls)
 }
 
+/// Input for [`generate_html_shell`].
+#[napi(object)]
+pub struct JsHtmlShellInput {
+    /// Document title.
+    pub title: String,
+    /// `html[lang]`.
+    pub lang: String,
+    /// Stylesheet hrefs.
+    pub css_hrefs: Option<Vec<String>>,
+    /// Trusted body HTML.
+    pub body_html: String,
+    /// Body attribute pairs `[name, value, …]` flattened (even length).
+    pub body_attrs: Option<Vec<String>>,
+}
+
+/// Generate a generic HTML5 shell via MarkupCodeGenerator.
+#[napi]
+pub fn generate_html_shell(input: JsHtmlShellInput) -> String {
+    let mut body_attrs = Vec::new();
+    let flat = input.body_attrs.unwrap_or_default();
+    let mut i = 0;
+    while i + 1 < flat.len() {
+        body_attrs.push((flat[i].clone(), flat[i + 1].clone()));
+        i += 2;
+    }
+    vmz_generator::emit_html_shell(&vmz_generator::HtmlShellInput {
+        title: input.title,
+        lang: input.lang,
+        css_hrefs: input.css_hrefs.unwrap_or_default(),
+        body_html: input.body_html,
+        body_attrs,
+        body_nodes: vec![],
+        head_extra: vec![],
+    })
+}
+
+/// Input for [`generate_redirect_html`].
+#[napi(object)]
+pub struct JsRedirectHtmlInput {
+    /// `html[lang]`.
+    pub lang: String,
+    /// Redirect target URL.
+    pub target: String,
+    /// Document title.
+    pub title: String,
+    /// Optional visible link label.
+    pub link_label: Option<String>,
+}
+
+/// Generate a meta-refresh redirect HTML page.
+#[napi]
+pub fn generate_redirect_html(input: JsRedirectHtmlInput) -> String {
+    vmz_generator::emit_redirect_html(&vmz_generator::RedirectHtmlInput {
+        lang: input.lang,
+        target: input.target,
+        title: input.title,
+        link_label: input.link_label.unwrap_or_default(),
+    })
+}
+
 /// One locale export for [`generate_locale_runtime_module`].
 #[napi(object)]
 pub struct JsLocaleExport {

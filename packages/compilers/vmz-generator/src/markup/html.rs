@@ -67,25 +67,124 @@ pub fn emit_html_document(
     body_children: Vec<MarkupNode>,
     head_extra: Vec<MarkupNode>,
 ) -> String {
+    emit_html_shell(&HtmlShellInput {
+        title: title.into(),
+        lang: "en".into(),
+        css_hrefs: vec![],
+        body_html: String::new(),
+        body_attrs: vec![],
+        body_nodes: body_children,
+        head_extra,
+    })
+}
+
+/// Flexible HTML5 document shell (documents / redirects / custom pages).
+#[derive(Debug, Clone, Default)]
+pub struct HtmlShellInput {
+    /// `<title>` text (escaped).
+    pub title: String,
+    /// `html[lang]`.
+    pub lang: String,
+    /// Stylesheet `href` values (escaped as attributes).
+    pub css_hrefs: Vec<String>,
+    /// Trusted body HTML fragment (not re-escaped). Prefer this or [`Self::body_nodes`].
+    pub body_html: String,
+    /// Extra attributes on `<body>`.
+    pub body_attrs: Vec<(String, String)>,
+    /// Structured body children (used when [`Self::body_html`] is empty).
+    pub body_nodes: Vec<MarkupNode>,
+    /// Extra head nodes after charset/viewport/title/css.
+    pub head_extra: Vec<MarkupNode>,
+}
+
+/// Emit an HTML5 document from [`HtmlShellInput`].
+pub fn emit_html_shell(input: &HtmlShellInput) -> String {
+    let lang = if input.lang.is_empty() { "en" } else { input.lang.as_str() };
     let mut head_kids = vec![
         void_el("meta", vec![attr("charset", "utf-8")]),
         void_el(
             "meta",
             vec![attr("name", "viewport"), attr("content", "width=device-width, initial-scale=1")],
         ),
-        el("title", vec![], vec![MarkupNode::Text(title.into())]),
+        el("title", vec![], vec![MarkupNode::Text(input.title.clone())]),
     ];
-    head_kids.extend(head_extra);
+    for href in &input.css_hrefs {
+        head_kids.push(void_el(
+            "link",
+            vec![attr("rel", "stylesheet"), attr("href", href.clone())],
+        ));
+    }
+    head_kids.extend(input.head_extra.iter().cloned());
+
+    let body_kids = if !input.body_html.is_empty() {
+        vec![MarkupNode::Raw(input.body_html.clone())]
+    } else {
+        input.body_nodes.clone()
+    };
+
     let doc = MarkupDocument {
         doctype: Some("html".into()),
         dialect: MarkupDialect::Html5,
         roots: vec![el(
             "html",
-            vec![attr("lang", "en")],
-            vec![el("head", vec![], head_kids), el("body", vec![], body_children)],
+            vec![attr("lang", lang)],
+            vec![
+                el("head", vec![], head_kids),
+                el("body", input.body_attrs.clone(), body_kids),
+            ],
         )],
     };
     emit_markup(&doc)
+}
+
+/// Meta-refresh redirect document (document mount roots, etc.).
+#[derive(Debug, Clone)]
+pub struct RedirectHtmlInput {
+    /// `html[lang]`.
+    pub lang: String,
+    /// Absolute or root-relative redirect target.
+    pub target: String,
+    /// Document title.
+    pub title: String,
+    /// Visible link label (defaults to a Continue… string when empty).
+    pub link_label: String,
+}
+
+/// Emit a tiny HTML redirect page with refresh + canonical + fallback link.
+pub fn emit_redirect_html(input: &RedirectHtmlInput) -> String {
+    let label = if input.link_label.is_empty() {
+        format!("Continue to {}", input.lang)
+    } else {
+        input.link_label.clone()
+    };
+    let head_extra = vec![
+        void_el(
+            "meta",
+            vec![
+                attr("http-equiv", "refresh"),
+                attr("content", format!("0;url={}", input.target)),
+            ],
+        ),
+        void_el("link", vec![attr("rel", "canonical"), attr("href", input.target.clone())]),
+    ];
+    let body = vec![el(
+        "p",
+        vec![],
+        vec![el(
+            "a",
+            vec![attr("href", input.target.clone())],
+            vec![MarkupNode::Text(label)],
+        )],
+    )];
+    emit_html_shell(&HtmlShellInput {
+        title: input.title.clone(),
+        lang: input.lang.clone(),
+        css_hrefs: vec![],
+        body_html: String::new(),
+        body_attrs: vec![],
+        body_nodes: body,
+        head_extra,
+    })
 }
 
 /// Emit the production page HTML shell (static delivery / SSR wrap).
@@ -243,5 +342,32 @@ mod tests {
         let xml = emit_sitemap_xml(&[SitemapUrl { loc: "https://ex.test/a&b".into() }]);
         assert!(xml.contains("https://ex.test/a&amp;b"));
         assert!(xml.contains("urlset"));
+    }
+
+    #[test]
+    fn html_shell_and_redirect_escape() {
+        let html = emit_html_shell(&HtmlShellInput {
+            title: "A < B".into(),
+            lang: "zh-hans".into(),
+            css_hrefs: vec!["/vmz.css".into()],
+            body_html: "<main>ok</main>".into(),
+            body_attrs: vec![("data-vmz-hydrate".into(), "island-only".into())],
+            body_nodes: vec![],
+            head_extra: vec![],
+        });
+        assert!(html.contains("A &lt; B"));
+        assert!(html.contains("lang=\"zh-hans\""));
+        assert!(html.contains("href=\"/vmz.css\""));
+        assert!(html.contains("data-vmz-hydrate=\"island-only\""));
+        assert!(html.contains("<main>ok</main>"));
+
+        let redir = emit_redirect_html(&RedirectHtmlInput {
+            lang: "en-us".into(),
+            target: "/d/en-us/\"".into(),
+            title: "Documents".into(),
+            link_label: String::new(),
+        });
+        assert!(redir.contains("url=/d/en-us/&quot;"));
+        assert!(redir.contains("href=\"/d/en-us/&quot;\""));
     }
 }
