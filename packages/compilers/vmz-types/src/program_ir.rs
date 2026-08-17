@@ -1439,10 +1439,10 @@ impl ProgramUnit {
                     }
                 }
                 ViewNode::Element { children, each, .. } => {
-                    if let Some(e) = each {
-                        if let Some(r) = e.region {
-                            map.entry(r.0).or_insert(LifetimeRegionKind::Each);
-                        }
+                    if let Some(e) = each
+                        && let Some(r) = e.region
+                    {
+                        map.entry(r.0).or_insert(LifetimeRegionKind::Each);
                     }
                     for c in children {
                         walk_lifetime_kinds(c, map);
@@ -1724,10 +1724,10 @@ fn project_motion_view(unit: &ProgramUnit) -> MotionView {
         match node {
             ViewNode::Element { attrs, children, each, .. } => {
                 let mut next_region = region;
-                if let Some(e) = each {
-                    if let Some(r) = e.region {
-                        next_region = Some(r.0);
-                    }
+                if let Some(e) = each
+                    && let Some(r) = e.region
+                {
+                    next_region = Some(r.0);
                 }
                 let mut overlay_here: Option<String> = None;
                 let mut motion_here: Option<String> = None;
@@ -1757,17 +1757,17 @@ fn project_motion_view(unit: &ProgramUnit) -> MotionView {
                     if !scan.motion_kinds.iter().any(|k| k == &v) {
                         scan.motion_kinds.push(v.clone());
                     }
-                    if v == "control" {
-                        if let Some(tok) = &token_here {
-                            scan.control_token = Some(tok.clone());
-                        }
+                    if v == "control"
+                        && let Some(tok) = &token_here
+                    {
+                        scan.control_token = Some(tok.clone());
                     }
                     // Overlay enter/exit markers may carry token on the motion element itself.
-                    if (v == "overlay-enter" || v == "overlay-exit") && scan.overlay_token.is_none()
+                    if (v == "overlay-enter" || v == "overlay-exit")
+                        && scan.overlay_token.is_none()
+                        && let Some(tok) = &token_here
                     {
-                        if let Some(tok) = &token_here {
-                            scan.overlay_token = Some(tok.clone());
-                        }
+                        scan.overlay_token = Some(tok.clone());
                     }
                 }
                 for c in children {
