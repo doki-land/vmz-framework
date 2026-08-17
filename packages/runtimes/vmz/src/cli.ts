@@ -109,7 +109,7 @@ Usage:
   vmz build [path] [options]    Build project via Workspace
   vmz serve [path] [options]    Serve dist (optional --build)
   vmz dev [path] [options]      Long-lived rebuild session (no CLI spawn)
-  vmz format [path] [--check]   Format .vmz via N-API (oxc codegen)
+  vmz format [path] [--check]   Format .vmz via N-API (oxc formatter + EditorConfig)
   vmz lint [path] [--deny-warnings]  Lint (= check) via N-API
   vmz test [path] [options]     Native test discover / report
   vmz document|docs <cmd>       Project /documents domain 

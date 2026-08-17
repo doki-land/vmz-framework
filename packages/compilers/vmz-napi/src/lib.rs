@@ -704,13 +704,15 @@ impl JsWorkspace {
         })
     }
 
-    /// format workspace `.vmz` files (no cargo spawn).
+    /// Format workspace `.vmz` files via `vmz-formatter` (oxc IR + EditorConfig).
     #[napi]
     pub fn format(&self, check_only: Option<bool>) -> Result<JsFormatReport> {
-        let mut ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
-        let report = ws
-            .format(&vmz_compiler::FormatOptions { check: check_only.unwrap_or(false) })
-            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
+        let report = vmz_formatter::format_path(
+            ws.root(),
+            &vmz_formatter::FormatOptions { check: check_only.unwrap_or(false) },
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
         Ok(JsFormatReport {
             files_checked: report.files_checked as u32,
             files_written: report.files_written as u32,

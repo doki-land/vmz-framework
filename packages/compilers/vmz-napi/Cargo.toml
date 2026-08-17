@@ -16,6 +16,7 @@ napi.workspace = true
 napi-derive.workspace = true
 serde_json.workspace = true
 vmz-compiler.workspace = true
+vmz-formatter.workspace = true
 vmz-generator.workspace = true
 vmz-inspector.workspace = true
 vmz-protocol.workspace = true

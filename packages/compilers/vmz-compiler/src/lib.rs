@@ -4,7 +4,7 @@
 //! orchestrates analyze → IR → `vmz_generator::*` → disk layout.
 //!
 //! Source layout (subsystems, not dump folders):
-//! - [`parse`] - SFC / template / analyze / format
+//! - [`parse`] - SFC / template / analyze (author format → `vmz-formatter`)
 //! - [`pipeline`] - check / compile / graph / emit orchestration
 //! - [`style`] - designs / TW / SCSS hooks (CSS print → generator)
 //! - [`application`] - collection / mount
@@ -32,7 +32,7 @@ pub mod tooling;
 
 // --- Flat module path aliases (internal `crate::…` + napi) ---
 
-pub use parse::{analyze, format, sfc, template, transpile};
+pub use parse::{analyze, sfc, template, transpile};
 
 pub use pipeline::{
     check, compile, dep_graph, emit, emit_direct, emit_ir, field_rw, method_compose, plan_build,
@@ -112,7 +112,6 @@ pub use designs::{
 };
 pub use diagnostic::{ReportedDiagnostic, Severity, parse_severity};
 pub use emit::{ServerBridge, bind_field_idents, emit_client_js, emit_client_js_with_ir};
-pub use format::{FormatOptions, FormatReport, format_path};
 pub use plugin::{
     ApplyContributionsReport, ContributionBatch, ContributionDiff, ContributionItem,
     ContributionKind, ContributionStore, ExplainContributionRow, ExplainContributionSurface,
