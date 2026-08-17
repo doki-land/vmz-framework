@@ -335,11 +335,34 @@ function normalizeActionResult(acted) {
  * @param {string} marker
  */
 async function* emitAccessShell(marker) {
-    yield `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8" /><title>VMZ</title></head>
-<body><p>${marker}</p></body>
-</html>`;
+    const native = requireNativeGenerator();
+    if (typeof native.generateHtmlShell !== 'function') {
+        throw new Error('vmz native addon missing generateHtmlShell — rebuild with `pnpm napi:build`');
+    }
+    yield native.generateHtmlShell({
+        title: 'App',
+        lang: 'en',
+        cssHrefs: [],
+        bodyHtml: `<p>${marker}</p>`,
+        bodyAttrs: [],
+    });
+}
+
+/**
+ * Prefer page `static meta()` for document title/description — never brand the framework in business HTML.
+ * @param {any} Page
+ */
+function resolvePageDocumentMeta(Page) {
+    try {
+        let raw = {};
+        if (typeof Page?.meta === 'function') raw = Page.meta() || {};
+        else if (Page?.meta && typeof Page.meta === 'object') raw = Page.meta;
+        const title = String(raw.title || '').trim();
+        const description = String(raw.description || '').trim();
+        return { title: title || 'App', description };
+    } catch {
+        return { title: 'App', description: '' };
+    }
 }
 
 /**
@@ -380,7 +403,7 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
       const stack = (err && err.stack) || "";
       const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
       el.innerHTML = "<div style=\\"max-width:56rem;margin:0 auto\\">"
-        + "<p style=\\"margin:0 0 .5rem;color:#f87171;font-weight:700\\">VMZ Dev Error</p>"
+        + "<p style=\\"margin:0 0 .5rem;color:#f87171;font-weight:700\\">Dev Error</p>"
         + "<pre style=\\"white-space:pre-wrap;margin:0 0 1rem;font-size:13px;line-height:1.45\\">" + esc(msg) + "</pre>"
         + (stack ? "<pre style=\\"white-space:pre-wrap;opacity:.7;font-size:12px\\">" + esc(stack) + "</pre>" : "")
         + "<p style=\\"opacity:.65;font-size:12px\\">Fix the file and save — soft reload will clear this overlay.</p>"
@@ -453,43 +476,29 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
               `/* paint immediately */` +
               `var d=document.createElement("div");d.id="vmz-dev-overlay";d.setAttribute("role","alert");` +
               `Object.assign(d.style,{position:"fixed",inset:"0",zIndex:"2147483646",background:"rgba(15,17,21,0.92)",color:"#f4f4f5",fontFamily:"ui-monospace,monospace",padding:"2rem",overflow:"auto"});` +
-              `d.innerHTML="<div style='max-width:56rem;margin:0 auto'><p style='color:#f87171;font-weight:700'>VMZ Dev Error</p><pre style='white-space:pre-wrap'>"+String(e.message||e).replace(/[<>&]/g,function(c){return {"<":"&lt;",">":"&gt;","&":"&amp;"}[c]})+"</pre></div>";` +
+              `d.innerHTML="<div style='max-width:56rem;margin:0 auto'><p style='color:#f87171;font-weight:700'>Dev Error</p><pre style='white-space:pre-wrap'>"+String(e.message||e).replace(/[<>&]/g,function(c){return {"<":"&lt;",">":"&gt;","&":"&amp;"}[c]})+"</pre></div>";` +
               `document.documentElement.appendChild(d);})();</script>`
             : '';
     if (signal?.aborted) return;
     const themeId = resolveThemeId(opts.searchParams, opts.cookieHeader);
-    const htmlTheme = htmlThemeAttributeForId(themeId);
     const themeBoot = themeBootstrapScript();
-    const cssLink = cssEntry ? `  <link rel="stylesheet" href="/${String(cssEntry).replace(/^\/+/, '')}?t=${reloadToken}" />\n` : '';
     const propsJson = JSON.stringify(props ?? {});
-    const layoutAttr = layoutChain.length ? ` data-vmz-layout="${escapeAttr(layoutChain.join(','))}"` : '';
     const localeId = localeCtx.localeId || localeArtifact?.defaultLocale || 'en';
     const dir = localeCtx.dir || 'ltr';
-    const localeAttr = ` data-vmz-locale="${escapeAttr(localeId)}" data-vmz-dir="${escapeAttr(dir)}"`;
-    const routingJson = localeArtifact?.routing
-        ? escapeAttr(
-              JSON.stringify({
-                  strategy: localeArtifact.routing.strategy || 'prefix',
-                  defaultPrefix: localeArtifact.routing.defaultPrefix || 'include',
-                  defaultLocale: localeArtifact.defaultLocale,
-                  locales: (localeArtifact.locales || []).map((l) => l.id),
-              }),
-          )
-        : '';
-    const routingAttr = routingJson ? ` data-vmz-locale-routing="${routingJson}"` : '';
-    const hreflangLinks = (localeCtx.alternates || [])
-        .map((a) => `  <link rel="alternate" hreflang="${escapeAttr(a.hreflang)}" href="${escapeAttr(a.href)}" />`)
-        .join('\n');
-    const hreflangBlock = hreflangLinks ? `${hreflangLinks}\n` : '';
-    yield `<!DOCTYPE html>
-<html lang="${escapeAttr(localeId)}" data-locale="${escapeAttr(localeId)}" dir="${escapeAttr(dir)}"${routingAttr}${htmlTheme}>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>VMZ</title>
-${hreflangBlock}${themeBoot}${cssLink}</head>
-<body>
-  <div id="app" data-vmz-page="${escapeAttr(chunkId)}"${layoutAttr}${localeAttr} data-vmz-props="${escapeAttr(propsJson)}">`;
+    /** @type {string[]} */
+    const htmlExtraAttrs = [...htmlThemeAttrPair(themeId)];
+    if (localeArtifact?.routing) {
+        htmlExtraAttrs.push(
+            'data-vmz-locale-routing',
+            JSON.stringify({
+                strategy: localeArtifact.routing.strategy || 'prefix',
+                defaultPrefix: localeArtifact.routing.defaultPrefix || 'include',
+                defaultLocale: localeArtifact.defaultLocale,
+                locales: (localeArtifact.locales || []).map((l) => l.id),
+            }),
+        );
+    }
+    const pageDocMeta = resolvePageDocumentMeta(Page);
     const prevLocaleHint = globalThis.__vmzLocaleIdHint;
     globalThis.__vmzLocaleIdHint = localeId;
     let bodyHtml = '';
@@ -514,12 +523,35 @@ ${hreflangBlock}${themeBoot}${cssLink}</head>
         if (prevLocaleHint === undefined) delete globalThis.__vmzLocaleIdHint;
         else globalThis.__vmzLocaleIdHint = prevLocaleHint;
     }
-    yield bodyHtml;
     if (signal?.aborted) return;
-    yield `</div>
-  <script type="module" src="/${eventOnlyShell ? 'entry-event.js' : 'entry-client.js'}?t=${reloadToken}"></script>${live}${bootOverlay}
-</body>
-</html>`;
+
+    const native = requireNativeGenerator();
+    if (typeof native.generatePageShell !== 'function') {
+        throw new Error('vmz native addon missing generatePageShell — rebuild with `pnpm napi:build`');
+    }
+    const entrySrc = `/${eventOnlyShell ? 'entry-event.js' : 'entry-client.js'}?t=${reloadToken}`;
+    const cssHref = cssEntry ? `${String(cssEntry).replace(/^\/+/, '')}?t=${reloadToken}` : null;
+    yield native.generatePageShell({
+        bodyHtml,
+        chunkId,
+        layoutChain,
+        propsJson,
+        meta: {
+            title: pageDocMeta.title,
+            description: pageDocMeta.description,
+            canonical: '',
+            robots: '',
+            lang: localeId,
+            dir,
+            alternates: localeCtx.alternates || [],
+        },
+        cssEntry: cssHref,
+        isErrorDocument: false,
+        htmlExtraAttrs,
+        headExtraHtml: themeBoot,
+        moduleScriptSrc: entrySrc,
+        bodyTailHtml: `${live}${bootOverlay}`,
+    });
 }
 
 const server = http.createServer((req, res) => {
@@ -843,23 +875,16 @@ function normalizeDevError(err) {
 async function* emitDevErrorHtml(err) {
     const msg = escapeHtml(err.message || 'Unknown error');
     const stack = err.stack ? escapeHtml(err.stack) : '';
-    yield `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>VMZ Dev Error</title>
-  <style>
+    const style = `<style>
     body{margin:0;background:#0f1115;color:#f4f4f5;font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
     main{max-width:56rem;margin:0 auto;padding:2rem 1.25rem}
     h1{margin:0 0 .75rem;color:#f87171;font-size:1.1rem}
     pre{white-space:pre-wrap;margin:0 0 1rem}
     .hint{opacity:.65;font-size:12px}
-  </style>
-</head>
-<body>
+  </style>`;
+    const body = `${style}
   <main>
-    <h1>VMZ Dev Error</h1>
+    <h1>Dev Error</h1>
     <pre>${msg}</pre>
     ${stack ? `<pre style="opacity:.7;font-size:12px">${stack}</pre>` : ''}
     <p class="hint">Dev host stayed up. Fix the source and save — soft reload will recover.</p>
@@ -873,9 +898,18 @@ async function* emitDevErrorHtml(err) {
       if (msg && msg.type === "hmr") location.reload();
     };
   })();
-  </script>
-</body>
-</html>`;
+  </script>`;
+    const native = requireNativeGenerator();
+    if (typeof native.generateHtmlShell !== 'function') {
+        throw new Error('vmz native addon missing generateHtmlShell — rebuild with `pnpm napi:build`');
+    }
+    yield native.generateHtmlShell({
+        title: 'Dev Error',
+        lang: 'en',
+        cssHrefs: [],
+        bodyHtml: body,
+        bodyAttrs: [],
+    });
 }
 
 /** @param {string} s */
@@ -1405,12 +1439,13 @@ function resolveThemeId(searchParams, cookieHeader) {
 /**
  * Always emit activation attr for an explicit theme id (incl. default) so it overrides OS media.
  * @param {string|null} themeId
+ * @returns {[string, string] | []} flattened attr pair for generatePageShell
  */
-function htmlThemeAttributeForId(themeId) {
-    if (!styleTheme || !themeId) return '';
+function htmlThemeAttrPair(themeId) {
+    if (!styleTheme || !themeId) return [];
     const attr = styleTheme.activationAttr || 'data-theme';
-    if (!(styleTheme.themeIds || []).includes(themeId)) return '';
-    return ` ${attr}="${escapeAttr(themeId)}"`;
+    if (!(styleTheme.themeIds || []).includes(themeId)) return [];
+    return [attr, themeId];
 }
 
 /**
