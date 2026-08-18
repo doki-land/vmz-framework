@@ -87,6 +87,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'Mini deploy package + deterministic host + vendor tooling handoff',
         pre: ['build:runtimes'],
     },
+    'miniprogram-wechat-pack': {
+        file: 'miniprogram/miniprogram-wechat-pack.ts',
+        description: 'WeChat pages/**/*.wxml|wxss via vmz-generator (not authoring truth)',
+        pre: ['build:runtimes'],
+    },
     'miniprogram-multi-adapter': {
         file: 'miniprogram/miniprogram-multi-adapter.ts',
         description: 'Mini ≥2 packaging adapters share one neutral deploy package',
@@ -308,6 +313,7 @@ export const CHECK_ALL = [
     'miniprogram-structure',
     'miniprogram-route-server-style',
     'miniprogram-tooling-deploy',
+    'miniprogram-wechat-pack',
     'miniprogram-multi-adapter',
     'host-profile',
     'profile-solver',
