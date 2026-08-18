@@ -16,7 +16,6 @@ use crate::reactive_build::build_program_module_with_server;
 use crate::scss::{ScssCompilerHandle, ScssEmitRequest};
 use crate::sfc::{ScriptKind, parse_vmz};
 use crate::template::parse_template;
-use crate::transpile::transpile_ts;
 use crate::tw::{TwCompilerHandle, TwEmitRequest, register_tw_from_parsed};
 use crate::virtual_server;
 use vmz_types::{DeploymentClientCall, DeploymentView, ProgramModule, StubStatus};
@@ -416,7 +415,7 @@ fn emit_stylesheets(
     report: &mut CompileReport,
 ) -> crate::Result<()> {
     use crate::designs::{emit_style_theme_css, load_designs};
-    use crate::style_emit::{StyleContribution, StyleLayer, emit_style_bundle};
+    use crate::style_emit::{StyleContribution, StyleLayer, emit_style_bundle_opts};
 
     let designs = load_designs(root);
     report.diagnostics.extend(designs.diagnostics.clone());
@@ -503,7 +502,7 @@ fn emit_stylesheets(
         }
     }
 
-    let emitted = emit_style_bundle(&options.out_dir, &contributions)?;
+    let emitted = emit_style_bundle_opts(&options.out_dir, &contributions, options.release)?;
     for path in emitted.written {
         report.emitted.push(path.clone());
         report.style_assets.push(path);
@@ -667,8 +666,18 @@ fn emit_server_tree(
         }
         let source = fs::read_to_string(path)?;
         let id = virtual_server::id_from_src_path(src_root, path);
-        match transpile_ts(&source, &path.display().to_string()) {
-            Ok(js) => {
+        match vmz_generator::transpile_ts_printed(
+            &source,
+            &path.display().to_string(),
+            &if options.release {
+                vmz_generator::JsPrintOptions::release_mapped(
+                    Path::new(&id).file_name().unwrap_or_default(),
+                )
+            } else {
+                vmz_generator::JsPrintOptions::default()
+            },
+        ) {
+            Ok(printed) => {
                 let rel = id.trim_start_matches("#server/");
                 let out = options
                     .out_dir
@@ -678,7 +687,7 @@ fn emit_server_tree(
                 if let Some(parent) = out.parent() {
                     fs::create_dir_all(parent)?;
                 }
-                let js = format!("// virtual: {id}\n{js}");
+                let js = format!("// virtual: {id}\n{}", printed.code);
                 let js = virtual_server::rewrite_imports_to_relative(&js, &id);
                 fs::write(&out, js)?;
                 report.emitted.push(out);
@@ -728,12 +737,49 @@ fn emit_client_modules(
         }
         let source = fs::read_to_string(path)?;
         let js = if ext == "ts" {
-            match transpile_ts(&source, &path.display().to_string()) {
-                Ok(js) => js,
+            match vmz_generator::transpile_ts_printed(
+                &source,
+                &path.display().to_string(),
+                &if options.release {
+                    vmz_generator::JsPrintOptions::release_mapped(out.file_name().unwrap())
+                } else {
+                    vmz_generator::JsPrintOptions::mapped(out.file_name().unwrap())
+                },
+            ) {
+                Ok(printed) => {
+                    if let Some(map) = printed.map {
+                        let map_path = out.with_extension("js.map");
+                        let _ = fs::write(&map_path, map);
+                        report.emitted.push(map_path);
+                    }
+                    printed.code
+                }
                 Err(e) => {
                     report.diagnostics.push(ReportedDiagnostic::error(
                         path,
                         format!("client module emit failed: {e}"),
+                    ));
+                    continue;
+                }
+            }
+        } else if options.release {
+            match vmz_generator::print_js_source(
+                &source,
+                &out.file_name().unwrap().to_string_lossy(),
+                &vmz_generator::JsPrintOptions::release_mapped(out.file_name().unwrap()),
+            ) {
+                Ok(printed) => {
+                    if let Some(map) = printed.map {
+                        let map_path = out.with_extension("js.map");
+                        let _ = fs::write(&map_path, map);
+                        report.emitted.push(map_path);
+                    }
+                    printed.code
+                }
+                Err(e) => {
+                    report.diagnostics.push(ReportedDiagnostic::error(
+                        path,
+                        format!("client js print failed: {e}"),
                     ));
                     continue;
                 }
@@ -849,7 +895,7 @@ fn emit_file(
     let native_view = program.units.first().map(|u| &u.view);
     let exec_plan = program.units.first().map(|u| &u.plan);
 
-    let (client_js, client_map) = match crate::emit::emit_client_js_with_ir_mapped(
+    let (client_js, _) = match crate::emit::emit_client_js_with_ir_mapped(
         &parsed.client.content,
         &client,
         &template_ir,
@@ -884,9 +930,27 @@ fn emit_file(
         }
         crate::emit::rewrite_ts_spec_imports(&js)
     };
-    fs::write(&client_path, &client_js)?;
+    let js_name = format!("{stem}.client.js");
+    let printed = match vmz_generator::print_js_source(
+        &client_js,
+        &js_name,
+        &if options.release {
+            vmz_generator::JsPrintOptions::release_mapped(&js_name)
+        } else {
+            vmz_generator::JsPrintOptions::mapped(&js_name)
+        },
+    ) {
+        Ok(p) => p,
+        Err(e) => {
+            report
+                .diagnostics
+                .push(ReportedDiagnostic::error(path, format!("client js print failed: {e}")));
+            return Ok(());
+        }
+    };
+    fs::write(&client_path, &printed.code)?;
     report.emitted.push(client_path);
-    if let Some(map) = client_map {
+    if let Some(map) = printed.map {
         let map_path = out_dir.join(format!("{stem}.client.js.map"));
         fs::write(&map_path, map)?;
         report.emitted.push(map_path);
@@ -896,7 +960,21 @@ fn emit_file(
         (server.as_ref(), parsed.server.as_ref(), server_id.as_ref())
     {
         let server_js = match emit_server_js(&server_block.content, server_an, id) {
-            Ok(js) => js,
+            Ok(js) => {
+                let name = format!("{}.js", id.trim_start_matches("#server/").replace('/', "_"));
+                match vmz_generator::print_js_source(
+                    &js,
+                    &name,
+                    &if options.release {
+                        vmz_generator::JsPrintOptions::release_mapped(&name)
+                    } else {
+                        vmz_generator::JsPrintOptions::default()
+                    },
+                ) {
+                    Ok(p) => p.code,
+                    Err(_) => js,
+                }
+            }
             Err(e) => {
                 report
                     .diagnostics

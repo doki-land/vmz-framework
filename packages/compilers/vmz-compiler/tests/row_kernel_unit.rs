@@ -105,14 +105,15 @@ fn keyed_static_row_emits_row_kernel() {
     assert!(js.contains("function(root, item) {\n"), "{js}");
     assert!(!js.contains("slot ==="), "{js}");
     assert!(js.contains("classItemField"), "{js}");
-    // Create seeds __vmzT*; applyByField trusts the Text handle (no cold path walk).
-    assert!(js.contains("root.__vmzT0 ="), "{js}");
-    assert!(js.contains("root.__vmzT1 ="), "{js}");
+    // Create seeds `root.__vmzT = [t0, t1]`; applyByField uses index (no `__vmzT` + slot).
+    assert!(js.contains("root.__vmzT = ["), "{js}");
     assert!(
-        js.contains("root.__vmzT1.nodeValue = item.label")
+        js.contains("root.__vmzT[1].nodeValue = item.label")
             || js.contains("t1.nodeValue = item.label"),
         "{js}"
     );
+    assert!(!js.contains("__vmzT0"), "{js}");
+    assert!(!js.contains("__vmzT1"), "{js}");
     // Fresh-create hoists host field read outside the loop.
     assert!(js.contains("var hv = this.selected"), "{js}");
     // Acts baked into html — cloneNode carries them; no per-row __vmzAct assign.
@@ -122,7 +123,6 @@ fn keyed_static_row_emits_row_kernel() {
     assert!(js.contains("entryByIndex[i] = root"), "{js}");
     assert!(js.contains("textSlots"), "{js}");
     assert!(js.contains("\"label\": 1") || js.contains("label: 1"), "{js}");
-    // No parallel __vmzTexts array — stride/apply use __vmzT* expandos.
     assert!(!js.contains("__vmzTexts"), "{js}");
 }
 

@@ -9,13 +9,14 @@ mod entry;
 /// Shared expression / attr helpers (also used by `vmz-compiler` structural build).
 pub mod helpers;
 mod locale;
+mod print;
 mod row_kernel;
 mod transpile;
 
 pub use deps::collect_template_deps;
 pub use emit::{
-    EmittedJs, ServerBridge, emit_client_module, emit_entry_client, emit_server_module,
-    rewrite_ts_spec_imports, rewrite_virtual_import,
+    ServerBridge, emit_client_module, emit_entry_client, emit_server_module, rewrite_ts_spec_imports,
+    rewrite_virtual_import,
 };
 pub use emit_direct::{emit_direct_create, emit_vmz_plan, is_direct_eligible};
 pub use emit_ir::{IrDepCursor, TakenBinding, TakenCfBranch, TakenControlFlow};
@@ -28,5 +29,6 @@ pub use locale::{
     LocaleExport, LocaleTypedExport, LocaleTypedParam, emit_locale_runtime_module,
     emit_locale_typed_module,
 };
+pub use print::{EmittedJs, JsPrintOptions, print_js_program, print_js_source};
 pub use row_kernel::try_emit_row_kernel_js;
-pub use transpile::{transpile_ts, transpile_ts_with_map};
+pub use transpile::{transpile_ts, transpile_ts_printed, transpile_ts_with_map};

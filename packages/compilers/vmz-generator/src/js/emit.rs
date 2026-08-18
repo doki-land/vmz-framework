@@ -8,6 +8,7 @@ use vmz_types::{
 
 use super::emit_direct::{emit_direct_create, emit_vmz_plan, is_direct_eligible};
 use super::emit_ir::IrDepCursor;
+use super::print::EmittedJs;
 use super::transpile::transpile_ts;
 
 /// Options when co-located `<script server>` is compiled into a client-facing stub.
@@ -21,18 +22,11 @@ pub struct ServerBridge {
     pub methods: Vec<MethodDecl>,
 }
 
-/// JS emit result (code + optional source map JSON).
-#[derive(Debug, Clone)]
-pub struct EmittedJs {
-    /// Module source.
-    pub code: String,
-    /// Source map JSON when produced.
-    pub map: Option<String>,
-}
-
 /// Emit client JS from barrier-rewritten source + analyzed decl + Native View / Reactive / Plan.
 ///
-/// Caller (`vmz-compiler`) must apply WriteBarrier and build Reactive/View/Plan IR.
+/// Assembles transpile + Direct/meta. Caller (`vmz-compiler`) rewrites virtual
+/// imports then runs [`super::print::print_js_source`] so minify and sourcemap
+/// apply to the final module (one oxc print).
 pub fn emit_client_module(
     client_source: &str,
     decl: &ComponentDecl,
@@ -41,13 +35,7 @@ pub fn emit_client_module(
     view: &ViewView,
     plan: Option<&ExecutionPlan>,
 ) -> Result<EmittedJs, String> {
-    let map_name = format!("{}.client.js.map", decl.name);
-    let transpiled = super::transpile::transpile_ts_with_map(
-        client_source,
-        &format!("{}.client.ts", decl.name),
-        Some(Path::new(&map_name)),
-    )?;
-    let mut js = transpiled.code;
+    let mut js = transpile_ts(client_source, &format!("{}.client.ts", decl.name))?;
     let has_source_constructor = decl.methods.iter().any(|method| method.name == "constructor");
     js = inject_props_constructor(&js, &decl.name, has_source_constructor);
 
@@ -99,10 +87,7 @@ pub fn emit_client_module(
         use super::ast_util::print_export_default;
         js.push_str(&format!("\n{}", print_export_default(&decl.name)));
     }
-    if transpiled.map.is_some() {
-        js.push_str(&format!("\n//# sourceMappingURL={map_name}\n"));
-    }
-    Ok(EmittedJs { code: js, map: transpiled.map })
+    Ok(EmittedJs { code: js, map: None })
 }
 
 fn emit_method_rw(decl: &ComponentDecl) -> String {

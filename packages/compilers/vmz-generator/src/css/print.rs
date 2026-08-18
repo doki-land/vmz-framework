@@ -84,10 +84,98 @@ pub fn format_css(css: &str) -> String {
     body
 }
 
+/// Production CSS print: parse/validate via oxc-css-parser when possible, then
+/// drop comments and collapse whitespace (strings / `url()` kept intact).
+pub fn minify_css(css: &str) -> String {
+    let trimmed = css.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    let _ = validate_css(trimmed);
+    compact_css(trimmed)
+}
+
+fn compact_css(src: &str) -> String {
+    let bytes = src.as_bytes();
+    let mut out = String::with_capacity(src.len());
+    let mut i = 0;
+    let mut in_str: Option<u8> = None;
+    let mut escaped = false;
+    let mut last_punct = true;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if let Some(q) = in_str {
+            out.push(b as char);
+            if escaped {
+                escaped = false;
+            } else if b == b'\\' {
+                escaped = true;
+            } else if b == q {
+                in_str = None;
+            }
+            i += 1;
+            last_punct = false;
+            continue;
+        }
+        if b == b'/' && i + 1 < bytes.len() && bytes[i + 1] == b'*' {
+            i += 2;
+            while i + 1 < bytes.len() && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
+                i += 1;
+            }
+            i = (i + 2).min(bytes.len());
+            continue;
+        }
+        if b == b'"' || b == b'\'' {
+            in_str = Some(b);
+            out.push(b as char);
+            i += 1;
+            last_punct = false;
+            continue;
+        }
+        if b.is_ascii_whitespace() {
+            i += 1;
+            continue;
+        }
+        let punct = matches!(b, b'{' | b'}' | b':' | b';' | b',' | b'(' | b')');
+        if !last_punct && !punct && !out.is_empty() {
+            let prev = out.as_bytes()[out.len() - 1];
+            if !matches!(prev, b'{' | b'}' | b':' | b';' | b',' | b'(' | b')') {
+                out.push(' ');
+            }
+        }
+        if b >= 0x80 {
+            let rest = &src[i..];
+            let ch = rest.chars().next().unwrap();
+            out.push(ch);
+            i += ch.len_utf8();
+            last_punct = false;
+            continue;
+        }
+        out.push(b as char);
+        last_punct = punct;
+        i += 1;
+    }
+    out
+}
+
+/// Print CSS for artifacts: [`format_css`] (dev) or [`minify_css`] (release).
+pub fn print_css(css: &str, minify: bool) -> String {
+    if minify { minify_css(css) } else { format_css(css) }
+}
+
 /// Emit per-layer assets and a composition entry that `@import`s them in order.
 pub fn emit_style_bundle(
     out_dir: &Path,
     contributions: &[StyleContribution],
+) -> std::io::Result<StyleEmitReport> {
+    emit_style_bundle_opts(out_dir, contributions, false)
+}
+
+/// Like [`emit_style_bundle`]; `minify` selects compact CSS (no layer comments).
+pub fn emit_style_bundle_opts(
+    out_dir: &Path,
+    contributions: &[StyleContribution],
+    minify: bool,
 ) -> std::io::Result<StyleEmitReport> {
     let mut report = StyleEmitReport::default();
     let mut imports: Vec<String> = Vec::new();
@@ -96,8 +184,8 @@ pub fn emit_style_bundle(
     ordered.sort_by_key(|c| c.layer as u8);
 
     for contrib in &ordered {
-        let formatted = format_css(&contrib.css);
-        if formatted.is_empty() {
+        let printed = print_css(&contrib.css, minify);
+        if printed.is_empty() {
             continue;
         }
         let out = out_dir.join(&contrib.asset_name);
@@ -105,8 +193,10 @@ pub fn emit_style_bundle(
             fs::create_dir_all(parent)?;
         }
         let mut file = String::new();
-        file.push_str(&format!("/* vmz style layer: {:?} */\n", contrib.layer));
-        file.push_str(&formatted);
+        if !minify {
+            file.push_str(&format!("/* vmz style layer: {:?} */\n", contrib.layer));
+        }
+        file.push_str(&printed);
         fs::write(&out, file)?;
         report.written.push(out);
         imports.push(contrib.asset_name.clone());
@@ -118,12 +208,35 @@ pub fn emit_style_bundle(
 
     let entry_name = "vmz.css";
     let entry_path = out_dir.join(entry_name);
-    let mut entry = String::from("/* vmz style entry: composed via @import */\n");
+    let mut entry = String::new();
+    if !minify {
+        entry.push_str("/* vmz style entry: composed via @import */\n");
+    }
     for name in &imports {
-        entry.push_str(&format!("@import \"./{name}\";\n"));
+        if minify {
+            entry.push_str(&format!("@import\"./{name}\";"));
+        } else {
+            entry.push_str(&format!("@import \"./{name}\";\n"));
+        }
     }
     fs::write(&entry_path, entry)?;
     report.written.push(entry_path);
     report.css_entry = Some(entry_name.to_string());
     Ok(report)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn minify_css_drops_comments_and_ws() {
+        let src = "/* layer */\n.foo {\n  color: red;\n  margin: 1px 2px;\n}\n";
+        let min = minify_css(src);
+        assert!(!min.contains("/*"), "{min}");
+        assert!(min.contains(".foo{") || min.contains(".foo {"), "{min}");
+        assert!(min.contains("color:red") || min.contains("color: red"), "{min}");
+        assert!(min.len() < src.len(), "min={} src={}", min.len(), src.len());
+        assert!(min.contains("1px 2px"), "keep ident spaces: {min}");
+    }
 }
