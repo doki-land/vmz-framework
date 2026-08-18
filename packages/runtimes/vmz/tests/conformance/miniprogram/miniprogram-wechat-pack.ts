@@ -137,13 +137,22 @@ const pageJson = JSON.parse(fs.readFileSync(path.join(pack, 'pages', 'index', 'i
 if (pageJson.enableShareAppMessage !== true) {
     fail(`enableShareAppMessage ${pageJson.enableShareAppMessage}`);
 }
-if (app.tabBar?.custom === true) fail('native tabBar must not set custom');
+if (app.tabBar?.custom !== true) fail(`custom tabBar required: ${JSON.stringify(app.tabBar)}`);
 if (!Array.isArray(app.tabBar?.list) || app.tabBar.list.length !== 2) {
     fail(`tabBar.list ${JSON.stringify(app.tabBar)}`);
 }
 if (app.tabBar.list[0]?.text !== '首页' || app.tabBar.list[0]?.iconPath !== 'assets/tab-home.png') {
     fail(`tab 0 ${JSON.stringify(app.tabBar.list[0])}`);
 }
+const customTabJs = path.join(pack, 'custom-tab-bar', 'index.js');
+if (!fs.existsSync(customTabJs)) fail('custom-tab-bar/index.js missing');
+if (!fs.readFileSync(customTabJs, 'utf8').includes('switchTab')) {
+    fail('custom-tab-bar missing switchTab');
+}
+const pageJs = fs.readFileSync(pageJsPath, 'utf8');
+if (!pageJs.includes('store:')) fail(`page data missing store: ${pageJs}`);
+if (!pageJs.includes('Waitrose')) fail(`page data/share missing Waitrose: ${pageJs}`);
+if (!pageJs.includes('getTabBar')) fail(`tab page missing getTabBar: ${pageJs}`);
 const tabPng = path.join(pack, 'assets', 'tab-home.png');
 const tabOn = path.join(pack, 'assets', 'tab-home-on.png');
 if (!fs.existsSync(tabPng) || !fs.existsSync(tabOn)) fail('tab png missing');

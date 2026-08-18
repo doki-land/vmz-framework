@@ -231,7 +231,7 @@ fn rasterize_svg_writes_png_magic() {
 }
 
 #[test]
-fn native_tab_bar_from_route_tab_and_svg() {
+fn custom_tab_bar_from_route_tab_and_svg() {
     let nanos =
         std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
     let dir = std::env::temp_dir().join(format!("vmz-wechat-tab-{nanos}"));
@@ -272,7 +272,7 @@ fn native_tab_bar_from_route_tab_and_svg() {
     let app: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(dir.join("dist/wechat/app.json")).unwrap())
             .unwrap();
-    assert!(app["tabBar"]["custom"].is_null(), "{app}");
+    assert_eq!(app["tabBar"]["custom"].as_bool(), Some(true), "{app}");
     let list = app["tabBar"]["list"].as_array().expect("list");
     assert_eq!(list.len(), 2, "{app}");
     assert_eq!(list[0]["pagePath"].as_str(), Some("pages/home/home"));
@@ -287,6 +287,14 @@ fn native_tab_bar_from_route_tab_and_svg() {
     let home_on = fs::read(dir.join("dist/wechat/assets/tab-home-on.png")).unwrap();
     assert!(home_png.starts_with(&[0x89, b'P', b'N', b'G']));
     assert!(home_on.starts_with(&[0x89, b'P', b'N', b'G']));
+    let tab_js = fs::read_to_string(dir.join("dist/wechat/custom-tab-bar/index.js")).unwrap();
+    assert!(tab_js.contains("switchTab"), "{tab_js}");
+    assert!(tab_js.contains("pages/home/home"), "{tab_js}");
+    let home_js = fs::read_to_string(dir.join("dist/wechat/pages/home/home.js")).unwrap();
+    assert!(home_js.contains("getTabBar"), "{home_js}");
+    assert!(home_js.contains("selected: 0"), "{home_js}");
+    let app_wxss = fs::read_to_string(dir.join("dist/wechat/app.wxss")).unwrap();
+    assert!(app_wxss.contains("tab-spacer"), "{app_wxss}");
     let _ = fs::remove_dir_all(&dir);
 }
 
