@@ -211,6 +211,8 @@ fn writes_pages_under_dist_wechat() {
     let app: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(app_json).unwrap()).unwrap();
     assert_eq!(app["window"]["navigationBarTitleText"].as_str(), Some("Waitrose"), "{app}");
+    assert_eq!(app["window"]["navigationBarBackgroundColor"].as_str(), Some("#3D6B2F"), "{app}");
+    assert_eq!(app["window"]["navigationBarTextStyle"].as_str(), Some("white"), "{app}");
     assert!(
         app["pages"].as_array().unwrap().iter().any(|p| p.as_str() == Some("pages/home/home")),
         "{app}"
@@ -285,5 +287,48 @@ fn native_tab_bar_from_route_tab_and_svg() {
     let home_on = fs::read(dir.join("dist/wechat/assets/tab-home-on.png")).unwrap();
     assert!(home_png.starts_with(&[0x89, b'P', b'N', b'G']));
     assert!(home_on.starts_with(&[0x89, b'P', b'N', b'G']));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn page_wxss_stays_on_owning_sfc() {
+    let nanos =
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+    let dir = std::env::temp_dir().join(format!("vmz-wechat-wxss-{nanos}"));
+    fs::create_dir_all(dir.join("dist")).unwrap();
+    fs::write(
+        dir.join("dist/vmz-style.css"),
+        "/* vmz style layer: Scss */\n/* src/pages/home.vmz */\n.home-only { color: #3d6b2f; }\n/* src/pages/cart.vmz */\n.cart-only { padding-bottom: 160rpx; }\n",
+    )
+    .unwrap();
+    let home = ProgramModule {
+        schema: PROGRAM_SCHEMA.into(),
+        source: "src/pages/home.vmz".into(),
+        units: vec![home_unit()],
+    };
+    let mut cart_unit = home_unit();
+    cart_unit.name = "CartPage".into();
+    cart_unit.deployment.chunk_id = Some("pages/cart".into());
+    let cart = ProgramModule {
+        schema: PROGRAM_SCHEMA.into(),
+        source: "src/pages/cart.vmz".into(),
+        units: vec![cart_unit],
+    };
+    fs::write(dir.join("dist/home.program.json"), serde_json::to_string_pretty(&home).unwrap())
+        .unwrap();
+    fs::write(dir.join("dist/cart.program.json"), serde_json::to_string_pretty(&cart).unwrap())
+        .unwrap();
+
+    let report = lower_miniprogram_wechat_packaging(&dir);
+    assert!(report.status == vmz_protocol::CheckReportStatus::Ready, "{:?}", report.diagnostics);
+    let home_wxss = fs::read_to_string(dir.join("dist/wechat/pages/home/home.wxss")).unwrap();
+    let cart_wxss = fs::read_to_string(dir.join("dist/wechat/pages/cart/cart.wxss")).unwrap();
+    assert!(home_wxss.contains("home-only"), "{home_wxss}");
+    assert!(!home_wxss.contains("cart-only"), "{home_wxss}");
+    assert!(cart_wxss.contains("cart-only"), "{cart_wxss}");
+    assert!(!cart_wxss.contains("home-only"), "{cart_wxss}");
+    let app_wxss = fs::read_to_string(dir.join("dist/wechat/app.wxss")).unwrap();
+    assert!(!app_wxss.contains("home-only"), "{app_wxss}");
+    assert!(!app_wxss.contains("cart-only"), "{app_wxss}");
     let _ = fs::remove_dir_all(&dir);
 }

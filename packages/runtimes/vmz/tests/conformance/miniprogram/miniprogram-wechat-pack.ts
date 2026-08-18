@@ -58,6 +58,9 @@ fs.writeFileSync(
 <template>
   <div class="page">me</div>
 </template>
+<style>
+.me-only { color: #c00; }
+</style>
 <script client>
 export default class MePage {}
 </script>
@@ -110,10 +113,17 @@ if (wxml.includes('@click')) fail(`author event leaked: ${wxml}`);
 
 const wxss = fs.readFileSync(wxssPath, 'utf8');
 if (!wxss.includes('24rpx')) fail(`rpx missing: ${wxss}`);
+if (wxss.includes('me-only')) fail(`index wxss leaked me-only: ${wxss}`);
+const meWxss = fs.readFileSync(path.join(pack, 'pages', 'me', 'me.wxss'), 'utf8');
+if (!meWxss.includes('me-only')) fail(`me wxss missing me-only: ${meWxss}`);
+if (meWxss.includes('24rpx')) fail(`me wxss leaked index padding: ${meWxss}`);
 
 const app = JSON.parse(fs.readFileSync(appJsonPath, 'utf8'));
 if (!(app.pages || []).includes('pages/index/index')) {
     fail(`app.json pages ${JSON.stringify(app.pages)}`);
+}
+if (app.window?.navigationBarBackgroundColor !== '#3D6B2F') {
+    fail(`nav bg ${app.window?.navigationBarBackgroundColor}`);
 }
 const project = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
 if (project.compileType !== 'miniprogram') fail(`compileType ${project.compileType}`);

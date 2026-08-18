@@ -19,8 +19,16 @@ use vmz_protocol::{
 use vmz_types::{ProgramModule, ProgramUnit, RouteTabDecl};
 
 use super::wechat_tab::{TAB_BG, TAB_COLOR, TAB_SELECTED_COLOR, materialize_tab_icons};
+use super::wechat_wxss::{load_pack_style, page_css};
 
 pub use super::wechat_tab::rasterize_svg_png;
+
+/// Pack-default navigation bar background (not defineConfig).
+const WINDOW_NAV_BG: &str = "#3D6B2F";
+/// Pack-default navigation bar text style (not defineConfig).
+const WINDOW_NAV_TEXT: &str = "white";
+/// Pack-default page background (not defineConfig).
+const WINDOW_BG: &str = "#F6F3EC";
 
 /// Report schema for WeChat packaging writes.
 pub const MINI_WECHAT_PACK_REPORT_SCHEMA: &str = "vmz.target.mini_wechat_pack.v0";
@@ -180,31 +188,6 @@ fn print_chrome_js(source: &str, filename: &str) -> Result<String, String> {
         .map(|emitted| emitted.code)
 }
 
-fn read_css_bundle(root: &Path) -> String {
-    let dist = root.join("dist");
-    let mut parts = Vec::new();
-    // Prefer layer bodies (SFC / TW / designs). `vmz.css` is an @import entry
-    // and must not be the only WXSS source.
-    for name in ["vmz-style.css", "vmz-tw.css", "vmz-designs.css"] {
-        let p = dist.join(name);
-        if let Ok(text) = fs::read_to_string(&p)
-            && !text.trim().is_empty()
-        {
-            parts.push(text);
-        }
-    }
-    if parts.is_empty() {
-        let p = dist.join("vmz.css");
-        if let Ok(text) = fs::read_to_string(&p)
-            && !text.trim().is_empty()
-            && !text.contains("@import")
-        {
-            parts.push(text);
-        }
-    }
-    parts.join("\n")
-}
-
 fn write_pack_file(abs: &Path, body: &str) -> std::io::Result<()> {
     if let Some(parent) = abs.parent() {
         fs::create_dir_all(parent)?;
@@ -241,7 +224,7 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
     if legacy.exists() {
         let _ = fs::remove_dir_all(&legacy);
     }
-    let css = read_css_bundle(root);
+    let styles = load_pack_style(root);
     let mut app_pages: Vec<String> = Vec::new();
     let mut tab_pages: Vec<(u32, String, RouteTabDecl)> = Vec::new();
 
@@ -278,6 +261,7 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
             }
             let chunk = unit.deployment.chunk_id.clone().unwrap_or_else(|| unit.name.clone());
             let stem = wechat_page_stem(&chunk);
+            let css = page_css(&styles, &module.source);
             match emit_wechat_page(unit, &css) {
                 Ok((wxml, wxss)) => {
                     let wxml_rel = format!("{WECHAT_PACK_ROOT}/{stem}.wxml");
@@ -411,7 +395,10 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
     let mut app_json = json!({
         "pages": app_pages,
         "window": {
-            "navigationBarTitleText": wechat_title(&packaging)
+            "navigationBarTitleText": wechat_title(&packaging),
+            "navigationBarBackgroundColor": WINDOW_NAV_BG,
+            "navigationBarTextStyle": WINDOW_NAV_TEXT,
+            "backgroundColor": WINDOW_BG
         },
         "sitemapLocation": "sitemap.json"
     });
@@ -434,7 +421,7 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
             DIAG_ARTIFACT_INVALID,
         ));
     }
-    let app_wxss = vmz_generator::print_wxss(&css, false);
+    let app_wxss = vmz_generator::print_wxss(&styles.shared, false);
     let app_wxss_rel = format!("{WECHAT_PACK_ROOT}/app.wxss");
     let _ = write_pack_file(&root.join(&app_wxss_rel), &format!("{app_wxss}\n"));
 
