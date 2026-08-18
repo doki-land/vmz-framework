@@ -165,6 +165,13 @@ fn writes_pages_under_dist_wechat() {
     let body = serde_json::to_string_pretty(&module).unwrap();
     fs::write(dir.join("dist").join("home.program.json"), body).unwrap();
     fs::write(dir.join("dist").join("vmz.css"), ".page { color: #3d6b2f; }\n").unwrap();
+    fs::create_dir_all(dir.join("dist/_vmz")).unwrap();
+    fs::write(
+        dir.join("dist/_vmz/wechat-packaging.json"),
+        r#"{ "schema": "vmz.target.wechat_packaging.v0", "appId": "wx47094018073f0644", "projectName": "waitrose-vmz-shell", "title": "Waitrose" }
+"#,
+    )
+    .unwrap();
 
     let report = lower_miniprogram_wechat_packaging(&dir);
     assert!(report.status == vmz_protocol::CheckReportStatus::Ready, "{:?}", report.diagnostics);
@@ -185,6 +192,11 @@ fn writes_pages_under_dist_wechat() {
         fs::read_to_string(&page_js).unwrap()
     );
     assert!(
+        fs::read_to_string(&page_js).unwrap().contains("Waitrose"),
+        "{}",
+        fs::read_to_string(&page_js).unwrap()
+    );
+    assert!(
         fs::read_to_string(&app_js).unwrap().contains("App("),
         "{}",
         fs::read_to_string(&app_js).unwrap()
@@ -193,8 +205,11 @@ fn writes_pages_under_dist_wechat() {
         serde_json::from_str(&fs::read_to_string(project).unwrap()).unwrap();
     assert_eq!(project_json["compileType"].as_str(), Some("miniprogram"), "{project_json}");
     assert_eq!(project_json["miniprogramRoot"].as_str(), Some("./"), "{project_json}");
+    assert_eq!(project_json["appid"].as_str(), Some("wx47094018073f0644"), "{project_json}");
+    assert_eq!(project_json["projectname"].as_str(), Some("waitrose-vmz-shell"), "{project_json}");
     let app: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(app_json).unwrap()).unwrap();
+    assert_eq!(app["window"]["navigationBarTitleText"].as_str(), Some("Waitrose"), "{app}");
     assert!(
         app["pages"].as_array().unwrap().iter().any(|p| p.as_str() == Some("pages/home/home")),
         "{app}"

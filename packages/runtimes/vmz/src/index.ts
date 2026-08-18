@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { materializeWechatPackaging } from './wechat-packaging.js';
 
 export {
     HOST_PROTOCOL,
@@ -650,7 +651,7 @@ export function createWorkspace(options) {
     const native = loadNative();
     const protocol = options.protocol ?? expectedProtocol();
     const runtimeDist = options.runtimeDist ?? resolveCoreRuntimeDist() ?? undefined;
-    return native.JsWorkspace.create({
+    const ws = native.JsWorkspace.create({
         root: options.root,
         outDir: options.outDir,
         runtimeDist,
@@ -661,6 +662,23 @@ export function createWorkspace(options) {
             pluginProtocol: protocol.pluginProtocol,
         },
     });
+    const pack = ws.lowerMiniprogramWechatPackaging.bind(ws);
+    const wrappedPack = () => {
+        materializeWechatPackaging(options.root);
+        return pack();
+    };
+    try {
+        ws.lowerMiniprogramWechatPackaging = wrappedPack;
+        return ws;
+    } catch {
+        return new Proxy(ws, {
+            get(target, prop, receiver) {
+                if (prop === 'lowerMiniprogramWechatPackaging') return wrappedPack;
+                const value = Reflect.get(target, prop, receiver);
+                return typeof value === 'function' ? value.bind(target) : value;
+            },
+        });
+    }
 }
 
 /**
@@ -720,6 +738,7 @@ export function lowerMiniprogramToolingDeployJson(rootPath) {
 
 export function lowerMiniprogramWechatPackagingJson(rootPath) {
     const native = loadNative();
+    materializeWechatPackaging(rootPath);
     return native.lowerMiniprogramWechatPackagingJson(rootPath);
 }
 
@@ -954,12 +973,19 @@ export {
     assertLangRuntimePair,
 } from './server-language-backend.js';
 export {
+    WECHAT_PACKAGING_SCHEMA,
+    WECHAT_PACKAGING_REL,
+    wechatPackagingFromDelivery,
+    materializeWechatPackaging,
+} from './wechat-packaging.js';
+export {
     DELIVERY_PROFILE_AUTHORING_SCHEMA,
     BUILD_PROFILE_SELECTION_SCHEMA,
     ASSEMBLIES,
     SERVER_RUNTIMES,
     BUILTIN_PROFILES,
     pickSiteAuthoring,
+    pickDeliveryPackaging,
     normalizeDeliveryAuthoring,
     selectBuildProfile,
     semanticIdsForAssembly,

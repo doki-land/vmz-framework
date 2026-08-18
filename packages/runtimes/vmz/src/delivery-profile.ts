@@ -53,6 +53,63 @@ export function pickSiteAuthoring(raw) {
     return site;
 }
 
+/**
+ * `delivery.packaging.wechat` — vendor identity, not WeChat JSON / wx APIs.
+ * @param {unknown} raw
+ * @param {Array<{ code: string, message: string }>} diagnostics
+ */
+export function pickDeliveryPackaging(raw, diagnostics) {
+    if (!isPlainObject(raw) || raw.packaging == null) return null;
+    if (!isPlainObject(raw.packaging)) {
+        diagnostics.push({ code: 'delivery.packaging', message: 'delivery.packaging must be an object' });
+        return null;
+    }
+    for (const key of Object.keys(raw.packaging)) {
+        if (key !== 'wechat') {
+            diagnostics.push({
+                code: 'delivery.packaging.vendor',
+                message: `delivery.packaging.${key} is not a known vendor (wechat)`,
+            });
+        }
+    }
+    const wechat = raw.packaging.wechat;
+    if (wechat == null) return {};
+    if (!isPlainObject(wechat)) {
+        diagnostics.push({
+            code: 'delivery.packaging.wechat',
+            message: 'delivery.packaging.wechat must be an object',
+        });
+        return null;
+    }
+    for (const [k, v] of Object.entries(wechat)) {
+        if (typeof v === 'function') {
+            diagnostics.push({
+                code: 'delivery.packaging.executable',
+                message: `delivery.packaging.wechat.${k} must be pure data (no functions)`,
+            });
+            continue;
+        }
+        if (k !== 'appId' && k !== 'projectName' && k !== 'title') {
+            diagnostics.push({
+                code: 'delivery.packaging.wechat.field',
+                message: `delivery.packaging.wechat.${k} is not a known field (appId|projectName|title)`,
+            });
+        } else if (v != null && typeof v !== 'string') {
+            diagnostics.push({
+                code: 'delivery.packaging.wechat.type',
+                message: `delivery.packaging.wechat.${k} must be a string`,
+            });
+        }
+    }
+    const out = {};
+    if (typeof wechat.appId === 'string' && wechat.appId.trim()) out.appId = wechat.appId.trim();
+    if (typeof wechat.projectName === 'string' && wechat.projectName.trim()) {
+        out.projectName = wechat.projectName.trim();
+    }
+    if (typeof wechat.title === 'string' && wechat.title.trim()) out.title = wechat.title.trim();
+    return { wechat: out };
+}
+
 function normalizeProfileEntry(entry, id, diagnostics) {
     if (!isPlainObject(entry)) {
         diagnostics.push({ code: 'delivery.profile.invalid', message: `profiles.${id} must be an object` });
@@ -186,6 +243,9 @@ export function normalizeDeliveryAuthoring(raw) {
                     : {}),
             },
         };
+    } else if (isPlainObject(raw.packaging)) {
+        defaultId = String(raw.default || 'web-ssr').trim() || 'web-ssr';
+        profileInputs = { ...BUILTIN_PROFILES };
     } else {
         return {
             ok: false,
@@ -211,11 +271,15 @@ export function normalizeDeliveryAuthoring(raw) {
     }
     if (diagnostics.length) return { ok: false, diagnostics };
 
+    const packaging = pickDeliveryPackaging(raw, diagnostics);
+    if (diagnostics.length) return { ok: false, diagnostics };
+
     const table = {
         schema: DELIVERY_PROFILE_AUTHORING_SCHEMA,
         default: defaultId,
         profiles,
         sugar,
+        ...(packaging ? { packaging } : {}),
     };
     table.digest = sha256Hex(canonicalJson(table));
     return { ok: true, table };

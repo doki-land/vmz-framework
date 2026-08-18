@@ -153,17 +153,33 @@ export interface DeliveryProfileAuthoring {
     activation?: SiteDeliveryAuthoring['activation'];
 }
 
+/** WeChat DevTools project identity. Pure data; not WeChat JSON / wx.* APIs. */
+export interface WechatPackagingAuthoring {
+    /** Registered AppID. Omit for WeChat tourist mode (`touristappid`). */
+    appId?: string;
+    projectName?: string;
+    /** `app.json` `window.navigationBarTitleText`. */
+    title?: string;
+}
+
+/** Vendor packaging identity under `defineConfig({ delivery })`. */
+export interface DeliveryPackagingAuthoring {
+    wechat?: WechatPackagingAuthoring;
+}
+
 /** Named profiles (preferred) or legacy site-only sugar. */
 export type DeliveryAuthoring =
     | {
           default?: string;
           profiles: Record<string, DeliveryProfileAuthoring>;
+          packaging?: DeliveryPackagingAuthoring;
       }
     | (SiteDeliveryAuthoring & {
           default?: string;
           assembly?: DeliveryAssembly;
           host?: 'browser';
           serverRuntime?: DeliveryServerRuntime;
+          packaging?: DeliveryPackagingAuthoring;
       });
 
 export type DefinePluginInput = PluginManifest & {

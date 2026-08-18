@@ -8,7 +8,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use walkdir::WalkDir;
 
@@ -25,6 +25,38 @@ pub const WECHAT_PACK_TARGET: &str = "wechat";
 
 /// Relative root of the WeChat DevTools project (`dist/wechat`).
 pub const WECHAT_PACK_ROOT: &str = "dist/wechat";
+
+/// Contract written from defineConfig delivery.packaging.wechat.
+pub const WECHAT_PACKAGING_REL: &str = "dist/_vmz/wechat-packaging.json";
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WechatPackagingSpec {
+    #[serde(default)]
+    app_id: String,
+    #[serde(default)]
+    project_name: String,
+    #[serde(default)]
+    title: String,
+}
+
+fn load_wechat_packaging(root: &Path) -> WechatPackagingSpec {
+    let path = root.join("dist").join("_vmz").join("wechat-packaging.json");
+    let Ok(text) = fs::read_to_string(path) else {
+        return WechatPackagingSpec::default();
+    };
+    serde_json::from_str(&text).unwrap_or_default()
+}
+
+fn wechat_app_id(spec: &WechatPackagingSpec) -> &str {
+    let id = spec.app_id.trim();
+    if id.is_empty() { "touristappid" } else { id }
+}
+
+fn wechat_title(spec: &WechatPackagingSpec) -> &str {
+    let title = spec.title.trim();
+    if title.is_empty() { "VMZ" } else { title }
+}
 
 /// One written WeChat page (or app chrome) file set.
 #[derive(Debug, Clone, Serialize)]
@@ -199,6 +231,7 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
 
     let pack_abs = wechat_pack_abs(root);
     let _ = fs::create_dir_all(&pack_abs);
+    let packaging = load_wechat_packaging(root);
     let legacy = root.join("dist").join("_vmz").join("mini-deploy").join("wechat");
     if legacy.exists() {
         let _ = fs::remove_dir_all(&legacy);
@@ -251,10 +284,12 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
                     });
                     let page_json_body =
                         vmz_generator::to_pretty_json(&page_json).unwrap_or_else(|_| "{}".into());
-                    let page_js = match print_chrome_js(
-                        "Page({ onShareAppMessage() { return { title: 'VMZ' }; } });\n",
-                        &format!("{stem}.js"),
-                    ) {
+                    let share_title = serde_json::to_string(wechat_title(&packaging))
+                        .unwrap_or_else(|_| "\"VMZ\"".into());
+                    let page_js_src = format!(
+                        "Page({{ onShareAppMessage() {{ return {{ title: {share_title} }}; }} }});\n"
+                    );
+                    let page_js = match print_chrome_js(&page_js_src, &format!("{stem}.js")) {
                         Ok(code) => code,
                         Err(e) => {
                             diagnostics.push(diag(
@@ -303,7 +338,7 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
     let app_json = json!({
         "pages": app_pages,
         "window": {
-            "navigationBarTitleText": "VMZ"
+            "navigationBarTitleText": wechat_title(&packaging)
         },
         "sitemapLocation": "sitemap.json"
     });
@@ -349,7 +384,11 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
     let sitemap_body = vmz_generator::to_pretty_json(&sitemap).unwrap_or_else(|_| "{}".into());
     let _ = write_pack_file(&root.join(&sitemap_rel), &format!("{sitemap_body}\n"));
 
-    let projectname = root.file_name().and_then(|s| s.to_str()).unwrap_or("vmz");
+    let folder_name = root.file_name().and_then(|s| s.to_str()).unwrap_or("vmz");
+    let projectname = {
+        let n = packaging.project_name.trim();
+        if n.is_empty() { folder_name } else { n }
+    };
     let project_config = json!({
         "description": "VMZ WeChat pack: open this folder in WeChat DevTools",
         "packOptions": { "ignore": [], "include": [] },
@@ -363,7 +402,7 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
         },
         "compileType": "miniprogram",
         "libVersion": "3.7.12",
-        "appid": "touristappid",
+        "appid": wechat_app_id(&packaging),
         "projectname": projectname,
         "miniprogramRoot": "./",
         "condition": {},
