@@ -27,6 +27,7 @@ import { diffFingerprints, fileFingerprintMap } from './watch-diff.js';
  * @property {string} [host]
  * @property {number} [port]
  * @property {number} [pollMs]
+ * @property {'browser' | 'mini-program-wechat'} [target]
  * @property {AbortSignal} [signal]
  * @property {typeof createWorkspace} [createWorkspaceFn]
  * @property {(opts: { project: string, outDir: string, host: string, port: number }) => import('node:child_process').ChildProcess} [spawnHostFn]
@@ -42,6 +43,7 @@ export function createDevSession(options) {
     const host = options.host ?? '127.0.0.1';
     const port = options.port ?? 5173;
     const pollMs = Math.max(50, options.pollMs ?? 300);
+    const wechatPreview = options.target === 'mini-program-wechat';
     const createWs = options.createWorkspaceFn ?? createWorkspace;
     const spawnHost = options.spawnHostFn ?? defaultSpawnHost;
     const softReload = options.softReloadFn ?? defaultSoftReload;
@@ -79,6 +81,33 @@ export function createDevSession(options) {
         const mode = report.full ? 'full' : 'affected';
         const chunks = (report.affectedChunks || []).join(', ') || '(none)';
         log.info(`${label} ok (${mode}; chunks=[${chunks}]; ${(report.emitted ?? []).length} emitted)`);
+        return true;
+    }
+
+    /**
+     * Rewrite `dist/wechat` so WeChat DevTools (already open) recompiles WXSS.
+     * Preview is vendor compile, not the browser serve-host.
+     */
+    function packWechatPreview() {
+        if (typeof ws.lowerMiniprogramWechatPackaging !== 'function') {
+            log.error('wechat pack: workspace missing lowerMiniprogramWechatPackaging');
+            return false;
+        }
+        let report;
+        try {
+            const raw = ws.lowerMiniprogramWechatPackaging();
+            report = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        } catch (err) {
+            log.error(`wechat pack failed: ${err}`);
+            return false;
+        }
+        log.diagnostics(report.diagnostics ?? []);
+        if (report.status !== 'ready') {
+            log.error(`wechat pack ${report.status || 'failed'}`);
+            return false;
+        }
+        const packRoot = report.packRoot || 'dist/wechat';
+        log.info(`wechat pack ok → ${path.join(project, packRoot)} (WeChat DevTools compiles WXSS here)`);
         return true;
     }
 
@@ -152,19 +181,29 @@ export function createDevSession(options) {
             }
         }
 
-        const hostJs = path.join(outDir, 'vmz-serve-host.mjs');
-        if (!existsSync(hostJs)) {
-            throw new Error(`vmz dev: missing ${hostJs}`);
-        }
+        if (wechatPreview) {
+            if (!packWechatPreview()) {
+                throw new Error('vmz dev: wechat pack failed');
+            }
+        } else {
+            const hostJs = path.join(outDir, 'vmz-serve-host.mjs');
+            if (!existsSync(hostJs)) {
+                throw new Error(`vmz dev: missing ${hostJs}`);
+            }
 
-        child = spawnHost({ project, outDir, host, port });
-        await waitHostReady().catch((err) => {
-            log.warn(String(err));
-        });
+            child = spawnHost({ project, outDir, host, port });
+            await waitHostReady().catch((err) => {
+                log.warn(String(err));
+            });
+        }
         const docsRoot = path.join(project, 'documents');
         const localesRoot = path.join(project, 'locales');
         const watchRoots = [src].concat(existsSync(docsRoot) ? [docsRoot] : []).concat(existsSync(localesRoot) ? [localesRoot] : []);
-        log.info(`dev → http://${host}:${port} (watching ${watchRoots.join(', ')})`);
+        if (wechatPreview) {
+            log.info(`dev → WeChat DevTools (watching ${watchRoots.join(', ')}; keep dist/wechat open)`);
+        } else {
+            log.info(`dev → http://${host}:${port} (watching ${watchRoots.join(', ')})`);
+        }
 
         /** @type {Map<string, Map<string, string>>} */
         const fingerprints = new Map();
@@ -198,7 +237,7 @@ export function createDevSession(options) {
                 await sleep(pollMs);
                 if (stopped || signal?.aborted) break;
 
-                if (child && child.exitCode != null) {
+                if (!wechatPreview && child && child.exitCode != null) {
                     log.warn(`serve-host exited (${child.exitCode}) — respawning…`);
                     child = spawnHost({ project, outDir, host, port });
                     await waitHostReady().catch(() => {});
@@ -270,6 +309,12 @@ export function createDevSession(options) {
                             needFullReload = true;
                         }
                     }
+                    if (wechatPreview) {
+                        if (!packWechatPreview()) {
+                            log.warn('wechat pack failed — keeping previous dist/wechat');
+                        }
+                        continue;
+                    }
                     const kind = await reloadAfterBuild({
                         affectedChunks: report.affectedChunks ?? [],
                         seedChunks: report.seedChunks ?? [],
@@ -295,9 +340,16 @@ export function createDevSession(options) {
                         log.warn('locale runtime emit failed — keeping previous modules');
                         continue;
                     }
-                    const kind = await reloadAfterBuild({ full: true, islandHmr: false, emitted: [] });
-                    log.info(kind === 'respawn' ? 'reload ok (respawned; locales)' : 'soft reload ok (full page; locales)');
-                    if (!batch.docsDirty) continue;
+                    if (wechatPreview) {
+                        if (!packWechatPreview()) {
+                            log.warn('wechat pack failed — keeping previous dist/wechat');
+                        }
+                        if (!batch.docsDirty) continue;
+                    } else {
+                        const kind = await reloadAfterBuild({ full: true, islandHmr: false, emitted: [] });
+                        log.info(kind === 'respawn' ? 'reload ok (respawned; locales)' : 'soft reload ok (full page; locales)');
+                        if (!batch.docsDirty) continue;
+                    }
                 }
 
                 if (batch.docsDirty) {
@@ -307,8 +359,14 @@ export function createDevSession(options) {
                         log.warn('document mount rebuild failed — keeping previous docs');
                         continue;
                     }
-                    const kind = await reloadAfterBuild({ full: true, islandHmr: false, emitted: [] });
-                    log.info(kind === 'respawn' ? 'reload ok (respawned; docs)' : 'soft reload ok (full page; docs)');
+                    if (wechatPreview) {
+                        if (!packWechatPreview()) {
+                            log.warn('wechat pack failed — keeping previous dist/wechat');
+                        }
+                    } else {
+                        const kind = await reloadAfterBuild({ full: true, islandHmr: false, emitted: [] });
+                        log.info(kind === 'respawn' ? 'reload ok (respawned; docs)' : 'soft reload ok (full page; docs)');
+                    }
                 }
             }
         } finally {

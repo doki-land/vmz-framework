@@ -18,6 +18,8 @@ describe('vmz Node CLI host (N2)', () => {
         expect(a.release).toBe(true);
         expect(Object.prototype.hasOwnProperty.call(a, 'port')).toBe(true);
         expect(Object.prototype.hasOwnProperty.call(parseArgs(['.']), 'port')).toBe(false);
+        const t = parseArgs(['.', '--target', 'mini-program-wechat']);
+        expect(t.target).toBe('mini-program-wechat');
     });
 
     it('resolveWorkspaceDirs joins relative out-dir', () => {
@@ -88,6 +90,45 @@ describe('vmz Node CLI host (N2)', () => {
         expect(spawned.filter((c) => c.some((x) => String(x).includes('cargo')))).toEqual([]);
 
         void session.stop();
+        fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('wechat preview packs dist/wechat and does not spawn serve-host', async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-dev-wechat-'));
+        const src = path.join(dir, 'src');
+        fs.mkdirSync(src);
+        fs.writeFileSync(
+            path.join(src, 'Application.vmz'),
+            `<template><p>hi</p></template>\n<script client>\nexport default class Application {}\n</script>\n`,
+        );
+        let packed = 0;
+        /** @type {string[]} */
+        const spawned = [];
+        const session = createDevSession({
+            project: dir,
+            outDir: path.join(dir, 'dist'),
+            target: 'mini-program-wechat',
+            pollMs: 40,
+            createWorkspaceFn: () => ({
+                build: () => ({ diagnostics: [], full: true, affectedChunks: [], emitted: [] }),
+                updateFiles() {},
+                dispose() {},
+                lowerMiniprogramWechatPackaging() {
+                    packed += 1;
+                    return JSON.stringify({ status: 'ready', packRoot: 'dist/wechat', diagnostics: [] });
+                },
+            }),
+            spawnHostFn: () => {
+                spawned.push('host');
+                throw new Error('serve-host must not spawn for wechat preview');
+            },
+        });
+        const started = session.start();
+        await new Promise((r) => setTimeout(r, 80));
+        await session.stop();
+        await started.catch(() => {});
+        expect(packed).toBeGreaterThanOrEqual(1);
+        expect(spawned).toEqual([]);
         fs.rmSync(dir, { recursive: true, force: true });
     });
 

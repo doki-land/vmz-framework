@@ -108,7 +108,7 @@ Usage:
   vmz check [path]              Check project via Workspace
   vmz build [path] [options]    Build project via Workspace
   vmz serve [path] [options]    Serve dist (optional --build)
-  vmz dev [path] [options]      Long-lived rebuild session (no CLI spawn)
+  vmz dev [path] [options]      Rebuild session; --target mini-program-wechat packs dist/wechat
   vmz format [path] [--check]   Format .vmz via N-API (oxc formatter + EditorConfig)
   vmz lint [path] [--deny-warnings]  Lint (= check) via N-API
   vmz test [path] [options]     Native test discover / report
@@ -126,6 +126,7 @@ Options:
   --out-dir, -o <dir>   Output directory (default: dist)
   --release             Release build (omit serve-host; pack minify slot; proof)
   --profile <name>      Delivery profile (default from config; builtins: web-ssr|web-static|web-client|web-hybrid)
+  --target <id>         Dev preview: browser (default) | mini-program-wechat (pack dist/wechat; WeChat DevTools)
   --origin <url>        Site origin for static-cdn canonical/sitemap
   --host <host>         Listen host (default: 127.0.0.1)
   --port <port>         Listen port (dev: omit = auto from 5173; set = lock)
@@ -544,6 +545,11 @@ async function cmdDev(args) {
         }
     }
     const pollMs = Number(args['poll-ms'] ?? 300);
+    const targetRaw = typeof args.target === 'string' ? args.target : 'browser';
+    if (targetRaw !== 'browser' && targetRaw !== 'mini-program-wechat') {
+        log.error(`unknown --target ${targetRaw} (browser | mini-program-wechat)`);
+        return 1;
+    }
 
     const ac = new AbortController();
     const onSig = () => {
@@ -559,6 +565,7 @@ async function cmdDev(args) {
         host,
         port,
         pollMs,
+        target: targetRaw,
         signal: ac.signal,
     });
 
