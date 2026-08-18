@@ -3,7 +3,9 @@
 //! Composes on route/server/style artifacts into a VMZ-owned deploy package and
 //! deterministic Mini Host descriptor. Vendor developer-tools CLI is recorded as
 //! transport/conformance only — never invoked here, never becomes test semantics.
-//! Not a WXML/WXSS emitter; does not ship `#server` implementation bodies.
+//! WeChat `pages/**/*.wxml|wxss` are written via [`super::wechat_pack`]
+//! (`vmz-generator` printers). Adapters still do not own a WXML emitter.
+//! Does not ship `#server` implementation bodies.
 
 use std::fs;
 use std::path::Path;
@@ -17,6 +19,7 @@ use super::route_server_style::{
     MiniRouteServerStyleReport, lower_miniprogram_route_server_style_slices,
 };
 use super::static_slice::MINI_TEMPLATE_DIALECT;
+use super::wechat_pack::{MiniWechatPackReport, lower_miniprogram_wechat_packaging};
 
 /// Report schema for tooling/deploy lowering.
 pub const MINI_TOOLING_DEPLOY_REPORT_SCHEMA: &str = "vmz.target.mini_tooling_deploy.v0";
@@ -69,7 +72,7 @@ fn diag(
     TargetDiagnostic::with_severity(path, severity, message).with_code(code)
 }
 
-fn build_deploy_package(rss: &MiniRouteServerStyleReport) -> Value {
+fn build_deploy_package(rss: &MiniRouteServerStyleReport, wechat: &MiniWechatPackReport) -> Value {
     let pages = rss.route_table.get("pages").cloned().unwrap_or_else(|| json!([]));
     let artifacts: Vec<Value> = rss
         .artifacts
@@ -164,6 +167,13 @@ fn build_deploy_package(rss: &MiniRouteServerStyleReport) -> Value {
             "serverImplInMiniPackage": false,
             "independentBackend": false,
             "miniIr": false
+        },
+        "wechatPack": {
+            "schema": wechat.schema,
+            "status": wechat.status,
+            "root": wechat.pack_root,
+            "printer": wechat.printer,
+            "pages": wechat.pages
         }
     })
 }
@@ -209,7 +219,9 @@ pub fn lower_miniprogram_tooling_deploy(root: &Path) -> MiniToolingDeployReport 
         };
     }
 
-    let package = build_deploy_package(&rss);
+    let wechat = lower_miniprogram_wechat_packaging(root);
+    diagnostics.extend(wechat.diagnostics.clone());
+    let package = build_deploy_package(&rss, &wechat);
     if let Some(parent) = package_abs.parent() {
         let _ = fs::create_dir_all(parent);
     }

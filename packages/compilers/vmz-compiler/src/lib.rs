@@ -79,6 +79,7 @@ pub use miniprogram::static_slice as miniprogram_static_slice;
 pub use miniprogram::structure as miniprogram_structure;
 pub use miniprogram::target as miniprogram_target;
 pub use miniprogram::tooling_deploy as miniprogram_tooling_deploy;
+pub use miniprogram::wechat_pack as miniprogram_wechat_pack;
 
 pub use platform::conformance as cross_host_conformance;
 pub use platform::delivery as delivery_proof;
