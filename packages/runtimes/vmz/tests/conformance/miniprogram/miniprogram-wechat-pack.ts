@@ -34,7 +34,7 @@ fs.writeFileSync(
 export default class IndexPage {
   store = 'Waitrose';
   deals = [{ id: 'd1', title: 'deal' }];
-  onStore() {}
+  onStore() { this.store = 'Waitrose 静安店'; }
 }
 </script>
 `,

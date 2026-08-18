@@ -121,10 +121,21 @@ fn collect_program_json(root: &Path) -> Vec<PathBuf> {
 fn read_css_bundle(root: &Path) -> String {
     let dist = root.join("dist");
     let mut parts = Vec::new();
-    for name in ["vmz.css", "vmz-tw.css", "vmz-designs.css"] {
+    // Prefer layer bodies (SFC / TW / designs). `vmz.css` is an @import entry
+    // and must not be the only WXSS source.
+    for name in ["vmz-style.css", "vmz-tw.css", "vmz-designs.css"] {
         let p = dist.join(name);
         if let Ok(text) = fs::read_to_string(&p)
             && !text.trim().is_empty()
+        {
+            parts.push(text);
+        }
+    }
+    if parts.is_empty() {
+        let p = dist.join("vmz.css");
+        if let Ok(text) = fs::read_to_string(&p)
+            && !text.trim().is_empty()
+            && !text.contains("@import")
         {
             parts.push(text);
         }
