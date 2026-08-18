@@ -180,7 +180,7 @@ fn writes_pages_under_dist_wechat() {
     assert!(wxml.contains("bindtap=\"onStore\""), "{wxml}");
     assert!(wxss.contains("#3d6b2f") || wxss.contains(".page"), "{wxss}");
     assert!(
-        fs::read_to_string(&page_js).unwrap().contains("Page("),
+        fs::read_to_string(&page_js).unwrap().contains("onShareAppMessage"),
         "{}",
         fs::read_to_string(&page_js).unwrap()
     );

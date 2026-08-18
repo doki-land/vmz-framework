@@ -95,7 +95,13 @@ const project = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
 if (project.compileType !== 'miniprogram') fail(`compileType ${project.compileType}`);
 if (project.miniprogramRoot !== './') fail(`miniprogramRoot ${project.miniprogramRoot}`);
 if (!fs.readFileSync(appJsPath, 'utf8').includes('App(')) fail('app.js missing App()');
-if (!fs.readFileSync(pageJsPath, 'utf8').includes('Page(')) fail('page js missing Page()');
+if (!fs.readFileSync(pageJsPath, 'utf8').includes('onShareAppMessage')) {
+    fail('page js missing onShareAppMessage');
+}
+const pageJson = JSON.parse(fs.readFileSync(path.join(pack, 'pages', 'index', 'index.json'), 'utf8'));
+if (pageJson.enableShareAppMessage !== true) {
+    fail(`enableShareAppMessage ${pageJson.enableShareAppMessage}`);
+}
 
 const wsReport = JSON.parse(ws.lowerMiniprogramWechatPackaging());
 if (wsReport.status !== 'ready') fail(`workspace lower ${wsReport.status}`);
