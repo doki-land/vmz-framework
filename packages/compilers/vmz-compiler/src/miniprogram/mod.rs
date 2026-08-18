@@ -10,6 +10,7 @@ pub mod structure;
 pub mod target;
 pub mod tooling_deploy;
 pub mod wechat_pack;
+mod wechat_tab;
 
 use vmz_generator::{MiniEmitError, MiniEmitErrorKind};
 use vmz_protocol::{DIAG_ARTIFACT_INVALID, DIAG_PLATFORM_UNSUPPORTED, Severity, TargetDiagnostic};

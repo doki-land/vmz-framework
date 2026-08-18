@@ -133,6 +133,7 @@ fn sample_unit() -> ProgramUnit {
             server_module_id: None,
             client_calls: vec![],
             resume_entries: vec![],
+            tab: None,
         },
         graph: Default::default(),
     }

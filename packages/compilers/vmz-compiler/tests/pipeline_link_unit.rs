@@ -22,6 +22,7 @@ fn demo_table() -> RouteTable {
             chunk_id: "pages/index".into(),
             source: PathBuf::from("src/pages/index.vmz"),
             load: None,
+            tab: None,
         })
         .unwrap();
     table
@@ -31,6 +32,7 @@ fn demo_table() -> RouteTable {
             chunk_id: "pages/about".into(),
             source: PathBuf::from("src/pages/about.vmz"),
             load: None,
+            tab: None,
         })
         .unwrap();
     table
@@ -40,6 +42,7 @@ fn demo_table() -> RouteTable {
             chunk_id: "pages/products/[id]".into(),
             source: PathBuf::from("src/pages/products/[id].vmz"),
             load: Some("load".into()),
+            tab: None,
         })
         .unwrap();
     table
@@ -82,6 +85,7 @@ fn class_default_route_id_survives_path_rename() {
             chunk_id: "pages/legacy/[id]".into(),
             source: PathBuf::from("src/pages/legacy/[id].vmz"),
             load: None,
+            tab: None,
         })
         .unwrap();
     table.by_id.get_mut("ProductPage").unwrap().path_pattern = "/products/[id]".into();
@@ -114,6 +118,48 @@ fn router_attr_shorthand_desugars() {
     let c = parse_route_contract(&block).unwrap();
     assert_eq!(c.path.as_deref(), Some("/docs"));
     assert!(c.id.is_none());
+    assert!(c.tab.is_none());
+}
+
+#[test]
+fn router_tab_parses_order_label_icon() {
+    use vmz_compiler::pipeline::link::parse_route_contract;
+    use vmz_compiler::sfc::DataBlock;
+    let block = DataBlock {
+        content: r#"{ tab: { order: 0, label: "首页", icon: "assets/tab-home.svg" } }"#.into(),
+        content_start: 0,
+        lang: None,
+        attrs: String::new(),
+    };
+    let c = parse_route_contract(&block).unwrap();
+    let tab = c.tab.expect("tab");
+    assert_eq!(tab.order, 0);
+    assert_eq!(tab.label, "首页");
+    assert_eq!(tab.icon, "assets/tab-home.svg");
+    assert!(tab.selected_icon.is_none());
+}
+
+#[test]
+fn router_tab_rejects_wechat_keys_and_unknown_fields() {
+    use vmz_compiler::pipeline::link::parse_route_contract;
+    use vmz_compiler::sfc::DataBlock;
+    let wechat = DataBlock {
+        content: r#"{ tabBar: { list: [] } }"#.into(),
+        content_start: 0,
+        lang: None,
+        attrs: String::new(),
+    };
+    let err = parse_route_contract(&wechat).unwrap_err();
+    assert!(err.contains("tabBar"), "{err}");
+    let unknown = DataBlock {
+        content: r#"{ tab: { order: 0, label: "首页", icon: "assets/a.svg", iconPath: "x.png" } }"#
+            .into(),
+        content_start: 0,
+        lang: None,
+        attrs: String::new(),
+    };
+    let err = parse_route_contract(&unknown).unwrap_err();
+    assert!(err.contains("iconPath"), "{err}");
 }
 
 #[test]

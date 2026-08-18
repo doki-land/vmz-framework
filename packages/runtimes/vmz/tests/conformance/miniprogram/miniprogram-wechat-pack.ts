@@ -19,9 +19,18 @@ function fail(msg: string): never {
 console.log('miniprogram-wechat-pack: build rewrite-mini home-shaped page…');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-mini-wechat-'));
 fs.mkdirSync(path.join(dir, 'src', 'pages'), { recursive: true });
+fs.mkdirSync(path.join(dir, 'assets'), { recursive: true });
+const tabSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" fill="currentColor"/></svg>';
+fs.writeFileSync(path.join(dir, 'assets', 'tab-home.svg'), tabSvg);
+fs.writeFileSync(path.join(dir, 'assets', 'tab-me.svg'), tabSvg);
 fs.writeFileSync(
     path.join(dir, 'src', 'pages', 'index.vmz'),
-    `<template>
+    `<router>
+{
+  tab: { order: 0, label: "首页", icon: "assets/tab-home.svg" },
+}
+</router>
+<template>
   <div class="page">
     <div class="loc" @click={onStore}>{store}</div>
     <div class="deal" each={deals} as="item" key={item.id}>{item.title}</div>
@@ -36,6 +45,21 @@ export default class IndexPage {
   deals = [{ id: 'd1', title: 'deal' }];
   onStore() { this.store = 'Waitrose 静安店'; }
 }
+</script>
+`,
+);
+fs.writeFileSync(
+    path.join(dir, 'src', 'pages', 'me.vmz'),
+    `<router>
+{
+  tab: { order: 1, label: "我的", icon: "assets/tab-me.svg" },
+}
+</router>
+<template>
+  <div class="page">me</div>
+</template>
+<script client>
+export default class MePage {}
 </script>
 `,
 );
@@ -102,6 +126,20 @@ if (!fs.readFileSync(pageJsPath, 'utf8').includes('onShareAppMessage')) {
 const pageJson = JSON.parse(fs.readFileSync(path.join(pack, 'pages', 'index', 'index.json'), 'utf8'));
 if (pageJson.enableShareAppMessage !== true) {
     fail(`enableShareAppMessage ${pageJson.enableShareAppMessage}`);
+}
+if (app.tabBar?.custom === true) fail('native tabBar must not set custom');
+if (!Array.isArray(app.tabBar?.list) || app.tabBar.list.length !== 2) {
+    fail(`tabBar.list ${JSON.stringify(app.tabBar)}`);
+}
+if (app.tabBar.list[0]?.text !== '首页' || app.tabBar.list[0]?.iconPath !== 'assets/tab-home.png') {
+    fail(`tab 0 ${JSON.stringify(app.tabBar.list[0])}`);
+}
+const tabPng = path.join(pack, 'assets', 'tab-home.png');
+const tabOn = path.join(pack, 'assets', 'tab-home-on.png');
+if (!fs.existsSync(tabPng) || !fs.existsSync(tabOn)) fail('tab png missing');
+const pngHead = fs.readFileSync(tabPng).subarray(0, 4);
+if (pngHead[0] !== 0x89 || pngHead[1] !== 0x50 || pngHead[2] !== 0x4e || pngHead[3] !== 0x47) {
+    fail('tab-home.png is not PNG');
 }
 
 const wsReport = JSON.parse(ws.lowerMiniprogramWechatPackaging());
