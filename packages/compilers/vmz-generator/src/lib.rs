@@ -26,7 +26,7 @@ pub use js::{
 pub use css::{
     StyleContribution, StyleEmitReport, StyleLayer, ThemeDecl, ThemeRule, css_var_name,
     emit_style_bundle, emit_style_bundle_opts, emit_theme_css, format_css, minify_css,
-    print_css, theme_attr_selector, validate_css,
+    print_css, print_wxss, theme_attr_selector, validate_css,
 };
 pub use json::{
     DataFormat, emit_data, emit_data_artifact, to_json, to_json5, to_pretty_json, to_yaml,
@@ -35,7 +35,8 @@ pub use lang::emit_rust_server_unit;
 pub use markup::{
     HreflangAlternate, HtmlShellInput, MINI_TEMPLATE_DIALECT, MarkupDocument, MarkupNode,
     MiniEmitError, MiniEmitErrorKind, MiniEventHandler, MiniTemplateEmit, MiniTemplateProfile,
-    PageShellInput, PageShellMeta, RedirectHtmlInput, SitemapUrl, emit_html_document,
-    emit_html_shell, emit_markup, emit_mini_template, emit_mini_template_profile, emit_page_shell,
-    emit_redirect_html, emit_robots_txt, emit_sitemap_xml,
+    PageShellInput, PageShellMeta, RedirectHtmlInput, SitemapUrl, WECHAT_WXML_DIALECT,
+    emit_html_document, emit_html_shell, emit_markup, emit_mini_template,
+    emit_mini_template_profile, emit_page_shell, emit_redirect_html, emit_robots_txt,
+    emit_sitemap_xml, emit_wechat_wxml,
 };

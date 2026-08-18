@@ -360,40 +360,53 @@ fn wire_event(a: &ViewAttr, attr_s: &mut String, ctx: &mut EmitCtx<'_>) -> Resul
         );
         return Err(());
     };
+    match wire_event_handler(a, reactive, &mut ctx.next_handler, &mut ctx.handlers) {
+        Ok(h) => {
+            attr_s.push_str(&format!(" data-vmz-on=\"{}\"", h.handler_id));
+            Ok(())
+        }
+        Err(e) => {
+            ctx.errors.push(e);
+            ctx.failed = true;
+            Err(())
+        }
+    }
+}
+
+/// Resolve an event attr to a handler row (shared by Mini dialect and WeChat print).
+pub(crate) fn wire_event_handler(
+    a: &ViewAttr,
+    reactive: &ReactiveComponent,
+    next_handler: &mut u32,
+    handlers: &mut Vec<MiniEventHandler>,
+) -> Result<MiniEventHandler, MiniEmitError> {
     let method = match &a.value {
         ViewAttrValue::Interp { expr } => expr.trim(),
         ViewAttrValue::Static { value } => value.trim(),
         ViewAttrValue::Bare => {
-            push_err(
-                ctx,
-                MiniEmitErrorKind::ArtifactInvalid,
-                format!("mini template: bare event attr {}", a.name),
-            );
-            return Err(());
+            return Err(MiniEmitError {
+                kind: MiniEmitErrorKind::ArtifactInvalid,
+                message: format!("mini template: bare event attr {}", a.name),
+            });
         }
     };
     if method.is_empty() {
-        push_err(
-            ctx,
-            MiniEmitErrorKind::ArtifactInvalid,
-            format!("mini template: empty handler on {}", a.name),
-        );
-        return Err(());
+        return Err(MiniEmitError {
+            kind: MiniEmitErrorKind::ArtifactInvalid,
+            message: format!("mini template: empty handler on {}", a.name),
+        });
     }
     let Some((effect_id, written)) = written_field_ids(reactive, method) else {
-        push_err(
-            ctx,
-            MiniEmitErrorKind::ArtifactInvalid,
-            format!("mini template: no Reactive effect for method `{method}`"),
-        );
-        return Err(());
+        return Err(MiniEmitError {
+            kind: MiniEmitErrorKind::ArtifactInvalid,
+            message: format!("mini template: no Reactive effect for method `{method}`"),
+        });
     };
     let affected = affected_binding_ids(reactive, &written);
-    let handler_id = format!("h{}", ctx.next_handler);
-    ctx.next_handler += 1;
+    let handler_id = format!("h{}", *next_handler);
+    *next_handler += 1;
     let patch_paths: Vec<String> = affected.iter().map(|id| format!("b.B_{id}")).collect();
-    attr_s.push_str(&format!(" data-vmz-on=\"{handler_id}\""));
-    ctx.handlers.push(MiniEventHandler {
+    let row = MiniEventHandler {
         handler_id,
         event_kind: normalize_event_kind(&a.name),
         method: method.to_string(),
@@ -401,8 +414,9 @@ fn wire_event(a: &ViewAttr, attr_s: &mut String, ctx: &mut EmitCtx<'_>) -> Resul
         written_fields: written,
         affected_bindings: affected,
         patch_paths,
-    });
-    Ok(())
+    };
+    handlers.push(row.clone());
+    Ok(row)
 }
 
 fn field_root_id(path: &IrDepPath) -> Option<u32> {
@@ -436,7 +450,7 @@ fn affected_binding_ids(reactive: &ReactiveComponent, written: &[u32]) -> Vec<u3
     out
 }
 
-fn normalize_event_kind(attr: &str) -> String {
+pub(crate) fn normalize_event_kind(attr: &str) -> String {
     let n = attr.trim();
     if let Some(rest) = n.strip_prefix('@') {
         return rest.to_ascii_lowercase();
@@ -449,7 +463,7 @@ fn normalize_event_kind(attr: &str) -> String {
     n.to_ascii_lowercase()
 }
 
-fn is_event_attr(name: &str) -> bool {
+pub(crate) fn is_event_attr(name: &str) -> bool {
     let n = name.trim();
     n.starts_with('@') || (n.starts_with("on") && n.len() > 2)
 }
