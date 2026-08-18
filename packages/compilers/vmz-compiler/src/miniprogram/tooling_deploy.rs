@@ -3,7 +3,7 @@
 //! Composes on route/server/style artifacts into a VMZ-owned deploy package and
 //! deterministic Mini Host descriptor. Vendor developer-tools CLI is recorded as
 //! transport/conformance only — never invoked here, never becomes test semantics.
-//! WeChat `pages/**/*.wxml|wxss` are written via [`super::wechat_pack`]
+//! WeChat `dist/wechat/` DevTools project is written via [`super::wechat_pack`]
 //! (`vmz-generator` printers). Adapters still do not own a WXML emitter.
 //! Does not ship `#server` implementation bodies.
 

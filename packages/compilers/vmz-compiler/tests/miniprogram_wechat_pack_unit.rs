@@ -8,9 +8,9 @@ use vmz_compiler::miniprogram::wechat_pack::{
 use vmz_protocol::VmzModuleKind;
 use vmz_types::{
     Binding, BindingId, DeploymentView, Effect, EffectId, ExprId, FieldId, FieldKind, IrDepPath,
-    ProgramModule, ProgramUnit, ProgramUnitKind, ReactiveComponent, StateSlot, StubStatus, UnitId,
-    ViewAttr, ViewAttrValue, ViewEach, ViewNode, ViewStatus, ViewView, WritePath,
-    PROGRAM_SCHEMA,
+    PROGRAM_SCHEMA, ProgramModule, ProgramUnit, ProgramUnitKind, ReactiveComponent, StateSlot,
+    StubStatus, UnitId, ViewAttr, ViewAttrValue, ViewEach, ViewNode, ViewStatus, ViewView,
+    WritePath,
 };
 
 fn home_unit() -> ProgramUnit {
@@ -72,7 +72,11 @@ fn home_unit() -> ProgramUnit {
     };
     let reactive = ReactiveComponent {
         name: "HomePage".into(),
-        state_slots: vec![StateSlot { id: FieldId(0), name: "store".into(), kind: FieldKind::State }],
+        state_slots: vec![StateSlot {
+            id: FieldId(0),
+            name: "store".into(),
+            kind: FieldKind::State,
+        }],
         properties: vec![],
         bindings: vec![
             Binding::Text {
@@ -148,11 +152,9 @@ fn emit_matches_rewrite_mini_home_markers() {
 }
 
 #[test]
-fn writes_pages_wxml_wxss_under_mini_deploy() {
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
+fn writes_pages_under_dist_wechat() {
+    let nanos =
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
     let dir = std::env::temp_dir().join(format!("vmz-wechat-pack-{nanos}"));
     fs::create_dir_all(dir.join("dist")).unwrap();
     let module = ProgramModule {
@@ -165,25 +167,36 @@ fn writes_pages_wxml_wxss_under_mini_deploy() {
     fs::write(dir.join("dist").join("vmz.css"), ".page { color: #3d6b2f; }\n").unwrap();
 
     let report = lower_miniprogram_wechat_packaging(&dir);
-    assert!(
-        report.status == vmz_protocol::CheckReportStatus::Ready,
-        "{:?}",
-        report.diagnostics
-    );
-    let wxml_path = dir.join("dist/_vmz/mini-deploy/wechat/pages/home/home.wxml");
-    let wxss_path = dir.join("dist/_vmz/mini-deploy/wechat/pages/home/home.wxss");
-    let app_json = dir.join("dist/_vmz/mini-deploy/wechat/app.json");
+    assert!(report.status == vmz_protocol::CheckReportStatus::Ready, "{:?}", report.diagnostics);
+    assert_eq!(report.pack_root, "dist/wechat");
+    let wxml_path = dir.join("dist/wechat/pages/home/home.wxml");
+    let wxss_path = dir.join("dist/wechat/pages/home/home.wxss");
+    let page_js = dir.join("dist/wechat/pages/home/home.js");
+    let app_json = dir.join("dist/wechat/app.json");
+    let app_js = dir.join("dist/wechat/app.js");
+    let project = dir.join("dist/wechat/project.config.json");
     let wxml = fs::read_to_string(&wxml_path).unwrap();
     let wxss = fs::read_to_string(&wxss_path).unwrap();
     assert!(wxml.contains("bindtap=\"onStore\""), "{wxml}");
     assert!(wxss.contains("#3d6b2f") || wxss.contains(".page"), "{wxss}");
-    let app: serde_json::Value = serde_json::from_str(&fs::read_to_string(app_json).unwrap()).unwrap();
     assert!(
-        app["pages"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|p| p.as_str() == Some("pages/home/home")),
+        fs::read_to_string(&page_js).unwrap().contains("Page("),
+        "{}",
+        fs::read_to_string(&page_js).unwrap()
+    );
+    assert!(
+        fs::read_to_string(&app_js).unwrap().contains("App("),
+        "{}",
+        fs::read_to_string(&app_js).unwrap()
+    );
+    let project_json: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(project).unwrap()).unwrap();
+    assert_eq!(project_json["compileType"].as_str(), Some("miniprogram"), "{project_json}");
+    assert_eq!(project_json["miniprogramRoot"].as_str(), Some("./"), "{project_json}");
+    let app: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(app_json).unwrap()).unwrap();
+    assert!(
+        app["pages"].as_array().unwrap().iter().any(|p| p.as_str() == Some("pages/home/home")),
         "{app}"
     );
     let _ = fs::remove_dir_all(&dir);
