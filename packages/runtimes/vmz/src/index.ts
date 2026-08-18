@@ -718,6 +718,11 @@ export function lowerMiniprogramToolingDeployJson(rootPath) {
     return native.lowerMiniprogramToolingDeployJson(rootPath);
 }
 
+export function lowerMiniprogramWechatPackagingJson(rootPath) {
+    const native = loadNative();
+    return native.lowerMiniprogramWechatPackagingJson(rootPath);
+}
+
 export function lowerMiniprogramMultiAdapterJson(rootPath) {
     const native = loadNative();
     return native.lowerMiniprogramMultiAdapterJson(rootPath);
@@ -1138,6 +1143,7 @@ export default {
     lowerMiniprogramStructureJson,
     lowerMiniprogramRouteServerStyleJson,
     lowerMiniprogramToolingDeployJson,
+    lowerMiniprogramWechatPackagingJson,
     lowerMiniprogramMultiAdapterJson,
     createMiniHost,
     queryProfileProtocolCatalog,
