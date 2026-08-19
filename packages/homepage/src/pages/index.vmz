@@ -7,8 +7,8 @@
         <h1 id="landing-title">编译整套应用，<br /><em>不只是一棵组件树。</em></h1>
         <p class="v2-lede">VMZ 从组件、状态和服务端边界中建立程序图。开发时只重编译受影响的区域，交付时为 Web、SSR、Native 和 Edge 生成各自需要的结果。</p>
         <div class="v2-actions">
-          <a class="v2-button v2-button--primary" href="/d/zh-hans/guide/">开始构建</a>
-          <a class="v2-button v2-button--text" href="/d/">阅读文档 <span aria-hidden="true">→</span></a>
+          <a class="v2-button v2-button--primary" data-dogfood="landing-primary-cta" href={guideHref}>{buildLabel}</a>
+          <a class="v2-button v2-button--text" data-dogfood="landing-secondary-cta" href={docsRootHref}>{readDocsLabel} <span aria-hidden="true">→</span></a>
         </div>
         <div class="v2-signal" aria-label="VMZ compilation model">
           <div><small>Author</small><strong>Components</strong></div>
@@ -114,7 +114,7 @@
         <h2 id="start-title">从一个组件开始。</h2>
         <p>创建项目，启动开发服务器，让 VMZ 接管后面的分析与编译。</p>
         <div class="v2-command"><code>pnpm create vmz-app my-app</code><Button type="button" variant="secondary" onClick={() => this.copyCommand()}>{copied ? '已复制' : '复制'}</Button></div>
-        <div class="v2-actions"><a class="v2-button v2-button--light" href="/d/zh-hans/guide/">开始使用</a><a class="v2-button v2-button--dark-text" href="/deploy-planner">部署计划器 →</a></div>
+        <div class="v2-actions"><a class="v2-button v2-button--light" data-dogfood="landing-start-cta" href={guideHref}>{startLabel}</a><a class="v2-button v2-button--dark-text" href="/deploy-planner">{deployPlannerLabel} →</a></div>
       </section>
     </main>
     <SiteFooter />
@@ -122,14 +122,50 @@
 </template>
 
 <script client>
+import { build, readDocs, start, deployPlanner } from '#locales/common';
+import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../lib/locale-copy.ts';
+
 export default class IndexPage {
   showcaseTab = 'overview';
   notifyOpen = false;
   copied = false;
+  localeId = 'zh-hans';
+  buildLabel = '';
+  readDocsLabel = '';
+  startLabel = '';
+  deployPlannerLabel = '';
+  docsRootHref = '/d/zh-hans/';
+  guideHref = '/d/zh-hans/guide/';
+  _unwatchLocale = null;
   showcaseTabs = [{ id: 'overview', title: '概览', controls: 'landing-showcase-panel' }, { id: 'source', title: '源码', controls: 'landing-showcase-panel' }, { id: 'activity', title: '活动', controls: 'landing-showcase-panel' }];
   codeSample = '<template>\n  <Button onClick={increment}>\n    Count {count}\n  </Button>\n</template>';
   surfaceColumns = [{ id: 'surface', title: '目标' }, { id: 'result', title: '交付结果' }, { id: 'status', title: '状态' }];
   surfaceRows = [{ id: 'browser', cells: ['Browser', 'Direct DOM update', 'Ready'] }, { id: 'ssr', cells: ['SSR', 'HTML + resume', 'Ready'] }, { id: 'native', cells: ['Native', 'Host operations', 'Ready'] }, { id: 'edge', cells: ['Edge', 'Server capabilities', 'Ready'] }];
+
+  onMount() {
+    this.applyLocaleCopy();
+    this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+  }
+
+  onDestroy() {
+    if (typeof this._unwatchLocale === 'function') this._unwatchLocale();
+    this._unwatchLocale = null;
+  }
+
+  refreshCopy() {
+    this.buildLabel = build();
+    this.readDocsLabel = readDocs();
+    this.startLabel = start();
+    this.deployPlannerLabel = deployPlanner();
+    const paths = docsPaths(this.localeId);
+    this.docsRootHref = paths.docsRootHref;
+    this.guideHref = paths.guideHref;
+  }
+
+  applyLocaleCopy(preferred) {
+    this.localeId = readLocaleId(preferred);
+    withLocaleHint(this.localeId, () => this.refreshCopy());
+  }
 
   copyCommand() {
     const text = 'pnpm create vmz-app my-app';

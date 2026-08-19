@@ -52,6 +52,7 @@ import {
   langZhFull,
   langEn,
 } from '#locales/common';
+import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../lib/locale-copy.ts';
 
 export default class SiteHeader {
   localeId = 'zh-hans';
@@ -70,12 +71,16 @@ export default class SiteHeader {
   docsRootHref = '/d/zh-hans/';
   guideHref = '/d/zh-hans/guide/';
   deployDocHref = '/d/zh-hans/guide/deploy/';
+  _unwatchLocale = null;
 
   onMount() {
-    if (typeof document !== 'undefined') {
-      this.localeId = document.documentElement.getAttribute('data-locale') || 'zh-hans';
-    }
-    this.refreshCopy();
+    this.applyLocaleCopy();
+    this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+  }
+
+  onDestroy() {
+    if (typeof this._unwatchLocale === 'function') this._unwatchLocale();
+    this._unwatchLocale = null;
   }
 
   refreshCopy() {
@@ -91,26 +96,15 @@ export default class SiteHeader {
     this.langSummary = this.localeId === 'en-us' ? langEn() : langZh();
     this.langZhFullLabel = langZhFull();
     this.langEnLabel = langEn();
-    this.docsRootHref = this.localeId === 'en-us' ? '/d/en-us/' : '/d/zh-hans/';
-    this.guideHref = this.localeId === 'en-us' ? '/d/en-us/guide/' : '/d/zh-hans/guide/';
-    this.deployDocHref = this.localeId === 'en-us' ? '/d/en-us/guide/deploy/' : '/d/zh-hans/guide/deploy/';
+    const paths = docsPaths(this.localeId);
+    this.docsRootHref = paths.docsRootHref;
+    this.guideHref = paths.guideHref;
+    this.deployDocHref = paths.deployDocHref;
   }
 
   applyLocaleCopy(preferred) {
-    const fromDom =
-      typeof document !== 'undefined' ? document.documentElement.getAttribute('data-locale') : null;
-    this.localeId = preferred || fromDom || this.localeId || 'zh-hans';
-    const g = typeof globalThis !== 'undefined' ? globalThis : null;
-    const prev = g ? g.__vmzLocaleIdHint : undefined;
-    if (g) g.__vmzLocaleIdHint = this.localeId;
-    try {
-      this.refreshCopy();
-    } finally {
-      if (g) {
-        if (prev === undefined) delete g.__vmzLocaleIdHint;
-        else g.__vmzLocaleIdHint = prev;
-      }
-    }
+    this.localeId = readLocaleId(preferred);
+    withLocaleHint(this.localeId, () => this.refreshCopy());
   }
 
   async switchLocale(to) {

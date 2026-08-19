@@ -1,8 +1,8 @@
 <template>
   <main class="welcome-v2" aria-labelledby="welcome-title">
     <header class="welcome-v2__header">
-      <a class="welcome-v2__brand" href="/"><strong>VMZ</strong><span></span></a>
-      <div><a href="/d/">文档</a><a class="welcome-v2__github" href="https://github.com/doki-land/vmz-framework">GitHub</a></div>
+      <a class="welcome-v2__brand" href="/"><strong>{brandLabel}</strong><span></span></a>
+      <div><a href={docsRootHref}>{docsLabel}</a><a class="welcome-v2__github" href="https://github.com/doki-land/vmz-framework">GitHub</a></div>
     </header>
 
     <section class="welcome-v2__main">
@@ -10,8 +10,8 @@
       <h1 id="welcome-title">让编译器<br /><em>理解整套应用。</em></h1>
       <p class="welcome-v2__lede">一份程序图，连接组件、状态与服务端边界。开发时获得更快反馈，交付时让每个运行环境只得到它真正需要的部分。</p>
       <div class="welcome-v2__actions">
-        <a class="welcome-v2__primary" href="/">探索 VMZ</a>
-        <a class="welcome-v2__secondary" href="/d/zh-hans/guide/">开始使用 <span aria-hidden="true">→</span></a>
+        <a class="welcome-v2__primary" href="/">{exploreLabel}</a>
+        <a class="welcome-v2__secondary" data-dogfood="welcome-start" href={guideHref}>{startLabel} <span aria-hidden="true">→</span></a>
       </div>
     </section>
 
@@ -24,5 +24,42 @@
 </template>
 
 <script client>
-export default class WelcomePage {}
+import { brand, docs, explore, start } from '#locales/common';
+import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../lib/locale-copy.ts';
+
+export default class WelcomePage {
+  localeId = 'zh-hans';
+  brandLabel = '';
+  docsLabel = '';
+  exploreLabel = '';
+  startLabel = '';
+  docsRootHref = '/d/zh-hans/';
+  guideHref = '/d/zh-hans/guide/';
+  _unwatchLocale = null;
+
+  onMount() {
+    this.applyLocaleCopy();
+    this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+  }
+
+  onDestroy() {
+    if (typeof this._unwatchLocale === 'function') this._unwatchLocale();
+    this._unwatchLocale = null;
+  }
+
+  refreshCopy() {
+    this.brandLabel = brand();
+    this.docsLabel = docs();
+    this.exploreLabel = explore();
+    this.startLabel = start();
+    const paths = docsPaths(this.localeId);
+    this.docsRootHref = paths.docsRootHref;
+    this.guideHref = paths.guideHref;
+  }
+
+  applyLocaleCopy(preferred) {
+    this.localeId = readLocaleId(preferred);
+    withLocaleHint(this.localeId, () => this.refreshCopy());
+  }
+}
 </script>
