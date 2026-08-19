@@ -241,8 +241,6 @@
             "stableHint": "ui.Dialog",
             "tokens": [
                 "action.primary.background",
-                "action.primary.foreground",
-                "action.primary.active",
                 "focus.ring",
                 "motion.overlay.duration",
                 "motion.overlay.easing"
@@ -286,14 +284,14 @@
         "Tabs": {
             "source": "src/components/Tabs.vmz",
             "stableHint": "ui.Tabs",
-            "tokens": ["action.primary.background", "action.primary.foreground", "focus.ring"],
+            "tokens": ["action.primary.background", "focus.ring"],
             "surfaces": ["WebSurface"],
             "contracts": ["tablist", "keyboard-roving", "live-selected-prop"]
         },
         "Menu": {
             "source": "src/components/Menu.vmz",
             "stableHint": "ui.Menu",
-            "tokens": ["action.primary.background", "action.primary.foreground", "action.primary.active", "focus.ring"],
+            "tokens": ["action.primary.background", "focus.ring"],
             "surfaces": ["WebSurface"],
             "contracts": ["overlay-ownership", "escape-dismiss", "focus-restore", "outside-dismiss", "live-open-prop"]
         },
@@ -302,8 +300,6 @@
             "stableHint": "ui.Drawer",
             "tokens": [
                 "action.primary.background",
-                "action.primary.foreground",
-                "action.primary.active",
                 "focus.ring",
                 "motion.overlay.duration",
                 "motion.overlay.easing"
