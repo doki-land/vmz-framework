@@ -11,9 +11,9 @@ import http from 'node:http';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { resolveNativePath } from 'vmz';
 import { repoRoot } from '../_lib/repo-root.ts';
 import { addLimitation, readProof, runVmzBuild, upsertCheck, writeProof } from '../_lib/production-proof.ts';
+import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
 
 const root = repoRoot(import.meta.url);
 const EXAMPLE = 'packages/examples/production-router';
@@ -167,13 +167,11 @@ try {
 
 const child = spawn(process.execPath, [hostJs], {
     cwd: dist,
-    env: {
-        ...process.env,
+    env: serveHostChildEnv({
         VMZ_DIST: dist,
         VMZ_HOST: '127.0.0.1',
         VMZ_PORT: String(PORT),
-        VMZ_NATIVE_NODE: resolveNativePath(),
-    },
+    }),
     stdio: ['ignore', 'pipe', 'pipe'],
 });
 

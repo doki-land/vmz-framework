@@ -28,6 +28,7 @@ import {
 } from 'vmz';
 import { repoRoot } from '../_lib/repo-root.ts';
 import { addLimitation, readProof, runVmzBuild, upsertCheck, writeProof } from '../_lib/production-proof.ts';
+import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
 
 const root = repoRoot(import.meta.url);
 const EXAMPLE = 'packages/examples/production-router';
@@ -185,7 +186,7 @@ const hostJs = path.join(dist, 'vmz-serve-host.mjs');
 if (!fs.existsSync(hostJs)) fail(`missing serve-host ${hostJs}`);
 const child = spawn(process.execPath, [hostJs], {
     cwd: dist,
-    env: { ...process.env, VMZ_DIST: dist, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(PORT) },
+    env: serveHostChildEnv({ VMZ_DIST: dist, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(PORT) }),
     stdio: ['ignore', 'pipe', 'pipe'],
 });
 let healthOk = false;
