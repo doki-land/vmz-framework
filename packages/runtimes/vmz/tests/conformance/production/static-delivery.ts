@@ -65,6 +65,7 @@ const requiredHtml = [
     path.join('about', 'index.html'),
     path.join('shop', 'index.html'),
     path.join('shop', 'offer', 'index.html'),
+    path.join('welcome', 'index.html'),
     '404.html',
 ];
 for (const rel of requiredHtml) {
@@ -134,6 +135,7 @@ const routes = manifest.routes || [];
 if (!routes.some((r: { path: string }) => r.path === '/')) errors.push('manifest missing /');
 if (!routes.some((r: { path: string }) => r.path === '/about')) errors.push('manifest missing /about');
 if (!routes.some((r: { path: string }) => r.path === '/shop')) errors.push('manifest missing /shop');
+if (!routes.some((r: { path: string }) => r.path === '/welcome')) errors.push('manifest missing explicit /welcome');
 const skipped = manifest.skipped || [];
 if (
     !skipped.some((s: { chunkId: string; classification: string }) => s.chunkId.includes('products') && s.classification === 'ServerRequired')

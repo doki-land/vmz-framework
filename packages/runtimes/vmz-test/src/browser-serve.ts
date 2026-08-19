@@ -32,7 +32,7 @@ function freePort(): Promise<number> {
 
 /**
  * Resolve author RouteId / pathPattern to a pathname for page.goto.
- * Prefers explicit path; then cdn-policy-manifest; then route-realization.
+ * Prefers explicit path; then `vmz-deployment.json` pathPattern; then CDN / realization.
  */
 export function resolveRoutePath(outDir: string, opts: { routeId?: string; path?: string; params?: Record<string, string> }): string {
     if (typeof opts.path === 'string' && opts.path.trim()) {
@@ -40,6 +40,26 @@ export function resolveRoutePath(outDir: string, opts: { routeId?: string; path?
     }
     const routeId = String(opts.routeId || '').trim();
     if (!routeId) throw new Error('open/navigate: routeId or path required');
+
+    const depPath = path.join(outDir, 'vmz-deployment.json');
+    if (fs.existsSync(depPath)) {
+        try {
+            const dep = JSON.parse(fs.readFileSync(depPath, 'utf8')) as {
+                units?: Array<{ kind?: string; chunkId?: string; routeId?: string; pathPattern?: string }>;
+            };
+            const units = Array.isArray(dep.units) ? dep.units : [];
+            const pages = units.filter((u) => u.kind === 'page');
+            const hit =
+                pages.find((u) => u.routeId === routeId) ||
+                pages.find((u) => u.chunkId === routeId) ||
+                pages.find((u) => u.chunkId === `pages/${routeId}`) ||
+                pages.find((u) => String(u.chunkId || '').endsWith(`/${routeId}`));
+            const pattern = String(hit?.pathPattern || '').trim();
+            if (pattern) return applyParams(pattern, opts.params);
+        } catch {
+            /* fall through */
+        }
+    }
 
     const cdnPath = path.join(outDir, '_vmz', 'cdn-policy-manifest.json');
     if (fs.existsSync(cdnPath)) {

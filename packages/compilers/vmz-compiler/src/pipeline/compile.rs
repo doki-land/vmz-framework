@@ -139,6 +139,12 @@ pub struct DeploymentUnitWire {
     /// Island resume entries.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub resume_entries: Vec<DeploymentResumeWire>,
+    /// Browser HTTP path pattern (`/` / `/home` / `/users/:id`). Mini pack ignores this.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub path_pattern: String,
+    /// Stable RouteId when this unit is a page.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub route_id: String,
     /// True when this unit was rebuilt in the current plan.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub rebuilt: bool,
@@ -349,6 +355,7 @@ pub fn compile_project_with_dirty(
         Some(t) => t,
         None => return Ok(report),
     };
+    advise_browser_path_deviations(&route_table, &mut report);
 
     for unit in &plan.units {
         emit_file(
@@ -367,7 +374,7 @@ pub fn compile_project_with_dirty(
         merge_routes_json(options, &mut report)?;
     }
     emit_stylesheets(root, options, &mut report)?;
-    emit_deployment_json(root, &src_root, options, &plan, &mut report)?;
+    emit_deployment_json(root, &src_root, options, &plan, &route_table, &mut report)?;
     Ok(report)
 }
 
@@ -406,6 +413,25 @@ fn build_project_route_table(
             }
             None
         }
+    }
+}
+
+fn advise_browser_path_deviations(
+    table: &crate::pipeline::link::RouteTable,
+    report: &mut CompileReport,
+) {
+    for entry in table.by_id.values() {
+        let file = crate::pipeline::link::path_pattern_from_chunk(&entry.chunk_id);
+        if entry.path_pattern == file {
+            continue;
+        }
+        report.diagnostics.push(ReportedDiagnostic::advice(
+            &entry.source,
+            format!(
+                "explicit path {:?} differs from file route {file}; Browser uses the explicit HTTP path, Mini page stem still follows chunk id",
+                entry.path_pattern
+            ),
+        ));
     }
 }
 
@@ -1055,6 +1081,7 @@ fn emit_deployment_json(
     _src_root: &Path,
     options: &CompileOptions,
     plan: &AffectedPlan,
+    route_table: &crate::pipeline::link::RouteTable,
     report: &mut CompileReport,
 ) -> crate::Result<()> {
     let (_src, graph, catalog) = crate::affected::component_graph_for(root);
@@ -1067,6 +1094,7 @@ fn emit_deployment_json(
         let depends_on = graph.deps.get(chunk_id).cloned().unwrap_or_default();
         let depended_by = graph.reverse.get(chunk_id).cloned().unwrap_or_default();
         let extras = read_program_deployment_extras(&options.out_dir.join(&program_ir));
+        let route = route_table.get_by_chunk(chunk_id);
         units.push(DeploymentUnitWire {
             chunk_id: chunk_id.clone(),
             kind: *kind,
@@ -1091,6 +1119,8 @@ fn emit_deployment_json(
                 .into_iter()
                 .map(|(component, strategy)| DeploymentResumeWire { component, strategy })
                 .collect(),
+            path_pattern: route.map(|e| e.path_pattern.clone()).unwrap_or_default(),
+            route_id: route.map(|e| e.route_id.clone()).unwrap_or_default(),
             rebuilt,
         });
     }

@@ -125,6 +125,9 @@ fn diag(
 }
 
 /// Map `pages/home` → `pages/home/home` (WeChat page stem).
+///
+/// Mini lowering is chunk_id only. Do not read Browser `pathPattern` /
+/// `<router>.path` here; that HTTP projection is a different host.
 pub fn wechat_page_stem(chunk_id: &str) -> String {
     let chunk = chunk_id.trim().trim_matches('/');
     let name = chunk.rsplit('/').next().unwrap_or("index");

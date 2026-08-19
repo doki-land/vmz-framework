@@ -1,0 +1,23 @@
+<router>
+{
+  path: "/welcome",
+}
+</router>
+<template>
+  <main>
+      <h1>Landing</h1>
+      <p>route-welcome</p>
+      <Link to="IndexPage">Home</Link>
+    </main>
+</template>
+
+<script client>
+export default class LandingPage {
+	static meta() {
+		return {
+			title: "Welcome · Production Router",
+			description: "Explicit Browser path, file route is /landing"
+		};
+	}
+}
+</script>

@@ -11,6 +11,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { writePrettyJsonFile } from './pretty-json.js';
+import { listPublicPageUnits, unitBrowserPathPattern } from './route-path.js';
 
 export const RELEASE_ENVELOPE_SCHEMA = 'vmz.release.envelope.v0';
 export const APPLICATION_ARTIFACT_SCHEMA = 'vmz.application.artifact.v0';
@@ -93,21 +94,6 @@ function listContentFiles(distDir) {
 }
 
 /**
- * @param {string} chunkId
- */
-function pathPatternFromChunk(chunkId) {
-    const rel = chunkId.replace(/^pages\//, '');
-    const parts = rel.split('/').filter(Boolean);
-    const segs = [];
-    for (let i = 0; i < parts.length; i++) {
-        const p = parts[i];
-        if (p === 'index' && i === parts.length - 1) continue;
-        segs.push(p);
-    }
-    return segs.length ? `/${segs.join('/')}` : '/';
-}
-
-/**
  * Pack `dist/` into `_vmz` manifests + release envelope (filesystem Delivery Profile).
  * @param {string} distDir
  * @param {{ applicationId?: string }} [opts]
@@ -129,13 +115,13 @@ export function packRelease(distDir, opts = {}) {
         fileDigests[rel] = sha256File(path.join(abs, ...rel.split('/')));
     }
 
-    const pages = (deployment.units || []).filter((u) => u.kind === 'page');
+    const pages = listPublicPageUnits(deployment);
     const routeRealization = {
         schema: ROUTE_REALIZATION_TABLE_SCHEMA,
         routes: pages.map((u) => ({
             routeId: String(u.chunkId),
             chunkId: String(u.chunkId),
-            pathPattern: pathPatternFromChunk(String(u.chunkId)),
+            pathPattern: unitBrowserPathPattern(u),
             clientEntry: u.clientEntry || null,
             programIr: u.programIr || null,
         })),

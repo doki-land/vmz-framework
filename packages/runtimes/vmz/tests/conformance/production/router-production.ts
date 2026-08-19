@@ -11,6 +11,7 @@ import http from 'node:http';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { resolveNativePath } from 'vmz';
 import { repoRoot } from '../_lib/repo-root.ts';
 import { addLimitation, readProof, runVmzBuild, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 
@@ -134,6 +135,14 @@ if (!indexClient.includes('data-vmz-route') || !indexClient.includes('AboutPage'
 if (!indexClient.includes('/shop')) {
     fail(`index.client.js missing Shop Link href: ${indexClient.slice(0, 400)}`);
 }
+if (!indexClient.includes('/welcome')) {
+    fail(`index.client.js missing explicit LandingPage href /welcome: ${indexClient.slice(0, 400)}`);
+}
+const deployment = JSON.parse(fs.readFileSync(path.join(dist, 'vmz-deployment.json'), 'utf8'));
+const landingUnit = (deployment.units || []).find((u: { chunkId?: string }) => u.chunkId === 'pages/landing');
+if (landingUnit?.pathPattern !== '/welcome') {
+    fail(`pages/landing pathPattern want /welcome, got ${JSON.stringify(landingUnit)}`);
+}
 if (!fs.existsSync(path.join(dist, 'vmz-client-nav.js'))) {
     fail('missing vmz-client-nav.js runtime copy');
 }
@@ -158,7 +167,13 @@ try {
 
 const child = spawn(process.execPath, [hostJs], {
     cwd: dist,
-    env: { ...process.env, VMZ_DIST: dist, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(PORT) },
+    env: {
+        ...process.env,
+        VMZ_DIST: dist,
+        VMZ_HOST: '127.0.0.1',
+        VMZ_PORT: String(PORT),
+        VMZ_NATIVE_NODE: resolveNativePath(),
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
 });
 
@@ -198,6 +213,8 @@ try {
     const actionRedirect = await postJson(`http://127.0.0.1:${PORT}/products/bounce`, { note: 'x' });
     const shop = await get(`http://127.0.0.1:${PORT}/shop`);
     const offer = await get(`http://127.0.0.1:${PORT}/shop/offer`);
+    const welcome = await get(`http://127.0.0.1:${PORT}/welcome`);
+    const landingFile = await get(`http://127.0.0.1:${PORT}/landing`);
     const aborted = await getThenAbort(`http://127.0.0.1:${PORT}/products/sku-1?slow=1`, 20);
 
     const errors: string[] = [];
@@ -259,6 +276,12 @@ try {
     }
     if (offer.status !== 200 || !offer.body.includes('layout-shop') || !offer.body.includes('route-shop-offer')) {
         errors.push(`GET /shop/offer want layout+offer, got ${offer.status} ${offer.body.slice(0, 400)}`);
+    }
+    if (welcome.status !== 200 || !welcome.body.includes('route-welcome')) {
+        errors.push(`GET /welcome want explicit path landing page, got ${welcome.status} ${welcome.body.slice(0, 200)}`);
+    }
+    if (landingFile.status === 200 && landingFile.body.includes('route-welcome')) {
+        errors.push('GET /landing must not match pages/landing when path is /welcome');
     }
     if (shop.body.includes('route-shop-offer') || offer.body.includes('>route-shop<')) {
         errors.push('shop and offer page markers must not cross-contaminate');
