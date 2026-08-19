@@ -19,6 +19,7 @@
     "surface": {
         "paper": "#FFFFFF",
         "mist": "#F4F6F8",
+        "page": "#F4F6F8",
         "ink": "#121416",
         "graphite": "#292D31"
     },
@@ -30,6 +31,7 @@
     },
     "line": {
         "default": "#D9DEE3",
+        "subtle": "#E8ECF0",
         "strong": "#292D31"
     },
     "status": {
