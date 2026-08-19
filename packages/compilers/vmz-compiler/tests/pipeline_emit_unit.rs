@@ -257,3 +257,25 @@ return this.#users.findDefault();
     assert!(!js.contains("vmz:http"));
     assert_eq!(js.matches("export default").count(), 1);
 }
+
+#[test]
+fn emits_server_when_http_decorator_shares_method_line() {
+    let src = r#"
+import { Get } from 'vmz:http';
+export default class UserCardServer {
+  @Get('/api/users/me') async getMe() {
+    return this.fetchUser();
+  }
+  async fetchUser() {
+    return null;
+  }
+}
+"#;
+    let server = analyze_script(ScriptKind::Server, src);
+    let js = emit_server_js(src, &server, "#server/components/UserCard").unwrap();
+    assert!(js.contains("async getMe()"), "{js}");
+    assert!(js.contains("async fetchUser()"), "{js}");
+    assert!(js.contains("return this.fetchUser()"), "{js}");
+    assert!(!js.contains("@Get"), "{js}");
+    assert!(!js.contains("vmz:http"), "{js}");
+}

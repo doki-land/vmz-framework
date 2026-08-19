@@ -254,6 +254,7 @@ pub fn emit_server_module(
 }
 
 fn strip_http_surface(source: &str) -> String {
+    let verbs = ["Get", "Post", "Put", "Delete", "Patch"];
     let mut out = String::new();
     for line in source.lines() {
         let trimmed = line.trim();
@@ -262,15 +263,83 @@ fn strip_http_surface(source: &str) -> String {
         {
             continue;
         }
-        if trimmed.starts_with('@')
-            && ["Get", "Post", "Put", "Delete", "Patch"].iter().any(|v| trimmed[1..].starts_with(v))
-        {
+        if let Some(rest) = strip_leading_http_decorators(trimmed, &verbs) {
+            if rest.is_empty() {
+                // Decorator-only line (method follows on the next line).
+                continue;
+            }
+            let indent_len = line.len() - line.trim_start().len();
+            out.push_str(&line[..indent_len]);
+            out.push_str(rest);
+            out.push('\n');
             continue;
         }
         out.push_str(line);
         out.push('\n');
     }
     out
+}
+
+/// Strip leading `@Get(...)` / `@Post` HTTP surface decorators.
+/// Returns `Some(rest)` when at least one was removed (`rest` may be empty).
+fn strip_leading_http_decorators<'a>(trimmed: &'a str, verbs: &[&str]) -> Option<&'a str> {
+    let mut s = trimmed;
+    let mut stripped_any = false;
+    loop {
+        if !s.starts_with('@') {
+            break;
+        }
+        let after_at = &s[1..];
+        let Some(verb) = verbs.iter().find(|v| after_at.starts_with(*v)) else {
+            break;
+        };
+        let after_verb = &after_at[verb.len()..];
+        let after_call = if after_verb.starts_with('(') {
+            match close_paren_index(after_verb) {
+                Some(i) => after_verb[i + 1..].trim_start(),
+                None => return None,
+            }
+        } else {
+            after_verb.trim_start()
+        };
+        s = after_call;
+        stripped_any = true;
+    }
+    if stripped_any { Some(s) } else { None }
+}
+
+fn close_paren_index(s: &str) -> Option<usize> {
+    let mut depth = 0usize;
+    let mut in_str: Option<char> = None;
+    let mut escaped = false;
+    for (i, ch) in s.char_indices() {
+        if let Some(q) = in_str {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            if ch == '\\' {
+                escaped = true;
+                continue;
+            }
+            if ch == q {
+                in_str = None;
+            }
+            continue;
+        }
+        match ch {
+            '\'' | '"' | '`' => in_str = Some(ch),
+            '(' => depth += 1,
+            ')' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 fn emit_server_client_stub(bridge: &ServerBridge) -> String {
