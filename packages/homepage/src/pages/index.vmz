@@ -3,9 +3,9 @@
     <SiteHeader />
     <main>
       <section class="v2-hero" aria-labelledby="landing-title" data-dogfood="landing-brand">
-        <p class="v2-kicker"><span></span> Full-stack application compiler</p>
-        <h1 id="landing-title">编译整套应用，<br /><em>不只是一棵组件树。</em></h1>
-        <p class="v2-lede">VMZ 从组件、状态和服务端边界中建立程序图。开发时只重编译受影响的区域，交付时为 Web、SSR、Native 和 Edge 生成各自需要的结果。</p>
+        <p class="v2-kicker" data-dogfood="landing-hero-kicker"><span></span> {heroKickerLabel}</p>
+        <h1 id="landing-title" data-dogfood="landing-hero-title">{heroTitleLeadLabel}<br /><em>{heroTitleEmLabel}</em></h1>
+        <p class="v2-lede" data-dogfood="landing-hero-lede">{heroLedeLabel}</p>
         <div class="v2-actions">
           <a class="v2-button v2-button--primary" data-dogfood="landing-primary-cta" href={guideHref}>{buildLabel}</a>
           <a class="v2-button v2-button--text" data-dogfood="landing-secondary-cta" href={docsRootHref}>{readDocsLabel} <span aria-hidden="true">→</span></a>
@@ -22,8 +22,8 @@
       <section class="v2-statement" aria-labelledby="statement-title">
         <p class="v2-index">01 / WHY VMZ</p>
         <div>
-          <h2 id="statement-title">让浏览器少做一些，<br />让编译器多理解一些。</h2>
-          <p>多数框架把大量工作留到运行时。VMZ 把依赖关系、更新路径和交付边界提前变成可分析的程序结构。</p>
+          <h2 id="statement-title" data-dogfood="landing-statement-title">{statementTitleLeadLabel}<br /><em>{statementTitleEmLabel}</em></h2>
+          <p data-dogfood="landing-statement-body">{statementBodyLabel}</p>
         </div>
       </section>
 
@@ -111,8 +111,8 @@
 
       <section class="v2-start" aria-labelledby="start-title">
         <p class="v2-index">05 / GET STARTED</p>
-        <h2 id="start-title">从一个组件开始。</h2>
-        <p>创建项目，启动开发服务器，让 VMZ 接管后面的分析与编译。</p>
+        <h2 id="start-title" data-dogfood="landing-start-title">{startTitleLabel}</h2>
+        <p data-dogfood="landing-start-lede">{startLedeLabel}</p>
         <div class="v2-command"><code>pnpm create vmz-app my-app</code><Button type="button" variant="secondary" onClick={() => this.copyCommand()}>{copied ? '已复制' : '复制'}</Button></div>
         <div class="v2-actions"><a class="v2-button v2-button--light" data-dogfood="landing-start-cta" href={guideHref}>{startLabel}</a><a class="v2-button v2-button--dark-text" href="/deploy-planner">{deployPlannerLabel} →</a></div>
       </section>
@@ -122,7 +122,21 @@
 </template>
 
 <script client>
-import { build, readDocs, start, deployPlanner } from '#locales/common';
+import {
+  build,
+  readDocs,
+  start,
+  deployPlanner,
+  heroKicker,
+  heroTitleLead,
+  heroTitleEm,
+  heroLede,
+  statementTitleLead,
+  statementTitleEm,
+  statementBody,
+  startTitle,
+  startLede,
+} from '#locales/common';
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../lib/locale-copy.ts';
 
 export default class IndexPage {
@@ -130,6 +144,15 @@ export default class IndexPage {
   notifyOpen = false;
   copied = false;
   localeId = 'zh-hans';
+  heroKickerLabel = '';
+  heroTitleLeadLabel = '';
+  heroTitleEmLabel = '';
+  heroLedeLabel = '';
+  statementTitleLeadLabel = '';
+  statementTitleEmLabel = '';
+  statementBodyLabel = '';
+  startTitleLabel = '';
+  startLedeLabel = '';
   buildLabel = '';
   readDocsLabel = '';
   startLabel = '';
@@ -153,6 +176,15 @@ export default class IndexPage {
   }
 
   refreshCopy() {
+    this.heroKickerLabel = heroKicker();
+    this.heroTitleLeadLabel = heroTitleLead();
+    this.heroTitleEmLabel = heroTitleEm();
+    this.heroLedeLabel = heroLede();
+    this.statementTitleLeadLabel = statementTitleLead();
+    this.statementTitleEmLabel = statementTitleEm();
+    this.statementBodyLabel = statementBody();
+    this.startTitleLabel = startTitle();
+    this.startLedeLabel = startLede();
     this.buildLabel = build();
     this.readDocsLabel = readDocs();
     this.startLabel = start();
