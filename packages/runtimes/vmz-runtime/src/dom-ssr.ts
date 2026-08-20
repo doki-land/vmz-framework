@@ -25,38 +25,87 @@ import {
     stripFns,
 } from './dom-core.js';
 
+/** @type {Error | null} last linkedom resolve failure (for clear SSR errors) */
+let _ssrDocumentLastError = null;
+
 /**
- * Node SSR has no browser `document`. rowKernel omits `createItem` and materializes
- * rows via `html` + `hydrate`, which needs `document.createElement('template')`.
- * Install a linkedom document once when missing (optional at runtime if linkedom is present).
+ * Node SSR has no browser `document`. rowKernel prefers document-free HTML fill;
+ * DOM hydrate is a fallback (class ternaries / missing textSlots) and needs linkedom.
  *
  * Must not statically import `node:module`: `dom.js` / `vmz-dom.js` re-export this file,
  * and browser hosts load that barrel.
+ *
+ * When this file is copied into an app `dist/`, `createRequire(import.meta.url)` cannot
+ * see `@vmz/core`'s dependency tree — resolve linkedom from cwd / `@vmz/core` as well.
  */
 function ensureSsrDocument() {
     if (typeof globalThis.document !== 'undefined' && typeof globalThis.document.createElement === 'function') {
         return true;
     }
     const proc = globalThis.process;
-    if (!proc?.versions?.node) return false;
+    if (!proc?.versions?.node) {
+        _ssrDocumentLastError = new Error('vmz:dom SSR document: not running on Node');
+        return false;
+    }
     try {
         // Node 20.16+ / 22.3+: sync builtin load without a static `node:` import.
         const mod = typeof proc.getBuiltinModule === 'function' ? proc.getBuiltinModule('module') : null;
-        if (!mod?.createRequire) return false;
-        const { parseHTML } = mod.createRequire(import.meta.url)('linkedom');
+        if (!mod?.createRequire) {
+            _ssrDocumentLastError = new Error('vmz:dom SSR document: createRequire unavailable');
+            return false;
+        }
+        const pathMod = typeof proc.getBuiltinModule === 'function' ? proc.getBuiltinModule('path') : null;
+        const createRequire = mod.createRequire;
+        /** @type {string[]} */
+        const bases = [];
+        bases.push(import.meta.url);
+        if (pathMod && typeof proc.cwd === 'function') {
+            bases.push(pathMod.join(proc.cwd(), 'package.json'));
+        }
+        /** @type {string[]} */
+        const errors = [];
+        let parseHTML = null;
+        for (const base of bases) {
+            let req;
+            try {
+                req = createRequire(base);
+            } catch (e) {
+                errors.push(`${base}: createRequire failed: ${e && e.message ? e.message : e}`);
+                continue;
+            }
+            try {
+                parseHTML = req('linkedom').parseHTML;
+                break;
+            } catch (e) {
+                errors.push(`${base} → linkedom: ${e && e.message ? e.message : e}`);
+            }
+            // Walk into @vmz/core's dependency tree (linkedom is declared there).
+            for (const coreId of ['@vmz/core', '@vmz/core/dom', '@vmz/core/server']) {
+                try {
+                    const coreEntry = req.resolve(coreId);
+                    parseHTML = createRequire(coreEntry)('linkedom').parseHTML;
+                    break;
+                } catch (e) {
+                    errors.push(`${base} → ${coreId}/linkedom: ${e && e.message ? e.message : e}`);
+                }
+            }
+            if (parseHTML) break;
+        }
+        if (typeof parseHTML !== 'function') {
+            const detail = errors.length ? `\n${errors.join('\n')}` : '';
+            throw new Error(`linkedom unresolved for SSR document${detail}`);
+        }
         const { window, document } = parseHTML('<!DOCTYPE html><html><body></body></html>');
         globalThis.window = window;
         globalThis.document = document;
+        _ssrDocumentLastError = null;
         return typeof document.createElement === 'function';
-    } catch {
+    } catch (err) {
+        _ssrDocumentLastError = err instanceof Error ? err : new Error(String(err));
         return false;
     }
 }
 
-/**
- * @param {new (props?: object) => any} Component
- * @param {object} [props]
- */
 export async function renderToString(Component, props = {}, opts = {}) {
     ensureSsrDocument();
     const signal = opts && opts.signal;
@@ -373,16 +422,85 @@ function* streamSerializeChunks(node) {
 }
 
 /**
+ * Document-free rowKernel SSR: fill generator text placeholders (` `) from textSlots + item.
+ * Prefer this over linkedom — createItem was omitted because html + slots are enough.
+ * @param {{ html: string, textSlots?: Record<string, number>, hostFields?: string[] }} rk
+ * @param {any} item
+ * @param {any} key
+ * @returns {string | null} filled outer HTML, or null if shape is not fillable
+ */
+function fillRowKernelHtml(rk, item, key) {
+    const slots = rk.textSlots;
+    if (!slots || typeof slots !== 'object') return null;
+    /** @type {string[]} */
+    const fields = Object.entries(slots)
+        .filter(([, i]) => typeof i === 'number' && Number.isFinite(i))
+        .sort((a, b) => /** @type {number} */ (a[1]) - /** @type {number} */ (b[1]))
+        .map(([f]) => f);
+    if (!fields.length) return null;
+    let slotI = 0;
+    // Generator emits one space per text interp as a dedicated text node (`> <`).
+    const filled = String(rk.html).replace(/>([^<]*)</g, (m, text) => {
+        if (text === ' ' && slotI < fields.length) {
+            const f = fields[slotI++];
+            const v = item == null ? '' : item[f];
+            return `>${escapeHtml(v == null ? '' : String(v))}<`;
+        }
+        return m;
+    });
+    if (slotI !== fields.length) return null;
+    if (key == null) return filled;
+    // Inject data-vmz-key on the root opening tag (same attr hydrate would set).
+    return filled.replace(/^<([A-Za-z][\w:-]*)/, `<$1 data-vmz-key="${escapeHtml(String(key))}"`);
+}
+
+/**
  * SSR row when `createItem` was omitted (rowKernel client emit).
- * Hydrate a detached DOM node from `rowKernel.html`, then ship outerHTML.
+ * Prefer document-free fill from `html` + `textSlots`; fall back to linkedom + hydrate
+ * when host class ternaries need live DOM, or when placeholders cannot be string-filled.
  * @param {object} inst
- * @param {{ html: string, hydrate?: Function }} rk
+ * @param {{ html: string, hydrate?: Function, textSlots?: Record<string, number>, hostFields?: string[] }} rk
  * @param {{ item: any, index: number }} box
  * @param {any} key
  */
 function serializeRowFromKernel(inst, rk, box, key) {
+    const item = box.item;
+    const hostFields = Array.isArray(rk.hostFields) ? rk.hostFields : [];
+    // Text-only kernels: no document. Host class ternaries still need hydrate/DOM.
+    if (hostFields.length === 0) {
+        const raw = fillRowKernelHtml(rk, item, key);
+        if (raw != null) {
+            return {
+                __kind: 'el',
+                tag: 'div',
+                attrs: Object.create(null),
+                children: [],
+                __rawOuter: true,
+                __rawHtml: raw,
+                appendChild() {},
+            };
+        }
+    }
     if (!ensureSsrDocument()) {
-        throw new Error('vmz:dom SSR rowKernel requires a document (createItem omitted)');
+        // Degrade: still ship text fill if possible (class may be wrong until client hydrate).
+        const raw = fillRowKernelHtml(rk, item, key);
+        if (raw != null) {
+            return {
+                __kind: 'el',
+                tag: 'div',
+                attrs: Object.create(null),
+                children: [],
+                __rawOuter: true,
+                __rawHtml: raw,
+                appendChild() {},
+            };
+        }
+        const cause = _ssrDocumentLastError;
+        const detail = cause && cause.message ? cause.message : 'unavailable';
+        throw new Error(
+            `vmz:dom SSR rowKernel requires a document (createItem omitted): ${detail}`,
+            cause ? { cause } : undefined,
+        );
     }
     const tpl = document.createElement('template');
     tpl.innerHTML = rk.html;
@@ -391,7 +509,7 @@ function serializeRowFromKernel(inst, rk, box, key) {
         throw new Error('vmz:dom SSR rowKernel html produced no element');
     }
     if (typeof rk.hydrate === 'function') {
-        rk.hydrate.call(inst, root, box.item);
+        rk.hydrate.call(inst, root, item);
     }
     if (key != null) root.setAttribute('data-vmz-key', String(key));
     return {
