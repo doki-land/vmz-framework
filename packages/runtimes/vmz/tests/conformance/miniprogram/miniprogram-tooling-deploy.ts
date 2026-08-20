@@ -91,6 +91,29 @@ if (pkg.constraints?.wxssEmitter !== false) fail('wxssEmitter must be false');
 if (pkg.constraints?.serverImplInMiniPackage !== false) fail('serverImpl must be false');
 if (pkg.constraints?.independentBackend !== false) fail('independentBackend must be false');
 
+const wechatPack = pkg.wechatPack;
+if (!wechatPack) fail('missing package.wechatPack');
+if (wechatPack.root !== 'dist/wechat' && wechatPack.packRoot !== 'dist/wechat') {
+    fail(`wechatPack root want dist/wechat, got ${JSON.stringify(wechatPack)}`);
+}
+if (wechatPack.status && wechatPack.status !== 'ready') {
+    fail(`wechatPack status ${wechatPack.status}`);
+}
+
+const packRoot = path.join(dir, 'dist', 'wechat');
+const projectCfgPath = path.join(packRoot, 'app.json');
+const projectConfigPath = path.join(packRoot, 'project.config.json');
+if (!fs.existsSync(projectCfgPath)) fail(`missing ${projectCfgPath}`);
+if (!fs.existsSync(projectConfigPath)) fail(`missing ${projectConfigPath}`);
+const projectCfg = JSON.parse(fs.readFileSync(projectConfigPath, 'utf8'));
+if (projectCfg.miniprogramRoot !== './') {
+    fail(`DevTools root must be ./ not nested miniprogram/: ${projectCfg.miniprogramRoot}`);
+}
+const indexStem = path.join(packRoot, 'pages', 'index', 'index');
+for (const ext of ['wxml', 'wxss', 'json', 'js']) {
+    if (!fs.existsSync(`${indexStem}.${ext}`)) fail(`missing page foursome ${indexStem}.${ext}`);
+}
+
 const onDisk = path.join(dir, report.packagePath);
 if (!fs.existsSync(onDisk)) fail(`missing package ${onDisk}`);
 const harnessPath = path.join(dir, 'dist', '_vmz', 'mini-deploy', 'host-harness.json');

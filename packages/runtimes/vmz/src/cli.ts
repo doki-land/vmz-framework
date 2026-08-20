@@ -106,7 +106,7 @@ export function printProjectHelp() {
 Usage:
   vmz new|init <dir>            Scaffold a minimal app (native CLI)
   vmz check [path]              Check project via Workspace
-  vmz build [path] [options]    Build project via Workspace
+  vmz build [path] [options]    Build project via Workspace; --target mini-program-wechat packs dist/wechat
   vmz serve [path] [options]    Serve dist (optional --build)
   vmz dev [path] [options]      Rebuild session; --target mini-program-wechat packs dist/wechat
   vmz format [path] [--check]   Format .vmz via N-API (oxc formatter + EditorConfig)
@@ -126,7 +126,7 @@ Options:
   --out-dir, -o <dir>   Output directory (default: dist)
   --release             Release build (omit serve-host; pack minify slot; proof)
   --profile <name>      Delivery profile (default from config; builtins: web-ssr|web-static|web-client|web-hybrid)
-  --target <id>         Dev preview: browser (default) | mini-program-wechat (pack dist/wechat; WeChat DevTools)
+  --target <id>         browser (default) | mini-program-wechat (pack dist/wechat for WeChat DevTools; build+dev)
   --origin <url>        Site origin for static-cdn canonical/sitemap
   --host <host>         Listen host (default: 127.0.0.1)
   --port <port>         Listen port (dev: omit = auto from 5173; set = lock)
@@ -340,11 +340,17 @@ async function runWithPlugins(ws, project, outDir, fn) {
  */
 async function cmdBuild(args) {
     const pathArg = args._[0] ?? '.';
+    const targetRaw = typeof args.target === 'string' ? args.target : 'browser';
+    if (targetRaw !== 'browser' && targetRaw !== 'mini-program-wechat') {
+        log.error(`unknown --target ${targetRaw} (browser | mini-program-wechat)`);
+        return 1;
+    }
+    const wechatPack = targetRaw === 'mini-program-wechat';
     const { project, outDir } = resolveWorkspaceDirs({
         path: pathArg,
         outDir: typeof args['out-dir'] === 'string' ? args['out-dir'] : undefined,
     });
-    log.info(`build ${project} → ${outDir}`);
+    log.info(`build ${project} → ${outDir}${wechatPack ? ' (target=mini-program-wechat)' : ''}`);
     const ws = createWorkspace({ root: project, outDir });
     try {
         const cfg = await loadVmzConfig(project);
@@ -399,6 +405,29 @@ async function cmdBuild(args) {
         if (projectHasDocuments(project)) {
             const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
             if (!docs.ok) return 1;
+        }
+
+        if (wechatPack) {
+            if (typeof ws.lowerMiniprogramWechatPackaging !== 'function') {
+                log.error('wechat pack: workspace missing lowerMiniprogramWechatPackaging');
+                return 1;
+            }
+            let report;
+            try {
+                const raw = ws.lowerMiniprogramWechatPackaging();
+                report = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            } catch (err) {
+                log.error(`wechat pack failed: ${err instanceof Error ? err.message : String(err)}`);
+                return 1;
+            }
+            log.diagnostics(report.diagnostics ?? []);
+            if (report.status !== 'ready') {
+                log.error(`wechat pack ${report.status || 'failed'}`);
+                return 1;
+            }
+            const packRoot = report.packRoot || 'dist/wechat';
+            log.info(`wechat pack ok → ${path.join(project, packRoot)} (open in WeChat DevTools)`);
+            return 0;
         }
 
         let pack = null;
