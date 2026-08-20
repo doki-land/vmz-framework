@@ -13,13 +13,7 @@ import { emitContentAddressedAssets } from './content-addressed-assets.js';
 import { absoluteUrl, buildLocalePageMeta, localizeBodyLinks } from './locale-router.js';
 import { requireNativeAddon } from './native-addon.js';
 import { writePrettyJsonFile } from './pretty-json.js';
-import {
-    filePathPatternFromChunk,
-    isRouteBoundaryStem,
-    listPublicPageUnits,
-    parsePathPattern,
-    unitBrowserPathPattern,
-} from './route-path.js';
+import { filePathPatternFromChunk, isRouteBoundaryStem, listPublicPageUnits, parsePathPattern, unitBrowserPathPattern } from './route-path.js';
 
 export const STATIC_DELIVERY_MANIFEST_SCHEMA = 'vmz.static.delivery_manifest.v0';
 

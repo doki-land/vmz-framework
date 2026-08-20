@@ -276,8 +276,7 @@ if (homeBuild.status !== 0) {
         errors.push('homepage missing designs/document/chrome.css');
     } else {
         const chrome = fs.readFileSync(path.join(root, HOMEPAGE, 'designs/document/chrome.css'), 'utf8');
-        const hasDensityVar =
-            chrome.includes('var(--vmz-density-control-padding-y') || chrome.includes('--vmz-density-control-padding-y');
+        const hasDensityVar = chrome.includes('var(--vmz-density-control-padding-y') || chrome.includes('--vmz-density-control-padding-y');
         const hasDense =
             chrome.includes('data-density="dense"') ||
             chrome.includes("data-density='dense'") ||
@@ -484,11 +483,7 @@ let docsDetail = '';
                     css.includes("data-density='dense'") ||
                     css.includes('[data-density="dense"]') ||
                     css.includes("[data-density='dense']");
-                if (
-                    !css.includes('--vmz-density-control-padding-y') ||
-                    !css.includes('--vmz-density-dense-padding-y') ||
-                    !hasDense
-                ) {
+                if (!css.includes('--vmz-density-control-padding-y') || !css.includes('--vmz-density-dense-padding-y') || !hasDense) {
                     docsOk = false;
                     docsDetail = 'documents CSS missing density token emit / dense activation';
                 } else {
