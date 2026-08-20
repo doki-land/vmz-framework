@@ -1,6 +1,6 @@
 /**
- * rowKernel SSR with createItem omitted must not require a preinstalled document.
- * Document-free path fills html + textSlots (farm-h5 deals / ERR_EMPTY_RESPONSE regression).
+ * v0.1.7: rowKernel + createItem:null must SSR via IR-homologous serializeItem
+ * (not regex fill of rowKernel.html / linkedom).
  */
 import { afterEach, describe, it } from 'node:test';
 import { expect } from '../../../../../scripts/test/expect.mjs';
@@ -11,8 +11,29 @@ afterEach(() => {
     delete (globalThis as any).window;
 });
 
-describe('rowKernel SSR (createItem omitted)', () => {
-    it('renderToString fills textSlots without document / without calling hydrate', async () => {
+/** Mimic generator serializeItem body for a simple article row. */
+function dealSerializeItem(api: any, box: { item: { title: string; note: string } }) {
+    const root = api.el('article');
+    api.attr(root, 'class', 'deal');
+    const h = api.el('h3');
+    const tTitle = api.text('');
+    api.bindText(this, null, [], function () {
+        return box.item.title;
+    }, tTitle);
+    h.appendChild(tTitle);
+    root.appendChild(h);
+    const p = api.el('p');
+    const tNote = api.text('');
+    api.bindText(this, null, [], function () {
+        return box.item.note;
+    }, tNote);
+    p.appendChild(tNote);
+    root.appendChild(p);
+    return root;
+}
+
+describe('rowKernel SSR (serializeItem / IR)', () => {
+    it('renderToString uses serializeItem without document or hydrate', async () => {
         delete (globalThis as any).document;
         delete (globalThis as any).window;
 
@@ -34,13 +55,13 @@ describe('rowKernel SSR (createItem omitted)', () => {
                         return box.item.id;
                     },
                     createItem: null,
+                    serializeItem: dealSerializeItem,
                     rowKernel: {
                         html: '<article class="deal"><h3> </h3><p> </p></article>',
                         textSlots: { title: 0, note: 1 },
-                        itemFields: ['note', 'title'],
                         hydrate() {
                             hydrateCalls++;
-                            throw new Error('hydrate must not run on document-free SSR path');
+                            throw new Error('hydrate must not run when serializeItem is present');
                         },
                     },
                 });
@@ -61,7 +82,7 @@ describe('rowKernel SSR (createItem omitted)', () => {
         expect(html).toContain('class="deal"');
     });
 
-    it('escapes item text in document-free rowKernel fill', async () => {
+    it('escapes item text via serializeItem bindText', async () => {
         delete (globalThis as any).document;
         delete (globalThis as any).window;
 
@@ -79,12 +100,14 @@ describe('rowKernel SSR (createItem omitted)', () => {
                             return box.item.id;
                         },
                         createItem: null,
-                        rowKernel: {
-                            html: '<li> </li>',
-                            textSlots: { label: 0 },
-                            hydrate() {
-                                throw new Error('hydrate must not run');
-                            },
+                        serializeItem(apiInner: any, box: { item: { label: string } }) {
+                            const li = apiInner.el('li');
+                            const t = apiInner.text('');
+                            apiInner.bindText(this, null, [], function () {
+                                return box.item.label;
+                            }, t);
+                            li.appendChild(t);
+                            return li;
                         },
                     }),
                 );

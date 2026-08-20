@@ -602,9 +602,10 @@ fn emit_each_block(
         key_bound.as_deref(),
     )
     .unwrap_or_default();
-    // With rowKernel.create the client hot path never calls createItem -- omit the fat
-    // Direct body (bindText/on) to shrink client bundles. SSR materializes via rowKernel html.
-    let create_item = if row_kernel.is_empty() {
+    // Client hot path: rowKernel.create / cloneNode. With a kernel, omit fat createItem to
+    // shrink bundles — but still emit IR-homologous serializeItem for SSR (same schedule as
+    // today's fat createItem). Do not treat rowKernel.html as SSR truth source.
+    let item_fn = |ir: &mut IrDepCursor<'_>, next_id: &mut u32| {
         let mut item_stmts = Vec::new();
         let item_root = emit_plain_element(
             tag,
@@ -622,13 +623,17 @@ fn emit_each_block(
             "function(api, {box_id}) {{\n{}  return {item_root};\n}}",
             indent_block(&item_stmts.join("\n"))
         )
+    };
+    let (create_item, serialize_item_field) = if row_kernel.is_empty() {
+        (item_fn(ir, next_id), String::new())
     } else {
-        "null".to_string()
+        let serialize_fn = item_fn(ir, next_id);
+        ("null".to_string(), format!("serializeItem: {serialize_fn}, "))
     };
     let v = fresh("k", next_id);
     let region_arg = each.region.map(|r| r.0.to_string()).unwrap_or_else(|| "null".into());
     stmts.push(format!(
-        "var {v} = api.eachBlock(this, {id_arg}, [{deps}], {{ list: function() {{ return ({list_body}); }}, {key_field}{row_kernel}createItem: {create_item} }}, {region_arg});"
+        "var {v} = api.eachBlock(this, {id_arg}, [{deps}], {{ list: function() {{ return ({list_body}); }}, {key_field}{row_kernel}{serialize_item_field}createItem: {create_item} }}, {region_arg});"
     ));
     v
 }
