@@ -18,6 +18,12 @@ import { buildIntegratedDocuments, projectHasDocuments } from './document-integr
 import { createWorkspace, resolveNativePath } from './index.js';
 import { emitLocaleRuntimeModules, localeHasErrors } from './locale-check.js';
 import { log } from './log.js';
+import {
+    coalesceRootBurst,
+    collectDevWatchRoots,
+    isDependencyPath,
+    mergeDirtySets,
+} from './dev-watch-roots.js';
 import { diffFingerprints, fileFingerprintMap } from './watch-diff.js';
 
 /**
@@ -198,11 +204,18 @@ export function createDevSession(options) {
         }
         const docsRoot = path.join(project, 'documents');
         const localesRoot = path.join(project, 'locales');
-        const watchRoots = [src].concat(existsSync(docsRoot) ? [docsRoot] : []).concat(existsSync(localesRoot) ? [localesRoot] : []);
+        const watched = collectDevWatchRoots({ project, outDir });
+        /** @type {string[]} */
+        const watchRoots = [...watched.roots];
+        /** @type {string[]} */
+        let dependencyRoots = [...watched.dependencyRoots];
         if (wechatPreview) {
             log.info(`dev → WeChat DevTools (watching ${watchRoots.join(', ')}; keep dist/wechat open)`);
         } else {
             log.info(`dev → http://${host}:${port} (watching ${watchRoots.join(', ')})`);
+        }
+        if (dependencyRoots.length) {
+            log.info(`dev dependency watch roots (${dependencyRoots.length}): ${dependencyRoots.join(', ')}`);
         }
 
         /** @type {Map<string, Map<string, string>>} */
@@ -218,17 +231,44 @@ export function createDevSession(options) {
         signal?.addEventListener('abort', onAbort, { once: true });
 
         /**
-         * Wait until src/ stops changing (multi-file agent edits).
+         * Scan all watch roots into a batch. Does not update fingerprints.
          */
-        async function coalesceSrcBurst() {
-            let guard = 0;
-            while (guard++ < 20) {
-                await sleep(220);
-                const prev = fingerprints.get(src) || new Map();
-                const next = fileFingerprintMap(src);
+        function scanBatch() {
+            /** @type {{ srcChanged: string[], srcDeleted: string[], depChanged: string[], depDeleted: string[], docsDirty: boolean, localesDirty: boolean }} */
+            const batch = {
+                srcChanged: [],
+                srcDeleted: [],
+                depChanged: [],
+                depDeleted: [],
+                docsDirty: false,
+                localesDirty: false,
+            };
+            for (const root of watchRoots) {
+                const prev = fingerprints.get(root) || new Map();
+                const next = fileFingerprintMap(root);
                 const diff = diffFingerprints(prev, next);
-                if (!diff.changed.length && !diff.deleted.length) break;
-                fingerprints.set(src, next);
+                if (!diff.changed.length && !diff.deleted.length) continue;
+                if (root === src) {
+                    batch.srcChanged.push(...diff.changed);
+                    batch.srcDeleted.push(...diff.deleted);
+                } else if (root === localesRoot) {
+                    batch.localesDirty = true;
+                } else if (root === docsRoot) {
+                    batch.docsDirty = true;
+                } else if (dependencyRoots.includes(root)) {
+                    batch.depChanged.push(...diff.changed);
+                    batch.depDeleted.push(...diff.deleted);
+                } else {
+                    // designs or other application roots → treat like docs (full reload)
+                    batch.docsDirty = true;
+                }
+            }
+            return batch;
+        }
+
+        function commitFingerprints() {
+            for (const root of watchRoots) {
+                fingerprints.set(root, fileFingerprintMap(root));
             }
         }
 
@@ -244,54 +284,129 @@ export function createDevSession(options) {
                     continue;
                 }
 
-                /** @type {{ srcChanged: string[], srcDeleted: string[], docsDirty: boolean, localesDirty: boolean }} */
-                let batch = { srcChanged: [], srcDeleted: [], docsDirty: false, localesDirty: false };
+                let batch;
                 try {
-                    for (const root of watchRoots) {
-                        const prev = fingerprints.get(root) || new Map();
-                        const next = fileFingerprintMap(root);
-                        const diff = diffFingerprints(prev, next);
-                        if (root === src) {
-                            batch.srcChanged = diff.changed;
-                            batch.srcDeleted = diff.deleted;
-                        } else if (root === localesRoot) {
-                            if (diff.changed.length || diff.deleted.length) batch.localesDirty = true;
-                        } else if (diff.changed.length || diff.deleted.length) {
-                            batch.docsDirty = true;
-                        }
-                    }
+                    batch = scanBatch();
                 } catch (err) {
                     log.warn('watch error:', err);
                     continue;
                 }
-                if (!batch.srcChanged.length && !batch.srcDeleted.length && !batch.docsDirty && !batch.localesDirty) continue;
+                const srcDirty = batch.srcChanged.length + batch.srcDeleted.length;
+                const depDirty = batch.depChanged.length + batch.depDeleted.length;
+                if (!srcDirty && !depDirty && !batch.docsDirty && !batch.localesDirty) continue;
 
-                if (batch.srcChanged.length + batch.srcDeleted.length > 1) {
-                    await coalesceSrcBurst();
-                } else {
+                // Coalesce multi-file bursts without dropping the initial dirty set.
+                if (srcDirty > 1) {
+                    const coalesced = await coalesceRootBurst(src, fingerprints, {
+                        changed: batch.srcChanged,
+                        deleted: batch.srcDeleted,
+                    });
+                    batch.srcChanged = coalesced.changed;
+                    batch.srcDeleted = coalesced.deleted;
+                }
+                if (depDirty > 1) {
+                    // Coalesce each dirty dependency root independently, then merge.
+                    /** @type {{ changed: string[], deleted: string[] }} */
+                    let acc = { changed: [...batch.depChanged], deleted: [...batch.depDeleted] };
+                    for (const root of dependencyRoots) {
+                        const prev = fingerprints.get(root) || new Map();
+                        const next = fileFingerprintMap(root);
+                        const peek = diffFingerprints(prev, next);
+                        if (peek.changed.length + peek.deleted.length <= 1 && !acc.changed.some((f) => isDependencyPath(f, [root]))) {
+                            continue;
+                        }
+                        const coalesced = await coalesceRootBurst(root, fingerprints, {
+                            changed: acc.changed.filter((f) => isDependencyPath(f, [root])),
+                            deleted: acc.deleted.filter((f) => isDependencyPath(f, [root])),
+                        });
+                        const others = {
+                            changed: acc.changed.filter((f) => !isDependencyPath(f, [root])),
+                            deleted: acc.deleted.filter((f) => !isDependencyPath(f, [root])),
+                        };
+                        acc = mergeDirtySets(others, coalesced);
+                    }
+                    batch.depChanged = acc.changed;
+                    batch.depDeleted = acc.deleted;
+                } else if (srcDirty === 1 || depDirty === 1) {
                     await sleep(200);
                 }
 
-                batch = { srcChanged: [], srcDeleted: [], docsDirty: false, localesDirty: false };
-                for (const root of watchRoots) {
-                    const prev = fingerprints.get(root) || new Map();
-                    const next = fileFingerprintMap(root);
-                    const diff = diffFingerprints(prev, next);
-                    fingerprints.set(root, next);
-                    if (root === src) {
-                        batch.srcChanged = diff.changed;
-                        batch.srcDeleted = diff.deleted;
-                    } else if (root === localesRoot) {
-                        if (diff.changed.length || diff.deleted.length) batch.localesDirty = true;
-                    } else if (diff.changed.length || diff.deleted.length) {
-                        batch.docsDirty = true;
-                    }
+                // Refresh residual dirty after settle (without discarding coalesced sets).
+                const residual = scanBatch();
+                {
+                    const srcMerged = mergeDirtySets(
+                        { changed: batch.srcChanged, deleted: batch.srcDeleted },
+                        { changed: residual.srcChanged, deleted: residual.srcDeleted },
+                    );
+                    batch.srcChanged = srcMerged.changed;
+                    batch.srcDeleted = srcMerged.deleted;
+                    const depMerged = mergeDirtySets(
+                        { changed: batch.depChanged, deleted: batch.depDeleted },
+                        { changed: residual.depChanged, deleted: residual.depDeleted },
+                    );
+                    batch.depChanged = depMerged.changed;
+                    batch.depDeleted = depMerged.deleted;
+                    batch.docsDirty = batch.docsDirty || residual.docsDirty;
+                    batch.localesDirty = batch.localesDirty || residual.localesDirty;
                 }
-                if (!batch.srcChanged.length && !batch.srcDeleted.length && !batch.docsDirty && !batch.localesDirty) continue;
+
+                commitFingerprints();
+
+                if (
+                    !batch.srcChanged.length &&
+                    !batch.srcDeleted.length &&
+                    !batch.depChanged.length &&
+                    !batch.depDeleted.length &&
+                    !batch.docsDirty &&
+                    !batch.localesDirty
+                ) {
+                    continue;
+                }
+
+                // Dependency changes: conservative full rebuild + full reload (v0.1.5).
+                if (batch.depChanged.length || batch.depDeleted.length) {
+                    log.info(
+                        `dependency change detected (${batch.depChanged.length} update, ${batch.depDeleted.length} delete) — full rebuild…`,
+                    );
+                    const report = rebuild();
+                    if (!printReport(report, 'rebuild')) {
+                        log.warn('rebuild failed — keeping previous server');
+                        continue;
+                    }
+                    // Refresh watch roots in case the graph gained new packages.
+                    const refreshed = collectDevWatchRoots({ project, outDir });
+                    for (const r of refreshed.roots) {
+                        if (!watchRoots.includes(r)) {
+                            watchRoots.push(r);
+                            fingerprints.set(r, fileFingerprintMap(r));
+                        }
+                    }
+                    dependencyRoots = [...refreshed.dependencyRoots];
+
+                    if (batch.docsDirty || projectHasDocuments(project)) {
+                        const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
+                        if (!docs.ok) log.warn('document mount rebuild failed — keeping previous docs');
+                    }
+                    if (wechatPreview) {
+                        if (!packWechatPreview()) log.warn('wechat pack failed — keeping previous dist/wechat');
+                        continue;
+                    }
+                    const kind = await reloadAfterBuild({
+                        affectedChunks: report.affectedChunks ?? [],
+                        seedChunks: report.seedChunks ?? [],
+                        emitted: report.emitted ?? [],
+                        full: true,
+                        islandHmr: false,
+                    });
+                    log.info(kind === 'respawn' ? 'reload ok (respawned; deps)' : 'soft reload ok (full page; deps)');
+                    continue;
+                }
 
                 let needFullReload = batch.docsDirty;
                 if (batch.srcChanged.length || batch.srcDeleted.length) {
-                    log.info(`change detected (${batch.srcChanged.length} update, ${batch.srcDeleted.length} delete) — affected rebuild…`);
+                    log.info(
+                        `change detected (${batch.srcChanged.length} update, ${batch.srcDeleted.length} delete) — affected rebuild…`,
+                    );
                     const changes = [
                         ...batch.srcChanged.map((p) => ({ path: p, kind: /** @type {'update'} */ ('update') })),
                         ...batch.srcDeleted.map((p) => ({ path: p, kind: /** @type {'delete'} */ ('delete') })),

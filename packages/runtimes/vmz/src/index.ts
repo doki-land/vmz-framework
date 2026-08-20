@@ -893,6 +893,13 @@ export function checkApplicationDevTestDeployJson(hostRoot, packageRoots, dirtyP
 }
 
 export { createDevSession, listWatchedFiles, srcFingerprint } from './dev-session.js';
+export {
+    coalesceRootBurst,
+    collectDevWatchRoots,
+    mergeDirtySets,
+    localLinkDependencyRoots,
+    watchRootForSourceFile,
+} from './dev-watch-roots.js';
 export { findAvailablePort } from './port.js';
 export { runCli, parseArgs, printHelp, printGlobalHelp, printProjectHelp } from './cli.js';
 export {
