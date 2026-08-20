@@ -3,7 +3,8 @@
 //! Writes a WeChat DevTools project under `dist/wechat/` (`dist/{target}/` layout):
 //! `app.json` / `app.js` / `app.wxss` / `project.config.json` / page files /
 //! `custom-tab-bar/` when `<router>.tab` is present.
-//! Page JS seeds `data` from class field literals and may sync tab selection.
+//! Page JS seeds BindingId-shaped `data.b.B_*` from class field literals and may
+//! sync tab selection.
 //! WXML/WXSS are not authoring truth; adapters must not own this printer.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -19,7 +20,7 @@ use vmz_protocol::{
 };
 use vmz_types::{ProgramModule, ProgramUnit, RouteTabDecl};
 
-use super::wechat_page_js::{format_page_js, page_data_fields};
+use super::wechat_page_js::{format_page_js, page_binding_data_fields, page_data_fields};
 use super::wechat_tab::{
     CustomTabItem, TAB_BG, TAB_COLOR, TAB_SELECTED_COLOR, materialize_center_white_icon,
     materialize_tab_icons, pack_app_wxss_chrome, write_custom_tab_bar,
@@ -139,16 +140,18 @@ pub fn wechat_page_stem(chunk_id: &str) -> String {
 }
 
 /// Emit one page's WXML + WXSS via generator printers.
+///
+/// Returns `(wxml, wxss, patch_bindings)` - binding ids match mustache / `wx:*` paths.
 pub fn emit_wechat_page(
     unit: &ProgramUnit,
     css: &str,
-) -> Result<(String, String), Vec<TargetDiagnostic>> {
+) -> Result<(String, String, BTreeMap<u32, ()>), Vec<TargetDiagnostic>> {
     let emit = match vmz_generator::emit_wechat_wxml(&unit.view.roots, Some(&unit.reactive)) {
         Ok(e) => e,
         Err(errs) => return Err(crate::miniprogram::map_mini_emit_errors(&unit.name, errs)),
     };
     let wxss = vmz_generator::print_wxss(css, false);
-    Ok((emit.template, wxss))
+    Ok((emit.template, wxss, emit.patch_bindings))
 }
 
 fn is_page_unit(unit: &ProgramUnit) -> bool {
@@ -207,9 +210,10 @@ struct PendingPage {
     chunk_id: String,
     unit_name: String,
     stem: String,
-    module_source: String,
     wxml: String,
     wxss: String,
+    /// BindingId seeds for `Page({ data: { b: { B_*: ... } } })`.
+    binding_fields: Vec<(String, String)>,
 }
 
 /// Lower page units into WeChat packaging files (generator printers only).
@@ -221,7 +225,7 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
         diagnostics.push(diag(
             "",
             Severity::Advice,
-            "no *.program.json — build workspace before wechat packaging",
+            "no *.program.json - build workspace before wechat packaging",
             "vmz::target::mini_wechat_pack_catalog_only",
         ));
         return MiniWechatPackReport {
@@ -281,17 +285,20 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
             let stem = wechat_page_stem(&chunk);
             let css = page_css(&styles, &module.source);
             match emit_wechat_page(unit, &css) {
-                Ok((wxml, wxss)) => {
+                Ok((wxml, wxss, patch_bindings)) => {
                     if let Some(tab) = unit.deployment.tab.clone() {
                         tab_pages.push((tab.order, stem.clone(), tab));
                     }
+                    let field_inits = page_data_fields(root, &module.source);
+                    let binding_fields =
+                        page_binding_data_fields(unit, &field_inits, &patch_bindings);
                     pending.push(PendingPage {
                         chunk_id: chunk,
                         unit_name: unit.name.clone(),
                         stem: stem.clone(),
-                        module_source: module.source.clone(),
                         wxml,
                         wxss,
+                        binding_fields,
                     });
                     app_pages.push(stem);
                 }
@@ -423,9 +430,8 @@ pub fn lower_miniprogram_wechat_packaging(root: &Path) -> MiniWechatPackReport {
         });
         let page_json_body =
             vmz_generator::to_pretty_json(&page_json).unwrap_or_else(|_| "{}".into());
-        let fields = page_data_fields(root, &page.module_source);
         let selected = tab_selected.get(&page.stem).copied();
-        let page_js_src = format_page_js(&share_title, &fields, selected);
+        let page_js_src = format_page_js(&share_title, &page.binding_fields, selected);
         let page_js = match print_chrome_js(&page_js_src, &format!("{}.js", page.stem)) {
             Ok(code) => code,
             Err(e) => {
