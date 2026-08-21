@@ -107,15 +107,31 @@ export function buildLocaleRouteRealizationTable(input) {
                 pathPattern: normalizePath(route.path),
             };
             realizations.push(entry);
-            const prev = pathOwners.get(entry.path);
-            if (prev && prev !== `${route.routeId}@${localeId}`) {
-                diagnostics.push({
-                    code: DIAG_LOCALE_ROUTE_COLLISION,
-                    severity: 'error',
-                    message: `path ${entry.path} claimed by ${prev} and ${route.routeId}@${localeId}`,
-                });
+            // `none` / `domain`: LocaleId is Host preference — many locales share one URL path.
+            // Collision only when *different RouteIds* claim the same path.
+            if (routing.strategy === 'none' || routing.strategy === 'domain') {
+                const prevRoute = pathOwners.get(entry.path);
+                if (prevRoute && prevRoute !== route.routeId) {
+                    diagnostics.push({
+                        code: DIAG_LOCALE_ROUTE_COLLISION,
+                        severity: 'error',
+                        message: `path ${entry.path} claimed by ${prevRoute} and ${route.routeId}`,
+                    });
+                } else {
+                    pathOwners.set(entry.path, route.routeId);
+                }
             } else {
-                pathOwners.set(entry.path, `${route.routeId}@${localeId}`);
+                const owner = `${route.routeId}@${localeId}`;
+                const prev = pathOwners.get(entry.path);
+                if (prev && prev !== owner) {
+                    diagnostics.push({
+                        code: DIAG_LOCALE_ROUTE_COLLISION,
+                        severity: 'error',
+                        message: `path ${entry.path} claimed by ${prev} and ${owner}`,
+                    });
+                } else {
+                    pathOwners.set(entry.path, owner);
+                }
             }
         }
     }

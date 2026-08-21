@@ -17,7 +17,7 @@
  * dist so soft reload does not keep a stale `lib/*.js` ESM cache entry.
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import { createRequire, registerHooks } from 'node:module';
@@ -75,6 +75,8 @@ if (isDev) {
 
 /** @type {number} */
 let reloadToken = Date.now();
+/** @type {string | null} Correlatable build id from vmz dev (Living §12.8). */
+let lastDevBuildId = null;
 /** @type {Array<{ chunkId: string, pageRel: string, segs: ReturnType<typeof parseChunkSegments> }>} */
 let pageCatalog = [];
 /** @type {Map<string, any>} */
@@ -156,7 +158,7 @@ async function renderPageStream(pathname, opts = {}) {
         return { status: 500, stream: emitDevErrorHtml(lastDevError) };
     }
 
-    const localePlan = resolveLocalePath(pathname);
+    const localePlan = resolveLocalePath(pathname, opts.cookieHeader);
     if (localePlan.redirectTo) {
         return { status: 302, redirect: localePlan.redirectTo, headers: { Location: localePlan.redirectTo } };
     }
@@ -480,9 +482,15 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
               `d.innerHTML="<div style='max-width:56rem;margin:0 auto'><p style='color:#f87171;font-weight:700'>Dev Error</p><pre style='white-space:pre-wrap'>"+String(e.message||e).replace(/[<>&]/g,function(c){return {"<":"&lt;",">":"&gt;","&":"&amp;"}[c]})+"</pre></div>";` +
               `document.documentElement.appendChild(d);})();</script>`
             : '';
+    const buildIdBoot =
+        isDev && lastDevBuildId
+            ? `\n  <script>window.__VMZ_DEV_BUILD_ID__=${JSON.stringify(lastDevBuildId)};</script>`
+            : '';
     if (signal?.aborted) return;
     const themeId = resolveThemeId(opts.searchParams, opts.cookieHeader);
     const themeBoot = themeBootstrapScript();
+    const localeBoot = localeBootstrapScript();
+    const faviconHead = siteFaviconHeadHtml();
     const propsJson = JSON.stringify(props ?? {});
     const localeId = localeCtx.localeId || localeArtifact?.defaultLocale || 'en';
     const dir = localeCtx.dir || 'ltr';
@@ -550,9 +558,9 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
         ...(cssHref ? { cssEntry: cssHref } : {}),
         isErrorDocument: false,
         htmlExtraAttrs,
-        headExtraHtml: themeBoot,
+        headExtraHtml: `${themeBoot}${localeBoot}${faviconHead}`,
         moduleScriptSrc: entrySrc,
-        bodyTailHtml: `${live}${bootOverlay}`,
+        bodyTailHtml: `${live}${bootOverlay}${buildIdBoot}`,
     });
 }
 
@@ -676,7 +684,7 @@ process.on('SIGINT', () => {
  * Re-import routes / pages / components with a new cache-bust token.
  * Keeps the HTTP server process alive (no Node restart).
  * Failed reloads keep the previous in-memory modules (Vite-like resilience).
- * @param {{ quiet?: boolean, payload?: { affectedChunks?: string[], seedChunks?: string[], emitted?: string[], full?: boolean, islandHmr?: boolean } }} [opts]
+ * @param {{ quiet?: boolean, payload?: { affectedChunks?: string[], seedChunks?: string[], emitted?: string[], full?: boolean, islandHmr?: boolean, buildId?: string, sourceRevision?: string, bundleRevision?: string, changed?: string[] } }} [opts]
  */
 async function softReload(opts = {}) {
     const prevToken = reloadToken;
@@ -689,6 +697,10 @@ async function softReload(opts = {}) {
     const emitted = opts.payload?.emitted ?? [];
     const full = opts.payload?.full;
     const islandHmr = Boolean(opts.payload?.islandHmr);
+    const buildId = opts.payload?.buildId != null ? String(opts.payload.buildId) : null;
+    const sourceRevision = opts.payload?.sourceRevision != null ? String(opts.payload.sourceRevision) : null;
+    const bundleRevision = opts.payload?.bundleRevision != null ? String(opts.payload.bundleRevision) : null;
+    if (buildId) lastDevBuildId = buildId;
     const reloadAllPages = shouldReloadAllPages({ full, affected, emitted, islandHmr });
 
     try {
@@ -792,6 +804,10 @@ async function softReload(opts = {}) {
                 affectedChunks: affected,
                 seedChunks: seeds,
                 token: reloadToken,
+                buildId: buildId || lastDevBuildId,
+                sourceRevision,
+                bundleRevision,
+                serveRevision: String(reloadToken),
                 full: Boolean(full),
                 eventOnlyShell,
             }),
@@ -799,7 +815,12 @@ async function softReload(opts = {}) {
         if (!opts.quiet) {
             const aff = affected.length > 0 ? ` affected=[${affected.join(', ')}]` : full === false ? ' affected=[]' : '';
             const scope = islandHmr ? 'island' : reloadAllPages ? 'all-pages' : `pages=${nextCtors.size}`;
-            console.log(`vmz serve: soft reload ok (mode=${mode}; ${scope}; catalog=${pageCatalog.length}; t=${reloadToken}${aff})`);
+            const bid = buildId || lastDevBuildId;
+            const rev =
+                bid || sourceRevision || bundleRevision
+                    ? ` buildId=${bid || '-'} source=${sourceRevision || '-'} bundle=${bundleRevision || '-'} serve=${reloadToken}`
+                    : ` t=${reloadToken}`;
+            console.log(`vmz serve: soft reload ok (mode=${mode}; ${scope}; catalog=${pageCatalog.length};${rev}${aff})`);
         }
         return {
             affectedChunks: affected,
@@ -811,6 +832,11 @@ async function softReload(opts = {}) {
             pageCount: pageCatalog.length,
             reloadedPages: islandHmr ? 0 : nextCtors.size,
             reloadAllPages,
+            buildId: buildId || lastDevBuildId,
+            sourceRevision,
+            bundleRevision,
+            serveRevision: String(reloadToken),
+            token: reloadToken,
         };
     } catch (err) {
         reloadToken = prevToken;
@@ -920,11 +946,14 @@ function escapeHtml(s) {
 }
 
 /**
- * Resolve LocaleId from pathname using `_vmz/locale-route-realization.json`.
- * LocaleId is a realization dimension — matching still uses stable route path.
+ * Resolve LocaleId for this request.
+ * - `prefix`: LocaleId from URL path (existing).
+ * - `none`: Host preference from cookie `vmz.locale` (validated), else defaultLocale.
+ *   URL never carries LocaleId.
  * @param {string} pathname
+ * @param {string | undefined} cookieHeader
  */
-function resolveLocalePath(pathname) {
+function resolveLocalePath(pathname, cookieHeader) {
     const raw = String(pathname || '/');
     const normalized = raw.length > 1 && raw.endsWith('/') ? raw.slice(0, -1) : raw || '/';
     if (!localeArtifact) {
@@ -934,6 +963,19 @@ function resolveLocalePath(pathname) {
     const defaultLocale = localeArtifact.defaultLocale || supported[0] || 'en';
     const directions = Object.fromEntries((localeArtifact.locales || []).map((l) => [l.id, l.direction || 'ltr']));
     const routing = localeArtifact.routing || {};
+    const strategy = routing.strategy || 'prefix';
+
+    if (strategy === 'none') {
+        const preferred = readCookie(cookieHeader, LOCALE_STORE_KEY);
+        const localeId = preferred && supported.includes(preferred) ? preferred : defaultLocale;
+        return {
+            localeId,
+            dir: directions[localeId] || 'ltr',
+            restPath: normalized,
+            redirectTo: null,
+        };
+    }
+
     const parts = normalized.split('/').filter(Boolean);
     let localeId = null;
     let restPath = normalized;
@@ -1443,6 +1485,8 @@ function requireNativeGenerator() {
  * Style Theme cookie / localStorage key (host contract, not a second theme API).
  */
 const THEME_STORE_KEY = 'vmz-theme';
+/** Host preference key for `routing.strategy: 'none'` (cookie + localStorage). */
+const LOCALE_STORE_KEY = 'vmz.locale';
 
 /**
  * @param {string} dir
@@ -1515,6 +1559,41 @@ function themeBootstrapScript() {
     const ids = JSON.stringify(styleTheme.themeIds || []);
     const key = JSON.stringify(THEME_STORE_KEY);
     return `  <script>(function(){try{var k=${key},attr=${attr},ids=${ids};var id=localStorage.getItem(k);if(!id||ids.indexOf(id)<0)return;document.documentElement.setAttribute(attr,id);}catch(e){}})();</script>\n`;
+}
+
+/**
+ * LocaleId as client state (routing.strategy = none): apply localStorage before any
+ * page/client module runs so `#locales/*` pick the right variant. Prefix strategy
+ * keeps LocaleId in the URL — no boot rewrite.
+ * Also mirrors into cookie so the next SSR negotiate sees Host preference.
+ */
+function localeBootstrapScript() {
+    if (!localeArtifact) return '';
+    const routing = localeArtifact.routing || {};
+    if ((routing.strategy || 'prefix') !== 'none') return '';
+    const ids = (localeArtifact.locales || []).map((l) => l.id).filter(Boolean);
+    if (!ids.length) return '';
+    const key = JSON.stringify(LOCALE_STORE_KEY);
+    const idList = JSON.stringify(ids);
+    return `  <script>(function(){try{var k=${key},ids=${idList};var id=localStorage.getItem(k);if(!id||ids.indexOf(id)<0)return;document.documentElement.setAttribute("data-locale",id);document.documentElement.setAttribute("lang",id);window.__vmzLocaleIdHint=id;document.cookie=k+"="+encodeURIComponent(id)+"; path=/; max-age=31536000; SameSite=Lax";}catch(e){}})();</script>\n`;
+}
+
+/**
+ * Site favicon links from build artifact `_vmz/site-favicon.json` (author SVG → PNG/ICO).
+ * Empty when skipped / missing — do not invent broken <link>s.
+ */
+function siteFaviconHeadHtml() {
+    try {
+        const p = path.join(distDir, '_vmz', 'site-favicon.json');
+        if (!existsSync(p)) return '';
+        // Sync read: head is per-request; file is tiny and rebuilt with dist.
+        const raw = readFileSync(p, 'utf8');
+        const j = JSON.parse(raw);
+        if (j?.status !== 'ready' || typeof j.headHtml !== 'string') return '';
+        return j.headHtml;
+    } catch {
+        return '';
+    }
 }
 
 /**
