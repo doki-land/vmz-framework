@@ -926,24 +926,34 @@ async function proveFormDepth(page) {
     if (!markers.novalidate) fail('Form depth: form must set data-novalidate (HTML5 validation off by contract)');
 
     // DatePicker calendar overlay: open → Escape closes (owned overlay, not OS date UI).
-    await page.evaluate(() => {
-        document.getElementById('home-form-date')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    await page.waitForSelector('[data-vmz-overlay="date-picker"][data-vmz-date="panel"]', { timeout: 5000 });
+    // Prefer real pointer click — synthetic MouseEvent often misses Direct @click after resume.
+    await page.waitForSelector('#home-form-date', { timeout: 5000 });
+    await page.click('#home-form-date');
+    try {
+        await page.waitForSelector('[data-vmz-overlay="date-picker"][data-vmz-date="panel"]', { timeout: 8000 });
+    } catch (err) {
+        const snap = await page.evaluate(() => ({
+            control: !!document.getElementById('home-form-date'),
+            expanded: document.getElementById('home-form-date')?.getAttribute('aria-expanded') || null,
+            overlay: !!document.querySelector('[data-vmz-overlay="date-picker"]'),
+            openedClass: !!document.querySelector('[data-vmz-ui="date-picker"].is-opened'),
+        }));
+        fail(`Form depth: DatePicker overlay open timed out: ${JSON.stringify(snap)} (${err})`);
+    }
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="date-picker"]'), { timeout: 5000 });
 
     // Tooltip parent-owned open (toggle lives outside Tooltip slot — slotted
     // Button clicks are deferred with the sibling-host debt after resume).
-    await page.waitForSelector('[data-vmz-fixture="form-tip-toggle"]', { timeout: 5000 });
-    await page.click('[data-vmz-fixture="form-tip-toggle"]');
+    await page.waitForSelector('[data-vmz-fixture="form-tip-toggle"] button.vmz-ui-btn', { timeout: 5000 });
+    await page.click('[data-vmz-fixture="form-tip-toggle"] button.vmz-ui-btn');
     try {
         await page.waitForSelector('[data-vmz-ui="tooltip"][data-open="true"] [data-vmz-tooltip="bubble"]', {
             timeout: 8000,
         });
     } catch (err) {
         const snap = await page.evaluate(() => ({
-            tip: !!document.querySelector('[data-vmz-fixture="form-tip-toggle"]'),
+            tip: !!document.querySelector('[data-vmz-fixture="form-tip-toggle"] button.vmz-ui-btn'),
             open: document.querySelector('[data-vmz-ui="tooltip"]')?.getAttribute('data-open') || null,
             bubble: !!document.querySelector('[data-vmz-tooltip="bubble"]'),
         }));
@@ -1048,10 +1058,8 @@ async function proveFormDepth(page) {
             fail(`Form depth: role select did not apply ops: ${JSON.stringify(dbg)} (${err})`);
         });
     // DatePicker: open owned calendar → navigate to Aug 2026 if needed → pick 13.
-    await page.evaluate(() => {
-        document.getElementById('home-form-date')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    await page.waitForSelector('[data-vmz-overlay="date-picker"]', { timeout: 5000 });
+    await page.click('#home-form-date');
+    await page.waitForSelector('[data-vmz-overlay="date-picker"]', { timeout: 8000 });
     await page.evaluate(async () => {
         const monthNames = [
             'January',
