@@ -1,13 +1,82 @@
 /**
- * Single HTML `<a data-vmz-route>` locale rewrite for serve-host and static-emit.
- * Plan-only hosts must not keep a second copy of this semantic (0.1.22).
+ * Plan-native locale link rewrite for serve-host and static-emit.
+ * Href authority is RouteId × LocaleId realization rows — not path parsing on existing href.
  */
+
+export const LOCALE_LINK_PLAN_SCHEMA = 'vmz.static.locale_link_plan.v0';
 
 export type LocaleHrefArtifact = {
     locales?: Array<{ id: string } | string>;
     defaultLocale?: string;
     routing?: { strategy?: string; defaultPrefix?: string; defaultLocale?: string };
+    realizations?: Array<{ routeId: string; localeId: string; path: string }>;
 };
+
+export type LocaleLinkPlanRow = {
+    routeId: string;
+    localeId: string;
+    href: string;
+};
+
+export type LocaleLinkPlan = {
+    schema: typeof LOCALE_LINK_PLAN_SCHEMA;
+    rows: LocaleLinkPlanRow[];
+};
+
+/** Build RouteId × LocaleId → href rows from locale route realization artifact. */
+export function buildLocaleLinkPlan(
+    artifact: LocaleHrefArtifact | null | undefined,
+): LocaleLinkPlan {
+    const rows: LocaleLinkPlanRow[] = [];
+    for (const r of artifact?.realizations || []) {
+        if (!r?.routeId || !r?.localeId || !r?.path) continue;
+        rows.push({ routeId: String(r.routeId), localeId: String(r.localeId), href: String(r.path) });
+    }
+    rows.sort((a, b) =>
+        a.routeId === b.routeId
+            ? a.localeId.localeCompare(b.localeId)
+            : a.routeId.localeCompare(b.routeId),
+    );
+    return { schema: LOCALE_LINK_PLAN_SCHEMA, rows };
+}
+
+/** Apply plan rows to `<a data-vmz-route="RouteId">` markers for one LocaleId. */
+export function applyLocaleLinkPlan(
+    html: string,
+    localeId: string,
+    plan: LocaleLinkPlan,
+    escapeAttr: (s: string) => string = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;'),
+): string {
+    if (!html || !localeId || !plan?.rows?.length) return html;
+    const byRoute = new Map<string, string>();
+    for (const row of plan.rows) {
+        if (row.localeId === localeId) byRoute.set(row.routeId, row.href);
+    }
+    if (!byRoute.size) return html;
+    return String(html).replace(/<a\b([^>]*)>/gi, (full, attrs) => {
+        const rm = attrs.match(/\bdata-vmz-route\s*=\s*"([^"]*)"/i);
+        if (!rm) return full;
+        const href = byRoute.get(rm[1]);
+        if (!href) return full;
+        const hm = attrs.match(/\bhref\s*=\s*"([^"]*)"/i);
+        if (hm && hm[1] === href) return full;
+        const newAttrs = hm
+            ? attrs.replace(/\bhref\s*=\s*"[^"]*"/i, `href="${escapeAttr(href)}"`)
+            : ` href="${escapeAttr(href)}"${attrs}`;
+        return `<a${newAttrs}>`;
+    });
+}
+
+/** Rewrite `<a data-vmz-route href>` using locale realization plan (Plan-native). */
+export function localizeBodyLinks(
+    html: string,
+    localeId: string,
+    artifact: LocaleHrefArtifact,
+    escapeAttr?: (s: string) => string,
+): string {
+    if (!html || !localeId || !artifact) return html;
+    return applyLocaleLinkPlan(html, localeId, buildLocaleLinkPlan(artifact), escapeAttr);
+}
 
 function normalizePath(pathname: string): string {
     let p = String(pathname || '/');
@@ -16,44 +85,12 @@ function normalizePath(pathname: string): string {
     return p || '/';
 }
 
-function parseLocaleFromPath(pathname: string, supportedLocales: string[]) {
-    const parts = normalizePath(pathname).split('/').filter(Boolean);
-    if (!parts.length) return { localeId: null as string | null, restPath: '/' };
-    if (supportedLocales.includes(parts[0])) {
-        const rest = parts.slice(1);
-        return { localeId: parts[0], restPath: rest.length ? `/${rest.join('/')}` : '/' };
-    }
-    return { localeId: null as string | null, restPath: normalizePath(pathname) };
-}
-
-function realizeRoutePath(
-    localeId: string,
-    pathPattern: string,
-    routing: { strategy?: string; defaultPrefix?: string; defaultLocale?: string },
-) {
-    const strategy = routing.strategy || 'prefix';
-    const defaultPrefix = routing.defaultPrefix || 'include';
-    const defaultLocale = routing.defaultLocale;
-    const base = normalizePath(pathPattern);
-
-    if (strategy === 'none' || strategy === 'domain') {
-        return { path: base };
-    }
-
-    const omitDefault = defaultPrefix === 'omit' && localeId === defaultLocale;
-    if (omitDefault) {
-        return { path: base };
-    }
-    const pathOut = base === '/' ? `/${localeId}` : `/${localeId}${base}`;
-    return { path: pathOut };
-}
-
-/** Rewrite a same-app href to the given LocaleId via route realization. */
+/** Legacy same-app href helper for callers without `data-vmz-route` markers. */
 export function localizeSameAppHref(href: string, localeId: string, artifact: LocaleHrefArtifact): string {
     if (!href || !localeId || !artifact) return href;
     if (href.startsWith('#') || /^(mailto|tel|javascript):/i.test(href)) return href;
     if (/^[a-z][a-z0-9+.-]*:/i.test(href) && !href.startsWith('/')) return href;
-
+    const plan = buildLocaleLinkPlan(artifact);
     let pathname = String(href);
     let search = '';
     let hash = '';
@@ -67,36 +104,10 @@ export function localizeSameAppHref(href: string, localeId: string, artifact: Lo
         search = pathname.slice(qIdx);
         pathname = pathname.slice(0, qIdx);
     }
-    if (!pathname) pathname = '/';
-
-    const supported = (artifact.locales || []).map((l) => (typeof l === 'string' ? l : l.id)).filter(Boolean);
-    const defaultLocale = artifact.defaultLocale || artifact.routing?.defaultLocale;
-    const routing = {
-        strategy: artifact.routing?.strategy || 'prefix',
-        defaultPrefix: artifact.routing?.defaultPrefix || 'include',
-        defaultLocale,
-    };
-    const parsed = parseLocaleFromPath(pathname, supported);
-    const rest = parsed.restPath || '/';
-    const realized = realizeRoutePath(localeId, rest, routing);
-    return `${realized.path}${search}${hash}`;
-}
-
-/** Rewrite `<a data-vmz-route href>` in HTML body to retain `localeId`. */
-export function localizeBodyLinks(
-    html: string,
-    localeId: string,
-    artifact: LocaleHrefArtifact,
-    escapeAttr: (s: string) => string = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;'),
-): string {
-    if (!html || !localeId || !artifact) return html;
-    return String(html).replace(/<a\b([^>]*)>/gi, (full, attrs) => {
-        if (!/\bdata-vmz-route\s*=/.test(attrs)) return full;
-        const hm = attrs.match(/\bhref\s*=\s*"([^"]*)"/i);
-        if (!hm) return full;
-        const next = localizeSameAppHref(hm[1], localeId, artifact);
-        if (next === hm[1]) return full;
-        const newAttrs = attrs.replace(/\bhref\s*=\s*"[^"]*"/i, `href="${escapeAttr(next)}"`);
-        return `<a${newAttrs}>`;
-    });
+    pathname = normalizePath(pathname || '/');
+    for (const row of plan.rows) {
+        if (row.localeId !== localeId) continue;
+        if (normalizePath(row.href) === pathname) return `${row.href}${search}${hash}`;
+    }
+    return href;
 }

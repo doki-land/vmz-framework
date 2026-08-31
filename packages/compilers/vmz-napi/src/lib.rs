@@ -1683,6 +1683,38 @@ pub fn deployment_depends_on_closure(json_text: String, roots: Vec<String>) -> R
     Ok(vmz_artifacts::collect_depends_on_closure(&doc, &roots).into_iter().collect())
 }
 
+/// Validate `_vmz/static-emit-plan.json` body.
+#[napi]
+pub fn static_emit_plan_validate(json_text: String) -> Result<()> {
+    vmz_artifacts::parse_static_emit_plan(&json_text)
+        .map(|_| ())
+        .map_err(|e| Error::from_reason(e.to_string()))
+}
+
+/// Validate `_vmz/asset-plan.json` body.
+#[napi]
+pub fn asset_plan_validate(json_text: String) -> Result<()> {
+    vmz_artifacts::parse_asset_plan(&json_text)
+        .map(|_| ())
+        .map_err(|e| Error::from_reason(e.to_string()))
+}
+
+/// Validate `_vmz/content-addressed-assets.json` body.
+#[napi]
+pub fn content_addressed_assets_validate(json_text: String) -> Result<()> {
+    vmz_artifacts::parse_content_addressed_assets(&json_text)
+        .map(|_| ())
+        .map_err(|e| Error::from_reason(e.to_string()))
+}
+
+/// Validate `_vmz/static-delivery-manifest.json` body (closure fields).
+#[napi]
+pub fn static_delivery_manifest_validate(json_text: String) -> Result<()> {
+    vmz_artifacts::parse_static_delivery_manifest(&json_text)
+        .map(|_| ())
+        .map_err(|e| Error::from_reason(e.to_string()))
+}
+
 /// Rasterize SVG markup to a square PNG (site favicon / tab icons).
 #[napi]
 pub fn rasterize_svg_png(svg: String, px: u32) -> Result<Buffer> {

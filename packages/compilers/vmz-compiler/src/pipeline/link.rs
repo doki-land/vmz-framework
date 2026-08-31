@@ -263,6 +263,19 @@ pub fn layout_chain_for_page(
     chain
 }
 
+/// Merge template-tag `dependsOn` with page `layoutChain` (deduped, sorted).
+pub fn merge_depends_on_with_layout(
+    template_deps: Vec<String>,
+    layout_chain: &[String],
+) -> Vec<String> {
+    use std::collections::BTreeSet;
+    let mut set: BTreeSet<String> = template_deps.into_iter().collect();
+    for id in layout_chain {
+        set.insert(id.clone());
+    }
+    set.into_iter().collect()
+}
+
 fn nested_layout_chain(
     page_chunk_id: &str,
     known_chunks: &std::collections::BTreeSet<String>,
@@ -613,6 +626,17 @@ mod layout_chain_tests {
         assert_eq!(
             layout_chain_for_page("pages/shop/offer", &known),
             vec!["pages/shop/Layout".to_string()]
+        );
+    }
+
+    #[test]
+    fn merge_depends_on_includes_layout_chain() {
+        assert_eq!(
+            merge_depends_on_with_layout(
+                vec!["components/Card".into()],
+                &["Application".into(), "pages/Layout".into()],
+            ),
+            vec!["Application", "components/Card", "pages/Layout"]
         );
     }
 }

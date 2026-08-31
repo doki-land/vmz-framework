@@ -1208,6 +1208,22 @@ fn emit_file(
     Ok(())
 }
 
+fn recompute_depended_by(units: &mut [DeploymentUnitWire]) {
+    use std::collections::{BTreeSet, HashMap};
+    let mut rev: HashMap<String, BTreeSet<String>> = HashMap::new();
+    for u in units.iter() {
+        for dep in &u.depends_on {
+            rev.entry(dep.clone()).or_default().insert(u.chunk_id.clone());
+        }
+    }
+    for u in units.iter_mut() {
+        u.depended_by = rev
+            .get(&u.chunk_id)
+            .map(|s| s.iter().cloned().collect::<Vec<_>>())
+            .unwrap_or_default();
+    }
+}
+
 fn emit_deployment_json(
     root: &Path,
     _src_root: &Path,
@@ -1236,6 +1252,7 @@ fn emit_deployment_json(
         } else {
             Vec::new()
         };
+        let depends_on = crate::pipeline::link::merge_depends_on_with_layout(depends_on, &layout_chain);
         units.push(DeploymentUnitWire {
             chunk_id: chunk_id.clone(),
             kind: *kind,
@@ -1266,6 +1283,8 @@ fn emit_deployment_json(
             rebuilt,
         });
     }
+
+    recompute_depended_by(&mut units);
 
     let doc = DeploymentDocument {
         schema: DEPLOYMENT_SCHEMA.to_string(),

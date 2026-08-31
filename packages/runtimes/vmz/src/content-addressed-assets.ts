@@ -15,6 +15,7 @@ import { canonicalJson, sha256Hex } from './release-pack.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 
 export const CONTENT_ADDRESSED_ASSETS_SCHEMA = 'vmz.content_addressed_assets.v0';
+export const ASSET_PLAN_SCHEMA = 'vmz.asset.plan.v0';
 
 interface ContentAddressedAssetObject {
     logicalPath: string;
@@ -132,6 +133,15 @@ export function emitContentAddressedAssets(distDir: string, opts: EmitContentAdd
     const rewrites: Record<string, string> = {};
 
     const ordered = orderCandidates(candidates);
+    const vmzMetaDir = path.join(abs, '_vmz');
+    fs.mkdirSync(vmzMetaDir, { recursive: true });
+    writePrettyJsonFile(path.join(vmzMetaDir, 'asset-plan.json'), {
+        schema: ASSET_PLAN_SCHEMA,
+        layout: 'assets/<sha256>.<ext>',
+        immutable: true,
+        candidates: ordered,
+    });
+
     for (const rel of ordered) {
         // Aggregators are replaced in later passes; leaf JS must rewrite ./ → ../ so a
         // hashed barrel under assets/ never 404s on second-hop relative re-exports.
