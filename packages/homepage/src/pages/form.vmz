@@ -32,7 +32,9 @@
               :value="email"
               @input="(e) => this.onEmail(e)"
             />
-            <Button type="button" variant="ghost" data-vmz-fixture="form-tip-toggle" @click="() => this.toggleTip()">Why?</Button>
+            <div data-vmz-fixture="form-tip-toggle">
+              <Button type="button" variant="ghost" @click="() => this.toggleTip()">Why?</Button>
+            </div>
             <Tooltip :open="tipOpen" :open-attr="tipOpenAttr" content="Use your company domain when possible." tooltip-id="home-form-email-tip">
               <span data-vmz-tooltip="anchor" aria-hidden="true"></span>
             </Tooltip>
