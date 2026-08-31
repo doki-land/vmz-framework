@@ -189,9 +189,7 @@ export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {
             fs.mkdirSync(path.dirname(absHtml), { recursive: true });
             // Each LocaleId HTML must retain locale on same-app Links (realization authority).
             const localizedBody =
-                gen.localeId && localeLinkPlan.rows.length
-                    ? applyLocaleLinkPlan(bodyHtml, gen.localeId, localeLinkPlan)
-                    : bodyHtml;
+                gen.localeId && localeLinkPlan.rows.length ? applyLocaleLinkPlan(bodyHtml, gen.localeId, localeLinkPlan) : bodyHtml;
             const html = wrapDocument({
                 bodyHtml: localizedBody,
                 chunkId: page.chunkId,

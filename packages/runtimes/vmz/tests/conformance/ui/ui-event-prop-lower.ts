@@ -14,16 +14,12 @@ function fail(msg) {
 }
 
 console.log('ui-event-prop-lower: pipeline_emit component event props…');
-const run = spawnSync(
-    'cargo',
-    ['test', '-p', 'vmz-compiler', 'maps_component_at_click_to_on_click_wire_prop', '--quiet'],
-    {
-        cwd: path.join(root, 'packages', 'compilers', 'vmz-compiler'),
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-        shell: true,
-    },
-);
+const run = spawnSync('cargo', ['test', '-p', 'vmz-compiler', 'maps_component_at_click_to_on_click_wire_prop', '--quiet'], {
+    cwd: path.join(root, 'packages', 'compilers', 'vmz-compiler'),
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    shell: true,
+});
 if (run.status !== 0) {
     fail(`cargo test failed\n${run.stdout}\n${run.stderr}`);
 }

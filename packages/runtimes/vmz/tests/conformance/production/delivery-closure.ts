@@ -43,12 +43,7 @@ const deploymentPath = path.join(dist, 'vmz-deployment.json');
 if (!fs.existsSync(deploymentPath)) fail(`missing ${deploymentPath} after static gates`);
 
 const native = loadNative();
-for (const fn of [
-    'staticEmitPlanValidate',
-    'assetPlanValidate',
-    'contentAddressedAssetsValidate',
-    'staticDeliveryManifestValidate',
-] as const) {
+for (const fn of ['staticEmitPlanValidate', 'assetPlanValidate', 'contentAddressedAssetsValidate', 'staticDeliveryManifestValidate'] as const) {
     if (typeof native[fn] !== 'function') {
         fail(`native missing ${fn} — run pnpm napi:build`);
     }

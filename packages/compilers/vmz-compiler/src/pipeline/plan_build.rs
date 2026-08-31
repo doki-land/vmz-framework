@@ -108,9 +108,11 @@ fn push_node(node: &ViewNode, out: &mut Vec<PlanNode>, next_id: &mut u32) -> u32
         }
         ViewNode::Component { tag, children, attrs, .. } => {
             let kid_ids: Vec<u32> = children.iter().map(|c| push_node(c, out, next_id)).collect();
-            let resume_marker = attrs.iter().find_map(|a| a.name.strip_prefix("client:").map(|s| {
-                if s.is_empty() { "load".into() } else { s.to_string() }
-            }));
+            let resume_marker = attrs.iter().find_map(|a| {
+                a.name
+                    .strip_prefix("client:")
+                    .map(|s| if s.is_empty() { "load".into() } else { s.to_string() })
+            });
             PlanNode::Component { id, tag: Some(tag.clone()), resume_marker, children: kid_ids }
         }
         ViewNode::Slot { name, children, .. } => {

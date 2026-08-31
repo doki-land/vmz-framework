@@ -41,17 +41,9 @@ function runTest(example, filter, label) {
 }
 
 console.log('runtime-identity: island resume nodeIdentity…');
-runTest(
-    path.join(root, 'packages', 'examples', 'island'),
-    'resume\\.resume\\.island',
-    'island-resume',
-);
+runTest(path.join(root, 'packages', 'examples', 'island'), 'resume\\.resume\\.island', 'island-resume');
 
 console.log('runtime-identity: counter browser hydrate nodeIdentity…');
-runTest(
-    path.join(root, 'packages', 'examples', 'counter'),
-    'counter\\.browser\\.increment',
-    'counter-hydrate',
-);
+runTest(path.join(root, 'packages', 'examples', 'counter'), 'counter\\.browser\\.increment', 'counter-hydrate');
 
 console.log('runtime-identity GATE PASS: resume + hydrate preserve node identity');
