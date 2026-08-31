@@ -933,6 +933,137 @@ export function attachEventEntries(root = globalThis.document) {
 }
 
 /**
+ * Adopt parked SSR/Island nodes while `__vmzCreate` rebuilds the live tree.
+ * Children of `rootEl` are moved into `pool` first so the create schedule never
+ * leaves orphan SSR siblings beside if/each markers (duplicate h2 / stale text).
+ * @param {DocumentFragment} pool
+ * @param {Element} rootEl
+ */
+function createResumeAdopt(pool, rootEl) {
+    const used = new WeakSet();
+    /** @type {Element[]} */
+    const adopted = [];
+
+    const markElement = (n) => {
+        used.add(n);
+        adopted.push(n);
+        if (typeof n.getAttribute === 'function') {
+            const k = n.getAttribute('data-vmz-key');
+            if (k != null && n.__vmzKey == null) n.__vmzKey = k;
+        }
+        // Park descendants so create can rebuild if/each without orphan SSR siblings.
+        while (n.firstChild) pool.appendChild(n.firstChild);
+        return n;
+    };
+
+    /**
+     * linkedom lacks `NodeFilter` — walk manually.
+     * @param {Node} root
+     * @param {(n: Element) => void} visit
+     */
+    const walkElements = (root, visit) => {
+        if (!root || root.nodeType !== 1) return;
+        const el = /** @type {Element} */ (root);
+        visit(el);
+        for (let c = el.firstChild; c; c = c.nextSibling) walkElements(c, visit);
+    };
+
+    /**
+     * @param {Node} root
+     * @param {(n: Text) => void} visit
+     */
+    const walkTexts = (root, visit) => {
+        if (!root) return;
+        if (root.nodeType === 3) {
+            visit(/** @type {Text} */ (root));
+            return;
+        }
+        if (root.nodeType !== 1) return;
+        for (let c = root.firstChild; c; c = c.nextSibling) walkTexts(c, visit);
+    };
+
+    /** @returns {Generator<Element>} */
+    function* elementCandidates() {
+        if (!used.has(rootEl)) yield rootEl;
+        for (const n of pool.childNodes) {
+            if (n.nodeType !== 1) continue;
+            /** @type {Element[]} */
+            const found = [];
+            walkElements(n, (el) => {
+                if (!used.has(el)) found.push(el);
+            });
+            for (const el of found) yield el;
+        }
+        for (const a of adopted) {
+            /** @type {Element[]} */
+            const found = [];
+            for (let c = a.firstChild; c; c = c.nextSibling) {
+                walkElements(c, (el) => {
+                    if (!used.has(el)) found.push(el);
+                });
+            }
+            for (const el of found) yield el;
+        }
+    }
+
+    /** @returns {Generator<Text>} */
+    function* textCandidates() {
+        for (const n of pool.childNodes) {
+            /** @type {Text[]} */
+            const found = [];
+            walkTexts(n, (t) => {
+                if (!used.has(t)) found.push(t);
+            });
+            for (const t of found) yield t;
+        }
+        for (const a of adopted) {
+            /** @type {Text[]} */
+            const found = [];
+            walkTexts(a, (t) => {
+                if (!used.has(t)) found.push(t);
+            });
+            for (const t of found) yield t;
+        }
+    }
+
+    const adoptElement = (tag) => {
+        const want = String(tag || 'div').toLowerCase();
+        for (const el of elementCandidates()) {
+            if (String(el.tagName).toLowerCase() === want) return markElement(el);
+        }
+        noteDomCreate();
+        return document.createElement(tag || 'div');
+    };
+
+    const adoptText = (value) => {
+        for (const n of textCandidates()) {
+            used.add(n);
+            if (value != null && value !== '') n.textContent = String(value);
+            return n;
+        }
+        noteDomCreate();
+        return document.createTextNode(value == null ? '' : String(value));
+    };
+
+    /** Reclaim SSR `<div data-vmz="Name">` hosts for nested Direct components. */
+    const componentHost = (name) => {
+        const want = String(name || '');
+        for (const el of elementCandidates()) {
+            if (String(el.tagName).toLowerCase() !== 'div') continue;
+            if (el.getAttribute('data-vmz') !== want) continue;
+            return markElement(el);
+        }
+        return null;
+    };
+
+    return {
+        el: adoptElement,
+        text: adoptText,
+        componentHost,
+    };
+}
+
+/**
  * Adopt existing Island DOM while running the same `__vmzCreate` schedule (resume).
  * @param {new (props?: object) => any} Component
  * @param {object} inst
@@ -943,49 +1074,31 @@ function runDirectResume(Component, inst, container) {
     if (!rootEl || rootEl.nodeType !== 1) {
         return runDirectCreate(Component, inst);
     }
-    let textI = 0;
-    const api = {
-        _inst: inst,
-        _branchBinds: null,
-        _itemPatches: null,
-        el(tag) {
-            if (String(rootEl.tagName).toLowerCase() !== String(tag).toLowerCase()) {
-                noteDomCreate();
-                return document.createElement(tag);
-            }
-            return rootEl;
-        },
-        frag() {
-            return document.createDocumentFragment();
-        },
-        text(s) {
-            while (textI < rootEl.childNodes.length) {
-                const n = rootEl.childNodes[textI++];
-                if (n.nodeType === 3) {
-                    if (s != null && s !== '') n.textContent = String(s);
-                    return n;
-                }
-            }
-            noteDomCreate();
-            return document.createTextNode(String(s ?? ''));
-        },
-        attr(el, name, value) {
-            applyDomAttr(el, name, value);
-        },
-        on(el, type, handler) {
-            el.addEventListener(type, handler);
-        },
-        bindText: directApi.bindText,
-        bindAttr: directApi.bindAttr,
-        bindComponentProp: directApi.bindComponentProp,
-        projectDefaultSlot: directApi.projectDefaultSlot,
-        setHtml: directApi.setHtml,
-        bindHtml: directApi.bindHtml,
-        ifBlock: directApi.ifBlock,
-        eachBlock: directApi.eachBlock,
-        component: directApi.component,
-    };
-    return Component.__vmzCreate.call(inst, api);
+
+    // Park SSR descendants so create can append if/each structure without orphan siblings.
+    const pool = document.createDocumentFragment();
+    while (rootEl.firstChild) pool.appendChild(rootEl.firstChild);
+
+    const prevInst = directApi._inst;
+    const prevBranch = directApi._branchBinds;
+    const prevItems = directApi._itemPatches;
+    const prevEach = directApi._eachCtx;
+    const prevAdopt = directApi._resumeAdopt;
+    directApi._inst = inst;
+    directApi._branchBinds = null;
+    directApi._itemPatches = null;
+    directApi._eachCtx = null;
+    directApi._resumeAdopt = createResumeAdopt(pool, rootEl);
+    try {
+        return Component.__vmzCreate.call(inst, directApi);
+    } finally {
+        directApi._resumeAdopt = prevAdopt;
+        directApi._inst = prevInst;
+        directApi._branchBinds = prevBranch;
+        directApi._itemPatches = prevItems;
+        directApi._eachCtx = prevEach;
+        while (pool.firstChild) pool.removeChild(pool.firstChild);
+    }
 }
 
 /**
@@ -1031,7 +1144,7 @@ export async function hydrate(Component, container, props = {}, opts = {}) {
             container.appendChild(node);
         }
     } else {
-        // Deep adopt: reuse SSR DOM via the same Direct schedule as resume (binders attach in-place).
+        // Deep adopt: park SSR children, rebuild schedule, reclaim nodes (no orphan siblings).
         const node = runDirectResume(Component, inst, container);
         if (node) inst.__vmzDomRoot = node;
     }
