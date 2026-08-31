@@ -19,8 +19,8 @@
         :aria-describedby="describedBy"
         :value="value"
         :disabled="disabled"
-        @input="onInput"
-        :onKeyDown="onKeyDown"
+        @input="this.onDomInput"
+        :onKeyDown="this.onKeyDown"
       />
       <ul
         v-if="listOpen"
@@ -28,7 +28,7 @@
         class="vmz-ui-autocomplete__list"
         role="listbox"
         data-vmz-autocomplete="list"
-        @click="onListClick"
+        @click="this.onListClick"
       >
         <li
           v-for="opt in options"
@@ -157,6 +157,10 @@ export default class Autocomplete {
 	public onInput: ((e: Event) => void) | null = null;
 	public onSelect: ((value: string) => void) | null = null;
 	public onClose: (() => void) | null = null;
+	onDomInput(e: Event) {
+		this.emit("input", e);
+		if (typeof this.onInput === "function") this.onInput(e);
+	}
 	onListClick(ev) {
 		if (this.disabled) return;
 		const t = ev && ev.target;
@@ -165,11 +169,13 @@ export default class Autocomplete {
 		if (!opt) return;
 		const next = opt.getAttribute("data-vmz-option") || "";
 		if (!next) return;
+		this.emit("select", next);
 		if (typeof this.onSelect === "function") this.onSelect(next);
 	}
 	onKeyDown(ev) {
 		if (!ev || ev.key !== "Escape") return;
 		ev.preventDefault();
+		this.emit("close");
 		if (typeof this.onClose === "function") this.onClose();
 	}
 }

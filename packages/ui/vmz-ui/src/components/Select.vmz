@@ -19,8 +19,8 @@
         :aria-invalid="error ? 'true' : 'false'"
         :aria-describedby="describedBy"
         :aria-multiselectable="isMultiple ? 'true' : 'false'"
-        @click="toggle"
-        :onKeyDown="onTriggerKeyDown"
+        @click="this.toggle"
+        :onKeyDown="this.onTriggerKeyDown"
       >
         <span class="vmz-ui-select__value">{{ displayLabel }}</span>
         <span class="vmz-ui-select__chev" aria-hidden="true"></span>
@@ -41,8 +41,8 @@
             :value="searchQuery"
             :placeholder="searchPlaceholder"
             :aria-label="searchPlaceholder"
-            @input="onSearchInput"
-            :onKeyDown="onSearchKeyDown"
+            @input="this.onSearchInput"
+            :onKeyDown="this.onSearchKeyDown"
           />
         </div>
         <ul
@@ -50,7 +50,7 @@
           role="listbox"
           :aria-multiselectable="isMultiple ? 'true' : 'false'"
           tabindex="-1"
-          :onKeyDown="onListKeyDown"
+          :onKeyDown="this.onListKeyDown"
         >
           <li v-if="showEmpty" class="vmz-ui-select__empty" role="presentation">{{ emptyText }}</li>
           <li v-for="opt in visibleOptions" :key="opt.value" role="presentation">
@@ -60,12 +60,12 @@
               role="option"
               :data-vmz-option="opt.value"
               :aria-selected="opt.selected ? 'true' : 'false'"
-              @click="onOptionClick"
+              @click="this.onOptionClick"
             >{{ opt.label }}</button>
           </li>
         </ul>
         <div v-if="isMultiple" class="vmz-ui-select__footer">
-          <button type="button" class="vmz-ui-select__done" data-vmz-select="done" @click="close">Done</button>
+          <button type="button" class="vmz-ui-select__done" data-vmz-select="done" @click="this.close">Done</button>
         </div>
       </div>
       <p v-if="description" :id="descriptionId" class="vmz-ui-select__description">{{ description }}</p>
@@ -387,11 +387,13 @@ export default class Select {
 		this._rebuildVisible();
 	}
 	_emit(nextValue: string, nextValues: string[]) {
+		const payload = { target: {
+			value: nextValue,
+			values: nextValues
+		} };
+		this.emit("change", payload);
 		if (typeof this.onChange === "function") {
-			this.onChange({ target: {
-				value: nextValue,
-				values: nextValues
-			} });
+			this.onChange(payload);
 		}
 	}
 	/** Parent-owned prop writes (bindComponentProp) — keep derived label/options in sync. */

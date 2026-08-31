@@ -16,7 +16,7 @@
           class="vmz-ui-dialog__backdrop"
           data-vmz-overlay-layer="backdrop"
           aria-label="Dismiss dialog"
-          @click="dismiss"
+          @click="this.dismiss"
         ></button>
         <div
           class="vmz-ui-dialog__panel"
@@ -28,14 +28,14 @@
           data-vmz-focus="enter"
           data-vmz-motion="overlay-enter"
           data-vmz-motion-token="motion.overlay"
-          :onKeyDown="onPanelKeyDown"
+          :onKeyDown="this.onPanelKeyDown"
         >
           <h2 :id="titleId" class="vmz-ui-dialog__title">{{ title }}</h2>
           <div class="vmz-ui-dialog__body">
             <slot />
           </div>
           <div class="vmz-ui-dialog__actions">
-            <button type="button" class="vmz-ui-dialog__close" data-vmz-focus="close" @click="dismiss">
+            <button type="button" class="vmz-ui-dialog__close" data-vmz-focus="close" @click="this.dismiss">
               Close
             </button>
           </div>
@@ -265,10 +265,12 @@ export default class Dialog {
 				// Stale exit after interrupt/re-enter must not call onClose.
 				if (!this._exiting || exitGen !== this._motionGen) return;
 				this._exiting = false;
+				this.emit("close");
 				if (typeof this.onClose === "function") this.onClose();
 			}, ms);
 			return;
 		}
+		this.emit("close");
 		if (typeof this.onClose === "function") this.onClose();
 	}
 	_cancelExit(reason) {

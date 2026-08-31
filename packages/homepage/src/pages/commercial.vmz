@@ -52,8 +52,8 @@
           :error-summary="contactSummary"
           summary-id="home-commercial-summary"
           :described-by="contactDescribedBy"
-          :on-submit="() => this.confirmContact()"
-          :on-reset="() => this.resetContact()"
+          @submit="() => this.confirmContact()"
+          @reset="() => this.resetContact()"
         >
           <Field
             label="Work email"

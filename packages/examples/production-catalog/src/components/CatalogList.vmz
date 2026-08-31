@@ -8,8 +8,8 @@
       <p v-if="selected">selected: {{ selected }}</p>
       <p v-else>none selected</p>
       <p>async: {{ asyncLabel }}</p>
-      <button type="button" @click="selectFirst">select</button>
-      <button type="button" @click="clear">clear</button>
+      <button type="button" @click="this.selectFirst">select</button>
+      <button type="button" @click="this.clear">clear</button>
     </section>
 </template>
 

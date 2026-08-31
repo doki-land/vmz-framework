@@ -10,7 +10,8 @@
 use super::ast_util::{js_string_literal, print_one_stmt};
 use super::emit_ir::IrDepCursor;
 use super::helpers::{
-    bind_field_idents, collect_deps_oxc, component_prop_wire_name, event_dom_type, is_event_attr,
+    bind_field_idents, collect_deps_oxc, component_event_name, component_prop_wire_name, event_dom_type,
+    is_component_event_attr, is_event_attr,
     is_html_attr, looks_like_ternary, parse_this_method_call_arrow, sanitize_interp,
     split_ternary_parts, wrap_event_handler_body,
 };
@@ -441,6 +442,8 @@ fn emit_component(
 ) -> String {
     let mut client: Option<String> = None;
     let mut prop_parts = Vec::new();
+    // (eventName, handlerExpr)
+    let mut event_parts: Vec<(String, String)> = Vec::new();
     for a in attrs {
         if a.name == "style:tw" {
             continue;
@@ -449,14 +452,29 @@ fn emit_component(
             client = Some(if strategy.is_empty() { "load".into() } else { strategy.to_string() });
             continue;
         }
+        // Component `@event` → subscribe channel (not a prop).
+        if is_component_event_attr(&a.name) {
+            let ViewAttrValue::Interp { expr: e } = &a.value else {
+                continue;
+            };
+            let body = bind_field_idents(e, fields, scope, aliases);
+            let handler = wrap_event_handler_body(&body);
+            event_parts.push((component_event_name(&a.name), handler));
+            continue;
+        }
         let val = match &a.value {
             ViewAttrValue::Static { value: s } => q(s),
             ViewAttrValue::Bare => "true".to_string(),
-            ViewAttrValue::Interp { expr: e } if is_event_attr(&a.name) => {
-                wrap_event_handler_body(&bind_field_idents(e, fields, scope, aliases))
+            ViewAttrValue::Interp { expr: e } => {
+                // `:on-submit` / function props — wrap bare method refs like events.
+                let body = bind_field_idents(e, fields, scope, aliases);
+                let wire = component_prop_wire_name(&a.name);
+                if wire.starts_with("on") && wire.len() > 2 && wire.as_bytes()[2].is_ascii_uppercase() {
+                    wrap_event_handler_body(&body)
+                } else {
+                    body
+                }
             }
-            // Always rewrite bare field idents for complex interps (not a single field root).
-            ViewAttrValue::Interp { expr: e } => bind_field_idents(e, fields, scope, aliases),
         };
         let wire = component_prop_wire_name(&a.name);
         prop_parts.push(format!("{}:{}", q(&wire), val));
@@ -468,10 +486,13 @@ fn emit_component(
     };
     let v = fresh("c", next_id);
     stmts.push(format!("var {v} = api.component(this, {}, {props}, {client_arg});", q(tag)));
-    // Live prop binders: any interp with field deps stays in sync.
+    for (ev, handler) in &event_parts {
+        stmts.push(format!("api.onComponentEvent({v}, {}, {handler});", q(ev)));
+    }
+    // Live prop binders: any interp with field deps stays in sync (not @events).
     if client.is_none() && aliases.is_empty() {
         for a in attrs {
-            if a.name == "style:tw" || a.name.starts_with("client:") || is_event_attr(&a.name) {
+            if a.name == "style:tw" || a.name.starts_with("client:") || is_component_event_attr(&a.name) {
                 continue;
             }
             let ViewAttrValue::Interp { expr: e } = &a.value else {

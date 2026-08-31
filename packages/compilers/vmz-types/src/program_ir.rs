@@ -389,6 +389,19 @@ impl DisposeRegionSource {
     }
 }
 
+/// Component event subscribe plan — orthogonal to public prop wire.
+///
+/// Authoring `<Child @submit="this.confirm" />` projects here; `:on-submit` does **not**.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ComponentEventPlan {
+    /// Event name (`submit`, `click`, …) — never `onSubmit`.
+    pub name: String,
+    /// Host component plan node id when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_id: Option<u32>,
+}
+
 /// One scheduled structural node in the shared plan.
 ///
 /// **Tagged union** (closed): serde `tag = "kind"` + per-variant payload.
@@ -479,6 +492,9 @@ pub enum PlanNode {
         /// Resume / island marker from `client:*` when present.
         #[serde(default, skip_serializing_if = "crate::serde_util::is_none_or_empty_string")]
         resume_marker: Option<String>,
+        /// Component `@event` subscriptions (orthogonal to prop wire).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        events: Vec<ComponentEventPlan>,
         /// Child plan node ids (default slot body).
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         children: Vec<u32>,

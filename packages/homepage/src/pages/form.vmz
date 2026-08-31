@@ -16,8 +16,8 @@
           :described-by="formDescribedBy"
           :disabled="submitting"
           :disabled-attr="disabledAttr"
-          :on-submit="() => this.submit()"
-          :on-reset="() => this.reset()"
+          @submit="() => this.submit()"
+          @reset="() => this.reset()"
         >
           <div class="vmz-form-email-row" data-vmz-fixture="form-email-row">
             <Field

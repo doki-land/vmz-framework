@@ -7,7 +7,8 @@ pub fn is_html_attr(name: &str) -> bool {
     name == "html"
 }
 
-/// True when the attr name is an event (`onClick` / `@click`).
+/// True when the attr is a **DOM** event listener (`@click` / `on:click` / `onClick`).
+/// Does **not** treat `on-submit` kebab as an event — that is a prop name on components.
 pub fn is_event_attr(name: &str) -> bool {
     if name.starts_with('@') {
         return name.len() > 1;
@@ -15,12 +16,24 @@ pub fn is_event_attr(name: &str) -> bool {
     if let Some(rest) = name.strip_prefix("on:") {
         return !rest.is_empty();
     }
-    // `on-click` (kebab) is an event callback prop surface in templates.
-    if let Some(rest) = name.strip_prefix("on-") {
-        return !rest.is_empty();
-    }
     let bytes = name.as_bytes();
     bytes.len() >= 3 && bytes[..2].eq_ignore_ascii_case(b"on") && bytes[2].is_ascii_uppercase()
+}
+
+/// Component template `@submit` / `@click.stop` — component event channel (not a prop).
+pub fn is_component_event_attr(name: &str) -> bool {
+    name.starts_with('@') && name.len() > 1
+}
+
+/// `@submit` / `@click.stop` → event name `submit` / `click`.
+pub fn component_event_name(name: &str) -> String {
+    let raw = name.strip_prefix('@').unwrap_or(name);
+    let ev = raw.split('.').next().unwrap_or(raw);
+    if ev.contains('-') {
+        kebab_to_camel(ev)
+    } else {
+        ev.to_string()
+    }
 }
 
 /// `home-href` / `on-copy` → `homeHref` / `onCopy`. Leaves already-camel names alone.
@@ -44,52 +57,35 @@ pub fn kebab_to_camel(name: &str) -> String {
     out
 }
 
-/// Event attr → component callback prop (`@click` / `on-click` / `onClick` → `onClick`).
-pub fn event_handler_prop_name(name: &str) -> String {
-    let raw = if let Some(rest) = name.strip_prefix('@') {
-        rest
-    } else if let Some(rest) = name.strip_prefix("on:") {
-        rest
-    } else if let Some(rest) = name.strip_prefix("on-") {
-        rest
-    } else if name.len() >= 3 && name.as_bytes()[..2].eq_ignore_ascii_case(b"on") {
-        &name[2..]
-    } else {
-        name
-    };
-    let ev = raw.split('.').next().unwrap_or(raw);
-    let camel = if ev.contains('-') { kebab_to_camel(ev) } else { ev.to_string() };
-    let mut chars = camel.chars();
-    match chars.next() {
-        Some(c) => format!("on{}{}", c.to_ascii_uppercase(), chars.as_str()),
-        None => "on".into(),
-    }
-}
-
-/// Template attr on a component → wire prop name (script/`public` camelCase).
-/// `@click` → `onClick`; `home-href` → `homeHref`; `on-copy` → `onCopy`.
+/// Template attr on a component → **prop** wire name (script/`public` camelCase).
+/// `:on-submit` / `on-submit` → `onSubmit`; `home-href` → `homeHref`.
+/// **Never** pass `@event` here — those are [`is_component_event_attr`].
 pub fn component_prop_wire_name(attr: &str) -> String {
-    if is_event_attr(attr) {
-        return event_handler_prop_name(attr);
-    }
+    debug_assert!(
+        !is_component_event_attr(attr),
+        "component @event must not use component_prop_wire_name: {attr}"
+    );
     if attr.contains('-') {
         return kebab_to_camel(attr);
     }
     attr.to_string()
 }
 
-/// Wrap bare `methodName` / `this.methodName` handlers as `(ev) => this.method(ev)`.
+/// Wrap **explicit** `this.methodName` handlers as `(ev) => this.method(ev)`.
+/// Bare identifiers are **not** silently guessed as instance methods (Living `01`).
 pub fn wrap_event_handler_body(body: &str) -> String {
     let body = body.trim();
     if let Some(method) = parse_this_method_call_arrow(body) {
         return format!("(ev) => this.{method}(ev)");
     }
-    let bare = body.strip_prefix("this.").unwrap_or(body);
-    let is_method_ref = !bare.is_empty()
-        && bare.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
-        && !bare.contains('(');
-    if is_method_ref {
-        return format!("(ev) => this.{bare}(ev)");
+    // Only `this.method` — never bare `method`.
+    if let Some(rest) = body.strip_prefix("this.") {
+        let is_method_ref = !rest.is_empty()
+            && rest.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
+            && !rest.contains('(');
+        if is_method_ref {
+            return format!("(ev) => this.{rest}(ev)");
+        }
     }
     body.to_string()
 }
@@ -143,10 +139,10 @@ pub fn event_dom_type(name: &str) -> String {
     raw.split('.').next().unwrap_or(raw).to_ascii_lowercase()
 }
 
-/// Strip leading `this.` from interpolation expressions.
+/// Trim template interp expressions. **Does not** strip leading `this.` —
+/// Living `01` requires explicit `this.method` / `this.field` (no silent rewrite).
 pub fn sanitize_interp(expr: &str) -> String {
-    let e = expr.trim();
-    e.strip_prefix("this.").unwrap_or(e).to_string()
+    expr.trim().to_string()
 }
 
 /// Component tags are PascalCase.
@@ -481,8 +477,8 @@ fn bind_field_idents_legacy(
 #[cfg(test)]
 mod tests {
     use super::{
-        bind_field_idents, component_prop_wire_name, event_dom_type, event_handler_prop_name,
-        kebab_to_camel,
+        bind_field_idents, component_event_name, component_prop_wire_name, event_dom_type,
+        is_component_event_attr, is_event_attr, kebab_to_camel, wrap_event_handler_body,
     };
 
     #[test]
@@ -493,28 +489,33 @@ mod tests {
     }
 
     #[test]
-    fn event_handler_prop_name_maps_vue_and_kebab() {
-        assert_eq!(event_handler_prop_name("@click"), "onClick");
-        assert_eq!(event_handler_prop_name("on-click"), "onClick");
-        assert_eq!(event_handler_prop_name("onClick"), "onClick");
-        assert_eq!(event_handler_prop_name("on-copy"), "onCopy");
-        assert_eq!(event_handler_prop_name("@click.stop"), "onClick");
+    fn wrap_event_handler_requires_explicit_this() {
+        assert_eq!(wrap_event_handler_body("this.bump"), "(ev) => this.bump(ev)");
+        assert_eq!(wrap_event_handler_body("bump"), "bump");
+        assert_eq!(wrap_event_handler_body("() => this.bump()"), "(ev) => this.bump(ev)");
     }
 
     #[test]
-    fn component_prop_wire_name_events_and_attrs() {
-        assert_eq!(component_prop_wire_name("@click"), "onClick");
+    fn component_prop_wire_name_props_only_not_at_events() {
+        assert_eq!(component_prop_wire_name("on-submit"), "onSubmit");
         assert_eq!(component_prop_wire_name("on-copy"), "onCopy");
         assert_eq!(component_prop_wire_name("home-href"), "homeHref");
         assert_eq!(component_prop_wire_name("copy-label"), "copyLabel");
         assert_eq!(component_prop_wire_name("type"), "type");
+        assert_eq!(component_event_name("@submit"), "submit");
+        assert_eq!(component_event_name("@click.stop"), "click");
+        assert!(is_component_event_attr("@submit"));
+        assert!(!is_component_event_attr("on-submit"));
+        assert!(!is_event_attr("on-submit"));
+        assert!(is_event_attr("@click"));
+        assert!(is_event_attr("onClick"));
     }
 
     #[test]
-    fn event_dom_type_accepts_on_kebab() {
+    fn event_dom_type_accepts_at_and_on_camel() {
         assert_eq!(event_dom_type("@click"), "click");
-        assert_eq!(event_dom_type("on-click"), "click");
         assert_eq!(event_dom_type("onClick"), "click");
+        assert_eq!(event_dom_type("on:click"), "click");
     }
 
     #[test]

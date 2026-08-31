@@ -7,7 +7,7 @@
       :disabled="disabled"
     >
       <legend class="vmz-ui-radio-group__legend">{{ label }}</legend>
-      <div class="vmz-ui-radio-group__list" role="radiogroup" :aria-label="label" @click="onListClick">
+      <div class="vmz-ui-radio-group__list" role="radiogroup" :aria-label="label" @click="this.onListClick">
         <label
           v-for="item in items"
           :key="item.value"
@@ -131,6 +131,7 @@ export default class RadioGroup {
 		if (!input) return;
 		const next = input.getAttribute("data-vmz-radio") || input.value || "";
 		if (!next || next === this.value) return;
+		this.emit("change", next);
 		if (typeof this.onChange === "function") this.onChange(next);
 	}
 }

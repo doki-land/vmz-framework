@@ -23,6 +23,7 @@ export default class Segmented {
   public options: Array<{ value: string; label: string }> = [];
   public onChange: ((value: string) => void) | null = null;
   onPick(next: string) {
+    this.emit('change', next);
     if (typeof this.onChange === 'function') this.onChange(next);
   }
 }

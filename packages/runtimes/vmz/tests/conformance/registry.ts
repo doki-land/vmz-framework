@@ -239,9 +239,36 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'ui/ui-direct-host-box.ts',
         description: 'Direct chip hosts display:contents (ui-direct-host-box) + Notification stays block',
     },
-    'ui-event-prop-lower': {
-        file: 'ui/ui-event-prop-lower.ts',
-        description: 'Component @click lowers to onClick in Direct client emit',
+    'component-event-wire': {
+        file: 'ui/component-event-wire.ts',
+        description: 'Component @event → onComponentEvent subscribe; :on-* stays prop (orthogonal)',
+    },
+    'ui-host-box': {
+        description: 'Alias — ui-direct-host-box',
+        composite: ['ui-direct-host-box'],
+    },
+    'upload': {
+        description: 'Upload thin gate — covered by ui-automation Form depth + official-homepage',
+        composite: ['ui-automation', 'official-homepage'],
+    },
+    'official-dogfood': {
+        description: 'Alias — official-homepage',
+        composite: ['official-homepage'],
+    },
+    'highlighter-wasm': {
+        file: 'ui/highlighter-wasm.ts',
+        description: '@vmz/highlighter + unknown-wasm32 + vmz-highlighter CE',
+        pre: ['build:content-engines'],
+    },
+    'markdown-wasm32': {
+        file: 'ui/markdown-wasm32.ts',
+        description: '@vmz/markdown + unknown-wasm32 plain engines',
+        pre: ['build:content-engines'],
+    },
+    'replaceable-content-plugin': {
+        file: 'ui/replaceable-content-plugin.ts',
+        description: 'Third-party highlighter registration via @vmz/plugin-syntect shape',
+        pre: ['build:content-engines'],
     },
     'ui-v-if-dom': {
         file: 'ui/ui-v-if-dom.ts',
@@ -464,7 +491,10 @@ export const CHECK_ALL = [
     'style-theme',
     'ui-automation',
     'ui-direct-host-box',
-    'ui-event-prop-lower',
+    'component-event-wire',
+    'highlighter-wasm',
+    'markdown-wasm32',
+    'replaceable-content-plugin',
     'ui-v-if-dom',
     'ui-nav-button',
     'ssr-unknown-component-error-node',

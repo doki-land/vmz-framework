@@ -527,6 +527,8 @@ export const directApi = {
         /** @type {Record<string, any>} */
         const resolved = {};
         for (const [k, v] of Object.entries(props || {})) {
+            // Function props that already look like `onXxx` stay as handlers.
+            // Component `@event` never arrives here (emit uses onComponentEvent).
             const onKey = typeof v === 'function' ? eventPropHandlerName(k) : null;
             if (onKey) resolved[onKey] = v;
             else if (typeof v === 'function') resolved[k] = v.call(hostInst);
@@ -589,6 +591,21 @@ export const directApi = {
             bag.push(pending);
         }
         return host;
+    },
+    /**
+     * Subscribe to a child component event (`@submit` → event name `submit`).
+     * Orthogonal to function props (`:on-submit` → prop `onSubmit`).
+     * @param {HTMLElement} hostEl
+     * @param {string} eventName
+     * @param {(ev?: any, ...rest: any[]) => any} handler
+     */
+    onComponentEvent(hostEl, eventName, handler) {
+        const child = hostEl && hostEl.__vmzInst;
+        if (!child || typeof eventName !== 'string' || !eventName) return;
+        if (typeof handler !== 'function') return;
+        const bag = child.__vmzComponentListeners || (child.__vmzComponentListeners = Object.create(null));
+        const list = bag[eventName] || (bag[eventName] = []);
+        list.push(handler);
     },
     /**
      * Keep nested Direct child props live with parent field writes.
@@ -2555,21 +2572,32 @@ function wireDirectBind(inst, bindingId, deps, get, write, cf) {
 }
 
 /**
- * Vue-familiar `@click` / legacy `onClick` → canonical `onXxx` prop name.
- * Function props that are not events are treated as getters (`v.call(host)`).
+ * Function prop wire: only `onXxx` camelCase is a handler prop.
+ * Component `@event` must never normalize here — that channel is `onComponentEvent`.
  * @param {unknown} name
  * @returns {string | null}
  */
 export function eventPropHandlerName(name) {
     if (typeof name !== 'string' || !name) return null;
     if (/^on[A-Z]/.test(name)) return name;
-    // `@input` → `onInput`; reject `@update:modelValue` until that surface exists.
-    if (name.charAt(0) === '@' && name.length > 1 && !name.includes(':')) {
-        const ev = name.slice(1);
-        if (!ev || !/^[A-Za-z]/.test(ev)) return null;
-        return `on${ev.charAt(0).toUpperCase()}${ev.slice(1)}`;
-    }
     return null;
+}
+
+/**
+ * Dispatch a component event to parent subscribers registered via `onComponentEvent`.
+ * Installed on every Direct instance as `inst.emit`.
+ * @param {object} inst
+ * @param {string} eventName
+ * @param {...any} payload
+ */
+export function emitComponentEvent(inst, eventName, ...payload) {
+    if (!inst || typeof eventName !== 'string' || !eventName) return;
+    const bag = inst.__vmzComponentListeners;
+    const list = bag && bag[eventName];
+    if (!Array.isArray(list) || list.length === 0) return;
+    for (const fn of list) {
+        if (typeof fn === 'function') fn(...payload);
+    }
 }
 
 export function isEventPropName(name) {
@@ -2944,6 +2972,11 @@ export function createInstance(Component, props = {}) {
     inst.__vmzBinders = Object.create(null);
     inst.__vmzBindings = Object.create(null);
     inst.__vmzDepToBindings = Object.create(null);
+    inst.__vmzComponentListeners = Object.create(null);
+    // Compiler intrinsic surface: `this.emit('submit', payload)` — not a string bus.
+    inst.emit = function emit(eventName, ...payload) {
+        return emitComponentEvent(inst, eventName, ...payload);
+    };
     makeReactive(inst, Component.__vmzState || []);
     makeReactive(inst, Component.__vmzProps || []);
     // WriteBarrier: install Component helpers once (no import needed in emitted code).

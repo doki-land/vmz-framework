@@ -6,8 +6,8 @@
       data-novalidate="true"
       :aria-label="label"
       :aria-describedby="describedBy"
-      @submit="onSubmitGuard"
-      :onReset="onResetGuard"
+      @submit="this.onSubmitGuard"
+      @reset="this.onResetGuard"
     >
       <div v-if="errorSummary" :id="summaryId" class="vmz-ui-form__summary" role="alert" data-vmz-form="summary">
         {{ errorSummary }}
@@ -59,11 +59,13 @@ export default class Form {
 	onSubmitGuard(ev) {
 		if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
 		if (this.disabled) return;
+		this.emit("submit");
 		if (typeof this.onSubmit === "function") this.onSubmit();
 	}
 	onResetGuard(ev) {
 		if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
 		if (this.disabled) return;
+		this.emit("reset");
 		if (typeof this.onReset === "function") this.onReset();
 	}
 }

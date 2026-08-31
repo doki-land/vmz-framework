@@ -3,8 +3,8 @@
 //! Plan nodes share BindingId / RegionId with ViewView -- not a competing IR.
 
 use vmz_types::{
-    DisposeRegionSource, ExecutionPlan, PLAN_SCHEMA, PlanNode, PlanStatus, ViewNode, ViewStatus,
-    ViewView,
+    ComponentEventPlan, DisposeRegionSource, ExecutionPlan, PLAN_SCHEMA, PlanNode, PlanStatus,
+    ViewNode, ViewStatus, ViewView,
 };
 
 /// Derive a shared Execution Plan from Native View roots.
@@ -113,7 +113,23 @@ fn push_node(node: &ViewNode, out: &mut Vec<PlanNode>, next_id: &mut u32) -> u32
                     .strip_prefix("client:")
                     .map(|s| if s.is_empty() { "load".into() } else { s.to_string() })
             });
-            PlanNode::Component { id, tag: Some(tag.clone()), resume_marker, children: kid_ids }
+            // Component `@event` → ComponentEventPlan (never onXxx prop).
+            let events: Vec<ComponentEventPlan> = attrs
+                .iter()
+                .filter(|a| a.name.starts_with('@') && a.name.len() > 1)
+                .map(|a| {
+                    let raw = a.name.strip_prefix('@').unwrap_or(&a.name);
+                    let name = raw.split('.').next().unwrap_or(raw).to_string();
+                    ComponentEventPlan { name, host_id: Some(id) }
+                })
+                .collect();
+            PlanNode::Component {
+                id,
+                tag: Some(tag.clone()),
+                resume_marker,
+                events,
+                children: kid_ids,
+            }
         }
         ViewNode::Slot { name, children, .. } => {
             let kid_ids: Vec<u32> = children.iter().map(|c| push_node(c, out, next_id)).collect();

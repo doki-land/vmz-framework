@@ -1,0 +1,35 @@
+{
+    "name": "@vmz/highlighter",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Language-neutral highlighter API + token/span contract (plain fallback; replaceable)",
+    "license": "MIT",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./ce": {
+            "types": "./dist/ce.d.ts",
+            "default": "./dist/ce.js"
+        }
+    },
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json"
+    },
+    "devDependencies": {
+        "typescript": "^5.8.3"
+    },
+    "keywords": [
+        "vmz",
+        "highlighter",
+        "code"
+    ]
+}

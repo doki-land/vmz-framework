@@ -15,6 +15,7 @@ use crate::template::{
     AttrValue, ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg, SemanticIr,
     SemanticNode, SemanticProp, TemplateAttr, TemplateIr, TemplateNode, TemplateSpan,
 };
+use vmz_generator::js::is_event_attr;
 use vmz_generator::template_expr_snippet_error;
 
 /// One invalid template expression finding (body-local span for absolute conversion).
@@ -1053,10 +1054,6 @@ fn attr_static(attrs: &[TemplateAttr], name: &str) -> Option<String> {
 
 fn has_bare_attr(attrs: &[TemplateAttr], name: &str) -> bool {
     attrs.iter().any(|a| a.name == name)
-}
-
-fn is_event_attr(name: &str) -> bool {
-    name.starts_with('@') || (name.starts_with("on") && name.len() > 2)
 }
 
 fn is_component_tag(tag: &str) -> bool {

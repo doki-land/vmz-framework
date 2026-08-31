@@ -25,6 +25,23 @@ const PRESETS: Record<string, [string, string[]]> = {
     'build:plugin-shiki': ['pnpm', ['--filter', '@vmz/plugin-shiki', 'run', 'build']],
     'build:vmz-test': ['pnpm', ['build:vmz-test']],
     'build:protocol-vmz': ['pnpm', ['--filter', '@vmz/protocol', '--filter', 'vmz', 'run', 'build']],
+    'build:content-engines': [
+        'pnpm',
+        [
+            '--filter',
+            '@vmz/highlighter',
+            '--filter',
+            '@vmz/highlighter-unknown-wasm32',
+            '--filter',
+            '@vmz/markdown',
+            '--filter',
+            '@vmz/markdown-unknown-wasm32',
+            '--filter',
+            '@vmz/plugin-syntect',
+            'run',
+            'build',
+        ],
+    ],
 };
 
 function fail(msg: string): never {

@@ -19,10 +19,10 @@
     <div
       class="vmz-ui-datagrid__viewport"
       data-vmz-grid-viewport="true"
-      :onScroll="onViewportScroll"
+      :onScroll="this.onViewportScroll"
     >
       <div class="vmz-ui-datagrid__canvas" :style="canvasStyle">
-        <div class="vmz-ui-datagrid__head" data-vmz-grid-head="true" :style="rowLayoutStyle" @click="onHeadClick">
+        <div class="vmz-ui-datagrid__head" data-vmz-grid-head="true" :style="rowLayoutStyle" @click="this.onHeadClick">
           <div class="vmz-ui-datagrid__cell vmz-ui-datagrid__cell--check vmz-ui-datagrid__cell--pinned" data-pinned="true">
             <input
               type="checkbox"
@@ -65,7 +65,7 @@
           :data-expanded="row.expandedAttr"
           :data-selected="row.selectedAttr"
           :data-pivot-row="row.pivotRowAttr"
-          @click="onBodyClick"
+          @click="this.onBodyClick"
         >
           <div v-if="row.isGroup" class="vmz-ui-datagrid__cell vmz-ui-datagrid__cell--check vmz-ui-datagrid__cell--pinned" data-pinned="true">
             <button
@@ -115,10 +115,10 @@
               :data-vmz-cell-editor="cell.cellKey"
               :value="cell.editValue"
               :aria-label="cell.editLabel"
-              @input="onEditorInput"
-              :onKeyDown="onEditorKeyDown"
-              @blur="onEditorBlur"
-              @click="onEditorClick"
+              @input="this.onEditorInput"
+              :onKeyDown="this.onEditorKeyDown"
+              @blur="this.onEditorBlur"
+              @click="this.onEditorClick"
             />
           </div>
         </div>
