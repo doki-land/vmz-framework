@@ -63,7 +63,7 @@
           :error-summary="contactSummary"
           summary-id="home-commercial-summary"
           :described-by="contactDescribedBy"
-          @submit="() => this.confirmContact()"
+          :on-submit="() => this.confirmContact()"
           :on-reset="() => this.resetContact()"
         >
           <Field

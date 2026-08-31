@@ -791,14 +791,30 @@ async function proveCommercialComposition(page) {
             timeout: 5000,
         },
     );
-    // Contact Card contains Confirm button.
-    await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-ui="card"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Confirm'),
-        );
-        btn?.click();
-    });
-    await page.waitForSelector('[data-vmz-overlay="dialog"] [data-vmz-focus="enter"]', { timeout: 5000 });
+    // Contact Card contains Confirm button (Form submit → Dialog open).
+    const confirmSel = '[data-vmz-fixture="commercial-form-actions"] button.vmz-ui-btn';
+    const confirmReady = await page.evaluate((sel) => {
+        const btn = [...document.querySelectorAll(sel)].find((b) => (b.textContent || '').includes('Confirm'));
+        return !!btn;
+    }, confirmSel);
+    if (!confirmReady) fail('Commercial: Confirm submit button missing');
+    await page.evaluate((sel) => {
+        const btn = [...document.querySelectorAll(sel)].find((b) => (b.textContent || '').includes('Confirm'));
+        if (!(btn instanceof HTMLElement)) throw new Error('Confirm missing');
+        btn.click();
+    }, confirmSel);
+    try {
+        await page.waitForSelector('[data-vmz-overlay="dialog"] [data-vmz-focus="enter"]', { timeout: 8000 });
+    } catch (err) {
+        const snap = await page.evaluate(() => ({
+            email: document.querySelector('[data-vmz-fixture="commercial-email"]')?.textContent || '',
+            summary: document.querySelector('#home-commercial-summary')?.textContent || '',
+            overlay: !!document.querySelector('[data-vmz-overlay="dialog"]'),
+            dialogRoot: !!document.querySelector('[data-vmz-ui="dialog"]'),
+            openAttr: document.querySelector('[data-vmz-ui="dialog"]')?.getAttribute('data-vmz-overlay-open') || null,
+        }));
+        fail(`Commercial: Dialog after Confirm timed out: ${JSON.stringify(snap)} (${err})`);
+    }
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="dialog"]'), { timeout: 5000 });
 
