@@ -19,12 +19,7 @@ export type MarkdownEngine = {
 };
 
 function escapeHtml(text: string): string {
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 /**
@@ -65,9 +60,7 @@ export function createPlainMarkdown(id = 'plain'): MarkdownEngine {
                     }
                     i += 1; // closing fence or EOF
                     const langAttr = lang ? ` data-language="${escapeHtml(lang)}"` : '';
-                    parts.push(
-                        `<pre class="vmz-md-fence"${langAttr}><code>${escapeHtml(bodyLines.join('\n'))}</code></pre>`,
-                    );
+                    parts.push(`<pre class="vmz-md-fence"${langAttr}><code>${escapeHtml(bodyLines.join('\n'))}</code></pre>`);
                     continue;
                 }
 

@@ -29,11 +29,7 @@ pub fn is_component_event_attr(name: &str) -> bool {
 pub fn component_event_name(name: &str) -> String {
     let raw = name.strip_prefix('@').unwrap_or(name);
     let ev = raw.split('.').next().unwrap_or(raw);
-    if ev.contains('-') {
-        kebab_to_camel(ev)
-    } else {
-        ev.to_string()
-    }
+    if ev.contains('-') { kebab_to_camel(ev) } else { ev.to_string() }
 }
 
 /// `home-href` / `on-copy` → `homeHref` / `onCopy`. Leaves already-camel names alone.

@@ -54,12 +54,7 @@ export type Highlighter = {
 };
 
 function escapeHtml(text: string): string {
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 /** Plain fallback: escape + wrap in pre/code. No grammar, no WASM. */
@@ -71,8 +66,7 @@ export function createPlainHighlighter(id = 'plain'): Highlighter {
             const source = String(code ?? '');
             const escaped = escapeHtml(source);
             const language = options?.language;
-            const theme =
-                typeof options?.theme === 'string' ? options.theme : options?.theme?.id;
+            const theme = typeof options?.theme === 'string' ? options.theme : options?.theme?.id;
             const langAttr = language ? ` data-language="${escapeHtml(language)}"` : '';
             return {
                 html: `<pre class="vmz-highlight"${langAttr}><code>${escaped}</code></pre>`,

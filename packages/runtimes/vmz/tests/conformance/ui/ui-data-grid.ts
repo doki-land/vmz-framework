@@ -157,14 +157,23 @@ if (!pageSrc.includes('<DataGrid') || !pageSrc.includes('data-vmz-fixture="datag
 if (!pageSrc.includes('<BulkActions') || !pageSrc.includes('<ConsoleShell')) {
     fail('homepage /datagrid must reuse @vmz/ui BulkActions/ConsoleShell');
 }
-if (!pageSrc.includes('groupBy') || !pageSrc.includes('onToggleGroup') || !pageSrc.includes('aggSample')) {
+if (!pageSrc.includes('groupBy') || !pageSrc.includes('aggSample')) {
     fail('homepage /datagrid must compose parent-owned groupBy + aggregates');
 }
-if (!pageSrc.includes('setMode') || !pageSrc.includes('onToggleTree') || !pageSrc.includes('mode-tree')) {
-    fail('homepage /datagrid must compose tree mode + onToggleTree');
+if (!pageSrc.includes('on-toggle-group') && !pageSrc.includes('onToggleGroup') && !pageSrc.includes('toggleGroup')) {
+    fail('homepage /datagrid must wire group expand (on-toggle-group / toggleGroup)');
 }
-if (!pageSrc.includes('<Field') || !pageSrc.includes('onStartEdit') || !pageSrc.includes('editingKey')) {
+if (!pageSrc.includes('setMode') || !pageSrc.includes('mode-tree')) {
+    fail('homepage /datagrid must compose tree mode');
+}
+if (!pageSrc.includes('on-toggle-tree') && !pageSrc.includes('onToggleTree') && !pageSrc.includes('toggleTree')) {
+    fail('homepage /datagrid must wire tree expand (on-toggle-tree / toggleTree)');
+}
+if (!pageSrc.includes('<Field') || !pageSrc.includes('editingKey')) {
     fail('homepage /datagrid must compose cell edit + @vmz/ui Field mirror');
+}
+if (!pageSrc.includes('on-start-edit') && !pageSrc.includes('onStartEdit') && !pageSrc.includes('startEdit')) {
+    fail('homepage /datagrid must wire cell edit start');
 }
 if (!pageSrc.includes('mode-pivot') || !pageSrc.includes('buildPivotRows') || !pageSrc.includes('pivotSample')) {
     fail('homepage /datagrid must compose parent-owned pivot matrix');
@@ -173,8 +182,13 @@ if (!pageSrc.includes('mode-pivot') || !pageSrc.includes('buildPivotRows') || !p
 console.log('ui-data-grid: build homepage…');
 const homeBuild = runBuild(homepage);
 if (homeBuild.status !== 0) fail(`homepage build failed\n${homeBuild.out}`);
-const dist = path.join(homepage, 'dist');
-const gridClient = fs.existsSync(path.join(dist, 'DataGrid.client.js')) || fs.existsSync(path.join(dist, 'components', 'DataGrid.client.js'));
+const { resolveDeliveryDist } = await import('../_lib/serve-host-env.ts');
+const dist = resolveDeliveryDist(homepage);
+const gridClient =
+    fs.existsSync(path.join(dist, 'DataGrid.client.js')) ||
+    fs.existsSync(path.join(dist, 'components', 'DataGrid.client.js')) ||
+    fs.existsSync(path.join(homepage, 'dist', 'DataGrid.client.js')) ||
+    fs.existsSync(path.join(homepage, 'dist', 'components', 'DataGrid.client.js'));
 if (!gridClient) fail('homepage build must emit DataGrid.client.js from @vmz/ui-data-grid');
 
 console.log('ui-data-grid: browser virtualization + pin + selection…');
@@ -189,6 +203,7 @@ async function proveBrowser(dist) {
     const { createRequire } = await import('node:module');
     const { pathToFileURL } = await import('node:url');
     const { spawn } = await import('node:child_process');
+    const { serveHostProjectEnv } = await import('../_lib/serve-host-env.ts');
 
     const hostJs = path.join(dist, 'vmz-serve-host.mjs');
     if (!fs.existsSync(hostJs)) fail('homepage missing vmz-serve-host.mjs');
@@ -210,7 +225,11 @@ async function proveBrowser(dist) {
     const PORT = 18782;
     const child = spawn(process.execPath, [hostJs], {
         cwd: dist,
-        env: { ...process.env, VMZ_DIST: dist, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(PORT) },
+        env: serveHostProjectEnv(path.join(root, 'packages', 'homepage'), {
+            VMZ_DIST: dist,
+            VMZ_HOST: '127.0.0.1',
+            VMZ_PORT: String(PORT),
+        }),
         stdio: ['ignore', 'pipe', 'pipe'],
     });
     const kill = () => {

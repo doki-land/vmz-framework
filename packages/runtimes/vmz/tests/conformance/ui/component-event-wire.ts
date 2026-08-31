@@ -16,11 +16,11 @@ function fail(msg: string): never {
 }
 
 function cargoFilter(filter: string) {
-    const run = spawnSync(
-        'cargo',
-        ['test', '-p', 'vmz-compiler', '--test', 'pipeline_emit_unit', filter, '--quiet'],
-        { cwd: root, encoding: 'utf8', shell: true },
-    );
+    const run = spawnSync('cargo', ['test', '-p', 'vmz-compiler', '--test', 'pipeline_emit_unit', filter, '--quiet'], {
+        cwd: root,
+        encoding: 'utf8',
+        shell: true,
+    });
     if (run.status !== 0) {
         console.error(run.stdout || '');
         console.error(run.stderr || '');

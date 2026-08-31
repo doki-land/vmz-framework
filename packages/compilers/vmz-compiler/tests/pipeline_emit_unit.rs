@@ -247,12 +247,10 @@ export default class Page {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let ir = parse_template(r#"<CounterButton @click="this.bump" :copy-label="'Copy'" />"#).unwrap();
+    let ir =
+        parse_template(r#"<CounterButton @click="this.bump" :copy-label="'Copy'" />"#).unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
-    assert!(
-        js.contains("api.onComponentEvent(") && js.contains("\"click\""),
-        "{js}"
-    );
+    assert!(js.contains("api.onComponentEvent(") && js.contains("\"click\""), "{js}");
     assert!(js.contains("(ev) => this.bump(ev)"), "{js}");
     assert!(js.contains(r#""copyLabel":"#) || js.contains(r#""copyLabel": "#), "{js}");
     assert!(!js.contains(r#""onClick""#), "{js}");
@@ -269,7 +267,8 @@ export default class Page {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let ir = parse_template(r#"<Form @submit="this.confirm" :on-submit="this.viaProp" />"#).unwrap();
+    let ir =
+        parse_template(r#"<Form @submit="this.confirm" :on-submit="this.viaProp" />"#).unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
     assert!(js.contains("api.onComponentEvent(") && js.contains("\"submit\""), "{js}");
     assert!(js.contains(r#""onSubmit":"#) || js.contains(r#""onSubmit": "#), "{js}");
