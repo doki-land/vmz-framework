@@ -71,6 +71,20 @@ export const CHECKS: Record<string, CheckEntry> = {
     rename: { file: 'tooling/rename.ts', description: 'Rename + test selection' },
     symbols: { file: 'tooling/symbols.ts', description: 'Cross-SFC symbol index' },
     incremental: { file: 'tooling/incremental.ts', description: 'Semantic transaction / HMR plan' },
+    'dev-rebuild-convergence': {
+        file: 'tooling/dev-rebuild-convergence.ts',
+        description: '0.1.24: outputRevision stable without dirty input',
+        pre: ['build:runtimes'],
+    },
+    'dev-invalidation-closure': {
+        file: 'tooling/dev-invalidation-closure.ts',
+        description: '0.1.24: HMR plan includes importer page on component edit',
+        pre: ['build:runtimes'],
+    },
+    'dev-output-write-suppression': {
+        file: 'tooling/dev-output-write-suppression.ts',
+        description: '0.1.24: generation write-set filtered from author dirty',
+    },
     'deployment-proof': {
         file: 'tooling/deployment-proof.ts',
         description: 'Deployment boundary proof',

@@ -17,7 +17,23 @@ import { buildIntegratedDocuments, projectHasDocuments } from './document-integr
 import { createWorkspace, resolveNativePath } from './index.js';
 import { emitLocaleRuntimeModules, localeHasErrors } from './locale-check.js';
 import { log } from './log.js';
-import { coalesceRootBurst, collectDevWatchRoots, classifyWatchRoot, isDependencyPath, mergeDirtySets } from './dev-watch-roots.js';
+import {
+    coalesceRootBurst,
+    collectDevWatchRoots,
+    classifyWatchRoot,
+    isDependencyPath,
+    mergeDirtySets,
+    collectDevConfigPaths,
+    configFingerprintMap,
+} from './dev-watch-roots.js';
+import {
+    buildReloadPayload,
+    filterGenerationIgnore,
+    parseHmrPlan,
+    registerWrittenOutputsIgnore,
+    shouldSoftReload,
+    staticRevisionFromArtifact,
+} from './dev-incremental.js';
 import { diffFingerprints, fileFingerprintMap } from './watch-diff.js';
 
 /** Track serve-host so a failed/killed launcher cannot leave an orphan port. */
@@ -50,10 +66,57 @@ export function createDevSession(options: DevSessionOptions) {
     const ws = createWs({ root: project, outDir });
     let child: import('node:child_process').ChildProcess | null = null;
     let stopped = false;
+    let lastOutputRevision: string | null = null;
+    let lastStaticRevision: string | null = null;
+    const generationIgnore = new Set<string>();
+
+    function planAndRebuild(changes?: Array<{ path: string; kind: 'update' | 'delete' }>) {
+        if (changes?.length) ws.updateFiles(changes);
+        let hmrPlan = null;
+        try {
+            if (typeof ws.queryHmrPlan === 'function') {
+                hmrPlan = parseHmrPlan(ws.queryHmrPlan());
+            }
+        } catch {
+            hmrPlan = null;
+        }
+        const report = ws.build();
+        return { report, hmrPlan };
+    }
 
     function rebuild(changes?: Array<{ path: string; kind: 'update' | 'delete' }>) {
-        if (changes?.length) ws.updateFiles(changes);
-        return ws.build();
+        return planAndRebuild(changes).report;
+    }
+
+    async function emitPublicAndTrack() {
+        const { emitPublicStaticAssets } = await import('./public-static-assets.js');
+        const artifact = emitPublicStaticAssets(outDir, { projectRoot: project });
+        lastStaticRevision = staticRevisionFromArtifact(artifact);
+        return artifact;
+    }
+
+    async function maybeReloadAfterBuild(report, hmrPlan, opts: { force?: boolean; staticOnly?: boolean } = {}) {
+        const rev = report.outputRevision ?? report.output_revision ?? null;
+        const skipEntry = Boolean(rev && rev === lastOutputRevision);
+        if (!opts.force && !opts.staticOnly && !shouldSoftReload(report, lastOutputRevision)) {
+            log.info('rebuild ok — artifact unchanged, skip soft reload');
+            if (rev) lastOutputRevision = rev;
+            registerWrittenOutputsIgnore(report.writtenOutputs ?? report.written_outputs, outDir, project, generationIgnore);
+            return 'skip';
+        }
+        const payload = buildReloadPayload(report, hmrPlan, {
+            staticRevision: lastStaticRevision ?? undefined,
+            skipEntryRewrite: skipEntry && !opts.force,
+        });
+        if (opts.staticOnly) {
+            payload.full = false;
+            payload.islandHmr = false;
+            payload.skipEntryRewrite = true;
+        }
+        const kind = await reloadAfterBuild(payload);
+        if (rev) lastOutputRevision = rev;
+        registerWrittenOutputsIgnore(report.writtenOutputs ?? report.written_outputs, outDir, project, generationIgnore);
+        return kind;
     }
 
     function emitLocales() {
@@ -175,17 +238,15 @@ export function createDevSession(options: DevSessionOptions) {
         }
 
         log.info('initial build (N-API workspace, full)…');
-        const initial = rebuild();
+        const initialPair = planAndRebuild();
+        const initial = initialPair.report;
         if (!printReport(initial, 'build')) {
             throw new Error('vmz dev: initial build failed');
         }
+        lastOutputRevision = initial.outputRevision ?? initial.output_revision ?? null;
 
         // `vmz build` assemble copies `public/**` → outDir; soft `ws.build()` does not.
-        // Without this, marketing images and other opaque assets 404 under `vmz dev`.
-        {
-            const { emitPublicStaticAssets } = await import('./public-static-assets.js');
-            emitPublicStaticAssets(outDir, { projectRoot: project });
-        }
+        await emitPublicAndTrack();
 
         // Reclaim orphan serve-host from a previous crashed launcher (same outDir).
         reclaimStaleDevHost(outDir);
@@ -216,6 +277,8 @@ export function createDevSession(options: DevSessionOptions) {
         const localesRoot = path.join(project, 'locales');
         const designsRoot = path.join(project, 'designs');
         const watched = collectDevWatchRoots({ project, outDir });
+        const publicRoot = watched.publicRoot;
+        const configPaths = watched.configPaths.length ? watched.configPaths : collectDevConfigPaths(project);
         /** @type {string[]} */
         const watchRoots = [...watched.roots];
         /** @type {string[]} */
@@ -234,6 +297,7 @@ export function createDevSession(options: DevSessionOptions) {
         for (const root of watchRoots) {
             fingerprints.set(root, fileFingerprintMap(root));
         }
+        let configFingerprints = configFingerprintMap(configPaths);
         const signal = options.signal;
 
         const onAbort = () => {
@@ -245,7 +309,7 @@ export function createDevSession(options: DevSessionOptions) {
          * Scan all watch roots into a batch. Does not update fingerprints.
          */
         function scanBatch() {
-            /** @type {{ srcChanged: string[], srcDeleted: string[], depChanged: string[], depDeleted: string[], designsChanged: string[], designsDeleted: string[], docsDirty: boolean, localesDirty: boolean, designsDirty: boolean }} */
+            /** @type {{ srcChanged: string[], srcDeleted: string[], depChanged: string[], depDeleted: string[], designsChanged: string[], designsDeleted: string[], publicChanged: string[], docsDirty: boolean, localesDirty: boolean, designsDirty: boolean, configDirty: boolean }} */
             const batch = {
                 srcChanged: [],
                 srcDeleted: [],
@@ -253,11 +317,13 @@ export function createDevSession(options: DevSessionOptions) {
                 depDeleted: [],
                 designsChanged: [],
                 designsDeleted: [],
+                publicChanged: [],
                 docsDirty: false,
                 localesDirty: false,
                 designsDirty: false,
+                configDirty: false,
             };
-            const watchCtx = { src, docsRoot, localesRoot, designsRoot, dependencyRoots };
+            const watchCtx = { src, docsRoot, localesRoot, designsRoot, publicRoot, dependencyRoots };
             for (const root of watchRoots) {
                 const prev = fingerprints.get(root) || new Map();
                 const next = fileFingerprintMap(root);
@@ -267,6 +333,8 @@ export function createDevSession(options: DevSessionOptions) {
                 if (kind === 'src') {
                     batch.srcChanged.push(...diff.changed);
                     batch.srcDeleted.push(...diff.deleted);
+                } else if (kind === 'public') {
+                    batch.publicChanged.push(...diff.changed);
                 } else if (kind === 'locales') {
                     batch.localesDirty = true;
                 } else if (kind === 'docs') {
@@ -306,14 +374,53 @@ export function createDevSession(options: DevSessionOptions) {
                 let batch;
                 try {
                     batch = scanBatch();
+                    const nextConfigFp = configFingerprintMap(configPaths);
+                    const configDiff = diffFingerprints(configFingerprints, nextConfigFp);
+                    if (configDiff.changed.length || configDiff.deleted.length) {
+                        batch.configDirty = true;
+                    }
                 } catch (err) {
                     log.warn('watch error:', err);
                     continue;
                 }
+
+                if (generationIgnore.size) {
+                    batch.srcChanged = filterGenerationIgnore(batch.srcChanged, generationIgnore);
+                    batch.srcDeleted = filterGenerationIgnore(batch.srcDeleted, generationIgnore);
+                    generationIgnore.clear();
+                }
+
                 const srcDirty = batch.srcChanged.length + batch.srcDeleted.length;
                 const depDirty = batch.depChanged.length + batch.depDeleted.length;
                 const designsDirty = batch.designsDirty || batch.designsChanged.length + batch.designsDeleted.length;
-                if (!srcDirty && !depDirty && !batch.docsDirty && !batch.localesDirty && !designsDirty) continue;
+                const publicDirty = batch.publicChanged.length;
+                if (!srcDirty && !depDirty && !batch.docsDirty && !batch.localesDirty && !designsDirty && !publicDirty && !batch.configDirty) {
+                    continue;
+                }
+
+                if (batch.configDirty) {
+                    log.info('vmz.config change detected — respawn required (devControl)');
+                    configFingerprints = configFingerprintMap(configPaths);
+                    commitFingerprints();
+                    await respawnHost('config-changed');
+                    const report = rebuild();
+                    if (printReport(report, 'rebuild')) {
+                        lastOutputRevision = report.outputRevision ?? report.output_revision ?? null;
+                        await emitPublicAndTrack();
+                    }
+                    continue;
+                }
+
+                if (publicDirty && !srcDirty && !depDirty && !batch.docsDirty && !batch.localesDirty && !designsDirty) {
+                    log.info(`public change detected (${publicDirty} file(s)) — re-emit static assets…`);
+                    await emitPublicAndTrack();
+                    commitFingerprints();
+                    if (!wechatPreview) {
+                        const kind = await maybeReloadAfterBuild({ reloadRequired: true }, null, { force: true, staticOnly: true });
+                        if (kind !== 'skip') log.info('soft reload ok (public assets)');
+                    }
+                    continue;
+                }
 
                 // Coalesce multi-file bursts without dropping the initial dirty set.
                 if (srcDirty > 1) {
@@ -377,8 +484,6 @@ export function createDevSession(options: DevSessionOptions) {
                     batch.designsDeleted = designsMerged.deleted;
                 }
 
-                commitFingerprints();
-
                 if (
                     !batch.srcChanged.length &&
                     !batch.srcDeleted.length &&
@@ -396,11 +501,12 @@ export function createDevSession(options: DevSessionOptions) {
                     log.info(
                         `dependency change detected (${batch.depChanged.length} update, ${batch.depDeleted.length} delete) — full rebuild…`,
                     );
-                    const report = rebuild();
+                    const { report, hmrPlan } = planAndRebuild();
                     if (!printReport(report, 'rebuild')) {
                         log.warn('rebuild failed — keeping previous server');
                         continue;
                     }
+                    await emitPublicAndTrack();
                     // Refresh watch roots in case the graph gained new packages.
                     const refreshed = collectDevWatchRoots({ project, outDir });
                     for (const r of refreshed.roots) {
@@ -419,14 +525,11 @@ export function createDevSession(options: DevSessionOptions) {
                         if (!packWechatPreview()) log.warn('wechat pack failed — keeping previous dist/wechat');
                         continue;
                     }
-                    const kind = await reloadAfterBuild({
-                        affectedChunks: report.affectedChunks ?? [],
-                        seedChunks: report.seedChunks ?? [],
-                        emitted: report.emitted ?? [],
-                        full: true,
-                        islandHmr: false,
-                    });
-                    log.info(kind === 'respawn' ? 'reload ok (respawned; deps)' : 'soft reload ok (full page; deps)');
+                    const kind = await maybeReloadAfterBuild(report, hmrPlan, { force: true });
+                    commitFingerprints();
+                    if (kind !== 'skip') {
+                        log.info(kind === 'respawn' ? 'reload ok (respawned; deps)' : 'soft reload ok (full page; deps)');
+                    }
                     continue;
                 }
 
@@ -437,11 +540,12 @@ export function createDevSession(options: DevSessionOptions) {
                         ...batch.srcChanged.map((p) => ({ path: p, kind: /** @type {'update'} */ ('update') })),
                         ...batch.srcDeleted.map((p) => ({ path: p, kind: /** @type {'delete'} */ ('delete') })),
                     ];
-                    const report = rebuild(changes);
+                    const { report, hmrPlan } = planAndRebuild(changes);
                     if (!printReport(report, 'rebuild')) {
                         log.warn('rebuild failed — keeping previous server');
                         continue;
                     }
+                    await emitPublicAndTrack();
                     if (batch.docsDirty || projectHasDocuments(project)) {
                         const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
                         if (!docs.ok) {
@@ -456,22 +560,21 @@ export function createDevSession(options: DevSessionOptions) {
                         }
                         continue;
                     }
-                    const kind = await reloadAfterBuild({
-                        affectedChunks: report.affectedChunks ?? [],
-                        seedChunks: report.seedChunks ?? [],
-                        emitted: report.emitted ?? [],
-                        full: Boolean(report.full) || needFullReload,
-                        islandHmr: Boolean(report.islandHmr) && !needFullReload,
+                    const kind = await maybeReloadAfterBuild(report, hmrPlan, {
+                        force: needFullReload,
                     });
-                    log.info(
-                        kind === 'respawn'
-                            ? 'reload ok (respawned serve-host)'
-                            : needFullReload
-                              ? 'soft reload ok (full page; docs)'
-                              : report.islandHmr
-                                ? 'soft reload ok (island HMR)'
-                                : 'soft reload ok',
-                    );
+                    commitFingerprints();
+                    if (kind !== 'skip') {
+                        log.info(
+                            kind === 'respawn'
+                                ? 'reload ok (respawned serve-host)'
+                                : needFullReload
+                                  ? 'soft reload ok (full page; docs)'
+                                  : report.islandHmr
+                                    ? 'soft reload ok (island HMR)'
+                                    : 'soft reload ok',
+                        );
+                    }
                     continue;
                 }
 
@@ -483,11 +586,12 @@ export function createDevSession(options: DevSessionOptions) {
                         ...batch.designsChanged.map((p) => ({ path: p, kind: /** @type {'update'} */ ('update') })),
                         ...batch.designsDeleted.map((p) => ({ path: p, kind: /** @type {'delete'} */ ('delete') })),
                     ];
-                    const report = rebuild(changes.length ? changes : undefined);
+                    const { report, hmrPlan } = planAndRebuild(changes.length ? changes : undefined);
                     if (!printReport(report, 'rebuild')) {
                         log.warn('designs rebuild failed — keeping previous styles');
                         continue;
                     }
+                    await emitPublicAndTrack();
                     if (batch.docsDirty || projectHasDocuments(project)) {
                         const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
                         if (!docs.ok) log.warn('document mount rebuild failed — keeping previous docs');
@@ -496,14 +600,11 @@ export function createDevSession(options: DevSessionOptions) {
                         if (!packWechatPreview()) log.warn('wechat pack failed — keeping previous dist/wechat');
                         continue;
                     }
-                    const kind = await reloadAfterBuild({
-                        affectedChunks: report.affectedChunks ?? [],
-                        seedChunks: report.seedChunks ?? [],
-                        emitted: report.emitted ?? [],
-                        full: true,
-                        islandHmr: false,
-                    });
-                    log.info(kind === 'respawn' ? 'reload ok (respawned; designs)' : 'soft reload ok (full page; designs)');
+                    const kind = await maybeReloadAfterBuild(report, hmrPlan, { force: true });
+                    commitFingerprints();
+                    if (kind !== 'skip') {
+                        log.info(kind === 'respawn' ? 'reload ok (respawned; designs)' : 'soft reload ok (full page; designs)');
+                    }
                     continue;
                 }
 
@@ -519,8 +620,11 @@ export function createDevSession(options: DevSessionOptions) {
                         }
                         if (!batch.docsDirty) continue;
                     } else {
-                        const kind = await reloadAfterBuild({ full: true, islandHmr: false, emitted: [] });
-                        log.info(kind === 'respawn' ? 'reload ok (respawned; locales)' : 'soft reload ok (full page; locales)');
+                        const kind = await maybeReloadAfterBuild({ reloadRequired: true, full: true }, null, { force: true });
+                        commitFingerprints();
+                        if (kind !== 'skip') {
+                            log.info(kind === 'respawn' ? 'reload ok (respawned; locales)' : 'soft reload ok (full page; locales)');
+                        }
                         if (!batch.docsDirty) continue;
                     }
                 }
@@ -537,8 +641,11 @@ export function createDevSession(options: DevSessionOptions) {
                             log.warn('wechat pack failed — keeping previous dist/wechat');
                         }
                     } else {
-                        const kind = await reloadAfterBuild({ full: true, islandHmr: false, emitted: [] });
-                        log.info(kind === 'respawn' ? 'reload ok (respawned; docs)' : 'soft reload ok (full page; docs)');
+                        const kind = await maybeReloadAfterBuild({ reloadRequired: true, full: true }, null, { force: true });
+                        commitFingerprints();
+                        if (kind !== 'skip') {
+                            log.info(kind === 'respawn' ? 'reload ok (respawned; docs)' : 'soft reload ok (full page; docs)');
+                        }
                     }
                 }
             }

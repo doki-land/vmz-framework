@@ -773,10 +773,8 @@ fn emit_client_modules(
     if !src_root.is_dir() {
         return Ok(());
     }
-    let dirty_set: std::collections::BTreeSet<PathBuf> = dirty
-        .iter()
-        .map(|p| std::fs::canonicalize(p).unwrap_or_else(|_| p.clone()))
-        .collect();
+    let dirty_set: std::collections::BTreeSet<PathBuf> =
+        dirty.iter().map(|p| std::fs::canonicalize(p).unwrap_or_else(|_| p.clone())).collect();
     let server_root = src_root.join("server");
     for entry in WalkDir::new(src_root).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
@@ -866,7 +864,11 @@ fn emit_client_modules(
     Ok(())
 }
 
-fn finalize_output_revision(options: &CompileOptions, dirty: &[PathBuf], report: &mut CompileReport) {
+fn finalize_output_revision(
+    options: &CompileOptions,
+    dirty: &[PathBuf],
+    report: &mut CompileReport,
+) {
     use crate::session::plugin::sha256_hex;
     use serde_json::json;
 
@@ -882,9 +884,7 @@ fn finalize_output_revision(options: &CompileOptions, dirty: &[PathBuf], report:
         .emitted
         .iter()
         .filter_map(|p| {
-            p.strip_prefix(&options.out_dir)
-                .ok()
-                .map(|r| r.to_string_lossy().replace('\\', "/"))
+            p.strip_prefix(&options.out_dir).ok().map(|r| r.to_string_lossy().replace('\\', "/"))
         })
         .collect();
     written.sort();
