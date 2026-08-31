@@ -88,10 +88,11 @@
 
       <Card title="Workspace" description="Empty → success feedback stays inside the same composition.">
         <div v-if="showEmpty">
-          <Empty title="No projects yet" description="Create a project to see it listed here." />
-          <div data-vmz-fixture="commercial-create">
-            <Button type="button" @click="() => this.createProject()">Create project</Button>
-          </div>
+          <Empty title="No projects yet" description="Create a project to see it listed here.">
+            <div data-vmz-fixture="commercial-create">
+              <Button type="button" @click="() => this.createProject()">Create project</Button>
+            </div>
+          </Empty>
         </div>
         <div v-else data-vmz-fixture="commercial-ready">
           <div data-vmz-fixture="commercial-notify">
