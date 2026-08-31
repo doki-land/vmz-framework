@@ -491,11 +491,15 @@ fn emit_component(
         }
     }
     // Default slot: project parent children into the child's first unnamed <slot>.
+    // Re-enter the host resume pool so slot reclaim cannot run in the parent
+    // sibling scope (ifBlock must not steal Drawer hosts parked under the Card).
     if !children.is_empty() {
+        stmts.push(format!("api.adoptEnter({v});"));
         let kids = emit_nodes(children, fields, scope, aliases, each_depth, ir, stmts, next_id);
         for kid in kids {
             stmts.push(format!("api.projectDefaultSlot({v}, {kid});"));
         }
+        stmts.push(format!("api.adoptLeave();"));
     }
     v
 }

@@ -105,7 +105,74 @@ class CompositionPage {
     }
 }
 
-registerComponents({ SiblingHost, CompositionPage });
+/**
+ * Card-like host: slot children are created after `component()` returns.
+ * Resume must re-enter the host pool for those children (emit adoptEnter).
+ */
+class SlotCard {
+    static __vmzDirect = true;
+    static __vmzCreate(api) {
+        const rootEl = api.el('div');
+        api.attr(rootEl, 'data-fixture', 'slot-card');
+        const slot = api.el('slot');
+        rootEl.appendChild(slot);
+        return rootEl;
+    }
+}
+
+class SlotCompositionPage {
+    static __vmzDirect = true;
+    static __vmzState = ['showEmpty'];
+    showEmpty = true;
+    static __vmzCreate(api) {
+        const rootEl = api.el('div');
+        api.attr(rootEl, 'data-fixture', 'resume-slot-composition');
+        const card = api.component(this, 'SlotCard', {}, null);
+        // Mirror emit_component: adoptEnter host before projecting slot kids.
+        api.adoptEnter(card);
+        const block = api.ifBlock(
+            this,
+            null,
+            ['showEmpty'],
+            [
+                {
+                    cond: function () {
+                        return this.showEmpty;
+                    },
+                    create: (api) => {
+                        const wrap = api.el('div');
+                        api.attr(wrap, 'data-fixture', 'slot-branch-empty');
+                        const btn = api.el('button');
+                        api.attr(btn, 'type', 'button');
+                        api.attr(btn, 'data-fixture', 'slot-create-btn');
+                        btn.appendChild(api.text('Create'));
+                        api.on(btn, 'click', function () {
+                            this.showEmpty = false;
+                        });
+                        wrap.appendChild(btn);
+                        return wrap;
+                    },
+                },
+                {
+                    create: (api) => {
+                        const wrap = api.el('div');
+                        api.attr(wrap, 'data-fixture', 'slot-branch-ready');
+                        wrap.appendChild(api.text('Ready'));
+                        return wrap;
+                    },
+                },
+            ],
+        );
+        api.projectDefaultSlot(card, block);
+        const sibling = api.component(this, 'SiblingHost', {}, null);
+        api.projectDefaultSlot(card, sibling);
+        api.adoptLeave();
+        rootEl.appendChild(card);
+        return rootEl;
+    }
+}
+
+registerComponents({ SiblingHost, CompositionPage, SlotCard, SlotCompositionPage });
 
 console.log('resume-composition: SSR → hydrate…');
 const html = await renderToString(CompositionPage, { props: {} });
@@ -175,3 +242,34 @@ if (!app2.querySelector('[data-fixture="branch-ready"]')) fail('create-btn click
 if (!app2.querySelector('[data-fixture="sibling-host"]')) fail('sibling lost after create-btn click switch');
 
 console.log('resume-composition GATE PASS: if/else switch keeps sibling host interactive');
+
+console.log('resume-composition: Card slot projection shape…');
+const htmlSlot = await renderToString(SlotCompositionPage, { props: {} });
+if (!htmlSlot.includes('data-fixture="slot-branch-empty"')) fail(`SSR slot missing empty branch: ${htmlSlot}`);
+if (!htmlSlot.includes('data-fixture="sibling-host"')) fail(`SSR slot missing sibling host: ${htmlSlot}`);
+
+const { window: liveSlot } = parseHTML(`<!DOCTYPE html><html><body><div id="app">${htmlSlot}</div></body></html>`);
+globalThis.window = liveSlot;
+globalThis.document = liveSlot.document;
+globalThis.HTMLElement = liveSlot.HTMLElement;
+globalThis.Node = liveSlot.Node;
+globalThis.DocumentFragment = liveSlot.DocumentFragment;
+globalThis.Text = liveSlot.Text;
+globalThis.Comment = liveSlot.Comment;
+const appSlot = liveSlot.document.getElementById('app');
+const instSlot = await hydrate(SlotCompositionPage, appSlot);
+const siblingSlotBefore = appSlot.querySelector('[data-fixture="sibling-host"]');
+if (!siblingSlotBefore) fail('slot hydrate: sibling host missing');
+instSlot.showEmpty = false;
+await flushPending(instSlot);
+if (!appSlot.querySelector('[data-fixture="slot-branch-ready"]')) fail('slot: ready branch missing after switch');
+if (!appSlot.querySelector('[data-fixture="sibling-host"]')) {
+    fail('slot: sibling host removed when if/else switched inside Card projection');
+}
+const sibBtnSlot = appSlot.querySelector('[data-fixture="sibling-btn"]');
+if (!sibBtnSlot) fail('slot: sibling button missing after switch');
+sibBtnSlot.dispatchEvent(new liveSlot.Event('click', { bubbles: true }));
+const countSlot = appSlot.querySelector('[data-fixture="sibling-count"]')?.textContent;
+if (countSlot !== '1') fail(`slot: sibling click dead after if switch, count=${countSlot}`);
+
+console.log('resume-composition GATE PASS: Card slot if/else keeps projected sibling interactive');
