@@ -234,6 +234,18 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'ui/ui-direct-host-box.ts',
         description: 'Direct chip hosts display:contents (ui-direct-host-box) + Notification stays block',
     },
+    'ui-event-prop-lower': {
+        file: 'ui/ui-event-prop-lower.ts',
+        description: 'Component @click lowers to onClick in Direct client emit',
+    },
+    'ui-v-if-dom': {
+        file: 'ui/ui-v-if-dom.ts',
+        description: 'False v-if omits empty data-vmz-if layout shell in SSR',
+    },
+    'ui-nav-button': {
+        file: 'ui/ui-nav-button.ts',
+        description: 'Button href renders single navigable anchor',
+    },
     'ssr-unknown-component-error-node': {
         file: 'ui/ssr-unknown-component-error-node.ts',
         description: 'Unknown Direct leaf → data-vmz-error node; document SSR does not throw',
@@ -322,6 +334,10 @@ export const CHECKS: Record<string, CheckEntry> = {
     'official-homepage': {
         file: 'production/official-homepage.ts',
         description: 'Official homepage + documents + inspector fixture + @vmz/ui Field/Dialog',
+    },
+    'delivery-closure': {
+        file: 'production/delivery-closure.ts',
+        description: 'Deployment dependsOn + static-delivery + content-addressed assets parity',
     },
     // M-PR0: public semantic ids as composites over existing evidence (no parallel fake gates).
     'resume-lazy': {
@@ -413,6 +429,7 @@ export const CHECK_ALL = [
     'slot-projection',
     'invalidation',
     'cancellation',
+    'delivery-closure',
     'event-flow',
     'test-protocol',
     'test-compile',
@@ -441,6 +458,9 @@ export const CHECK_ALL = [
     'style-theme',
     'ui-automation',
     'ui-direct-host-box',
+    'ui-event-prop-lower',
+    'ui-v-if-dom',
+    'ui-nav-button',
     'ssr-unknown-component-error-node',
     'ui-data-grid',
     'ui-icons',

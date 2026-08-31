@@ -1,5 +1,23 @@
 <template>
+  <a
+      v-if="href"
+      class="vmz-ui-btn"
+      data-vmz-ui="button"
+      data-vmz-motion="control"
+      data-vmz-motion-token="motion.control"
+      :data-variant="variant"
+      :data-size="size"
+      :data-block="block ? 'true' : 'false'"
+      :href="href"
+      :target="target"
+      :rel="rel"
+      @click="onClick"
+    >
+      <span v-if="loading" class="vmz-ui-btn__spinner" aria-hidden="true"></span>
+      <slot />
+    </a>
   <button
+      v-else
       :type="type"
       class="vmz-ui-btn"
       data-vmz-ui="button"
@@ -144,6 +162,9 @@ export default class Button {
 	public loading: boolean = false;
 	public block: boolean = false;
 	public size: string = "middle";
+	public href: string = "";
+	public target: string = "";
+	public rel: string = "";
 	public onClick: ((e: Event) => void) | null = null;
 }
 </script>
