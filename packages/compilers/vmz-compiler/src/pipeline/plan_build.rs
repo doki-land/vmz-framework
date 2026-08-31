@@ -79,10 +79,19 @@ fn push_node(node: &ViewNode, out: &mut Vec<PlanNode>, next_id: &mut u32) -> u32
             let kid_ids: Vec<u32> = children.iter().map(|c| push_node(c, out, next_id)).collect();
             let binding = attrs.iter().find_map(|a| a.binding.map(|b| b.0));
             let list_binding = each.as_ref().and_then(|e| e.list_binding.map(|b| b.0));
+            let key_binding = each.as_ref().and_then(|e| e.key_binding.map(|b| b.0));
             let region = each.as_ref().and_then(|e| e.region.map(|r| r.0));
             let binding = list_binding.or(binding);
             if each.is_some() {
-                PlanNode::Each { id, tag: Some(tag.clone()), binding, region, children: kid_ids }
+                PlanNode::Each {
+                    id,
+                    tag: Some(tag.clone()),
+                    binding,
+                    key_binding,
+                    region,
+                    resume_marker: None,
+                    children: kid_ids,
+                }
             } else {
                 PlanNode::Element { id, tag: Some(tag.clone()), binding, region, children: kid_ids }
             }
@@ -97,15 +106,19 @@ fn push_node(node: &ViewNode, out: &mut Vec<PlanNode>, next_id: &mut u32) -> u32
                 branches: branch_ids,
             }
         }
-        ViewNode::Component { tag, children, .. } => {
+        ViewNode::Component { tag, children, attrs, .. } => {
             let kid_ids: Vec<u32> = children.iter().map(|c| push_node(c, out, next_id)).collect();
-            PlanNode::Component { id, tag: Some(tag.clone()), children: kid_ids }
+            let resume_marker = attrs.iter().find_map(|a| a.name.strip_prefix("client:").map(|s| {
+                if s.is_empty() { "load".into() } else { s.to_string() }
+            }));
+            PlanNode::Component { id, tag: Some(tag.clone()), resume_marker, children: kid_ids }
         }
         ViewNode::Slot { name, children, .. } => {
             let kid_ids: Vec<u32> = children.iter().map(|c| push_node(c, out, next_id)).collect();
             PlanNode::Slot {
                 id,
                 tag: name.clone().or_else(|| Some("slot".into())),
+                projection_id: Some(id),
                 children: kid_ids,
             }
         }

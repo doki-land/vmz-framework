@@ -173,6 +173,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         composite: ['write-barrier', 'write-barrier-array', 'write-barrier-shared', 'write-barrier-logical'],
     },
     resume: { file: 'runtime/resume.ts', pre: ['build:vmz-test'] },
+    'runtime-identity': { file: 'runtime/runtime-identity.ts', pre: ['build:vmz-test'] },
+    'keyed-list': { file: 'runtime/keyed-list.ts' },
+    'slot-projection': { file: 'runtime/slot-projection.ts' },
+    invalidation: { file: 'runtime/invalidation.ts' },
+    cancellation: { file: 'runtime/cancellation.ts' },
     'zero-js': { file: 'runtime/zero-js.ts', pre: ['build:vmz-test'] },
     'mixed-pack': { file: 'runtime/mixed-pack.ts', pre: ['build:vmz-test'] },
 
@@ -320,8 +325,8 @@ export const CHECKS: Record<string, CheckEntry> = {
     },
     // M-PR0: public semantic ids as composites over existing evidence (no parallel fake gates).
     'resume-lazy': {
-        description: 'P3 Resume/lazy — resume + event-flow + browser-core (lazy/EventEntry seed)',
-        composite: ['resume', 'event-flow', 'browser-core'],
+        description: 'P3 Resume/lazy — resume + runtime-identity + event-flow + browser-core',
+        composite: ['resume', 'runtime-identity', 'event-flow', 'browser-core'],
     },
     'asset-graph': {
         description: 'P5 Asset Graph v0 — content-addressed assets + static SEO seed (image variants still open)',
@@ -403,6 +408,11 @@ export const CHECK_ALL = [
     'async-graph',
     'motion-ir',
     'resume',
+    'runtime-identity',
+    'keyed-list',
+    'slot-projection',
+    'invalidation',
+    'cancellation',
     'event-flow',
     'test-protocol',
     'test-compile',

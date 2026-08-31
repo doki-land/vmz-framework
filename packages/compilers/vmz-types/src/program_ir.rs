@@ -442,9 +442,15 @@ pub enum PlanNode {
         /// List binding id when known.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         binding: Option<u32>,
+        /// `:key` binding id when known.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        key_binding: Option<u32>,
         /// Lifetime / control region id.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         region: Option<u32>,
+        /// Resume / island marker when this region participates in hydrate identity.
+        #[serde(default, skip_serializing_if = "crate::serde_util::is_none_or_empty_string")]
+        resume_marker: Option<String>,
         /// Child plan node ids (template body).
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         children: Vec<u32>,
@@ -470,6 +476,9 @@ pub enum PlanNode {
         /// Component tag / name.
         #[serde(default, skip_serializing_if = "crate::serde_util::is_none_or_empty_string")]
         tag: Option<String>,
+        /// Resume / island marker from `client:*` when present.
+        #[serde(default, skip_serializing_if = "crate::serde_util::is_none_or_empty_string")]
+        resume_marker: Option<String>,
         /// Child plan node ids (default slot body).
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         children: Vec<u32>,
@@ -481,6 +490,9 @@ pub enum PlanNode {
         /// Slot name; `None` / omitted means default slot (`"slot"` may also appear).
         #[serde(default, skip_serializing_if = "crate::serde_util::is_none_or_empty_string")]
         tag: Option<String>,
+        /// Stable projection id for slot outlet identity (defaults to plan node id).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        projection_id: Option<u32>,
         /// Fallback / projected child plan node ids.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         children: Vec<u32>,
@@ -542,13 +554,39 @@ impl PlanNode {
         }
     }
 
-    /// Binding id when this variant carries one.
+    /// Binding id when this variant carries one (list binding for [`Self::Each`]).
     pub fn binding(&self) -> Option<u32> {
         match self {
             Self::Interp { binding, .. }
             | Self::Element { binding, .. }
             | Self::Each { binding, .. }
             | Self::If { binding, .. } => *binding,
+            _ => None,
+        }
+    }
+
+    /// Key binding id when this is [`Self::Each`].
+    pub fn key_binding(&self) -> Option<u32> {
+        match self {
+            Self::Each { key_binding, .. } => *key_binding,
+            _ => None,
+        }
+    }
+
+    /// Slot projection id when this is [`Self::Slot`].
+    pub fn projection_id(&self) -> Option<u32> {
+        match self {
+            Self::Slot { projection_id, .. } => projection_id.or_else(|| Some(self.id())),
+            _ => None,
+        }
+    }
+
+    /// Resume marker when this node participates in hydrate identity.
+    pub fn resume_marker(&self) -> Option<&str> {
+        match self {
+            Self::Each { resume_marker, .. } | Self::Component { resume_marker, .. } => {
+                resume_marker.as_deref()
+            }
             _ => None,
         }
     }

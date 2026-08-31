@@ -119,12 +119,21 @@ pub fn emit_vmz_plan(name: &str, plan: &vmz_types::ExecutionPlan) -> String {
             None => b.null_lit(),
         };
         let binding = n.binding().map(|id| b.num_lit(id)).unwrap_or_else(|| b.null_lit());
+        let key_binding = n.key_binding().map(|id| b.num_lit(id)).unwrap_or_else(|| b.null_lit());
+        let projection_id = n.projection_id().map(|id| b.num_lit(id)).unwrap_or_else(|| b.null_lit());
+        let resume_marker = n
+            .resume_marker()
+            .map(|s| b.str_lit(s))
+            .unwrap_or_else(|| b.null_lit());
         let region = n.region().map(|id| b.num_lit(id)).unwrap_or_else(|| b.null_lit());
         let props = ArenaVec::from_iter_in(
             [
                 b.prop("id", b.num_lit(n.id())),
                 b.prop("kind", b.str_lit(n.kind().as_str())),
                 b.prop("binding", binding),
+                b.prop("keyBinding", key_binding),
+                b.prop("projectionId", projection_id),
+                b.prop("resumeMarker", resume_marker),
                 b.prop("region", region),
                 b.prop("tag", tag),
                 b.prop("children", b.u32_array(n.children())),
