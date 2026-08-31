@@ -1,6 +1,6 @@
 //! VMZ authoring formatter: `.vmz` SFC + EditorConfig.
 //!
-//! `<template>` is pretty-printed from the Semantic AST as Vue syntax (no JSX).
+//! `<template>` is pretty-printed from the Semantic AST as Vue syntax.
 //! Script/style bodies go through `oxc_formatter` / `oxc_formatter_css`.
 
 #![deny(missing_docs)]

@@ -1,4 +1,4 @@
-//! Print Semantic template AST as Vue author syntax (no JSX).
+//! Print Semantic template AST as Vue author syntax.
 
 use vmz_compiler::{
     Directive, DirectiveArg, SemanticIr, SemanticNode, SemanticProp, lower_concrete_to_semantic,
@@ -9,7 +9,7 @@ use crate::editorconfig::EditorSettings;
 
 /// Format a `<template>` body via Concrete → Semantic → Vue print.
 ///
-/// Rejects JSX / illegal templates with a structured error string (no JSX emit).
+/// Rejects illegal templates with a structured error string (Vue-only emit).
 pub fn format_template_body(body: &str, settings: &EditorSettings) -> Result<String, String> {
     let concrete = parse_template_concrete(body).map_err(|e| e.message)?;
     let semantic = lower_concrete_to_semantic(&concrete).map_err(|e| e.message)?;
@@ -286,18 +286,18 @@ mod tests {
         assert_eq!(once, twice, "once={once:?}");
         assert!(
             !once.contains('{') || once.contains("{{"),
-            "must not emit JSX attr braces: {once}"
+            "must not emit unquoted brace attrs: {once}"
         );
         assert!(once.contains("v-model="), "{once}");
         assert!(once.contains("#header"), "{once}");
     }
 
     #[test]
-    fn rejects_jsx_attr_without_emitting_jsx() {
+    fn rejects_unquoted_brace_attr() {
         let err = format_template_body(r#"<Button onClick={inc} />"#, &settings()).unwrap_err();
         assert!(
-            err.to_ascii_lowercase().contains("jsx") || err.contains('{'),
-            "expected JSX rejection, got {err}"
+            err.contains("unquoted") || err.contains('{') || err.to_ascii_lowercase().contains("parse"),
+            "expected parse rejection, got {err}"
         );
     }
 

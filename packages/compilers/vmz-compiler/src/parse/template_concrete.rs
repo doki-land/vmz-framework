@@ -244,7 +244,7 @@ impl<'a> ConcreteParser<'a> {
         }
         if self.starts_with("{") {
             return Err(self.err(
-                "JSX / single-brace `{…}` is not valid VMZ template syntax; use Vue `{{ … }}` or `:attr=\"…\"`",
+                "single-brace `{…}` is not valid VMZ template syntax; use Vue `{{ … }}` or `:attr=\"…\"`",
             ));
         }
         if self.starts_with("</") {
@@ -326,7 +326,7 @@ impl<'a> ConcreteParser<'a> {
                     break;
                 }
                 return Err(self.err(
-                    "JSX / single-brace `{…}` is not valid VMZ template syntax; use Vue `{{ … }}`",
+                    "single-brace `{…}` is not valid VMZ template syntax; use Vue `{{ … }}`",
                 ));
             }
             self.bump();
@@ -449,7 +449,7 @@ impl<'a> ConcreteParser<'a> {
         self.skip_ws();
         if self.starts_with("{") {
             return Err(self.err(format!(
-                "JSX attribute `{}={{…}}` is not valid VMZ template syntax; use `:{}=\"…\"` or a Vue directive",
+                "unquoted `{}={{…}}` is not valid VMZ template syntax; use `:{}=\"…\"` or a Vue directive",
                 name,
                 name.trim_start_matches([':', '@', '#'])
             )));
@@ -463,7 +463,7 @@ impl<'a> ConcreteParser<'a> {
             });
         }
         Err(self.err(format!(
-            "attribute `{name}` value must be a quoted string (Vue template); JSX `{{…}}` is rejected"
+            "attribute `{name}` value must be a quoted string (Vue template)"
         )))
     }
 

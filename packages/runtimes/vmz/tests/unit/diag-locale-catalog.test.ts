@@ -10,11 +10,11 @@ import { formatDiagnostic, type DiagnosticInput } from '@vmz/diagnostic';
 
 const localesRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'locales');
 
-const JSX_INPUT: DiagnosticInput = {
+const PARSE_INPUT: DiagnosticInput = {
     path: 'src/App.vmz',
     severity: 'error',
-    code: 'vmz::template::jsx_rejected',
-    args: { detail: 'JSX is not allowed' },
+    code: 'vmz::template::parse_failed',
+    args: { detail: 'single-brace is not allowed' },
     span: { start: 12, end: 18 },
 };
 
@@ -33,24 +33,24 @@ describe('vmz diagnostic locale catalogs', () => {
         const en = loadCatalog('en-US', localesRoot);
         const zh = loadCatalog('zh-CN', localesRoot);
 
-        expect(en['vmz::template::jsx_rejected']).toBeTruthy();
-        expect(zh['vmz::template::jsx_rejected']).toBeTruthy();
+        expect(en['vmz::template::parse_failed']).toBeTruthy();
+        expect(zh['vmz::template::parse_failed']).toBeTruthy();
 
-        const enLine = formatDiagnostic(JSX_INPUT, { locale: 'en-US', catalog: en });
-        const zhLine = formatDiagnostic(JSX_INPUT, { locale: 'zh-CN', catalog: zh });
+        const enLine = formatDiagnostic(PARSE_INPUT, { locale: 'en-US', catalog: en });
+        const zhLine = formatDiagnostic(PARSE_INPUT, { locale: 'zh-CN', catalog: zh });
 
-        expect(enLine).toContain('error[vmz::template::jsx_rejected]');
-        expect(zhLine).toContain('error[vmz::template::jsx_rejected]');
+        expect(enLine).toContain('error[vmz::template::parse_failed]');
+        expect(zhLine).toContain('error[vmz::template::parse_failed]');
         expect(enLine).toContain('src/App.vmz');
         expect(zhLine).toContain('src/App.vmz');
-        expect(enLine).toContain('JSX is not allowed');
-        expect(zhLine).toContain('JSX is not allowed');
+        expect(enLine).toContain('single-brace is not allowed');
+        expect(zhLine).toContain('single-brace is not allowed');
         expect(enLine).not.toBe(zhLine);
 
         // Structured identity: same code / args / span regardless of locale render.
-        expect(JSX_INPUT.code).toBe('vmz::template::jsx_rejected');
-        expect(JSX_INPUT.args).toEqual({ detail: 'JSX is not allowed' });
-        expect(JSX_INPUT.span).toEqual({ start: 12, end: 18 });
+        expect(PARSE_INPUT.code).toBe('vmz::template::parse_failed');
+        expect(PARSE_INPUT.args).toEqual({ detail: 'single-brace is not allowed' });
+        expect(PARSE_INPUT.span).toEqual({ start: 12, end: 18 });
     });
 
     it('missing translation falls back without changing structured fields', () => {

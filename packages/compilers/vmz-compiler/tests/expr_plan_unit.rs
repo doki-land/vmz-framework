@@ -48,10 +48,10 @@ fn invalid_expr_plan_fails_oxc_ingress() {
 }
 
 #[test]
-fn jsx_rejection_carries_structured_code() {
+fn single_brace_rejection_carries_parse_failed_code() {
     let err = parse_template_concrete("<h2>{user.name}</h2>").unwrap_err();
     let diag = template_parse_to_diagnostic("App.vmz", 11, &err);
-    assert_eq!(diag.code_string().as_deref(), Some("vmz::template::jsx_rejected"));
+    assert_eq!(diag.code_string().as_deref(), Some("vmz::template::parse_failed"));
 }
 
 #[test]

@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-/// Parse failure for Vue template syntax (including JSX rejection).
+/// Parse failure for Vue template syntax.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateParseError {
     /// Human-readable diagnostic.
