@@ -13,6 +13,7 @@ import {
     destroy,
     directApi,
     eventPropHandlerName,
+    findOwnedDefaultSlot,
     getRegisteredComponent,
     hasMeaningfulChild,
     isEventEntryStrategy,
@@ -195,25 +196,11 @@ function injectDefaultSlotHtml(node, html) {
 /**
  * Live-DOM counterpart: first default `<slot>` owned by this tree, not by a nested
  * `[data-vmz]` component (Button/Link labels, etc.).
+ * Re-exported from dom-core (single implementation).
  * @param {Element | null | undefined} root
  * @returns {Element | null}
  */
-export function findOwnedDefaultSlot(root) {
-    if (!root || root.nodeType !== 1) return null;
-    const tag = String(root.tagName || '').toLowerCase();
-    if (tag === 'slot' && !root.getAttribute('name')) return root;
-    const kids = root.children;
-    if (!kids || !kids.length) return null;
-    for (let i = 0; i < kids.length; i++) {
-        const c = kids[i];
-        if (c.nodeType !== 1) continue;
-        // Nested component host — its slots are not the layout page outlet.
-        if (c.hasAttribute('data-vmz')) continue;
-        const hit = findOwnedDefaultSlot(c);
-        if (hit) return hit;
-    }
-    return null;
-}
+export { findOwnedDefaultSlot };
 
 /**
  * Hydrate/mount a file-route page inside an optional layout chain (outer → inner).
@@ -613,11 +600,12 @@ const serializeApi = {
         if (!hostEl || node == null) return;
         // serializeApi.component returns a serialize el tree (or island shell).
         const root = hostEl.__kind === 'el' ? hostEl : null;
-        const findSlot = (n) => {
+        const findOwnedSlot = (n) => {
             if (!n || n.__kind !== 'el') return null;
             if (n.tag === 'slot' && !(n.attrs && n.attrs.name)) return n;
             for (const c of n.children || []) {
-                const hit = findSlot(c);
+                if (c && c.__kind === 'el' && c.attrs && c.attrs['data-vmz'] != null) continue;
+                const hit = findOwnedSlot(c);
                 if (hit) return hit;
             }
             return null;
@@ -626,10 +614,11 @@ const serializeApi = {
         let slot = null;
         if (root) {
             for (const c of root.children || []) {
-                slot = findSlot(c);
+                if (c && c.__kind === 'el' && c.attrs && c.attrs['data-vmz'] != null) continue;
+                slot = findOwnedSlot(c);
                 if (slot) break;
             }
-            if (!slot) slot = findSlot(root);
+            if (!slot) slot = findOwnedSlot(root);
         }
         if (slot) {
             slot.__rawHtml = null;

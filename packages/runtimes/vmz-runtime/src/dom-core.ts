@@ -279,6 +279,29 @@ export function runDirectCreate(Component, inst) {
 }
 
 /** Host API for compiler-emitted `__vmzCreate` (direct path, Program IR B). */
+/**
+ * First default `<slot>` owned by this component tree — skip nested `[data-vmz]`
+ * hosts (Button/Link/Empty label slots). `querySelector('slot')` steals those and
+ * projects parent siblings into the wrong host (commercial Drawer into Create btn).
+ * @param {Element | null | undefined} root
+ * @returns {Element | null}
+ */
+export function findOwnedDefaultSlot(root) {
+    if (!root || root.nodeType !== 1) return null;
+    const tag = String(root.tagName || '').toLowerCase();
+    if (tag === 'slot' && !root.getAttribute('name')) return root;
+    const kids = root.children;
+    if (!kids || !kids.length) return null;
+    for (let i = 0; i < kids.length; i++) {
+        const c = kids[i];
+        if (c.nodeType !== 1) continue;
+        if (c.hasAttribute('data-vmz')) continue;
+        const hit = findOwnedDefaultSlot(c);
+        if (hit) return hit;
+    }
+    return null;
+}
+
 export const directApi = {
     /** @type {object | null} */
     _inst: null,
@@ -318,12 +341,22 @@ export const directApi = {
     /** Push adopted node's private resume pool for depth-first child create. */
     adoptEnter(node) {
         const adopt = directApi._resumeAdopt;
-        if (adopt && typeof adopt.enter === 'function') return adopt.enter(node);
+        if (adopt && typeof adopt.enter === 'function') {
+            const ok = adopt.enter(node);
+            if (ok) adopt._enterBalance = (adopt._enterBalance || 0) + 1;
+            return ok;
+        }
         return false;
     },
     adoptLeave() {
         const adopt = directApi._resumeAdopt;
-        if (adopt && typeof adopt.leave === 'function') adopt.leave();
+        // Emit always pairs leave after enter; if enter failed (fresh node, no
+        // pool), do not pop — unbalanced leave previously stole parent scopes
+        // and projected siblings into nested Button slots.
+        if (!adopt || typeof adopt.leave !== 'function') return;
+        if ((adopt._enterBalance || 0) <= 0) return;
+        adopt._enterBalance -= 1;
+        adopt.leave();
     },
     frag() {
         noteDomCreate();
@@ -588,6 +621,7 @@ export const directApi = {
     },
     /**
      * Project parent children into nested Direct component default `<slot>`.
+     * Uses {@link findOwnedDefaultSlot} so nested Button/Link slots are not stolen.
      * @param {HTMLElement} hostEl
      * @param {Node} node
      */
@@ -598,11 +632,7 @@ export const directApi = {
         /** @type {Element | null} */
         let slot = null;
         if (root && root.nodeType === 1) {
-            if (String(root.tagName || '').toLowerCase() === 'slot' && !root.getAttribute('name')) {
-                slot = root;
-            } else if (typeof root.querySelector === 'function') {
-                slot = root.querySelector('slot:not([name])');
-            }
+            slot = findOwnedDefaultSlot(root);
         }
         if (slot && slot.parentNode) {
             slot.replaceWith(node);

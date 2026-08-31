@@ -273,3 +273,97 @@ const countSlot = appSlot.querySelector('[data-fixture="sibling-count"]')?.textC
 if (countSlot !== '1') fail(`slot: sibling click dead after if switch, count=${countSlot}`);
 
 console.log('resume-composition GATE PASS: Card slot if/else keeps projected sibling interactive');
+
+console.log('resume-composition: nested Button slot must not steal Card siblings…');
+
+/** Label host with its own `<slot>` — mirrors `@vmz/ui` Button. */
+class NestedLabel {
+    static __vmzDirect = true;
+    static __vmzCreate(api) {
+        const rootEl = api.el('button');
+        api.attr(rootEl, 'type', 'button');
+        api.attr(rootEl, 'data-fixture', 'nested-label');
+        const slot = api.el('slot');
+        rootEl.appendChild(slot);
+        return rootEl;
+    }
+}
+
+class NestedSlotStealPage {
+    static __vmzDirect = true;
+    static __vmzState = ['showEmpty'];
+    showEmpty = true;
+    static __vmzCreate(api) {
+        const rootEl = api.el('div');
+        api.attr(rootEl, 'data-fixture', 'nested-slot-steal');
+        const card = api.component(this, 'SlotCard', {}, null);
+        api.adoptEnter(card);
+        const block = api.ifBlock(
+            this,
+            null,
+            ['showEmpty'],
+            [
+                {
+                    cond: function () {
+                        return this.showEmpty;
+                    },
+                    create: (api) => {
+                        const wrap = api.el('div');
+                        api.attr(wrap, 'data-fixture', 'nested-branch-empty');
+                        const label = api.component(this, 'NestedLabel', {}, null);
+                        api.adoptEnter(label);
+                        const t = api.text('Create');
+                        api.projectDefaultSlot(label, t);
+                        api.adoptLeave();
+                        wrap.appendChild(label);
+                        return wrap;
+                    },
+                },
+                {
+                    create: (api) => {
+                        const wrap = api.el('div');
+                        api.attr(wrap, 'data-fixture', 'nested-branch-ready');
+                        wrap.appendChild(api.text('Ready'));
+                        return wrap;
+                    },
+                },
+            ],
+        );
+        api.projectDefaultSlot(card, block);
+        const sibling = api.el('div');
+        api.attr(sibling, 'data-fixture', 'nested-sibling');
+        sibling.appendChild(api.text('Sibling outside if'));
+        api.projectDefaultSlot(card, sibling);
+        api.adoptLeave();
+        rootEl.appendChild(card);
+        return rootEl;
+    }
+}
+
+registerComponents({ NestedLabel, NestedSlotStealPage });
+
+const htmlSteal = await renderToString(NestedSlotStealPage, { props: {} });
+const { window: liveSteal } = parseHTML(`<!DOCTYPE html><html><body><div id="app">${htmlSteal}</div></body></html>`);
+globalThis.window = liveSteal;
+globalThis.document = liveSteal.document;
+globalThis.HTMLElement = liveSteal.HTMLElement;
+globalThis.Node = liveSteal.Node;
+globalThis.DocumentFragment = liveSteal.DocumentFragment;
+globalThis.Text = liveSteal.Text;
+globalThis.Comment = liveSteal.Comment;
+const appSteal = liveSteal.document.getElementById('app');
+const instSteal = await hydrate(NestedSlotStealPage, appSteal);
+const siblingSteal = appSteal.querySelector('[data-fixture="nested-sibling"]');
+if (!siblingSteal) fail('nested-slot-steal: sibling missing after hydrate');
+const nestedBtn = appSteal.querySelector('[data-fixture="nested-label"]');
+if (nestedBtn && nestedBtn.contains(siblingSteal)) {
+    fail('nested-slot-steal: Card sibling projected into NestedLabel button slot (querySelector slot bug)');
+}
+instSteal.showEmpty = false;
+await flushPending(instSteal);
+if (!appSteal.querySelector('[data-fixture="nested-branch-ready"]')) fail('nested-slot-steal: ready branch missing');
+if (!appSteal.querySelector('[data-fixture="nested-sibling"]')) {
+    fail('nested-slot-steal: sibling removed after if switch (was nested under label)');
+}
+
+console.log('resume-composition GATE PASS: nested label slot does not steal Card siblings');
