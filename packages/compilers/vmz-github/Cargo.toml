@@ -1,0 +1,19 @@
+[package]
+name = "vmz-github"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+description = "GitHub Actions monitor via octocrab (no gh CLI)"
+publish = false
+
+[dependencies]
+octocrab = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
