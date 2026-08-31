@@ -98,6 +98,12 @@ pub struct JsBuildReport {
     pub seed_chunks: Vec<String>,
     /// True when only island HMR units were selected.
     pub island_hmr: bool,
+    /// Relative paths under out_dir written this round.
+    pub written_outputs: Vec<String>,
+    /// Stable artifact digest for dev reload convergence.
+    pub output_revision: String,
+    /// Whether a browser soft reload should run after this build.
+    pub reload_required: bool,
 }
 
 /// One deployment unit from [`JsWorkspace::query_affected`].
@@ -782,6 +788,9 @@ impl JsWorkspace {
             affected_chunks: report.affected_chunks.clone(),
             seed_chunks: report.seed_chunks.clone(),
             island_hmr: report.island_hmr,
+            written_outputs: report.written_outputs.clone(),
+            output_revision: report.output_revision.clone(),
+            reload_required: report.reload_required,
         })
     }
 
