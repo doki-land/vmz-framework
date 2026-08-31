@@ -819,8 +819,8 @@ async function proveCommercialComposition(page) {
     await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="dialog"]'), { timeout: 5000 });
 
     // Empty → success Alert + Notification.
-    await page.waitForSelector('[data-vmz-fixture="commercial-create"]', { timeout: 5000 });
-    await page.click('[data-vmz-fixture="commercial-create"]');
+    await page.waitForSelector('[data-vmz-fixture="commercial-create"] button.vmz-ui-btn', { timeout: 5000 });
+    await page.click('[data-vmz-fixture="commercial-create"] button.vmz-ui-btn');
     try {
         await page.waitForFunction(
             () =>
@@ -840,7 +840,7 @@ async function proveCommercialComposition(page) {
     }
 
     // Drawer from composition page.
-    await page.click('[data-vmz-fixture="commercial-drawer-open"]');
+    await page.click('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn');
     await page.waitForSelector('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]', { timeout: 5000 });
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="drawer"]'), { timeout: 5000 });
