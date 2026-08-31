@@ -33,7 +33,9 @@ export function cmdGithubActions(args: ParsedOptions): number {
         return 1;
     }
 
-    const modeRaw = String(args.mode ?? 'status').trim().toLowerCase();
+    const modeRaw = String(args.mode ?? 'status')
+        .trim()
+        .toLowerCase();
     if (modeRaw !== 'status' && modeRaw !== 'wait') {
         log.errorId('cli.err.gha.mode', { mode: modeRaw });
         return 1;
@@ -45,11 +47,7 @@ export function cmdGithubActions(args: ParsedOptions): number {
         return 1;
     }
 
-    const token =
-        (typeof args.token === 'string' && args.token.trim()) ||
-        process.env.GITHUB_TOKEN ||
-        process.env.GH_TOKEN ||
-        undefined;
+    const token = (typeof args.token === 'string' && args.token.trim()) || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || undefined;
 
     const timeoutMinutes = positiveNumber(args['timeout-minutes'], 45);
     const intervalSeconds = positiveNumber(args['interval-seconds'], 15);

@@ -32,6 +32,49 @@ function parseDir() {
 const dist = parseDir();
 if (!fs.existsSync(dist)) fail(`missing dist dir: ${dist}`);
 
+/** Publish job stages matrix natives under VMZ_NATIVE_ARTIFACTS — wire before oxc smoke. */
+function bootstrapNativeForSmoke() {
+    if (process.env.VMZ_NATIVE_NODE?.trim()) return;
+    const artifactsRoot = process.env.VMZ_NATIVE_ARTIFACTS || path.join(ROOT, 'dist', 'native-flat');
+    const { platform, arch } = process;
+    let short = `${platform}-${arch}`;
+    let triple = short;
+    if (platform === 'linux' && arch === 'x64') {
+        short = 'linux-x64';
+        triple = 'linux-x64-gnu';
+    } else if (platform === 'linux' && arch === 'arm64') {
+        short = 'linux-arm64';
+        triple = 'linux-arm64-gnu';
+    } else if (platform === 'darwin' && arch === 'arm64') {
+        short = 'darwin-arm64';
+        triple = 'darwin-arm64';
+    } else if (platform === 'darwin' && arch === 'x64') {
+        short = 'darwin-x64';
+        triple = 'darwin-x64';
+    } else if (platform === 'win32' && arch === 'x64') {
+        short = 'win32-x64';
+        triple = 'win32-x64-msvc';
+    } else if (platform === 'win32' && arch === 'arm64') {
+        short = 'win32-arm64';
+        triple = 'win32-arm64-msvc';
+    }
+    const candidates = [
+        path.join(artifactsRoot, short, `vmz.${triple}.node`),
+        path.join(artifactsRoot, short, 'vmz.node'),
+        path.join(ROOT, 'dist', short, `vmz.${triple}.node`),
+        path.join(ROOT, `packages/runtimes/vmz-${short}`, `vmz.${triple}.node`),
+        path.join(ROOT, `packages/runtimes/vmz-${short}`, 'vmz.node'),
+    ];
+    for (const p of candidates) {
+        if (fs.existsSync(p)) {
+            process.env.VMZ_NATIVE_NODE = p;
+            return;
+        }
+    }
+}
+
+bootstrapNativeForSmoke();
+
 /** @type {string[]} */
 const required = [
     'index.js',

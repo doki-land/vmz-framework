@@ -3054,6 +3054,7 @@ dependencies = [
  "napi",
  "napi-build",
  "napi-derive",
+ "serde",
  "serde_json",
  "vmz-artifacts",
  "vmz-compiler",
