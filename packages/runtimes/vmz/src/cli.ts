@@ -30,6 +30,7 @@ import { registerArtifactCommands } from './release-cmd.js';
 import { registerRefactorCommands } from './refactor-cmd.js';
 import { registerExplainCommand } from './explain-cmd.js';
 import { registerPlanCommands } from './plan-cmd.js';
+import { registerGithubActionsCommand } from './github-actions-cmd.js';
 import { loadVmzConfig } from './plugin-host.js';
 import { normalizeDeliveryAuthoring, resolveProfileArtifactDir, selectBuildProfile } from './delivery-profile.js';
 import { packFromDeploymentIr } from './pack.js';
@@ -98,6 +99,7 @@ function buildProductCli(opts: { mode?: 'global' | 'project' } = {}): Cli {
     registerArtifactCommands(cli.command('artifact|artifacts|release', 'cli.cmd.artifact'));
     registerRefactorCommands(cli.command('refactor', 'cli.cmd.refactor'));
     registerExplainCommand(cli);
+    registerGithubActionsCommand(cli);
 
     cli.command('version', 'cli.cmd.version').action(() => cmdVersion());
     return cli;
