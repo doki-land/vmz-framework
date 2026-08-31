@@ -90,7 +90,12 @@ pub fn apply_semantic_transaction(
         id,
         status: vmz_protocol::SemanticTransactionStatus::Committed,
         edits: edits.to_vec(),
-        diagnostics: vec![ReportedDiagnostic::coded_advice("", "dx.x3.transaction.committed").with_arg("detail", format!("committed {} TextEdit(s) in semantic transaction", edits.len()))],
+        diagnostics: vec![
+            ReportedDiagnostic::coded_advice("", "dx.x3.transaction.committed").with_arg(
+                "detail",
+                format!("committed {} TextEdit(s) in semantic transaction", edits.len()),
+            ),
+        ],
         dirty_paths,
     }
 }
@@ -251,7 +256,12 @@ pub fn check_transaction(
     let budget = plan_budget(out_dir);
     let mut diagnostics = Vec::new();
     if budget.status == vmz_protocol::DxPreviewStatus::Empty {
-        diagnostics.push(ReportedDiagnostic::coded_advice("", "dx.x3.budget.empty").with_arg("detail", "budget empty — build workspace to materialize deployment units"));
+        diagnostics.push(
+            ReportedDiagnostic::coded_advice("", "dx.x3.budget.empty").with_arg(
+                "detail",
+                "budget empty — build workspace to materialize deployment units",
+            ),
+        );
     }
     let status = if budget.status == vmz_protocol::DxPreviewStatus::Ready {
         vmz_protocol::TransactionCheckStatus::Ready

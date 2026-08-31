@@ -26,9 +26,10 @@ fn check_template_snippet(template: &str) -> CheckReport {
 fn warns_each_without_key() {
     let report = check_template_snippet(r#"<li v-for="tag in tags">{{ tag }}</li>"#);
     assert!(
-        report.diagnostics.iter().any(|d| {
-            d.severity() == Severity::Warning && d.code().contains("key")
-        }),
+        report
+            .diagnostics
+            .iter()
+            .any(|d| { d.severity() == Severity::Warning && d.code().contains("key") }),
         "{:?}",
         report.diagnostics.iter().map(|d| d.code()).collect::<Vec<_>>()
     );
@@ -38,9 +39,10 @@ fn warns_each_without_key() {
 fn errors_constant_key() {
     let report = check_template_snippet(r#"<li v-for="tag in tags" :key="'x'">{{ tag }}</li>"#);
     assert!(
-        report.diagnostics.iter().any(|d| {
-            d.severity() == Severity::Error && d.code().contains("key")
-        }),
+        report
+            .diagnostics
+            .iter()
+            .any(|d| { d.severity() == Severity::Error && d.code().contains("key") }),
         "{:?}",
         report.diagnostics.iter().map(|d| d.code()).collect::<Vec<_>>()
     );
@@ -73,7 +75,9 @@ fn template_parse_error_carries_absolute_source_span() {
     let diag = report
         .diagnostics
         .iter()
-        .find(|d| d.code() == "vmz::template::parse_failed" || d.code().starts_with("vmz::template::"))
+        .find(|d| {
+            d.code() == "vmz::template::parse_failed" || d.code().starts_with("vmz::template::")
+        })
         .expect("template diagnostic");
     let span = diag.source_span().expect("SourceSpan on template diagnostic");
     assert!(span.start >= 11, "expected absolute offset past `<template>\\n`, got {}", span.start);

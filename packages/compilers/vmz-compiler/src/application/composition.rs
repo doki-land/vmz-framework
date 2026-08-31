@@ -166,14 +166,26 @@ fn load_declared_links(
     let text = match fs::read_to_string(&path) {
         Ok(t) => t,
         Err(e) => {
-            diagnostics.push(ApplicationDiagnostic::coded_error(path.display().to_string(), DIAG_UNKNOWN_REFERENCE).with_arg("detail", format!("read cross-links.json failed: {e}")));
+            diagnostics.push(
+                ApplicationDiagnostic::coded_error(
+                    path.display().to_string(),
+                    DIAG_UNKNOWN_REFERENCE,
+                )
+                .with_arg("detail", format!("read cross-links.json failed: {e}")),
+            );
             return Vec::new();
         }
     };
     let value: serde_json::Value = match serde_json::from_str(&text) {
         Ok(v) => v,
         Err(e) => {
-            diagnostics.push(ApplicationDiagnostic::coded_error(path.display().to_string(), DIAG_UNKNOWN_REFERENCE).with_arg("detail", format!("cross-links.json is not JSON: {e}")));
+            diagnostics.push(
+                ApplicationDiagnostic::coded_error(
+                    path.display().to_string(),
+                    DIAG_UNKNOWN_REFERENCE,
+                )
+                .with_arg("detail", format!("cross-links.json is not JSON: {e}")),
+            );
             return Vec::new();
         }
     };
@@ -218,7 +230,12 @@ fn resolve_links(
         let path = link.path.clone().unwrap_or_else(|| "<host>".into());
 
         let Some(artifact) = artifact_by_id.get(app) else {
-            diagnostics.push(ApplicationDiagnostic::coded_error(path.clone(), DIAG_UNKNOWN_REFERENCE).with_arg("detail", format!("cross-application Link references unknown ApplicationId `{app}`")));
+            diagnostics.push(
+                ApplicationDiagnostic::coded_error(path.clone(), DIAG_UNKNOWN_REFERENCE).with_arg(
+                    "detail",
+                    format!("cross-application Link references unknown ApplicationId `{app}`"),
+                ),
+            );
             continue;
         };
 
@@ -250,7 +267,10 @@ fn resolve_links(
         let href = match join_application_base(route_base, &logical) {
             Ok(h) => h,
             Err(msg) => {
-                diagnostics.push(ApplicationDiagnostic::coded_error(path.clone(), DIAG_MOUNT_UNREACHABLE).with_arg("detail", format!("Link href join failed for `{app}`: {msg}")));
+                diagnostics.push(
+                    ApplicationDiagnostic::coded_error(path.clone(), DIAG_MOUNT_UNREACHABLE)
+                        .with_arg("detail", format!("Link href join failed for `{app}`: {msg}")),
+                );
                 continue;
             }
         };

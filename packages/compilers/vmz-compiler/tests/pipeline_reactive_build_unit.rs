@@ -16,7 +16,7 @@ fn ternary_builds_control_region_with_body_reads() {
             kind: FieldKind::State,
             visibility: Visibility::Private,
             span: Span::default(),
-        name_span: Span::default(),
+            name_span: Span::default(),
         });
     }
     let tpl = parse_template(r#"{{ enabled ? user.name : account.name }}"#).unwrap();
@@ -43,7 +43,7 @@ fn distinguishes_user_name_and_bio() {
         kind: FieldKind::State,
         visibility: Visibility::Private,
         span: Span::default(),
-    name_span: Span::default(),
+        name_span: Span::default(),
     });
     decl.fields.push(FieldDecl {
         name: "tags".into(),
@@ -52,7 +52,7 @@ fn distinguishes_user_name_and_bio() {
         kind: FieldKind::State,
         visibility: Visibility::Private,
         span: Span::default(),
-    name_span: Span::default(),
+        name_span: Span::default(),
     });
     let tpl = parse_template(
         r#"<p v-if="!user">L</p><div v-else><h2>{{ user.name }}</h2><p>{{ user.bio }}</p><li v-for="tag in tags" :key="tag">{{ tag }}</li></div>"#,
@@ -92,7 +92,7 @@ fn keyed_each_item_prop_is_list_item() {
         kind: FieldKind::State,
         visibility: Visibility::Private,
         span: Span::default(),
-    name_span: Span::default(),
+        name_span: Span::default(),
     });
     let tpl =
         parse_template(r#"<li v-for="tag in tags" :key="tag.id">{{ tag.label }}</li>"#).unwrap();
@@ -132,7 +132,7 @@ fn dynamic_index_path_is_dynamic_path() {
             kind: FieldKind::State,
             visibility: Visibility::Private,
             span: Span::default(),
-        name_span: Span::default(),
+            name_span: Span::default(),
         });
     }
     let tpl = parse_template(r#"{{ items[selected].label }}"#).unwrap();
@@ -167,7 +167,7 @@ fn nested_each_alias_list_is_nested_list_item() {
         kind: FieldKind::State,
         visibility: Visibility::Private,
         span: Span::default(),
-    name_span: Span::default(),
+        name_span: Span::default(),
     });
     let tpl = parse_template(
         r#"<div v-for="g in groups" :key="g.id"><span v-for="item in g.items" :key="item.id">{{ item.label }}</span></div>"#,
@@ -206,7 +206,7 @@ fn multi_segment_dynamic_index_path() {
             kind: FieldKind::State,
             visibility: Visibility::Private,
             span: Span::default(),
-        name_span: Span::default(),
+            name_span: Span::default(),
         });
     }
     let tpl = parse_template(r#"{{ rows[ri].cells[ci].value }}"#).unwrap();
@@ -240,7 +240,7 @@ fn each_without_proveable_list_field_skips_list_item() {
         kind: FieldKind::State,
         visibility: Visibility::Private,
         span: Span::default(),
-    name_span: Span::default(),
+        name_span: Span::default(),
     });
     decl.fields.push(FieldDecl {
         name: "b".into(),
@@ -249,7 +249,7 @@ fn each_without_proveable_list_field_skips_list_item() {
         kind: FieldKind::State,
         visibility: Visibility::Private,
         span: Span::default(),
-    name_span: Span::default(),
+        name_span: Span::default(),
     });
     // Ternary list ?not a single Field root ?no ListItem frame.
     let tpl =
@@ -272,7 +272,7 @@ fn program_module_lifts_reactive_view() {
         kind: FieldKind::State,
         visibility: Visibility::Private,
         span: Span::default(),
-    name_span: Span::default(),
+        name_span: Span::default(),
     });
     let tpl = parse_template("<h2>{{ user.name }}</h2>").unwrap();
     let program = build_program_module("UserCard.vmz", &decl, &tpl);
@@ -298,7 +298,7 @@ fn program_module_attaches_server_capabilities() {
         kind: FieldKind::State,
         visibility: Visibility::Private,
         span: Span::default(),
-    name_span: Span::default(),
+        name_span: Span::default(),
     });
     let tpl = parse_template("<h2>{{ user.name }}</h2>").unwrap();
     let attach = ServerAttach {
@@ -317,7 +317,7 @@ fn program_module_attaches_server_capabilities() {
                 opaque_callee: false,
                 star_reasons: Vec::new(),
                 span: Span::default(),
-            name_span: Span::default(),
+                name_span: Span::default(),
             },
             MethodDecl {
                 name: "getMe".into(),
@@ -331,7 +331,7 @@ fn program_module_attaches_server_capabilities() {
                 opaque_callee: false,
                 star_reasons: Vec::new(),
                 span: Span::default(),
-            name_span: Span::default(),
+                name_span: Span::default(),
             },
         ],
         client_calls: vmz_compiler::server_calls::collect_server_class_calls(
@@ -380,7 +380,7 @@ fn effect_records_sibling_method_calls() {
         kind: FieldKind::State,
         visibility: Visibility::Private,
         span: Span::default(),
-    name_span: Span::default(),
+        name_span: Span::default(),
     });
     decl.methods.push(MethodDecl {
         name: "onClick".into(),
@@ -394,7 +394,7 @@ fn effect_records_sibling_method_calls() {
         opaque_callee: false,
         star_reasons: Vec::new(),
         span: Span::default(),
-    name_span: Span::default(),
+        name_span: Span::default(),
     });
     decl.methods.push(MethodDecl {
         name: "refresh".into(),
@@ -408,7 +408,7 @@ fn effect_records_sibling_method_calls() {
         opaque_callee: false,
         star_reasons: Vec::new(),
         span: Span::default(),
-    name_span: Span::default(),
+        name_span: Span::default(),
     });
     let tpl = parse_template(r#"<button @click="onClick">{{ user.name }}</button>"#).unwrap();
     let module = build_reactive_module("Card.vmz", &decl, &tpl);
@@ -437,7 +437,7 @@ fn semantic_if_chain_builds_control_region_without_flat_attr_guess() {
             kind: FieldKind::State,
             visibility: Visibility::Private,
             span: Span::default(),
-        name_span: Span::default(),
+            name_span: Span::default(),
         });
     }
     let (sem, ir) = vmz_compiler::parse_template_asts(

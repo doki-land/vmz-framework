@@ -23,7 +23,7 @@ When the user needs syntax-colored source:
 
 1. Use the `default` code highlighting contract.
 2. For build, SSR, and static export, consume the Rust-generated `NativeCodeArtifact`.
-3. For runtime highlighting, use **`@vmz/highlighter`** and install **`@vmz/highlighter-unknown-wasm`** when unknown-language fallback is needed.
+3. For runtime highlighting, use **`@vmz/highlighter`** and install **`@vmz/highlighter-unknown-wasm32`** when unknown-language fallback is needed.
 4. For non-VMZ applications, prefer the **`vmz-highlighter`** Custom Element. It does not require the VMZ runtime.
 
 **Do not:**

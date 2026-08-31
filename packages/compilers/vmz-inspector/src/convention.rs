@@ -50,10 +50,9 @@ fn lint_legacy_root_shell(path: &Path, name: &str, rel: &str, report: &mut Check
         || rel.ends_with("/src/App.vmz")
         || name.eq_ignore_ascii_case("app.vmz");
     if is_rootish && !name.eq_ignore_ascii_case("application.vmz") {
-        report.diagnostics.push(ReportedDiagnostic::warning(
-            path,
-            "vmz::convention::prefer_application_shell",
-        ));
+        report
+            .diagnostics
+            .push(ReportedDiagnostic::warning(path, "vmz::convention::prefer_application_shell"));
     }
 }
 
@@ -62,10 +61,9 @@ fn lint_page_index_case(path: &Path, kind: VmzModuleKind, name: &str, report: &m
         return;
     }
     if name == "index.vmz" {
-        report.diagnostics.push(ReportedDiagnostic::warning(
-            path,
-            "vmz::convention::prefer_pascal_index",
-        ));
+        report
+            .diagnostics
+            .push(ReportedDiagnostic::warning(path, "vmz::convention::prefer_pascal_index"));
     }
 }
 

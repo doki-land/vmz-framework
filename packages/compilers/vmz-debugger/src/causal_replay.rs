@@ -506,7 +506,10 @@ pub fn check_causal_replay(out_dir: &Path, generation: u64) -> CausalReplayCheck
     let units = load_program_units(out_dir);
     let mut diagnostics = Vec::new();
     if units.is_empty() {
-        diagnostics.push(ReportedDiagnostic::coded_advice("", "dx.x5.program.empty").with_arg("detail", "no *.program.json - build workspace first"));
+        diagnostics.push(
+            ReportedDiagnostic::coded_advice("", "dx.x5.program.empty")
+                .with_arg("detail", "no *.program.json - build workspace first"),
+        );
         return CausalReplayCheckReport {
             schema: CAUSAL_REPLAY_CHECK_SCHEMA.into(),
             sample_explain: None,
@@ -583,10 +586,16 @@ pub fn check_causal_replay(out_dir: &Path, generation: u64) -> CausalReplayCheck
     let status = if !explain.chain.is_empty() && replay.status == CausalReplayStatus::Ready {
         CausalReplayCheckStatus::Ready
     } else if explain.chain.is_empty() {
-        diagnostics.push(ReportedDiagnostic::coded_warning("", "dx.x5.explain.empty").with_arg("detail", "sample write explain chain empty"));
+        diagnostics.push(
+            ReportedDiagnostic::coded_warning("", "dx.x5.explain.empty")
+                .with_arg("detail", "sample write explain chain empty"),
+        );
         CausalReplayCheckStatus::Failed
     } else {
-        diagnostics.push(ReportedDiagnostic::coded_warning("", "dx.x5.replay.failed").with_arg("detail", format!("causal replay status {}", replay.status.as_str())));
+        diagnostics.push(
+            ReportedDiagnostic::coded_warning("", "dx.x5.replay.failed")
+                .with_arg("detail", format!("causal replay status {}", replay.status.as_str())),
+        );
         CausalReplayCheckStatus::Failed
     };
 

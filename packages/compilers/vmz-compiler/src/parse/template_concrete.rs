@@ -462,9 +462,7 @@ impl<'a> ConcreteParser<'a> {
                 span: TemplateSpan::from_usize(name_start, self.pos),
             });
         }
-        Err(self.err(format!(
-            "attribute `{name}` value must be a quoted string (Vue template)"
-        )))
+        Err(self.err(format!("attribute `{name}` value must be a quoted string (Vue template)")))
     }
 
     fn parse_quoted(&mut self) -> Result<String, TemplateParseError> {

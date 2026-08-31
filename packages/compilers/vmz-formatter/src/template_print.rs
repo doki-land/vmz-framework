@@ -228,12 +228,8 @@ fn format_props(props: &[SemanticProp]) -> Result<String, String> {
                 }
             }
             SemanticProp::Directive { dir, .. } => match dir {
-                Directive::Show { expr } => {
-                    s.push_str(&format!(" v-show=\"{}\"", oxc_expr(expr)?))
-                }
-                Directive::Html { expr } => {
-                    s.push_str(&format!(" v-html=\"{}\"", oxc_expr(expr)?))
-                }
+                Directive::Show { expr } => s.push_str(&format!(" v-show=\"{}\"", oxc_expr(expr)?)),
+                Directive::Html { expr } => s.push_str(&format!(" v-html=\"{}\"", oxc_expr(expr)?)),
                 Directive::Custom { name, arg, expr, modifiers } => {
                     let mods = format_modifiers(modifiers);
                     let arg_s = match arg {

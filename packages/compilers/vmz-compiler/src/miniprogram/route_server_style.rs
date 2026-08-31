@@ -375,12 +375,14 @@ fn collect_program_json(root: &Path) -> Vec<PathBuf> {
 }
 
 fn is_page_or_app(unit: &ProgramUnit) -> bool {
-    matches!(unit.deployment.unit_kind, Some(VmzModuleKind::Page) | Some(VmzModuleKind::Application))
-        || unit
-            .deployment
-            .chunk_id
-            .as_deref()
-            .is_some_and(|c| c.starts_with("pages/") || c == "Application")
+    matches!(
+        unit.deployment.unit_kind,
+        Some(VmzModuleKind::Page) | Some(VmzModuleKind::Application)
+    ) || unit
+        .deployment
+        .chunk_id
+        .as_deref()
+        .is_some_and(|c| c.starts_with("pages/") || c == "Application")
 }
 
 /// Lower page/app units with route + `#server` stubs + Canonical Style.

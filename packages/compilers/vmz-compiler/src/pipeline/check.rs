@@ -136,7 +136,8 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
         Ok(s) => s,
         Err(e) => {
             report.diagnostics.push(
-                ReportedDiagnostic::error(path, "vmz::io::read_failed").with_arg("error", e.to_string()),
+                ReportedDiagnostic::error(path, "vmz::io::read_failed")
+                    .with_arg("error", e.to_string()),
             );
             return;
         }
@@ -191,12 +192,10 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
             },
         };
         for err in &analyzed.parse_errors {
-            report
-                .diagnostics
-                .push(
-                    ReportedDiagnostic::error(path, "vmz::script::server_parse_failed")
-                        .with_arg("detail", err.clone()),
-                );
+            report.diagnostics.push(
+                ReportedDiagnostic::error(path, "vmz::script::server_parse_failed")
+                    .with_arg("detail", err.clone()),
+            );
         }
         if analyzed.decl.name == "Anonymous" && analyzed.parse_errors.is_empty() {
             let code = match server.lang {
@@ -263,10 +262,7 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
                 .with_source_span(SourceSpan { path: path_s, start, end }),
         );
     }
-    if report
-        .diagnostics
-        .iter()
-        .any(|d| d.is_error() && d.code() == "vmz::template::invalid_expr")
+    if report.diagnostics.iter().any(|d| d.is_error() && d.code() == "vmz::template::invalid_expr")
     {
         return;
     }

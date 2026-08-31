@@ -95,7 +95,9 @@ fn rejects_single_brace_text_interp() {
 fn rejects_unquoted_brace_attr_bind() {
     let err = parse_template(r#"<Button onClick={increment} />"#).unwrap_err();
     assert!(
-        err.message.contains("unquoted") || err.message.contains("single-brace") || err.message.contains("quoted"),
+        err.message.contains("unquoted")
+            || err.message.contains("single-brace")
+            || err.message.contains("quoted"),
         "{err}"
     );
 }

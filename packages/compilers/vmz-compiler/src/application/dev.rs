@@ -109,14 +109,26 @@ fn build_sessions(
         let key = format!("{}::{}", s.role, s.package_root);
         if let Some(prev) = seen.insert(key.clone(), s.application_id.as_str().into()) {
             if prev != s.application_id.as_str() {
-                diagnostics.push(ApplicationDiagnostic::coded_error(s.package_root.clone(), DIAG_SESSION_SHARED).with_arg("detail", format!(
-                        "dev session package root shared by `{prev}` and `{}`",
-                        s.application_id.as_str()
-                    )));
+                diagnostics.push(
+                    ApplicationDiagnostic::coded_error(s.package_root.clone(), DIAG_SESSION_SHARED)
+                        .with_arg(
+                            "detail",
+                            format!(
+                                "dev session package root shared by `{prev}` and `{}`",
+                                s.application_id.as_str()
+                            ),
+                        ),
+                );
             }
         }
         if !s.independent {
-            diagnostics.push(ApplicationDiagnostic::coded_error(s.application_id.as_str(), DIAG_SESSION_SHARED).with_arg("detail", "dev session must be independent (no shared Program Graph/runtime)"));
+            diagnostics.push(
+                ApplicationDiagnostic::coded_error(s.application_id.as_str(), DIAG_SESSION_SHARED)
+                    .with_arg(
+                        "detail",
+                        "dev session must be independent (no shared Program Graph/runtime)",
+                    ),
+            );
         }
     }
 
@@ -266,10 +278,19 @@ fn plan_affected(
                         && u.reason == ApplicationAffectedReason::ChildSource
                 })
             {
-                diagnostics.push(ApplicationDiagnostic::coded_error(dirty_paths[0].display().to_string(), DIAG_AFFECTED_LEAK).with_arg("detail", format!(
-                        "child_source change under `{}` leaked rebuild to sibling applications",
-                        id.as_str()
-                    )));
+                diagnostics.push(
+                    ApplicationDiagnostic::coded_error(
+                        dirty_paths[0].display().to_string(),
+                        DIAG_AFFECTED_LEAK,
+                    )
+                    .with_arg(
+                        "detail",
+                        format!(
+                            "child_source change under `{}` leaked rebuild to sibling applications",
+                            id.as_str()
+                        ),
+                    ),
+                );
             }
         }
     }
@@ -494,7 +515,10 @@ fn build_deploy_proof(
         && !table_json.contains("\"program\"")
         && !table_json.contains("executableModule");
     if !refs_only {
-        diagnostics.push(ApplicationDiagnostic::coded_error("ApplicationMountTable", DIAG_PROXY_MISROUTE).with_arg("detail", "deploy adapter proof: MountTable must remain refs-only"));
+        diagnostics.push(
+            ApplicationDiagnostic::coded_error("ApplicationMountTable", DIAG_PROXY_MISROUTE)
+                .with_arg("detail", "deploy adapter proof: MountTable must remain refs-only"),
+        );
     }
 
     let per_app = artifacts.iter().all(|a| !a.server_deployment_ref.hash.is_empty());

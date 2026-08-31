@@ -28,7 +28,8 @@ pub fn parse_application_base(
             Ok(ApplicationBase { schema: APPLICATION_BASE_SCHEMA.into(), base, application_id })
         }
         Err(msg) => {
-            Err(ApplicationDiagnostic::coded_error("<application-base>", DIAG_INVALID_BASE).with_arg("detail", msg))
+            Err(ApplicationDiagnostic::coded_error("<application-base>", DIAG_INVALID_BASE)
+                .with_arg("detail", msg))
         }
     }
 }
@@ -88,15 +89,20 @@ pub fn relocate_manifest(
     base: &ApplicationBase,
 ) -> Result<RelocatedApplicationUrls, ApplicationDiagnostic> {
     if manifest.logical_base != "/" {
-        return Err(ApplicationDiagnostic::coded_error("<relocation-manifest>", DIAG_INVALID_BASE).with_arg("detail", format!(
-                "relocation manifest logicalBase must be `/` (independent compile), got `{}`",
-                manifest.logical_base
-            )));
+        return Err(ApplicationDiagnostic::coded_error("<relocation-manifest>", DIAG_INVALID_BASE)
+            .with_arg(
+                "detail",
+                format!(
+                    "relocation manifest logicalBase must be `/` (independent compile), got `{}`",
+                    manifest.logical_base
+                ),
+            ));
     }
     let mut entries = Vec::with_capacity(manifest.entries.len());
     for e in &manifest.entries {
         let href = join_application_base(&base.base, &e.logical_path).map_err(|msg| {
-            ApplicationDiagnostic::coded_error("<relocation-manifest>", DIAG_INVALID_BASE).with_arg("detail", format!("entry `{}` ({}): {msg}", e.id, e.kind))
+            ApplicationDiagnostic::coded_error("<relocation-manifest>", DIAG_INVALID_BASE)
+                .with_arg("detail", format!("entry `{}` ({}): {msg}", e.id, e.kind))
         })?;
         entries.push(RelocatedUrlEntry {
             id: e.id.clone(),
@@ -171,7 +177,13 @@ pub fn check_application_relocatable(
     // Ensure logical paths themselves are well-formed.
     for e in &manifest.entries {
         if let Err(msg) = normalize_logical_path(&e.logical_path) {
-            diagnostics.push(ApplicationDiagnostic::coded_error(package_root.display().to_string(), DIAG_INVALID_BASE).with_arg("detail", format!("manifest entry `{}`: {msg}", e.id)));
+            diagnostics.push(
+                ApplicationDiagnostic::coded_error(
+                    package_root.display().to_string(),
+                    DIAG_INVALID_BASE,
+                )
+                .with_arg("detail", format!("manifest entry `{}`: {msg}", e.id)),
+            );
         }
     }
 
@@ -244,12 +256,27 @@ fn verify_roundtrip(
     for e in &relocated.entries {
         match strip_application_base(base, &e.href) {
             Ok(Some(logical)) if logical == e.logical_path => {}
-            Ok(Some(logical)) => diagnostics.push(ApplicationDiagnostic::coded_error("<relocation-proof>", DIAG_INVALID_BASE).with_arg("detail", format!(
-                    "strip(base=`{base}`, href=`{}`) → `{logical}` but logicalPath is `{}`",
-                    e.href, e.logical_path
-                ))),
-            Ok(None) => diagnostics.push(ApplicationDiagnostic::coded_error("<relocation-proof>", DIAG_INVALID_BASE).with_arg("detail", format!("strip(base=`{base}`, href=`{}`) missed entry `{}`", e.href, e.id))),
-            Err(msg) => diagnostics.push(ApplicationDiagnostic::coded_error("<relocation-proof>", DIAG_INVALID_BASE).with_arg("detail", msg)),
+            Ok(Some(logical)) => diagnostics.push(
+                ApplicationDiagnostic::coded_error("<relocation-proof>", DIAG_INVALID_BASE)
+                    .with_arg(
+                        "detail",
+                        format!(
+                            "strip(base=`{base}`, href=`{}`) → `{logical}` but logicalPath is `{}`",
+                            e.href, e.logical_path
+                        ),
+                    ),
+            ),
+            Ok(None) => diagnostics.push(
+                ApplicationDiagnostic::coded_error("<relocation-proof>", DIAG_INVALID_BASE)
+                    .with_arg(
+                        "detail",
+                        format!("strip(base=`{base}`, href=`{}`) missed entry `{}`", e.href, e.id),
+                    ),
+            ),
+            Err(msg) => diagnostics.push(
+                ApplicationDiagnostic::coded_error("<relocation-proof>", DIAG_INVALID_BASE)
+                    .with_arg("detail", msg),
+            ),
         }
     }
 }
@@ -264,13 +291,28 @@ fn verify_not_equal_to_logical_when_prefixed(
     }
     for e in &relocated.entries {
         if e.logical_path != "/" && e.href == e.logical_path {
-            diagnostics.push(ApplicationDiagnostic::coded_error("<relocation-proof>", DIAG_INVALID_BASE).with_arg("detail", format!("non-root base `{base}` left entry `{}` unprefixed (`{}`)", e.id, e.href)));
+            diagnostics.push(
+                ApplicationDiagnostic::coded_error("<relocation-proof>", DIAG_INVALID_BASE)
+                    .with_arg(
+                        "detail",
+                        format!(
+                            "non-root base `{base}` left entry `{}` unprefixed (`{}`)",
+                            e.id, e.href
+                        ),
+                    ),
+            );
         }
         if !e.href.starts_with(base) {
-            diagnostics.push(ApplicationDiagnostic::coded_error("<relocation-proof>", DIAG_INVALID_BASE).with_arg("detail", format!(
-                    "relocated href `{}` for `{}` does not start with base `{base}`",
-                    e.href, e.id
-                )));
+            diagnostics.push(
+                ApplicationDiagnostic::coded_error("<relocation-proof>", DIAG_INVALID_BASE)
+                    .with_arg(
+                        "detail",
+                        format!(
+                            "relocated href `{}` for `{}` does not start with base `{base}`",
+                            e.href, e.id
+                        ),
+                    ),
+            );
         }
     }
 }
@@ -432,16 +474,12 @@ fn is_marked_external(source: &str, lit_start: usize) -> bool {
 pub fn relocate_manifest_json(manifest_json: &str, base: &str) -> Result<String, String> {
     let manifest: ApplicationRelocationManifest = serde_json::from_str(manifest_json)
         .map_err(|e| format!("invalid relocation manifest JSON: {e}"))?;
-    let app_base = parse_application_base(base, Some(manifest.application_id.clone()))
-        .map_err(|d| {
-            d.args()
-                .and_then(|m| m.get("detail").cloned())
-                .unwrap_or_else(|| d.to_string())
+    let app_base =
+        parse_application_base(base, Some(manifest.application_id.clone())).map_err(|d| {
+            d.args().and_then(|m| m.get("detail").cloned()).unwrap_or_else(|| d.to_string())
         })?;
     let relocated = relocate_manifest(&manifest, &app_base).map_err(|d| {
-        d.args()
-            .and_then(|m| m.get("detail").cloned())
-            .unwrap_or_else(|| d.to_string())
+        d.args().and_then(|m| m.get("detail").cloned()).unwrap_or_else(|| d.to_string())
     })?;
     vmz_generator::to_pretty_json(&relocated).map_err(|e| e.to_string())
 }

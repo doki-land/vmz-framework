@@ -180,9 +180,15 @@ mod tests {
             LspPosition { line: 0, character: 3 }
         );
         assert_eq!(idx.offset_from_lsp(src, LspPosition { line: 0, character: 1 }), 1);
-        assert_eq!(idx.offset_from_lsp(src, LspPosition { line: 0, character: 3 }), after_emoji as u32);
+        assert_eq!(
+            idx.offset_from_lsp(src, LspPosition { line: 0, character: 3 }),
+            after_emoji as u32
+        );
         // Mid-surrogate clamp: character 2 lands after the full scalar.
-        assert_eq!(idx.offset_from_lsp(src, LspPosition { line: 0, character: 2 }), after_emoji as u32);
+        assert_eq!(
+            idx.offset_from_lsp(src, LspPosition { line: 0, character: 2 }),
+            after_emoji as u32
+        );
     }
 
     #[test]
