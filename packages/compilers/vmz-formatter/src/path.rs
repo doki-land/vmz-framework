@@ -8,10 +8,8 @@ use serde::{Deserialize, Serialize};
 use vmz_compiler::{ReportedDiagnostic, parse_vmz};
 use walkdir::WalkDir;
 
-use crate::assemble::assemble_vmz;
+use crate::document::VmzDocument;
 use crate::editorconfig::{EditorSettings, resolve_for_path};
-use crate::script::format_script_block;
-use crate::style::format_style_block;
 
 /// Options for [`format_path`].
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
@@ -142,16 +140,5 @@ fn format_parsed(
     parsed: &vmz_compiler::ParsedVmz,
     settings: &EditorSettings,
 ) -> Result<String, String> {
-    let client = format_script_block(&parsed.client, settings)?;
-    let server = if let Some(server) = &parsed.server {
-        Some(format_script_block(server, settings)?)
-    } else {
-        None
-    };
-    let style = if let Some(style) = &parsed.style {
-        Some(format_style_block(style, settings)?)
-    } else {
-        None
-    };
-    assemble_vmz(parsed, &client, server.as_deref(), style.as_deref(), settings)
+    VmzDocument::from_parsed(parsed, settings).print()
 }

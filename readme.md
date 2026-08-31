@@ -1,10 +1,43 @@
 # VMZ
 
-## ✨ A full-stack application compiler for TypeScript
+## Build an application from one prompt
 
-VMZ is a new kind of web framework: a full-stack application compiler. You write readable `.vmz` components and ordinary
-TypeScript; VMZ understands the application as a whole and compiles it into direct browser updates, server work, SSR
-output, resumable interaction, tests, and deployment artifacts.
+VMZ is a Vue-familiar, multi-platform, zero-cost application compiler. Give an agent one clear product request and it can
+turn the request into `.vmz` components, compiler-visible state, server capabilities, routes, tests, and deployment
+artifacts. The author describes the outcome. VMZ keeps the boundaries explicit and produces the smallest target-specific
+result it can prove.
+
+### Start with an agent
+
+Install the VMZ application skill in the project where you want to build:
+
+```bash
+npx skills add @vmz/vmz-skills --skill vmz-application -y
+```
+
+Then give your coding agent a product-level prompt:
+
+```text
+Build a searchable customer directory for this project.
+Keep customer data server-only, add filtering and pagination,
+make the results keyboard-accessible, and verify the client/server boundary.
+```
+
+The agent should inspect the project, choose the VMZ authoring surface, implement the smallest necessary interactive
+regions, run the relevant checks, and explain the generated output. You do not start by wiring a router, choosing a state
+library, or copying a component template. You start with what the application must do.
+
+For a quick tour of the available skills:
+
+```bash
+npx skills add @vmz/vmz-skills --list
+```
+
+## What VMZ compiles
+
+VMZ is a full-stack application compiler. You write readable `.vmz` components and ordinary TypeScript; VMZ understands the
+application as a whole and compiles it into direct browser updates, server work, SSR output, resumable interaction, tests,
+and deployment artifacts.
 
 Its source surface is intentionally familiar to developers who like Vue-style single-file components, while the
 semantics stay VMZ-native. A `public` class field is a prop; a non-public field is component state; the compiler derives
