@@ -1,0 +1,53 @@
+# Dogfood — official tool collection `vmz-tools` (engineering bypass).
+# Primary tool: monitor GitHub Actions via Octokit (not the gh CLI).
+
+name: Dogfood VMZ Tools
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - '.github/actions/vmz-tools/**'
+      - '.github/workflows/dogfood-vmz-tools.yml'
+  pull_request:
+    branches: [dev]
+    paths:
+      - '.github/actions/vmz-tools/**'
+      - '.github/workflows/dogfood-vmz-tools.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  monitor-status:
+    name: github-actions status smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          package-manager-cache: false
+
+      - name: Monitor CI (one-shot status)
+        id: monitor
+        uses: ./.github/actions/vmz-tools
+        with:
+          tool: github-actions
+          mode: status
+          workflow: ci.yml
+          branch: ${{ github.event.repository.default_branch }}
+
+      - name: Assert outputs
+        shell: bash
+        run: |
+          test -n "${{ steps.monitor.outputs.run-id }}"
+          echo "run-id=${{ steps.monitor.outputs.run-id }}"
+          echo "status=${{ steps.monitor.outputs.status }}"
+          echo "conclusion=${{ steps.monitor.outputs.conclusion }}"
+          echo "html-url=${{ steps.monitor.outputs.html-url }}"
