@@ -375,6 +375,8 @@ fn emit_plain_element(
     let el = fresh("e", next_id);
     let tag_owned = tag.to_string();
     stmts.push(print_one_stmt(|b| b.var_stmt(&el, b.api_call("el", vec![b.str_lit(&tag_owned)]))));
+    // Resume adopt: push this node's private child pool before depth-first children.
+    stmts.push(print_one_stmt(|b| b.expr_stmt(b.api_call("adoptEnter", vec![b.ident(&el)]))));
     for a in attrs {
         if a.name == "style:tw" {
             continue;
@@ -421,6 +423,7 @@ fn emit_plain_element(
             b.expr_stmt(b.call(b.member(&el, "appendChild"), vec![b.ident(&child)]))
         }));
     }
+    stmts.push(print_one_stmt(|b| b.expr_stmt(b.api_call("adoptLeave", vec![]))));
     el
 }
 
