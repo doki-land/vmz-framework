@@ -1,58 +1,69 @@
 name: VMZ Tools
 description: >-
-  Official tool collection for VMZ CI hosts. First tool monitors GitHub Actions
-  via the GitHub API (Octokit / @actions/github). Does not require the gh CLI.
-  Downstream: doki-land/vmz-framework/.github/actions/vmz-tools@<ref>
+  Downstream template for the VMZ tool collection. First tool monitors GitHub
+  Actions by spawning the product CLI (`vmz github-actions`), which calls Rust
+  octocrab via N-API. No Octokit / gh CLI inside this Action.
+  uses: doki-land/vmz-framework/.github/actions/vmz-tools@<ref>
 
 inputs:
   tool:
-    description: Tool id in this collection (github-actions)
+    description: Tool id (github-actions)
     required: false
     default: github-actions
   mode:
-    description: github-actions mode — status (one-shot) or wait (poll until completed)
+    description: github-actions mode — status or wait
     required: false
     default: status
   workflow:
-    description: Workflow file name (e.g. ci.yml) or numeric workflow id
+    description: Workflow file name (e.g. ci.yml) or numeric id
     required: false
     default: ''
   run-id:
-    description: Watch a specific workflow run id (skips workflow/ref lookup)
+    description: Specific workflow run id
     required: false
     default: ''
   ref:
-    description: Commit SHA (head_sha filter when listing runs)
+    description: Commit SHA filter
     required: false
     default: ''
   branch:
-    description: Branch name filter when listing runs
+    description: Branch name filter
     required: false
     default: ''
   timeout-minutes:
-    description: Max wait time for mode=wait
+    description: Max wait minutes for mode=wait
     required: false
     default: '45'
   interval-seconds:
-    description: Poll interval for mode=wait
+    description: Poll interval seconds for mode=wait
     required: false
     default: '15'
   required-conclusion:
-    description: Required conclusion when mode=wait (default success)
+    description: Required conclusion when mode=wait
     required: false
     default: success
-  token:
-    description: GitHub token for Actions API (defaults to env GITHUB_TOKEN)
-    required: false
-    default: ${{ github.token }}
   owner:
-    description: Repository owner override (default github.repository_owner)
+    description: Repository owner override
     required: false
     default: ''
   repo:
-    description: Repository name override (default github.event.repository.name)
+    description: Repository name override
     required: false
     default: ''
+  token:
+    description: GitHub token (default github.token)
+    required: false
+    default: ${{ github.token }}
+  vmz-command:
+    description: >-
+      Product CLI invocation (downstream usually `pnpm exec vmz` with a locked
+      published @vmz/vmz). Framework dogfood should point at workspace-latest bin.
+    required: false
+    default: pnpm exec vmz
+  working-directory:
+    description: Working directory for the CLI (project root with package.json)
+    required: false
+    default: '.'
 
 outputs:
   run-id:
@@ -62,7 +73,7 @@ outputs:
     description: Latest run status
     value: ${{ steps.run.outputs.status }}
   conclusion:
-    description: Latest run conclusion (empty while in progress)
+    description: Latest run conclusion
     value: ${{ steps.run.outputs.conclusion }}
   html-url:
     description: Workflow run HTML URL
@@ -71,27 +82,51 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Install API libraries
-      shell: bash
-      working-directory: ${{ github.action_path }}
-      run: npm ci --omit=dev
-
-    - name: Run tool
+    - name: Run tool via product CLI
       id: run
       shell: bash
-      working-directory: ${{ github.action_path }}
+      working-directory: ${{ inputs.working-directory }}
       env:
-        INPUT_TOOL: ${{ inputs.tool }}
-        INPUT_MODE: ${{ inputs.mode }}
-        INPUT_WORKFLOW: ${{ inputs.workflow }}
-        INPUT_RUN-ID: ${{ inputs.run-id }}
-        INPUT_REF: ${{ inputs.ref }}
-        INPUT_BRANCH: ${{ inputs.branch }}
-        INPUT_TIMEOUT-MINUTES: ${{ inputs.timeout-minutes }}
-        INPUT_INTERVAL-SECONDS: ${{ inputs.interval-seconds }}
-        INPUT_REQUIRED-CONCLUSION: ${{ inputs.required-conclusion }}
-        INPUT_TOKEN: ${{ inputs.token }}
-        INPUT_OWNER: ${{ inputs.owner }}
-        INPUT_REPO: ${{ inputs.repo }}
         GITHUB_TOKEN: ${{ inputs.token }}
-      run: node src/index.js
+      run: |
+        set -euo pipefail
+        TOOL='${{ inputs.tool }}'
+        if [ "${TOOL}" != "github-actions" ]; then
+          echo "vmz-tools: unknown tool '${TOOL}' (known: github-actions)" >&2
+          exit 1
+        fi
+        ARGS=(github-actions --mode '${{ inputs.mode }}' --json)
+        WORKFLOW='${{ inputs.workflow }}'
+        RUN_ID='${{ inputs.run-id }}'
+        REF='${{ inputs.ref }}'
+        BRANCH='${{ inputs.branch }}'
+        OWNER='${{ inputs.owner }}'
+        REPO='${{ inputs.repo }}'
+        if [ -n "${WORKFLOW}" ]; then ARGS+=(--workflow "${WORKFLOW}"); fi
+        if [ -n "${RUN_ID}" ]; then ARGS+=(--run-id "${RUN_ID}"); fi
+        if [ -n "${REF}" ]; then ARGS+=(--ref "${REF}"); fi
+        if [ -n "${BRANCH}" ]; then ARGS+=(--branch "${BRANCH}"); fi
+        ARGS+=(--timeout-minutes '${{ inputs.timeout-minutes }}')
+        ARGS+=(--interval-seconds '${{ inputs.interval-seconds }}')
+        ARGS+=(--required-conclusion '${{ inputs.required-conclusion }}')
+        if [ -n "${OWNER}" ]; then ARGS+=(--owner "${OWNER}"); fi
+        if [ -n "${REPO}" ]; then ARGS+=(--repo "${REPO}"); fi
+        JSON="$(${{ inputs.vmz-command }} "${ARGS[@]}")"
+        echo "${JSON}"
+        printf '%s' "${JSON}" | node -e '
+        const fs = require("fs");
+        const text = fs.readFileSync(0, "utf8");
+        const start = text.indexOf("{");
+        const end = text.lastIndexOf("}");
+        if (start < 0 || end < start) {
+          console.error("vmz-tools: missing JSON from vmz github-actions");
+          process.exit(1);
+        }
+        const j = JSON.parse(text.slice(start, end + 1));
+        const out = process.env.GITHUB_OUTPUT;
+        const w = (k, v) => fs.appendFileSync(out, `${k}=${v ?? ""}\n`);
+        w("run-id", j.runId);
+        w("status", j.status);
+        w("conclusion", j.conclusion);
+        w("html-url", j.htmlUrl);
+        '
