@@ -22,7 +22,7 @@ export const PACK_MANIFEST_SCHEMA = 'vmz.pack.manifest.v0';
  */
 export function ensureRuntimeCompanions(outDir, coreDist) {
     if (!coreDist) return [];
-    const names = ['dom-core.js', 'dom-ssr.js', 'dom.client.js', 'direct-host-box.js', 'unknown-component.js'];
+    const names = ['dom-core.js', 'dom-ssr.js', 'dom.client.js', 'dom.browser.js', 'direct-host-box.js', 'unknown-component.js'];
     const copied = [];
     for (const name of names) {
         const src = path.join(coreDist, name);

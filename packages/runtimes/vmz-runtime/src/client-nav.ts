@@ -55,7 +55,7 @@ export function installClientNavigation(opts = {}) {
     }
 
     async function loadDomFallback() {
-        return import(/* @vite-ignore */ '/vmz-dom.js');
+        return import(/* @vite-ignore */ '/dom.browser.js');
     }
 
     function navKey(pathname, search) {

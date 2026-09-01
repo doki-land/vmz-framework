@@ -459,8 +459,8 @@ const __vmzLazy = new Map([
 ]);
 export {{ hydrate, mount, __vmzLazy }};
 "#,
-        dom = serde_json::to_string(&format!("./vmz-dom.js{q}"))
-            .unwrap_or_else(|_| "\"./vmz-dom.js\"".into()),
+        dom = serde_json::to_string(&format!("./dom.browser.js{q}"))
+            .unwrap_or_else(|_| "\"./dom.browser.js\"".into()),
         eager_list = eager_regs.join(", "),
         lazy_block = lazy_regs.join(",\n"),
     );

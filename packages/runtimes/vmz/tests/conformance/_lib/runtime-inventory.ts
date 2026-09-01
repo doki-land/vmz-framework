@@ -62,7 +62,7 @@ const SIDE_EFFECT_IMPORT_RE = /\bimport\s+(['"])([^'"]+)\1/g;
 const OWNER_SEED: Array<{
     id: string;
     owner: InventoryOwnerKind;
-    debtTarget: string;
+    debtTarget: string | null;
     evidencePaths: string[];
     note: string;
     distSignalId?: string;
@@ -126,21 +126,25 @@ const OWNER_SEED: Array<{
     {
         id: 'hydrateResumeDispatch',
         owner: 'browser-runtime',
-        debtTarget: '0.1.31',
-        evidencePaths: ['packages/runtimes/vmz-runtime/src/dom-core.ts', 'packages/runtimes/vmz-runtime/src/dom-ssr.ts'],
-        note: 'Generic hydrate / resume dispatch still in shared runtime',
+        debtTarget: '0.1.32',
+        evidencePaths: [
+            'packages/runtimes/vmz-runtime/src/dom-core.ts',
+            'packages/runtimes/vmz-runtime/src/dom-ssr.ts',
+            'packages/runtimes/vmz-runtime/src/dom.browser.ts',
+        ],
+        note: 'Hydrate/resume still execute in browser via thin face; must not invent reload/plan (0.1.31 closed dispatch authority)',
     },
     {
         id: 'pageCatalog',
         owner: 'generated-artifact',
-        debtTarget: '0.1.30',
+        debtTarget: null,
         evidencePaths: ['packages/runtimes/vmz/src/route-catalog-emit.ts', 'packages/runtimes/vmz-runtime/src/serve-host.ts'],
         note: 'Host loads `_vmz/route-catalog.json`; no live deployment pathPattern catalog',
     },
     {
         id: 'routeLocaleDocument',
         owner: 'generated-artifact',
-        debtTarget: '0.1.30',
+        debtTarget: null,
         evidencePaths: [
             'packages/runtimes/vmz/src/locale-route-emit.ts',
             'packages/runtimes/vmz-runtime/src/localize-body-links.ts',
@@ -153,16 +157,20 @@ const OWNER_SEED: Array<{
     {
         id: 'cacheBust',
         owner: 'dev-host',
-        debtTarget: '0.1.31',
+        debtTarget: null,
         evidencePaths: ['packages/runtimes/vmz-runtime/src/serve-host.ts'],
-        note: 'Soft-reload cache-bust token on module imports',
+        note: 'Opaque soft-reload `?t=` token only; not a second revision authority',
     },
     {
         id: 'reloadScope',
         owner: 'dev-host',
-        debtTarget: '0.1.31',
-        evidencePaths: ['packages/runtimes/vmz-runtime/src/serve-host.ts'],
-        note: 'Dev softReload affected / full scope decisions',
+        debtTarget: null,
+        evidencePaths: [
+            'packages/runtimes/vmz/src/dev-incremental.ts',
+            'packages/runtimes/vmz/src/dev-session.ts',
+            'packages/runtimes/vmz-runtime/src/serve-host.ts',
+        ],
+        note: 'Decision in outputRevision + buildReloadPayload; serve-host executes payload only',
     },
 ];
 
@@ -282,6 +290,7 @@ function mapPreferredFaceToDist(face: string | null): string | null {
     if (f.endsWith('.js') || f.startsWith('./') || f.startsWith('../')) return f.replace(/^\.\//, '');
     const FACE_MAP: Record<string, string> = {
         '@vmz/core/dom/client': 'dom.client.js',
+        '@vmz/core/dom/browser': 'dom.browser.js',
         '@vmz/core/dom': 'vmz-dom.js',
         '@vmz/core/runtime': 'vmz-runtime.js',
         '@vmz/core/http': 'vmz-http.js',
@@ -300,8 +309,9 @@ function pickClientEntries(boundary: BrowserArtifactBoundary, distDir: string): 
 
     push(mapPreferredFaceToDist(boundary.pack.preferredClientFace));
     push('entry-client.js');
+    push('dom.browser.js');
     push('dom.client.js');
-    push('vmz-dom.js');
+    push('dom-core.js');
     for (const entry of boundary.pack.generatedEntries) push(entry);
     for (const rel of boundary.modules.generatedComponents) push(rel);
     return seeds;
@@ -410,7 +420,10 @@ export function assertInventoryContract(inv: RuntimeInventory): string[] {
     for (const row of inv.owners) {
         if (row.owner === 'unassigned') errors.push(`owner unassigned for ${row.id}`);
         if (!row.evidencePaths.length) errors.push(`missing evidence for ${row.id}`);
-        if (!row.debtTarget) errors.push(`missing debtTarget for ${row.id}`);
+        // null debtTarget = closed (0.1.30+); open debt must name a future peel.
+        if (row.debtTarget != null && !String(row.debtTarget).trim()) {
+            errors.push(`empty debtTarget for ${row.id}`);
+        }
     }
     const required = new Set(OWNER_SEED.map((s) => s.id));
     for (const id of required) {
@@ -427,6 +440,13 @@ export function assertBoundaryAudit(inv: RuntimeInventory): string[] {
     if (!inv.browserClosure.modules.length) errors.push('browserClosure.modules empty');
     for (const hit of inv.forbiddenImports) {
         errors.push(`forbidden import: ${hit.module} (${hit.reason})`);
+    }
+    // 0.1.31: host blacklist must not sit at delivery root (only under `_vmz/host/` or absent).
+    for (const rel of inv.hostInOutDirNotInClosure) {
+        const norm = rel.replace(/\\/g, '/');
+        if (!norm.startsWith('_vmz/host/')) {
+            errors.push(`host module at delivery root (want _vmz/host/): ${norm}`);
+        }
     }
     return errors;
 }

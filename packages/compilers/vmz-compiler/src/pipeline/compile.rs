@@ -670,25 +670,27 @@ fn emit_runtime_js(options: &CompileOptions, report: &mut CompileReport) -> crat
     let mut copies = vec![
         ("server.js", "vmz-runtime.js"),
         ("dom.js", "vmz-dom.js"),
-        // Companions required by `dom.js` / `dom.client.js` re-exports (same out dir names).
+        // Companions required by `dom.js` / `dom.browser.js` / `dom.client.js` re-exports.
         ("dom-core.js", "dom-core.js"),
         ("dom-ssr.js", "dom-ssr.js"),
+        ("dom.client.js", "dom.client.js"),
+        ("dom.browser.js", "dom.browser.js"),
         ("direct-host-box.js", "direct-host-box.js"),
         ("unknown-component.js", "unknown-component.js"),
         ("http.js", "vmz-http.js"),
         ("client-nav.js", "vmz-client-nav.js"),
     ];
-    // Local `vmz serve` / `vmz dev` need the host; production `--release` deploys omit it
-    // (~26KB) — Node CLI materializes from `@vmz/core` when serving if missing.
+    // Local `vmz serve` / `vmz dev` need the host; production `--release` deploys omit it.
+    // 0.1.31: host companions nest under `_vmz/host/` (not delivery root).
     if !options.release {
-        copies.push(("serve-host.mjs", "vmz-serve-host.mjs"));
+        copies.push(("serve-host.mjs", "_vmz/host/vmz-serve-host.mjs"));
         copies.extend([
-            ("native-addon.js", "native-addon.js"),
-            ("list-client-components.js", "list-client-components.js"),
-            ("deployment-registry.js", "deployment-registry.js"),
-            ("render-host.js", "render-host.js"),
-            ("route-layout-chain.js", "route-layout-chain.js"),
-            ("localize-body-links.js", "localize-body-links.js"),
+            ("native-addon.js", "_vmz/host/native-addon.js"),
+            ("list-client-components.js", "_vmz/host/list-client-components.js"),
+            ("deployment-registry.js", "_vmz/host/deployment-registry.js"),
+            ("render-host.js", "_vmz/host/render-host.js"),
+            ("route-layout-chain.js", "_vmz/host/route-layout-chain.js"),
+            ("localize-body-links.js", "_vmz/host/localize-body-links.js"),
         ]);
     }
     for (src_name, out_name) in copies {
@@ -702,8 +704,34 @@ fn emit_runtime_js(options: &CompileOptions, report: &mut CompileReport) -> crat
             continue;
         }
         let out = options.out_dir.join(out_name);
-        fs::copy(&runtime_src, &out)?;
+        if let Some(parent) = out.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        if src_name == "serve-host.mjs" {
+            // Nested under `_vmz/host/`: delivery-root `vmz-runtime.js` is two levels up.
+            let mut text = fs::read_to_string(&runtime_src)?;
+            text = text.replace(
+                "from './vmz-runtime.js'",
+                "from '../../vmz-runtime.js'",
+            );
+            text = text.replace(
+                "from \"./vmz-runtime.js\"",
+                "from \"../../vmz-runtime.js\"",
+            );
+            fs::write(&out, text)?;
+        } else {
+            fs::copy(&runtime_src, &out)?;
+        }
         report.emitted.push(out);
+    }
+    // Root launcher keeps `vmz serve` / tests on a stable path.
+    if !options.release {
+        let stub = options.out_dir.join("vmz-serve-host.mjs");
+        fs::write(
+            &stub,
+            "// Generated launcher — host companions live under `_vmz/host/` (0.1.31).\nimport './_vmz/host/vmz-serve-host.mjs';\n",
+        )?;
+        report.emitted.push(stub);
     }
     Ok(())
 }
@@ -1074,7 +1102,7 @@ fn emit_file(
     };
     let client_path = out_dir.join(format!("{stem}.client.js"));
     let runtime_path = options.out_dir.join("vmz-runtime.js");
-    let dom_path = options.out_dir.join("vmz-dom.js");
+    let dom_path = options.out_dir.join("dom-core.js");
     let client_js = {
         let mut js = client_js;
         if js.contains("vmz:runtime") && runtime_path.exists() {

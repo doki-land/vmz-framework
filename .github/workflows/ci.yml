@@ -151,3 +151,8 @@ jobs:
         env:
           CI: 'true'
         run: pnpm verify -- compiled-delivery-artifact
+
+      - name: Thin runtime host boundary (0.1.31 Slim)
+        env:
+          CI: 'true'
+        run: pnpm verify -- thin-runtime-host-boundary

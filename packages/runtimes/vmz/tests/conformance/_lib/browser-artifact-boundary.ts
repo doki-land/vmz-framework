@@ -19,9 +19,9 @@ const RUNTIME_SHARED_NAMES = new Set([
     'dom-core.js',
     'dom-ssr.js',
     'dom.client.js',
+    'dom.browser.js',
     'direct-host-box.js',
     'unknown-component.js',
-    'localize-body-links.js',
 ]);
 
 /**
