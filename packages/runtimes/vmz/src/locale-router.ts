@@ -295,10 +295,16 @@ export function parseLocaleFromPath(pathname: string, supportedLocales: string[]
     return { localeId: null, restPath: normalizePath(pathname) };
 }
 
-export type { LocaleHrefArtifact } from '@vmz/core/localize-body-links';
+export type { LinkRouteAlias, LocaleHrefArtifact } from '@vmz/core/localize-body-links';
 
 /** Rewrite a same-app href — single implementation in `@vmz/core/localize-body-links`. */
-export { localizeBodyLinks, localizeSameAppHref, buildLocaleLinkPlan, applyLocaleLinkPlan } from '@vmz/core/localize-body-links';
+export {
+    applyLocaleLinkPlan,
+    buildLocaleLinkPlan,
+    linkRouteAliasesFromUnits,
+    localizeBodyLinks,
+    localizeSameAppHref,
+} from '@vmz/core/localize-body-links';
 
 /** Plan redirect / negotiation for an incoming URL (omit-prefix aware). */
 export function planLocalePathNavigation(input: {

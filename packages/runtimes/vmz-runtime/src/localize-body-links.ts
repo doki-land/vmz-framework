@@ -5,11 +5,23 @@
 
 export const LOCALE_LINK_PLAN_SCHEMA = 'vmz.static.locale_link_plan.v0';
 
+export type LinkRouteAlias = {
+    /** Author Link `to` / `data-vmz-route` (class RouteId, e.g. IndexPage). */
+    linkRouteId: string;
+    /** Locale realization `routeId` (often chunk path, e.g. pages/index). */
+    realizationRouteId: string;
+};
+
 export type LocaleHrefArtifact = {
     locales?: Array<{ id: string } | string>;
     defaultLocale?: string;
     routing?: { strategy?: string; defaultPrefix?: string; defaultLocale?: string };
     realizations?: Array<{ routeId: string; localeId: string; path: string }>;
+    /**
+     * Bridge author Link RouteId ↔ realization routeId.
+     * Realization artifacts historically key by chunk path; Links emit class names.
+     */
+    linkRouteAliases?: LinkRouteAlias[];
 };
 
 export type LocaleLinkPlanRow = {
@@ -23,12 +35,40 @@ export type LocaleLinkPlan = {
     rows: LocaleLinkPlanRow[];
 };
 
+/** Build Link RouteId aliases from deployment page units (`routeId` + `chunkId`). */
+export function linkRouteAliasesFromUnits(
+    units: Array<{ kind?: string; routeId?: string; chunkId?: string }> | null | undefined,
+): LinkRouteAlias[] {
+    const out: LinkRouteAlias[] = [];
+    const seen = new Set<string>();
+    for (const unit of units || []) {
+        if (unit?.kind && unit.kind !== 'page') continue;
+        const linkRouteId = typeof unit?.routeId === 'string' ? unit.routeId.trim() : '';
+        const realizationRouteId = typeof unit?.chunkId === 'string' ? unit.chunkId.replace(/\\/g, '/').trim() : '';
+        if (!linkRouteId || !realizationRouteId || linkRouteId === realizationRouteId) continue;
+        const key = `${linkRouteId}\0${realizationRouteId}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ linkRouteId, realizationRouteId });
+    }
+    return out;
+}
+
 /** Build RouteId × LocaleId → href rows from locale route realization artifact. */
 export function buildLocaleLinkPlan(artifact: LocaleHrefArtifact | null | undefined): LocaleLinkPlan {
     const rows: LocaleLinkPlanRow[] = [];
+    const aliases = artifact?.linkRouteAliases || [];
     for (const r of artifact?.realizations || []) {
         if (!r?.routeId || !r?.localeId || !r?.path) continue;
-        rows.push({ routeId: String(r.routeId), localeId: String(r.localeId), href: String(r.path) });
+        const realizationRouteId = String(r.routeId);
+        const localeId = String(r.localeId);
+        const href = String(r.path);
+        rows.push({ routeId: realizationRouteId, localeId, href });
+        for (const alias of aliases) {
+            if (alias.realizationRouteId === realizationRouteId && alias.linkRouteId) {
+                rows.push({ routeId: String(alias.linkRouteId), localeId, href });
+            }
+        }
     }
     rows.sort((a, b) => (a.routeId === b.routeId ? a.localeId.localeCompare(b.localeId) : a.routeId.localeCompare(b.routeId)));
     return { schema: LOCALE_LINK_PLAN_SCHEMA, rows };
@@ -52,6 +92,9 @@ export function applyLocaleLinkPlan(
         if (!rm) return full;
         const href = byRoute.get(rm[1]);
         if (!href) return full;
+        // Realization rows for dynamic routes keep unresolved patterns (`[id]` / `:id`).
+        // Do not clobber compile-time realized hrefs like `/products/sku-1`.
+        if (/\[[^\]]+\]/.test(href) || /\/:[^/]+/.test(href)) return full;
         const hm = attrs.match(/\bhref\s*=\s*"([^"]*)"/i);
         if (hm && hm[1] === href) return full;
         const newAttrs = hm ? attrs.replace(/\bhref\s*=\s*"[^"]*"/i, `href="${escapeAttr(href)}"`) : ` href="${escapeAttr(href)}"${attrs}`;

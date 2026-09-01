@@ -7,12 +7,12 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { listClientComponentsSync } from '@vmz/core/component-registry';
 import { createRenderHost } from '@vmz/core/render-host';
 import { resolveRouteLayoutChain } from '@vmz/core/route-layout-chain';
-import { listClientComponentsSync } from '@vmz/core/component-registry';
 import { emitCdnPolicy } from './cdn-policy.js';
 import { emitContentAddressedAssets, hashedAssetHref } from './content-addressed-assets.js';
-import { absoluteUrl, buildLocalePageMeta, buildLocaleLinkPlan, applyLocaleLinkPlan } from './locale-router.js';
+import { absoluteUrl, applyLocaleLinkPlan, buildLocaleLinkPlan, buildLocalePageMeta, linkRouteAliasesFromUnits } from './locale-router.js';
 import { requireNativeAddon } from './native-addon.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 import { emitPublicStaticAssets } from './public-static-assets.js';
@@ -105,7 +105,7 @@ export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {
     const cssEntry = hashedAssetHref(assets.rewrites, cssLogical) || hashedAssetHref(assets.rewrites, 'vmz.css');
     const moduleScriptSrc = hashedAssetHref(assets.rewrites, 'entry-client.js') || '/entry-client.js';
     const localeArt = loadLocaleArtifact(distDir);
-    const localeLinkPlan = buildLocaleLinkPlan(localeArt);
+    const localeLinkPlan = buildLocaleLinkPlan(withLinkRouteAliases(localeArt, distDir, pageCatalog));
 
     for (const page of pageCatalog) {
         const pattern = page.pathPattern || patternFromSegs(page.segs);
@@ -461,17 +461,44 @@ async function resolvePageMeta(
     return { title, description, canonical, robots, lang, alternates: [] as unknown[] };
 }
 
-/**
- * @param {string} distDir
- */
-function loadLocaleArtifact(distDir) {
+function loadLocaleArtifact(distDir: string): Record<string, unknown> | null {
     const p = path.join(distDir, '_vmz', 'locale-route-realization.json');
     if (!fs.existsSync(p)) return null;
     try {
-        return JSON.parse(fs.readFileSync(p, 'utf8'));
+        return JSON.parse(fs.readFileSync(p, 'utf8')) as Record<string, unknown>;
     } catch {
         return null;
     }
+}
+
+type LocaleArtWithAliases = Record<string, unknown> & {
+    linkRouteAliases?: Array<{ linkRouteId: string; realizationRouteId: string }>;
+};
+
+/** Bridge Link class RouteId ↔ realization chunk routeId for locale href rewrite. */
+function withLinkRouteAliases(
+    localeArt: Record<string, unknown> | null,
+    distDir: string,
+    pageCatalog: Array<{ chunkId: string }>,
+): LocaleArtWithAliases | null {
+    if (!localeArt) return null;
+    try {
+        const dep = JSON.parse(fs.readFileSync(path.join(distDir, 'vmz-deployment.json'), 'utf8')) as {
+            units?: Array<{ kind?: string; routeId?: string; chunkId?: string }>;
+        };
+        const fromDep = linkRouteAliasesFromUnits(Array.isArray(dep.units) ? dep.units : []);
+        if (fromDep.length) return { ...localeArt, linkRouteAliases: fromDep };
+    } catch {
+        /* fall through to catalog guess */
+    }
+    const guessed: Array<{ linkRouteId: string; realizationRouteId: string }> = [];
+    for (const page of pageCatalog || []) {
+        const linkRouteId = guessRouteId(distDir, page.chunkId);
+        if (linkRouteId && linkRouteId !== page.chunkId) {
+            guessed.push({ linkRouteId, realizationRouteId: page.chunkId });
+        }
+    }
+    return guessed.length ? { ...localeArt, linkRouteAliases: guessed } : localeArt;
 }
 
 /**

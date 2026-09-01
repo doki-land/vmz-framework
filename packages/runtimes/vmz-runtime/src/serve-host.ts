@@ -23,10 +23,10 @@ import http from 'node:http';
 import { createRequire, registerHooks } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { localizeBodyLinks } from './localize-body-links.js';
-import { createRenderHost } from './render-host.js';
 import { listClientComponents } from './list-client-components.js';
+import { linkRouteAliasesFromUnits, localizeBodyLinks } from './localize-body-links.js';
 import { loadNativeAddon } from './native-addon.js';
+import { createRenderHost } from './render-host.js';
 import { resolveRouteLayoutChain } from './route-layout-chain.js';
 import { handleNodeRequest, setRoutes, setServerModuleResolver } from './vmz-runtime.js';
 
@@ -766,6 +766,24 @@ process.on('SIGINT', () => {
 });
 
 /**
+ * Attach author Link RouteId aliases so localizeBodyLinks can match `data-vmz-route="IndexPage"`
+ * against realization rows keyed by chunk path (`pages/index`).
+ * @param {any} artifact
+ * @param {string} dir
+ */
+function attachLinkRouteAliases(artifact, dir) {
+    if (!artifact || typeof artifact !== 'object') return artifact;
+    try {
+        const dep = JSON.parse(readFileSync(path.join(dir, 'vmz-deployment.json'), 'utf8'));
+        const aliases = linkRouteAliasesFromUnits(Array.isArray(dep.units) ? dep.units : []);
+        if (!aliases.length) return artifact;
+        return { ...artifact, linkRouteAliases: aliases };
+    } catch {
+        return artifact;
+    }
+}
+
+/**
  * Re-import routes / pages / components with a new cache-bust token.
  * Keeps the HTTP server process alive (no Node restart).
  * Failed reloads keep the previous in-memory modules (Vite-like resilience).
@@ -799,6 +817,7 @@ async function softReload(opts = {}) {
         }
         try {
             localeArtifact = JSON.parse(await readFile(path.join(distDir, '_vmz', 'locale-route-realization.json'), 'utf8'));
+            localeArtifact = attachLinkRouteAliases(localeArtifact, distDir);
         } catch {
             localeArtifact = null;
         }
