@@ -121,7 +121,7 @@ if (!existsSync(pkgJsonPath)) {
                 files: [binaryName, 'README.md'],
             },
             null,
-            2,
+            4,
         )}\n`,
     );
 } else {
@@ -132,7 +132,7 @@ if (!existsSync(pkgJsonPath)) {
         pkg.description = `VMZ native N-API addon for @vmz/vmz (${plat.short})`;
         pkg.main = binaryName;
         pkg.files = [binaryName, 'README.md'];
-        writeFileSync(pkgJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
+        writeFileSync(pkgJsonPath, `${JSON.stringify(pkg, null, 4)}\n`);
     } catch {
         /* ignore */
     }

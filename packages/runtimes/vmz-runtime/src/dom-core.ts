@@ -412,7 +412,7 @@ export const directApi = {
     onMethod(el, type, methodName, opts) {
         const inst = directApi._inst;
         let skipFlush = !!(opts && opts.skipFlush);
-        el.addEventListener(type, (ev) => {
+        const invoke = (ev) => {
             if (type === 'submit' && ev && typeof ev.preventDefault === 'function') {
                 ev.preventDefault();
             }
@@ -433,7 +433,15 @@ export const directApi = {
                     skipFlush = true;
                 }
             }
-        });
+        };
+        if (directApi._eachCtx) {
+            /** @type {Record<string, Function>} */
+            const bag = el.__vmzEvt || (el.__vmzEvt = Object.create(null));
+            bag[type] = (ev) => invoke(ev);
+            directApi._eachCtx.needDelegate(type);
+            return;
+        }
+        el.addEventListener(type, (ev) => invoke(ev));
     },
     /**
      * @param {object} inst
@@ -1629,8 +1637,18 @@ export const directApi = {
                 for (let i = 0; i < nAttr; i++) attrEls[i] = attrSlots[i].get(root);
                 for (let i = 0; i < nOn; i++) {
                     const el = onSlots[i].get(root);
-                    if (!el.__vmzAct) {
-                        el.__vmzAct = onSlots[i].method;
+                    const slot = onSlots[i];
+                    if (slot.directMethod) {
+                        /** @type {Record<string, Function>} */
+                        const bag = el.__vmzEvt || (el.__vmzEvt = Object.create(null));
+                        const method = slot.method;
+                        bag[slot.type] = (ev) => {
+                            const fn = inst[method];
+                            if (typeof fn !== 'function') return;
+                            runDomEventHandler(inst, method, () => fn.call(inst, ev));
+                        };
+                    } else if (!el.__vmzAct) {
+                        el.__vmzAct = slot.method;
                     }
                 }
                 for (let i = 0; i < nText; i++) {
@@ -1790,6 +1808,17 @@ export const directApi = {
                     api.on(el, type, handler);
                     recordFailed = true;
                 },
+                onMethod(el, type, methodName, opts) {
+                    if (!recordFailed) {
+                        pending.ons.push({
+                            node: el,
+                            type,
+                            method: methodName,
+                            directMethod: true,
+                        });
+                    }
+                    api.onMethod(el, type, methodName, opts);
+                },
             });
 
             const dom = userCreateItem.call(inst, recordingApi, box);
@@ -1867,6 +1896,7 @@ export const directApi = {
                             path,
                             type: p.type,
                             method: p.method,
+                            directMethod: !!p.directMethod,
                             get: makeChildGetter(path),
                         });
                     }
