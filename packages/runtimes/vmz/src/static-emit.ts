@@ -12,11 +12,12 @@ import { createRenderHost } from '@vmz/core/render-host';
 import { resolveRouteLayoutChain } from '@vmz/core/route-layout-chain';
 import { emitCdnPolicy } from './cdn-policy.js';
 import { emitContentAddressedAssets, hashedAssetHref } from './content-addressed-assets.js';
+import { LOCALE_LINK_PLAN_REL } from './locale-route-emit.js';
 import { absoluteUrl, applyLocaleLinkPlan, buildLocaleLinkPlan, buildLocalePageMeta, linkRouteAliasesFromUnits } from './locale-router.js';
 import { requireNativeAddon } from './native-addon.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 import { emitPublicStaticAssets } from './public-static-assets.js';
-import { listPublicPageUnits, parsePathPattern, unitBrowserPathPattern } from './route-path.js';
+import { emitRouteCatalog, loadRouteCatalog, ROUTE_CATALOG_SCHEMA } from './route-catalog-emit.js';
 import { emitSiteFavicon, readSiteFaviconHeadHtml } from './site-favicon.js';
 
 export const STATIC_DELIVERY_MANIFEST_SCHEMA = 'vmz.static.delivery_manifest.v0';
@@ -105,7 +106,7 @@ export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {
     const cssEntry = hashedAssetHref(assets.rewrites, cssLogical) || hashedAssetHref(assets.rewrites, 'vmz.css');
     const moduleScriptSrc = hashedAssetHref(assets.rewrites, 'entry-client.js') || '/entry-client.js';
     const localeArt = loadLocaleArtifact(distDir);
-    const localeLinkPlan = buildLocaleLinkPlan(withLinkRouteAliases(localeArt, distDir, pageCatalog));
+    const localeLinkPlan = loadLocaleLinkPlan(distDir) || buildLocaleLinkPlan(withLinkRouteAliases(localeArt, distDir, pageCatalog));
 
     for (const page of pageCatalog) {
         const pattern = page.pathPattern || patternFromSegs(page.segs);
@@ -363,27 +364,21 @@ function sortKeys(value) {
  * @param {string} distDir
  */
 function listPageClientFiles(distDir) {
-    const fromDep = listPagesFromDeployment(distDir);
-    if (!fromDep.length) {
-        throw new Error(`emitWebStatic: no page units with pathPattern in ${path.join(distDir, 'vmz-deployment.json')} (plan-only host)`);
+    let catalog = loadRouteCatalog(distDir);
+    if (!catalog?.pages?.length) {
+        const emitted = emitRouteCatalog(distDir);
+        if (!emitted.ok || !emitted.catalog?.pages?.length) {
+            throw new Error(`emitWebStatic: missing compiled ${ROUTE_CATALOG_SCHEMA} at _vmz/route-catalog.json (${emitted.error || 'empty'})`);
+        }
+        catalog = emitted.catalog;
     }
-    return fromDep;
-}
-
-/**
- * @param {string} distDir
- */
-function listPagesFromDeployment(distDir) {
-    const deploymentPath = path.join(distDir, 'vmz-deployment.json');
-    if (!fs.existsSync(deploymentPath)) {
-        throw new Error(`emitWebStatic: missing ${deploymentPath} (plan-only host)`);
-    }
-    const deployment = JSON.parse(fs.readFileSync(deploymentPath, 'utf8'));
-    return listPublicPageUnits(deployment).map((u) => {
-        const chunkId = String(u.chunkId || '').replace(/\\/g, '/');
-        const pathPattern = unitBrowserPathPattern(u);
-        return { chunkId, pathPattern, segs: parsePathPattern(pathPattern) };
-    });
+    return catalog.pages.map((p) => ({
+        chunkId: p.chunkId,
+        pathPattern: p.pathPattern,
+        pageRel: p.pageRel,
+        segs: p.segs,
+        routeId: p.routeId,
+    }));
 }
 
 /**
@@ -466,6 +461,18 @@ function loadLocaleArtifact(distDir: string): Record<string, unknown> | null {
     if (!fs.existsSync(p)) return null;
     try {
         return JSON.parse(fs.readFileSync(p, 'utf8')) as Record<string, unknown>;
+    } catch {
+        return null;
+    }
+}
+
+function loadLocaleLinkPlan(distDir: string): ReturnType<typeof buildLocaleLinkPlan> | null {
+    const p = path.join(distDir, ...LOCALE_LINK_PLAN_REL.split('/'));
+    if (!fs.existsSync(p)) return null;
+    try {
+        const raw = JSON.parse(fs.readFileSync(p, 'utf8')) as { schema?: string; rows?: unknown };
+        if (raw?.schema !== 'vmz.static.locale_link_plan.v0' || !Array.isArray(raw.rows)) return null;
+        return raw as ReturnType<typeof buildLocaleLinkPlan>;
     } catch {
         return null;
     }

@@ -40,11 +40,12 @@ TypeScript drivers under **domain folders** — not a flat dump:
     - `pnpm verify -- browser-artifact-boundary` — **0.1.27**：记录 delivery dist 模块边界 + interpreter signals（`dist/vmz.browser-artifact-boundary.json`；**不**关 thin runtime）
     - `pnpm verify -- browser-artifact-inventory` / `runtime-boundary-audit` / `runtime-budget-baseline` / `runtime-boundary` — **0.1.28**：owner 矩阵 + browser 闭包审计 + budget baseline（`dist/vmz.runtime-inventory.json`；**不**关 thin / 专用组件 emit）
     - `pnpm verify -- handler-symbol-resolution` / `generated-component-code` / `specialized-bindings` / `no-generic-component-interpreter` / `specialized-component-artifact` — **0.1.29**：bare handler scope + Direct `__vmzCreate` + specialized bindings（**不**关 thin / registry 删除）
+    - `pnpm verify -- compiled-route-artifact` / `compiled-locale-artifact` / `compiled-asset-artifact` / `no-runtime-manifest-interpretation` / `no-post-emit-semantic-rewrite` / `compiled-delivery-artifact` — **0.1.30**：route/locale/asset 冻结产物（**不**关 thin runtime）
     - `pnpm verify -- official-homepage` / `official-dogfood` — **Official homepage**：homepage SSR + documents + production-inspector + `@vmz/ui`
       Button/Field/Dialog（sibling panel / focus-loop 仍开）
     - `pnpm verify -- browser-production` — **0.1.27** aggregate **薄绿**（`productionReadyClaim` / thin runtime **仍 false**；已进入默认 `pnpm verify` / CI）
     - Proof: `dist/vmz.production.proof.json` + boundary / inventory records above
-- **Default `pnpm verify`:** includes `browser-production`（0.1.27）与 `runtime-boundary`（0.1.28）和 `specialized-component-artifact`（0.1.29）。聚合/inventory/artifact 绿 ≠ `production-ready` / thin runtime。
+- **Default `pnpm verify`:** includes `browser-production`（0.1.27）与 `runtime-boundary`（0.1.28）和 `specialized-component-artifact`（0.1.29）和 `compiled-delivery-artifact`（0.1.30）。聚合/inventory/artifact 绿 ≠ `production-ready` / thin runtime。
 - **Long-term:** migrate into `vmz test` manifests / `cargo test`; this tree is the transitional Node driver home.
 - **Source language:** TypeScript only (no `.mjs` drivers).
 

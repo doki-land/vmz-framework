@@ -6,37 +6,38 @@ import { spawn } from 'node:child_process';
 import { copyFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import type { Cli, Command, ParsedOptions } from '@vmz/commander';
+import { createCli } from '@vmz/commander';
+import { registerApplicationCommands } from './application-cmd.js';
+import { assembleDelivery, emitBuildProof } from './build-assemble.js';
+import { resolveCliLocalesRoot } from './cli-localize.js';
+import { normalizeDeliveryAuthoring, resolveProfileArtifactDir, selectBuildProfile } from './delivery-profile.js';
+import { createDevSession } from './dev-session.js';
+import { registerDocumentCommands } from './document-cmd.js';
+import { buildIntegratedDocuments, projectHasDocuments } from './document-integrate.js';
+import { registerExplainCommand } from './explain-cmd.js';
+import { registerGithubActionsCommand } from './github-actions-cmd.js';
 import {
-    HOST_PROTOCOL,
     createWorkspace,
     getProtocolVersions,
+    HOST_PROTOCOL,
     materializeServeHostRuntime,
     resolveCoreRuntimeDist,
     resolveNativePath,
 } from './index.js';
-import { createDevSession } from './dev-session.js';
 import { gateGlobalProjectCommand, getInvocationContext, isGlobalAllowedCommand } from './invocation.js';
-import { log } from './log.js';
-import { findAvailablePort } from './port.js';
-import { readPackageMeta, resolveWorkspaceDirs } from './resolve.js';
-import { registerTestCommand } from './test-cmd.js';
-import { registerDocumentCommands } from './document-cmd.js';
-import { buildIntegratedDocuments, projectHasDocuments } from './document-integrate.js';
-import { registerLocaleCommands } from './locale-cmd.js';
 import { emitLocaleRuntimeModules, localeHasErrors } from './locale-check.js';
+import { registerLocaleCommands } from './locale-cmd.js';
 import { emitLocaleRouteRealization } from './locale-route-emit.js';
-import { registerApplicationCommands } from './application-cmd.js';
-import { registerArtifactCommands } from './release-cmd.js';
-import { registerRefactorCommands } from './refactor-cmd.js';
-import { registerExplainCommand } from './explain-cmd.js';
-import { registerPlanCommands } from './plan-cmd.js';
-import { registerGithubActionsCommand } from './github-actions-cmd.js';
-import { loadVmzConfig } from './plugin-host.js';
-import { normalizeDeliveryAuthoring, resolveProfileArtifactDir, selectBuildProfile } from './delivery-profile.js';
+import { log } from './log.js';
 import { packFromDeploymentIr } from './pack.js';
-import { assembleDelivery, emitBuildProof } from './build-assemble.js';
-import { createCli } from '@vmz/commander';
-import { resolveCliLocalesRoot } from './cli-localize.js';
+import { registerPlanCommands } from './plan-cmd.js';
+import { loadVmzConfig } from './plugin-host.js';
+import { findAvailablePort } from './port.js';
+import { registerRefactorCommands } from './refactor-cmd.js';
+import { registerArtifactCommands } from './release-cmd.js';
+import { readPackageMeta, resolveWorkspaceDirs } from './resolve.js';
+import { emitRouteCatalog } from './route-catalog-emit.js';
+import { registerTestCommand } from './test-cmd.js';
 
 export function printGlobalHelp(): Promise<number> {
     return buildProductCli({ mode: 'global' }).parse(['help']);
@@ -265,6 +266,14 @@ async function cmdBuild(args: ParsedOptions): Promise<number> {
         if (localeRoutes.written.length) {
             log.info(`locale route realization (${localeRoutes.written.length} artifact(s))`);
         }
+        const routeCatalog = emitRouteCatalog(outDir);
+        if (!routeCatalog.ok) {
+            log.error(routeCatalog.error || 'route catalog emit failed');
+            return 1;
+        }
+        if (routeCatalog.written.length) {
+            log.info(`route catalog (${routeCatalog.written.length} artifact(s))`);
+        }
         if (projectHasDocuments(project)) {
             const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
             if (!docs.ok) return 1;
@@ -452,7 +461,7 @@ async function cmdDev(args: ParsedOptions): Promise<number> {
     }
     const outDir = resolveProfileArtifactDir(outDirRoot, selected.profile);
     const host = typeof args.host === 'string' ? args.host : '127.0.0.1';
-    const portLocked = Object.prototype.hasOwnProperty.call(args, 'port');
+    const portLocked = Object.hasOwn(args, 'port');
     let port;
     if (portLocked) {
         port = Number(args.port);

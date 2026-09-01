@@ -102,10 +102,33 @@ export function applyLocaleLinkPlan(
     });
 }
 
-/** Rewrite `<a data-vmz-route href>` using locale realization plan (Plan-native). */
-export function localizeBodyLinks(html: string, localeId: string, artifact: LocaleHrefArtifact, escapeAttr?: (s: string) => string): string {
+/** Rewrite `<a data-vmz-route href>` using a frozen locale link plan (preferred) or build once from realization. */
+export function localizeBodyLinks(
+    html: string,
+    localeId: string,
+    artifact: LocaleHrefArtifact,
+    escapeAttr?: (s: string) => string,
+    frozenPlan?: LocaleLinkPlan | null,
+): string {
     if (!html || !localeId || !artifact) return html;
-    return applyLocaleLinkPlan(html, localeId, buildLocaleLinkPlan(artifact), escapeAttr);
+    const plan =
+        frozenPlan && frozenPlan.schema === LOCALE_LINK_PLAN_SCHEMA && Array.isArray(frozenPlan.rows)
+            ? frozenPlan
+            : buildLocaleLinkPlan(artifact);
+    return applyLocaleLinkPlan(html, localeId, plan, escapeAttr);
+}
+
+/** Compact RouteId → LocaleId → href table for browser (no path-prefix algebra). */
+export function localeHrefTableFromPlan(plan: LocaleLinkPlan | null | undefined): Record<string, Record<string, string>> {
+    /** @type {Record<string, Record<string, string>>} */
+    const out: Record<string, Record<string, string>> = Object.create(null);
+    for (const row of plan?.rows || []) {
+        if (!row?.routeId || !row?.localeId || !row?.href) continue;
+        if (/\[[^\]]+\]/.test(row.href) || /\/:[^/]+/.test(row.href)) continue;
+        const byLocale = out[row.routeId] || (out[row.routeId] = Object.create(null));
+        byLocale[row.localeId] = row.href;
+    }
+    return out;
 }
 
 function normalizePath(pathname: string): string {

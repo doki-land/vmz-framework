@@ -12,6 +12,7 @@ import { emitLocaleRuntimeModules, localeHasErrors } from './locale-check.js';
 import { emitLocaleRouteRealization } from './locale-route-emit.js';
 import { packFromDeploymentIr } from './pack.js';
 import { loadVmzConfig } from './plugin-host.js';
+import { emitRouteCatalog } from './route-catalog-emit.js';
 
 export type BuildProjectOptions = {
     /** `--profile` id; empty → delivery default. */
@@ -179,6 +180,18 @@ export async function buildProjectToOutDirRoot(
                 deliveryName,
                 diagnostics,
                 error: 'locale route realization emit failed',
+            };
+        }
+
+        const routeCatalog = emitRouteCatalog(artifactDir);
+        if (!routeCatalog.ok) {
+            return {
+                ok: false,
+                outDirRoot: root,
+                artifactDir,
+                deliveryName,
+                diagnostics,
+                error: routeCatalog.error || 'route catalog emit failed',
             };
         }
 

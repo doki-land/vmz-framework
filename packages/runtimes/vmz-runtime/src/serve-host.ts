@@ -4,8 +4,8 @@
  *
  * Invoked by `vmz serve` / `vmz dev` (or: node dist/vmz-serve-host.mjs).
  *
- * Pathname matches `vmz-deployment.json` `pathPattern` (explicit `<router>.path`
- * or file-route default). Mini page stems are a different host projection.
+ * Pathname matches compiled `_vmz/route-catalog.json` (frozen segs / pathPattern).
+ * Hosts must not re-parse deployment pathPattern into a live catalog.
  * Not an SPA shell.
  *
  * `VMZ_DEV=1`: POST `/__vmz/reload` soft-reloads modules (cache-bust import);
@@ -24,11 +24,15 @@ import { createRequire, registerHooks } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { listClientComponents } from './list-client-components.js';
-import { linkRouteAliasesFromUnits, localizeBodyLinks } from './localize-body-links.js';
+import { LOCALE_LINK_PLAN_SCHEMA, linkRouteAliasesFromUnits, localeHrefTableFromPlan, localizeBodyLinks } from './localize-body-links.js';
 import { loadNativeAddon } from './native-addon.js';
 import { createRenderHost } from './render-host.js';
 import { resolveRouteLayoutChain } from './route-layout-chain.js';
 import { handleNodeRequest, setRoutes, setServerModuleResolver } from './vmz-runtime.js';
+
+const ROUTE_CATALOG_SCHEMA = 'vmz.route.catalog.v0';
+const ROUTE_CATALOG_REL = '_vmz/route-catalog.json';
+const LOCALE_LINK_PLAN_REL = '_vmz/locale-link-plan.json';
 
 const require = createRequire(import.meta.url);
 
@@ -157,6 +161,8 @@ let styleBundleHash = null;
 let styleTheme = null;
 /** Locale route realization artifact from `_vmz/locale-route-realization.json` (optional). */
 let localeArtifact = null;
+/** Frozen locale link plan from `_vmz/locale-link-plan.json` (0.1.30 authority). */
+let localeLinkPlan = null;
 /** @type {Set<import('node:http').ServerResponse>} */
 const sseClients = new Set();
 /** In-flight HTTP requests (graceful shutdown drain). */
@@ -583,6 +589,10 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
                 locales: (localeArtifact.locales || []).map((l) => l.id),
             }),
         );
+        const hrefTable = localeHrefTableFromPlan(localeLinkPlan);
+        if (hrefTable && Object.keys(hrefTable).length) {
+            htmlExtraAttrs.push('data-vmz-locale-hrefs', JSON.stringify(hrefTable));
+        }
     }
     const pageDocMeta = resolvePageDocumentMeta(Page);
     const prevLocaleHint = globalThis.__vmzLocaleIdHint;
@@ -609,9 +619,9 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
             bodyHtml = await ssrRenderHost.renderToString(Layout, {}, { signal, slotHtml: bodyHtml });
             if (signal?.aborted) return;
         }
-        // Locale discipline: same-app Links retain current LocaleId (realization authority).
+        // Locale discipline: apply frozen link plan rows (0.1.30) — no path algebra.
         if (localeArtifact && localeId) {
-            bodyHtml = localizeBodyLinks(bodyHtml, localeId, localeArtifact);
+            bodyHtml = localizeBodyLinks(bodyHtml, localeId, localeArtifact, undefined, localeLinkPlan);
         }
     } finally {
         if (prevLocaleHint === undefined) delete globalThis.__vmzLocaleIdHint;
@@ -820,6 +830,12 @@ async function softReload(opts = {}) {
             localeArtifact = attachLinkRouteAliases(localeArtifact, distDir);
         } catch {
             localeArtifact = null;
+        }
+        try {
+            const rawPlan = JSON.parse(await readFile(path.join(distDir, ...LOCALE_LINK_PLAN_REL.split('/')), 'utf8'));
+            localeLinkPlan = rawPlan?.schema === LOCALE_LINK_PLAN_SCHEMA && Array.isArray(rawPlan.rows) ? rawPlan : null;
+        } catch {
+            localeLinkPlan = null;
         }
 
         const componentEntries = await listClientComponents(distDir, { strict: !isDev });
@@ -1133,50 +1149,48 @@ async function loadPageCtor(chunkId) {
 }
 
 /**
- * Discover compiled page modules from Route Graph `pathPattern` in
- * `vmz-deployment.json` only (plan-only host — no `pages/**` walk).
+ * Load compiled page catalog from `_vmz/route-catalog.json` (0.1.30 authority).
+ * Hosts must not re-parse deployment pathPattern into a live catalog.
  * @param {string} dir
  */
 async function listPageClientFiles(dir) {
-    const fromDep = await listPagesFromDeployment(dir);
-    if (!fromDep.length) {
+    const fromCatalog = await listPagesFromRouteCatalog(dir);
+    if (!fromCatalog.length) {
         if (isDev) {
-            console.warn(`vmz dev: no page units with pathPattern in ${path.join(dir, 'vmz-deployment.json')}`);
+            console.warn(`vmz dev: missing compiled ${ROUTE_CATALOG_SCHEMA} at ${path.join(dir, ...ROUTE_CATALOG_REL.split('/'))}`);
             return [];
         }
-        throw new Error(`vmz serve: no page units with pathPattern in ${path.join(dir, 'vmz-deployment.json')} (plan-only host)`);
+        throw new Error(`vmz serve: missing compiled ${ROUTE_CATALOG_SCHEMA} at ${path.join(dir, ...ROUTE_CATALOG_REL.split('/'))}`);
     }
-    return fromDep;
+    return fromCatalog;
 }
 
 /**
  * @param {string} dir
  */
-async function listPagesFromDeployment(dir) {
-    /** @type {Array<{ chunkId: string, pageRel: string, segs: ReturnType<typeof parsePathPattern> }>} */
+async function listPagesFromRouteCatalog(dir) {
+    /** @type {Array<{ chunkId: string, pageRel: string, routeId?: string, pathPattern?: string, segs: ReturnType<typeof parsePathPattern> }>} */
     const out = [];
     try {
-        const raw = await readFile(path.join(dir, 'vmz-deployment.json'), 'utf8');
-        const dep = JSON.parse(raw);
-        for (const unit of dep.units || []) {
-            if (unit?.kind !== 'page') continue;
-            const chunkId = String(unit.chunkId || '').replace(/\\/g, '/');
+        const raw = await readFile(path.join(dir, ...ROUTE_CATALOG_REL.split('/')), 'utf8');
+        const catalog = JSON.parse(raw);
+        if (catalog?.schema !== ROUTE_CATALOG_SCHEMA || !Array.isArray(catalog.pages)) return [];
+        for (const page of catalog.pages) {
+            const chunkId = String(page?.chunkId || '').replace(/\\/g, '/');
             if (!chunkId.startsWith('pages/')) continue;
             const stem = chunkId.split('/').pop() || '';
             if (isRouteBoundaryStem(stem)) continue;
-            const pattern = String(unit.pathPattern || '').trim();
-            if (!pattern) {
-                throw new Error(`vmz serve: page unit ${chunkId} missing pathPattern in vmz-deployment.json (plan-only host)`);
-            }
-            const pageRel = String(unit.clientEntry || `${chunkId}.client.js`).replace(/\\/g, '/');
+            const segs = Array.isArray(page?.segs) && page.segs.length ? page.segs : parsePathPattern(String(page?.pathPattern || ''));
+            const pageRel = String(page?.pageRel || `${chunkId}.client.js`).replace(/\\/g, '/');
             out.push({
                 chunkId,
                 pageRel,
-                segs: parsePathPattern(pattern),
+                routeId: typeof page?.routeId === 'string' ? page.routeId : chunkId,
+                pathPattern: typeof page?.pathPattern === 'string' ? page.pathPattern : undefined,
+                segs,
             });
         }
-    } catch (err) {
-        if (err && typeof err.message === 'string' && err.message.includes('plan-only host')) throw err;
+    } catch {
         return [];
     }
     return out;
