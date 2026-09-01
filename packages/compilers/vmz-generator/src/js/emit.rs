@@ -50,6 +50,18 @@ pub fn emit_client_module(
     field_names.sort();
     field_names.dedup();
 
+    let method_names: Vec<String> = decl
+        .methods
+        .iter()
+        .filter(|m| !m.is_private && !m.is_static && m.name != "constructor")
+        .map(|m| m.name.clone())
+        .collect();
+    let prop_names: Vec<String> = decl.properties.iter().map(|f| f.name.clone()).collect();
+    let handler_ctx = super::emit_direct::ComponentHandlerCtx {
+        methods: &method_names,
+        props: &prop_names,
+    };
+
     if !is_direct_eligible(view) {
         return Err(format!(
             "vmz: component `{}` is not Direct-eligible; production blueprint render() was removed (production Direct emit)",
@@ -58,7 +70,13 @@ pub fn emit_client_module(
     }
     {
         let mut ir_direct = IrDepCursor::new(reactive);
-        js.push_str(&emit_direct_create(&decl.name, view, &field_names, &mut ir_direct));
+        js.push_str(&emit_direct_create(
+            &decl.name,
+            view,
+            &field_names,
+            handler_ctx,
+            &mut ir_direct,
+        )?);
         if let Some(plan_ref) = plan
             && plan_ref.status != PlanStatus::Empty
         {

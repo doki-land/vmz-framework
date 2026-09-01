@@ -141,3 +141,8 @@ jobs:
         env:
           CI: 'true'
         run: pnpm verify -- runtime-boundary
+
+      - name: Specialized component artifact (0.1.29 Slim)
+        env:
+          CI: 'true'
+        run: pnpm verify -- specialized-component-artifact

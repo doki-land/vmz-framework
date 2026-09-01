@@ -318,6 +318,33 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: '0.1.28 Slim composite: inventory + closure audit + budget baseline (≠ thin runtime)',
         composite: ['browser-artifact-inventory', 'runtime-boundary-audit', 'runtime-budget-baseline'],
     },
+    'handler-symbol-resolution': {
+        file: 'production/handler-symbol-resolution.ts',
+        description: '0.1.29: bare class method handler scope at compile time',
+    },
+    'generated-component-code': {
+        file: 'production/generated-component-code.ts',
+        description: '0.1.29: Direct __vmzCreate artifacts for generated client modules',
+    },
+    'specialized-bindings': {
+        file: 'production/specialized-bindings.ts',
+        description: '0.1.29: specFieldText/Attr + onMethod specialized emit in artifacts',
+    },
+    'no-generic-component-interpreter': {
+        file: 'production/no-generic-component-interpreter.ts',
+        description: '0.1.29: no blueprint render interpreter in generated client modules',
+    },
+    'specialized-component-artifact': {
+        description: '0.1.29 Slim composite: handler scope + Direct emit + specialized bindings (≠ thin runtime)',
+        composite: [
+            'handler-symbol-resolution',
+            'generated-component-code',
+            'specialized-bindings',
+            'no-generic-component-interpreter',
+            'component-event-wire',
+            'resume-composition',
+        ],
+    },
     'browser-core': {
         file: 'production/browser-core.ts',
         description: 'A1 catalog: compile+logic+ssr+resume+browser+async + no-render',
@@ -526,4 +553,6 @@ export const CHECK_ALL = [
     'browser-production',
     // 0.1.28 Slim inventory / boundary / budget (not part of browser-production)
     'runtime-boundary',
+    // 0.1.29 Specialized component artifact (not part of browser-production)
+    'specialized-component-artifact',
 ];

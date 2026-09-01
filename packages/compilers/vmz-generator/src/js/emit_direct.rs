@@ -12,7 +12,8 @@ use super::emit_ir::IrDepCursor;
 use super::helpers::{
     bind_field_idents, collect_deps_oxc, component_event_name, component_prop_wire_name,
     event_dom_type, is_component_event_attr, is_event_attr, is_html_attr, looks_like_ternary,
-    parse_this_method_call_arrow, sanitize_interp, split_ternary_parts, wrap_event_handler_body,
+    parse_this_method_call_arrow, sanitize_interp, single_field_binding_target,
+    split_ternary_parts, wrap_event_handler_body, HandlerResolution,
 };
 use vmz_types::{BindingId, ViewAttr, ViewAttrValue, ViewEach, ViewNode, ViewStatus, ViewView};
 
@@ -53,6 +54,15 @@ fn node_eligible(node: &ViewNode) -> bool {
     }
 }
 
+/// Class method / prop tables for handler resolution and specialized binding emit.
+#[derive(Debug, Clone, Copy)]
+pub struct ComponentHandlerCtx<'a> {
+    /// Public instance method names on the authoring class.
+    pub methods: &'a [String],
+    /// Public prop names on the authoring class.
+    pub props: &'a [String],
+}
+
 /// Emit `__vmzDirect` + `__vmzCreate(api)` from Native View roots.
 ///
 /// Create body statements for static text/element/attr/fragment are built with
@@ -64,8 +74,9 @@ pub fn emit_direct_create(
     name: &str,
     view: &ViewView,
     fields: &[String],
+    handler_ctx: ComponentHandlerCtx<'_>,
     ir: &mut IrDepCursor<'_>,
-) -> String {
+) -> Result<String, String> {
     use super::ast_util::JsAst;
     use oxc_allocator::{Allocator, ArenaVec, CloneIn};
     use oxc_ast::ast::Statement;
@@ -73,7 +84,16 @@ pub fn emit_direct_create(
     use oxc_span::SourceType;
 
     let mut next_id = 0u32;
-    let body = emit_create_body(&view.roots, fields, &[], &[], 0, ir, &mut next_id);
+    let body = emit_create_body(
+        &view.roots,
+        fields,
+        &[],
+        &[],
+        0,
+        handler_ctx,
+        ir,
+        &mut next_id,
+    )?;
     let fn_src = format!("(function __vmzCreate(api) {{\n{body}}})");
 
     let allocator = Allocator::default();
@@ -98,7 +118,41 @@ pub fn emit_direct_create(
         ],
         &b.ast,
     );
-    format!("\n{}", b.print_stmts(stmts))
+    Ok(format!("\n{}", b.print_stmts(stmts)))
+}
+
+fn parse_wrapped_instance_method(handler: &str) -> Option<String> {
+    let rest = handler.trim().strip_prefix("(ev) => this.")?;
+    let name = rest.split('(').next()?.trim();
+    if name.is_empty()
+        || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
+    {
+        return None;
+    }
+    let after = rest.strip_prefix(name)?.trim();
+    if after == "(ev)" || after.starts_with("(ev)") {
+        return Some(name.to_string());
+    }
+    None
+}
+
+fn handler_resolution<'a>(
+    handler_ctx: ComponentHandlerCtx<'a>,
+    scope: &'a [String],
+) -> HandlerResolution<'a> {
+    HandlerResolution {
+        methods: handler_ctx.methods,
+        props: handler_ctx.props,
+        locals: scope,
+    }
+}
+
+fn wrap_handler(
+    body: &str,
+    handler_ctx: ComponentHandlerCtx<'_>,
+    scope: &[String],
+) -> Result<String, String> {
+    wrap_event_handler_body(body, handler_resolution(handler_ctx, scope))
 }
 
 /// Emit `__vmzPlan` literal matching `units[].plan` in program.json (shared identity).
@@ -164,11 +218,22 @@ fn emit_create_body(
     scope: &[String],
     aliases: &[(String, String)],
     each_depth: u32,
+    handler_ctx: ComponentHandlerCtx<'_>,
     ir: &mut IrDepCursor<'_>,
     next_id: &mut u32,
-) -> String {
+) -> Result<String, String> {
     let mut stmts = Vec::new();
-    let roots = emit_nodes(nodes, fields, scope, aliases, each_depth, ir, &mut stmts, next_id);
+    let roots = emit_nodes(
+        nodes,
+        fields,
+        scope,
+        aliases,
+        each_depth,
+        handler_ctx,
+        ir,
+        &mut stmts,
+        next_id,
+    )?;
     let return_expr = match roots.len() {
         0 => "null".to_string(),
         1 => roots[0].clone(),
@@ -184,7 +249,7 @@ fn emit_create_body(
             frag
         }
     };
-    format!("{}  return {};\n", indent_block(&stmts.join("\n")), return_expr)
+    Ok(format!("{}  return {};\n", indent_block(&stmts.join("\n")), return_expr))
 }
 
 fn indent_block(s: &str) -> String {
@@ -220,15 +285,26 @@ fn emit_nodes(
     scope: &[String],
     aliases: &[(String, String)],
     each_depth: u32,
+    handler_ctx: ComponentHandlerCtx<'_>,
     ir: &mut IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
-) -> Vec<String> {
+) -> Result<Vec<String>, String> {
     let mut out = Vec::new();
     for node in nodes {
-        out.push(emit_node(node, fields, scope, aliases, each_depth, ir, stmts, next_id));
+        out.push(emit_node(
+            node,
+            fields,
+            scope,
+            aliases,
+            each_depth,
+            handler_ctx,
+            ir,
+            stmts,
+            next_id,
+        )?);
     }
-    out
+    Ok(out)
 }
 
 fn emit_node(
@@ -237,10 +313,11 @@ fn emit_node(
     scope: &[String],
     aliases: &[(String, String)],
     each_depth: u32,
+    handler_ctx: ComponentHandlerCtx<'_>,
     ir: &mut IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
-) -> String {
+) -> Result<String, String> {
     match node {
         ViewNode::Text { value: t } => {
             let v = fresh("t", next_id);
@@ -248,19 +325,53 @@ fn emit_node(
             stmts.push(print_one_stmt(|b| {
                 b.var_stmt(&v, b.api_call("text", vec![b.str_lit(&text)]))
             }));
-            v
+            Ok(v)
         }
-        ViewNode::Interp { expr, binding } => {
-            emit_bind_text(expr, *binding, fields, scope, aliases, ir, stmts, next_id)
-        }
-        ViewNode::Element { .. } => {
-            emit_element(node, fields, scope, aliases, each_depth, ir, stmts, next_id)
-        }
-        ViewNode::If { .. } => {
-            emit_if_block(node, fields, scope, aliases, each_depth, ir, stmts, next_id)
-        }
+        ViewNode::Interp { expr, binding } => emit_bind_text(
+            expr,
+            *binding,
+            fields,
+            scope,
+            aliases,
+            handler_ctx,
+            ir,
+            stmts,
+            next_id,
+        ),
+        ViewNode::Element { .. } => emit_element(
+            node,
+            fields,
+            scope,
+            aliases,
+            each_depth,
+            handler_ctx,
+            ir,
+            stmts,
+            next_id,
+        ),
+        ViewNode::If { .. } => emit_if_block(
+            node,
+            fields,
+            scope,
+            aliases,
+            each_depth,
+            handler_ctx,
+            ir,
+            stmts,
+            next_id,
+        ),
         ViewNode::Component { tag, attrs, children } => emit_component(
-            tag, attrs, children, fields, scope, aliases, each_depth, ir, stmts, next_id,
+            tag,
+            attrs,
+            children,
+            fields,
+            scope,
+            aliases,
+            each_depth,
+            handler_ctx,
+            ir,
+            stmts,
+            next_id,
         ),
         ViewNode::Slot { name, attrs, children } => {
             let mut attrs = attrs.clone();
@@ -277,7 +388,17 @@ fn emit_node(
                 );
             }
             emit_plain_element(
-                "slot", &attrs, children, fields, scope, aliases, each_depth, ir, stmts, next_id,
+                "slot",
+                &attrs,
+                children,
+                fields,
+                scope,
+                aliases,
+                each_depth,
+                handler_ctx,
+                ir,
+                stmts,
+                next_id,
             )
         }
     }
@@ -289,12 +410,13 @@ fn emit_if_block(
     scope: &[String],
     aliases: &[(String, String)],
     each_depth: u32,
+    handler_ctx: ComponentHandlerCtx<'_>,
     ir: &mut IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
-) -> String {
+) -> Result<String, String> {
     let ViewNode::If { binding, branches, region } = node else {
-        return "null".to_string();
+        return Ok("null".to_string());
     };
     let first_cond = branches.iter().find_map(|b| b.cond.as_deref()).unwrap_or("");
     let (binding_id, all_deps) = binding_deps(ir, *binding, first_cond, fields, scope);
@@ -303,8 +425,16 @@ fn emit_if_block(
     let region_arg = region.map(|r| r.0.to_string()).unwrap_or_else(|| "null".into());
     let mut branch_objs = Vec::new();
     for br in branches {
-        let create_fn =
-            emit_branch_create_fn(&br.body, fields, scope, aliases, each_depth, ir, next_id);
+        let create_fn = emit_branch_create_fn(
+            &br.body,
+            fields,
+            scope,
+            aliases,
+            each_depth,
+            handler_ctx,
+            ir,
+            next_id,
+        )?;
         match &br.cond {
             Some(c) => {
                 let expr = bind_field_idents(c, fields, scope, aliases);
@@ -322,7 +452,7 @@ fn emit_if_block(
         "var {v} = api.ifBlock(this, {id_arg}, [{deps}], [{}], {region_arg});",
         branch_objs.join(", ")
     ));
-    v
+    Ok(v)
 }
 
 fn emit_branch_create_fn(
@@ -331,12 +461,26 @@ fn emit_branch_create_fn(
     scope: &[String],
     aliases: &[(String, String)],
     each_depth: u32,
+    handler_ctx: ComponentHandlerCtx<'_>,
     ir: &mut IrDepCursor<'_>,
     next_id: &mut u32,
-) -> String {
+) -> Result<String, String> {
     let mut stmts = Vec::new();
-    let root = emit_node(node, fields, scope, aliases, each_depth, ir, &mut stmts, next_id);
-    format!("function(api) {{\n{}  return {root};\n}}", indent_block(&stmts.join("\n")))
+    let root = emit_node(
+        node,
+        fields,
+        scope,
+        aliases,
+        each_depth,
+        handler_ctx,
+        ir,
+        &mut stmts,
+        next_id,
+    )?;
+    Ok(format!(
+        "function(api) {{\n{}  return {root};\n}}",
+        indent_block(&stmts.join("\n"))
+    ))
 }
 
 fn emit_element(
@@ -345,19 +489,43 @@ fn emit_element(
     scope: &[String],
     aliases: &[(String, String)],
     each_depth: u32,
+    handler_ctx: ComponentHandlerCtx<'_>,
     ir: &mut IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
-) -> String {
+) -> Result<String, String> {
     let ViewNode::Element { tag, attrs, children, each } = node else {
-        return "null".to_string();
+        return Ok("null".to_string());
     };
     if let Some(each) = each {
         return emit_each_block(
-            tag, attrs, children, each, fields, scope, aliases, each_depth, ir, stmts, next_id,
+            tag,
+            attrs,
+            children,
+            each,
+            fields,
+            scope,
+            aliases,
+            each_depth,
+            handler_ctx,
+            ir,
+            stmts,
+            next_id,
         );
     }
-    emit_plain_element(tag, attrs, children, fields, scope, aliases, each_depth, ir, stmts, next_id)
+    emit_plain_element(
+        tag,
+        attrs,
+        children,
+        fields,
+        scope,
+        aliases,
+        each_depth,
+        handler_ctx,
+        ir,
+        stmts,
+        next_id,
+    )
 }
 
 fn emit_plain_element(
@@ -368,14 +536,14 @@ fn emit_plain_element(
     scope: &[String],
     aliases: &[(String, String)],
     each_depth: u32,
+    handler_ctx: ComponentHandlerCtx<'_>,
     ir: &mut IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
-) -> String {
+) -> Result<String, String> {
     let el = fresh("e", next_id);
     let tag_owned = tag.to_string();
     stmts.push(print_one_stmt(|b| b.var_stmt(&el, b.api_call("el", vec![b.str_lit(&tag_owned)]))));
-    // Resume adopt: push this node's private child pool before depth-first children.
     stmts.push(print_one_stmt(|b| b.expr_stmt(b.api_call("adoptEnter", vec![b.ident(&el)]))));
     for a in attrs {
         if a.name == "style:tw" {
@@ -403,28 +571,51 @@ fn emit_plain_element(
                 let body = bind_field_idents(e, fields, scope, aliases);
                 let type_name = event_dom_type(&a.name);
                 if let Some(method) = parse_this_method_call_arrow(&body) {
-                    // `() => this.foo()` / `(ev) => this.foo(ev)` ? onMethod (no arrow IC).
                     stmts.push(format!("api.onMethod({el}, {}, {});", q(&type_name), q(&method)));
                 } else {
-                    let handler = wrap_event_handler_body(&body);
-                    stmts.push(format!("api.on({el}, {}, {handler});", q(&type_name)));
+                    let handler = wrap_handler(&body, handler_ctx, scope)?;
+                    if let Some(method) = parse_wrapped_instance_method(&handler) {
+                        stmts.push(format!("api.onMethod({el}, {}, {});", q(&type_name), q(&method)));
+                    } else {
+                        stmts.push(format!("api.on({el}, {}, {handler});", q(&type_name)));
+                    }
                 }
             }
             ViewAttrValue::Interp { expr: e } if is_html_attr(&a.name) => {
                 emit_bind_html(e, a.binding, &el, fields, scope, aliases, ir, stmts);
             }
             ViewAttrValue::Interp { expr: e } => {
-                emit_bind_attr(e, a.binding, &a.name, &el, fields, scope, aliases, ir, stmts);
+                emit_bind_attr(
+                    e,
+                    a.binding,
+                    &a.name,
+                    &el,
+                    fields,
+                    scope,
+                    aliases,
+                    ir,
+                    stmts,
+                );
             }
         }
     }
-    for child in emit_nodes(children, fields, scope, aliases, each_depth, ir, stmts, next_id) {
+    for child in emit_nodes(
+        children,
+        fields,
+        scope,
+        aliases,
+        each_depth,
+        handler_ctx,
+        ir,
+        stmts,
+        next_id,
+    )? {
         stmts.push(print_one_stmt(|b| {
             b.expr_stmt(b.call(b.member(&el, "appendChild"), vec![b.ident(&child)]))
         }));
     }
     stmts.push(print_one_stmt(|b| b.expr_stmt(b.api_call("adoptLeave", vec![]))));
-    el
+    Ok(el)
 }
 
 fn emit_component(
@@ -435,13 +626,13 @@ fn emit_component(
     scope: &[String],
     aliases: &[(String, String)],
     each_depth: u32,
+    handler_ctx: ComponentHandlerCtx<'_>,
     ir: &mut IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
-) -> String {
+) -> Result<String, String> {
     let mut client: Option<String> = None;
     let mut prop_parts = Vec::new();
-    // (eventName, handlerExpr)
     let mut event_parts: Vec<(String, String)> = Vec::new();
     for a in attrs {
         if a.name == "style:tw" {
@@ -451,13 +642,12 @@ fn emit_component(
             client = Some(if strategy.is_empty() { "load".into() } else { strategy.to_string() });
             continue;
         }
-        // Component `@event` → subscribe channel (not a prop).
         if is_component_event_attr(&a.name) {
             let ViewAttrValue::Interp { expr: e } = &a.value else {
                 continue;
             };
             let body = bind_field_idents(e, fields, scope, aliases);
-            let handler = wrap_event_handler_body(&body);
+            let handler = wrap_handler(&body, handler_ctx, scope)?;
             event_parts.push((component_event_name(&a.name), handler));
             continue;
         }
@@ -465,14 +655,13 @@ fn emit_component(
             ViewAttrValue::Static { value: s } => q(s),
             ViewAttrValue::Bare => "true".to_string(),
             ViewAttrValue::Interp { expr: e } => {
-                // `:on-submit` / function props — wrap bare method refs like events.
                 let body = bind_field_idents(e, fields, scope, aliases);
                 let wire = component_prop_wire_name(&a.name);
                 if wire.starts_with("on")
                     && wire.len() > 2
                     && wire.as_bytes()[2].is_ascii_uppercase()
                 {
-                    wrap_event_handler_body(&body)
+                    wrap_handler(&body, handler_ctx, scope)?
                 } else {
                     body
                 }
@@ -491,7 +680,6 @@ fn emit_component(
     for (ev, handler) in &event_parts {
         stmts.push(format!("api.onComponentEvent({v}, {}, {handler});", q(ev)));
     }
-    // Live prop binders: any interp with field deps stays in sync (not @events).
     if client.is_none() && aliases.is_empty() {
         for a in attrs {
             if a.name == "style:tw"
@@ -516,18 +704,25 @@ fn emit_component(
             ));
         }
     }
-    // Default slot: project parent children into the child's first unnamed <slot>.
-    // Re-enter the host resume pool so slot reclaim cannot run in the parent
-    // sibling scope (ifBlock must not steal Drawer hosts parked under the Card).
     if !children.is_empty() {
         stmts.push(format!("api.adoptEnter({v});"));
-        let kids = emit_nodes(children, fields, scope, aliases, each_depth, ir, stmts, next_id);
+        let kids = emit_nodes(
+            children,
+            fields,
+            scope,
+            aliases,
+            each_depth,
+            handler_ctx,
+            ir,
+            stmts,
+            next_id,
+        )?;
         for kid in kids {
             stmts.push(format!("api.projectDefaultSlot({v}, {kid});"));
         }
         stmts.push(format!("api.adoptLeave();"));
     }
-    v
+    Ok(v)
 }
 
 fn emit_bind_attr(
@@ -544,9 +739,19 @@ fn emit_bind_attr(
     let e = sanitize_interp(expr);
     let name = if attr_name == "className" { "class" } else { attr_name };
     let (binding_id, deps, cf_js) = bind_payload(&e, binding, fields, scope, aliases, ir);
+    let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
+    if cf_js.is_none()
+        && let Some(field) = single_field_binding_target(&e, fields, scope, aliases)
+    {
+        stmts.push(format!(
+            "api.specFieldAttr(this, {id_arg}, {}, {el}, {});",
+            q(&field),
+            q(name)
+        ));
+        return;
+    }
     let deps = deps_js(&deps);
     let body = bind_field_idents(&e, fields, scope, aliases);
-    let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
     if let Some(cf) = cf_js {
         stmts.push(format!(
             "api.bindAttr(this, {id_arg}, [{deps}], function() {{ return {body}; }}, {el}, {}, {cf});",
@@ -595,10 +800,11 @@ fn emit_each_block(
     outer_scope: &[String],
     outer_aliases: &[(String, String)],
     each_depth: u32,
+    handler_ctx: ComponentHandlerCtx<'_>,
     ir: &mut IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
-) -> String {
+) -> Result<String, String> {
     let depth = each_depth + 1;
     let box_id = format!("box{depth}");
     let mut child_scope = outer_scope.to_vec();
@@ -640,7 +846,7 @@ fn emit_each_block(
     // Client hot path: rowKernel.create / cloneNode. With a kernel, omit fat createItem to
     // shrink bundles — but still emit IR-homologous serializeItem for SSR (same schedule as
     // today's fat createItem). Do not treat rowKernel.html as SSR truth source.
-    let item_fn = |ir: &mut IrDepCursor<'_>, next_id: &mut u32| {
+    let item_fn = |ir: &mut IrDepCursor<'_>, next_id: &mut u32| -> Result<String, String> {
         let mut item_stmts = Vec::new();
         let item_root = emit_plain_element(
             tag,
@@ -650,19 +856,20 @@ fn emit_each_block(
             &child_scope,
             &child_aliases,
             depth,
+            handler_ctx,
             ir,
             &mut item_stmts,
             next_id,
-        );
-        format!(
+        )?;
+        Ok(format!(
             "function(api, {box_id}) {{\n{}  return {item_root};\n}}",
             indent_block(&item_stmts.join("\n"))
-        )
+        ))
     };
     let (create_item, serialize_item_field) = if row_kernel.is_empty() {
-        (item_fn(ir, next_id), String::new())
+        (item_fn(ir, next_id)?, String::new())
     } else {
-        let serialize_fn = item_fn(ir, next_id);
+        let serialize_fn = item_fn(ir, next_id)?;
         ("null".to_string(), format!("serializeItem: {serialize_fn}, "))
     };
     let v = fresh("k", next_id);
@@ -670,7 +877,7 @@ fn emit_each_block(
     stmts.push(format!(
         "var {v} = api.eachBlock(this, {id_arg}, [{deps}], {{ list: function() {{ return ({list_body}); }}, {key_field}{row_kernel}{serialize_item_field}createItem: {create_item} }}, {region_arg});"
     ));
-    v
+    Ok(v)
 }
 
 fn emit_bind_text(
@@ -679,17 +886,24 @@ fn emit_bind_text(
     fields: &[String],
     scope: &[String],
     aliases: &[(String, String)],
+    _handler_ctx: ComponentHandlerCtx<'_>,
     ir: &IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
-) -> String {
+) -> Result<String, String> {
     let e = sanitize_interp(expr);
     let (binding_id, deps, cf_js) = bind_payload(&e, binding, fields, scope, aliases, ir);
-    let deps = deps_js(&deps);
-    let body = bind_field_idents(&e, fields, scope, aliases);
     let v = fresh("t", next_id);
     stmts.push(format!("var {v} = api.text(\"\");"));
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
+    if cf_js.is_none()
+        && let Some(field) = single_field_binding_target(&e, fields, scope, aliases)
+    {
+        stmts.push(format!("api.specFieldText(this, {id_arg}, {}, {v});", q(&field)));
+        return Ok(v);
+    }
+    let deps = deps_js(&deps);
+    let body = bind_field_idents(&e, fields, scope, aliases);
     if let Some(cf) = cf_js {
         stmts.push(format!(
             "api.bindText(this, {id_arg}, [{deps}], function() {{ return {body}; }}, {v}, {cf});"
@@ -699,7 +913,7 @@ fn emit_bind_text(
             "api.bindText(this, {id_arg}, [{deps}], function() {{ return {body}; }}, {v});"
         ));
     }
-    v
+    Ok(v)
 }
 
 /// (bindingId, unionDeps, optional cf object JS)

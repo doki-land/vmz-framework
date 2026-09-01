@@ -1,7 +1,7 @@
 /**
  * component-event-wire — component `@event` subscribes via onComponentEvent,
  * never lowers to onXxx prop. Orthogonal to `:on-submit` prop wire.
- * Bare idents are not silently guessed as `this.method`.
+ * Bare class methods resolve to `this.method` at compile time when scope confirms.
  */
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -30,9 +30,11 @@ function cargoFilter(filter: string) {
 
 console.log('component-event-wire: pipeline_emit component event subscribe + orthogonal prop…');
 cargoFilter('maps_component');
-console.log('component-event-wire: bare ident must not become this.method…');
-cargoFilter('does_not_guess_bare_ident');
+console.log('component-event-wire: bare class method resolves to this.method…');
+cargoFilter('resolves_bare_class_method');
+console.log('component-event-wire: unresolved bare handler fails at compile time…');
+cargoFilter('rejects_unresolved_bare_handler');
 console.log('component-event-wire: explicit this.method prop wrap…');
 cargoFilter('wraps_explicit_this_method');
 
-console.log('component-event-wire GATE PASS: @click → onComponentEvent, :on-submit stays prop, no bare guess');
+console.log('component-event-wire GATE PASS: @submit → onComponentEvent, bare method resolves, :on-submit stays prop');

@@ -94,17 +94,17 @@ const OWNER_SEED: Array<{
     {
         id: 'bindAttr',
         owner: 'browser-runtime',
-        debtTarget: '0.1.29',
+        debtTarget: '0.1.30',
         evidencePaths: ['packages/runtimes/vmz-runtime/src/dom-core.ts'],
-        note: 'Generic attr binding interpreter',
+        note: 'Generic attr binding interpreter (Direct emit uses specFieldAttr when eligible)',
         distSignalId: 'bindAttr',
     },
     {
         id: 'bindText',
         owner: 'browser-runtime',
-        debtTarget: '0.1.29',
+        debtTarget: '0.1.30',
         evidencePaths: ['packages/runtimes/vmz-runtime/src/dom-core.ts'],
-        note: 'Generic text binding interpreter',
+        note: 'Generic text binding interpreter (Direct emit uses specFieldText when eligible)',
         distSignalId: 'bindText',
     },
     {
