@@ -410,7 +410,10 @@ export const directApi = {
      * @param {{ skipFlush?: boolean } | null | undefined} [opts]
      */
     onMethod(el, type, methodName, opts) {
-        const inst = directApi._inst;
+        // Prefer each-block owner: item create often runs during flush when `_inst` is unset.
+        const eachOwner = directApi._eachCtx && directApi._eachCtx.inst;
+        const inst = eachOwner || directApi._inst;
+        if (!inst) return;
         let skipFlush = !!(opts && opts.skipFlush);
         const invoke = (ev) => {
             if (type === 'submit' && ev && typeof ev.preventDefault === 'function') {
@@ -1169,7 +1172,9 @@ export const directApi = {
             ensureDelegateAttached();
         };
 
-        const eachCtx = { noteItemBind, needDelegate };
+        // `inst` must ride eachCtx: month/list rebuilds call createItem during flush
+        // when `directApi._inst` is null (unlike ifBlock branch create which sets it).
+        const eachCtx = { inst, noteItemBind, needDelegate };
 
         const clearDomEvt = (root) => {
             if (!root || root.nodeType !== 1) return;
@@ -2053,14 +2058,17 @@ export const directApi = {
                     const patches0 = [];
                     const prevPatches = directApi._itemPatches;
                     const prevCtx = directApi._eachCtx;
+                    const prevInst = directApi._inst;
                     directApi._itemPatches = patches0;
                     directApi._eachCtx = eachCtx;
+                    directApi._inst = inst;
                     let dom0 = null;
                     try {
                         dom0 = createItem(directApi, box0, patches0);
                     } finally {
                         directApi._itemPatches = prevPatches;
                         directApi._eachCtx = prevCtx;
+                        directApi._inst = prevInst;
                     }
                     if (applied !== gen || inst.__vmzDestroyed) return;
                     if (!dom0) return;
@@ -2171,14 +2179,17 @@ export const directApi = {
                         const patches = [];
                         const prevPatches = directApi._itemPatches;
                         const prevCtx = directApi._eachCtx;
+                        const prevInst = directApi._inst;
                         directApi._itemPatches = patches;
                         directApi._eachCtx = eachCtx;
+                        directApi._inst = inst;
                         let dom = null;
                         try {
                             dom = createItem(directApi, box, patches);
                         } finally {
                             directApi._itemPatches = prevPatches;
                             directApi._eachCtx = prevCtx;
+                            directApi._inst = prevInst;
                         }
                         if (applied !== gen || inst.__vmzDestroyed) return;
                         if (!dom) continue;
@@ -2279,14 +2290,17 @@ export const directApi = {
                         const patches = [];
                         const prevPatches = directApi._itemPatches;
                         const prevCtx = directApi._eachCtx;
+                        const prevInst = directApi._inst;
                         directApi._itemPatches = patches;
                         directApi._eachCtx = eachCtx;
+                        directApi._inst = inst;
                         let dom = null;
                         try {
                             dom = createItem(directApi, box, patches);
                         } finally {
                             directApi._itemPatches = prevPatches;
                             directApi._eachCtx = prevCtx;
+                            directApi._inst = prevInst;
                         }
                         if (applied !== gen || inst.__vmzDestroyed) return;
                         tagItemPatches(patches, i);
