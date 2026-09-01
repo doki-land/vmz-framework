@@ -15,12 +15,7 @@ import {
 } from './runtime-inventory.ts';
 import { runVmzBuild } from './production-proof.ts';
 import { repoRoot } from './repo-root.ts';
-import {
-    THIN_HOST_SERVE_FIXTURE,
-    THIN_HOST_STATIC_FIXTURE,
-    buildThinHostFixture,
-    type ThinHostScan,
-} from './thin-runtime-host-gate.ts';
+import { THIN_HOST_SERVE_FIXTURE, THIN_HOST_STATIC_FIXTURE, buildThinHostFixture, type ThinHostScan } from './thin-runtime-host-gate.ts';
 
 export const THIN_PROOF_SERVE_FIXTURE = THIN_HOST_SERVE_FIXTURE;
 export const THIN_PROOF_STATIC_FIXTURE = THIN_HOST_STATIC_FIXTURE;
@@ -112,16 +107,12 @@ export function assertBrowserArtifactSize(scan: ThinProductionScan): string[] {
     const b = scan.inventory.budget;
     if (!(b.browserClosureBytes > 0)) errors.push('browserClosureBytes must be > 0');
     if (b.browserClosureBytes > THIN_RUNTIME_BUDGET.maxBrowserClosureBytes) {
-        errors.push(
-            `browserClosureBytes ${b.browserClosureBytes} exceeds cap ${THIN_RUNTIME_BUDGET.maxBrowserClosureBytes}`,
-        );
+        errors.push(`browserClosureBytes ${b.browserClosureBytes} exceeds cap ${THIN_RUNTIME_BUDGET.maxBrowserClosureBytes}`);
     }
     if (b.ratioRuntimeToGenerated == null) {
         errors.push('ratioRuntimeToGenerated missing');
     } else if (b.ratioRuntimeToGenerated > THIN_RUNTIME_BUDGET.maxRatioRuntimeToGenerated) {
-        errors.push(
-            `ratioRuntimeToGenerated ${b.ratioRuntimeToGenerated} exceeds cap ${THIN_RUNTIME_BUDGET.maxRatioRuntimeToGenerated}`,
-        );
+        errors.push(`ratioRuntimeToGenerated ${b.ratioRuntimeToGenerated} exceeds cap ${THIN_RUNTIME_BUDGET.maxRatioRuntimeToGenerated}`);
     }
     return errors;
 }
@@ -137,9 +128,7 @@ export function assertRuntimeForbiddenImports(scan: ThinProductionScan): string[
         errors.push('forbidden: registerComponents in entry-client.js');
     }
 
-    const seeds = ['entry-client.js', 'dom.browser.js'].filter((rel) =>
-        fs.existsSync(path.join(staticDist, rel)),
-    );
+    const seeds = ['entry-client.js', 'dom.browser.js'].filter((rel) => fs.existsSync(path.join(staticDist, rel)));
     const closure = buildBrowserImportClosure(staticDist, seeds);
     for (const hit of closure.forbiddenImports) {
         errors.push(`forbidden import: ${hit.module} (${hit.reason})`);

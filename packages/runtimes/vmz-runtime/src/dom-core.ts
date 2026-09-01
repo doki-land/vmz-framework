@@ -572,10 +572,7 @@ export const directApi = {
      * @param {string | null} client
      */
     component(hostInst, nameOrCtor, props, client) {
-        const name =
-            typeof nameOrCtor === 'function'
-                ? nameOrCtor.__vmzTag || nameOrCtor.name || 'Component'
-                : nameOrCtor;
+        const name = typeof nameOrCtor === 'function' ? nameOrCtor.__vmzTag || nameOrCtor.name || 'Component' : nameOrCtor;
         /** @type {HTMLElement | null} */
         let host = null;
         if (directApi._resumeAdopt && typeof directApi._resumeAdopt.componentHost === 'function') {
@@ -605,10 +602,7 @@ export const directApi = {
             }
             // resume: resume on schedule; EventEntry may lazy-load chunk via __vmzLoadComponent.
             scheduleClientOn(host, String(client), async () => {
-                const Ctor =
-                    typeof nameOrCtor === 'function'
-                        ? nameOrCtor
-                        : await resolveComponent(name);
+                const Ctor = typeof nameOrCtor === 'function' ? nameOrCtor : await resolveComponent(name);
                 if (!Ctor) {
                     // Replace placeholder island with leaf error node (do not throw page).
                     const err = createUnknownComponentElement(name, 'island');

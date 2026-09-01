@@ -71,10 +71,7 @@ const OWNER_SEED: Array<{
         id: 'registerComponents',
         owner: 'node-host',
         debtTarget: null,
-        evidencePaths: [
-            'packages/runtimes/vmz-runtime/src/dom-core.ts',
-            'packages/runtimes/vmz-runtime/src/render-host.ts',
-        ],
+        evidencePaths: ['packages/runtimes/vmz-runtime/src/dom-core.ts', 'packages/runtimes/vmz-runtime/src/render-host.ts'],
         note: 'SSR/Node host registry only; browser entry uses static Ctor imports (0.1.32)',
         distSignalId: 'registerComponents',
     },
