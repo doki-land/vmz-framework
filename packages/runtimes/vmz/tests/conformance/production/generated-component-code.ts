@@ -34,6 +34,4 @@ upsertCheck(proof, {
 addLimitation(proof, 'registry / dynamic load still runtime-owned; specialized create only');
 writeProof(proof, root);
 
-console.log(
-    `generated-component-code PASS: modules=${scan.directModules.length} dist=${scan.boundary.distRel}`,
-);
+console.log(`generated-component-code PASS: modules=${scan.directModules.length} dist=${scan.boundary.distRel}`);

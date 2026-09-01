@@ -4,10 +4,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import {
-    recordBrowserArtifactBoundary,
-    type BrowserArtifactBoundary,
-} from './browser-artifact-boundary.ts';
+import { recordBrowserArtifactBoundary, type BrowserArtifactBoundary } from './browser-artifact-boundary.ts';
 import { scanForbiddenHotPath, runVmzBuild } from './production-proof.ts';
 import { repoRoot } from './repo-root.ts';
 
