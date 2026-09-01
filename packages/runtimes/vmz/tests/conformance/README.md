@@ -42,11 +42,12 @@ TypeScript drivers under **domain folders** — not a flat dump:
     - `pnpm verify -- handler-symbol-resolution` / `generated-component-code` / `specialized-bindings` / `no-generic-component-interpreter` / `specialized-component-artifact` — **0.1.29**：bare handler scope + Direct `__vmzCreate` + specialized bindings（**不**关 thin / registry 删除）
     - `pnpm verify -- compiled-route-artifact` / `compiled-locale-artifact` / `compiled-asset-artifact` / `no-runtime-manifest-interpretation` / `no-post-emit-semantic-rewrite` / `compiled-delivery-artifact` — **0.1.30**：route/locale/asset 冻结产物（**不**关 thin runtime）
     - `pnpm verify -- thin-runtime-imports` / `host-runtime-boundary` / `single-revision-owner` / `no-browser-plan-dispatch` / `thin-runtime-host-boundary` — **0.1.31**：thin browser face + `_vmz/host/` + payload-only reload（**不**关 thin runtime proof）
+    - `pnpm verify -- thin-runtime-production` / `browser-artifact-size` / `runtime-forbidden-imports` / `thin-runtime-production-proof` — **0.1.32**：`thinRuntimeClaim:true` + entry 无 `registerComponents` + 硬体积/forbidden 门 + 复用 `production-observability` / `official-homepage`（**仍** ≠ `production-ready`）
     - `pnpm verify -- official-homepage` / `official-dogfood` — **Official homepage**：homepage SSR + documents + production-inspector + `@vmz/ui`
       Button/Field/Dialog（sibling panel / focus-loop 仍开）
     - `pnpm verify -- browser-production` — **0.1.27** aggregate **薄绿**（`productionReadyClaim` / thin runtime **仍 false**；已进入默认 `pnpm verify` / CI）
     - Proof: `dist/vmz.production.proof.json` + boundary / inventory records above
-- **Default `pnpm verify`:** includes `browser-production`（0.1.27）与 `runtime-boundary`（0.1.28）和 `specialized-component-artifact`（0.1.29）和 `compiled-delivery-artifact`（0.1.30）和 `thin-runtime-host-boundary`（0.1.31）。聚合/inventory/artifact 绿 ≠ `production-ready` / thin runtime。
+- **Default `pnpm verify`:** includes `browser-production`（0.1.27）与 `runtime-boundary`（0.1.28）和 `specialized-component-artifact`（0.1.29）和 `compiled-delivery-artifact`（0.1.30）和 `thin-runtime-host-boundary`（0.1.31）和 `thin-runtime-production-proof`（0.1.32）。聚合/inventory/artifact 绿 ≠ `production-ready`；0.1.32 仅证明 thin runtime 已关闭 Slim 线。
 - **Long-term:** migrate into `vmz test` manifests / `cargo test`; this tree is the transitional Node driver home.
 - **Source language:** TypeScript only (no `.mjs` drivers).
 

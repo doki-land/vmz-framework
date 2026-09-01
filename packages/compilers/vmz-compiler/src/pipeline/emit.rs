@@ -1,5 +1,6 @@
 //! Client / server JS emit — orchestration only; printers live in `vmz-generator`.
 
+use std::collections::HashMap;
 use std::path::Path;
 
 use vmz_generator::js::{
@@ -41,17 +42,22 @@ impl From<&ServerBridge> for GenServerBridge {
 }
 
 /// Emit client JS from analyzed script + template (no Reactive / View / Plan IR).
+///
+/// `child_ctors`: when `None`, uses an empty map (string-tag registry fallback for unit tests).
 pub fn emit_client_js(
     client_source: &str,
     client: &AnalyzedScript,
     template: &TemplateIr,
     server: Option<&ServerBridge>,
 ) -> Result<String, String> {
-    emit_client_js_with_ir(client_source, client, template, server, None, None, None)
+    emit_client_js_with_ir(client_source, client, template, server, None, None, None, None)
 }
 
 /// Emit client JS; when `reactive` / `view` / `plan` are provided, Direct emit consumes them.
 /// Returns `(js, optional source map JSON)`.
+///
+/// `child_ctors`: tag → relative import (e.g. `./components/Child.client.js`).
+/// `None` → empty map (string-tag fallback).
 pub fn emit_client_js_with_ir_mapped(
     client_source: &str,
     client: &AnalyzedScript,
@@ -60,6 +66,7 @@ pub fn emit_client_js_with_ir_mapped(
     reactive: Option<&ReactiveComponent>,
     view: Option<&ViewView>,
     plan: Option<&vmz_types::ExecutionPlan>,
+    child_ctors: Option<&HashMap<String, String>>,
 ) -> Result<(String, Option<String>), String> {
     let owned = if reactive.is_none() {
         Some(build_reactive_module(&format!("{}.client", client.decl.name), &client.decl, template))
@@ -95,8 +102,17 @@ pub fn emit_client_js_with_ir_mapped(
         }
     };
 
-    let mut emitted =
-        emit_client_module(&barrier.source, &client.decl, bridge.as_ref(), comp, view, plan_ref)?;
+    let empty = HashMap::new();
+    let ctors = child_ctors.unwrap_or(&empty);
+    let mut emitted = emit_client_module(
+        &barrier.source,
+        &client.decl,
+        bridge.as_ref(),
+        comp,
+        view,
+        plan_ref,
+        ctors,
+    )?;
     if barrier.rewritten > 0 && !emitted.code.contains("__vmzWriteBarrier") {
         emitted.code.push_str(&format!("\n{}.__vmzWriteBarrier = true;\n", client.decl.name));
     }
@@ -104,6 +120,8 @@ pub fn emit_client_js_with_ir_mapped(
 }
 
 /// Emit client JS; when `reactive` / `view` / `plan` are provided, Direct emit consumes them.
+///
+/// `child_ctors`: see [`emit_client_js_with_ir_mapped`].
 pub fn emit_client_js_with_ir(
     client_source: &str,
     client: &AnalyzedScript,
@@ -112,6 +130,7 @@ pub fn emit_client_js_with_ir(
     reactive: Option<&ReactiveComponent>,
     view: Option<&ViewView>,
     plan: Option<&vmz_types::ExecutionPlan>,
+    child_ctors: Option<&HashMap<String, String>>,
 ) -> Result<String, String> {
     Ok(emit_client_js_with_ir_mapped(
         client_source,
@@ -121,6 +140,7 @@ pub fn emit_client_js_with_ir(
         reactive,
         view,
         plan,
+        child_ctors,
     )?
     .0)
 }

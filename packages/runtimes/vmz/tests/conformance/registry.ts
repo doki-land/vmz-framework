@@ -395,6 +395,28 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: '0.1.31 Slim composite: thin imports + host nest + revision owner (≠ thin runtime)',
         composite: ['thin-runtime-imports', 'host-runtime-boundary', 'single-revision-owner', 'no-browser-plan-dispatch'],
     },
+    'thin-runtime-production': {
+        file: 'production/thin-runtime-production.ts',
+        description: '0.1.32: thinRuntimeClaim true + entry without registerComponents + owner flip',
+    },
+    'browser-artifact-size': {
+        file: 'production/browser-artifact-size.ts',
+        description: '0.1.32: hard browserClosureBytes + ratioRuntimeToGenerated caps',
+    },
+    'runtime-forbidden-imports': {
+        file: 'production/runtime-forbidden-imports.ts',
+        description: '0.1.32: browser closure/entry forbid host registry bootstrap symbols',
+    },
+    'thin-runtime-production-proof': {
+        description: '0.1.32 Slim final: thin claim + size + forbidden + observability + homepage',
+        composite: [
+            'thin-runtime-production',
+            'browser-artifact-size',
+            'runtime-forbidden-imports',
+            'production-observability',
+            'official-homepage',
+        ],
+    },
     'browser-core': {
         file: 'production/browser-core.ts',
         description: 'A1 catalog: compile+logic+ssr+resume+browser+async + no-render',
@@ -609,4 +631,6 @@ export const CHECK_ALL = [
     'compiled-delivery-artifact',
     // 0.1.31 Thin runtime host boundary (not part of browser-production)
     'thin-runtime-host-boundary',
+    // 0.1.32 Thin runtime production proof (Slim final — still ≠ production-ready)
+    'thin-runtime-production-proof',
 ];

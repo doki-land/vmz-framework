@@ -728,8 +728,13 @@ const serializeApi = {
         }
         return frag;
     },
-    component(hostInst, name, props, client) {
-        const Ctor = getRegisteredComponent(name);
+    component(hostInst, nameOrCtor, props, client) {
+        const name =
+            typeof nameOrCtor === 'function'
+                ? nameOrCtor.__vmzTag || nameOrCtor.name || 'Component'
+                : nameOrCtor;
+        const Ctor =
+            typeof nameOrCtor === 'function' ? nameOrCtor : getRegisteredComponent(name);
         if (!Ctor) {
             return serializeUnknownComponentNode(name);
         }
