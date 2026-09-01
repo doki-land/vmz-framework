@@ -302,6 +302,22 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'production/browser-artifact-boundary.ts',
         description: '0.1.27: record browser delivery module boundary (not thin-runtime close)',
     },
+    'browser-artifact-inventory': {
+        file: 'production/browser-artifact-inventory.ts',
+        description: '0.1.28: owner matrix + dist/vmz.runtime-inventory.json',
+    },
+    'runtime-boundary-audit': {
+        file: 'production/runtime-boundary-audit.ts',
+        description: '0.1.28: browser import closure must not import Node/host blacklist',
+    },
+    'runtime-budget-baseline': {
+        file: 'production/runtime-budget-baseline.ts',
+        description: '0.1.28: record runtime budget baseline (no hard size fail)',
+    },
+    'runtime-boundary': {
+        description: '0.1.28 Slim composite: inventory + closure audit + budget baseline (≠ thin runtime)',
+        composite: ['browser-artifact-inventory', 'runtime-boundary-audit', 'runtime-budget-baseline'],
+    },
     'browser-core': {
         file: 'production/browser-core.ts',
         description: 'A1 catalog: compile+logic+ssr+resume+browser+async + no-render',
@@ -508,4 +524,6 @@ export const CHECK_ALL = [
     'ui7',
     // 0.1.27 Production Evidence Baseline — aggregate (includes official-dogfood via official-homepage)
     'browser-production',
+    // 0.1.28 Slim inventory / boundary / budget (not part of browser-production)
+    'runtime-boundary',
 ];

@@ -136,3 +136,8 @@ jobs:
           PUPPETEER_EXECUTABLE_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
           CI: 'true'
         run: pnpm verify -- browser-production
+
+      - name: Runtime boundary inventory (0.1.28 Slim)
+        env:
+          CI: 'true'
+        run: pnpm verify -- runtime-boundary
