@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [dev, master]
 
+# One Rust/native build, then parallel required gates (no continue-on-error on gates):
+#   build-runtimes — sole cargo/napi + JS runtime dist artifact
+#   build-test     — pack smoke already done upstream; unit + examples
+#   ui-browser     — ui-automation + browser-production (Chrome)
+#   runtime-gates  — Slim + runtime-quality-baseline
+# Downstream jobs set VMZ_SKIP_NATIVE_BUILD=1 so verify `pre: build:runtimes` is a no-op.
+
 jobs:
   fmt:
     name: Format Check
@@ -21,7 +28,6 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '24'
-          # Lockfile is gitignored; setup-node@v5 auto-cache requires pnpm-lock.yaml.
           package-manager-cache: false
 
       - name: Install dependencies
@@ -30,9 +36,8 @@ jobs:
       - name: Check format (Biome; same as `pnpm fmt:check`)
         run: pnpm fmt:check
 
-  # One runner: build runtimes once, then examples + tests (no second cargo/JS rebuild).
-  build-test:
-    name: Build and Test
+  build-runtimes:
+    name: Build Runtimes
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -64,6 +69,71 @@ jobs:
 
       - name: Assert @vmz/vmz dist pack contract
         run: node scripts/ci/assert-vmz-pack.mjs
+
+      - name: Pack runtime artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          native="$(ls packages/runtimes/vmz-linux-x64/vmz.*.node | head -n1)"
+          test -n "$native"
+          test -f "$native"
+          tar -czf runtime-build.tar.gz \
+            packages/runtimes/vmz/dist \
+            packages/runtimes/vmz-runtime/dist \
+            packages/runtimes/vmz-protocol/dist \
+            packages/runtimes/vmz-commander/dist \
+            packages/runtimes/vmz-diagnostic/dist \
+            packages/runtimes/vmz-fixtures/dist \
+            packages/runtimes/vmz-test/dist \
+            packages/plugins/vmz-plugin-shiki/dist \
+            packages/runtimes/vmz-linux-x64/package.json \
+            "$native"
+          ls -lh runtime-build.tar.gz
+
+      - name: Upload runtime artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: runtime-build
+          path: runtime-build.tar.gz
+          if-no-files-found: error
+          retention-days: 2
+
+  build-test:
+    name: Build and Test
+    needs: [build-runtimes]
+    runs-on: ubuntu-latest
+    env:
+      VMZ_SKIP_NATIVE_BUILD: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Download runtime artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: runtime-build
+          path: .
+
+      - name: Restore runtime artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf runtime-build.tar.gz
+          test -f packages/runtimes/vmz/dist/cli/cli.js
+          test -f packages/runtimes/vmz-runtime/dist/faces/server.js
+          ls packages/runtimes/vmz-linux-x64/vmz.*.node
 
       - name: Build tools + examples
         run: pnpm build:examples
@@ -121,48 +191,100 @@ jobs:
           CI: 'true'
         run: pnpm --filter @vmz-examples/fullstack run test
 
-      - name: UI automation (Chrome)
+  ui-browser:
+    name: UI and Browser Production
+    needs: [build-runtimes]
+    runs-on: ubuntu-latest
+    env:
+      VMZ_SKIP_NATIVE_BUILD: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Download runtime artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: runtime-build
+          path: .
+
+      - name: Restore runtime artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf runtime-build.tar.gz
+          test -f packages/runtimes/vmz/dist/cli/cli.js
+          ls packages/runtimes/vmz-linux-x64/vmz.*.node
+
+      - name: Install Chromium (browser host / CDP)
+        uses: browser-actions/setup-chrome@v2
+        id: setup-chrome
+        with:
+          install-dependencies: true
+
+      - name: UI automation + browser-production (keep-going)
         env:
           CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
           VMZ_BROWSER: ${{ steps.setup-chrome.outputs.chrome-path }}
           PUPPETEER_EXECUTABLE_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
           CI: 'true'
-        run: pnpm verify -- ui-automation
+        run: pnpm verify -- --keep-going ui-automation browser-production
 
-      - name: Browser production evidence (0.1.27 aggregate)
-        env:
-          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
-          VMZ_BROWSER: ${{ steps.setup-chrome.outputs.chrome-path }}
-          PUPPETEER_EXECUTABLE_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
-          CI: 'true'
-        run: pnpm verify -- browser-production
+  runtime-gates:
+    name: Slim and Runtime Quality
+    needs: [build-runtimes]
+    runs-on: ubuntu-latest
+    env:
+      VMZ_SKIP_NATIVE_BUILD: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
 
-      - name: Runtime boundary inventory (0.1.28 Slim)
-        env:
-          CI: 'true'
-        run: pnpm verify -- runtime-boundary
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
 
-      - name: Specialized component artifact (0.1.29 Slim)
-        env:
-          CI: 'true'
-        run: pnpm verify -- specialized-component-artifact
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          package-manager-cache: false
 
-      - name: Compiled delivery artifact (0.1.30 Slim)
-        env:
-          CI: 'true'
-        run: pnpm verify -- compiled-delivery-artifact
+      - name: Install dependencies
+        run: pnpm install
 
-      - name: Thin runtime host boundary (0.1.31 Slim)
-        env:
-          CI: 'true'
-        run: pnpm verify -- thin-runtime-host-boundary
+      - name: Download runtime artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: runtime-build
+          path: .
 
-      - name: Thin runtime production proof (0.1.32 Slim)
-        env:
-          CI: 'true'
-        run: pnpm verify -- thin-runtime-production-proof
+      - name: Restore runtime artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf runtime-build.tar.gz
+          test -f packages/runtimes/vmz/dist/cli/cli.js
+          ls packages/runtimes/vmz-linux-x64/vmz.*.node
 
-      - name: Runtime quality baseline (0.2.0 pre-tag)
+      - name: Slim + runtime-quality-baseline (keep-going)
         env:
           CI: 'true'
-        run: pnpm verify -- runtime-quality-baseline
+        run: >
+          pnpm verify -- --keep-going
+          runtime-boundary
+          specialized-component-artifact
+          compiled-delivery-artifact
+          thin-runtime-host-boundary
+          thin-runtime-production-proof
+          runtime-quality-baseline
