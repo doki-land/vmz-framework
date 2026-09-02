@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { unitBrowserPathPattern } from '../../../src/route-path.ts';
+import { unitBrowserPathPattern } from '../../../src/workspace/route-path.ts';
 import { resolveRouteLayoutChain } from '../../../../vmz-runtime/src/host/route-layout-chain.ts';
 import { repoRoot } from '../_lib/repo-root.ts';
 

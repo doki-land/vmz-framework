@@ -5,7 +5,14 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { diffArtifacts, loadReleaseEnvelope, packRelease, publishRelease, readPointer, rollbackRelease } from '../../../src/release-pack.ts';
+import {
+    diffArtifacts,
+    loadReleaseEnvelope,
+    packRelease,
+    publishRelease,
+    readPointer,
+    rollbackRelease,
+} from '../../../src/workspace/release-pack.ts';
 import { repoRoot } from '../_lib/repo-root.ts';
 import { addLimitation, readProof, runVmzBuild, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 

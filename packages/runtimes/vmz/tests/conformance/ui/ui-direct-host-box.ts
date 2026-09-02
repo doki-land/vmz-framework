@@ -14,7 +14,7 @@ function fail(msg) {
     process.exit(1);
 }
 
-const distBox = path.join(root, 'packages', 'runtimes', 'vmz-runtime', 'dist', 'direct-host-box.js');
+const distBox = path.join(root, 'packages', 'runtimes', 'vmz-runtime', 'dist', 'browser', 'direct-host-box.js');
 if (!fs.existsSync(distBox)) {
     fail(`missing ${distBox} — run pnpm --filter @vmz/core build`);
 }
@@ -44,7 +44,7 @@ for (const name of ['Button', 'Badge', 'Link', 'Tag', 'Icon']) {
 
 console.log('ui-direct-host-box: SSR serialize Button host…');
 const { registerComponents, renderToString } = await import(
-    pathToFileURL(path.join(root, 'packages', 'runtimes', 'vmz-runtime', 'dist', 'dom.js')).href
+    pathToFileURL(path.join(root, 'packages', 'runtimes', 'vmz-runtime', 'dist', 'faces', 'dom.js')).href
 );
 
 class Button {

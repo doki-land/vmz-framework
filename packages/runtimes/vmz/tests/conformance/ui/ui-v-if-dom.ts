@@ -9,7 +9,7 @@ import { createDirectIfBlock } from '../_lib/direct-inline-if.ts';
 import { repoRoot } from '../_lib/repo-root.ts';
 
 const root = repoRoot(import.meta.url);
-const domHref = pathToFileURL(path.join(root, 'packages', 'runtimes', 'vmz-runtime', 'dist', 'dom.js')).href;
+const domHref = pathToFileURL(path.join(root, 'packages', 'runtimes', 'vmz-runtime', 'dist', 'faces', 'dom.js')).href;
 
 function fail(msg) {
     console.error(`ui-v-if-dom GATE FAIL: ${msg}`);
