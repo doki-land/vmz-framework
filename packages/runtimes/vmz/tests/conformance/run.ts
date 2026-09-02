@@ -75,7 +75,10 @@ function runPre(preId: string, opts: RunOpts): boolean {
     if (!spec) failHard(`unknown pre step: ${preId}`);
     const [cmd, args] = spec;
     console.log(`» pre ${preId}`);
-    const r = spawnSync(cmd, args, { cwd: root, stdio: 'inherit', shell: true });
+    // Only `pnpm` needs `shell: true` (Windows `.cmd`). Never put `node -e` / meta
+    // characters into PRESETS — Linux `/bin/sh` concatenates args unsafely.
+    const useShell = cmd === 'pnpm';
+    const r = spawnSync(cmd, args, { cwd: root, stdio: 'inherit', shell: useShell });
     if (r.status === 0) return true;
     const msg = `pre ${preId} exited ${r.status}`;
     if (opts.keepGoing) {
