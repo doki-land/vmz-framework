@@ -24,15 +24,11 @@ function fail(msg: string): never {
 
 console.log('skip-native-pre: spawn probe under VMZ_SKIP_NATIVE_BUILD=1…');
 
-const child = spawnSync(
-    process.execPath,
-    ['--import', resolveHook, '--experimental-strip-types', runTs, '--', 'skip-native-pre-probe'],
-    {
-        cwd: root,
-        encoding: 'utf8',
-        env: { ...process.env, VMZ_SKIP_NATIVE_BUILD: '1' },
-    },
-);
+const child = spawnSync(process.execPath, ['--import', resolveHook, '--experimental-strip-types', runTs, '--', 'skip-native-pre-probe'], {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...process.env, VMZ_SKIP_NATIVE_BUILD: '1' },
+});
 
 const out = `${child.stdout ?? ''}${child.stderr ?? ''}`;
 if (child.status !== 0) {
