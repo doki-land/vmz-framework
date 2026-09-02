@@ -433,6 +433,15 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'production/host-runtime-manifest.ts',
         description: '0.2.0: sole host-runtime-files.json for compile + materialize',
     },
+    'skip-native-pre-probe': {
+        file: 'production/skip-native-pre-probe.ts',
+        description: 'internal probe: body only; exercises pre build:runtimes skip',
+        pre: ['build:runtimes'],
+    },
+    'skip-native-pre': {
+        file: 'production/skip-native-pre.ts',
+        description: 'CI: VMZ_SKIP_NATIVE_BUILD must short-circuit pre build:runtimes',
+    },
     'package-layout-core': {
         file: 'production/package-layout-core.ts',
         description: '0.2.0: @vmz/core src browser/ssr/host/faces/shared',
