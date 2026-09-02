@@ -558,7 +558,19 @@ const serializeApi = {
         return makeVirtualEl(tag);
     },
     text(value) {
-        return { __kind: 'text', value: value == null ? '' : String(value), parentNode: null };
+        const node = { __kind: 'text', value: value == null ? '' : String(value), parentNode: null };
+        // Generated Direct patches use DOM `textContent`; virtual text uses `value`.
+        Object.defineProperty(node, 'textContent', {
+            configurable: true,
+            enumerable: false,
+            get() {
+                return node.value;
+            },
+            set(v) {
+                node.value = v == null ? '' : String(v);
+            },
+        });
+        return node;
     },
     comment(value) {
         return { __kind: 'comment', value: value == null ? '' : String(value), parentNode: null };

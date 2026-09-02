@@ -993,9 +993,13 @@ fn emit_each_block(
     child_aliases.retain(|(k, _)| k != &each.as_name && k != "index");
     child_aliases.push((each.as_name.clone(), format!("{box_id}.item")));
     child_aliases.push(("index".into(), format!("{box_id}.index")));
-    let (binding_id, deps) =
+    let (binding_id, dep_list) =
         binding_deps(ir, each.list_binding, &each.list_expr, fields, outer_scope);
-    let deps = deps_js(&deps);
+    let list_root = dep_list
+        .first()
+        .map(|d| d.split('.').next().unwrap_or(d.as_str()).to_string())
+        .unwrap_or_else(|| "list".into());
+    let deps = deps_js(&dep_list);
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
     let list_body = bind_field_idents(&each.list_expr, fields, outer_scope, outer_aliases);
     let key_field = if let Some(k) = &each.key_expr {
@@ -1097,15 +1101,38 @@ fn emit_each_block(
             .to_string()
     } else {
         r#"    var rk = spec.rowKernel;
+    var ssrEach = spec.serializeItem && api.text && api.text('').__kind === 'text';
     var nextKeys = new Set();
     var i;
     for (i = 0; i < list.length; i++) nextKeys.add(keyOf(list[i], i));
     for (var k of keyed.keys()) {
       if (!nextKeys.has(k)) {
         var old = keyed.get(k);
-        if (old && old.parentNode) api.removeNode(old);
+        if (old) {
+          var oldDom = ssrEach && old.dom ? old.dom : old;
+          if (oldDom && oldDom.parentNode) api.removeNode(oldDom);
+        }
         keyed.delete(k);
       }
+    }
+    if (ssrEach) {
+      for (i = 0; i < list.length; i++) {
+        var item = list[i];
+        var key = keyOf(item, i);
+        var entry = keyed.get(key);
+        if (!entry) {
+          var box = { item: item, index: i };
+          var dom = spec.serializeItem.call(inst, api, box);
+          if (dom && dom.__kind === 'el') dom.__vmzKey = key;
+          entry = { box: box, dom: dom, patches: [] };
+          keyed.set(key, entry);
+          if (dom && end.parentNode) end.parentNode.insertBefore(dom, end);
+        } else {
+          entry.box.item = item;
+          entry.box.index = i;
+        }
+      }
+      return;
     }
     var parent = end.parentNode;
     if (!parent) return;
@@ -1127,6 +1154,14 @@ fn emit_each_block(
     }"#
             .to_string()
     };
+    let row_kernel_hooks = if row_kernel.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "  if (spec.rowKernel && spec.rowKernel.applyByField) {{\n    if (!inst.__vmzEachApplyLeaf) inst.__vmzEachApplyLeaf = Object.create(null);\n    inst.__vmzEachApplyLeaf[{list_root_q}] = function(idx, leaf, item) {{\n      var k = keyOf(item, idx);\n      var root = keyed.get(k);\n      if (!root) return false;\n      var fn = spec.rowKernel.applyByField[leaf];\n      if (typeof fn !== 'function') return false;\n      fn.call(inst, root, item);\n      return true;\n    }};\n    inst.__vmzDrainLeafDirty = function __vmzDrainLeafDirty() {{\n      var ld = inst.__vmzLeafDirty;\n      if (!ld || ld.root !== {list_root_q}) return;\n      var field = ld.field;\n      var fn = spec.rowKernel.applyByField[field];\n      if (typeof fn !== 'function') return;\n      var arr = inst[{list_root_q}];\n      for (var j = 0; j < ld.idxs.length; j++) {{\n        var ix = ld.idxs[j];\n        var it = arr && arr[ix];\n        if (!it) continue;\n        var k = keyOf(it, ix);\n        var root = keyed.get(k);\n        if (root) fn.call(inst, root, it);\n      }}\n      inst.__vmzLeafDirty = null;\n    }};\n  }}\n",
+            list_root_q = q(&list_root),
+        )
+    };
     let v = fresh("k", next_id);
     let region_arg = each.region.map(|r| r.0.to_string()).unwrap_or_else(|| "null".into());
     stmts.push(format!(
@@ -1140,7 +1175,7 @@ fn emit_each_block(
   frag.appendChild(start);
   frag.appendChild(end);
   var keyed = new Map();
-  var keyScratch = {{ item: null, index: 0 }};
+{row_kernel_hooks}  var keyScratch = {{ item: null, index: 0 }};
   function itemKey(box) {{
     if (typeof spec.key === 'function') {{
       try {{ return spec.key.call(inst, box); }} catch {{ return box.index; }}
@@ -1169,6 +1204,7 @@ fn emit_each_block(
 }}).call(this);",
         row_tpl_helper = row_tpl_helper,
         apply_body = apply_body,
+        row_kernel_hooks = row_kernel_hooks,
         v = v,
         list_body = list_body,
         key_field = key_field,
