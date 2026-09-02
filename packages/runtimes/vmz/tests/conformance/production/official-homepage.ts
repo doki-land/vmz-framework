@@ -54,7 +54,7 @@ function existsRel(...parts: string[]): boolean {
 
 console.log('official-homepage: forbid framework special-case hooks…');
 {
-    const cli = fs.readFileSync(path.join(root, 'packages/runtimes/vmz/src/cli.ts'), 'utf8');
+    const cli = fs.readFileSync(path.join(root, 'packages/runtimes/vmz/src/cli/cli.ts'), 'utf8');
     for (const bad of ['homepage-mode', 'documents-mode', 'panel-mode', 'vmz.homepage', 'specialHomepage']) {
         if (cli.includes(bad)) errors.push(`CLI must not special-case ${bad}`);
     }

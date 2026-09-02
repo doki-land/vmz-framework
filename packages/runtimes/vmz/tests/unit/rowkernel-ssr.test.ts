@@ -17,31 +17,48 @@ function dealSerializeItem(api: any, box: { item: { title: string; note: string 
     api.attr(root, 'class', 'deal');
     const h = api.el('h3');
     const tTitle = api.text('');
-    api.bindText(
+    api.trackPatch(
         this,
-        null,
         [],
         function () {
-            return box.item.title;
+            tTitle.value = String(box.item.title ?? '');
         },
-        tTitle,
+        null,
     );
     h.appendChild(tTitle);
     root.appendChild(h);
     const p = api.el('p');
     const tNote = api.text('');
-    api.bindText(
+    api.trackPatch(
         this,
-        null,
         [],
         function () {
-            return box.item.note;
+            tNote.value = String(box.item.note ?? '');
         },
-        tNote,
+        null,
     );
     p.appendChild(tNote);
     root.appendChild(p);
     return root;
+}
+
+function appendSerializeEach(
+    api: any,
+    inst: { deals?: Array<{ id: string; title: string; note: string }>; rows?: Array<{ id: string; label: string }> },
+    listField: 'deals' | 'rows',
+    keyFn: (box: { item: { id: string }; index: number }) => string,
+    serializeItem: (apiInner: any, box: { item: any; index: number }) => unknown,
+) {
+    const frag = api.frag();
+    const list = (inst as any)[listField] || [];
+    for (let i = 0; i < list.length; i++) {
+        const box = { item: list[i], index: i };
+        const k = keyFn(box as { item: { id: string }; index: number });
+        const dom = serializeItem.call(inst, api, box);
+        if (dom && dom.__kind === 'el' && !dom.__rawOuter) api.attr(dom, 'data-vmz-key', String(k));
+        if (dom) frag.appendChild(dom);
+    }
+    return frag;
 }
 
 describe('rowKernel SSR (serializeItem / IR)', () => {
@@ -59,24 +76,7 @@ describe('rowKernel SSR (serializeItem / IR)', () => {
             static __vmzCreate(api: any) {
                 const root = api.el('div');
                 api.attr(root, 'class', 'home');
-                const list = api.eachBlock(this, 1, ['deals'], {
-                    list() {
-                        return this.deals;
-                    },
-                    key(box: { item: { id: string } }) {
-                        return box.item.id;
-                    },
-                    createItem: null,
-                    serializeItem: dealSerializeItem,
-                    rowKernel: {
-                        html: '<article class="deal"><h3> </h3><p> </p></article>',
-                        textSlots: { title: 0, note: 1 },
-                        hydrate() {
-                            hydrateCalls++;
-                            throw new Error('hydrate must not run when serializeItem is present');
-                        },
-                    },
-                });
+                const list = appendSerializeEach(api, this, 'deals', (box) => box.item.id, dealSerializeItem);
                 root.appendChild(list);
                 return root;
             }
@@ -94,7 +94,7 @@ describe('rowKernel SSR (serializeItem / IR)', () => {
         expect(html).toContain('class="deal"');
     });
 
-    it('escapes item text via serializeItem bindText', async () => {
+    it('escapes item text via serializeItem trackPatch', async () => {
         delete (globalThis as any).document;
         delete (globalThis as any).window;
 
@@ -104,30 +104,26 @@ describe('rowKernel SSR (serializeItem / IR)', () => {
             static __vmzCreate(api: any) {
                 const root = api.el('ul');
                 root.appendChild(
-                    api.eachBlock(this, 1, ['rows'], {
-                        list() {
-                            return this.rows;
-                        },
-                        key(box: { item: { id: string } }) {
-                            return box.item.id;
-                        },
-                        createItem: null,
-                        serializeItem(apiInner: any, box: { item: { label: string } }) {
+                    appendSerializeEach(
+                        api,
+                        this,
+                        'rows',
+                        (box) => box.item.id,
+                        function (apiInner: any, box: { item: { label: string } }) {
                             const li = apiInner.el('li');
                             const t = apiInner.text('');
-                            apiInner.bindText(
+                            apiInner.trackPatch(
                                 this,
-                                null,
                                 [],
                                 function () {
-                                    return box.item.label;
+                                    t.value = String(box.item.label ?? '');
                                 },
-                                t,
+                                null,
                             );
                             li.appendChild(t);
                             return li;
                         },
-                    }),
+                    ),
                 );
                 return root;
             }

@@ -9,6 +9,7 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseHTML } from 'linkedom';
+import { createDirectIfBlock } from '../_lib/direct-inline-if.ts';
 import { repoRoot } from '../_lib/repo-root.ts';
 
 const root = repoRoot(import.meta.url);
@@ -65,9 +66,9 @@ class CompositionPage {
     static __vmzCreate(api) {
         const rootEl = api.el('div');
         api.attr(rootEl, 'data-fixture', 'resume-composition');
-        const block = api.ifBlock(
+        const block = createDirectIfBlock(
+            api,
             this,
-            null,
             ['showEmpty'],
             [
                 {
@@ -130,9 +131,9 @@ class SlotCompositionPage {
         const card = api.component(this, 'SlotCard', {}, null);
         // Mirror emit_component: adoptEnter host before projecting slot kids.
         api.adoptEnter(card);
-        const block = api.ifBlock(
+        const block = createDirectIfBlock(
+            api,
             this,
-            null,
             ['showEmpty'],
             [
                 {
@@ -298,9 +299,9 @@ class NestedSlotStealPage {
         api.attr(rootEl, 'data-fixture', 'nested-slot-steal');
         const card = api.component(this, 'SlotCard', {}, null);
         api.adoptEnter(card);
-        const block = api.ifBlock(
+        const block = createDirectIfBlock(
+            api,
             this,
-            null,
             ['showEmpty'],
             [
                 {
@@ -376,9 +377,9 @@ class IfRootButton {
     static __vmzHostBox = 'contents';
     href = '';
     static __vmzCreate(api) {
-        return api.ifBlock(
+        return createDirectIfBlock(
+            api,
             this,
-            null,
             ['href'],
             [
                 {

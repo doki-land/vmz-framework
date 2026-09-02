@@ -19,12 +19,12 @@ function fail(msg: string): never {
 }
 
 console.log('document-integrated-layout: forbid regex chrome lowering…');
-const buildSrc = fs.readFileSync(path.join(root, 'packages/runtimes/vmz/src/document-build.ts'), 'utf8');
-const layoutSrc = fs.readFileSync(path.join(root, 'packages/runtimes/vmz/src/document-layout-render.ts'), 'utf8');
+const buildSrc = fs.readFileSync(path.join(root, 'packages/runtimes/vmz/src/document/document-build.ts'), 'utf8');
+const layoutSrc = fs.readFileSync(path.join(root, 'packages/runtimes/vmz/src/document/document-layout-render.ts'), 'utf8');
 for (const bad of ['renderHostChromeTemplate', 'extractVmzTemplateHtml', 'document-host-chrome']) {
     if (buildSrc.includes(bad)) fail(`document-build must not reference ${bad}`);
 }
-if (fs.existsSync(path.join(root, 'packages/runtimes/vmz/src/document-host-chrome.ts'))) {
+if (fs.existsSync(path.join(root, 'packages/runtimes/vmz/src/document/document-host-chrome.ts'))) {
     fail('document-host-chrome.ts must be removed (regex chrome deprecated)');
 }
 if (!layoutSrc.includes('createRenderHost')) fail('document-layout-render must use createRenderHost');

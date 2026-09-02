@@ -3,7 +3,7 @@
  */
 import assert from 'node:assert/strict';
 import { formatDiagnostic } from '@vmz/diagnostic';
-import { createPositionContext } from '../../../../vmz-runtime/src/position-context.ts';
+import { createPositionContext } from '../../../../vmz-runtime/src/browser/position-context.ts';
 import { loadNative } from 'vmz';
 
 function fail(msg: string): never {

@@ -11,7 +11,7 @@ import {
     hasApplicationShell,
     resolveNestedLayoutChain,
     resolveRouteLayoutChain,
-} from '../../../vmz-runtime/src/route-layout-chain.ts';
+} from '../../../vmz-runtime/src/host/route-layout-chain.ts';
 
 function writeDeployment(dist: string, units: Array<{ chunkId: string; kind?: string; layoutChain?: string[] }>) {
     fs.writeFileSync(

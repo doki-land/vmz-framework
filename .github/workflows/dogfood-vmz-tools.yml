@@ -12,15 +12,15 @@ on:
       - '.github/workflows/dogfood-vmz-tools.yml'
       - 'packages/compilers/vmz-github/**'
       - 'packages/compilers/vmz-napi/**'
-      - 'packages/runtimes/vmz/src/github-actions-cmd.ts'
-      - 'packages/runtimes/vmz/src/cli.ts'
+      - 'packages/runtimes/vmz/src/cli/github-actions-cmd.ts'
+      - 'packages/runtimes/vmz/src/cli/cli.ts'
   pull_request:
     branches: [dev]
     paths:
       - '.github/actions/vmz-tools/**'
       - '.github/workflows/dogfood-vmz-tools.yml'
       - 'packages/compilers/vmz-github/**'
-      - 'packages/runtimes/vmz/src/github-actions-cmd.ts'
+      - 'packages/runtimes/vmz/src/cli/github-actions-cmd.ts'
   workflow_dispatch:
 
 permissions:

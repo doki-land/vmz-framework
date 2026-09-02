@@ -7,7 +7,7 @@ import {
     collectDependsOnClosure,
     componentEntriesFromDeployment,
     DEPLOYMENT_SCHEMA,
-} from '../../../../vmz-runtime/dist/deployment-registry.js';
+} from '../../../../vmz-runtime/dist/host/deployment-registry.js';
 import { loadNative } from 'vmz';
 import { repoRoot } from '../_lib/repo-root.ts';
 

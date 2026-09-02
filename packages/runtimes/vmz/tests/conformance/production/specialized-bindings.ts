@@ -3,7 +3,7 @@
  * verify id: specialized-bindings
  */
 
-import { addLimitation, readProof, upsertCheck, writeProof } from '../_lib/production-proof.ts';
+import { readProof, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 import { repoRoot } from '../_lib/repo-root.ts';
 import { assertSpecializedBindings, buildAndScanSpecialized } from '../_lib/specialized-component-gate.ts';
 
@@ -31,7 +31,6 @@ upsertCheck(proof, {
     status: 'passed',
     detail: `kinds=${scan.specializedKinds.join('|')}; hits=${scan.specializedHits}`,
 });
-addLimitation(proof, 'generic bindAttr/bindText remain runtime fallback for ternary and control-flow');
 writeProof(proof, root);
 
 console.log(`specialized-bindings PASS: ${scan.specializedKinds.join(', ')}`);

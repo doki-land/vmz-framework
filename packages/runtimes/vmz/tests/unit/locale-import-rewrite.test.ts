@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { expect } from '../../../../../scripts/test/expect.mjs';
-import { ensureLocaleImportsRewritten } from '../../src/locale-check.ts';
+import { ensureLocaleImportsRewritten } from '../../src/locale/locale-check.ts';
 
 describe('ensureLocaleImportsRewritten', () => {
     it('rewrites bare #locales imports to relative locales/*.js', () => {

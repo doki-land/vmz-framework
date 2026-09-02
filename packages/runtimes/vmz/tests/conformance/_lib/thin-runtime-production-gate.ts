@@ -15,22 +15,17 @@ import {
 } from './runtime-inventory.ts';
 import { runVmzBuild } from './production-proof.ts';
 import { repoRoot } from './repo-root.ts';
-import {
-    THIN_HOST_SERVE_FIXTURE,
-    THIN_HOST_STATIC_FIXTURE,
-    buildThinHostFixture,
-    type ThinHostScan,
-} from './thin-runtime-host-gate.ts';
+import { THIN_HOST_SERVE_FIXTURE, THIN_HOST_STATIC_FIXTURE, buildThinHostFixture, type ThinHostScan } from './thin-runtime-host-gate.ts';
 
 export const THIN_PROOF_SERVE_FIXTURE = THIN_HOST_SERVE_FIXTURE;
 export const THIN_PROOF_STATIC_FIXTURE = THIN_HOST_STATIC_FIXTURE;
 
 /** Hard budget caps (calibrated on production-catalog web-ssr + static entry closure). */
 export const THIN_RUNTIME_BUDGET = {
-    /** Browser import closure bytes from entry-client + dom.browser seeds. */
-    maxBrowserClosureBytes: 220_000,
-    /** runtimeShared / generated from inventory record. */
-    maxRatioRuntimeToGenerated: 35,
+    /** Browser import closure bytes from entry-client + dom.browser seeds (0.2.0 baseline ~138k). */
+    maxBrowserClosureBytes: 160_000,
+    /** runtimeShared / generated from inventory record (0.2.0 baseline ~12). */
+    maxRatioRuntimeToGenerated: 16,
 } as const;
 
 export type ThinProductionScan = ThinHostScan & {
@@ -71,10 +66,15 @@ export function assertThinRuntimeProduction(scan: ThinProductionScan): string[] 
     }
     if (reg?.debtTarget != null) errors.push('registerComponents debtTarget must be null (closed)');
 
-    for (const id of ['bindAttr', 'bindText', 'eachBlock', 'ifBlock']) {
+    for (const id of ['trackPatch', 'untrackPatch']) {
         const row = inv.owners.find((o) => o.id === id);
         if (!row || row.owner !== 'browser-runtime') errors.push(`${id} owner must be browser-runtime`);
-        if (row?.debtTarget != null) errors.push(`${id} debtTarget must be null (Direct platform API)`);
+        if (row?.debtTarget != null) errors.push(`${id} debtTarget must be null (thin platform API)`);
+    }
+    for (const removed of ['bindAttr', 'bindText', 'eachBlock', 'ifBlock']) {
+        if (inv.owners.some((o) => o.id === removed)) {
+            errors.push(`${removed} must not remain in inventory owners (0.2.0 removed generic interpreter)`);
+        }
     }
 
     if (!scan.entryClient) {
@@ -112,16 +112,12 @@ export function assertBrowserArtifactSize(scan: ThinProductionScan): string[] {
     const b = scan.inventory.budget;
     if (!(b.browserClosureBytes > 0)) errors.push('browserClosureBytes must be > 0');
     if (b.browserClosureBytes > THIN_RUNTIME_BUDGET.maxBrowserClosureBytes) {
-        errors.push(
-            `browserClosureBytes ${b.browserClosureBytes} exceeds cap ${THIN_RUNTIME_BUDGET.maxBrowserClosureBytes}`,
-        );
+        errors.push(`browserClosureBytes ${b.browserClosureBytes} exceeds cap ${THIN_RUNTIME_BUDGET.maxBrowserClosureBytes}`);
     }
     if (b.ratioRuntimeToGenerated == null) {
         errors.push('ratioRuntimeToGenerated missing');
     } else if (b.ratioRuntimeToGenerated > THIN_RUNTIME_BUDGET.maxRatioRuntimeToGenerated) {
-        errors.push(
-            `ratioRuntimeToGenerated ${b.ratioRuntimeToGenerated} exceeds cap ${THIN_RUNTIME_BUDGET.maxRatioRuntimeToGenerated}`,
-        );
+        errors.push(`ratioRuntimeToGenerated ${b.ratioRuntimeToGenerated} exceeds cap ${THIN_RUNTIME_BUDGET.maxRatioRuntimeToGenerated}`);
     }
     return errors;
 }
@@ -137,9 +133,7 @@ export function assertRuntimeForbiddenImports(scan: ThinProductionScan): string[
         errors.push('forbidden: registerComponents in entry-client.js');
     }
 
-    const seeds = ['entry-client.js', 'dom.browser.js'].filter((rel) =>
-        fs.existsSync(path.join(staticDist, rel)),
-    );
+    const seeds = ['entry-client.js', 'dom.browser.js'].filter((rel) => fs.existsSync(path.join(staticDist, rel)));
     const closure = buildBrowserImportClosure(staticDist, seeds);
     for (const hit of closure.forbiddenImports) {
         errors.push(`forbidden import: ${hit.module} (${hit.reason})`);

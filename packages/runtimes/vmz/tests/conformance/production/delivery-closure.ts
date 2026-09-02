@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { DEPLOYMENT_SCHEMA } from '../../../../vmz-runtime/dist/deployment-registry.js';
+import { DEPLOYMENT_SCHEMA } from '../../../../vmz-runtime/dist/host/deployment-registry.js';
 import { loadNative } from 'vmz';
 import { repoRoot } from '../_lib/repo-root.ts';
 
