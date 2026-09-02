@@ -28,12 +28,9 @@ export default class CounterButton {
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
     assert!(js.contains("__vmzDirect = true"), "{js}");
     assert!(js.contains("__vmzCreate"), "expected __vmzCreate factory: {js}");
+    assert!(js.contains("api.specFieldText(this,") || js.contains("api.trackPatch(this,"), "{js}");
     assert!(
-        js.contains("api.specFieldText(this,") || js.contains("api.bindText(this,"),
-        "{js}"
-    );
-    assert!(
-        js.contains("api.specFieldText(this, 1,") || js.contains("api.bindText(this, 1,"),
+        js.contains("api.specFieldText(this, 1,") || js.contains("api.trackPatch(this,"),
         "{js}"
     );
     assert!(!js.contains("prototype.render"), "{js}");
@@ -55,7 +52,8 @@ export default class BranchDemo {
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
-    assert!(js.contains("api.ifBlock(this,"), "{js}");
+    assert!(js.contains("api.comment('vmz-if')"), "{js}");
+    assert!(js.contains("api.trackPatch(inst,"), "{js}");
     assert!(js.contains("__vmzDirect = true"), "{js}");
 }
 
@@ -73,8 +71,9 @@ export default class ListDemo {
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
-    assert!(js.contains("api.eachBlock(this,"), "{js}");
+    assert!(js.contains("api.trackPatch(inst,"), "{js}");
     assert!(js.contains("createItem:"), "{js}");
+    assert!(!js.contains("api.eachBlock(this,"), "{js}");
 }
 
 #[test]
@@ -94,7 +93,10 @@ export default class DealsPage {
     assert!(js.contains("rowKernel:"), "expected rowKernel for static deals row: {js}");
     assert!(js.contains("createItem: null"), "client createItem must be null: {js}");
     assert!(js.contains("serializeItem:"), "SSR must get IR-homologous serializeItem: {js}");
-    assert!(js.contains("api.bindText(this,"), "serializeItem body uses bindText: {js}");
+    assert!(
+        js.contains("api.trackPatch(this,") || js.contains("api.specFieldText(this,"),
+        "serializeItem body uses specialized patch: {js}"
+    );
 }
 
 #[test]
@@ -130,9 +132,10 @@ export default class LikeButton {
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
     assert!(js.contains("__vmzDirect = true"), "{js}");
-    assert!(js.contains("api.bindText(this,"), "{js}");
+    assert!(js.contains("api.trackPatch(this,"), "{js}");
     assert!(js.contains("stable:"), "{js}");
     assert!(js.contains("branches:"), "{js}");
+    assert!(!js.contains("api.bindText(this,"), "{js}");
     assert!(!js.contains("prototype.render"), "{js}");
 }
 
@@ -181,8 +184,10 @@ export default class HtmlDemo {
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
-    assert!(js.contains("api.bindHtml(this,"), "{js}");
+    assert!(js.contains("api.trackPatch(this,"), "{js}");
+    assert!(!js.contains("api.bindHtml(this,"), "{js}");
     assert!(!js.contains("api.bindAttr(this,"), "{js}");
+    assert!(!js.contains("api.bindText(this,"), "{js}");
 }
 
 #[test]
@@ -199,10 +204,7 @@ export default class CatalogList {
     let roots = &tpl.roots;
     assert_eq!(roots.len(), 1, "button must parse as one element, not text/@click split");
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
-    assert!(
-        js.contains("api.on(") || js.contains("api.onMethod("),
-        "{js}"
-    );
+    assert!(js.contains("api.on(") || js.contains("api.onMethod("), "{js}");
     assert!(js.contains("\"click\""), "{js}");
     assert!(
         js.contains("this.selectFirst")

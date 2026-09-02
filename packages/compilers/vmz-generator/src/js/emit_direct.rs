@@ -10,10 +10,10 @@
 use super::ast_util::{js_string_literal, print_one_stmt};
 use super::emit_ir::IrDepCursor;
 use super::helpers::{
-    bind_field_idents, collect_deps_oxc, component_event_name, component_prop_wire_name,
-    event_dom_type, is_component_event_attr, is_event_attr, is_html_attr, looks_like_ternary,
-    parse_this_method_call_arrow, sanitize_interp, single_field_binding_target,
-    split_ternary_parts, wrap_event_handler_body, HandlerResolution,
+    HandlerResolution, bind_field_idents, collect_deps_oxc, component_event_name,
+    component_prop_wire_name, event_dom_type, is_component_event_attr, is_event_attr, is_html_attr,
+    looks_like_ternary, parse_this_method_call_arrow, sanitize_interp, single_field_binding_target,
+    split_ternary_parts, wrap_event_handler_body,
 };
 use std::collections::HashMap;
 
@@ -129,9 +129,7 @@ pub fn emit_direct_create(
 fn parse_wrapped_instance_method(handler: &str) -> Option<String> {
     let rest = handler.trim().strip_prefix("(ev) => this.")?;
     let name = rest.split('(').next()?.trim();
-    if name.is_empty()
-        || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
-    {
+    if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$') {
         return None;
     }
     let after = rest.strip_prefix(name)?.trim();
@@ -145,11 +143,7 @@ fn handler_resolution<'a>(
     handler_ctx: ComponentHandlerCtx<'a>,
     scope: &'a [String],
 ) -> HandlerResolution<'a> {
-    HandlerResolution {
-        methods: handler_ctx.methods,
-        props: handler_ctx.props,
-        locals: scope,
-    }
+    HandlerResolution { methods: handler_ctx.methods, props: handler_ctx.props, locals: scope }
 }
 
 fn wrap_handler(
@@ -239,8 +233,8 @@ fn emit_create_body(
         ir,
         &mut stmts,
         next_id,
-            child_ctors,
-        )?;
+        child_ctors,
+    )?;
     let return_expr = match roots.len() {
         0 => "null".to_string(),
         1 => roots[0].clone(),
@@ -337,17 +331,9 @@ fn emit_node(
             }));
             Ok(v)
         }
-        ViewNode::Interp { expr, binding } => emit_bind_text(
-            expr,
-            *binding,
-            fields,
-            scope,
-            aliases,
-            handler_ctx,
-            ir,
-            stmts,
-            next_id,
-        ),
+        ViewNode::Interp { expr, binding } => {
+            emit_bind_text(expr, *binding, fields, scope, aliases, handler_ctx, ir, stmts, next_id)
+        }
         ViewNode::Element { .. } => emit_element(
             node,
             fields,
@@ -412,7 +398,7 @@ fn emit_node(
                 ir,
                 stmts,
                 next_id,
-            child_ctors,
+                child_ctors,
             )
         }
     }
@@ -465,8 +451,101 @@ fn emit_if_block(
     }
     let v = fresh("i", next_id);
     stmts.push(format!(
-        "var {v} = api.ifBlock(this, {id_arg}, [{deps}], [{}], {region_arg});",
-        branch_objs.join(", ")
+        "var {v} = (function() {{
+  var inst = this;
+  var start = api.comment('vmz-if');
+  var end = api.comment('/vmz-if');
+  if ({region_arg} != null) start.__vmzRegion = {region_arg};
+  var frag = api.frag();
+  frag.appendChild(start);
+  var regionHost = null;
+  if ({region_arg} != null) {{
+    regionHost = api.el('span');
+    regionHost.style.display = 'contents';
+    regionHost.setAttribute('data-vmz-region', String({region_arg}));
+    frag.appendChild(regionHost);
+  }}
+  frag.appendChild(end);
+  var branches = [{branch_objs}];
+  var cached = branches.map(function() {{ return null; }});
+  var branchBinds = branches.map(function() {{ return []; }});
+  var active = -1;
+  var gen = 0;
+  function pick() {{
+    for (var i = 0; i < branches.length; i++) {{
+      var b = branches[i];
+      if (!b.cond) return i;
+      try {{ if (b.cond.call(inst)) return i; }} catch {{}}
+    }}
+    return -1;
+  }}
+  function wireBranch(idx) {{
+    if (idx < 0) return;
+    for (var j = 0; j < branchBinds[idx].length; j++) {{
+      var bb = branchBinds[idx][j];
+      api.trackPatch(inst, bb.deps, bb.fn, bb.bindingId);
+    }}
+  }}
+  function unwireBranch(idx) {{
+    if (idx < 0) return;
+    for (var j = 0; j < branchBinds[idx].length; j++) {{
+      var bb = branchBinds[idx][j];
+      api.untrackPatch(inst, bb.deps, bb.fn, bb.bindingId);
+    }}
+  }}
+  function apply() {{
+    if (inst.__vmzDestroyed) return;
+    var applied = ++gen;
+    var next = pick();
+    if (next === active) return;
+    if (next >= 0 && !cached[next]) {{
+      var binds = [];
+      var prevSink = api._branchBinds;
+      var prevInst = api._inst;
+      api._branchBinds = binds;
+      api._inst = inst;
+      var created = null;
+      var adopt = api._resumeAdopt;
+      var endBranch = adopt && typeof adopt.beginBranchScope === 'function' ? adopt.beginBranchScope() : null;
+      try {{ created = branches[next].create.call(inst, api); }} finally {{
+        if (typeof endBranch === 'function') endBranch();
+        api._branchBinds = prevSink;
+        api._inst = prevInst;
+      }}
+      if (applied !== gen || inst.__vmzDestroyed) return;
+      if (!cached[next]) {{ cached[next] = created; branchBinds[next] = binds; }}
+    }}
+    if (applied !== gen || inst.__vmzDestroyed) return;
+    if (active >= 0) {{
+      unwireBranch(active);
+      if (cached[active] && cached[active].parentNode) api.removeNode(cached[active]);
+    }}
+    active = next;
+    if (next < 0) return;
+    wireBranch(next);
+    if (cached[next] && end.parentNode) {{
+      if (regionHost) regionHost.appendChild(cached[next]);
+      else end.parentNode.insertBefore(cached[next], end);
+    }}
+  }}
+  api.trackPatch(inst, [{deps}], apply, {id_arg});
+  if (api._itemPatches) api._itemPatches.push(apply);
+  start.__vmzDispose = function() {{
+    for (var i = 0; i < cached.length; i++) {{
+      unwireBranch(i);
+      if (cached[i]) api.disposeTree(cached[i]);
+      cached[i] = null;
+    }}
+    active = -1;
+  }};
+  apply();
+  return frag;
+}}).call(this);",
+        v = v,
+        region_arg = region_arg,
+        branch_objs = branch_objs.join(", "),
+        deps = deps,
+        id_arg = id_arg
     ));
     Ok(v)
 }
@@ -493,12 +572,9 @@ fn emit_branch_create_fn(
         ir,
         &mut stmts,
         next_id,
-            child_ctors,
-        )?;
-    Ok(format!(
-        "function(api) {{\n{}  return {root};\n}}",
-        indent_block(&stmts.join("\n"))
-    ))
+        child_ctors,
+    )?;
+    Ok(format!("function(api) {{\n{}  return {root};\n}}", indent_block(&stmts.join("\n"))))
 }
 
 fn emit_element(
@@ -545,7 +621,7 @@ fn emit_element(
         ir,
         stmts,
         next_id,
-            child_ctors,
+        child_ctors,
     )
 }
 
@@ -597,7 +673,11 @@ fn emit_plain_element(
                 } else {
                     let handler = wrap_handler(&body, handler_ctx, scope)?;
                     if let Some(method) = parse_wrapped_instance_method(&handler) {
-                        stmts.push(format!("api.onMethod({el}, {}, {});", q(&type_name), q(&method)));
+                        stmts.push(format!(
+                            "api.onMethod({el}, {}, {});",
+                            q(&type_name),
+                            q(&method)
+                        ));
                     } else {
                         stmts.push(format!("api.on({el}, {}, {handler});", q(&type_name)));
                     }
@@ -607,17 +687,7 @@ fn emit_plain_element(
                 emit_bind_html(e, a.binding, &el, fields, scope, aliases, ir, stmts);
             }
             ViewAttrValue::Interp { expr: e } => {
-                emit_bind_attr(
-                    e,
-                    a.binding,
-                    &a.name,
-                    &el,
-                    fields,
-                    scope,
-                    aliases,
-                    ir,
-                    stmts,
-                );
+                emit_bind_attr(e, a.binding, &a.name, &el, fields, scope, aliases, ir, stmts);
             }
         }
     }
@@ -631,8 +701,8 @@ fn emit_plain_element(
         ir,
         stmts,
         next_id,
-            child_ctors,
-        )? {
+        child_ctors,
+    )? {
         stmts.push(print_one_stmt(|b| {
             b.expr_stmt(b.call(b.member(&el, "appendChild"), vec![b.ident(&child)]))
         }));
@@ -706,9 +776,7 @@ fn emit_component(
         // Unit / no-graph path: keep string tag for registry lookup.
         q(tag)
     } else {
-        return Err(format!(
-            "vmz: unknown component tag `{tag}` (not in ComponentGraph.by_tag)"
-        ));
+        return Err(format!("vmz: unknown component tag `{tag}` (not in ComponentGraph.by_tag)"));
     };
     stmts.push(format!("var {v} = api.component(this, {ctor_arg}, {props}, {client_arg});"));
     for (ev, handler) in &event_parts {
@@ -778,24 +846,57 @@ fn emit_bind_attr(
     if cf_js.is_none()
         && let Some(field) = single_field_binding_target(&e, fields, scope, aliases)
     {
-        stmts.push(format!(
-            "api.specFieldAttr(this, {id_arg}, {}, {el}, {});",
-            q(&field),
-            q(name)
-        ));
+        stmts.push(format!("api.specFieldAttr(this, {id_arg}, {}, {el}, {});", q(&field), q(name)));
         return;
     }
-    let deps = deps_js(&deps);
+    let deps_js = deps_js(&deps);
     let body = bind_field_idents(&e, fields, scope, aliases);
+    let patch_name =
+        format!("__patchAttr{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
     if let Some(cf) = cf_js {
         stmts.push(format!(
-            "api.bindAttr(this, {id_arg}, [{deps}], function() {{ return {body}; }}, {el}, {}, {cf});",
-            q(name)
+            "(function() {{
+  var __cf = {cf};
+  var __liveDeps = [{deps_js}];
+  var __activeBranch = -1;
+  function {patch_name}() {{
+    var __raw;
+    try {{ __raw = {body}; }} catch {{ __raw = null; }}
+    api.attr({el}, {name_q}, __raw);
+    if (!__cf || !__cf.branches) return;
+    var __next = -1;
+    for (var __i = 0; __i < __cf.branches.length; __i++) {{
+      var __b = __cf.branches[__i];
+      if (!__b.cond) {{ __next = __i; break; }}
+      try {{ if (__b.cond.call(this)) {{ __next = __i; break; }} }} catch {{}}
+    }}
+    if (__next === __activeBranch) return;
+    __activeBranch = __next;
+    var __br = __cf.branches[__next];
+    var __nd = [].concat(__cf.stable || []).concat((__br && __br.deps) || []);
+    __nd = Array.from(new Set(__nd));
+    api.untrackPatch(this, __liveDeps, {patch_name}, {id_arg});
+    __liveDeps = __nd;
+    api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
+  }}
+  api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
+}}).call(this);",
+            cf = cf,
+            deps_js = deps_js,
+            body = body,
+            el = el,
+            name_q = q(name),
+            patch_name = patch_name,
+            id_arg = id_arg
         ));
     } else {
         stmts.push(format!(
-            "api.bindAttr(this, {id_arg}, [{deps}], function() {{ return {body}; }}, {el}, {});",
-            q(name)
+            "api.trackPatch(this, [{deps_js}], function() {{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} api.attr({el}, {name_q}, __v); }}, {id_arg});",
+            deps_js = deps_js,
+            body = body,
+            el = el,
+            name_q = q(name),
+            id_arg = id_arg
         ));
     }
 }
@@ -812,16 +913,54 @@ fn emit_bind_html(
 ) {
     let e = sanitize_interp(expr);
     let (binding_id, deps, cf_js) = bind_payload(&e, binding, fields, scope, aliases, ir);
-    let deps = deps_js(&deps);
+    let deps_js = deps_js(&deps);
     let body = bind_field_idents(&e, fields, scope, aliases);
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
+    let patch_name =
+        format!("__patchHtml{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
     if let Some(cf) = cf_js {
         stmts.push(format!(
-            "api.bindHtml(this, {id_arg}, [{deps}], function() {{ return {body}; }}, {el}, {cf});"
+            "(function() {{
+  var __cf = {cf};
+  var __liveDeps = [{deps_js}];
+  var __activeBranch = -1;
+  function {patch_name}() {{
+    var __raw;
+    try {{ __raw = {body}; }} catch {{ __raw = null; }}
+    {el}.innerHTML = __raw == null ? '' : String(__raw);
+    if (!__cf || !__cf.branches) return;
+    var __next = -1;
+    for (var __i = 0; __i < __cf.branches.length; __i++) {{
+      var __b = __cf.branches[__i];
+      if (!__b.cond) {{ __next = __i; break; }}
+      try {{ if (__b.cond.call(this)) {{ __next = __i; break; }} }} catch {{}}
+    }}
+    if (__next === __activeBranch) return;
+    __activeBranch = __next;
+    var __br = __cf.branches[__next];
+    var __nd = [].concat(__cf.stable || []).concat((__br && __br.deps) || []);
+    __nd = Array.from(new Set(__nd));
+    api.untrackPatch(this, __liveDeps, {patch_name}, {id_arg});
+    __liveDeps = __nd;
+    api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
+  }}
+  api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
+}}).call(this);",
+            cf = cf,
+            deps_js = deps_js,
+            body = body,
+            el = el,
+            patch_name = patch_name,
+            id_arg = id_arg
         ));
     } else {
         stmts.push(format!(
-            "api.bindHtml(this, {id_arg}, [{deps}], function() {{ return {body}; }}, {el});"
+            "api.trackPatch(this, [{deps_js}], function {patch_name}() {{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} {el}.innerHTML = __v == null ? '' : String(__v); }}, {id_arg});",
+            deps_js = deps_js,
+            body = body,
+            el = el,
+            patch_name = patch_name,
+            id_arg = id_arg
         ));
     }
 }
@@ -912,7 +1051,91 @@ fn emit_each_block(
     let v = fresh("k", next_id);
     let region_arg = each.region.map(|r| r.0.to_string()).unwrap_or_else(|| "null".into());
     stmts.push(format!(
-        "var {v} = api.eachBlock(this, {id_arg}, [{deps}], {{ list: function() {{ return ({list_body}); }}, {key_field}{row_kernel}{serialize_item_field}createItem: {create_item} }}, {region_arg});"
+        "var {v} = (function() {{
+  var inst = this;
+  var spec = {{ list: function() {{ return ({list_body}); }}, {key_field}{row_kernel}{serialize_item_field}createItem: {create_item} }};
+  var start = api.comment('vmz-each:' + (spec.as || ''));
+  var end = api.comment('/vmz-each');
+  if ({region_arg} != null) start.__vmzRegion = {region_arg};
+  var frag = api.frag();
+  frag.appendChild(start);
+  frag.appendChild(end);
+  var keyed = new Map();
+  var keyScratch = {{ item: null, index: 0 }};
+  function itemKey(box) {{
+    if (typeof spec.key === 'function') {{
+      try {{ return spec.key.call(inst, box); }} catch {{ return box.index; }}
+    }}
+    return box.index;
+  }}
+  function keyOf(item, index) {{
+    keyScratch.item = item;
+    keyScratch.index = index;
+    return itemKey(keyScratch);
+  }}
+  function readList() {{
+    var list = [];
+    try {{ list = spec.list.call(inst) || []; }} catch {{ list = []; }}
+    if (!Array.isArray(list)) list = Array.from(list);
+    return list;
+  }}
+  function apply() {{
+    if (inst.__vmzDestroyed) return;
+    var list = readList();
+    var nextKeys = new Set();
+    var i;
+    for (i = 0; i < list.length; i++) nextKeys.add(keyOf(list[i], i));
+    for (var k of keyed.keys()) {{
+      if (!nextKeys.has(k)) {{
+        var old = keyed.get(k);
+        if (old && old.dom && old.dom.parentNode) api.removeNode(old.dom);
+        keyed.delete(k);
+      }}
+    }}
+    for (i = 0; i < list.length; i++) {{
+      var item = list[i];
+      var key = keyOf(item, i);
+      var entry = keyed.get(key);
+      if (!entry) {{
+        var box = {{ item: item, index: i }};
+        var prevEach = api._eachCtx;
+        var prevInst = api._inst;
+        var itemPatches = [];
+        api._eachCtx = {{
+          noteItemBind: function(bId, d, fn) {{ fn.__vmzItemDeps = d; itemPatches.push(fn); }},
+          needDelegate: function() {{}}
+        }};
+        api._inst = inst;
+        api._itemPatches = itemPatches;
+        var dom = spec.createItem.call(inst, api, box);
+        api._eachCtx = prevEach;
+        api._inst = prevInst;
+        api._itemPatches = null;
+        entry = {{ box: box, dom: dom, patches: itemPatches }};
+        keyed.set(key, entry);
+        if (dom && end.parentNode) end.parentNode.insertBefore(dom, end);
+        for (var p = 0; p < itemPatches.length; p++) {{
+          try {{ itemPatches[p].call(inst); }} catch {{}}
+        }}
+      }} else {{
+        entry.box.item = item;
+        entry.box.index = i;
+      }}
+    }}
+  }}
+  api.trackPatch(inst, [{deps}], apply, {id_arg});
+  apply();
+  return frag;
+}}).call(this);",
+        v = v,
+        list_body = list_body,
+        key_field = key_field,
+        row_kernel = row_kernel,
+        serialize_item_field = serialize_item_field,
+        create_item = create_item,
+        region_arg = region_arg,
+        deps = deps,
+        id_arg = id_arg
     ));
     Ok(v)
 }
@@ -941,13 +1164,51 @@ fn emit_bind_text(
     }
     let deps = deps_js(&deps);
     let body = bind_field_idents(&e, fields, scope, aliases);
+    let patch_name =
+        format!("__patchText{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
     if let Some(cf) = cf_js {
         stmts.push(format!(
-            "api.bindText(this, {id_arg}, [{deps}], function() {{ return {body}; }}, {v}, {cf});"
+            "(function() {{
+  var __cf = {cf};
+  var __liveDeps = [{deps}];
+  var __activeBranch = -1;
+  function {patch_name}() {{
+    var __raw;
+    try {{ __raw = {body}; }} catch {{ __raw = null; }}
+    {v}.textContent = String(__raw != null ? __raw : '');
+    if (!__cf || !__cf.branches) return;
+    var __next = -1;
+    for (var __i = 0; __i < __cf.branches.length; __i++) {{
+      var __b = __cf.branches[__i];
+      if (!__b.cond) {{ __next = __i; break; }}
+      try {{ if (__b.cond.call(this)) {{ __next = __i; break; }} }} catch {{}}
+    }}
+    if (__next === __activeBranch) return;
+    __activeBranch = __next;
+    var __br = __cf.branches[__next];
+    var __nd = [].concat(__cf.stable || []).concat((__br && __br.deps) || []);
+    __nd = Array.from(new Set(__nd));
+    api.untrackPatch(this, __liveDeps, {patch_name}, {id_arg});
+    __liveDeps = __nd;
+    api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
+  }}
+  api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
+}}).call(this);",
+            cf = cf,
+            deps = deps,
+            body = body,
+            v = v,
+            patch_name = patch_name,
+            id_arg = id_arg
         ));
     } else {
         stmts.push(format!(
-            "api.bindText(this, {id_arg}, [{deps}], function() {{ return {body}; }}, {v});"
+            "api.trackPatch(this, [{deps}], function {patch_name}() {{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} {text}.textContent = String(__v != null ? __v : ''); }}, {id_arg});",
+            deps = deps,
+            body = body,
+            text = v,
+            patch_name = patch_name,
+            id_arg = id_arg
         ));
     }
     Ok(v)

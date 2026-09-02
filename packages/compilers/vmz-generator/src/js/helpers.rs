@@ -95,9 +95,11 @@ pub fn wrap_event_handler_body(
     if let Some(method) = parse_this_method_call_arrow(body) {
         return Ok(format!("(ev) => this.{method}(ev)"));
     }
+    if let Some(rewritten) = rewrite_arrow_bare_method_call(body, resolution) {
+        return Ok(rewritten);
+    }
     if let Some(rest) = body.strip_prefix("this.") {
-        let is_method_ref =
-            is_simple_ident(rest) && !rest.contains('(') && !rest.contains('.');
+        let is_method_ref = is_simple_ident(rest) && !rest.contains('(') && !rest.contains('.');
         if is_method_ref {
             return Ok(format!("(ev) => this.{rest}(ev)"));
         }
@@ -167,6 +169,29 @@ pub fn parse_this_method_call_arrow(body: &str) -> Option<String> {
         return None;
     }
     Some(name.to_string())
+}
+
+/// `() => switchLocale('en-us')` / `(e) => onEmail(e)` when `name` is a class method → rewrite with `this.`.
+fn rewrite_arrow_bare_method_call(body: &str, resolution: HandlerResolution<'_>) -> Option<String> {
+    let b = body.trim();
+    let arrow_idx = b.find("=>")?;
+    let prefix = b[..=arrow_idx + 1].trim();
+    let mut call = b[arrow_idx + 2..].trim();
+    if call.ends_with(';') {
+        call = call.trim_end_matches(';').trim();
+    }
+    let paren = call.find('(')?;
+    let name = call[..paren].trim();
+    if !is_simple_ident(name) || name.contains('.') {
+        return None;
+    }
+    if resolution.locals.iter().any(|l| l == name) {
+        return None;
+    }
+    if !resolution.methods.iter().any(|m| m == name) {
+        return None;
+    }
+    Some(format!("{prefix} this.{call}"))
 }
 
 /// DOM event type from `onClick` / `@click` / `@click.stop` / `on:click` / `on-click`.
@@ -523,9 +548,9 @@ fn bind_field_idents_legacy(
 #[cfg(test)]
 mod tests {
     use super::{
-        bind_field_idents, component_event_name, component_prop_wire_name, event_dom_type,
-        is_component_event_attr, is_event_attr, kebab_to_camel, wrap_event_handler_body,
-        HandlerResolution,
+        HandlerResolution, bind_field_idents, component_event_name, component_prop_wire_name,
+        event_dom_type, is_component_event_attr, is_event_attr, kebab_to_camel,
+        wrap_event_handler_body,
     };
 
     #[test]
@@ -539,17 +564,36 @@ mod tests {
     fn wrap_event_handler_resolves_bare_class_method() {
         let methods = vec!["bump".into()];
         let res = HandlerResolution { methods: &methods, props: &[], locals: &[] };
-        assert_eq!(
-            wrap_event_handler_body("this.bump", res).unwrap(),
-            "(ev) => this.bump(ev)"
-        );
-        assert_eq!(
-            wrap_event_handler_body("bump", res).unwrap(),
-            "(ev) => this.bump(ev)"
-        );
+        assert_eq!(wrap_event_handler_body("this.bump", res).unwrap(), "(ev) => this.bump(ev)");
+        assert_eq!(wrap_event_handler_body("bump", res).unwrap(), "(ev) => this.bump(ev)");
         assert_eq!(
             wrap_event_handler_body("() => this.bump()", res).unwrap(),
             "(ev) => this.bump(ev)"
+        );
+    }
+
+    #[test]
+    fn wrap_event_handler_resolves_bare_method_call_in_arrow() {
+        let methods = vec!["switchLocale".into(), "onEmail".into()];
+        let res = HandlerResolution { methods: &methods, props: &[], locals: &[] };
+        assert_eq!(
+            wrap_event_handler_body("() => switchLocale('en-us')", res).unwrap(),
+            "() => this.switchLocale('en-us')"
+        );
+        assert_eq!(
+            wrap_event_handler_body("(e) => onEmail(e)", res).unwrap(),
+            "(e) => this.onEmail(e)"
+        );
+    }
+
+    #[test]
+    fn wrap_event_handler_arrow_local_shadows_method() {
+        let methods = vec!["switchLocale".into()];
+        let locals = vec!["switchLocale".into()];
+        let res = HandlerResolution { methods: &methods, props: &[], locals: &locals };
+        assert_eq!(
+            wrap_event_handler_body("() => switchLocale('en-us')", res).unwrap(),
+            "() => switchLocale('en-us')"
         );
     }
 

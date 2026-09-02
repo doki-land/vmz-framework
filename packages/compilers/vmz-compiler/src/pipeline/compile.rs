@@ -673,73 +673,129 @@ fn emit_runtime_js(options: &CompileOptions, report: &mut CompileReport) -> crat
     let runtime_root = options.runtime_dist.clone().unwrap_or_else(|| {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../runtimes/vmz-runtime/dist")
     });
-    let mut copies = vec![
-        ("server.js", "vmz-runtime.js"),
-        ("dom.js", "vmz-dom.js"),
-        // Companions required by `dom.js` / `dom.browser.js` / `dom.client.js` re-exports.
-        ("dom-core.js", "dom-core.js"),
-        ("dom-ssr.js", "dom-ssr.js"),
-        ("dom.client.js", "dom.client.js"),
-        ("dom.browser.js", "dom.browser.js"),
-        ("direct-host-box.js", "direct-host-box.js"),
-        ("unknown-component.js", "unknown-component.js"),
-        ("http.js", "vmz-http.js"),
-        ("client-nav.js", "vmz-client-nav.js"),
+    let browser_copies = [
+        ("faces/server.js", "vmz-runtime.js"),
+        ("faces/dom.js", "vmz-dom.js"),
+        ("browser/dom-core.js", "dom-core.js"),
+        ("ssr/dom-ssr.js", "dom-ssr.js"),
+        ("faces/dom.client.js", "dom.client.js"),
+        ("faces/dom.browser.js", "dom.browser.js"),
+        ("browser/direct-host-box.js", "direct-host-box.js"),
+        ("browser/unknown-component.js", "unknown-component.js"),
+        ("faces/http.js", "vmz-http.js"),
+        ("browser/client-nav.js", "vmz-client-nav.js"),
     ];
+    for (src_name, out_name) in browser_copies {
+        copy_runtime_file(&runtime_root, src_name, out_name, false, options, report)?;
+    }
     // Local `vmz serve` / `vmz dev` need the host; production `--release` deploys omit it.
     // 0.1.31: host companions nest under `_vmz/host/` (not delivery root).
+    // 0.2.0: file list from packages/runtimes/vmz/host-runtime-files.json only.
     if !options.release {
-        copies.push(("serve-host.mjs", "_vmz/host/vmz-serve-host.mjs"));
-        copies.extend([
-            ("native-addon.js", "_vmz/host/native-addon.js"),
-            ("list-client-components.js", "_vmz/host/list-client-components.js"),
-            ("deployment-registry.js", "_vmz/host/deployment-registry.js"),
-            ("render-host.js", "_vmz/host/render-host.js"),
-            ("route-layout-chain.js", "_vmz/host/route-layout-chain.js"),
-            ("localize-body-links.js", "_vmz/host/localize-body-links.js"),
-        ]);
-    }
-    for (src_name, out_name) in copies {
-        let runtime_src = runtime_root.join(src_name);
-        if !runtime_src.is_file() {
-            report.diagnostics.push(
-                ReportedDiagnostic::error(&runtime_src, "vmz::runtime::missing")
-                    .with_arg("name", src_name.to_string())
-                    .with_arg("root", runtime_root.display().to_string()),
-            );
-            continue;
+        let host_manifest = host_runtime_files_manifest();
+        for f in &host_manifest.files {
+            copy_runtime_file(
+                &runtime_root,
+                &f.src,
+                &f.out,
+                f.rewrite_vmz_runtime_import,
+                options,
+                report,
+            )?;
         }
-        let out = options.out_dir.join(out_name);
-        if let Some(parent) = out.parent() {
+        let stub = options.out_dir.join(&host_manifest.launcher_stub.out);
+        if let Some(parent) = stub.parent() {
             fs::create_dir_all(parent)?;
         }
-        if src_name == "serve-host.mjs" {
-            // Nested under `_vmz/host/`: delivery-root `vmz-runtime.js` is two levels up.
-            let mut text = fs::read_to_string(&runtime_src)?;
-            text = text.replace(
-                "from './vmz-runtime.js'",
-                "from '../../vmz-runtime.js'",
-            );
-            text = text.replace(
-                "from \"./vmz-runtime.js\"",
-                "from \"../../vmz-runtime.js\"",
-            );
-            fs::write(&out, text)?;
-        } else {
-            fs::copy(&runtime_src, &out)?;
-        }
-        report.emitted.push(out);
-    }
-    // Root launcher keeps `vmz serve` / tests on a stable path.
-    if !options.release {
-        let stub = options.out_dir.join("vmz-serve-host.mjs");
-        fs::write(
-            &stub,
-            "// Generated launcher — host companions live under `_vmz/host/` (0.1.31).\nimport './_vmz/host/vmz-serve-host.mjs';\n",
-        )?;
+        fs::write(&stub, &host_manifest.launcher_stub.body)?;
         report.emitted.push(stub);
     }
     Ok(())
+}
+
+fn copy_runtime_file(
+    runtime_root: &Path,
+    src_name: &str,
+    out_name: &str,
+    rewrite_vmz_runtime_import: bool,
+    options: &CompileOptions,
+    report: &mut CompileReport,
+) -> crate::Result<()> {
+    let runtime_src = runtime_root.join(src_name);
+    if !runtime_src.is_file() {
+        report.diagnostics.push(
+            ReportedDiagnostic::error(&runtime_src, "vmz::runtime::missing")
+                .with_arg("name", src_name.to_string())
+                .with_arg("root", runtime_root.display().to_string()),
+        );
+        return Ok(());
+    }
+    let out = options.out_dir.join(out_name);
+    if let Some(parent) = out.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut text = fs::read_to_string(&runtime_src)?;
+    if rewrite_vmz_runtime_import {
+        // Nested under `_vmz/host/`: delivery-root `vmz-runtime.js` is two levels up.
+        text = text.replace("from './vmz-runtime.js'", "from '../../vmz-runtime.js'");
+        text = text.replace("from \"./vmz-runtime.js\"", "from \"../../vmz-runtime.js\"");
+        text = text.replace("from '../faces/vmz-runtime.js'", "from '../../vmz-runtime.js'");
+        text = text.replace("from \"../faces/vmz-runtime.js\"", "from \"../../vmz-runtime.js\"");
+        text = text.replace("from '../faces/server.js'", "from '../../vmz-runtime.js'");
+        text = text.replace("from \"../faces/server.js\"", "from \"../../vmz-runtime.js\"");
+    } else if !out_name.starts_with("_vmz/") {
+        text = rewrite_flat_delivery_imports(&text);
+    }
+    fs::write(&out, text)?;
+    report.emitted.push(out);
+    Ok(())
+}
+
+/// `@vmz/core` dist is layered (`browser/`, `ssr/`, `faces/`); delivery root is flat.
+fn rewrite_flat_delivery_imports(text: &str) -> String {
+    let mut out = text.to_string();
+    const PAIRS: &[(&str, &str)] = &[
+        ("../browser/dom-core.js", "./dom-core.js"),
+        ("../browser/direct-host-box.js", "./direct-host-box.js"),
+        ("../browser/unknown-component.js", "./unknown-component.js"),
+        ("../browser/client-nav.js", "./vmz-client-nav.js"),
+        ("../ssr/dom-ssr.js", "./dom-ssr.js"),
+        ("../faces/server.js", "./vmz-runtime.js"),
+        ("../faces/vmz-runtime.js", "./vmz-runtime.js"),
+        ("../faces/http.js", "./vmz-http.js"),
+    ];
+    for (from, to) in PAIRS {
+        out = out.replace(&format!("'{from}'"), &format!("'{to}'"));
+        out = out.replace(&format!("\"{from}\""), &format!("\"{to}\""));
+    }
+    out
+}
+
+#[derive(Debug, Deserialize)]
+struct HostRuntimeFilesManifest {
+    files: Vec<HostRuntimeFileEntry>,
+    #[serde(rename = "launcherStub")]
+    launcher_stub: HostLauncherStub,
+}
+
+#[derive(Debug, Deserialize)]
+struct HostRuntimeFileEntry {
+    src: String,
+    out: String,
+    #[serde(default, rename = "rewriteVmzRuntimeImport")]
+    rewrite_vmz_runtime_import: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct HostLauncherStub {
+    out: String,
+    body: String,
+}
+
+fn host_runtime_files_manifest() -> HostRuntimeFilesManifest {
+    // packages/compilers/vmz-compiler → packages/runtimes/vmz/host-runtime-files.json
+    const RAW: &str = include_str!("../../../../runtimes/vmz/host-runtime-files.json");
+    serde_json::from_str(RAW).expect("host-runtime-files.json must parse")
 }
 
 /// Transpile `src/server/**/*.ts` `dist/#server/**/*.js`.
