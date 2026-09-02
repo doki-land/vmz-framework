@@ -4,7 +4,7 @@
       data-vmz-ui="query-form"
       data-dense="true"
       :aria-label="label"
-      @submit="this.onSubmitGuard"
+      @submit="onSubmitGuard"
     >
       <slot />
     </form>

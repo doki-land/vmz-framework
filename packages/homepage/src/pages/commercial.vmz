@@ -8,7 +8,7 @@
           Vue-familiar authoring. Compile once into a Unified Program Graph — ship Commercial pages without a second design runtime.
         </p>
         <div class="vmz-commercial-hero__actions">
-          <Button type="button" @click="() => this.scrollContact()">Start a project</Button>
+          <Button type="button" @click="scrollContact">Start a project</Button>
           <Button type="button" variant="secondary" @click="() => (drawerOpen = true)">Open details</Button>
           <Link href="/documents">Read the docs</Link>
         </div>
@@ -36,12 +36,12 @@
           <Card title="Starter" description="Local static host and CDN WebArtifact.">
             <p class="vmz-commercial-price"><span>Open</span> source core</p>
             <Badge tone="info">Self-serve</Badge>
-            <Button type="button" variant="secondary" @click="() => this.scrollContact()">Contact sales</Button>
+            <Button type="button" variant="secondary" @click="scrollContact">Contact sales</Button>
           </Card>
           <Card title="Production" description="ServerArtifact parity, observability, and official conformance gates.">
             <p class="vmz-commercial-price"><span>Team</span> release proof</p>
             <Badge tone="success">Recommended</Badge>
-            <Button type="button" @click="() => this.scrollContact()">Talk to us</Button>
+            <Button type="button" @click="scrollContact">Talk to us</Button>
           </Card>
         </div>
       </section>
@@ -52,8 +52,8 @@
           :error-summary="contactSummary"
           summary-id="home-commercial-summary"
           :described-by="contactDescribedBy"
-          @submit="() => this.confirmContact()"
-          @reset="() => this.resetContact()"
+          @submit="confirmContact"
+          @reset="resetContact"
         >
           <Field
             label="Work email"
@@ -65,7 +65,7 @@
             :error="emailError"
             :invalid-attr="emailInvalid"
             :value="email"
-            @input="(e) => this.onEmail(e)"
+            @input="onEmail"
           />
           <p data-vmz-fixture="commercial-email">email:{{ email }}</p>
           <div data-vmz-fixture="commercial-form-actions" class="vmz-commercial-actions">
@@ -90,7 +90,7 @@
         <div v-if="showEmpty">
           <Empty title="No projects yet" description="Create a project to see it listed here.">
             <div data-vmz-fixture="commercial-create">
-              <Button type="button" @click="() => this.createProject()">Create project</Button>
+              <Button type="button" @click="createProject">Create project</Button>
             </div>
           </Empty>
         </div>
@@ -102,7 +102,7 @@
               title="Message queued"
               description="We will reply to your work email within one business day."
             >
-              <Button type="button" variant="ghost" @click="() => this.resetWorkspace()">Dismiss</Button>
+              <Button type="button" variant="ghost" @click="resetWorkspace">Dismiss</Button>
             </Notification>
           </div>
           <Alert

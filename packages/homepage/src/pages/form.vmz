@@ -16,8 +16,8 @@
           :described-by="formDescribedBy"
           :disabled="submitting"
           :disabled-attr="disabledAttr"
-          @submit="() => this.submit()"
-          @reset="() => this.reset()"
+          @submit="submit"
+          @reset="reset"
         >
           <div class="vmz-form-email-row" data-vmz-fixture="form-email-row">
             <Field
@@ -30,10 +30,10 @@
               :error="emailError"
               :invalid-attr="emailInvalid"
               :value="email"
-              @input="(e) => this.onEmail(e)"
+              @input="onEmail"
             />
             <div data-vmz-fixture="form-tip-toggle">
-              <Button type="button" variant="ghost" @click="() => this.toggleTip()">Why?</Button>
+              <Button type="button" variant="ghost" @click="toggleTip">Why?</Button>
             </div>
             <Tooltip :open="tipOpen" :open-attr="tipOpenAttr" content="Use your company domain when possible." tooltip-id="home-form-email-tip">
               <span data-vmz-tooltip="anchor" aria-hidden="true"></span>
@@ -59,7 +59,7 @@
               :invalid-attr="roleInvalid"
               :value="role"
               :options="roleOptions"
-              @change="(e) => this.onRole(e)"
+              @change="onRole"
             />
           </FormItem>
 
@@ -79,9 +79,9 @@
             :open-attr="teamOpenAttr"
             :show-empty="teamEmpty"
             empty-text="No matching team"
-            @input="(e) => this.onTeamInput(e)"
-            :on-select="(v) => this.onTeamSelect(v)"
-            :on-close="() => this.closeTeamList()"
+            @input="onTeamInput"
+            :on-select="onTeamSelect"
+            :on-close="closeTeamList"
           />
           <p data-vmz-fixture="form-team">team:{{ team }}</p>
 
@@ -95,7 +95,7 @@
             :error="dateError"
             :invalid-attr="dateInvalid"
             :value="preferredDate"
-            @change="(e) => this.onDate(e)"
+            @change="onDate"
           />
 
           <Upload
@@ -115,8 +115,8 @@
             empty-text="No file selected"
             cancel-label="Cancel upload"
             :clear-token="uploadClearToken"
-            :on-value="(items) => this.onUploadValue(items)"
-            :on-status="(s) => this.onUploadStatus(s)"
+            :on-value="onUploadValue"
+            :on-status="onUploadStatus"
           />
 
           <TextArea
@@ -141,14 +141,14 @@
             :invalid-attr="planInvalid"
             :value="plan"
             :items="planItems"
-            @change="(v) => this.onPlan(v)"
+            @change="onPlan"
           />
 
           <Checkbox
             label="I agree to be contacted"
             control-id="home-form-agree"
             :checked="agree"
-            @change="(e) => this.onAgree(e)"
+            @change="onAgree"
           />
           <p v-if="agreeError" data-vmz-fixture="form-agree-error" role="alert">{{ agreeError }}</p>
 
@@ -183,8 +183,8 @@
           error-id="home-upload-client-err"
           empty-text="No local file"
           :clear-token="clientClearToken"
-          :on-value="(items) => this.onClientValue(items)"
-          :on-status="(s) => this.onClientStatus(s)"
+          :on-value="onClientValue"
+          :on-status="onClientStatus"
         />
         <p data-vmz-fixture="upload-client-state">client:{{ clientStatus }};id:{{ clientId }};name:{{ clientName }};bytes:{{ clientBytes }}</p>
 
@@ -201,9 +201,9 @@
           empty-text="No object file"
           cancel-label="Cancel object upload"
           :clear-token="objectClearToken"
-          :on-presign="(file) => this.presignObject(file)"
-          :on-value="(items) => this.onObjectValue(items)"
-          :on-status="(s) => this.onObjectStatus(s)"
+          :on-presign="presignObject"
+          :on-value="onObjectValue"
+          :on-status="onObjectStatus"
         />
         <p data-vmz-fixture="upload-object-state">object:{{ objectStatus }};key:{{ objectKey }};bytes:{{ objectBytes }}</p>
 
@@ -222,8 +222,8 @@
           empty-text="No files selected"
           cancel-label="Cancel multi upload"
           :clear-token="multiClearToken"
-          :on-value="(items) => this.onMultiValue(items)"
-          :on-status="(s) => this.onMultiStatus(s)"
+          :on-value="onMultiValue"
+          :on-status="onMultiStatus"
         />
         <p data-vmz-fixture="upload-multi-state">multi:{{ multiStatus }};count:{{ multiCount }};ids:{{ multiIds }}</p>
 
@@ -240,8 +240,8 @@
           error-id="home-upload-dir-err"
           empty-text="No folder files"
           :clear-token="dirClearToken"
-          :on-value="(items) => this.onDirValue(items)"
-          :on-status="(s) => this.onDirStatus(s)"
+          :on-value="onDirValue"
+          :on-status="onDirStatus"
         />
         <p data-vmz-fixture="upload-dir-state">dir:{{ dirStatus }};mode:{{ dirMode }};count:{{ dirCount }};names:{{ dirNames }}</p>
 
@@ -261,8 +261,8 @@
           cancel-label="Pause upload"
           resume-label="Resume upload"
           :clear-token="resumeClearToken"
-          :on-value="(items) => this.onResumeValue(items)"
-          :on-status="(s) => this.onResumeStatus(s)"
+          :on-value="onResumeValue"
+          :on-status="onResumeStatus"
         />
         <p data-vmz-fixture="upload-resume-state">resume:{{ resumeStatus }};id:{{ resumeId }};bytes:{{ resumeBytes }};chunks:{{ resumeChunks }};head:{{ resumeHead }}</p>
       </Card>

@@ -3,14 +3,14 @@
     <AppShell brand="VMZ" home-href="/" nav-label="Product" :nav="navItems">
       <div class="vmz-product-toolbar" data-vmz-fixture="product-toolbar">
         <Badge tone="brand">{{ versionLabel }}</Badge>
-        <Button type="button" variant="secondary" @click="() => this.toggleVersion()">
+        <Button type="button" variant="secondary" @click="toggleVersion">
           Switch version
         </Button>
-        <Button type="button" variant="ghost" @click="() => this.toggleLocale()">
+        <Button type="button" variant="ghost" @click="toggleLocale">
           Locale: {{ localeLabel }}
         </Button>
-        <Button type="button" @click="() => this.cycleDensity()">Cycle density</Button>
-        <Button type="button" variant="secondary" @click="() => this.toggleDir()">Toggle RTL</Button>
+        <Button type="button" @click="cycleDensity">Cycle density</Button>
+        <Button type="button" variant="secondary" @click="toggleDir">Toggle RTL</Button>
         <Field
           label="Search"
           control-id="home-product-search"
@@ -18,7 +18,7 @@
           error-id="home-product-search-err"
           described-by="home-product-search-desc"
           :value="search"
-          @input="(e) => this.onSearch(e)"
+          @input="onSearch"
         />
         <p data-vmz-fixture="product-meta">
           version:{{ version }};locale:{{ locale }};search:{{ search }};copied:{{ copied }};density:{{ density }};dir:{{ dir }}
@@ -48,7 +48,7 @@
                 caption="shell"
                 code="pnpm add @vmz/ui"
                 :copy-label="copyLabel"
-                :on-copy="() => this.copyInstall()"
+                :on-copy="copyInstall"
               />
             </div>
             <div v-if="isV0">
@@ -56,7 +56,7 @@
                 caption="shell"
                 code="pnpm add @vmz/ui@0.0.0"
                 :copy-label="copyLabel"
-                :on-copy="() => this.copyInstall()"
+                :on-copy="copyInstall"
               />
             </div>
             <p v-if="copiedYes" data-vmz-fixture="product-copied" role="status">Copied install snippet</p>

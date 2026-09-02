@@ -19,8 +19,8 @@
         :aria-describedby="describedBy"
         :value="value"
         :disabled="disabled"
-        @input="this.onDomInput"
-        :onKeyDown="this.onKeyDown"
+        @input="onDomInput"
+        :onKeyDown="onKeyDown"
       />
       <ul
         v-if="listOpen"
@@ -28,7 +28,7 @@
         class="vmz-ui-autocomplete__list"
         role="listbox"
         data-vmz-autocomplete="list"
-        @click="this.onListClick"
+        @click="onListClick"
       >
         <li
           v-for="opt in options"

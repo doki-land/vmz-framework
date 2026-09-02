@@ -16,8 +16,8 @@
         :aria-controls="panelId"
         :aria-invalid="error ? 'true' : 'false'"
         :aria-describedby="describedBy"
-        @click="this.toggle"
-        :onKeyDown="this.onTriggerKeyDown"
+        @click="toggle"
+        :onKeyDown="onTriggerKeyDown"
       >
         <span class="vmz-ui-date-picker__value" data-vmz-date="value">{{ displayLabel }}</span>
         <span class="vmz-ui-date-picker__chev" aria-hidden="true"></span>
@@ -34,7 +34,7 @@
         data-vmz-overlay-owner="date-picker"
         data-vmz-focus="enter"
         data-vmz-date="panel"
-        :onKeyDown="this.onPanelKeyDown"
+        :onKeyDown="onPanelKeyDown"
       >
         <div class="vmz-ui-date-picker__monthbar">
           <button
@@ -42,7 +42,7 @@
             class="vmz-ui-date-picker__nav"
             data-vmz-date="prev"
             aria-label="Previous month"
-            @click="this.prevMonth"
+            @click="prevMonth"
           >‹</button>
           <p class="vmz-ui-date-picker__month" data-vmz-date="month">{{ monthLabel }}</p>
           <button
@@ -50,7 +50,7 @@
             class="vmz-ui-date-picker__nav"
             data-vmz-date="next"
             aria-label="Next month"
-            @click="this.nextMonth"
+            @click="nextMonth"
           >›</button>
         </div>
         <div class="vmz-ui-date-picker__weekdays" aria-hidden="true">
@@ -72,7 +72,7 @@
             :aria-selected="day.selected ? 'true' : 'false'"
             :aria-disabled="day.disabled ? 'true' : 'false'"
             :disabled="day.disabled"
-            @click="this.onDayClick"
+            @click="onDayClick"
           >{{ day.label }}</button>
         </div>
       </div>

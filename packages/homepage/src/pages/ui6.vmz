@@ -10,9 +10,9 @@
 
       <p data-vmz-fixture="ui6-state">density:{{ density }};dir:{{ dir }};theme:{{ theme }}</p>
       <div class="vmz-ui6-actions">
-        <Button type="button" @click="() => this.cycleDensity()">Cycle density</Button>
-        <Button type="button" variant="secondary" @click="() => this.toggleDir()">Toggle RTL</Button>
-        <Button type="button" variant="ghost" @click="() => this.toggleTheme()">Toggle high-contrast</Button>
+        <Button type="button" @click="cycleDensity">Cycle density</Button>
+        <Button type="button" variant="secondary" @click="toggleDir">Toggle RTL</Button>
+        <Button type="button" variant="ghost" @click="toggleTheme">Toggle high-contrast</Button>
       </div>
 
       <Card title="Density sample" description="Button padding follows data-density; chrome from Style Theme.">
@@ -22,7 +22,7 @@
           control-id="home-ui6-sample"
           description-id="home-ui6-sample-desc"
           :value="sample"
-          @input="(e) => this.onSample(e)"
+          @input="onSample"
         />
         <Button type="button">Probe control</Button>
       </Card>

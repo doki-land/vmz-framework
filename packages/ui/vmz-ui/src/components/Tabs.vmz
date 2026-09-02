@@ -4,8 +4,8 @@
         class="vmz-ui-tabs__list"
         role="tablist"
         :aria-label="label"
-        :onKeyDown="this.onListKeyDown"
-        @click="this.onListClick"
+        :onKeyDown="onListKeyDown"
+        @click="onListClick"
       >
         <button
           v-for="item in items"

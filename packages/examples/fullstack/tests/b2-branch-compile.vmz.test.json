@@ -19,7 +19,7 @@
             "expect": {
                 "direct": true,
                 "noRender": true,
-                "includes": "api.ifBlock(this,"
+                "includes": "api.comment('vmz-if')"
             }
         }
     ]

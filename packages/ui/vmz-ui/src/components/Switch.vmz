@@ -8,8 +8,8 @@
         :aria-checked="checked"
         :aria-describedby="describedBy"
         :disabled="disabled"
-        @click="this.toggle"
-        :onKeyDown="this.onKeyDown"
+        @click="toggle"
+        :onKeyDown="onKeyDown"
       >
         <span class="vmz-ui-switch__thumb" aria-hidden="true"></span>
       </button>

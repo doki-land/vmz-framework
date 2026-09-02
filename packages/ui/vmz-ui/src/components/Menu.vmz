@@ -7,8 +7,8 @@
         aria-haspopup="menu"
         :aria-expanded="open ? 'true' : 'false'"
         :aria-controls="menuId"
-        @click="this.toggle"
-        :onKeyDown="this.onTriggerKeyDown"
+        @click="toggle"
+        :onKeyDown="onTriggerKeyDown"
       >
         {{ label }}
       </button>
@@ -21,7 +21,7 @@
         data-vmz-overlay-owner="menu"
         data-vmz-focus="enter"
         tabindex="-1"
-        :onKeyDown="this.onMenuKeyDown"
+        :onKeyDown="onMenuKeyDown"
       >
         <button
           v-for="item in items"
@@ -30,7 +30,7 @@
           class="vmz-ui-menu__item"
           role="menuitem"
           :data-vmz-menu-item="item.id"
-          @click="this.onItemClick"
+          @click="onItemClick"
         >
           {{ item.title }}
         </button>

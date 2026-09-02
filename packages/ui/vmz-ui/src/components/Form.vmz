@@ -6,8 +6,8 @@
       data-novalidate="true"
       :aria-label="label"
       :aria-describedby="describedBy"
-      @submit="this.onSubmitGuard"
-      @reset="this.onResetGuard"
+      @submit="onSubmitGuard"
+      @reset="onResetGuard"
     >
       <div v-if="errorSummary" :id="summaryId" class="vmz-ui-form__summary" role="alert" data-vmz-form="summary">
         {{ errorSummary }}

@@ -18,7 +18,7 @@
             "kind": "graph",
             "expect": {
                 "direct": true,
-                "includesAll": ["api.bindText(this,", "stable:", "branches:"]
+                "includesAll": ["api.trackPatch(this,", "stable:", "branches:"]
             }
         }
     ]

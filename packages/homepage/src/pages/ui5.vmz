@@ -9,7 +9,7 @@
     >
       <Breadcrumb label="Console path" :items="crumbs" />
 
-      <QueryForm label="Dense query" @submit="() => this.applyQuery()">
+      <QueryForm label="Dense query" @submit="applyQuery">
         <Field
           label="Name"
           control-id="home-ui5-name"
@@ -28,7 +28,7 @@
           :value="statusQuery"
           @input="(e) => (statusQuery = e.target.value)"
         />
-        <Button type="button" @click="() => this.applyQuery()">Search</Button>
+        <Button type="button" @click="applyQuery">Search</Button>
         <Button type="button" :disabled="writeDisabled">Export</Button>
       </QueryForm>
 
@@ -36,8 +36,8 @@
       <p data-vmz-fixture="ui5-sort">sort:{{ sortKey }}:{{ sortDir }}</p>
       <p data-vmz-fixture="ui5-perm">write:{{ writeDisabled ? 'denied' : 'allowed' }}</p>
 
-      <Button type="button" @click="() => this.toggleLoading()">Toggle loading</Button>
-      <Button type="button" @click="() => this.toggleWrite()">Toggle write</Button>
+      <Button type="button" @click="toggleLoading">Toggle loading</Button>
+      <Button type="button" @click="toggleWrite">Toggle write</Button>
 
       <Skeleton :loading="loading" :loading-attr="loadingAttr">
         <Table
@@ -49,8 +49,8 @@
           action-label="Open"
           :sort-key="sortKey"
           :sort-dir="sortDir"
-          :on-sort="(id) => this.sortBy(id)"
-          :on-row-action="(id) => this.openDetail(id)"
+          :on-sort="sortBy"
+          :on-row-action="openDetail"
         />
       </Skeleton>
 

@@ -2,7 +2,7 @@
   <div data-vmz-fixture="ui4" :data-density="density">
     <AppShell brand="VMZ" home-href="/" nav-label="UI4" :nav="navItems">
       <p data-vmz-fixture="ui4-density">density:{{ density }}</p>
-      <Button type="button" @click="() => this.toggleDensity()">Toggle density</Button>
+      <Button type="button" @click="toggleDensity">Toggle density</Button>
 
       <Card title="Status tones">
         <Alert tone="info" role-name="status" title="Info" description="status.info tokens" />

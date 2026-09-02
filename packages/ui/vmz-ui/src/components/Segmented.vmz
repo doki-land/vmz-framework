@@ -6,7 +6,7 @@
       type="button"
       :data-vmz-segment="opt.value"
       :aria-pressed="opt.value === value ? 'true' : 'false'"
-      @click="() => this.onPick(opt.value)"
+      @click="() => onPick(opt.value)"
     >{{ opt.label }}</button>
   </div>
 </template>

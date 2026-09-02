@@ -6,8 +6,8 @@
         role="tree"
         :aria-labelledby="labelId"
         :aria-label="label"
-        @click="this.onTreeClick"
-        :onKeyDown="this.onTreeKeyDown"
+        @click="onTreeClick"
+        :onKeyDown="onTreeKeyDown"
       >
         <li
           v-for="item in items"

@@ -6,8 +6,8 @@
       <p data-vmz-fixture="inspector-state">density:{{ density }};dir:{{ dir }}</p>
 
       <div class="inspector-actions">
-        <Button type="button" @click="() => this.cycleDensity()">Cycle density</Button>
-        <Button type="button" variant="secondary" @click="() => this.toggleDir()">Toggle RTL</Button>
+        <Button type="button" @click="cycleDensity">Cycle density</Button>
+        <Button type="button" variant="secondary" @click="toggleDir">Toggle RTL</Button>
       </div>
 
       <Field
@@ -19,11 +19,11 @@
         errorId="inspector-query-err"
         :describedBy="queryDescribedBy"
         :value="query"
-        @input="(e) => this.onQueryInput(e)"
+        @input="onQueryInput"
       />
 
-      <Button type="button" @click="() => this.openDialog()">Replay error</Button>
-      <Dialog :open="open" title="Error replay" titleId="inspector-dialog-title" :onClose="() => this.closeDialog()">
+      <Button type="button" @click="openDialog">Replay error</Button>
+      <Dialog :open="open" title="Error replay" titleId="inspector-dialog-title" :onClose="closeDialog">
         <p data-vmz-fixture="inspector-replay">replay:generation=1</p>
       </Dialog>
     </AppShell>

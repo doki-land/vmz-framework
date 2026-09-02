@@ -13,9 +13,9 @@
       </p>
 
       <div class="vmz-stacking-actions">
-        <Button type="button" @click="() => this.openDrawer()">Open drawer (stack 0)</Button>
-        <Button type="button" variant="secondary" @click="() => this.openDialog()">Open dialog (stack 1)</Button>
-        <Button type="button" variant="ghost" @click="() => this.openPopover()">Open popover (stack 2)</Button>
+        <Button type="button" @click="openDrawer">Open drawer (stack 0)</Button>
+        <Button type="button" variant="secondary" @click="openDialog">Open dialog (stack 1)</Button>
+        <Button type="button" variant="ghost" @click="openPopover">Open popover (stack 2)</Button>
       </div>
 
       <Drawer
@@ -23,7 +23,7 @@
         title="Base drawer"
         title-id="home-stack-drawer-title"
         stack-level="0"
-        :on-close="() => this.closeDrawer()"
+        :on-close="closeDrawer"
       >
         <p data-vmz-fixture="stacking-drawer-body">Base layer stack-level=0</p>
       </Drawer>
@@ -33,7 +33,7 @@
         title="Stacked dialog"
         title-id="home-stack-dialog-title"
         stack-level="1"
-        :on-close="() => this.closeDialog()"
+        :on-close="closeDialog"
       >
         <p data-vmz-fixture="stacking-dialog-body">Middle layer stack-level=1</p>
       </Dialog>
@@ -43,7 +43,7 @@
         title="Top popover"
         title-id="home-stack-popover-title"
         stack-level="2"
-        :on-close="() => this.closePopover()"
+        :on-close="closePopover"
       >
         <p data-vmz-fixture="stacking-popover-body">Top layer stack-level=2</p>
       </Popover>
