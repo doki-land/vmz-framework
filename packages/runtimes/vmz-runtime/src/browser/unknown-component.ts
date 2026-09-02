@@ -3,13 +3,11 @@
  * Leaf failure → subtree error node; do not throw out of document SSR.
  */
 
-/** @type {string} */
+import type { SerializeTreeNode, UnknownComponentErrorDetail } from './dom-core.types.js';
+
 export const UNKNOWN_COMPONENT_ERROR = 'unknown-component';
 
-/**
- * @returns {boolean}
- */
-function isDevSurface() {
+function isDevSurface(): boolean {
     try {
         if (typeof process !== 'undefined' && process.env) {
             if (process.env.VMZ_DEV === '1' || process.env.VMZ_DEV === 'true') return true;
@@ -21,13 +19,9 @@ function isDevSurface() {
     return false;
 }
 
-/**
- * Append a leaf diagnostic for tooling (does not replace the error node).
- * @param {string} name
- * @param {string} [via]
- */
-export function noteUnknownComponent(name, via = 'ssr') {
-    const detail = { kind: UNKNOWN_COMPONENT_ERROR, component: String(name || ''), via };
+/** Append a leaf diagnostic for tooling (does not replace the error node). */
+export function noteUnknownComponent(name: string, via = 'ssr'): void {
+    const detail: UnknownComponentErrorDetail = { kind: UNKNOWN_COMPONENT_ERROR, component: String(name || ''), via };
     try {
         if (typeof console !== 'undefined' && typeof console.error === 'function') {
             console.error(`vmz:dom unknown component <${name} /> (${via})`);
@@ -41,27 +35,21 @@ export function noteUnknownComponent(name, via = 'ssr') {
         if (!Array.isArray(g.__VMZ_COMPONENT_ERRORS__)) {
             g.__VMZ_COMPONENT_ERRORS__ = [];
         }
-        /** @type {unknown[]} */
-        const bag = g.__VMZ_COMPONENT_ERRORS__;
+        const bag = g.__VMZ_COMPONENT_ERRORS__ as UnknownComponentErrorDetail[];
         bag.push(detail);
     } catch {
         /* ignore */
     }
 }
 
-/**
- * SSR serialize-tree error node (keeps document HTTP 200).
- * @param {string} name
- */
-export function serializeUnknownComponentNode(name) {
+/** SSR serialize-tree error node (keeps document HTTP 200). */
+export function serializeUnknownComponentNode(name: string): SerializeTreeNode {
     noteUnknownComponent(name, 'ssr');
-    /** @type {Record<string, string>} */
-    const attrs = {
+    const attrs: Record<string, string> = {
         'data-vmz-error': UNKNOWN_COMPONENT_ERROR,
         'data-vmz-component': String(name || ''),
     };
-    /** @type {any[]} */
-    const children = [];
+    const children: SerializeTreeNode[] = [];
     if (isDevSurface()) {
         children.push({
             __kind: 'text',
@@ -74,18 +62,13 @@ export function serializeUnknownComponentNode(name) {
         attrs,
         children,
         appendChild(c) {
-            if (c != null) this.children.push(c);
+            if (c != null) this.children!.push(c);
         },
     };
 }
 
-/**
- * Live DOM error host (client create / schedule).
- * @param {string} name
- * @param {string} [via]
- * @returns {HTMLElement}
- */
-export function createUnknownComponentElement(name, via = 'client') {
+/** Live DOM error host (client create / schedule). */
+export function createUnknownComponentElement(name: string, via = 'client'): HTMLElement {
     noteUnknownComponent(name, via);
     const host = document.createElement('div');
     host.setAttribute('data-vmz-error', UNKNOWN_COMPONENT_ERROR);
@@ -96,13 +79,8 @@ export function createUnknownComponentElement(name, via = 'client') {
     return host;
 }
 
-/**
- * Mark an existing island host as unknown (resume / EventEntry).
- * @param {HTMLElement} el
- * @param {string} name
- * @param {string} [via]
- */
-export function markUnknownComponentHost(el, name, via = 'resume') {
+/** Mark an existing island host as unknown (resume / EventEntry). */
+export function markUnknownComponentHost(el: HTMLElement, name: string, via = 'resume'): void {
     if (!el) return;
     noteUnknownComponent(name, via);
     el.setAttribute('data-vmz-error', UNKNOWN_COMPONENT_ERROR);

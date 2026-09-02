@@ -1,6 +1,5 @@
-// @ts-nocheck
 /**
- * Generic VMZ Node host — SSR Route Graph pages + dist static + RPC/REST.
+ * Generic VMZ Node host �?SSR Route Graph pages + dist static + RPC/REST.
  *
  * Invoked by `vmz serve` / `vmz dev` (or: node dist/vmz-serve-host.mjs).
  *
@@ -10,8 +9,8 @@
  *
  * `VMZ_DEV=1`: POST `/__vmz/reload` soft-reloads modules (cache-bust import);
  * GET `/__vmz/events` SSE notifies the browser:
- * - island HMR → re-import `entry-client.js` (no full document reload)
- * - otherwise → `location.reload`
+ * - island HMR �?re-import `entry-client.js` (no full document reload)
+ * - otherwise �?`location.reload`
  *
  * Dev resolve hook propagates `?t=` onto nested relative `file:` imports under
  * dist so soft reload does not keep a stale `lib/*.js` ESM cache entry.
@@ -24,11 +23,12 @@ import { createRequire, registerHooks } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { listClientComponents } from './list-client-components.js';
+import type { ClosedAccessResult, HostRequestOpts, LocaleHostCtx, SseClient } from '../shared/host.types.js';
 import { LOCALE_LINK_PLAN_SCHEMA, linkRouteAliasesFromUnits, localeHrefTableFromPlan, localizeBodyLinks } from './localize-body-links.js';
 import { loadNativeAddon } from './native-addon.js';
 import { createRenderHost } from './render-host.js';
 import { resolveRouteLayoutChain } from './route-layout-chain.js';
-import { handleNodeRequest, setRoutes, setServerModuleResolver } from './vmz-runtime.js';
+import { handleNodeRequest, setRoutes, setServerModuleResolver } from '../faces/vmz-runtime.js';
 
 const ROUTE_CATALOG_SCHEMA = 'vmz.route.catalog.v0';
 const ROUTE_CATALOG_REL = '_vmz/route-catalog.json';
@@ -36,7 +36,6 @@ const LOCALE_LINK_PLAN_REL = '_vmz/locale-link-plan.json';
 
 const require = createRequire(import.meta.url);
 
-/** App delivery root. Host companions may live under `_vmz/host/` (0.1.31). */
 function resolveServeDistDir() {
     if (process.env.VMZ_DIST) return path.resolve(process.env.VMZ_DIST);
     const here = path.dirname(fileURLToPath(import.meta.url));
@@ -49,14 +48,12 @@ function resolveServeDistDir() {
 
 const distDir = resolveServeDistDir();
 
-/** App project root for bare import / JSON resolve (dev SSR ≡ build node_modules). */
 function projectRootForResolve() {
     const fromEnv = typeof process.env.VMZ_PROJECT_ROOT === 'string' ? process.env.VMZ_PROJECT_ROOT.trim() : '';
     if (fromEnv) return path.resolve(fromEnv);
     return process.cwd();
 }
 
-/** @type {ReturnType<typeof createRequire> | null} */
 let appPackageRequire = null;
 
 function appPackageRequireResolve() {
@@ -121,7 +118,7 @@ globalThis.__VMZ_RPC_ORIGIN = `http://${host}:${port}`;
 
 /**
  * Soft reload only busts the top-level `import(page?t=token)`. Nested relative
- * imports (`../../lib/units.js`) keep the first-loaded ESM cache entry — so a
+ * imports (`../../lib/units.js`) keep the first-loaded ESM cache entry �?so a
  * page can demand exports that the stale dep never had (or vice versa).
  * Propagate `t` from parentURL onto file: children under this dist.
  */
@@ -154,34 +151,32 @@ if (isDev) {
     });
 }
 
-/** @type {number} */
 let reloadToken = Date.now();
-/** @type {Awaited<ReturnType<typeof createRenderHost>> | null} */
+
 let ssrRenderHost = null;
-/** @type {string | null} Correlatable build id from vmz dev (Living §12.8). */
+
 let lastDevBuildId = null;
-/** @type {Array<{ chunkId: string, pageRel: string, segs: ReturnType<typeof parsePathPattern> }>} */
+
 let pageCatalog = [];
-/** @type {Map<string, any>} */
+
 const pageCtors = new Map();
-/** Stylesheet from deployment `cssEntry` (e.g. vmz.css). */
+
 let cssEntry = null;
-/** Fingerprint of style inputs — busts `@import` siblings when tokens change (VMZ-8). */
+
 let styleBundleHash = null;
-/** @type {{ defaultThemeId: string, themeIds: string[], activationAttr: string, contentHash: string|null } | null} */
+
 let styleTheme = null;
-/** Locale route realization artifact from `_vmz/locale-route-realization.json` (optional). */
+
 let localeArtifact = null;
-/** Frozen locale link plan from `_vmz/locale-link-plan.json` (0.1.30 authority). */
+
 let localeLinkPlan = null;
-/** @type {Set<import('node:http').ServerResponse>} */
-const sseClients = new Set();
-/** In-flight HTTP requests (graceful shutdown drain). */
+const sseClients = new Set<SseClient>();
+
 let inFlight = 0;
-/** When true, refuse new work except health. */
+
 let shuttingDown = false;
 let ready = false;
-/** @type {{ message: string, stack?: string, at: number } | null} */
+
 let lastDevError = null;
 
 setServerModuleResolver((moduleId) => {
@@ -194,14 +189,10 @@ try {
     ready = true;
 } catch (err) {
     lastDevError = normalizeDevError(err);
-    ready = true; // still accept HTTP — serve error page / recover on next reload
+    ready = true; // still accept HTTP �?serve error page / recover on next reload
     console.error('vmz serve: initial load failed (dev host stays up)', lastDevError.message);
 }
 
-/**
- * @param {import('node:http').IncomingMessage} req
- * @returns {Promise<string>}
- */
 function readRequestBody(req) {
     return new Promise((resolve, reject) => {
         const chunks = [];
@@ -211,16 +202,15 @@ function readRequestBody(req) {
     });
 }
 
-/**
- * @param {string} pathname
- * @returns {Promise<string | null>}
- */
-async function renderPage(pathname, opts = {}) {
+async function renderPage(pathname, opts: HostRequestOpts = {}) {
     const rendered = await renderPageStream(pathname, opts);
     if (!rendered) return null;
-    const stream = rendered.stream ?? rendered;
+    const raw = rendered.stream ?? rendered;
+    if (!raw || typeof raw !== 'object' || typeof (raw as AsyncIterable<string>)[Symbol.asyncIterator] !== 'function') {
+        return null;
+    }
     let html = '';
-    for await (const chunk of stream) {
+    for await (const chunk of raw as AsyncIterable<string>) {
         html += chunk;
     }
     return html;
@@ -230,11 +220,8 @@ async function renderPage(pathname, opts = {}) {
  * Stream shell + Direct serialize body for the matched file-route page.
  * Runs Page.access (closed allow/redirect/not-found/deny) before load;
  * POST may run Page.action before re-render.
- * @param {string} pathname
- * @param {{ signal?: AbortSignal, searchParams?: URLSearchParams, cookieHeader?: string, method?: string, body?: unknown }} [opts]
- * @returns {Promise<{ status: number, stream?: AsyncGenerator<string, void, void>, redirect?: string, headers?: Record<string, string> } | null>}
  */
-async function renderPageStream(pathname, opts = {}) {
+async function renderPageStream(pathname, opts: any = {}) {
     try {
         return await renderPageStreamInner(pathname, opts);
     } catch (err) {
@@ -245,12 +232,7 @@ async function renderPageStream(pathname, opts = {}) {
     }
 }
 
-/**
- * @param {string} pathname
- * @param {{ signal?: AbortSignal, searchParams?: URLSearchParams, cookieHeader?: string, method?: string, body?: unknown }} [opts]
- * @returns {Promise<{ status: number, stream?: AsyncGenerator<string, void, void>, redirect?: string, headers?: Record<string, string> } | null>}
- */
-async function renderPageStreamInner(pathname, opts = {}) {
+async function renderPageStreamInner(pathname, opts: any = {}) {
     if (isDev && lastDevError && pageCtors.size === 0) {
         return { status: 500, stream: emitDevErrorHtml(lastDevError) };
     }
@@ -388,11 +370,7 @@ async function renderPageStreamInner(pathname, opts = {}) {
     };
 }
 
-/**
- * @param {unknown} access
- * @returns {{ kind: 'allow' } | { kind: 'redirect', location: string } | { kind: 'deny' } | { kind: 'not-found' }}
- */
-function normalizeAccessResult(access) {
+function normalizeAccessResult(access: unknown): ClosedAccessResult {
     if (access == null || access === true) return { kind: 'allow' };
     if (typeof access === 'string') {
         const k = access.toLowerCase();
@@ -400,10 +378,11 @@ function normalizeAccessResult(access) {
         if (k === 'deny') return { kind: 'deny' };
         if (k === 'not-found' || k === 'notfound') return { kind: 'not-found' };
     }
-    if (typeof access === 'object') {
-        const kind = String(access.kind || access.type || 'allow').toLowerCase();
+    if (typeof access === 'object' && access) {
+        const row = access as Record<string, unknown>;
+        const kind = String(row.kind || row.type || 'allow').toLowerCase();
         if (kind === 'redirect') {
-            const location = String(access.location || access.to || access.href || '');
+            const location = String(row.location || row.to || row.href || '');
             if (!location) return { kind: 'deny' };
             return { kind: 'redirect', location };
         }
@@ -414,30 +393,28 @@ function normalizeAccessResult(access) {
     return { kind: 'allow' };
 }
 
-/**
- * @param {unknown} acted
- * @returns {{ kind: 'allow', props?: Record<string, unknown> } | { kind: 'redirect', location: string } | { kind: 'deny' } | { kind: 'not-found' }}
- */
-function normalizeActionResult(acted) {
+function normalizeActionResult(acted: unknown): ClosedAccessResult {
     const base = normalizeAccessResult(acted);
     if (base.kind !== 'allow') return base;
-    if (acted && typeof acted === 'object' && acted.props && typeof acted.props === 'object') {
-        return { kind: 'allow', props: acted.props };
-    }
-    if (acted && typeof acted === 'object' && !('kind' in acted) && !('type' in acted) && !Array.isArray(acted)) {
-        return { kind: 'allow', props: acted };
+    if (acted && typeof acted === 'object' && !Array.isArray(acted)) {
+        const row = acted as Record<string, unknown>;
+        if (row.props && typeof row.props === 'object') {
+            return { kind: 'allow', props: row.props as Record<string, unknown> };
+        }
+        if (!('kind' in row) && !('type' in row)) {
+            return { kind: 'allow', props: row };
+        }
     }
     return { kind: 'allow' };
 }
 
 /**
  * Minimal HTML for closed access/action results when no NotFound page exists.
- * @param {string} marker
  */
 async function* emitAccessShell(marker) {
     const native = loadNativeAddon();
     if (typeof native.generateHtmlShell !== 'function') {
-        throw new Error('vmz native addon missing generateHtmlShell — rebuild with `pnpm napi:build`');
+        throw new Error('vmz native addon missing generateHtmlShell �?rebuild with `pnpm napi:build`');
     }
     yield native.generateHtmlShell({
         title: 'App',
@@ -449,12 +426,11 @@ async function* emitAccessShell(marker) {
 }
 
 /**
- * Prefer page `static meta()` for document title/description — never brand the framework in business HTML.
- * @param {any} Page
+ * Prefer page `static meta()` for document title/description �?never brand the framework in business HTML.
  */
-function resolvePageDocumentMeta(Page) {
+function resolvePageDocumentMeta(Page: { meta?: (() => Record<string, unknown>) | Record<string, unknown> }) {
     try {
-        let raw = {};
+        let raw: Record<string, unknown> = {};
         if (typeof Page?.meta === 'function') raw = Page.meta() || {};
         else if (Page?.meta && typeof Page.meta === 'object') raw = Page.meta;
         const title = String(raw.title || '').trim();
@@ -465,15 +441,15 @@ function resolvePageDocumentMeta(Page) {
     }
 }
 
-/**
- * @param {any} Page
- * @param {string} chunkId
- * @param {boolean} eventOnlyShell
- * @param {Record<string, unknown>} props
- * @param {{ signal?: AbortSignal, searchParams?: URLSearchParams, cookieHeader?: string }} [opts]
- * @param {string[]} [layoutChain] layout chunk ids outer→inner
- */
-async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {}, layoutChain = [], localeCtx = {}) {
+async function* emitPageHtml(
+    Page,
+    chunkId,
+    eventOnlyShell,
+    props: Record<string, unknown> = {},
+    opts: HostRequestOpts = {},
+    layoutChain: string[] = [],
+    localeCtx: LocaleHostCtx = {},
+) {
     const signal = opts.signal;
     const live = isDev
         ? `\n  <script>
@@ -482,7 +458,7 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
     let sawDisconnect = false;
     es.onerror = () => { sawDisconnect = true; };
     es.onopen = () => {
-      // Host respawn drops SSE — reload once the new process is up (no manual restart).
+      // Host respawn drops SSE �?reload once the new process is up (no manual restart).
       if (sawDisconnect) location.reload();
     };
     function showOverlay(err) {
@@ -506,7 +482,7 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
         + "<p style=\\"margin:0 0 .5rem;color:#f87171;font-weight:700\\">Dev Error</p>"
         + "<pre style=\\"white-space:pre-wrap;margin:0 0 1rem;font-size:13px;line-height:1.45\\">" + esc(msg) + "</pre>"
         + (stack ? "<pre style=\\"white-space:pre-wrap;opacity:.7;font-size:12px\\">" + esc(stack) + "</pre>" : "")
-        + "<p style=\\"opacity:.65;font-size:12px\\">Fix the file and save — soft reload will clear this overlay.</p>"
+        + "<p style=\\"opacity:.65;font-size:12px\\">Fix the file and save �?soft reload will clear this overlay.</p>"
         + "</div>";
     }
     function hideOverlay() {
@@ -573,7 +549,7 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
     const propsJson = JSON.stringify(props ?? {});
     const localeId = localeCtx.localeId || localeArtifact?.defaultLocale || 'en';
     const dir = localeCtx.dir || 'ltr';
-    /** @type {string[]} */
+
     const htmlExtraAttrs = [...htmlThemeAttrPair(themeId)];
     if (localeArtifact?.routing) {
         htmlExtraAttrs.push(
@@ -608,14 +584,14 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
             bodyHtml += chunk;
         }
         if (signal?.aborted) return;
-        // Wrap page HTML in layout chain (outer → inner) via default slot injection.
+        // Wrap page HTML in layout chain (outer �?inner) via default slot injection.
         for (let i = layoutChain.length - 1; i >= 0; i--) {
             const Layout = await loadPageCtor(layoutChain[i]);
             if (!Layout) continue;
             bodyHtml = await ssrRenderHost.renderToString(Layout, {}, { signal, slotHtml: bodyHtml });
             if (signal?.aborted) return;
         }
-        // Locale discipline: apply frozen link plan rows (0.1.30) — no path algebra.
+        // Locale discipline: apply frozen link plan rows (0.1.30) �?no path algebra.
         if (localeArtifact && localeId) {
             bodyHtml = localizeBodyLinks(bodyHtml, localeId, localeArtifact, undefined, localeLinkPlan);
         }
@@ -627,7 +603,7 @@ async function* emitPageHtml(Page, chunkId, eventOnlyShell, props = {}, opts = {
 
     const native = loadNativeAddon();
     if (typeof native.generatePageShell !== 'function') {
-        throw new Error('vmz native addon missing generatePageShell — rebuild with `pnpm napi:build`');
+        throw new Error('vmz native addon missing generatePageShell �?rebuild with `pnpm napi:build`');
     }
     const entrySrc = `/${eventOnlyShell ? 'entry-event.js' : 'entry-client.js'}?t=${reloadToken}`;
     const cssHref = cssEntryWithBust(cssEntry);
@@ -693,9 +669,9 @@ const server = http.createServer((req, res) => {
     if (url.pathname === '/__vmz/reload' && req.method === 'POST') {
         readRequestBody(req)
             .then((raw) => {
-                let payload = {};
+                let payload: Record<string, unknown> = {};
                 try {
-                    payload = raw ? JSON.parse(raw) : {};
+                    payload = raw ? (JSON.parse(String(raw)) as Record<string, unknown>) : {};
                 } catch {
                     payload = {};
                 }
@@ -747,7 +723,7 @@ async function gracefulShutdown(signal) {
     if (shuttingDown) return;
     shuttingDown = true;
     ready = false;
-    console.log(`vmz serve: ${signal} — draining in-flight=${inFlight} timeout=${SHUTDOWN_TIMEOUT_MS}ms`);
+    console.log(`vmz serve: ${signal} �?draining in-flight=${inFlight} timeout=${SHUTDOWN_TIMEOUT_MS}ms`);
     server.close();
     const start = Date.now();
     while (inFlight > 0 && Date.now() - start < SHUTDOWN_TIMEOUT_MS) {
@@ -774,8 +750,6 @@ process.on('SIGINT', () => {
 /**
  * Attach author Link RouteId aliases so localizeBodyLinks can match `data-vmz-route="IndexPage"`
  * against realization rows keyed by chunk path (`pages/index`).
- * @param {any} artifact
- * @param {string} dir
  */
 function attachLinkRouteAliases(artifact, dir) {
     if (!artifact || typeof artifact !== 'object') return artifact;
@@ -793,9 +767,8 @@ function attachLinkRouteAliases(artifact, dir) {
  * Re-import routes / pages / components with a new cache-bust token.
  * Keeps the HTTP server process alive (no Node restart).
  * Failed reloads keep the previous in-memory modules (Vite-like resilience).
- * @param {{ quiet?: boolean, payload?: { affectedChunks?: string[], seedChunks?: string[], emitted?: string[], full?: boolean, islandHmr?: boolean, buildId?: string, sourceRevision?: string, bundleRevision?: string, changed?: string[] } }} [opts]
  */
-async function softReload(opts = {}) {
+async function softReload(opts: any = {}) {
     const prevToken = reloadToken;
     const prevCatalog = pageCatalog;
     const prevCtors = new Map(pageCtors);
@@ -811,7 +784,7 @@ async function softReload(opts = {}) {
     const sourceRevision = opts.payload?.sourceRevision != null ? String(opts.payload.sourceRevision) : null;
     const bundleRevision = opts.payload?.bundleRevision != null ? String(opts.payload.bundleRevision) : null;
     if (buildId) lastDevBuildId = buildId;
-    // 0.1.31: payload-only scope. `reloadToken` is opaque cache-bust — never invent full/affected here.
+    // 0.1.31: payload-only scope. `reloadToken` is opaque cache-bust �?never invent full/affected here.
     const reloadAllPages = Boolean(full) || (!islandHmr && rerunLoaders.length === 0 && affected.length === 0);
 
     try {
@@ -843,7 +816,6 @@ async function softReload(opts = {}) {
         const nextCatalog = await listPageClientFiles(distDir);
         // empty catalog throws inside listPageClientFiles
 
-        /** @type {Map<string, any>} */
         const nextCtors = new Map();
 
         if (!islandHmr) {
@@ -956,7 +928,6 @@ async function softReload(opts = {}) {
     }
 }
 
-/** @param {string} chunkId @param {string[]} affected */
 function pageNeedsReload(chunkId, affected) {
     if (chunkId === 'pages/Layout' || chunkId.endsWith('/Layout')) return true;
     return affected.some((a) => {
@@ -965,7 +936,6 @@ function pageNeedsReload(chunkId, affected) {
     });
 }
 
-/** @param {string} event */
 function notifySse(event) {
     for (const client of [...sseClients]) {
         try {
@@ -976,10 +946,9 @@ function notifySse(event) {
     }
 }
 
-/** @param {unknown} err */
 function normalizeDevError(err) {
     if (err && typeof err === 'object') {
-        const e = /** @type {{ message?: string, stack?: string }} */ (err);
+        const e = err;
         return {
             message: e.message ? String(e.message) : String(err),
             stack: e.stack ? String(e.stack) : undefined,
@@ -989,7 +958,6 @@ function normalizeDevError(err) {
     return { message: String(err), at: Date.now() };
 }
 
-/** @param {{ message: string, stack?: string }} err */
 async function* emitDevErrorHtml(err) {
     const msg = escapeHtml(err.message || 'Unknown error');
     const stack = err.stack ? escapeHtml(err.stack) : '';
@@ -1005,7 +973,7 @@ async function* emitDevErrorHtml(err) {
     <h1>Dev Error</h1>
     <pre>${msg}</pre>
     ${stack ? `<pre style="opacity:.7;font-size:12px">${stack}</pre>` : ''}
-    <p class="hint">Dev host stayed up. Fix the source and save — soft reload will recover.</p>
+    <p class="hint">Dev host stayed up. Fix the source and save �?soft reload will recover.</p>
   </main>
   <script>
   (() => {
@@ -1030,12 +998,11 @@ async function* emitDevErrorHtml(err) {
             return;
         }
     } catch {
-        /* fall through to plain HTML — never throw from the error page itself */
+        /* fall through to plain HTML �?never throw from the error page itself */
     }
     yield `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><title>Dev Error</title></head><body>${body}</body></html>`;
 }
 
-/** @param {string} s */
 function escapeHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -1045,8 +1012,6 @@ function escapeHtml(s) {
  * - `prefix`: LocaleId from URL path (existing).
  * - `none`: Host preference from cookie `vmz.locale` (validated), else defaultLocale.
  *   URL never carries LocaleId.
- * @param {string} pathname
- * @param {string | undefined} cookieHeader
  */
 function resolveLocalePath(pathname, cookieHeader) {
     const raw = String(pathname || '/');
@@ -1097,10 +1062,6 @@ function resolveLocalePath(pathname, cookieHeader) {
     };
 }
 
-/**
- * @param {string} chunkId
- * @param {string} localeId
- */
 function pageMetaAlternates(chunkId, localeId) {
     if (!localeArtifact?.pageMetas) return [];
     const meta =
@@ -1109,14 +1070,12 @@ function pageMetaAlternates(chunkId, localeId) {
     return Array.isArray(meta?.alternates) ? meta.alternates : [];
 }
 
-/** @param {string} href */
 function bustUrl(href) {
     const u = new URL(href);
     u.searchParams.set('t', String(reloadToken));
     return u.href;
 }
 
-/** @param {string} chunkId */
 async function loadPageCtor(chunkId) {
     const pageRel = `${chunkId}.client.js`;
     const href = bustUrl(pathToFileURL(path.join(distDir, pageRel)).href);
@@ -1128,7 +1087,6 @@ async function loadPageCtor(chunkId) {
 /**
  * Load compiled page catalog from `_vmz/route-catalog.json` (0.1.30 authority).
  * Hosts must not re-parse deployment pathPattern into a live catalog.
- * @param {string} dir
  */
 async function listPageClientFiles(dir) {
     const fromCatalog = await listPagesFromRouteCatalog(dir);
@@ -1142,11 +1100,7 @@ async function listPageClientFiles(dir) {
     return fromCatalog;
 }
 
-/**
- * @param {string} dir
- */
 async function listPagesFromRouteCatalog(dir) {
-    /** @type {Array<{ chunkId: string, pageRel: string, routeId?: string, pathPattern?: string, segs: ReturnType<typeof parsePathPattern> }>} */
     const out = [];
     try {
         const raw = await readFile(path.join(dir, ...ROUTE_CATALOG_REL.split('/')), 'utf8');
@@ -1175,13 +1129,12 @@ async function listPagesFromRouteCatalog(dir) {
 
 /**
  * Browser HTTP pattern (`/` / `/home` / `/users/:id` / `/blog/[...slug]`).
- * @param {string} pattern
  */
 function parsePathPattern(pattern) {
     const raw = String(pattern || '').trim();
     if (!raw || raw === '/') return [];
     const parts = raw.replace(/^\/+/, '').split('/').filter(Boolean);
-    /** @type {Array<{ kind: 'static' | 'param' | 'catch', value?: string, name?: string }>} */
+
     const segs = [];
     for (const p of parts) {
         if (isRouteGroupDir(p)) continue;
@@ -1190,9 +1143,6 @@ function parsePathPattern(pattern) {
     return segs;
 }
 
-/**
- * @param {string} p
- */
 function parsePathSegment(p) {
     const catchAll = /^\[\.\.\.([^\]]+)\]$/.exec(p);
     const param = /^\[([^\]]+)\]$/.exec(p);
@@ -1211,10 +1161,6 @@ function isRouteBoundaryStem(stem) {
     return stem === 'Layout' || stem === 'Loading' || stem === 'Error' || stem === 'NotFound';
 }
 
-/**
- * @param {string} pathname
- * @param {typeof pageCatalog} catalog
- */
 function matchFileRoute(pathname, catalog) {
     const pathParts = decodeURIComponent(pathname.split('?')[0] || '/')
         .replace(/\/+$/, '')
@@ -1235,17 +1181,12 @@ function matchFileRoute(pathname, catalog) {
     return best;
 }
 
-/**
- * @param {ReturnType<typeof parsePathPattern>} segs
- * @param {string} pathname
- * @returns {Record<string, string>}
- */
 function extractRouteParams(segs, pathname) {
     const pathParts = decodeURIComponent(pathname.split('?')[0] || '/')
         .replace(/\/+$/, '')
         .split('/')
         .filter(Boolean);
-    /** @type {Record<string, string>} */
+
     const params = {};
     let j = 0;
     for (let i = 0; i < segs.length; i++) {
@@ -1263,11 +1204,6 @@ function extractRouteParams(segs, pathname) {
     return params;
 }
 
-/**
- * @param {ReturnType<typeof parsePathPattern>} segs
- * @param {string[]} pathParts
- * @returns {number | null}
- */
 function scoreRoute(segs, pathParts) {
     let i = 0;
     let j = 0;
@@ -1275,7 +1211,7 @@ function scoreRoute(segs, pathParts) {
     while (i < segs.length) {
         const s = segs[i];
         if (s.kind === 'catch') {
-            // Required catch-all `[...slug]` needs ≥1 remaining segment (not `/`).
+            // Required catch-all `[...slug]` needs �? remaining segment (not `/`).
             if (j >= pathParts.length) return null;
             score += 1;
             return score;
@@ -1303,9 +1239,7 @@ function findRootCatchAll(catalog) {
 }
 
 /**
- * Optional app gate: `dist/vmz-route-gate.mjs` → `{ check(pathname, chunkId) => 'not_found' | null }`.
- * @param {string} pathname
- * @param {string | undefined} chunkId
+ * Optional app gate: `dist/vmz-route-gate.mjs` �?`{ check(pathname, chunkId) => 'not_found' | null }`.
  */
 async function runRouteGate(pathname, chunkId) {
     try {
@@ -1318,16 +1252,11 @@ async function runRouteGate(pathname, chunkId) {
     }
 }
 
-/**
- * @param {Array<{ name: string, entry: string }>} eager
- * @param {Array<{ name: string, entry: string }>} lazy
- * @param {number} token
- */
 function emitEntryClient(eager, lazy, token) {
     const q = `?t=${token}`;
     const native = loadNativeAddon();
     if (typeof native.generateServeEntryClient !== 'function') {
-        throw new Error('vmz native addon missing generateServeEntryClient — rebuild with `pnpm napi:build`');
+        throw new Error('vmz native addon missing generateServeEntryClient �?rebuild with `pnpm napi:build`');
     }
     return native.generateServeEntryClient(eager, lazy, q);
 }
@@ -1335,13 +1264,12 @@ function emitEntryClient(eager, lazy, token) {
 /**
  * EventEntry zero-framework bootstrap: no static import of vmz-dom / page / islands.
  * Framework bytes load only inside the first matching DOM event handler.
- * @param {number} token
  */
 function emitEntryEvent(token) {
     const q = `?t=${token}`;
     const native = loadNativeAddon();
     if (typeof native.generateServeEntryEvent !== 'function') {
-        throw new Error('vmz native addon missing generateServeEntryEvent — rebuild with `pnpm napi:build`');
+        throw new Error('vmz native addon missing generateServeEntryEvent �?rebuild with `pnpm napi:build`');
     }
     return native.generateServeEntryEvent(q);
 }
@@ -1350,12 +1278,11 @@ function emitEntryEvent(token) {
  * Style Theme cookie / localStorage key (host contract, not a second theme API).
  */
 const THEME_STORE_KEY = 'vmz-theme';
-/** Host preference key for `routing.strategy: 'none'` (cookie + localStorage). */
+
 const LOCALE_STORE_KEY = 'vmz.locale';
 
 /**
  * Cache-bust stylesheet entry for dev reload (token + serve revision).
- * @param {string | null | undefined} entry
  */
 function cssEntryWithBust(entry) {
     if (!entry) return undefined;
@@ -1366,10 +1293,6 @@ function cssEntryWithBust(entry) {
     return `${base}?${params.toString()}`;
 }
 
-/**
- * @param {string} dir
- * @returns {Promise<{ cssEntry: string|null, styleTheme: typeof styleTheme, styleBundleHash: string|null }>}
- */
 async function loadDeploymentStyle(dir) {
     try {
         const raw = await readFile(path.join(dir, 'vmz-deployment.json'), 'utf8');
@@ -1398,11 +1321,8 @@ async function loadDeploymentStyle(dir) {
 }
 
 /**
- * Priority: `?theme=` → cookie → none (CSS `:root` + prefers-color-scheme media).
+ * Priority: `?theme=` �?cookie �?none (CSS `:root` + prefers-color-scheme media).
  * Explicit ids (including default) always win over OS preference via activation attr.
- * @param {URLSearchParams | undefined} searchParams
- * @param {string | undefined} cookieHeader
- * @returns {string|null}
  */
 function resolveThemeId(searchParams, cookieHeader) {
     if (!styleTheme) return null;
@@ -1416,8 +1336,6 @@ function resolveThemeId(searchParams, cookieHeader) {
 
 /**
  * Always emit activation attr for an explicit theme id (incl. default) so it overrides OS media.
- * @param {string|null} themeId
- * @returns {[string, string] | []} flattened attr pair for generatePageShell
  */
 function htmlThemeAttrPair(themeId) {
     if (!styleTheme || !themeId) return [];
@@ -1428,7 +1346,7 @@ function htmlThemeAttrPair(themeId) {
 
 /**
  * Inline boot when SSR had no query/cookie: apply explicit `localStorage` only.
- * No stored choice → leave bare `<html>` so CSS `@media (prefers-color-scheme)` follows OS live.
+ * No stored choice �?leave bare `<html>` so CSS `@media (prefers-color-scheme)` follows OS live.
  * Explicit ids (incl. default) always set the activation attr so they override OS media.
  */
 function themeBootstrapScript() {
@@ -1442,7 +1360,7 @@ function themeBootstrapScript() {
 /**
  * LocaleId as client state (routing.strategy = none): apply localStorage before any
  * page/client module runs so `#locales/*` pick the right variant. Prefix strategy
- * keeps LocaleId in the URL — no boot rewrite.
+ * keeps LocaleId in the URL �?no boot rewrite.
  * Also mirrors into cookie so the next SSR negotiate sees Host preference.
  */
 function localeBootstrapScript() {
@@ -1457,8 +1375,8 @@ function localeBootstrapScript() {
 }
 
 /**
- * Site favicon links from build artifact `_vmz/site-favicon.json` (author SVG → PNG/ICO).
- * Empty when skipped / missing — do not invent broken <link>s.
+ * Site favicon links from build artifact `_vmz/site-favicon.json` (author SVG �?PNG/ICO).
+ * Empty when skipped / missing �?do not invent broken <link>s.
  */
 function siteFaviconHeadHtml() {
     try {
@@ -1474,10 +1392,6 @@ function siteFaviconHeadHtml() {
     }
 }
 
-/**
- * @param {string|undefined} header
- * @param {string} name
- */
 function readCookie(header, name) {
     if (!header) return null;
     const parts = String(header).split(';');
@@ -1495,20 +1409,11 @@ function readCookie(header, name) {
     return null;
 }
 
-/**
- * @param {string} dir
- * @returns {Promise<string|null>}
- */
 async function loadCssEntry(dir) {
     const meta = await loadDeploymentStyle(dir);
     return meta.cssEntry;
 }
 
-/**
- * @param {string} dir
- * @param {string} chunkId
- * @returns {Promise<Array<{ component: string, strategy: string }>>}
- */
 async function loadPageResumeEntries(dir, chunkId) {
     try {
         const raw = await readFile(path.join(dir, 'vmz-deployment.json'), 'utf8');
@@ -1526,18 +1431,15 @@ async function loadPageResumeEntries(dir, chunkId) {
     }
 }
 
-/** @param {string} strategy */
 function isEventStrategy(strategy) {
     return strategy === 'event' || strategy === 'click' || strategy.startsWith('event:');
 }
 
-/** @param {string[]} strategies */
 function isEventOnlyShell(strategies) {
     if (!strategies.length) return false;
     return strategies.every((s) => isEventStrategy(s));
 }
 
-/** @param {string} s */
 function escapeAttr(s) {
     return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }

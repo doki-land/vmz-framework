@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Unified SSR/DOM render host — explicit deployment bootstrap before renderToString/stream/mount.
  * Hosts must not call renderToString until ensureComponents() has run for the active closure.
@@ -6,6 +5,7 @@
 
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type { BootstrapComponentRegistryOpts } from '../shared/host.types.js';
 import {
     bootstrapComponentRegistry,
     collectDependsOnClosure,
@@ -14,32 +14,21 @@ import {
     importAndRegisterComponentEntries,
 } from './deployment-registry.js';
 
-/**
- * @param {string} distDir
- * @param {{
- *   strictDeployment?: boolean,
- *   strict?: boolean,
- *   explicit?: Record<string, string>,
- *   cacheBust?: string | number,
- *   preload?: 'all' | 'closure' | 'none',
- *   closureRoots?: string[],
- * }} [opts]
- */
-export async function createRenderHost(distDir, opts = {}) {
+export async function createRenderHost(distDir: string, opts: Record<string, unknown> = {}) {
     const strict = opts.strictDeployment === true || opts.strict === true;
     const domPath = path.join(distDir, 'vmz-dom.js');
     const dom = await import(pathToFileURL(domPath).href);
     const deployment = readDeploymentDocument(distDir, { strict });
-    /** @type {Set<string>} */
-    const loadedChunkIds = new Set();
 
-    const bootstrapOpts = {
+    const loadedChunkIds = new Set<string>();
+
+    const bootstrapOpts: BootstrapComponentRegistryOpts = {
         strict,
-        explicit: opts.explicit,
-        cacheBust: opts.cacheBust,
+        explicit: opts.explicit as Record<string, string> | undefined,
+        cacheBust: opts.cacheBust as string | number | undefined,
         loaded: loadedChunkIds,
-        preload: opts.preload ?? 'none',
-        closureRoots: opts.closureRoots,
+        preload: (opts.preload as BootstrapComponentRegistryOpts['preload']) ?? 'none',
+        closureRoots: opts.closureRoots as string[] | undefined,
     };
 
     if (bootstrapOpts.preload !== 'none') {
@@ -48,24 +37,22 @@ export async function createRenderHost(distDir, opts = {}) {
 
     /**
      * Load component closure for root chunk ids (page + layouts + fixture).
-     * @param {string[]} rootChunkIds
      */
     async function ensureComponents(rootChunkIds) {
         if (!rootChunkIds?.length) return {};
         const entries = await loadComponentEntries(distDir, {
             strict,
             closureRoots: rootChunkIds,
-            explicit: opts.explicit,
+            explicit: opts.explicit as Record<string, string> | undefined,
         });
         return importAndRegisterComponentEntries(distDir, entries, dom.registerComponents, {
-            cacheBust: opts.cacheBust,
+            cacheBust: opts.cacheBust as string | number | undefined,
             loaded: loadedChunkIds,
         });
     }
 
     /**
      * Union closure chunk ids (pages + layouts) without importing yet.
-     * @param {string[]} rootChunkIds
      */
     function closureChunkIds(rootChunkIds) {
         if (!deployment || !rootChunkIds?.length) return new Set(rootChunkIds || []);
@@ -86,7 +73,7 @@ export async function createRenderHost(distDir, opts = {}) {
         resume: dom.resume?.bind(dom),
         destroy: dom.destroy?.bind(dom),
         flushPending: dom.flushPending?.bind(dom),
-        /** @deprecated Prefer ensureComponents via createRenderHost; low-level escape hatch. */
+
         registerComponents: dom.registerComponents.bind(dom),
     };
 }

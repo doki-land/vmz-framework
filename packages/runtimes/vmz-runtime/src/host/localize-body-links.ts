@@ -120,7 +120,6 @@ export function localizeBodyLinks(
 
 /** Compact RouteId → LocaleId → href table for browser (no path-prefix algebra). */
 export function localeHrefTableFromPlan(plan: LocaleLinkPlan | null | undefined): Record<string, Record<string, string>> {
-    /** @type {Record<string, Record<string, string>>} */
     const out: Record<string, Record<string, string>> = Object.create(null);
     for (const row of plan?.rows || []) {
         if (!row?.routeId || !row?.localeId || !row?.href) continue;

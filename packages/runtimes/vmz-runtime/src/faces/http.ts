@@ -1,5 +1,4 @@
-// @ts-nocheck
-/** Compile-time HTTP decorators — erased from server JS emit; kept for authoring. */
+/** Compile-time HTTP decorators �?erased from server JS emit; kept for authoring. */
 export function Get(path) {
     return function GetDecorator(_target, _key, descriptor) {
         return descriptor;
