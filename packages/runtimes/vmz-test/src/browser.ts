@@ -1012,6 +1012,13 @@ async function pageText(page: { evaluate: (...args: unknown[]) => Promise<unknow
     })) as string;
 }
 
+async function flushBrowserInst(page: { evaluate: (...args: unknown[]) => Promise<unknown> }): Promise<void> {
+    await page.evaluate(async () => {
+        const ctx = (window as any).__vmzBrowser;
+        if (ctx?.inst && ctx?.dom?.flushPending) await ctx.dom.flushPending(ctx.inst);
+    });
+}
+
 /**
  * Native <select> or listbox/combobox (data-vmz-option / role=option).
  * Prefer option value (data-vmz-option) then accessible name/label.
@@ -1045,16 +1052,30 @@ async function selectTarget(
     }
     if ((native as { kind?: string }).kind === 'native') return;
 
+    // VMZ combobox opens via reactive patch — drain before option lookup.
+    await flushBrowserInst(page);
+
     // Prefer stable option value contract, then accessible name.
     const byValue: BrowserLocator = { kind: 'css', selector: `[data-vmz-option="${want.replace(/"/g, '\\"')}"]` };
     try {
         await waitForLocator(page, byValue, opts);
         await clickTarget(page);
+        await flushBrowserInst(page);
         return;
     } catch {
         /* fall through to role=option name */
     }
-    const optionLocator: BrowserLocator = { kind: 'role', role: 'option', name: want };
-    await waitForLocator(page, optionLocator, opts);
-    await clickTarget(page);
+    const optionNames = [want, want.charAt(0).toUpperCase() + want.slice(1)];
+    for (const name of optionNames) {
+        try {
+            const optionLocator: BrowserLocator = { kind: 'role', role: 'option', name };
+            await waitForLocator(page, optionLocator, opts);
+            await clickTarget(page);
+            await flushBrowserInst(page);
+            return;
+        } catch {
+            /* try next label variant */
+        }
+    }
+    throw new Error(`select: no option for ${JSON.stringify(want)}`);
 }
