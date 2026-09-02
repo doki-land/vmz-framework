@@ -28,7 +28,7 @@
             "kind": "graph",
             "expect": {
                 "direct": true,
-                "includesAll": ["api.comment('vmz-if')", "api.comment('vmz-each"]
+                "includesAll": ["api.comment(\"vmz-if\")", "api.comment(\"vmz-each"]
             }
         }
     ]

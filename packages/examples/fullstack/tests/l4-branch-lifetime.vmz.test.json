@@ -28,7 +28,7 @@
             "kind": "graph",
             "expect": {
                 "ownsUnitToRegion": true,
-                "includesAll": ["api.comment('vmz-if')", "api.trackPatch"]
+                "includesAll": ["api.comment(\"vmz-if\")", "api.trackPatch"]
             }
         }
     ]
