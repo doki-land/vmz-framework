@@ -16,36 +16,36 @@
             "default": "./dist/index.js"
         },
         "./cli": {
-            "types": "./dist/cli.d.ts",
-            "default": "./dist/cli.js"
+            "types": "./dist/cli/cli.d.ts",
+            "default": "./dist/cli/cli.js"
         },
         "./dev-session": {
-            "types": "./dist/dev-session.d.ts",
-            "default": "./dist/dev-session.js"
+            "types": "./dist/dev/dev-session.d.ts",
+            "default": "./dist/dev/dev-session.js"
         },
         "./plugin-host": {
-            "types": "./dist/plugin-host.d.ts",
-            "default": "./dist/plugin-host.js"
+            "types": "./dist/workspace/plugin-host.d.ts",
+            "default": "./dist/workspace/plugin-host.js"
         },
         "./bundler-adapter": {
-            "types": "./dist/bundler-adapter.d.ts",
-            "default": "./dist/bundler-adapter.js"
+            "types": "./dist/workspace/bundler-adapter.d.ts",
+            "default": "./dist/workspace/bundler-adapter.js"
         },
         "./test-protocol": {
-            "types": "./dist/test-protocol.d.ts",
-            "default": "./dist/test-protocol.js"
+            "types": "./dist/cli/test-protocol.d.ts",
+            "default": "./dist/cli/test-protocol.js"
         },
         "./test-discover": {
-            "types": "./dist/test-discover.d.ts",
-            "default": "./dist/test-discover.js"
+            "types": "./dist/cli/test-discover.d.ts",
+            "default": "./dist/cli/test-discover.js"
         },
         "./document-check": {
-            "types": "./dist/document-check.d.ts",
-            "default": "./dist/document-check.js"
+            "types": "./dist/document/document-check.d.ts",
+            "default": "./dist/document/document-check.js"
         },
         "./document-schema": {
-            "types": "./dist/document-schema.d.ts",
-            "default": "./dist/document-schema.js"
+            "types": "./dist/document/document-schema.d.ts",
+            "default": "./dist/document/document-schema.js"
         }
     },
     "dependencies": {
@@ -84,7 +84,7 @@
         "test": "node --experimental-strip-types ./tests/run-node-tests.ts",
         "verify": "node --import ../../../scripts/test/resolve-ts-from-js.mjs --experimental-strip-types ./tests/conformance/run.ts",
         "verify:list": "node --import ../../../scripts/test/resolve-ts-from-js.mjs --experimental-strip-types ./tests/conformance/run.ts --list",
-        "build:js": "tsc -p tsconfig.json && node ../../../scripts/build/copy-vmz-public-api.mjs"
+        "build:js": "node ../../../scripts/build/clean-package-dist.mjs packages/runtimes/vmz/dist && tsc -p tsconfig.json"
     },
     "devDependencies": {
         "@types/node": "^22.15.0",
