@@ -385,8 +385,24 @@ export const directApi = {
         const inst = directApi._inst;
         if (directApi._eachCtx && typeof handler === 'function') {
             const bag = el.__vmzEvt || (el.__vmzEvt = Object.create(null));
-            bag[type] = handler;
+            const methodHint = inferHandlerMethod(handler);
+            const listener = (ev: Event) => {
+                if (type === 'submit' && ev && typeof (ev as SubmitEvent).preventDefault === 'function') {
+                    (ev as SubmitEvent).preventDefault();
+                }
+                if (methodHint && methodAllowsSyncEventFlush(inst, methodHint)) {
+                    runDomEventHandler(inst, methodHint, () => {
+                        const m = inst[methodHint];
+                        if (typeof m === 'function') return m.call(inst, ev);
+                        return handler.call(inst, ev);
+                    });
+                    return;
+                }
+                runDomEventHandler(inst, methodHint, () => handler.call(inst, ev));
+            };
+            bag[type] = listener;
             directApi._eachCtx.needDelegate(type);
+            el.addEventListener(type, listener);
             return;
         }
         // Infer once at bind time ??never Function#toString on the click hot path.
@@ -450,8 +466,10 @@ export const directApi = {
         };
         if (directApi._eachCtx) {
             const bag = el.__vmzEvt || (el.__vmzEvt = Object.create(null));
-            bag[type] = (ev) => invoke(ev);
+            const listener = (ev: Event) => invoke(ev);
+            bag[type] = listener;
             directApi._eachCtx.needDelegate(type);
+            el.addEventListener(type, listener);
             return;
         }
         el.addEventListener(type, (ev) => invoke(ev));
