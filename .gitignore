@@ -1,3 +1,5 @@
+# OS
+
 # IDE
 .idea/
 .trae/
@@ -5,9 +7,13 @@
 !.vscode/launch.json
 !.vscode/tasks.json
 !.vscode/extensions.json
+*.log
+*.txt
 
 # Rust
 target/
+*.node
+*.wasm
 
 # Node
 node_modules/
@@ -15,12 +21,9 @@ pnpm-lock.yaml
 .turbo/
 dist/
 coverage/
-*.log
 *.tsbuildinfo
-*.node
-.vmz-releases/
-.vmz-releases-*/
-.vmz-cdn-releases/
+reword.fixes.json
+reword.pending.json
 
 # Generated
 **/src/auto-imports.d.ts
@@ -45,3 +48,5 @@ artifacts/
 # Design/handoffs live only in workspace ????/ ? never recreate in this repo
 docs/
 
+# Nifty change-logs draft index (local only — regenerate with `nifty change-logs --version X.Y.Z --write`)
+documentation/maintenance/releases/*.reference.md
