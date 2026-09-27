@@ -1559,6 +1559,61 @@ pub fn generate_json(json_text: String) -> Result<String> {
     vmz_generator::to_json(&value).map_err(|e| Error::from_reason(format!("generateJson: {e}")))
 }
 
+/// Options for [`format_workspace_run`] (JS/TS + optional `cargo fmt`).
+#[napi(object)]
+#[derive(Default)]
+pub struct FormatWorkspaceRunOptions {
+    /// Project root (default: cwd).
+    pub cwd: Option<String>,
+    /// Check-only mode.
+    pub check: Option<bool>,
+    /// Include globs under `cwd`.
+    pub includes: Option<Vec<String>>,
+    /// Exclude globs after includes expand.
+    pub excludes: Option<Vec<String>>,
+    /// Run `cargo fmt` when a Cargo workspace is present.
+    pub rust: Option<bool>,
+    /// Run `oxc_formatter` on JS/TS targets.
+    pub javascript: Option<bool>,
+    /// Style config path relative to `cwd` (default: `biome.json`).
+    pub style_config: Option<String>,
+}
+
+/// Summary from [`format_workspace_run`].
+#[napi(object)]
+pub struct FormatWorkspaceReportNapi {
+    /// Files rewritten on disk (zero in check mode).
+    pub formatted: u32,
+    /// Files already matching formatter output.
+    pub unchanged: u32,
+    /// Human-readable failures.
+    pub errors: Vec<String>,
+}
+
+/// Format hybrid workspace surfaces (JS/TS + Rust). `.vmz` uses [`JsWorkspace::format`].
+#[napi]
+pub fn format_workspace_run(
+    options: FormatWorkspaceRunOptions,
+) -> Result<FormatWorkspaceReportNapi> {
+    let cwd = options.cwd.map(PathBuf::from).or_else(|| std::env::current_dir().ok());
+    let style_config = options.style_config.map(PathBuf::from);
+    let report = vmz_formatter::run_workspace_format(vmz_formatter::WorkspaceFormatOptions {
+        cwd,
+        check: options.check.unwrap_or(false),
+        includes: options.includes,
+        excludes: options.excludes,
+        rust: options.rust,
+        javascript: options.javascript,
+        style_config,
+    })
+    .map_err(Error::from_reason)?;
+    Ok(FormatWorkspaceReportNapi {
+        formatted: report.formatted as u32,
+        unchanged: report.unchanged as u32,
+        errors: report.errors,
+    })
+}
+
 /// One component row from [`vmz_artifacts::component_entries`].
 #[napi(object)]
 pub struct JsComponentEntry {

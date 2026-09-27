@@ -41,6 +41,7 @@ export async function importMaybeTs(full) {
  *   engines: import('@vmz/plugin').VmzEngines,
  *   delivery: import('@vmz/plugin').DeliveryAuthoring | null,
  *   application: { id?: string } | null,
+ *   format: import('@vmz/plugin').VmzFormatConfig | null,
  *   path: string | null,
  *   pluginPath: string | null,
  * }>}
@@ -54,6 +55,8 @@ export async function loadVmzConfig(project) {
     let delivery = null;
     /** @type {{ id?: string } | null} */
     let application = null;
+    /** @type {import('@vmz/plugin').VmzFormatConfig | null} */
+    let format = null;
     /** @type {string | null} */
     let configPath = null;
     /** @type {string | null} */
@@ -72,6 +75,9 @@ export async function loadVmzConfig(project) {
         if (cfg?.application && typeof cfg.application === 'object') {
             application = cfg.application;
         }
+        if (cfg?.format && typeof cfg.format === 'object') {
+            format = cfg.format;
+        }
         for (const entry of raw) {
             plugins.push(await resolvePluginEntry(project, entry));
         }
@@ -86,7 +92,7 @@ export async function loadVmzConfig(project) {
         break;
     }
 
-    return { plugins, engines, delivery, application, path: configPath, pluginPath };
+    return { plugins, engines, delivery, application, format, path: configPath, pluginPath };
 }
 
 /**

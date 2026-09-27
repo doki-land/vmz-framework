@@ -7,12 +7,13 @@ Authoring formatter for `.vmz` SFCs: **oxc IR formatter** (not codegen pretty-pr
 | **Crate**      | `vmz-formatter`                                          |
 | **Kind**       | library                                                  |
 | **Publish**    | `false` (workspace-internal)                             |
-| **CLI surface**| `vmz format` / `vmz format --check`                      |
+| **CLI surface**| `vmz format` / `vmz format --check` (`vmz.config` `format`) |
 | **Depends on** | [`vmz-compiler`](../vmz-compiler/) (parse / discover only) |
 
 ## Features
 
 - Discover / format a file or project tree (`format_path`)
+- Hybrid monorepo JS/TS + `cargo fmt` (`run_workspace_format`; read `vmz.config` `format` from CLI)
 - Default **write**; `--check` only reports drift (cargo-fmt style — no `--write`)
 - `<script lang=ts>` → `oxc_formatter::format` (text-in IR)
 - `<style>` → `oxc_formatter_css` (`css` / `scss` / `sass`)

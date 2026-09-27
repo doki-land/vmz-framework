@@ -94,9 +94,27 @@ export interface VmzEngines {
     markdown?: string;
 }
 
+/** Workspace format options (`vmz format` reads `vmz.config` `format`). */
+export interface VmzFormatConfig {
+    /** Include globs under the project root. */
+    includes?: string[];
+    /** Skip paths under these globs after includes expand. */
+    excludes?: string[];
+    /** Run `cargo fmt` when a Cargo workspace is present. */
+    rust?: boolean;
+    /** Run `oxc_formatter` on JS/TS targets. */
+    javascript?: boolean;
+    /** Format `.vmz` author files via `vmz-formatter`. */
+    vmz?: boolean;
+    /** Biome-style formatter config for oxc (default: `biome.json` at project root). */
+    style?: string;
+}
+
 export interface VmzUserConfig {
     plugins?: Array<string | VmzPlugin | Promise<VmzPlugin>>;
     engines?: VmzEngines;
+    /** Workspace format targets and engines (`vmz format`). */
+    format?: VmzFormatConfig;
     /** Application identity (optional authoring). */
     application?: { id?: string; [key: string]: unknown };
     /**

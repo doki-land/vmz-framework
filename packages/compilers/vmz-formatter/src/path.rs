@@ -81,7 +81,7 @@ fn discover_local_vmz_files(root: &Path) -> Vec<PathBuf> {
 
 fn should_skip_dir(path: &Path) -> bool {
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-    matches!(name, "node_modules" | "dist" | "target" | ".git" | ".turbo" | "coverage")
+    matches!(name, "node_modules" | "dist" | "target" | ".git" | ".turbo" | "coverage" | "fixtures")
 }
 
 fn format_file(

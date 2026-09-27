@@ -2995,6 +2995,7 @@ dependencies = [
  "oxc_span",
  "schemars",
  "serde",
+ "serde_json",
  "vmz-compiler",
  "vmz-generator",
  "walkdir",

@@ -89,7 +89,11 @@ function buildProductCli(opts: { mode?: 'global' | 'project' } = {}): Cli {
     withWorkspaceOpts(cli.command('build', 'cli.cmd.build')).action((options) => cmdBuild(options));
     withWorkspaceOpts(cli.command('serve', 'cli.cmd.serve')).action((options) => cmdServe(options));
     withWorkspaceOpts(cli.command('dev', 'cli.cmd.dev')).action((options) => cmdDev(options));
-    withWorkspaceOpts(cli.command('format', 'cli.cmd.format')).action((options) => cmdFormat(options));
+    withWorkspaceOpts(cli.command('format', 'cli.cmd.format'))
+        .option('--no-javascript', 'cli.opt.format-no-javascript')
+        .option('--no-rust', 'cli.opt.format-no-rust')
+        .option('--no-vmz', 'cli.opt.format-no-vmz')
+        .action((options) => cmdFormat(options));
     withWorkspaceOpts(cli.command('lint', 'cli.cmd.lint')).action((options) => cmdLint(options));
 
     registerTestCommand(cli);
@@ -515,7 +519,7 @@ async function cmdDev(args: ParsedOptions): Promise<number> {
     }
 }
 
-function cmdFormat(args: ParsedOptions): number {
+async function cmdFormat(args: ParsedOptions): Promise<number> {
     const pathArg = args._[0] ?? '.';
     const { project, outDir } = resolveWorkspaceDirs({
         path: pathArg,
@@ -523,19 +527,18 @@ function cmdFormat(args: ParsedOptions): number {
     });
     const checkOnly = Boolean(args.check);
     log.info(`format ${project}${checkOnly ? ' --check' : ''}`);
-    const ws = createWorkspace({ root: project, outDir });
-    try {
-        const report = ws.format(checkOnly);
-        const errors = log.diagnostics(report.diagnostics ?? []);
-        if (checkOnly) {
-            log.info(`checked ${report.filesChecked} file(s); ${report.filesNeedWrite} need write`);
-            return errors || report.filesNeedWrite > 0 ? 1 : 0;
-        }
-        log.info(`formatted ${report.filesWritten}/${report.filesChecked} file(s)`);
-        return errors ? 1 : 0;
-    } finally {
-        ws.dispose();
-    }
+    const { runFormatCommand } = await import('./format-cmd.js');
+    return runFormatCommand({
+        project,
+        outDir,
+        check: checkOnly,
+        overrides: {
+            javascript: args['no-javascript'] ? false : undefined,
+            rust: args['no-rust'] ? false : undefined,
+            vmz: args['no-vmz'] ? false : undefined,
+        },
+        createWorkspace,
+    });
 }
 
 function cmdLint(args: ParsedOptions): number {

@@ -29,10 +29,8 @@
         "lint": "pnpm exec nifty check",
         "fmt": "node scripts/format.mjs",
         "fmt:check": "node scripts/format.mjs --check",
-        "fmt:rust": "node scripts/format.mjs",
-        "fmt:rust:check": "node scripts/format.mjs --check",
-        "fmt:vmz": "pnpm vmz format .",
-        "fmt:vmz:check": "pnpm vmz format --check .",
+        "fmt:vmz": "pnpm vmz format --no-javascript --no-rust .",
+        "fmt:vmz:check": "pnpm vmz format --check --no-javascript --no-rust .",
         "clean": "rimraf .turbo packages/examples/*/dist target"
     },
     "pnpm": {
@@ -44,6 +42,7 @@
         "@doki-land/nifty": "^0.0.5",
         "@types/node": "^22.15.30",
         "@vmz/core": "workspace:*",
+        "@vmz/plugin": "workspace:*",
         "@vmz/protocol": "workspace:*",
         "@vmz/test": "workspace:*",
         "linkedom": "^0.18.13",

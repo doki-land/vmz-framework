@@ -1,4 +1,4 @@
-//! VMZ authoring formatter: `.vmz` SFC + EditorConfig.
+//! VMZ formatter: `.vmz` SFC authoring + hybrid workspace surfaces (JS/TS + `cargo fmt`).
 //!
 //! Final `.vmz` text exits through [`VmzDocument`]. `<template>` prints from the
 //! Semantic AST with OXC-canonical expressions. Script/style bodies go through
@@ -13,7 +13,9 @@ mod path;
 mod script;
 mod style;
 mod template_print;
+mod workspace;
 
 pub use document::VmzDocument;
 pub use path::{FormatOptions, FormatReport, format_path};
 pub use template_print::format_template_body;
+pub use workspace::{WorkspaceFormatOptions, WorkspaceFormatReport, run_workspace_format};
