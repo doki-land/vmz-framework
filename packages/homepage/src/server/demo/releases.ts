@@ -142,8 +142,13 @@ export function demoReleaseSummary(): DemoReleaseSummary {
 export function demoConsoleRows(): DemoConsoleRow[] {
     return demoReleaseRecords().map((row) => ({
         id: row.id,
-        cells: [row.project, row.target, row.statusLabel, row.updatedAt],
+        cells: [row.project, row.target, row.statusLabel, row.actor, row.updatedAt],
     }));
+}
+
+export function demoReleaseDetail(id: string): DemoReleaseRecord | null {
+    const row = demoReleaseRecords().find((entry) => entry.id === id);
+    return row ? { ...row } : null;
 }
 
 export function demoShowcaseOverview(): DemoShowcaseOverview {

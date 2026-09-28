@@ -2,6 +2,7 @@ import { Get } from 'vmz:http';
 import {
     demoConsoleRows,
     demoHeroPreview,
+    demoReleaseDetail,
     demoReleaseRecords,
     demoReleaseSummary,
     demoShowcaseOverview,
@@ -24,6 +25,10 @@ export default class ReleaseDemo {
 
     getConsoleRows(): DemoConsoleRow[] {
         return demoConsoleRows();
+    }
+
+    getReleaseDetail(id: string): DemoReleaseRecord | null {
+        return demoReleaseDetail(id);
     }
 
     getHeroPreview(): DemoHeroPreview {
