@@ -213,7 +213,6 @@ import {
   productCloudName,
   productNavOverview,
   productNavProjects,
-  productNavDeploy,
   productNavMonitor,
   productWorkspaceLabel,
   productCreateRelease,
@@ -348,7 +347,6 @@ export default class IndexPage {
   productCloudNameLabel = '';
   productNavOverviewLabel = '';
   productNavProjectsLabel = '';
-  productNavDeployLabel = '';
   productNavMonitorLabel = '';
   productWorkspaceLabel = '';
   productCreateReleaseLabel = '';
@@ -472,7 +470,7 @@ export default class IndexPage {
       'flowStep3TitleLabel', 'flowStep3DescLabel', 'flowStep4TitleLabel', 'flowStep4DescLabel', 'flowStep5TitleLabel', 'flowStep5DescLabel',
       'flowStep6TitleLabel', 'flowStep6DescLabel',
       'showcaseIndexLabel', 'showcaseTitleLabel', 'showcaseBodyLabel', 'productCloudNameLabel',
-      'productNavOverviewLabel', 'productNavProjectsLabel', 'productNavDeployLabel', 'productNavMonitorLabel',
+      'productNavOverviewLabel', 'productNavProjectsLabel', 'productNavMonitorLabel',
       'productWorkspaceLabel', 'productCreateReleaseLabel', 'showcaseTabsLabel',
       'showcaseMetricBuildLabel', 'showcaseMetricBuildDescLabel', 'showcaseMetricScopeLabel', 'showcaseMetricScopeDescLabel',
       'showcaseMetricTargetsLabel', 'showcaseMetricTargetsDescLabel', 'showcaseBadgeProductionLabel', 'showcaseBadgeDirectLabel',
@@ -552,7 +550,6 @@ export default class IndexPage {
     this.productCloudNameLabel = productCloudName();
     this.productNavOverviewLabel = productNavOverview();
     this.productNavProjectsLabel = productNavProjects();
-    this.productNavDeployLabel = productNavDeploy();
     this.productNavMonitorLabel = productNavMonitor();
     this.productWorkspaceLabel = productWorkspaceLabel();
     this.productCreateReleaseLabel = productCreateRelease();

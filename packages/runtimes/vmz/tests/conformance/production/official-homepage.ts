@@ -154,7 +154,7 @@ if (homeBuild.status !== 0) {
         errors.push('homepage missing /commercial composition page');
     } else {
         const commercialVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/commercial.vmz'), 'utf8');
-        for (const tag of ['AppShell', 'Card', 'Alert', 'Empty', 'Form', 'Field', 'Dialog', 'Drawer']) {
+        for (const tag of ['AppShell', 'Form', 'Field', 'FilterBar', 'Table', 'Drawer', 'Button', 'Notification']) {
             if (!commercialVmz.includes(`<${tag}`)) {
                 errors.push(`homepage /commercial must compose <${tag}>`);
             }
