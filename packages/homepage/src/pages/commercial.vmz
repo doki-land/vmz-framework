@@ -6,7 +6,7 @@
         <h1 id="commercial-hero-title" class="vmz-commercial-hero__title">{{ commercialHeroTitleLabel }}</h1>
         <p class="vmz-commercial-hero__lead">{{ commercialHeroLeadLabel }}</p>
         <div class="vmz-commercial-hero__actions">
-          <Button type="button" @click="scrollContact">{{ commercialCtaContactLabel }}</Button>
+          <Link href="/console">{{ commercialCtaContactLabel }}</Link>
           <Button type="button" variant="secondary" @click="() => (drawerOpen = true)">{{ commercialCtaChecklistLabel }}</Button>
           <Link :href="guideHref">{{ deployGuideLabel }}</Link>
         </div>
@@ -34,12 +34,12 @@
           <Card :title="commercialPlanOpenTitleLabel" :description="commercialPlanOpenDescLabel">
             <p class="vmz-commercial-price"><span>{{ commercialPlanPriceLabel }}</span>{{ commercialPlanOpenPriceLabel }}</p>
             <Badge tone="info">{{ commercialPlanOpenBadgeLabel }}</Badge>
-            <Button type="button" variant="secondary" @click="scrollContact">{{ commercialPlanOpenCtaLabel }}</Button>
+            <Link href="/">{{ commercialPlanOpenCtaLabel }}</Link>
           </Card>
           <Card :title="commercialPlanTeamTitleLabel" :description="commercialPlanTeamDescLabel">
             <p class="vmz-commercial-price"><span>{{ commercialPlanPriceLabel }}</span>{{ commercialPlanTeamPriceLabel }}</p>
             <Badge tone="success">{{ commercialPlanTeamBadgeLabel }}</Badge>
-            <Button type="button" @click="scrollContact">{{ commercialPlanTeamCtaLabel }}</Button>
+            <Link href="/console">{{ commercialPlanTeamCtaLabel }}</Link>
           </Card>
         </div>
       </section>
