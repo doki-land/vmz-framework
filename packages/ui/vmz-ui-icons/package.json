@@ -7,7 +7,8 @@
     "license": "MIT",
     "exports": {
         "./contracts/token-requirements": "./contracts/token-requirements.v0.json",
-        "./Icon": "./src/components/Icon.vmz"
+        "./Icon": "./src/components/Icon.vmz",
+        "./registry": "./src/registry.ts"
     },
     "files": [
         "src",

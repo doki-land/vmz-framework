@@ -1,64 +1,5 @@
-<template>
-  <span
-    class="vmz-ui-icon"
-    data-vmz-ui="icon"
-    :data-icon="name"
-    :data-size="size"
-    :role="roleAttr"
-    :aria-hidden="hiddenAttr"
-    :aria-label="labelAttr"
-  >
-    <svg class="vmz-ui-icon__svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-      <path v-if="pathD" fill="currentColor" :d="pathD" />
-    </svg>
-  </span>
-</template>
-
-<style>
-.vmz-ui-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  box-sizing: border-box;
-  color: var(--vmz-action-primary-background);
-  line-height: 1;
-  vertical-align: middle;
-  user-select: none;
-}
-
-.vmz-ui-icon__svg {
-  display: block;
-  width: 1em;
-  height: 1em;
-}
-
-.vmz-ui-icon[data-size='sm'] {
-  width: 1.5rem;
-  height: 1.5rem;
-  font-size: 0.95rem;
-}
-
-.vmz-ui-icon[data-size='md'] {
-  width: 2.35rem;
-  height: 2.35rem;
-  font-size: 1.15rem;
-}
-
-.vmz-ui-icon[data-size='lg'] {
-  width: 2.85rem;
-  height: 2.85rem;
-  font-size: 1.35rem;
-}
-</style>
-
-<script client>
-/**
- * VMZ UI Icons — semantic Icon registry with unified SVG glyphs.
- * Registry source of truth also lives in ../registry.ts for @vmz/ui shim.
- */
-
-const REGISTRY = {
+/** Shared SVG path registry for @vmz/ui-icons and @vmz/ui Icon shim. */
+export const REGISTRY = {
   'action.search': 'M10.5 3a7.5 7.5 0 0 1 5.9 12.1l4 4-1.4 1.4-4-4A7.5 7.5 0 1 1 10.5 3zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11z',
   'action.close': 'M6.4 7.8 7.8 6.4 12 10.6 16.2 6.4 17.6 7.8 13.4 12 17.6 16.2 16.2 17.6 12 13.4 7.8 17.6 6.4 16.2 10.6 12z',
   'action.copy': 'M8 4h9a2 2 0 0 1 2 2v11h-2V6H8V4zm-2 4h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2zm0 2v10h9V10H6z',
@@ -110,45 +51,33 @@ const REGISTRY = {
   'status.danger': 'M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm-1 5h2v6h-2zm0 8h2v2h-2z',
 };
 
-const FALLBACK_PATH =
+export const FALLBACK_PATH =
   'M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm1 5h-2v2h2zm0 4h-2v7h2z';
 
-function resolveIconPath(name) {
+export const LEGACY_ICON_ALIASES: Record<string, string> = {
+  check: 'action.check',
+  close: 'action.close',
+  search: 'action.search',
+  'chevron-down': 'action.chevron-down',
+  'chevron-right': 'action.chevron-right',
+  info: 'status.info',
+  warning: 'status.warning',
+  success: 'status.success',
+  danger: 'status.danger',
+  menu: 'action.menu',
+  plus: 'action.plus',
+};
+
+export function resolveIconName(name: string): string {
   const key = String(name || '').trim();
+  if (!key) return '';
+  if (LEGACY_ICON_ALIASES[key]) return LEGACY_ICON_ALIASES[key];
+  return key;
+}
+
+export function resolveIconPath(name: string): string {
+  const key = resolveIconName(name);
   if (!key) return FALLBACK_PATH;
   if (REGISTRY[key]) return REGISTRY[key];
   return FALLBACK_PATH;
 }
-
-export default class Icon {
-  /** Semantic icon id, e.g. tool.base64 / action.search */
-  public name: string = '';
-  /** sm | md | lg */
-  public size: string = 'md';
-  /** Accessible name; empty ⇒ decorative */
-  public label: string = '';
-
-  pathD = FALLBACK_PATH;
-  roleAttr = '';
-  hiddenAttr = 'true';
-  labelAttr = '';
-
-  onMount() {
-    this.sync();
-  }
-
-  sync() {
-    this.pathD = resolveIconPath(this.name);
-    const labelled = String(this.label || '').trim();
-    if (labelled) {
-      this.roleAttr = 'img';
-      this.hiddenAttr = '';
-      this.labelAttr = labelled;
-    } else {
-      this.roleAttr = '';
-      this.hiddenAttr = 'true';
-      this.labelAttr = '';
-    }
-  }
-}
-</script>

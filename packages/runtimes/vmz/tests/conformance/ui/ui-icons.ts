@@ -45,6 +45,7 @@ if (pkg.dependencies?.['@vmz/plugin'] || pkg.devDependencies?.['@vmz/plugin']) {
     fail('@vmz/ui-icons must not depend on @vmz/plugin');
 }
 if (!pkg.exports?.['./Icon']) fail('package exports must include ./Icon');
+if (!pkg.exports?.['./registry']) fail('package exports must include ./registry');
 
 console.log('ui-icons: token requirements contract…');
 const contractPath = path.join(iconsRoot, 'contracts', 'token-requirements.v0.json');
@@ -85,13 +86,18 @@ for (const banned of ['Button', 'Field', 'Dialog', 'Form', 'Empty', 'Skeleton', 
 if (!componentNames.includes('Icon')) fail('missing Icon.vmz');
 
 const iconSrc = fs.readFileSync(path.join(iconsRoot, 'src', 'components', 'Icon.vmz'), 'utf8');
+const registrySrc = fs.readFileSync(path.join(iconsRoot, 'src', 'registry.ts'), 'utf8');
 if (!iconSrc.includes('data-vmz-ui="icon"')) fail('Icon missing data-vmz-ui=icon');
 if (!iconSrc.includes('data-icon={name}') && !iconSrc.includes('data-icon=')) {
     fail('Icon must expose data-icon from semantic name');
 }
-if (!iconSrc.includes('REGISTRY') || !iconSrc.includes("'tool.base64'") || !iconSrc.includes("'action.search'")) {
-    fail('Icon must ship semantic registry (tool.* + action.*), not loose per-page SVG');
+if (!iconSrc.includes('REGISTRY') || !iconSrc.includes('registry.ts')) {
+    fail('Icon must inline shared registry and reference ../registry.ts source');
 }
+if (!registrySrc.includes('export const REGISTRY') || !registrySrc.includes("'tool.base64'") || !registrySrc.includes("'action.search'")) {
+    fail('registry.ts must ship semantic registry (tool.* + action.*), not loose per-page SVG');
+}
+if (!registrySrc.includes('LEGACY_ICON_ALIASES')) fail('registry.ts must export legacy @vmz/ui Icon aliases');
 if (!iconSrc.includes('public name') || !iconSrc.includes('public label') || !iconSrc.includes('public size')) {
     fail('Icon must expose public name / size / label props');
 }
