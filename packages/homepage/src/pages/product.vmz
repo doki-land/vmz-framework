@@ -1,18 +1,18 @@
 <template>
   <div data-vmz-fixture="product" :data-density="density" :dir="dir">
-    <AppShell brand="VMZ" home-href="/" nav-label="Product" :nav="navItems">
+    <AppShell brand="VMZ" home-href="/" :nav-label="productNavLabel" :nav="navItems">
       <div class="vmz-product-toolbar" data-vmz-fixture="product-toolbar">
         <Badge tone="brand">{{ versionLabel }}</Badge>
         <Button type="button" variant="secondary" @click="toggleVersion">
-          Switch version
+          {{ switchVersionLabel }}
         </Button>
         <Button type="button" variant="ghost" @click="toggleLocale">
-          Locale: {{ localeLabel }}
+          {{ localePrefixLabel }} {{ localeLabel }}
         </Button>
-        <Button type="button" @click="cycleDensity">Cycle density</Button>
-        <Button type="button" variant="secondary" @click="toggleDir">Toggle RTL</Button>
+        <Button type="button" @click="cycleDensity">{{ cycleDensityLabel }}</Button>
+        <Button type="button" variant="secondary" @click="toggleDir">{{ toggleRtlLabel }}</Button>
         <Field
-          label="Search"
+          :label="searchLabel"
           control-id="home-product-search"
           description-id="home-product-search-desc"
           error-id="home-product-search-err"
@@ -26,7 +26,7 @@
       </div>
 
       <div class="vmz-product-layout">
-        <Toc label="On this page" :items="tocItems" />
+        <Toc :label="tocLabel" :items="tocItems" />
 
         <Prose>
           <div>
@@ -35,14 +35,14 @@
             <Callout
               tone="info"
               role-name="note"
-              title="Zero-JS readable"
-              description="Headings, callouts, and code remain in the first HTML. Copy and locale switch enhance, they do not own the content."
+              :title="calloutZeroJsTitle"
+              :description="calloutZeroJsDesc"
             />
           </div>
 
           <div>
-            <h2 id="install">Install</h2>
-            <p>Install the official UI package and materialize tokens from application /designs.</p>
+            <h2 id="install">{{ installHeading }}</h2>
+            <p>{{ installBody }}</p>
             <div v-if="isV1">
               <CodeBlock
                 caption="shell"
@@ -59,35 +59,34 @@
                 :on-copy="copyInstall"
               />
             </div>
-            <p v-if="copiedYes" data-vmz-fixture="product-copied" role="status">Copied install snippet</p>
+            <p v-if="copiedYes" data-vmz-fixture="product-copied" role="status">{{ copiedStatus }}</p>
           </div>
 
           <div>
-            <h2 id="contract">Composition contract</h2>
+            <h2 id="contract">{{ contractHeading }}</h2>
             <p>
-              Document/Product pages prove Prose, Toc, Callout, and CodeBlock together — not a parallel markdown runtime.
-              Integrated docs at
+              {{ contractBodyLead }}
               <Link href="/d/">/d/</Link>
-              remain the collection mount.
+              {{ contractBodyTail }}
             </p>
             <Callout
               tone="warning"
               role-name="note"
-              title="No second theme"
-              description="Components consume semantic tokens only. Brand hex stays in /designs."
+              :title="calloutNoThemeTitle"
+              :description="calloutNoThemeDesc"
             />
             <ul>
-              <li>Commercial · Console · Document/Product</li>
-              <li>SSR HTML carries meaning before resume</li>
-              <li>Search filters the outline without a Query runtime</li>
+              <li>{{ contractLi1 }}</li>
+              <li>{{ contractLi2 }}</li>
+              <li>{{ contractLi3 }}</li>
             </ul>
           </div>
 
           <hr />
           <p>
-            <Link href="/commercial">Commercial</Link>
+            <Link href="/commercial">{{ navCommercialLabel }}</Link>
             ·
-            <Link href="/console">Console</Link>
+            <Link href="/console">{{ navConsoleLabel }}</Link>
           </p>
         </Prose>
       </div>
@@ -118,6 +117,44 @@
 </style>
 
 <script client>
+import {
+  productNav,
+  productDocSwitchVersion,
+  productDocLocalePrefix,
+  productDocLocaleEn,
+  productDocLocaleZh,
+  productDocCycleDensity,
+  productDocToggleRtl,
+  productDocSearchLabel,
+  productDocTocLabel,
+  productDocTitle,
+  productDocLead,
+  productDocCalloutZeroJsTitle,
+  productDocCalloutZeroJsDesc,
+  productDocInstallHeading,
+  productDocInstallBody,
+  productDocCopiedStatus,
+  productDocContractHeading,
+  productDocContractBodyLead,
+  productDocContractBodyTail,
+  productDocCalloutNoThemeTitle,
+  productDocCalloutNoThemeDesc,
+  productDocContractLi1,
+  productDocContractLi2,
+  productDocContractLi3,
+  productDocTocOverview,
+  productDocTocInstall,
+  productDocTocContract,
+  productDocCopyCommand,
+  productDocCopiedCommand,
+  productDocNavForm,
+  productDocNavUi6,
+  productDocNavWelcome,
+  commercialNavCommercial,
+  commercialNavConsole,
+} from '#locales/common';
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
+
 export default class ProductPage {
   version = 'v1';
   locale = 'en';
@@ -130,6 +167,32 @@ export default class ProductPage {
   installCode = 'pnpm add @vmz/ui';
   isV1 = true;
   isV0 = false;
+  productNavLabel = 'Product';
+  switchVersionLabel = 'Switch version';
+  localePrefixLabel = 'Locale:';
+  localeLabel = 'en-US';
+  cycleDensityLabel = 'Cycle density';
+  toggleRtlLabel = 'Toggle RTL';
+  searchLabel = 'Search';
+  tocLabel = 'On this page';
+  titleText = 'VMZ Product surface';
+  leadText =
+    'One composition for documentation and product guides — Prose measure, Toc outline, Callout guidance, CodeBlock with copy.';
+  calloutZeroJsTitle = '';
+  calloutZeroJsDesc = '';
+  installHeading = '';
+  installBody = '';
+  copiedStatus = '';
+  contractHeading = '';
+  contractBodyLead = '';
+  contractBodyTail = '';
+  calloutNoThemeTitle = '';
+  calloutNoThemeDesc = '';
+  contractLi1 = '';
+  contractLi2 = '';
+  contractLi3 = '';
+  navCommercialLabel = '';
+  navConsoleLabel = '';
   navItems = [
     { id: 'product', title: 'Product', href: '/product' },
     { id: 'commercial', title: 'Commercial', href: '/commercial' },
@@ -149,10 +212,77 @@ export default class ProductPage {
     { id: 'contract', title: 'Composition contract', href: '#contract' },
   ];
   versionLabel = 'v1';
-  localeLabel = 'en-US';
-  titleText = 'VMZ Product surface';
-  leadText =
-    'One composition for documentation and product guides — Prose measure, Toc outline, Callout guidance, CodeBlock with copy.';
+  _demoLocaleId = 'en-us';
+  _unwatchLocale = null;
+
+  onMount() {
+    this.applyLocaleCopy('en-us');
+    this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+  }
+
+  onDestroy() {
+    if (typeof this._unwatchLocale === 'function') this._unwatchLocale();
+    this._unwatchLocale = null;
+  }
+
+  refreshCopy() {
+    this.productNavLabel = productNav();
+    this.switchVersionLabel = productDocSwitchVersion();
+    this.localePrefixLabel = productDocLocalePrefix();
+    this.cycleDensityLabel = productDocCycleDensity();
+    this.toggleRtlLabel = productDocToggleRtl();
+    this.searchLabel = productDocSearchLabel();
+    this.tocLabel = productDocTocLabel();
+    this.titleText = productDocTitle();
+    this.leadText = productDocLead();
+    this.calloutZeroJsTitle = productDocCalloutZeroJsTitle();
+    this.calloutZeroJsDesc = productDocCalloutZeroJsDesc();
+    this.installHeading = productDocInstallHeading();
+    this.installBody = productDocInstallBody();
+    this.copiedStatus = productDocCopiedStatus();
+    this.contractHeading = productDocContractHeading();
+    this.contractBodyLead = productDocContractBodyLead();
+    this.contractBodyTail = productDocContractBodyTail();
+    this.calloutNoThemeTitle = productDocCalloutNoThemeTitle();
+    this.calloutNoThemeDesc = productDocCalloutNoThemeDesc();
+    this.contractLi1 = productDocContractLi1();
+    this.contractLi2 = productDocContractLi2();
+    this.contractLi3 = productDocContractLi3();
+    this.navCommercialLabel = commercialNavCommercial();
+    this.navConsoleLabel = commercialNavConsole();
+    this.copyLabel = productDocCopyCommand();
+    this.navItems = [
+      { id: 'product', title: productNav(), href: '/product' },
+      { id: 'commercial', title: commercialNavCommercial(), href: '/commercial' },
+      { id: 'console', title: commercialNavConsole(), href: '/console' },
+      { id: 'form', title: productDocNavForm(), href: '/form' },
+      { id: 'ui6', title: productDocNavUi6(), href: '/ui6' },
+      { id: 'welcome', title: productDocNavWelcome(), href: '/welcome' },
+    ];
+    this.tocAll = [
+      { id: 'overview', title: productDocTocOverview(), href: '#overview' },
+      { id: 'install', title: productDocTocInstall(), href: '#install' },
+      { id: 'contract', title: productDocTocContract(), href: '#contract' },
+    ];
+    this.syncLocaleMeta(this._demoLocaleId);
+    this.onSearch({ target: { value: this.search } });
+  }
+
+  syncLocaleMeta(localeId) {
+    if (localeId === 'en-us') {
+      this.locale = 'en';
+      this.localeLabel = productDocLocaleEn();
+    } else {
+      this.locale = 'zh';
+      this.localeLabel = productDocLocaleZh();
+    }
+  }
+
+  applyLocaleCopy(preferred) {
+    const localeId = readLocaleId(preferred);
+    this._demoLocaleId = localeId === 'en-us' ? 'en-us' : 'zh-hans';
+    withLocaleHint(this._demoLocaleId, () => this.refreshCopy());
+  }
 
   toggleVersion() {
     if (this.version === 'v1') {
@@ -169,23 +299,12 @@ export default class ProductPage {
     this.versionLabel = this.version;
     this.copied = 'no';
     this.copiedYes = false;
-    this.copyLabel = 'Copy';
+    this.copyLabel = productDocCopyCommand();
   }
 
   toggleLocale() {
-    if (this.locale === 'en') {
-      this.locale = 'zh';
-      this.localeLabel = 'zh-Hans';
-      this.titleText = 'VMZ 产品文档表面';
-      this.leadText =
-        '文档与产品指南共用一套组合：Prose 排版、Toc 目录、Callout 提示、CodeBlock 复制。';
-    } else {
-      this.locale = 'en';
-      this.localeLabel = 'en-US';
-      this.titleText = 'VMZ Product surface';
-      this.leadText =
-        'One composition for documentation and product guides — Prose measure, Toc outline, Callout guidance, CodeBlock with copy.';
-    }
+    this._demoLocaleId = this._demoLocaleId === 'en-us' ? 'zh-hans' : 'en-us';
+    withLocaleHint(this._demoLocaleId, () => this.refreshCopy());
   }
 
   cycleDensity() {
@@ -225,7 +344,7 @@ export default class ProductPage {
     }
     this.copied = 'yes';
     this.copiedYes = true;
-    this.copyLabel = 'Copied';
+    this.copyLabel = productDocCopiedCommand();
   }
 }
 </script>
