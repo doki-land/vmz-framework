@@ -103,6 +103,8 @@ fn oxc_params_static_strings() {
     let p2 = parse_static_link_params("{ id: \"sku-2\", tab: 'security' }").unwrap();
     assert_eq!(p2.get("id").map(String::as_str), Some("sku-2"));
     assert_eq!(p2.get("tab").map(String::as_str), Some("security"));
+    let p3 = parse_static_link_params("({ id: \"sku-3\" })").unwrap();
+    assert_eq!(p3.get("id").map(String::as_str), Some("sku-3"));
 }
 
 #[test]

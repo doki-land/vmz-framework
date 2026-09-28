@@ -487,7 +487,7 @@ pub fn realize_path_pattern(
 /// Parse static string entries from a params object expression via oxc AST.
 /// Returns `None` when the expression is not a fully static object of string literals.
 pub fn parse_static_link_params(expr: &str) -> Option<BTreeMap<String, String>> {
-    let trimmed = expr.trim();
+    let trimmed = strip_outer_parens(expr.trim());
     if trimmed.is_empty() {
         return Some(BTreeMap::new());
     }
@@ -507,6 +507,18 @@ pub fn parse_static_link_params(expr: &str) -> Option<BTreeMap<String, String>> 
         return None;
     }
     visitor.result
+}
+
+fn strip_outer_parens(expr: &str) -> &str {
+    let mut t = expr.trim();
+    while t.starts_with('(') && t.ends_with(')') {
+        let inner = t[1..t.len() - 1].trim();
+        if inner.is_empty() {
+            break;
+        }
+        t = inner;
+    }
+    t
 }
 
 struct StaticParamsVisitor {
