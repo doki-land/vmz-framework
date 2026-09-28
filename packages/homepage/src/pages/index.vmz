@@ -38,14 +38,6 @@
         </div>
       </section>
 
-      <section class="v2-statement" aria-labelledby="statement-title">
-        <p class="v2-index">{{ statementIndexLabel }}</p>
-        <div>
-          <h2 id="statement-title" data-vmz-fixture="landing-statement-title">{{ statementTitleLeadLabel }}<br /><em>{{ statementTitleEmLabel }}</em></h2>
-          <p data-vmz-fixture="landing-statement-body">{{ statementBodyLabel }}</p>
-        </div>
-      </section>
-
       <section class="v2-features" :aria-label="featuresAriaLabel">
         <article class="v2-feature">
           <div class="v2-feature__icon"><Icon name="feature.incremental" size="md" /></div>
@@ -64,38 +56,6 @@
         </article>
       </section>
 
-      <section class="v2-feedback" aria-labelledby="feedback-title">
-        <div class="v2-feedback__copy">
-          <p class="v2-index">{{ feedbackIndexLabel }}</p>
-          <h2 id="feedback-title">{{ feedbackTitleLabel }}<br />{{ feedbackTitleBreakLabel }}</h2>
-          <p>{{ feedbackBodyLabel }}</p>
-        </div>
-        <ol class="v2-activity">
-          <li><span>{{ feedbackActivity1Label }}</span><strong>{{ feedbackActivity1ValueLabel }}</strong><small>{{ feedbackActivity1NoteLabel }}</small></li>
-          <li><span>{{ feedbackActivity2Label }}</span><strong>{{ feedbackActivity2ValueLabel }}</strong><small>{{ feedbackActivity2NoteLabel }}</small></li>
-          <li class="is-current"><span>{{ feedbackActivity3Label }}</span><strong>{{ feedbackActivity3ValueLabel }}</strong><small>{{ feedbackActivity3NoteLabel }}</small></li>
-        </ol>
-      </section>
-
-      <section class="v2-flow" aria-labelledby="flow-title">
-        <div class="v2-signal" :aria-label="heroSignalAriaLabel">
-          <div><small>{{ heroSignalAuthorLabel }}</small><strong>{{ heroSignalAuthorValueLabel }}</strong></div>
-          <i aria-hidden="true"></i>
-          <div class="is-core"><small>{{ heroSignalUnderstandLabel }}</small><strong>{{ heroSignalUnderstandValueLabel }}</strong></div>
-          <i aria-hidden="true"></i>
-          <div><small>{{ heroSignalDeliverLabel }}</small><strong>{{ heroSignalDeliverValueLabel }}</strong></div>
-        </div>
-        <div class="v2-section-head"><p class="v2-index">{{ flowIndexLabel }}</p><h2 id="flow-title">{{ flowTitleLabel }}</h2></div>
-        <ol>
-          <li><b>{{ flowStep1TitleLabel }}</b><span>{{ flowStep1DescLabel }}</span></li>
-          <li><b>{{ flowStep2TitleLabel }}</b><span>{{ flowStep2DescLabel }}</span></li>
-          <li><b>{{ flowStep3TitleLabel }}</b><span>{{ flowStep3DescLabel }}</span></li>
-          <li><b>{{ flowStep4TitleLabel }}</b><span>{{ flowStep4DescLabel }}</span></li>
-          <li><b>{{ flowStep5TitleLabel }}</b><span>{{ flowStep5DescLabel }}</span></li>
-          <li><b>{{ flowStep6TitleLabel }}</b><span>{{ flowStep6DescLabel }}</span></li>
-        </ol>
-      </section>
-
       <section id="showcase" class="v2-showcase" aria-labelledby="showcase-title">
         <div class="v2-section-head">
           <p class="v2-index">{{ showcaseIndexLabel }}</p>
@@ -105,11 +65,11 @@
         <div class="v2-product">
           <aside class="v2-product__side">
             <div class="v2-product__identity"><span class="v2-product__logo">V</span><strong>{{ productCloudNameLabel }}</strong></div>
-            <nav :aria-label="productNavOverviewLabel"><a class="is-active" href="#showcase">{{ productNavOverviewLabel }}</a><a href="#showcase">{{ productNavProjectsLabel }}</a><a href="/deploy-planner">{{ productNavDeployLabel }}</a><a href="/console">{{ productNavMonitorLabel }}</a></nav>
+            <nav :aria-label="productNavOverviewLabel"><a href="/console">{{ productNavOverviewLabel }}</a><a href="#showcase">{{ productNavProjectsLabel }}</a><a href="/commercial">{{ productNavMonitorLabel }}</a></nav>
             <small>{{ productWorkspaceLabel }}</small>
           </aside>
           <div class="v2-product__work">
-          <div class="v2-product__bar"><div><span>{{ showcasePathLabel }}</span><strong>{{ heroPreviewReleaseCenterLabel }}</strong></div><Link href="/console">{{ productCreateReleaseLabel }}</Link></div>
+          <div class="v2-product__bar"><div><span>{{ showcasePathLabel }}</span><strong>{{ showcaseTabSourceLabel }}</strong></div><Link href="/console">{{ productCreateReleaseLabel }}</Link></div>
           <Tabs :label="showcaseTabsLabel" :selected="showcaseTab" panel-id="landing-showcase-panel" :items="showcaseTabs" :on-select="(id) => (showcaseTab = id)">
             <div v-if="showcaseTab === 'overview'" class="v2-dashboard">
               <p class="v2-showcase-summary-line">{{ showcaseSummaryLine }}</p>
@@ -133,7 +93,37 @@
             <div v-if="showcaseTab === 'activity'" class="v2-empty"><Badge tone="success">{{ showcaseEmptyBadgeLabel }}</Badge><h3>{{ showcaseEmptyTitleLabel }}</h3><p>{{ showcaseEmptyBodyLabel }}</p></div>
           </Tabs></div>
         </div>
-        <div v-if="notifyOpen" class="v2-notification"><Notification tone="success" role-name="status" :title="showcaseNotifyTitleLabel" :description="showcaseNotifyBodyLabel"><Button type="button" variant="ghost" @click="() => (notifyOpen = false)">{{ showcaseNotifyCloseLabel }}</Button></Notification></div>
+      </section>
+
+      <section class="v2-flow" aria-labelledby="flow-title">
+        <div class="v2-signal" :aria-label="heroSignalAriaLabel">
+          <div><small>{{ heroSignalAuthorLabel }}</small><strong>{{ heroSignalAuthorValueLabel }}</strong></div>
+          <i aria-hidden="true"></i>
+          <div class="is-core"><small>{{ heroSignalUnderstandLabel }}</small><strong>{{ heroSignalUnderstandValueLabel }}</strong></div>
+          <i aria-hidden="true"></i>
+          <div><small>{{ heroSignalDeliverLabel }}</small><strong>{{ heroSignalDeliverValueLabel }}</strong></div>
+        </div>
+        <div class="v2-section-head"><p class="v2-index">{{ flowIndexLabel }}</p><h2 id="flow-title">{{ flowTitleLabel }}</h2></div>
+        <ol>
+          <li><b>{{ flowStep1TitleLabel }}</b><span>{{ flowStep1DescLabel }}</span></li>
+          <li><b>{{ flowStep2TitleLabel }}</b><span>{{ flowStep2DescLabel }}</span></li>
+          <li><b>{{ flowStep3TitleLabel }}</b><span>{{ flowStep3DescLabel }}</span></li>
+          <li><b>{{ flowStep4TitleLabel }}</b><span>{{ flowStep4DescLabel }}</span></li>
+          <li><b>{{ flowStep5TitleLabel }}</b><span>{{ flowStep5DescLabel }}</span></li>
+          <li><b>{{ flowStep6TitleLabel }}</b><span>{{ flowStep6DescLabel }}</span></li>
+        </ol>
+      </section>
+
+      <section class="v2-statement" aria-labelledby="statement-title">
+        <p class="v2-index">{{ statementIndexLabel }}</p>
+        <div>
+          <h2 id="statement-title" data-vmz-fixture="landing-statement-title">{{ statementTitleLeadLabel }}<br /><em>{{ statementTitleEmLabel }}</em></h2>
+          <p data-vmz-fixture="landing-statement-body">{{ statementBodyLabel }}</p>
+          <div class="v2-statement__actions">
+            <a class="v2-button v2-button--text" :href="docsRootHref">{{ readDocsLabel }}</a>
+            <a class="v2-button v2-button--text" :href="guideHref">{{ gettingStartedGuideLabel }}</a>
+          </div>
+        </div>
       </section>
 
       <section class="v2-start" aria-labelledby="start-title">
@@ -141,7 +131,7 @@
         <h2 id="start-title" data-vmz-fixture="landing-start-title">{{ startTitleLabel }}</h2>
         <p data-vmz-fixture="landing-start-lede">{{ startLedeLabel }}</p>
         <div class="v2-command"><code>pnpm create vmz-app my-app</code><Button type="button" variant="secondary" @click="copyCommand">{{ copied ? copiedCommandLabel : copyCommandLabel }}</Button></div>
-        <div class="v2-actions"><a class="v2-button v2-button--light" data-vmz-fixture="landing-start-cta" :href="guideHref">{{ startLabel }}</a><a class="v2-button v2-button--dark-text" href="/deploy-planner">{{ deployPlannerLabel }} →</a></div>
+        <div class="v2-actions"><a class="v2-button v2-button--light" data-vmz-fixture="landing-start-cta" :href="guideHref">{{ startLabel }}</a></div>
       </section>
     </main>
     <SiteFooter />
@@ -151,8 +141,9 @@
 <script client>
 import {
   build,
+  readDocs,
+  gettingStartedGuide,
   start,
-  deployPlanner,
   heroKicker,
   heroTitleLead,
   heroTitleEm,
@@ -202,19 +193,6 @@ import {
   feature3Title,
   feature3Body,
   feature3Tag,
-  feedbackIndex,
-  feedbackTitle,
-  feedbackTitleBreak,
-  feedbackBody,
-  feedbackActivity1Label,
-  feedbackActivity1Value,
-  feedbackActivity1Note,
-  feedbackActivity2Label,
-  feedbackActivity2Value,
-  feedbackActivity2Note,
-  feedbackActivity3Label,
-  feedbackActivity3Value,
-  feedbackActivity3Note,
   flowIndex,
   flowTitle,
   flowStep1Title,
@@ -268,9 +246,6 @@ import {
   showcaseEmptyBadge,
   showcaseEmptyTitle,
   showcaseEmptyBody,
-  showcaseNotifyTitle,
-  showcaseNotifyBody,
-  showcaseNotifyClose,
   startIndex,
   startTitle,
   startLede,
@@ -285,8 +260,7 @@ import IndexPageServer from '#server/pages/index';
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
 
 export default class IndexPage {
-  showcaseTab = 'overview';
-  notifyOpen = false;
+  showcaseTab = 'source';
   copied = false;
   localeId = 'zh-hans';
   heroKickerLabel = '';
@@ -354,19 +328,6 @@ export default class IndexPage {
   feature3TitleLabel = '';
   feature3BodyLabel = '';
   feature3TagLabel = '';
-  feedbackIndexLabel = '';
-  feedbackTitleLabel = '';
-  feedbackTitleBreakLabel = '';
-  feedbackBodyLabel = '';
-  feedbackActivity1Label = '';
-  feedbackActivity1ValueLabel = '';
-  feedbackActivity1NoteLabel = '';
-  feedbackActivity2Label = '';
-  feedbackActivity2ValueLabel = '';
-  feedbackActivity2NoteLabel = '';
-  feedbackActivity3Label = '';
-  feedbackActivity3ValueLabel = '';
-  feedbackActivity3NoteLabel = '';
   flowIndexLabel = '';
   flowTitleLabel = '';
   flowStep1TitleLabel = '';
@@ -406,15 +367,14 @@ export default class IndexPage {
   showcaseEmptyBadgeLabel = '';
   showcaseEmptyTitleLabel = '';
   showcaseEmptyBodyLabel = '';
-  showcaseNotifyTitleLabel = '';
-  showcaseNotifyBodyLabel = '';
-  showcaseNotifyCloseLabel = '';
+  showcaseTabSourceLabel = '';
   startIndexLabel = '';
   startTitleLabel = '';
   startLedeLabel = '';
   buildLabel = '';
+  readDocsLabel = '';
+  gettingStartedGuideLabel = '';
   startLabel = '';
-  deployPlannerLabel = '';
   copyCommandLabel = '';
   copiedCommandLabel = '';
   docsRootHref = '/d/zh-hans/';
@@ -508,10 +468,6 @@ export default class IndexPage {
       'statementIndexLabel', 'statementTitleLeadLabel', 'statementTitleEmLabel', 'statementBodyLabel',
       'featuresAriaLabel', 'feature1TitleLabel', 'feature1BodyLabel', 'feature1TagLabel',
       'feature2TitleLabel', 'feature2BodyLabel', 'feature2TagLabel', 'feature3TitleLabel', 'feature3BodyLabel', 'feature3TagLabel',
-      'feedbackIndexLabel', 'feedbackTitleLabel', 'feedbackTitleBreakLabel', 'feedbackBodyLabel',
-      'feedbackActivity1Label', 'feedbackActivity1ValueLabel', 'feedbackActivity1NoteLabel',
-      'feedbackActivity2Label', 'feedbackActivity2ValueLabel', 'feedbackActivity2NoteLabel',
-      'feedbackActivity3Label', 'feedbackActivity3ValueLabel', 'feedbackActivity3NoteLabel',
       'flowIndexLabel', 'flowTitleLabel', 'flowStep1TitleLabel', 'flowStep1DescLabel', 'flowStep2TitleLabel', 'flowStep2DescLabel',
       'flowStep3TitleLabel', 'flowStep3DescLabel', 'flowStep4TitleLabel', 'flowStep4DescLabel', 'flowStep5TitleLabel', 'flowStep5DescLabel',
       'flowStep6TitleLabel', 'flowStep6DescLabel',
@@ -521,9 +477,8 @@ export default class IndexPage {
       'showcaseMetricBuildLabel', 'showcaseMetricBuildDescLabel', 'showcaseMetricScopeLabel', 'showcaseMetricScopeDescLabel',
       'showcaseMetricTargetsLabel', 'showcaseMetricTargetsDescLabel', 'showcaseBadgeProductionLabel', 'showcaseBadgeDirectLabel',
       'showcaseBadgeActiveLabel', 'showcaseBadgeWebToEdgeLabel', 'showcaseStatusReadyLabel',
-      'showcaseEmptyBadgeLabel', 'showcaseEmptyTitleLabel', 'showcaseEmptyBodyLabel',
-      'showcaseNotifyTitleLabel', 'showcaseNotifyBodyLabel', 'showcaseNotifyCloseLabel',
-      'startIndexLabel', 'startTitleLabel', 'startLedeLabel', 'buildLabel', 'startLabel', 'deployPlannerLabel',
+      'showcaseEmptyBadgeLabel', 'showcaseEmptyTitleLabel', 'showcaseEmptyBodyLabel', 'showcaseTabSourceLabel',
+      'startIndexLabel', 'startTitleLabel', 'startLedeLabel', 'buildLabel', 'readDocsLabel', 'gettingStartedGuideLabel', 'startLabel',
       'copyCommandLabel', 'copiedCommandLabel',
     ];
     for (const k of keys) bump(k);
@@ -577,19 +532,6 @@ export default class IndexPage {
     this.feature3TitleLabel = feature3Title();
     this.feature3BodyLabel = feature3Body();
     this.feature3TagLabel = feature3Tag();
-    this.feedbackIndexLabel = feedbackIndex();
-    this.feedbackTitleLabel = feedbackTitle();
-    this.feedbackTitleBreakLabel = feedbackTitleBreak();
-    this.feedbackBodyLabel = feedbackBody();
-    this.feedbackActivity1Label = feedbackActivity1Label();
-    this.feedbackActivity1ValueLabel = feedbackActivity1Value();
-    this.feedbackActivity1NoteLabel = feedbackActivity1Note();
-    this.feedbackActivity2Label = feedbackActivity2Label();
-    this.feedbackActivity2ValueLabel = feedbackActivity2Value();
-    this.feedbackActivity2NoteLabel = feedbackActivity2Note();
-    this.feedbackActivity3Label = feedbackActivity3Label();
-    this.feedbackActivity3ValueLabel = feedbackActivity3Value();
-    this.feedbackActivity3NoteLabel = feedbackActivity3Note();
     this.flowIndexLabel = flowIndex();
     this.flowTitleLabel = flowTitle();
     this.flowStep1TitleLabel = flowStep1Title();
@@ -633,15 +575,14 @@ export default class IndexPage {
     this.showcaseEmptyBadgeLabel = showcaseEmptyBadge();
     this.showcaseEmptyTitleLabel = showcaseEmptyTitle();
     this.showcaseEmptyBodyLabel = showcaseEmptyBody();
-    this.showcaseNotifyTitleLabel = showcaseNotifyTitle();
-    this.showcaseNotifyBodyLabel = showcaseNotifyBody();
-    this.showcaseNotifyCloseLabel = showcaseNotifyClose();
+    this.showcaseTabSourceLabel = showcaseTabSource();
     this.startIndexLabel = startIndex();
     this.startTitleLabel = startTitle();
     this.startLedeLabel = startLede();
     this.buildLabel = build();
+    this.readDocsLabel = readDocs();
+    this.gettingStartedGuideLabel = gettingStartedGuide();
     this.startLabel = start();
-    this.deployPlannerLabel = deployPlanner();
     this.copyCommandLabel = copyCommand();
     this.copiedCommandLabel = copiedCommand();
 

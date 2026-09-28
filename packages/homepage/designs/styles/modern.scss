@@ -161,11 +161,12 @@ html:has([data-vmz-ui='app-shell']) {
 .v2-signal i::after { content: ""; position: absolute; right: 0; top: -3px; width: 7px; height: 7px; border-top: 1px solid #90959d; border-right: 1px solid #90959d; transform: rotate(45deg); }
 
 .v2-statement { display: grid; grid-template-columns: 1fr; gap: 1rem; width: min(calc(100% - 4rem), var(--v2-content)); margin: 0 auto; padding: 5rem 0; }
-.v2-statement h2, .v2-section-head h2, .v2-feedback h2, .v2-start h2 { margin: 0; color: var(--v2-ink); font: 600 1.875rem/2.625rem var(--vmz-font-display); letter-spacing: 0; }
-.v2-statement h2 em, .v2-section-head h2 em, .v2-feedback h2 em, .v2-start h2 em { color: inherit; font-style: normal; }
+.v2-statement h2, .v2-section-head h2, .v2-start h2 { margin: 0; color: var(--v2-ink); font: 600 1.875rem/2.625rem var(--vmz-font-display); letter-spacing: 0; }
+.v2-statement h2 em, .v2-section-head h2 em, .v2-start h2 em { color: inherit; font-style: normal; }
 .v2-statement > div { display: grid; gap: .75rem; max-width: 48rem; }
 .v2-statement h2 { max-width: none; }
-.v2-statement p:last-child { max-width: 40rem; margin: 0; color: var(--v2-muted); font: 400 1rem/1.625rem var(--vmz-font-sans); }
+.v2-statement > div > p { max-width: 40rem; margin: 0; color: var(--v2-muted); font: 400 1rem/1.625rem var(--vmz-font-sans); }
+.v2-statement__actions { display: flex; flex-wrap: wrap; gap: .75rem 1rem; margin-top: .25rem; }
 
 .v2-features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2rem; width: min(calc(100% - 4rem), var(--v2-content)); margin: 0 auto; padding: 5rem 0 5rem; }
 .v2-feature { display: grid; gap: .75rem; align-content: start; padding: 0; border: 0; background: transparent; box-shadow: none; }
@@ -174,18 +175,6 @@ html:has([data-vmz-ui='app-shell']) {
 .v2-feature h3 { margin: 0; color: var(--v2-ink); font: 600 1.125rem/1.75rem var(--vmz-font-display); letter-spacing: 0; }
 .v2-feature p { max-width: 22rem; margin: 0; color: var(--v2-muted); font: 400 1rem/1.625rem var(--vmz-font-sans); }
 .v2-flow .v2-signal { width: 100%; margin: 0 0 2rem; }
-
-.v2-feedback { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 3rem; align-items: center; padding: 5rem max(2rem, calc((100% - var(--v2-content)) / 2)); color: #fff; background: #1f2329; }
-.v2-feedback__copy { display: grid; gap: .75rem; }
-.v2-feedback .v2-index { color: #9da4ae; }
-.v2-feedback__copy > p:last-child { max-width: 34rem; margin: 0; color: #aeb4bd; font: 400 1rem/1.625rem var(--vmz-font-sans); }
-.v2-activity { margin: 0; padding: 0; list-style: none; border-top: 1px solid #343941; }
-.v2-activity li { display: grid; grid-template-columns: 7rem 1fr auto; gap: 1rem; align-items: center; padding: 1rem .2rem; border-bottom: 1px solid #343941; }
-.v2-activity span { color: #8f97a3; font: 400 .8125rem/1.25rem var(--vmz-font-sans); text-transform: none; }
-.v2-activity strong { font-weight: 500; }
-.v2-activity small { color: #8f97a3; }
-.v2-activity .is-current { color: #fff; margin-top: .35rem; padding-inline: .85rem; border: 1px solid #51565d; border-radius: 6px; background: #2f343c; box-shadow: none; }
-.v2-activity .is-current span, .v2-activity .is-current small { color: #d0d3d8; }
 
 .v2-flow { width: min(calc(100% - 4rem), var(--v2-content)); margin: 0 auto; padding: 5rem 0; }
 .v2-section-head { display: grid; gap: .75rem; max-width: 48rem; }
@@ -333,8 +322,8 @@ html:has([data-vmz-ui='app-shell']) {
   .v2-hero-preview__row:not(.v2-hero-preview__row--head) span:first-child { font-weight: 600; }
   .v2-signal { grid-template-columns: 1fr; gap: .5rem; margin-top: 2rem; }
   .v2-signal i { width: 1px; height: 1.5rem; margin-left: 1.2rem; }
-  .v2-statement, .v2-statement > div, .v2-feedback { grid-template-columns: 1fr; gap: 2rem; }
-  .v2-statement h2, .v2-section-head h2, .v2-feedback h2, .v2-start h2 { font: 600 1.5rem/2.125rem var(--vmz-font-display); }
+  .v2-statement, .v2-statement > div { grid-template-columns: 1fr; gap: 2rem; }
+  .v2-statement h2, .v2-section-head h2, .v2-start h2 { font: 600 1.5rem/2.125rem var(--vmz-font-display); }
   .v2-flow ol { grid-template-columns: repeat(2, 1fr); gap: 2rem 0; }
   .v2-metrics { grid-template-columns: 1fr; }
   .v2-product { grid-template-columns: 1fr; }
