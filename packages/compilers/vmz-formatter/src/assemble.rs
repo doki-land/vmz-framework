@@ -1,6 +1,7 @@
 //! Faithful `.vmz` reassembly: preserve router/meta/lang/attrs/block order.
 
 use vmz_compiler::{DataBlock, ParsedVmz, ScriptBlock, ScriptLanguage, StyleLanguage};
+use vmz_generator::to_json5;
 
 use crate::editorconfig::EditorSettings;
 use crate::template_print::format_template_body;
@@ -17,13 +18,14 @@ pub fn assemble_vmz(
     let mut parts: Vec<String> = Vec::new();
 
     if let Some(router) = &parsed.router {
-        parts.push(emit_data_block("router", router, settings));
+        parts.push(emit_data_block("router", router, settings)?);
     }
     if let Some(meta) = &parsed.meta {
-        parts.push(emit_data_block("meta", meta, settings));
+        parts.push(emit_data_block("meta", meta, settings)?);
     }
 
-    let template_body = format_template_body(&parsed.template.content, settings)?;
+    let template_source = detent_envelope(&parsed.template.content);
+    let template_body = format_template_body(&template_source, settings)?;
     // Envelope indent is EditorConfig-owned; AST print stays at depth 0 inside the body.
     let template_body = indent_block(&template_body, settings);
     parts.push(emit_tagged_block("template", None, &template_body, settings));
@@ -57,7 +59,11 @@ pub fn assemble_vmz(
     Ok(out)
 }
 
-fn emit_data_block(name: &str, block: &DataBlock, settings: &EditorSettings) -> String {
+fn emit_data_block(
+    name: &str,
+    block: &DataBlock,
+    settings: &EditorSettings,
+) -> Result<String, String> {
     let nl = settings.newline();
     let attrs = block.attrs.trim();
     let lang = block.lang.as_deref().filter(|s| !s.is_empty());
@@ -74,21 +80,48 @@ fn emit_data_block(name: &str, block: &DataBlock, settings: &EditorSettings) -> 
         }
     }
 
-    let body = block.content.trim();
-    if body.is_empty() {
+    let body = trim_outer_newlines(&block.content);
+    if body.trim().is_empty() {
         // Self-closing when original had no body (attrs-only sugar).
         if attrs.contains('/') || block.content.is_empty() {
             // Prefer explicit close when we only have empty content from a pair of tags;
             // self-close when attrs look like opening-tag sugar without body.
             if block.content.is_empty() && !attrs.is_empty() {
-                return format!("{open} />");
+                return Ok(format!("{open} />"));
             }
         }
-        return format!("{open}>{nl}</{name}>");
+        return Ok(format!("{open}>{nl}</{name}>"));
     }
 
-    let indented = indent_block(body, settings);
-    format!("{open}>{nl}{indented}</{name}>")
+    let indented = format_data_body(body, block.lang.as_deref(), settings)?;
+    Ok(format!("{open}>{nl}{indented}</{name}>"))
+}
+
+/// Canonicalize JSON5 router/meta bodies. Other langs keep envelope-only indent.
+fn format_data_body(
+    body: &str,
+    lang: Option<&str>,
+    settings: &EditorSettings,
+) -> Result<String, String> {
+    let lang = lang.filter(|l| !l.is_empty()).unwrap_or("json5");
+    if lang != "json5" {
+        return Ok(indent_block(body, settings));
+    }
+    let relative = normalize_relative_lines(body).join("\n");
+    let value: serde_json::Value = json5::from_str(&relative)
+        .map_err(|e| format!("invalid JSON5 in `<{lang}>` block: {e}"))?;
+    let canonical = to_json5(&value).map_err(|e| e.to_string())?;
+    Ok(indent_block(canonical.trim(), settings))
+}
+
+/// Trim only leading/trailing newlines — never strip envelope indentation on the first line.
+fn trim_outer_newlines(content: &str) -> &str {
+    content.trim_matches(|c: char| c == '\n' || c == '\r')
+}
+
+/// Drop one envelope indent level from block innards before AST/CSS/JSON format.
+fn detent_envelope(content: &str) -> String {
+    normalize_relative_lines(trim_outer_newlines(content)).join("\n")
 }
 
 fn emit_tagged_block(

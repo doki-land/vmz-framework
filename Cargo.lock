@@ -2988,6 +2988,7 @@ name = "vmz-formatter"
 version = "0.1.0"
 dependencies = [
  "editorconfig",
+ "json5",
  "oxc_allocator",
  "oxc_formatter",
  "oxc_formatter_core",

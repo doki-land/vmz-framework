@@ -189,6 +189,155 @@ fn check_mode_does_not_write() {
 }
 
 #[test]
+fn class_bind_string_concat_roundtrips_without_corruption() {
+    let dir = temp_dir("class-bind");
+    write(
+        &dir.join(".editorconfig"),
+        "root = true\n[*]\nindent_style = space\nindent_size = 2\nend_of_line = lf\ninsert_final_newline = true\n",
+    );
+    let file = dir.join("Select.vmz");
+    let src = r#"<template>
+  <div :class="'vmz-ui-select' + (open ? ' is-opened' : '')" />
+</template>
+
+<script client>
+export default class Select {}
+</script>
+"#;
+    write(&file, src);
+
+    format_path(&file, &FormatOptions { check: false }).unwrap();
+    let once = fs::read_to_string(&file).unwrap();
+    assert!(!once.contains(":class=\"\""), "formatter must not corrupt nested quotes: {once}");
+    format_path(&file, &FormatOptions { check: false }).unwrap();
+    let twice = fs::read_to_string(&file).unwrap();
+    assert_eq!(once, twice, "class bind format must be idempotent");
+}
+
+#[test]
+fn router_json5_block_format_is_idempotent() {
+    let dir = temp_dir("router-idempotent");
+    write(
+        &dir.join(".editorconfig"),
+        "root = true\n[*]\nindent_style = space\nindent_size = 4\nend_of_line = lf\ninsert_final_newline = true\n",
+    );
+    let file = dir.join("landing.vmz");
+    write(
+        &file,
+        r#"<router>
+{
+  path: "/welcome",
+}
+</router>
+<template>
+  <main />
+</template>
+<script client>
+export default class LandingPage {}
+</script>
+"#,
+    );
+
+    format_path(&file, &FormatOptions { check: false }).unwrap();
+    let once = fs::read_to_string(&file).unwrap();
+    format_path(&file, &FormatOptions { check: false }).unwrap();
+    let twice = fs::read_to_string(&file).unwrap();
+    assert_eq!(
+        once, twice,
+        "router block must not drift on second format:\nonce={once:?}\ntwice={twice:?}"
+    );
+    let report = format_path(&file, &FormatOptions { check: true }).unwrap();
+    assert_eq!(report.files_need_write, 0, "check after format: {:?}", report.diagnostics);
+    assert!(!report.has_errors(), "{:?}", report.diagnostics);
+}
+
+#[test]
+fn template_multiline_text_format_is_idempotent() {
+    let dir = temp_dir("template-text");
+    write(
+        &dir.join(".editorconfig"),
+        "root = true\n[*]\nindent_style = space\nindent_size = 4\nend_of_line = lf\ninsert_final_newline = true\n",
+    );
+    let file = dir.join("Planner.vmz");
+    write(
+        &file,
+        r#"<template>
+  <p class="lede">
+    line one
+    line two indented
+  </p>
+</template>
+<script client>
+export default class Planner {}
+</script>
+"#,
+    );
+
+    format_path(&file, &FormatOptions { check: false }).unwrap();
+    let once = fs::read_to_string(&file).unwrap();
+    format_path(&file, &FormatOptions { check: false }).unwrap();
+    let twice = fs::read_to_string(&file).unwrap();
+    assert_eq!(once, twice, "multiline text must not drift:\nonce={once:?}\ntwice={twice:?}");
+}
+
+#[test]
+fn style_block_format_is_idempotent() {
+    let dir = temp_dir("style-idempotent");
+    write(
+        &dir.join(".editorconfig"),
+        "root = true\n[*]\nindent_style = space\nindent_size = 4\nend_of_line = lf\ninsert_final_newline = true\n",
+    );
+    let file = dir.join("Monaco.vmz");
+    write(
+        &file,
+        r#"<template>
+  <div class="monaco-host" />
+</template>
+<style>
+.monaco-host {
+  display: block;
+}
+</style>
+<script client>
+export default class Monaco {}
+</script>
+"#,
+    );
+
+    format_path(&file, &FormatOptions { check: false }).unwrap();
+    let once = fs::read_to_string(&file).unwrap();
+    format_path(&file, &FormatOptions { check: false }).unwrap();
+    let twice = fs::read_to_string(&file).unwrap();
+    assert_eq!(once, twice, "style block must not drift:\nonce={once:?}\ntwice={twice:?}");
+}
+
+#[test]
+fn deploy_planner_page_format_is_idempotent() {
+    let source_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../homepage/src/pages/deploy-planner.vmz");
+    if !source_path.exists() {
+        eprintln!("skip deploy-planner fixture: {}", source_path.display());
+        return;
+    }
+    let dir = temp_dir("deploy-planner");
+    write(
+        &dir.join(".editorconfig"),
+        "root = true\n[*]\nindent_style = space\nindent_size = 4\nend_of_line = lf\ninsert_final_newline = true\n",
+    );
+    let file = dir.join("deploy-planner.vmz");
+    fs::write(&file, fs::read_to_string(&source_path).unwrap()).unwrap();
+
+    format_path(&file, &FormatOptions { check: false }).unwrap();
+    let once = fs::read_to_string(&file).unwrap();
+    format_path(&file, &FormatOptions { check: false }).unwrap();
+    let twice = fs::read_to_string(&file).unwrap();
+    assert_eq!(once, twice, "deploy-planner must not drift on second format");
+    let report = format_path(&file, &FormatOptions { check: true }).unwrap();
+    assert_eq!(report.files_need_write, 0, "check after format: {:?}", report.diagnostics);
+    assert!(!report.has_errors(), "{:?}", report.diagnostics);
+}
+
+#[test]
 fn non_ts_server_lang_is_not_rewritten_by_js_formatter() {
     let dir = temp_dir("rust-server");
     write(

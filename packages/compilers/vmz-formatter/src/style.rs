@@ -8,7 +8,7 @@ use crate::editorconfig::EditorSettings;
 
 /// Format one style block via oxc CSS formatter.
 pub fn format_style_block(block: &StyleBlock, settings: &EditorSettings) -> Result<String, String> {
-    let source = block.content.trim();
+    let source = trim_outer_newlines(&block.content);
     if source.is_empty() {
         return Ok(String::new());
     }
@@ -27,14 +27,16 @@ pub fn format_style_block(block: &StyleBlock, settings: &EditorSettings) -> Resu
     Ok(normalize_style_body(&code, settings))
 }
 
+fn trim_outer_newlines(content: &str) -> &str {
+    content.trim_matches(|c: char| c == '\n' || c == '\r')
+}
+
 fn normalize_style_body(source: &str, settings: &EditorSettings) -> String {
     let nl = settings.newline();
-    let unit = settings.indent_unit();
     let mut lines: Vec<String> = source
         .lines()
         .map(|l| {
-            let l = if settings.trim_trailing_whitespace { l.trim_end() } else { l };
-            if l.is_empty() { String::new() } else { format!("{unit}{l}") }
+            if settings.trim_trailing_whitespace { l.trim_end().to_string() } else { l.to_string() }
         })
         .collect();
     while lines.last().is_some_and(|l| l.is_empty()) {

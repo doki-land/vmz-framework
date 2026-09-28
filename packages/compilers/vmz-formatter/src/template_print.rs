@@ -22,6 +22,46 @@ fn oxc_expr(expr: &str) -> Result<String, String> {
     print_template_expr(expr)
 }
 
+/// Delimit a printed JS expression for a Vue/HTML attribute value.
+///
+/// oxc codegen prefers double-quoted string literals. Inside `attr="…"` that breaks
+/// when the expression itself contains `"`. Prefer single-quoted attribute delimiters
+/// in that case (Vue author surface).
+fn delimit_vue_attr_value(printed: &str) -> String {
+    if printed.is_empty() {
+        return "\"\"".to_string();
+    }
+    if !printed.contains('"') {
+        return format!("\"{}\"", printed);
+    }
+    if !printed.contains('\'') {
+        return format!("'{}'", printed);
+    }
+    format!("\"{}\"", escape_js_double_quotes(printed))
+}
+
+fn escape_js_double_quotes(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 8);
+    for ch in s.chars() {
+        match ch {
+            '\\' => {
+                out.push('\\');
+                out.push('\\');
+            }
+            '"' => {
+                out.push('\\');
+                out.push('"');
+            }
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+fn vue_attr_assignment(expr: &str) -> Result<String, String> {
+    Ok(format!("={}", delimit_vue_attr_value(&oxc_expr(expr)?)))
+}
+
 fn print_semantic(sem: &SemanticIr, settings: &EditorSettings) -> Result<String, String> {
     let nl = settings.newline();
     let mut lines = Vec::new();
@@ -59,8 +99,8 @@ fn print_node(
         SemanticNode::IfChain { branches, .. } => {
             for (i, b) in branches.iter().enumerate() {
                 let cf = match &b.test {
-                    Some(test) if i == 0 => vec![format!("v-if=\"{}\"", oxc_expr(test)?)],
-                    Some(test) => vec![format!("v-else-if=\"{}\"", oxc_expr(test)?)],
+                    Some(test) if i == 0 => vec![format!("v-if{}", vue_attr_assignment(test)?)],
+                    Some(test) => vec![format!("v-else-if{}", vue_attr_assignment(test)?)],
                     None => vec!["v-else".to_string()],
                 };
                 print_node_with_control(b.body.as_ref(), depth, settings, lines, &cf)?;
@@ -75,9 +115,12 @@ fn print_node(
                 (None, Some(i)) => format!("({value_alias}, {i})"),
                 (None, None) => value_alias.clone(),
             };
-            let mut cf = vec![format!("v-for=\"{alias} in {}\"", oxc_expr(source)?)];
+            let mut cf = vec![format!(
+                "v-for={}",
+                delimit_vue_attr_value(&format!("{alias} in {}", oxc_expr(source)?))
+            )];
             if let Some(k) = key {
-                cf.push(format!(":key=\"{}\"", oxc_expr(k)?));
+                cf.push(format!(":key{}", vue_attr_assignment(k)?));
             }
             print_node_with_control(body.as_ref(), depth, settings, lines, &cf)?;
         }
@@ -108,7 +151,7 @@ fn print_node(
             };
             let mut open = format!("{pad}<template #{name_s}");
             if let Some(p) = slot_props {
-                open.push_str(&format!("=\"{}\"", oxc_expr(p)?));
+                open.push_str(&vue_attr_assignment(p)?);
             }
             open.push('>');
             lines.push(open);
@@ -190,25 +233,25 @@ fn format_props(props: &[SemanticProp]) -> Result<String, String> {
             SemanticProp::Bind { arg, expr, modifiers, .. } => {
                 let arg_s = format_arg(arg)?;
                 let mods = format_modifiers(modifiers);
-                s.push_str(&format!(" :{arg_s}{mods}=\"{}\"", oxc_expr(expr)?));
+                s.push_str(&format!(" :{arg_s}{mods}{}", vue_attr_assignment(expr)?));
             }
             SemanticProp::BindObject { expr, .. } => {
-                s.push_str(&format!(" v-bind=\"{}\"", oxc_expr(expr)?));
+                s.push_str(&format!(" v-bind{}", vue_attr_assignment(expr)?));
             }
             SemanticProp::On { arg, handler, modifiers, .. } => {
                 let arg_s = format_arg(arg)?;
                 let mods = format_modifiers(modifiers);
-                s.push_str(&format!(" @{arg_s}{mods}=\"{}\"", oxc_expr(handler)?));
+                s.push_str(&format!(" @{arg_s}{mods}{}", vue_attr_assignment(handler)?));
             }
             SemanticProp::OnObject { expr, .. } => {
-                s.push_str(&format!(" v-on=\"{}\"", oxc_expr(expr)?));
+                s.push_str(&format!(" v-on{}", vue_attr_assignment(expr)?));
             }
             SemanticProp::Model { arg, expr, modifiers, .. } => {
                 let mods = format_modifiers(modifiers);
-                let e = oxc_expr(expr)?;
+                let assignment = vue_attr_assignment(expr)?;
                 match arg {
-                    None => s.push_str(&format!(" v-model{mods}=\"{e}\"")),
-                    Some(a) => s.push_str(&format!(" v-model:{a}{mods}=\"{e}\"")),
+                    None => s.push_str(&format!(" v-model{mods}{assignment}")),
+                    Some(a) => s.push_str(&format!(" v-model:{a}{mods}{assignment}")),
                 }
             }
             SemanticProp::ClassPlan { static_classes, binds, .. } => {
@@ -216,7 +259,7 @@ fn format_props(props: &[SemanticProp]) -> Result<String, String> {
                     s.push_str(&format!(" class=\"{}\"", static_classes.join(" ")));
                 }
                 for b in binds {
-                    s.push_str(&format!(" :class=\"{}\"", oxc_expr(b)?));
+                    s.push_str(&format!(" :class{}", vue_attr_assignment(b)?));
                 }
             }
             SemanticProp::StylePlan { static_style, binds, .. } => {
@@ -224,12 +267,16 @@ fn format_props(props: &[SemanticProp]) -> Result<String, String> {
                     s.push_str(&format!(" style=\"{st}\""));
                 }
                 for b in binds {
-                    s.push_str(&format!(" :style=\"{}\"", oxc_expr(b)?));
+                    s.push_str(&format!(" :style{}", vue_attr_assignment(b)?));
                 }
             }
             SemanticProp::Directive { dir, .. } => match dir {
-                Directive::Show { expr } => s.push_str(&format!(" v-show=\"{}\"", oxc_expr(expr)?)),
-                Directive::Html { expr } => s.push_str(&format!(" v-html=\"{}\"", oxc_expr(expr)?)),
+                Directive::Show { expr } => {
+                    s.push_str(&format!(" v-show{}", vue_attr_assignment(expr)?))
+                }
+                Directive::Html { expr } => {
+                    s.push_str(&format!(" v-html{}", vue_attr_assignment(expr)?))
+                }
                 Directive::Custom { name, arg, expr, modifiers } => {
                     let mods = format_modifiers(modifiers);
                     let arg_s = match arg {
@@ -237,9 +284,10 @@ fn format_props(props: &[SemanticProp]) -> Result<String, String> {
                         Some(a) => format!(":{}", format_arg(a)?),
                     };
                     match expr {
-                        Some(e) => {
-                            s.push_str(&format!(" v-{name}{arg_s}{mods}=\"{}\"", oxc_expr(e)?))
-                        }
+                        Some(e) => s.push_str(&format!(
+                            " v-{name}{arg_s}{mods}{}",
+                            vue_attr_assignment(e)?
+                        )),
                         None => s.push_str(&format!(" v-{name}{arg_s}{mods}")),
                     }
                 }
@@ -316,6 +364,28 @@ mod tests {
         assert!(out.contains("v-if=\"a\""), "{out}");
         assert!(out.contains("v-else"), "{out}");
         assert!(out.contains("v-for="), "{out}");
+    }
+
+    #[test]
+    fn class_bind_string_concat_does_not_corrupt_attr_quotes() {
+        let src = r#"<div :class="'vmz-ui-select' + (open ? ' is-opened' : '')" />"#;
+        let out = format_template_body(src, &settings()).unwrap();
+        assert!(!out.contains(":class=\"\""), "corrupted nested quotes: {out}");
+        let twice = format_template_body(&out, &settings()).unwrap();
+        assert_eq!(out, twice, "idempotent: {out}");
+    }
+
+    #[test]
+    fn class_bind_double_quoted_literals_roundtrip() {
+        let src = r#"<div :class='"vmz-ui-select" + (open ? " is-opened" : "") + (isMultiple ? " is-multiple" : "")' />"#;
+        let out = format_template_body(src, &settings()).unwrap();
+        assert!(!out.contains(":class=\"\""), "corrupted nested quotes: {out}");
+        assert!(
+            out.contains("vmz-ui-select") && out.contains("is-opened"),
+            "expression must survive print: {out}"
+        );
+        let twice = format_template_body(&out, &settings()).unwrap();
+        assert_eq!(out, twice, "idempotent: {out}");
     }
 
     #[test]
