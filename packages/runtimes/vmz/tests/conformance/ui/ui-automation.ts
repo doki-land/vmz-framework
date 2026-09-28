@@ -1718,8 +1718,8 @@ async function proveConsoleComposition(page) {
     }
     if (markers.rows < 1) fail(`Console: expected table rows, got ${markers.rows}`);
 
-    await page.type('#home-console-query', 'Web + SSR');
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="console-query"]')?.textContent?.includes('Web + SSR'), {
+    await page.type('#home-console-query', 'vmz-homepage');
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="console-query"]')?.textContent?.includes('vmz-homepage'), {
         timeout: 5000,
     });
     await page.evaluate(() => {
@@ -1752,14 +1752,14 @@ async function proveConsoleComposition(page) {
     });
 
     await page.evaluate(() => {
-        const btn = document.querySelector('[data-vmz-row-action="r1"]');
+        const btn = document.querySelector('[data-vmz-row-action="r3"]');
         btn?.click();
     });
     await page.waitForSelector('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]', { timeout: 5000 });
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="console-drawer-project"]')?.textContent?.includes('docs-site'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="console-drawer-project"]')?.textContent?.includes('vmz-homepage'), {
         timeout: 5000,
     });
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="console-drawer-target"]')?.textContent?.includes('Web + SSR'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="console-drawer-target"]')?.textContent?.includes('Web'), {
         timeout: 5000,
     });
     await page.keyboard.press('Escape');
@@ -1767,21 +1767,9 @@ async function proveConsoleComposition(page) {
 
     // Reset filter so pagination Next is available (4 rows → 2 pages).
     await page.evaluate(() => {
-        const input = document.getElementById('home-console-query');
-        if (input) {
-            input.focus();
-            input.select?.();
-        }
-    });
-    await page.keyboard.press('Backspace');
-    await page.keyboard.press('Backspace');
-    await page.keyboard.press('Backspace');
-    await page.keyboard.press('Backspace');
-    await page.keyboard.press('Backspace');
-    await page.evaluate(() => {
         const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) => {
             const text = b.textContent || '';
-            return text.includes('Search') || text.includes('Apply') || text.includes('查询');
+            return text.includes('Reset') || text.includes('重置');
         });
         btn?.click();
     });
