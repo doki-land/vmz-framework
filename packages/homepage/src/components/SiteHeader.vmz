@@ -12,7 +12,7 @@
       <a href="/#showcase">{{ showcaseLabel }}</a>
       <a href="https://github.com/doki-land/vmz-framework">GitHub</a>
       <details class="site-language">
-        <summary :aria-label="selectLanguageLabel">{{ langSummary }}</summary>
+        <summary :aria-label="selectLanguageLabel"><Icon name="nav.language" size="sm" />{{ langSummary }}</summary>
         <div class="site-language__menu">
           <button
             type="button"

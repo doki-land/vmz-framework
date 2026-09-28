@@ -9,6 +9,28 @@
         <div class="v2-actions">
           <a class="v2-button v2-button--primary" data-vmz-fixture="landing-primary-cta" :href="guideHref">{{ buildLabel }}</a>
           <a class="v2-button v2-button--text" data-vmz-fixture="landing-secondary-cta" :href="docsRootHref">{{ readDocsLabel }} <span aria-hidden="true">→</span></a>
+          <a class="v2-button v2-button--text" href="#showcase">查看产品界面</a>
+        </div>
+        <div class="v2-hero-preview" data-vmz-fixture="landing-hero-preview" aria-label="VMZ product surface preview">
+          <div class="v2-hero-preview__head">
+            <div>
+              <span>Projects / vmz-site</span>
+              <strong>Release Center</strong>
+            </div>
+            <span class="v2-hero-preview__status">Production ready</span>
+          </div>
+          <div class="v2-hero-preview__metrics">
+            <div><small>Build</small><strong>main</strong><em>Ready</em></div>
+            <div><small>Scope</small><strong>1 region</strong><em>Direct</em></div>
+            <div><small>Targets</small><strong>4 active</strong><em>Web to Edge</em></div>
+          </div>
+          <div class="v2-hero-preview__table" role="table" aria-label="Delivery targets">
+            <div class="v2-hero-preview__row v2-hero-preview__row--head" role="row">
+              <span role="columnheader">目标</span><span role="columnheader">交付结果</span><span role="columnheader">状态</span>
+            </div>
+            <div class="v2-hero-preview__row" role="row"><span role="cell">Browser</span><span role="cell">Direct DOM update</span><span role="cell">Ready</span></div>
+            <div class="v2-hero-preview__row" role="row"><span role="cell">SSR</span><span role="cell">HTML + resume</span><span role="cell">Ready</span></div>
+          </div>
         </div>
         <div class="v2-signal" aria-label="VMZ compilation model">
           <div><small>Author</small><strong>Components</strong></div>
@@ -30,28 +52,28 @@
       <section class="v2-features" aria-label="VMZ core capabilities">
         <article class="v2-feature v2-feature--dark">
           <span class="v2-feature__number">01</span>
-          <div class="v2-feature__icon">↯</div>
+          <div class="v2-feature__icon"><Icon name="feature.incremental" size="md" /></div>
           <h3>修改之后，快速回来</h3>
           <p>文件变化沿依赖图传播。重分析、重编译和页面更新只覆盖真正受影响的区域。</p>
           <small>Incremental analysis</small>
         </article>
         <article class="v2-feature v2-feature--lime">
           <span class="v2-feature__number">02</span>
-          <div class="v2-feature__icon">◎</div>
+          <div class="v2-feature__icon"><Icon name="feature.runtime" size="md" /></div>
           <h3>浏览器只接手必要工作</h3>
           <p>能在生成阶段确定的依赖、调度和事件边界，不再交给通用客户端运行时重复判断。</p>
           <small>Direct update</small>
         </article>
         <article class="v2-feature v2-feature--paper">
           <span class="v2-feature__number">03</span>
-          <div class="v2-feature__icon">⌁</div>
+          <div class="v2-feature__icon"><Icon name="feature.ssr" size="md" /></div>
           <h3>服务端与客户端共享模型</h3>
           <p>HTML 可以先到达，交互可以稍后恢复；无需为两端维护互相漂移的应用逻辑。</p>
           <small>SSR resume</small>
         </article>
         <article class="v2-feature v2-feature--coral">
           <span class="v2-feature__number">04</span>
-          <div class="v2-feature__icon">◇</div>
+          <div class="v2-feature__icon"><Icon name="feature.deploy" size="md" /></div>
           <h3>一份程序，多种交付结果</h3>
           <p>同一份应用语义可以面向 Browser、SSR、Native 与 Edge 生成不同 Host Profile。</p>
           <small>Multi-platform</small>
@@ -86,8 +108,8 @@
       <section id="showcase" class="v2-showcase" aria-labelledby="showcase-title">
         <div class="v2-section-head">
           <p class="v2-index">04 / @VMZ/UI</p>
-          <h2 id="showcase-title">构建产品界面，也用我们自己的组件。</h2>
-          <p>下面的状态、切换、表格和通知全部由 <code>@vmz/ui</code> 组成。它面向需要长期维护的商业应用，而不只是组件演示。</p>
+          <h2 id="showcase-title">同一套组件，支撑真实发布流程。</h2>
+          <p>Release Center 使用官方 <code>@vmz/ui</code> 构建：指标、表格、标签页与通知在同一工作区内协同，展示 VMZ 面向长期维护产品的能力。</p>
         </div>
         <div class="v2-product">
           <aside class="v2-product__side">
