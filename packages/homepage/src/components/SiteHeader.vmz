@@ -5,12 +5,20 @@
       <span class="site-brand__pulse" aria-hidden="true"></span>
     </a>
     <nav class="site-nav" aria-label="Primary">
-      <a :href="docsRootHref">{{ docsLabel }}</a>
-      <a :href="guideHref">{{ guideLabel }}</a>
-      <a :href="deployDocHref">{{ deployLabel }}</a>
-      <a href="/deploy-planner">{{ deployPlannerLabel }}</a>
-      <a href="/commercial">{{ showcaseLabel }}</a>
-      <a href="https://github.com/doki-land/vmz-framework">GitHub</a>
+      <div class="site-nav__links">
+        <a :href="docsRootHref">{{ docsLabel }}</a>
+        <a href="/commercial">{{ showcaseLabel }}</a>
+        <a href="https://github.com/doki-land/vmz-framework">{{ githubLabel }}</a>
+      </div>
+      <details class="site-nav-mobile">
+        <summary :aria-label="navMenuLabel">{{ navMenuLabel }}</summary>
+        <div class="site-nav-mobile__menu">
+          <a :href="docsRootHref">{{ docsLabel }}</a>
+          <a href="/commercial">{{ showcaseLabel }}</a>
+          <a href="https://github.com/doki-land/vmz-framework">{{ githubLabel }}</a>
+          <a :href="guideHref">{{ startLabel }}</a>
+        </div>
+      </details>
       <details class="site-language">
         <summary :aria-label="selectLanguageLabel"><Icon name="nav.language" size="sm" />{{ langSummary }}</summary>
         <div class="site-language__menu">
@@ -42,11 +50,10 @@ import {
   brand,
   home,
   docs,
-  guide,
-  deploy,
-  deployPlanner,
   showcase,
   start,
+  github,
+  navMenu,
   selectLanguage,
   langZh,
   langZhFull,
@@ -59,18 +66,16 @@ export default class SiteHeader {
   brandLabel = '';
   homeLabel = '';
   docsLabel = '';
-  guideLabel = '';
-  deployLabel = '';
-  deployPlannerLabel = '';
   showcaseLabel = '';
   startLabel = '';
+  githubLabel = '';
+  navMenuLabel = '';
   selectLanguageLabel = '';
   langSummary = '';
   langZhFullLabel = '';
   langEnLabel = '';
   docsRootHref = '/d/zh-hans/';
   guideHref = '/d/zh-hans/guide/';
-  deployDocHref = '/d/zh-hans/guide/deploy/';
   _unwatchLocale = null;
 
   onMount() {
@@ -87,11 +92,10 @@ export default class SiteHeader {
     this.brandLabel = brand();
     this.homeLabel = home();
     this.docsLabel = docs();
-    this.guideLabel = guide();
-    this.deployLabel = deploy();
-    this.deployPlannerLabel = deployPlanner();
     this.showcaseLabel = showcase();
     this.startLabel = start();
+    this.githubLabel = github();
+    this.navMenuLabel = navMenu();
     this.selectLanguageLabel = selectLanguage();
     this.langSummary = this.localeId === 'en-us' ? langEn() : langZh();
     this.langZhFullLabel = langZhFull();
@@ -99,7 +103,6 @@ export default class SiteHeader {
     const paths = docsPaths(this.localeId);
     this.docsRootHref = paths.docsRootHref;
     this.guideHref = paths.guideHref;
-    this.deployDocHref = paths.deployDocHref;
   }
 
   applyLocaleCopy(preferred) {
@@ -129,7 +132,6 @@ export default class SiteHeader {
     }
     if (r && r.status === 'committed') {
       this.applyLocaleCopy(to);
-      // Soft nav may settle a tick later; re-sync after paint.
       queueMicrotask(() => this.applyLocaleCopy(to));
     }
   }
