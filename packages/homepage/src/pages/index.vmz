@@ -155,23 +155,11 @@ import {
   heroPreviewAria,
   heroPreviewReleaseCenter,
   heroPreviewProductionReady,
-  heroPreviewMetricBuild,
-  heroPreviewMetricScope,
-  heroPreviewMetricTargets,
   heroPreviewBranchMain,
-  heroPreviewScopeOneRegion,
-  heroPreviewTargetsActive,
-  heroPreviewStatusReady,
-  heroPreviewStatusDirect,
-  heroPreviewStatusWebToEdge,
   heroPreviewTableAria,
   heroPreviewColTarget,
   heroPreviewColResult,
   heroPreviewColStatus,
-  heroPreviewRowBrowser,
-  heroPreviewRowBrowserResult,
-  heroPreviewRowSsr,
-  heroPreviewRowSsrResult,
   heroSignalAria,
   heroSignalAuthor,
   heroSignalAuthorValue,
@@ -186,13 +174,10 @@ import {
   featuresAria,
   feature1Title,
   feature1Body,
-  feature1Tag,
   feature2Title,
   feature2Body,
-  feature2Tag,
   feature3Title,
   feature3Body,
-  feature3Tag,
   flowIndex,
   flowTitle,
   flowStep1Title,
@@ -220,16 +205,6 @@ import {
   showcaseTabOverview,
   showcaseTabSource,
   showcaseTabActivity,
-  showcaseMetricBuild,
-  showcaseMetricBuildDesc,
-  showcaseMetricScope,
-  showcaseMetricScopeDesc,
-  showcaseMetricTargets,
-  showcaseMetricTargetsDesc,
-  showcaseBadgeProduction,
-  showcaseBadgeDirect,
-  showcaseBadgeActive,
-  showcaseBadgeWebToEdge,
   showcaseTableColSurface,
   showcaseTableColResult,
   showcaseTableColStatus,
@@ -289,23 +264,11 @@ export default class IndexPage {
     { id: 'ssr', name: 'SSR', result: 'Hydration bundle', status: 'succeeded', statusLabel: 'Ready' },
     { id: 'edge', name: 'Edge', result: 'Worker route', status: 'running', statusLabel: 'Running' },
   ];
-  heroPreviewMetricBuildLabel = '';
-  heroPreviewMetricScopeLabel = '';
-  heroPreviewMetricTargetsLabel = '';
   heroPreviewBranchMainLabel = '';
-  heroPreviewScopeOneRegionLabel = '';
-  heroPreviewTargetsActiveLabel = '';
-  heroPreviewStatusReadyLabel = '';
-  heroPreviewStatusDirectLabel = '';
-  heroPreviewStatusWebToEdgeLabel = '';
   heroPreviewTableAriaLabel = '';
   heroPreviewColTargetLabel = '';
   heroPreviewColResultLabel = '';
   heroPreviewColStatusLabel = '';
-  heroPreviewRowBrowserLabel = '';
-  heroPreviewRowBrowserResultLabel = '';
-  heroPreviewRowSsrLabel = '';
-  heroPreviewRowSsrResultLabel = '';
   heroSignalAriaLabel = '';
   heroSignalAuthorLabel = '';
   heroSignalAuthorValueLabel = '';
@@ -320,13 +283,10 @@ export default class IndexPage {
   featuresAriaLabel = '';
   feature1TitleLabel = '';
   feature1BodyLabel = '';
-  feature1TagLabel = '';
   feature2TitleLabel = '';
   feature2BodyLabel = '';
-  feature2TagLabel = '';
   feature3TitleLabel = '';
   feature3BodyLabel = '';
-  feature3TagLabel = '';
   flowIndexLabel = '';
   flowTitleLabel = '';
   flowStep1TitleLabel = '';
@@ -351,17 +311,6 @@ export default class IndexPage {
   productWorkspaceLabel = '';
   productCreateReleaseLabel = '';
   showcaseTabsLabel = '';
-  showcaseMetricBuildLabel = '';
-  showcaseMetricBuildDescLabel = '';
-  showcaseMetricScopeLabel = '';
-  showcaseMetricScopeDescLabel = '';
-  showcaseMetricTargetsLabel = '';
-  showcaseMetricTargetsDescLabel = '';
-  showcaseBadgeProductionLabel = '';
-  showcaseBadgeDirectLabel = '';
-  showcaseBadgeActiveLabel = '';
-  showcaseBadgeWebToEdgeLabel = '';
-  showcaseStatusReadyLabel = '';
   showcaseEmptyBadgeLabel = '';
   showcaseEmptyTitleLabel = '';
   showcaseEmptyBodyLabel = '';
@@ -456,25 +405,19 @@ export default class IndexPage {
       'heroKickerLabel', 'heroTitleLeadLabel', 'heroTitleEmLabel', 'heroLedeLabel', 'heroFootnoteLabel', 'viewProductUiLabel',
       'heroPreviewDemoLabelText', 'heroPreviewSiteNameLabel',
       'heroPreviewAriaLabel', 'heroPreviewReleaseCenterLabel', 'heroPreviewProductionReadyLabel',
-      'heroPreviewMetricBuildLabel', 'heroPreviewMetricScopeLabel', 'heroPreviewMetricTargetsLabel',
-      'heroPreviewBranchMainLabel', 'heroPreviewScopeOneRegionLabel', 'heroPreviewTargetsActiveLabel',
-      'heroPreviewStatusReadyLabel', 'heroPreviewStatusDirectLabel', 'heroPreviewStatusWebToEdgeLabel',
+      'heroPreviewBranchMainLabel',
       'heroPreviewTableAriaLabel', 'heroPreviewColTargetLabel', 'heroPreviewColResultLabel', 'heroPreviewColStatusLabel',
-      'heroPreviewRowBrowserLabel', 'heroPreviewRowBrowserResultLabel', 'heroPreviewRowSsrLabel', 'heroPreviewRowSsrResultLabel',
       'heroSignalAriaLabel', 'heroSignalAuthorLabel', 'heroSignalAuthorValueLabel', 'heroSignalUnderstandLabel',
       'heroSignalUnderstandValueLabel', 'heroSignalDeliverLabel', 'heroSignalDeliverValueLabel',
       'statementIndexLabel', 'statementTitleLeadLabel', 'statementTitleEmLabel', 'statementBodyLabel',
-      'featuresAriaLabel', 'feature1TitleLabel', 'feature1BodyLabel', 'feature1TagLabel',
-      'feature2TitleLabel', 'feature2BodyLabel', 'feature2TagLabel', 'feature3TitleLabel', 'feature3BodyLabel', 'feature3TagLabel',
+      'featuresAriaLabel', 'feature1TitleLabel', 'feature1BodyLabel',
+      'feature2TitleLabel', 'feature2BodyLabel', 'feature3TitleLabel', 'feature3BodyLabel',
       'flowIndexLabel', 'flowTitleLabel', 'flowStep1TitleLabel', 'flowStep1DescLabel', 'flowStep2TitleLabel', 'flowStep2DescLabel',
       'flowStep3TitleLabel', 'flowStep3DescLabel', 'flowStep4TitleLabel', 'flowStep4DescLabel', 'flowStep5TitleLabel', 'flowStep5DescLabel',
       'flowStep6TitleLabel', 'flowStep6DescLabel',
       'showcaseIndexLabel', 'showcaseTitleLabel', 'showcaseBodyLabel', 'productCloudNameLabel',
       'productNavOverviewLabel', 'productNavProjectsLabel', 'productNavMonitorLabel',
       'productWorkspaceLabel', 'productCreateReleaseLabel', 'showcaseTabsLabel',
-      'showcaseMetricBuildLabel', 'showcaseMetricBuildDescLabel', 'showcaseMetricScopeLabel', 'showcaseMetricScopeDescLabel',
-      'showcaseMetricTargetsLabel', 'showcaseMetricTargetsDescLabel', 'showcaseBadgeProductionLabel', 'showcaseBadgeDirectLabel',
-      'showcaseBadgeActiveLabel', 'showcaseBadgeWebToEdgeLabel', 'showcaseStatusReadyLabel',
       'showcaseEmptyBadgeLabel', 'showcaseEmptyTitleLabel', 'showcaseEmptyBodyLabel', 'showcaseTabSourceLabel',
       'startIndexLabel', 'startTitleLabel', 'startLedeLabel', 'buildLabel', 'readDocsLabel', 'gettingStartedGuideLabel', 'startLabel',
       'copyCommandLabel', 'copiedCommandLabel',
@@ -492,23 +435,11 @@ export default class IndexPage {
     this.heroPreviewAriaLabel = heroPreviewAria();
     this.heroPreviewReleaseCenterLabel = heroPreviewReleaseCenter();
     this.heroPreviewProductionReadyLabel = heroPreviewProductionReady();
-    this.heroPreviewMetricBuildLabel = heroPreviewMetricBuild();
-    this.heroPreviewMetricScopeLabel = heroPreviewMetricScope();
-    this.heroPreviewMetricTargetsLabel = heroPreviewMetricTargets();
     this.heroPreviewBranchMainLabel = heroPreviewBranchMain();
-    this.heroPreviewScopeOneRegionLabel = heroPreviewScopeOneRegion();
-    this.heroPreviewTargetsActiveLabel = heroPreviewTargetsActive();
-    this.heroPreviewStatusReadyLabel = heroPreviewStatusReady();
-    this.heroPreviewStatusDirectLabel = heroPreviewStatusDirect();
-    this.heroPreviewStatusWebToEdgeLabel = heroPreviewStatusWebToEdge();
     this.heroPreviewTableAriaLabel = heroPreviewTableAria();
     this.heroPreviewColTargetLabel = heroPreviewColTarget();
     this.heroPreviewColResultLabel = heroPreviewColResult();
     this.heroPreviewColStatusLabel = heroPreviewColStatus();
-    this.heroPreviewRowBrowserLabel = heroPreviewRowBrowser();
-    this.heroPreviewRowBrowserResultLabel = heroPreviewRowBrowserResult();
-    this.heroPreviewRowSsrLabel = heroPreviewRowSsr();
-    this.heroPreviewRowSsrResultLabel = heroPreviewRowSsrResult();
     this.heroSignalAriaLabel = heroSignalAria();
     this.heroSignalAuthorLabel = heroSignalAuthor();
     this.heroSignalAuthorValueLabel = heroSignalAuthorValue();
@@ -523,13 +454,10 @@ export default class IndexPage {
     this.featuresAriaLabel = featuresAria();
     this.feature1TitleLabel = feature1Title();
     this.feature1BodyLabel = feature1Body();
-    this.feature1TagLabel = feature1Tag();
     this.feature2TitleLabel = feature2Title();
     this.feature2BodyLabel = feature2Body();
-    this.feature2TagLabel = feature2Tag();
     this.feature3TitleLabel = feature3Title();
     this.feature3BodyLabel = feature3Body();
-    this.feature3TagLabel = feature3Tag();
     this.flowIndexLabel = flowIndex();
     this.flowTitleLabel = flowTitle();
     this.flowStep1TitleLabel = flowStep1Title();
@@ -558,17 +486,6 @@ export default class IndexPage {
     this.showcaseSummaryFailedLabel = consoleStatAffectedRegions();
     this.showcaseSummaryAriaLabel = consoleSummaryAria();
     this.showcaseTabsLabel = showcaseTabsLabel();
-    this.showcaseMetricBuildLabel = showcaseMetricBuild();
-    this.showcaseMetricBuildDescLabel = showcaseMetricBuildDesc();
-    this.showcaseMetricScopeLabel = showcaseMetricScope();
-    this.showcaseMetricScopeDescLabel = showcaseMetricScopeDesc();
-    this.showcaseMetricTargetsLabel = showcaseMetricTargets();
-    this.showcaseMetricTargetsDescLabel = showcaseMetricTargetsDesc();
-    this.showcaseBadgeProductionLabel = showcaseBadgeProduction();
-    this.showcaseBadgeDirectLabel = showcaseBadgeDirect();
-    this.showcaseBadgeActiveLabel = showcaseBadgeActive();
-    this.showcaseBadgeWebToEdgeLabel = showcaseBadgeWebToEdge();
-    this.showcaseStatusReadyLabel = showcaseStatusReady();
     this.showcaseEmptyBadgeLabel = showcaseEmptyBadge();
     this.showcaseEmptyTitleLabel = showcaseEmptyTitle();
     this.showcaseEmptyBodyLabel = showcaseEmptyBody();
