@@ -1,0 +1,57 @@
+<template>
+    <span data-vmz-ui="icon" :data-name="name" :data-size="size" :role='decorative ? "presentation" : "img"' :aria-hidden='decorative ? "true" : "false"' :aria-label='decorative ? "" : label' class="vmz-ui-icon">
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true" class="vmz-ui-icon__svg">
+            <path v-if="resolvedPath" fill="currentColor" :d="resolvedPath" />
+        </svg>
+    </span>
+</template>
+<style>
+    .vmz-ui-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1em;
+        height: 1em;
+        vertical-align: -0.125em;
+        color: inherit;
+        line-height: 1;
+    }
+    .vmz-ui-icon[data-size="sm"] {
+        font-size: 0.875rem;
+    }
+    .vmz-ui-icon[data-size="md"] {
+        font-size: 1rem;
+    }
+    .vmz-ui-icon[data-size="lg"] {
+        font-size: 1.25rem;
+    }
+    .vmz-ui-icon__svg {
+        width: 1em;
+        height: 1em;
+        display: block;
+    }
+</style>
+<script client>
+import { resolveIconPath } from '@vmz/ui-icons/registry';
+
+/**
+ * Homepage Icon — semantic registry from `@vmz/ui-icons` for official dogfood surfaces.
+ * Overrides dependency `Icon` tags within this app only.
+ */
+export default class Icon {
+    static __vmzHostBox = 'contents';
+    public name: string = 'status.info';
+    public size: string = 'md';
+    public label: string = '';
+    public decorative: boolean = true;
+    resolvedPath = '';
+
+    onMount() {
+        this._sync();
+    }
+
+    _sync() {
+        this.resolvedPath = resolveIconPath(this.name);
+    }
+}
+</script>
