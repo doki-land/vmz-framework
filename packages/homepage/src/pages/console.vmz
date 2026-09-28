@@ -170,7 +170,7 @@ export default class ConsolePage {
   navItems = [
     { id: 'console', title: 'Console', href: '/console' },
     { id: 'commercial', title: 'Commercial', href: '/commercial' },
-    { id: 'ui', title: 'UI lab', href: '/ui' },
+    { id: 'home', title: 'Homepage', href: '/' },
   ];
 
   onMount() {

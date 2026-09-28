@@ -214,12 +214,9 @@ export default class CommercialPage {
   showEmpty = true;
   submitting = false;
   navItems = [
-    { id: 'ui', title: 'UI lab', href: '/ui' },
     { id: 'commercial', title: 'Commercial', href: '/commercial' },
-    { id: 'form', title: 'Form', href: '/form' },
     { id: 'console', title: 'Console', href: '/console' },
-    { id: 'ui4', title: 'UI4', href: '/ui4' },
-    { id: 'welcome', title: 'Welcome', href: '/welcome' },
+    { id: 'home', title: 'Homepage', href: '/' },
   ];
 
   scrollContact() {

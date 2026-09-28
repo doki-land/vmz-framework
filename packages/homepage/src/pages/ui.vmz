@@ -168,9 +168,9 @@ export default class UiLabPage {
   drawerOpen = false;
   popoverOpen = false;
   navItems = [
-    { id: 'ui', title: 'UI lab', href: '/ui' },
     { id: 'commercial', title: 'Commercial', href: '/commercial' },
     { id: 'console', title: 'Console', href: '/console' },
+    { id: 'home', title: 'Homepage', href: '/' },
   ];
 }
 </script>
