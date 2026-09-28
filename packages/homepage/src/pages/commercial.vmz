@@ -2,51 +2,51 @@
   <div data-vmz-fixture="commercial">
     <AppShell brand="VMZ" home-href="/" nav-label="Commercial" :nav="navItems">
       <section class="vmz-commercial-hero" data-vmz-fixture="commercial-hero" aria-labelledby="commercial-hero-title">
-        <Badge tone="brand">Official UI</Badge>
-        <h1 id="commercial-hero-title" class="vmz-commercial-hero__title">VMZ</h1>
+        <Badge tone="brand">Enterprise</Badge>
+        <h1 id="commercial-hero-title" class="vmz-commercial-hero__title">为生产团队交付可维护的商业应用</h1>
         <p class="vmz-commercial-hero__lead">
-          Vue-familiar authoring. Compile once into a Unified Program Graph — ship Commercial pages without a second design runtime.
+          VMZ 将路由、表单、反馈与数据展示收敛到同一套官方 UI。团队只需维护一份应用语义，即可在 Web、SSR 与 Edge 上保持一致体验。
         </p>
         <div class="vmz-commercial-hero__actions">
-          <Button type="button" @click="scrollContact">Start a project</Button>
-          <Button type="button" variant="secondary" @click="() => (drawerOpen = true)">Open details</Button>
-          <Link href="/documents">Read the docs</Link>
+          <Button type="button" @click="scrollContact">预约方案沟通</Button>
+          <Button type="button" variant="secondary" @click="() => (drawerOpen = true)">查看交付清单</Button>
+          <Link href="/d/zh-hans/guide/">阅读部署指南</Link>
         </div>
       </section>
 
       <Alert
         tone="info"
         role-name="status"
-        title="Commercial composition"
-        description="AppShell, hero, feature comparison, pricing, Form, Notification, Empty, Dialog, and Drawer on one route."
+        title="适合需要长期演进的业务前台"
+        description="从营销页到运营后台，VMZ 官方 UI 提供统一的信息层级、可访问交互与可验证的发布流程。"
       />
 
       <section data-vmz-fixture="commercial-features" aria-labelledby="commercial-features-title">
-        <h2 id="commercial-features-title" class="vmz-commercial-section-title">What you get</h2>
+        <h2 id="commercial-features-title" class="vmz-commercial-section-title">团队获得的能力</h2>
         <div class="vmz-commercial-grid">
-          <Card title="Router-first" description="One Route Graph owns URL, load, metadata, and resume boundaries." />
-          <Card title="Semantic tokens" description="Colors and density come from /designs — components never embed brand hex." />
-          <Card title="Proven overlays" description="Dialog and Drawer share focus ownership, Escape dismiss, and restore." />
+          <Card title="统一路由与恢复边界" description="Route Graph 管理 URL、加载、元数据与 resume，减少页面切换时的状态漂移。" />
+          <Card title="设计令牌驱动界面" description="颜色与密度来自 `/designs` 语义令牌，组件不内嵌品牌色，便于跨产品线复用。" />
+          <Card title="成熟的覆盖层交互" description="Dialog 与 Drawer 共享焦点管理、Escape 关闭与返回恢复，适合复杂业务流程。" />
         </div>
       </section>
 
       <section data-vmz-fixture="commercial-pricing" aria-labelledby="commercial-pricing-title">
-        <h2 id="commercial-pricing-title" class="vmz-commercial-section-title">Plans</h2>
+        <h2 id="commercial-pricing-title" class="vmz-commercial-section-title">合作方式</h2>
         <div class="vmz-commercial-grid vmz-commercial-grid--pricing">
-          <Card title="Starter" description="Local static host and CDN WebArtifact.">
-            <p class="vmz-commercial-price"><span>Open</span> source core</p>
-            <Badge tone="info">Self-serve</Badge>
-            <Button type="button" variant="secondary" @click="scrollContact">Contact sales</Button>
+          <Card title="开源核心" description="适合自托管静态站点与 CDN 交付，完整编译链路与官方文档。">
+            <p class="vmz-commercial-price"><span>费用</span>免费使用</p>
+            <Badge tone="info">自托管</Badge>
+            <Button type="button" variant="secondary" @click="scrollContact">联系顾问</Button>
           </Card>
-          <Card title="Production" description="ServerArtifact parity, observability, and official conformance gates.">
-            <p class="vmz-commercial-price"><span>Team</span> release proof</p>
-            <Badge tone="success">Recommended</Badge>
-            <Button type="button" @click="scrollContact">Talk to us</Button>
+          <Card title="生产协作" description="面向需要发布证明、观测性与官方符合性门的团队版本。">
+            <p class="vmz-commercial-price"><span>费用</span>按团队协商</p>
+            <Badge tone="success">推荐</Badge>
+            <Button type="button" @click="scrollContact">预约沟通</Button>
           </Card>
         </div>
       </section>
 
-      <Card title="Contact" description="Parent-owned Form values and validation — no parallel form store.">
+      <Card title="联系顾问" description="留下工作邮箱，我们会在一个工作日内回复。">
         <Form
           label="Contact"
           :error-summary="contactSummary"
@@ -56,8 +56,8 @@
           @reset="resetContact"
         >
           <Field
-            label="Work email"
-            description="We will not share this address"
+            label="工作邮箱"
+            description="仅用于方案沟通，不会对外共享"
             control-id="home-commercial-email"
             description-id="home-commercial-email-desc"
             error-id="home-commercial-email-err"
@@ -67,10 +67,10 @@
             :value="email"
             @input="onEmail"
           />
-          <p data-vmz-fixture="commercial-email">email:{{ email }}</p>
+          <p class="vmz-sr-only" data-vmz-fixture="commercial-email">email:{{ email }}</p>
           <div data-vmz-fixture="commercial-form-actions" class="vmz-commercial-actions">
             <Button type="submit">Confirm</Button>
-            <Button type="reset" variant="secondary">Clear</Button>
+            <Button type="reset" variant="secondary">清空</Button>
             <span v-if="submitting" data-vmz-fixture="commercial-spinner">
               <Spinner label="Sending" />
             </span>
@@ -78,19 +78,19 @@
         </Form>
         <Dialog
           :open="dialogOpen"
-          title="Send message"
+          title="确认提交"
           title-id="home-commercial-dialog-title"
           :on-close="() => (dialogOpen = false)"
         >
-          <p data-vmz-fixture="commercial-dialog-body">Confirm sending to {{ email }}</p>
+          <p data-vmz-fixture="commercial-dialog-body">我们将向 {{ email }} 发送后续沟通说明。</p>
         </Dialog>
       </Card>
 
-      <Card title="Workspace" description="Empty → success feedback stays inside the same composition.">
+      <Card title="项目工作区" description="创建项目后，可在此查看交付状态与后续动作。">
         <div v-if="showEmpty">
-          <Empty title="No projects yet" description="Create a project to see it listed here.">
+          <Empty title="还没有项目" description="创建首个项目以查看发布进度与协作记录。">
             <div data-vmz-fixture="commercial-create">
-              <Button type="button" @click="createProject">Create project</Button>
+              <Button type="button" @click="createProject">创建项目</Button>
             </div>
           </Empty>
         </div>
@@ -99,30 +99,30 @@
             <Notification
               tone="success"
               role-name="status"
-              title="Message queued"
-              description="We will reply to your work email within one business day."
+              title="沟通请求已记录"
+              description="顾问会在一个工作日内通过工作邮箱回复。"
             >
-              <Button type="button" variant="ghost" @click="resetWorkspace">Dismiss</Button>
+              <Button type="button" variant="ghost" @click="resetWorkspace">关闭</Button>
             </Notification>
           </div>
           <Alert
             tone="success"
             role-name="status"
-            title="Project ready"
-            description="Empty state dismissed — composition continues with feedback."
+            title="项目已创建"
+            description="工作区已就绪，可继续查看交付清单与控制台示例。"
           />
         </div>
         <div data-vmz-fixture="commercial-drawer-open">
-          <Button type="button" variant="secondary" @click="() => (drawerOpen = true)">Open details</Button>
+          <Button type="button" variant="secondary" @click="() => (drawerOpen = true)">查看交付清单</Button>
         </div>
         <Drawer
           :open="drawerOpen"
-          title="Project details"
+          title="交付清单"
           title-id="home-commercial-drawer-title"
           :on-close="() => (drawerOpen = false)"
         >
-          <p data-vmz-fixture="commercial-drawer-body">Drawer inside commercial composition.</p>
-          <Link href="/console">Open Console surface</Link>
+          <p data-vmz-fixture="commercial-drawer-body">包含路由、表单、通知、空态与覆盖层等生产必备能力。</p>
+          <Link href="/console">打开控制台示例</Link>
         </Drawer>
       </Card>
     </AppShell>
@@ -141,18 +141,19 @@
 .vmz-commercial-hero__title {
   margin: 0;
   font-family: var(--vmz-font-display);
-  font-size: clamp(2.4rem, 6vw, 3.4rem);
+  font-size: clamp(2rem, 4.8vw, 2.8rem);
   font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
   color: var(--vmz-text-ink);
+  max-width: 22ch;
 }
 
 .vmz-commercial-hero__lead {
   margin: 0;
-  max-width: 38rem;
-  font-size: 1.05rem;
-  line-height: 1.55;
+  max-width: 40rem;
+  font-size: 1.02rem;
+  line-height: 1.65;
   color: var(--vmz-text-steel);
 }
 
@@ -167,7 +168,7 @@
 .vmz-commercial-section-title {
   margin: 0 0 0.85rem;
   font-family: var(--vmz-font-display);
-  font-size: 1.35rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--vmz-text-ink);
 }
@@ -185,14 +186,14 @@
 .vmz-commercial-price {
   margin: 0;
   font-family: var(--vmz-font-display);
-  font-size: 1.35rem;
+  font-size: 1.2rem;
   font-weight: 700;
   color: var(--vmz-action-primary-active);
 }
 
 .vmz-commercial-price span {
   display: block;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -240,10 +241,10 @@ export default class CommercialPage {
   confirmContact() {
     const ok = /.+@.+\..+/.test(String(this.email || '').trim());
     if (!ok) {
-      this.emailError = 'Enter a valid work email';
+      this.emailError = '请输入有效的工作邮箱';
       this.emailInvalid = 'true';
       this.emailDescribedBy = 'home-commercial-email-desc home-commercial-email-err';
-      this.contactSummary = 'Fix the email before confirming';
+      this.contactSummary = '请先修正邮箱后再提交';
       this.contactDescribedBy = 'home-commercial-summary';
       this.dialogOpen = false;
       return;
