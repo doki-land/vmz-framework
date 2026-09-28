@@ -197,10 +197,11 @@ async function main() {
     fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
     const overflow = manifest.shots.filter((s) => s.horizontalOverflow);
     if (overflow.length) {
-        console.warn(`capture-commercial-visual-evidence: ${overflow.length} shot(s) report horizontal overflow`);
+        console.error(`capture-commercial-visual-evidence: ${overflow.length} shot(s) report horizontal overflow`);
         for (const row of overflow) {
-            console.warn(`  ${row.page} @ ${row.viewport}: scrollWidth ${row.scrollWidth} > innerWidth ${row.innerWidth}`);
+            console.error(`  ${row.page} @ ${row.viewport}: scrollWidth ${row.scrollWidth} > innerWidth ${row.innerWidth}`);
         }
+        process.exit(1);
     }
     console.log(`capture-commercial-visual-evidence: manifest ${path.relative(ROOT, manifestPath)}`);
 }
