@@ -10,7 +10,9 @@
         "dev": "vmz dev .",
         "test:deploy-planner": "node --experimental-strip-types ./tests/deploy-planner.selftest.ts",
         "document:check": "vmz document check . --strict",
-        "document:dev": "vmz document dev"
+        "document:dev": "vmz document dev",
+        "evidence:visual": "node ../../scripts/dev/capture-commercial-visual-evidence.mjs",
+        "evidence:ssr": "node ../../scripts/dev/inspect-ssr-html.mjs"
     },
     "dependencies": {
         "@vmz/ui": "workspace:*",
