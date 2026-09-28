@@ -46,6 +46,11 @@ export default class Icon {
     public decorative: boolean = true;
     resolvedPath = '';
 
+    constructor(props: Record<string, unknown> = {}) {
+        if (typeof this.__vmzApplyProps === 'function') this.__vmzApplyProps(props);
+        this._sync();
+    }
+
     onMount() {
         this._sync();
     }

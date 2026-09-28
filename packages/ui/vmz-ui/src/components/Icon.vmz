@@ -71,6 +71,11 @@ export default class Icon {
     public pathD: string = '';
     resolvedPath = FALLBACK_PATH;
 
+    constructor(props: Record<string, unknown> = {}) {
+        if (typeof this.__vmzApplyProps === 'function') this.__vmzApplyProps(props);
+        this._sync();
+    }
+
     onMount() {
         this._sync();
     }
