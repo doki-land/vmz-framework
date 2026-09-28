@@ -203,9 +203,12 @@ html:has([data-vmz-ui='app-shell']) {
 .v2-product .vmz-ui-tabs { max-width: none; }
 .v2-product .vmz-ui-tabs__list { padding: .6rem 1.2rem 0; background: #fff; }
 .v2-dashboard { padding: 1.2rem; }
-.v2-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8rem; }
-.v2-metrics .vmz-ui-card { min-height: 9rem; border-radius: 7px; background: #f7f8fa; box-shadow: none; }
-.v2-metrics strong { display: block; margin-top: 1.2rem; font: 600 1.25rem var(--vmz-font-display); }
+.v2-showcase-summary-line { margin: 0 0 .85rem; color: #51565d; font: 400 .88rem/1.45 var(--vmz-font-sans); }
+.v2-showcase-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; padding: 1rem 1.1rem; border: 1px solid var(--v2-line); border-radius: 8px; background: #fff; }
+.v2-showcase-summary > div { display: grid; gap: .2rem; }
+.v2-showcase-summary small { color: #646a73; font: 400 .81rem/1.25 var(--vmz-font-sans); }
+.v2-showcase-summary strong { font: 600 1.75rem/1.1 var(--vmz-font-display); font-variant-numeric: tabular-nums; color: var(--v2-ink); }
+.v2-showcase-summary strong.is-failed { color: #a8071a; }
 .v2-table { margin-top: 1rem; overflow: hidden; border: 1px solid var(--v2-line); border-radius: 7px; }
 .v2-source { padding: 1.2rem; }
 .v2-source .vmz-ui-card { overflow: hidden; border-radius: 7px; color: #e2e8f2; background: var(--v2-ink); }

@@ -111,14 +111,28 @@
         <div class="v2-product">
           <aside class="v2-product__side">
             <div class="v2-product__identity"><span class="v2-product__logo">V</span><strong>{{ productCloudNameLabel }}</strong></div>
-            <nav :aria-label="productNavOverviewLabel"><a class="is-active" href="#showcase">{{ productNavOverviewLabel }}</a><a href="#showcase">{{ productNavProjectsLabel }}</a><a href="/deploy-planner">{{ productNavDeployLabel }}</a><a href="#showcase">{{ productNavMonitorLabel }}</a></nav>
+            <nav :aria-label="productNavOverviewLabel"><a class="is-active" href="#showcase">{{ productNavOverviewLabel }}</a><a href="#showcase">{{ productNavProjectsLabel }}</a><a href="/deploy-planner">{{ productNavDeployLabel }}</a><a href="/console">{{ productNavMonitorLabel }}</a></nav>
             <small>{{ productWorkspaceLabel }}</small>
           </aside>
           <div class="v2-product__work">
-          <div class="v2-product__bar"><div><span>Projects / vmz-site</span><strong>{{ heroPreviewReleaseCenterLabel }}</strong></div><Button type="button" @click="() => (notifyOpen = true)">{{ productCreateReleaseLabel }}</Button></div>
+          <div class="v2-product__bar"><div><span>{{ showcasePathLabel }}</span><strong>{{ heroPreviewReleaseCenterLabel }}</strong></div><Link href="/console">{{ productCreateReleaseLabel }}</Link></div>
           <Tabs :label="showcaseTabsLabel" :selected="showcaseTab" panel-id="landing-showcase-panel" :items="showcaseTabs" :on-select="(id) => (showcaseTab = id)">
             <div v-if="showcaseTab === 'overview'" class="v2-dashboard">
-              <div class="v2-metrics"><Card :title="showcaseMetricBuildLabel" :description="showcaseMetricBuildDescLabel"><Badge tone="success">{{ showcaseStatusReadyLabel }}</Badge><strong>{{ showcaseBadgeProductionLabel }}</strong></Card><Card :title="showcaseMetricScopeLabel" :description="showcaseMetricScopeDescLabel"><Badge tone="info">{{ showcaseBadgeDirectLabel }}</Badge><strong>{{ heroPreviewScopeOneRegionLabel }}</strong></Card><Card :title="showcaseMetricTargetsLabel" :description="showcaseMetricTargetsDescLabel"><Badge tone="brand">{{ showcaseBadgeActiveLabel }}</Badge><strong>{{ showcaseBadgeWebToEdgeLabel }}</strong></Card></div>
+              <p class="v2-showcase-summary-line">{{ showcaseSummaryLine }}</p>
+              <div class="v2-showcase-summary" :aria-label="showcaseSummaryAriaLabel">
+                <div>
+                  <small>{{ showcaseSummaryTotalLabel }}</small>
+                  <strong>{{ showcaseSummaryTotal }}</strong>
+                </div>
+                <div>
+                  <small>{{ showcaseSummaryRunningLabel }}</small>
+                  <strong>{{ showcaseSummaryRunning }}</strong>
+                </div>
+                <div>
+                  <small>{{ showcaseSummaryFailedLabel }}</small>
+                  <strong :class="showcaseSummaryFailed > 0 ? 'is-failed' : ''">{{ showcaseSummaryFailed }}</strong>
+                </div>
+              </div>
               <div class="v2-table"><Table :columns="surfaceColumns" :rows="surfaceRows" sort-key="surface" sort-dir="asc" :has-row-action="false" /></div>
             </div>
             <div v-if="showcaseTab === 'source'" class="v2-source"><CodeBlock :code="codeSample" language="vmz" title="Counter.vmz" /></div>
@@ -269,6 +283,10 @@ import {
   startLede,
   copyCommand,
   copiedCommand,
+  consoleStatActiveServices,
+  consoleStatPendingReleases,
+  consoleStatAffectedRegions,
+  consoleSummaryAria,
 } from '#locales/common';
 import IndexPageServer from '#server/pages/index';
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
@@ -288,6 +306,15 @@ export default class IndexPage {
   heroPreviewProductionReadyLabel = '';
   heroPreviewPathLabel = 'vmz-docs / docs-site';
   heroPreviewSummaryLine = 'main · Web + SSR + Edge · 12m ago';
+  showcasePathLabel = 'vmz-docs / docs-site';
+  showcaseSummaryLine = 'main · Web + SSR + Edge · 12m ago';
+  showcaseSummaryTotal = 6;
+  showcaseSummaryRunning = 2;
+  showcaseSummaryFailed = 1;
+  showcaseSummaryTotalLabel = '';
+  showcaseSummaryRunningLabel = '';
+  showcaseSummaryFailedLabel = '';
+  showcaseSummaryAriaLabel = '';
   heroPreviewTargets = [
     { id: 'browser', name: 'Browser', result: 'Static shell', status: 'succeeded', statusLabel: 'Ready' },
     { id: 'ssr', name: 'SSR', result: 'Hydration bundle', status: 'succeeded', statusLabel: 'Ready' },
@@ -409,7 +436,7 @@ export default class IndexPage {
   onMount() {
     this.applyLocaleCopy();
     this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
-    this.loadHeroPreview();
+    this.loadDemoFixture();
   }
 
   applyHeroPreview(preview) {
@@ -433,11 +460,34 @@ export default class IndexPage {
     }
   }
 
-  async loadHeroPreview() {
+  applyShowcaseOverview(showcase) {
+    if (!showcase || typeof showcase !== 'object') return;
+    if (showcase.pathLabel) {
+      this.showcasePathLabel = String(showcase.pathLabel);
+    }
+    if (showcase.summaryLine) {
+      this.showcaseSummaryLine = String(showcase.summaryLine);
+    }
+    if (showcase.summary && typeof showcase.summary === 'object') {
+      this.showcaseSummaryTotal = Number(showcase.summary.total) || this.showcaseSummaryTotal;
+      this.showcaseSummaryRunning = Number(showcase.summary.running) || this.showcaseSummaryRunning;
+      this.showcaseSummaryFailed = Number(showcase.summary.failed) || this.showcaseSummaryFailed;
+    }
+    if (Array.isArray(showcase.surfaceRows) && showcase.surfaceRows.length) {
+      this.surfaceRows = showcase.surfaceRows.map((row) => ({
+        id: String(row.id || ''),
+        cells: Array.isArray(row.cells) ? row.cells.map((cell) => String(cell)) : [],
+      }));
+    }
+  }
+
+  async loadDemoFixture() {
     try {
       const server = new IndexPageServer();
       const preview = await server.getHeroPreview();
+      const showcase = await server.getShowcaseOverview();
       this.applyHeroPreview(preview);
+      this.applyShowcaseOverview(showcase);
     } catch {
       /* SSR defaults mirror the server fixture */
     }
@@ -572,6 +622,10 @@ export default class IndexPage {
     this.productNavMonitorLabel = productNavMonitor();
     this.productWorkspaceLabel = productWorkspaceLabel();
     this.productCreateReleaseLabel = productCreateRelease();
+    this.showcaseSummaryTotalLabel = consoleStatActiveServices();
+    this.showcaseSummaryRunningLabel = consoleStatPendingReleases();
+    this.showcaseSummaryFailedLabel = consoleStatAffectedRegions();
+    this.showcaseSummaryAriaLabel = consoleSummaryAria();
     this.showcaseTabsLabel = showcaseTabsLabel();
     this.showcaseMetricBuildLabel = showcaseMetricBuild();
     this.showcaseMetricBuildDescLabel = showcaseMetricBuildDesc();
@@ -613,8 +667,7 @@ export default class IndexPage {
     this.surfaceRows = [
       { id: 'browser', cells: [showcaseRowBrowser(), showcaseRowBrowserResult(), showcaseStatusReady()] },
       { id: 'ssr', cells: [showcaseRowSsr(), showcaseRowSsrResult(), showcaseStatusReady()] },
-      { id: 'native', cells: [showcaseRowNative(), showcaseRowNativeResult(), showcaseStatusReady()] },
-      { id: 'edge', cells: [showcaseRowEdge(), showcaseRowEdgeResult(), showcaseStatusReady()] },
+      { id: 'edge', cells: [showcaseRowEdge(), showcaseRowEdgeResult(), 'Running'] },
     ];
 
     const paths = docsPaths(this.localeId);
@@ -650,6 +703,10 @@ import ReleaseDemo from '#server/demo/ReleaseDemo';
 export default class IndexPageServer {
   getHeroPreview() {
     return new ReleaseDemo().getHeroPreview();
+  }
+
+  getShowcaseOverview() {
+    return new ReleaseDemo().getShowcaseOverview();
   }
 }
 </script>
