@@ -9,7 +9,7 @@
       <a :href="guideHref">{{ guideLabel }}</a>
       <a :href="deployDocHref">{{ deployLabel }}</a>
       <a href="/deploy-planner">{{ deployPlannerLabel }}</a>
-      <a href="/#showcase">{{ showcaseLabel }}</a>
+      <a href="/commercial">{{ showcaseLabel }}</a>
       <a href="https://github.com/doki-land/vmz-framework">GitHub</a>
       <details class="site-language">
         <summary :aria-label="selectLanguageLabel"><Icon name="nav.language" size="sm" />{{ langSummary }}</summary>

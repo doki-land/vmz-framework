@@ -9,7 +9,7 @@
         <div class="v2-actions">
           <a class="v2-button v2-button--primary" data-vmz-fixture="landing-primary-cta" :href="guideHref">{{ buildLabel }}</a>
           <a class="v2-button v2-button--text" data-vmz-fixture="landing-secondary-cta" :href="docsRootHref">{{ readDocsLabel }} <span aria-hidden="true">→</span></a>
-          <a class="v2-button v2-button--text" href="#showcase">查看产品界面</a>
+          <a class="v2-button v2-button--text" href="/commercial">查看产品界面</a>
         </div>
         <div class="v2-hero-preview" data-vmz-fixture="landing-hero-preview" aria-label="VMZ product surface preview">
           <div class="v2-hero-preview__head">
