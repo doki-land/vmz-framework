@@ -559,6 +559,11 @@ const serializeApi = {
     el(tag) {
         return makeVirtualEl(tag);
     },
+    elNS(ns, tag) {
+        const node = makeVirtualEl(tag) as ReturnType<typeof makeVirtualEl> & { namespaceURI?: string };
+        node.namespaceURI = ns || 'http://www.w3.org/2000/svg';
+        return node;
+    },
     text(value) {
         const node = { __kind: 'text', value: value == null ? '' : String(value), parentNode: null };
         // Generated Direct patches use DOM `textContent`; virtual text uses `value`.
@@ -691,7 +696,15 @@ const serializeApi = {
         // serializeApi.component returns a serialize el tree (or island shell).
         const root = hostEl.__kind === 'el' ? hostEl : null;
         const findOwnedSlot = (n) => {
-            if (!n || n.__kind !== 'el') return null;
+            if (!n || typeof n !== 'object') return null;
+            if (n.__kind === 'frag') {
+                for (const c of n.children || []) {
+                    const hit = findOwnedSlot(c);
+                    if (hit) return hit;
+                }
+                return null;
+            }
+            if (n.__kind !== 'el') return null;
             if (n.tag === 'slot' && !(n.attrs && n.attrs.name)) return n;
             for (const c of n.children || []) {
                 if (c && c.__kind === 'el' && c.attrs && c.attrs['data-vmz'] != null) continue;

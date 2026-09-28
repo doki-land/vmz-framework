@@ -36,13 +36,48 @@ export function createDirectIfBlock(
     const frag = api.frag();
     frag.appendChild(start);
     let regionHost: unknown = null;
-    if (regionId != null) {
-        regionHost = api.el('span');
-        const rh = regionHost as { style?: { display?: string }; setAttribute?: (n: string, v: string) => void };
-        if (rh.style) rh.style.display = 'contents';
+    const regionMountKind = (node: unknown) => {
+        let cur = node as {
+            parentNode?: unknown;
+            namespaceURI?: string;
+            tagName?: string;
+            __kind?: string;
+            tag?: string;
+            nodeType?: number;
+        } | null;
+        while (cur) {
+            if (cur.__kind === 'frag' || cur.nodeType === 11) {
+                cur = cur.parentNode as typeof cur;
+                continue;
+            }
+            if (cur.namespaceURI === 'http://www.w3.org/2000/svg') return 'svg';
+            if (cur.tagName && String(cur.tagName).toLowerCase() === 'svg') return 'svg';
+            if (cur.__kind === 'el' && String(cur.tag || '').toLowerCase() === 'svg') return 'svg';
+            if (cur.__kind === 'el' || cur.nodeType === 1) return 'html';
+            cur = cur.parentNode as typeof cur;
+        }
+        return null;
+    };
+    const ensureRegionHost = () => {
+        if (regionHost != null || regionId == null) return regionHost;
+        const parent = (end as { parentNode?: unknown }).parentNode;
+        if (!parent) return null;
+        const mountKind = regionMountKind(end);
+        if (!mountKind) return null;
+        if (mountKind === 'svg') {
+            const elNS = (api as { elNS?: (ns: string, tag: string) => unknown }).elNS;
+            regionHost = typeof elNS === 'function' ? elNS('http://www.w3.org/2000/svg', 'g') : api.el('g');
+        } else {
+            regionHost = api.el('span');
+            const rh = regionHost as { style?: { display?: string } };
+            if (rh.style) rh.style.display = 'contents';
+        }
+        const rh = regionHost as { setAttribute?: (n: string, v: string) => void };
         if (typeof rh.setAttribute === 'function') rh.setAttribute('data-vmz-region', String(regionId));
-        frag.appendChild(regionHost);
-    }
+        const par = parent as { insertBefore?: (node: unknown, ref: unknown) => void };
+        if (typeof par.insertBefore === 'function') par.insertBefore(regionHost, end);
+        return regionHost;
+    };
     frag.appendChild(end);
 
     const cached: Array<unknown> = branches.map(() => null);
@@ -121,8 +156,9 @@ export function createDirectIfBlock(
         const created = cached[next] as unknown;
         const endNode = end as { parentNode?: unknown };
         if (created && endNode.parentNode) {
-            if (regionHost && typeof (regionHost as { appendChild?: (n: unknown) => void }).appendChild === 'function') {
-                (regionHost as { appendChild: (n: unknown) => void }).appendChild(created);
+            const host = ensureRegionHost();
+            if (host && typeof (host as { appendChild?: (n: unknown) => void }).appendChild === 'function') {
+                (host as { appendChild: (n: unknown) => void }).appendChild(created);
             } else {
                 const parent = endNode.parentNode as {
                     insertBefore?: (node: unknown, ref: unknown) => void;

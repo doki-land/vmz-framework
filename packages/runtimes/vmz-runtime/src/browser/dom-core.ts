@@ -306,6 +306,13 @@ export const directApi = {
         noteDomCreate();
         return document.createElement(tag || 'div');
     },
+    elNS(ns, tag) {
+        if (directApi._resumeAdopt && typeof directApi._resumeAdopt.elNS === 'function') {
+            return directApi._resumeAdopt.elNS(ns, tag);
+        }
+        noteDomCreate();
+        return document.createElementNS(ns || 'http://www.w3.org/2000/svg', tag || 'g');
+    },
     text(value) {
         if (directApi._resumeAdopt) return directApi._resumeAdopt.text(value);
         noteDomCreate();

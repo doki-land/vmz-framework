@@ -595,11 +595,38 @@ fn emit_if_block(
   var frag = api.frag();
   frag.appendChild(start);
   var regionHost = null;
-  if ({region_arg} != null) {{
-    regionHost = api.el('span');
-    regionHost.style.display = 'contents';
+  function regionMountKind(node) {{
+    var cur = node;
+    while (cur) {{
+      if (cur.__kind === 'frag' || cur.nodeType === 11) {{
+        cur = cur.parentNode;
+        continue;
+      }}
+      if (cur.namespaceURI === 'http://www.w3.org/2000/svg') return 'svg';
+      if (cur.tagName && String(cur.tagName).toLowerCase() === 'svg') return 'svg';
+      if (cur.__kind === 'el' && String(cur.tag || '').toLowerCase() === 'svg') return 'svg';
+      if (cur.__kind === 'el' || cur.nodeType === 1) return 'html';
+      cur = cur.parentNode;
+    }}
+    return null;
+  }}
+  function ensureRegionHost() {{
+    if (regionHost != null || {region_arg} == null) return regionHost;
+    var parent = end.parentNode;
+    if (!parent) return null;
+    var mountKind = regionMountKind(end);
+    if (!mountKind) return null;
+    if (mountKind === 'svg') {{
+      regionHost = typeof api.elNS === 'function'
+        ? api.elNS('http://www.w3.org/2000/svg', 'g')
+        : api.el('g');
+    }} else {{
+      regionHost = api.el('span');
+      regionHost.style.display = 'contents';
+    }}
     regionHost.setAttribute('data-vmz-region', String({region_arg}));
-    frag.appendChild(regionHost);
+    parent.insertBefore(regionHost, end);
+    return regionHost;
   }}
   frag.appendChild(end);
   var branches = [{branch_objs}];
@@ -660,7 +687,8 @@ fn emit_if_block(
     if (next < 0) return;
     wireBranch(next);
     if (cached[next] && end.parentNode) {{
-      if (regionHost) regionHost.appendChild(cached[next]);
+      var __regionHost = ensureRegionHost();
+      if (__regionHost) __regionHost.appendChild(cached[next]);
       else end.parentNode.insertBefore(cached[next], end);
     }}
   }}
