@@ -189,7 +189,7 @@ export async function proveHomepageLocaleTransition(opts: {
                             text('.site-nav__cta') === expected.start &&
                             text('[data-vmz-fixture="footer-docs"]') === expected.docs &&
                             href('[data-vmz-fixture="landing-primary-cta"]').includes(expected.guideHref) &&
-                            href('[data-vmz-fixture="landing-secondary-cta"]').includes(expected.docsRootHref) &&
+                            href('[data-vmz-fixture="landing-secondary-cta"]').includes('/commercial') &&
                             href('[data-vmz-fixture="footer-docs"]').includes(expected.docsRootHref)
                         );
                     },

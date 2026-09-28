@@ -3,38 +3,38 @@
     <SiteHeader />
     <main>
       <section class="v2-hero" aria-labelledby="landing-title" data-vmz-fixture="landing-brand">
-        <p class="v2-kicker" data-vmz-fixture="landing-hero-kicker">{{ heroKickerLabel }}</p>
-        <h1 id="landing-title" data-vmz-fixture="landing-hero-title">{{ heroTitleLeadLabel }}<br /><em>{{ heroTitleEmLabel }}</em></h1>
-        <p class="v2-lede" data-vmz-fixture="landing-hero-lede">{{ heroLedeLabel }}</p>
-        <div class="v2-actions">
-          <a class="v2-button v2-button--primary" data-vmz-fixture="landing-primary-cta" :href="guideHref">{{ buildLabel }}</a>
-          <a class="v2-button v2-button--text" data-vmz-fixture="landing-secondary-cta" :href="docsRootHref">{{ readDocsLabel }} <span aria-hidden="true">→</span></a>
-          <a class="v2-button v2-button--text" href="/commercial">{{ viewProductUiLabel }}</a>
-        </div>
-        <div class="v2-hero-preview" data-vmz-fixture="landing-hero-preview" :aria-label="heroPreviewAriaLabel">
-          <div class="v2-hero-preview__head">
-            <div>
-              <span>{{ heroPreviewPathLabel }}</span>
-              <strong>{{ heroPreviewReleaseCenterLabel }}</strong>
+        <div class="v2-hero__inner">
+          <div class="v2-hero__copy">
+            <p class="v2-kicker" data-vmz-fixture="landing-hero-kicker">{{ heroKickerLabel }}</p>
+            <h1 id="landing-title" data-vmz-fixture="landing-hero-title">{{ heroTitleLeadLabel }}<br /><em>{{ heroTitleEmLabel }}</em></h1>
+            <p class="v2-lede" data-vmz-fixture="landing-hero-lede">{{ heroLedeLabel }}</p>
+            <div class="v2-actions">
+              <a class="v2-button v2-button--primary" data-vmz-fixture="landing-primary-cta" :href="guideHref">{{ buildLabel }}</a>
+              <a class="v2-button v2-button--text" data-vmz-fixture="landing-secondary-cta" href="/commercial">{{ viewProductUiLabel }}</a>
             </div>
-            <span class="v2-hero-preview__status">{{ heroPreviewProductionReadyLabel }}</span>
+            <p class="v2-hero-note"><a :href="docsRootHref">{{ heroFootnoteLabel }}</a></p>
           </div>
-          <p class="v2-hero-preview__summary">{{ heroPreviewSummaryLine }}</p>
-          <div class="v2-hero-preview__table" role="table" :aria-label="heroPreviewTableAriaLabel">
-            <div class="v2-hero-preview__row v2-hero-preview__row--head" role="row">
-              <span role="columnheader">{{ heroPreviewColTargetLabel }}</span><span role="columnheader">{{ heroPreviewColResultLabel }}</span><span role="columnheader">{{ heroPreviewColStatusLabel }}</span>
-            </div>
-            <div v-for="target in heroPreviewTargets" :key="target.id" class="v2-hero-preview__row" role="row">
-              <span role="cell">{{ target.name }}</span><span role="cell">{{ target.result }}</span><span role="cell" :class="target.status === 'running' ? 'is-running' : ''">{{ target.statusLabel }}</span>
+          <div class="v2-hero__preview-wrap">
+            <p class="v2-hero-preview__demo-label">{{ heroPreviewDemoLabelText }}</p>
+            <div class="v2-hero-preview" data-vmz-fixture="landing-hero-preview" :aria-label="heroPreviewAriaLabel">
+              <div class="v2-hero-preview__head">
+                <div>
+                  <strong>{{ heroPreviewReleaseCenterLabel }}</strong>
+                  <span>{{ heroPreviewSiteNameLabel }} · {{ heroPreviewBranchMainLabel }}</span>
+                </div>
+                <span class="v2-hero-preview__status">{{ heroPreviewProductionReadyLabel }}</span>
+              </div>
+              <p class="v2-hero-preview__summary">{{ heroPreviewSummaryLine }}</p>
+              <div class="v2-hero-preview__table" role="table" :aria-label="heroPreviewTableAriaLabel">
+                <div class="v2-hero-preview__row v2-hero-preview__row--head" role="row">
+                  <span role="columnheader">{{ heroPreviewColTargetLabel }}</span><span role="columnheader">{{ heroPreviewColResultLabel }}</span><span role="columnheader">{{ heroPreviewColStatusLabel }}</span>
+                </div>
+                <div v-for="target in heroPreviewTargets" :key="target.id" class="v2-hero-preview__row" role="row">
+                  <span role="cell">{{ target.name }}</span><span role="cell">{{ target.result }}</span><span role="cell" :class="target.status === 'running' ? 'is-running' : ''">{{ target.statusLabel }}</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="v2-signal" :aria-label="heroSignalAriaLabel">
-          <div><small>{{ heroSignalAuthorLabel }}</small><strong>{{ heroSignalAuthorValueLabel }}</strong></div>
-          <i aria-hidden="true"></i>
-          <div class="is-core"><small>{{ heroSignalUnderstandLabel }}</small><strong>{{ heroSignalUnderstandValueLabel }}</strong></div>
-          <i aria-hidden="true"></i>
-          <div><small>{{ heroSignalDeliverLabel }}</small><strong>{{ heroSignalDeliverValueLabel }}</strong></div>
         </div>
       </section>
 
@@ -47,33 +47,20 @@
       </section>
 
       <section class="v2-features" :aria-label="featuresAriaLabel">
-        <article class="v2-feature v2-feature--dark">
-          <span class="v2-feature__number">01</span>
+        <article class="v2-feature">
           <div class="v2-feature__icon"><Icon name="feature.incremental" size="md" /></div>
           <h3>{{ feature1TitleLabel }}</h3>
           <p>{{ feature1BodyLabel }}</p>
-          <small>{{ feature1TagLabel }}</small>
         </article>
-        <article class="v2-feature v2-feature--lime">
-          <span class="v2-feature__number">02</span>
+        <article class="v2-feature">
           <div class="v2-feature__icon"><Icon name="feature.runtime" size="md" /></div>
           <h3>{{ feature2TitleLabel }}</h3>
           <p>{{ feature2BodyLabel }}</p>
-          <small>{{ feature2TagLabel }}</small>
         </article>
-        <article class="v2-feature v2-feature--paper">
-          <span class="v2-feature__number">03</span>
-          <div class="v2-feature__icon"><Icon name="feature.ssr" size="md" /></div>
+        <article class="v2-feature">
+          <div class="v2-feature__icon"><Icon name="feature.deploy" size="md" /></div>
           <h3>{{ feature3TitleLabel }}</h3>
           <p>{{ feature3BodyLabel }}</p>
-          <small>{{ feature3TagLabel }}</small>
-        </article>
-        <article class="v2-feature v2-feature--coral">
-          <span class="v2-feature__number">04</span>
-          <div class="v2-feature__icon"><Icon name="feature.deploy" size="md" /></div>
-          <h3>{{ feature4TitleLabel }}</h3>
-          <p>{{ feature4BodyLabel }}</p>
-          <small>{{ feature4TagLabel }}</small>
         </article>
       </section>
 
@@ -91,6 +78,13 @@
       </section>
 
       <section class="v2-flow" aria-labelledby="flow-title">
+        <div class="v2-signal" :aria-label="heroSignalAriaLabel">
+          <div><small>{{ heroSignalAuthorLabel }}</small><strong>{{ heroSignalAuthorValueLabel }}</strong></div>
+          <i aria-hidden="true"></i>
+          <div class="is-core"><small>{{ heroSignalUnderstandLabel }}</small><strong>{{ heroSignalUnderstandValueLabel }}</strong></div>
+          <i aria-hidden="true"></i>
+          <div><small>{{ heroSignalDeliverLabel }}</small><strong>{{ heroSignalDeliverValueLabel }}</strong></div>
+        </div>
         <div class="v2-section-head"><p class="v2-index">{{ flowIndexLabel }}</p><h2 id="flow-title">{{ flowTitleLabel }}</h2></div>
         <ol>
           <li><b>{{ flowStep1TitleLabel }}</b><span>{{ flowStep1DescLabel }}</span></li>
@@ -157,14 +151,16 @@
 <script client>
 import {
   build,
-  readDocs,
   start,
   deployPlanner,
   heroKicker,
   heroTitleLead,
   heroTitleEm,
   heroLede,
+  heroFootnote,
   viewProductUi,
+  heroPreviewDemoLabel,
+  heroPreviewSiteName,
   heroPreviewAria,
   heroPreviewReleaseCenter,
   heroPreviewProductionReady,
@@ -206,9 +202,6 @@ import {
   feature3Title,
   feature3Body,
   feature3Tag,
-  feature4Title,
-  feature4Body,
-  feature4Tag,
   feedbackIndex,
   feedbackTitle,
   feedbackTitleBreak,
@@ -300,7 +293,10 @@ export default class IndexPage {
   heroTitleLeadLabel = '';
   heroTitleEmLabel = '';
   heroLedeLabel = '';
+  heroFootnoteLabel = '';
   viewProductUiLabel = '';
+  heroPreviewDemoLabelText = '';
+  heroPreviewSiteNameLabel = '';
   heroPreviewAriaLabel = '';
   heroPreviewReleaseCenterLabel = '';
   heroPreviewProductionReadyLabel = '';
@@ -358,9 +354,6 @@ export default class IndexPage {
   feature3TitleLabel = '';
   feature3BodyLabel = '';
   feature3TagLabel = '';
-  feature4TitleLabel = '';
-  feature4BodyLabel = '';
-  feature4TagLabel = '';
   feedbackIndexLabel = '';
   feedbackTitleLabel = '';
   feedbackTitleBreakLabel = '';
@@ -420,7 +413,6 @@ export default class IndexPage {
   startTitleLabel = '';
   startLedeLabel = '';
   buildLabel = '';
-  readDocsLabel = '';
   startLabel = '';
   deployPlannerLabel = '';
   copyCommandLabel = '';
@@ -503,7 +495,8 @@ export default class IndexPage {
       this[key] = '\u200b';
     };
     const keys = [
-      'heroKickerLabel', 'heroTitleLeadLabel', 'heroTitleEmLabel', 'heroLedeLabel', 'viewProductUiLabel',
+      'heroKickerLabel', 'heroTitleLeadLabel', 'heroTitleEmLabel', 'heroLedeLabel', 'heroFootnoteLabel', 'viewProductUiLabel',
+      'heroPreviewDemoLabelText', 'heroPreviewSiteNameLabel',
       'heroPreviewAriaLabel', 'heroPreviewReleaseCenterLabel', 'heroPreviewProductionReadyLabel',
       'heroPreviewMetricBuildLabel', 'heroPreviewMetricScopeLabel', 'heroPreviewMetricTargetsLabel',
       'heroPreviewBranchMainLabel', 'heroPreviewScopeOneRegionLabel', 'heroPreviewTargetsActiveLabel',
@@ -515,7 +508,6 @@ export default class IndexPage {
       'statementIndexLabel', 'statementTitleLeadLabel', 'statementTitleEmLabel', 'statementBodyLabel',
       'featuresAriaLabel', 'feature1TitleLabel', 'feature1BodyLabel', 'feature1TagLabel',
       'feature2TitleLabel', 'feature2BodyLabel', 'feature2TagLabel', 'feature3TitleLabel', 'feature3BodyLabel', 'feature3TagLabel',
-      'feature4TitleLabel', 'feature4BodyLabel', 'feature4TagLabel',
       'feedbackIndexLabel', 'feedbackTitleLabel', 'feedbackTitleBreakLabel', 'feedbackBodyLabel',
       'feedbackActivity1Label', 'feedbackActivity1ValueLabel', 'feedbackActivity1NoteLabel',
       'feedbackActivity2Label', 'feedbackActivity2ValueLabel', 'feedbackActivity2NoteLabel',
@@ -531,7 +523,7 @@ export default class IndexPage {
       'showcaseBadgeActiveLabel', 'showcaseBadgeWebToEdgeLabel', 'showcaseStatusReadyLabel',
       'showcaseEmptyBadgeLabel', 'showcaseEmptyTitleLabel', 'showcaseEmptyBodyLabel',
       'showcaseNotifyTitleLabel', 'showcaseNotifyBodyLabel', 'showcaseNotifyCloseLabel',
-      'startIndexLabel', 'startTitleLabel', 'startLedeLabel', 'buildLabel', 'readDocsLabel', 'startLabel', 'deployPlannerLabel',
+      'startIndexLabel', 'startTitleLabel', 'startLedeLabel', 'buildLabel', 'startLabel', 'deployPlannerLabel',
       'copyCommandLabel', 'copiedCommandLabel',
     ];
     for (const k of keys) bump(k);
@@ -540,7 +532,10 @@ export default class IndexPage {
     this.heroTitleLeadLabel = heroTitleLead();
     this.heroTitleEmLabel = heroTitleEm();
     this.heroLedeLabel = heroLede();
+    this.heroFootnoteLabel = heroFootnote();
     this.viewProductUiLabel = viewProductUi();
+    this.heroPreviewDemoLabelText = heroPreviewDemoLabel();
+    this.heroPreviewSiteNameLabel = heroPreviewSiteName();
     this.heroPreviewAriaLabel = heroPreviewAria();
     this.heroPreviewReleaseCenterLabel = heroPreviewReleaseCenter();
     this.heroPreviewProductionReadyLabel = heroPreviewProductionReady();
@@ -582,9 +577,6 @@ export default class IndexPage {
     this.feature3TitleLabel = feature3Title();
     this.feature3BodyLabel = feature3Body();
     this.feature3TagLabel = feature3Tag();
-    this.feature4TitleLabel = feature4Title();
-    this.feature4BodyLabel = feature4Body();
-    this.feature4TagLabel = feature4Tag();
     this.feedbackIndexLabel = feedbackIndex();
     this.feedbackTitleLabel = feedbackTitle();
     this.feedbackTitleBreakLabel = feedbackTitleBreak();
@@ -648,7 +640,6 @@ export default class IndexPage {
     this.startTitleLabel = startTitle();
     this.startLedeLabel = startLede();
     this.buildLabel = build();
-    this.readDocsLabel = readDocs();
     this.startLabel = start();
     this.deployPlannerLabel = deployPlanner();
     this.copyCommandLabel = copyCommand();
