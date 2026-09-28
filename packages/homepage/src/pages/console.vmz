@@ -3,32 +3,32 @@
     <ConsoleShell
       brand="VMZ"
       home-href="/"
-      title="运营控制台"
-      nav-label="Console"
+      :title="consoleTitleLabel"
+      :nav-label="consoleNavLabel"
       :nav="navItems"
     >
-      <section class="vmz-console-summary" aria-label="Operations summary">
-        <Card title="活跃服务" description="过去 24 小时">
+      <section class="vmz-console-summary" :aria-label="consoleSummaryAriaLabel">
+        <Card :title="consoleStatActiveServicesLabel" :description="consoleStatActiveServicesDescLabel">
           <strong class="vmz-console-stat">12</strong>
-          <Badge tone="success">稳定</Badge>
+          <Badge tone="success">{{ consoleStatStableLabel }}</Badge>
         </Card>
-        <Card title="待处理发布" description="Release queue">
+        <Card :title="consoleStatPendingReleasesLabel" :description="consoleStatPendingReleasesDescLabel">
           <strong class="vmz-console-stat">3</strong>
-          <Badge tone="warning">需关注</Badge>
+          <Badge tone="warning">{{ consoleStatNeedsAttentionLabel }}</Badge>
         </Card>
-        <Card title="受影响区域" description="最近编译">
+        <Card :title="consoleStatAffectedRegionsLabel" :description="consoleStatAffectedRegionsDescLabel">
           <strong class="vmz-console-stat">1</strong>
-          <Badge tone="info">Direct</Badge>
+          <Badge tone="info">{{ consoleStatDirectLabel }}</Badge>
         </Card>
-        <Card title="告警" description="Open incidents">
+        <Card :title="consoleStatAlertsLabel" :description="consoleStatAlertsDescLabel">
           <strong class="vmz-console-stat">0</strong>
-          <Badge tone="success">正常</Badge>
+          <Badge tone="success">{{ consoleStatNormalLabel }}</Badge>
         </Card>
       </section>
 
-      <FilterBar label="Query">
+      <FilterBar :label="consoleFilterLabel">
         <Field
-          label="名称包含"
+          :label="consoleFieldNameLabel"
           control-id="home-console-query"
           description-id="home-console-query-desc"
           error-id="home-console-query-err"
@@ -36,30 +36,30 @@
           :value="query"
           @input="(e) => (query = e.target.value)"
         />
-        <Button type="button" @click="applyFilter">Apply</Button>
-        <Button type="button" @click="selectVisible">Select visible</Button>
+        <Button type="button" @click="applyFilter">{{ consoleApplyLabel }}</Button>
+        <Button type="button" @click="selectVisible">{{ consoleSelectVisibleLabel }}</Button>
       </FilterBar>
 
       <p class="vmz-sr-only" data-vmz-fixture="console-query">query:{{ query }}</p>
 
       <BulkActions
-        label="Bulk actions"
+        :label="consoleBulkActionsLabel"
         :selected-count="selectedCount"
         :count-label="bulkLabel"
       />
-      <Button type="button" @click="() => (selectedCount = 0)">Clear selection</Button>
+      <Button type="button" @click="() => (selectedCount = 0)">{{ consoleClearSelectionLabel }}</Button>
 
       <Table
         :columns="columns"
         :rows="rows"
         :has-row-action="rowAction"
-        action-title="Detail"
-        action-label="Open"
+        :action-title="consoleActionTitleLabel"
+        :action-label="consoleActionLabel"
         :on-row-action="openDetail"
       />
 
       <Pagination
-        label="Rows"
+        :label="consolePaginationLabel"
         :status="pageStatus"
         :prev-disabled="prevDisabled"
         :next-disabled="nextDisabled"
@@ -69,7 +69,7 @@
 
       <Drawer
         :open="drawerOpen"
-        title="Row detail"
+        :title="consoleDrawerTitleLabel"
         title-id="home-console-drawer-title"
         :on-close="() => (drawerOpen = false)"
       >
@@ -134,6 +134,44 @@
 </style>
 
 <script client>
+import {
+  consoleNavLabel,
+  consoleTitle,
+  consoleSummaryAria,
+  consoleStatActiveServices,
+  consoleStatActiveServicesDesc,
+  consoleStatStable,
+  consoleStatPendingReleases,
+  consoleStatPendingReleasesDesc,
+  consoleStatNeedsAttention,
+  consoleStatAffectedRegions,
+  consoleStatAffectedRegionsDesc,
+  consoleStatDirect,
+  consoleStatAlerts,
+  consoleStatAlertsDesc,
+  consoleStatNormal,
+  consoleFilterLabel,
+  consoleFieldNameLabel,
+  consoleApply,
+  consoleSelectVisible,
+  consoleBulkActions,
+  consoleClearSelection,
+  consoleBulkSelected,
+  consoleColName,
+  consoleColOwner,
+  consoleColStatus,
+  consoleColUpdated,
+  consoleActionTitle,
+  consoleActionLabel,
+  consolePaginationLabel,
+  consoleDrawerTitle,
+  consolePageStatus,
+  commercialNavCommercial,
+  commercialNavConsole,
+  commercialNavHome,
+} from '#locales/common';
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
+
 export default class ConsolePage {
   query = '';
   appliedQuery = '';
@@ -147,12 +185,32 @@ export default class ConsolePage {
   prevDisabled = true;
   nextDisabled = true;
   rowAction = true;
-  columns = [
-    { id: 'name', title: '名称' },
-    { id: 'owner', title: '负责人' },
-    { id: 'status', title: '状态' },
-    { id: 'updated', title: '更新时间' },
-  ];
+  consoleNavLabel = '';
+  consoleTitleLabel = '';
+  consoleSummaryAriaLabel = '';
+  consoleStatActiveServicesLabel = '';
+  consoleStatActiveServicesDescLabel = '';
+  consoleStatStableLabel = '';
+  consoleStatPendingReleasesLabel = '';
+  consoleStatPendingReleasesDescLabel = '';
+  consoleStatNeedsAttentionLabel = '';
+  consoleStatAffectedRegionsLabel = '';
+  consoleStatAffectedRegionsDescLabel = '';
+  consoleStatDirectLabel = '';
+  consoleStatAlertsLabel = '';
+  consoleStatAlertsDescLabel = '';
+  consoleStatNormalLabel = '';
+  consoleFilterLabel = '';
+  consoleFieldNameLabel = '';
+  consoleApplyLabel = '';
+  consoleSelectVisibleLabel = '';
+  consoleBulkActionsLabel = '';
+  consoleClearSelectionLabel = '';
+  consoleActionTitleLabel = '';
+  consoleActionLabel = '';
+  consolePaginationLabel = '';
+  consoleDrawerTitleLabel = '';
+  columns = [];
   allRows = [
     { id: 'r1', cells: ['Alpha', 'Platform', 'Active', '2m ago'] },
     { id: 'r2', cells: ['docs-portal', 'Docs', 'Paused', '18m ago'] },
@@ -167,14 +225,73 @@ export default class ConsolePage {
     { id: 'r3', cells: ['edge-gateway', 'Infra', 'Active', '41m ago'] },
     { id: 'r4', cells: ['billing-ui', 'Growth', 'Draft', '1h ago'] },
   ];
-  navItems = [
-    { id: 'console', title: 'Console', href: '/console' },
-    { id: 'commercial', title: 'Commercial', href: '/commercial' },
-    { id: 'home', title: 'Homepage', href: '/' },
-  ];
+  navItems = [];
+  _unwatchLocale = null;
 
   onMount() {
+    this.applyLocaleCopy();
+    this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
     this.refreshPage();
+  }
+
+  onDestroy() {
+    if (typeof this._unwatchLocale === 'function') this._unwatchLocale();
+    this._unwatchLocale = null;
+  }
+
+  refreshCopy() {
+    this.consoleNavLabel = consoleNavLabel();
+    this.consoleTitleLabel = consoleTitle();
+    this.consoleSummaryAriaLabel = consoleSummaryAria();
+    this.consoleStatActiveServicesLabel = consoleStatActiveServices();
+    this.consoleStatActiveServicesDescLabel = consoleStatActiveServicesDesc();
+    this.consoleStatStableLabel = consoleStatStable();
+    this.consoleStatPendingReleasesLabel = consoleStatPendingReleases();
+    this.consoleStatPendingReleasesDescLabel = consoleStatPendingReleasesDesc();
+    this.consoleStatNeedsAttentionLabel = consoleStatNeedsAttention();
+    this.consoleStatAffectedRegionsLabel = consoleStatAffectedRegions();
+    this.consoleStatAffectedRegionsDescLabel = consoleStatAffectedRegionsDesc();
+    this.consoleStatDirectLabel = consoleStatDirect();
+    this.consoleStatAlertsLabel = consoleStatAlerts();
+    this.consoleStatAlertsDescLabel = consoleStatAlertsDesc();
+    this.consoleStatNormalLabel = consoleStatNormal();
+    this.consoleFilterLabel = consoleFilterLabel();
+    this.consoleFieldNameLabel = consoleFieldNameLabel();
+    this.consoleApplyLabel = consoleApply();
+    this.consoleSelectVisibleLabel = consoleSelectVisible();
+    this.consoleBulkActionsLabel = consoleBulkActions();
+    this.consoleClearSelectionLabel = consoleClearSelection();
+    this.consoleActionTitleLabel = consoleActionTitle();
+    this.consoleActionLabel = consoleActionLabel();
+    this.consolePaginationLabel = consolePaginationLabel();
+    this.consoleDrawerTitleLabel = consoleDrawerTitle();
+    this.columns = [
+      { id: 'name', title: consoleColName() },
+      { id: 'owner', title: consoleColOwner() },
+      { id: 'status', title: consoleColStatus() },
+      { id: 'updated', title: consoleColUpdated() },
+    ];
+    this.navItems = [
+      { id: 'console', title: commercialNavConsole(), href: '/console' },
+      { id: 'commercial', title: commercialNavCommercial(), href: '/commercial' },
+      { id: 'home', title: commercialNavHome(), href: '/' },
+    ];
+    if (this.selectedCount > 0) {
+      this.bulkLabel = consoleBulkSelected().replace('{count}', String(this.selectedCount));
+    }
+    this.refreshPageStatus();
+  }
+
+  applyLocaleCopy(preferred) {
+    withLocaleHint(readLocaleId(preferred), () => this.refreshCopy());
+  }
+
+  formatPageStatus(page, pageCount) {
+    return consolePageStatus().replace('{page}', String(page)).replace('{count}', String(pageCount));
+  }
+
+  refreshPageStatus() {
+    this.pageStatus = this.formatPageStatus(this.page, this.pageCount);
   }
 
   applyFilter() {
@@ -206,7 +323,7 @@ export default class ConsolePage {
     if (this.page < 1) this.page = 1;
     const start = (this.page - 1) * pageSize;
     this.rows = list.slice(start, start + pageSize);
-    this.pageStatus = `Page ${this.page} / ${this.pageCount}`;
+    this.refreshPageStatus();
     this.prevDisabled = this.page <= 1;
     this.nextDisabled = this.page >= this.pageCount;
   }
@@ -225,7 +342,7 @@ export default class ConsolePage {
 
   selectVisible() {
     this.selectedCount = this.rows.length;
-    this.bulkLabel = `${this.selectedCount} selected`;
+    this.bulkLabel = consoleBulkSelected().replace('{count}', String(this.selectedCount));
   }
 
   clearSelection() {
