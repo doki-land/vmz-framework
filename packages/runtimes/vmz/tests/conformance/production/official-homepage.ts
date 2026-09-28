@@ -316,6 +316,21 @@ if (homeBuild.status !== 0) {
     }
 }
 
+console.log('official-homepage: SSR HTML inspect (R1/R2)…');
+let homeSsrHtmlOk = false;
+let homeSsrHtmlDetail = '';
+if (homeBuild.status === 0) {
+    const inspectScript = path.join(root, 'scripts', 'dev', 'inspect-ssr-html.mjs');
+    const inspect = spawnSync(process.execPath, [inspectScript], { cwd: root, encoding: 'utf8' });
+    if (inspect.status !== 0) {
+        homeSsrHtmlDetail = (inspect.stderr || inspect.stdout || 'inspect-ssr-html failed').trim().slice(0, 1200);
+        errors.push(`homepage SSR HTML inspect: ${homeSsrHtmlDetail}`);
+    } else {
+        homeSsrHtmlOk = true;
+        homeSsrHtmlDetail = 'R1 button slot and R2 SVG region checks passed on static index.html';
+    }
+}
+
 console.log('official-homepage: serve homepage SSR…');
 let homeSsrOk = false;
 let homeSsrDetail = '';
@@ -599,6 +614,11 @@ upsertCheck(proof, {
     id: 'official-homepage.homepage',
     status: homeSsrOk ? 'passed' : 'failed',
     detail: homeSsrDetail,
+});
+upsertCheck(proof, {
+    id: 'official-homepage.ssr-html',
+    status: homeSsrHtmlOk ? 'passed' : 'failed',
+    detail: homeSsrHtmlDetail || 'skipped (homepage build failed)',
 });
 upsertCheck(proof, {
     id: 'official-homepage.homepage-locale',
