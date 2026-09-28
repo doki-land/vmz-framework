@@ -14,22 +14,19 @@
         <div class="v2-hero-preview" data-vmz-fixture="landing-hero-preview" :aria-label="heroPreviewAriaLabel">
           <div class="v2-hero-preview__head">
             <div>
-              <span>Projects / vmz-site</span>
+              <span>{{ heroPreviewPathLabel }}</span>
               <strong>{{ heroPreviewReleaseCenterLabel }}</strong>
             </div>
             <span class="v2-hero-preview__status">{{ heroPreviewProductionReadyLabel }}</span>
           </div>
-          <div class="v2-hero-preview__metrics">
-            <div><small>{{ heroPreviewMetricBuildLabel }}</small><strong>{{ heroPreviewBranchMainLabel }}</strong><em>{{ heroPreviewStatusReadyLabel }}</em></div>
-            <div><small>{{ heroPreviewMetricScopeLabel }}</small><strong>{{ heroPreviewScopeOneRegionLabel }}</strong><em>{{ heroPreviewStatusDirectLabel }}</em></div>
-            <div><small>{{ heroPreviewMetricTargetsLabel }}</small><strong>{{ heroPreviewTargetsActiveLabel }}</strong><em>{{ heroPreviewStatusWebToEdgeLabel }}</em></div>
-          </div>
+          <p class="v2-hero-preview__summary">{{ heroPreviewSummaryLine }}</p>
           <div class="v2-hero-preview__table" role="table" :aria-label="heroPreviewTableAriaLabel">
             <div class="v2-hero-preview__row v2-hero-preview__row--head" role="row">
               <span role="columnheader">{{ heroPreviewColTargetLabel }}</span><span role="columnheader">{{ heroPreviewColResultLabel }}</span><span role="columnheader">{{ heroPreviewColStatusLabel }}</span>
             </div>
-            <div class="v2-hero-preview__row" role="row"><span role="cell">{{ heroPreviewRowBrowserLabel }}</span><span role="cell">{{ heroPreviewRowBrowserResultLabel }}</span><span role="cell">{{ heroPreviewStatusReadyLabel }}</span></div>
-            <div class="v2-hero-preview__row" role="row"><span role="cell">{{ heroPreviewRowSsrLabel }}</span><span role="cell">{{ heroPreviewRowSsrResultLabel }}</span><span role="cell">{{ heroPreviewStatusReadyLabel }}</span></div>
+            <div v-for="target in heroPreviewTargets" :key="target.id" class="v2-hero-preview__row" role="row">
+              <span role="cell">{{ target.name }}</span><span role="cell">{{ target.result }}</span><span role="cell" :class="target.status === 'running' ? 'is-running' : ''">{{ target.statusLabel }}</span>
+            </div>
           </div>
         </div>
         <div class="v2-signal" :aria-label="heroSignalAriaLabel">
@@ -273,6 +270,7 @@ import {
   copyCommand,
   copiedCommand,
 } from '#locales/common';
+import IndexPageServer from '#server/pages/index';
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
 
 export default class IndexPage {
@@ -288,6 +286,13 @@ export default class IndexPage {
   heroPreviewAriaLabel = '';
   heroPreviewReleaseCenterLabel = '';
   heroPreviewProductionReadyLabel = '';
+  heroPreviewPathLabel = 'vmz-docs / docs-site';
+  heroPreviewSummaryLine = 'main · Web + SSR + Edge · 12m ago';
+  heroPreviewTargets = [
+    { id: 'browser', name: 'Browser', result: 'Static shell', status: 'succeeded', statusLabel: 'Ready' },
+    { id: 'ssr', name: 'SSR', result: 'Hydration bundle', status: 'succeeded', statusLabel: 'Ready' },
+    { id: 'edge', name: 'Edge', result: 'Worker route', status: 'running', statusLabel: 'Running' },
+  ];
   heroPreviewMetricBuildLabel = '';
   heroPreviewMetricScopeLabel = '';
   heroPreviewMetricTargetsLabel = '';
@@ -404,6 +409,38 @@ export default class IndexPage {
   onMount() {
     this.applyLocaleCopy();
     this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+    this.loadHeroPreview();
+  }
+
+  applyHeroPreview(preview) {
+    if (!preview || typeof preview !== 'object') return;
+    const workspace = String(preview.workspace || '').trim();
+    const project = String(preview.project || '').trim();
+    if (workspace && project) {
+      this.heroPreviewPathLabel = `${workspace} / ${project}`;
+    }
+    if (preview.summaryLine) {
+      this.heroPreviewSummaryLine = String(preview.summaryLine);
+    }
+    if (Array.isArray(preview.targets) && preview.targets.length) {
+      this.heroPreviewTargets = preview.targets.map((target) => ({
+        id: String(target.id || ''),
+        name: String(target.name || ''),
+        result: String(target.result || ''),
+        status: String(target.status || ''),
+        statusLabel: String(target.statusLabel || ''),
+      }));
+    }
+  }
+
+  async loadHeroPreview() {
+    try {
+      const server = new IndexPageServer();
+      const preview = await server.getHeroPreview();
+      this.applyHeroPreview(preview);
+    } catch {
+      /* SSR defaults mirror the server fixture */
+    }
   }
 
   onDestroy() {
@@ -603,6 +640,16 @@ export default class IndexPage {
       return;
     }
     fail();
+  }
+}
+</script>
+
+<script server>
+import ReleaseDemo from '#server/demo/ReleaseDemo';
+
+export default class IndexPageServer {
+  getHeroPreview() {
+    return new ReleaseDemo().getHeroPreview();
   }
 }
 </script>
