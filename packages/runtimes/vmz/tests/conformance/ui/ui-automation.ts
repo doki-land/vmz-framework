@@ -1773,9 +1773,10 @@ async function proveConsoleComposition(page) {
         timeout: 5000,
     });
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Apply'),
-        );
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) => {
+            const text = b.textContent || '';
+            return text.includes('Search') || text.includes('Apply') || text.includes('查询');
+        });
         btn?.click();
     });
     await page.waitForFunction(() => document.querySelectorAll('[data-vmz-row]').length === 1, { timeout: 5000 });
@@ -1805,7 +1806,10 @@ async function proveConsoleComposition(page) {
         btn?.click();
     });
     await page.waitForSelector('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]', { timeout: 5000 });
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="console-drawer-body"]')?.textContent?.includes('detail:r1'), {
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="console-drawer-project"]')?.textContent?.includes('docs-site'), {
+        timeout: 5000,
+    });
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="console-drawer-target"]')?.textContent?.includes('Web + SSR'), {
         timeout: 5000,
     });
     await page.keyboard.press('Escape');
@@ -1825,9 +1829,10 @@ async function proveConsoleComposition(page) {
     await page.keyboard.press('Backspace');
     await page.keyboard.press('Backspace');
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Apply'),
-        );
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) => {
+            const text = b.textContent || '';
+            return text.includes('Search') || text.includes('Apply') || text.includes('查询');
+        });
         btn?.click();
     });
     await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="page-status"]')?.textContent?.includes('Page 1 / 2'), {
