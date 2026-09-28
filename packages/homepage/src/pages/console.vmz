@@ -89,21 +89,35 @@
 .vmz-console-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.75rem;
+  gap: 0.55rem;
 }
 
 .vmz-console-summary .vmz-ui-card {
-  min-height: 6.5rem;
+  min-height: 0;
+  padding: 0.75rem 0.9rem;
+}
+
+.vmz-console-summary .vmz-ui-card__title {
+  font-size: 0.92rem;
+}
+
+.vmz-console-summary .vmz-ui-card__description {
+  font-size: 0.78rem;
 }
 
 .vmz-console-stat {
   display: block;
-  margin: 0.35rem 0 0.55rem;
+  margin: 0.2rem 0 0.35rem;
   font-family: var(--vmz-font-display);
-  font-size: 1.6rem;
+  font-size: 1.25rem;
   font-weight: 700;
   line-height: 1;
   color: var(--vmz-text-ink);
+}
+
+.vmz-console-page .vmz-ui-filter-bar,
+.vmz-console-page .vmz-ui-table-wrap {
+  margin-top: 0;
 }
 
 @media (max-width: 900px) {
