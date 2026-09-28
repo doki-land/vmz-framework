@@ -1,4 +1,4 @@
-/** Shared SVG path registry for @vmz/ui-icons and @vmz/ui Icon shim. */
+/** Shared SVG path registry for `@vmz/ui-icons` and optional app-level Icon shims. */
 export const REGISTRY = {
   'action.search': 'M10.5 3a7.5 7.5 0 0 1 5.9 12.1l4 4-1.4 1.4-4-4A7.5 7.5 0 1 1 10.5 3zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11z',
   'action.close': 'M6.4 7.8 7.8 6.4 12 10.6 16.2 6.4 17.6 7.8 13.4 12 17.6 16.2 16.2 17.6 12 13.4 7.8 17.6 6.4 16.2 10.6 12z',

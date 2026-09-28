@@ -66,6 +66,8 @@ if (contract.composition?.mustNotShip?.includes('Tooltip') !== true) {
 }
 
 console.log('ui-icons: forbid brand hex + shell components…');
+const iconPath = path.join(iconsRoot, 'src', 'Icon.vmz');
+if (!fs.existsSync(iconPath)) fail('missing src/Icon.vmz export');
 const iconVmzFiles = walkFiles(path.join(iconsRoot, 'src'), (p) => p.endsWith('.vmz'));
 if (iconVmzFiles.length === 0) fail('no .vmz under src/');
 for (const f of iconVmzFiles) {
@@ -76,23 +78,19 @@ for (const f of iconVmzFiles) {
         }
     }
 }
-const componentNames = fs
-    .readdirSync(path.join(iconsRoot, 'src', 'components'))
-    .filter((n) => n.endsWith('.vmz'))
-    .map((n) => n.replace(/\.vmz$/, ''));
 for (const banned of ['Button', 'Field', 'Dialog', 'Form', 'Empty', 'Skeleton', 'Tooltip']) {
-    if (componentNames.includes(banned)) fail(`must not ship ${banned}.vmz — reuse @vmz/ui`);
+    const bannedPath = path.join(iconsRoot, 'src', 'components', `${banned}.vmz`);
+    if (fs.existsSync(bannedPath)) fail(`must not ship ${banned}.vmz — reuse @vmz/ui`);
 }
-if (!componentNames.includes('Icon')) fail('missing Icon.vmz');
 
-const iconSrc = fs.readFileSync(path.join(iconsRoot, 'src', 'components', 'Icon.vmz'), 'utf8');
+const iconSrc = fs.readFileSync(iconPath, 'utf8');
 const registrySrc = fs.readFileSync(path.join(iconsRoot, 'src', 'registry.ts'), 'utf8');
 if (!iconSrc.includes('data-vmz-ui="icon"')) fail('Icon missing data-vmz-ui=icon');
 if (!iconSrc.includes('data-icon={name}') && !iconSrc.includes('data-icon=')) {
     fail('Icon must expose data-icon from semantic name');
 }
-if (!iconSrc.includes('REGISTRY') || !iconSrc.includes('registry.ts')) {
-    fail('Icon must inline shared registry and reference ../registry.ts source');
+if (!iconSrc.includes('registry.ts') || !iconSrc.includes('resolveIconPath')) {
+    fail('Icon must import shared registry.ts via resolveIconPath');
 }
 if (!registrySrc.includes('export const REGISTRY') || !registrySrc.includes("'tool.base64'") || !registrySrc.includes("'action.search'")) {
     fail('registry.ts must ship semantic registry (tool.* + action.*), not loose per-page SVG');

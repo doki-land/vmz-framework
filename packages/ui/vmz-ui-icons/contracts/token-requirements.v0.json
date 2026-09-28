@@ -8,7 +8,7 @@
     "forbiddenBrandHex": ["#176BFF", "#0D57DB", "#FFB000", "#00C878", "#121416"],
     "components": {
         "Icon": {
-            "source": "src/components/Icon.vmz",
+            "source": "src/Icon.vmz",
             "stableHint": "ui-icons.Icon",
             "tokens": [
                 "text.ink",
