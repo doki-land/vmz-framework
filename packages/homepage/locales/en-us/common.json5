@@ -99,7 +99,7 @@
   flowStep5Desc: 'Interaction on demand',
   flowStep6Title: 'Deploy',
   flowStep6Desc: 'Multi-environment delivery',
-  showcaseIndex: '04 / @VMZ/UI',
+  showcaseIndex: '02 / @VMZ/UI',
   showcaseTitle: 'The same docs-site release in a product shell.',
   showcaseBody: 'This workspace reuses the homepage preview fixture: summary counts, target table, and Console records all describe one docs-site build on main.',
   productCloudName: 'vmz-docs',

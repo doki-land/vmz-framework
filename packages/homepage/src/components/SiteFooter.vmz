@@ -9,7 +9,6 @@
       <a data-vmz-fixture="footer-docs" :href="docsRootHref">{{ docsLabel }}</a>
       <a :href="guideHref">{{ gettingStartedGuideLabel }}</a>
       <a :href="deployDocHref">{{ deployGuideLabel }}</a>
-      <a href="/deploy-planner">{{ deployPlannerLabel }}</a>
       <a href="/#showcase">{{ showcaseLabel }}</a>
     </nav>
     <nav class="site-footer__group" :aria-label="resourcesNavLabel">
@@ -26,7 +25,6 @@
 import {
   brand,
   docs,
-  deployPlanner,
   showcase,
   gettingStartedGuide,
   deployGuide,
@@ -47,7 +45,6 @@ export default class SiteFooter {
   docsLabel = '';
   gettingStartedGuideLabel = '';
   deployGuideLabel = '';
-  deployPlannerLabel = '';
   showcaseLabel = '';
   pluginsLabel = '';
   productNavLabel = '';
@@ -77,7 +74,6 @@ export default class SiteFooter {
     this.docsLabel = docs();
     this.gettingStartedGuideLabel = gettingStartedGuide();
     this.deployGuideLabel = deployGuide();
-    this.deployPlannerLabel = deployPlanner();
     this.showcaseLabel = showcase();
     this.pluginsLabel = plugins();
     this.productNavLabel = productNav();

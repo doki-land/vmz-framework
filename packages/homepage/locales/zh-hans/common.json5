@@ -99,7 +99,7 @@
   flowStep5Desc: '按需恢复交互',
   flowStep6Title: '部署',
   flowStep6Desc: '多环境交付',
-  showcaseIndex: '04 / @VMZ/UI',
+  showcaseIndex: '02 / @VMZ/UI',
   showcaseTitle: '同一 docs-site 发布，放进产品壳里。',
   showcaseBody: '此工作区复用首页预览 fixture：摘要统计、目标表与 Console 记录都描述 main 上的同一次 docs-site 构建。',
   productCloudName: 'vmz-docs',
