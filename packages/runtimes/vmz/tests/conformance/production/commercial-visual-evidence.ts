@@ -62,10 +62,7 @@ upsertCheck(proof, {
     status: 'passed',
     detail,
 });
-addLimitation(
-    proof,
-    'commercial-visual-evidence: PNG artifacts stay gitignored under packages/homepage/evidence/commercial-visual/',
-);
+addLimitation(proof, 'commercial-visual-evidence: PNG artifacts stay gitignored under packages/homepage/evidence/commercial-visual/');
 writeProof(proof, root);
 
 console.log(`commercial-visual-evidence PASS: ${detail}`);

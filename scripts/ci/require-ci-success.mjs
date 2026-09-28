@@ -22,12 +22,7 @@ const WORKFLOW = process.env.CI_WORKFLOW_FILE || 'ci.yml';
 const TIMEOUT_MS = Number(process.env.CI_WAIT_TIMEOUT_MS || 45 * 60 * 1000);
 const INTERVAL_MS = Number(process.env.CI_WAIT_INTERVAL_MS || 20 * 1000);
 
-const REQUIRED_JOBS = [
-    'Build Runtimes',
-    'Build and Test',
-    'UI and Browser Production',
-    'Slim and Runtime Quality',
-];
+const REQUIRED_JOBS = ['Build Runtimes', 'Build and Test', 'UI and Browser Production', 'Slim and Runtime Quality'];
 
 function fail(msg) {
     console.error(`require-ci-success: ${msg}`);
@@ -111,9 +106,7 @@ async function main() {
         if (active.length === 0) {
             if (successes.length > 0) {
                 const pick = successes[0];
-                console.log(
-                    `CI success confirmed for ${TAG_SHA} (run ${pick.databaseId} "${pick.displayTitle}" event=${pick.event})`,
-                );
+                console.log(`CI success confirmed for ${TAG_SHA} (run ${pick.databaseId} "${pick.displayTitle}" event=${pick.event})`);
                 return;
             }
 

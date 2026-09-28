@@ -56,9 +56,7 @@ export async function runFormatCommand(opts: FormatCommandOptions): Promise<numb
         } else if (check && report.formatted === 0 && report.unchanged > 0) {
             log.info(`workspace format: no changes needed (${report.unchanged} file(s) checked)`);
         } else if (!check) {
-            log.info(
-                `workspace format: ${report.formatted} file(s) updated, ${report.unchanged} unchanged`,
-            );
+            log.info(`workspace format: ${report.formatted} file(s) updated, ${report.unchanged} unchanged`);
         }
     }
 

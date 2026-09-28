@@ -787,10 +787,9 @@ async function proveCommercialComposition(page) {
         });
         btn?.click();
     });
-    await page.waitForFunction(
-        () => document.querySelectorAll('[data-vmz-fixture="commercial-task-browse"] [data-vmz-row]').length >= 1,
-        { timeout: 5000 },
-    );
+    await page.waitForFunction(() => document.querySelectorAll('[data-vmz-fixture="commercial-task-browse"] [data-vmz-row]').length >= 1, {
+        timeout: 5000,
+    });
 
     await page.click('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn');
     await page.waitForSelector('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]', { timeout: 8000 });
@@ -815,10 +814,9 @@ async function proveCommercialComposition(page) {
         if (!(btn instanceof HTMLElement)) throw new Error('Submit review missing');
         btn.click();
     }, confirmSel);
-    await page.waitForFunction(
-        () => !!document.querySelector('[data-vmz-fixture="commercial-notify"] [data-vmz-ui="notification"]'),
-        { timeout: 8000 },
-    );
+    await page.waitForFunction(() => !!document.querySelector('[data-vmz-fixture="commercial-notify"] [data-vmz-ui="notification"]'), {
+        timeout: 8000,
+    });
 
     console.log('ui-automation: Commercial composition PASS');
     await proveFormDepth(page);
@@ -1756,9 +1754,12 @@ async function proveConsoleComposition(page) {
         btn?.click();
     });
     await page.waitForSelector('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]', { timeout: 5000 });
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="console-drawer-project"]')?.textContent?.includes('vmz-homepage'), {
-        timeout: 5000,
-    });
+    await page.waitForFunction(
+        () => document.querySelector('[data-vmz-fixture="console-drawer-project"]')?.textContent?.includes('vmz-homepage'),
+        {
+            timeout: 5000,
+        },
+    );
     await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="console-drawer-target"]')?.textContent?.includes('Web'), {
         timeout: 5000,
     });

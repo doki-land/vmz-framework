@@ -724,8 +724,7 @@ export const directApi = {
         // Emptied DocumentFragment after append must not receive slot kids.
         if (!root || root.nodeType !== 1) root = hostEl;
 
-        const target =
-            root && root.nodeType === 1 ? findOwnedDefaultSlotTarget(root) : null;
+        const target = root && root.nodeType === 1 ? findOwnedDefaultSlotTarget(root) : null;
         if (target && target.parentNode) {
             if (String(target.tagName || '').toLowerCase() === 'slot') {
                 target.replaceWith(node);
