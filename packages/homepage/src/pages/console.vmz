@@ -8,22 +8,23 @@
       :nav="navItems"
     >
       <section class="vmz-console-summary" :aria-label="consoleSummaryAriaLabel">
-        <Card :title="consoleStatActiveServicesLabel" :description="consoleStatActiveServicesDescLabel">
-          <strong class="vmz-console-stat">{{ summaryTotal }}</strong>
-          <Badge tone="success">{{ consoleStatStableLabel }}</Badge>
-        </Card>
-        <Card :title="consoleStatPendingReleasesLabel" :description="consoleStatPendingReleasesDescLabel">
-          <strong class="vmz-console-stat">{{ summaryRunning }}</strong>
-          <Badge tone="warning">{{ consoleStatNeedsAttentionLabel }}</Badge>
-        </Card>
-        <Card :title="consoleStatAffectedRegionsLabel" :description="consoleStatAffectedRegionsDescLabel">
-          <strong class="vmz-console-stat">{{ summaryFailed }}</strong>
-          <Badge tone="info">{{ consoleStatDirectLabel }}</Badge>
-        </Card>
-        <Card :title="consoleStatAlertsLabel" :description="consoleStatAlertsDescLabel">
-          <strong class="vmz-console-stat">{{ summaryAlerts }}</strong>
-          <Badge tone="success">{{ consoleStatNormalLabel }}</Badge>
-        </Card>
+        <div class="vmz-console-summary__panel">
+          <div class="vmz-console-summary__item">
+            <span class="vmz-console-summary__label">{{ consoleStatActiveServicesLabel }}</span>
+            <strong class="vmz-console-summary__value">{{ summaryTotal }}</strong>
+            <span class="vmz-console-summary__hint">{{ consoleStatActiveServicesDescLabel }}</span>
+          </div>
+          <div class="vmz-console-summary__item">
+            <span class="vmz-console-summary__label">{{ consoleStatPendingReleasesLabel }}</span>
+            <strong class="vmz-console-summary__value">{{ summaryRunning }}</strong>
+            <span class="vmz-console-summary__hint">{{ consoleStatPendingReleasesDescLabel }}</span>
+          </div>
+          <div class="vmz-console-summary__item">
+            <span class="vmz-console-summary__label">{{ consoleStatAffectedRegionsLabel }}</span>
+            <strong class="vmz-console-summary__value" :class="summaryFailed > 0 ? 'is-failed' : ''">{{ summaryFailed }}</strong>
+            <span class="vmz-console-summary__hint">{{ consoleStatAffectedRegionsDescLabel }}</span>
+          </div>
+        </div>
       </section>
 
       <FilterBar :label="consoleFilterLabel">
@@ -86,33 +87,45 @@
   align-content: start;
 }
 
-.vmz-console-summary {
+.vmz-console-summary__panel {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.55rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  background: #fff;
 }
 
-.vmz-console-summary .vmz-ui-card {
-  min-height: 0;
-  padding: 0.75rem 0.9rem;
+.vmz-console-summary__item {
+  display: grid;
+  gap: 0.2rem;
+  align-content: start;
 }
 
-.vmz-console-summary .vmz-ui-card__title {
-  font-size: 0.92rem;
+.vmz-console-summary__label {
+  color: #646a73;
+  font-size: 0.81rem;
+  line-height: 1.25;
 }
 
-.vmz-console-summary .vmz-ui-card__description {
-  font-size: 0.78rem;
-}
-
-.vmz-console-stat {
-  display: block;
-  margin: 0.2rem 0 0.35rem;
+.vmz-console-summary__value {
   font-family: var(--vmz-font-display);
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 1;
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
   color: var(--vmz-text-ink);
+}
+
+.vmz-console-summary__value.is-failed {
+  color: #a8071a;
+}
+
+.vmz-console-summary__hint {
+  color: #7a8493;
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .vmz-console-page .vmz-ui-filter-bar,
@@ -120,14 +133,8 @@
   margin-top: 0;
 }
 
-@media (max-width: 900px) {
-  .vmz-console-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 520px) {
-  .vmz-console-summary {
+@media (max-width: 720px) {
+  .vmz-console-summary__panel {
     grid-template-columns: 1fr;
   }
 }
@@ -140,16 +147,10 @@ import {
   consoleSummaryAria,
   consoleStatActiveServices,
   consoleStatActiveServicesDesc,
-  consoleStatStable,
   consoleStatPendingReleases,
   consoleStatPendingReleasesDesc,
-  consoleStatNeedsAttention,
   consoleStatAffectedRegions,
   consoleStatAffectedRegionsDesc,
-  consoleStatDirect,
-  consoleStatAlerts,
-  consoleStatAlertsDesc,
-  consoleStatNormal,
   consoleFilterLabel,
   consoleFieldNameLabel,
   consoleApply,
@@ -177,7 +178,6 @@ export default class ConsolePage {
   summaryTotal = 6;
   summaryRunning = 2;
   summaryFailed = 1;
-  summaryAlerts = 0;
   query = '';
   appliedQuery = '';
   selectedCount = 0;
@@ -195,16 +195,10 @@ export default class ConsolePage {
   consoleSummaryAriaLabel = '';
   consoleStatActiveServicesLabel = '';
   consoleStatActiveServicesDescLabel = '';
-  consoleStatStableLabel = '';
   consoleStatPendingReleasesLabel = '';
   consoleStatPendingReleasesDescLabel = '';
-  consoleStatNeedsAttentionLabel = '';
   consoleStatAffectedRegionsLabel = '';
   consoleStatAffectedRegionsDescLabel = '';
-  consoleStatDirectLabel = '';
-  consoleStatAlertsLabel = '';
-  consoleStatAlertsDescLabel = '';
-  consoleStatNormalLabel = '';
   consoleFilterLabel = '';
   consoleFieldNameLabel = '';
   consoleApplyLabel = '';
@@ -270,16 +264,10 @@ export default class ConsolePage {
     this.consoleSummaryAriaLabel = consoleSummaryAria();
     this.consoleStatActiveServicesLabel = consoleStatActiveServices();
     this.consoleStatActiveServicesDescLabel = consoleStatActiveServicesDesc();
-    this.consoleStatStableLabel = consoleStatStable();
     this.consoleStatPendingReleasesLabel = consoleStatPendingReleases();
     this.consoleStatPendingReleasesDescLabel = consoleStatPendingReleasesDesc();
-    this.consoleStatNeedsAttentionLabel = consoleStatNeedsAttention();
     this.consoleStatAffectedRegionsLabel = consoleStatAffectedRegions();
     this.consoleStatAffectedRegionsDescLabel = consoleStatAffectedRegionsDesc();
-    this.consoleStatDirectLabel = consoleStatDirect();
-    this.consoleStatAlertsLabel = consoleStatAlerts();
-    this.consoleStatAlertsDescLabel = consoleStatAlertsDesc();
-    this.consoleStatNormalLabel = consoleStatNormal();
     this.consoleFilterLabel = consoleFilterLabel();
     this.consoleFieldNameLabel = consoleFieldNameLabel();
     this.consoleApplyLabel = consoleApply();
