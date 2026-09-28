@@ -11,7 +11,7 @@ import {
     type DemoReleaseRecord,
     type DemoReleaseSummary,
     type DemoShowcaseOverview,
-} from './releases.js';
+} from '../../demo/releases.js';
 
 /** Homepage release workflow demo — single source for Console, index preview, and Commercial. */
 export default class ReleaseDemo {

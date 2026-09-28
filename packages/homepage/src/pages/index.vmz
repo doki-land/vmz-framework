@@ -231,7 +231,11 @@ import {
   consoleSummaryAria,
 } from '#locales/common';
 import IndexPageServer from '#server/pages/index';
+import { demoHeroPreview, demoShowcaseOverview } from '../demo/releases.ts';
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
+
+const initialHeroPreview = demoHeroPreview();
+const initialShowcaseOverview = demoShowcaseOverview();
 
 export default class IndexPage {
   showcaseTab = 'source';
@@ -248,22 +252,24 @@ export default class IndexPage {
   heroPreviewAriaLabel = '';
   heroPreviewReleaseCenterLabel = '';
   heroPreviewProductionReadyLabel = '';
-  heroPreviewPathLabel = 'vmz-docs / docs-site';
-  heroPreviewSummaryLine = 'main · Web + SSR + Edge · 12m ago';
-  showcasePathLabel = 'vmz-docs / docs-site';
-  showcaseSummaryLine = 'main · Web + SSR + Edge · 12m ago';
-  showcaseSummaryTotal = 6;
-  showcaseSummaryRunning = 2;
-  showcaseSummaryFailed = 1;
+  heroPreviewPathLabel = `${initialHeroPreview.workspace} / ${initialHeroPreview.project}`;
+  heroPreviewSummaryLine = initialHeroPreview.summaryLine;
+  showcasePathLabel = initialShowcaseOverview.pathLabel;
+  showcaseSummaryLine = initialShowcaseOverview.summaryLine;
+  showcaseSummaryTotal = initialShowcaseOverview.summary.total;
+  showcaseSummaryRunning = initialShowcaseOverview.summary.running;
+  showcaseSummaryFailed = initialShowcaseOverview.summary.failed;
   showcaseSummaryTotalLabel = '';
   showcaseSummaryRunningLabel = '';
   showcaseSummaryFailedLabel = '';
   showcaseSummaryAriaLabel = '';
-  heroPreviewTargets = [
-    { id: 'browser', name: 'Browser', result: 'Static shell', status: 'succeeded', statusLabel: 'Ready' },
-    { id: 'ssr', name: 'SSR', result: 'Hydration bundle', status: 'succeeded', statusLabel: 'Ready' },
-    { id: 'edge', name: 'Edge', result: 'Worker route', status: 'running', statusLabel: 'Running' },
-  ];
+  heroPreviewTargets = initialHeroPreview.targets.map((target) => ({
+    id: target.id,
+    name: target.name,
+    result: target.result,
+    status: target.status,
+    statusLabel: target.statusLabel,
+  }));
   heroPreviewBranchMainLabel = '';
   heroPreviewTableAriaLabel = '';
   heroPreviewColTargetLabel = '';

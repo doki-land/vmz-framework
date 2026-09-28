@@ -304,7 +304,10 @@ import {
   consoleColUpdated,
 } from '#locales/common';
 import CommercialPageServer from '#server/pages/commercial';
+import { demoConsoleRows } from '../demo/releases.ts';
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
+
+const initialBrowseRows = demoConsoleRows();
 
 export default class CommercialPage {
   browseQuery = '';
@@ -355,12 +358,10 @@ export default class CommercialPage {
   commercialDrawerActorLabel = '';
   commercialOpenConsoleLabel = '';
   browseColumns = [];
-  allBrowseRows = [
-    { id: 'r1', cells: ['docs-site', 'Web + SSR', 'Succeeded', 'Chen Wei', '12m ago'] },
-    { id: 'r2', cells: ['docs-site', 'Edge', 'Running', 'Chen Wei', '18m ago'] },
-    { id: 'r3', cells: ['vmz-homepage', 'Web', 'Succeeded', 'Lin Mei', '41m ago'] },
-    { id: 'r4', cells: ['component-gallery', 'SSR', 'Queued', 'Ops bot', '1h ago'] },
-  ];
+  allBrowseRows = initialBrowseRows.map((row) => ({
+    id: row.id,
+    cells: row.cells.map((cell) => String(cell)),
+  }));
   browseRows = [];
   navItems = [];
   _unwatchLocale = null;

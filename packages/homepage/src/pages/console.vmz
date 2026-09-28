@@ -274,12 +274,16 @@ import {
   commercialNavHome,
 } from '#locales/common';
 import ConsolePageServer from '#server/pages/console';
+import { demoConsoleRows, demoReleaseSummary } from '../demo/releases.ts';
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
 
+const initialConsoleSummary = demoReleaseSummary();
+const initialConsoleRows = demoConsoleRows();
+
 export default class ConsolePage {
-  summaryTotal = 6;
-  summaryRunning = 2;
-  summaryFailed = 1;
+  summaryTotal = initialConsoleSummary.total;
+  summaryRunning = initialConsoleSummary.running;
+  summaryFailed = initialConsoleSummary.failed;
   query = '';
   statusQuery = '';
   appliedQuery = '';
@@ -328,14 +332,10 @@ export default class ConsolePage {
   consoleDrawerUpdatedLabel = '';
   consoleDrawerBranchLabel = '';
   columns = [];
-  allRows = [
-    { id: 'r1', cells: ['docs-site', 'Web + SSR', 'Succeeded', 'Chen Wei', '12m ago'] },
-    { id: 'r2', cells: ['docs-site', 'Edge', 'Running', 'Chen Wei', '18m ago'] },
-    { id: 'r3', cells: ['vmz-homepage', 'Web', 'Succeeded', 'Lin Mei', '41m ago'] },
-    { id: 'r4', cells: ['component-gallery', 'SSR', 'Queued', 'Ops bot', '1h ago'] },
-    { id: 'r5', cells: ['docs-site', 'Native', 'Failed', 'Chen Wei', '3h ago'] },
-    { id: 'r6', cells: ['deploy-planner', 'Web', 'Succeeded', 'Lin Mei', '6h ago'] },
-  ];
+  allRows = initialConsoleRows.map((row) => ({
+    id: row.id,
+    cells: row.cells.map((cell) => String(cell)),
+  }));
   rows = [];
   navItems = [];
   _unwatchLocale = null;

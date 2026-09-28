@@ -1,4 +1,4 @@
-/** Canonical homepage demo release records — consumed by `#server/demo/ReleaseDemo` only. */
+/** Canonical homepage demo release records — shared by `#server/demo/ReleaseDemo` and product page SSR seeds. */
 
 export type ReleaseStatus = 'succeeded' | 'running' | 'failed' | 'queued';
 
