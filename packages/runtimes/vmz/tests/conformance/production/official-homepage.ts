@@ -16,6 +16,7 @@ import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
 import { proveHomepageLocaleTransition as proveHomepageLocaleTransitionImpl } from './homepage-locale-fixture.ts';
 
 const root = repoRoot(import.meta.url);
+const { inspectSsrHtml } = await import(pathToFileURL(path.join(root, 'scripts/dev/ssr-html-checks.mjs')).href);
 const HOMEPAGE = 'packages/homepage';
 const DOCUMENTS = 'packages/examples/documents-fixture';
 const INSPECTOR = 'packages/examples/production-inspector';
@@ -316,24 +317,11 @@ if (homeBuild.status !== 0) {
     }
 }
 
-console.log('official-homepage: SSR HTML inspect (R1/R2)…');
-let homeSsrHtmlOk = false;
-let homeSsrHtmlDetail = '';
-if (homeBuild.status === 0) {
-    const inspectScript = path.join(root, 'scripts', 'dev', 'inspect-ssr-html.mjs');
-    const inspect = spawnSync(process.execPath, [inspectScript], { cwd: root, encoding: 'utf8' });
-    if (inspect.status !== 0) {
-        homeSsrHtmlDetail = (inspect.stderr || inspect.stdout || 'inspect-ssr-html failed').trim().slice(0, 1200);
-        errors.push(`homepage SSR HTML inspect: ${homeSsrHtmlDetail}`);
-    } else {
-        homeSsrHtmlOk = true;
-        homeSsrHtmlDetail = 'R1 button slot and R2 SVG region checks passed on static index.html';
-    }
-}
-
 console.log('official-homepage: serve homepage SSR…');
 let homeSsrOk = false;
 let homeSsrDetail = '';
+let homeSsrHtmlOk = false;
+let homeSsrHtmlDetail = '';
 let homeLocaleOk = false;
 let homeLocaleDetail = '';
 if (homeBuild.status === 0) {
@@ -354,6 +342,14 @@ if (homeBuild.status === 0) {
         try {
             await waitServe(child, 10000);
             const home = await get(`http://127.0.0.1:${PORT}/`);
+            const ssrInspect = inspectSsrHtml(home.body);
+            if (!ssrInspect.ok) {
+                homeSsrHtmlDetail = ssrInspect.failures.join('; ');
+                errors.push(`homepage SSR HTML inspect: ${homeSsrHtmlDetail}`);
+            } else {
+                homeSsrHtmlOk = true;
+                homeSsrHtmlDetail = 'R1 button slot and R2 SVG region checks passed on live homepage SSR';
+            }
             const ui = await get(`http://127.0.0.1:${PORT}/ui`);
             const commercial = await get(`http://127.0.0.1:${PORT}/commercial`);
             const formPage = await get(`http://127.0.0.1:${PORT}/form`);
