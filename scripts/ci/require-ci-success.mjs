@@ -7,6 +7,9 @@
  *
  * Pass when any completed `ci.yml` run on TAG_SHA has conclusion `success`, after
  * in-flight runs for that commit settle (or timeout waiting for first CI).
+ *
+ * Fallback: if workflow conclusion is failure but all required jobs succeeded
+ * (Format Check is advisory via `continue-on-error`), still pass.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -18,6 +21,13 @@ const TAG_SHA = String(process.env.TAG_SHA || process.argv.find((a) => a.startsW
 const WORKFLOW = process.env.CI_WORKFLOW_FILE || 'ci.yml';
 const TIMEOUT_MS = Number(process.env.CI_WAIT_TIMEOUT_MS || 45 * 60 * 1000);
 const INTERVAL_MS = Number(process.env.CI_WAIT_INTERVAL_MS || 20 * 1000);
+
+const REQUIRED_JOBS = [
+    'Build Runtimes',
+    'Build and Test',
+    'UI and Browser Production',
+    'Slim and Runtime Quality',
+];
 
 function fail(msg) {
     console.error(`require-ci-success: ${msg}`);
@@ -58,6 +68,24 @@ function listRuns() {
     }
 }
 
+function requiredJobsSucceeded(runId) {
+    const raw = gh(['api', `repos/${REPO}/actions/runs/${runId}/jobs?per_page=100`]);
+    let jobs;
+    try {
+        jobs = JSON.parse(raw).jobs ?? [];
+    } catch {
+        return false;
+    }
+    const byName = new Map(jobs.map((job) => [job.name, job]));
+    for (const name of REQUIRED_JOBS) {
+        const job = byName.get(name);
+        if (!job || job.conclusion !== 'success') {
+            return false;
+        }
+    }
+    return true;
+}
+
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -75,14 +103,27 @@ async function main() {
         const runs = listRuns();
         const active = runs.filter((r) => r.status === 'queued' || r.status === 'in_progress' || r.status === 'pending');
         const successes = runs.filter((r) => r.status === 'completed' && r.conclusion === 'success');
+        const completed = runs.filter((r) => r.status === 'completed');
         const failures = runs.filter(
             (r) => r.status === 'completed' && r.conclusion && r.conclusion !== 'success' && r.conclusion !== 'skipped',
         );
 
-        if (successes.length > 0 && active.length === 0) {
-            const pick = successes[0];
-            console.log(`CI success confirmed for ${TAG_SHA} (run ${pick.databaseId} "${pick.displayTitle}" event=${pick.event})`);
-            return;
+        if (active.length === 0) {
+            if (successes.length > 0) {
+                const pick = successes[0];
+                console.log(
+                    `CI success confirmed for ${TAG_SHA} (run ${pick.databaseId} "${pick.displayTitle}" event=${pick.event})`,
+                );
+                return;
+            }
+
+            const jobPass = completed.find((r) => requiredJobsSucceeded(r.databaseId));
+            if (jobPass) {
+                console.log(
+                    `CI required jobs passed for ${TAG_SHA} (run ${jobPass.databaseId} workflow=${jobPass.conclusion} event=${jobPass.event})`,
+                );
+                return;
+            }
         }
 
         if (runs.length === 0) {

@@ -20,7 +20,8 @@ export default defineConfig({
         excludes: ['**/fixtures/**'],
         rust: true,
         javascript: true,
-        vmz: true,
+        // vmz mass format off: formatter corrupts dynamic :class bindings
+        vmz: false,
         style: 'biome.json',
     },
 });

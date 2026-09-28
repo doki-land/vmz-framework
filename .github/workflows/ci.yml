@@ -81,7 +81,7 @@ jobs:
     name: Format Check
     needs: [build-runtimes]
     runs-on: ubuntu-latest
-    # Non-blocking until formatter emit is stable (0.2.2 ships without fmt mass-reformat).
+    # Advisory: vmz formatter emit is not stable enough for mass `.vmz` reformat yet.
     continue-on-error: true
     steps:
       - name: Checkout
@@ -121,7 +121,7 @@ jobs:
 
   build-test:
     name: Build and Test
-    needs: [build-runtimes, fmt]
+    needs: [build-runtimes]
     runs-on: ubuntu-latest
     env:
       VMZ_SKIP_NATIVE_BUILD: '1'
