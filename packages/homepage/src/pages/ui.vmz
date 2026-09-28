@@ -1,23 +1,23 @@
 <template>
   <div data-vmz-fixture="ui-lab" class="ui-lab-page">
-    <AppShell brand="VMZ" home-href="/" nav-label="UI lab" :nav="navItems">
+    <AppShell brand="VMZ" home-href="/" :nav-label="uiLabNavLabel" :nav="navItems">
       <Alert
         tone="info"
         role-name="status"
-        title="内部组件实验台"
-        description="此页面用于 `@vmz/ui` 符合性验证，不代表对外产品成品。公开展示请查看首页与 Commercial。"
+        :title="uiLabAlertTitleLabel"
+        :description="uiLabAlertDescLabel"
       />
 
       <header class="ui-lab-page__head">
-        <h1>UI lab</h1>
-        <p>Form、Disclosure 与覆盖层交互的最小验收场景。</p>
+        <h1>{{ uiLabPageTitleLabel }}</h1>
+        <p>{{ uiLabPageLeadLabel }}</p>
       </header>
 
       <div class="ui-lab-page__grid">
-        <Card title="基础输入" description="Field 与描述文案关联。">
+        <Card :title="uiLabCardFieldTitleLabel" :description="uiLabCardFieldDescLabel">
           <Field
-            label="Display name"
-            description="Shown on public profile"
+            :label="uiLabFieldLabelLabel"
+            :description="uiLabFieldDescLabel"
             control-id="home-ui-name"
             description-id="home-ui-name-desc"
             error-id="home-ui-name-err"
@@ -29,16 +29,16 @@
         </Card>
 
         <div data-vmz-fixture="ui2-form">
-        <Card title="选择与开关" description="Checkbox 与 Switch 状态由页面持有。">
+        <Card :title="uiLabCardChoiceTitleLabel" :description="uiLabCardChoiceDescLabel">
           <Checkbox
-            label="Accept terms"
+            :label="uiLabCheckboxLabel"
             control-id="home-ui-agree"
             :checked="agree"
             @change="(e) => (agree = e.target.checked)"
           />
           <p class="vmz-sr-only" data-vmz-fixture="checkbox-value">agree:{{ agree ? 'yes' : 'no' }}</p>
           <Switch
-            label="Email notifications"
+            :label="uiLabSwitchLabel"
             control-id="home-ui-notify"
             :checked="notify"
             @change="(v) => (notify = v)"
@@ -48,24 +48,24 @@
         </div>
 
         <div data-vmz-fixture="ui2-tabs">
-        <Card title="标签页" description="Tabs 面板由选中项驱动。">
+        <Card :title="uiLabCardTabsTitleLabel" :description="uiLabCardTabsDescLabel">
           <Tabs
-            label="Profile sections"
+            :label="uiLabTabsLabel"
             :selected="tab"
             panel-id="home-ui-tabs-panel"
             :items="tabItems"
             :on-select="(id) => (tab = id)"
           >
-            <p class="ui-lab-page__panel-copy">当前分区会根据上方标签切换。</p>
+            <p class="ui-lab-page__panel-copy">{{ uiLabTabPanelCopyLabel }}</p>
             <p class="vmz-sr-only" data-vmz-fixture="tab-panel">panel:{{ tab }}</p>
           </Tabs>
         </Card>
         </div>
 
         <div data-vmz-fixture="ui2-menu">
-        <Card title="菜单" description="Menu 打开状态与选项由页面控制。">
+        <Card :title="uiLabCardMenuTitleLabel" :description="uiLabCardMenuDescLabel">
           <Menu
-            label="Actions"
+            :label="uiLabMenuLabel"
             menu-id="home-ui-menu"
             :open="menuOpen"
             :items="menuItems"
@@ -77,25 +77,25 @@
         </div>
 
         <div data-vmz-fixture="ui1-dialog">
-        <Card title="Dialog" description="模态层焦点与 Escape 关闭。">
-          <Button type="button" @click="() => (open = true)">Open dialog</Button>
-          <Dialog :open="open" title="Confirm" title-id="home-ui-dialog-title" :on-close="() => (open = false)">
-            <p data-vmz-fixture="dialog-body">Dialog body for UI lab.</p>
+        <Card :title="uiLabCardDialogTitleLabel" :description="uiLabCardDialogDescLabel">
+          <Button type="button" @click="() => (open = true)">{{ uiLabOpenDialogLabel }}</Button>
+          <Dialog :open="open" :title="uiLabDialogTitleLabel" title-id="home-ui-dialog-title" :on-close="() => (open = false)">
+            <p data-vmz-fixture="dialog-body">{{ uiLabDialogBodyLabel }}</p>
           </Dialog>
         </Card>
         </div>
 
-        <Card title="Drawer 与 Popover" description="侧栏与浮层共享关闭合同。">
+        <Card :title="uiLabCardOverlayTitleLabel" :description="uiLabCardOverlayDescLabel">
           <div class="ui-lab-page__actions" data-vmz-fixture="ui2-drawer">
-            <Button type="button" variant="secondary" @click="() => (drawerOpen = true)">Open drawer</Button>
-            <Drawer :open="drawerOpen" title="Details" title-id="home-ui-drawer-title" :on-close="() => (drawerOpen = false)">
-              <p data-vmz-fixture="drawer-body">Drawer body for UI lab.</p>
+            <Button type="button" variant="secondary" @click="() => (drawerOpen = true)">{{ uiLabOpenDrawerLabel }}</Button>
+            <Drawer :open="drawerOpen" :title="uiLabDrawerTitleLabel" title-id="home-ui-drawer-title" :on-close="() => (drawerOpen = false)">
+              <p data-vmz-fixture="drawer-body">{{ uiLabDrawerBodyLabel }}</p>
             </Drawer>
           </div>
           <div class="ui-lab-page__actions" data-vmz-fixture="ui2-popover">
-            <Button type="button" variant="secondary" @click="() => (popoverOpen = true)">Open popover</Button>
-            <Popover :open="popoverOpen" title="Hint" title-id="home-ui-popover-title" :on-close="() => (popoverOpen = false)">
-              <p data-vmz-fixture="popover-body">Popover body for UI lab.</p>
+            <Button type="button" variant="secondary" @click="() => (popoverOpen = true)">{{ uiLabOpenPopoverLabel }}</Button>
+            <Popover :open="popoverOpen" :title="uiLabPopoverTitleLabel" title-id="home-ui-popover-title" :on-close="() => (popoverOpen = false)">
+              <p data-vmz-fixture="popover-body">{{ uiLabPopoverBodyLabel }}</p>
             </Popover>
           </div>
         </Card>
@@ -147,6 +147,52 @@
 </style>
 
 <script client>
+import {
+  uiLabNavLabel,
+  uiLabAlertTitle,
+  uiLabAlertDesc,
+  uiLabPageTitle,
+  uiLabPageLead,
+  uiLabCardFieldTitle,
+  uiLabCardFieldDesc,
+  uiLabCardChoiceTitle,
+  uiLabCardChoiceDesc,
+  uiLabCardTabsTitle,
+  uiLabCardTabsDesc,
+  uiLabCardMenuTitle,
+  uiLabCardMenuDesc,
+  uiLabCardDialogTitle,
+  uiLabCardDialogDesc,
+  uiLabCardOverlayTitle,
+  uiLabCardOverlayDesc,
+  uiLabTabPanelCopy,
+  uiLabFieldLabel,
+  uiLabFieldDesc,
+  uiLabCheckboxLabel,
+  uiLabSwitchLabel,
+  uiLabTabsLabel,
+  uiLabTabProfile,
+  uiLabTabSecurity,
+  uiLabTabBilling,
+  uiLabMenuLabel,
+  uiLabMenuEdit,
+  uiLabMenuShare,
+  uiLabMenuArchive,
+  uiLabOpenDialog,
+  uiLabDialogTitle,
+  uiLabDialogBody,
+  uiLabOpenDrawer,
+  uiLabDrawerTitle,
+  uiLabDrawerBody,
+  uiLabOpenPopover,
+  uiLabPopoverTitle,
+  uiLabPopoverBody,
+  commercialNavCommercial,
+  commercialNavConsole,
+  commercialNavHome,
+} from '#locales/common';
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
+
 export default class UiLabPage {
   name = '';
   open = false;
@@ -167,10 +213,105 @@ export default class UiLabPage {
   ];
   drawerOpen = false;
   popoverOpen = false;
-  navItems = [
-    { id: 'commercial', title: 'Commercial', href: '/commercial' },
-    { id: 'console', title: 'Console', href: '/console' },
-    { id: 'home', title: 'Homepage', href: '/' },
-  ];
+  navItems = [];
+  uiLabNavLabel = 'UI lab';
+  uiLabAlertTitleLabel = 'Internal component lab';
+  uiLabAlertDescLabel = '';
+  uiLabPageTitleLabel = 'UI lab';
+  uiLabPageLeadLabel = '';
+  uiLabCardFieldTitleLabel = '';
+  uiLabCardFieldDescLabel = '';
+  uiLabCardChoiceTitleLabel = '';
+  uiLabCardChoiceDescLabel = '';
+  uiLabCardTabsTitleLabel = '';
+  uiLabCardTabsDescLabel = '';
+  uiLabCardMenuTitleLabel = '';
+  uiLabCardMenuDescLabel = '';
+  uiLabCardDialogTitleLabel = '';
+  uiLabCardDialogDescLabel = '';
+  uiLabCardOverlayTitleLabel = '';
+  uiLabCardOverlayDescLabel = '';
+  uiLabTabPanelCopyLabel = '';
+  uiLabFieldLabelLabel = 'Display name';
+  uiLabFieldDescLabel = 'Shown on public profile';
+  uiLabCheckboxLabel = 'Accept terms';
+  uiLabSwitchLabel = 'Email notifications';
+  uiLabTabsLabel = 'Profile sections';
+  uiLabMenuLabel = 'Actions';
+  uiLabOpenDialogLabel = 'Open dialog';
+  uiLabDialogTitleLabel = 'Confirm';
+  uiLabDialogBodyLabel = '';
+  uiLabOpenDrawerLabel = 'Open drawer';
+  uiLabDrawerTitleLabel = 'Details';
+  uiLabDrawerBodyLabel = '';
+  uiLabOpenPopoverLabel = 'Open popover';
+  uiLabPopoverTitleLabel = 'Hint';
+  uiLabPopoverBodyLabel = '';
+  _unwatchLocale = null;
+
+  onMount() {
+    this.applyLocaleCopy();
+    this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+  }
+
+  onDestroy() {
+    if (typeof this._unwatchLocale === 'function') this._unwatchLocale();
+    this._unwatchLocale = null;
+  }
+
+  refreshCopy() {
+    this.uiLabNavLabel = uiLabNavLabel();
+    this.uiLabAlertTitleLabel = uiLabAlertTitle();
+    this.uiLabAlertDescLabel = uiLabAlertDesc();
+    this.uiLabPageTitleLabel = uiLabPageTitle();
+    this.uiLabPageLeadLabel = uiLabPageLead();
+    this.uiLabCardFieldTitleLabel = uiLabCardFieldTitle();
+    this.uiLabCardFieldDescLabel = uiLabCardFieldDesc();
+    this.uiLabCardChoiceTitleLabel = uiLabCardChoiceTitle();
+    this.uiLabCardChoiceDescLabel = uiLabCardChoiceDesc();
+    this.uiLabCardTabsTitleLabel = uiLabCardTabsTitle();
+    this.uiLabCardTabsDescLabel = uiLabCardTabsDesc();
+    this.uiLabCardMenuTitleLabel = uiLabCardMenuTitle();
+    this.uiLabCardMenuDescLabel = uiLabCardMenuDesc();
+    this.uiLabCardDialogTitleLabel = uiLabCardDialogTitle();
+    this.uiLabCardDialogDescLabel = uiLabCardDialogDesc();
+    this.uiLabCardOverlayTitleLabel = uiLabCardOverlayTitle();
+    this.uiLabCardOverlayDescLabel = uiLabCardOverlayDesc();
+    this.uiLabTabPanelCopyLabel = uiLabTabPanelCopy();
+    this.uiLabFieldLabelLabel = uiLabFieldLabel();
+    this.uiLabFieldDescLabel = uiLabFieldDesc();
+    this.uiLabCheckboxLabel = uiLabCheckboxLabel();
+    this.uiLabSwitchLabel = uiLabSwitchLabel();
+    this.uiLabTabsLabel = uiLabTabsLabel();
+    this.uiLabMenuLabel = uiLabMenuLabel();
+    this.uiLabOpenDialogLabel = uiLabOpenDialog();
+    this.uiLabDialogTitleLabel = uiLabDialogTitle();
+    this.uiLabDialogBodyLabel = uiLabDialogBody();
+    this.uiLabOpenDrawerLabel = uiLabOpenDrawer();
+    this.uiLabDrawerTitleLabel = uiLabDrawerTitle();
+    this.uiLabDrawerBodyLabel = uiLabDrawerBody();
+    this.uiLabOpenPopoverLabel = uiLabOpenPopover();
+    this.uiLabPopoverTitleLabel = uiLabPopoverTitle();
+    this.uiLabPopoverBodyLabel = uiLabPopoverBody();
+    this.tabItems = [
+      { id: 'home-ui-tab-profile', title: uiLabTabProfile(), controls: 'home-ui-tabs-panel' },
+      { id: 'home-ui-tab-security', title: uiLabTabSecurity(), controls: 'home-ui-tabs-panel' },
+      { id: 'home-ui-tab-billing', title: uiLabTabBilling(), controls: 'home-ui-tabs-panel' },
+    ];
+    this.menuItems = [
+      { id: 'edit', title: uiLabMenuEdit() },
+      { id: 'share', title: uiLabMenuShare() },
+      { id: 'archive', title: uiLabMenuArchive() },
+    ];
+    this.navItems = [
+      { id: 'commercial', title: commercialNavCommercial(), href: '/commercial' },
+      { id: 'console', title: commercialNavConsole(), href: '/console' },
+      { id: 'home', title: commercialNavHome(), href: '/' },
+    ];
+  }
+
+  applyLocaleCopy(preferred) {
+    withLocaleHint(readLocaleId(preferred), () => this.refreshCopy());
+  }
 }
 </script>
