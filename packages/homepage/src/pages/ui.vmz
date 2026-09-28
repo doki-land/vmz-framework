@@ -1,85 +1,150 @@
 <template>
-  <main class="ui-lab" data-vmz-fixture="ui-lab">
-    <h1>UI lab</h1>
-    <p>@vmz/ui UI1 + UI2 Form / Disclosure lab.</p>
-
-    <section>
-      <Field
-        label="Display name"
-        description="Shown on public profile"
-        control-id="home-ui-name"
-        description-id="home-ui-name-desc"
-        error-id="home-ui-name-err"
-        described-by="home-ui-name-desc"
-        :value="name"
-        @input="(e) => (name = e.target.value)"
+  <div data-vmz-fixture="ui-lab" class="ui-lab-page">
+    <AppShell brand="VMZ" home-href="/" nav-label="UI lab" :nav="navItems">
+      <Alert
+        tone="info"
+        role-name="status"
+        title="内部组件实验台"
+        description="此页面用于 `@vmz/ui` 符合性验证，不代表对外产品成品。公开展示请查看首页与 Commercial。"
       />
-      <p data-vmz-fixture="field-value">value:{{ name }}</p>
-    </section>
 
-    <section data-vmz-fixture="ui2-form">
-      <Checkbox
-        label="Accept terms"
-        control-id="home-ui-agree"
-        :checked="agree"
-        @change="(e) => (agree = e.target.checked)"
-      />
-      <p data-vmz-fixture="checkbox-value">agree:{{ agree ? 'yes' : 'no' }}</p>
-      <Switch
-        label="Email notifications"
-        control-id="home-ui-notify"
-        :checked="notify"
-        @change="(v) => (notify = v)"
-      />
-      <p data-vmz-fixture="switch-value">notify:{{ notify ? 'on' : 'off' }}</p>
-    </section>
+      <header class="ui-lab-page__head">
+        <h1>UI lab</h1>
+        <p>Form、Disclosure 与覆盖层交互的最小验收场景。</p>
+      </header>
 
-    <section data-vmz-fixture="ui2-tabs">
-      <Tabs
-        label="Profile sections"
-        :selected="tab"
-        panel-id="home-ui-tabs-panel"
-        :items="tabItems"
-        :on-select="(id) => (tab = id)"
-      >
-        <p data-vmz-fixture="tab-panel">panel:{{ tab }}</p>
-      </Tabs>
-    </section>
+      <div class="ui-lab-page__grid">
+        <Card title="基础输入" description="Field 与描述文案关联。">
+          <Field
+            label="Display name"
+            description="Shown on public profile"
+            control-id="home-ui-name"
+            description-id="home-ui-name-desc"
+            error-id="home-ui-name-err"
+            described-by="home-ui-name-desc"
+            :value="name"
+            @input="(e) => (name = e.target.value)"
+          />
+          <p class="vmz-sr-only" data-vmz-fixture="field-value">value:{{ name }}</p>
+        </Card>
 
-    <section data-vmz-fixture="ui2-menu">
-      <Menu
-        label="Actions"
-        menu-id="home-ui-menu"
-        :open="menuOpen"
-        :items="menuItems"
-        :on-open-change="(v) => (menuOpen = v)"
-        :on-select="(id) => (menuChoice = id)"
-      />
-      <p data-vmz-fixture="menu-choice">menu:{{ menuChoice || 'none' }}</p>
-    </section>
+        <div data-vmz-fixture="ui2-form">
+        <Card title="选择与开关" description="Checkbox 与 Switch 状态由页面持有。">
+          <Checkbox
+            label="Accept terms"
+            control-id="home-ui-agree"
+            :checked="agree"
+            @change="(e) => (agree = e.target.checked)"
+          />
+          <p class="vmz-sr-only" data-vmz-fixture="checkbox-value">agree:{{ agree ? 'yes' : 'no' }}</p>
+          <Switch
+            label="Email notifications"
+            control-id="home-ui-notify"
+            :checked="notify"
+            @change="(v) => (notify = v)"
+          />
+          <p class="vmz-sr-only" data-vmz-fixture="switch-value">notify:{{ notify ? 'on' : 'off' }}</p>
+        </Card>
+        </div>
 
-    <section data-vmz-fixture="ui1-dialog">
-      <Button type="button" @click="() => (open = true)">Open dialog</Button>
-      <Dialog :open="open" title="Confirm" title-id="home-ui-dialog-title" :on-close="() => (open = false)">
-        <p data-vmz-fixture="dialog-body">Dialog body for UI lab.</p>
-      </Dialog>
-    </section>
+        <div data-vmz-fixture="ui2-tabs">
+        <Card title="标签页" description="Tabs 面板由选中项驱动。">
+          <Tabs
+            label="Profile sections"
+            :selected="tab"
+            panel-id="home-ui-tabs-panel"
+            :items="tabItems"
+            :on-select="(id) => (tab = id)"
+          >
+            <p class="ui-lab-page__panel-copy">当前分区会根据上方标签切换。</p>
+            <p class="vmz-sr-only" data-vmz-fixture="tab-panel">panel:{{ tab }}</p>
+          </Tabs>
+        </Card>
+        </div>
 
-    <section data-vmz-fixture="ui2-drawer">
-      <Button type="button" @click="() => (drawerOpen = true)">Open drawer</Button>
-      <Drawer :open="drawerOpen" title="Details" title-id="home-ui-drawer-title" :on-close="() => (drawerOpen = false)">
-        <p data-vmz-fixture="drawer-body">Drawer body for UI lab.</p>
-      </Drawer>
-    </section>
+        <div data-vmz-fixture="ui2-menu">
+        <Card title="菜单" description="Menu 打开状态与选项由页面控制。">
+          <Menu
+            label="Actions"
+            menu-id="home-ui-menu"
+            :open="menuOpen"
+            :items="menuItems"
+            :on-open-change="(v) => (menuOpen = v)"
+            :on-select="(id) => (menuChoice = id)"
+          />
+          <p class="vmz-sr-only" data-vmz-fixture="menu-choice">menu:{{ menuChoice || 'none' }}</p>
+        </Card>
+        </div>
 
-    <section data-vmz-fixture="ui2-popover">
-      <Button type="button" @click="() => (popoverOpen = true)">Open popover</Button>
-      <Popover :open="popoverOpen" title="Hint" title-id="home-ui-popover-title" :on-close="() => (popoverOpen = false)">
-        <p data-vmz-fixture="popover-body">Popover body for UI lab.</p>
-      </Popover>
-    </section>
-  </main>
+        <div data-vmz-fixture="ui1-dialog">
+        <Card title="Dialog" description="模态层焦点与 Escape 关闭。">
+          <Button type="button" @click="() => (open = true)">Open dialog</Button>
+          <Dialog :open="open" title="Confirm" title-id="home-ui-dialog-title" :on-close="() => (open = false)">
+            <p data-vmz-fixture="dialog-body">Dialog body for UI lab.</p>
+          </Dialog>
+        </Card>
+        </div>
+
+        <Card title="Drawer 与 Popover" description="侧栏与浮层共享关闭合同。">
+          <div class="ui-lab-page__actions" data-vmz-fixture="ui2-drawer">
+            <Button type="button" variant="secondary" @click="() => (drawerOpen = true)">Open drawer</Button>
+            <Drawer :open="drawerOpen" title="Details" title-id="home-ui-drawer-title" :on-close="() => (drawerOpen = false)">
+              <p data-vmz-fixture="drawer-body">Drawer body for UI lab.</p>
+            </Drawer>
+          </div>
+          <div class="ui-lab-page__actions" data-vmz-fixture="ui2-popover">
+            <Button type="button" variant="secondary" @click="() => (popoverOpen = true)">Open popover</Button>
+            <Popover :open="popoverOpen" title="Hint" title-id="home-ui-popover-title" :on-close="() => (popoverOpen = false)">
+              <p data-vmz-fixture="popover-body">Popover body for UI lab.</p>
+            </Popover>
+          </div>
+        </Card>
+      </div>
+    </AppShell>
+  </div>
 </template>
+
+<style>
+.ui-lab-page__head {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.ui-lab-page__head h1 {
+  margin: 0;
+  font-family: var(--vmz-font-display);
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: var(--vmz-text-ink);
+}
+
+.ui-lab-page__head p {
+  margin: 0;
+  max-width: 40rem;
+  color: var(--vmz-text-steel);
+  line-height: 1.55;
+}
+
+.ui-lab-page__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0.85rem;
+}
+
+.ui-lab-page__panel-copy {
+  margin: 0.75rem 0 0;
+  color: var(--vmz-text-steel);
+  font-size: 0.92rem;
+}
+
+.ui-lab-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.65rem;
+}
+</style>
 
 <script client>
 export default class UiLabPage {
@@ -102,5 +167,10 @@ export default class UiLabPage {
   ];
   drawerOpen = false;
   popoverOpen = false;
+  navItems = [
+    { id: 'ui', title: 'UI lab', href: '/ui' },
+    { id: 'commercial', title: 'Commercial', href: '/commercial' },
+    { id: 'console', title: 'Console', href: '/console' },
+  ];
 }
 </script>
