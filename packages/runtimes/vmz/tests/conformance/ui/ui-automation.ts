@@ -1768,8 +1768,8 @@ async function proveConsoleComposition(page) {
     }
     if (markers.rows < 1) fail(`Console: expected table rows, got ${markers.rows}`);
 
-    await page.type('#home-console-query', 'Alpha');
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="console-query"]')?.textContent?.includes('Alpha'), {
+    await page.type('#home-console-query', 'Web + SSR');
+    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="console-query"]')?.textContent?.includes('Web + SSR'), {
         timeout: 5000,
     });
     await page.evaluate(() => {

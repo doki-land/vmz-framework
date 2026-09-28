@@ -9,19 +9,19 @@
     >
       <section class="vmz-console-summary" :aria-label="consoleSummaryAriaLabel">
         <Card :title="consoleStatActiveServicesLabel" :description="consoleStatActiveServicesDescLabel">
-          <strong class="vmz-console-stat">12</strong>
+          <strong class="vmz-console-stat">{{ summaryTotal }}</strong>
           <Badge tone="success">{{ consoleStatStableLabel }}</Badge>
         </Card>
         <Card :title="consoleStatPendingReleasesLabel" :description="consoleStatPendingReleasesDescLabel">
-          <strong class="vmz-console-stat">3</strong>
+          <strong class="vmz-console-stat">{{ summaryRunning }}</strong>
           <Badge tone="warning">{{ consoleStatNeedsAttentionLabel }}</Badge>
         </Card>
         <Card :title="consoleStatAffectedRegionsLabel" :description="consoleStatAffectedRegionsDescLabel">
-          <strong class="vmz-console-stat">1</strong>
+          <strong class="vmz-console-stat">{{ summaryFailed }}</strong>
           <Badge tone="info">{{ consoleStatDirectLabel }}</Badge>
         </Card>
         <Card :title="consoleStatAlertsLabel" :description="consoleStatAlertsDescLabel">
-          <strong class="vmz-console-stat">0</strong>
+          <strong class="vmz-console-stat">{{ summaryAlerts }}</strong>
           <Badge tone="success">{{ consoleStatNormalLabel }}</Badge>
         </Card>
       </section>
@@ -170,9 +170,14 @@ import {
   commercialNavConsole,
   commercialNavHome,
 } from '#locales/common';
+import ConsolePageServer from '#server/pages/console';
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
 
 export default class ConsolePage {
+  summaryTotal = 6;
+  summaryRunning = 2;
+  summaryFailed = 1;
+  summaryAlerts = 0;
   query = '';
   appliedQuery = '';
   selectedCount = 0;
@@ -212,18 +217,18 @@ export default class ConsolePage {
   consoleDrawerTitleLabel = '';
   columns = [];
   allRows = [
-    { id: 'r1', cells: ['Alpha', 'Platform', 'Active', '2m ago'] },
-    { id: 'r2', cells: ['docs-portal', 'Docs', 'Paused', '18m ago'] },
-    { id: 'r3', cells: ['edge-gateway', 'Infra', 'Active', '41m ago'] },
-    { id: 'r4', cells: ['billing-ui', 'Growth', 'Draft', '1h ago'] },
-    { id: 'r5', cells: ['status-page', 'Ops', 'Active', '3h ago'] },
-    { id: 'r6', cells: ['internal-tools', 'Platform', 'Active', '6h ago'] },
+    { id: 'r1', cells: ['docs-site', 'Web + SSR', 'Succeeded', '12m ago'] },
+    { id: 'r2', cells: ['docs-site', 'Edge', 'Running', '18m ago'] },
+    { id: 'r3', cells: ['vmz-homepage', 'Web', 'Succeeded', '41m ago'] },
+    { id: 'r4', cells: ['component-gallery', 'SSR', 'Queued', '1h ago'] },
+    { id: 'r5', cells: ['docs-site', 'Native', 'Failed', '3h ago'] },
+    { id: 'r6', cells: ['deploy-planner', 'Web', 'Succeeded', '6h ago'] },
   ];
   rows = [
-    { id: 'r1', cells: ['Alpha', 'Platform', 'Active', '2m ago'] },
-    { id: 'r2', cells: ['docs-portal', 'Docs', 'Paused', '18m ago'] },
-    { id: 'r3', cells: ['edge-gateway', 'Infra', 'Active', '41m ago'] },
-    { id: 'r4', cells: ['billing-ui', 'Growth', 'Draft', '1h ago'] },
+    { id: 'r1', cells: ['docs-site', 'Web + SSR', 'Succeeded', '12m ago'] },
+    { id: 'r2', cells: ['docs-site', 'Edge', 'Running', '18m ago'] },
+    { id: 'r3', cells: ['vmz-homepage', 'Web', 'Succeeded', '41m ago'] },
+    { id: 'r4', cells: ['component-gallery', 'SSR', 'Queued', '1h ago'] },
   ];
   navItems = [];
   _unwatchLocale = null;
@@ -232,6 +237,26 @@ export default class ConsolePage {
     this.applyLocaleCopy();
     this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
     this.refreshPage();
+    this.loadDemoData();
+  }
+
+  async loadDemoData() {
+    try {
+      const server = new ConsolePageServer();
+      const rows = await server.getConsoleRows();
+      const summary = await server.getSummary();
+      if (Array.isArray(rows) && rows.length) {
+        this.allRows = rows;
+      }
+      if (summary && typeof summary === 'object') {
+        this.summaryTotal = Number(summary.total) || this.summaryTotal;
+        this.summaryRunning = Number(summary.running) || this.summaryRunning;
+        this.summaryFailed = Number(summary.failed) || this.summaryFailed;
+      }
+      this.refreshPage();
+    } catch {
+      /* SSR defaults remain the server fixture mirror */
+    }
   }
 
   onDestroy() {
@@ -353,6 +378,20 @@ export default class ConsolePage {
   openDetail(id) {
     this.detailId = id;
     this.drawerOpen = true;
+  }
+}
+</script>
+
+<script server>
+import ReleaseDemo from '#server/demo/ReleaseDemo';
+
+export default class ConsolePageServer {
+  getConsoleRows() {
+    return new ReleaseDemo().getConsoleRows();
+  }
+
+  getSummary() {
+    return new ReleaseDemo().getSummary();
   }
 }
 </script>
