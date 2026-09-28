@@ -69,7 +69,8 @@
         "./Header": "./src/components/Header.vmz",
         "./Sider": "./src/components/Sider.vmz",
         "./Content": "./src/components/Content.vmz",
-        "./Footer": "./src/components/Footer.vmz"
+        "./Footer": "./src/components/Footer.vmz",
+        "./Icon": "./src/components/Icon.vmz"
     },
     "files": [
         "src",
@@ -82,8 +83,5 @@
         "vmz",
         "ui",
         "components"
-    ],
-    "dependencies": {
-        "@vmz/ui-icons": "workspace:*"
-    }
+    ]
 }

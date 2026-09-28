@@ -1,57 +1,83 @@
 <template>
-  <span
-    class="vmz-ui-icon"
-    data-vmz-ui="icon"
-    :data-name="name"
-    :data-size="size"
-    :role="decorative ? 'presentation' : 'img'"
-    :aria-hidden="decorative ? 'true' : 'false'"
-    :aria-label="decorative ? '' : label"
-  >
-    <svg class="vmz-ui-icon__svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-      <path v-if="pathD" fill="currentColor" :d="pathD" />
-    </svg>
-  </span>
+    <span data-vmz-ui="icon" :data-name="name" :data-size="size" :role='decorative ? "presentation" : "img"' :aria-hidden='decorative ? "true" : "false"' :aria-label='decorative ? "" : label' class="vmz-ui-icon">
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true" class="vmz-ui-icon__svg">
+            <path v-if="resolvedPath" fill="currentColor" :d="resolvedPath" />
+        </svg>
+    </span>
 </template>
-
 <style>
-.vmz-ui-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1em;
-  height: 1em;
-  vertical-align: -0.125em;
-  color: inherit;
-  line-height: 1;
-}
-.vmz-ui-icon[data-size='sm'] { font-size: 0.875rem; }
-.vmz-ui-icon[data-size='md'] { font-size: 1rem; }
-.vmz-ui-icon[data-size='lg'] { font-size: 1.25rem; }
-.vmz-ui-icon__svg { width: 1em; height: 1em; display: block; }
+    .vmz-ui-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1em;
+        height: 1em;
+        vertical-align: -0.125em;
+        color: inherit;
+        line-height: 1;
+    }
+    .vmz-ui-icon[data-size="sm"] {
+        font-size: 0.875rem;
+    }
+    .vmz-ui-icon[data-size="md"] {
+        font-size: 1rem;
+    }
+    .vmz-ui-icon[data-size="lg"] {
+        font-size: 1.25rem;
+    }
+    .vmz-ui-icon__svg {
+        width: 1em;
+        height: 1em;
+        display: block;
+    }
 </style>
-
 <script client>
-import { FALLBACK_PATH, resolveIconPath } from '@vmz/ui-icons/registry';
-
 /**
- * VMZ UI Icon shim over @vmz/ui-icons registry.
- * Accepts legacy short names (check, close) and semantic ids (action.search).
+ * VMZ UI Icon — shell for UI chrome and author-supplied glyphs.
+ * Pass `pathD` for custom SVG paths, or `name` for the built-in chrome set.
+ * Full semantic registries live in optional `@vmz/ui-icons`.
  */
+const FALLBACK_PATH =
+    'M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm1 5h-2v2h2zm0 4h-2v7h2z';
+
+const CHROME_PATHS = {
+    check: 'M9.2 16.6 4.8 12.2l1.4-1.4 3 3 8-8 1.4 1.4z',
+    close: 'M6.4 7.8 7.8 6.4 12 10.6 16.2 6.4 17.6 7.8 13.4 12 17.6 16.2 16.2 17.6 12 13.4 7.8 17.6 6.4 16.2 10.6 12z',
+    search: 'M10.5 3a7.5 7.5 0 0 1 5.9 12.1l4 4-1.4 1.4-4-4A7.5 7.5 0 1 1 10.5 3zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11z',
+    'chevron-down': 'M7.4 9.1 12 13.7l4.6-4.6 1.4 1.4L12 16.5 6 10.5z',
+    'chevron-right': 'M9.1 6 15.1 12l-6 6-1.4-1.4L12.3 12 7.7 7.4z',
+    info: 'M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 8.2a1 1 0 0 0-1 1V17a1 1 0 1 0 2 0v-5.8a1 1 0 0 0-1-1zm0-3.7a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4z',
+    warning:
+        'M12 3.2 21 19H3L12 3.2zm0 5.3a1 1 0 0 0-1 1v4.2a1 1 0 1 0 2 0V9.5a1 1 0 0 0-1-1zm0 8.1a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4z',
+    success: 'M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm-2.5 10.3-2-2 1.4-1.4 2 2 5-5 1.4 1.4z',
+    danger: 'M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm-1 5h2v6h-2zm0 8h2v2h-2z',
+    menu: 'M4 7h16v2H4zm0 4h16v2H4zm0 4h16v2H4z',
+    plus: 'M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z',
+};
+
+function resolveChromePath(name) {
+    const key = String(name || '').trim();
+    if (!key) return FALLBACK_PATH;
+    return CHROME_PATHS[key] || FALLBACK_PATH;
+}
+
 export default class Icon {
-  static __vmzHostBox = 'contents';
-  public name: string = 'info';
-  public size: string = 'md';
-  public label: string = '';
-  public decorative: boolean = true;
-  pathD = FALLBACK_PATH;
+    static __vmzHostBox = 'contents';
+    public name: string = 'info';
+    public size: string = 'md';
+    public label: string = '';
+    public decorative: boolean = true;
+    /** Optional author SVG path override. When set, `name` is ignored for rendering. */
+    public pathD: string = '';
+    resolvedPath = FALLBACK_PATH;
 
-  onMount() {
-    this._sync();
-  }
+    onMount() {
+        this._sync();
+    }
 
-  _sync() {
-    this.pathD = resolveIconPath(this.name);
-  }
+    _sync() {
+        const explicit = String(this.pathD || '').trim();
+        this.resolvedPath = explicit || resolveChromePath(this.name);
+    }
 }
 </script>
