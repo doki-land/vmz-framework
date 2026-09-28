@@ -557,7 +557,11 @@ const serializeApi = {
         return child;
     },
     el(tag) {
-        return makeVirtualEl(tag);
+        const node = makeVirtualEl(tag) as ReturnType<typeof makeVirtualEl> & { namespaceURI?: string };
+        if (String(tag || '').toLowerCase() === 'svg') {
+            node.namespaceURI = 'http://www.w3.org/2000/svg';
+        }
+        return node;
     },
     elNS(ns, tag) {
         const node = makeVirtualEl(tag) as ReturnType<typeof makeVirtualEl> & { namespaceURI?: string };
@@ -713,22 +717,41 @@ const serializeApi = {
             }
             return null;
         };
+        const findOwnedSlotTarget = (n) => {
+            const slot = findOwnedSlot(n);
+            if (slot) return slot;
+            if (!n || n.__kind !== 'el') return null;
+            const tag = String(n.tag || '').toLowerCase();
+            if ((tag === 'button' || tag === 'a') && n.attrs && n.attrs['data-vmz-ui'] === 'button') return n;
+            if (n.attrs && n.attrs['data-vmz'] != null) return null;
+            for (const c of n.children || []) {
+                if (c && c.__kind === 'el' && c.attrs && c.attrs['data-vmz'] != null) continue;
+                const hit = findOwnedSlotTarget(c);
+                if (hit) return hit;
+            }
+            return null;
+        };
         // Prefer searching the component body (first child of host wrapper).
-        let slot = null;
+        let target = null;
         if (root) {
             for (const c of root.children || []) {
                 if (c && c.__kind === 'el' && c.attrs && c.attrs['data-vmz'] != null) continue;
-                slot = findOwnedSlot(c);
-                if (slot) break;
+                target = findOwnedSlotTarget(c);
+                if (target) break;
             }
-            if (!slot) slot = findOwnedSlot(root);
+            if (!target) target = findOwnedSlotTarget(root);
         }
-        if (slot) {
-            slot.__rawHtml = null;
-            if (!Array.isArray(slot.children)) slot.children = [];
-            // Append ??multiple projectDefaultSlot calls must accumulate (SSR).
-            // Client path replaces the live <slot> then appends siblings; serialize must push.
-            slot.children.push(node);
+        if (target) {
+            if (target.tag === 'slot') {
+                target.__rawHtml = null;
+                if (!Array.isArray(target.children)) target.children = [];
+                // Append ??multiple projectDefaultSlot calls must accumulate (SSR).
+                // Client path replaces the live <slot> then appends siblings; serialize must push.
+                target.children.push(node);
+                return;
+            }
+            if (!Array.isArray(target.children)) target.children = [];
+            target.children.push(node);
             return;
         }
         if (root) root.appendChild(node);

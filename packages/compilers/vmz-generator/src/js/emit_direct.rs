@@ -597,14 +597,16 @@ fn emit_if_block(
   var regionHost = null;
   function regionMountKind(node) {{
     var cur = node;
+    var insideSvg = false;
     while (cur) {{
       if (cur.__kind === 'frag' || cur.nodeType === 11) {{
         cur = cur.parentNode;
         continue;
       }}
-      if (cur.namespaceURI === 'http://www.w3.org/2000/svg') return 'svg';
-      if (cur.tagName && String(cur.tagName).toLowerCase() === 'svg') return 'svg';
-      if (cur.__kind === 'el' && String(cur.tag || '').toLowerCase() === 'svg') return 'svg';
+      if (cur.namespaceURI === 'http://www.w3.org/2000/svg') insideSvg = true;
+      if (cur.tagName && String(cur.tagName).toLowerCase() === 'svg') insideSvg = true;
+      if (cur.__kind === 'el' && String(cur.tag || '').toLowerCase() === 'svg') insideSvg = true;
+      if (insideSvg) return 'svg';
       if (cur.__kind === 'el' || cur.nodeType === 1) return 'html';
       cur = cur.parentNode;
     }}

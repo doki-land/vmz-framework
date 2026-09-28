@@ -295,6 +295,27 @@ export function findOwnedDefaultSlot(root) {
     return null;
 }
 
+/** Button/Link shell when `<slot>` is absent (SSR-flattened or resume adopt). */
+export function findOwnedDefaultSlotTarget(root) {
+    const slot = findOwnedDefaultSlot(root);
+    if (slot) return slot;
+    if (!root || root.nodeType !== 1) return null;
+    const walk = (el) => {
+        if (!el || el.nodeType !== 1) return null;
+        const tag = String(el.tagName || '').toLowerCase();
+        if ((tag === 'button' || tag === 'a') && el.getAttribute('data-vmz-ui') === 'button') return el;
+        if (el.hasAttribute('data-vmz')) return null;
+        const kids = el.children;
+        if (!kids || !kids.length) return null;
+        for (let i = 0; i < kids.length; i++) {
+            const hit = walk(kids[i]);
+            if (hit) return hit;
+        }
+        return null;
+    };
+    return walk(root);
+}
+
 export const directApi = {
     _inst: null as DirectInstance | null,
     _branchBinds: null as Array<{ deps: string[]; fn: PatchFn; bindingId?: BindingId }> | null,
@@ -703,12 +724,14 @@ export const directApi = {
         // Emptied DocumentFragment after append must not receive slot kids.
         if (!root || root.nodeType !== 1) root = hostEl;
 
-        let slot = null;
-        if (root && root.nodeType === 1) {
-            slot = findOwnedDefaultSlot(root);
-        }
-        if (slot && slot.parentNode) {
-            slot.replaceWith(node);
+        const target =
+            root && root.nodeType === 1 ? findOwnedDefaultSlotTarget(root) : null;
+        if (target && target.parentNode) {
+            if (String(target.tagName || '').toLowerCase() === 'slot') {
+                target.replaceWith(node);
+                return;
+            }
+            target.appendChild(node);
             return;
         }
         if (root && root.nodeType === 1 && typeof root.appendChild === 'function') root.appendChild(node);
