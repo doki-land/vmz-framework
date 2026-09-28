@@ -730,9 +730,9 @@ async function proveUi2InPage(page) {
  * @param {import('puppeteer-core').Page} page
  */
 async function proveCommercialComposition(page) {
-    console.log('ui-automation: Commercial AppShell/Card/Alert/Empty composition…');
+    console.log('ui-automation: Commercial AppShell task-surface composition…');
 
-    for (const name of ['AppShell', 'Card', 'Alert', 'Empty']) {
+    for (const name of ['AppShell', 'FilterBar', 'Table', 'Form', 'Drawer', 'Notification']) {
         const src = path.join(uiRoot, 'src', 'components', `${name}.vmz`);
         if (!fs.existsSync(src)) fail(`Commercial missing ${name}.vmz`);
         if (!pkg.exports?.[`./${name}`]) fail(`Commercial package exports must include ./${name}`);
@@ -751,124 +751,74 @@ async function proveCommercialComposition(page) {
         main: !!document.querySelector('[data-vmz-shell="main"]'),
         nav: !!document.querySelector('[data-vmz-nav="commercial"]'),
         hero: !!document.querySelector('[data-vmz-fixture="commercial-hero"]'),
-        features: !!document.querySelector('[data-vmz-fixture="commercial-features"]'),
-        pricing: !!document.querySelector('[data-vmz-fixture="commercial-pricing"]'),
-        badge: !!document.querySelector('[data-vmz-ui="badge"]'),
+        browse: !!document.querySelector('[data-vmz-fixture="commercial-task-browse"]'),
+        detail: !!document.querySelector('[data-vmz-fixture="commercial-task-detail"]'),
+        action: !!document.querySelector('[data-vmz-fixture="commercial-task-action"]'),
         link: !!document.querySelector('[data-vmz-ui="link"]'),
-        secondary: !!document.querySelector('button.vmz-ui-btn[data-variant="secondary"]'),
-        card: document.querySelectorAll('[data-vmz-ui="card"]').length,
-        alert: !!document.querySelector('[data-vmz-ui="alert"]'),
-        empty: !!document.querySelector('[data-vmz-ui="empty"]'),
-        field: !!document.getElementById('home-commercial-email'),
+        filter: !!document.querySelector('[data-vmz-fixture="commercial-task-browse"] [data-vmz-ui="filter-bar"]'),
+        table: !!document.querySelector('[data-vmz-fixture="commercial-task-browse"] [data-vmz-ui="table"]'),
+        field: !!document.getElementById('home-commercial-review'),
+        rows: document.querySelectorAll('[data-vmz-fixture="commercial-task-browse"] [data-vmz-row]').length,
     }));
     if (!markers.shell || !markers.header || !markers.main) {
         fail(`Commercial: AppShell landmarks missing: ${JSON.stringify(markers)}`);
     }
     if (!markers.nav) fail('Commercial: nav item missing');
-    if (!markers.hero || !markers.features || !markers.pricing) {
-        fail(`Commercial: hero/features/pricing missing: ${JSON.stringify(markers)}`);
+    if (!markers.hero || !markers.browse || !markers.detail || !markers.action) {
+        fail(`Commercial: hero/task sections missing: ${JSON.stringify(markers)}`);
     }
-    if (!markers.badge || !markers.link || !markers.secondary) {
-        fail(`Commercial: Badge/Link/secondary Button missing: ${JSON.stringify(markers)}`);
+    if (!markers.link || !markers.filter || !markers.table || !markers.field) {
+        fail(`Commercial: Link/Filter/Table/Field missing: ${JSON.stringify(markers)}`);
     }
-    if (markers.card < 4) fail(`Commercial: expected >=4 Cards (features+pricing+contact+workspace), got ${markers.card}`);
-    if (!markers.alert || !markers.empty || !markers.field) {
-        fail(`Commercial: Alert/Empty/Field missing: ${JSON.stringify(markers)}`);
-    }
+    if (markers.rows < 1) fail(`Commercial: expected browse table rows, got ${markers.rows}`);
 
-    for (const name of ['Link', 'Badge', 'Spinner']) {
+    for (const name of ['Link']) {
         const src = path.join(uiRoot, 'src', 'components', `${name}.vmz`);
         if (!fs.existsSync(src)) fail(`Commercial foundation missing ${name}.vmz`);
         if (!pkg.exports?.[`./${name}`]) fail(`Commercial package exports must include ./${name}`);
         if (!contract.components?.[name]) fail(`Commercial token contract missing ${name}`);
     }
 
-    // Form + Dialog still interactive inside Card composition.
-    await page.type('#home-commercial-email', 'ops@example.com');
+    await page.type('#home-commercial-browse-query', 'docs-site');
+    await page.evaluate(() => {
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="commercial-task-browse"] button.vmz-ui-btn')].find((b) => {
+            const text = b.textContent || '';
+            return text.includes('Search') || text.includes('查询');
+        });
+        btn?.click();
+    });
     await page.waitForFunction(
-        () => document.querySelector('[data-vmz-fixture="commercial-email"]')?.textContent?.includes('ops@example.com'),
-        {
-            timeout: 5000,
-        },
+        () => document.querySelectorAll('[data-vmz-fixture="commercial-task-browse"] [data-vmz-row]').length >= 1,
+        { timeout: 5000 },
     );
-    // Contact Card contains Confirm button (Form submit → Dialog open).
-    const confirmSel = '[data-vmz-fixture="commercial-form-actions"] button.vmz-ui-btn';
-    const confirmReady = await page.evaluate((sel) => {
-        const btn = [...document.querySelectorAll(sel)].find((b) => (b.textContent || '').includes('Confirm'));
-        return !!btn;
-    }, confirmSel);
-    if (!confirmReady) fail('Commercial: Confirm submit button missing');
-    await page.evaluate((sel) => {
-        const btn = [...document.querySelectorAll(sel)].find((b) => (b.textContent || '').includes('Confirm'));
-        if (!(btn instanceof HTMLElement)) throw new Error('Confirm missing');
-        btn.click();
-    }, confirmSel);
-    try {
-        await page.waitForSelector('[data-vmz-overlay="dialog"] [data-vmz-focus="enter"]', { timeout: 8000 });
-    } catch (err) {
-        const snap = await page.evaluate(() => ({
-            email: document.querySelector('[data-vmz-fixture="commercial-email"]')?.textContent || '',
-            summary: document.querySelector('#home-commercial-summary')?.textContent || '',
-            overlay: !!document.querySelector('[data-vmz-overlay="dialog"]'),
-            dialogRoot: !!document.querySelector('[data-vmz-ui="dialog"]'),
-            openAttr: document.querySelector('[data-vmz-ui="dialog"]')?.getAttribute('data-vmz-overlay-open') || null,
-        }));
-        fail(`Commercial: Dialog after Confirm timed out: ${JSON.stringify(snap)} (${err})`);
-    }
-    await page.keyboard.press('Escape');
-    await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="dialog"]'), { timeout: 5000 });
 
-    // Empty → success Alert + Notification.
-    const drawerBefore = await page.evaluate(() => ({
-        fixture: !!document.querySelector('[data-vmz-fixture="commercial-drawer-open"]'),
-        btn: !!document.querySelector('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn'),
-        drawerHost: !!document.querySelector('[data-vmz="Drawer"], [data-vmz-ui="drawer"]'),
-    }));
-    if (!drawerBefore.fixture || !drawerBefore.btn) {
-        fail(`Commercial: Drawer opener missing before Empty switch: ${JSON.stringify(drawerBefore)}`);
-    }
-    await page.waitForSelector('[data-vmz-fixture="commercial-create"] button.vmz-ui-btn', { timeout: 5000 });
-    await page.click('[data-vmz-fixture="commercial-create"] button.vmz-ui-btn');
-    try {
-        await page.waitForFunction(
-            () =>
-                !document.querySelector('[data-vmz-ui="empty"]') &&
-                !!document.querySelector('[data-vmz-ui="alert"][data-tone="success"]') &&
-                !!document.querySelector('[data-vmz-fixture="commercial-notify"] [data-vmz-ui="notification"]'),
-            { timeout: 8000 },
-        );
-    } catch (err) {
-        const snap = await page.evaluate(() => ({
-            empty: !!document.querySelector('[data-vmz-ui="empty"]'),
-            successAlert: !!document.querySelector('[data-vmz-ui="alert"][data-tone="success"]'),
-            notify: !!document.querySelector('[data-vmz-fixture="commercial-notify"] [data-vmz-ui="notification"]'),
-            create: !!document.querySelector('[data-vmz-fixture="commercial-create"]'),
-            drawer: {
-                fixture: !!document.querySelector('[data-vmz-fixture="commercial-drawer-open"]'),
-                btn: !!document.querySelector('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn'),
-            },
-        }));
-        fail(`Commercial: Empty→Alert/Notification timed out: ${JSON.stringify(snap)} (${err})`);
-    }
-
-    // Workspace if/else switch must keep Drawer sibling host (scoped resume adopt).
-    try {
-        await page.waitForSelector('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn', { timeout: 5000 });
-    } catch (err) {
-        const snap = await page.evaluate(() => ({
-            fixture: !!document.querySelector('[data-vmz-fixture="commercial-drawer-open"]'),
-            btn: !!document.querySelector('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn'),
-            ready: !!document.querySelector('[data-vmz-fixture="commercial-ready"]'),
-            empty: !!document.querySelector('[data-vmz-ui="empty"]'),
-            workspaceHtml: document.querySelector('[data-vmz-fixture="commercial-ready"]')?.parentElement?.innerHTML?.slice(0, 500) || null,
-        }));
-        fail(`Commercial: Drawer opener missing after Empty switch: ${JSON.stringify(snap)} (${err})`);
-    }
     await page.click('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn');
     await page.waitForSelector('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]', { timeout: 8000 });
-    await page.focus('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]');
+    await page.waitForFunction(
+        () => document.querySelector('[data-vmz-fixture="commercial-drawer-project"]')?.textContent?.includes('docs-site'),
+        { timeout: 5000 },
+    );
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="drawer"]'), { timeout: 8000 });
+
+    await page.type('#home-commercial-review', 'ready for console');
+    await page.waitForFunction(
+        () => document.querySelector('[data-vmz-fixture="commercial-review-note"]')?.textContent?.includes('ready for console'),
+        { timeout: 5000 },
+    );
+    const confirmSel = '[data-vmz-fixture="commercial-form-actions"] button.vmz-ui-btn';
+    await page.evaluate((sel) => {
+        const btn = [...document.querySelectorAll(sel)].find((b) => {
+            const text = b.textContent || '';
+            return text.includes('Submit review') || text.includes('提交复查');
+        });
+        if (!(btn instanceof HTMLElement)) throw new Error('Submit review missing');
+        btn.click();
+    }, confirmSel);
+    await page.waitForFunction(
+        () => !!document.querySelector('[data-vmz-fixture="commercial-notify"] [data-vmz-ui="notification"]'),
+        { timeout: 8000 },
+    );
 
     console.log('ui-automation: Commercial composition PASS');
     await proveFormDepth(page);

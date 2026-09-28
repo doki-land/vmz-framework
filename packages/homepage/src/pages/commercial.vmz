@@ -2,127 +2,124 @@
   <div data-vmz-fixture="commercial">
     <AppShell brand="VMZ" home-href="/" :nav-label="commercialNavLabel" :nav="navItems">
       <section class="vmz-commercial-hero" data-vmz-fixture="commercial-hero" aria-labelledby="commercial-hero-title">
-        <Badge tone="brand">{{ commercialHeroBadgeLabel }}</Badge>
         <h1 id="commercial-hero-title" class="vmz-commercial-hero__title">{{ commercialHeroTitleLabel }}</h1>
         <p class="vmz-commercial-hero__lead">{{ commercialHeroLeadLabel }}</p>
         <div class="vmz-commercial-hero__actions">
           <Link href="/console">{{ commercialCtaContactLabel }}</Link>
-          <Button type="button" variant="secondary" @click="() => (drawerOpen = true)">{{ commercialCtaChecklistLabel }}</Button>
-          <Link :href="guideHref">{{ deployGuideLabel }}</Link>
+          <Link :href="guideHref">{{ commercialCtaDocsLabel }}</Link>
         </div>
       </section>
 
-      <Alert
-        tone="info"
-        role-name="status"
-        :title="commercialAlertTitleLabel"
-        :description="commercialAlertDescLabel"
-      />
-
-      <section data-vmz-fixture="commercial-features" aria-labelledby="commercial-features-title">
-        <h2 id="commercial-features-title" class="vmz-commercial-section-title">{{ commercialFeaturesTitleLabel }}</h2>
-        <div class="vmz-commercial-grid">
-          <Card :title="commercialFeature1TitleLabel" :description="commercialFeature1DescLabel" />
-          <Card :title="commercialFeature2TitleLabel" :description="commercialFeature2DescLabel" />
-          <Card :title="commercialFeature3TitleLabel" :description="commercialFeature3DescLabel" />
+      <section class="vmz-commercial-task" data-vmz-fixture="commercial-task-browse" aria-labelledby="commercial-task-browse-title">
+        <div class="vmz-commercial-task__copy">
+          <h2 id="commercial-task-browse-title">{{ commercialFeature1TitleLabel }}</h2>
+          <p>{{ commercialFeature1DescLabel }}</p>
         </div>
-      </section>
-
-      <section data-vmz-fixture="commercial-pricing" aria-labelledby="commercial-pricing-title">
-        <h2 id="commercial-pricing-title" class="vmz-commercial-section-title">{{ commercialPricingTitleLabel }}</h2>
-        <div class="vmz-commercial-grid vmz-commercial-grid--pricing">
-          <Card :title="commercialPlanOpenTitleLabel" :description="commercialPlanOpenDescLabel">
-            <p class="vmz-commercial-price"><span>{{ commercialPlanPriceLabel }}</span>{{ commercialPlanOpenPriceLabel }}</p>
-            <Badge tone="info">{{ commercialPlanOpenBadgeLabel }}</Badge>
-            <Link href="/">{{ commercialPlanOpenCtaLabel }}</Link>
-          </Card>
-          <Card :title="commercialPlanTeamTitleLabel" :description="commercialPlanTeamDescLabel">
-            <p class="vmz-commercial-price"><span>{{ commercialPlanPriceLabel }}</span>{{ commercialPlanTeamPriceLabel }}</p>
-            <Badge tone="success">{{ commercialPlanTeamBadgeLabel }}</Badge>
-            <Link href="/console">{{ commercialPlanTeamCtaLabel }}</Link>
-          </Card>
-        </div>
-      </section>
-
-      <Card :title="commercialContactTitleLabel" :description="commercialContactDescLabel">
-        <Form
-          :label="commercialFormLabel"
-          :error-summary="contactSummary"
-          summary-id="home-commercial-summary"
-          :described-by="contactDescribedBy"
-          @submit="confirmContact"
-          @reset="resetContact"
-        >
-          <Field
-            :label="commercialEmailLabel"
-            :description="commercialEmailDescLabel"
-            control-id="home-commercial-email"
-            description-id="home-commercial-email-desc"
-            error-id="home-commercial-email-err"
-            :described-by="emailDescribedBy"
-            :error="emailError"
-            :invalid-attr="emailInvalid"
-            :value="email"
-            @input="onEmail"
+        <div class="vmz-commercial-task__demo vmz-commercial-panel">
+          <FilterBar :label="commercialBrowseFilterLabel">
+            <Field
+              :label="commercialBrowseFieldLabel"
+              control-id="home-commercial-browse-query"
+              description-id="home-commercial-browse-desc"
+              error-id="home-commercial-browse-err"
+              described-by="home-commercial-browse-desc"
+              :value="browseQuery"
+              @input="(e) => (browseQuery = e.target.value)"
+            />
+            <Button type="button" variant="primary" @click="applyBrowseFilter">{{ commercialBrowseApplyLabel }}</Button>
+            <Button type="button" variant="secondary" @click="resetBrowseFilter">{{ commercialBrowseResetLabel }}</Button>
+          </FilterBar>
+          <Table
+            :columns="browseColumns"
+            :rows="browseRows"
+            :has-row-action="false"
           />
-          <p class="vmz-sr-only" data-vmz-fixture="commercial-email">email:{{ email }}</p>
-          <div data-vmz-fixture="commercial-form-actions" class="vmz-commercial-actions">
-            <Button type="submit">{{ commercialConfirmLabel }}</Button>
-            <Button type="reset" variant="secondary">{{ commercialResetLabel }}</Button>
-            <span v-if="submitting" data-vmz-fixture="commercial-spinner">
-              <Spinner :label="commercialSendingLabel" />
-            </span>
-          </div>
-        </Form>
-        <Dialog
-          :open="dialogOpen"
-          :title="commercialDialogTitleLabel"
-          title-id="home-commercial-dialog-title"
-          :on-close="() => (dialogOpen = false)"
-        >
-          <p data-vmz-fixture="commercial-dialog-body">{{ commercialDialogBodyLeadLabel }} {{ email }} {{ commercialDialogBodyTailLabel }}</p>
-        </Dialog>
-      </Card>
-
-      <Card :title="commercialWorkspaceTitleLabel" :description="commercialWorkspaceDescLabel">
-        <div v-if="showEmpty">
-          <Empty :title="commercialEmptyTitleLabel" :description="commercialEmptyDescLabel">
-            <div data-vmz-fixture="commercial-create">
-              <Button type="button" @click="createProject">{{ commercialCreateProjectLabel }}</Button>
-            </div>
-          </Empty>
         </div>
-        <div v-else data-vmz-fixture="commercial-ready">
-          <div data-vmz-fixture="commercial-notify">
+      </section>
+
+      <section class="vmz-commercial-task" data-vmz-fixture="commercial-task-detail" aria-labelledby="commercial-task-detail-title">
+        <div class="vmz-commercial-task__copy">
+          <h2 id="commercial-task-detail-title">{{ commercialFeature2TitleLabel }}</h2>
+          <p>{{ commercialFeature2DescLabel }}</p>
+        </div>
+        <div class="vmz-commercial-task__demo vmz-commercial-panel">
+          <p class="vmz-commercial-detail-line">{{ commercialDetailSummaryLabel }}</p>
+          <div data-vmz-fixture="commercial-drawer-open">
+            <Button type="button" variant="secondary" @click="openFeaturedDetail">{{ commercialDetailOpenLabel }}</Button>
+          </div>
+          <Drawer
+            :open="drawerOpen"
+            :title="commercialDrawerTitleLabel"
+            title-id="home-commercial-drawer-title"
+            :on-close="() => (drawerOpen = false)"
+          >
+            <dl class="vmz-commercial-detail" data-vmz-fixture="commercial-drawer-body">
+              <div>
+                <dt>{{ commercialDrawerProjectLabel }}</dt>
+                <dd data-vmz-fixture="commercial-drawer-project">{{ detailProject }}</dd>
+              </div>
+              <div>
+                <dt>{{ commercialDrawerTargetLabel }}</dt>
+                <dd data-vmz-fixture="commercial-drawer-target">{{ detailTarget }}</dd>
+              </div>
+              <div>
+                <dt>{{ commercialDrawerStatusLabel }}</dt>
+                <dd data-vmz-fixture="commercial-drawer-status">{{ detailStatus }}</dd>
+              </div>
+              <div>
+                <dt>{{ commercialDrawerActorLabel }}</dt>
+                <dd data-vmz-fixture="commercial-drawer-actor">{{ detailActor }}</dd>
+              </div>
+            </dl>
+            <Link href="/console">{{ commercialOpenConsoleLabel }}</Link>
+          </Drawer>
+        </div>
+      </section>
+
+      <section class="vmz-commercial-task" data-vmz-fixture="commercial-task-action" aria-labelledby="commercial-task-action-title">
+        <div class="vmz-commercial-task__copy">
+          <h2 id="commercial-task-action-title">{{ commercialFeature3TitleLabel }}</h2>
+          <p>{{ commercialFeature3DescLabel }}</p>
+        </div>
+        <div class="vmz-commercial-task__demo vmz-commercial-panel">
+          <Form
+            :label="commercialFormLabel"
+            :error-summary="actionSummary"
+            summary-id="home-commercial-summary"
+            :described-by="actionDescribedBy"
+            @submit="confirmReview"
+            @reset="resetReview"
+          >
+            <Field
+              :label="commercialReviewNoteLabel"
+              :description="commercialReviewNoteDescLabel"
+              control-id="home-commercial-review"
+              description-id="home-commercial-review-desc"
+              error-id="home-commercial-review-err"
+              :described-by="reviewDescribedBy"
+              :error="reviewError"
+              :invalid-attr="reviewInvalid"
+              :value="reviewNote"
+              @input="onReviewNote"
+            />
+            <p class="vmz-sr-only" data-vmz-fixture="commercial-review-note">note:{{ reviewNote }}</p>
+            <div data-vmz-fixture="commercial-form-actions" class="vmz-commercial-actions">
+              <Button type="submit">{{ commercialConfirmLabel }}</Button>
+              <Button type="reset" variant="secondary">{{ commercialResetLabel }}</Button>
+            </div>
+          </Form>
+          <div v-if="reviewSuccess" data-vmz-fixture="commercial-notify">
             <Notification
               tone="success"
               role-name="status"
               :title="commercialNotifyTitleLabel"
               :description="commercialNotifyDescLabel"
             >
-              <Button type="button" variant="ghost" @click="resetWorkspace">{{ commercialNotifyCloseLabel }}</Button>
+              <Button type="button" variant="ghost" @click="() => (reviewSuccess = false)">{{ commercialNotifyCloseLabel }}</Button>
             </Notification>
           </div>
-          <Alert
-            tone="success"
-            role-name="status"
-            :title="commercialProjectCreatedTitleLabel"
-            :description="commercialProjectCreatedDescLabel"
-          />
         </div>
-        <div data-vmz-fixture="commercial-drawer-open">
-          <Button type="button" variant="secondary" @click="() => (drawerOpen = true)">{{ commercialCtaChecklistLabel }}</Button>
-        </div>
-        <Drawer
-          :open="drawerOpen"
-          :title="commercialDrawerTitleLabel"
-          title-id="home-commercial-drawer-title"
-          :on-close="() => (drawerOpen = false)"
-        >
-          <p data-vmz-fixture="commercial-drawer-body">{{ commercialDrawerBodyLabel }}</p>
-          <Link href="/console">{{ commercialOpenConsoleLabel }}</Link>
-        </Drawer>
-      </Card>
+      </section>
     </AppShell>
   </div>
 </template>
@@ -132,27 +129,26 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.85rem;
-  padding: 1.75rem 0 0.5rem;
+  gap: 0.75rem;
+  padding: 1.5rem 0 0.25rem;
 }
 
 .vmz-commercial-hero__title {
   margin: 0;
   font-family: var(--vmz-font-display);
-  font-size: clamp(2rem, 4.8vw, 2.8rem);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.12;
-  color: var(--vmz-text-ink);
-  max-width: 22ch;
+  font-size: clamp(1.5rem, 3.6vw, 1.875rem);
+  font-weight: 600;
+  line-height: 1.35;
+  color: #1f2329;
+  max-width: 24ch;
 }
 
 .vmz-commercial-hero__lead {
   margin: 0;
   max-width: 40rem;
-  font-size: 1.02rem;
-  line-height: 1.65;
-  color: var(--vmz-text-steel);
+  font-size: 1rem;
+  line-height: 1.625;
+  color: #51565d;
 }
 
 .vmz-commercial-hero__actions,
@@ -160,178 +156,220 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.65rem 0.85rem;
+  gap: 0.75rem;
 }
 
-.vmz-commercial-section-title {
-  margin: 0 0 0.85rem;
-  font-family: var(--vmz-font-display);
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--vmz-text-ink);
-}
-
-.vmz-commercial-grid {
+.vmz-commercial-task {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: 0.85rem;
+  grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+  padding: 2.5rem 0;
+  border-top: 1px solid #e5e6eb;
 }
 
-.vmz-commercial-grid--pricing {
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+.vmz-commercial-task__copy {
+  display: grid;
+  gap: 0.75rem;
 }
 
-.vmz-commercial-price {
+.vmz-commercial-task__copy h2 {
   margin: 0;
   font-family: var(--vmz-font-display);
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--vmz-action-primary-active);
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #1f2329;
 }
 
-.vmz-commercial-price span {
-  display: block;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--vmz-text-steel);
+.vmz-commercial-task__copy p {
+  margin: 0;
+  color: #51565d;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+}
+
+.vmz-commercial-panel {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.vmz-commercial-panel .vmz-ui-filter-bar {
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid #e5e6eb;
+  border-radius: 0;
+}
+
+.vmz-commercial-panel .vmz-ui-table-wrap {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.vmz-commercial-panel .vmz-ui-form,
+.vmz-commercial-panel .vmz-commercial-actions,
+.vmz-commercial-panel .vmz-commercial-detail-line,
+.vmz-commercial-panel [data-vmz-fixture='commercial-drawer-open'],
+.vmz-commercial-panel [data-vmz-fixture='commercial-notify'] {
+  padding: 1rem;
+}
+
+.vmz-commercial-detail-line {
+  margin: 0;
+  color: #51565d;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+}
+
+.vmz-commercial-detail {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+.vmz-commercial-detail > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.vmz-commercial-detail dt {
+  margin: 0;
+  color: #646a73;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+
+.vmz-commercial-detail dd {
+  margin: 0;
+  color: #1f2329;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+}
+
+@media (max-width: 768px) {
+  .vmz-commercial-task {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
 }
 </style>
 
 <script client>
 import {
-  deployGuide,
   commercialNavLabel,
   commercialNavCommercial,
   commercialNavConsole,
   commercialNavHome,
-  commercialHeroBadge,
   commercialHeroTitle,
   commercialHeroLead,
   commercialCtaContact,
-  commercialCtaChecklist,
-  commercialAlertTitle,
-  commercialAlertDesc,
-  commercialFeaturesTitle,
+  commercialCtaDocs,
   commercialFeature1Title,
   commercialFeature1Desc,
   commercialFeature2Title,
   commercialFeature2Desc,
   commercialFeature3Title,
   commercialFeature3Desc,
-  commercialPricingTitle,
-  commercialPlanOpenTitle,
-  commercialPlanOpenDesc,
-  commercialPlanPriceLabel,
-  commercialPlanOpenPrice,
-  commercialPlanOpenBadge,
-  commercialPlanOpenCta,
-  commercialPlanTeamTitle,
-  commercialPlanTeamDesc,
-  commercialPlanTeamPrice,
-  commercialPlanTeamBadge,
-  commercialPlanTeamCta,
-  commercialContactTitle,
-  commercialContactDesc,
+  commercialBrowseFilterLabel,
+  commercialBrowseFieldLabel,
+  commercialBrowseApply,
+  commercialBrowseReset,
+  commercialDetailSummary,
+  commercialDetailOpen,
   commercialFormLabel,
-  commercialEmailLabel,
-  commercialEmailDesc,
+  commercialReviewNoteLabel,
+  commercialReviewNoteDesc,
   commercialConfirm,
   commercialReset,
-  commercialSending,
-  commercialDialogTitle,
-  commercialDialogBodyLead,
-  commercialDialogBodyTail,
-  commercialWorkspaceTitle,
-  commercialWorkspaceDesc,
-  commercialEmptyTitle,
-  commercialEmptyDesc,
-  commercialCreateProject,
   commercialNotifyTitle,
   commercialNotifyDesc,
   commercialNotifyClose,
-  commercialProjectCreatedTitle,
-  commercialProjectCreatedDesc,
   commercialDrawerTitle,
-  commercialDrawerBody,
+  commercialDrawerProject,
+  commercialDrawerTarget,
+  commercialDrawerStatus,
+  commercialDrawerActor,
   commercialOpenConsole,
-  commercialEmailError,
+  commercialReviewError,
   commercialContactSummaryError,
+  consoleColName,
+  consoleColTarget,
+  consoleColStatus,
+  consoleColActor,
+  consoleColUpdated,
 } from '#locales/common';
+import CommercialPageServer from '#server/pages/commercial';
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
 
 export default class CommercialPage {
-  email = '';
-  emailError = '';
-  emailInvalid = 'false';
-  emailDescribedBy = 'home-commercial-email-desc';
-  contactSummary = '';
-  contactDescribedBy = '';
-  dialogOpen = false;
+  browseQuery = '';
+  appliedBrowseQuery = '';
+  reviewNote = '';
+  reviewError = '';
+  reviewInvalid = 'false';
+  reviewDescribedBy = 'home-commercial-review-desc';
+  actionSummary = '';
+  actionDescribedBy = '';
+  reviewSuccess = false;
   drawerOpen = false;
-  showEmpty = true;
-  submitting = false;
+  detailProject = '';
+  detailTarget = '';
+  detailStatus = '';
+  detailActor = '';
   localeId = 'zh-hans';
   guideHref = '/d/zh-hans/guide/';
-  deployGuideLabel = '';
   commercialNavLabel = '';
-  commercialHeroBadgeLabel = '';
   commercialHeroTitleLabel = '';
   commercialHeroLeadLabel = '';
   commercialCtaContactLabel = '';
-  commercialCtaChecklistLabel = '';
-  commercialAlertTitleLabel = '';
-  commercialAlertDescLabel = '';
-  commercialFeaturesTitleLabel = '';
+  commercialCtaDocsLabel = '';
   commercialFeature1TitleLabel = '';
   commercialFeature1DescLabel = '';
   commercialFeature2TitleLabel = '';
   commercialFeature2DescLabel = '';
   commercialFeature3TitleLabel = '';
   commercialFeature3DescLabel = '';
-  commercialPricingTitleLabel = '';
-  commercialPlanOpenTitleLabel = '';
-  commercialPlanOpenDescLabel = '';
-  commercialPlanPriceLabel = '';
-  commercialPlanOpenPriceLabel = '';
-  commercialPlanOpenBadgeLabel = '';
-  commercialPlanOpenCtaLabel = '';
-  commercialPlanTeamTitleLabel = '';
-  commercialPlanTeamDescLabel = '';
-  commercialPlanTeamPriceLabel = '';
-  commercialPlanTeamBadgeLabel = '';
-  commercialPlanTeamCtaLabel = '';
-  commercialContactTitleLabel = '';
-  commercialContactDescLabel = '';
+  commercialBrowseFilterLabel = '';
+  commercialBrowseFieldLabel = '';
+  commercialBrowseApplyLabel = '';
+  commercialBrowseResetLabel = '';
+  commercialDetailSummaryLabel = '';
+  commercialDetailOpenLabel = '';
   commercialFormLabel = '';
-  commercialEmailLabel = '';
-  commercialEmailDescLabel = '';
+  commercialReviewNoteLabel = '';
+  commercialReviewNoteDescLabel = '';
   commercialConfirmLabel = '';
   commercialResetLabel = '';
-  commercialSendingLabel = '';
-  commercialDialogTitleLabel = '';
-  commercialDialogBodyLeadLabel = '';
-  commercialDialogBodyTailLabel = '';
-  commercialWorkspaceTitleLabel = '';
-  commercialWorkspaceDescLabel = '';
-  commercialEmptyTitleLabel = '';
-  commercialEmptyDescLabel = '';
-  commercialCreateProjectLabel = '';
   commercialNotifyTitleLabel = '';
   commercialNotifyDescLabel = '';
   commercialNotifyCloseLabel = '';
-  commercialProjectCreatedTitleLabel = '';
-  commercialProjectCreatedDescLabel = '';
   commercialDrawerTitleLabel = '';
-  commercialDrawerBodyLabel = '';
+  commercialDrawerProjectLabel = '';
+  commercialDrawerTargetLabel = '';
+  commercialDrawerStatusLabel = '';
+  commercialDrawerActorLabel = '';
   commercialOpenConsoleLabel = '';
+  browseColumns = [];
+  allBrowseRows = [
+    { id: 'r1', cells: ['docs-site', 'Web + SSR', 'Succeeded', 'Chen Wei', '12m ago'] },
+    { id: 'r2', cells: ['docs-site', 'Edge', 'Running', 'Chen Wei', '18m ago'] },
+    { id: 'r3', cells: ['vmz-homepage', 'Web', 'Succeeded', 'Lin Mei', '41m ago'] },
+    { id: 'r4', cells: ['component-gallery', 'SSR', 'Queued', 'Ops bot', '1h ago'] },
+  ];
+  browseRows = [];
   navItems = [];
   _unwatchLocale = null;
 
   onMount() {
     this.applyLocaleCopy();
     this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+    this.refreshBrowseRows();
+    this.loadDemoData();
   }
 
   onDestroy() {
@@ -339,59 +377,58 @@ export default class CommercialPage {
     this._unwatchLocale = null;
   }
 
+  async loadDemoData() {
+    try {
+      const server = new CommercialPageServer();
+      const rows = await server.getConsoleRows();
+      if (Array.isArray(rows) && rows.length) {
+        this.allBrowseRows = rows;
+        this.refreshBrowseRows();
+      }
+    } catch {
+      /* SSR defaults mirror the server fixture */
+    }
+  }
+
   refreshCopy() {
-    this.deployGuideLabel = deployGuide();
     this.commercialNavLabel = commercialNavLabel();
-    this.commercialHeroBadgeLabel = commercialHeroBadge();
     this.commercialHeroTitleLabel = commercialHeroTitle();
     this.commercialHeroLeadLabel = commercialHeroLead();
     this.commercialCtaContactLabel = commercialCtaContact();
-    this.commercialCtaChecklistLabel = commercialCtaChecklist();
-    this.commercialAlertTitleLabel = commercialAlertTitle();
-    this.commercialAlertDescLabel = commercialAlertDesc();
-    this.commercialFeaturesTitleLabel = commercialFeaturesTitle();
+    this.commercialCtaDocsLabel = commercialCtaDocs();
     this.commercialFeature1TitleLabel = commercialFeature1Title();
     this.commercialFeature1DescLabel = commercialFeature1Desc();
     this.commercialFeature2TitleLabel = commercialFeature2Title();
     this.commercialFeature2DescLabel = commercialFeature2Desc();
     this.commercialFeature3TitleLabel = commercialFeature3Title();
     this.commercialFeature3DescLabel = commercialFeature3Desc();
-    this.commercialPricingTitleLabel = commercialPricingTitle();
-    this.commercialPlanOpenTitleLabel = commercialPlanOpenTitle();
-    this.commercialPlanOpenDescLabel = commercialPlanOpenDesc();
-    this.commercialPlanPriceLabel = commercialPlanPriceLabel();
-    this.commercialPlanOpenPriceLabel = commercialPlanOpenPrice();
-    this.commercialPlanOpenBadgeLabel = commercialPlanOpenBadge();
-    this.commercialPlanOpenCtaLabel = commercialPlanOpenCta();
-    this.commercialPlanTeamTitleLabel = commercialPlanTeamTitle();
-    this.commercialPlanTeamDescLabel = commercialPlanTeamDesc();
-    this.commercialPlanTeamPriceLabel = commercialPlanTeamPrice();
-    this.commercialPlanTeamBadgeLabel = commercialPlanTeamBadge();
-    this.commercialPlanTeamCtaLabel = commercialPlanTeamCta();
-    this.commercialContactTitleLabel = commercialContactTitle();
-    this.commercialContactDescLabel = commercialContactDesc();
+    this.commercialBrowseFilterLabel = commercialBrowseFilterLabel();
+    this.commercialBrowseFieldLabel = commercialBrowseFieldLabel();
+    this.commercialBrowseApplyLabel = commercialBrowseApply();
+    this.commercialBrowseResetLabel = commercialBrowseReset();
+    this.commercialDetailSummaryLabel = commercialDetailSummary();
+    this.commercialDetailOpenLabel = commercialDetailOpen();
     this.commercialFormLabel = commercialFormLabel();
-    this.commercialEmailLabel = commercialEmailLabel();
-    this.commercialEmailDescLabel = commercialEmailDesc();
+    this.commercialReviewNoteLabel = commercialReviewNoteLabel();
+    this.commercialReviewNoteDescLabel = commercialReviewNoteDesc();
     this.commercialConfirmLabel = commercialConfirm();
     this.commercialResetLabel = commercialReset();
-    this.commercialSendingLabel = commercialSending();
-    this.commercialDialogTitleLabel = commercialDialogTitle();
-    this.commercialDialogBodyLeadLabel = commercialDialogBodyLead();
-    this.commercialDialogBodyTailLabel = commercialDialogBodyTail();
-    this.commercialWorkspaceTitleLabel = commercialWorkspaceTitle();
-    this.commercialWorkspaceDescLabel = commercialWorkspaceDesc();
-    this.commercialEmptyTitleLabel = commercialEmptyTitle();
-    this.commercialEmptyDescLabel = commercialEmptyDesc();
-    this.commercialCreateProjectLabel = commercialCreateProject();
     this.commercialNotifyTitleLabel = commercialNotifyTitle();
     this.commercialNotifyDescLabel = commercialNotifyDesc();
     this.commercialNotifyCloseLabel = commercialNotifyClose();
-    this.commercialProjectCreatedTitleLabel = commercialProjectCreatedTitle();
-    this.commercialProjectCreatedDescLabel = commercialProjectCreatedDesc();
     this.commercialDrawerTitleLabel = commercialDrawerTitle();
-    this.commercialDrawerBodyLabel = commercialDrawerBody();
+    this.commercialDrawerProjectLabel = commercialDrawerProject();
+    this.commercialDrawerTargetLabel = commercialDrawerTarget();
+    this.commercialDrawerStatusLabel = commercialDrawerStatus();
+    this.commercialDrawerActorLabel = commercialDrawerActor();
     this.commercialOpenConsoleLabel = commercialOpenConsole();
+    this.browseColumns = [
+      { id: 'name', title: consoleColName() },
+      { id: 'target', title: consoleColTarget() },
+      { id: 'status', title: consoleColStatus() },
+      { id: 'actor', title: consoleColActor() },
+      { id: 'updated', title: consoleColUpdated() },
+    ];
     this.navItems = [
       { id: 'commercial', title: commercialNavCommercial(), href: '/commercial' },
       { id: 'console', title: commercialNavConsole(), href: '/console' },
@@ -406,57 +443,102 @@ export default class CommercialPage {
     withLocaleHint(this.localeId, () => this.refreshCopy());
   }
 
-  scrollContact() {
-    const el = document.getElementById('home-commercial-email');
-    if (el && typeof el.focus === 'function') el.focus();
+  refreshBrowseRows() {
+    const q = (this.appliedBrowseQuery || '').trim().toLowerCase();
+    const filtered = !q
+      ? this.allBrowseRows.slice()
+      : this.allBrowseRows.filter((row) =>
+          row.cells.some((cell) => String(cell).toLowerCase().includes(q)),
+        );
+    this.browseRows = filtered.slice(0, 4);
   }
 
-  onEmail(e) {
-    this.email = e && e.target ? e.target.value : '';
-    if (this.emailError) {
-      this.emailError = '';
-      this.emailInvalid = 'false';
-      this.emailDescribedBy = 'home-commercial-email-desc';
-      this.contactSummary = '';
-      this.contactDescribedBy = '';
+  applyBrowseFilter() {
+    this.appliedBrowseQuery = this.browseQuery;
+    this.refreshBrowseRows();
+  }
+
+  resetBrowseFilter() {
+    this.browseQuery = '';
+    this.appliedBrowseQuery = '';
+    this.refreshBrowseRows();
+  }
+
+  async openFeaturedDetail() {
+    this.drawerOpen = true;
+    try {
+      const server = new CommercialPageServer();
+      const detail = await server.getReleaseDetail('r1');
+      if (detail && typeof detail === 'object') {
+        this.detailProject = String(detail.project || '');
+        this.detailTarget = String(detail.target || '');
+        this.detailStatus = String(detail.statusLabel || '');
+        this.detailActor = String(detail.actor || '');
+        return;
+      }
+    } catch {
+      /* fall back below */
+    }
+    const row = this.allBrowseRows.find((entry) => entry.id === 'r1') || this.allBrowseRows[0];
+    if (!row) return;
+    this.detailProject = String(row.cells[0] || '');
+    this.detailTarget = String(row.cells[1] || '');
+    this.detailStatus = String(row.cells[2] || '');
+    this.detailActor = String(row.cells[3] || '');
+  }
+
+  onReviewNote(e) {
+    this.reviewNote = e && e.target ? e.target.value : '';
+    if (this.reviewError) {
+      this.reviewError = '';
+      this.reviewInvalid = 'false';
+      this.reviewDescribedBy = 'home-commercial-review-desc';
+      this.actionSummary = '';
+      this.actionDescribedBy = '';
     }
   }
 
-  confirmContact() {
-    const ok = /.+@.+\..+/.test(String(this.email || '').trim());
+  confirmReview() {
+    const ok = String(this.reviewNote || '').trim().length >= 4;
     if (!ok) {
-      this.emailError = commercialEmailError();
-      this.emailInvalid = 'true';
-      this.emailDescribedBy = 'home-commercial-email-desc home-commercial-email-err';
-      this.contactSummary = commercialContactSummaryError();
-      this.contactDescribedBy = 'home-commercial-summary';
-      this.dialogOpen = false;
+      this.reviewError = commercialReviewError();
+      this.reviewInvalid = 'true';
+      this.reviewDescribedBy = 'home-commercial-review-desc home-commercial-review-err';
+      this.actionSummary = commercialContactSummaryError();
+      this.actionDescribedBy = 'home-commercial-summary';
+      this.reviewSuccess = false;
       return;
     }
-    this.emailError = '';
-    this.emailInvalid = 'false';
-    this.emailDescribedBy = 'home-commercial-email-desc';
-    this.contactSummary = '';
-    this.contactDescribedBy = '';
-    this.dialogOpen = true;
+    this.reviewError = '';
+    this.reviewInvalid = 'false';
+    this.reviewDescribedBy = 'home-commercial-review-desc';
+    this.actionSummary = '';
+    this.actionDescribedBy = '';
+    this.reviewSuccess = true;
   }
 
-  createProject() {
-    this.showEmpty = false;
+  resetReview() {
+    this.reviewNote = '';
+    this.reviewError = '';
+    this.reviewInvalid = 'false';
+    this.reviewDescribedBy = 'home-commercial-review-desc';
+    this.actionSummary = '';
+    this.actionDescribedBy = '';
+    this.reviewSuccess = false;
+  }
+}
+</script>
+
+<script server>
+import ReleaseDemo from '#server/demo/ReleaseDemo';
+
+export default class CommercialPageServer {
+  getConsoleRows() {
+    return new ReleaseDemo().getConsoleRows();
   }
 
-  resetWorkspace() {
-    this.showEmpty = true;
-  }
-
-  resetContact() {
-    this.email = '';
-    this.emailError = '';
-    this.emailInvalid = 'false';
-    this.emailDescribedBy = 'home-commercial-email-desc';
-    this.contactSummary = '';
-    this.contactDescribedBy = '';
-    this.dialogOpen = false;
+  getReleaseDetail(id) {
+    return new ReleaseDemo().getReleaseDetail(id);
   }
 }
 </script>
