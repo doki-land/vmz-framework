@@ -549,6 +549,10 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'production/commercial-visual-evidence.ts',
         description: 'Commercial visual spec §7 viewport overflow for home, console, and commercial',
     },
+    'homepage-ssr-html': {
+        file: 'production/homepage-ssr-html.ts',
+        description: 'Commercial visual spec R1/R2 live homepage SSR HTML rendering contract',
+    },
     'delivery-closure': {
         file: 'production/delivery-closure.ts',
         description: 'Deployment dependsOn + static-delivery + content-addressed assets parity',
