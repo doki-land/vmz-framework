@@ -85,6 +85,17 @@ body { background: #fff; color: var(--v2-ink); overflow-x: clip; }
   overflow: hidden;
 }
 .landing-v2 [id] { scroll-margin-top: 5.5rem; }
+
+/* AppShell product demos: keep focused controls clear of sticky header */
+html:has([data-vmz-ui='app-shell']) {
+  scroll-padding-top: 5.5rem;
+}
+
+[data-vmz-ui='app-shell'] [data-vmz-ui='field'],
+[data-vmz-ui='app-shell'] [data-vmz-ui='date-picker'],
+[data-vmz-ui='app-shell'] .vmz-form-email-row {
+  scroll-margin-top: 5.5rem;
+}
 .v2-hero { display: grid; justify-items: center; width: 100%; min-height: 43rem; margin: 0; padding: 7rem max(1.5rem, calc((100% - var(--v2-content)) / 2)) 4.5rem; text-align: center; background: #f7faff; border-bottom: 1px solid #e5edf8; }
 .v2-kicker, .v2-index { margin: 0; color: var(--v2-muted); font: 500 .73rem/1.2 var(--vmz-font-mono); letter-spacing: 0; text-transform: uppercase; }
 .v2-kicker { display: flex; align-items: center; gap: .6rem; color: #4d535b; }

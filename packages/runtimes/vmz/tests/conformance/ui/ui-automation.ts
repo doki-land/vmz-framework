@@ -973,6 +973,11 @@ async function proveFormDepth(page) {
 
     // Tooltip parent-owned open (toggle outside Tooltip content).
     await page.waitForSelector('[data-vmz-fixture="form-tip-toggle"] button.vmz-ui-btn', { timeout: 5000 });
+    await page.evaluate(() => {
+        document
+            .querySelector('[data-vmz-fixture="form-tip-toggle"] button.vmz-ui-btn')
+            ?.scrollIntoView({ block: 'center', inline: 'nearest' });
+    });
     await page.click('[data-vmz-fixture="form-tip-toggle"] button.vmz-ui-btn');
     try {
         await page.waitForSelector('[data-vmz-ui="tooltip"][data-open="true"] [data-vmz-tooltip="bubble"]', {
