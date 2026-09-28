@@ -43,6 +43,15 @@ export type DemoHeroPreview = {
     targets: DemoHeroTarget[];
 };
 
+export type DemoShowcaseOverview = {
+    workspace: string;
+    project: string;
+    pathLabel: string;
+    summaryLine: string;
+    summary: DemoReleaseSummary;
+    surfaceRows: DemoConsoleRow[];
+};
+
 export const DEMO_WORKSPACE = 'vmz-docs';
 export const DEMO_PROJECT = 'docs-site';
 export const DEMO_BRANCH = 'main';
@@ -135,6 +144,21 @@ export function demoConsoleRows(): DemoConsoleRow[] {
         id: row.id,
         cells: [row.project, row.target, row.statusLabel, row.updatedAt],
     }));
+}
+
+export function demoShowcaseOverview(): DemoShowcaseOverview {
+    const hero = demoHeroPreview();
+    return {
+        workspace: hero.workspace,
+        project: hero.project,
+        pathLabel: `${hero.workspace} / ${hero.project}`,
+        summaryLine: hero.summaryLine,
+        summary: demoReleaseSummary(),
+        surfaceRows: hero.targets.map((target) => ({
+            id: target.id,
+            cells: [target.name, target.result, target.statusLabel],
+        })),
+    };
 }
 
 export function demoHeroPreview(): DemoHeroPreview {

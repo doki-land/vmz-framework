@@ -4,10 +4,12 @@ import {
     demoHeroPreview,
     demoReleaseRecords,
     demoReleaseSummary,
+    demoShowcaseOverview,
     type DemoConsoleRow,
     type DemoHeroPreview,
     type DemoReleaseRecord,
     type DemoReleaseSummary,
+    type DemoShowcaseOverview,
 } from './releases.js';
 
 /** Homepage release workflow demo — single source for Console, index preview, and Commercial. */
@@ -26,6 +28,10 @@ export default class ReleaseDemo {
 
     getHeroPreview(): DemoHeroPreview {
         return demoHeroPreview();
+    }
+
+    getShowcaseOverview(): DemoShowcaseOverview {
+        return demoShowcaseOverview();
     }
 
     @Get('/api/demo/releases')
