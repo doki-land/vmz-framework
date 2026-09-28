@@ -545,6 +545,10 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'production/official-homepage.ts',
         description: 'Official homepage + documents + inspector fixture + @vmz/ui Field/Dialog',
     },
+    'commercial-visual-evidence': {
+        file: 'production/commercial-visual-evidence.ts',
+        description: 'Commercial visual spec §7 viewport overflow for home, console, and commercial',
+    },
     'delivery-closure': {
         file: 'production/delivery-closure.ts',
         description: 'Deployment dependsOn + static-delivery + content-addressed assets parity',
@@ -559,12 +563,12 @@ export const CHECKS: Record<string, CheckEntry> = {
         composite: ['content-addressed-assets', 'static-delivery'],
     },
     'ui-commercial': {
-        description: 'Commercial surface — ui-automation + official-homepage',
-        composite: ['ui-automation', 'official-homepage'],
+        description: 'Commercial surface — ui-automation + official-homepage + commercial visual overflow',
+        composite: ['ui-automation', 'official-homepage', 'commercial-visual-evidence'],
     },
     'ui-console': {
-        description: 'Console surface — ui-automation + official-homepage',
-        composite: ['ui-automation', 'official-homepage'],
+        description: 'Console surface — ui-automation + official-homepage + commercial visual overflow',
+        composite: ['ui-automation', 'official-homepage', 'commercial-visual-evidence'],
     },
     'motion-continuity': {
         description: 'Motion continuity — motion-ir + ui7 + official-homepage',
