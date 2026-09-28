@@ -1,19 +1,18 @@
 <template>
-  <div class="markdown-host" v-html="format(source)"></div>
+    <div v-html="format(source)" class="markdown-host" />
 </template>
-
 <script client>
-import { renderMarkdown } from '@vmz/plugin-markdown-it/runtime';
+import { renderMarkdown } from "@vmz/plugin-markdown-it/runtime";
 
 function format(source) {
-  try {
-    return renderMarkdown(source ?? '');
-  } catch {
-    return '';
-  }
+    try {
+        return renderMarkdown(source ?? "");
+    } catch {
+        return "";
+    }
 }
 
 export default class MarkdownIt {
-  public source: string = '';
+    public source: string = "";
 }
 </script>

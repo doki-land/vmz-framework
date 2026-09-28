@@ -1,350 +1,361 @@
 <template>
-  <div data-vmz-fixture="product" :data-density="density" :dir="dir">
-    <AppShell brand="VMZ" home-href="/" :nav-label="productNavLabel" :nav="navItems">
-      <div class="vmz-product-toolbar" data-vmz-fixture="product-toolbar">
-        <Badge tone="brand">{{ versionLabel }}</Badge>
-        <Button type="button" variant="secondary" @click="toggleVersion">
-          {{ switchVersionLabel }}
-        </Button>
-        <Button type="button" variant="ghost" @click="toggleLocale">
-          {{ localePrefixLabel }} {{ localeLabel }}
-        </Button>
-        <Button type="button" @click="cycleDensity">{{ cycleDensityLabel }}</Button>
-        <Button type="button" variant="secondary" @click="toggleDir">{{ toggleRtlLabel }}</Button>
-        <Field
-          :label="searchLabel"
-          control-id="home-product-search"
-          description-id="home-product-search-desc"
-          error-id="home-product-search-err"
-          described-by="home-product-search-desc"
-          :value="search"
-          @input="onSearch"
-        />
-        <p data-vmz-fixture="product-meta">
-          version:{{ version }};locale:{{ locale }};search:{{ search }};copied:{{ copied }};density:{{ density }};dir:{{ dir }}
-        </p>
-      </div>
-
-      <div class="vmz-product-layout">
-        <Toc :label="tocLabel" :items="tocItems" />
-
-        <Prose>
-          <div>
-            <h1 id="overview">{{ titleText }}</h1>
-            <p class="lead">{{ leadText }}</p>
-            <Callout
-              tone="info"
-              role-name="note"
-              :title="calloutZeroJsTitle"
-              :description="calloutZeroJsDesc"
-            />
-          </div>
-
-          <div>
-            <h2 id="install">{{ installHeading }}</h2>
-            <p>{{ installBody }}</p>
-            <div v-if="isV1">
-              <CodeBlock
-                caption="shell"
-                code="pnpm add @vmz/ui"
-                :copy-label="copyLabel"
-                :on-copy="copyInstall"
-              />
+    <div data-vmz-fixture="product" :data-density="density" :dir="dir">
+        <AppShell brand="VMZ" home-href="/" :nav-label="productNavLabel" :nav="navItems">
+            <div data-vmz-fixture="product-toolbar" class="vmz-product-toolbar">
+                <Badge tone="brand">
+                    {{ versionLabel }}
+                </Badge>
+                <Button type="button" variant="secondary" @click="toggleVersion">
+                    {{ switchVersionLabel }}
+                </Button>
+                <Button type="button" variant="ghost" @click="toggleLocale">
+                    {{ localePrefixLabel }}
+                    {{ localeLabel }}
+                </Button>
+                <Button type="button" @click="cycleDensity">
+                    {{ cycleDensityLabel }}
+                </Button>
+                <Button type="button" variant="secondary" @click="toggleDir">
+                    {{ toggleRtlLabel }}
+                </Button>
+                <Field :label="searchLabel" control-id="home-product-search" description-id="home-product-search-desc" error-id="home-product-search-err" described-by="home-product-search-desc" :value="search" @input="onSearch" />
+                <p data-vmz-fixture="product-meta">
+                    version:
+                    {{ version }}
+                    ;locale:
+                    {{ locale }}
+                    ;search:
+                    {{ search }}
+                    ;copied:
+                    {{ copied }}
+                    ;density:
+                    {{ density }}
+                    ;dir:
+                    {{ dir }}
+                </p>
             </div>
-            <div v-if="isV0">
-              <CodeBlock
-                caption="shell"
-                code="pnpm add @vmz/ui@0.0.0"
-                :copy-label="copyLabel"
-                :on-copy="copyInstall"
-              />
+            <div class="vmz-product-layout">
+                <Toc :label="tocLabel" :items="tocItems" />
+                <Prose>
+                    <div>
+                        <h1 id="overview">
+                            {{ titleText }}
+                        </h1>
+                        <p class="lead">
+                            {{ leadText }}
+                        </p>
+                        <Callout tone="info" role-name="note" :title="calloutZeroJsTitle" :description="calloutZeroJsDesc" />
+                    </div>
+                    <div>
+                        <h2 id="install">
+                            {{ installHeading }}
+                        </h2>
+                        <p>
+                            {{ installBody }}
+                        </p>
+                        <div v-if="isV1">
+                            <CodeBlock caption="shell" code="pnpm add @vmz/ui" :copy-label="copyLabel" :on-copy="copyInstall" />
+                        </div>
+                        <div v-if="isV0">
+                            <CodeBlock caption="shell" code="pnpm add @vmz/ui@0.0.0" :copy-label="copyLabel" :on-copy="copyInstall" />
+                        </div>
+                        <p v-if="copiedYes" data-vmz-fixture="product-copied" role="status">
+                            {{ copiedStatus }}
+                        </p>
+                    </div>
+                    <div>
+                        <h2 id="contract">
+                            {{ contractHeading }}
+                        </h2>
+                        <p>
+                            {{ contractBodyLead }}
+                            <Link href="/d/">
+                                /d/
+                            </Link>
+                            {{ contractBodyTail }}
+                        </p>
+                        <Callout tone="warning" role-name="note" :title="calloutNoThemeTitle" :description="calloutNoThemeDesc" />
+                        <ul>
+                            <li>
+                                {{ contractLi1 }}
+                            </li>
+                            <li>
+                                {{ contractLi2 }}
+                            </li>
+                            <li>
+                                {{ contractLi3 }}
+                            </li>
+                        </ul>
+                    </div>
+                    <hr />
+                    <p>
+                        <Link href="/commercial">
+                            {{ navCommercialLabel }}
+                        </Link>
+                        ·
+                        <Link href="/console">
+                            {{ navConsoleLabel }}
+                        </Link>
+                    </p>
+                </Prose>
             </div>
-            <p v-if="copiedYes" data-vmz-fixture="product-copied" role="status">{{ copiedStatus }}</p>
-          </div>
-
-          <div>
-            <h2 id="contract">{{ contractHeading }}</h2>
-            <p>
-              {{ contractBodyLead }}
-              <Link href="/d/">/d/</Link>
-              {{ contractBodyTail }}
-            </p>
-            <Callout
-              tone="warning"
-              role-name="note"
-              :title="calloutNoThemeTitle"
-              :description="calloutNoThemeDesc"
-            />
-            <ul>
-              <li>{{ contractLi1 }}</li>
-              <li>{{ contractLi2 }}</li>
-              <li>{{ contractLi3 }}</li>
-            </ul>
-          </div>
-
-          <hr />
-          <p>
-            <Link href="/commercial">{{ navCommercialLabel }}</Link>
-            ·
-            <Link href="/console">{{ navConsoleLabel }}</Link>
-          </p>
-        </Prose>
-      </div>
-    </AppShell>
-  </div>
+        </AppShell>
+    </div>
 </template>
-
 <style>
 .vmz-product-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 0.65rem 0.85rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.65rem 0.85rem;
 }
 
 .vmz-product-layout {
-  display: grid;
-  grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
-  gap: 1.25rem 1.5rem;
-  align-items: start;
+    display: grid;
+    grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
+    gap: 1.25rem 1.5rem;
+    align-items: start;
 }
 
 @media (max-width: 48rem) {
-  .vmz-product-layout {
-    grid-template-columns: 1fr;
-  }
+    .vmz-product-layout {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
-
 <script client>
 import {
-  productNav,
-  productDocSwitchVersion,
-  productDocLocalePrefix,
-  productDocLocaleEn,
-  productDocLocaleZh,
-  productDocCycleDensity,
-  productDocToggleRtl,
-  productDocSearchLabel,
-  productDocTocLabel,
-  productDocTitle,
-  productDocLead,
-  productDocCalloutZeroJsTitle,
-  productDocCalloutZeroJsDesc,
-  productDocInstallHeading,
-  productDocInstallBody,
-  productDocCopiedStatus,
-  productDocContractHeading,
-  productDocContractBodyLead,
-  productDocContractBodyTail,
-  productDocCalloutNoThemeTitle,
-  productDocCalloutNoThemeDesc,
-  productDocContractLi1,
-  productDocContractLi2,
-  productDocContractLi3,
-  productDocTocOverview,
-  productDocTocInstall,
-  productDocTocContract,
-  productDocCopyCommand,
-  productDocCopiedCommand,
-  productDocNavForm,
-  productDocNavUi6,
-  productDocNavWelcome,
-  commercialNavCommercial,
-  commercialNavConsole,
-} from '#locales/common';
-import { readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
+    productNav,
+    productDocSwitchVersion,
+    productDocLocalePrefix,
+    productDocLocaleEn,
+    productDocLocaleZh,
+    productDocCycleDensity,
+    productDocToggleRtl,
+    productDocSearchLabel,
+    productDocTocLabel,
+    productDocTitle,
+    productDocLead,
+    productDocCalloutZeroJsTitle,
+    productDocCalloutZeroJsDesc,
+    productDocInstallHeading,
+    productDocInstallBody,
+    productDocCopiedStatus,
+    productDocContractHeading,
+    productDocContractBodyLead,
+    productDocContractBodyTail,
+    productDocCalloutNoThemeTitle,
+    productDocCalloutNoThemeDesc,
+    productDocContractLi1,
+    productDocContractLi2,
+    productDocContractLi3,
+    productDocTocOverview,
+    productDocTocInstall,
+    productDocTocContract,
+    productDocCopyCommand,
+    productDocCopiedCommand,
+    productDocNavForm,
+    productDocNavUi6,
+    productDocNavWelcome,
+    commercialNavCommercial,
+    commercialNavConsole,
+} from "#locales/common";
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
 export default class ProductPage {
-  version = 'v1';
-  locale = 'en';
-  density = 'comfortable';
-  dir = 'ltr';
-  search = '';
-  copied = 'no';
-  copiedYes = false;
-  copyLabel = 'Copy';
-  installCode = 'pnpm add @vmz/ui';
-  isV1 = true;
-  isV0 = false;
-  productNavLabel = 'Product';
-  switchVersionLabel = 'Switch version';
-  localePrefixLabel = 'Locale:';
-  localeLabel = 'en-US';
-  cycleDensityLabel = 'Cycle density';
-  toggleRtlLabel = 'Toggle RTL';
-  searchLabel = 'Search';
-  tocLabel = 'On this page';
-  titleText = 'VMZ Product surface';
-  leadText =
-    'One composition for documentation and product guides — Prose measure, Toc outline, Callout guidance, CodeBlock with copy.';
-  calloutZeroJsTitle = '';
-  calloutZeroJsDesc = '';
-  installHeading = '';
-  installBody = '';
-  copiedStatus = '';
-  contractHeading = '';
-  contractBodyLead = '';
-  contractBodyTail = '';
-  calloutNoThemeTitle = '';
-  calloutNoThemeDesc = '';
-  contractLi1 = '';
-  contractLi2 = '';
-  contractLi3 = '';
-  navCommercialLabel = '';
-  navConsoleLabel = '';
-  navItems = [
-    { id: 'product', title: 'Product', href: '/product' },
-    { id: 'commercial', title: 'Commercial', href: '/commercial' },
-    { id: 'console', title: 'Console', href: '/console' },
-    { id: 'form', title: 'Form', href: '/form' },
-    { id: 'ui6', title: 'UI6', href: '/ui6' },
-    { id: 'welcome', title: 'Welcome', href: '/welcome' },
-  ];
-  tocAll = [
-    { id: 'overview', title: 'Overview', href: '#overview' },
-    { id: 'install', title: 'Install', href: '#install' },
-    { id: 'contract', title: 'Composition contract', href: '#contract' },
-  ];
-  tocItems = [
-    { id: 'overview', title: 'Overview', href: '#overview' },
-    { id: 'install', title: 'Install', href: '#install' },
-    { id: 'contract', title: 'Composition contract', href: '#contract' },
-  ];
-  versionLabel = 'v1';
-  _demoLocaleId = 'en-us';
-  _unwatchLocale = null;
-
-  onMount() {
-    this.applyLocaleCopy('en-us');
-    this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
-  }
-
-  onDestroy() {
-    if (typeof this._unwatchLocale === 'function') this._unwatchLocale();
-    this._unwatchLocale = null;
-  }
-
-  refreshCopy() {
-    this.productNavLabel = productNav();
-    this.switchVersionLabel = productDocSwitchVersion();
-    this.localePrefixLabel = productDocLocalePrefix();
-    this.cycleDensityLabel = productDocCycleDensity();
-    this.toggleRtlLabel = productDocToggleRtl();
-    this.searchLabel = productDocSearchLabel();
-    this.tocLabel = productDocTocLabel();
-    this.titleText = productDocTitle();
-    this.leadText = productDocLead();
-    this.calloutZeroJsTitle = productDocCalloutZeroJsTitle();
-    this.calloutZeroJsDesc = productDocCalloutZeroJsDesc();
-    this.installHeading = productDocInstallHeading();
-    this.installBody = productDocInstallBody();
-    this.copiedStatus = productDocCopiedStatus();
-    this.contractHeading = productDocContractHeading();
-    this.contractBodyLead = productDocContractBodyLead();
-    this.contractBodyTail = productDocContractBodyTail();
-    this.calloutNoThemeTitle = productDocCalloutNoThemeTitle();
-    this.calloutNoThemeDesc = productDocCalloutNoThemeDesc();
-    this.contractLi1 = productDocContractLi1();
-    this.contractLi2 = productDocContractLi2();
-    this.contractLi3 = productDocContractLi3();
-    this.navCommercialLabel = commercialNavCommercial();
-    this.navConsoleLabel = commercialNavConsole();
-    this.copyLabel = productDocCopyCommand();
-    this.navItems = [
-      { id: 'product', title: productNav(), href: '/product' },
-      { id: 'commercial', title: commercialNavCommercial(), href: '/commercial' },
-      { id: 'console', title: commercialNavConsole(), href: '/console' },
-      { id: 'form', title: productDocNavForm(), href: '/form' },
-      { id: 'ui6', title: productDocNavUi6(), href: '/ui6' },
-      { id: 'welcome', title: productDocNavWelcome(), href: '/welcome' },
+    version = "v1";
+    locale = "en";
+    density = "comfortable";
+    dir = "ltr";
+    search = "";
+    copied = "no";
+    copiedYes = false;
+    copyLabel = "Copy";
+    installCode = "pnpm add @vmz/ui";
+    isV1 = true;
+    isV0 = false;
+    productNavLabel = "Product";
+    switchVersionLabel = "Switch version";
+    localePrefixLabel = "Locale:";
+    localeLabel = "en-US";
+    cycleDensityLabel = "Cycle density";
+    toggleRtlLabel = "Toggle RTL";
+    searchLabel = "Search";
+    tocLabel = "On this page";
+    titleText = "VMZ Product surface";
+    leadText =
+        "One composition for documentation and product guides — Prose measure, Toc outline, Callout guidance, CodeBlock with copy.";
+    calloutZeroJsTitle = "";
+    calloutZeroJsDesc = "";
+    installHeading = "";
+    installBody = "";
+    copiedStatus = "";
+    contractHeading = "";
+    contractBodyLead = "";
+    contractBodyTail = "";
+    calloutNoThemeTitle = "";
+    calloutNoThemeDesc = "";
+    contractLi1 = "";
+    contractLi2 = "";
+    contractLi3 = "";
+    navCommercialLabel = "";
+    navConsoleLabel = "";
+    navItems = [
+        { id: "product", title: "Product", href: "/product" },
+        { id: "commercial", title: "Commercial", href: "/commercial" },
+        { id: "console", title: "Console", href: "/console" },
+        { id: "form", title: "Form", href: "/form" },
+        { id: "ui6", title: "UI6", href: "/ui6" },
+        { id: "welcome", title: "Welcome", href: "/welcome" },
     ];
-    this.tocAll = [
-      { id: 'overview', title: productDocTocOverview(), href: '#overview' },
-      { id: 'install', title: productDocTocInstall(), href: '#install' },
-      { id: 'contract', title: productDocTocContract(), href: '#contract' },
+    tocAll = [
+        { id: "overview", title: "Overview", href: "#overview" },
+        { id: "install", title: "Install", href: "#install" },
+        { id: "contract", title: "Composition contract", href: "#contract" },
     ];
-    this.syncLocaleMeta(this._demoLocaleId);
-    this.onSearch({ target: { value: this.search } });
-  }
+    tocItems = [
+        { id: "overview", title: "Overview", href: "#overview" },
+        { id: "install", title: "Install", href: "#install" },
+        { id: "contract", title: "Composition contract", href: "#contract" },
+    ];
+    versionLabel = "v1";
+    _demoLocaleId = "en-us";
+    _unwatchLocale = null;
 
-  syncLocaleMeta(localeId) {
-    if (localeId === 'en-us') {
-      this.locale = 'en';
-      this.localeLabel = productDocLocaleEn();
-    } else {
-      this.locale = 'zh';
-      this.localeLabel = productDocLocaleZh();
+    onMount() {
+        this.applyLocaleCopy("en-us");
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
     }
-  }
 
-  applyLocaleCopy(preferred) {
-    const localeId = readLocaleId(preferred);
-    this._demoLocaleId = localeId === 'en-us' ? 'en-us' : 'zh-hans';
-    withLocaleHint(this._demoLocaleId, () => this.refreshCopy());
-  }
-
-  toggleVersion() {
-    if (this.version === 'v1') {
-      this.version = 'v0';
-      this.isV1 = false;
-      this.isV0 = true;
-      this.installCode = 'pnpm add @vmz/ui@0.0.0';
-    } else {
-      this.version = 'v1';
-      this.isV1 = true;
-      this.isV0 = false;
-      this.installCode = 'pnpm add @vmz/ui';
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
     }
-    this.versionLabel = this.version;
-    this.copied = 'no';
-    this.copiedYes = false;
-    this.copyLabel = productDocCopyCommand();
-  }
 
-  toggleLocale() {
-    this._demoLocaleId = this._demoLocaleId === 'en-us' ? 'zh-hans' : 'en-us';
-    withLocaleHint(this._demoLocaleId, () => this.refreshCopy());
-  }
-
-  cycleDensity() {
-    if (this.density === 'comfortable') this.density = 'compact';
-    else if (this.density === 'compact') this.density = 'dense';
-    else this.density = 'comfortable';
-  }
-
-  toggleDir() {
-    this.dir = this.dir === 'rtl' ? 'ltr' : 'rtl';
-  }
-
-  onSearch(e) {
-    this.search = e && e.target ? e.target.value : '';
-    const q = String(this.search || '')
-      .trim()
-      .toLowerCase();
-    if (!q) {
-      this.tocItems = this.tocAll.slice();
-      return;
+    refreshCopy() {
+        this.productNavLabel = productNav();
+        this.switchVersionLabel = productDocSwitchVersion();
+        this.localePrefixLabel = productDocLocalePrefix();
+        this.cycleDensityLabel = productDocCycleDensity();
+        this.toggleRtlLabel = productDocToggleRtl();
+        this.searchLabel = productDocSearchLabel();
+        this.tocLabel = productDocTocLabel();
+        this.titleText = productDocTitle();
+        this.leadText = productDocLead();
+        this.calloutZeroJsTitle = productDocCalloutZeroJsTitle();
+        this.calloutZeroJsDesc = productDocCalloutZeroJsDesc();
+        this.installHeading = productDocInstallHeading();
+        this.installBody = productDocInstallBody();
+        this.copiedStatus = productDocCopiedStatus();
+        this.contractHeading = productDocContractHeading();
+        this.contractBodyLead = productDocContractBodyLead();
+        this.contractBodyTail = productDocContractBodyTail();
+        this.calloutNoThemeTitle = productDocCalloutNoThemeTitle();
+        this.calloutNoThemeDesc = productDocCalloutNoThemeDesc();
+        this.contractLi1 = productDocContractLi1();
+        this.contractLi2 = productDocContractLi2();
+        this.contractLi3 = productDocContractLi3();
+        this.navCommercialLabel = commercialNavCommercial();
+        this.navConsoleLabel = commercialNavConsole();
+        this.copyLabel = productDocCopyCommand();
+        this.navItems = [
+            { id: "product", title: productNav(), href: "/product" },
+            { id: "commercial", title: commercialNavCommercial(), href: "/commercial" },
+            { id: "console", title: commercialNavConsole(), href: "/console" },
+            { id: "form", title: productDocNavForm(), href: "/form" },
+            { id: "ui6", title: productDocNavUi6(), href: "/ui6" },
+            { id: "welcome", title: productDocNavWelcome(), href: "/welcome" },
+        ];
+        this.tocAll = [
+            { id: "overview", title: productDocTocOverview(), href: "#overview" },
+            { id: "install", title: productDocTocInstall(), href: "#install" },
+            { id: "contract", title: productDocTocContract(), href: "#contract" },
+        ];
+        this.syncLocaleMeta(this._demoLocaleId);
+        this.onSearch({ target: { value: this.search } });
     }
-    this.tocItems = this.tocAll.filter((item) => {
-      const title = String(item.title || '').toLowerCase();
-      const id = String(item.id || '').toLowerCase();
-      return title.includes(q) || id.includes(q);
-    });
-  }
 
-  copyInstall() {
-    const text = String(this.installCode || '');
-    try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text);
-      }
-    } catch {
-      /* ignore */
+    syncLocaleMeta(localeId) {
+        if (localeId === "en-us") {
+            this.locale = "en";
+            this.localeLabel = productDocLocaleEn();
+        } else {
+            this.locale = "zh";
+            this.localeLabel = productDocLocaleZh();
+        }
     }
-    this.copied = 'yes';
-    this.copiedYes = true;
-    this.copyLabel = productDocCopiedCommand();
-  }
+
+    applyLocaleCopy(preferred) {
+        const localeId = readLocaleId(preferred);
+        this._demoLocaleId = localeId === "en-us" ? "en-us" : "zh-hans";
+        withLocaleHint(this._demoLocaleId, () => this.refreshCopy());
+    }
+
+    toggleVersion() {
+        if (this.version === "v1") {
+            this.version = "v0";
+            this.isV1 = false;
+            this.isV0 = true;
+            this.installCode = "pnpm add @vmz/ui@0.0.0";
+        } else {
+            this.version = "v1";
+            this.isV1 = true;
+            this.isV0 = false;
+            this.installCode = "pnpm add @vmz/ui";
+        }
+        this.versionLabel = this.version;
+        this.copied = "no";
+        this.copiedYes = false;
+        this.copyLabel = productDocCopyCommand();
+    }
+
+    toggleLocale() {
+        this._demoLocaleId = this._demoLocaleId === "en-us" ? "zh-hans" : "en-us";
+        withLocaleHint(this._demoLocaleId, () => this.refreshCopy());
+    }
+
+    cycleDensity() {
+        if (this.density === "comfortable") this.density = "compact";
+        else if (this.density === "compact") this.density = "dense";
+        else this.density = "comfortable";
+    }
+
+    toggleDir() {
+        this.dir = this.dir === "rtl" ? "ltr" : "rtl";
+    }
+
+    onSearch(e) {
+        this.search = e && e.target ? e.target.value : "";
+        const q = String(this.search || "")
+            .trim()
+            .toLowerCase();
+        if (!q) {
+            this.tocItems = this.tocAll.slice();
+            return;
+        }
+        this.tocItems = this.tocAll.filter((item) => {
+            const title = String(item.title || "").toLowerCase();
+            const id = String(item.id || "").toLowerCase();
+            return title.includes(q) || id.includes(q);
+        });
+    }
+
+    copyInstall() {
+        const text = String(this.installCode || "");
+        try {
+            if (
+                typeof navigator !== "undefined" &&
+                navigator.clipboard &&
+                navigator.clipboard.writeText
+            ) {
+                navigator.clipboard.writeText(text);
+            }
+        } catch {
+            /* ignore */
+        }
+        this.copied = "yes";
+        this.copiedYes = true;
+        this.copyLabel = productDocCopiedCommand();
+    }
 }
 </script>

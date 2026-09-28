@@ -1,45 +1,43 @@
 <template>
-  <div class="vmz-ui-console-shell" data-vmz-ui="console-shell">
-      <aside class="vmz-ui-console-shell__sidebar" data-vmz-shell="sidebar" :aria-label="navLabel">
-        <a class="vmz-ui-console-shell__brand" :href="homeHref">{{ brand }}</a>
-        <nav class="vmz-ui-console-shell__nav">
-          <a
-            v-for="item in nav"
-            :key="item.id"
-            :href="item.href"
-            :data-vmz-nav="item.id"
-            :data-active="item.id === activeNavId ? 'true' : null"
-            :aria-current="item.id === activeNavId ? 'page' : null"
-          >
-            {{ item.title }}
-          </a>
-        </nav>
-      </aside>
-      <div class="vmz-ui-console-shell__body">
-        <header class="vmz-ui-console-shell__header" data-vmz-shell="header">
-          <div class="vmz-ui-console-shell__header-copy">
-            <p v-if="breadcrumbLabel" class="vmz-ui-console-shell__breadcrumb" data-vmz-shell="breadcrumb">{{ breadcrumbLabel }}</p>
-            <h1 class="vmz-ui-console-shell__title">{{ title }}</h1>
-            <p v-if="subtitle" class="vmz-ui-console-shell__subtitle">{{ subtitle }}</p>
-          </div>
-          <a
-            v-if="primaryActionLabel && primaryActionHref"
-            class="vmz-ui-console-shell__action"
-            :href="primaryActionHref"
-          >{{ primaryActionLabel }}</a>
-        </header>
-        <main class="vmz-ui-console-shell__main" data-vmz-shell="main">
-          <slot />
-        </main>
-        <footer v-if="footer" class="vmz-ui-console-shell__footer" data-vmz-shell="footer">
-          {{ footer }}
-        </footer>
-      </div>
+    <div data-vmz-ui="console-shell" class="vmz-ui-console-shell">
+        <aside data-vmz-shell="sidebar" :aria-label="navLabel" class="vmz-ui-console-shell__sidebar">
+            <a :href="homeHref" class="vmz-ui-console-shell__brand">
+                {{ brand }}
+            </a>
+            <nav class="vmz-ui-console-shell__nav">
+                <a v-for="item in nav" :key="item.id" :href="item.href" :data-vmz-nav="item.id" :data-active='item.id === activeNavId ? "true" : null' :aria-current='item.id === activeNavId ? "page" : null'>
+                    {{ item.title }}
+                </a>
+            </nav>
+        </aside>
+        <div class="vmz-ui-console-shell__body">
+            <header data-vmz-shell="header" class="vmz-ui-console-shell__header">
+                <div class="vmz-ui-console-shell__header-copy">
+                    <p v-if="breadcrumbLabel" data-vmz-shell="breadcrumb" class="vmz-ui-console-shell__breadcrumb">
+                        {{ breadcrumbLabel }}
+                    </p>
+                    <h1 class="vmz-ui-console-shell__title">
+                        {{ title }}
+                    </h1>
+                    <p v-if="subtitle" class="vmz-ui-console-shell__subtitle">
+                        {{ subtitle }}
+                    </p>
+                </div>
+                <a v-if="primaryActionLabel && primaryActionHref" :href="primaryActionHref" class="vmz-ui-console-shell__action">
+                    {{ primaryActionLabel }}
+                </a>
+            </header>
+            <main data-vmz-shell="main" class="vmz-ui-console-shell__main">
+                <slot />
+            </main>
+            <footer v-if="footer" data-vmz-shell="footer" class="vmz-ui-console-shell__footer">
+                {{ footer }}
+            </footer>
+        </div>
     </div>
 </template>
-
 <style>
-  .vmz-ui-console-shell {
+.vmz-ui-console-shell {
     display: grid;
     grid-template-columns: 13rem minmax(0, 1fr);
     grid-template-rows: minmax(100%, 100%);
@@ -48,9 +46,9 @@
     height: 100dvh;
     color: inherit;
     background: var(--vmz-surface-page, #f5f6f8);
-  }
+}
 
-  .vmz-ui-console-shell__sidebar {
+.vmz-ui-console-shell__sidebar {
     display: flex;
     flex-direction: column;
     gap: 1rem;
@@ -59,30 +57,30 @@
     min-height: 100%;
     align-self: stretch;
     background: #fff;
-  }
+}
 
-  .vmz-ui-console-shell__brand {
+.vmz-ui-console-shell__brand {
     font: inherit;
     font-weight: 600;
     font-size: 1rem;
     letter-spacing: 0;
     text-decoration: none;
     color: #1f2329;
-  }
+}
 
-  .vmz-ui-console-shell__brand:focus-visible {
+.vmz-ui-console-shell__brand:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-  }
+}
 
-  .vmz-ui-console-shell__nav {
+.vmz-ui-console-shell__nav {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
     flex: 1;
-  }
+}
 
-  .vmz-ui-console-shell__nav a {
+.vmz-ui-console-shell__nav a {
     font: inherit;
     font-weight: 400;
     font-size: 0.875rem;
@@ -91,29 +89,29 @@
     color: #51565d;
     padding: 0.45rem 0.55rem;
     border-radius: 6px;
-  }
+}
 
-  .vmz-ui-console-shell__nav a[data-active='true'] {
+.vmz-ui-console-shell__nav a[data-active="true"] {
     color: #0958d9;
     font-weight: 500;
     background: #e6f4ff;
-  }
+}
 
-  .vmz-ui-console-shell__nav a:focus-visible {
+.vmz-ui-console-shell__nav a:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-  }
+}
 
-  .vmz-ui-console-shell__body {
+.vmz-ui-console-shell__body {
     display: flex;
     flex-direction: column;
     min-width: 0;
     min-height: 0;
     height: 100%;
     overflow: auto;
-  }
+}
 
-  .vmz-ui-console-shell__header {
+.vmz-ui-console-shell__header {
     position: sticky;
     top: 0;
     z-index: 20;
@@ -125,37 +123,37 @@
     padding: 0.75rem 1.5rem;
     border-bottom: 1px solid var(--vmz-line-subtle, #e5e6eb);
     background: #fff;
-  }
+}
 
-  .vmz-ui-console-shell__header-copy {
+.vmz-ui-console-shell__header-copy {
     display: grid;
     gap: 0.15rem;
     min-width: 0;
-  }
+}
 
-  .vmz-ui-console-shell__breadcrumb {
+.vmz-ui-console-shell__breadcrumb {
     margin: 0;
     color: #646a73;
     font-size: 0.8125rem;
     line-height: 1.25rem;
-  }
+}
 
-  .vmz-ui-console-shell__title {
+.vmz-ui-console-shell__title {
     margin: 0;
     font-size: 1.5rem;
     line-height: 2rem;
     font-weight: 600;
     color: #1f2329;
-  }
+}
 
-  .vmz-ui-console-shell__subtitle {
+.vmz-ui-console-shell__subtitle {
     margin: 0;
     color: #51565d;
     font-size: 0.875rem;
     line-height: 1.375rem;
-  }
+}
 
-  .vmz-ui-console-shell__action {
+.vmz-ui-console-shell__action {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -168,87 +166,86 @@
     font-weight: 500;
     text-decoration: none;
     white-space: nowrap;
-  }
+}
 
-  .vmz-ui-console-shell__action:hover {
+.vmz-ui-console-shell__action:hover {
     color: #fff;
     background: #0958d9;
-  }
+}
 
-  .vmz-ui-console-shell__action:focus-visible {
+.vmz-ui-console-shell__action:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-  }
+}
 
-  .vmz-ui-console-shell__main {
+.vmz-ui-console-shell__main {
     flex: 1 1 auto;
     padding: 1.5rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
-  }
+}
 
-  .vmz-ui-console-shell__footer {
+.vmz-ui-console-shell__footer {
     margin-top: auto;
     padding: 0.85rem 1.5rem 1.1rem;
     border-top: 1px solid var(--vmz-line-subtle, #e5e6eb);
     color: var(--vmz-text-steel, #646a73);
     font-size: 0.82rem;
     background: #fff;
-  }
+}
 
-  @media (max-width: 40rem) {
+@media (max-width: 40rem) {
     .vmz-ui-console-shell {
-      grid-template-columns: 1fr;
-      grid-template-rows: auto minmax(0, 1fr);
-      height: auto;
-      min-height: 100dvh;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(0, 1fr);
+        height: auto;
+        min-height: 100dvh;
     }
 
     .vmz-ui-console-shell__sidebar {
-      border-right: 0;
-      border-bottom: 1px solid var(--vmz-line-subtle, #e5e6eb);
+        border-right: 0;
+        border-bottom: 1px solid var(--vmz-line-subtle, #e5e6eb);
     }
 
     .vmz-ui-console-shell__nav {
-      flex-direction: row;
-      flex-wrap: wrap;
-      flex: 0;
+        flex-direction: row;
+        flex-wrap: wrap;
+        flex: 0;
     }
 
     .vmz-ui-console-shell__header {
-      flex-direction: column;
-      align-items: flex-start;
-      padding-inline: 1rem;
+        flex-direction: column;
+        align-items: flex-start;
+        padding-inline: 1rem;
     }
 
     .vmz-ui-console-shell__main {
-      padding: 1rem;
+        padding: 1rem;
     }
-  }
+}
 </style>
-
 <script client>
 /**
-* VMZ UI — ConsoleShell (Console composition).
-* Sidebar + sticky header + main slot + optional footer. Parent supplies nav.
-*/
+ * VMZ UI — ConsoleShell (Console composition).
+ * Sidebar + sticky header + main slot + optional footer. Parent supplies nav.
+ */
 export default class ConsoleShell {
-	public brand: string = "VMZ";
-	public homeHref: string = "/";
-	public title: string = "Console";
-	public subtitle: string = "";
-	public breadcrumbLabel: string = "";
-	public primaryActionLabel: string = "";
-	public primaryActionHref: string = "";
-	public activeNavId: string = "";
-	public navLabel: string = "Console";
-	public footer: string = "";
-	/** @type {{ id: string, title: string, href: string }[]} */
-	public nav: {
-		id: string;
-		title: string;
-		href: string;
-	}[] = [];
+    public brand: string = "VMZ";
+    public homeHref: string = "/";
+    public title: string = "Console";
+    public subtitle: string = "";
+    public breadcrumbLabel: string = "";
+    public primaryActionLabel: string = "";
+    public primaryActionHref: string = "";
+    public activeNavId: string = "";
+    public navLabel: string = "Console";
+    public footer: string = "";
+    /** @type {{ id: string, title: string, href: string }[]} */
+    public nav: {
+        id: string;
+        title: string;
+        href: string;
+    }[] = [];
 }
 </script>

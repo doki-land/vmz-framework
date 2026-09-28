@@ -1,96 +1,119 @@
 <template>
-  <footer class="site-footer" data-vmz-fixture="site-footer">
-    <div class="site-footer__brand">
-      <span class="site-footer__mark">{{ brandLabel }}</span>
-      <p class="site-footer__tag">{{ footerTagLabel }}</p>
-    </div>
-    <nav class="site-footer__group" :aria-label="productNavLabel">
-      <b>{{ productNavLabel }}</b>
-      <a data-vmz-fixture="footer-docs" :href="docsRootHref">{{ docsLabel }}</a>
-      <a :href="guideHref">{{ gettingStartedGuideLabel }}</a>
-      <a :href="deployDocHref">{{ deployGuideLabel }}</a>
-      <a href="/#showcase">{{ showcaseLabel }}</a>
-    </nav>
-    <nav class="site-footer__group" :aria-label="resourcesNavLabel">
-      <b>{{ resourcesNavLabel }}</b>
-      <a href="/welcome">{{ welcomeLinkLabel }}</a>
-      <a :href="pluginsHref">{{ pluginsLabel }}</a>
-      <a href="https://github.com/doki-land/vmz-framework">{{ githubLabel }}</a>
-    </nav>
-    <p class="site-footer__note">{{ footerNoteLabel }}</p>
-  </footer>
+    <footer data-vmz-fixture="site-footer" class="site-footer">
+        <div class="site-footer__brand">
+            <span class="site-footer__mark">
+                {{ brandLabel }}
+            </span>
+            <p class="site-footer__tag">
+                {{ footerTagLabel }}
+            </p>
+        </div>
+        <nav :aria-label="productNavLabel" class="site-footer__group">
+            <b>
+                {{ productNavLabel }}
+            </b>
+            <a data-vmz-fixture="footer-docs" :href="docsRootHref">
+                {{ docsLabel }}
+            </a>
+            <a :href="guideHref">
+                {{ gettingStartedGuideLabel }}
+            </a>
+            <a :href="deployDocHref">
+                {{ deployGuideLabel }}
+            </a>
+            <a href="/#showcase">
+                {{ showcaseLabel }}
+            </a>
+        </nav>
+        <nav :aria-label="resourcesNavLabel" class="site-footer__group">
+            <b>
+                {{ resourcesNavLabel }}
+            </b>
+            <a href="/welcome">
+                {{ welcomeLinkLabel }}
+            </a>
+            <a :href="pluginsHref">
+                {{ pluginsLabel }}
+            </a>
+            <a href="https://github.com/doki-land/vmz-framework">
+                {{ githubLabel }}
+            </a>
+        </nav>
+        <p class="site-footer__note">
+            {{ footerNoteLabel }}
+        </p>
+    </footer>
 </template>
-
 <script client>
 import {
-  brand,
-  docs,
-  showcase,
-  gettingStartedGuide,
-  deployGuide,
-  plugins,
-  footerTag,
-  productNav,
-  resourcesNav,
-  welcomeLink,
-  github,
-  footerNote,
-} from '#locales/common';
-import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
+    brand,
+    docs,
+    showcase,
+    gettingStartedGuide,
+    deployGuide,
+    plugins,
+    footerTag,
+    productNav,
+    resourcesNav,
+    welcomeLink,
+    github,
+    footerNote,
+} from "#locales/common";
+import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
 export default class SiteFooter {
-  localeId = 'zh-hans';
-  brandLabel = '';
-  footerTagLabel = '';
-  docsLabel = '';
-  gettingStartedGuideLabel = '';
-  deployGuideLabel = '';
-  showcaseLabel = '';
-  pluginsLabel = '';
-  productNavLabel = '';
-  resourcesNavLabel = '';
-  welcomeLinkLabel = '';
-  githubLabel = '';
-  footerNoteLabel = '';
-  docsRootHref = '/d/zh-hans/';
-  guideHref = '/d/zh-hans/guide/';
-  deployDocHref = '/d/zh-hans/guide/deploy/';
-  pluginsHref = '/d/zh-hans/plugins/';
-  _unwatchLocale = null;
+    localeId = "zh-hans";
+    brandLabel = "";
+    footerTagLabel = "";
+    docsLabel = "";
+    gettingStartedGuideLabel = "";
+    deployGuideLabel = "";
+    showcaseLabel = "";
+    pluginsLabel = "";
+    productNavLabel = "";
+    resourcesNavLabel = "";
+    welcomeLinkLabel = "";
+    githubLabel = "";
+    footerNoteLabel = "";
+    docsRootHref = "/d/zh-hans/";
+    guideHref = "/d/zh-hans/guide/";
+    deployDocHref = "/d/zh-hans/guide/deploy/";
+    pluginsHref = "/d/zh-hans/plugins/";
+    _unwatchLocale = null;
 
-  onMount() {
-    this.applyLocaleCopy();
-    this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
-  }
+    onMount() {
+        this.applyLocaleCopy();
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+    }
 
-  onDestroy() {
-    if (typeof this._unwatchLocale === 'function') this._unwatchLocale();
-    this._unwatchLocale = null;
-  }
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
+    }
 
-  refreshCopy() {
-    this.brandLabel = brand();
-    this.footerTagLabel = footerTag();
-    this.docsLabel = docs();
-    this.gettingStartedGuideLabel = gettingStartedGuide();
-    this.deployGuideLabel = deployGuide();
-    this.showcaseLabel = showcase();
-    this.pluginsLabel = plugins();
-    this.productNavLabel = productNav();
-    this.resourcesNavLabel = resourcesNav();
-    this.welcomeLinkLabel = welcomeLink();
-    this.githubLabel = github();
-    this.footerNoteLabel = footerNote();
-    const paths = docsPaths(this.localeId);
-    this.docsRootHref = paths.docsRootHref;
-    this.guideHref = paths.guideHref;
-    this.deployDocHref = paths.deployDocHref;
-    this.pluginsHref = paths.pluginsHref;
-  }
+    refreshCopy() {
+        this.brandLabel = brand();
+        this.footerTagLabel = footerTag();
+        this.docsLabel = docs();
+        this.gettingStartedGuideLabel = gettingStartedGuide();
+        this.deployGuideLabel = deployGuide();
+        this.showcaseLabel = showcase();
+        this.pluginsLabel = plugins();
+        this.productNavLabel = productNav();
+        this.resourcesNavLabel = resourcesNav();
+        this.welcomeLinkLabel = welcomeLink();
+        this.githubLabel = github();
+        this.footerNoteLabel = footerNote();
+        const paths = docsPaths(this.localeId);
+        this.docsRootHref = paths.docsRootHref;
+        this.guideHref = paths.guideHref;
+        this.deployDocHref = paths.deployDocHref;
+        this.pluginsHref = paths.pluginsHref;
+    }
 
-  applyLocaleCopy(preferred) {
-    this.localeId = readLocaleId(preferred);
-    withLocaleHint(this.localeId, () => this.refreshCopy());
-  }
+    applyLocaleCopy(preferred) {
+        this.localeId = readLocaleId(preferred);
+        withLocaleHint(this.localeId, () => this.refreshCopy());
+    }
 }
 </script>

@@ -1,114 +1,122 @@
 <template>
-  <div data-vmz-fixture="motion">
-    <h1>Motion lab</h1>
-    <p>Motion continuity lab: exit, interrupt/cancel, and SSR resume adopt.</p>
-
-    <section data-vmz-fixture="motion-feedback">
-      <Button type="button" @click="() => (clicks += 1)">Pulse</Button>
-      <p data-vmz-fixture="motion-clicks">clicks:{{ clicks }}</p>
-    </section>
-
-    <section data-vmz-fixture="motion-overlay">
-      <Button type="button" @click="() => (dialogOpen = true)">Open dialog</Button>
-      <Dialog
-        :open="dialogOpen"
-        title="Motion dialog"
-        title-id="home-motion-dialog-title"
-        :on-close="() => (dialogOpen = false)"
-      >
-        <p data-vmz-fixture="motion-dialog-body">Overlay enter/exit uses motion.overlay tokens.</p>
-      </Dialog>
-      <Button type="button" @click="() => (drawerOpen = true)">Open drawer</Button>
-      <Drawer
-        :open="drawerOpen"
-        title="Motion drawer"
-        title-id="home-motion-drawer-title"
-        :on-close="() => (drawerOpen = false)"
-      >
-        <p data-vmz-fixture="motion-drawer-body">Drawer enter/exit uses motion.overlay tokens.</p>
-      </Drawer>
-    </section>
-
-    <section data-vmz-fixture="motion-interrupt">
-      <p data-vmz-fixture="motion-interrupt-state">
-        interrupt-dialog:{{ interruptDialogOpen ? 'open' : 'closed' }}
-      </p>
-      <Button type="button" @click="openInterruptDialog">Open interrupt dialog</Button>
-      <Dialog
-        :open="interruptDialogOpen"
-        title="Interrupt dialog"
-        title-id="home-motion-interrupt-dialog-title"
-        :on-close="onInterruptDialogClose"
-      >
-        <p data-vmz-fixture="motion-interrupt-body">
-          Escape starts exit; Escape again cancels exit (motion generation / cancel edge).
+    <div data-vmz-fixture="motion">
+        <h1>
+            Motion lab
+        </h1>
+        <p>
+            Motion continuity lab: exit, interrupt/cancel, and SSR resume adopt.
         </p>
-      </Dialog>
-    </section>
-
-    <section data-vmz-fixture="motion-resume">
-      <p data-vmz-fixture="motion-resume-state">ssr-dialog:{{ ssrDialogOpen ? 'open' : 'closed' }}</p>
-      <Button type="button" @click="() => (ssrDialogOpen = true)">Reopen SSR dialog</Button>
-      <Dialog
-        :open="ssrDialogOpen"
-        title="SSR resume dialog"
-        title-id="home-motion-ssr-dialog-title"
-        :on-close="() => (ssrDialogOpen = false)"
-      >
-        <p data-vmz-fixture="motion-resume-body">SSR-stable overlay — resume keeps enter from replaying.</p>
-      </Dialog>
-    </section>
-
-    <section data-vmz-fixture="motion-list">
-      <Button type="button" @click="filterAlpha">Filter Alpha</Button>
-      <Button type="button" @click="resetRows">Reset rows</Button>
-      <Table :columns="columns" :rows="rows" :has-row-action="rowAction" />
-      <p data-vmz-fixture="motion-row-count">rows:{{ rowCount }}</p>
-    </section>
-  </div>
+        <section data-vmz-fixture="motion-feedback">
+            <Button type="button" @click="(() => clicks += 1)">
+                Pulse
+            </Button>
+            <p data-vmz-fixture="motion-clicks">
+                clicks:
+                {{ clicks }}
+            </p>
+        </section>
+        <section data-vmz-fixture="motion-overlay">
+            <Button type="button" @click="(() => dialogOpen = true)">
+                Open dialog
+            </Button>
+            <Dialog :open="dialogOpen" title="Motion dialog" title-id="home-motion-dialog-title" :on-close="(() => dialogOpen = false)">
+                <p data-vmz-fixture="motion-dialog-body">
+                    Overlay enter/exit uses motion.overlay tokens.
+                </p>
+            </Dialog>
+            <Button type="button" @click="(() => drawerOpen = true)">
+                Open drawer
+            </Button>
+            <Drawer :open="drawerOpen" title="Motion drawer" title-id="home-motion-drawer-title" :on-close="(() => drawerOpen = false)">
+                <p data-vmz-fixture="motion-drawer-body">
+                    Drawer enter/exit uses motion.overlay tokens.
+                </p>
+            </Drawer>
+        </section>
+        <section data-vmz-fixture="motion-interrupt">
+            <p data-vmz-fixture="motion-interrupt-state">
+                interrupt-dialog:
+                {{ interruptDialogOpen ? "open" : "closed" }}
+            </p>
+            <Button type="button" @click="openInterruptDialog">
+                Open interrupt dialog
+            </Button>
+            <Dialog :open="interruptDialogOpen" title="Interrupt dialog" title-id="home-motion-interrupt-dialog-title" :on-close="onInterruptDialogClose">
+                <p data-vmz-fixture="motion-interrupt-body">
+                    Escape starts exit; Escape again cancels exit (motion generation / cancel edge).
+                </p>
+            </Dialog>
+        </section>
+        <section data-vmz-fixture="motion-resume">
+            <p data-vmz-fixture="motion-resume-state">
+                ssr-dialog:
+                {{ ssrDialogOpen ? "open" : "closed" }}
+            </p>
+            <Button type="button" @click="(() => ssrDialogOpen = true)">
+                Reopen SSR dialog
+            </Button>
+            <Dialog :open="ssrDialogOpen" title="SSR resume dialog" title-id="home-motion-ssr-dialog-title" :on-close="(() => ssrDialogOpen = false)">
+                <p data-vmz-fixture="motion-resume-body">
+                    SSR-stable overlay — resume keeps enter from replaying.
+                </p>
+            </Dialog>
+        </section>
+        <section data-vmz-fixture="motion-list">
+            <Button type="button" @click="filterAlpha">
+                Filter Alpha
+            </Button>
+            <Button type="button" @click="resetRows">
+                Reset rows
+            </Button>
+            <Table :columns="columns" :rows="rows" :has-row-action="rowAction" />
+            <p data-vmz-fixture="motion-row-count">
+                rows:
+                {{ rowCount }}
+            </p>
+        </section>
+    </div>
 </template>
-
 <script client>
 export default class MotionPage {
-  clicks = 0;
-  dialogOpen = false;
-  drawerOpen = false;
-  interruptDialogOpen = false;
-  /** Open on first paint so SSR HTML includes the overlay for resume-adopt proof. */
-  ssrDialogOpen = true;
-  rowCount = 3;
-  rowAction = false;
-  columns = [
-    { id: 'name', title: 'Name' },
-    { id: 'status', title: 'Status' },
-  ];
-  allRows = [
-    { id: 'r1', cells: ['Alpha', 'Active'] },
-    { id: 'r2', cells: ['Beta', 'Paused'] },
-    { id: 'r3', cells: ['Gamma', 'Active'] },
-  ];
-  rows = [
-    { id: 'r1', cells: ['Alpha', 'Active'] },
-    { id: 'r2', cells: ['Beta', 'Paused'] },
-    { id: 'r3', cells: ['Gamma', 'Active'] },
-  ];
+    clicks = 0;
+    dialogOpen = false;
+    drawerOpen = false;
+    interruptDialogOpen = false;
+    /** Open on first paint so SSR HTML includes the overlay for resume-adopt proof. */
+    ssrDialogOpen = true;
+    rowCount = 3;
+    rowAction = false;
+    columns = [
+        { id: "name", title: "Name" },
+        { id: "status", title: "Status" },
+    ];
+    allRows = [
+        { id: "r1", cells: ["Alpha", "Active"] },
+        { id: "r2", cells: ["Beta", "Paused"] },
+        { id: "r3", cells: ["Gamma", "Active"] },
+    ];
+    rows = [
+        { id: "r1", cells: ["Alpha", "Active"] },
+        { id: "r2", cells: ["Beta", "Paused"] },
+        { id: "r3", cells: ["Gamma", "Active"] },
+    ];
 
-  openInterruptDialog() {
-    this.interruptDialogOpen = true;
-  }
+    openInterruptDialog() {
+        this.interruptDialogOpen = true;
+    }
 
-  onInterruptDialogClose() {
-    this.interruptDialogOpen = false;
-  }
+    onInterruptDialogClose() {
+        this.interruptDialogOpen = false;
+    }
 
-  filterAlpha() {
-    this.rows = this.allRows.filter((row) => row.id === 'r1');
-    this.rowCount = this.rows.length;
-  }
+    filterAlpha() {
+        this.rows = this.allRows.filter((row) => row.id === "r1");
+        this.rowCount = this.rows.length;
+    }
 
-  resetRows() {
-    this.rows = this.allRows.slice();
-    this.rowCount = this.rows.length;
-  }
+    resetRows() {
+        this.rows = this.allRows.slice();
+        this.rowCount = this.rows.length;
+    }
 }
 </script>

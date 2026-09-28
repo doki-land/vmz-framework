@@ -1,74 +1,68 @@
 <template>
-  <label class="vmz-ui-checkbox" data-vmz-ui="checkbox" :for="controlId">
-      <input
-        :id="controlId"
-        class="vmz-ui-checkbox__input"
-        type="checkbox"
-        :checked="checked"
-        :disabled="disabled"
-        :aria-describedby="describedBy"
-        @click="onToggle"
-      />
-      <span class="vmz-ui-checkbox__label">{{ label }}</span>
+    <label data-vmz-ui="checkbox" :for="controlId" class="vmz-ui-checkbox">
+        <input :id="controlId" type="checkbox" :checked="checked" :disabled="disabled" :aria-describedby="describedBy" @click="onToggle" class="vmz-ui-checkbox__input" />
+        <span class="vmz-ui-checkbox__label">
+            {{ label }}
+        </span>
     </label>
 </template>
-
 <style>
-  .vmz-ui-checkbox {
+.vmz-ui-checkbox {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
     font: inherit;
     cursor: pointer;
-  }
+}
 
-  .vmz-ui-checkbox__input {
+.vmz-ui-checkbox__input {
     width: 1rem;
     height: 1rem;
     accent-color: var(--vmz-action-primary-background);
     outline: none;
-  }
+}
 
-  .vmz-ui-checkbox__input:focus-visible {
+.vmz-ui-checkbox__input:focus-visible {
     box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-  }
+}
 
-  .vmz-ui-checkbox__input:disabled {
+.vmz-ui-checkbox__input:disabled {
     opacity: 0.55;
     cursor: not-allowed;
-  }
+}
 
-  .vmz-ui-checkbox__label {
+.vmz-ui-checkbox__label {
     font-weight: 600;
-  }
+}
 </style>
-
 <script client>
 /**
-* VMZ UI — Checkbox (UI2).
-* Label association via wrapping label + for/id; parent owns checked (no parallel form store).
-* Toggle goes through onChange so live `checked` prop stays authoritative.
-*/
+ * VMZ UI — Checkbox (UI2).
+ * Label association via wrapping label + for/id; parent owns checked (no parallel form store).
+ * Toggle goes through onChange so live `checked` prop stays authoritative.
+ */
 export default class Checkbox {
-	public label: string = "";
-	public checked: boolean = false;
-	public disabled: boolean = false;
-	public controlId: string = "vmz-checkbox";
-	public describedBy: string = "";
-	public onChange: ((e: {
-		target: {
-			checked: boolean;
-		};
-	}) => void) | null = null;
-	onToggle(ev) {
-		if (this.disabled) return;
-		if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
-		const next = !this.checked;
-		const payload = { target: { checked: next } };
-		this.emit("change", payload);
-		if (typeof this.onChange === "function") {
-			this.onChange(payload);
-		}
-	}
+    public label: string = "";
+    public checked: boolean = false;
+    public disabled: boolean = false;
+    public controlId: string = "vmz-checkbox";
+    public describedBy: string = "";
+    public onChange:
+        | ((e: {
+              target: {
+                  checked: boolean;
+              };
+          }) => void)
+        | null = null;
+    onToggle(ev) {
+        if (this.disabled) return;
+        if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
+        const next = !this.checked;
+        const payload = { target: { checked: next } };
+        this.emit("change", payload);
+        if (typeof this.onChange === "function") {
+            this.onChange(payload);
+        }
+    }
 }
 </script>

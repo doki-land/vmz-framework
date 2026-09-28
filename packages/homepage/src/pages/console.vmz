@@ -1,543 +1,533 @@
 <template>
-  <div data-vmz-fixture="console" class="vmz-console-page">
-    <ConsoleShell
-      brand="VMZ"
-      home-href="/"
-      active-nav-id="console"
-      :title="consoleTitleLabel"
-      :subtitle="consoleSubtitleLabel"
-      :breadcrumb-label="consoleBreadcrumbLabel"
-      :primary-action-label="consolePrimaryActionLabel"
-      primary-action-href="/commercial"
-      :nav-label="consoleNavLabel"
-      :nav="navItems"
-    >
-      <section class="vmz-console-summary" :aria-label="consoleSummaryAriaLabel">
-        <div class="vmz-console-summary__panel">
-          <div class="vmz-console-summary__item">
-            <span class="vmz-console-summary__label">{{ consoleStatActiveServicesLabel }}</span>
-            <strong class="vmz-console-summary__value">{{ summaryTotal }}</strong>
-          </div>
-          <div class="vmz-console-summary__item">
-            <span class="vmz-console-summary__label">{{ consoleStatPendingReleasesLabel }}</span>
-            <strong class="vmz-console-summary__value">{{ summaryRunning }}</strong>
-          </div>
-          <div class="vmz-console-summary__item">
-            <span class="vmz-console-summary__label">{{ consoleStatAffectedRegionsLabel }}</span>
-            <strong class="vmz-console-summary__value" :class="summaryFailed > 0 ? 'is-failed' : ''">{{ summaryFailed }}</strong>
-          </div>
-        </div>
-      </section>
-
-      <section class="vmz-console-data-panel" :aria-label="consoleDataPanelAriaLabel">
-        <FilterBar :label="consoleFilterLabel">
-          <Field
-            :label="consoleFieldNameLabel"
-            control-id="home-console-query"
-            description-id="home-console-query-desc"
-            error-id="home-console-query-err"
-            described-by="home-console-query-desc"
-            :value="query"
-            @input="(e) => (query = e.target.value)"
-          />
-          <Field
-            :label="consoleFieldStatusLabel"
-            control-id="home-console-status"
-            description-id="home-console-status-desc"
-            error-id="home-console-status-err"
-            described-by="home-console-status-desc"
-            :value="statusQuery"
-            @input="(e) => (statusQuery = e.target.value)"
-          />
-          <Button type="button" variant="primary" @click="applyFilter">{{ consoleApplyLabel }}</Button>
-          <Button type="button" variant="secondary" @click="resetFilter">{{ consoleResetLabel }}</Button>
-          <Button type="button" variant="ghost" @click="selectVisible">{{ consoleSelectVisibleLabel }}</Button>
-        </FilterBar>
-
-        <p class="vmz-sr-only" data-vmz-fixture="console-query">query:{{ query }}</p>
-
-        <BulkActions
-          :label="consoleBulkActionsLabel"
-          :selected-count="selectedCount"
-          :count-label="bulkLabel"
-        >
-          <Button type="button" variant="ghost" @click="clearSelection">{{ consoleClearSelectionLabel }}</Button>
-        </BulkActions>
-
-        <Table
-          :columns="columns"
-          :rows="rows"
-          :has-row-action="rowAction"
-          :action-title="consoleActionTitleLabel"
-          :action-label="consoleActionLabel"
-          :on-row-action="openDetail"
-        />
-
-        <Pagination
-          :label="consolePaginationLabel"
-          :status="pageStatus"
-          :prev-disabled="prevDisabled"
-          :next-disabled="nextDisabled"
-          :on-prev="goPrev"
-          :on-next="goNext"
-        />
-      </section>
-
-      <Drawer
-        :open="drawerOpen"
-        :title="consoleDrawerTitleLabel"
-        title-id="home-console-drawer-title"
-        :on-close="() => (drawerOpen = false)"
-      >
-        <dl class="vmz-console-detail" data-vmz-fixture="console-drawer-body">
-          <div>
-            <dt>{{ consoleDrawerProjectLabel }}</dt>
-            <dd data-vmz-fixture="console-drawer-project">{{ detailProject }}</dd>
-          </div>
-          <div>
-            <dt>{{ consoleDrawerTargetLabel }}</dt>
-            <dd data-vmz-fixture="console-drawer-target">{{ detailTarget }}</dd>
-          </div>
-          <div>
-            <dt>{{ consoleDrawerStatusLabel }}</dt>
-            <dd data-vmz-fixture="console-drawer-status">{{ detailStatus }}</dd>
-          </div>
-          <div>
-            <dt>{{ consoleDrawerActorLabel }}</dt>
-            <dd data-vmz-fixture="console-drawer-actor">{{ detailActor }}</dd>
-          </div>
-          <div>
-            <dt>{{ consoleDrawerUpdatedLabel }}</dt>
-            <dd data-vmz-fixture="console-drawer-updated">{{ detailUpdated }}</dd>
-          </div>
-          <div>
-            <dt>{{ consoleDrawerBranchLabel }}</dt>
-            <dd data-vmz-fixture="console-drawer-branch">{{ detailBranch }}</dd>
-          </div>
-        </dl>
-      </Drawer>
-    </ConsoleShell>
-  </div>
+    <div data-vmz-fixture="console" class="vmz-console-page">
+        <ConsoleShell brand="VMZ" home-href="/" active-nav-id="console" :title="consoleTitleLabel" :subtitle="consoleSubtitleLabel" :breadcrumb-label="consoleBreadcrumbLabel" :primary-action-label="consolePrimaryActionLabel" primary-action-href="/commercial" :nav-label="consoleNavLabel" :nav="navItems">
+            <section :aria-label="consoleSummaryAriaLabel" class="vmz-console-summary">
+                <div class="vmz-console-summary__panel">
+                    <div class="vmz-console-summary__item">
+                        <span class="vmz-console-summary__label">
+                            {{ consoleStatActiveServicesLabel }}
+                        </span>
+                        <strong class="vmz-console-summary__value">
+                            {{ summaryTotal }}
+                        </strong>
+                    </div>
+                    <div class="vmz-console-summary__item">
+                        <span class="vmz-console-summary__label">
+                            {{ consoleStatPendingReleasesLabel }}
+                        </span>
+                        <strong class="vmz-console-summary__value">
+                            {{ summaryRunning }}
+                        </strong>
+                    </div>
+                    <div class="vmz-console-summary__item">
+                        <span class="vmz-console-summary__label">
+                            {{ consoleStatAffectedRegionsLabel }}
+                        </span>
+                        <strong class="vmz-console-summary__value" :class='summaryFailed > 0 ? "is-failed" : ""'>
+                            {{ summaryFailed }}
+                        </strong>
+                    </div>
+                </div>
+            </section>
+            <section :aria-label="consoleDataPanelAriaLabel" class="vmz-console-data-panel">
+                <FilterBar :label="consoleFilterLabel">
+                    <Field :label="consoleFieldNameLabel" control-id="home-console-query" description-id="home-console-query-desc" error-id="home-console-query-err" described-by="home-console-query-desc" :value="query" @input="((e) => query = e.target.value)" />
+                    <Field :label="consoleFieldStatusLabel" control-id="home-console-status" description-id="home-console-status-desc" error-id="home-console-status-err" described-by="home-console-status-desc" :value="statusQuery" @input="((e) => statusQuery = e.target.value)" />
+                    <Button type="button" variant="primary" @click="applyFilter">
+                        {{ consoleApplyLabel }}
+                    </Button>
+                    <Button type="button" variant="secondary" @click="resetFilter">
+                        {{ consoleResetLabel }}
+                    </Button>
+                    <Button type="button" variant="ghost" @click="selectVisible">
+                        {{ consoleSelectVisibleLabel }}
+                    </Button>
+                </FilterBar>
+                <p data-vmz-fixture="console-query" class="vmz-sr-only">
+                    query:
+                    {{ query }}
+                </p>
+                <BulkActions :label="consoleBulkActionsLabel" :selected-count="selectedCount" :count-label="bulkLabel">
+                    <Button type="button" variant="ghost" @click="clearSelection">
+                        {{ consoleClearSelectionLabel }}
+                    </Button>
+                </BulkActions>
+                <Table :columns="columns" :rows="rows" :has-row-action="rowAction" :action-title="consoleActionTitleLabel" :action-label="consoleActionLabel" :on-row-action="openDetail" />
+                <Pagination :label="consolePaginationLabel" :status="pageStatus" :prev-disabled="prevDisabled" :next-disabled="nextDisabled" :on-prev="goPrev" :on-next="goNext" />
+            </section>
+            <Drawer :open="drawerOpen" :title="consoleDrawerTitleLabel" title-id="home-console-drawer-title" :on-close="(() => drawerOpen = false)">
+                <dl data-vmz-fixture="console-drawer-body" class="vmz-console-detail">
+                    <div>
+                        <dt>
+                            {{ consoleDrawerProjectLabel }}
+                        </dt>
+                        <dd data-vmz-fixture="console-drawer-project">
+                            {{ detailProject }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>
+                            {{ consoleDrawerTargetLabel }}
+                        </dt>
+                        <dd data-vmz-fixture="console-drawer-target">
+                            {{ detailTarget }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>
+                            {{ consoleDrawerStatusLabel }}
+                        </dt>
+                        <dd data-vmz-fixture="console-drawer-status">
+                            {{ detailStatus }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>
+                            {{ consoleDrawerActorLabel }}
+                        </dt>
+                        <dd data-vmz-fixture="console-drawer-actor">
+                            {{ detailActor }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>
+                            {{ consoleDrawerUpdatedLabel }}
+                        </dt>
+                        <dd data-vmz-fixture="console-drawer-updated">
+                            {{ detailUpdated }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>
+                            {{ consoleDrawerBranchLabel }}
+                        </dt>
+                        <dd data-vmz-fixture="console-drawer-branch">
+                            {{ detailBranch }}
+                        </dd>
+                    </div>
+                </dl>
+            </Drawer>
+        </ConsoleShell>
+    </div>
 </template>
-
 <style>
 .vmz-console-page .vmz-ui-console-shell__main {
-  display: grid;
-  gap: 1rem;
-  align-content: start;
+    display: grid;
+    gap: 1rem;
+    align-content: start;
 }
 
 .vmz-console-summary__panel {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
-  padding: 1rem 1.15rem;
-  border: 1px solid #e5e6eb;
-  border-radius: 8px;
-  background: #fff;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    padding: 1rem 1.15rem;
+    border: 1px solid #e5e6eb;
+    border-radius: 8px;
+    background: #fff;
 }
 
 .vmz-console-summary__item {
-  display: grid;
-  gap: 0.2rem;
-  align-content: start;
+    display: grid;
+    gap: 0.2rem;
+    align-content: start;
 }
 
 .vmz-console-summary__label {
-  color: #646a73;
-  font-size: 0.8125rem;
-  line-height: 1.25rem;
+    color: #646a73;
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
 }
 
 .vmz-console-summary__value {
-  font-family: var(--vmz-font-display);
-  font-size: 1.75rem;
-  font-weight: 600;
-  line-height: 2.25rem;
-  font-variant-numeric: tabular-nums;
-  color: #1f2329;
+    font-family: var(--vmz-font-display);
+    font-size: 1.75rem;
+    font-weight: 600;
+    line-height: 2.25rem;
+    font-variant-numeric: tabular-nums;
+    color: #1f2329;
 }
 
 .vmz-console-summary__value.is-failed {
-  color: #a8071a;
+    color: #a8071a;
 }
 
 .vmz-console-data-panel {
-  display: grid;
-  gap: 0;
-  overflow: hidden;
-  border: 1px solid #e5e6eb;
-  border-radius: 8px;
-  background: #fff;
+    display: grid;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid #e5e6eb;
+    border-radius: 8px;
+    background: #fff;
 }
 
 .vmz-console-data-panel .vmz-ui-filter-bar {
-  margin: 0;
-  border: 0;
-  border-bottom: 1px solid #e5e6eb;
-  border-radius: 0;
-  background: #fff;
+    margin: 0;
+    border: 0;
+    border-bottom: 1px solid #e5e6eb;
+    border-radius: 0;
+    background: #fff;
 }
 
 .vmz-console-data-panel .vmz-ui-bulk-actions {
-  margin: 0;
-  border: 0;
-  border-bottom: 1px solid #e5e6eb;
-  border-radius: 0;
-  background: #f7f8fa;
+    margin: 0;
+    border: 0;
+    border-bottom: 1px solid #e5e6eb;
+    border-radius: 0;
+    background: #f7f8fa;
 }
 
 .vmz-console-data-panel .vmz-ui-table-wrap {
-  margin: 0;
-  border: 0;
-  border-radius: 0;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
 }
 
 .vmz-console-data-panel .vmz-ui-pagination {
-  margin: 0;
-  padding: 0.75rem 1rem;
-  border-top: 1px solid #e5e6eb;
-  border-radius: 0;
-  background: #fff;
+    margin: 0;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid #e5e6eb;
+    border-radius: 0;
+    background: #fff;
 }
 
 .vmz-console-detail {
-  display: grid;
-  gap: 0.85rem;
-  margin: 0;
+    display: grid;
+    gap: 0.85rem;
+    margin: 0;
 }
 
 .vmz-console-detail > div {
-  display: grid;
-  gap: 0.2rem;
+    display: grid;
+    gap: 0.2rem;
 }
 
 .vmz-console-detail dt {
-  margin: 0;
-  color: #646a73;
-  font-size: 0.8125rem;
-  line-height: 1.25rem;
+    margin: 0;
+    color: #646a73;
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
 }
 
 .vmz-console-detail dd {
-  margin: 0;
-  color: #1f2329;
-  font-size: 0.875rem;
-  line-height: 1.375rem;
+    margin: 0;
+    color: #1f2329;
+    font-size: 0.875rem;
+    line-height: 1.375rem;
 }
 
 @media (max-width: 720px) {
-  .vmz-console-summary__panel {
-    grid-template-columns: 1fr;
-  }
+    .vmz-console-summary__panel {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
-
 <script client>
 import {
-  consoleNavLabel,
-  consoleTitle,
-  consoleSubtitle,
-  consoleBreadcrumb,
-  consolePrimaryAction,
-  consoleSummaryAria,
-  consoleStatActiveServices,
-  consoleStatPendingReleases,
-  consoleStatAffectedRegions,
-  consoleFilterLabel,
-  consoleFieldNameLabel,
-  consoleFieldStatusLabel,
-  consoleApply,
-  consoleReset,
-  consoleSelectVisible,
-  consoleBulkActions,
-  consoleClearSelection,
-  consoleBulkSelected,
-  consoleColName,
-  consoleColTarget,
-  consoleColStatus,
-  consoleColActor,
-  consoleColUpdated,
-  consoleActionTitle,
-  consoleActionLabel,
-  consolePaginationLabel,
-  consoleDrawerTitle,
-  consoleDrawerProject,
-  consoleDrawerTarget,
-  consoleDrawerStatus,
-  consoleDrawerActor,
-  consoleDrawerUpdated,
-  consoleDrawerBranch,
-  consolePageStatus,
-  commercialNavCommercial,
-  commercialNavConsole,
-  commercialNavHome,
-} from '#locales/common';
-import ConsolePageServer from '#server/pages/console';
-import { demoConsoleRows, demoReleaseSummary } from '../demo/releases.ts';
-import { readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
+    consoleNavLabel,
+    consoleTitle,
+    consoleSubtitle,
+    consoleBreadcrumb,
+    consolePrimaryAction,
+    consoleSummaryAria,
+    consoleStatActiveServices,
+    consoleStatPendingReleases,
+    consoleStatAffectedRegions,
+    consoleFilterLabel,
+    consoleFieldNameLabel,
+    consoleFieldStatusLabel,
+    consoleApply,
+    consoleReset,
+    consoleSelectVisible,
+    consoleBulkActions,
+    consoleClearSelection,
+    consoleBulkSelected,
+    consoleColName,
+    consoleColTarget,
+    consoleColStatus,
+    consoleColActor,
+    consoleColUpdated,
+    consoleActionTitle,
+    consoleActionLabel,
+    consolePaginationLabel,
+    consoleDrawerTitle,
+    consoleDrawerProject,
+    consoleDrawerTarget,
+    consoleDrawerStatus,
+    consoleDrawerActor,
+    consoleDrawerUpdated,
+    consoleDrawerBranch,
+    consolePageStatus,
+    commercialNavCommercial,
+    commercialNavConsole,
+    commercialNavHome,
+} from "#locales/common";
+import ConsolePageServer from "#server/pages/console";
+import { demoConsoleRows, demoReleaseSummary } from "../demo/releases.ts";
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
 const initialConsoleSummary = demoReleaseSummary();
 const initialConsoleRows = demoConsoleRows();
 
 export default class ConsolePage {
-  summaryTotal = initialConsoleSummary.total;
-  summaryRunning = initialConsoleSummary.running;
-  summaryFailed = initialConsoleSummary.failed;
-  query = '';
-  statusQuery = '';
-  appliedQuery = '';
-  appliedStatusQuery = '';
-  selectedCount = 0;
-  bulkLabel = '';
-  drawerOpen = false;
-  detailProject = '';
-  detailTarget = '';
-  detailStatus = '';
-  detailActor = '';
-  detailUpdated = '';
-  detailBranch = '';
-  page = 1;
-  pageCount = 1;
-  pageStatus = 'Page 1 / 1';
-  prevDisabled = true;
-  nextDisabled = true;
-  rowAction = true;
-  consoleNavLabel = '';
-  consoleTitleLabel = '';
-  consoleSubtitleLabel = '';
-  consoleBreadcrumbLabel = '';
-  consolePrimaryActionLabel = '';
-  consoleSummaryAriaLabel = '';
-  consoleDataPanelAriaLabel = '';
-  consoleStatActiveServicesLabel = '';
-  consoleStatPendingReleasesLabel = '';
-  consoleStatAffectedRegionsLabel = '';
-  consoleFilterLabel = '';
-  consoleFieldNameLabel = '';
-  consoleFieldStatusLabel = '';
-  consoleApplyLabel = '';
-  consoleResetLabel = '';
-  consoleSelectVisibleLabel = '';
-  consoleBulkActionsLabel = '';
-  consoleClearSelectionLabel = '';
-  consoleActionTitleLabel = '';
-  consoleActionLabel = '';
-  consolePaginationLabel = '';
-  consoleDrawerTitleLabel = '';
-  consoleDrawerProjectLabel = '';
-  consoleDrawerTargetLabel = '';
-  consoleDrawerStatusLabel = '';
-  consoleDrawerActorLabel = '';
-  consoleDrawerUpdatedLabel = '';
-  consoleDrawerBranchLabel = '';
-  columns = [];
-  allRows = initialConsoleRows.map((row) => ({
-    id: row.id,
-    cells: row.cells.map((cell) => String(cell)),
-  }));
-  rows = [];
-  navItems = [];
-  _unwatchLocale = null;
+    summaryTotal = initialConsoleSummary.total;
+    summaryRunning = initialConsoleSummary.running;
+    summaryFailed = initialConsoleSummary.failed;
+    query = "";
+    statusQuery = "";
+    appliedQuery = "";
+    appliedStatusQuery = "";
+    selectedCount = 0;
+    bulkLabel = "";
+    drawerOpen = false;
+    detailProject = "";
+    detailTarget = "";
+    detailStatus = "";
+    detailActor = "";
+    detailUpdated = "";
+    detailBranch = "";
+    page = 1;
+    pageCount = 1;
+    pageStatus = "Page 1 / 1";
+    prevDisabled = true;
+    nextDisabled = true;
+    rowAction = true;
+    consoleNavLabel = "";
+    consoleTitleLabel = "";
+    consoleSubtitleLabel = "";
+    consoleBreadcrumbLabel = "";
+    consolePrimaryActionLabel = "";
+    consoleSummaryAriaLabel = "";
+    consoleDataPanelAriaLabel = "";
+    consoleStatActiveServicesLabel = "";
+    consoleStatPendingReleasesLabel = "";
+    consoleStatAffectedRegionsLabel = "";
+    consoleFilterLabel = "";
+    consoleFieldNameLabel = "";
+    consoleFieldStatusLabel = "";
+    consoleApplyLabel = "";
+    consoleResetLabel = "";
+    consoleSelectVisibleLabel = "";
+    consoleBulkActionsLabel = "";
+    consoleClearSelectionLabel = "";
+    consoleActionTitleLabel = "";
+    consoleActionLabel = "";
+    consolePaginationLabel = "";
+    consoleDrawerTitleLabel = "";
+    consoleDrawerProjectLabel = "";
+    consoleDrawerTargetLabel = "";
+    consoleDrawerStatusLabel = "";
+    consoleDrawerActorLabel = "";
+    consoleDrawerUpdatedLabel = "";
+    consoleDrawerBranchLabel = "";
+    columns = [];
+    allRows = initialConsoleRows.map((row) => ({
+        id: row.id,
+        cells: row.cells.map((cell) => String(cell)),
+    }));
+    rows = [];
+    navItems = [];
+    _unwatchLocale = null;
 
-  onMount() {
-    this.applyLocaleCopy();
-    this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
-    this.refreshPage();
-    this.loadDemoData();
-  }
-
-  async loadDemoData() {
-    try {
-      const server = new ConsolePageServer();
-      const rows = await server.getConsoleRows();
-      const summary = await server.getSummary();
-      if (Array.isArray(rows) && rows.length) {
-        this.allRows = rows;
-      }
-      if (summary && typeof summary === 'object') {
-        this.summaryTotal = Number(summary.total) || this.summaryTotal;
-        this.summaryRunning = Number(summary.running) || this.summaryRunning;
-        this.summaryFailed = Number(summary.failed) || this.summaryFailed;
-      }
-      this.refreshPage();
-    } catch {
-      /* SSR defaults remain the server fixture mirror */
+    onMount() {
+        this.applyLocaleCopy();
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+        this.refreshPage();
+        this.loadDemoData();
     }
-  }
 
-  onDestroy() {
-    if (typeof this._unwatchLocale === 'function') this._unwatchLocale();
-    this._unwatchLocale = null;
-  }
-
-  refreshCopy() {
-    this.consoleNavLabel = consoleNavLabel();
-    this.consoleTitleLabel = consoleTitle();
-    this.consoleSubtitleLabel = consoleSubtitle();
-    this.consoleBreadcrumbLabel = consoleBreadcrumb();
-    this.consolePrimaryActionLabel = consolePrimaryAction();
-    this.consoleSummaryAriaLabel = consoleSummaryAria();
-    this.consoleDataPanelAriaLabel = consoleFilterLabel();
-    this.consoleStatActiveServicesLabel = consoleStatActiveServices();
-    this.consoleStatPendingReleasesLabel = consoleStatPendingReleases();
-    this.consoleStatAffectedRegionsLabel = consoleStatAffectedRegions();
-    this.consoleFilterLabel = consoleFilterLabel();
-    this.consoleFieldNameLabel = consoleFieldNameLabel();
-    this.consoleFieldStatusLabel = consoleFieldStatusLabel();
-    this.consoleApplyLabel = consoleApply();
-    this.consoleResetLabel = consoleReset();
-    this.consoleSelectVisibleLabel = consoleSelectVisible();
-    this.consoleBulkActionsLabel = consoleBulkActions();
-    this.consoleClearSelectionLabel = consoleClearSelection();
-    this.consoleActionTitleLabel = consoleActionTitle();
-    this.consoleActionLabel = consoleActionLabel();
-    this.consolePaginationLabel = consolePaginationLabel();
-    this.consoleDrawerTitleLabel = consoleDrawerTitle();
-    this.consoleDrawerProjectLabel = consoleDrawerProject();
-    this.consoleDrawerTargetLabel = consoleDrawerTarget();
-    this.consoleDrawerStatusLabel = consoleDrawerStatus();
-    this.consoleDrawerActorLabel = consoleDrawerActor();
-    this.consoleDrawerUpdatedLabel = consoleDrawerUpdated();
-    this.consoleDrawerBranchLabel = consoleDrawerBranch();
-    this.columns = [
-      { id: 'name', title: consoleColName() },
-      { id: 'target', title: consoleColTarget() },
-      { id: 'status', title: consoleColStatus() },
-      { id: 'actor', title: consoleColActor() },
-      { id: 'updated', title: consoleColUpdated() },
-    ];
-    this.navItems = [
-      { id: 'console', title: commercialNavConsole(), href: '/console' },
-      { id: 'ui', title: commercialNavCommercial(), href: '/ui' },
-      { id: 'home', title: commercialNavHome(), href: '/' },
-    ];
-    if (this.selectedCount > 0) {
-      this.bulkLabel = consoleBulkSelected().replace('{count}', String(this.selectedCount));
+    async loadDemoData() {
+        try {
+            const server = new ConsolePageServer();
+            const rows = await server.getConsoleRows();
+            const summary = await server.getSummary();
+            if (Array.isArray(rows) && rows.length) {
+                this.allRows = rows;
+            }
+            if (summary && typeof summary === "object") {
+                this.summaryTotal = Number(summary.total) || this.summaryTotal;
+                this.summaryRunning = Number(summary.running) || this.summaryRunning;
+                this.summaryFailed = Number(summary.failed) || this.summaryFailed;
+            }
+            this.refreshPage();
+        } catch {
+            /* SSR defaults remain the server fixture mirror */
+        }
     }
-    this.refreshPageStatus();
-  }
 
-  applyLocaleCopy(preferred) {
-    withLocaleHint(readLocaleId(preferred), () => this.refreshCopy());
-  }
-
-  formatPageStatus(page, pageCount) {
-    return consolePageStatus().replace('{page}', String(page)).replace('{count}', String(pageCount));
-  }
-
-  refreshPageStatus() {
-    this.pageStatus = this.formatPageStatus(this.page, this.pageCount);
-  }
-
-  applyFilter() {
-    this.appliedQuery = this.query;
-    this.appliedStatusQuery = this.statusQuery;
-    this.page = 1;
-    this.refreshPage();
-    this.clearSelection();
-  }
-
-  resetFilter() {
-    this.query = '';
-    this.statusQuery = '';
-    this.appliedQuery = '';
-    this.appliedStatusQuery = '';
-    this.page = 1;
-    this.refreshPage();
-    this.clearSelection();
-  }
-
-  filteredRows() {
-    const nameQ = (this.appliedQuery || '').trim().toLowerCase();
-    const statusQ = (this.appliedStatusQuery || '').trim().toLowerCase();
-    return this.allRows.filter((row) => {
-      const project = String(row.cells[0] || '').toLowerCase();
-      const status = String(row.cells[2] || '').toLowerCase();
-      if (nameQ && !project.includes(nameQ)) return false;
-      if (statusQ && !status.includes(statusQ)) return false;
-      return true;
-    });
-  }
-
-  refreshPage(source) {
-    const list = source || this.filteredRows();
-    const pageSize = 4;
-    this.pageCount = Math.max(1, Math.ceil(list.length / pageSize) || 1);
-    if (this.page > this.pageCount) this.page = this.pageCount;
-    if (this.page < 1) this.page = 1;
-    const start = (this.page - 1) * pageSize;
-    this.rows = list.slice(start, start + pageSize);
-    this.refreshPageStatus();
-    this.prevDisabled = this.page <= 1;
-    this.nextDisabled = this.page >= this.pageCount;
-  }
-
-  goPrev() {
-    if (this.page <= 1) return;
-    this.page -= 1;
-    this.refreshPage();
-  }
-
-  goNext() {
-    if (this.page >= this.pageCount) return;
-    this.page += 1;
-    this.refreshPage();
-  }
-
-  selectVisible() {
-    this.selectedCount = this.rows.length;
-    this.bulkLabel = consoleBulkSelected().replace('{count}', String(this.selectedCount));
-  }
-
-  clearSelection() {
-    this.selectedCount = 0;
-    this.bulkLabel = '';
-  }
-
-  async openDetail(id) {
-    this.drawerOpen = true;
-    try {
-      const server = new ConsolePageServer();
-      const detail = await server.getReleaseDetail(id);
-      if (detail && typeof detail === 'object') {
-        this.detailProject = String(detail.project || '');
-        this.detailTarget = String(detail.target || '');
-        this.detailStatus = String(detail.statusLabel || '');
-        this.detailActor = String(detail.actor || '');
-        this.detailUpdated = String(detail.updatedAt || '');
-        this.detailBranch = String(detail.branch || '');
-        return;
-      }
-    } catch {
-      /* fall back to visible row cells */
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
     }
-    const row = this.allRows.find((entry) => entry.id === id);
-    if (!row) return;
-    this.detailProject = String(row.cells[0] || '');
-    this.detailTarget = String(row.cells[1] || '');
-    this.detailStatus = String(row.cells[2] || '');
-    this.detailActor = String(row.cells[3] || '');
-    this.detailUpdated = String(row.cells[4] || '');
-    this.detailBranch = '';
-  }
+
+    refreshCopy() {
+        this.consoleNavLabel = consoleNavLabel();
+        this.consoleTitleLabel = consoleTitle();
+        this.consoleSubtitleLabel = consoleSubtitle();
+        this.consoleBreadcrumbLabel = consoleBreadcrumb();
+        this.consolePrimaryActionLabel = consolePrimaryAction();
+        this.consoleSummaryAriaLabel = consoleSummaryAria();
+        this.consoleDataPanelAriaLabel = consoleFilterLabel();
+        this.consoleStatActiveServicesLabel = consoleStatActiveServices();
+        this.consoleStatPendingReleasesLabel = consoleStatPendingReleases();
+        this.consoleStatAffectedRegionsLabel = consoleStatAffectedRegions();
+        this.consoleFilterLabel = consoleFilterLabel();
+        this.consoleFieldNameLabel = consoleFieldNameLabel();
+        this.consoleFieldStatusLabel = consoleFieldStatusLabel();
+        this.consoleApplyLabel = consoleApply();
+        this.consoleResetLabel = consoleReset();
+        this.consoleSelectVisibleLabel = consoleSelectVisible();
+        this.consoleBulkActionsLabel = consoleBulkActions();
+        this.consoleClearSelectionLabel = consoleClearSelection();
+        this.consoleActionTitleLabel = consoleActionTitle();
+        this.consoleActionLabel = consoleActionLabel();
+        this.consolePaginationLabel = consolePaginationLabel();
+        this.consoleDrawerTitleLabel = consoleDrawerTitle();
+        this.consoleDrawerProjectLabel = consoleDrawerProject();
+        this.consoleDrawerTargetLabel = consoleDrawerTarget();
+        this.consoleDrawerStatusLabel = consoleDrawerStatus();
+        this.consoleDrawerActorLabel = consoleDrawerActor();
+        this.consoleDrawerUpdatedLabel = consoleDrawerUpdated();
+        this.consoleDrawerBranchLabel = consoleDrawerBranch();
+        this.columns = [
+            { id: "name", title: consoleColName() },
+            { id: "target", title: consoleColTarget() },
+            { id: "status", title: consoleColStatus() },
+            { id: "actor", title: consoleColActor() },
+            { id: "updated", title: consoleColUpdated() },
+        ];
+        this.navItems = [
+            { id: "console", title: commercialNavConsole(), href: "/console" },
+            { id: "ui", title: commercialNavCommercial(), href: "/ui" },
+            { id: "home", title: commercialNavHome(), href: "/" },
+        ];
+        if (this.selectedCount > 0) {
+            this.bulkLabel = consoleBulkSelected().replace("{count}", String(this.selectedCount));
+        }
+        this.refreshPageStatus();
+    }
+
+    applyLocaleCopy(preferred) {
+        withLocaleHint(readLocaleId(preferred), () => this.refreshCopy());
+    }
+
+    formatPageStatus(page, pageCount) {
+        return consolePageStatus()
+            .replace("{page}", String(page))
+            .replace("{count}", String(pageCount));
+    }
+
+    refreshPageStatus() {
+        this.pageStatus = this.formatPageStatus(this.page, this.pageCount);
+    }
+
+    applyFilter() {
+        this.appliedQuery = this.query;
+        this.appliedStatusQuery = this.statusQuery;
+        this.page = 1;
+        this.refreshPage();
+        this.clearSelection();
+    }
+
+    resetFilter() {
+        this.query = "";
+        this.statusQuery = "";
+        this.appliedQuery = "";
+        this.appliedStatusQuery = "";
+        this.page = 1;
+        this.refreshPage();
+        this.clearSelection();
+    }
+
+    filteredRows() {
+        const nameQ = (this.appliedQuery || "").trim().toLowerCase();
+        const statusQ = (this.appliedStatusQuery || "").trim().toLowerCase();
+        return this.allRows.filter((row) => {
+            const project = String(row.cells[0] || "").toLowerCase();
+            const status = String(row.cells[2] || "").toLowerCase();
+            if (nameQ && !project.includes(nameQ)) return false;
+            if (statusQ && !status.includes(statusQ)) return false;
+            return true;
+        });
+    }
+
+    refreshPage(source) {
+        const list = source || this.filteredRows();
+        const pageSize = 4;
+        this.pageCount = Math.max(1, Math.ceil(list.length / pageSize) || 1);
+        if (this.page > this.pageCount) this.page = this.pageCount;
+        if (this.page < 1) this.page = 1;
+        const start = (this.page - 1) * pageSize;
+        this.rows = list.slice(start, start + pageSize);
+        this.refreshPageStatus();
+        this.prevDisabled = this.page <= 1;
+        this.nextDisabled = this.page >= this.pageCount;
+    }
+
+    goPrev() {
+        if (this.page <= 1) return;
+        this.page -= 1;
+        this.refreshPage();
+    }
+
+    goNext() {
+        if (this.page >= this.pageCount) return;
+        this.page += 1;
+        this.refreshPage();
+    }
+
+    selectVisible() {
+        this.selectedCount = this.rows.length;
+        this.bulkLabel = consoleBulkSelected().replace("{count}", String(this.selectedCount));
+    }
+
+    clearSelection() {
+        this.selectedCount = 0;
+        this.bulkLabel = "";
+    }
+
+    async openDetail(id) {
+        this.drawerOpen = true;
+        try {
+            const server = new ConsolePageServer();
+            const detail = await server.getReleaseDetail(id);
+            if (detail && typeof detail === "object") {
+                this.detailProject = String(detail.project || "");
+                this.detailTarget = String(detail.target || "");
+                this.detailStatus = String(detail.statusLabel || "");
+                this.detailActor = String(detail.actor || "");
+                this.detailUpdated = String(detail.updatedAt || "");
+                this.detailBranch = String(detail.branch || "");
+                return;
+            }
+        } catch {
+            /* fall back to visible row cells */
+        }
+        const row = this.allRows.find((entry) => entry.id === id);
+        if (!row) return;
+        this.detailProject = String(row.cells[0] || "");
+        this.detailTarget = String(row.cells[1] || "");
+        this.detailStatus = String(row.cells[2] || "");
+        this.detailActor = String(row.cells[3] || "");
+        this.detailUpdated = String(row.cells[4] || "");
+        this.detailBranch = "";
+    }
 }
 </script>
-
 <script server>
-import ReleaseDemo from '#server/demo/ReleaseDemo';
+import ReleaseDemo from "#server/demo/ReleaseDemo";
 
 export default class ConsolePageServer {
-  getConsoleRows() {
-    return new ReleaseDemo().getConsoleRows();
-  }
+    getConsoleRows() {
+        return new ReleaseDemo().getConsoleRows();
+    }
 
-  getSummary() {
-    return new ReleaseDemo().getSummary();
-  }
+    getSummary() {
+        return new ReleaseDemo().getSummary();
+    }
 
-  getReleaseDetail(id) {
-    return new ReleaseDemo().getReleaseDetail(id);
-  }
+    getReleaseDetail(id) {
+        return new ReleaseDemo().getReleaseDetail(id);
+    }
 }
 </script>

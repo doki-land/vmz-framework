@@ -1,24 +1,26 @@
 <template>
-  <div class="mermaid-host" html={html != null ? html : fallback(source)}></div>
+    <div v-html="html != null ? html : fallback(source)" class="mermaid-host" />
 </template>
-
 <script client>
-import { renderMermaid, renderMermaidFallback } from '@vmz/plugin-mermaid/runtime';
+import { renderMermaid, renderMermaidFallback } from "@vmz/plugin-mermaid/runtime";
 
 function fallback(source) {
-  return renderMermaidFallback(source);
+    return renderMermaidFallback(source);
 }
 
 export default class Mermaid {
-  public source: string = '';
-  html: string | null = null;
+    public source: string = "";
+    html: string | null = null;
 
-  async onMount() {
-    try {
-      this.html = await renderMermaid(this.source, 'vmz-mmd-' + Math.random().toString(36).slice(2));
-    } catch {
-      this.html = renderMermaidFallback(this.source);
+    async onMount() {
+        try {
+            this.html = await renderMermaid(
+                this.source,
+                "vmz-mmd-" + Math.random().toString(36).slice(2),
+            );
+        } catch {
+            this.html = renderMermaidFallback(this.source);
+        }
     }
-  }
 }
 </script>

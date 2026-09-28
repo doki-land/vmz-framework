@@ -1,18 +1,44 @@
 <template>
-  <div class="vmz-ui-progress" data-vmz-ui="progress" role="progressbar" :aria-valuemin="0" :aria-valuemax="100" :aria-valuenow="percent">
-    <div class="vmz-ui-progress__track"><span :style="'width:' + percent + '%'"></span></div>
-    <span v-if="showInfo" class="vmz-ui-progress__text">{{ percent }}%</span>
-  </div>
+    <div data-vmz-ui="progress" role="progressbar" :aria-valuemin="0" :aria-valuemax="100" :aria-valuenow="percent" class="vmz-ui-progress">
+        <div class="vmz-ui-progress__track">
+            <span :style='"width:" + percent + "%"' />
+        </div>
+        <span v-if="showInfo" class="vmz-ui-progress__text">
+            {{ percent }}
+            %
+        </span>
+    </div>
 </template>
 <style>
-.vmz-ui-progress{display:flex;align-items:center;gap:.75rem;width:100%}
-.vmz-ui-progress__track{height:.5rem;flex:1;overflow:hidden;border-radius:999px;background:var(--vmz-surface-mist)}
-.vmz-ui-progress__track span{display:block;height:100%;border-radius:inherit;background:var(--vmz-action-primary-background);transition:width var(--vmz-motion-control-duration,.16s)}
-.vmz-ui-progress__text{min-width:2.5rem;color:var(--vmz-text-steel);font-size:.875rem}
+.vmz-ui-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+}
+.vmz-ui-progress__track {
+    height: 0.5rem;
+    flex: 1;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--vmz-surface-mist);
+}
+.vmz-ui-progress__track span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--vmz-action-primary-background);
+    transition: width var(--vmz-motion-control-duration, 0.16s);
+}
+.vmz-ui-progress__text {
+    min-width: 2.5rem;
+    color: var(--vmz-text-steel);
+    font-size: 0.875rem;
+}
 </style>
 <script client>
 export default class Progress {
-  public percent: number = 0;
-  public showInfo: boolean = true;
+    public percent: number = 0;
+    public showInfo: boolean = true;
 }
 </script>

@@ -1,9 +1,10 @@
 <template>
-  <span class="row" :aria-label="title">{{ title }}</span>
+    <span :aria-label="title" class="row">
+        {{ title }}
+    </span>
 </template>
-
 <script client>
 export default class ProductRow {
-	public title: string = "";
+    public title: string = "";
 }
 </script>

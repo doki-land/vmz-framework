@@ -1,14 +1,17 @@
 <template>
-  <div>
-      <p v-if="showA">{{ aText }}</p>
-      <p v-else>{{ bText }}</p>
+    <div>
+        <p v-if="showA">
+            {{ aText }}
+        </p>
+        <p v-else>
+            {{ bText }}
+        </p>
     </div>
 </template>
-
 <script client>
 export default class BranchDemo {
-	showA = true;
-	aText = "A";
-	bText = "B";
+    showA = true;
+    aText = "A";
+    bText = "B";
 }
 </script>

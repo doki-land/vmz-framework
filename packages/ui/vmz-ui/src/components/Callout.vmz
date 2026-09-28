@@ -1,20 +1,18 @@
 <template>
-  <aside
-      class="vmz-ui-callout"
-      data-vmz-ui="callout"
-      :data-tone="tone"
-      :role="roleName"
-    >
-      <p v-if="title" class="vmz-ui-callout__title">{{ title }}</p>
-      <p v-if="description" class="vmz-ui-callout__description">{{ description }}</p>
-      <div class="vmz-ui-callout__body">
-        <slot />
-      </div>
+    <aside data-vmz-ui="callout" :data-tone="tone" :role="roleName" class="vmz-ui-callout">
+        <p v-if="title" class="vmz-ui-callout__title">
+            {{ title }}
+        </p>
+        <p v-if="description" class="vmz-ui-callout__description">
+            {{ description }}
+        </p>
+        <div class="vmz-ui-callout__body">
+            <slot />
+        </div>
     </aside>
 </template>
-
 <style>
-  .vmz-ui-callout {
+.vmz-ui-callout {
     display: flex;
     flex-direction: column;
     gap: 0.45rem;
@@ -24,57 +22,56 @@
     border-radius: var(--vmz-radius-md, 6px);
     background: color-mix(in srgb, var(--vmz-status-info-accent) 10%, var(--vmz-surface-paper));
     color: var(--vmz-status-info-foreground);
-  }
+}
 
-  .vmz-ui-callout[data-tone='info'] {
+.vmz-ui-callout[data-tone="info"] {
     border-color: var(--vmz-status-info-accent);
     background: color-mix(in srgb, var(--vmz-status-info-accent) 10%, var(--vmz-surface-paper));
     color: var(--vmz-status-info-foreground);
-  }
+}
 
-  .vmz-ui-callout[data-tone='success'] {
+.vmz-ui-callout[data-tone="success"] {
     border-color: var(--vmz-status-success-accent);
     background: color-mix(in srgb, var(--vmz-status-success-accent) 10%, var(--vmz-surface-paper));
     color: var(--vmz-status-success-foreground);
-  }
+}
 
-  .vmz-ui-callout[data-tone='warning'] {
+.vmz-ui-callout[data-tone="warning"] {
     border-color: var(--vmz-status-warning-accent);
     background: color-mix(in srgb, var(--vmz-status-warning-accent) 10%, var(--vmz-surface-paper));
     color: var(--vmz-status-warning-foreground);
-  }
+}
 
-  .vmz-ui-callout[data-tone='danger'] {
+.vmz-ui-callout[data-tone="danger"] {
     border-color: var(--vmz-status-danger-accent);
     background: color-mix(in srgb, var(--vmz-status-danger-accent) 10%, var(--vmz-surface-paper));
     color: var(--vmz-status-danger-foreground);
-  }
+}
 
-  .vmz-ui-callout__title {
+.vmz-ui-callout__title {
     margin: 0;
     font-family: var(--vmz-font-display);
     font-weight: 700;
-  }
+}
 
-  .vmz-ui-callout__description {
+.vmz-ui-callout__description {
     margin: 0;
     line-height: 1.5;
-  }
+}
 
-  .vmz-ui-callout__body:empty {
+.vmz-ui-callout__body:empty {
     display: none;
-  }
+}
 </style>
-
 <script client>
 /**
-* VMZ UI — Callout (Document/Product composition).
-* Inline guidance block for prose; shares status.* tones with Alert.
-*/
+ * VMZ UI — Callout (Document/Product composition).
+ * Inline guidance block for prose; shares status.* tones with Alert.
+ */
 export default class Callout {
-	public title: string = "";
-	public description: string = "";
-	public tone: string = "info";
-	public roleName: string = "note";
+    public title: string = "";
+    public description: string = "";
+    public tone: string = "info";
+    public roleName: string = "note";
 }
 </script>

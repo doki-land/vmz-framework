@@ -1,102 +1,89 @@
 <template>
-  <div data-vmz-fixture="stacking">
-    <AppShell brand="VMZ" home-href="/" nav-label="Stacking" :nav="navItems">
-      <Alert
-        tone="info"
-        role-name="status"
-        title="Overlay stacking"
-        description="Drawer → Dialog → Popover with rising stackLevel; Escape closes topmost only. Parent owns the stack."
-      />
-
-      <p data-vmz-fixture="stacking-state">
-        drawer:{{ drawerOpen ? 'open' : 'closed' }};dialog:{{ dialogOpen ? 'open' : 'closed' }};popover:{{ popoverOpen ? 'open' : 'closed' }}
-      </p>
-
-      <div class="vmz-stacking-actions">
-        <Button type="button" @click="openDrawer">Open drawer (stack 0)</Button>
-        <Button type="button" variant="secondary" @click="openDialog">Open dialog (stack 1)</Button>
-        <Button type="button" variant="ghost" @click="openPopover">Open popover (stack 2)</Button>
-      </div>
-
-      <Drawer
-        :open="drawerOpen"
-        title="Base drawer"
-        title-id="home-stack-drawer-title"
-        stack-level="0"
-        :on-close="closeDrawer"
-      >
-        <p data-vmz-fixture="stacking-drawer-body">Base layer stack-level=0</p>
-      </Drawer>
-
-      <Dialog
-        :open="dialogOpen"
-        title="Stacked dialog"
-        title-id="home-stack-dialog-title"
-        stack-level="1"
-        :on-close="closeDialog"
-      >
-        <p data-vmz-fixture="stacking-dialog-body">Middle layer stack-level=1</p>
-      </Dialog>
-
-      <Popover
-        :open="popoverOpen"
-        title="Top popover"
-        title-id="home-stack-popover-title"
-        stack-level="2"
-        :on-close="closePopover"
-      >
-        <p data-vmz-fixture="stacking-popover-body">Top layer stack-level=2</p>
-      </Popover>
-    </AppShell>
-  </div>
+    <div data-vmz-fixture="stacking">
+        <AppShell brand="VMZ" home-href="/" nav-label="Stacking" :nav="navItems">
+            <Alert tone="info" role-name="status" title="Overlay stacking" description="Drawer → Dialog → Popover with rising stackLevel; Escape closes topmost only. Parent owns the stack." />
+            <p data-vmz-fixture="stacking-state">
+                drawer:
+                {{ drawerOpen ? "open" : "closed" }}
+                ;dialog:
+                {{ dialogOpen ? "open" : "closed" }}
+                ;popover:
+                {{ popoverOpen ? "open" : "closed" }}
+            </p>
+            <div class="vmz-stacking-actions">
+                <Button type="button" @click="openDrawer">
+                    Open drawer (stack 0)
+                </Button>
+                <Button type="button" variant="secondary" @click="openDialog">
+                    Open dialog (stack 1)
+                </Button>
+                <Button type="button" variant="ghost" @click="openPopover">
+                    Open popover (stack 2)
+                </Button>
+            </div>
+            <Drawer :open="drawerOpen" title="Base drawer" title-id="home-stack-drawer-title" stack-level="0" :on-close="closeDrawer">
+                <p data-vmz-fixture="stacking-drawer-body">
+                    Base layer stack-level=0
+                </p>
+            </Drawer>
+            <Dialog :open="dialogOpen" title="Stacked dialog" title-id="home-stack-dialog-title" stack-level="1" :on-close="closeDialog">
+                <p data-vmz-fixture="stacking-dialog-body">
+                    Middle layer stack-level=1
+                </p>
+            </Dialog>
+            <Popover :open="popoverOpen" title="Top popover" title-id="home-stack-popover-title" stack-level="2" :on-close="closePopover">
+                <p data-vmz-fixture="stacking-popover-body">
+                    Top layer stack-level=2
+                </p>
+            </Popover>
+        </AppShell>
+    </div>
 </template>
-
 <style>
 .vmz-stacking-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem 0.75rem;
 }
 </style>
-
 <script client>
 export default class StackingPage {
-  drawerOpen = false;
-  dialogOpen = false;
-  popoverOpen = false;
+    drawerOpen = false;
+    dialogOpen = false;
+    popoverOpen = false;
 
-  navItems = [
-    { id: 'stacking', title: 'Stacking', href: '/stacking' },
-    { id: 'structure', title: 'Structure', href: '/structure' },
-    { id: 'ui', title: 'UI lab', href: '/ui' },
-    { id: 'motion', title: 'Motion', href: '/motion' },
-  ];
+    navItems = [
+        { id: "stacking", title: "Stacking", href: "/stacking" },
+        { id: "structure", title: "Structure", href: "/structure" },
+        { id: "ui", title: "UI lab", href: "/ui" },
+        { id: "motion", title: "Motion", href: "/motion" },
+    ];
 
-  openDrawer() {
-    this.drawerOpen = true;
-  }
+    openDrawer() {
+        this.drawerOpen = true;
+    }
 
-  closeDrawer() {
-    this.popoverOpen = false;
-    this.dialogOpen = false;
-    this.drawerOpen = false;
-  }
+    closeDrawer() {
+        this.popoverOpen = false;
+        this.dialogOpen = false;
+        this.drawerOpen = false;
+    }
 
-  openDialog() {
-    this.dialogOpen = true;
-  }
+    openDialog() {
+        this.dialogOpen = true;
+    }
 
-  closeDialog() {
-    this.popoverOpen = false;
-    this.dialogOpen = false;
-  }
+    closeDialog() {
+        this.popoverOpen = false;
+        this.dialogOpen = false;
+    }
 
-  openPopover() {
-    this.popoverOpen = true;
-  }
+    openPopover() {
+        this.popoverOpen = true;
+    }
 
-  closePopover() {
-    this.popoverOpen = false;
-  }
+    closePopover() {
+        this.popoverOpen = false;
+    }
 }
 </script>

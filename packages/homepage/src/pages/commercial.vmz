@@ -1,545 +1,554 @@
 <template>
-  <div data-vmz-fixture="commercial">
-    <AppShell brand="VMZ" home-href="/" :nav-label="commercialNavLabel" :nav="navItems">
-      <section class="vmz-commercial-hero" data-vmz-fixture="commercial-hero" aria-labelledby="commercial-hero-title">
-        <h1 id="commercial-hero-title" class="vmz-commercial-hero__title">{{ commercialHeroTitleLabel }}</h1>
-        <p class="vmz-commercial-hero__lead">{{ commercialHeroLeadLabel }}</p>
-        <div class="vmz-commercial-hero__actions">
-          <Link href="/console">{{ commercialCtaContactLabel }}</Link>
-          <Link :href="guideHref">{{ commercialCtaDocsLabel }}</Link>
-        </div>
-      </section>
-
-      <section class="vmz-commercial-task" data-vmz-fixture="commercial-task-browse" aria-labelledby="commercial-task-browse-title">
-        <div class="vmz-commercial-task__copy">
-          <h2 id="commercial-task-browse-title">{{ commercialFeature1TitleLabel }}</h2>
-          <p>{{ commercialFeature1DescLabel }}</p>
-        </div>
-        <div class="vmz-commercial-task__demo vmz-commercial-panel">
-          <FilterBar :label="commercialBrowseFilterLabel">
-            <Field
-              :label="commercialBrowseFieldLabel"
-              control-id="home-commercial-browse-query"
-              description-id="home-commercial-browse-desc"
-              error-id="home-commercial-browse-err"
-              described-by="home-commercial-browse-desc"
-              :value="browseQuery"
-              @input="(e) => (browseQuery = e.target.value)"
-            />
-            <Button type="button" variant="primary" @click="applyBrowseFilter">{{ commercialBrowseApplyLabel }}</Button>
-            <Button type="button" variant="secondary" @click="resetBrowseFilter">{{ commercialBrowseResetLabel }}</Button>
-          </FilterBar>
-          <Table
-            :columns="browseColumns"
-            :rows="browseRows"
-            :has-row-action="false"
-          />
-        </div>
-      </section>
-
-      <section class="vmz-commercial-task" data-vmz-fixture="commercial-task-detail" aria-labelledby="commercial-task-detail-title">
-        <div class="vmz-commercial-task__copy">
-          <h2 id="commercial-task-detail-title">{{ commercialFeature2TitleLabel }}</h2>
-          <p>{{ commercialFeature2DescLabel }}</p>
-        </div>
-        <div class="vmz-commercial-task__demo vmz-commercial-panel">
-          <p class="vmz-commercial-detail-line">{{ commercialDetailSummaryLabel }}</p>
-          <div data-vmz-fixture="commercial-drawer-open">
-            <Button type="button" variant="secondary" @click="openFeaturedDetail">{{ commercialDetailOpenLabel }}</Button>
-          </div>
-          <Drawer
-            :open="drawerOpen"
-            :title="commercialDrawerTitleLabel"
-            title-id="home-commercial-drawer-title"
-            :on-close="() => (drawerOpen = false)"
-          >
-            <dl class="vmz-commercial-detail" data-vmz-fixture="commercial-drawer-body">
-              <div>
-                <dt>{{ commercialDrawerProjectLabel }}</dt>
-                <dd data-vmz-fixture="commercial-drawer-project">{{ detailProject }}</dd>
-              </div>
-              <div>
-                <dt>{{ commercialDrawerTargetLabel }}</dt>
-                <dd data-vmz-fixture="commercial-drawer-target">{{ detailTarget }}</dd>
-              </div>
-              <div>
-                <dt>{{ commercialDrawerStatusLabel }}</dt>
-                <dd data-vmz-fixture="commercial-drawer-status">{{ detailStatus }}</dd>
-              </div>
-              <div>
-                <dt>{{ commercialDrawerActorLabel }}</dt>
-                <dd data-vmz-fixture="commercial-drawer-actor">{{ detailActor }}</dd>
-              </div>
-            </dl>
-            <Link href="/console">{{ commercialOpenConsoleLabel }}</Link>
-          </Drawer>
-        </div>
-      </section>
-
-      <section class="vmz-commercial-task" data-vmz-fixture="commercial-task-action" aria-labelledby="commercial-task-action-title">
-        <div class="vmz-commercial-task__copy">
-          <h2 id="commercial-task-action-title">{{ commercialFeature3TitleLabel }}</h2>
-          <p>{{ commercialFeature3DescLabel }}</p>
-        </div>
-        <div class="vmz-commercial-task__demo vmz-commercial-panel">
-          <Form
-            :label="commercialFormLabel"
-            :error-summary="actionSummary"
-            summary-id="home-commercial-summary"
-            :described-by="actionDescribedBy"
-            @submit="confirmReview"
-            @reset="resetReview"
-          >
-            <Field
-              :label="commercialReviewNoteLabel"
-              :description="commercialReviewNoteDescLabel"
-              control-id="home-commercial-review"
-              description-id="home-commercial-review-desc"
-              error-id="home-commercial-review-err"
-              :described-by="reviewDescribedBy"
-              :error="reviewError"
-              :invalid-attr="reviewInvalid"
-              :value="reviewNote"
-              @input="onReviewNote"
-            />
-            <p class="vmz-sr-only" data-vmz-fixture="commercial-review-note">note:{{ reviewNote }}</p>
-            <div data-vmz-fixture="commercial-form-actions" class="vmz-commercial-actions">
-              <Button type="submit">{{ commercialConfirmLabel }}</Button>
-              <Button type="reset" variant="secondary">{{ commercialResetLabel }}</Button>
-            </div>
-          </Form>
-          <div v-if="reviewSuccess" data-vmz-fixture="commercial-notify">
-            <Notification
-              tone="success"
-              role-name="status"
-              :title="commercialNotifyTitleLabel"
-              :description="commercialNotifyDescLabel"
-            >
-              <Button type="button" variant="ghost" @click="() => (reviewSuccess = false)">{{ commercialNotifyCloseLabel }}</Button>
-            </Notification>
-          </div>
-        </div>
-      </section>
-    </AppShell>
-  </div>
+    <div data-vmz-fixture="commercial">
+        <AppShell brand="VMZ" home-href="/" :nav-label="commercialNavLabel" :nav="navItems">
+            <section data-vmz-fixture="commercial-hero" aria-labelledby="commercial-hero-title" class="vmz-commercial-hero">
+                <h1 id="commercial-hero-title" class="vmz-commercial-hero__title">
+                    {{ commercialHeroTitleLabel }}
+                </h1>
+                <p class="vmz-commercial-hero__lead">
+                    {{ commercialHeroLeadLabel }}
+                </p>
+                <div class="vmz-commercial-hero__actions">
+                    <Link href="/console">
+                        {{ commercialCtaContactLabel }}
+                    </Link>
+                    <Link :href="guideHref">
+                        {{ commercialCtaDocsLabel }}
+                    </Link>
+                </div>
+            </section>
+            <section data-vmz-fixture="commercial-task-browse" aria-labelledby="commercial-task-browse-title" class="vmz-commercial-task">
+                <div class="vmz-commercial-task__copy">
+                    <h2 id="commercial-task-browse-title">
+                        {{ commercialFeature1TitleLabel }}
+                    </h2>
+                    <p>
+                        {{ commercialFeature1DescLabel }}
+                    </p>
+                </div>
+                <div class="vmz-commercial-task__demo vmz-commercial-panel">
+                    <FilterBar :label="commercialBrowseFilterLabel">
+                        <Field :label="commercialBrowseFieldLabel" control-id="home-commercial-browse-query" description-id="home-commercial-browse-desc" error-id="home-commercial-browse-err" described-by="home-commercial-browse-desc" :value="browseQuery" @input="((e) => browseQuery = e.target.value)" />
+                        <Button type="button" variant="primary" @click="applyBrowseFilter">
+                            {{ commercialBrowseApplyLabel }}
+                        </Button>
+                        <Button type="button" variant="secondary" @click="resetBrowseFilter">
+                            {{ commercialBrowseResetLabel }}
+                        </Button>
+                    </FilterBar>
+                    <Table :columns="browseColumns" :rows="browseRows" :has-row-action="false" />
+                </div>
+            </section>
+            <section data-vmz-fixture="commercial-task-detail" aria-labelledby="commercial-task-detail-title" class="vmz-commercial-task">
+                <div class="vmz-commercial-task__copy">
+                    <h2 id="commercial-task-detail-title">
+                        {{ commercialFeature2TitleLabel }}
+                    </h2>
+                    <p>
+                        {{ commercialFeature2DescLabel }}
+                    </p>
+                </div>
+                <div class="vmz-commercial-task__demo vmz-commercial-panel">
+                    <p class="vmz-commercial-detail-line">
+                        {{ commercialDetailSummaryLabel }}
+                    </p>
+                    <div data-vmz-fixture="commercial-drawer-open">
+                        <Button type="button" variant="secondary" @click="openFeaturedDetail">
+                            {{ commercialDetailOpenLabel }}
+                        </Button>
+                    </div>
+                    <Drawer :open="drawerOpen" :title="commercialDrawerTitleLabel" title-id="home-commercial-drawer-title" :on-close="(() => drawerOpen = false)">
+                        <dl data-vmz-fixture="commercial-drawer-body" class="vmz-commercial-detail">
+                            <div>
+                                <dt>
+                                    {{ commercialDrawerProjectLabel }}
+                                </dt>
+                                <dd data-vmz-fixture="commercial-drawer-project">
+                                    {{ detailProject }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>
+                                    {{ commercialDrawerTargetLabel }}
+                                </dt>
+                                <dd data-vmz-fixture="commercial-drawer-target">
+                                    {{ detailTarget }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>
+                                    {{ commercialDrawerStatusLabel }}
+                                </dt>
+                                <dd data-vmz-fixture="commercial-drawer-status">
+                                    {{ detailStatus }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>
+                                    {{ commercialDrawerActorLabel }}
+                                </dt>
+                                <dd data-vmz-fixture="commercial-drawer-actor">
+                                    {{ detailActor }}
+                                </dd>
+                            </div>
+                        </dl>
+                        <Link href="/console">
+                            {{ commercialOpenConsoleLabel }}
+                        </Link>
+                    </Drawer>
+                </div>
+            </section>
+            <section data-vmz-fixture="commercial-task-action" aria-labelledby="commercial-task-action-title" class="vmz-commercial-task">
+                <div class="vmz-commercial-task__copy">
+                    <h2 id="commercial-task-action-title">
+                        {{ commercialFeature3TitleLabel }}
+                    </h2>
+                    <p>
+                        {{ commercialFeature3DescLabel }}
+                    </p>
+                </div>
+                <div class="vmz-commercial-task__demo vmz-commercial-panel">
+                    <Form :label="commercialFormLabel" :error-summary="actionSummary" summary-id="home-commercial-summary" :described-by="actionDescribedBy" @submit="confirmReview" @reset="resetReview">
+                        <Field :label="commercialReviewNoteLabel" :description="commercialReviewNoteDescLabel" control-id="home-commercial-review" description-id="home-commercial-review-desc" error-id="home-commercial-review-err" :described-by="reviewDescribedBy" :error="reviewError" :invalid-attr="reviewInvalid" :value="reviewNote" @input="onReviewNote" />
+                        <p data-vmz-fixture="commercial-review-note" class="vmz-sr-only">
+                            note:
+                            {{ reviewNote }}
+                        </p>
+                        <div data-vmz-fixture="commercial-form-actions" class="vmz-commercial-actions">
+                            <Button type="submit">
+                                {{ commercialConfirmLabel }}
+                            </Button>
+                            <Button type="reset" variant="secondary">
+                                {{ commercialResetLabel }}
+                            </Button>
+                        </div>
+                    </Form>
+                    <div v-if="reviewSuccess" data-vmz-fixture="commercial-notify">
+                        <Notification tone="success" role-name="status" :title="commercialNotifyTitleLabel" :description="commercialNotifyDescLabel">
+                            <Button type="button" variant="ghost" @click="(() => reviewSuccess = false)">
+                                {{ commercialNotifyCloseLabel }}
+                            </Button>
+                        </Notification>
+                    </div>
+                </div>
+            </section>
+        </AppShell>
+    </div>
 </template>
-
 <style>
 .vmz-commercial-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.75rem;
-  padding: 1.5rem 0 0.25rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1.5rem 0 0.25rem;
 }
 
 .vmz-commercial-hero__title {
-  margin: 0;
-  font-family: var(--vmz-font-display);
-  font-size: clamp(1.5rem, 3.6vw, 1.875rem);
-  font-weight: 600;
-  line-height: 1.35;
-  color: #1f2329;
-  max-width: 24ch;
+    margin: 0;
+    font-family: var(--vmz-font-display);
+    font-size: clamp(1.5rem, 3.6vw, 1.875rem);
+    font-weight: 600;
+    line-height: 1.35;
+    color: #1f2329;
+    max-width: 24ch;
 }
 
 .vmz-commercial-hero__lead {
-  margin: 0;
-  max-width: 40rem;
-  font-size: 1rem;
-  line-height: 1.625;
-  color: #51565d;
+    margin: 0;
+    max-width: 40rem;
+    font-size: 1rem;
+    line-height: 1.625;
+    color: #51565d;
 }
 
 .vmz-commercial-hero__actions,
 .vmz-commercial-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
 }
 
 .vmz-commercial-task {
-  display: grid;
-  grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
-  gap: 2rem;
-  align-items: start;
-  padding: 2.5rem 0;
-  border-top: 1px solid #e5e6eb;
+    display: grid;
+    grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+    gap: 2rem;
+    align-items: start;
+    padding: 2.5rem 0;
+    border-top: 1px solid #e5e6eb;
 }
 
 .vmz-commercial-task__copy {
-  display: grid;
-  gap: 0.75rem;
+    display: grid;
+    gap: 0.75rem;
 }
 
 .vmz-commercial-task__copy h2 {
-  margin: 0;
-  font-family: var(--vmz-font-display);
-  font-size: 1.25rem;
-  font-weight: 600;
-  line-height: 1.4;
-  color: #1f2329;
+    margin: 0;
+    font-family: var(--vmz-font-display);
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: #1f2329;
 }
 
 .vmz-commercial-task__copy p {
-  margin: 0;
-  color: #51565d;
-  font-size: 0.875rem;
-  line-height: 1.375rem;
+    margin: 0;
+    color: #51565d;
+    font-size: 0.875rem;
+    line-height: 1.375rem;
 }
 
 .vmz-commercial-panel {
-  display: grid;
-  gap: 0;
-  overflow: hidden;
-  border: 1px solid #e5e6eb;
-  border-radius: 8px;
-  background: #fff;
+    display: grid;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid #e5e6eb;
+    border-radius: 8px;
+    background: #fff;
 }
 
 .vmz-commercial-panel .vmz-ui-filter-bar {
-  margin: 0;
-  border: 0;
-  border-bottom: 1px solid #e5e6eb;
-  border-radius: 0;
+    margin: 0;
+    border: 0;
+    border-bottom: 1px solid #e5e6eb;
+    border-radius: 0;
 }
 
 .vmz-commercial-panel .vmz-ui-table-wrap {
-  margin: 0;
-  border: 0;
-  border-radius: 0;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
 }
 
 .vmz-commercial-panel .vmz-ui-form,
 .vmz-commercial-panel .vmz-commercial-actions,
 .vmz-commercial-panel .vmz-commercial-detail-line,
-.vmz-commercial-panel [data-vmz-fixture='commercial-drawer-open'],
-.vmz-commercial-panel [data-vmz-fixture='commercial-notify'] {
-  padding: 1rem;
+.vmz-commercial-panel [data-vmz-fixture="commercial-drawer-open"],
+.vmz-commercial-panel [data-vmz-fixture="commercial-notify"] {
+    padding: 1rem;
 }
 
 .vmz-commercial-detail-line {
-  margin: 0;
-  color: #51565d;
-  font-size: 0.875rem;
-  line-height: 1.375rem;
+    margin: 0;
+    color: #51565d;
+    font-size: 0.875rem;
+    line-height: 1.375rem;
 }
 
 .vmz-commercial-detail {
-  display: grid;
-  gap: 0.85rem;
-  margin: 0 0 1rem;
+    display: grid;
+    gap: 0.85rem;
+    margin: 0 0 1rem;
 }
 
 .vmz-commercial-detail > div {
-  display: grid;
-  gap: 0.2rem;
+    display: grid;
+    gap: 0.2rem;
 }
 
 .vmz-commercial-detail dt {
-  margin: 0;
-  color: #646a73;
-  font-size: 0.8125rem;
-  line-height: 1.25rem;
+    margin: 0;
+    color: #646a73;
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
 }
 
 .vmz-commercial-detail dd {
-  margin: 0;
-  color: #1f2329;
-  font-size: 0.875rem;
-  line-height: 1.375rem;
+    margin: 0;
+    color: #1f2329;
+    font-size: 0.875rem;
+    line-height: 1.375rem;
 }
 
 @media (max-width: 768px) {
-  .vmz-commercial-task {
-    grid-template-columns: 1fr;
-    gap: 1.25rem;
-  }
+    .vmz-commercial-task {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
 }
 </style>
-
 <script client>
 import {
-  commercialNavLabel,
-  commercialNavCommercial,
-  commercialNavConsole,
-  commercialNavHome,
-  commercialHeroTitle,
-  commercialHeroLead,
-  commercialCtaContact,
-  commercialCtaDocs,
-  commercialFeature1Title,
-  commercialFeature1Desc,
-  commercialFeature2Title,
-  commercialFeature2Desc,
-  commercialFeature3Title,
-  commercialFeature3Desc,
-  commercialBrowseFilterLabel,
-  commercialBrowseFieldLabel,
-  commercialBrowseApply,
-  commercialBrowseReset,
-  commercialDetailSummary,
-  commercialDetailOpen,
-  commercialFormLabel,
-  commercialReviewNoteLabel,
-  commercialReviewNoteDesc,
-  commercialConfirm,
-  commercialReset,
-  commercialNotifyTitle,
-  commercialNotifyDesc,
-  commercialNotifyClose,
-  commercialDrawerTitle,
-  commercialDrawerProject,
-  commercialDrawerTarget,
-  commercialDrawerStatus,
-  commercialDrawerActor,
-  commercialOpenConsole,
-  commercialReviewError,
-  commercialContactSummaryError,
-  consoleColName,
-  consoleColTarget,
-  consoleColStatus,
-  consoleColActor,
-  consoleColUpdated,
-} from '#locales/common';
-import CommercialPageServer from '#server/pages/commercial';
-import { demoConsoleRows } from '../demo/releases.ts';
-import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
+    commercialNavLabel,
+    commercialNavCommercial,
+    commercialNavConsole,
+    commercialNavHome,
+    commercialHeroTitle,
+    commercialHeroLead,
+    commercialCtaContact,
+    commercialCtaDocs,
+    commercialFeature1Title,
+    commercialFeature1Desc,
+    commercialFeature2Title,
+    commercialFeature2Desc,
+    commercialFeature3Title,
+    commercialFeature3Desc,
+    commercialBrowseFilterLabel,
+    commercialBrowseFieldLabel,
+    commercialBrowseApply,
+    commercialBrowseReset,
+    commercialDetailSummary,
+    commercialDetailOpen,
+    commercialFormLabel,
+    commercialReviewNoteLabel,
+    commercialReviewNoteDesc,
+    commercialConfirm,
+    commercialReset,
+    commercialNotifyTitle,
+    commercialNotifyDesc,
+    commercialNotifyClose,
+    commercialDrawerTitle,
+    commercialDrawerProject,
+    commercialDrawerTarget,
+    commercialDrawerStatus,
+    commercialDrawerActor,
+    commercialOpenConsole,
+    commercialReviewError,
+    commercialContactSummaryError,
+    consoleColName,
+    consoleColTarget,
+    consoleColStatus,
+    consoleColActor,
+    consoleColUpdated,
+} from "#locales/common";
+import CommercialPageServer from "#server/pages/commercial";
+import { demoConsoleRows } from "../demo/releases.ts";
+import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
 const initialBrowseRows = demoConsoleRows();
 
 export default class CommercialPage {
-  browseQuery = '';
-  appliedBrowseQuery = '';
-  reviewNote = '';
-  reviewError = '';
-  reviewInvalid = 'false';
-  reviewDescribedBy = 'home-commercial-review-desc';
-  actionSummary = '';
-  actionDescribedBy = '';
-  reviewSuccess = false;
-  drawerOpen = false;
-  detailProject = '';
-  detailTarget = '';
-  detailStatus = '';
-  detailActor = '';
-  localeId = 'zh-hans';
-  guideHref = '/d/zh-hans/guide/';
-  commercialNavLabel = '';
-  commercialHeroTitleLabel = '';
-  commercialHeroLeadLabel = '';
-  commercialCtaContactLabel = '';
-  commercialCtaDocsLabel = '';
-  commercialFeature1TitleLabel = '';
-  commercialFeature1DescLabel = '';
-  commercialFeature2TitleLabel = '';
-  commercialFeature2DescLabel = '';
-  commercialFeature3TitleLabel = '';
-  commercialFeature3DescLabel = '';
-  commercialBrowseFilterLabel = '';
-  commercialBrowseFieldLabel = '';
-  commercialBrowseApplyLabel = '';
-  commercialBrowseResetLabel = '';
-  commercialDetailSummaryLabel = '';
-  commercialDetailOpenLabel = '';
-  commercialFormLabel = '';
-  commercialReviewNoteLabel = '';
-  commercialReviewNoteDescLabel = '';
-  commercialConfirmLabel = '';
-  commercialResetLabel = '';
-  commercialNotifyTitleLabel = '';
-  commercialNotifyDescLabel = '';
-  commercialNotifyCloseLabel = '';
-  commercialDrawerTitleLabel = '';
-  commercialDrawerProjectLabel = '';
-  commercialDrawerTargetLabel = '';
-  commercialDrawerStatusLabel = '';
-  commercialDrawerActorLabel = '';
-  commercialOpenConsoleLabel = '';
-  browseColumns = [];
-  allBrowseRows = initialBrowseRows.map((row) => ({
-    id: row.id,
-    cells: row.cells.map((cell) => String(cell)),
-  }));
-  browseRows = [];
-  navItems = [];
-  _unwatchLocale = null;
+    browseQuery = "";
+    appliedBrowseQuery = "";
+    reviewNote = "";
+    reviewError = "";
+    reviewInvalid = "false";
+    reviewDescribedBy = "home-commercial-review-desc";
+    actionSummary = "";
+    actionDescribedBy = "";
+    reviewSuccess = false;
+    drawerOpen = false;
+    detailProject = "";
+    detailTarget = "";
+    detailStatus = "";
+    detailActor = "";
+    localeId = "zh-hans";
+    guideHref = "/d/zh-hans/guide/";
+    commercialNavLabel = "";
+    commercialHeroTitleLabel = "";
+    commercialHeroLeadLabel = "";
+    commercialCtaContactLabel = "";
+    commercialCtaDocsLabel = "";
+    commercialFeature1TitleLabel = "";
+    commercialFeature1DescLabel = "";
+    commercialFeature2TitleLabel = "";
+    commercialFeature2DescLabel = "";
+    commercialFeature3TitleLabel = "";
+    commercialFeature3DescLabel = "";
+    commercialBrowseFilterLabel = "";
+    commercialBrowseFieldLabel = "";
+    commercialBrowseApplyLabel = "";
+    commercialBrowseResetLabel = "";
+    commercialDetailSummaryLabel = "";
+    commercialDetailOpenLabel = "";
+    commercialFormLabel = "";
+    commercialReviewNoteLabel = "";
+    commercialReviewNoteDescLabel = "";
+    commercialConfirmLabel = "";
+    commercialResetLabel = "";
+    commercialNotifyTitleLabel = "";
+    commercialNotifyDescLabel = "";
+    commercialNotifyCloseLabel = "";
+    commercialDrawerTitleLabel = "";
+    commercialDrawerProjectLabel = "";
+    commercialDrawerTargetLabel = "";
+    commercialDrawerStatusLabel = "";
+    commercialDrawerActorLabel = "";
+    commercialOpenConsoleLabel = "";
+    browseColumns = [];
+    allBrowseRows = initialBrowseRows.map((row) => ({
+        id: row.id,
+        cells: row.cells.map((cell) => String(cell)),
+    }));
+    browseRows = [];
+    navItems = [];
+    _unwatchLocale = null;
 
-  onMount() {
-    this.applyLocaleCopy();
-    this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
-    this.refreshBrowseRows();
-    this.loadDemoData();
-  }
-
-  onDestroy() {
-    if (typeof this._unwatchLocale === 'function') this._unwatchLocale();
-    this._unwatchLocale = null;
-  }
-
-  async loadDemoData() {
-    try {
-      const server = new CommercialPageServer();
-      const rows = await server.getConsoleRows();
-      if (Array.isArray(rows) && rows.length) {
-        this.allBrowseRows = rows;
+    onMount() {
+        this.applyLocaleCopy();
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
         this.refreshBrowseRows();
-      }
-    } catch {
-      /* SSR defaults mirror the server fixture */
+        this.loadDemoData();
     }
-  }
 
-  refreshCopy() {
-    this.commercialNavLabel = commercialNavLabel();
-    this.commercialHeroTitleLabel = commercialHeroTitle();
-    this.commercialHeroLeadLabel = commercialHeroLead();
-    this.commercialCtaContactLabel = commercialCtaContact();
-    this.commercialCtaDocsLabel = commercialCtaDocs();
-    this.commercialFeature1TitleLabel = commercialFeature1Title();
-    this.commercialFeature1DescLabel = commercialFeature1Desc();
-    this.commercialFeature2TitleLabel = commercialFeature2Title();
-    this.commercialFeature2DescLabel = commercialFeature2Desc();
-    this.commercialFeature3TitleLabel = commercialFeature3Title();
-    this.commercialFeature3DescLabel = commercialFeature3Desc();
-    this.commercialBrowseFilterLabel = commercialBrowseFilterLabel();
-    this.commercialBrowseFieldLabel = commercialBrowseFieldLabel();
-    this.commercialBrowseApplyLabel = commercialBrowseApply();
-    this.commercialBrowseResetLabel = commercialBrowseReset();
-    this.commercialDetailSummaryLabel = commercialDetailSummary();
-    this.commercialDetailOpenLabel = commercialDetailOpen();
-    this.commercialFormLabel = commercialFormLabel();
-    this.commercialReviewNoteLabel = commercialReviewNoteLabel();
-    this.commercialReviewNoteDescLabel = commercialReviewNoteDesc();
-    this.commercialConfirmLabel = commercialConfirm();
-    this.commercialResetLabel = commercialReset();
-    this.commercialNotifyTitleLabel = commercialNotifyTitle();
-    this.commercialNotifyDescLabel = commercialNotifyDesc();
-    this.commercialNotifyCloseLabel = commercialNotifyClose();
-    this.commercialDrawerTitleLabel = commercialDrawerTitle();
-    this.commercialDrawerProjectLabel = commercialDrawerProject();
-    this.commercialDrawerTargetLabel = commercialDrawerTarget();
-    this.commercialDrawerStatusLabel = commercialDrawerStatus();
-    this.commercialDrawerActorLabel = commercialDrawerActor();
-    this.commercialOpenConsoleLabel = commercialOpenConsole();
-    this.browseColumns = [
-      { id: 'name', title: consoleColName() },
-      { id: 'target', title: consoleColTarget() },
-      { id: 'status', title: consoleColStatus() },
-      { id: 'actor', title: consoleColActor() },
-      { id: 'updated', title: consoleColUpdated() },
-    ];
-    this.navItems = [
-      { id: 'commercial', title: commercialNavCommercial(), href: '/commercial' },
-      { id: 'console', title: commercialNavConsole(), href: '/console' },
-      { id: 'home', title: commercialNavHome(), href: '/' },
-    ];
-    const paths = docsPaths(this.localeId);
-    this.guideHref = paths.guideHref;
-  }
-
-  applyLocaleCopy(preferred) {
-    this.localeId = readLocaleId(preferred);
-    withLocaleHint(this.localeId, () => this.refreshCopy());
-  }
-
-  refreshBrowseRows() {
-    const q = (this.appliedBrowseQuery || '').trim().toLowerCase();
-    const filtered = !q
-      ? this.allBrowseRows.slice()
-      : this.allBrowseRows.filter((row) =>
-          row.cells.some((cell) => String(cell).toLowerCase().includes(q)),
-        );
-    this.browseRows = filtered.slice(0, 4);
-  }
-
-  applyBrowseFilter() {
-    this.appliedBrowseQuery = this.browseQuery;
-    this.refreshBrowseRows();
-  }
-
-  resetBrowseFilter() {
-    this.browseQuery = '';
-    this.appliedBrowseQuery = '';
-    this.refreshBrowseRows();
-  }
-
-  async openFeaturedDetail() {
-    this.drawerOpen = true;
-    try {
-      const server = new CommercialPageServer();
-      const detail = await server.getReleaseDetail('r1');
-      if (detail && typeof detail === 'object') {
-        this.detailProject = String(detail.project || '');
-        this.detailTarget = String(detail.target || '');
-        this.detailStatus = String(detail.statusLabel || '');
-        this.detailActor = String(detail.actor || '');
-        return;
-      }
-    } catch {
-      /* fall back below */
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
     }
-    const row = this.allBrowseRows.find((entry) => entry.id === 'r1') || this.allBrowseRows[0];
-    if (!row) return;
-    this.detailProject = String(row.cells[0] || '');
-    this.detailTarget = String(row.cells[1] || '');
-    this.detailStatus = String(row.cells[2] || '');
-    this.detailActor = String(row.cells[3] || '');
-  }
 
-  onReviewNote(e) {
-    this.reviewNote = e && e.target ? e.target.value : '';
-    if (this.reviewError) {
-      this.reviewError = '';
-      this.reviewInvalid = 'false';
-      this.reviewDescribedBy = 'home-commercial-review-desc';
-      this.actionSummary = '';
-      this.actionDescribedBy = '';
+    async loadDemoData() {
+        try {
+            const server = new CommercialPageServer();
+            const rows = await server.getConsoleRows();
+            if (Array.isArray(rows) && rows.length) {
+                this.allBrowseRows = rows;
+                this.refreshBrowseRows();
+            }
+        } catch {
+            /* SSR defaults mirror the server fixture */
+        }
     }
-  }
 
-  confirmReview() {
-    const ok = String(this.reviewNote || '').trim().length >= 4;
-    if (!ok) {
-      this.reviewError = commercialReviewError();
-      this.reviewInvalid = 'true';
-      this.reviewDescribedBy = 'home-commercial-review-desc home-commercial-review-err';
-      this.actionSummary = commercialContactSummaryError();
-      this.actionDescribedBy = 'home-commercial-summary';
-      this.reviewSuccess = false;
-      return;
+    refreshCopy() {
+        this.commercialNavLabel = commercialNavLabel();
+        this.commercialHeroTitleLabel = commercialHeroTitle();
+        this.commercialHeroLeadLabel = commercialHeroLead();
+        this.commercialCtaContactLabel = commercialCtaContact();
+        this.commercialCtaDocsLabel = commercialCtaDocs();
+        this.commercialFeature1TitleLabel = commercialFeature1Title();
+        this.commercialFeature1DescLabel = commercialFeature1Desc();
+        this.commercialFeature2TitleLabel = commercialFeature2Title();
+        this.commercialFeature2DescLabel = commercialFeature2Desc();
+        this.commercialFeature3TitleLabel = commercialFeature3Title();
+        this.commercialFeature3DescLabel = commercialFeature3Desc();
+        this.commercialBrowseFilterLabel = commercialBrowseFilterLabel();
+        this.commercialBrowseFieldLabel = commercialBrowseFieldLabel();
+        this.commercialBrowseApplyLabel = commercialBrowseApply();
+        this.commercialBrowseResetLabel = commercialBrowseReset();
+        this.commercialDetailSummaryLabel = commercialDetailSummary();
+        this.commercialDetailOpenLabel = commercialDetailOpen();
+        this.commercialFormLabel = commercialFormLabel();
+        this.commercialReviewNoteLabel = commercialReviewNoteLabel();
+        this.commercialReviewNoteDescLabel = commercialReviewNoteDesc();
+        this.commercialConfirmLabel = commercialConfirm();
+        this.commercialResetLabel = commercialReset();
+        this.commercialNotifyTitleLabel = commercialNotifyTitle();
+        this.commercialNotifyDescLabel = commercialNotifyDesc();
+        this.commercialNotifyCloseLabel = commercialNotifyClose();
+        this.commercialDrawerTitleLabel = commercialDrawerTitle();
+        this.commercialDrawerProjectLabel = commercialDrawerProject();
+        this.commercialDrawerTargetLabel = commercialDrawerTarget();
+        this.commercialDrawerStatusLabel = commercialDrawerStatus();
+        this.commercialDrawerActorLabel = commercialDrawerActor();
+        this.commercialOpenConsoleLabel = commercialOpenConsole();
+        this.browseColumns = [
+            { id: "name", title: consoleColName() },
+            { id: "target", title: consoleColTarget() },
+            { id: "status", title: consoleColStatus() },
+            { id: "actor", title: consoleColActor() },
+            { id: "updated", title: consoleColUpdated() },
+        ];
+        this.navItems = [
+            { id: "commercial", title: commercialNavCommercial(), href: "/commercial" },
+            { id: "console", title: commercialNavConsole(), href: "/console" },
+            { id: "home", title: commercialNavHome(), href: "/" },
+        ];
+        const paths = docsPaths(this.localeId);
+        this.guideHref = paths.guideHref;
     }
-    this.reviewError = '';
-    this.reviewInvalid = 'false';
-    this.reviewDescribedBy = 'home-commercial-review-desc';
-    this.actionSummary = '';
-    this.actionDescribedBy = '';
-    this.reviewSuccess = true;
-  }
 
-  resetReview() {
-    this.reviewNote = '';
-    this.reviewError = '';
-    this.reviewInvalid = 'false';
-    this.reviewDescribedBy = 'home-commercial-review-desc';
-    this.actionSummary = '';
-    this.actionDescribedBy = '';
-    this.reviewSuccess = false;
-  }
+    applyLocaleCopy(preferred) {
+        this.localeId = readLocaleId(preferred);
+        withLocaleHint(this.localeId, () => this.refreshCopy());
+    }
+
+    refreshBrowseRows() {
+        const q = (this.appliedBrowseQuery || "").trim().toLowerCase();
+        const filtered = !q
+            ? this.allBrowseRows.slice()
+            : this.allBrowseRows.filter((row) =>
+                  row.cells.some((cell) => String(cell).toLowerCase().includes(q)),
+              );
+        this.browseRows = filtered.slice(0, 4);
+    }
+
+    applyBrowseFilter() {
+        this.appliedBrowseQuery = this.browseQuery;
+        this.refreshBrowseRows();
+    }
+
+    resetBrowseFilter() {
+        this.browseQuery = "";
+        this.appliedBrowseQuery = "";
+        this.refreshBrowseRows();
+    }
+
+    async openFeaturedDetail() {
+        this.drawerOpen = true;
+        try {
+            const server = new CommercialPageServer();
+            const detail = await server.getReleaseDetail("r1");
+            if (detail && typeof detail === "object") {
+                this.detailProject = String(detail.project || "");
+                this.detailTarget = String(detail.target || "");
+                this.detailStatus = String(detail.statusLabel || "");
+                this.detailActor = String(detail.actor || "");
+                return;
+            }
+        } catch {
+            /* fall back below */
+        }
+        const row = this.allBrowseRows.find((entry) => entry.id === "r1") || this.allBrowseRows[0];
+        if (!row) return;
+        this.detailProject = String(row.cells[0] || "");
+        this.detailTarget = String(row.cells[1] || "");
+        this.detailStatus = String(row.cells[2] || "");
+        this.detailActor = String(row.cells[3] || "");
+    }
+
+    onReviewNote(e) {
+        this.reviewNote = e && e.target ? e.target.value : "";
+        if (this.reviewError) {
+            this.reviewError = "";
+            this.reviewInvalid = "false";
+            this.reviewDescribedBy = "home-commercial-review-desc";
+            this.actionSummary = "";
+            this.actionDescribedBy = "";
+        }
+    }
+
+    confirmReview() {
+        const ok = String(this.reviewNote || "").trim().length >= 4;
+        if (!ok) {
+            this.reviewError = commercialReviewError();
+            this.reviewInvalid = "true";
+            this.reviewDescribedBy = "home-commercial-review-desc home-commercial-review-err";
+            this.actionSummary = commercialContactSummaryError();
+            this.actionDescribedBy = "home-commercial-summary";
+            this.reviewSuccess = false;
+            return;
+        }
+        this.reviewError = "";
+        this.reviewInvalid = "false";
+        this.reviewDescribedBy = "home-commercial-review-desc";
+        this.actionSummary = "";
+        this.actionDescribedBy = "";
+        this.reviewSuccess = true;
+    }
+
+    resetReview() {
+        this.reviewNote = "";
+        this.reviewError = "";
+        this.reviewInvalid = "false";
+        this.reviewDescribedBy = "home-commercial-review-desc";
+        this.actionSummary = "";
+        this.actionDescribedBy = "";
+        this.reviewSuccess = false;
+    }
 }
 </script>
-
 <script server>
-import ReleaseDemo from '#server/demo/ReleaseDemo';
+import ReleaseDemo from "#server/demo/ReleaseDemo";
 
 export default class CommercialPageServer {
-  getConsoleRows() {
-    return new ReleaseDemo().getConsoleRows();
-  }
+    getConsoleRows() {
+        return new ReleaseDemo().getConsoleRows();
+    }
 
-  getReleaseDetail(id) {
-    return new ReleaseDemo().getReleaseDetail(id);
-  }
+    getReleaseDetail(id) {
+        return new ReleaseDemo().getReleaseDetail(id);
+    }
 }
 </script>

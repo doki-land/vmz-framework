@@ -1,23 +1,22 @@
 <template>
-  <div class="katex-host" v-html="format(tex, display)"></div>
+    <div v-html="format(tex, display)" class="katex-host" />
 </template>
-
 <script client>
-import katex from 'katex';
+import katex from "katex";
 
 function format(tex, display) {
-  try {
-    return katex.renderToString(tex ?? '', {
-      displayMode: !!display,
-      throwOnError: false,
-    });
-  } catch {
-    return '';
-  }
+    try {
+        return katex.renderToString(tex ?? "", {
+            displayMode: !!display,
+            throwOnError: false,
+        });
+    } catch {
+        return "";
+    }
 }
 
 export default class Katex {
-  public tex: string = '';
-  public display: boolean = false;
+    public tex: string = "";
+    public display: boolean = false;
 }
 </script>

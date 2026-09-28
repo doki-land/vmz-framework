@@ -1,7 +1,6 @@
 <template>
-  <DemoCard />
+    <DemoCard />
 </template>
-
 <script client>
 export default class IndexPage {}
 </script>

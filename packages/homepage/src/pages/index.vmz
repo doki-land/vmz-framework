@@ -1,564 +1,850 @@
 <template>
-  <div class="site landing-page landing-v2">
-    <SiteHeader />
-    <main>
-      <section class="v2-hero" aria-labelledby="landing-title" data-vmz-fixture="landing-brand">
-        <div class="v2-hero__inner">
-          <div class="v2-hero__copy">
-            <p class="v2-kicker" data-vmz-fixture="landing-hero-kicker">{{ heroKickerLabel }}</p>
-            <h1 id="landing-title" data-vmz-fixture="landing-hero-title">{{ heroTitleLeadLabel }}<br /><em>{{ heroTitleEmLabel }}</em></h1>
-            <p class="v2-lede" data-vmz-fixture="landing-hero-lede">{{ heroLedeLabel }}</p>
-            <div class="v2-actions">
-              <a class="v2-button v2-button--primary" data-vmz-fixture="landing-primary-cta" :href="guideHref">{{ buildLabel }}</a>
-              <a class="v2-button v2-button--text" data-vmz-fixture="landing-secondary-cta" href="/commercial">{{ viewProductUiLabel }}</a>
-            </div>
-            <p class="v2-hero-note"><a :href="docsRootHref">{{ heroFootnoteLabel }}</a></p>
-          </div>
-          <div class="v2-hero__preview-wrap">
-            <p class="v2-hero-preview__demo-label">{{ heroPreviewDemoLabelText }}</p>
-            <div class="v2-hero-preview" data-vmz-fixture="landing-hero-preview" :aria-label="heroPreviewAriaLabel">
-              <div class="v2-hero-preview__head">
+    <div class="site landing-page landing-v2">
+        <SiteHeader />
+        <main>
+            <section aria-labelledby="landing-title" data-vmz-fixture="landing-brand" class="v2-hero">
+                <div class="v2-hero__inner">
+                    <div class="v2-hero__copy">
+                        <p data-vmz-fixture="landing-hero-kicker" class="v2-kicker">
+                            {{ heroKickerLabel }}
+                        </p>
+                        <h1 id="landing-title" data-vmz-fixture="landing-hero-title">
+                            {{ heroTitleLeadLabel }}
+                            <br />
+                            <em>
+                                {{ heroTitleEmLabel }}
+                            </em>
+                        </h1>
+                        <p data-vmz-fixture="landing-hero-lede" class="v2-lede">
+                            {{ heroLedeLabel }}
+                        </p>
+                        <div class="v2-actions">
+                            <a data-vmz-fixture="landing-primary-cta" :href="guideHref" class="v2-button v2-button--primary">
+                                {{ buildLabel }}
+                            </a>
+                            <a data-vmz-fixture="landing-secondary-cta" href="/commercial" class="v2-button v2-button--text">
+                                {{ viewProductUiLabel }}
+                            </a>
+                        </div>
+                        <p class="v2-hero-note">
+                            <a :href="docsRootHref">
+                                {{ heroFootnoteLabel }}
+                            </a>
+                        </p>
+                    </div>
+                    <div class="v2-hero__preview-wrap">
+                        <p class="v2-hero-preview__demo-label">
+                            {{ heroPreviewDemoLabelText }}
+                        </p>
+                        <div data-vmz-fixture="landing-hero-preview" :aria-label="heroPreviewAriaLabel" class="v2-hero-preview">
+                            <div class="v2-hero-preview__head">
+                                <div>
+                                    <strong>
+                                        {{ heroPreviewReleaseCenterLabel }}
+                                    </strong>
+                                    <span>
+                                        {{ heroPreviewSiteNameLabel }}
+                                        ·
+                                        {{ heroPreviewBranchMainLabel }}
+                                    </span>
+                                </div>
+                                <span class="v2-hero-preview__status">
+                                    {{ heroPreviewProductionReadyLabel }}
+                                </span>
+                            </div>
+                            <p class="v2-hero-preview__summary">
+                                {{ heroPreviewSummaryLine }}
+                            </p>
+                            <div role="table" :aria-label="heroPreviewTableAriaLabel" class="v2-hero-preview__table">
+                                <div role="row" class="v2-hero-preview__row v2-hero-preview__row--head">
+                                    <span role="columnheader">
+                                        {{ heroPreviewColTargetLabel }}
+                                    </span>
+                                    <span role="columnheader">
+                                        {{ heroPreviewColResultLabel }}
+                                    </span>
+                                    <span role="columnheader">
+                                        {{ heroPreviewColStatusLabel }}
+                                    </span>
+                                </div>
+                                <div v-for="target in heroPreviewTargets" :key="target.id" role="row" class="v2-hero-preview__row">
+                                    <span role="cell">
+                                        {{ target.name }}
+                                    </span>
+                                    <span role="cell">
+                                        {{ target.result }}
+                                    </span>
+                                    <span role="cell" :class='target.status === "running" ? "is-running" : ""'>
+                                        {{ target.statusLabel }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section :aria-label="featuresAriaLabel" class="v2-features">
+                <article class="v2-feature">
+                    <div class="v2-feature__icon">
+                        <Icon name="feature.incremental" size="md" />
+                    </div>
+                    <h3>
+                        {{ feature1TitleLabel }}
+                    </h3>
+                    <p>
+                        {{ feature1BodyLabel }}
+                    </p>
+                </article>
+                <article class="v2-feature">
+                    <div class="v2-feature__icon">
+                        <Icon name="feature.runtime" size="md" />
+                    </div>
+                    <h3>
+                        {{ feature2TitleLabel }}
+                    </h3>
+                    <p>
+                        {{ feature2BodyLabel }}
+                    </p>
+                </article>
+                <article class="v2-feature">
+                    <div class="v2-feature__icon">
+                        <Icon name="feature.deploy" size="md" />
+                    </div>
+                    <h3>
+                        {{ feature3TitleLabel }}
+                    </h3>
+                    <p>
+                        {{ feature3BodyLabel }}
+                    </p>
+                </article>
+            </section>
+            <section id="showcase" aria-labelledby="showcase-title" class="v2-showcase">
+                <div class="v2-section-head">
+                    <p class="v2-index">
+                        {{ showcaseIndexLabel }}
+                    </p>
+                    <h2 id="showcase-title">
+                        {{ showcaseTitleLabel }}
+                    </h2>
+                    <p>
+                        {{ showcaseBodyLabel }}
+                    </p>
+                </div>
+                <div class="v2-product">
+                    <aside class="v2-product__side">
+                        <div class="v2-product__identity">
+                            <span class="v2-product__logo">
+                                V
+                            </span>
+                            <strong>
+                                {{ productCloudNameLabel }}
+                            </strong>
+                        </div>
+                        <nav :aria-label="productNavOverviewLabel">
+                            <a href="/console">
+                                {{ productNavOverviewLabel }}
+                            </a>
+                            <a href="#showcase">
+                                {{ productNavProjectsLabel }}
+                            </a>
+                            <a href="/commercial">
+                                {{ productNavMonitorLabel }}
+                            </a>
+                        </nav>
+                        <small>
+                            {{ productWorkspaceLabel }}
+                        </small>
+                    </aside>
+                    <div class="v2-product__work">
+                        <div class="v2-product__bar">
+                            <div>
+                                <span>
+                                    {{ showcasePathLabel }}
+                                </span>
+                                <strong>
+                                    {{ showcaseTabSourceLabel }}
+                                </strong>
+                            </div>
+                            <Link href="/console">
+                                {{ productCreateReleaseLabel }}
+                            </Link>
+                        </div>
+                        <Tabs :label="showcaseTabsLabel" :selected="showcaseTab" panel-id="landing-showcase-panel" :items="showcaseTabs" :on-select="((id) => showcaseTab = id)">
+                            <div v-if='showcaseTab === "overview"' class="v2-dashboard">
+                                <p class="v2-showcase-summary-line">
+                                    {{ showcaseSummaryLine }}
+                                </p>
+                                <div :aria-label="showcaseSummaryAriaLabel" class="v2-showcase-summary">
+                                    <div>
+                                        <small>
+                                            {{ showcaseSummaryTotalLabel }}
+                                        </small>
+                                        <strong>
+                                            {{ showcaseSummaryTotal }}
+                                        </strong>
+                                    </div>
+                                    <div>
+                                        <small>
+                                            {{ showcaseSummaryRunningLabel }}
+                                        </small>
+                                        <strong>
+                                            {{ showcaseSummaryRunning }}
+                                        </strong>
+                                    </div>
+                                    <div>
+                                        <small>
+                                            {{ showcaseSummaryFailedLabel }}
+                                        </small>
+                                        <strong :class='showcaseSummaryFailed > 0 ? "is-failed" : ""'>
+                                            {{ showcaseSummaryFailed }}
+                                        </strong>
+                                    </div>
+                                </div>
+                                <div class="v2-table">
+                                    <Table :columns="surfaceColumns" :rows="surfaceRows" sort-key="surface" sort-dir="asc" :has-row-action="false" />
+                                </div>
+                            </div>
+                            <div v-if='showcaseTab === "source"' class="v2-source">
+                                <CodeBlock :code="codeSample" language="vmz" title="Counter.vmz" />
+                            </div>
+                            <div v-if='showcaseTab === "activity"' class="v2-empty">
+                                <Badge tone="success">
+                                    {{ showcaseEmptyBadgeLabel }}
+                                </Badge>
+                                <h3>
+                                    {{ showcaseEmptyTitleLabel }}
+                                </h3>
+                                <p>
+                                    {{ showcaseEmptyBodyLabel }}
+                                </p>
+                            </div>
+                        </Tabs>
+                    </div>
+                </div>
+            </section>
+            <section aria-labelledby="flow-title" class="v2-flow">
+                <div :aria-label="heroSignalAriaLabel" class="v2-signal">
+                    <div>
+                        <small>
+                            {{ heroSignalAuthorLabel }}
+                        </small>
+                        <strong>
+                            {{ heroSignalAuthorValueLabel }}
+                        </strong>
+                    </div>
+                    <i aria-hidden="true" />
+                    <div class="is-core">
+                        <small>
+                            {{ heroSignalUnderstandLabel }}
+                        </small>
+                        <strong>
+                            {{ heroSignalUnderstandValueLabel }}
+                        </strong>
+                    </div>
+                    <i aria-hidden="true" />
+                    <div>
+                        <small>
+                            {{ heroSignalDeliverLabel }}
+                        </small>
+                        <strong>
+                            {{ heroSignalDeliverValueLabel }}
+                        </strong>
+                    </div>
+                </div>
+                <div class="v2-section-head">
+                    <p class="v2-index">
+                        {{ flowIndexLabel }}
+                    </p>
+                    <h2 id="flow-title">
+                        {{ flowTitleLabel }}
+                    </h2>
+                </div>
+                <ol>
+                    <li>
+                        <b>
+                            {{ flowStep1TitleLabel }}
+                        </b>
+                        <span>
+                            {{ flowStep1DescLabel }}
+                        </span>
+                    </li>
+                    <li>
+                        <b>
+                            {{ flowStep2TitleLabel }}
+                        </b>
+                        <span>
+                            {{ flowStep2DescLabel }}
+                        </span>
+                    </li>
+                    <li>
+                        <b>
+                            {{ flowStep3TitleLabel }}
+                        </b>
+                        <span>
+                            {{ flowStep3DescLabel }}
+                        </span>
+                    </li>
+                    <li>
+                        <b>
+                            {{ flowStep4TitleLabel }}
+                        </b>
+                        <span>
+                            {{ flowStep4DescLabel }}
+                        </span>
+                    </li>
+                    <li>
+                        <b>
+                            {{ flowStep5TitleLabel }}
+                        </b>
+                        <span>
+                            {{ flowStep5DescLabel }}
+                        </span>
+                    </li>
+                    <li>
+                        <b>
+                            {{ flowStep6TitleLabel }}
+                        </b>
+                        <span>
+                            {{ flowStep6DescLabel }}
+                        </span>
+                    </li>
+                </ol>
+            </section>
+            <section aria-labelledby="statement-title" class="v2-statement">
+                <p class="v2-index">
+                    {{ statementIndexLabel }}
+                </p>
                 <div>
-                  <strong>{{ heroPreviewReleaseCenterLabel }}</strong>
-                  <span>{{ heroPreviewSiteNameLabel }} · {{ heroPreviewBranchMainLabel }}</span>
+                    <h2 id="statement-title" data-vmz-fixture="landing-statement-title">
+                        {{ statementTitleLeadLabel }}
+                        <br />
+                        <em>
+                            {{ statementTitleEmLabel }}
+                        </em>
+                    </h2>
+                    <p data-vmz-fixture="landing-statement-body">
+                        {{ statementBodyLabel }}
+                    </p>
+                    <div class="v2-statement__actions">
+                        <a :href="docsRootHref" class="v2-button v2-button--text">
+                            {{ readDocsLabel }}
+                        </a>
+                        <a :href="guideHref" class="v2-button v2-button--text">
+                            {{ gettingStartedGuideLabel }}
+                        </a>
+                    </div>
                 </div>
-                <span class="v2-hero-preview__status">{{ heroPreviewProductionReadyLabel }}</span>
-              </div>
-              <p class="v2-hero-preview__summary">{{ heroPreviewSummaryLine }}</p>
-              <div class="v2-hero-preview__table" role="table" :aria-label="heroPreviewTableAriaLabel">
-                <div class="v2-hero-preview__row v2-hero-preview__row--head" role="row">
-                  <span role="columnheader">{{ heroPreviewColTargetLabel }}</span><span role="columnheader">{{ heroPreviewColResultLabel }}</span><span role="columnheader">{{ heroPreviewColStatusLabel }}</span>
+            </section>
+            <section aria-labelledby="start-title" class="v2-start">
+                <p class="v2-index">
+                    {{ startIndexLabel }}
+                </p>
+                <h2 id="start-title" data-vmz-fixture="landing-start-title">
+                    {{ startTitleLabel }}
+                </h2>
+                <p data-vmz-fixture="landing-start-lede">
+                    {{ startLedeLabel }}
+                </p>
+                <div class="v2-command">
+                    <code>
+                        pnpm create vmz-app my-app
+                    </code>
+                    <Button type="button" variant="secondary" @click="copyCommand">
+                        {{ copied ? copiedCommandLabel : copyCommandLabel }}
+                    </Button>
                 </div>
-                <div v-for="target in heroPreviewTargets" :key="target.id" class="v2-hero-preview__row" role="row">
-                  <span role="cell">{{ target.name }}</span><span role="cell">{{ target.result }}</span><span role="cell" :class="target.status === 'running' ? 'is-running' : ''">{{ target.statusLabel }}</span>
+                <div class="v2-actions">
+                    <a data-vmz-fixture="landing-start-cta" :href="guideHref" class="v2-button v2-button--light">
+                        {{ startLabel }}
+                    </a>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="v2-features" :aria-label="featuresAriaLabel">
-        <article class="v2-feature">
-          <div class="v2-feature__icon"><Icon name="feature.incremental" size="md" /></div>
-          <h3>{{ feature1TitleLabel }}</h3>
-          <p>{{ feature1BodyLabel }}</p>
-        </article>
-        <article class="v2-feature">
-          <div class="v2-feature__icon"><Icon name="feature.runtime" size="md" /></div>
-          <h3>{{ feature2TitleLabel }}</h3>
-          <p>{{ feature2BodyLabel }}</p>
-        </article>
-        <article class="v2-feature">
-          <div class="v2-feature__icon"><Icon name="feature.deploy" size="md" /></div>
-          <h3>{{ feature3TitleLabel }}</h3>
-          <p>{{ feature3BodyLabel }}</p>
-        </article>
-      </section>
-
-      <section id="showcase" class="v2-showcase" aria-labelledby="showcase-title">
-        <div class="v2-section-head">
-          <p class="v2-index">{{ showcaseIndexLabel }}</p>
-          <h2 id="showcase-title">{{ showcaseTitleLabel }}</h2>
-          <p>{{ showcaseBodyLabel }}</p>
-        </div>
-        <div class="v2-product">
-          <aside class="v2-product__side">
-            <div class="v2-product__identity"><span class="v2-product__logo">V</span><strong>{{ productCloudNameLabel }}</strong></div>
-            <nav :aria-label="productNavOverviewLabel"><a href="/console">{{ productNavOverviewLabel }}</a><a href="#showcase">{{ productNavProjectsLabel }}</a><a href="/commercial">{{ productNavMonitorLabel }}</a></nav>
-            <small>{{ productWorkspaceLabel }}</small>
-          </aside>
-          <div class="v2-product__work">
-          <div class="v2-product__bar"><div><span>{{ showcasePathLabel }}</span><strong>{{ showcaseTabSourceLabel }}</strong></div><Link href="/console">{{ productCreateReleaseLabel }}</Link></div>
-          <Tabs :label="showcaseTabsLabel" :selected="showcaseTab" panel-id="landing-showcase-panel" :items="showcaseTabs" :on-select="(id) => (showcaseTab = id)">
-            <div v-if="showcaseTab === 'overview'" class="v2-dashboard">
-              <p class="v2-showcase-summary-line">{{ showcaseSummaryLine }}</p>
-              <div class="v2-showcase-summary" :aria-label="showcaseSummaryAriaLabel">
-                <div>
-                  <small>{{ showcaseSummaryTotalLabel }}</small>
-                  <strong>{{ showcaseSummaryTotal }}</strong>
-                </div>
-                <div>
-                  <small>{{ showcaseSummaryRunningLabel }}</small>
-                  <strong>{{ showcaseSummaryRunning }}</strong>
-                </div>
-                <div>
-                  <small>{{ showcaseSummaryFailedLabel }}</small>
-                  <strong :class="showcaseSummaryFailed > 0 ? 'is-failed' : ''">{{ showcaseSummaryFailed }}</strong>
-                </div>
-              </div>
-              <div class="v2-table"><Table :columns="surfaceColumns" :rows="surfaceRows" sort-key="surface" sort-dir="asc" :has-row-action="false" /></div>
-            </div>
-            <div v-if="showcaseTab === 'source'" class="v2-source"><CodeBlock :code="codeSample" language="vmz" title="Counter.vmz" /></div>
-            <div v-if="showcaseTab === 'activity'" class="v2-empty"><Badge tone="success">{{ showcaseEmptyBadgeLabel }}</Badge><h3>{{ showcaseEmptyTitleLabel }}</h3><p>{{ showcaseEmptyBodyLabel }}</p></div>
-          </Tabs></div>
-        </div>
-      </section>
-
-      <section class="v2-flow" aria-labelledby="flow-title">
-        <div class="v2-signal" :aria-label="heroSignalAriaLabel">
-          <div><small>{{ heroSignalAuthorLabel }}</small><strong>{{ heroSignalAuthorValueLabel }}</strong></div>
-          <i aria-hidden="true"></i>
-          <div class="is-core"><small>{{ heroSignalUnderstandLabel }}</small><strong>{{ heroSignalUnderstandValueLabel }}</strong></div>
-          <i aria-hidden="true"></i>
-          <div><small>{{ heroSignalDeliverLabel }}</small><strong>{{ heroSignalDeliverValueLabel }}</strong></div>
-        </div>
-        <div class="v2-section-head"><p class="v2-index">{{ flowIndexLabel }}</p><h2 id="flow-title">{{ flowTitleLabel }}</h2></div>
-        <ol>
-          <li><b>{{ flowStep1TitleLabel }}</b><span>{{ flowStep1DescLabel }}</span></li>
-          <li><b>{{ flowStep2TitleLabel }}</b><span>{{ flowStep2DescLabel }}</span></li>
-          <li><b>{{ flowStep3TitleLabel }}</b><span>{{ flowStep3DescLabel }}</span></li>
-          <li><b>{{ flowStep4TitleLabel }}</b><span>{{ flowStep4DescLabel }}</span></li>
-          <li><b>{{ flowStep5TitleLabel }}</b><span>{{ flowStep5DescLabel }}</span></li>
-          <li><b>{{ flowStep6TitleLabel }}</b><span>{{ flowStep6DescLabel }}</span></li>
-        </ol>
-      </section>
-
-      <section class="v2-statement" aria-labelledby="statement-title">
-        <p class="v2-index">{{ statementIndexLabel }}</p>
-        <div>
-          <h2 id="statement-title" data-vmz-fixture="landing-statement-title">{{ statementTitleLeadLabel }}<br /><em>{{ statementTitleEmLabel }}</em></h2>
-          <p data-vmz-fixture="landing-statement-body">{{ statementBodyLabel }}</p>
-          <div class="v2-statement__actions">
-            <a class="v2-button v2-button--text" :href="docsRootHref">{{ readDocsLabel }}</a>
-            <a class="v2-button v2-button--text" :href="guideHref">{{ gettingStartedGuideLabel }}</a>
-          </div>
-        </div>
-      </section>
-
-      <section class="v2-start" aria-labelledby="start-title">
-        <p class="v2-index">{{ startIndexLabel }}</p>
-        <h2 id="start-title" data-vmz-fixture="landing-start-title">{{ startTitleLabel }}</h2>
-        <p data-vmz-fixture="landing-start-lede">{{ startLedeLabel }}</p>
-        <div class="v2-command"><code>pnpm create vmz-app my-app</code><Button type="button" variant="secondary" @click="copyCommand">{{ copied ? copiedCommandLabel : copyCommandLabel }}</Button></div>
-        <div class="v2-actions"><a class="v2-button v2-button--light" data-vmz-fixture="landing-start-cta" :href="guideHref">{{ startLabel }}</a></div>
-      </section>
-    </main>
-    <SiteFooter />
-  </div>
+            </section>
+        </main>
+        <SiteFooter />
+    </div>
 </template>
-
 <script client>
 import {
-  build,
-  readDocs,
-  gettingStartedGuide,
-  start,
-  heroKicker,
-  heroTitleLead,
-  heroTitleEm,
-  heroLede,
-  heroFootnote,
-  viewProductUi,
-  heroPreviewDemoLabel,
-  heroPreviewSiteName,
-  heroPreviewAria,
-  heroPreviewReleaseCenter,
-  heroPreviewProductionReady,
-  heroPreviewBranchMain,
-  heroPreviewTableAria,
-  heroPreviewColTarget,
-  heroPreviewColResult,
-  heroPreviewColStatus,
-  heroSignalAria,
-  heroSignalAuthor,
-  heroSignalAuthorValue,
-  heroSignalUnderstand,
-  heroSignalUnderstandValue,
-  heroSignalDeliver,
-  heroSignalDeliverValue,
-  statementIndex,
-  statementTitleLead,
-  statementTitleEm,
-  statementBody,
-  featuresAria,
-  feature1Title,
-  feature1Body,
-  feature2Title,
-  feature2Body,
-  feature3Title,
-  feature3Body,
-  flowIndex,
-  flowTitle,
-  flowStep1Title,
-  flowStep1Desc,
-  flowStep2Title,
-  flowStep2Desc,
-  flowStep3Title,
-  flowStep3Desc,
-  flowStep4Title,
-  flowStep4Desc,
-  flowStep5Title,
-  flowStep5Desc,
-  flowStep6Title,
-  flowStep6Desc,
-  showcaseIndex,
-  showcaseTitle,
-  showcaseBody,
-  productCloudName,
-  productNavOverview,
-  productNavProjects,
-  productNavMonitor,
-  productWorkspaceLabel,
-  productCreateRelease,
-  showcaseTabsLabel,
-  showcaseTabOverview,
-  showcaseTabSource,
-  showcaseTabActivity,
-  showcaseTableColSurface,
-  showcaseTableColResult,
-  showcaseTableColStatus,
-  showcaseRowBrowser,
-  showcaseRowBrowserResult,
-  showcaseRowSsr,
-  showcaseRowSsrResult,
-  showcaseRowNative,
-  showcaseRowNativeResult,
-  showcaseRowEdge,
-  showcaseRowEdgeResult,
-  showcaseStatusReady,
-  showcaseEmptyBadge,
-  showcaseEmptyTitle,
-  showcaseEmptyBody,
-  startIndex,
-  startTitle,
-  startLede,
-  copyCommand,
-  copiedCommand,
-  consoleStatActiveServices,
-  consoleStatPendingReleases,
-  consoleStatAffectedRegions,
-  consoleSummaryAria,
-} from '#locales/common';
-import IndexPageServer from '#server/pages/index';
-import { demoHeroPreview, demoShowcaseOverview } from '../demo/releases.ts';
-import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
+    build,
+    readDocs,
+    gettingStartedGuide,
+    start,
+    heroKicker,
+    heroTitleLead,
+    heroTitleEm,
+    heroLede,
+    heroFootnote,
+    viewProductUi,
+    heroPreviewDemoLabel,
+    heroPreviewSiteName,
+    heroPreviewAria,
+    heroPreviewReleaseCenter,
+    heroPreviewProductionReady,
+    heroPreviewBranchMain,
+    heroPreviewTableAria,
+    heroPreviewColTarget,
+    heroPreviewColResult,
+    heroPreviewColStatus,
+    heroSignalAria,
+    heroSignalAuthor,
+    heroSignalAuthorValue,
+    heroSignalUnderstand,
+    heroSignalUnderstandValue,
+    heroSignalDeliver,
+    heroSignalDeliverValue,
+    statementIndex,
+    statementTitleLead,
+    statementTitleEm,
+    statementBody,
+    featuresAria,
+    feature1Title,
+    feature1Body,
+    feature2Title,
+    feature2Body,
+    feature3Title,
+    feature3Body,
+    flowIndex,
+    flowTitle,
+    flowStep1Title,
+    flowStep1Desc,
+    flowStep2Title,
+    flowStep2Desc,
+    flowStep3Title,
+    flowStep3Desc,
+    flowStep4Title,
+    flowStep4Desc,
+    flowStep5Title,
+    flowStep5Desc,
+    flowStep6Title,
+    flowStep6Desc,
+    showcaseIndex,
+    showcaseTitle,
+    showcaseBody,
+    productCloudName,
+    productNavOverview,
+    productNavProjects,
+    productNavMonitor,
+    productWorkspaceLabel,
+    productCreateRelease,
+    showcaseTabsLabel,
+    showcaseTabOverview,
+    showcaseTabSource,
+    showcaseTabActivity,
+    showcaseTableColSurface,
+    showcaseTableColResult,
+    showcaseTableColStatus,
+    showcaseRowBrowser,
+    showcaseRowBrowserResult,
+    showcaseRowSsr,
+    showcaseRowSsrResult,
+    showcaseRowNative,
+    showcaseRowNativeResult,
+    showcaseRowEdge,
+    showcaseRowEdgeResult,
+    showcaseStatusReady,
+    showcaseEmptyBadge,
+    showcaseEmptyTitle,
+    showcaseEmptyBody,
+    startIndex,
+    startTitle,
+    startLede,
+    copyCommand,
+    copiedCommand,
+    consoleStatActiveServices,
+    consoleStatPendingReleases,
+    consoleStatAffectedRegions,
+    consoleSummaryAria,
+} from "#locales/common";
+import IndexPageServer from "#server/pages/index";
+import { demoHeroPreview, demoShowcaseOverview } from "../demo/releases.ts";
+import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
 const initialHeroPreview = demoHeroPreview();
 const initialShowcaseOverview = demoShowcaseOverview();
 
 export default class IndexPage {
-  showcaseTab = 'source';
-  copied = false;
-  localeId = 'zh-hans';
-  heroKickerLabel = '';
-  heroTitleLeadLabel = '';
-  heroTitleEmLabel = '';
-  heroLedeLabel = '';
-  heroFootnoteLabel = '';
-  viewProductUiLabel = '';
-  heroPreviewDemoLabelText = '';
-  heroPreviewSiteNameLabel = '';
-  heroPreviewAriaLabel = '';
-  heroPreviewReleaseCenterLabel = '';
-  heroPreviewProductionReadyLabel = '';
-  heroPreviewPathLabel = `${initialHeroPreview.workspace} / ${initialHeroPreview.project}`;
-  heroPreviewSummaryLine = initialHeroPreview.summaryLine;
-  showcasePathLabel = initialShowcaseOverview.pathLabel;
-  showcaseSummaryLine = initialShowcaseOverview.summaryLine;
-  showcaseSummaryTotal = initialShowcaseOverview.summary.total;
-  showcaseSummaryRunning = initialShowcaseOverview.summary.running;
-  showcaseSummaryFailed = initialShowcaseOverview.summary.failed;
-  showcaseSummaryTotalLabel = '';
-  showcaseSummaryRunningLabel = '';
-  showcaseSummaryFailedLabel = '';
-  showcaseSummaryAriaLabel = '';
-  heroPreviewTargets = initialHeroPreview.targets.map((target) => ({
-    id: target.id,
-    name: target.name,
-    result: target.result,
-    status: target.status,
-    statusLabel: target.statusLabel,
-  }));
-  heroPreviewBranchMainLabel = '';
-  heroPreviewTableAriaLabel = '';
-  heroPreviewColTargetLabel = '';
-  heroPreviewColResultLabel = '';
-  heroPreviewColStatusLabel = '';
-  heroSignalAriaLabel = '';
-  heroSignalAuthorLabel = '';
-  heroSignalAuthorValueLabel = '';
-  heroSignalUnderstandLabel = '';
-  heroSignalUnderstandValueLabel = '';
-  heroSignalDeliverLabel = '';
-  heroSignalDeliverValueLabel = '';
-  statementIndexLabel = '';
-  statementTitleLeadLabel = '';
-  statementTitleEmLabel = '';
-  statementBodyLabel = '';
-  featuresAriaLabel = '';
-  feature1TitleLabel = '';
-  feature1BodyLabel = '';
-  feature2TitleLabel = '';
-  feature2BodyLabel = '';
-  feature3TitleLabel = '';
-  feature3BodyLabel = '';
-  flowIndexLabel = '';
-  flowTitleLabel = '';
-  flowStep1TitleLabel = '';
-  flowStep1DescLabel = '';
-  flowStep2TitleLabel = '';
-  flowStep2DescLabel = '';
-  flowStep3TitleLabel = '';
-  flowStep3DescLabel = '';
-  flowStep4TitleLabel = '';
-  flowStep4DescLabel = '';
-  flowStep5TitleLabel = '';
-  flowStep5DescLabel = '';
-  flowStep6TitleLabel = '';
-  flowStep6DescLabel = '';
-  showcaseIndexLabel = '';
-  showcaseTitleLabel = '';
-  showcaseBodyLabel = '';
-  productCloudNameLabel = '';
-  productNavOverviewLabel = '';
-  productNavProjectsLabel = '';
-  productNavMonitorLabel = '';
-  productWorkspaceLabel = '';
-  productCreateReleaseLabel = '';
-  showcaseTabsLabel = '';
-  showcaseEmptyBadgeLabel = '';
-  showcaseEmptyTitleLabel = '';
-  showcaseEmptyBodyLabel = '';
-  showcaseTabSourceLabel = '';
-  startIndexLabel = '';
-  startTitleLabel = '';
-  startLedeLabel = '';
-  buildLabel = '';
-  readDocsLabel = '';
-  gettingStartedGuideLabel = '';
-  startLabel = '';
-  copyCommandLabel = '';
-  copiedCommandLabel = '';
-  docsRootHref = '/d/zh-hans/';
-  guideHref = '/d/zh-hans/guide/';
-  _unwatchLocale = null;
-  showcaseTabs = [];
-  codeSample = '<template>\n  <Button @click="increment">\n    Count {{ count }}\n  </Button>\n</template>';
-  surfaceColumns = [];
-  surfaceRows = [];
+    showcaseTab = "source";
+    copied = false;
+    localeId = "zh-hans";
+    heroKickerLabel = "";
+    heroTitleLeadLabel = "";
+    heroTitleEmLabel = "";
+    heroLedeLabel = "";
+    heroFootnoteLabel = "";
+    viewProductUiLabel = "";
+    heroPreviewDemoLabelText = "";
+    heroPreviewSiteNameLabel = "";
+    heroPreviewAriaLabel = "";
+    heroPreviewReleaseCenterLabel = "";
+    heroPreviewProductionReadyLabel = "";
+    heroPreviewPathLabel = `${initialHeroPreview.workspace} / ${initialHeroPreview.project}`;
+    heroPreviewSummaryLine = initialHeroPreview.summaryLine;
+    showcasePathLabel = initialShowcaseOverview.pathLabel;
+    showcaseSummaryLine = initialShowcaseOverview.summaryLine;
+    showcaseSummaryTotal = initialShowcaseOverview.summary.total;
+    showcaseSummaryRunning = initialShowcaseOverview.summary.running;
+    showcaseSummaryFailed = initialShowcaseOverview.summary.failed;
+    showcaseSummaryTotalLabel = "";
+    showcaseSummaryRunningLabel = "";
+    showcaseSummaryFailedLabel = "";
+    showcaseSummaryAriaLabel = "";
+    heroPreviewTargets = initialHeroPreview.targets.map((target) => ({
+        id: target.id,
+        name: target.name,
+        result: target.result,
+        status: target.status,
+        statusLabel: target.statusLabel,
+    }));
+    heroPreviewBranchMainLabel = "";
+    heroPreviewTableAriaLabel = "";
+    heroPreviewColTargetLabel = "";
+    heroPreviewColResultLabel = "";
+    heroPreviewColStatusLabel = "";
+    heroSignalAriaLabel = "";
+    heroSignalAuthorLabel = "";
+    heroSignalAuthorValueLabel = "";
+    heroSignalUnderstandLabel = "";
+    heroSignalUnderstandValueLabel = "";
+    heroSignalDeliverLabel = "";
+    heroSignalDeliverValueLabel = "";
+    statementIndexLabel = "";
+    statementTitleLeadLabel = "";
+    statementTitleEmLabel = "";
+    statementBodyLabel = "";
+    featuresAriaLabel = "";
+    feature1TitleLabel = "";
+    feature1BodyLabel = "";
+    feature2TitleLabel = "";
+    feature2BodyLabel = "";
+    feature3TitleLabel = "";
+    feature3BodyLabel = "";
+    flowIndexLabel = "";
+    flowTitleLabel = "";
+    flowStep1TitleLabel = "";
+    flowStep1DescLabel = "";
+    flowStep2TitleLabel = "";
+    flowStep2DescLabel = "";
+    flowStep3TitleLabel = "";
+    flowStep3DescLabel = "";
+    flowStep4TitleLabel = "";
+    flowStep4DescLabel = "";
+    flowStep5TitleLabel = "";
+    flowStep5DescLabel = "";
+    flowStep6TitleLabel = "";
+    flowStep6DescLabel = "";
+    showcaseIndexLabel = "";
+    showcaseTitleLabel = "";
+    showcaseBodyLabel = "";
+    productCloudNameLabel = "";
+    productNavOverviewLabel = "";
+    productNavProjectsLabel = "";
+    productNavMonitorLabel = "";
+    productWorkspaceLabel = "";
+    productCreateReleaseLabel = "";
+    showcaseTabsLabel = "";
+    showcaseEmptyBadgeLabel = "";
+    showcaseEmptyTitleLabel = "";
+    showcaseEmptyBodyLabel = "";
+    showcaseTabSourceLabel = "";
+    startIndexLabel = "";
+    startTitleLabel = "";
+    startLedeLabel = "";
+    buildLabel = "";
+    readDocsLabel = "";
+    gettingStartedGuideLabel = "";
+    startLabel = "";
+    copyCommandLabel = "";
+    copiedCommandLabel = "";
+    docsRootHref = "/d/zh-hans/";
+    guideHref = "/d/zh-hans/guide/";
+    _unwatchLocale = null;
+    showcaseTabs = [];
+    codeSample =
+        '<template>\n  <Button @click="increment">\n    Count {{ count }}\n  </Button>\n</template>';
+    surfaceColumns = [];
+    surfaceRows = [];
 
-  onMount() {
-    this.applyLocaleCopy();
-    this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
-    this.loadDemoFixture();
-  }
-
-  applyHeroPreview(preview) {
-    if (!preview || typeof preview !== 'object') return;
-    const workspace = String(preview.workspace || '').trim();
-    const project = String(preview.project || '').trim();
-    if (workspace && project) {
-      this.heroPreviewPathLabel = `${workspace} / ${project}`;
+    onMount() {
+        this.applyLocaleCopy();
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+        this.loadDemoFixture();
     }
-    if (preview.summaryLine) {
-      this.heroPreviewSummaryLine = String(preview.summaryLine);
+
+    applyHeroPreview(preview) {
+        if (!preview || typeof preview !== "object") return;
+        const workspace = String(preview.workspace || "").trim();
+        const project = String(preview.project || "").trim();
+        if (workspace && project) {
+            this.heroPreviewPathLabel = `${workspace} / ${project}`;
+        }
+        if (preview.summaryLine) {
+            this.heroPreviewSummaryLine = String(preview.summaryLine);
+        }
+        if (Array.isArray(preview.targets) && preview.targets.length) {
+            this.heroPreviewTargets = preview.targets.map((target) => ({
+                id: String(target.id || ""),
+                name: String(target.name || ""),
+                result: String(target.result || ""),
+                status: String(target.status || ""),
+                statusLabel: String(target.statusLabel || ""),
+            }));
+        }
     }
-    if (Array.isArray(preview.targets) && preview.targets.length) {
-      this.heroPreviewTargets = preview.targets.map((target) => ({
-        id: String(target.id || ''),
-        name: String(target.name || ''),
-        result: String(target.result || ''),
-        status: String(target.status || ''),
-        statusLabel: String(target.statusLabel || ''),
-      }));
+
+    applyShowcaseOverview(showcase) {
+        if (!showcase || typeof showcase !== "object") return;
+        if (showcase.pathLabel) {
+            this.showcasePathLabel = String(showcase.pathLabel);
+        }
+        if (showcase.summaryLine) {
+            this.showcaseSummaryLine = String(showcase.summaryLine);
+        }
+        if (showcase.summary && typeof showcase.summary === "object") {
+            this.showcaseSummaryTotal = Number(showcase.summary.total) || this.showcaseSummaryTotal;
+            this.showcaseSummaryRunning =
+                Number(showcase.summary.running) || this.showcaseSummaryRunning;
+            this.showcaseSummaryFailed =
+                Number(showcase.summary.failed) || this.showcaseSummaryFailed;
+        }
+        if (Array.isArray(showcase.surfaceRows) && showcase.surfaceRows.length) {
+            this.surfaceRows = showcase.surfaceRows.map((row) => ({
+                id: String(row.id || ""),
+                cells: Array.isArray(row.cells) ? row.cells.map((cell) => String(cell)) : [],
+            }));
+        }
     }
-  }
 
-  applyShowcaseOverview(showcase) {
-    if (!showcase || typeof showcase !== 'object') return;
-    if (showcase.pathLabel) {
-      this.showcasePathLabel = String(showcase.pathLabel);
+    async loadDemoFixture() {
+        try {
+            const server = new IndexPageServer();
+            const preview = await server.getHeroPreview();
+            const showcase = await server.getShowcaseOverview();
+            this.applyHeroPreview(preview);
+            this.applyShowcaseOverview(showcase);
+        } catch {
+            /* SSR defaults mirror the server fixture */
+        }
     }
-    if (showcase.summaryLine) {
-      this.showcaseSummaryLine = String(showcase.summaryLine);
+
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
     }
-    if (showcase.summary && typeof showcase.summary === 'object') {
-      this.showcaseSummaryTotal = Number(showcase.summary.total) || this.showcaseSummaryTotal;
-      this.showcaseSummaryRunning = Number(showcase.summary.running) || this.showcaseSummaryRunning;
-      this.showcaseSummaryFailed = Number(showcase.summary.failed) || this.showcaseSummaryFailed;
+
+    refreshCopy() {
+        const bump = (key) => {
+            this[key] = "\u200b";
+        };
+        const keys = [
+            "heroKickerLabel",
+            "heroTitleLeadLabel",
+            "heroTitleEmLabel",
+            "heroLedeLabel",
+            "heroFootnoteLabel",
+            "viewProductUiLabel",
+            "heroPreviewDemoLabelText",
+            "heroPreviewSiteNameLabel",
+            "heroPreviewAriaLabel",
+            "heroPreviewReleaseCenterLabel",
+            "heroPreviewProductionReadyLabel",
+            "heroPreviewBranchMainLabel",
+            "heroPreviewTableAriaLabel",
+            "heroPreviewColTargetLabel",
+            "heroPreviewColResultLabel",
+            "heroPreviewColStatusLabel",
+            "heroSignalAriaLabel",
+            "heroSignalAuthorLabel",
+            "heroSignalAuthorValueLabel",
+            "heroSignalUnderstandLabel",
+            "heroSignalUnderstandValueLabel",
+            "heroSignalDeliverLabel",
+            "heroSignalDeliverValueLabel",
+            "statementIndexLabel",
+            "statementTitleLeadLabel",
+            "statementTitleEmLabel",
+            "statementBodyLabel",
+            "featuresAriaLabel",
+            "feature1TitleLabel",
+            "feature1BodyLabel",
+            "feature2TitleLabel",
+            "feature2BodyLabel",
+            "feature3TitleLabel",
+            "feature3BodyLabel",
+            "flowIndexLabel",
+            "flowTitleLabel",
+            "flowStep1TitleLabel",
+            "flowStep1DescLabel",
+            "flowStep2TitleLabel",
+            "flowStep2DescLabel",
+            "flowStep3TitleLabel",
+            "flowStep3DescLabel",
+            "flowStep4TitleLabel",
+            "flowStep4DescLabel",
+            "flowStep5TitleLabel",
+            "flowStep5DescLabel",
+            "flowStep6TitleLabel",
+            "flowStep6DescLabel",
+            "showcaseIndexLabel",
+            "showcaseTitleLabel",
+            "showcaseBodyLabel",
+            "productCloudNameLabel",
+            "productNavOverviewLabel",
+            "productNavProjectsLabel",
+            "productNavMonitorLabel",
+            "productWorkspaceLabel",
+            "productCreateReleaseLabel",
+            "showcaseTabsLabel",
+            "showcaseEmptyBadgeLabel",
+            "showcaseEmptyTitleLabel",
+            "showcaseEmptyBodyLabel",
+            "showcaseTabSourceLabel",
+            "startIndexLabel",
+            "startTitleLabel",
+            "startLedeLabel",
+            "buildLabel",
+            "readDocsLabel",
+            "gettingStartedGuideLabel",
+            "startLabel",
+            "copyCommandLabel",
+            "copiedCommandLabel",
+        ];
+        for (const k of keys) bump(k);
+
+        this.heroKickerLabel = heroKicker();
+        this.heroTitleLeadLabel = heroTitleLead();
+        this.heroTitleEmLabel = heroTitleEm();
+        this.heroLedeLabel = heroLede();
+        this.heroFootnoteLabel = heroFootnote();
+        this.viewProductUiLabel = viewProductUi();
+        this.heroPreviewDemoLabelText = heroPreviewDemoLabel();
+        this.heroPreviewSiteNameLabel = heroPreviewSiteName();
+        this.heroPreviewAriaLabel = heroPreviewAria();
+        this.heroPreviewReleaseCenterLabel = heroPreviewReleaseCenter();
+        this.heroPreviewProductionReadyLabel = heroPreviewProductionReady();
+        this.heroPreviewBranchMainLabel = heroPreviewBranchMain();
+        this.heroPreviewTableAriaLabel = heroPreviewTableAria();
+        this.heroPreviewColTargetLabel = heroPreviewColTarget();
+        this.heroPreviewColResultLabel = heroPreviewColResult();
+        this.heroPreviewColStatusLabel = heroPreviewColStatus();
+        this.heroSignalAriaLabel = heroSignalAria();
+        this.heroSignalAuthorLabel = heroSignalAuthor();
+        this.heroSignalAuthorValueLabel = heroSignalAuthorValue();
+        this.heroSignalUnderstandLabel = heroSignalUnderstand();
+        this.heroSignalUnderstandValueLabel = heroSignalUnderstandValue();
+        this.heroSignalDeliverLabel = heroSignalDeliver();
+        this.heroSignalDeliverValueLabel = heroSignalDeliverValue();
+        this.statementIndexLabel = statementIndex();
+        this.statementTitleLeadLabel = statementTitleLead();
+        this.statementTitleEmLabel = statementTitleEm();
+        this.statementBodyLabel = statementBody();
+        this.featuresAriaLabel = featuresAria();
+        this.feature1TitleLabel = feature1Title();
+        this.feature1BodyLabel = feature1Body();
+        this.feature2TitleLabel = feature2Title();
+        this.feature2BodyLabel = feature2Body();
+        this.feature3TitleLabel = feature3Title();
+        this.feature3BodyLabel = feature3Body();
+        this.flowIndexLabel = flowIndex();
+        this.flowTitleLabel = flowTitle();
+        this.flowStep1TitleLabel = flowStep1Title();
+        this.flowStep1DescLabel = flowStep1Desc();
+        this.flowStep2TitleLabel = flowStep2Title();
+        this.flowStep2DescLabel = flowStep2Desc();
+        this.flowStep3TitleLabel = flowStep3Title();
+        this.flowStep3DescLabel = flowStep3Desc();
+        this.flowStep4TitleLabel = flowStep4Title();
+        this.flowStep4DescLabel = flowStep4Desc();
+        this.flowStep5TitleLabel = flowStep5Title();
+        this.flowStep5DescLabel = flowStep5Desc();
+        this.flowStep6TitleLabel = flowStep6Title();
+        this.flowStep6DescLabel = flowStep6Desc();
+        this.showcaseIndexLabel = showcaseIndex();
+        this.showcaseTitleLabel = showcaseTitle();
+        this.showcaseBodyLabel = showcaseBody();
+        this.productCloudNameLabel = productCloudName();
+        this.productNavOverviewLabel = productNavOverview();
+        this.productNavProjectsLabel = productNavProjects();
+        this.productNavMonitorLabel = productNavMonitor();
+        this.productWorkspaceLabel = productWorkspaceLabel();
+        this.productCreateReleaseLabel = productCreateRelease();
+        this.showcaseSummaryTotalLabel = consoleStatActiveServices();
+        this.showcaseSummaryRunningLabel = consoleStatPendingReleases();
+        this.showcaseSummaryFailedLabel = consoleStatAffectedRegions();
+        this.showcaseSummaryAriaLabel = consoleSummaryAria();
+        this.showcaseTabsLabel = showcaseTabsLabel();
+        this.showcaseEmptyBadgeLabel = showcaseEmptyBadge();
+        this.showcaseEmptyTitleLabel = showcaseEmptyTitle();
+        this.showcaseEmptyBodyLabel = showcaseEmptyBody();
+        this.showcaseTabSourceLabel = showcaseTabSource();
+        this.startIndexLabel = startIndex();
+        this.startTitleLabel = startTitle();
+        this.startLedeLabel = startLede();
+        this.buildLabel = build();
+        this.readDocsLabel = readDocs();
+        this.gettingStartedGuideLabel = gettingStartedGuide();
+        this.startLabel = start();
+        this.copyCommandLabel = copyCommand();
+        this.copiedCommandLabel = copiedCommand();
+
+        this.showcaseTabs = [
+            { id: "overview", title: showcaseTabOverview(), controls: "landing-showcase-panel" },
+            { id: "source", title: showcaseTabSource(), controls: "landing-showcase-panel" },
+            { id: "activity", title: showcaseTabActivity(), controls: "landing-showcase-panel" },
+        ];
+        this.surfaceColumns = [
+            { id: "surface", title: showcaseTableColSurface() },
+            { id: "result", title: showcaseTableColResult() },
+            { id: "status", title: showcaseTableColStatus() },
+        ];
+        this.surfaceRows = [
+            {
+                id: "browser",
+                cells: [showcaseRowBrowser(), showcaseRowBrowserResult(), showcaseStatusReady()],
+            },
+            { id: "ssr", cells: [showcaseRowSsr(), showcaseRowSsrResult(), showcaseStatusReady()] },
+            { id: "edge", cells: [showcaseRowEdge(), showcaseRowEdgeResult(), "Running"] },
+        ];
+
+        const paths = docsPaths(this.localeId);
+        this.docsRootHref = paths.docsRootHref;
+        this.guideHref = paths.guideHref;
     }
-    if (Array.isArray(showcase.surfaceRows) && showcase.surfaceRows.length) {
-      this.surfaceRows = showcase.surfaceRows.map((row) => ({
-        id: String(row.id || ''),
-        cells: Array.isArray(row.cells) ? row.cells.map((cell) => String(cell)) : [],
-      }));
+
+    applyLocaleCopy(preferred) {
+        this.localeId = readLocaleId(preferred);
+        withLocaleHint(this.localeId, () => this.refreshCopy());
     }
-  }
 
-  async loadDemoFixture() {
-    try {
-      const server = new IndexPageServer();
-      const preview = await server.getHeroPreview();
-      const showcase = await server.getShowcaseOverview();
-      this.applyHeroPreview(preview);
-      this.applyShowcaseOverview(showcase);
-    } catch {
-      /* SSR defaults mirror the server fixture */
+    copyCommand() {
+        const text = "pnpm create vmz-app my-app";
+        const ok = () => {
+            this.copied = true;
+        };
+        const fail = () => {
+            this.copied = false;
+        };
+        if (
+            typeof navigator !== "undefined" &&
+            navigator.clipboard &&
+            navigator.clipboard.writeText
+        ) {
+            navigator.clipboard.writeText(text).then(ok, fail);
+            return;
+        }
+        fail();
     }
-  }
-
-  onDestroy() {
-    if (typeof this._unwatchLocale === 'function') this._unwatchLocale();
-    this._unwatchLocale = null;
-  }
-
-  refreshCopy() {
-    const bump = (key) => {
-      this[key] = '\u200b';
-    };
-    const keys = [
-      'heroKickerLabel', 'heroTitleLeadLabel', 'heroTitleEmLabel', 'heroLedeLabel', 'heroFootnoteLabel', 'viewProductUiLabel',
-      'heroPreviewDemoLabelText', 'heroPreviewSiteNameLabel',
-      'heroPreviewAriaLabel', 'heroPreviewReleaseCenterLabel', 'heroPreviewProductionReadyLabel',
-      'heroPreviewBranchMainLabel',
-      'heroPreviewTableAriaLabel', 'heroPreviewColTargetLabel', 'heroPreviewColResultLabel', 'heroPreviewColStatusLabel',
-      'heroSignalAriaLabel', 'heroSignalAuthorLabel', 'heroSignalAuthorValueLabel', 'heroSignalUnderstandLabel',
-      'heroSignalUnderstandValueLabel', 'heroSignalDeliverLabel', 'heroSignalDeliverValueLabel',
-      'statementIndexLabel', 'statementTitleLeadLabel', 'statementTitleEmLabel', 'statementBodyLabel',
-      'featuresAriaLabel', 'feature1TitleLabel', 'feature1BodyLabel',
-      'feature2TitleLabel', 'feature2BodyLabel', 'feature3TitleLabel', 'feature3BodyLabel',
-      'flowIndexLabel', 'flowTitleLabel', 'flowStep1TitleLabel', 'flowStep1DescLabel', 'flowStep2TitleLabel', 'flowStep2DescLabel',
-      'flowStep3TitleLabel', 'flowStep3DescLabel', 'flowStep4TitleLabel', 'flowStep4DescLabel', 'flowStep5TitleLabel', 'flowStep5DescLabel',
-      'flowStep6TitleLabel', 'flowStep6DescLabel',
-      'showcaseIndexLabel', 'showcaseTitleLabel', 'showcaseBodyLabel', 'productCloudNameLabel',
-      'productNavOverviewLabel', 'productNavProjectsLabel', 'productNavMonitorLabel',
-      'productWorkspaceLabel', 'productCreateReleaseLabel', 'showcaseTabsLabel',
-      'showcaseEmptyBadgeLabel', 'showcaseEmptyTitleLabel', 'showcaseEmptyBodyLabel', 'showcaseTabSourceLabel',
-      'startIndexLabel', 'startTitleLabel', 'startLedeLabel', 'buildLabel', 'readDocsLabel', 'gettingStartedGuideLabel', 'startLabel',
-      'copyCommandLabel', 'copiedCommandLabel',
-    ];
-    for (const k of keys) bump(k);
-
-    this.heroKickerLabel = heroKicker();
-    this.heroTitleLeadLabel = heroTitleLead();
-    this.heroTitleEmLabel = heroTitleEm();
-    this.heroLedeLabel = heroLede();
-    this.heroFootnoteLabel = heroFootnote();
-    this.viewProductUiLabel = viewProductUi();
-    this.heroPreviewDemoLabelText = heroPreviewDemoLabel();
-    this.heroPreviewSiteNameLabel = heroPreviewSiteName();
-    this.heroPreviewAriaLabel = heroPreviewAria();
-    this.heroPreviewReleaseCenterLabel = heroPreviewReleaseCenter();
-    this.heroPreviewProductionReadyLabel = heroPreviewProductionReady();
-    this.heroPreviewBranchMainLabel = heroPreviewBranchMain();
-    this.heroPreviewTableAriaLabel = heroPreviewTableAria();
-    this.heroPreviewColTargetLabel = heroPreviewColTarget();
-    this.heroPreviewColResultLabel = heroPreviewColResult();
-    this.heroPreviewColStatusLabel = heroPreviewColStatus();
-    this.heroSignalAriaLabel = heroSignalAria();
-    this.heroSignalAuthorLabel = heroSignalAuthor();
-    this.heroSignalAuthorValueLabel = heroSignalAuthorValue();
-    this.heroSignalUnderstandLabel = heroSignalUnderstand();
-    this.heroSignalUnderstandValueLabel = heroSignalUnderstandValue();
-    this.heroSignalDeliverLabel = heroSignalDeliver();
-    this.heroSignalDeliverValueLabel = heroSignalDeliverValue();
-    this.statementIndexLabel = statementIndex();
-    this.statementTitleLeadLabel = statementTitleLead();
-    this.statementTitleEmLabel = statementTitleEm();
-    this.statementBodyLabel = statementBody();
-    this.featuresAriaLabel = featuresAria();
-    this.feature1TitleLabel = feature1Title();
-    this.feature1BodyLabel = feature1Body();
-    this.feature2TitleLabel = feature2Title();
-    this.feature2BodyLabel = feature2Body();
-    this.feature3TitleLabel = feature3Title();
-    this.feature3BodyLabel = feature3Body();
-    this.flowIndexLabel = flowIndex();
-    this.flowTitleLabel = flowTitle();
-    this.flowStep1TitleLabel = flowStep1Title();
-    this.flowStep1DescLabel = flowStep1Desc();
-    this.flowStep2TitleLabel = flowStep2Title();
-    this.flowStep2DescLabel = flowStep2Desc();
-    this.flowStep3TitleLabel = flowStep3Title();
-    this.flowStep3DescLabel = flowStep3Desc();
-    this.flowStep4TitleLabel = flowStep4Title();
-    this.flowStep4DescLabel = flowStep4Desc();
-    this.flowStep5TitleLabel = flowStep5Title();
-    this.flowStep5DescLabel = flowStep5Desc();
-    this.flowStep6TitleLabel = flowStep6Title();
-    this.flowStep6DescLabel = flowStep6Desc();
-    this.showcaseIndexLabel = showcaseIndex();
-    this.showcaseTitleLabel = showcaseTitle();
-    this.showcaseBodyLabel = showcaseBody();
-    this.productCloudNameLabel = productCloudName();
-    this.productNavOverviewLabel = productNavOverview();
-    this.productNavProjectsLabel = productNavProjects();
-    this.productNavMonitorLabel = productNavMonitor();
-    this.productWorkspaceLabel = productWorkspaceLabel();
-    this.productCreateReleaseLabel = productCreateRelease();
-    this.showcaseSummaryTotalLabel = consoleStatActiveServices();
-    this.showcaseSummaryRunningLabel = consoleStatPendingReleases();
-    this.showcaseSummaryFailedLabel = consoleStatAffectedRegions();
-    this.showcaseSummaryAriaLabel = consoleSummaryAria();
-    this.showcaseTabsLabel = showcaseTabsLabel();
-    this.showcaseEmptyBadgeLabel = showcaseEmptyBadge();
-    this.showcaseEmptyTitleLabel = showcaseEmptyTitle();
-    this.showcaseEmptyBodyLabel = showcaseEmptyBody();
-    this.showcaseTabSourceLabel = showcaseTabSource();
-    this.startIndexLabel = startIndex();
-    this.startTitleLabel = startTitle();
-    this.startLedeLabel = startLede();
-    this.buildLabel = build();
-    this.readDocsLabel = readDocs();
-    this.gettingStartedGuideLabel = gettingStartedGuide();
-    this.startLabel = start();
-    this.copyCommandLabel = copyCommand();
-    this.copiedCommandLabel = copiedCommand();
-
-    this.showcaseTabs = [
-      { id: 'overview', title: showcaseTabOverview(), controls: 'landing-showcase-panel' },
-      { id: 'source', title: showcaseTabSource(), controls: 'landing-showcase-panel' },
-      { id: 'activity', title: showcaseTabActivity(), controls: 'landing-showcase-panel' },
-    ];
-    this.surfaceColumns = [
-      { id: 'surface', title: showcaseTableColSurface() },
-      { id: 'result', title: showcaseTableColResult() },
-      { id: 'status', title: showcaseTableColStatus() },
-    ];
-    this.surfaceRows = [
-      { id: 'browser', cells: [showcaseRowBrowser(), showcaseRowBrowserResult(), showcaseStatusReady()] },
-      { id: 'ssr', cells: [showcaseRowSsr(), showcaseRowSsrResult(), showcaseStatusReady()] },
-      { id: 'edge', cells: [showcaseRowEdge(), showcaseRowEdgeResult(), 'Running'] },
-    ];
-
-    const paths = docsPaths(this.localeId);
-    this.docsRootHref = paths.docsRootHref;
-    this.guideHref = paths.guideHref;
-  }
-
-  applyLocaleCopy(preferred) {
-    this.localeId = readLocaleId(preferred);
-    withLocaleHint(this.localeId, () => this.refreshCopy());
-  }
-
-  copyCommand() {
-    const text = 'pnpm create vmz-app my-app';
-    const ok = () => {
-      this.copied = true;
-    };
-    const fail = () => {
-      this.copied = false;
-    };
-    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(ok, fail);
-      return;
-    }
-    fail();
-  }
 }
 </script>
-
 <script server>
-import ReleaseDemo from '#server/demo/ReleaseDemo';
+import ReleaseDemo from "#server/demo/ReleaseDemo";
 
 export default class IndexPageServer {
-  getHeroPreview() {
-    return new ReleaseDemo().getHeroPreview();
-  }
+    getHeroPreview() {
+        return new ReleaseDemo().getHeroPreview();
+    }
 
-  getShowcaseOverview() {
-    return new ReleaseDemo().getShowcaseOverview();
-  }
+    getShowcaseOverview() {
+        return new ReleaseDemo().getShowcaseOverview();
+    }
 }
 </script>

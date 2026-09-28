@@ -1,15 +1,17 @@
 <template>
-  <p>{{ label }}</p>
+    <p>
+        {{ label }}
+    </p>
 </template>
 <script client>
-import { save, greeting, itemCount } from '#locales/account';
-import { brand } from '#locales/common';
+import { save, greeting, itemCount } from "#locales/account";
+import { brand } from "#locales/common";
 
 export default class IndexPage {
-  userName = 'Ada';
-  count = 2;
-  get label() {
-    return `${brand()} ${save()} ${greeting({ name: this.userName })} ${itemCount({ count: this.count })}`;
-  }
+    userName = "Ada";
+    count = 2;
+    get label() {
+        return `${brand()} ${save()} ${greeting({ name: this.userName })} ${itemCount({ count: this.count })}`;
+    }
 }
 </script>

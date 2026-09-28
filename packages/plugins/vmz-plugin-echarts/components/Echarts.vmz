@@ -1,34 +1,33 @@
 <template>
-  <div class="echarts-host" data-vmz-echarts style="min-height: 320px; width: 100%"></div>
+    <div data-vmz-echarts class="echarts-host" style="min-height: 320px; width: 100%" />
 </template>
-
 <script client>
-import { mountEcharts } from '@vmz/plugin-echarts/runtime';
+import { mountEcharts } from "@vmz/plugin-echarts/runtime";
 
 export default class Echarts {
-  public option: any = null;
-  public theme: string | null = null;
-  public renderer: string = 'canvas';
+    public option: any = null;
+    public theme: string | null = null;
+    public renderer: string = "canvas";
 
-  #api: { setOption: (o: any, notMerge?: boolean) => void; dispose: () => void } | null = null;
+    #api: { setOption: (o: any, notMerge?: boolean) => void; dispose: () => void } | null = null;
 
-  async onMount() {
-    const root = this.__vmzDomRoot;
-    const el =
-      (root && root.nodeType === 1 && root.matches?.('[data-vmz-echarts]') && root) ||
-      root?.querySelector?.('[data-vmz-echarts]') ||
-      root;
-    if (!el || el.nodeType !== 1) return;
-    this.#api = await mountEcharts(el, {
-      option: this.option,
-      theme: this.theme,
-      renderer: this.renderer === 'svg' ? 'svg' : 'canvas',
-    });
-  }
+    async onMount() {
+        const root = this.__vmzDomRoot;
+        const el =
+            (root && root.nodeType === 1 && root.matches?.("[data-vmz-echarts]") && root) ||
+            root?.querySelector?.("[data-vmz-echarts]") ||
+            root;
+        if (!el || el.nodeType !== 1) return;
+        this.#api = await mountEcharts(el, {
+            option: this.option,
+            theme: this.theme,
+            renderer: this.renderer === "svg" ? "svg" : "canvas",
+        });
+    }
 
-  onDestroy() {
-    this.#api?.dispose();
-    this.#api = null;
-  }
+    onDestroy() {
+        this.#api?.dispose();
+        this.#api = null;
+    }
 }
 </script>

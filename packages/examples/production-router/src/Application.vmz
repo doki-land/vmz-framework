@@ -1,9 +1,8 @@
 <template>
-  <div class="app-shell" data-vmz-fixture="application-shell">
-    <slot />
-  </div>
+    <div data-vmz-fixture="application-shell" class="app-shell">
+        <slot />
+    </div>
 </template>
-
 <script client>
 export default class Application {}
 </script>

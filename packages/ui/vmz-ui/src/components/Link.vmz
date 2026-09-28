@@ -1,17 +1,10 @@
 <template>
-  <a
-      class="vmz-ui-link"
-      data-vmz-ui="link"
-      :href="href"
-      :target="target"
-      :rel="rel"
-    >
-      <slot />
+    <a data-vmz-ui="link" :href="href" :target="target" :rel="rel" class="vmz-ui-link">
+        <slot />
     </a>
 </template>
-
 <style>
-  .vmz-ui-link {
+.vmz-ui-link {
     font: inherit;
     font-weight: 600;
     color: var(--vmz-action-primary-background);
@@ -19,31 +12,30 @@
     text-underline-offset: 0.15em;
     text-decoration-thickness: 1px;
     outline: none;
-  }
+}
 
-  .vmz-ui-link:hover {
+.vmz-ui-link:hover {
     color: var(--vmz-action-primary-hover);
-  }
+}
 
-  .vmz-ui-link:active {
+.vmz-ui-link:active {
     color: var(--vmz-action-primary-active);
-  }
+}
 
-  .vmz-ui-link:focus-visible {
+.vmz-ui-link:focus-visible {
     box-shadow: 0 0 0 2px var(--vmz-focus-ring);
     border-radius: var(--vmz-radius-md, 6px);
-  }
+}
 </style>
-
 <script client>
 /**
-* VMZ UI — Link (Foundation).
-* Navigation / inline text link; tokens only, no brand hex.
-*/
+ * VMZ UI — Link (Foundation).
+ * Navigation / inline text link; tokens only, no brand hex.
+ */
 export default class Link {
-	static __vmzHostBox = 'contents';
-	public href: string = "#";
-	public target: string = "";
-	public rel: string = "";
+    static __vmzHostBox = "contents";
+    public href: string = "#";
+    public target: string = "";
+    public rel: string = "";
 }
 </script>

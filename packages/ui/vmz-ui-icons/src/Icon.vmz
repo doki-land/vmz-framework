@@ -6,44 +6,44 @@
     </span>
 </template>
 <style>
-    .vmz-ui-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        box-sizing: border-box;
-        color: var(--vmz-action-primary-background);
-        line-height: 1;
-        vertical-align: middle;
-        user-select: none;
-    }
+.vmz-ui-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    color: var(--vmz-action-primary-background);
+    line-height: 1;
+    vertical-align: middle;
+    user-select: none;
+}
 
-    .vmz-ui-icon__svg {
-        display: block;
-        width: 1em;
-        height: 1em;
-    }
+.vmz-ui-icon__svg {
+    display: block;
+    width: 1em;
+    height: 1em;
+}
 
-    .vmz-ui-icon[data-size="sm"] {
-        width: 1.5rem;
-        height: 1.5rem;
-        font-size: 0.95rem;
-    }
+.vmz-ui-icon[data-size="sm"] {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.95rem;
+}
 
-    .vmz-ui-icon[data-size="md"] {
-        width: 2.35rem;
-        height: 2.35rem;
-        font-size: 1.15rem;
-    }
+.vmz-ui-icon[data-size="md"] {
+    width: 2.35rem;
+    height: 2.35rem;
+    font-size: 1.15rem;
+}
 
-    .vmz-ui-icon[data-size="lg"] {
-        width: 2.85rem;
-        height: 2.85rem;
-        font-size: 1.35rem;
-    }
+.vmz-ui-icon[data-size="lg"] {
+    width: 2.85rem;
+    height: 2.85rem;
+    font-size: 1.35rem;
+}
 </style>
 <script client>
-import { FALLBACK_PATH, resolveIconPath } from './registry.ts';
+import { FALLBACK_PATH, resolveIconPath } from "./registry.ts";
 
 /**
  * VMZ UI Icons — semantic Icon backed by the shared registry export.
@@ -51,15 +51,15 @@ import { FALLBACK_PATH, resolveIconPath } from './registry.ts';
  */
 export default class Icon {
     /** Semantic icon id, e.g. tool.base64 / action.search */
-    public name: string = '';
+    public name: string = "";
     /** sm | md | lg */
-    public size: string = 'md';
+    public size: string = "md";
     /** Accessible name; empty ⇒ decorative */
-    public label: string = '';
+    public label: string = "";
 
-    roleAttr = '';
-    hiddenAttr = 'true';
-    labelAttr = '';
+    roleAttr = "";
+    hiddenAttr = "true";
+    labelAttr = "";
 
     onMount() {
         this.syncA11y();
@@ -70,15 +70,15 @@ export default class Icon {
     }
 
     syncA11y() {
-        const labelled = String(this.label || '').trim();
+        const labelled = String(this.label || "").trim();
         if (labelled) {
-            this.roleAttr = 'img';
-            this.hiddenAttr = '';
+            this.roleAttr = "img";
+            this.hiddenAttr = "";
             this.labelAttr = labelled;
         } else {
-            this.roleAttr = '';
-            this.hiddenAttr = 'true';
-            this.labelAttr = '';
+            this.roleAttr = "";
+            this.hiddenAttr = "true";
+            this.labelAttr = "";
         }
     }
 }

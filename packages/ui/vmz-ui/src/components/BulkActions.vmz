@@ -1,20 +1,15 @@
 <template>
-  <div
-      class="vmz-ui-bulk-actions"
-      data-vmz-ui="bulk-actions"
-      role="region"
-      :aria-label="label"
-      :data-open="selectedCount ? 'true' : 'false'"
-    >
-      <p class="vmz-ui-bulk-actions__count" data-vmz-fixture="bulk-count">{{ countLabel }}</p>
-      <div class="vmz-ui-bulk-actions__actions">
-        <slot />
-      </div>
+    <div data-vmz-ui="bulk-actions" role="region" :aria-label="label" :data-open='selectedCount ? "true" : "false"' class="vmz-ui-bulk-actions">
+        <p data-vmz-fixture="bulk-count" class="vmz-ui-bulk-actions__count">
+            {{ countLabel }}
+        </p>
+        <div class="vmz-ui-bulk-actions__actions">
+            <slot />
+        </div>
     </div>
 </template>
-
 <style>
-  .vmz-ui-bulk-actions {
+.vmz-ui-bulk-actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -24,34 +19,33 @@
     border: 1px solid var(--vmz-line-default);
     border-radius: var(--vmz-radius-md, 6px);
     background: transparent;
-  }
+}
 
-  /* Keep host+slot mounted so default slot projects at create time (not inside v-if). */
-  .vmz-ui-bulk-actions[data-open='false'] {
+/* Keep host+slot mounted so default slot projects at create time (not inside v-if). */
+.vmz-ui-bulk-actions[data-open="false"] {
     display: none;
-  }
+}
 
-  .vmz-ui-bulk-actions__count {
+.vmz-ui-bulk-actions__count {
     margin: 0;
     font-weight: 700;
     color: var(--vmz-action-primary-active);
-  }
+}
 
-  .vmz-ui-bulk-actions__actions {
+.vmz-ui-bulk-actions__actions {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-  }
+}
 </style>
-
 <script client>
 /**
-* VMZ UI — BulkActions (Console composition).
-* Hides when selectedCount is falsy but keeps the tree mounted so parent slot children project.
-*/
+ * VMZ UI — BulkActions (Console composition).
+ * Hides when selectedCount is falsy but keeps the tree mounted so parent slot children project.
+ */
 export default class BulkActions {
-	public label: string = "Bulk actions";
-	public selectedCount: number = 0;
-	public countLabel: string = "";
+    public label: string = "Bulk actions";
+    public selectedCount: number = 0;
+    public countLabel: string = "";
 }
 </script>

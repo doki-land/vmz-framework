@@ -1,7 +1,6 @@
 <template>
-  <slot />
+    <slot />
 </template>
-
 <script client>
 // Root shell. Pages under `pages/` are routed automatically.
 export default class Application {}

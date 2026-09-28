@@ -1,139 +1,153 @@
 <template>
-  <header class="site-header" data-vmz-fixture="site-header">
-    <a class="site-brand" href="/" :aria-label="homeLabel">
-      <span class="site-brand__mark">{{ brandLabel }}</span>
-      <span class="site-brand__pulse" aria-hidden="true"></span>
-    </a>
-    <nav class="site-nav" aria-label="Primary">
-      <div class="site-nav__links">
-        <a :href="docsRootHref">{{ docsLabel }}</a>
-        <a href="/commercial">{{ showcaseLabel }}</a>
-        <a href="https://github.com/doki-land/vmz-framework">{{ githubLabel }}</a>
-      </div>
-      <details class="site-nav-mobile">
-        <summary :aria-label="navMenuLabel">{{ navMenuLabel }}</summary>
-        <div class="site-nav-mobile__menu">
-          <a :href="docsRootHref">{{ docsLabel }}</a>
-          <a href="/commercial">{{ showcaseLabel }}</a>
-          <a href="https://github.com/doki-land/vmz-framework">{{ githubLabel }}</a>
-          <a :href="guideHref">{{ startLabel }}</a>
-        </div>
-      </details>
-      <details class="site-language">
-        <summary :aria-label="selectLanguageLabel"><Icon name="nav.language" size="sm" />{{ langSummary }}</summary>
-        <div class="site-language__menu">
-          <button
-            type="button"
-            data-vmz-fixture="locale-zh-hans"
-            :aria-current="localeId === 'zh-hans' ? 'true' : null"
-            @click="() => switchLocale('zh-hans')"
-          >
-            {{ langZhFullLabel }}
-          </button>
-          <button
-            type="button"
-            data-vmz-fixture="locale-en-us"
-            :aria-current="localeId === 'en-us' ? 'true' : null"
-            @click="() => switchLocale('en-us')"
-          >
-            {{ langEnLabel }}
-          </button>
-        </div>
-      </details>
-      <a class="site-nav__cta" :href="guideHref">{{ startLabel }}</a>
-    </nav>
-  </header>
+    <header data-vmz-fixture="site-header" class="site-header">
+        <a href="/" :aria-label="homeLabel" class="site-brand">
+            <span class="site-brand__mark">
+                {{ brandLabel }}
+            </span>
+            <span aria-hidden="true" class="site-brand__pulse" />
+        </a>
+        <nav aria-label="Primary" class="site-nav">
+            <div class="site-nav__links">
+                <a :href="docsRootHref">
+                    {{ docsLabel }}
+                </a>
+                <a href="/commercial">
+                    {{ showcaseLabel }}
+                </a>
+                <a href="https://github.com/doki-land/vmz-framework">
+                    {{ githubLabel }}
+                </a>
+            </div>
+            <details class="site-nav-mobile">
+                <summary :aria-label="navMenuLabel">
+                    {{ navMenuLabel }}
+                </summary>
+                <div class="site-nav-mobile__menu">
+                    <a :href="docsRootHref">
+                        {{ docsLabel }}
+                    </a>
+                    <a href="/commercial">
+                        {{ showcaseLabel }}
+                    </a>
+                    <a href="https://github.com/doki-land/vmz-framework">
+                        {{ githubLabel }}
+                    </a>
+                    <a :href="guideHref">
+                        {{ startLabel }}
+                    </a>
+                </div>
+            </details>
+            <details class="site-language">
+                <summary :aria-label="selectLanguageLabel">
+                    <Icon name="nav.language" size="sm" />
+                    {{ langSummary }}
+                </summary>
+                <div class="site-language__menu">
+                    <button type="button" data-vmz-fixture="locale-zh-hans" :aria-current='localeId === "zh-hans" ? "true" : null' @click='(() => switchLocale("zh-hans"))'>
+                        {{ langZhFullLabel }}
+                    </button>
+                    <button type="button" data-vmz-fixture="locale-en-us" :aria-current='localeId === "en-us" ? "true" : null' @click='(() => switchLocale("en-us"))'>
+                        {{ langEnLabel }}
+                    </button>
+                </div>
+            </details>
+            <a :href="guideHref" class="site-nav__cta">
+                {{ startLabel }}
+            </a>
+        </nav>
+    </header>
 </template>
-
 <script client>
 import {
-  brand,
-  home,
-  docs,
-  showcase,
-  start,
-  github,
-  navMenu,
-  selectLanguage,
-  langZh,
-  langZhFull,
-  langEn,
-} from '#locales/common';
-import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
+    brand,
+    home,
+    docs,
+    showcase,
+    start,
+    github,
+    navMenu,
+    selectLanguage,
+    langZh,
+    langZhFull,
+    langEn,
+} from "#locales/common";
+import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
 export default class SiteHeader {
-  localeId = 'zh-hans';
-  brandLabel = '';
-  homeLabel = '';
-  docsLabel = '';
-  showcaseLabel = '';
-  startLabel = '';
-  githubLabel = '';
-  navMenuLabel = '';
-  selectLanguageLabel = '';
-  langSummary = '';
-  langZhFullLabel = '';
-  langEnLabel = '';
-  docsRootHref = '/d/zh-hans/';
-  guideHref = '/d/zh-hans/guide/';
-  _unwatchLocale = null;
+    localeId = "zh-hans";
+    brandLabel = "";
+    homeLabel = "";
+    docsLabel = "";
+    showcaseLabel = "";
+    startLabel = "";
+    githubLabel = "";
+    navMenuLabel = "";
+    selectLanguageLabel = "";
+    langSummary = "";
+    langZhFullLabel = "";
+    langEnLabel = "";
+    docsRootHref = "/d/zh-hans/";
+    guideHref = "/d/zh-hans/guide/";
+    _unwatchLocale = null;
 
-  onMount() {
-    this.applyLocaleCopy();
-    this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
-  }
-
-  onDestroy() {
-    if (typeof this._unwatchLocale === 'function') this._unwatchLocale();
-    this._unwatchLocale = null;
-  }
-
-  refreshCopy() {
-    this.brandLabel = brand();
-    this.homeLabel = home();
-    this.docsLabel = docs();
-    this.showcaseLabel = showcase();
-    this.startLabel = start();
-    this.githubLabel = github();
-    this.navMenuLabel = navMenu();
-    this.selectLanguageLabel = selectLanguage();
-    this.langSummary = this.localeId === 'en-us' ? langEn() : langZh();
-    this.langZhFullLabel = langZhFull();
-    this.langEnLabel = langEn();
-    const paths = docsPaths(this.localeId);
-    this.docsRootHref = paths.docsRootHref;
-    this.guideHref = paths.guideHref;
-  }
-
-  applyLocaleCopy(preferred) {
-    this.localeId = readLocaleId(preferred);
-    withLocaleHint(this.localeId, () => this.refreshCopy());
-  }
-
-  async switchLocale(to) {
-    if (typeof window === 'undefined') return;
-    const fn = window.__vmzTransitionLocale;
-    if (typeof fn !== 'function') {
-      if (typeof console !== 'undefined' && console.warn) {
-        console.warn('[vmz] locale switch skipped: __vmzTransitionLocale missing (dev host not bootstrapped?)');
-      }
-      if (window) {
-        window.__vmzLastLocaleTransition = {
-          status: 'rejected',
-          toLocale: to,
-          reason: 'missing_host',
-        };
-      }
-      return;
+    onMount() {
+        this.applyLocaleCopy();
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
     }
-    const r = await fn(to);
-    if (r && r.status !== 'committed' && typeof console !== 'undefined' && console.warn) {
-      console.warn('[vmz] locale transition not committed:', r.status, r.reason || '');
+
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
     }
-    if (r && r.status === 'committed') {
-      this.applyLocaleCopy(to);
-      queueMicrotask(() => this.applyLocaleCopy(to));
+
+    refreshCopy() {
+        this.brandLabel = brand();
+        this.homeLabel = home();
+        this.docsLabel = docs();
+        this.showcaseLabel = showcase();
+        this.startLabel = start();
+        this.githubLabel = github();
+        this.navMenuLabel = navMenu();
+        this.selectLanguageLabel = selectLanguage();
+        this.langSummary = this.localeId === "en-us" ? langEn() : langZh();
+        this.langZhFullLabel = langZhFull();
+        this.langEnLabel = langEn();
+        const paths = docsPaths(this.localeId);
+        this.docsRootHref = paths.docsRootHref;
+        this.guideHref = paths.guideHref;
     }
-  }
+
+    applyLocaleCopy(preferred) {
+        this.localeId = readLocaleId(preferred);
+        withLocaleHint(this.localeId, () => this.refreshCopy());
+    }
+
+    async switchLocale(to) {
+        if (typeof window === "undefined") return;
+        const fn = window.__vmzTransitionLocale;
+        if (typeof fn !== "function") {
+            if (typeof console !== "undefined" && console.warn) {
+                console.warn(
+                    "[vmz] locale switch skipped: __vmzTransitionLocale missing (dev host not bootstrapped?)",
+                );
+            }
+            if (window) {
+                window.__vmzLastLocaleTransition = {
+                    status: "rejected",
+                    toLocale: to,
+                    reason: "missing_host",
+                };
+            }
+            return;
+        }
+        const r = await fn(to);
+        if (r && r.status !== "committed" && typeof console !== "undefined" && console.warn) {
+            console.warn("[vmz] locale transition not committed:", r.status, r.reason || "");
+        }
+        if (r && r.status === "committed") {
+            this.applyLocaleCopy(to);
+            queueMicrotask(() => this.applyLocaleCopy(to));
+        }
+    }
 }
 </script>

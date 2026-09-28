@@ -1,122 +1,118 @@
 <template>
-  <div class="vmz-ui-textarea" data-vmz-ui="textarea" :data-invalid="invalidAttr">
-      <label v-if="label" class="vmz-ui-textarea__label" :for="controlId">{{ label }}</label>
-      <textarea
-        :id="controlId"
-        class="vmz-ui-textarea__control"
-        :rows="rows"
-        :value="value"
-        :disabled="disabled"
-        :readonly="readonly"
-        :aria-invalid="error ? 'true' : 'false'"
-        :aria-describedby="describedBy"
-        @input="onDomInput"
-      ></textarea>
-      <p v-if="description" :id="descriptionId" class="vmz-ui-textarea__description">{{ description }}</p>
-      <p v-if="error" :id="errorId" class="vmz-ui-textarea__error" role="alert">{{ error }}</p>
+    <div data-vmz-ui="textarea" :data-invalid="invalidAttr" class="vmz-ui-textarea">
+        <label v-if="label" :for="controlId" class="vmz-ui-textarea__label">
+            {{ label }}
+        </label>
+        <textarea :id="controlId" :rows="rows" :value="value" :disabled="disabled" :readonly="readonly" :aria-invalid='error ? "true" : "false"' :aria-describedby="describedBy" @input="onDomInput" class="vmz-ui-textarea__control" />
+        <p v-if="description" :id="descriptionId" class="vmz-ui-textarea__description">
+            {{ description }}
+        </p>
+        <p v-if="error" :id="errorId" role="alert" class="vmz-ui-textarea__error">
+            {{ error }}
+        </p>
     </div>
 </template>
-
 <style>
-  .vmz-ui-textarea {
+.vmz-ui-textarea {
     display: flex;
     flex-direction: column;
     gap: 0.45rem;
     max-width: none;
     width: 100%;
-  }
+}
 
 .vmz-ui-textarea__label {
-  font: inherit;
-  font-weight: 500;
-  font-size: 0.875rem;
+    font: inherit;
+    font-weight: 500;
+    font-size: 0.875rem;
 }
 
 .vmz-ui-textarea__control {
-  box-sizing: border-box;
-  width: 100%;
-  font-family: var(--vmz-font-sans, inherit);
-  font-size: 0.875rem;
-  line-height: 1.5715;
-  min-height: 5.5rem;
-  padding: var(--vmz-density-control-padding-y, 0.25rem)
-    var(--vmz-density-control-padding-x, 0.75rem);
-  border: 1px solid var(--vmz-line-default, #d9d9d9);
-  border-radius: var(--vmz-radius-md, 6px);
-  background: var(--vmz-surface-paper, #fff);
-  color: var(--vmz-text-ink, inherit);
-  outline: none;
-  resize: vertical;
-  transition:
-    border-color var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, linear),
-    box-shadow var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, linear);
+    box-sizing: border-box;
+    width: 100%;
+    font-family: var(--vmz-font-sans, inherit);
+    font-size: 0.875rem;
+    line-height: 1.5715;
+    min-height: 5.5rem;
+    padding: var(--vmz-density-control-padding-y, 0.25rem)
+        var(--vmz-density-control-padding-x, 0.75rem);
+    border: 1px solid var(--vmz-line-default, #d9d9d9);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-surface-paper, #fff);
+    color: var(--vmz-text-ink, inherit);
+    outline: none;
+    resize: vertical;
+    transition:
+        border-color var(--vmz-motion-control-duration, 120ms)
+            var(--vmz-motion-control-easing, linear),
+        box-shadow var(--vmz-motion-control-duration, 120ms)
+            var(--vmz-motion-control-easing, linear);
 }
 
 .vmz-ui-textarea__control::placeholder {
-  color: var(--vmz-text-steel, #8c8c8c);
-  opacity: 1;
+    color: var(--vmz-text-steel, #8c8c8c);
+    opacity: 1;
 }
 
-.vmz-ui-textarea[data-invalid='true'] .vmz-ui-textarea__control {
-  border-color: var(--vmz-status-danger-accent);
+.vmz-ui-textarea[data-invalid="true"] .vmz-ui-textarea__control {
+    border-color: var(--vmz-status-danger-accent);
 }
 
 .vmz-ui-textarea__control:hover:not(:disabled):not(:focus-visible) {
-  border-color: var(--vmz-action-primary-background);
+    border-color: var(--vmz-action-primary-background);
 }
 
 .vmz-ui-textarea__control:focus-visible {
-  border-color: var(--vmz-action-primary-background);
-  box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    border-color: var(--vmz-action-primary-background);
+    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
 }
 
 .vmz-ui-textarea__control:disabled,
 .vmz-ui-textarea__control:read-only {
-  cursor: default;
-  background: var(--vmz-surface-mist, #fafafa);
+    cursor: default;
+    background: var(--vmz-surface-mist, #fafafa);
 }
 
 .vmz-ui-textarea__control:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
+    cursor: not-allowed;
+    opacity: 0.55;
 }
 
 .vmz-ui-textarea__description {
-  margin: 0;
-  color: var(--vmz-text-steel, #8c8c8c);
-  font-size: 0.875rem;
-  line-height: 1.4;
+    margin: 0;
+    color: var(--vmz-text-steel, #8c8c8c);
+    font-size: 0.875rem;
+    line-height: 1.4;
 }
 
 .vmz-ui-textarea__error {
-  margin: 0;
-  color: var(--vmz-status-danger-foreground);
-  font-size: 0.875rem;
+    margin: 0;
+    color: var(--vmz-status-danger-foreground);
+    font-size: 0.875rem;
 }
 </style>
-
 <script client>
 /**
-* VMZ UI — TextArea.
-* Same label/description/error ownership contract as Field; parent owns value.
-*/
+ * VMZ UI — TextArea.
+ * Same label/description/error ownership contract as Field; parent owns value.
+ */
 export default class TextArea {
-	public label: string = "";
-	public description: string = "";
-	public error: string = "";
-	public value: string = "";
-	public rows: number = 4;
-	public disabled: boolean = false;
-	public readonly: boolean = false;
-	public invalidAttr: string = "false";
-	public controlId: string = "vmz-textarea";
-	public descriptionId: string = "vmz-textarea-desc";
-	public errorId: string = "vmz-textarea-err";
-	public describedBy: string = "";
-	public onInput: ((e: Event) => void) | null = null;
-	onDomInput(e: Event) {
-		this.emit("input", e);
-		if (typeof this.onInput === "function") this.onInput(e);
-	}
+    public label: string = "";
+    public description: string = "";
+    public error: string = "";
+    public value: string = "";
+    public rows: number = 4;
+    public disabled: boolean = false;
+    public readonly: boolean = false;
+    public invalidAttr: string = "false";
+    public controlId: string = "vmz-textarea";
+    public descriptionId: string = "vmz-textarea-desc";
+    public errorId: string = "vmz-textarea-err";
+    public describedBy: string = "";
+    public onInput: ((e: Event) => void) | null = null;
+    onDomInput(e: Event) {
+        this.emit("input", e);
+        if (typeof this.onInput === "function") this.onInput(e);
+    }
 }
 </script>
