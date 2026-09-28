@@ -1,15 +1,34 @@
 <template>
-  <div data-vmz-fixture="console">
+  <div data-vmz-fixture="console" class="vmz-console-page">
     <ConsoleShell
       brand="VMZ"
       home-href="/"
-      title="Operations"
+      title="运营控制台"
       nav-label="Console"
       :nav="navItems"
     >
+      <section class="vmz-console-summary" aria-label="Operations summary">
+        <Card title="活跃服务" description="过去 24 小时">
+          <strong class="vmz-console-stat">12</strong>
+          <Badge tone="success">稳定</Badge>
+        </Card>
+        <Card title="待处理发布" description="Release queue">
+          <strong class="vmz-console-stat">3</strong>
+          <Badge tone="warning">需关注</Badge>
+        </Card>
+        <Card title="受影响区域" description="最近编译">
+          <strong class="vmz-console-stat">1</strong>
+          <Badge tone="info">Direct</Badge>
+        </Card>
+        <Card title="告警" description="Open incidents">
+          <strong class="vmz-console-stat">0</strong>
+          <Badge tone="success">正常</Badge>
+        </Card>
+      </section>
+
       <FilterBar label="Query">
         <Field
-          label="Name contains"
+          label="名称包含"
           control-id="home-console-query"
           description-id="home-console-query-desc"
           error-id="home-console-query-err"
@@ -21,7 +40,7 @@
         <Button type="button" @click="selectVisible">Select visible</Button>
       </FilterBar>
 
-      <p data-vmz-fixture="console-query">query:{{ query }}</p>
+      <p class="vmz-sr-only" data-vmz-fixture="console-query">query:{{ query }}</p>
 
       <BulkActions
         label="Bulk actions"
@@ -60,6 +79,46 @@
   </div>
 </template>
 
+<style>
+.vmz-console-page .vmz-ui-console-shell__main {
+  display: grid;
+  gap: 0.85rem;
+  align-content: start;
+}
+
+.vmz-console-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.vmz-console-summary .vmz-ui-card {
+  min-height: 6.5rem;
+}
+
+.vmz-console-stat {
+  display: block;
+  margin: 0.35rem 0 0.55rem;
+  font-family: var(--vmz-font-display);
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--vmz-text-ink);
+}
+
+@media (max-width: 900px) {
+  .vmz-console-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .vmz-console-summary {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+
 <script client>
 export default class ConsolePage {
   query = '';
@@ -69,30 +128,40 @@ export default class ConsolePage {
   drawerOpen = false;
   detailId = '';
   page = 1;
-  pageCount = 2;
-  pageStatus = 'Page 1 / 2';
+  pageCount = 1;
+  pageStatus = 'Page 1 / 1';
   prevDisabled = true;
-  nextDisabled = false;
+  nextDisabled = true;
   rowAction = true;
   columns = [
-    { id: 'name', title: 'Name' },
-    { id: 'status', title: 'Status' },
+    { id: 'name', title: '名称' },
+    { id: 'owner', title: '负责人' },
+    { id: 'status', title: '状态' },
+    { id: 'updated', title: '更新时间' },
   ];
   allRows = [
-    { id: 'r1', cells: ['Alpha', 'Active'] },
-    { id: 'r2', cells: ['Beta', 'Paused'] },
-    { id: 'r3', cells: ['Gamma', 'Active'] },
-    { id: 'r4', cells: ['Delta', 'Draft'] },
+    { id: 'r1', cells: ['Alpha', 'Platform', 'Active', '2m ago'] },
+    { id: 'r2', cells: ['docs-portal', 'Docs', 'Paused', '18m ago'] },
+    { id: 'r3', cells: ['edge-gateway', 'Infra', 'Active', '41m ago'] },
+    { id: 'r4', cells: ['billing-ui', 'Growth', 'Draft', '1h ago'] },
+    { id: 'r5', cells: ['status-page', 'Ops', 'Active', '3h ago'] },
+    { id: 'r6', cells: ['internal-tools', 'Platform', 'Active', '6h ago'] },
   ];
   rows = [
-    { id: 'r1', cells: ['Alpha', 'Active'] },
-    { id: 'r2', cells: ['Beta', 'Paused'] },
+    { id: 'r1', cells: ['Alpha', 'Platform', 'Active', '2m ago'] },
+    { id: 'r2', cells: ['docs-portal', 'Docs', 'Paused', '18m ago'] },
+    { id: 'r3', cells: ['edge-gateway', 'Infra', 'Active', '41m ago'] },
+    { id: 'r4', cells: ['billing-ui', 'Growth', 'Draft', '1h ago'] },
   ];
   navItems = [
     { id: 'console', title: 'Console', href: '/console' },
     { id: 'commercial', title: 'Commercial', href: '/commercial' },
     { id: 'ui', title: 'UI lab', href: '/ui' },
   ];
+
+  onMount() {
+    this.refreshPage();
+  }
 
   applyFilter() {
     this.appliedQuery = this.query;
@@ -102,7 +171,6 @@ export default class ConsolePage {
       : this.allRows.filter((row) =>
           row.cells.some((cell) => String(cell).toLowerCase().includes(q)),
         );
-    this.pageCount = Math.max(1, Math.ceil(filtered.length / 2) || 1);
     this.page = 1;
     this.refreshPage(filtered);
     this.clearSelection();
@@ -118,11 +186,12 @@ export default class ConsolePage {
 
   refreshPage(source) {
     const list = source || this.filteredRows();
-    this.pageCount = Math.max(1, Math.ceil(list.length / 2) || 1);
+    const pageSize = 4;
+    this.pageCount = Math.max(1, Math.ceil(list.length / pageSize) || 1);
     if (this.page > this.pageCount) this.page = this.pageCount;
     if (this.page < 1) this.page = 1;
-    const start = (this.page - 1) * 2;
-    this.rows = list.slice(start, start + 2);
+    const start = (this.page - 1) * pageSize;
+    this.rows = list.slice(start, start + pageSize);
     this.pageStatus = `Page ${this.page} / ${this.pageCount}`;
     this.prevDisabled = this.page <= 1;
     this.nextDisabled = this.page >= this.pageCount;
