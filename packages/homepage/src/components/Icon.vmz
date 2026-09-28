@@ -1,7 +1,7 @@
 <template>
     <span data-vmz-ui="icon" :data-name="name" :data-size="size" :role='decorative ? "presentation" : "img"' :aria-hidden='decorative ? "true" : "false"' :aria-label='decorative ? "" : label' class="vmz-ui-icon">
         <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true" class="vmz-ui-icon__svg">
-            <path v-if="resolvedPath" fill="currentColor" :d="resolvedPath" />
+            <path fill="currentColor" :d="iconPath()" />
         </svg>
     </span>
 </template>
@@ -32,7 +32,7 @@
     }
 </style>
 <script client>
-import { resolveIconPath } from '@vmz/ui-icons/registry';
+import { FALLBACK_PATH, resolveIconPath } from '@vmz/ui-icons/registry';
 
 /**
  * Homepage Icon — semantic registry from `@vmz/ui-icons` for official dogfood surfaces.
@@ -44,19 +44,9 @@ export default class Icon {
     public size: string = 'md';
     public label: string = '';
     public decorative: boolean = true;
-    resolvedPath = '';
 
-    constructor(props: Record<string, unknown> = {}) {
-        if (typeof this.__vmzApplyProps === 'function') this.__vmzApplyProps(props);
-        this._sync();
-    }
-
-    onMount() {
-        this._sync();
-    }
-
-    _sync() {
-        this.resolvedPath = resolveIconPath(this.name);
+    iconPath() {
+        return resolveIconPath(this.name) || FALLBACK_PATH;
     }
 }
 </script>

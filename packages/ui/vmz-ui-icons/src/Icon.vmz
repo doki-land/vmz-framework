@@ -1,7 +1,7 @@
 <template>
     <span data-vmz-ui="icon" :data-icon="name" :data-size="size" :role="roleAttr" :aria-hidden="hiddenAttr" :aria-label="labelAttr" class="vmz-ui-icon">
         <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true" class="vmz-ui-icon__svg">
-            <path v-if="pathD" fill="currentColor" :d="pathD" />
+            <path fill="currentColor" :d="iconPath()" />
         </svg>
     </span>
 </template>
@@ -57,17 +57,19 @@ export default class Icon {
     /** Accessible name; empty ⇒ decorative */
     public label: string = '';
 
-    pathD = FALLBACK_PATH;
     roleAttr = '';
     hiddenAttr = 'true';
     labelAttr = '';
 
     onMount() {
-        this.sync();
+        this.syncA11y();
     }
 
-    sync() {
-        this.pathD = resolveIconPath(this.name);
+    iconPath() {
+        return resolveIconPath(this.name) || FALLBACK_PATH;
+    }
+
+    syncA11y() {
         const labelled = String(this.label || '').trim();
         if (labelled) {
             this.roleAttr = 'img';

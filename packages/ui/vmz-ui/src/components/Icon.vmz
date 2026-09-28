@@ -1,7 +1,7 @@
 <template>
     <span data-vmz-ui="icon" :data-name="name" :data-size="size" :role='decorative ? "presentation" : "img"' :aria-hidden='decorative ? "true" : "false"' :aria-label='decorative ? "" : label' class="vmz-ui-icon">
         <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true" class="vmz-ui-icon__svg">
-            <path v-if="resolvedPath" fill="currentColor" :d="resolvedPath" />
+            <path fill="currentColor" :d="iconPath()" />
         </svg>
     </span>
 </template>
@@ -69,20 +69,10 @@ export default class Icon {
     public decorative: boolean = true;
     /** Optional author SVG path override. When set, `name` is ignored for rendering. */
     public pathD: string = '';
-    resolvedPath = FALLBACK_PATH;
 
-    constructor(props: Record<string, unknown> = {}) {
-        if (typeof this.__vmzApplyProps === 'function') this.__vmzApplyProps(props);
-        this._sync();
-    }
-
-    onMount() {
-        this._sync();
-    }
-
-    _sync() {
+    iconPath() {
         const explicit = String(this.pathD || '').trim();
-        this.resolvedPath = explicit || resolveChromePath(this.name);
+        return explicit || resolveChromePath(this.name);
     }
 }
 </script>
