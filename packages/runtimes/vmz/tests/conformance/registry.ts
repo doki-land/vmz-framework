@@ -589,6 +589,7 @@ export const CHECKS: Record<string, CheckEntry> = {
             'production-test',
             'production-observability',
             'official-homepage',
+            'commercial-visual-evidence',
         ],
     },
 };
