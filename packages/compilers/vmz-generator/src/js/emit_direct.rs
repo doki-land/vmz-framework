@@ -630,6 +630,24 @@ fn emit_if_block(
     parent.insertBefore(regionHost, end);
     return regionHost;
   }}
+  function tagRegionFallback(node, id) {{
+    if (id == null || node == null) return;
+    if (node.nodeType === 11) {{
+      for (var __ri = 0; __ri < node.childNodes.length; __ri++) {{
+        tagRegionFallback(node.childNodes[__ri], id);
+        return;
+      }}
+      return;
+    }}
+    if (typeof node.setAttribute === 'function') {{
+      node.setAttribute('data-vmz-region', String(id));
+      return;
+    }}
+    if (node.__kind === 'el') {{
+      if (!node.attrs) node.attrs = {{}};
+      node.attrs['data-vmz-region'] = String(id);
+    }}
+  }}
   frag.appendChild(end);
   var branches = [{branch_objs}];
   var cached = branches.map(function() {{ return null; }});
@@ -691,7 +709,10 @@ fn emit_if_block(
     if (cached[next] && end.parentNode) {{
       var __regionHost = ensureRegionHost();
       if (__regionHost) __regionHost.appendChild(cached[next]);
-      else end.parentNode.insertBefore(cached[next], end);
+      else {{
+        tagRegionFallback(cached[next], {region_arg});
+        end.parentNode.insertBefore(cached[next], end);
+      }}
     }}
   }}
   api.trackPatch(inst, [{deps}], apply, {id_arg});

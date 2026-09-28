@@ -80,6 +80,31 @@ export function createDirectIfBlock(
         if (typeof par.insertBefore === 'function') par.insertBefore(regionHost, end);
         return regionHost;
     };
+    const tagRegionFallback = (node: unknown, id: number | string | null) => {
+        if (id == null || node == null) return;
+        const n = node as {
+            nodeType?: number;
+            childNodes?: unknown[];
+            setAttribute?: (name: string, value: string) => void;
+            __kind?: string;
+            attrs?: Record<string, string>;
+        };
+        if (n.nodeType === 11) {
+            for (const child of n.childNodes || []) {
+                tagRegionFallback(child, id);
+                return;
+            }
+            return;
+        }
+        if (typeof n.setAttribute === 'function') {
+            n.setAttribute('data-vmz-region', String(id));
+            return;
+        }
+        if (n.__kind === 'el') {
+            if (!n.attrs) n.attrs = {};
+            n.attrs['data-vmz-region'] = String(id);
+        }
+    };
     frag.appendChild(end);
 
     const cached: Array<unknown> = branches.map(() => null);
@@ -162,6 +187,7 @@ export function createDirectIfBlock(
             if (host && typeof (host as { appendChild?: (n: unknown) => void }).appendChild === 'function') {
                 (host as { appendChild: (n: unknown) => void }).appendChild(created);
             } else {
+                tagRegionFallback(created, regionId);
                 const parent = endNode.parentNode as {
                     insertBefore?: (node: unknown, ref: unknown) => void;
                     appendChild?: (n: unknown) => void;
