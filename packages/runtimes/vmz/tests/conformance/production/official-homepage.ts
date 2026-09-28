@@ -624,7 +624,6 @@ upsertCheck(proof, {
 const gaps = [
     'Dogfood: sibling vmz-panel product app not gated in this driver (production-inspector stands in as ordinary panel-shaped app)',
     'Dogfood: documents search UX not covered',
-    'Dogfood: homepage features/showcase/feedback prose not yet in #locales catalog',
 ];
 for (const g of gaps) addLimitation(proof, g);
 proof.knownLimitations = proof.knownLimitations.filter(

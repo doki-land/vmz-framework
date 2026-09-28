@@ -9,133 +9,133 @@
         <div class="v2-actions">
           <a class="v2-button v2-button--primary" data-vmz-fixture="landing-primary-cta" :href="guideHref">{{ buildLabel }}</a>
           <a class="v2-button v2-button--text" data-vmz-fixture="landing-secondary-cta" :href="docsRootHref">{{ readDocsLabel }} <span aria-hidden="true">→</span></a>
-          <a class="v2-button v2-button--text" href="/commercial">查看产品界面</a>
+          <a class="v2-button v2-button--text" href="/commercial">{{ viewProductUiLabel }}</a>
         </div>
-        <div class="v2-hero-preview" data-vmz-fixture="landing-hero-preview" aria-label="VMZ product surface preview">
+        <div class="v2-hero-preview" data-vmz-fixture="landing-hero-preview" :aria-label="heroPreviewAriaLabel">
           <div class="v2-hero-preview__head">
             <div>
               <span>Projects / vmz-site</span>
-              <strong>Release Center</strong>
+              <strong>{{ heroPreviewReleaseCenterLabel }}</strong>
             </div>
-            <span class="v2-hero-preview__status">Production ready</span>
+            <span class="v2-hero-preview__status">{{ heroPreviewProductionReadyLabel }}</span>
           </div>
           <div class="v2-hero-preview__metrics">
-            <div><small>Build</small><strong>main</strong><em>Ready</em></div>
-            <div><small>Scope</small><strong>1 region</strong><em>Direct</em></div>
-            <div><small>Targets</small><strong>4 active</strong><em>Web to Edge</em></div>
+            <div><small>{{ heroPreviewMetricBuildLabel }}</small><strong>{{ heroPreviewBranchMainLabel }}</strong><em>{{ heroPreviewStatusReadyLabel }}</em></div>
+            <div><small>{{ heroPreviewMetricScopeLabel }}</small><strong>{{ heroPreviewScopeOneRegionLabel }}</strong><em>{{ heroPreviewStatusDirectLabel }}</em></div>
+            <div><small>{{ heroPreviewMetricTargetsLabel }}</small><strong>{{ heroPreviewTargetsActiveLabel }}</strong><em>{{ heroPreviewStatusWebToEdgeLabel }}</em></div>
           </div>
-          <div class="v2-hero-preview__table" role="table" aria-label="Delivery targets">
+          <div class="v2-hero-preview__table" role="table" :aria-label="heroPreviewTableAriaLabel">
             <div class="v2-hero-preview__row v2-hero-preview__row--head" role="row">
-              <span role="columnheader">目标</span><span role="columnheader">交付结果</span><span role="columnheader">状态</span>
+              <span role="columnheader">{{ heroPreviewColTargetLabel }}</span><span role="columnheader">{{ heroPreviewColResultLabel }}</span><span role="columnheader">{{ heroPreviewColStatusLabel }}</span>
             </div>
-            <div class="v2-hero-preview__row" role="row"><span role="cell">Browser</span><span role="cell">Direct DOM update</span><span role="cell">Ready</span></div>
-            <div class="v2-hero-preview__row" role="row"><span role="cell">SSR</span><span role="cell">HTML + resume</span><span role="cell">Ready</span></div>
+            <div class="v2-hero-preview__row" role="row"><span role="cell">{{ heroPreviewRowBrowserLabel }}</span><span role="cell">{{ heroPreviewRowBrowserResultLabel }}</span><span role="cell">{{ heroPreviewStatusReadyLabel }}</span></div>
+            <div class="v2-hero-preview__row" role="row"><span role="cell">{{ heroPreviewRowSsrLabel }}</span><span role="cell">{{ heroPreviewRowSsrResultLabel }}</span><span role="cell">{{ heroPreviewStatusReadyLabel }}</span></div>
           </div>
         </div>
-        <div class="v2-signal" aria-label="VMZ compilation model">
-          <div><small>Author</small><strong>Components</strong></div>
+        <div class="v2-signal" :aria-label="heroSignalAriaLabel">
+          <div><small>{{ heroSignalAuthorLabel }}</small><strong>{{ heroSignalAuthorValueLabel }}</strong></div>
           <i aria-hidden="true"></i>
-          <div class="is-core"><small>Understand</small><strong>Program Graph</strong></div>
+          <div class="is-core"><small>{{ heroSignalUnderstandLabel }}</small><strong>{{ heroSignalUnderstandValueLabel }}</strong></div>
           <i aria-hidden="true"></i>
-          <div><small>Deliver</small><strong>Every surface</strong></div>
+          <div><small>{{ heroSignalDeliverLabel }}</small><strong>{{ heroSignalDeliverValueLabel }}</strong></div>
         </div>
       </section>
 
       <section class="v2-statement" aria-labelledby="statement-title">
-        <p class="v2-index">01 / WHY VMZ</p>
+        <p class="v2-index">{{ statementIndexLabel }}</p>
         <div>
           <h2 id="statement-title" data-vmz-fixture="landing-statement-title">{{ statementTitleLeadLabel }}<br /><em>{{ statementTitleEmLabel }}</em></h2>
           <p data-vmz-fixture="landing-statement-body">{{ statementBodyLabel }}</p>
         </div>
       </section>
 
-      <section class="v2-features" aria-label="VMZ core capabilities">
+      <section class="v2-features" :aria-label="featuresAriaLabel">
         <article class="v2-feature v2-feature--dark">
           <span class="v2-feature__number">01</span>
           <div class="v2-feature__icon"><Icon name="feature.incremental" size="md" /></div>
-          <h3>修改之后，快速回来</h3>
-          <p>文件变化沿依赖图传播。重分析、重编译和页面更新只覆盖真正受影响的区域。</p>
-          <small>Incremental analysis</small>
+          <h3>{{ feature1TitleLabel }}</h3>
+          <p>{{ feature1BodyLabel }}</p>
+          <small>{{ feature1TagLabel }}</small>
         </article>
         <article class="v2-feature v2-feature--lime">
           <span class="v2-feature__number">02</span>
           <div class="v2-feature__icon"><Icon name="feature.runtime" size="md" /></div>
-          <h3>浏览器只接手必要工作</h3>
-          <p>能在生成阶段确定的依赖、调度和事件边界，不再交给通用客户端运行时重复判断。</p>
-          <small>Direct update</small>
+          <h3>{{ feature2TitleLabel }}</h3>
+          <p>{{ feature2BodyLabel }}</p>
+          <small>{{ feature2TagLabel }}</small>
         </article>
         <article class="v2-feature v2-feature--paper">
           <span class="v2-feature__number">03</span>
           <div class="v2-feature__icon"><Icon name="feature.ssr" size="md" /></div>
-          <h3>服务端与客户端共享模型</h3>
-          <p>HTML 可以先到达，交互可以稍后恢复；无需为两端维护互相漂移的应用逻辑。</p>
-          <small>SSR resume</small>
+          <h3>{{ feature3TitleLabel }}</h3>
+          <p>{{ feature3BodyLabel }}</p>
+          <small>{{ feature3TagLabel }}</small>
         </article>
         <article class="v2-feature v2-feature--coral">
           <span class="v2-feature__number">04</span>
           <div class="v2-feature__icon"><Icon name="feature.deploy" size="md" /></div>
-          <h3>一份程序，多种交付结果</h3>
-          <p>同一份应用语义可以面向 Browser、SSR、Native 与 Edge 生成不同 Host Profile。</p>
-          <small>Multi-platform</small>
+          <h3>{{ feature4TitleLabel }}</h3>
+          <p>{{ feature4BodyLabel }}</p>
+          <small>{{ feature4TagLabel }}</small>
         </article>
       </section>
 
       <section class="v2-feedback" aria-labelledby="feedback-title">
         <div class="v2-feedback__copy">
-          <p class="v2-index">02 / DEVELOPMENT</p>
-          <h2 id="feedback-title">保持思路，<br />不用等待整套应用。</h2>
-          <p>保存组件后，VMZ 先定位受影响的依赖，再生成局部结果。反馈路径围绕程序图工作，而不是重新遍历所有内容。</p>
+          <p class="v2-index">{{ feedbackIndexLabel }}</p>
+          <h2 id="feedback-title">{{ feedbackTitleLabel }}<br />{{ feedbackTitleBreakLabel }}</h2>
+          <p>{{ feedbackBodyLabel }}</p>
         </div>
         <ol class="v2-activity">
-          <li><span>Changed</span><strong>Counter.vmz</strong><small>Source saved</small></li>
-          <li><span>Analyzed</span><strong>1 affected region</strong><small>Dependency graph updated</small></li>
-          <li class="is-current"><span>Delivered</span><strong>Browser is ready</strong><small>Only affected nodes updated</small></li>
+          <li><span>{{ feedbackActivity1Label }}</span><strong>{{ feedbackActivity1ValueLabel }}</strong><small>{{ feedbackActivity1NoteLabel }}</small></li>
+          <li><span>{{ feedbackActivity2Label }}</span><strong>{{ feedbackActivity2ValueLabel }}</strong><small>{{ feedbackActivity2NoteLabel }}</small></li>
+          <li class="is-current"><span>{{ feedbackActivity3Label }}</span><strong>{{ feedbackActivity3ValueLabel }}</strong><small>{{ feedbackActivity3NoteLabel }}</small></li>
         </ol>
       </section>
 
       <section class="v2-flow" aria-labelledby="flow-title">
-        <div class="v2-section-head"><p class="v2-index">03 / COMPILER PIPELINE</p><h2 id="flow-title">从编写到交付，一条连续路径。</h2></div>
+        <div class="v2-section-head"><p class="v2-index">{{ flowIndexLabel }}</p><h2 id="flow-title">{{ flowTitleLabel }}</h2></div>
         <ol>
-          <li><b>Write</b><span>单文件组件</span></li>
-          <li><b>Analyze</b><span>依赖与边界</span></li>
-          <li><b>Compile</b><span>精确更新计划</span></li>
-          <li><b>Render</b><span>HTML 与静态输出</span></li>
-          <li><b>Resume</b><span>按需恢复交互</span></li>
-          <li><b>Deploy</b><span>多环境交付</span></li>
+          <li><b>{{ flowStep1TitleLabel }}</b><span>{{ flowStep1DescLabel }}</span></li>
+          <li><b>{{ flowStep2TitleLabel }}</b><span>{{ flowStep2DescLabel }}</span></li>
+          <li><b>{{ flowStep3TitleLabel }}</b><span>{{ flowStep3DescLabel }}</span></li>
+          <li><b>{{ flowStep4TitleLabel }}</b><span>{{ flowStep4DescLabel }}</span></li>
+          <li><b>{{ flowStep5TitleLabel }}</b><span>{{ flowStep5DescLabel }}</span></li>
+          <li><b>{{ flowStep6TitleLabel }}</b><span>{{ flowStep6DescLabel }}</span></li>
         </ol>
       </section>
 
       <section id="showcase" class="v2-showcase" aria-labelledby="showcase-title">
         <div class="v2-section-head">
-          <p class="v2-index">04 / @VMZ/UI</p>
-          <h2 id="showcase-title">同一套组件，支撑真实发布流程。</h2>
-          <p>Release Center 使用官方 <code>@vmz/ui</code> 构建：指标、表格、标签页与通知在同一工作区内协同，展示 VMZ 面向长期维护产品的能力。</p>
+          <p class="v2-index">{{ showcaseIndexLabel }}</p>
+          <h2 id="showcase-title">{{ showcaseTitleLabel }}</h2>
+          <p>{{ showcaseBodyLabel }}</p>
         </div>
         <div class="v2-product">
           <aside class="v2-product__side">
-            <div class="v2-product__identity"><span class="v2-product__logo">V</span><strong>VMZ Cloud</strong></div>
-            <nav aria-label="Product navigation"><a class="is-active" href="#showcase">概览</a><a href="#showcase">项目</a><a href="/deploy-planner">部署</a><a href="#showcase">监控</a></nav>
-            <small>Production workspace</small>
+            <div class="v2-product__identity"><span class="v2-product__logo">V</span><strong>{{ productCloudNameLabel }}</strong></div>
+            <nav :aria-label="productNavOverviewLabel"><a class="is-active" href="#showcase">{{ productNavOverviewLabel }}</a><a href="#showcase">{{ productNavProjectsLabel }}</a><a href="/deploy-planner">{{ productNavDeployLabel }}</a><a href="#showcase">{{ productNavMonitorLabel }}</a></nav>
+            <small>{{ productWorkspaceLabel }}</small>
           </aside>
           <div class="v2-product__work">
-          <div class="v2-product__bar"><div><span>Projects / vmz-site</span><strong>Release Center</strong></div><Button type="button" @click="() => (notifyOpen = true)">创建发布</Button></div>
-          <Tabs label="Product views" :selected="showcaseTab" panel-id="landing-showcase-panel" :items="showcaseTabs" :on-select="(id) => (showcaseTab = id)">
+          <div class="v2-product__bar"><div><span>Projects / vmz-site</span><strong>{{ heroPreviewReleaseCenterLabel }}</strong></div><Button type="button" @click="() => (notifyOpen = true)">{{ productCreateReleaseLabel }}</Button></div>
+          <Tabs :label="showcaseTabsLabel" :selected="showcaseTab" panel-id="landing-showcase-panel" :items="showcaseTabs" :on-select="(id) => (showcaseTab = id)">
             <div v-if="showcaseTab === 'overview'" class="v2-dashboard">
-              <div class="v2-metrics"><Card title="Build" description="main · latest"><Badge tone="success">Ready</Badge><strong>Production</strong></Card><Card title="Affected scope" description="Last compilation"><Badge tone="info">Direct</Badge><strong>1 region</strong></Card><Card title="Targets" description="Current profile"><Badge tone="brand">4 active</Badge><strong>Web to Edge</strong></Card></div>
+              <div class="v2-metrics"><Card :title="showcaseMetricBuildLabel" :description="showcaseMetricBuildDescLabel"><Badge tone="success">{{ showcaseStatusReadyLabel }}</Badge><strong>{{ showcaseBadgeProductionLabel }}</strong></Card><Card :title="showcaseMetricScopeLabel" :description="showcaseMetricScopeDescLabel"><Badge tone="info">{{ showcaseBadgeDirectLabel }}</Badge><strong>{{ heroPreviewScopeOneRegionLabel }}</strong></Card><Card :title="showcaseMetricTargetsLabel" :description="showcaseMetricTargetsDescLabel"><Badge tone="brand">{{ showcaseBadgeActiveLabel }}</Badge><strong>{{ showcaseBadgeWebToEdgeLabel }}</strong></Card></div>
               <div class="v2-table"><Table :columns="surfaceColumns" :rows="surfaceRows" sort-key="surface" sort-dir="asc" :has-row-action="false" /></div>
             </div>
             <div v-if="showcaseTab === 'source'" class="v2-source"><CodeBlock :code="codeSample" language="vmz" title="Counter.vmz" /></div>
-            <div v-if="showcaseTab === 'activity'" class="v2-empty"><Badge tone="success">All systems ready</Badge><h3>最近的变更已经交付。</h3><p>Program Graph 与所有目标环境保持同步。</p></div>
+            <div v-if="showcaseTab === 'activity'" class="v2-empty"><Badge tone="success">{{ showcaseEmptyBadgeLabel }}</Badge><h3>{{ showcaseEmptyTitleLabel }}</h3><p>{{ showcaseEmptyBodyLabel }}</p></div>
           </Tabs></div>
         </div>
-        <div v-if="notifyOpen" class="v2-notification"><Notification tone="success" role-name="status" title="发布已创建" description="Web、SSR、Native 与 Edge 目标正在生成。"><Button type="button" variant="ghost" @click="() => (notifyOpen = false)">关闭</Button></Notification></div>
+        <div v-if="notifyOpen" class="v2-notification"><Notification tone="success" role-name="status" :title="showcaseNotifyTitleLabel" :description="showcaseNotifyBodyLabel"><Button type="button" variant="ghost" @click="() => (notifyOpen = false)">{{ showcaseNotifyCloseLabel }}</Button></Notification></div>
       </section>
 
       <section class="v2-start" aria-labelledby="start-title">
-        <p class="v2-index">05 / GET STARTED</p>
+        <p class="v2-index">{{ startIndexLabel }}</p>
         <h2 id="start-title" data-vmz-fixture="landing-start-title">{{ startTitleLabel }}</h2>
         <p data-vmz-fixture="landing-start-lede">{{ startLedeLabel }}</p>
-        <div class="v2-command"><code>pnpm create vmz-app my-app</code><Button type="button" variant="secondary" @click="copyCommand">{{ copied ? '已复制' : '复制' }}</Button></div>
+        <div class="v2-command"><code>pnpm create vmz-app my-app</code><Button type="button" variant="secondary" @click="copyCommand">{{ copied ? copiedCommandLabel : copyCommandLabel }}</Button></div>
         <div class="v2-actions"><a class="v2-button v2-button--light" data-vmz-fixture="landing-start-cta" :href="guideHref">{{ startLabel }}</a><a class="v2-button v2-button--dark-text" href="/deploy-planner">{{ deployPlannerLabel }} →</a></div>
       </section>
     </main>
@@ -153,11 +153,125 @@ import {
   heroTitleLead,
   heroTitleEm,
   heroLede,
+  viewProductUi,
+  heroPreviewAria,
+  heroPreviewReleaseCenter,
+  heroPreviewProductionReady,
+  heroPreviewMetricBuild,
+  heroPreviewMetricScope,
+  heroPreviewMetricTargets,
+  heroPreviewBranchMain,
+  heroPreviewScopeOneRegion,
+  heroPreviewTargetsActive,
+  heroPreviewStatusReady,
+  heroPreviewStatusDirect,
+  heroPreviewStatusWebToEdge,
+  heroPreviewTableAria,
+  heroPreviewColTarget,
+  heroPreviewColResult,
+  heroPreviewColStatus,
+  heroPreviewRowBrowser,
+  heroPreviewRowBrowserResult,
+  heroPreviewRowSsr,
+  heroPreviewRowSsrResult,
+  heroSignalAria,
+  heroSignalAuthor,
+  heroSignalAuthorValue,
+  heroSignalUnderstand,
+  heroSignalUnderstandValue,
+  heroSignalDeliver,
+  heroSignalDeliverValue,
+  statementIndex,
   statementTitleLead,
   statementTitleEm,
   statementBody,
+  featuresAria,
+  feature1Title,
+  feature1Body,
+  feature1Tag,
+  feature2Title,
+  feature2Body,
+  feature2Tag,
+  feature3Title,
+  feature3Body,
+  feature3Tag,
+  feature4Title,
+  feature4Body,
+  feature4Tag,
+  feedbackIndex,
+  feedbackTitle,
+  feedbackTitleBreak,
+  feedbackBody,
+  feedbackActivity1Label,
+  feedbackActivity1Value,
+  feedbackActivity1Note,
+  feedbackActivity2Label,
+  feedbackActivity2Value,
+  feedbackActivity2Note,
+  feedbackActivity3Label,
+  feedbackActivity3Value,
+  feedbackActivity3Note,
+  flowIndex,
+  flowTitle,
+  flowStep1Title,
+  flowStep1Desc,
+  flowStep2Title,
+  flowStep2Desc,
+  flowStep3Title,
+  flowStep3Desc,
+  flowStep4Title,
+  flowStep4Desc,
+  flowStep5Title,
+  flowStep5Desc,
+  flowStep6Title,
+  flowStep6Desc,
+  showcaseIndex,
+  showcaseTitle,
+  showcaseBody,
+  productCloudName,
+  productNavOverview,
+  productNavProjects,
+  productNavDeploy,
+  productNavMonitor,
+  productWorkspaceLabel,
+  productCreateRelease,
+  showcaseTabsLabel,
+  showcaseTabOverview,
+  showcaseTabSource,
+  showcaseTabActivity,
+  showcaseMetricBuild,
+  showcaseMetricBuildDesc,
+  showcaseMetricScope,
+  showcaseMetricScopeDesc,
+  showcaseMetricTargets,
+  showcaseMetricTargetsDesc,
+  showcaseBadgeProduction,
+  showcaseBadgeDirect,
+  showcaseBadgeActive,
+  showcaseBadgeWebToEdge,
+  showcaseTableColSurface,
+  showcaseTableColResult,
+  showcaseTableColStatus,
+  showcaseRowBrowser,
+  showcaseRowBrowserResult,
+  showcaseRowSsr,
+  showcaseRowSsrResult,
+  showcaseRowNative,
+  showcaseRowNativeResult,
+  showcaseRowEdge,
+  showcaseRowEdgeResult,
+  showcaseStatusReady,
+  showcaseEmptyBadge,
+  showcaseEmptyTitle,
+  showcaseEmptyBody,
+  showcaseNotifyTitle,
+  showcaseNotifyBody,
+  showcaseNotifyClose,
+  startIndex,
   startTitle,
   startLede,
+  copyCommand,
+  copiedCommand,
 } from '#locales/common';
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
 
@@ -170,22 +284,122 @@ export default class IndexPage {
   heroTitleLeadLabel = '';
   heroTitleEmLabel = '';
   heroLedeLabel = '';
+  viewProductUiLabel = '';
+  heroPreviewAriaLabel = '';
+  heroPreviewReleaseCenterLabel = '';
+  heroPreviewProductionReadyLabel = '';
+  heroPreviewMetricBuildLabel = '';
+  heroPreviewMetricScopeLabel = '';
+  heroPreviewMetricTargetsLabel = '';
+  heroPreviewBranchMainLabel = '';
+  heroPreviewScopeOneRegionLabel = '';
+  heroPreviewTargetsActiveLabel = '';
+  heroPreviewStatusReadyLabel = '';
+  heroPreviewStatusDirectLabel = '';
+  heroPreviewStatusWebToEdgeLabel = '';
+  heroPreviewTableAriaLabel = '';
+  heroPreviewColTargetLabel = '';
+  heroPreviewColResultLabel = '';
+  heroPreviewColStatusLabel = '';
+  heroPreviewRowBrowserLabel = '';
+  heroPreviewRowBrowserResultLabel = '';
+  heroPreviewRowSsrLabel = '';
+  heroPreviewRowSsrResultLabel = '';
+  heroSignalAriaLabel = '';
+  heroSignalAuthorLabel = '';
+  heroSignalAuthorValueLabel = '';
+  heroSignalUnderstandLabel = '';
+  heroSignalUnderstandValueLabel = '';
+  heroSignalDeliverLabel = '';
+  heroSignalDeliverValueLabel = '';
+  statementIndexLabel = '';
   statementTitleLeadLabel = '';
   statementTitleEmLabel = '';
   statementBodyLabel = '';
+  featuresAriaLabel = '';
+  feature1TitleLabel = '';
+  feature1BodyLabel = '';
+  feature1TagLabel = '';
+  feature2TitleLabel = '';
+  feature2BodyLabel = '';
+  feature2TagLabel = '';
+  feature3TitleLabel = '';
+  feature3BodyLabel = '';
+  feature3TagLabel = '';
+  feature4TitleLabel = '';
+  feature4BodyLabel = '';
+  feature4TagLabel = '';
+  feedbackIndexLabel = '';
+  feedbackTitleLabel = '';
+  feedbackTitleBreakLabel = '';
+  feedbackBodyLabel = '';
+  feedbackActivity1Label = '';
+  feedbackActivity1ValueLabel = '';
+  feedbackActivity1NoteLabel = '';
+  feedbackActivity2Label = '';
+  feedbackActivity2ValueLabel = '';
+  feedbackActivity2NoteLabel = '';
+  feedbackActivity3Label = '';
+  feedbackActivity3ValueLabel = '';
+  feedbackActivity3NoteLabel = '';
+  flowIndexLabel = '';
+  flowTitleLabel = '';
+  flowStep1TitleLabel = '';
+  flowStep1DescLabel = '';
+  flowStep2TitleLabel = '';
+  flowStep2DescLabel = '';
+  flowStep3TitleLabel = '';
+  flowStep3DescLabel = '';
+  flowStep4TitleLabel = '';
+  flowStep4DescLabel = '';
+  flowStep5TitleLabel = '';
+  flowStep5DescLabel = '';
+  flowStep6TitleLabel = '';
+  flowStep6DescLabel = '';
+  showcaseIndexLabel = '';
+  showcaseTitleLabel = '';
+  showcaseBodyLabel = '';
+  productCloudNameLabel = '';
+  productNavOverviewLabel = '';
+  productNavProjectsLabel = '';
+  productNavDeployLabel = '';
+  productNavMonitorLabel = '';
+  productWorkspaceLabel = '';
+  productCreateReleaseLabel = '';
+  showcaseTabsLabel = '';
+  showcaseMetricBuildLabel = '';
+  showcaseMetricBuildDescLabel = '';
+  showcaseMetricScopeLabel = '';
+  showcaseMetricScopeDescLabel = '';
+  showcaseMetricTargetsLabel = '';
+  showcaseMetricTargetsDescLabel = '';
+  showcaseBadgeProductionLabel = '';
+  showcaseBadgeDirectLabel = '';
+  showcaseBadgeActiveLabel = '';
+  showcaseBadgeWebToEdgeLabel = '';
+  showcaseStatusReadyLabel = '';
+  showcaseEmptyBadgeLabel = '';
+  showcaseEmptyTitleLabel = '';
+  showcaseEmptyBodyLabel = '';
+  showcaseNotifyTitleLabel = '';
+  showcaseNotifyBodyLabel = '';
+  showcaseNotifyCloseLabel = '';
+  startIndexLabel = '';
   startTitleLabel = '';
   startLedeLabel = '';
   buildLabel = '';
   readDocsLabel = '';
   startLabel = '';
   deployPlannerLabel = '';
+  copyCommandLabel = '';
+  copiedCommandLabel = '';
   docsRootHref = '/d/zh-hans/';
   guideHref = '/d/zh-hans/guide/';
   _unwatchLocale = null;
-  showcaseTabs = [{ id: 'overview', title: '概览', controls: 'landing-showcase-panel' }, { id: 'source', title: '源码', controls: 'landing-showcase-panel' }, { id: 'activity', title: '活动', controls: 'landing-showcase-panel' }];
+  showcaseTabs = [];
   codeSample = '<template>\n  <Button @click="increment">\n    Count {{ count }}\n  </Button>\n</template>';
-  surfaceColumns = [{ id: 'surface', title: '目标' }, { id: 'result', title: '交付结果' }, { id: 'status', title: '状态' }];
-  surfaceRows = [{ id: 'browser', cells: ['Browser', 'Direct DOM update', 'Ready'] }, { id: 'ssr', cells: ['SSR', 'HTML + resume', 'Ready'] }, { id: 'native', cells: ['Native', 'Host operations', 'Ready'] }, { id: 'edge', cells: ['Edge', 'Server capabilities', 'Ready'] }];
+  surfaceColumns = [];
+  surfaceRows = [];
 
   onMount() {
     this.applyLocaleCopy();
@@ -198,34 +412,174 @@ export default class IndexPage {
   }
 
   refreshCopy() {
-    // Force dirty writes: soft-nav / resume can leave text nodes empty while the
-    // next catalog string equals the previous reactive value (e.g. shared kickers).
-    this.heroKickerLabel = '\u200b';
-    this.heroTitleLeadLabel = '\u200b';
-    this.heroTitleEmLabel = '\u200b';
-    this.heroLedeLabel = '\u200b';
-    this.statementTitleLeadLabel = '\u200b';
-    this.statementTitleEmLabel = '\u200b';
-    this.statementBodyLabel = '\u200b';
-    this.startTitleLabel = '\u200b';
-    this.startLedeLabel = '\u200b';
-    this.buildLabel = '\u200b';
-    this.readDocsLabel = '\u200b';
-    this.startLabel = '\u200b';
-    this.deployPlannerLabel = '\u200b';
+    const bump = (key) => {
+      this[key] = '\u200b';
+    };
+    const keys = [
+      'heroKickerLabel', 'heroTitleLeadLabel', 'heroTitleEmLabel', 'heroLedeLabel', 'viewProductUiLabel',
+      'heroPreviewAriaLabel', 'heroPreviewReleaseCenterLabel', 'heroPreviewProductionReadyLabel',
+      'heroPreviewMetricBuildLabel', 'heroPreviewMetricScopeLabel', 'heroPreviewMetricTargetsLabel',
+      'heroPreviewBranchMainLabel', 'heroPreviewScopeOneRegionLabel', 'heroPreviewTargetsActiveLabel',
+      'heroPreviewStatusReadyLabel', 'heroPreviewStatusDirectLabel', 'heroPreviewStatusWebToEdgeLabel',
+      'heroPreviewTableAriaLabel', 'heroPreviewColTargetLabel', 'heroPreviewColResultLabel', 'heroPreviewColStatusLabel',
+      'heroPreviewRowBrowserLabel', 'heroPreviewRowBrowserResultLabel', 'heroPreviewRowSsrLabel', 'heroPreviewRowSsrResultLabel',
+      'heroSignalAriaLabel', 'heroSignalAuthorLabel', 'heroSignalAuthorValueLabel', 'heroSignalUnderstandLabel',
+      'heroSignalUnderstandValueLabel', 'heroSignalDeliverLabel', 'heroSignalDeliverValueLabel',
+      'statementIndexLabel', 'statementTitleLeadLabel', 'statementTitleEmLabel', 'statementBodyLabel',
+      'featuresAriaLabel', 'feature1TitleLabel', 'feature1BodyLabel', 'feature1TagLabel',
+      'feature2TitleLabel', 'feature2BodyLabel', 'feature2TagLabel', 'feature3TitleLabel', 'feature3BodyLabel', 'feature3TagLabel',
+      'feature4TitleLabel', 'feature4BodyLabel', 'feature4TagLabel',
+      'feedbackIndexLabel', 'feedbackTitleLabel', 'feedbackTitleBreakLabel', 'feedbackBodyLabel',
+      'feedbackActivity1Label', 'feedbackActivity1ValueLabel', 'feedbackActivity1NoteLabel',
+      'feedbackActivity2Label', 'feedbackActivity2ValueLabel', 'feedbackActivity2NoteLabel',
+      'feedbackActivity3Label', 'feedbackActivity3ValueLabel', 'feedbackActivity3NoteLabel',
+      'flowIndexLabel', 'flowTitleLabel', 'flowStep1TitleLabel', 'flowStep1DescLabel', 'flowStep2TitleLabel', 'flowStep2DescLabel',
+      'flowStep3TitleLabel', 'flowStep3DescLabel', 'flowStep4TitleLabel', 'flowStep4DescLabel', 'flowStep5TitleLabel', 'flowStep5DescLabel',
+      'flowStep6TitleLabel', 'flowStep6DescLabel',
+      'showcaseIndexLabel', 'showcaseTitleLabel', 'showcaseBodyLabel', 'productCloudNameLabel',
+      'productNavOverviewLabel', 'productNavProjectsLabel', 'productNavDeployLabel', 'productNavMonitorLabel',
+      'productWorkspaceLabel', 'productCreateReleaseLabel', 'showcaseTabsLabel',
+      'showcaseMetricBuildLabel', 'showcaseMetricBuildDescLabel', 'showcaseMetricScopeLabel', 'showcaseMetricScopeDescLabel',
+      'showcaseMetricTargetsLabel', 'showcaseMetricTargetsDescLabel', 'showcaseBadgeProductionLabel', 'showcaseBadgeDirectLabel',
+      'showcaseBadgeActiveLabel', 'showcaseBadgeWebToEdgeLabel', 'showcaseStatusReadyLabel',
+      'showcaseEmptyBadgeLabel', 'showcaseEmptyTitleLabel', 'showcaseEmptyBodyLabel',
+      'showcaseNotifyTitleLabel', 'showcaseNotifyBodyLabel', 'showcaseNotifyCloseLabel',
+      'startIndexLabel', 'startTitleLabel', 'startLedeLabel', 'buildLabel', 'readDocsLabel', 'startLabel', 'deployPlannerLabel',
+      'copyCommandLabel', 'copiedCommandLabel',
+    ];
+    for (const k of keys) bump(k);
+
     this.heroKickerLabel = heroKicker();
     this.heroTitleLeadLabel = heroTitleLead();
     this.heroTitleEmLabel = heroTitleEm();
     this.heroLedeLabel = heroLede();
+    this.viewProductUiLabel = viewProductUi();
+    this.heroPreviewAriaLabel = heroPreviewAria();
+    this.heroPreviewReleaseCenterLabel = heroPreviewReleaseCenter();
+    this.heroPreviewProductionReadyLabel = heroPreviewProductionReady();
+    this.heroPreviewMetricBuildLabel = heroPreviewMetricBuild();
+    this.heroPreviewMetricScopeLabel = heroPreviewMetricScope();
+    this.heroPreviewMetricTargetsLabel = heroPreviewMetricTargets();
+    this.heroPreviewBranchMainLabel = heroPreviewBranchMain();
+    this.heroPreviewScopeOneRegionLabel = heroPreviewScopeOneRegion();
+    this.heroPreviewTargetsActiveLabel = heroPreviewTargetsActive();
+    this.heroPreviewStatusReadyLabel = heroPreviewStatusReady();
+    this.heroPreviewStatusDirectLabel = heroPreviewStatusDirect();
+    this.heroPreviewStatusWebToEdgeLabel = heroPreviewStatusWebToEdge();
+    this.heroPreviewTableAriaLabel = heroPreviewTableAria();
+    this.heroPreviewColTargetLabel = heroPreviewColTarget();
+    this.heroPreviewColResultLabel = heroPreviewColResult();
+    this.heroPreviewColStatusLabel = heroPreviewColStatus();
+    this.heroPreviewRowBrowserLabel = heroPreviewRowBrowser();
+    this.heroPreviewRowBrowserResultLabel = heroPreviewRowBrowserResult();
+    this.heroPreviewRowSsrLabel = heroPreviewRowSsr();
+    this.heroPreviewRowSsrResultLabel = heroPreviewRowSsrResult();
+    this.heroSignalAriaLabel = heroSignalAria();
+    this.heroSignalAuthorLabel = heroSignalAuthor();
+    this.heroSignalAuthorValueLabel = heroSignalAuthorValue();
+    this.heroSignalUnderstandLabel = heroSignalUnderstand();
+    this.heroSignalUnderstandValueLabel = heroSignalUnderstandValue();
+    this.heroSignalDeliverLabel = heroSignalDeliver();
+    this.heroSignalDeliverValueLabel = heroSignalDeliverValue();
+    this.statementIndexLabel = statementIndex();
     this.statementTitleLeadLabel = statementTitleLead();
     this.statementTitleEmLabel = statementTitleEm();
     this.statementBodyLabel = statementBody();
+    this.featuresAriaLabel = featuresAria();
+    this.feature1TitleLabel = feature1Title();
+    this.feature1BodyLabel = feature1Body();
+    this.feature1TagLabel = feature1Tag();
+    this.feature2TitleLabel = feature2Title();
+    this.feature2BodyLabel = feature2Body();
+    this.feature2TagLabel = feature2Tag();
+    this.feature3TitleLabel = feature3Title();
+    this.feature3BodyLabel = feature3Body();
+    this.feature3TagLabel = feature3Tag();
+    this.feature4TitleLabel = feature4Title();
+    this.feature4BodyLabel = feature4Body();
+    this.feature4TagLabel = feature4Tag();
+    this.feedbackIndexLabel = feedbackIndex();
+    this.feedbackTitleLabel = feedbackTitle();
+    this.feedbackTitleBreakLabel = feedbackTitleBreak();
+    this.feedbackBodyLabel = feedbackBody();
+    this.feedbackActivity1Label = feedbackActivity1Label();
+    this.feedbackActivity1ValueLabel = feedbackActivity1Value();
+    this.feedbackActivity1NoteLabel = feedbackActivity1Note();
+    this.feedbackActivity2Label = feedbackActivity2Label();
+    this.feedbackActivity2ValueLabel = feedbackActivity2Value();
+    this.feedbackActivity2NoteLabel = feedbackActivity2Note();
+    this.feedbackActivity3Label = feedbackActivity3Label();
+    this.feedbackActivity3ValueLabel = feedbackActivity3Value();
+    this.feedbackActivity3NoteLabel = feedbackActivity3Note();
+    this.flowIndexLabel = flowIndex();
+    this.flowTitleLabel = flowTitle();
+    this.flowStep1TitleLabel = flowStep1Title();
+    this.flowStep1DescLabel = flowStep1Desc();
+    this.flowStep2TitleLabel = flowStep2Title();
+    this.flowStep2DescLabel = flowStep2Desc();
+    this.flowStep3TitleLabel = flowStep3Title();
+    this.flowStep3DescLabel = flowStep3Desc();
+    this.flowStep4TitleLabel = flowStep4Title();
+    this.flowStep4DescLabel = flowStep4Desc();
+    this.flowStep5TitleLabel = flowStep5Title();
+    this.flowStep5DescLabel = flowStep5Desc();
+    this.flowStep6TitleLabel = flowStep6Title();
+    this.flowStep6DescLabel = flowStep6Desc();
+    this.showcaseIndexLabel = showcaseIndex();
+    this.showcaseTitleLabel = showcaseTitle();
+    this.showcaseBodyLabel = showcaseBody();
+    this.productCloudNameLabel = productCloudName();
+    this.productNavOverviewLabel = productNavOverview();
+    this.productNavProjectsLabel = productNavProjects();
+    this.productNavDeployLabel = productNavDeploy();
+    this.productNavMonitorLabel = productNavMonitor();
+    this.productWorkspaceLabel = productWorkspaceLabel();
+    this.productCreateReleaseLabel = productCreateRelease();
+    this.showcaseTabsLabel = showcaseTabsLabel();
+    this.showcaseMetricBuildLabel = showcaseMetricBuild();
+    this.showcaseMetricBuildDescLabel = showcaseMetricBuildDesc();
+    this.showcaseMetricScopeLabel = showcaseMetricScope();
+    this.showcaseMetricScopeDescLabel = showcaseMetricScopeDesc();
+    this.showcaseMetricTargetsLabel = showcaseMetricTargets();
+    this.showcaseMetricTargetsDescLabel = showcaseMetricTargetsDesc();
+    this.showcaseBadgeProductionLabel = showcaseBadgeProduction();
+    this.showcaseBadgeDirectLabel = showcaseBadgeDirect();
+    this.showcaseBadgeActiveLabel = showcaseBadgeActive();
+    this.showcaseBadgeWebToEdgeLabel = showcaseBadgeWebToEdge();
+    this.showcaseStatusReadyLabel = showcaseStatusReady();
+    this.showcaseEmptyBadgeLabel = showcaseEmptyBadge();
+    this.showcaseEmptyTitleLabel = showcaseEmptyTitle();
+    this.showcaseEmptyBodyLabel = showcaseEmptyBody();
+    this.showcaseNotifyTitleLabel = showcaseNotifyTitle();
+    this.showcaseNotifyBodyLabel = showcaseNotifyBody();
+    this.showcaseNotifyCloseLabel = showcaseNotifyClose();
+    this.startIndexLabel = startIndex();
     this.startTitleLabel = startTitle();
     this.startLedeLabel = startLede();
     this.buildLabel = build();
     this.readDocsLabel = readDocs();
     this.startLabel = start();
     this.deployPlannerLabel = deployPlanner();
+    this.copyCommandLabel = copyCommand();
+    this.copiedCommandLabel = copiedCommand();
+
+    this.showcaseTabs = [
+      { id: 'overview', title: showcaseTabOverview(), controls: 'landing-showcase-panel' },
+      { id: 'source', title: showcaseTabSource(), controls: 'landing-showcase-panel' },
+      { id: 'activity', title: showcaseTabActivity(), controls: 'landing-showcase-panel' },
+    ];
+    this.surfaceColumns = [
+      { id: 'surface', title: showcaseTableColSurface() },
+      { id: 'result', title: showcaseTableColResult() },
+      { id: 'status', title: showcaseTableColStatus() },
+    ];
+    this.surfaceRows = [
+      { id: 'browser', cells: [showcaseRowBrowser(), showcaseRowBrowserResult(), showcaseStatusReady()] },
+      { id: 'ssr', cells: [showcaseRowSsr(), showcaseRowSsrResult(), showcaseStatusReady()] },
+      { id: 'native', cells: [showcaseRowNative(), showcaseRowNativeResult(), showcaseStatusReady()] },
+      { id: 'edge', cells: [showcaseRowEdge(), showcaseRowEdgeResult(), showcaseStatusReady()] },
+    ];
+
     const paths = docsPaths(this.localeId);
     this.docsRootHref = paths.docsRootHref;
     this.guideHref = paths.guideHref;

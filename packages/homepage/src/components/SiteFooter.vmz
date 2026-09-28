@@ -5,7 +5,7 @@
       <p class="site-footer__tag">{{ footerTagLabel }}</p>
     </div>
     <nav class="site-footer__group" :aria-label="productNavLabel">
-      <b>Product</b>
+      <b>{{ productNavLabel }}</b>
       <a data-vmz-fixture="footer-docs" :href="docsRootHref">{{ docsLabel }}</a>
       <a :href="guideHref">{{ gettingStartedGuideLabel }}</a>
       <a :href="deployDocHref">{{ deployGuideLabel }}</a>
@@ -13,12 +13,12 @@
       <a href="/#showcase">{{ showcaseLabel }}</a>
     </nav>
     <nav class="site-footer__group" :aria-label="resourcesNavLabel">
-      <b>Resources</b>
-      <a href="/welcome">Welcome</a>
+      <b>{{ resourcesNavLabel }}</b>
+      <a href="/welcome">{{ welcomeLinkLabel }}</a>
       <a :href="pluginsHref">{{ pluginsLabel }}</a>
-      <a href="https://github.com/doki-land/vmz-framework">GitHub</a>
+      <a href="https://github.com/doki-land/vmz-framework">{{ githubLabel }}</a>
     </nav>
-    <p class="site-footer__note">VMZ · Full-stack application compiler</p>
+    <p class="site-footer__note">{{ footerNoteLabel }}</p>
   </footer>
 </template>
 
@@ -34,6 +34,9 @@ import {
   footerTag,
   productNav,
   resourcesNav,
+  welcomeLink,
+  github,
+  footerNote,
 } from '#locales/common';
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from '../locale/copy.ts';
 
@@ -49,6 +52,9 @@ export default class SiteFooter {
   pluginsLabel = '';
   productNavLabel = '';
   resourcesNavLabel = '';
+  welcomeLinkLabel = '';
+  githubLabel = '';
+  footerNoteLabel = '';
   docsRootHref = '/d/zh-hans/';
   guideHref = '/d/zh-hans/guide/';
   deployDocHref = '/d/zh-hans/guide/deploy/';
@@ -76,6 +82,9 @@ export default class SiteFooter {
     this.pluginsLabel = plugins();
     this.productNavLabel = productNav();
     this.resourcesNavLabel = resourcesNav();
+    this.welcomeLinkLabel = welcomeLink();
+    this.githubLabel = github();
+    this.footerNoteLabel = footerNote();
     const paths = docsPaths(this.localeId);
     this.docsRootHref = paths.docsRootHref;
     this.guideHref = paths.guideHref;
