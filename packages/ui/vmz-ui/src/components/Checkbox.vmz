@@ -47,21 +47,14 @@ export default class Checkbox {
     public disabled: boolean = false;
     public controlId: string = "vmz-checkbox";
     public describedBy: string = "";
-    public onChange:
-        | ((e: {
-              target: {
-                  checked: boolean;
-              };
-          }) => void)
-        | null = null;
+    public onChange: ((checked: boolean) => void) | null = null;
     onToggle(ev) {
         if (this.disabled) return;
         if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
         const next = !this.checked;
-        const payload = { target: { checked: next } };
-        this.emit("change", payload);
+        this.emit("change", next);
         if (typeof this.onChange === "function") {
-            this.onChange(payload);
+            this.onChange(next);
         }
     }
 }

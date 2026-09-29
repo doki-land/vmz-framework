@@ -21,7 +21,7 @@
                     </Card>
                     <div data-vmz-fixture="ui2-form">
                         <Card :title="uiLabCardChoiceTitleLabel" :description="uiLabCardChoiceDescLabel">
-                            <Checkbox :label="uiLabCheckboxLabel" control-id="home-ui-agree" :checked="agree" @change="((e) => agree = e.target.checked)" />
+                            <Checkbox :label="uiLabCheckboxLabel" control-id="home-ui-agree" :checked="agree" @change="((v) => agree = v)" />
                             <p data-vmz-fixture="checkbox-value" class="vmz-sr-only">
                                 agree:
                                 {{ agree ? "yes" : "no" }}

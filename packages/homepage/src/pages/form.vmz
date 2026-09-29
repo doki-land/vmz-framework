@@ -504,8 +504,8 @@ export default class FormPage {
         }
     }
 
-    onAgree(e) {
-        this.agree = !!(e && e.target && e.target.checked);
+    onAgree(checked) {
+        this.agree = !!checked;
         if (this.agreeError) this.agreeError = "";
     }
 
