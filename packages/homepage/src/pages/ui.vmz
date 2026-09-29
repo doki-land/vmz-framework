@@ -57,10 +57,12 @@
                     </div>
                     <div data-vmz-fixture="ui1-dialog">
                         <Card :title="uiLabCardDialogTitleLabel" :description="uiLabCardDialogDescLabel">
-                            <Button type="button" @click="(() => open = true)">
-                                {{ uiLabOpenDialogLabel }}
-                            </Button>
-                            <Dialog v-if="open" :open="open" :title="uiLabDialogTitleLabel" title-id="home-ui-dialog-title" :on-close="(() => open = false)">
+                            <div data-vmz-dialog-trigger-for="home-ui-dialog-title">
+                                <Button type="button" aria-haspopup="dialog" aria-controls="home-ui-dialog-title" @click="(() => open = true)">
+                                    {{ uiLabOpenDialogLabel }}
+                                </Button>
+                            </div>
+                            <Dialog :open="open" :title="uiLabDialogTitleLabel" title-id="home-ui-dialog-title" :on-close="(() => open = false)">
                                 <p data-vmz-fixture="dialog-body">
                                     {{ uiLabDialogBodyLabel }}
                                 </p>
@@ -72,7 +74,7 @@
                             <Button type="button" variant="secondary" @click="(() => drawerOpen = true)">
                                 {{ uiLabOpenDrawerLabel }}
                             </Button>
-                            <Drawer v-if="drawerOpen" :open="drawerOpen" :title="uiLabDrawerTitleLabel" title-id="home-ui-drawer-title" :on-close="(() => drawerOpen = false)">
+                            <Drawer :open="drawerOpen" :title="uiLabDrawerTitleLabel" title-id="home-ui-drawer-title" :on-close="(() => drawerOpen = false)">
                                 <p data-vmz-fixture="drawer-body">
                                     {{ uiLabDrawerBodyLabel }}
                                 </p>

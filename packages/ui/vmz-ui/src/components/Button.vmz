@@ -3,7 +3,7 @@
         <span v-if="loading" aria-hidden="true" class="vmz-ui-btn__spinner" />
         <slot />
     </a>
-    <button v-else :type="type" data-vmz-ui="button" data-vmz-motion="control" data-vmz-motion-token="motion.control" :data-variant="variant" :data-size="size" :data-block='block ? "true" : "false"' :data-loading='loading ? "true" : "false"' :disabled="disabled" :aria-busy='loading ? "true" : "false"' @click="onDomClick" class="vmz-ui-btn">
+    <button v-else :type="type" data-vmz-ui="button" data-vmz-motion="control" data-vmz-motion-token="motion.control" :data-variant="variant" :data-size="size" :data-block='block ? "true" : "false"' :data-loading='loading ? "true" : "false"' :disabled="disabled" :aria-busy='loading ? "true" : "false"' :aria-haspopup="ariaHaspopup" :aria-controls="ariaControls" @click="onDomClick" class="vmz-ui-btn">
         <span v-if="loading" aria-hidden="true" class="vmz-ui-btn__spinner" />
         <slot />
     </button>
@@ -181,6 +181,8 @@ export default class Button {
     public href: string = "";
     public target: string = "";
     public rel: string = "";
+    public ariaHaspopup: string = "";
+    public ariaControls: string = "";
     public onClick: ((e: Event) => void) | null = null;
     onDomClick(e: Event) {
         this.emit("click", e);

@@ -188,6 +188,7 @@ export default class Dialog {
     _restoreFocus = null;
     _panel = null;
     _docKeyHandler = null;
+    _pointerCapture = null;
     _observer = null;
     _adoptNextEnter = false;
     _exiting = false;
@@ -204,6 +205,7 @@ export default class Dialog {
             childList: true,
             subtree: true,
         });
+        this._ensurePointerCapture();
         this._syncFromDom();
     }
     onDestroy() {
@@ -216,9 +218,7 @@ export default class Dialog {
             this._observer.disconnect();
             this._observer = null;
         }
-        this._teardownDocKey();
-        this._panel = null;
-        this._restoreFocus = null;
+        this._exitFocus();
     }
     dismiss() {
         if (!this._isTopmostStack()) return;
@@ -248,13 +248,44 @@ export default class Dialog {
                 // Stale exit after interrupt/re-enter must not call onClose.
                 if (!this._exiting || exitGen !== this._motionGen) return;
                 this._exiting = false;
-                this.emit("close");
-                if (typeof this.onClose === "function") this.onClose();
+                this._finishDismiss();
             }, ms);
             return;
         }
+        this._finishDismiss();
+    }
+    _finishDismiss() {
+        const restore = this._restoreFocus;
+        this._restoreFocus = null;
+        const opener =
+            restore && typeof restore.focus === "function" && document.contains(restore)
+                ? restore
+                : this._openerElement();
+        this._exiting = false;
+        if (this._exitTimer) {
+            clearTimeout(this._exitTimer);
+            this._exitTimer = null;
+        }
+        this._teardownDocKey();
+        this._panel = null;
         this.emit("close");
         if (typeof this.onClose === "function") this.onClose();
+        this._refocus(opener, true);
+    }
+    _refocus(el, sync = false) {
+        if (!(el instanceof HTMLElement) || typeof el.focus !== "function") return;
+        const focus = () => {
+            if (document.contains(el)) el.focus();
+        };
+        if (sync) {
+            focus();
+            return;
+        }
+        if (typeof requestAnimationFrame === "function") {
+            requestAnimationFrame(() => requestAnimationFrame(focus));
+            return;
+        }
+        focus();
     }
     _cancelExit(reason) {
         if (this._exitTimer) {
@@ -361,12 +392,14 @@ export default class Dialog {
         if (typeof document === "undefined") return;
         const active = document.activeElement;
         if (!this._restoreFocus) {
-            const root = this.__vmzDomRoot;
-            const outside =
+            if (
                 active instanceof HTMLElement &&
                 active !== document.body &&
-                !(root && typeof root.contains === "function" && root.contains(active));
-            if (outside) this._restoreFocus = active;
+                active !== panel &&
+                !(panel instanceof HTMLElement && panel.contains(active))
+            ) {
+                this._restoreFocus = active;
+            }
         }
         this._panel = panel instanceof HTMLElement ? panel : null;
         const overlay =
@@ -420,10 +453,48 @@ export default class Dialog {
         const focusTarget =
             restore && typeof restore.focus === "function" && document.contains(restore)
                 ? restore
-                : document.querySelector("button.vmz-ui-btn");
+                : this._openerElement();
         if (focusTarget && typeof focusTarget.focus === "function") {
             focusTarget.focus();
         }
+    }
+    _openerElement() {
+        if (typeof document === "undefined") return null;
+        const byTitle = document.querySelector(`[aria-controls="${this.titleId}"]`);
+        if (byTitle instanceof HTMLElement) return byTitle;
+        const byTrigger = document.querySelector(
+            `[data-vmz-dialog-trigger-for="${this.titleId}"] button, [data-vmz-dialog-trigger-for="${this.titleId}"]`,
+        );
+        if (byTrigger instanceof HTMLElement) return byTrigger;
+        const root = this.__vmzDomRoot;
+        if (!(root instanceof HTMLElement)) return null;
+        let host = root.parentElement;
+        while (host) {
+            const buttons = [...host.querySelectorAll("button.vmz-ui-btn")].filter(
+                (btn) => btn instanceof HTMLElement,
+            );
+            if (buttons.length === 1) return buttons[0];
+            for (const btn of buttons) {
+                if (root.compareDocumentPosition(btn) & Node.DOCUMENT_POSITION_PRECEDING) {
+                    return btn;
+                }
+            }
+            host = host.parentElement;
+        }
+        return null;
+    }
+    _ensurePointerCapture() {
+        if (typeof document === "undefined" || this._pointerCapture) return;
+        this._pointerCapture = (ev) => {
+            const t =
+                ev.target instanceof HTMLElement
+                    ? ev.target.closest("button, a[href], input, select, textarea, [tabindex]")
+                    : null;
+            if (!(t instanceof HTMLElement)) return;
+            if (t.closest('[data-vmz-overlay="dialog"]')) return;
+            this._restoreFocus = t;
+        };
+        document.addEventListener("mousedown", this._pointerCapture, true);
     }
     _teardownDocKey() {
         if (typeof document !== "undefined" && this._docKeyHandler) {
