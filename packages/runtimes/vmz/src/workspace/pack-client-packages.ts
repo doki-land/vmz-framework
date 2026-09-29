@@ -9,7 +9,7 @@
  * Not full oxc chunk-split/minify (`oxc-pending` remains for release minify).
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { resolvePackageRoot } from './packages.js';
@@ -34,7 +34,7 @@ export function packClientBareImports(outDir: string, opts: PackClientBareImport
     /** @type {Set<string>} absolute source files already materialized */
     const materializedSources = new Set();
     /** @type {string[]} */
-    const bareQueue = [];
+    const bareQueue: Array<{ spec: string; from: string }> = [];
     /** @type {string[]} */
     const unresolved = [];
     /** @type {string[]} */
@@ -42,14 +42,15 @@ export function packClientBareImports(outDir: string, opts: PackClientBareImport
 
     for (const file of listClientJs(outDir)) {
         for (const spec of collectBareSpecs(readFileSync(file, 'utf8'))) {
-            if (!bareQueue.includes(spec)) bareQueue.push(spec);
+            bareQueue.push({ spec: String(spec), from: file });
         }
     }
 
     while (bareQueue.length) {
-        const spec = bareQueue.shift();
+        const item = bareQueue.shift()!;
+        const { spec } = item;
         if (bareToVendor.has(spec)) continue;
-        const resolved = resolveBareToSource(projectRoot, spec);
+        const resolved = resolveBareToSource(projectRoot, spec, item.from);
         if (!resolved) {
             if (!unresolved.includes(spec)) unresolved.push(spec);
             continue;
@@ -69,7 +70,11 @@ export function packClientBareImports(outDir: string, opts: PackClientBareImport
     for (const file of [...listClientJs(outDir), ...listVendorJs(outDir)]) {
         const before = readFileSync(file, 'utf8');
         let after = rewriteBareImports(before, file, bareToVendor);
-        after = rewriteRelativeTsSpecs(after);
+        try {
+            after = rewriteRelativeTsSpecs(after);
+        } catch (error) {
+            throw new Error(`pack module ${file}: ${error instanceof Error ? error.message : String(error)}`);
+        }
         if (after !== before) {
             writeFileSync(file, after, 'utf8');
             rewritten.push(path.relative(outDir, file).replace(/\\/g, '/'));
@@ -118,9 +123,7 @@ function materializeSourceTree(outDir, resolved, materializedSources, bareQueue)
         writeFileSync(destAbs, js, 'utf8');
         if (sourceFile === resolved.sourceFile) entryDest = destAbs;
 
-        for (const bare of collectBareSpecs(js)) {
-            if (!bareQueue.includes(bare)) bareQueue.push(bare);
-        }
+        for (const bare of collectBareSpecs(js)) bareQueue.push({ spec: String(bare), from: sourceFile });
         for (const rel of collectRelativeSpecs(js)) {
             const target = resolveRelativeSource(path.dirname(sourceFile), rel);
             if (target && !materializedSources.has(target)) sourceQueue.push(target);
@@ -213,9 +216,23 @@ function shouldSkipBare(spec) {
     return SKIP_PREFIXES.some((p) => spec.startsWith(p));
 }
 
-function resolveBareToSource(projectRoot, spec) {
+function resolveBareToSource(projectRoot, spec, fromFile) {
     const { pkgName, subpath } = splitPackageSpec(spec);
-    let pkgRoot = resolvePackageRoot(projectRoot, pkgName);
+    let pkgRoot = null;
+    if (fromFile && existsSync(fromFile)) {
+        let cur = path.dirname(realpathSync(fromFile));
+        for (let i = 0; i < 12; i++) {
+            const nested = path.join(cur, 'node_modules', ...pkgName.split('/'));
+            if (existsSync(path.join(nested, 'package.json'))) {
+                pkgRoot = nested;
+                break;
+            }
+            const parent = path.dirname(cur);
+            if (parent === cur) break;
+            cur = parent;
+        }
+    }
+    if (!pkgRoot) pkgRoot = resolvePackageRoot(projectRoot, pkgName);
     if (!pkgRoot) {
         let cur = projectRoot;
         for (let i = 0; i < 8; i++) {
@@ -298,8 +315,13 @@ function packageDirName(pkgName) {
 function materializeModule(sourceFile) {
     const ext = path.extname(sourceFile).toLowerCase();
     const raw = readFileSync(sourceFile, 'utf8');
+    if (ext === '.json') return raw;
     if (ext === '.ts' || ext === '.tsx') return transpileTs(raw, sourceFile);
-    return rewriteRelativeTsSpecs(raw);
+    try {
+        return rewriteRelativeTsSpecs(raw);
+    } catch (error) {
+        throw new Error(`pack source ${sourceFile}: ${error instanceof Error ? error.message : String(error)}`);
+    }
 }
 
 function transpileTs(source, filename) {

@@ -43,8 +43,8 @@
     "devDependencies": {
         "@types/node": "^22.15.0",
         "shiki": "^3.12.2",
-        "typescript": "^5.8.3",
-        "vmz-textmate": "workspace:*"
+        "vmz-textmate": "workspace:*",
+        "typescript": "^5.8.3"
     },
     "keywords": [
         "vmz",

@@ -81,6 +81,20 @@ function installAppModuleResolveHooks() {
             ) {
                 return nextResolve(specifier, context);
             }
+            if (context.parentURL?.startsWith('file:')) {
+                try {
+                    const parentPath = fileURLToPath(context.parentURL);
+                    if (!parentPath.startsWith(distDir + path.sep)) return nextResolve(specifier, context);
+                } catch {
+                    return nextResolve(specifier, context);
+                }
+            }
+            try {
+                const appParent = pathToFileURL(path.join(projectRootForResolve(), 'package.json')).href;
+                return nextResolve(specifier, { ...context, parentURL: appParent });
+            } catch {
+                // Some legacy packages expose only a CommonJS entry.
+            }
             try {
                 const resolved = appPackageRequireResolve().resolve(specifier);
                 return { url: pathToFileURL(resolved).href, shortCircuit: true };

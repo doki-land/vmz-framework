@@ -400,7 +400,7 @@ async function cmdServe(args: ParsedOptions): Promise<number> {
     }
     const outDir = resolveProfileArtifactDir(outDirRoot, selected.profile);
     const hostJs = path.join(outDir, 'vmz-serve-host.mjs');
-    if (!existsSync(hostJs)) {
+    {
         try {
             materializeServeHostRuntime(outDir);
             log.info(`materialized ${hostJs} from @vmz/core (release builds omit it)`);

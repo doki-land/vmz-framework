@@ -39,7 +39,7 @@
                                 <span>Counter.vmz</span>
                                 <span>VMZ SFC</span>
                             </div>
-                            <pre><code>{{ codeSample }}</code></pre>
+                            <Shiki :code="codeSample" lang="vmz" theme="vitesse-dark" />
                             <div class="landing-code-panel__result">
                                 <div>
                                     <small>{{ heroPreviewReleaseCenterLabel }}</small>

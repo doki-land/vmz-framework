@@ -1,4 +1,10 @@
 import grammar from '../grammars/vmz.tmLanguage.json' with { type: 'json' };
+import { createHighlighterCore } from 'shiki/core';
+import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
+import html from '@shikijs/langs/html';
+import css from '@shikijs/langs/css';
+import typescript from '@shikijs/langs/typescript';
+import vitesseDark from '@shikijs/themes/vitesse-dark';
 
 /** TextMate grammar object (VS Code `contributes.grammars` / raw consumers). */
 export const vmzGrammar = grammar;
@@ -45,11 +51,14 @@ export type CreateVmzHighlighterOptions = {
  * ```
  */
 export async function createVmzHighlighter(options: CreateVmzHighlighterOptions = {}) {
-    const { createHighlighter } = await import('shiki');
     const themes = options.themes?.length ? options.themes : ['vitesse-dark'];
-    return createHighlighter({
-        langs: [vmzLanguage, ...vmzEmbeddedLangs, ...(options.langs ?? [])],
-        themes,
+    if (themes.some((theme) => theme !== 'vitesse-dark')) {
+        throw new Error('vmz-textmate: unsupported theme');
+    }
+    return createHighlighterCore({
+        langs: [vmzLanguage, html, css, typescript, ...(options.langs ?? [])] as any,
+        themes: [vitesseDark],
+        engine: createJavaScriptRegexEngine(),
     });
 }
 

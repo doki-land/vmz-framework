@@ -16,8 +16,9 @@ const DEFAULT_TEXTMATE = 'vmz-textmate/shiki';
 
 let config: ShikiRuntimeConfig = {};
 let configResolved = false;
-let cached: Highlighter | null = null;
-let pending: Promise<Highlighter> | null = null;
+type CodeHighlighter = Pick<Highlighter, 'codeToHtml'>;
+let cached: CodeHighlighter | null = null;
+let pending: Promise<CodeHighlighter> | null = null;
 
 /** @internal test hook */
 export function getShikiRuntimeConfig(): Readonly<ShikiRuntimeConfig> {
@@ -88,13 +89,15 @@ function textmateSpec(): string {
     return config.textmate || DEFAULT_TEXTMATE;
 }
 
-async function loadTextmateHighlighter(themes: string[]): Promise<Highlighter | null> {
+async function loadTextmateHighlighter(themes: string[]): Promise<CodeHighlighter | null> {
     const spec = textmateSpec();
     try {
-        const mod = (await import(/* webpackIgnore: true */ spec)) as {
-            createVmzHighlighter?: (opts: { themes?: string[]; langs?: unknown[] }) => Promise<Highlighter>;
-            createHighlighter?: (opts: { themes?: string[]; langs?: unknown[] }) => Promise<Highlighter>;
-            default?: { createVmzHighlighter?: (opts: { themes?: string[] }) => Promise<Highlighter> };
+        const mod = (spec === DEFAULT_TEXTMATE
+            ? await import('vmz-textmate/shiki')
+            : await import(/* webpackIgnore: true */ spec)) as {
+            createVmzHighlighter?: (opts: { themes?: string[]; langs?: unknown[] }) => Promise<CodeHighlighter>;
+            createHighlighter?: (opts: { themes?: string[]; langs?: unknown[] }) => Promise<CodeHighlighter>;
+            default?: { createVmzHighlighter?: (opts: { themes?: string[] }) => Promise<CodeHighlighter> };
         };
         const factory = mod.createVmzHighlighter ?? mod.createHighlighter ?? mod.default?.createVmzHighlighter;
         if (typeof factory === 'function') {
@@ -107,14 +110,15 @@ async function loadTextmateHighlighter(themes: string[]): Promise<Highlighter | 
 }
 
 async function loadGenericHighlighter(themes: string[]): Promise<Highlighter> {
-    const { createHighlighter } = await import('shiki');
+    const genericPackage = 'shiki';
+    const { createHighlighter } = await import(genericPackage);
     return createHighlighter({
         themes,
         langs: ['javascript', 'typescript', 'tsx', 'jsx', 'json', 'html', 'css', 'markdown', 'bash', 'text'],
     });
 }
 
-export async function prewarmShiki(opts: { themes?: string[] } = {}): Promise<Highlighter> {
+export async function prewarmShiki(opts: { themes?: string[] } = {}): Promise<CodeHighlighter> {
     if (cached) return cached;
     if (pending) return pending;
     pending = (async () => {

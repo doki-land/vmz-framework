@@ -18,7 +18,11 @@
         "@vmz/ui": "workspace:*",
         "@vmz/ui-icons": "workspace:*",
         "@vmz/ui-data-grid": "workspace:*",
-        "@vmz/core": "workspace:*"
+        "@vmz/plugin": "workspace:*",
+        "@vmz/plugin-shiki": "workspace:*",
+        "@vmz/core": "workspace:*",
+        "vmz-textmate": "workspace:*",
+        "shiki": "^3.12.2"
     },
     "devDependencies": {
         "vmz": "workspace:*"
