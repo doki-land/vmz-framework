@@ -2494,7 +2494,7 @@ async function proveDocumentProduct(page) {
     if (!copyButtonFound) fail('Product: CodeBlock copy button missing');
     await page.waitForFunction(
         () =>
-            document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent?.includes('copied:yes') &&
+            (document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent || '').replace(/\s+/g, '').includes('copied:yes') &&
             !!document.querySelector('[data-vmz-fixture="product-copied"]'),
         { timeout: 5000 },
     );
