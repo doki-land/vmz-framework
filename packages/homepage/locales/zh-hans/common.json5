@@ -105,7 +105,7 @@
   commercialNavConsole: '工单工作台',
   commercialNavHome: '返回官网',
   commercialHeroTitle: '把每条请求处理到有结果',
-  commercialHeroLead: '一个团队工单案例：从查找请求、查看上下文到记录处理结果。体验官方 UI 组件如何组成完整的业务流程。',
+  commercialHeroLead: '一个团队处理客户请求的演示应用。先找到需要关注的任务，查看背景与负责人，再记录处理进展。',
   commercialCtaContact: '打开交互工作台',
   commercialCtaDocs: '阅读组件文档',
   commercialBrowseFilterLabel: '查找请求',

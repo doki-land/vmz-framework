@@ -105,7 +105,7 @@
   commercialNavConsole: 'Request workspace',
   commercialNavHome: 'Back to site',
   commercialHeroTitle: 'Bring every request to a clear outcome',
-  commercialHeroLead: 'A team request example: find an issue, understand its context, and record the next action. See how official UI components form a complete workflow.',
+  commercialHeroLead: 'An interactive app for a team handling customer requests. Find a task, review its context and owner, then record the next step.',
   commercialCtaContact: 'Open interactive workspace',
   commercialCtaDocs: 'Read component docs',
   commercialBrowseFilterLabel: 'Find requests',

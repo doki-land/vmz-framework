@@ -3,6 +3,8 @@
         <AppShell brand="VMZ" home-href="/" :nav-label="commercialNavLabel" :nav="navItems">
             <div class="vmz-commercial-content">
             <section data-vmz-fixture="commercial-hero" aria-labelledby="commercial-hero-title" class="vmz-commercial-hero">
+                <div class="vmz-commercial-hero__copy">
+                <p class="vmz-commercial-hero__eyebrow">{{ commercialNavLabel }}</p>
                 <h1 id="commercial-hero-title" class="vmz-commercial-hero__title">
                     {{ commercialHeroTitleLabel }}
                 </h1>
@@ -17,8 +19,21 @@
                         {{ commercialCtaDocsLabel }}
                     </Link>
                 </div>
+                <p class="vmz-commercial-demo-note">{{ demoNote }}</p>
+                </div>
+                <div class="vmz-commercial-hero__preview" :aria-label="previewAriaLabel">
+                    <div class="vmz-commercial-hero__preview-head">
+                        <span>{{ featuredId }}</span>
+                        <span>{{ featuredStatusLabel }}</span>
+                    </div>
+                    <strong>{{ browseLoading ? loadingLabel : browseError ? loadErrorLabel : featuredSubjectLabel }}</strong>
+                    <p v-if="!browseLoading && !browseError">{{ featuredContextLabel }}</p>
+                    <div class="vmz-commercial-hero__preview-foot">
+                        <span>{{ featuredOwnerLabel }}</span>
+                        <Button type="button" variant="secondary" @click="openFeaturedDetail">{{ commercialDetailOpenLabel }}</Button>
+                    </div>
+                </div>
             </section>
-            <p class="vmz-commercial-demo-note">{{ demoNote }}</p>
             <section data-vmz-fixture="commercial-task-browse" aria-labelledby="commercial-task-browse-title" class="vmz-commercial-task">
                 <div class="vmz-commercial-task__copy">
                     <h2 id="commercial-task-browse-title">
@@ -39,7 +54,8 @@
                         </Button>
                     </FilterBar>
                     <p v-if="browseLoading" role="status" class="vmz-commercial-loading">{{ loadingLabel }}</p>
-                    <Table v-if="!browseLoading" :columns="browseColumns" :rows="browseRows" :has-row-action="false" />
+                    <p v-if="browseError" role="alert" class="vmz-commercial-loading">{{ loadErrorLabel }}</p>
+                    <Table v-if="!browseLoading && !browseError" :columns="browseColumns" :rows="browseRows" :has-row-action="false" />
                 </div>
             </section>
             <section data-vmz-fixture="commercial-task-detail" aria-labelledby="commercial-task-detail-title" class="vmz-commercial-task">
@@ -52,9 +68,10 @@
                     </p>
                 </div>
                 <div class="vmz-commercial-task__demo vmz-commercial-panel">
-                    <p class="vmz-commercial-detail-line">
-                        {{ commercialDetailSummaryLabel }}
+                    <p v-if="featuredId" class="vmz-commercial-detail-line">
+                        {{ featuredId }} · {{ featuredSubjectLabel }} · {{ featuredStatusLabel }}
                     </p>
+                    <p v-if="!featuredId" class="vmz-commercial-detail-line">{{ loadingLabel }}</p>
                     <div data-vmz-fixture="commercial-drawer-open">
                         <Button type="button" variant="secondary" @click="openFeaturedDetail">
                             {{ commercialDetailOpenLabel }}
@@ -143,12 +160,25 @@
 </template>
 <style>
 .vmz-commercial-hero {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-    padding: 1.5rem 0 0.25rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, .85fr);
+    align-items: center;
+    gap: 3rem;
+    margin: 1rem 0 2.5rem;
+    padding: 3rem;
+    border: 1px solid #e5e6eb;
+    border-radius: 10px;
+    background: #f8fafc;
 }
+.vmz-commercial-hero__copy { display: grid; justify-items: start; gap: 1rem; }
+.vmz-commercial-hero__eyebrow { margin: 0; color: #0958d9; font-size: .8rem; font-weight: 600; letter-spacing: .04em; }
+.vmz-commercial-hero__preview { display: grid; gap: 1rem; padding: 1.5rem; border: 1px solid #dce3ec; border-radius: 8px; background: #fff; box-shadow: 0 12px 28px rgb(31 35 41 / 6%); }
+.vmz-commercial-hero__preview-head, .vmz-commercial-hero__preview-foot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.vmz-commercial-hero__preview-head { padding-bottom: .75rem; border-bottom: 1px solid #e5e6eb; color: #646a73; font: 500 .8rem var(--vmz-font-mono); }
+.vmz-commercial-hero__preview-head span:last-child { padding: .25rem .55rem; border-radius: 4px; color: #8d4f00; background: #fff7e6; font: 500 .75rem var(--vmz-font-sans); }
+.vmz-commercial-hero__preview strong { color: #1f2329; font: 600 1.15rem/1.4 var(--vmz-font-display); }
+.vmz-commercial-hero__preview p { margin: 0; color: #51565d; font-size: .875rem; line-height: 1.6; }
+.vmz-commercial-hero__preview-foot { padding-top: 1rem; border-top: 1px solid #e5e6eb; color: #646a73; font-size: .8125rem; }
 .vmz-commercial-content { width: 100%; min-width: 0; }
 
 .vmz-commercial-hero__title {
@@ -176,6 +206,10 @@
     align-items: center;
     gap: 0.75rem;
 }
+.vmz-commercial-hero__actions a { display: inline-flex; align-items: center; min-height: 2.5rem; padding: .5rem .9rem; border-radius: 6px; color: #0958d9; font-weight: 600; text-decoration: none; }
+.vmz-commercial-hero__actions a:first-child { color: #fff; background: #1677ff; }
+.vmz-commercial-hero__actions a:first-child:hover { background: #0958d9; }
+.vmz-commercial-hero__actions a:not(:first-child):hover { background: #e6f4ff; }
 
 .vmz-commercial-task {
     display: grid;
@@ -228,6 +262,8 @@
     border: 0;
     border-radius: 0;
 }
+.vmz-commercial-panel .vmz-ui-table th,
+.vmz-commercial-panel .vmz-ui-table td { padding-top: .65rem; padding-bottom: .65rem; }
 
 .vmz-commercial-panel .vmz-ui-form,
 .vmz-commercial-panel .vmz-commercial-actions,
@@ -270,12 +306,13 @@
 }
 
 @media (max-width: 768px) {
+    .vmz-commercial-hero { grid-template-columns: 1fr; gap: 1.75rem; padding: 1.5rem; }
     .vmz-commercial-task {
         grid-template-columns: 1fr;
         gap: 1.25rem;
     }
 }
-.vmz-commercial-demo-note { margin: 1.5rem 0 0; color: #646a73; font-size: .82rem; }
+.vmz-commercial-demo-note { margin: .25rem 0 0; color: #646a73; font-size: .82rem; }
 .vmz-commercial-loading { margin: 0; padding: 1.5rem; color: #646a73; }
 </style>
 <script client>
@@ -382,8 +419,16 @@ export default class CommercialPage {
     }));
     browseRows = [];
     browseLoading = true;
+    browseError = false;
     demoNote = "";
     loadingLabel = "";
+    loadErrorLabel = "";
+    previewAriaLabel = "";
+    featuredId = "";
+    featuredSubjectLabel = "";
+    featuredContextLabel = "";
+    featuredStatusLabel = "";
+    featuredOwnerLabel = "";
     navItems = [];
     _unwatchLocale = null;
 
@@ -400,14 +445,23 @@ export default class CommercialPage {
     }
 
     async loadDemoData() {
+        this.browseError = false;
         try {
             const rows = await CommercialPageServer.getConsoleRows(readLocaleId());
             if (Array.isArray(rows) && rows.length) {
                 this.allBrowseRows = rows;
                 this.refreshBrowseRows();
+                const detail = await CommercialPageServer.getTicketDetail(rows[0].id, readLocaleId());
+                if (detail) {
+                    this.featuredId = detail.id;
+                    this.featuredSubjectLabel = detail.subject;
+                    this.featuredContextLabel = detail.context;
+                    this.featuredStatusLabel = detail.statusLabel;
+                    this.featuredOwnerLabel = detail.owner;
+                }
             }
         } catch {
-            /* The case still links to the full workspace. */
+            this.browseError = true;
         } finally {
             this.browseLoading = false;
         }
@@ -417,6 +471,8 @@ export default class CommercialPage {
         const english = readLocaleId() === "en-us";
         this.demoNote = english ? "Interactive example · Server provided sample requests. Notes stay on this page." : "交互演示 · 使用服务端示例记录，处理备注只保留在当前页面。";
         this.loadingLabel = english ? "Loading sample requests…" : "正在加载演示请求…";
+        this.loadErrorLabel = english ? "Sample requests are unavailable. Refresh to try again." : "示例请求暂时无法加载，请刷新页面重试。";
+        this.previewAriaLabel = english ? "Sample request" : "示例请求";
         this.commercialNavLabel = commercialNavLabel();
         this.commercialHeroTitleLabel = commercialHeroTitle();
         this.commercialHeroLeadLabel = commercialHeroLead();
@@ -494,7 +550,7 @@ export default class CommercialPage {
     async openFeaturedDetail() {
         this.drawerOpen = true;
         try {
-            const detail = await CommercialPageServer.getTicketDetail("REQ-1048", readLocaleId());
+            const detail = await CommercialPageServer.getTicketDetail(this.featuredId, readLocaleId());
             if (detail && typeof detail === "object") {
                 this.detailProject = String(detail.subject || "");
                 this.detailTarget = String(detail.priorityLabel || "");
@@ -505,7 +561,7 @@ export default class CommercialPage {
         } catch {
             /* fall back below */
         }
-        const row = this.allBrowseRows.find((entry) => entry.id === "REQ-1048") || this.allBrowseRows[0];
+        const row = this.allBrowseRows.find((entry) => entry.id === this.featuredId) || this.allBrowseRows[0];
         if (!row) return;
         this.detailProject = String(row.cells[0] || "");
         this.detailTarget = String(row.cells[1] || "");
