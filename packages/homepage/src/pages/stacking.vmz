@@ -2,41 +2,41 @@
     <div data-vmz-fixture="stacking">
         <AppShell brand="VMZ" home-href="/" nav-label="Stacking" :nav="navItems">
             <div class="vmz-slot-content">
-            <Alert tone="info" role-name="status" title="Overlay stacking" description="Drawer → Dialog → Popover with rising stackLevel; Escape closes topmost only. Parent owns the stack." />
-            <p data-vmz-fixture="stacking-state">
-                drawer:
-                {{ drawerOpen ? "open" : "closed" }}
-                ;dialog:
-                {{ dialogOpen ? "open" : "closed" }}
-                ;popover:
-                {{ popoverOpen ? "open" : "closed" }}
-            </p>
-            <div class="vmz-stacking-actions">
-                <Button type="button" @click="openDrawer">
-                    Open drawer (stack 0)
-                </Button>
-                <Button type="button" variant="secondary" @click="openDialog">
-                    Open dialog (stack 1)
-                </Button>
-                <Button type="button" variant="ghost" @click="openPopover">
-                    Open popover (stack 2)
-                </Button>
-            </div>
-            <Drawer :open="drawerOpen" title="Base drawer" title-id="home-stack-drawer-title" stack-level="0" :on-close="closeDrawer">
-                <p data-vmz-fixture="stacking-drawer-body">
-                    Base layer stack-level=0
+                <Alert tone="info" role-name="status" title="Overlay stacking" description="Drawer → Dialog → Popover with rising stackLevel; Escape closes topmost only. Parent owns the stack." />
+                <p data-vmz-fixture="stacking-state">
+                    drawer:
+                    {{ drawerOpen ? "open" : "closed" }}
+                    ;dialog:
+                    {{ dialogOpen ? "open" : "closed" }}
+                    ;popover:
+                    {{ popoverOpen ? "open" : "closed" }}
                 </p>
-            </Drawer>
-            <Dialog :open="dialogOpen" title="Stacked dialog" title-id="home-stack-dialog-title" stack-level="1" :on-close="closeDialog">
-                <p data-vmz-fixture="stacking-dialog-body">
-                    Middle layer stack-level=1
-                </p>
-            </Dialog>
-            <Popover :open="popoverOpen" title="Top popover" title-id="home-stack-popover-title" stack-level="2" :on-close="closePopover">
-                <p data-vmz-fixture="stacking-popover-body">
-                    Top layer stack-level=2
-                </p>
-            </Popover>
+                <div class="vmz-stacking-actions">
+                    <Button type="button" @click="openDrawer">
+                        Open drawer (stack 0)
+                    </Button>
+                    <Button type="button" variant="secondary" @click="openDialog">
+                        Open dialog (stack 1)
+                    </Button>
+                    <Button type="button" variant="ghost" @click="openPopover">
+                        Open popover (stack 2)
+                    </Button>
+                </div>
+                <Drawer :open="drawerOpen" title="Base drawer" title-id="home-stack-drawer-title" stack-level="0" :on-close="closeDrawer">
+                    <p data-vmz-fixture="stacking-drawer-body">
+                        Base layer stack-level=0
+                    </p>
+                </Drawer>
+                <Dialog :open="dialogOpen" title="Stacked dialog" title-id="home-stack-dialog-title" stack-level="1" :on-close="closeDialog">
+                    <p data-vmz-fixture="stacking-dialog-body">
+                        Middle layer stack-level=1
+                    </p>
+                </Dialog>
+                <Popover :open="popoverOpen" title="Top popover" title-id="home-stack-popover-title" stack-level="2" :on-close="closePopover">
+                    <p data-vmz-fixture="stacking-popover-body">
+                        Top layer stack-level=2
+                    </p>
+                </Popover>
             </div>
         </AppShell>
     </div>

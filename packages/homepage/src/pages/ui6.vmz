@@ -2,32 +2,32 @@
     <div data-vmz-fixture="ui6" :data-density="density" :dir="dir">
         <AppShell brand="VMZ" home-href="/" nav-label="UI6" :nav="navItems">
             <div class="vmz-slot-content">
-            <Alert tone="info" role-name="status" title="UI6 Density / RTL / Preset" description="comfortable → compact → dense; dir ltr/rtl; high-contrast theme overlay from /designs." />
-            <p data-vmz-fixture="ui6-state">
-                density:
-                {{ density }}
-                ;dir:
-                {{ dir }}
-                ;theme:
-                {{ theme }}
-            </p>
-            <div class="vmz-ui6-actions">
-                <Button type="button" @click="cycleDensity">
-                    Cycle density
-                </Button>
-                <Button type="button" variant="secondary" @click="toggleDir">
-                    Toggle RTL
-                </Button>
-                <Button type="button" variant="ghost" @click="toggleTheme">
-                    Toggle high-contrast
-                </Button>
-            </div>
-            <Card title="Density sample" description="Button padding follows data-density; chrome from Style Theme.">
-                <Field label="Sample field" description="Control spacing from density tokens" control-id="home-ui6-sample" description-id="home-ui6-sample-desc" :value="sample" @input="onSample" />
-                <Button type="button">
-                    Probe control
-                </Button>
-            </Card>
+                <Alert tone="info" role-name="status" title="UI6 Density / RTL / Preset" description="comfortable → compact → dense; dir ltr/rtl; high-contrast theme overlay from /designs." />
+                <p data-vmz-fixture="ui6-state">
+                    density:
+                    {{ density }}
+                    ;dir:
+                    {{ dir }}
+                    ;theme:
+                    {{ theme }}
+                </p>
+                <div class="vmz-ui6-actions">
+                    <Button type="button" @click="cycleDensity">
+                        Cycle density
+                    </Button>
+                    <Button type="button" variant="secondary" @click="toggleDir">
+                        Toggle RTL
+                    </Button>
+                    <Button type="button" variant="ghost" @click="toggleTheme">
+                        Toggle high-contrast
+                    </Button>
+                </div>
+                <Card title="Density sample" description="Button padding follows data-density; chrome from Style Theme.">
+                    <Field label="Sample field" description="Control spacing from density tokens" control-id="home-ui6-sample" description-id="home-ui6-sample-desc" :value="sample" @input="onSample" />
+                    <Button type="button">
+                        Probe control
+                    </Button>
+                </Card>
             </div>
         </AppShell>
     </div>

@@ -2,104 +2,104 @@
     <div data-vmz-fixture="product" :data-density="density" :dir="dir">
         <AppShell brand="VMZ" home-href="/" :nav-label="productNavLabel" :nav="navItems">
             <div class="vmz-slot-content">
-            <div data-vmz-fixture="product-toolbar" class="vmz-product-toolbar">
-                <Badge tone="brand">
-                    {{ versionLabel }}
-                </Badge>
-                <Button type="button" variant="secondary" @click="toggleVersion">
-                    {{ switchVersionLabel }}
-                </Button>
-                <Button type="button" variant="ghost" @click="toggleLocale">
-                    {{ localePrefixLabel }}
-                    {{ localeLabel }}
-                </Button>
-                <Button type="button" @click="cycleDensity">
-                    {{ cycleDensityLabel }}
-                </Button>
-                <Button type="button" variant="secondary" @click="toggleDir">
-                    {{ toggleRtlLabel }}
-                </Button>
-                <Field :label="searchLabel" control-id="home-product-search" description-id="home-product-search-desc" error-id="home-product-search-err" described-by="home-product-search-desc" :value="search" @input="onSearch" />
-                <p data-vmz-fixture="product-meta" class="vmz-sr-only">
-                    version:
-                    {{ version }}
-                    ;locale:
-                    {{ locale }}
-                    ;search:
-                    {{ search }}
-                    ;copied:
-                    {{ copied }}
-                    ;density:
-                    {{ density }}
-                    ;dir:
-                    {{ dir }}
-                </p>
-            </div>
-            <div class="vmz-product-layout">
-                <Toc :label="tocLabel" :items="tocItems" />
-                <Prose>
-                    <div>
-                        <h1 id="overview">
-                            {{ titleText }}
-                        </h1>
-                        <p class="lead">
-                            {{ leadText }}
-                        </p>
-                        <Callout tone="info" role-name="note" :title="calloutZeroJsTitle" :description="calloutZeroJsDesc" />
-                    </div>
-                    <div>
-                        <h2 id="install">
-                            {{ installHeading }}
-                        </h2>
-                        <p>
-                            {{ installBody }}
-                        </p>
-                        <div v-if="isV1">
-                            <CodeBlock caption="shell" code="pnpm add @vmz/ui" :copy-label="copyLabel" :on-copy="copyInstall" />
-                        </div>
-                        <div v-if="isV0">
-                            <CodeBlock caption="shell" code="pnpm add @vmz/ui" :copy-label="copyLabel" :on-copy="copyInstall" />
-                        </div>
-                        <p v-if="copiedYes" data-vmz-fixture="product-copied" role="status">
-                            {{ copiedStatus }}
-                        </p>
-                    </div>
-                    <div>
-                        <h2 id="contract">
-                            {{ contractHeading }}
-                        </h2>
-                        <p>
-                            {{ contractBodyLead }}
-                            <Link href="/d/">
-                                /d/
-                            </Link>
-                            {{ contractBodyTail }}
-                        </p>
-                        <Callout tone="warning" role-name="note" :title="calloutNoThemeTitle" :description="calloutNoThemeDesc" />
-                        <ul>
-                            <li>
-                                {{ contractLi1 }}
-                            </li>
-                            <li>
-                                {{ contractLi2 }}
-                            </li>
-                            <li>
-                                {{ contractLi3 }}
-                            </li>
-                        </ul>
-                    </div>
-                    <hr />
-                    <p>
-                        <Link href="/commercial">
-                            {{ navCommercialLabel }}
-                        </Link>
-                        ·
-                        <Link href="/console">
-                            {{ navConsoleLabel }}
-                        </Link>
+                <div data-vmz-fixture="product-toolbar" class="vmz-product-toolbar">
+                    <Badge tone="brand">
+                        {{ versionLabel }}
+                    </Badge>
+                    <Button type="button" variant="secondary" @click="toggleVersion">
+                        {{ switchVersionLabel }}
+                    </Button>
+                    <Button type="button" variant="ghost" @click="toggleLocale">
+                        {{ localePrefixLabel }}
+                        {{ localeLabel }}
+                    </Button>
+                    <Button type="button" @click="cycleDensity">
+                        {{ cycleDensityLabel }}
+                    </Button>
+                    <Button type="button" variant="secondary" @click="toggleDir">
+                        {{ toggleRtlLabel }}
+                    </Button>
+                    <Field :label="searchLabel" control-id="home-product-search" description-id="home-product-search-desc" error-id="home-product-search-err" described-by="home-product-search-desc" :value="search" @input="onSearch" />
+                    <p data-vmz-fixture="product-meta" class="vmz-sr-only">
+                        version:
+                        {{ version }}
+                        ;locale:
+                        {{ locale }}
+                        ;search:
+                        {{ search }}
+                        ;copied:
+                        {{ copied }}
+                        ;density:
+                        {{ density }}
+                        ;dir:
+                        {{ dir }}
                     </p>
-                </Prose>
-            </div>
+                </div>
+                <div class="vmz-product-layout">
+                    <Toc :label="tocLabel" :items="tocItems" />
+                    <Prose>
+                        <div>
+                            <h1 id="overview">
+                                {{ titleText }}
+                            </h1>
+                            <p class="lead">
+                                {{ leadText }}
+                            </p>
+                            <Callout tone="info" role-name="note" :title="calloutZeroJsTitle" :description="calloutZeroJsDesc" />
+                        </div>
+                        <div>
+                            <h2 id="install">
+                                {{ installHeading }}
+                            </h2>
+                            <p>
+                                {{ installBody }}
+                            </p>
+                            <div v-if="isV1">
+                                <CodeBlock caption="shell" code="pnpm add @vmz/ui" :copy-label="copyLabel" :on-copy="copyInstall" />
+                            </div>
+                            <div v-if="isV0">
+                                <CodeBlock caption="shell" code="pnpm add @vmz/ui" :copy-label="copyLabel" :on-copy="copyInstall" />
+                            </div>
+                            <p v-if="copiedYes" data-vmz-fixture="product-copied" role="status">
+                                {{ copiedStatus }}
+                            </p>
+                        </div>
+                        <div>
+                            <h2 id="contract">
+                                {{ contractHeading }}
+                            </h2>
+                            <p>
+                                {{ contractBodyLead }}
+                                <Link href="/d/">
+                                    /d/
+                                </Link>
+                                {{ contractBodyTail }}
+                            </p>
+                            <Callout tone="warning" role-name="note" :title="calloutNoThemeTitle" :description="calloutNoThemeDesc" />
+                            <ul>
+                                <li>
+                                    {{ contractLi1 }}
+                                </li>
+                                <li>
+                                    {{ contractLi2 }}
+                                </li>
+                                <li>
+                                    {{ contractLi3 }}
+                                </li>
+                            </ul>
+                        </div>
+                        <hr />
+                        <p>
+                            <Link href="/commercial">
+                                {{ navCommercialLabel }}
+                            </Link>
+                            ·
+                            <Link href="/console">
+                                {{ navConsoleLabel }}
+                            </Link>
+                        </p>
+                    </Prose>
+                </div>
             </div>
         </AppShell>
     </div>
@@ -110,7 +110,7 @@
     flex-wrap: wrap;
     align-items: flex-end;
     gap: 0.65rem 0.85rem;
-    margin: .5rem 0 2.5rem;
+    margin: 0.5rem 0 2.5rem;
     padding: 1rem 1.25rem;
     border: 1px solid #e5e6eb;
     border-radius: 8px;
@@ -123,11 +123,27 @@
     gap: 2rem;
     align-items: start;
 }
-.vmz-product-layout h1 { margin: 0 0 .75rem; font-size: clamp(1.9rem, 3vw, 2.45rem); line-height: 1.3; }
-.vmz-product-layout h2 { margin: 2.5rem 0 .75rem; font-size: 1.35rem; line-height: 1.4; }
-.vmz-product-layout p { line-height: 1.7; }
-.vmz-product-layout .lead { max-width: 48rem; color: #51565d; font-size: 1rem; }
-.vmz-product-layout .vmz-ui-callout { margin: 1.25rem 0; }
+.vmz-product-layout h1 {
+    margin: 0 0 0.75rem;
+    font-size: clamp(1.9rem, 3vw, 2.45rem);
+    line-height: 1.3;
+}
+.vmz-product-layout h2 {
+    margin: 2.5rem 0 0.75rem;
+    font-size: 1.35rem;
+    line-height: 1.4;
+}
+.vmz-product-layout p {
+    line-height: 1.7;
+}
+.vmz-product-layout .lead {
+    max-width: 48rem;
+    color: #51565d;
+    font-size: 1rem;
+}
+.vmz-product-layout .vmz-ui-callout {
+    margin: 1.25rem 0;
+}
 
 @media (max-width: 48rem) {
     .vmz-product-layout {

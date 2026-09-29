@@ -2,85 +2,85 @@
     <div data-vmz-fixture="datagrid" data-density="compact" :data-grid-mode="viewMode">
         <ConsoleShell brand="VMZ" home-href="/" title="DataGrid" nav-label="Console" :nav="navItems">
             <div class="vmz-slot-content">
-            <Alert tone="info" role-name="status" title="DataGrid group + tree + edit + pivot" description="@vmz/ui-data-grid — virtualized + pinned + group/tree/edit + parent-owned pivot matrix (row×col→sum). Not a second spreadsheet runtime." />
-            <p data-vmz-fixture="datagrid-state">
-                mode:
-                {{ viewMode }}
-                ;total:
-                {{ totalRows }}
-                ;flat:
-                {{ flatCount }}
-                ;visible:
-                {{ visibleCount }}
-                ;window:
-                {{ windowStart }}
-                -
-                {{ windowEnd }}
-                ;selected:
-                {{ selectedAttr || "none" }}
-                ;count:
-                {{ selectedCount }}
-                ;sort:
-                {{ sortKey }}
-                :
-                {{ sortDir }}
-                ;group:
-                {{ groupBy }}
-                ;groups:
-                {{ groupCount }}
-                ;expanded:
-                {{ expandedAttr }}
-                ;agg:
-                {{ aggSample }}
-                ;tree:
-                {{ treeAttr }}
-                ;depthMax:
-                {{ depthMax }}
-                ;treeExpanded:
-                {{ treeExpandedAttr }}
-                ;editing:
-                {{ editingKey || "none" }}
-                ;draft:
-                {{ editDraft || "-" }}
-                ;scoreSample:
-                {{ scoreSample }}
-                ;pivot:
-                {{ pivotAttr }}
-                ;pivotRows:
-                {{ pivotRowCount }}
-                ;pivotCols:
-                {{ pivotColsLabel }}
-                ;pivotMeasure:
-                {{ pivotMeasure }}
-                ;pivotSample:
-                {{ pivotSample }}
-            </p>
-            <div data-vmz-fixture="datagrid-modes">
-                <span data-vmz-fixture="mode-group">
-                    <Button type="button" variant="secondary" @click='(() => setMode("group"))'>
-                        Group mode
+                <Alert tone="info" role-name="status" title="DataGrid group + tree + edit + pivot" description="@vmz/ui-data-grid — virtualized + pinned + group/tree/edit + parent-owned pivot matrix (row×col→sum). Not a second spreadsheet runtime." />
+                <p data-vmz-fixture="datagrid-state">
+                    mode:
+                    {{ viewMode }}
+                    ;total:
+                    {{ totalRows }}
+                    ;flat:
+                    {{ flatCount }}
+                    ;visible:
+                    {{ visibleCount }}
+                    ;window:
+                    {{ windowStart }}
+                    -
+                    {{ windowEnd }}
+                    ;selected:
+                    {{ selectedAttr || "none" }}
+                    ;count:
+                    {{ selectedCount }}
+                    ;sort:
+                    {{ sortKey }}
+                    :
+                    {{ sortDir }}
+                    ;group:
+                    {{ groupBy }}
+                    ;groups:
+                    {{ groupCount }}
+                    ;expanded:
+                    {{ expandedAttr }}
+                    ;agg:
+                    {{ aggSample }}
+                    ;tree:
+                    {{ treeAttr }}
+                    ;depthMax:
+                    {{ depthMax }}
+                    ;treeExpanded:
+                    {{ treeExpandedAttr }}
+                    ;editing:
+                    {{ editingKey || "none" }}
+                    ;draft:
+                    {{ editDraft || "-" }}
+                    ;scoreSample:
+                    {{ scoreSample }}
+                    ;pivot:
+                    {{ pivotAttr }}
+                    ;pivotRows:
+                    {{ pivotRowCount }}
+                    ;pivotCols:
+                    {{ pivotColsLabel }}
+                    ;pivotMeasure:
+                    {{ pivotMeasure }}
+                    ;pivotSample:
+                    {{ pivotSample }}
+                </p>
+                <div data-vmz-fixture="datagrid-modes">
+                    <span data-vmz-fixture="mode-group">
+                        <Button type="button" variant="secondary" @click='(() => setMode("group"))'>
+                            Group mode
+                        </Button>
+                    </span>
+                    <span data-vmz-fixture="mode-tree">
+                        <Button type="button" variant="secondary" @click='(() => setMode("tree"))'>
+                            Tree mode
+                        </Button>
+                    </span>
+                    <span data-vmz-fixture="mode-pivot">
+                        <Button type="button" variant="secondary" @click='(() => setMode("pivot"))'>
+                            Pivot mode
+                        </Button>
+                    </span>
+                </div>
+                <div v-if="showEditField" data-vmz-fixture="datagrid-edit-field">
+                    <Field label="Cell draft (Field mirror)" control-id="datagrid-edit-draft" description-id="datagrid-edit-draft-desc" error-id="datagrid-edit-draft-err" description="Parent-owned draft mirrored via @vmz/ui Field — DataGrid does not ship Field." :value="editDraft" @input="onFieldDraft" />
+                </div>
+                <BulkActions label="Bulk actions" :selected-count="selectedCount" :count-label="bulkLabel">
+                    <Button type="button" variant="secondary" @click="clearSelection">
+                        Clear
                     </Button>
-                </span>
-                <span data-vmz-fixture="mode-tree">
-                    <Button type="button" variant="secondary" @click='(() => setMode("tree"))'>
-                        Tree mode
-                    </Button>
-                </span>
-                <span data-vmz-fixture="mode-pivot">
-                    <Button type="button" variant="secondary" @click='(() => setMode("pivot"))'>
-                        Pivot mode
-                    </Button>
-                </span>
-            </div>
-            <div v-if="showEditField" data-vmz-fixture="datagrid-edit-field">
-                <Field label="Cell draft (Field mirror)" control-id="datagrid-edit-draft" description-id="datagrid-edit-draft-desc" error-id="datagrid-edit-draft-err" description="Parent-owned draft mirrored via @vmz/ui Field — DataGrid does not ship Field." :value="editDraft" @input="onFieldDraft" />
-            </div>
-            <BulkActions label="Bulk actions" :selected-count="selectedCount" :count-label="bulkLabel">
-                <Button type="button" variant="secondary" @click="clearSelection">
-                    Clear
-                </Button>
-            </BulkActions>
-            <DataGrid :columns="columns" :rows="rows" :total-rows="totalRowsLabel" :visible-count="visibleCountLabel" pinned-cols="1" :sort-key="sortKey" :sort-dir="sortDir" :selected-count="selectedCountLabel" :all-selected="allSelected" select-all-label="Select all leaf rows in dataset" :group-by-attr="groupBy" :group-count="groupCountLabel" :tree-attr="treeAttr" :pivot-attr="pivotAttr" :pivot-cols-attr="pivotColsLabel" :editing-attr="editingKey" :row-layout-style="rowLayoutStyle" :canvas-style="canvasStyle" :pad-top-style="padTopStyle" :pad-bottom-style="padBottomStyle" :on-scroll="onScroll" :on-sort="sortBy" :on-toggle-row="toggleRow" :on-toggle-all="toggleAll" :on-toggle-group="toggleGroup" :on-toggle-tree="toggleTree" :on-start-edit="startEdit" :on-edit-input="onEditInput" :on-commit-edit="commitEdit" :on-cancel-edit="cancelEdit" />
+                </BulkActions>
+                <DataGrid :columns="columns" :rows="rows" :total-rows="totalRowsLabel" :visible-count="visibleCountLabel" pinned-cols="1" :sort-key="sortKey" :sort-dir="sortDir" :selected-count="selectedCountLabel" :all-selected="allSelected" select-all-label="Select all leaf rows in dataset" :group-by-attr="groupBy" :group-count="groupCountLabel" :tree-attr="treeAttr" :pivot-attr="pivotAttr" :pivot-cols-attr="pivotColsLabel" :editing-attr="editingKey" :row-layout-style="rowLayoutStyle" :canvas-style="canvasStyle" :pad-top-style="padTopStyle" :pad-bottom-style="padBottomStyle" :on-scroll="onScroll" :on-sort="sortBy" :on-toggle-row="toggleRow" :on-toggle-all="toggleAll" :on-toggle-group="toggleGroup" :on-toggle-tree="toggleTree" :on-start-edit="startEdit" :on-edit-input="onEditInput" :on-commit-edit="commitEdit" :on-cancel-edit="cancelEdit" />
             </div>
         </ConsoleShell>
     </div>

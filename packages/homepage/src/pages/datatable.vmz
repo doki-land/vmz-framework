@@ -2,31 +2,31 @@
     <div data-vmz-fixture="datatable" data-density="compact">
         <ConsoleShell brand="VMZ" home-href="/" title="DataTable" nav-label="Console" :nav="navItems">
             <div class="vmz-slot-content">
-            <Alert tone="info" role-name="status" title="DataTable thin gate" description="Ordinary HTML table with parent-owned selection + sticky header. Large-grid package is separate." />
-            <p data-vmz-fixture="datatable-state">
-                selected:
-                {{ selectedAttr || "none" }}
-                ;count:
-                {{ selectedCount }}
-                ;sort:
-                {{ sortKey }}
-                :
-                {{ sortDir }}
-                ;detail:
-                {{ detailId || "none" }}
-            </p>
-            <BulkActions label="Bulk actions" :selected-count="selectedCount" :count-label="bulkLabel">
-                <Button type="button" variant="secondary" @click="clearSelection">
-                    Clear
-                </Button>
-            </BulkActions>
-            <DataTable :columns="columns" :rows="rows" :has-row-action="rowAction" action-title="Detail" action-label="Open" :sort-key="sortKey" :sort-dir="sortDir" :selected-count="selectedCountLabel" :all-selected="allSelected" select-all-label="Select all visible rows" :on-sort="sortBy" :on-toggle-row="toggleRow" :on-toggle-all="toggleAll" :on-row-action="openDetail" />
-            <Drawer :open="drawerOpen" title="Row detail" title-id="home-datatable-drawer-title" :on-close="(() => drawerOpen = false)">
-                <p data-vmz-fixture="datatable-drawer-body">
-                    detail:
-                    {{ detailId }}
+                <Alert tone="info" role-name="status" title="DataTable thin gate" description="Ordinary HTML table with parent-owned selection + sticky header. Large-grid package is separate." />
+                <p data-vmz-fixture="datatable-state">
+                    selected:
+                    {{ selectedAttr || "none" }}
+                    ;count:
+                    {{ selectedCount }}
+                    ;sort:
+                    {{ sortKey }}
+                    :
+                    {{ sortDir }}
+                    ;detail:
+                    {{ detailId || "none" }}
                 </p>
-            </Drawer>
+                <BulkActions label="Bulk actions" :selected-count="selectedCount" :count-label="bulkLabel">
+                    <Button type="button" variant="secondary" @click="clearSelection">
+                        Clear
+                    </Button>
+                </BulkActions>
+                <DataTable :columns="columns" :rows="rows" :has-row-action="rowAction" action-title="Detail" action-label="Open" :sort-key="sortKey" :sort-dir="sortDir" :selected-count="selectedCountLabel" :all-selected="allSelected" select-all-label="Select all visible rows" :on-sort="sortBy" :on-toggle-row="toggleRow" :on-toggle-all="toggleAll" :on-row-action="openDetail" />
+                <Drawer :open="drawerOpen" title="Row detail" title-id="home-datatable-drawer-title" :on-close="(() => drawerOpen = false)">
+                    <p data-vmz-fixture="datatable-drawer-body">
+                        detail:
+                        {{ detailId }}
+                    </p>
+                </Drawer>
             </div>
         </ConsoleShell>
     </div>

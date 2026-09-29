@@ -2,49 +2,49 @@
     <div data-vmz-fixture="ui5" data-density="compact">
         <ConsoleShell brand="VMZ" home-href="/" title="Console UI5" nav-label="Console" :nav="navItems">
             <div class="vmz-slot-content">
-            <Breadcrumb label="Console path" :items="crumbs" />
-            <QueryForm label="Dense query" @submit="applyQuery">
-                <Field label="Name" control-id="home-ui5-name" description-id="home-ui5-name-desc" error-id="home-ui5-name-err" described-by="home-ui5-name-desc" :value="nameQuery" @input="((e) => nameQuery = e.target.value)" />
-                <Field label="Status" control-id="home-ui5-status" description-id="home-ui5-status-desc" error-id="home-ui5-status-err" described-by="home-ui5-status-desc" :value="statusQuery" @input="((e) => statusQuery = e.target.value)" />
-                <Button type="button" @click="applyQuery">
-                    Search
-                </Button>
-                <Button type="button" :disabled="writeDisabled">
-                    Export
-                </Button>
-            </QueryForm>
-            <p data-vmz-fixture="ui5-query">
-                name:
-                {{ nameQuery }}
-                ;status:
-                {{ statusQuery }}
-            </p>
-            <p data-vmz-fixture="ui5-sort">
-                sort:
-                {{ sortKey }}
-                :
-                {{ sortDir }}
-            </p>
-            <p data-vmz-fixture="ui5-perm">
-                write:
-                {{ writeDisabled ? "denied" : "allowed" }}
-            </p>
-            <Button type="button" @click="toggleLoading">
-                Toggle loading
-            </Button>
-            <Button type="button" @click="toggleWrite">
-                Toggle write
-            </Button>
-            <Skeleton :loading="loading" :loading-attr="loadingAttr">
-                <Table :columns="columns" :rows="rows" :has-row-action="rowAction" :row-action-disabled="writeDisabled" action-title="Detail" action-label="Open" :sort-key="sortKey" :sort-dir="sortDir" :on-sort="sortBy" :on-row-action="openDetail" />
-            </Skeleton>
-            <Timeline label="Audit" :items="auditItems" />
-            <Drawer :open="drawerOpen" title="Row detail" title-id="home-ui5-drawer-title" :on-close="(() => drawerOpen = false)">
-                <p data-vmz-fixture="ui5-drawer-body">
-                    detail:
-                    {{ detailId }}
+                <Breadcrumb label="Console path" :items="crumbs" />
+                <QueryForm label="Dense query" @submit="applyQuery">
+                    <Field label="Name" control-id="home-ui5-name" description-id="home-ui5-name-desc" error-id="home-ui5-name-err" described-by="home-ui5-name-desc" :value="nameQuery" @input="((e) => nameQuery = e.target.value)" />
+                    <Field label="Status" control-id="home-ui5-status" description-id="home-ui5-status-desc" error-id="home-ui5-status-err" described-by="home-ui5-status-desc" :value="statusQuery" @input="((e) => statusQuery = e.target.value)" />
+                    <Button type="button" @click="applyQuery">
+                        Search
+                    </Button>
+                    <Button type="button" :disabled="writeDisabled">
+                        Export
+                    </Button>
+                </QueryForm>
+                <p data-vmz-fixture="ui5-query">
+                    name:
+                    {{ nameQuery }}
+                    ;status:
+                    {{ statusQuery }}
                 </p>
-            </Drawer>
+                <p data-vmz-fixture="ui5-sort">
+                    sort:
+                    {{ sortKey }}
+                    :
+                    {{ sortDir }}
+                </p>
+                <p data-vmz-fixture="ui5-perm">
+                    write:
+                    {{ writeDisabled ? "denied" : "allowed" }}
+                </p>
+                <Button type="button" @click="toggleLoading">
+                    Toggle loading
+                </Button>
+                <Button type="button" @click="toggleWrite">
+                    Toggle write
+                </Button>
+                <Skeleton :loading="loading" :loading-attr="loadingAttr">
+                    <Table :columns="columns" :rows="rows" :has-row-action="rowAction" :row-action-disabled="writeDisabled" action-title="Detail" action-label="Open" :sort-key="sortKey" :sort-dir="sortDir" :on-sort="sortBy" :on-row-action="openDetail" />
+                </Skeleton>
+                <Timeline label="Audit" :items="auditItems" />
+                <Drawer :open="drawerOpen" title="Row detail" title-id="home-ui5-drawer-title" :on-close="(() => drawerOpen = false)">
+                    <p data-vmz-fixture="ui5-drawer-body">
+                        detail:
+                        {{ detailId }}
+                    </p>
+                </Drawer>
             </div>
         </ConsoleShell>
     </div>

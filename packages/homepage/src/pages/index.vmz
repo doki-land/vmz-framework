@@ -33,22 +33,36 @@
                         </p>
                     </div>
                     <div class="v2-hero__preview-wrap">
-                        <p class="v2-hero-preview__demo-label">{{ heroPreviewDemoLabelText }}</p>
-                        <div class="landing-code-panel" data-vmz-fixture="landing-hero-preview">
+                        <p class="v2-hero-preview__demo-label">
+                            {{ heroPreviewDemoLabelText }}
+                        </p>
+                        <div data-vmz-fixture="landing-hero-preview" class="landing-code-panel">
                             <div class="landing-code-panel__head">
-                                <span>Counter.vmz</span>
-                                <span>VMZ SFC</span>
+                                <span>
+                                    Counter.vmz
+                                </span>
+                                <span>
+                                    VMZ SFC
+                                </span>
                             </div>
                             <Shiki :code="codeSample" lang="vmz" theme="vitesse-dark" />
                             <div class="landing-code-panel__result">
                                 <div>
-                                    <small>{{ heroPreviewReleaseCenterLabel }}</small>
-                                    <strong>{{ sampleCount }}</strong>
+                                    <small>
+                                        {{ heroPreviewReleaseCenterLabel }}
+                                    </small>
+                                    <strong>
+                                        {{ sampleCount }}
+                                    </strong>
                                 </div>
-                                <Button type="button" @click="() => (sampleCount += 1)">+1</Button>
+                                <Button type="button" @click="(() => sampleCount += 1)">
+                                    +1
+                                </Button>
                             </div>
                         </div>
-                        <p class="landing-code-panel__caption">{{ heroPreviewProductionReadyLabel }}</p>
+                        <p class="landing-code-panel__caption">
+                            {{ heroPreviewProductionReadyLabel }}
+                        </p>
                     </div>
                 </div>
             </section>
@@ -90,36 +104,113 @@
             <section id="showcase" aria-labelledby="showcase-title" class="landing-case">
                 <div class="landing-case__inner">
                     <div class="landing-case__copy">
-                        <p class="v2-index">{{ showcaseIndexLabel }}</p>
-                        <h2 id="showcase-title">{{ showcaseTitleLabel }}</h2>
-                        <p>{{ showcaseBodyLabel }}</p>
-                        <a href="/commercial" class="landing-case__link">{{ productCreateReleaseLabel }} <span aria-hidden="true">→</span></a>
+                        <p class="v2-index">
+                            {{ showcaseIndexLabel }}
+                        </p>
+                        <h2 id="showcase-title">
+                            {{ showcaseTitleLabel }}
+                        </h2>
+                        <p>
+                            {{ showcaseBodyLabel }}
+                        </p>
+                        <a href="/commercial" class="landing-case__link">
+                            {{ productCreateReleaseLabel }}
+                            <span aria-hidden="true">
+                                →
+                            </span>
+                        </a>
                     </div>
-                    <div class="landing-case__preview" aria-label="业务应用案例预览">
+                    <div aria-label="业务应用案例预览" class="landing-case__preview">
                         <div class="landing-case__preview-head">
-                            <strong>{{ productCloudNameLabel }}</strong>
-                            <span>{{ productWorkspaceLabel }}</span>
+                            <strong>
+                                {{ productCloudNameLabel }}
+                            </strong>
+                            <span>
+                                {{ productWorkspaceLabel }}
+                            </span>
                         </div>
                         <div class="landing-case__preview-body">
-                            <p>{{ showcaseTabSourceLabel }}</p>
-                            <div><span>01</span><strong>{{ productNavOverviewLabel }}</strong></div>
-                            <div><span>02</span><strong>{{ productNavProjectsLabel }}</strong></div>
-                            <div><span>03</span><strong>{{ productNavMonitorLabel }}</strong></div>
+                            <p>
+                                {{ showcaseTabSourceLabel }}
+                            </p>
+                            <div>
+                                <span>
+                                    01
+                                </span>
+                                <strong>
+                                    {{ productNavOverviewLabel }}
+                                </strong>
+                            </div>
+                            <div>
+                                <span>
+                                    02
+                                </span>
+                                <strong>
+                                    {{ productNavProjectsLabel }}
+                                </strong>
+                            </div>
+                            <div>
+                                <span>
+                                    03
+                                </span>
+                                <strong>
+                                    {{ productNavMonitorLabel }}
+                                </strong>
+                            </div>
                         </div>
                     </div>
                 </div>
             </section>
             <section id="how-it-works" aria-labelledby="flow-title" class="landing-explain">
                 <div class="v2-section-head">
-                    <p class="v2-index">{{ flowIndexLabel }}</p>
-                    <h2 id="flow-title">{{ flowTitleLabel }}</h2>
+                    <p class="v2-index">
+                        {{ flowIndexLabel }}
+                    </p>
+                    <h2 id="flow-title">
+                        {{ flowTitleLabel }}
+                    </h2>
                 </div>
                 <div class="landing-explain__steps">
-                    <article><span>01</span><h3>{{ flowStep1TitleLabel }}</h3><p>{{ flowStep1DescLabel }}</p></article>
-                    <article><span>02</span><h3>{{ flowStep2TitleLabel }}</h3><p>{{ flowStep2DescLabel }}</p></article>
-                    <article><span>03</span><h3>{{ flowStep3TitleLabel }}</h3><p>{{ flowStep3DescLabel }}</p></article>
+                    <article>
+                        <span>
+                            01
+                        </span>
+                        <h3>
+                            {{ flowStep1TitleLabel }}
+                        </h3>
+                        <p>
+                            {{ flowStep1DescLabel }}
+                        </p>
+                    </article>
+                    <article>
+                        <span>
+                            02
+                        </span>
+                        <h3>
+                            {{ flowStep2TitleLabel }}
+                        </h3>
+                        <p>
+                            {{ flowStep2DescLabel }}
+                        </p>
+                    </article>
+                    <article>
+                        <span>
+                            03
+                        </span>
+                        <h3>
+                            {{ flowStep3TitleLabel }}
+                        </h3>
+                        <p>
+                            {{ flowStep3DescLabel }}
+                        </p>
+                    </article>
                 </div>
-                <a :href="guideHref" class="landing-explain__link">{{ gettingStartedGuideLabel }} <span aria-hidden="true">→</span></a>
+                <a :href="guideHref" class="landing-explain__link">
+                    {{ gettingStartedGuideLabel }}
+                    <span aria-hidden="true">
+                        →
+                    </span>
+                </a>
             </section>
             <section aria-labelledby="statement-title" class="v2-statement">
                 <p class="v2-index">
@@ -363,7 +454,9 @@ export default class IndexPage {
     guideHref = "/d/zh-hans/guide/";
     _unwatchLocale = null;
     showcaseTabs = [];
-    codeSample = "<template>\n  <Button @click=\"() => (count += 1)\">\n    Count {{ count }}\n  </Button>\n</template>\n\n<script client>\nexport default class Counter {\n  count = 0;\n}\n</scr" + "ipt>";
+    codeSample =
+        '<template>\n  <Button @click="() => (count += 1)">\n    Count {{ count }}\n  </Button>\n</template>\n\n<script client>\nexport default class Counter {\n  count = 0;\n}\n</scr' +
+        "ipt>";
     surfaceColumns = [];
     surfaceRows = [];
 

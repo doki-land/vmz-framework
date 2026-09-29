@@ -2,123 +2,135 @@
     <div data-vmz-fixture="console" class="vmz-console-page">
         <ConsoleShell brand="VMZ" home-href="/" active-nav-id="console" :title="consoleTitleLabel" :subtitle="consoleSubtitleLabel" :breadcrumb-label="consoleBreadcrumbLabel" :primary-action-label="consolePrimaryActionLabel" primary-action-href="/commercial" :nav-label="consoleNavLabel" :nav="navItems">
             <div class="vmz-console-content">
-            <section :aria-label="consoleSummaryAriaLabel" class="vmz-console-summary">
-                <div class="vmz-console-summary__panel">
-                    <div class="vmz-console-summary__item">
-                        <span class="vmz-console-summary__label">
-                            {{ consoleStatActiveServicesLabel }}
-                        </span>
-                        <strong class="vmz-console-summary__value">
-                            {{ summaryTotal }}
-                        </strong>
+                <section :aria-label="consoleSummaryAriaLabel" class="vmz-console-summary">
+                    <div class="vmz-console-summary__panel">
+                        <div class="vmz-console-summary__item">
+                            <span class="vmz-console-summary__label">
+                                {{ consoleStatActiveServicesLabel }}
+                            </span>
+                            <strong class="vmz-console-summary__value">
+                                {{ summaryTotal }}
+                            </strong>
+                        </div>
+                        <div class="vmz-console-summary__item">
+                            <span class="vmz-console-summary__label">
+                                {{ consoleStatPendingReleasesLabel }}
+                            </span>
+                            <strong class="vmz-console-summary__value">
+                                {{ summaryRunning }}
+                            </strong>
+                        </div>
+                        <div class="vmz-console-summary__item">
+                            <span class="vmz-console-summary__label">
+                                {{ consoleStatAffectedRegionsLabel }}
+                            </span>
+                            <strong class="vmz-console-summary__value" :class='summaryFailed > 0 ? "is-failed" : ""'>
+                                {{ summaryFailed }}
+                            </strong>
+                        </div>
                     </div>
-                    <div class="vmz-console-summary__item">
-                        <span class="vmz-console-summary__label">
-                            {{ consoleStatPendingReleasesLabel }}
-                        </span>
-                        <strong class="vmz-console-summary__value">
-                            {{ summaryRunning }}
-                        </strong>
-                    </div>
-                    <div class="vmz-console-summary__item">
-                        <span class="vmz-console-summary__label">
-                            {{ consoleStatAffectedRegionsLabel }}
-                        </span>
-                        <strong class="vmz-console-summary__value" :class='summaryFailed > 0 ? "is-failed" : ""'>
-                            {{ summaryFailed }}
-                        </strong>
-                    </div>
-                </div>
-            </section>
-            <p class="vmz-console-demo-note">{{ demoNote }}</p>
-            <p v-if="loading" role="status" class="vmz-console-state">{{ loadingLabel }}</p>
-            <p v-if="loadError" role="alert" class="vmz-console-state">{{ loadErrorLabel }}</p>
-            <section v-if="!loading && !loadError" :aria-label="consoleDataPanelAriaLabel" class="vmz-console-data-panel">
-                <FilterBar :label="consoleFilterLabel">
-                    <Field :label="consoleFieldNameLabel" control-id="home-console-query" description-id="home-console-query-desc" error-id="home-console-query-err" described-by="home-console-query-desc" :value="query" @input="((e) => query = e.target.value)" />
-                    <Field :label="consoleFieldStatusLabel" control-id="home-console-status" description-id="home-console-status-desc" error-id="home-console-status-err" described-by="home-console-status-desc" :value="statusQuery" @input="((e) => statusQuery = e.target.value)" />
-                    <Button type="button" variant="primary" @click="applyFilter">
-                        {{ consoleApplyLabel }}
-                    </Button>
-                    <Button type="button" variant="secondary" @click="resetFilter">
-                        {{ consoleResetLabel }}
-                    </Button>
-                    <Button type="button" variant="ghost" @click="selectVisible">
-                        {{ consoleSelectVisibleLabel }}
-                    </Button>
-                </FilterBar>
-                <p data-vmz-fixture="console-query" class="vmz-sr-only">
-                    query:
-                    {{ query }}
+                </section>
+                <p class="vmz-console-demo-note">
+                    {{ demoNote }}
                 </p>
-                <BulkActions :label="consoleBulkActionsLabel" :selected-count="selectedCount" :count-label="bulkLabel">
-                    <Button type="button" variant="ghost" @click="clearSelection">
-                        {{ consoleClearSelectionLabel }}
-                    </Button>
-                </BulkActions>
-                <p class="vmz-console-scroll-hint">{{ scrollHint }}</p>
-                <Table :columns="columns" :rows="rows" :has-row-action="rowAction" :action-title="consoleActionTitleLabel" :action-label="consoleActionLabel" :on-row-action="openDetail" />
-                <Pagination :label="consolePaginationLabel" :status="pageStatus" :prev-disabled="prevDisabled" :next-disabled="nextDisabled" :on-prev="goPrev" :on-next="goNext" />
-            </section>
-            <Drawer v-if="drawerOpen" :open="drawerOpen" :title="consoleDrawerTitleLabel" title-id="home-console-drawer-title" :on-close="(() => drawerOpen = false)">
-                <div class="vmz-console-drawer-content">
-                <dl data-vmz-fixture="console-drawer-body" class="vmz-console-detail">
-                    <div>
-                        <dt>
-                            {{ consoleDrawerProjectLabel }}
-                        </dt>
-                        <dd data-vmz-fixture="console-drawer-project">
-                            {{ detailProject }}
-                        </dd>
+                <p v-if="loading" role="status" class="vmz-console-state">
+                    {{ loadingLabel }}
+                </p>
+                <p v-if="loadError" role="alert" class="vmz-console-state">
+                    {{ loadErrorLabel }}
+                </p>
+                <section v-if="!loading && !loadError" :aria-label="consoleDataPanelAriaLabel" class="vmz-console-data-panel">
+                    <FilterBar :label="consoleFilterLabel">
+                        <Field :label="consoleFieldNameLabel" control-id="home-console-query" description-id="home-console-query-desc" error-id="home-console-query-err" described-by="home-console-query-desc" :value="query" @input="((e) => query = e.target.value)" />
+                        <Field :label="consoleFieldStatusLabel" control-id="home-console-status" description-id="home-console-status-desc" error-id="home-console-status-err" described-by="home-console-status-desc" :value="statusQuery" @input="((e) => statusQuery = e.target.value)" />
+                        <Button type="button" variant="primary" @click="applyFilter">
+                            {{ consoleApplyLabel }}
+                        </Button>
+                        <Button type="button" variant="secondary" @click="resetFilter">
+                            {{ consoleResetLabel }}
+                        </Button>
+                        <Button type="button" variant="ghost" @click="selectVisible">
+                            {{ consoleSelectVisibleLabel }}
+                        </Button>
+                    </FilterBar>
+                    <p data-vmz-fixture="console-query" class="vmz-sr-only">
+                        query:
+                        {{ query }}
+                    </p>
+                    <BulkActions :label="consoleBulkActionsLabel" :selected-count="selectedCount" :count-label="bulkLabel">
+                        <Button type="button" variant="ghost" @click="clearSelection">
+                            {{ consoleClearSelectionLabel }}
+                        </Button>
+                    </BulkActions>
+                    <p class="vmz-console-scroll-hint">
+                        {{ scrollHint }}
+                    </p>
+                    <Table :columns="columns" :rows="rows" :has-row-action="rowAction" :action-title="consoleActionTitleLabel" :action-label="consoleActionLabel" :on-row-action="openDetail" />
+                    <Pagination :label="consolePaginationLabel" :status="pageStatus" :prev-disabled="prevDisabled" :next-disabled="nextDisabled" :on-prev="goPrev" :on-next="goNext" />
+                </section>
+                <Drawer v-if="drawerOpen" :open="drawerOpen" :title="consoleDrawerTitleLabel" title-id="home-console-drawer-title" :on-close="(() => drawerOpen = false)">
+                    <div class="vmz-console-drawer-content">
+                        <dl data-vmz-fixture="console-drawer-body" class="vmz-console-detail">
+                            <div>
+                                <dt>
+                                    {{ consoleDrawerProjectLabel }}
+                                </dt>
+                                <dd data-vmz-fixture="console-drawer-project">
+                                    {{ detailProject }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>
+                                    {{ consoleDrawerTargetLabel }}
+                                </dt>
+                                <dd data-vmz-fixture="console-drawer-target">
+                                    {{ detailTarget }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>
+                                    {{ consoleDrawerStatusLabel }}
+                                </dt>
+                                <dd data-vmz-fixture="console-drawer-status">
+                                    {{ detailStatus }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>
+                                    {{ consoleDrawerActorLabel }}
+                                </dt>
+                                <dd data-vmz-fixture="console-drawer-actor">
+                                    {{ detailActor }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>
+                                    {{ consoleDrawerUpdatedLabel }}
+                                </dt>
+                                <dd data-vmz-fixture="console-drawer-updated">
+                                    {{ detailUpdated }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>
+                                    {{ consoleDrawerBranchLabel }}
+                                </dt>
+                                <dd data-vmz-fixture="console-drawer-branch">
+                                    {{ detailBranch }}
+                                </dd>
+                            </div>
+                        </dl>
+                        <div class="vmz-console-note">
+                            <TextArea :label="noteLabel" :description="noteDescription" control-id="home-console-note" description-id="home-console-note-desc" error-id="home-console-note-err" described-by="home-console-note-desc" :value="noteDraft" :error="noteError" @input="onNoteInput" />
+                            <Button type="button" variant="primary" @click="saveNote">
+                                {{ noteSaveLabel }}
+                            </Button>
+                            <p v-if="noteSaved" role="status" class="vmz-console-note__saved">
+                                {{ noteSavedLabel }}
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <dt>
-                            {{ consoleDrawerTargetLabel }}
-                        </dt>
-                        <dd data-vmz-fixture="console-drawer-target">
-                            {{ detailTarget }}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt>
-                            {{ consoleDrawerStatusLabel }}
-                        </dt>
-                        <dd data-vmz-fixture="console-drawer-status">
-                            {{ detailStatus }}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt>
-                            {{ consoleDrawerActorLabel }}
-                        </dt>
-                        <dd data-vmz-fixture="console-drawer-actor">
-                            {{ detailActor }}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt>
-                            {{ consoleDrawerUpdatedLabel }}
-                        </dt>
-                        <dd data-vmz-fixture="console-drawer-updated">
-                            {{ detailUpdated }}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt>
-                            {{ consoleDrawerBranchLabel }}
-                        </dt>
-                        <dd data-vmz-fixture="console-drawer-branch">
-                            {{ detailBranch }}
-                        </dd>
-                    </div>
-                </dl>
-                <div class="vmz-console-note">
-                    <TextArea :label="noteLabel" :description="noteDescription" control-id="home-console-note" description-id="home-console-note-desc" error-id="home-console-note-err" described-by="home-console-note-desc" :value="noteDraft" :error="noteError" @input="onNoteInput" />
-                    <Button type="button" variant="primary" @click="saveNote">{{ noteSaveLabel }}</Button>
-                    <p v-if="noteSaved" role="status" class="vmz-console-note__saved">{{ noteSavedLabel }}</p>
-                </div>
-                </div>
-            </Drawer>
+                </Drawer>
             </div>
         </ConsoleShell>
     </div>
@@ -228,13 +240,36 @@
     font-size: 0.875rem;
     line-height: 1.375rem;
 }
-.vmz-console-note { display: grid; justify-items: start; gap: .75rem; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #e5e6eb; }
-.vmz-console-note .vmz-ui-textarea { width: 100%; }
-.vmz-console-note__saved { margin: 0; color: #16773f; font-size: .875rem; }
-.vmz-console-scroll-hint { display: none; margin: 0; padding: .65rem 1rem 0; color: #646a73; font-size: .75rem; }
+.vmz-console-note {
+    display: grid;
+    justify-items: start;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #e5e6eb;
+}
+.vmz-console-note .vmz-ui-textarea {
+    width: 100%;
+}
+.vmz-console-note__saved {
+    margin: 0;
+    color: #16773f;
+    font-size: 0.875rem;
+}
+.vmz-console-scroll-hint {
+    display: none;
+    margin: 0;
+    padding: 0.65rem 1rem 0;
+    color: #646a73;
+    font-size: 0.75rem;
+}
 @media (max-width: 720px) {
-    .vmz-console-scroll-hint { display: block; }
-    .vmz-console-data-panel .vmz-ui-table { min-width: 44rem; }
+    .vmz-console-scroll-hint {
+        display: block;
+    }
+    .vmz-console-data-panel .vmz-ui-table {
+        min-width: 44rem;
+    }
 }
 
 @media (max-width: 720px) {
@@ -242,8 +277,19 @@
         grid-template-columns: 1fr;
     }
 }
-.vmz-console-demo-note { margin: 0; color: #646a73; font-size: .82rem; }
-.vmz-console-state { margin: 0; padding: 2rem; border: 1px solid #e5e6eb; border-radius: 8px; background: #fff; color: #51565d; }
+.vmz-console-demo-note {
+    margin: 0;
+    color: #646a73;
+    font-size: 0.82rem;
+}
+.vmz-console-state {
+    margin: 0;
+    padding: 2rem;
+    border: 1px solid #e5e6eb;
+    border-radius: 8px;
+    background: #fff;
+    color: #51565d;
+}
 </style>
 <script client>
 import {
@@ -388,7 +434,7 @@ export default class ConsolePage {
             this.loading = false;
             this.refreshPage();
         } catch (error) {
-            console.error('Failed to load request demo', error);
+            console.error("Failed to load request demo", error);
             this.loading = false;
             this.loadError = true;
         }
@@ -401,14 +447,24 @@ export default class ConsolePage {
 
     refreshCopy() {
         const english = readLocaleId() === "en-us";
-        this.demoNote = english ? "Interactive workspace · Server provided sample records. No customer data is changed." : "演示工作台 · 数据来自服务端示例，不会修改真实客户记录。";
+        this.demoNote = english
+            ? "Interactive workspace · Server provided sample records. No customer data is changed."
+            : "演示工作台 · 数据来自服务端示例，不会修改真实客户记录。";
         this.loadingLabel = english ? "Loading requests…" : "正在加载请求…";
-        this.loadErrorLabel = english ? "Requests are temporarily unavailable. Refresh to try again." : "请求暂时无法加载，请刷新页面重试。";
-        this.scrollHint = english ? "Swipe the table to see all columns and actions." : "左右滑动表格，查看完整字段与操作。";
+        this.loadErrorLabel = english
+            ? "Requests are temporarily unavailable. Refresh to try again."
+            : "请求暂时无法加载，请刷新页面重试。";
+        this.scrollHint = english
+            ? "Swipe the table to see all columns and actions."
+            : "左右滑动表格，查看完整字段与操作。";
         this.noteLabel = english ? "Handling note" : "处理备注";
-        this.noteDescription = english ? "Saved only in this browser session. No customer is notified." : "仅保留在当前浏览器会话，不会通知客户。";
+        this.noteDescription = english
+            ? "Saved only in this browser session. No customer is notified."
+            : "仅保留在当前浏览器会话，不会通知客户。";
         this.noteSaveLabel = english ? "Save note" : "保存备注";
-        this.noteSavedLabel = english ? "Note saved in this demo session." : "备注已保存在当前演示会话。";
+        this.noteSavedLabel = english
+            ? "Note saved in this demo session."
+            : "备注已保存在当前演示会话。";
         this.consoleNavLabel = consoleNavLabel();
         this.consoleTitleLabel = consoleTitle();
         this.consoleSubtitleLabel = consoleSubtitle();
@@ -573,7 +629,10 @@ export default class ConsolePage {
 
     saveNote() {
         if (this.noteDraft.trim().length < 4) {
-            this.noteError = readLocaleId() === "en-us" ? "Enter at least four characters." : "请至少填写四个字。";
+            this.noteError =
+                readLocaleId() === "en-us"
+                    ? "Enter at least four characters."
+                    : "请至少填写四个字。";
             this.noteSaved = false;
             return;
         }
@@ -590,19 +649,59 @@ export default class ConsolePageServer {
     getConsoleRows(locale) {
         return new TicketDemo().list(locale).map((ticket) => ({
             id: ticket.id,
-            cells: [ticket.subject, locale === 'en-us' ? ticket.priority : ticket.priority === 'high' ? '高' : ticket.priority === 'medium' ? '中' : '低', locale === 'en-us' ? ticket.status : ticket.status === 'open' ? '待处理' : ticket.status === 'in-progress' ? '处理中' : '已完成', ticket.owner, ticket.updated],
+            cells: [
+                ticket.subject,
+                locale === "en-us"
+                    ? ticket.priority
+                    : ticket.priority === "high"
+                      ? "高"
+                      : ticket.priority === "medium"
+                        ? "中"
+                        : "低",
+                locale === "en-us"
+                    ? ticket.status
+                    : ticket.status === "open"
+                      ? "待处理"
+                      : ticket.status === "in-progress"
+                        ? "处理中"
+                        : "已完成",
+                ticket.owner,
+                ticket.updated,
+            ],
         }));
     }
 
     getSummary() {
         const rows = new TicketDemo().list();
-        return { total: rows.length, running: rows.filter((row) => row.status === 'in-progress').length, failed: rows.filter((row) => row.status === 'open').length };
+        return {
+            total: rows.length,
+            running: rows.filter((row) => row.status === "in-progress").length,
+            failed: rows.filter((row) => row.status === "open").length,
+        };
     }
 
     getTicketDetail(id, locale) {
         const ticket = new TicketDemo().list(locale).find((item) => item.id === id);
         if (!ticket) return null;
-        return { ...ticket, priorityLabel: locale === 'en-us' ? ticket.priority : ticket.priority === 'high' ? '高' : ticket.priority === 'medium' ? '中' : '低', statusLabel: locale === 'en-us' ? ticket.status : ticket.status === 'open' ? '待处理' : ticket.status === 'in-progress' ? '处理中' : '已完成' };
+        return {
+            ...ticket,
+            priorityLabel:
+                locale === "en-us"
+                    ? ticket.priority
+                    : ticket.priority === "high"
+                      ? "高"
+                      : ticket.priority === "medium"
+                        ? "中"
+                        : "低",
+            statusLabel:
+                locale === "en-us"
+                    ? ticket.status
+                    : ticket.status === "open"
+                      ? "待处理"
+                      : ticket.status === "in-progress"
+                        ? "处理中"
+                        : "已完成",
+        };
     }
 }
 </script>

@@ -2,94 +2,94 @@
     <div data-vmz-fixture="ui-lab" class="ui-lab-page">
         <AppShell brand="VMZ" home-href="/" :nav-label="uiLabNavLabel" :nav="navItems">
             <div class="vmz-slot-content">
-            <Alert tone="info" role-name="status" :title="uiLabAlertTitleLabel" :description="uiLabAlertDescLabel" />
-            <header class="ui-lab-page__head">
-                <h1>
-                    {{ uiLabPageTitleLabel }}
-                </h1>
-                <p>
-                    {{ uiLabPageLeadLabel }}
-                </p>
-            </header>
-            <div class="ui-lab-page__grid">
-                <Card :title="uiLabCardFieldTitleLabel" :description="uiLabCardFieldDescLabel">
-                    <Field :label="uiLabFieldLabelLabel" :description="uiLabFieldDescLabel" control-id="home-ui-name" description-id="home-ui-name-desc" error-id="home-ui-name-err" described-by="home-ui-name-desc" :value="name" @input="((e) => name = e.target.value)" />
-                    <p data-vmz-fixture="field-value" class="vmz-sr-only">
-                        value:
-                        {{ name }}
+                <Alert tone="info" role-name="status" :title="uiLabAlertTitleLabel" :description="uiLabAlertDescLabel" />
+                <header class="ui-lab-page__head">
+                    <h1>
+                        {{ uiLabPageTitleLabel }}
+                    </h1>
+                    <p>
+                        {{ uiLabPageLeadLabel }}
                     </p>
-                </Card>
-                <div data-vmz-fixture="ui2-form">
-                    <Card :title="uiLabCardChoiceTitleLabel" :description="uiLabCardChoiceDescLabel">
-                        <Checkbox :label="uiLabCheckboxLabel" control-id="home-ui-agree" :checked="agree" @change="((e) => agree = e.target.checked)" />
-                        <p data-vmz-fixture="checkbox-value" class="vmz-sr-only">
-                            agree:
-                            {{ agree ? "yes" : "no" }}
-                        </p>
-                        <Switch :label="uiLabSwitchLabel" control-id="home-ui-notify" :checked="notify" @change="((v) => notify = v)" />
-                        <p data-vmz-fixture="switch-value" class="vmz-sr-only">
-                            notify:
-                            {{ notify ? "on" : "off" }}
+                </header>
+                <div class="ui-lab-page__grid">
+                    <Card :title="uiLabCardFieldTitleLabel" :description="uiLabCardFieldDescLabel">
+                        <Field :label="uiLabFieldLabelLabel" :description="uiLabFieldDescLabel" control-id="home-ui-name" description-id="home-ui-name-desc" error-id="home-ui-name-err" described-by="home-ui-name-desc" :value="name" @input="((e) => name = e.target.value)" />
+                        <p data-vmz-fixture="field-value" class="vmz-sr-only">
+                            value:
+                            {{ name }}
                         </p>
                     </Card>
-                </div>
-                <div data-vmz-fixture="ui2-tabs">
-                    <Card :title="uiLabCardTabsTitleLabel" :description="uiLabCardTabsDescLabel">
-                        <Tabs :label="uiLabTabsLabel" :selected="tab" panel-id="home-ui-tabs-panel" :items="tabItems" :on-select="((id) => tab = id)">
-                            <p class="ui-lab-page__panel-copy">
-                                {{ uiLabTabPanelCopyLabel }}
+                    <div data-vmz-fixture="ui2-form">
+                        <Card :title="uiLabCardChoiceTitleLabel" :description="uiLabCardChoiceDescLabel">
+                            <Checkbox :label="uiLabCheckboxLabel" control-id="home-ui-agree" :checked="agree" @change="((e) => agree = e.target.checked)" />
+                            <p data-vmz-fixture="checkbox-value" class="vmz-sr-only">
+                                agree:
+                                {{ agree ? "yes" : "no" }}
                             </p>
-                            <p data-vmz-fixture="tab-panel" class="vmz-sr-only">
-                                panel:
-                                {{ tab }}
+                            <Switch :label="uiLabSwitchLabel" control-id="home-ui-notify" :checked="notify" @change="((v) => notify = v)" />
+                            <p data-vmz-fixture="switch-value" class="vmz-sr-only">
+                                notify:
+                                {{ notify ? "on" : "off" }}
                             </p>
-                        </Tabs>
-                    </Card>
-                </div>
-                <div data-vmz-fixture="ui2-menu">
-                    <Card :title="uiLabCardMenuTitleLabel" :description="uiLabCardMenuDescLabel">
-                        <Menu :label="uiLabMenuLabel" menu-id="home-ui-menu" :open="menuOpen" :items="menuItems" :on-open-change="((v) => menuOpen = v)" :on-select="((id) => menuChoice = id)" />
-                        <p data-vmz-fixture="menu-choice" class="vmz-sr-only">
-                            menu:
-                            {{ menuChoice || "none" }}
-                        </p>
-                    </Card>
-                </div>
-                <div data-vmz-fixture="ui1-dialog">
-                    <Card :title="uiLabCardDialogTitleLabel" :description="uiLabCardDialogDescLabel">
-                        <Button type="button" @click="(() => open = true)">
-                            {{ uiLabOpenDialogLabel }}
-                        </Button>
-                        <Dialog v-if="open" :open="open" :title="uiLabDialogTitleLabel" title-id="home-ui-dialog-title" :on-close="(() => open = false)">
-                            <p data-vmz-fixture="dialog-body">
-                                {{ uiLabDialogBodyLabel }}
-                            </p>
-                        </Dialog>
-                    </Card>
-                </div>
-                <Card :title="uiLabCardOverlayTitleLabel" :description="uiLabCardOverlayDescLabel">
-                    <div data-vmz-fixture="ui2-drawer" class="ui-lab-page__actions">
-                        <Button type="button" variant="secondary" @click="(() => drawerOpen = true)">
-                            {{ uiLabOpenDrawerLabel }}
-                        </Button>
-                        <Drawer v-if="drawerOpen" :open="drawerOpen" :title="uiLabDrawerTitleLabel" title-id="home-ui-drawer-title" :on-close="(() => drawerOpen = false)">
-                            <p data-vmz-fixture="drawer-body">
-                                {{ uiLabDrawerBodyLabel }}
-                            </p>
-                        </Drawer>
+                        </Card>
                     </div>
-                    <div data-vmz-fixture="ui2-popover" class="ui-lab-page__actions">
-                        <Button type="button" variant="secondary" @click="(() => popoverOpen = true)">
-                            {{ uiLabOpenPopoverLabel }}
-                        </Button>
-                        <Popover v-if="popoverOpen" :open="popoverOpen" :title="uiLabPopoverTitleLabel" title-id="home-ui-popover-title" :on-close="(() => popoverOpen = false)">
-                            <p data-vmz-fixture="popover-body">
-                                {{ uiLabPopoverBodyLabel }}
-                            </p>
-                        </Popover>
+                    <div data-vmz-fixture="ui2-tabs">
+                        <Card :title="uiLabCardTabsTitleLabel" :description="uiLabCardTabsDescLabel">
+                            <Tabs :label="uiLabTabsLabel" :selected="tab" panel-id="home-ui-tabs-panel" :items="tabItems" :on-select="((id) => tab = id)">
+                                <p class="ui-lab-page__panel-copy">
+                                    {{ uiLabTabPanelCopyLabel }}
+                                </p>
+                                <p data-vmz-fixture="tab-panel" class="vmz-sr-only">
+                                    panel:
+                                    {{ tab }}
+                                </p>
+                            </Tabs>
+                        </Card>
                     </div>
-                </Card>
-            </div>
+                    <div data-vmz-fixture="ui2-menu">
+                        <Card :title="uiLabCardMenuTitleLabel" :description="uiLabCardMenuDescLabel">
+                            <Menu :label="uiLabMenuLabel" menu-id="home-ui-menu" :open="menuOpen" :items="menuItems" :on-open-change="((v) => menuOpen = v)" :on-select="((id) => menuChoice = id)" />
+                            <p data-vmz-fixture="menu-choice" class="vmz-sr-only">
+                                menu:
+                                {{ menuChoice || "none" }}
+                            </p>
+                        </Card>
+                    </div>
+                    <div data-vmz-fixture="ui1-dialog">
+                        <Card :title="uiLabCardDialogTitleLabel" :description="uiLabCardDialogDescLabel">
+                            <Button type="button" @click="(() => open = true)">
+                                {{ uiLabOpenDialogLabel }}
+                            </Button>
+                            <Dialog v-if="open" :open="open" :title="uiLabDialogTitleLabel" title-id="home-ui-dialog-title" :on-close="(() => open = false)">
+                                <p data-vmz-fixture="dialog-body">
+                                    {{ uiLabDialogBodyLabel }}
+                                </p>
+                            </Dialog>
+                        </Card>
+                    </div>
+                    <Card :title="uiLabCardOverlayTitleLabel" :description="uiLabCardOverlayDescLabel">
+                        <div data-vmz-fixture="ui2-drawer" class="ui-lab-page__actions">
+                            <Button type="button" variant="secondary" @click="(() => drawerOpen = true)">
+                                {{ uiLabOpenDrawerLabel }}
+                            </Button>
+                            <Drawer v-if="drawerOpen" :open="drawerOpen" :title="uiLabDrawerTitleLabel" title-id="home-ui-drawer-title" :on-close="(() => drawerOpen = false)">
+                                <p data-vmz-fixture="drawer-body">
+                                    {{ uiLabDrawerBodyLabel }}
+                                </p>
+                            </Drawer>
+                        </div>
+                        <div data-vmz-fixture="ui2-popover" class="ui-lab-page__actions">
+                            <Button type="button" variant="secondary" @click="(() => popoverOpen = true)">
+                                {{ uiLabOpenPopoverLabel }}
+                            </Button>
+                            <Popover v-if="popoverOpen" :open="popoverOpen" :title="uiLabPopoverTitleLabel" title-id="home-ui-popover-title" :on-close="(() => popoverOpen = false)">
+                                <p data-vmz-fixture="popover-body">
+                                    {{ uiLabPopoverBodyLabel }}
+                                </p>
+                            </Popover>
+                        </div>
+                    </Card>
+                </div>
             </div>
         </AppShell>
     </div>

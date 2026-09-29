@@ -2,30 +2,30 @@
     <div data-vmz-fixture="ui4" :data-density="density">
         <AppShell brand="VMZ" home-href="/" nav-label="UI4" :nav="navItems">
             <div class="vmz-slot-content">
-            <p data-vmz-fixture="ui4-density">
-                density:
-                {{ density }}
-            </p>
-            <Button type="button" @click="toggleDensity">
-                Toggle density
-            </Button>
-            <Card title="Status tones">
-                <Alert tone="info" role-name="status" title="Info" description="status.info tokens" />
-                <Alert tone="success" role-name="status" title="Success" description="status.success tokens" />
-                <Alert tone="warning" role-name="status" title="Warning" description="status.warning tokens" />
-                <Alert tone="danger" role-name="alert" title="Danger" description="status.danger tokens" />
-            </Card>
-            <Notification tone="warning" role-name="status" title="Deploy pending" description="Notification shares the status tone matrix." />
-            <Result status="success" title="Payment complete" description="Result outcome uses status.success tokens.">
-                <Button type="button" @click="(() => done = true)">
-                    Continue
+                <p data-vmz-fixture="ui4-density">
+                    density:
+                    {{ density }}
+                </p>
+                <Button type="button" @click="toggleDensity">
+                    Toggle density
                 </Button>
-            </Result>
-            <p data-vmz-fixture="ui4-done">
-                done:
-                {{ done ? "yes" : "no" }}
-            </p>
-            <Empty title="No extras" description="UI4 still includes Empty on the Commercial Surface." />
+                <Card title="Status tones">
+                    <Alert tone="info" role-name="status" title="Info" description="status.info tokens" />
+                    <Alert tone="success" role-name="status" title="Success" description="status.success tokens" />
+                    <Alert tone="warning" role-name="status" title="Warning" description="status.warning tokens" />
+                    <Alert tone="danger" role-name="alert" title="Danger" description="status.danger tokens" />
+                </Card>
+                <Notification tone="warning" role-name="status" title="Deploy pending" description="Notification shares the status tone matrix." />
+                <Result status="success" title="Payment complete" description="Result outcome uses status.success tokens.">
+                    <Button type="button" @click="(() => done = true)">
+                        Continue
+                    </Button>
+                </Result>
+                <p data-vmz-fixture="ui4-done">
+                    done:
+                    {{ done ? "yes" : "no" }}
+                </p>
+                <Empty title="No extras" description="UI4 still includes Empty on the Commercial Surface." />
             </div>
         </AppShell>
     </div>
