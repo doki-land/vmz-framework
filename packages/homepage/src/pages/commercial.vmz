@@ -61,6 +61,7 @@
                         </Button>
                     </div>
                     <Drawer v-if="drawerOpen" :open="drawerOpen" :title="commercialDrawerTitleLabel" title-id="home-commercial-drawer-title" :on-close="(() => drawerOpen = false)">
+                        <div class="vmz-commercial-drawer-content">
                         <dl data-vmz-fixture="commercial-drawer-body" class="vmz-commercial-detail">
                             <div>
                                 <dt>
@@ -98,6 +99,7 @@
                         <Link href="/console">
                             {{ commercialOpenConsoleLabel }}
                         </Link>
+                        </div>
                     </Drawer>
                 </div>
             </section>

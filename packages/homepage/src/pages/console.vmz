@@ -60,6 +60,7 @@
                 <Pagination :label="consolePaginationLabel" :status="pageStatus" :prev-disabled="prevDisabled" :next-disabled="nextDisabled" :on-prev="goPrev" :on-next="goNext" />
             </section>
             <Drawer v-if="drawerOpen" :open="drawerOpen" :title="consoleDrawerTitleLabel" title-id="home-console-drawer-title" :on-close="(() => drawerOpen = false)">
+                <div class="vmz-console-drawer-content">
                 <dl data-vmz-fixture="console-drawer-body" class="vmz-console-detail">
                     <div>
                         <dt>
@@ -110,6 +111,12 @@
                         </dd>
                     </div>
                 </dl>
+                <div class="vmz-console-note">
+                    <TextArea :label="noteLabel" :description="noteDescription" control-id="home-console-note" description-id="home-console-note-desc" error-id="home-console-note-err" described-by="home-console-note-desc" :value="noteDraft" :error="noteError" @input="onNoteInput" />
+                    <Button type="button" variant="primary" @click="saveNote">{{ noteSaveLabel }}</Button>
+                    <p v-if="noteSaved" role="status" class="vmz-console-note__saved">{{ noteSavedLabel }}</p>
+                </div>
+                </div>
             </Drawer>
             </div>
         </ConsoleShell>
@@ -220,6 +227,9 @@
     font-size: 0.875rem;
     line-height: 1.375rem;
 }
+.vmz-console-note { display: grid; justify-items: start; gap: .75rem; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #e5e6eb; }
+.vmz-console-note .vmz-ui-textarea { width: 100%; }
+.vmz-console-note__saved { margin: 0; color: #16773f; font-size: .875rem; }
 
 @media (max-width: 720px) {
     .vmz-console-summary__panel {
@@ -282,6 +292,15 @@ export default class ConsolePage {
     demoNote = "";
     loadingLabel = "";
     loadErrorLabel = "";
+    noteLabel = "";
+    noteDescription = "";
+    noteSaveLabel = "";
+    noteSavedLabel = "";
+    noteDraft = "";
+    noteError = "";
+    noteSaved = false;
+    selectedTicketId = "";
+    notes = {};
     summaryRunning = initialConsoleSummary.running;
     summaryFailed = initialConsoleSummary.failed;
     query = "";
@@ -378,6 +397,10 @@ export default class ConsolePage {
         this.demoNote = english ? "Interactive workspace · Server provided sample records. No customer data is changed." : "演示工作台 · 数据来自服务端示例，不会修改真实客户记录。";
         this.loadingLabel = english ? "Loading requests…" : "正在加载请求…";
         this.loadErrorLabel = english ? "Requests are temporarily unavailable. Refresh to try again." : "请求暂时无法加载，请刷新页面重试。";
+        this.noteLabel = english ? "Handling note" : "处理备注";
+        this.noteDescription = english ? "Saved only in this browser session. No customer is notified." : "仅保留在当前浏览器会话，不会通知客户。";
+        this.noteSaveLabel = english ? "Save note" : "保存备注";
+        this.noteSavedLabel = english ? "Note saved in this demo session." : "备注已保存在当前演示会话。";
         this.consoleNavLabel = consoleNavLabel();
         this.consoleTitleLabel = consoleTitle();
         this.consoleSubtitleLabel = consoleSubtitle();
@@ -505,6 +528,10 @@ export default class ConsolePage {
     }
 
     async openDetail(id) {
+        this.selectedTicketId = id;
+        this.noteDraft = this.notes[id] || "";
+        this.noteError = "";
+        this.noteSaved = false;
         this.drawerOpen = true;
         try {
             const detail = await ConsolePageServer.getTicketDetail(id, readLocaleId());
@@ -528,6 +555,23 @@ export default class ConsolePage {
         this.detailActor = String(row.cells[3] || "");
         this.detailUpdated = String(row.cells[4] || "");
         this.detailBranch = "";
+    }
+
+    onNoteInput(event) {
+        this.noteDraft = event.target.value;
+        this.noteError = "";
+        this.noteSaved = false;
+    }
+
+    saveNote() {
+        if (this.noteDraft.trim().length < 4) {
+            this.noteError = readLocaleId() === "en-us" ? "Enter at least four characters." : "请至少填写四个字。";
+            this.noteSaved = false;
+            return;
+        }
+        this.notes = { ...this.notes, [this.selectedTicketId]: this.noteDraft.trim() };
+        this.noteError = "";
+        this.noteSaved = true;
     }
 }
 </script>
