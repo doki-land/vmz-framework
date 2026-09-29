@@ -87,7 +87,7 @@ if (!inspect.ok) {
     fail(inspect.failures.join('; '));
 }
 
-const detail = 'R1 button slot and R2 SVG region checks passed on live homepage SSR';
+const detail = 'Button slots, SVG regions, and first-response highlighted code passed on live homepage SSR';
 const proof = readProof(root);
 upsertCheck(proof, {
     id: 'homepage-ssr-html',

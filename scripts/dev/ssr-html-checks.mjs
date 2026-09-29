@@ -25,5 +25,10 @@ export function inspectSsrHtml(html) {
         failures.push('R1 empty primary button detected in SSR HTML');
     }
 
+    const highlightedCode = html.match(/class="shiki-host"[^>]*>\s*<pre\b[^>]*class="[^"]*shiki[^\"]*"[^>]*>[\s\S]*?<code>[\s\S]*?Counter[\s\S]*?<\/code>/i);
+    if (!highlightedCode) {
+        failures.push('Homepage code example missing from the first SSR HTML response');
+    }
+
     return { ok: failures.length === 0, failures };
 }
