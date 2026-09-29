@@ -22,7 +22,7 @@ fn lower_node(node: &ConcreteNode) -> Result<Option<TemplateNode>, TemplateParse
             if value.trim().is_empty() {
                 Ok(None)
             } else {
-                Ok(Some(TemplateNode::Text(value.clone())))
+                Ok(Some(TemplateNode::Text(normalize_render_text(value))))
             }
         }
         ConcreteNode::Interpolation { expr, .. } => Ok(Some(TemplateNode::Interp(expr.clone()))),
@@ -44,6 +44,19 @@ fn lower_node(node: &ConcreteNode) -> Result<Option<TemplateNode>, TemplateParse
             }))
         }
     }
+}
+
+// Concrete AST retains author text for tooling. The execution IR condenses
+// indentation newlines so an adjacent interpolation remains one text phrase.
+fn normalize_render_text(value: &str) -> String {
+    if !value.contains(['\n', '\r']) {
+        return value.to_string();
+    }
+    let mut normalized = value.split_whitespace().collect::<Vec<_>>().join(" ");
+    if value.chars().last().is_some_and(char::is_whitespace) {
+        normalized.push(' ');
+    }
+    normalized
 }
 
 fn lower_attr(attr: &ConcreteAttr) -> Result<Vec<TemplateAttr>, TemplateParseError> {

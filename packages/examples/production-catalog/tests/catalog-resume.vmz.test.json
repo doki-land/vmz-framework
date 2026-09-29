@@ -70,7 +70,7 @@
             "schema": "vmz.test.assertion.v0",
             "kind": "text",
             "expect": {
-                "contains": "chip:on"
+                "contains": "chip: on"
             }
         }
     ]

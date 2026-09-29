@@ -3,6 +3,18 @@
 use vmz_compiler::parse::template::*;
 
 #[test]
+fn multiline_text_before_interpolation_has_one_render_space() {
+    let source = "<p>selected:\n            {{ selected }}</p>";
+    let concrete = parse_template_concrete(source).unwrap();
+    let ir = lower_concrete_to_ir(&concrete).unwrap();
+    let TemplateNode::Element { children, .. } = &ir.roots[0] else { panic!("expected p") };
+    assert!(matches!(&children[0], TemplateNode::Text(value) if value == "selected: "));
+    assert!(matches!(&children[1], TemplateNode::Interp(expr) if expr == "selected"));
+    let ConcreteNode::Element { children, .. } = &concrete.roots[0] else { panic!("expected p") };
+    assert!(matches!(&children[0], ConcreteNode::Text { value, .. } if value.contains('\n')));
+}
+
+#[test]
 fn on_modifiers_structured_and_ir_strips() {
     let src = r#"<button @click.stop.prevent="save">x</button>"#;
     let concrete = parse_template_concrete(src).unwrap();
