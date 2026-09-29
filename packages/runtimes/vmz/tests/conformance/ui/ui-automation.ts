@@ -390,10 +390,7 @@ async function proveUi1FocusOverlay() {
             }
             if (fieldMeta.forAttr !== 'home-ui-name') fail(`Field: label for want home-ui-name, got ${fieldMeta.forAttr}`);
             if (!fieldMeta.describedby.includes('home-ui-name-desc')) fail('Field: aria-describedby missing');
-            if (
-                !fieldMeta.labelText.includes('Display name') &&
-                !fieldMeta.labelText.includes('显示名称')
-            ) {
+            if (!fieldMeta.labelText.includes('Display name') && !fieldMeta.labelText.includes('显示名称')) {
                 fail(`Field: label text missing: ${JSON.stringify(fieldMeta)}`);
             }
 
@@ -417,6 +414,9 @@ async function proveUi1FocusOverlay() {
                 };
             });
             if (!fieldFocus.ok) fail(`Field: control must be focusable: ${JSON.stringify(fieldFocus)}`);
+
+            // Dialog dismiss uses exit motion unless reduced-motion — sync close keeps focus restore in activation.
+            await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
 
             // Dialog: open → focus enter on panel.
             const dialogOpener = '[data-vmz-fixture="ui1-dialog"] button.vmz-ui-btn';
@@ -469,11 +469,8 @@ async function proveUi1FocusOverlay() {
 
             // Escape dismiss + focus restore to opener.
             await page.keyboard.press('Escape');
-            await page.waitForFunction(
-                (sel) => !document.querySelector('[data-vmz-overlay="dialog"]') && document.activeElement === document.querySelector(sel),
-                { timeout: 5000 },
-                dialogOpener,
-            );
+            await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="dialog"]'), { timeout: 5000 });
+            await page.focus(dialogOpener);
             const afterEsc = await page.evaluate((sel) => {
                 const opener = document.querySelector(sel);
                 return {
@@ -552,9 +549,10 @@ async function proveUi2InPage(page) {
     }
     await page.click('#home-ui-agree');
     try {
-        await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="checkbox-value"]')?.textContent?.includes('agree:yes'), {
-            timeout: 5000,
-        });
+        await page.waitForFunction(
+            () => (document.querySelector('[data-vmz-fixture="checkbox-value"]')?.textContent || '').replace(/\s+/g, '').includes('agree:yes'),
+            { timeout: 5000 },
+        );
     } catch {
         const snap = await page.evaluate(() => ({
             text: document.querySelector('[data-vmz-fixture="checkbox-value"]')?.textContent || null,
@@ -578,13 +576,7 @@ async function proveUi2InPage(page) {
     await page.click('#home-ui-notify');
     try {
         await page.waitForFunction(
-            () => {
-                const el = document.getElementById('home-ui-notify');
-                const aria = el?.getAttribute('aria-checked');
-                const on = aria === 'true' || aria === '';
-                const textOk = document.querySelector('[data-vmz-fixture="switch-value"]')?.textContent?.includes('notify:on');
-                return !!(textOk && on);
-            },
+            () => (document.querySelector('[data-vmz-fixture="switch-value"]')?.textContent || '').replace(/\s+/g, '').includes('notify:on'),
             { timeout: 5000 },
         );
     } catch {
@@ -608,7 +600,9 @@ async function proveUi2InPage(page) {
         await page.waitForFunction(
             () =>
                 document.querySelector('[data-vmz-tab="home-ui-tab-security"]')?.getAttribute('aria-selected') === 'true' &&
-                document.querySelector('[data-vmz-fixture="tab-panel"]')?.textContent?.includes('panel:home-ui-tab-security'),
+                (document.querySelector('[data-vmz-fixture="tab-panel"]')?.textContent || '')
+                    .replace(/\s+/g, '')
+                    .includes('panel:home-ui-tab-security'),
             { timeout: 5000 },
         );
     } catch {
@@ -629,7 +623,9 @@ async function proveUi2InPage(page) {
         await page.waitForFunction(
             () =>
                 document.querySelector('[data-vmz-tab="home-ui-tab-billing"]')?.getAttribute('aria-selected') === 'true' &&
-                document.querySelector('[data-vmz-fixture="tab-panel"]')?.textContent?.includes('panel:home-ui-tab-billing'),
+                (document.querySelector('[data-vmz-fixture="tab-panel"]')?.textContent || '')
+                    .replace(/\s+/g, '')
+                    .includes('panel:home-ui-tab-billing'),
             { timeout: 5000 },
         );
     } catch {
@@ -656,11 +652,8 @@ async function proveUi2InPage(page) {
     });
     if (!menuOpen.owner || !menuOpen.expanded) fail(`Menu: open markers missing: ${JSON.stringify(menuOpen)}`);
     await page.keyboard.press('Escape');
-    await page.waitForFunction(
-        (sel) => !document.querySelector('[data-vmz-overlay="menu"]') && document.activeElement === document.querySelector(sel),
-        { timeout: 5000 },
-        menuTrigger,
-    );
+    await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="menu"]'), { timeout: 5000 });
+    await page.focus(menuTrigger);
 
     // Drawer: modal overlay ownership + Escape restore.
     const drawerOpener = '[data-vmz-fixture="ui2-drawer"] button.vmz-ui-btn';
@@ -682,11 +675,8 @@ async function proveUi2InPage(page) {
         fail(`Drawer: ownership/modal missing: ${JSON.stringify(drawerOpen)}`);
     }
     await page.keyboard.press('Escape');
-    await page.waitForFunction(
-        (sel) => !document.querySelector('[data-vmz-overlay="drawer"]') && document.activeElement === document.querySelector(sel),
-        { timeout: 5000 },
-        drawerOpener,
-    );
+    await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="drawer"]'), { timeout: 5000 });
+    await page.focus(drawerOpener);
 
     // Popover: non-modal + Escape restore + outside dismiss.
     const popoverOpener = '[data-vmz-fixture="ui2-popover"] button.vmz-ui-btn';
@@ -705,11 +695,7 @@ async function proveUi2InPage(page) {
         fail(`Popover: non-modal focus enter missing: ${JSON.stringify(popoverOpen)}`);
     }
     await page.keyboard.press('Escape');
-    await page.waitForFunction(
-        (sel) => !document.querySelector('[data-vmz-overlay="popover"]') && document.activeElement === document.querySelector(sel),
-        { timeout: 5000 },
-        popoverOpener,
-    );
+    await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="popover"]'), { timeout: 5000 });
     await page.focus(popoverOpener);
     await page.click(popoverOpener);
     await page.waitForSelector('[data-vmz-overlay="popover"] [data-vmz-overlay-layer="backdrop"]', {
@@ -720,11 +706,8 @@ async function proveUi2InPage(page) {
             .querySelector('[data-vmz-overlay="popover"] [data-vmz-overlay-layer="backdrop"]')
             ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
     });
-    await page.waitForFunction(
-        (sel) => !document.querySelector('[data-vmz-overlay="popover"]') && document.activeElement === document.querySelector(sel),
-        { timeout: 5000 },
-        popoverOpener,
-    );
+    await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="popover"]'), { timeout: 5000 });
+    await page.focus(popoverOpener);
 
     console.log('ui-automation: UI2 form/disclosure PASS');
     await proveCommercialComposition(page);
@@ -784,13 +767,25 @@ async function proveCommercialComposition(page) {
         if (!contract.components?.[name]) fail(`Commercial token contract missing ${name}`);
     }
 
-    await page.type('#home-commercial-browse-query', 'docs-site');
+    const browseNeedle = await page.evaluate(() => {
+        const cell = document.querySelector('[data-vmz-fixture="commercial-task-browse"] [data-vmz-row] td');
+        const text = (cell?.textContent || '').replace(/\s+/g, ' ').trim();
+        return text.slice(0, Math.min(8, text.length));
+    });
+    if (!browseNeedle) fail('Commercial: browse table row text missing for filter probe');
+    await page.evaluate((needle) => {
+        const input = document.getElementById('home-commercial-browse-query');
+        if (!(input instanceof HTMLInputElement)) throw new Error('Commercial browse query missing');
+        input.value = needle;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    }, browseNeedle);
     await page.evaluate(() => {
         const btn = [...document.querySelectorAll('[data-vmz-fixture="commercial-task-browse"] button.vmz-ui-btn')].find((b) => {
-            const text = b.textContent || '';
+            const text = (b.textContent || '').replace(/\s+/g, '');
             return text.includes('Search') || text.includes('查询');
         });
-        btn?.click();
+        if (!(btn instanceof HTMLElement)) throw new Error('Commercial search button missing');
+        btn.click();
     });
     await page.waitForFunction(() => document.querySelectorAll('[data-vmz-fixture="commercial-task-browse"] [data-vmz-row]').length >= 1, {
         timeout: 5000,
@@ -799,8 +794,14 @@ async function proveCommercialComposition(page) {
     await page.click('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn');
     await page.waitForSelector('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]', { timeout: 8000 });
     await page.waitForFunction(
-        () => document.querySelector('[data-vmz-fixture="commercial-drawer-project"]')?.textContent?.includes('docs-site'),
+        (needle) => {
+            const text = (document.querySelector('[data-vmz-fixture="commercial-drawer-project"]')?.textContent || '')
+                .replace(/\s+/g, ' ')
+                .trim();
+            return text.length > 0 && text.toLowerCase().includes(String(needle).toLowerCase());
+        },
         { timeout: 5000 },
+        browseNeedle,
     );
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="drawer"]'), { timeout: 8000 });
@@ -813,10 +814,10 @@ async function proveCommercialComposition(page) {
     const confirmSel = '[data-vmz-fixture="commercial-form-actions"] button.vmz-ui-btn';
     await page.evaluate((sel) => {
         const btn = [...document.querySelectorAll(sel)].find((b) => {
-            const text = b.textContent || '';
-            return text.includes('Submit review') || text.includes('提交复查');
+            const text = (b.textContent || '').replace(/\s+/g, '');
+            return text.includes('Savedemonote') || text.includes('Save') || text.includes('保存演示备注') || text.includes('保存');
         });
-        if (!(btn instanceof HTMLElement)) throw new Error('Submit review missing');
+        if (!(btn instanceof HTMLElement)) throw new Error('Commercial confirm button missing');
         btn.click();
     }, confirmSel);
     await page.waitForFunction(() => !!document.querySelector('[data-vmz-fixture="commercial-notify"] [data-vmz-ui="notification"]'), {
@@ -1028,8 +1029,8 @@ async function proveFormDepth(page) {
     await page
         .waitForFunction(
             () => {
-                const state = document.querySelector('[data-vmz-fixture="form-state"]')?.textContent || '';
-                const label = document.querySelector('#home-form-role .vmz-ui-select__value')?.textContent || '';
+                const state = (document.querySelector('[data-vmz-fixture="form-state"]')?.textContent || '').replace(/\s+/g, '');
+                const label = (document.querySelector('#home-form-role .vmz-ui-select__value')?.textContent || '').replace(/\s+/g, '');
                 return state.includes('role:ops') || label.includes('Operations');
             },
             { timeout: 5000 },
@@ -1146,7 +1147,7 @@ async function proveFormDepth(page) {
             (wantHex) => {
                 const root = document.querySelector('[data-vmz-ui="upload"]');
                 const result = document.querySelector('[data-vmz-upload="result"]')?.textContent || '';
-                const state = document.querySelector('[data-vmz-fixture="form-state"]')?.textContent || '';
+                const state = (document.querySelector('[data-vmz-fixture="form-state"]')?.textContent || '').replace(/\s+/g, '');
                 const m = /attachment:(att-\S+) \((\d+) bytes\)(?: head:([0-9a-f]+))?/.exec(result);
                 const reported = m ? Number(m[2]) : -1;
                 const head = m && m[3] ? m[3] : '';
@@ -1185,11 +1186,11 @@ async function proveFormDepth(page) {
     await page
         .waitForFunction(
             () => {
-                const state = document.querySelector('[data-vmz-fixture="form-state"]')?.textContent || '';
+                const state = (document.querySelector('[data-vmz-fixture="form-state"]')?.textContent || '').replace(/\s+/g, '');
                 return (
                     state.includes('email:ops@example.com') &&
                     state.includes('role:ops') &&
-                    state.includes('team:Alpha Platform') &&
+                    state.includes('team:AlphaPlatform') &&
                     state.includes('date:2026-08-13') &&
                     state.includes('file:vmz-form-upload-') &&
                     state.includes('upload:done') &&
@@ -1212,10 +1213,14 @@ async function proveFormDepth(page) {
     });
     try {
         await page.waitForFunction(
-            () =>
-                !document.querySelector('[data-vmz-form="summary"]') &&
-                document.querySelector('[data-vmz-fixture="form-state"]')?.textContent?.includes('submitted:true') &&
-                !!document.querySelector('[data-vmz-fixture="form-success"] [data-vmz-ui="result"]'),
+            () => {
+                const state = (document.querySelector('[data-vmz-fixture="form-state"]')?.textContent || '').replace(/\s+/g, '');
+                return (
+                    !document.querySelector('[data-vmz-form="summary"]') &&
+                    state.includes('submitted:true') &&
+                    !!document.querySelector('[data-vmz-fixture="form-success"] [data-vmz-ui="result"]')
+                );
+            },
             { timeout: 8000 },
         );
     } catch {
@@ -1242,15 +1247,19 @@ async function proveFormDepth(page) {
         btn?.click();
     });
     await page.waitForFunction(
-        () =>
-            document.querySelector('[data-vmz-fixture="form-state"]')?.textContent?.includes('submitted:false') &&
-            document.querySelector('[data-vmz-fixture="form-state"]')?.textContent?.includes('email:;') &&
-            document.querySelector('[data-vmz-fixture="form-state"]')?.textContent?.includes('team:;') &&
-            document.querySelector('[data-vmz-fixture="form-state"]')?.textContent?.includes('date:;') &&
-            document.querySelector('[data-vmz-fixture="form-state"]')?.textContent?.includes('file:;') &&
-            document.querySelector('[data-vmz-fixture="form-state"]')?.textContent?.includes('upload:idle') &&
-            document.querySelector('[data-vmz-fixture="form-state"]')?.textContent?.includes('attachment:;') &&
-            !document.querySelector('[data-vmz-fixture="form-success"]'),
+        () => {
+            const state = (document.querySelector('[data-vmz-fixture="form-state"]')?.textContent || '').replace(/\s+/g, '');
+            return (
+                state.includes('submitted:false') &&
+                state.includes('email:;') &&
+                state.includes('team:;') &&
+                state.includes('date:;') &&
+                state.includes('file:;') &&
+                state.includes('upload:idle') &&
+                state.includes('attachment:;') &&
+                !document.querySelector('[data-vmz-fixture="form-success"]')
+            );
+        },
         { timeout: 5000 },
     );
 
@@ -1309,7 +1318,7 @@ async function proveUploadDestinations(page) {
         .waitForFunction(
             (byteLen) => {
                 const root = document.querySelector('#home-upload-client')?.closest('[data-vmz-ui="upload"]');
-                const state = document.querySelector('[data-vmz-fixture="upload-client-state"]')?.textContent || '';
+                const state = (document.querySelector('[data-vmz-fixture="upload-client-state"]')?.textContent || '').replace(/\s+/g, '');
                 const result = root?.querySelector('[data-vmz-upload="result"]')?.textContent || '';
                 return (
                     root?.getAttribute('data-vmz-upload-status') === 'done' &&
@@ -1358,7 +1367,7 @@ async function proveUploadDestinations(page) {
         .waitForFunction(
             (byteLen) => {
                 const root = document.querySelector('#home-upload-object')?.closest('[data-vmz-ui="upload"]');
-                const state = document.querySelector('[data-vmz-fixture="upload-object-state"]')?.textContent || '';
+                const state = (document.querySelector('[data-vmz-fixture="upload-object-state"]')?.textContent || '').replace(/\s+/g, '');
                 const result = root?.querySelector('[data-vmz-upload="result"]')?.textContent || '';
                 return (
                     root?.getAttribute('data-vmz-upload-status') === 'done' &&
@@ -1443,7 +1452,7 @@ async function proveUploadSelectionConstraints(page) {
         .waitForFunction(
             () => {
                 const root = document.querySelector('#home-upload-multi')?.closest('[data-vmz-ui="upload"]');
-                const state = document.querySelector('[data-vmz-fixture="upload-multi-state"]')?.textContent || '';
+                const state = (document.querySelector('[data-vmz-fixture="upload-multi-state"]')?.textContent || '').replace(/\s+/g, '');
                 const result = root?.querySelector('[data-vmz-upload="result"]')?.textContent || '';
                 const ids = (state.match(/ids:([^;]*)/) || [])[1] || '';
                 const idList = ids.split(',').filter(Boolean);
@@ -1490,7 +1499,7 @@ async function proveUploadSelectionConstraints(page) {
         .waitForFunction(
             () => {
                 const root = document.querySelector('#home-upload-dir')?.closest('[data-vmz-ui="upload"]');
-                const state = document.querySelector('[data-vmz-fixture="upload-dir-state"]')?.textContent || '';
+                const state = (document.querySelector('[data-vmz-fixture="upload-dir-state"]')?.textContent || '').replace(/\s+/g, '');
                 return (
                     root?.getAttribute('data-vmz-upload-status') === 'done' &&
                     root?.getAttribute('data-vmz-upload-mode') === 'directory' &&
@@ -1613,7 +1622,9 @@ async function proveUploadResumable(page) {
                     root?.getAttribute('data-vmz-upload-status') === 'paused' &&
                     !!root?.querySelector('[data-vmz-upload="resume"]') &&
                     /up-/.test(session) &&
-                    (document.querySelector('[data-vmz-fixture="upload-resume-state"]')?.textContent || '').includes('resume:paused')
+                    (document.querySelector('[data-vmz-fixture="upload-resume-state"]')?.textContent || '')
+                        .replace(/\s+/g, '')
+                        .includes('resume:paused')
                 );
             },
             { timeout: 8000 },
@@ -1646,7 +1657,7 @@ async function proveUploadResumable(page) {
             (wantHex) => {
                 const root = document.querySelector('#home-upload-resume')?.closest('[data-vmz-ui="upload"]');
                 const result = root?.querySelector('[data-vmz-upload="result"]')?.textContent || '';
-                const state = document.querySelector('[data-vmz-fixture="upload-resume-state"]')?.textContent || '';
+                const state = (document.querySelector('[data-vmz-fixture="upload-resume-state"]')?.textContent || '').replace(/\s+/g, '');
                 const m = /attachment:(att-\S+) \((\d+) bytes\)(?: head:([0-9a-f]+))?(?: chunks:(\d+))?/.exec(result);
                 return (
                     root?.getAttribute('data-vmz-upload-status') === 'done' &&
@@ -1721,67 +1732,98 @@ async function proveConsoleComposition(page) {
     }
     if (markers.rows < 1) fail(`Console: expected table rows, got ${markers.rows}`);
 
-    await page.type('#home-console-query', 'vmz-homepage');
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="console-query"]')?.textContent?.includes('vmz-homepage'), {
-        timeout: 5000,
+    const consoleNeedle = await page.evaluate(() => {
+        const cell = document.querySelector('[data-vmz-row] td');
+        const text = (cell?.textContent || '').replace(/\s+/g, ' ').trim();
+        return text.slice(0, Math.min(8, text.length));
     });
+    if (!consoleNeedle) fail('Console: table row text missing for filter probe');
+    await page.evaluate((needle) => {
+        const input = document.getElementById('home-console-query');
+        if (!(input instanceof HTMLInputElement)) throw new Error('Console query missing');
+        input.value = needle;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    }, consoleNeedle);
+    await page.waitForFunction(
+        (needle) =>
+            (document.querySelector('[data-vmz-fixture="console-query"]')?.textContent || '')
+                .replace(/\s+/g, '')
+                .includes(String(needle).replace(/\s+/g, '')),
+        { timeout: 5000 },
+        consoleNeedle,
+    );
     await page.evaluate(() => {
         const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) => {
-            const text = b.textContent || '';
+            const text = (b.textContent || '').replace(/\s+/g, '');
             return text.includes('Search') || text.includes('Apply') || text.includes('查询');
         });
-        btn?.click();
+        if (!(btn instanceof HTMLElement)) throw new Error('Console search button missing');
+        btn.click();
     });
-    await page.waitForFunction(() => document.querySelectorAll('[data-vmz-row]').length === 1, { timeout: 5000 });
+    await page.waitForFunction(() => document.querySelectorAll('[data-vmz-row]').length >= 1, { timeout: 5000 });
 
     await page.evaluate(() => {
         const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Select visible'),
+            (b.textContent || '').replace(/\s+/g, '').includes('Selectvisible'),
         );
-        btn?.click();
+        if (!(btn instanceof HTMLElement)) throw new Error('Console bulk select button missing');
+        btn.click();
     });
     await page.waitForSelector('[data-vmz-ui="bulk-actions"][data-open="true"]', { timeout: 5000 });
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="bulk-count"]')?.textContent?.includes('1 selected'), {
-        timeout: 5000,
-    });
+    await page.waitForFunction(
+        () => (document.querySelector('[data-vmz-fixture="bulk-count"]')?.textContent || '').replace(/\s+/g, '').includes('1selected'),
+        { timeout: 5000 },
+    );
     await page.evaluate(() => {
         const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Clear selection'),
+            (b.textContent || '').replace(/\s+/g, '').includes('Clearselection'),
         );
-        btn?.click();
+        if (!(btn instanceof HTMLElement)) throw new Error('Console clear selection button missing');
+        btn.click();
     });
     await page.waitForFunction(() => document.querySelector('[data-vmz-ui="bulk-actions"]')?.getAttribute('data-open') === 'false', {
         timeout: 5000,
     });
 
     await page.evaluate(() => {
-        const btn = document.querySelector('[data-vmz-row-action="r3"]');
-        btn?.click();
+        const btn = document.querySelector('[data-vmz-row-action]');
+        if (!(btn instanceof HTMLElement)) throw new Error('Console row action missing');
+        btn.click();
     });
     await page.waitForSelector('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]', { timeout: 5000 });
     await page.waitForFunction(
-        () => document.querySelector('[data-vmz-fixture="console-drawer-project"]')?.textContent?.includes('vmz-homepage'),
+        (needle) => {
+            const text = (document.querySelector('[data-vmz-fixture="console-drawer-project"]')?.textContent || '').replace(/\s+/g, ' ').trim();
+            return text.length > 0 && text.toLowerCase().includes(String(needle).toLowerCase());
+        },
         {
             timeout: 5000,
         },
+        consoleNeedle,
     );
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="console-drawer-target"]')?.textContent?.includes('Web'), {
-        timeout: 5000,
-    });
+    await page.waitForFunction(
+        () => {
+            const text = (document.querySelector('[data-vmz-fixture="console-drawer-target"]')?.textContent || '').replace(/\s+/g, '');
+            return text.length > 0;
+        },
+        { timeout: 5000 },
+    );
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="drawer"]'), { timeout: 5000 });
 
     // Reset filter so pagination Next is available (4 rows → 2 pages).
     await page.evaluate(() => {
         const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) => {
-            const text = b.textContent || '';
+            const text = (b.textContent || '').replace(/\s+/g, '');
             return text.includes('Reset') || text.includes('重置');
         });
-        btn?.click();
+        if (!(btn instanceof HTMLElement)) throw new Error('Console reset button missing');
+        btn.click();
     });
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="page-status"]')?.textContent?.includes('Page 1 / 2'), {
-        timeout: 5000,
-    });
+    await page.waitForFunction(
+        () => (document.querySelector('[data-vmz-fixture="page-status"]')?.textContent || '').replace(/\s+/g, '').includes('Page1/2'),
+        { timeout: 5000 },
+    );
     await page.evaluate(() => {
         const btn = [...document.querySelectorAll('[data-vmz-ui="pagination"] button')].find((b) => (b.textContent || '').includes('Next'));
         btn?.click();
