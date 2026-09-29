@@ -2486,12 +2486,12 @@ async function proveDocumentProduct(page) {
     );
 
     // Copy action progressive enhancement.
-    await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-ui="code-block"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Copy'),
-        );
+    const copyButtonFound = await page.evaluate(() => {
+        const btn = document.querySelector('[data-vmz-ui="code-block"] button.vmz-ui-btn');
         btn?.click();
+        return !!btn;
     });
+    if (!copyButtonFound) fail('Product: CodeBlock copy button missing');
     await page.waitForFunction(
         () =>
             document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent?.includes('copied:yes') &&
