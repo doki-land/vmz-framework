@@ -2670,7 +2670,7 @@ async function proveUi6DensityRtlPreset(page) {
     if (markers.density !== 'comfortable' || markers.dir !== 'ltr') {
         fail(`UI6: default density/dir want comfortable/ltr, got ${markers.density}/${markers.dir}`);
     }
-    if (!markers.state.includes('theme:default')) fail(`UI6: default theme marker missing: ${markers.state}`);
+    if (!markers.state.replace(/\s+/g, '').includes('theme:default')) fail(`UI6: default theme marker missing: ${markers.state}`);
 
     const densVars = await page.evaluate(() => {
         const btn = [...document.querySelectorAll('[data-vmz-fixture="ui6"] button.vmz-ui-btn')].find((b) =>
@@ -2723,9 +2723,12 @@ async function proveUi6DensityRtlPreset(page) {
     await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui6"]')?.getAttribute('data-density') === 'dense', {
         timeout: 5000,
     });
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui6-state"]')?.textContent?.includes('density:dense'), {
-        timeout: 5000,
-    });
+    await page.waitForFunction(
+        () => (document.querySelector('[data-vmz-fixture="ui6-state"]')?.textContent || '').replace(/\s+/g, '').includes('density:dense'),
+        {
+            timeout: 5000,
+        },
+    );
     const densePad = await page.evaluate(() => {
         const btn = [...document.querySelectorAll('[data-vmz-fixture="ui6"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Probe control'),
@@ -2753,9 +2756,12 @@ async function proveUi6DensityRtlPreset(page) {
     await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui6"]')?.getAttribute('dir') === 'rtl', {
         timeout: 5000,
     });
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui6-state"]')?.textContent?.includes('dir:rtl'), {
-        timeout: 5000,
-    });
+    await page.waitForFunction(
+        () => (document.querySelector('[data-vmz-fixture="ui6-state"]')?.textContent || '').replace(/\s+/g, '').includes('dir:rtl'),
+        {
+            timeout: 5000,
+        },
+    );
     const rtlGeom = await page.evaluate(() => {
         const root = document.querySelector('[data-vmz-fixture="ui6"]');
         const brand = document.querySelector('[data-vmz-shell="header"] .vmz-ui-app-shell__brand');
@@ -2787,7 +2793,7 @@ async function proveUi6DensityRtlPreset(page) {
     await page.waitForFunction(
         () =>
             document.documentElement.getAttribute('data-theme') === 'high-contrast' &&
-            document.querySelector('[data-vmz-fixture="ui6-state"]')?.textContent?.includes('theme:high-contrast'),
+            (document.querySelector('[data-vmz-fixture="ui6-state"]')?.textContent || '').replace(/\s+/g, '').includes('theme:high-contrast'),
         { timeout: 5000 },
     );
     const afterInk = await page.evaluate(() => {
@@ -2848,7 +2854,8 @@ async function proveStructureComposition(page) {
         fail(`Structure: list/tree selection missing: ${JSON.stringify(markers)}`);
     }
     if (!markers.treeChild) fail('Structure: expanded Platform must show Runtime child');
-    if (!markers.state.includes('faq:billing') || !markers.state.includes('expanded:platform')) {
+    const structureState = markers.state.replace(/\s+/g, '');
+    if (!structureState.includes('faq:billing') || !structureState.includes('expanded:platform')) {
         fail(`Structure: state marker incomplete: ${markers.state}`);
     }
 
@@ -2858,14 +2865,14 @@ async function proveStructureComposition(page) {
         () =>
             !!document.querySelector('[data-vmz-accordion-panel="access"]') &&
             !document.querySelector('[data-vmz-accordion-panel="billing"]') &&
-            document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent?.includes('faq:access'),
+            (document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent || '').replace(/\s+/g, '').includes('faq:access'),
         { timeout: 5000 },
     );
     await page.click('[data-vmz-accordion-trigger="access"]');
     await page.waitForFunction(
         () =>
             !document.querySelector('[data-vmz-accordion-panel="access"]') &&
-            document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent?.includes('faq:none'),
+            (document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent || '').replace(/\s+/g, '').includes('faq:none'),
         { timeout: 5000 },
     );
 
@@ -2880,7 +2887,7 @@ async function proveStructureComposition(page) {
         () =>
             document.querySelector('[data-vmz-step="workspace"]')?.getAttribute('data-status') === 'current' &&
             document.querySelector('[data-vmz-step="account"]')?.getAttribute('data-status') === 'done' &&
-            document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent?.includes('step:workspace'),
+            (document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent || '').replace(/\s+/g, '').includes('step:workspace'),
         { timeout: 5000 },
     );
     await page.evaluate(() => {
@@ -2892,7 +2899,7 @@ async function proveStructureComposition(page) {
     await page.waitForFunction(
         () =>
             document.querySelector('[data-vmz-step="account"]')?.getAttribute('data-status') === 'current' &&
-            document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent?.includes('step:account'),
+            (document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent || '').replace(/\s+/g, '').includes('step:account'),
         { timeout: 5000 },
     );
 
@@ -2901,7 +2908,7 @@ async function proveStructureComposition(page) {
     await page.waitForFunction(
         () =>
             document.querySelector('[data-vmz-list-item="beta"]')?.getAttribute('aria-selected') === 'true' &&
-            document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent?.includes('list:beta'),
+            (document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent || '').replace(/\s+/g, '').includes('list:beta'),
         { timeout: 5000 },
     );
 
@@ -2911,7 +2918,9 @@ async function proveStructureComposition(page) {
         () =>
             !document.querySelector('[data-vmz-tree-item="runtime"]') &&
             document.querySelector('[data-vmz-tree-item="platform"]')?.getAttribute('aria-expanded') === 'false' &&
-            !document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent?.includes('expanded:platform'),
+            !(document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent || '')
+                .replace(/\s+/g, '')
+                .includes('expanded:platform'),
         { timeout: 5000 },
     );
     await page.click('[data-vmz-tree-twist="platform"]');
@@ -2922,8 +2931,10 @@ async function proveStructureComposition(page) {
     await page.waitForFunction(
         () =>
             document.querySelector('[data-vmz-tree-item="browser"]')?.getAttribute('aria-selected') === 'true' &&
-            document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent?.includes('tree:browser') &&
-            document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent?.includes('expanded:platform,runtime'),
+            (document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent || '').replace(/\s+/g, '').includes('tree:browser') &&
+            (document.querySelector('[data-vmz-fixture="structure-state"]')?.textContent || '')
+                .replace(/\s+/g, '')
+                .includes('expanded:platform,runtime'),
         { timeout: 5000 },
     );
 
@@ -2966,7 +2977,7 @@ async function proveChoiceDisclosure(page) {
     }
     if (markers.segmentPressed !== 'true') fail(`Choice: comfortable should start pressed, got ${markers.segmentPressed}`);
     if (!markers.tagSuccess || !markers.tagError) fail(`Choice: Tag status markers missing: ${JSON.stringify(markers)}`);
-    if (!markers.state.includes('segment:comfortable')) fail(`Choice: state marker incomplete: ${markers.state}`);
+    if (!markers.state.replace(/\s+/g, '').includes('segment:comfortable')) fail(`Choice: state marker incomplete: ${markers.state}`);
 
     // Segmented parent-owned value.
     await page.click('[data-vmz-segment="compact"]');
@@ -2974,7 +2985,7 @@ async function proveChoiceDisclosure(page) {
         () =>
             document.querySelector('[data-vmz-segment="compact"]')?.getAttribute('aria-pressed') === 'true' &&
             document.querySelector('[data-vmz-segment="comfortable"]')?.getAttribute('aria-pressed') === 'false' &&
-            document.querySelector('[data-vmz-fixture="choice-state"]')?.textContent?.includes('segment:compact'),
+            (document.querySelector('[data-vmz-fixture="choice-state"]')?.textContent || '').replace(/\s+/g, '').includes('segment:compact'),
         { timeout: 5000 },
     );
 
@@ -3103,9 +3114,9 @@ async function proveOverlayStacking(page) {
     }
     await page.waitForFunction(
         () =>
-            document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent?.includes('drawer:open') &&
-            document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent?.includes('dialog:open') &&
-            document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent?.includes('popover:open'),
+            (document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent || '').replace(/\s+/g, '').includes('drawer:open') &&
+            (document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent || '').replace(/\s+/g, '').includes('dialog:open') &&
+            (document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent || '').replace(/\s+/g, '').includes('popover:open'),
         { timeout: 5000 },
     );
 
@@ -3128,8 +3139,10 @@ async function proveOverlayStacking(page) {
                 !document.querySelector('[data-vmz-overlay="popover"]') &&
                 !!document.querySelector('[data-vmz-overlay="dialog"]') &&
                 !!document.querySelector('[data-vmz-overlay="drawer"]') &&
-                document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent?.includes('popover:closed') &&
-                document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent?.includes('dialog:open'),
+                (document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent || '')
+                    .replace(/\s+/g, '')
+                    .includes('popover:closed') &&
+                (document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent || '').replace(/\s+/g, '').includes('dialog:open'),
             { timeout: 8000 },
         );
     } catch {
@@ -3147,8 +3160,8 @@ async function proveOverlayStacking(page) {
         () =>
             !document.querySelector('[data-vmz-overlay="dialog"]') &&
             !!document.querySelector('[data-vmz-overlay="drawer"]') &&
-            document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent?.includes('dialog:closed') &&
-            document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent?.includes('drawer:open'),
+            (document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent || '').replace(/\s+/g, '').includes('dialog:closed') &&
+            (document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent || '').replace(/\s+/g, '').includes('drawer:open'),
         { timeout: 5000 },
     );
 
@@ -3156,7 +3169,7 @@ async function proveOverlayStacking(page) {
     await page.waitForFunction(
         () =>
             !document.querySelector('[data-vmz-overlay="drawer"]') &&
-            document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent?.includes('drawer:closed'),
+            (document.querySelector('[data-vmz-fixture="stacking-state"]')?.textContent || '').replace(/\s+/g, '').includes('drawer:closed'),
         { timeout: 5000 },
     );
 
@@ -3213,8 +3226,8 @@ async function proveDataTable(page) {
     await page.waitForFunction(
         () =>
             document.querySelector('[data-vmz-row="r2"]')?.getAttribute('data-selected') === 'true' &&
-            document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent?.includes('selected:r2') &&
-            document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent?.includes('count:1') &&
+            (document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent || '').replace(/\s+/g, '').includes('selected:r2') &&
+            (document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent || '').replace(/\s+/g, '').includes('count:1') &&
             !!document.querySelector('[data-vmz-ui="bulk-actions"][data-open="true"]'),
         { timeout: 5000 },
     );
@@ -3223,7 +3236,7 @@ async function proveDataTable(page) {
     await page.waitForFunction(
         () =>
             document.querySelectorAll('[data-vmz-ui="data-table"] [data-vmz-row][data-selected="true"]').length === 5 &&
-            document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent?.includes('count:5'),
+            (document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent || '').replace(/\s+/g, '').includes('count:5'),
         { timeout: 5000 },
     );
 
@@ -3242,21 +3255,28 @@ async function proveDataTable(page) {
     });
     await page.waitForFunction(
         () =>
-            document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent?.includes('selected:none') &&
+            (document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent || '').replace(/\s+/g, '').includes('selected:none') &&
             document.querySelector('[data-vmz-ui="bulk-actions"]')?.getAttribute('data-open') === 'false',
         { timeout: 15000 },
     );
 
     await page.click('[data-vmz-sort="status"]');
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent?.includes('sort:status:'), {
-        timeout: 5000,
-    });
+    await page.waitForFunction(
+        () => (document.querySelector('[data-vmz-fixture="datatable-state"]')?.textContent || '').replace(/\s+/g, '').includes('sort:status:'),
+        {
+            timeout: 5000,
+        },
+    );
 
     await page.click('[data-vmz-row-action="r1"]');
     await page.waitForSelector('[data-vmz-overlay="drawer"]', { timeout: 5000 });
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="datatable-drawer-body"]')?.textContent?.includes('detail:r1'), {
-        timeout: 5000,
-    });
+    await page.waitForFunction(
+        () =>
+            (document.querySelector('[data-vmz-fixture="datatable-drawer-body"]')?.textContent || '').replace(/\s+/g, '').includes('detail:r1'),
+        {
+            timeout: 5000,
+        },
+    );
 
     console.log('ui-automation: DataTable PASS');
     await proveDocumentsPanelDensity(page);
@@ -3402,7 +3422,9 @@ async function proveDocumentsPanelDensity(page) {
         await page.waitForFunction(
             () =>
                 document.querySelector('[data-vmz-fixture="inspector"]')?.getAttribute('data-density') === 'dense' &&
-                document.querySelector('[data-vmz-fixture="inspector-state"]')?.textContent?.includes('density:dense'),
+                (document.querySelector('[data-vmz-fixture="inspector-state"]')?.textContent || '')
+                    .replace(/\s+/g, '')
+                    .includes('density:dense'),
             { timeout: 5000 },
         );
         const afterPad = await page.evaluate(() => {
@@ -3424,7 +3446,7 @@ async function proveDocumentsPanelDensity(page) {
         await page.waitForFunction(
             () =>
                 document.querySelector('[data-vmz-fixture="inspector"]')?.getAttribute('dir') === 'rtl' &&
-                document.querySelector('[data-vmz-fixture="inspector-state"]')?.textContent?.includes('dir:rtl'),
+                (document.querySelector('[data-vmz-fixture="inspector-state"]')?.textContent || '').replace(/\s+/g, '').includes('dir:rtl'),
             { timeout: 5000 },
         );
         const rtlGeom = await page.evaluate(() => {
