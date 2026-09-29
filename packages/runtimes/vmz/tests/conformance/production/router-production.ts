@@ -526,7 +526,7 @@ async function proveSpaLayoutRetention(shopUrl: string): Promise<string> {
         });
         if (!bumped.ok) throw new Error(String((bumped as { reason?: string }).reason || 'bump failed'));
         if (bumped.ticks !== 1) throw new Error(`layout ticks want 1 after bump, got ${bumped.ticks}`);
-        await page.waitForFunction(() => document.body.innerText.includes('layout-ticks:1'), { timeout: 5000 });
+        await page.waitForFunction(() => document.body.innerText.replace(/\s+/g, '').includes('layout-ticks:1'), { timeout: 5000 });
 
         const bootBefore = await page.evaluate(() => (window as any).__vmzBootId);
         const offerLink = await page.$('a[data-vmz-route="ShopOfferPage"]');
@@ -560,7 +560,7 @@ async function proveSpaLayoutRetention(shopUrl: string): Promise<string> {
         if (after.ticks !== 1) {
             throw new Error(`shared Layout ticks must stay 1 across SPA page swap, got ${after.ticks}`);
         }
-        if (!after.text.includes('layout-ticks:1')) {
+        if (!after.text.replace(/\s+/g, '').includes('layout-ticks:1')) {
             throw new Error('DOM layout-ticks binding reset (layout remounted)');
         }
         if (after.text.includes('route-shop') && !after.text.includes('route-shop-offer')) {
