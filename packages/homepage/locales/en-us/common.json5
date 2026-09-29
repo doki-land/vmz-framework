@@ -21,7 +21,7 @@
   footerNote: 'VMZ · Full-stack application compiler',
   heroKicker: 'VMZ application compiler',
   heroTitleLead: 'Write with familiar templates.',
-  heroTitleEm: 'Let the compiler shape delivery.',
+  heroTitleEm: 'Let the compiler decide delivery.',
   heroLede: 'Express UI, state, and server boundaries in components. VMZ analyzes the program graph and emits artifacts for supported hosts.',
   heroFootnote: 'Current capabilities and limits are documented',
   viewProductUi: 'See how it works',
