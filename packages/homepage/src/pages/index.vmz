@@ -22,7 +22,7 @@
                             <a data-vmz-fixture="landing-primary-cta" :href="guideHref" class="v2-button v2-button--primary">
                                 {{ buildLabel }}
                             </a>
-                            <a data-vmz-fixture="landing-secondary-cta" href="/commercial" class="v2-button v2-button--text">
+                            <a data-vmz-fixture="landing-secondary-cta" href="#how-it-works" class="v2-button v2-button--text">
                                 {{ viewProductUiLabel }}
                             </a>
                         </div>
@@ -33,53 +33,22 @@
                         </p>
                     </div>
                     <div class="v2-hero__preview-wrap">
-                        <p class="v2-hero-preview__demo-label">
-                            {{ heroPreviewDemoLabelText }}
-                        </p>
-                        <div data-vmz-fixture="landing-hero-preview" :aria-label="heroPreviewAriaLabel" class="v2-hero-preview">
-                            <div class="v2-hero-preview__head">
-                                <div>
-                                    <strong>
-                                        {{ heroPreviewReleaseCenterLabel }}
-                                    </strong>
-                                    <span>
-                                        {{ heroPreviewSiteNameLabel }}
-                                        ·
-                                        {{ heroPreviewBranchMainLabel }}
-                                    </span>
-                                </div>
-                                <span class="v2-hero-preview__status">
-                                    {{ heroPreviewProductionReadyLabel }}
-                                </span>
+                        <p class="v2-hero-preview__demo-label">{{ heroPreviewDemoLabelText }}</p>
+                        <div class="landing-code-panel" data-vmz-fixture="landing-hero-preview">
+                            <div class="landing-code-panel__head">
+                                <span>Counter.vmz</span>
+                                <span>VMZ SFC</span>
                             </div>
-                            <p class="v2-hero-preview__summary">
-                                {{ heroPreviewSummaryLine }}
-                            </p>
-                            <div role="table" :aria-label="heroPreviewTableAriaLabel" class="v2-hero-preview__table">
-                                <div role="row" class="v2-hero-preview__row v2-hero-preview__row--head">
-                                    <span role="columnheader">
-                                        {{ heroPreviewColTargetLabel }}
-                                    </span>
-                                    <span role="columnheader">
-                                        {{ heroPreviewColResultLabel }}
-                                    </span>
-                                    <span role="columnheader">
-                                        {{ heroPreviewColStatusLabel }}
-                                    </span>
+                            <pre><code>{{ codeSample }}</code></pre>
+                            <div class="landing-code-panel__result">
+                                <div>
+                                    <small>{{ heroPreviewReleaseCenterLabel }}</small>
+                                    <strong>{{ sampleCount }}</strong>
                                 </div>
-                                <div v-for="target in heroPreviewTargets" :key="target.id" role="row" class="v2-hero-preview__row">
-                                    <span role="cell">
-                                        {{ target.name }}
-                                    </span>
-                                    <span role="cell">
-                                        {{ target.result }}
-                                    </span>
-                                    <span role="cell" :class='target.status === "running" ? "is-running" : ""'>
-                                        {{ target.statusLabel }}
-                                    </span>
-                                </div>
+                                <Button type="button" @click="() => (sampleCount += 1)">+1</Button>
                             </div>
                         </div>
+                        <p class="landing-code-panel__caption">{{ heroPreviewProductionReadyLabel }}</p>
                     </div>
                 </div>
             </section>
@@ -118,197 +87,39 @@
                     </p>
                 </article>
             </section>
-            <section id="showcase" aria-labelledby="showcase-title" class="v2-showcase">
-                <div class="v2-section-head">
-                    <p class="v2-index">
-                        {{ showcaseIndexLabel }}
-                    </p>
-                    <h2 id="showcase-title">
-                        {{ showcaseTitleLabel }}
-                    </h2>
-                    <p>
-                        {{ showcaseBodyLabel }}
-                    </p>
-                </div>
-                <div class="v2-product">
-                    <aside class="v2-product__side">
-                        <div class="v2-product__identity">
-                            <span class="v2-product__logo">
-                                V
-                            </span>
-                            <strong>
-                                {{ productCloudNameLabel }}
-                            </strong>
+            <section id="showcase" aria-labelledby="showcase-title" class="landing-case">
+                <div class="landing-case__inner">
+                    <div class="landing-case__copy">
+                        <p class="v2-index">{{ showcaseIndexLabel }}</p>
+                        <h2 id="showcase-title">{{ showcaseTitleLabel }}</h2>
+                        <p>{{ showcaseBodyLabel }}</p>
+                        <a href="/commercial" class="landing-case__link">{{ productCreateReleaseLabel }} <span aria-hidden="true">→</span></a>
+                    </div>
+                    <div class="landing-case__preview" aria-label="业务应用案例预览">
+                        <div class="landing-case__preview-head">
+                            <strong>{{ productCloudNameLabel }}</strong>
+                            <span>{{ productWorkspaceLabel }}</span>
                         </div>
-                        <nav :aria-label="productNavOverviewLabel">
-                            <a href="/console">
-                                {{ productNavOverviewLabel }}
-                            </a>
-                            <a href="#showcase">
-                                {{ productNavProjectsLabel }}
-                            </a>
-                            <a href="/commercial">
-                                {{ productNavMonitorLabel }}
-                            </a>
-                        </nav>
-                        <small>
-                            {{ productWorkspaceLabel }}
-                        </small>
-                    </aside>
-                    <div class="v2-product__work">
-                        <div class="v2-product__bar">
-                            <div>
-                                <span>
-                                    {{ showcasePathLabel }}
-                                </span>
-                                <strong>
-                                    {{ showcaseTabSourceLabel }}
-                                </strong>
-                            </div>
-                            <Link href="/console">
-                                {{ productCreateReleaseLabel }}
-                            </Link>
+                        <div class="landing-case__preview-body">
+                            <p>{{ showcaseTabSourceLabel }}</p>
+                            <div><span>01</span><strong>{{ productNavOverviewLabel }}</strong></div>
+                            <div><span>02</span><strong>{{ productNavProjectsLabel }}</strong></div>
+                            <div><span>03</span><strong>{{ productNavMonitorLabel }}</strong></div>
                         </div>
-                        <Tabs :label="showcaseTabsLabel" :selected="showcaseTab" panel-id="landing-showcase-panel" :items="showcaseTabs" :on-select="((id) => showcaseTab = id)">
-                            <div v-if='showcaseTab === "overview"' class="v2-dashboard">
-                                <p class="v2-showcase-summary-line">
-                                    {{ showcaseSummaryLine }}
-                                </p>
-                                <div :aria-label="showcaseSummaryAriaLabel" class="v2-showcase-summary">
-                                    <div>
-                                        <small>
-                                            {{ showcaseSummaryTotalLabel }}
-                                        </small>
-                                        <strong>
-                                            {{ showcaseSummaryTotal }}
-                                        </strong>
-                                    </div>
-                                    <div>
-                                        <small>
-                                            {{ showcaseSummaryRunningLabel }}
-                                        </small>
-                                        <strong>
-                                            {{ showcaseSummaryRunning }}
-                                        </strong>
-                                    </div>
-                                    <div>
-                                        <small>
-                                            {{ showcaseSummaryFailedLabel }}
-                                        </small>
-                                        <strong :class='showcaseSummaryFailed > 0 ? "is-failed" : ""'>
-                                            {{ showcaseSummaryFailed }}
-                                        </strong>
-                                    </div>
-                                </div>
-                                <div class="v2-table">
-                                    <Table :columns="surfaceColumns" :rows="surfaceRows" sort-key="surface" sort-dir="asc" :has-row-action="false" />
-                                </div>
-                            </div>
-                            <div v-if='showcaseTab === "source"' class="v2-source">
-                                <CodeBlock :code="codeSample" language="vmz" title="Counter.vmz" />
-                            </div>
-                            <div v-if='showcaseTab === "activity"' class="v2-empty">
-                                <Badge tone="success">
-                                    {{ showcaseEmptyBadgeLabel }}
-                                </Badge>
-                                <h3>
-                                    {{ showcaseEmptyTitleLabel }}
-                                </h3>
-                                <p>
-                                    {{ showcaseEmptyBodyLabel }}
-                                </p>
-                            </div>
-                        </Tabs>
                     </div>
                 </div>
             </section>
-            <section aria-labelledby="flow-title" class="v2-flow">
-                <div :aria-label="heroSignalAriaLabel" class="v2-signal">
-                    <div>
-                        <small>
-                            {{ heroSignalAuthorLabel }}
-                        </small>
-                        <strong>
-                            {{ heroSignalAuthorValueLabel }}
-                        </strong>
-                    </div>
-                    <i aria-hidden="true" />
-                    <div class="is-core">
-                        <small>
-                            {{ heroSignalUnderstandLabel }}
-                        </small>
-                        <strong>
-                            {{ heroSignalUnderstandValueLabel }}
-                        </strong>
-                    </div>
-                    <i aria-hidden="true" />
-                    <div>
-                        <small>
-                            {{ heroSignalDeliverLabel }}
-                        </small>
-                        <strong>
-                            {{ heroSignalDeliverValueLabel }}
-                        </strong>
-                    </div>
-                </div>
+            <section id="how-it-works" aria-labelledby="flow-title" class="landing-explain">
                 <div class="v2-section-head">
-                    <p class="v2-index">
-                        {{ flowIndexLabel }}
-                    </p>
-                    <h2 id="flow-title">
-                        {{ flowTitleLabel }}
-                    </h2>
+                    <p class="v2-index">{{ flowIndexLabel }}</p>
+                    <h2 id="flow-title">{{ flowTitleLabel }}</h2>
                 </div>
-                <ol>
-                    <li>
-                        <b>
-                            {{ flowStep1TitleLabel }}
-                        </b>
-                        <span>
-                            {{ flowStep1DescLabel }}
-                        </span>
-                    </li>
-                    <li>
-                        <b>
-                            {{ flowStep2TitleLabel }}
-                        </b>
-                        <span>
-                            {{ flowStep2DescLabel }}
-                        </span>
-                    </li>
-                    <li>
-                        <b>
-                            {{ flowStep3TitleLabel }}
-                        </b>
-                        <span>
-                            {{ flowStep3DescLabel }}
-                        </span>
-                    </li>
-                    <li>
-                        <b>
-                            {{ flowStep4TitleLabel }}
-                        </b>
-                        <span>
-                            {{ flowStep4DescLabel }}
-                        </span>
-                    </li>
-                    <li>
-                        <b>
-                            {{ flowStep5TitleLabel }}
-                        </b>
-                        <span>
-                            {{ flowStep5DescLabel }}
-                        </span>
-                    </li>
-                    <li>
-                        <b>
-                            {{ flowStep6TitleLabel }}
-                        </b>
-                        <span>
-                            {{ flowStep6DescLabel }}
-                        </span>
-                    </li>
-                </ol>
+                <div class="landing-explain__steps">
+                    <article><span>01</span><h3>{{ flowStep1TitleLabel }}</h3><p>{{ flowStep1DescLabel }}</p></article>
+                    <article><span>02</span><h3>{{ flowStep2TitleLabel }}</h3><p>{{ flowStep2DescLabel }}</p></article>
+                    <article><span>03</span><h3>{{ flowStep3TitleLabel }}</h3><p>{{ flowStep3DescLabel }}</p></article>
+                </div>
+                <a :href="guideHref" class="landing-explain__link">{{ gettingStartedGuideLabel }} <span aria-hidden="true">→</span></a>
             </section>
             <section aria-labelledby="statement-title" class="v2-statement">
                 <p class="v2-index">
@@ -345,14 +156,6 @@
                 <p data-vmz-fixture="landing-start-lede">
                     {{ startLedeLabel }}
                 </p>
-                <div class="v2-command">
-                    <code>
-                        pnpm create vmz-app my-app
-                    </code>
-                    <Button type="button" variant="secondary" @click="copyCommand">
-                        {{ copied ? copiedCommandLabel : copyCommandLabel }}
-                    </Button>
-                </div>
                 <div class="v2-actions">
                     <a data-vmz-fixture="landing-start-cta" :href="guideHref" class="v2-button v2-button--light">
                         {{ startLabel }}
@@ -465,6 +268,7 @@ const initialShowcaseOverview = demoShowcaseOverview();
 export default class IndexPage {
     showcaseTab = "source";
     copied = false;
+    sampleCount = 0;
     localeId = "zh-hans";
     heroKickerLabel = "";
     heroTitleLeadLabel = "";
@@ -559,8 +363,7 @@ export default class IndexPage {
     guideHref = "/d/zh-hans/guide/";
     _unwatchLocale = null;
     showcaseTabs = [];
-    codeSample =
-        '<template>\n  <Button @click="increment">\n    Count {{ count }}\n  </Button>\n</template>';
+    codeSample = "<template>\n  <Button @click=\"() => (count += 1)\">\n    Count {{ count }}\n  </Button>\n</template>\n\n<script client>\nexport default class Counter {\n  count = 0;\n}\n</scr" + "ipt>";
     surfaceColumns = [];
     surfaceRows = [];
 
