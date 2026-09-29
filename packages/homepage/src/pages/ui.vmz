@@ -1,6 +1,7 @@
 <template>
     <div data-vmz-fixture="ui-lab" class="ui-lab-page">
         <AppShell brand="VMZ" home-href="/" :nav-label="uiLabNavLabel" :nav="navItems">
+            <div class="vmz-slot-content">
             <Alert tone="info" role-name="status" :title="uiLabAlertTitleLabel" :description="uiLabAlertDescLabel" />
             <header class="ui-lab-page__head">
                 <h1>
@@ -59,7 +60,7 @@
                         <Button type="button" @click="(() => open = true)">
                             {{ uiLabOpenDialogLabel }}
                         </Button>
-                        <Dialog :open="open" :title="uiLabDialogTitleLabel" title-id="home-ui-dialog-title" :on-close="(() => open = false)">
+                        <Dialog v-if="open" :open="open" :title="uiLabDialogTitleLabel" title-id="home-ui-dialog-title" :on-close="(() => open = false)">
                             <p data-vmz-fixture="dialog-body">
                                 {{ uiLabDialogBodyLabel }}
                             </p>
@@ -71,7 +72,7 @@
                         <Button type="button" variant="secondary" @click="(() => drawerOpen = true)">
                             {{ uiLabOpenDrawerLabel }}
                         </Button>
-                        <Drawer :open="drawerOpen" :title="uiLabDrawerTitleLabel" title-id="home-ui-drawer-title" :on-close="(() => drawerOpen = false)">
+                        <Drawer v-if="drawerOpen" :open="drawerOpen" :title="uiLabDrawerTitleLabel" title-id="home-ui-drawer-title" :on-close="(() => drawerOpen = false)">
                             <p data-vmz-fixture="drawer-body">
                                 {{ uiLabDrawerBodyLabel }}
                             </p>
@@ -81,13 +82,14 @@
                         <Button type="button" variant="secondary" @click="(() => popoverOpen = true)">
                             {{ uiLabOpenPopoverLabel }}
                         </Button>
-                        <Popover :open="popoverOpen" :title="uiLabPopoverTitleLabel" title-id="home-ui-popover-title" :on-close="(() => popoverOpen = false)">
+                        <Popover v-if="popoverOpen" :open="popoverOpen" :title="uiLabPopoverTitleLabel" title-id="home-ui-popover-title" :on-close="(() => popoverOpen = false)">
                             <p data-vmz-fixture="popover-body">
                                 {{ uiLabPopoverBodyLabel }}
                             </p>
                         </Popover>
                     </div>
                 </Card>
+            </div>
             </div>
         </AppShell>
     </div>

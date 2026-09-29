@@ -34,6 +34,7 @@ body { background: #fff; color: var(--v2-ink); overflow-x: clip; }
 }
 .site > [data-vmz="SiteFooter"] { display: block; width: 100%; flex: 0 0 auto; }
 .site > div:has(> .site-header) { display: contents; }
+.vmz-slot-content { display: contents; }
 
 .site-header {
   position: sticky;

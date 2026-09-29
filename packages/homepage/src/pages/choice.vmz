@@ -1,6 +1,7 @@
 <template>
     <div data-vmz-fixture="choice">
         <AppShell brand="VMZ" home-href="/" nav-label="Choice" :nav="navItems">
+            <div class="vmz-slot-content">
             <Alert tone="info" role-name="status" title="Choice / disclosure" description="Segmented / Dropdown / Collapse / Tag — Chrome automation covers pick, open, expand." />
             <p data-vmz-fixture="choice-state">
                 segment:
@@ -31,6 +32,7 @@
                     </Tag>
                 </div>
             </Card>
+            </div>
         </AppShell>
     </div>
 </template>

@@ -1,6 +1,7 @@
 <template>
     <div data-vmz-fixture="ui6" :data-density="density" :dir="dir">
         <AppShell brand="VMZ" home-href="/" nav-label="UI6" :nav="navItems">
+            <div class="vmz-slot-content">
             <Alert tone="info" role-name="status" title="UI6 Density / RTL / Preset" description="comfortable → compact → dense; dir ltr/rtl; high-contrast theme overlay from /designs." />
             <p data-vmz-fixture="ui6-state">
                 density:
@@ -27,6 +28,7 @@
                     Probe control
                 </Button>
             </Card>
+            </div>
         </AppShell>
     </div>
 </template>

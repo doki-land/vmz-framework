@@ -1,6 +1,7 @@
 <template>
     <div data-vmz-fixture="structure">
         <AppShell brand="VMZ" home-href="/" nav-label="Structure" :nav="navItems">
+            <div class="vmz-slot-content">
             <Alert tone="info" role-name="status" title="Structure composition" description="Accordion / Steps / List / Tree — parent owns open, current, selection, and expand state." />
             <p data-vmz-fixture="structure-state">
                 faq:
@@ -34,6 +35,7 @@
             <Card title="Tree" description="Flat visible rows; parent expands/collapses.">
                 <Tree label="Repos" label-id="home-structure-tree-label" :selected="treeSelected" :items="treeItems" :on-select="onTreeSelect" :on-toggle="onTreeToggle" />
             </Card>
+            </div>
         </AppShell>
     </div>
 </template>

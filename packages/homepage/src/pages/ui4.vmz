@@ -1,6 +1,7 @@
 <template>
     <div data-vmz-fixture="ui4" :data-density="density">
         <AppShell brand="VMZ" home-href="/" nav-label="UI4" :nav="navItems">
+            <div class="vmz-slot-content">
             <p data-vmz-fixture="ui4-density">
                 density:
                 {{ density }}
@@ -25,6 +26,7 @@
                 {{ done ? "yes" : "no" }}
             </p>
             <Empty title="No extras" description="UI4 still includes Empty on the Commercial Surface." />
+            </div>
         </AppShell>
     </div>
 </template>

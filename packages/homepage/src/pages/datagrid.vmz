@@ -1,6 +1,7 @@
 <template>
     <div data-vmz-fixture="datagrid" data-density="compact" :data-grid-mode="viewMode">
         <ConsoleShell brand="VMZ" home-href="/" title="DataGrid" nav-label="Console" :nav="navItems">
+            <div class="vmz-slot-content">
             <Alert tone="info" role-name="status" title="DataGrid group + tree + edit + pivot" description="@vmz/ui-data-grid — virtualized + pinned + group/tree/edit + parent-owned pivot matrix (row×col→sum). Not a second spreadsheet runtime." />
             <p data-vmz-fixture="datagrid-state">
                 mode:
@@ -80,6 +81,7 @@
                 </Button>
             </BulkActions>
             <DataGrid :columns="columns" :rows="rows" :total-rows="totalRowsLabel" :visible-count="visibleCountLabel" pinned-cols="1" :sort-key="sortKey" :sort-dir="sortDir" :selected-count="selectedCountLabel" :all-selected="allSelected" select-all-label="Select all leaf rows in dataset" :group-by-attr="groupBy" :group-count="groupCountLabel" :tree-attr="treeAttr" :pivot-attr="pivotAttr" :pivot-cols-attr="pivotColsLabel" :editing-attr="editingKey" :row-layout-style="rowLayoutStyle" :canvas-style="canvasStyle" :pad-top-style="padTopStyle" :pad-bottom-style="padBottomStyle" :on-scroll="onScroll" :on-sort="sortBy" :on-toggle-row="toggleRow" :on-toggle-all="toggleAll" :on-toggle-group="toggleGroup" :on-toggle-tree="toggleTree" :on-start-edit="startEdit" :on-edit-input="onEditInput" :on-commit-edit="commitEdit" :on-cancel-edit="cancelEdit" />
+            </div>
         </ConsoleShell>
     </div>
 </template>

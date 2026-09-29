@@ -1,6 +1,7 @@
 <template>
     <div data-vmz-fixture="stacking">
         <AppShell brand="VMZ" home-href="/" nav-label="Stacking" :nav="navItems">
+            <div class="vmz-slot-content">
             <Alert tone="info" role-name="status" title="Overlay stacking" description="Drawer → Dialog → Popover with rising stackLevel; Escape closes topmost only. Parent owns the stack." />
             <p data-vmz-fixture="stacking-state">
                 drawer:
@@ -36,6 +37,7 @@
                     Top layer stack-level=2
                 </p>
             </Popover>
+            </div>
         </AppShell>
     </div>
 </template>

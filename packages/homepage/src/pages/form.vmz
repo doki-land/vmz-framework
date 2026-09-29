@@ -1,6 +1,7 @@
 <template>
     <div data-vmz-fixture="form">
         <AppShell brand="VMZ" home-href="/" nav-label="Form lab" :nav="navItems">
+            <div class="vmz-slot-content">
             <Alert tone="info" role-name="status" title="内部表单深度实验台" description="此页面用于 Form 与 Upload 符合性验证，不代表对外产品成品。公开展示请查看首页与 Commercial。" />
             <header class="vmz-form-lab__head">
                 <h1>
@@ -130,6 +131,7 @@
                     {{ resumeHead }}
                 </p>
             </Card>
+            </div>
         </AppShell>
     </div>
 </template>

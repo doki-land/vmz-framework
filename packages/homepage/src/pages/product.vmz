@@ -1,6 +1,7 @@
 <template>
     <div data-vmz-fixture="product" :data-density="density" :dir="dir">
         <AppShell brand="VMZ" home-href="/" :nav-label="productNavLabel" :nav="navItems">
+            <div class="vmz-slot-content">
             <div data-vmz-fixture="product-toolbar" class="vmz-product-toolbar">
                 <Badge tone="brand">
                     {{ versionLabel }}
@@ -98,6 +99,7 @@
                         </Link>
                     </p>
                 </Prose>
+            </div>
             </div>
         </AppShell>
     </div>

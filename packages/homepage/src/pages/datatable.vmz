@@ -1,6 +1,7 @@
 <template>
     <div data-vmz-fixture="datatable" data-density="compact">
         <ConsoleShell brand="VMZ" home-href="/" title="DataTable" nav-label="Console" :nav="navItems">
+            <div class="vmz-slot-content">
             <Alert tone="info" role-name="status" title="DataTable thin gate" description="Ordinary HTML table with parent-owned selection + sticky header. Large-grid package is separate." />
             <p data-vmz-fixture="datatable-state">
                 selected:
@@ -26,6 +27,7 @@
                     {{ detailId }}
                 </p>
             </Drawer>
+            </div>
         </ConsoleShell>
     </div>
 </template>

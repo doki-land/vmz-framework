@@ -1,6 +1,7 @@
 <template>
     <div data-vmz-fixture="ui5" data-density="compact">
         <ConsoleShell brand="VMZ" home-href="/" title="Console UI5" nav-label="Console" :nav="navItems">
+            <div class="vmz-slot-content">
             <Breadcrumb label="Console path" :items="crumbs" />
             <QueryForm label="Dense query" @submit="applyQuery">
                 <Field label="Name" control-id="home-ui5-name" description-id="home-ui5-name-desc" error-id="home-ui5-name-err" described-by="home-ui5-name-desc" :value="nameQuery" @input="((e) => nameQuery = e.target.value)" />
@@ -44,6 +45,7 @@
                     {{ detailId }}
                 </p>
             </Drawer>
+            </div>
         </ConsoleShell>
     </div>
 </template>
