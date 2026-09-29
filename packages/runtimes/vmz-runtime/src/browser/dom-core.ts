@@ -806,6 +806,10 @@ export function applyDomAttr(el, name, value) {
         return;
     }
     if (BOOLEAN_HTML_ATTRS.has(String(key).toLowerCase())) {
+        const on = value === true || value === '';
+        if (key === 'checked' && el && el.tagName === 'INPUT' && String(el.type || '').toLowerCase() === 'checkbox') {
+            if (el.checked !== on) el.checked = on;
+        }
         if (value === false || value == null || value === '') {
             el.removeAttribute(key);
         } else {

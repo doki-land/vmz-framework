@@ -55,10 +55,10 @@
                                 {{ installBody }}
                             </p>
                             <div v-if="isV1">
-                                <CodeBlock caption="shell" code="pnpm add @vmz/ui" :copy-label="copyLabel" :on-copy="copyInstall" />
+                                <CodeBlock caption="shell" :code="installCode" :copy-label="copyLabel" :on-copy="copyInstall" />
                             </div>
                             <div v-if="isV0">
-                                <CodeBlock caption="shell" code="pnpm add @vmz/ui" :copy-label="copyLabel" :on-copy="copyInstall" />
+                                <CodeBlock caption="shell" :code="installCode" :copy-label="copyLabel" :on-copy="copyInstall" />
                             </div>
                             <p v-if="copiedYes" data-vmz-fixture="product-copied" role="status">
                                 {{ copiedStatus }}
@@ -324,7 +324,7 @@ export default class ProductPage {
             this.version = "v0";
             this.isV1 = false;
             this.isV0 = true;
-            this.installCode = "pnpm add @vmz/ui";
+            this.installCode = "pnpm add @vmz/ui@0.0.0";
         } else {
             this.version = "v1";
             this.isV1 = true;

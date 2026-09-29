@@ -48,6 +48,21 @@ function fail(msg) {
     process.exit(1);
 }
 
+function foldFixtureText(text) {
+    return String(text ?? '').replace(/\s+/g, '');
+}
+
+/** Wait until a fixture node's folded text includes `needle` (template fold may insert newlines). */
+async function waitForFixtureTextIncludes(page, selector, needle, timeout = 5000) {
+    const folded = foldFixtureText(needle);
+    await page.waitForFunction(
+        (sel, n) => (document.querySelector(sel)?.textContent || '').replace(/\s+/g, '').includes(n),
+        { timeout },
+        selector,
+        folded,
+    );
+}
+
 /** True when build output has a product unknown-token diagnostic (not rustc quoting the const). */
 function productUnknownTokenDiag(out) {
     const text = String(out || '');
@@ -547,6 +562,22 @@ async function proveUi2InPage(page) {
     if (!checkboxMeta.hasInput || !checkboxMeta.hasLabel || checkboxMeta.type !== 'checkbox') {
         fail(`Checkbox: label/control missing: ${JSON.stringify(checkboxMeta)}`);
     }
+    await page.evaluate(() => {
+        const input = document.getElementById('home-ui-agree');
+        window.__vmzCheckboxEvents = [];
+        for (const type of ['click', 'change']) {
+            input?.addEventListener(type, (ev) => {
+                window.__vmzCheckboxEvents.push({ type, checked: ev.target.checked, defaultPrevented: ev.defaultPrevented });
+            });
+        }
+    });
+    await page.$eval('#home-ui-agree', (input) => input.scrollIntoView({ block: 'center', inline: 'center' }));
+    const checkboxHit = await page.$eval('#home-ui-agree', (input) => {
+        const rect = input.getBoundingClientRect();
+        const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        return { hitsInput: hit === input, hitTag: hit?.tagName ?? null, hitClass: hit?.className ?? null };
+    });
+    if (!checkboxHit.hitsInput) fail(`Checkbox: control is obscured before click: ${JSON.stringify(checkboxHit)}`);
     await page.click('#home-ui-agree');
     try {
         await page.waitForFunction(
@@ -557,8 +588,16 @@ async function proveUi2InPage(page) {
         const snap = await page.evaluate(() => ({
             text: document.querySelector('[data-vmz-fixture="checkbox-value"]')?.textContent || null,
             checked: document.getElementById('home-ui-agree')?.checked ?? null,
+            events: window.__vmzCheckboxEvents,
+            childChecked: document.getElementById('home-ui-agree')?.closest('[data-vmz="Checkbox"]')?.__vmzInst?.checked ?? null,
+            listenerCount:
+                document.getElementById('home-ui-agree')?.closest('[data-vmz="Checkbox"]')?.__vmzInst?.__vmzComponentListeners?.change
+                    ?.length ?? 0,
         }));
         fail(`Checkbox: live checked did not update parent: ${JSON.stringify(snap)}`);
+    }
+    if (!(await page.$eval('#home-ui-agree', (input) => input.checked))) {
+        fail('Checkbox: native checked state diverged from parent after change');
     }
 
     // Switch: role=switch + keyboard/click toggle.
@@ -1763,9 +1802,10 @@ async function proveConsoleComposition(page) {
     await page.waitForFunction(() => document.querySelectorAll('[data-vmz-row]').length >= 1, { timeout: 5000 });
 
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').replace(/\s+/g, '').includes('Selectvisible'),
-        );
+        const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) => {
+            const text = (b.textContent || '').replace(/\s+/g, '');
+            return text.includes('Selectthispage') || text.includes('Selectvisible') || text.includes('选择当前页');
+        });
         if (!(btn instanceof HTMLElement)) throw new Error('Console bulk select button missing');
         btn.click();
     });
@@ -1877,17 +1917,25 @@ async function proveMotionContinuity(page) {
 
     // SSR resume adopt: first paint dialog must skip enter replay.
     await page.waitForSelector('[data-vmz-fixture="motion-resume"] [data-vmz-overlay="dialog"]', { timeout: 10000 });
+    await page.waitForFunction(
+        () =>
+            (document.querySelector('[data-vmz-fixture="motion-resume-state"]')?.textContent || '')
+                .replace(/\s+/g, '')
+                .includes('ssr-dialog:open'),
+        { timeout: 5000 },
+    );
     const resumeAdopt = await page.evaluate(() => {
         const overlay = document.querySelector('[data-vmz-fixture="motion-resume"] [data-vmz-overlay="dialog"]');
         const panel = overlay?.querySelector('[data-vmz-focus="enter"]');
         if (!overlay || !panel) return { ok: false, reason: 'missing ssr dialog' };
         const cs = getComputedStyle(panel);
+        const state = (document.querySelector('[data-vmz-fixture="motion-resume-state"]')?.textContent || '').replace(/\s+/g, '');
         return {
             ok: true,
             adopt: overlay.getAttribute('data-vmz-motion-adopt') === 'true',
             motion: panel.getAttribute('data-vmz-motion') || '',
             animation: cs.animationName || 'none',
-            state: document.querySelector('[data-vmz-fixture="motion-resume-state"]')?.textContent || '',
+            state,
         };
     });
     if (!resumeAdopt.ok) fail(`Motion resume: ${resumeAdopt.reason}`);
@@ -1911,7 +1959,9 @@ async function proveMotionContinuity(page) {
     await page.waitForFunction(
         () =>
             !document.querySelector('[data-vmz-fixture="motion-resume"] [data-vmz-overlay="dialog"]') &&
-            document.querySelector('[data-vmz-fixture="motion-resume-state"]')?.textContent?.includes('ssr-dialog:closed'),
+            (document.querySelector('[data-vmz-fixture="motion-resume-state"]')?.textContent || '')
+                .replace(/\s+/g, '')
+                .includes('ssr-dialog:closed'),
         { timeout: 5000 },
     );
 
@@ -1948,9 +1998,10 @@ async function proveMotionContinuity(page) {
         );
         btn?.click();
     });
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="motion-clicks"]')?.textContent?.includes('clicks:1'), {
-        timeout: 2000,
-    });
+    await page.waitForFunction(
+        () => (document.querySelector('[data-vmz-fixture="motion-clicks"]')?.textContent || '').replace(/\s+/g, '').includes('clicks:1'),
+        { timeout: 2000 },
+    );
     const feedbackMs = Date.now() - t0;
     if (feedbackMs > 1000) fail(`Motion: immediate feedback too slow (${feedbackMs}ms)`);
 
@@ -2099,7 +2150,7 @@ async function proveMotionContinuity(page) {
     if (!(Number(interruptAfterCancel.gen) > Number(interruptGenBefore))) {
         fail(`Motion interrupt: generation must bump on cancel (${interruptGenBefore} -> ${interruptAfterCancel.gen})`);
     }
-    if (!interruptAfterCancel.state.includes('interrupt-dialog:open')) {
+    if (!interruptAfterCancel.state.replace(/\s+/g, '').includes('interrupt-dialog:open')) {
         fail(`Motion interrupt: parent open must remain true after cancel: ${interruptAfterCancel.state}`);
     }
 
@@ -2110,14 +2161,17 @@ async function proveMotionContinuity(page) {
         const state = document.querySelector('[data-vmz-fixture="motion-interrupt-state"]')?.textContent || '';
         return { open: !!overlay, state };
     });
-    if (!stillOpen.open || !stillOpen.state.includes('interrupt-dialog:open')) {
+    if (!stillOpen.open || !stillOpen.state.replace(/\s+/g, '').includes('interrupt-dialog:open')) {
         fail(`Motion interrupt: stale exit must not onClose after cancel: ${JSON.stringify(stillOpen)}`);
     }
 
     // Complete close after interrupt.
     await page.keyboard.press('Escape');
     await page.waitForFunction(
-        () => document.querySelector('[data-vmz-fixture="motion-interrupt-state"]')?.textContent?.includes('interrupt-dialog:closed'),
+        () =>
+            (document.querySelector('[data-vmz-fixture="motion-interrupt-state"]')?.textContent || '')
+                .replace(/\s+/g, '')
+                .includes('interrupt-dialog:closed'),
         { timeout: 5000 },
     );
 
@@ -2132,7 +2186,7 @@ async function proveMotionContinuity(page) {
         () =>
             document.querySelectorAll('[data-vmz-row]').length === 1 &&
             !!document.querySelector('[data-vmz-row="r1"]') &&
-            document.querySelector('[data-vmz-fixture="motion-row-count"]')?.textContent?.includes('rows:1'),
+            (document.querySelector('[data-vmz-fixture="motion-row-count"]')?.textContent || '').replace(/\s+/g, '').includes('rows:1'),
         { timeout: 5000 },
     );
 
@@ -2233,9 +2287,7 @@ async function proveUi4Surface(page) {
     await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui4"]')?.getAttribute('data-density') === 'compact', {
         timeout: 5000,
     });
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui4-density"]')?.textContent?.includes('density:compact'), {
-        timeout: 5000,
-    });
+    await waitForFixtureTextIncludes(page, '[data-vmz-fixture="ui4-density"]', 'density:compact');
     const afterPad = await page.evaluate(() => {
         const btn = [...document.querySelectorAll('[data-vmz-fixture="ui4"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Toggle density'),
@@ -2252,9 +2304,7 @@ async function proveUi4Surface(page) {
         );
         btn?.click();
     });
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui4-done"]')?.textContent?.includes('done:yes'), {
-        timeout: 5000,
-    });
+    await waitForFixtureTextIncludes(page, '[data-vmz-fixture="ui4-done"]', 'done:yes');
 
     console.log('ui-automation: UI4 surface PASS');
     await proveUi5Console(page);
@@ -2303,9 +2353,7 @@ async function proveUi5Console(page) {
     if (!markers.exportDisabled) fail('UI5: Export must start permission-disabled');
 
     await page.type('#home-ui5-name', 'Beta');
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui5-query"]')?.textContent?.includes('name:Beta'), {
-        timeout: 5000,
-    });
+    await waitForFixtureTextIncludes(page, '[data-vmz-fixture="ui5-query"]', 'name:Beta');
     await page.evaluate(() => {
         const btn = [...document.querySelectorAll('[data-vmz-fixture="ui5"] button.vmz-ui-btn')].find((b) =>
             (b.textContent || '').includes('Search'),
@@ -2324,9 +2372,7 @@ async function proveUi5Console(page) {
         const btn = document.querySelector('[data-vmz-sort="status"]');
         btn?.click();
     });
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui5-sort"]')?.textContent?.includes('sort:status:'), {
-        timeout: 5000,
-    });
+    await waitForFixtureTextIncludes(page, '[data-vmz-fixture="ui5-sort"]', 'sort:status:');
 
     // Permission: row action disabled until write toggled.
     const blocked = await page.evaluate(() => {
@@ -2341,17 +2387,13 @@ async function proveUi5Console(page) {
         );
         btn?.click();
     });
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui5-perm"]')?.textContent?.includes('write:allowed'), {
-        timeout: 5000,
-    });
+    await waitForFixtureTextIncludes(page, '[data-vmz-fixture="ui5-perm"]', 'write:allowed');
     await page.evaluate(() => {
         const btn = document.querySelector('[data-vmz-row-action="r2"]');
         btn?.click();
     });
     await page.waitForSelector('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]', { timeout: 5000 });
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui5-drawer-body"]')?.textContent?.includes('detail:r2'), {
-        timeout: 5000,
-    });
+    await waitForFixtureTextIncludes(page, '[data-vmz-fixture="ui5-drawer-body"]', 'detail:r2');
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="drawer"]'), { timeout: 5000 });
 
@@ -2413,39 +2455,29 @@ async function proveDocumentProduct(page) {
         fail(`Document/Product: CodeBlock must SSR readable install snippet, got ${markers.codeText}`);
     }
 
-    // Locale switch keeps composition readable.
+    // Version switch updates CodeBlock source (before locale toggle localizes toolbar labels).
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Locale:'),
-        );
-        btn?.click();
+        const buttons = document.querySelectorAll('[data-vmz-fixture="product-toolbar"] button.vmz-ui-btn');
+        buttons[0]?.click();
     });
-    await page.waitForFunction(
-        () =>
-            document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent?.includes('locale:zh') &&
-            document.getElementById('overview')?.textContent?.includes('产品'),
-        { timeout: 5000 },
-    );
+    await waitForFixtureTextIncludes(page, '[data-vmz-fixture="product-meta"]', 'version:v0');
+    await waitForFixtureTextIncludes(page, '[data-vmz-ui="code-block"] code', '@0.0.0');
 
-    // Version switch updates CodeBlock source.
+    // Locale switch keeps composition readable (page may SSR in en-US or zh-Hans).
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Switch version'),
-        );
-        btn?.click();
+        const meta = (document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent || '').replace(/\s+/g, '');
+        if (meta.includes('locale:zh')) return;
+        const buttons = document.querySelectorAll('[data-vmz-fixture="product-toolbar"] button.vmz-ui-btn');
+        buttons[1]?.click();
     });
-    await page.waitForFunction(
-        () =>
-            document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent?.includes('version:v0') &&
-            (document.querySelector('[data-vmz-ui="code-block"] code')?.textContent || '').includes('@0.0.0'),
-        { timeout: 5000 },
-    );
+    await waitForFixtureTextIncludes(page, '[data-vmz-fixture="product-meta"]', 'locale:zh');
+    await waitForFixtureTextIncludes(page, '#overview', '官方UI');
 
     // Search filters Toc outline; body stays readable (zero-JS contract).
     await page.type('#home-product-search', 'install');
+    await waitForFixtureTextIncludes(page, '[data-vmz-fixture="product-meta"]', 'search:install');
     await page.waitForFunction(
         () =>
-            document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent?.includes('search:install') &&
             !!document.getElementById('install') &&
             !!document.getElementById('overview') &&
             !!document.querySelector('[data-vmz-toc="install"]') &&

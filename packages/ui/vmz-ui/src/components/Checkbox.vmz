@@ -1,6 +1,6 @@
 <template>
     <label data-vmz-ui="checkbox" :for="controlId" class="vmz-ui-checkbox">
-        <input :id="controlId" type="checkbox" :checked="checked" :disabled="disabled" :aria-describedby="describedBy" @click="onToggle" class="vmz-ui-checkbox__input" />
+        <input :id="controlId" type="checkbox" :checked="checked" :disabled="disabled" :aria-describedby="describedBy" @change="onToggle" class="vmz-ui-checkbox__input" />
         <span class="vmz-ui-checkbox__label">
             {{ label }}
         </span>
@@ -39,7 +39,7 @@
 /**
  * VMZ UI — Checkbox (UI2).
  * Label association via wrapping label + for/id; parent owns checked (no parallel form store).
- * Toggle goes through onChange so live `checked` prop stays authoritative.
+ * Native change reports the committed checked state to the parent.
  */
 export default class Checkbox {
     public label: string = "";
@@ -47,15 +47,9 @@ export default class Checkbox {
     public disabled: boolean = false;
     public controlId: string = "vmz-checkbox";
     public describedBy: string = "";
-    public onChange: ((checked: boolean) => void) | null = null;
     onToggle(ev) {
         if (this.disabled) return;
-        if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
-        const next = !this.checked;
-        this.emit("change", next);
-        if (typeof this.onChange === "function") {
-            this.onChange(next);
-        }
+        this.emit("change", !!ev?.target?.checked);
     }
 }
 </script>
