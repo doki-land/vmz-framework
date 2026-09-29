@@ -1,6 +1,7 @@
 <template>
     <div data-vmz-fixture="console" class="vmz-console-page">
         <ConsoleShell brand="VMZ" home-href="/" active-nav-id="console" :title="consoleTitleLabel" :subtitle="consoleSubtitleLabel" :breadcrumb-label="consoleBreadcrumbLabel" :primary-action-label="consolePrimaryActionLabel" primary-action-href="/commercial" :nav-label="consoleNavLabel" :nav="navItems">
+            <div class="vmz-console-content">
             <section :aria-label="consoleSummaryAriaLabel" class="vmz-console-summary">
                 <div class="vmz-console-summary__panel">
                     <div class="vmz-console-summary__item">
@@ -29,7 +30,10 @@
                     </div>
                 </div>
             </section>
-            <section :aria-label="consoleDataPanelAriaLabel" class="vmz-console-data-panel">
+            <p class="vmz-console-demo-note">{{ demoNote }}</p>
+            <p v-if="loading" role="status" class="vmz-console-state">{{ loadingLabel }}</p>
+            <p v-if="loadError" role="alert" class="vmz-console-state">{{ loadErrorLabel }}</p>
+            <section v-if="!loading && !loadError" :aria-label="consoleDataPanelAriaLabel" class="vmz-console-data-panel">
                 <FilterBar :label="consoleFilterLabel">
                     <Field :label="consoleFieldNameLabel" control-id="home-console-query" description-id="home-console-query-desc" error-id="home-console-query-err" described-by="home-console-query-desc" :value="query" @input="((e) => query = e.target.value)" />
                     <Field :label="consoleFieldStatusLabel" control-id="home-console-status" description-id="home-console-status-desc" error-id="home-console-status-err" described-by="home-console-status-desc" :value="statusQuery" @input="((e) => statusQuery = e.target.value)" />
@@ -55,7 +59,7 @@
                 <Table :columns="columns" :rows="rows" :has-row-action="rowAction" :action-title="consoleActionTitleLabel" :action-label="consoleActionLabel" :on-row-action="openDetail" />
                 <Pagination :label="consolePaginationLabel" :status="pageStatus" :prev-disabled="prevDisabled" :next-disabled="nextDisabled" :on-prev="goPrev" :on-next="goNext" />
             </section>
-            <Drawer :open="drawerOpen" :title="consoleDrawerTitleLabel" title-id="home-console-drawer-title" :on-close="(() => drawerOpen = false)">
+            <Drawer v-if="drawerOpen" :open="drawerOpen" :title="consoleDrawerTitleLabel" title-id="home-console-drawer-title" :on-close="(() => drawerOpen = false)">
                 <dl data-vmz-fixture="console-drawer-body" class="vmz-console-detail">
                     <div>
                         <dt>
@@ -107,11 +111,12 @@
                     </div>
                 </dl>
             </Drawer>
+            </div>
         </ConsoleShell>
     </div>
 </template>
 <style>
-.vmz-console-page .vmz-ui-console-shell__main {
+.vmz-console-content {
     display: grid;
     gap: 1rem;
     align-content: start;
@@ -221,6 +226,8 @@
         grid-template-columns: 1fr;
     }
 }
+.vmz-console-demo-note { margin: 0; color: #646a73; font-size: .82rem; }
+.vmz-console-state { margin: 0; padding: 2rem; border: 1px solid #e5e6eb; border-radius: 8px; background: #fff; color: #51565d; }
 </style>
 <script client>
 import {
@@ -263,14 +270,18 @@ import {
     commercialNavHome,
 } from "#locales/common";
 import ConsolePageServer from "#server/pages/console";
-import { demoConsoleRows, demoReleaseSummary } from "../demo/releases.ts";
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
-const initialConsoleSummary = demoReleaseSummary();
-const initialConsoleRows = demoConsoleRows();
+const initialConsoleSummary = { total: 0, running: 0, failed: 0 };
+const initialConsoleRows = [];
 
 export default class ConsolePage {
     summaryTotal = initialConsoleSummary.total;
+    loading = true;
+    loadError = false;
+    demoNote = "";
+    loadingLabel = "";
+    loadErrorLabel = "";
     summaryRunning = initialConsoleSummary.running;
     summaryFailed = initialConsoleSummary.failed;
     query = "";
@@ -338,9 +349,8 @@ export default class ConsolePage {
 
     async loadDemoData() {
         try {
-            const server = new ConsolePageServer();
-            const rows = await server.getConsoleRows();
-            const summary = await server.getSummary();
+            const rows = await ConsolePageServer.getConsoleRows(readLocaleId());
+            const summary = await ConsolePageServer.getSummary();
             if (Array.isArray(rows) && rows.length) {
                 this.allRows = rows;
             }
@@ -349,9 +359,12 @@ export default class ConsolePage {
                 this.summaryRunning = Number(summary.running) || this.summaryRunning;
                 this.summaryFailed = Number(summary.failed) || this.summaryFailed;
             }
+            this.loading = false;
             this.refreshPage();
-        } catch {
-            /* SSR defaults remain the server fixture mirror */
+        } catch (error) {
+            console.error('Failed to load request demo', error);
+            this.loading = false;
+            this.loadError = true;
         }
     }
 
@@ -361,6 +374,10 @@ export default class ConsolePage {
     }
 
     refreshCopy() {
+        const english = readLocaleId() === "en-us";
+        this.demoNote = english ? "Interactive workspace · Server provided sample records. No customer data is changed." : "演示工作台 · 数据来自服务端示例，不会修改真实客户记录。";
+        this.loadingLabel = english ? "Loading requests…" : "正在加载请求…";
+        this.loadErrorLabel = english ? "Requests are temporarily unavailable. Refresh to try again." : "请求暂时无法加载，请刷新页面重试。";
         this.consoleNavLabel = consoleNavLabel();
         this.consoleTitleLabel = consoleTitle();
         this.consoleSubtitleLabel = consoleSubtitle();
@@ -409,6 +426,7 @@ export default class ConsolePage {
 
     applyLocaleCopy(preferred) {
         withLocaleHint(readLocaleId(preferred), () => this.refreshCopy());
+        if (preferred && !this.loading) this.loadDemoData();
     }
 
     formatPageStatus(page, pageCount) {
@@ -489,15 +507,14 @@ export default class ConsolePage {
     async openDetail(id) {
         this.drawerOpen = true;
         try {
-            const server = new ConsolePageServer();
-            const detail = await server.getReleaseDetail(id);
+            const detail = await ConsolePageServer.getTicketDetail(id, readLocaleId());
             if (detail && typeof detail === "object") {
-                this.detailProject = String(detail.project || "");
-                this.detailTarget = String(detail.target || "");
+                this.detailProject = String(detail.subject || "");
+                this.detailTarget = String(detail.priorityLabel || "");
                 this.detailStatus = String(detail.statusLabel || "");
-                this.detailActor = String(detail.actor || "");
-                this.detailUpdated = String(detail.updatedAt || "");
-                this.detailBranch = String(detail.branch || "");
+                this.detailActor = String(detail.owner || "");
+                this.detailUpdated = String(detail.updated || "");
+                this.detailBranch = String(detail.context || "");
                 return;
             }
         } catch {
@@ -515,19 +532,25 @@ export default class ConsolePage {
 }
 </script>
 <script server>
-import ReleaseDemo from "#server/demo/ReleaseDemo";
+import TicketDemo from "#server/demo/TicketDemo";
 
 export default class ConsolePageServer {
-    getConsoleRows() {
-        return new ReleaseDemo().getConsoleRows();
+    getConsoleRows(locale) {
+        return new TicketDemo().list(locale).map((ticket) => ({
+            id: ticket.id,
+            cells: [ticket.subject, locale === 'en-us' ? ticket.priority : ticket.priority === 'high' ? '高' : ticket.priority === 'medium' ? '中' : '低', locale === 'en-us' ? ticket.status : ticket.status === 'open' ? '待处理' : ticket.status === 'in-progress' ? '处理中' : '已完成', ticket.owner, ticket.updated],
+        }));
     }
 
     getSummary() {
-        return new ReleaseDemo().getSummary();
+        const rows = new TicketDemo().list();
+        return { total: rows.length, running: rows.filter((row) => row.status === 'in-progress').length, failed: rows.filter((row) => row.status === 'open').length };
     }
 
-    getReleaseDetail(id) {
-        return new ReleaseDemo().getReleaseDetail(id);
+    getTicketDetail(id, locale) {
+        const ticket = new TicketDemo().list(locale).find((item) => item.id === id);
+        if (!ticket) return null;
+        return { ...ticket, priorityLabel: locale === 'en-us' ? ticket.priority : ticket.priority === 'high' ? '高' : ticket.priority === 'medium' ? '中' : '低', statusLabel: locale === 'en-us' ? ticket.status : ticket.status === 'open' ? '待处理' : ticket.status === 'in-progress' ? '处理中' : '已完成' };
     }
 }
 </script>

@@ -1,6 +1,7 @@
 <template>
     <div data-vmz-fixture="commercial">
         <AppShell brand="VMZ" home-href="/" :nav-label="commercialNavLabel" :nav="navItems">
+            <div class="vmz-commercial-content">
             <section data-vmz-fixture="commercial-hero" aria-labelledby="commercial-hero-title" class="vmz-commercial-hero">
                 <h1 id="commercial-hero-title" class="vmz-commercial-hero__title">
                     {{ commercialHeroTitleLabel }}
@@ -17,6 +18,7 @@
                     </Link>
                 </div>
             </section>
+            <p class="vmz-commercial-demo-note">{{ demoNote }}</p>
             <section data-vmz-fixture="commercial-task-browse" aria-labelledby="commercial-task-browse-title" class="vmz-commercial-task">
                 <div class="vmz-commercial-task__copy">
                     <h2 id="commercial-task-browse-title">
@@ -36,7 +38,8 @@
                             {{ commercialBrowseResetLabel }}
                         </Button>
                     </FilterBar>
-                    <Table :columns="browseColumns" :rows="browseRows" :has-row-action="false" />
+                    <p v-if="browseLoading" role="status" class="vmz-commercial-loading">{{ loadingLabel }}</p>
+                    <Table v-if="!browseLoading" :columns="browseColumns" :rows="browseRows" :has-row-action="false" />
                 </div>
             </section>
             <section data-vmz-fixture="commercial-task-detail" aria-labelledby="commercial-task-detail-title" class="vmz-commercial-task">
@@ -57,7 +60,7 @@
                             {{ commercialDetailOpenLabel }}
                         </Button>
                     </div>
-                    <Drawer :open="drawerOpen" :title="commercialDrawerTitleLabel" title-id="home-commercial-drawer-title" :on-close="(() => drawerOpen = false)">
+                    <Drawer v-if="drawerOpen" :open="drawerOpen" :title="commercialDrawerTitleLabel" title-id="home-commercial-drawer-title" :on-close="(() => drawerOpen = false)">
                         <dl data-vmz-fixture="commercial-drawer-body" class="vmz-commercial-detail">
                             <div>
                                 <dt>
@@ -132,6 +135,7 @@
                     </div>
                 </div>
             </section>
+            </div>
         </AppShell>
     </div>
 </template>
@@ -143,6 +147,7 @@
     gap: 0.75rem;
     padding: 1.5rem 0 0.25rem;
 }
+.vmz-commercial-content { width: 100%; min-width: 0; }
 
 .vmz-commercial-hero__title {
     margin: 0;
@@ -268,6 +273,8 @@
         gap: 1.25rem;
     }
 }
+.vmz-commercial-demo-note { margin: 1.5rem 0 0; color: #646a73; font-size: .82rem; }
+.vmz-commercial-loading { margin: 0; padding: 1.5rem; color: #646a73; }
 </style>
 <script client>
 import {
@@ -314,10 +321,9 @@ import {
     consoleColUpdated,
 } from "#locales/common";
 import CommercialPageServer from "#server/pages/commercial";
-import { demoConsoleRows } from "../demo/releases.ts";
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
-const initialBrowseRows = demoConsoleRows();
+const initialBrowseRows = [];
 
 export default class CommercialPage {
     browseQuery = "";
@@ -373,6 +379,9 @@ export default class CommercialPage {
         cells: row.cells.map((cell) => String(cell)),
     }));
     browseRows = [];
+    browseLoading = true;
+    demoNote = "";
+    loadingLabel = "";
     navItems = [];
     _unwatchLocale = null;
 
@@ -390,18 +399,22 @@ export default class CommercialPage {
 
     async loadDemoData() {
         try {
-            const server = new CommercialPageServer();
-            const rows = await server.getConsoleRows();
+            const rows = await CommercialPageServer.getConsoleRows(readLocaleId());
             if (Array.isArray(rows) && rows.length) {
                 this.allBrowseRows = rows;
                 this.refreshBrowseRows();
             }
         } catch {
-            /* SSR defaults mirror the server fixture */
+            /* The case still links to the full workspace. */
+        } finally {
+            this.browseLoading = false;
         }
     }
 
     refreshCopy() {
+        const english = readLocaleId() === "en-us";
+        this.demoNote = english ? "Interactive example · Server provided sample requests. Notes stay on this page." : "交互演示 · 使用服务端示例记录，处理备注只保留在当前页面。";
+        this.loadingLabel = english ? "Loading sample requests…" : "正在加载演示请求…";
         this.commercialNavLabel = commercialNavLabel();
         this.commercialHeroTitleLabel = commercialHeroTitle();
         this.commercialHeroLeadLabel = commercialHeroLead();
@@ -452,6 +465,7 @@ export default class CommercialPage {
     applyLocaleCopy(preferred) {
         this.localeId = readLocaleId(preferred);
         withLocaleHint(this.localeId, () => this.refreshCopy());
+        if (preferred && !this.browseLoading) this.loadDemoData();
     }
 
     refreshBrowseRows() {
@@ -478,19 +492,18 @@ export default class CommercialPage {
     async openFeaturedDetail() {
         this.drawerOpen = true;
         try {
-            const server = new CommercialPageServer();
-            const detail = await server.getReleaseDetail("r1");
+            const detail = await CommercialPageServer.getTicketDetail("REQ-1048", readLocaleId());
             if (detail && typeof detail === "object") {
-                this.detailProject = String(detail.project || "");
-                this.detailTarget = String(detail.target || "");
+                this.detailProject = String(detail.subject || "");
+                this.detailTarget = String(detail.priorityLabel || "");
                 this.detailStatus = String(detail.statusLabel || "");
-                this.detailActor = String(detail.actor || "");
+                this.detailActor = String(detail.owner || "");
                 return;
             }
         } catch {
             /* fall back below */
         }
-        const row = this.allBrowseRows.find((entry) => entry.id === "r1") || this.allBrowseRows[0];
+        const row = this.allBrowseRows.find((entry) => entry.id === "REQ-1048") || this.allBrowseRows[0];
         if (!row) return;
         this.detailProject = String(row.cells[0] || "");
         this.detailTarget = String(row.cells[1] || "");
@@ -540,15 +553,20 @@ export default class CommercialPage {
 }
 </script>
 <script server>
-import ReleaseDemo from "#server/demo/ReleaseDemo";
+import TicketDemo from "#server/demo/TicketDemo";
 
 export default class CommercialPageServer {
-    getConsoleRows() {
-        return new ReleaseDemo().getConsoleRows();
+    getConsoleRows(locale) {
+        return new TicketDemo().list(locale).map((ticket) => ({
+            id: ticket.id,
+            cells: [ticket.subject, locale === 'en-us' ? ticket.priority : ticket.priority === 'high' ? '高' : ticket.priority === 'medium' ? '中' : '低', locale === 'en-us' ? ticket.status : ticket.status === 'open' ? '待处理' : ticket.status === 'in-progress' ? '处理中' : '已完成', ticket.owner, ticket.updated],
+        }));
     }
 
-    getReleaseDetail(id) {
-        return new ReleaseDemo().getReleaseDetail(id);
+    getTicketDetail(id, locale) {
+        const ticket = new TicketDemo().list(locale).find((item) => item.id === id);
+        if (!ticket) return null;
+        return { ...ticket, priorityLabel: locale === 'en-us' ? ticket.priority : ticket.priority === 'high' ? '高' : ticket.priority === 'medium' ? '中' : '低', statusLabel: locale === 'en-us' ? ticket.status : ticket.status === 'open' ? '待处理' : ticket.status === 'in-progress' ? '处理中' : '已完成' };
     }
 }
 </script>
