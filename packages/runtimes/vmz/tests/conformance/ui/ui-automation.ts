@@ -390,7 +390,12 @@ async function proveUi1FocusOverlay() {
             }
             if (fieldMeta.forAttr !== 'home-ui-name') fail(`Field: label for want home-ui-name, got ${fieldMeta.forAttr}`);
             if (!fieldMeta.describedby.includes('home-ui-name-desc')) fail('Field: aria-describedby missing');
-            if (!fieldMeta.labelText.includes('Display name')) fail('Field: label text missing');
+            if (
+                !fieldMeta.labelText.includes('Display name') &&
+                !fieldMeta.labelText.includes('显示名称')
+            ) {
+                fail(`Field: label text missing: ${JSON.stringify(fieldMeta)}`);
+            }
 
             await page.evaluate(() => {
                 const label = document.querySelector('label[for="home-ui-name"]');

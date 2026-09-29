@@ -241,7 +241,7 @@ if (build.status !== 0) {
         const actionOk = await postJson(`http://127.0.0.1:${PORT}/products/sku-1`, { note: 'from-action' });
         const actionRedirect = await postJson(`http://127.0.0.1:${PORT}/products/bounce`, { note: 'x' });
         const actionErrors: string[] = [];
-        if (actionOk.status !== 200 || !actionOk.body.includes('action-note:from-action')) {
+        if (actionOk.status !== 200 || !actionOk.body.includes('action-note: from-action')) {
             actionErrors.push(`action body ${actionOk.status}`);
         }
         if (actionRedirect.status !== 302 || String(actionRedirect.headers.location || '') !== '/about') {

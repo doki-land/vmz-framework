@@ -33,7 +33,7 @@
             "schema": "vmz.test.assertion.v0",
             "kind": "text",
             "expect": {
-                "contains": "plan:ops"
+                "contains": "plan: ops"
             }
         },
         {

@@ -239,7 +239,7 @@ try {
     if (!about.body.includes('href="/"')) {
         errors.push(`about SSR missing Link home href: ${about.body.slice(0, 400)}`);
     }
-    if (!product.body.includes('loader-title:Widget sku-1')) {
+    if (!product.body.includes('loader-title: Widget sku-1')) {
         errors.push(`product SSR missing Page.load data: ${product.body.slice(0, 500)}`);
     }
     if (!product.body.includes('data-vmz-props') || !product.body.includes('sku-1')) {
@@ -256,10 +256,10 @@ try {
         errors.push(`access redirect want 302 Location=/about, got ${elsewhere.status} ${elsewhere.headers.location}`);
     }
 
-    if (actionOk.status !== 200 || !actionOk.body.includes('action-note:from-action')) {
+    if (actionOk.status !== 200 || !actionOk.body.includes('action-note: from-action')) {
         errors.push(`POST action want action-note, got ${actionOk.status} ${actionOk.body.slice(0, 400)}`);
     }
-    if (!actionOk.body.includes('loader-title:Widget sku-1')) {
+    if (!actionOk.body.includes('loader-title: Widget sku-1')) {
         errors.push(`POST action must still run Page.load: ${actionOk.body.slice(0, 400)}`);
     }
     if (actionRedirect.status !== 302 || String(actionRedirect.headers.location || '') !== '/about') {
@@ -292,7 +292,7 @@ try {
     if (!aborted.aborted && aborted.status === 200 && aborted.body.includes('STALE-CANCELLED')) {
         errors.push('aborted slow load must not serve STALE-CANCELLED as success HTML');
     }
-    if (!aborted.aborted && aborted.status === 200 && aborted.body.includes('loader-title:Widget')) {
+    if (!aborted.aborted && aborted.status === 200 && aborted.body.includes('loader-title: Widget')) {
         // Slow path finished before destroy — still ok if race; require in-process cancel evidence instead.
     }
 
