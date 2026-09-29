@@ -55,6 +55,7 @@
                     </FilterBar>
                     <p v-if="browseLoading" role="status" class="vmz-commercial-loading">{{ loadingLabel }}</p>
                     <p v-if="browseError" role="alert" class="vmz-commercial-loading">{{ loadErrorLabel }}</p>
+                    <p v-if="!browseLoading && !browseError" class="vmz-commercial-scroll-hint">{{ scrollHint }}</p>
                     <Table v-if="!browseLoading && !browseError" :columns="browseColumns" :rows="browseRows" :has-row-action="false" />
                 </div>
             </section>
@@ -314,6 +315,11 @@
 }
 .vmz-commercial-demo-note { margin: .25rem 0 0; color: #646a73; font-size: .82rem; }
 .vmz-commercial-loading { margin: 0; padding: 1.5rem; color: #646a73; }
+.vmz-commercial-scroll-hint { display: none; margin: 0; padding: .65rem 1rem 0; color: #646a73; font-size: .75rem; }
+@media (max-width: 720px) {
+    .vmz-commercial-scroll-hint { display: block; }
+    .vmz-commercial-panel .vmz-ui-table { min-width: 42rem; }
+}
 </style>
 <script client>
 import {
@@ -423,6 +429,7 @@ export default class CommercialPage {
     demoNote = "";
     loadingLabel = "";
     loadErrorLabel = "";
+    scrollHint = "";
     previewAriaLabel = "";
     featuredId = "";
     featuredSubjectLabel = "";
@@ -472,6 +479,7 @@ export default class CommercialPage {
         this.demoNote = english ? "Interactive example · Server provided sample requests. Notes stay on this page." : "交互演示 · 使用服务端示例记录，处理备注只保留在当前页面。";
         this.loadingLabel = english ? "Loading sample requests…" : "正在加载演示请求…";
         this.loadErrorLabel = english ? "Sample requests are unavailable. Refresh to try again." : "示例请求暂时无法加载，请刷新页面重试。";
+        this.scrollHint = english ? "Swipe the table to see all columns." : "左右滑动表格，查看完整字段。";
         this.previewAriaLabel = english ? "Sample request" : "示例请求";
         this.commercialNavLabel = commercialNavLabel();
         this.commercialHeroTitleLabel = commercialHeroTitle();

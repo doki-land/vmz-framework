@@ -56,6 +56,7 @@
                         {{ consoleClearSelectionLabel }}
                     </Button>
                 </BulkActions>
+                <p class="vmz-console-scroll-hint">{{ scrollHint }}</p>
                 <Table :columns="columns" :rows="rows" :has-row-action="rowAction" :action-title="consoleActionTitleLabel" :action-label="consoleActionLabel" :on-row-action="openDetail" />
                 <Pagination :label="consolePaginationLabel" :status="pageStatus" :prev-disabled="prevDisabled" :next-disabled="nextDisabled" :on-prev="goPrev" :on-next="goNext" />
             </section>
@@ -230,6 +231,11 @@
 .vmz-console-note { display: grid; justify-items: start; gap: .75rem; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #e5e6eb; }
 .vmz-console-note .vmz-ui-textarea { width: 100%; }
 .vmz-console-note__saved { margin: 0; color: #16773f; font-size: .875rem; }
+.vmz-console-scroll-hint { display: none; margin: 0; padding: .65rem 1rem 0; color: #646a73; font-size: .75rem; }
+@media (max-width: 720px) {
+    .vmz-console-scroll-hint { display: block; }
+    .vmz-console-data-panel .vmz-ui-table { min-width: 44rem; }
+}
 
 @media (max-width: 720px) {
     .vmz-console-summary__panel {
@@ -292,6 +298,7 @@ export default class ConsolePage {
     demoNote = "";
     loadingLabel = "";
     loadErrorLabel = "";
+    scrollHint = "";
     noteLabel = "";
     noteDescription = "";
     noteSaveLabel = "";
@@ -397,6 +404,7 @@ export default class ConsolePage {
         this.demoNote = english ? "Interactive workspace · Server provided sample records. No customer data is changed." : "演示工作台 · 数据来自服务端示例，不会修改真实客户记录。";
         this.loadingLabel = english ? "Loading requests…" : "正在加载请求…";
         this.loadErrorLabel = english ? "Requests are temporarily unavailable. Refresh to try again." : "请求暂时无法加载，请刷新页面重试。";
+        this.scrollHint = english ? "Swipe the table to see all columns and actions." : "左右滑动表格，查看完整字段与操作。";
         this.noteLabel = english ? "Handling note" : "处理备注";
         this.noteDescription = english ? "Saved only in this browser session. No customer is notified." : "仅保留在当前浏览器会话，不会通知客户。";
         this.noteSaveLabel = english ? "Save note" : "保存备注";
