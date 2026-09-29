@@ -2422,6 +2422,15 @@ async function proveUi5Console(page) {
 async function proveDocumentProduct(page) {
     console.log('ui-automation: Document/Product Prose/Toc/Callout/CodeBlock composition…');
 
+    async function clickToolbarButton(index) {
+        const found = await page.evaluate((buttonIndex) => {
+            const button = document.querySelectorAll('[data-vmz-fixture="product-toolbar"] button.vmz-ui-btn')[buttonIndex];
+            button?.click();
+            return !!button;
+        }, index);
+        if (!found) fail(`Document/Product: toolbar button ${index} missing`);
+    }
+
     for (const name of ['Prose', 'Toc', 'Callout', 'CodeBlock']) {
         const src = path.join(uiRoot, 'src', 'components', `${name}.vmz`);
         if (!fs.existsSync(src)) fail(`Document/Product missing ${name}.vmz`);
@@ -2456,20 +2465,16 @@ async function proveDocumentProduct(page) {
     }
 
     // Version switch updates CodeBlock source (before locale toggle localizes toolbar labels).
-    await page.evaluate(() => {
-        const buttons = document.querySelectorAll('[data-vmz-fixture="product-toolbar"] button.vmz-ui-btn');
-        buttons[0]?.click();
-    });
+    await clickToolbarButton(0);
     await waitForFixtureTextIncludes(page, '[data-vmz-fixture="product-meta"]', 'version:v0');
     await waitForFixtureTextIncludes(page, '[data-vmz-ui="code-block"] code', '@0.0.0');
 
     // Locale switch keeps composition readable (page may SSR in en-US or zh-Hans).
-    await page.evaluate(() => {
+    const alreadyChinese = await page.evaluate(() => {
         const meta = (document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent || '').replace(/\s+/g, '');
-        if (meta.includes('locale:zh')) return;
-        const buttons = document.querySelectorAll('[data-vmz-fixture="product-toolbar"] button.vmz-ui-btn');
-        buttons[1]?.click();
+        return meta.includes('locale:zh');
     });
+    if (!alreadyChinese) await clickToolbarButton(1);
     await waitForFixtureTextIncludes(page, '[data-vmz-fixture="product-meta"]', 'locale:zh');
     await waitForFixtureTextIncludes(page, '#overview', '官方UI');
 
@@ -2505,20 +2510,15 @@ async function proveDocumentProduct(page) {
 
     const productDensity = await page.evaluate(() => {
         const root = document.querySelector('[data-vmz-fixture="product"]');
-        const cycle = [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Cycle density'),
-        );
-        const sample = [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Switch version'),
-        );
+        const buttons = document.querySelectorAll('[data-vmz-fixture="product-toolbar"] button.vmz-ui-btn');
+        const cycle = buttons[2];
+        const sample = buttons[0];
         const el = sample || cycle;
         if (!root || !el || !cycle) {
             return {
                 ok: false,
                 density: root?.getAttribute('data-density') || '',
-                buttons: [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].map((b) =>
-                    (b.textContent || '').trim(),
-                ),
+                buttons: [...buttons].map((b) => (b.textContent || '').trim()),
             };
         }
         const cs = getComputedStyle(el);
@@ -2540,7 +2540,8 @@ async function proveDocumentProduct(page) {
     if (!productDensity.controlY || !productDensity.compactY || !productDensity.denseY) {
         fail(`Document density: CSS vars missing: ${JSON.stringify(productDensity)}`);
     }
-    if (!productDensity.meta.includes('density:comfortable') || !productDensity.meta.includes('dir:ltr')) {
+    const productMeta = productDensity.meta.replace(/\s+/g, '');
+    if (!productMeta.includes('density:comfortable') || !productMeta.includes('dir:ltr')) {
         fail(`Document density: product-meta missing density/dir: ${productDensity.meta}`);
     }
     const productPadComfortable = productDensity.paddingTop;
@@ -2552,12 +2553,7 @@ async function proveDocumentProduct(page) {
     });
     if (!productLtrGeom) fail('Document density: AppShell geometry missing (ltr)');
 
-    await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Cycle density'),
-        );
-        btn?.click();
-    });
+    await clickToolbarButton(2);
     try {
         await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="product"]')?.getAttribute('data-density') === 'compact', {
             timeout: 5000,
@@ -2566,44 +2562,30 @@ async function proveDocumentProduct(page) {
         const snap = await page.evaluate(() => ({
             density: document.querySelector('[data-vmz-fixture="product"]')?.getAttribute('data-density') || '',
             meta: document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent || '',
-            hasCycle: [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].some((b) =>
-                (b.textContent || '').includes('Cycle density'),
-            ),
+            hasCycle: !!document.querySelectorAll('[data-vmz-fixture="product-toolbar"] button.vmz-ui-btn')[2],
         }));
         fail(`Document density: cycle to compact failed: ${JSON.stringify(snap)}`);
     }
-    await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Cycle density'),
-        );
-        btn?.click();
-    });
+    await clickToolbarButton(2);
     await page.waitForFunction(
         () =>
             document.querySelector('[data-vmz-fixture="product"]')?.getAttribute('data-density') === 'dense' &&
-            document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent?.includes('density:dense'),
+            (document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent || '').replace(/\s+/g, '').includes('density:dense'),
         { timeout: 5000 },
     );
     const productPadDense = await page.evaluate(() => {
-        const sample = [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Switch version'),
-        );
+        const sample = document.querySelectorAll('[data-vmz-fixture="product-toolbar"] button.vmz-ui-btn')[0];
         return sample ? getComputedStyle(sample).paddingTop : '';
     });
     if (!productPadDense || productPadDense === productPadComfortable) {
         fail(`Document density: dense must change Button padding (${productPadComfortable} -> ${productPadDense})`);
     }
 
-    await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="product"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Toggle RTL'),
-        );
-        btn?.click();
-    });
+    await clickToolbarButton(3);
     await page.waitForFunction(
         () =>
             document.querySelector('[data-vmz-fixture="product"]')?.getAttribute('dir') === 'rtl' &&
-            document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent?.includes('dir:rtl'),
+            (document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent || '').replace(/\s+/g, '').includes('dir:rtl'),
         { timeout: 5000 },
     );
     const productRtlGeom = await page.evaluate(() => {
