@@ -92,9 +92,7 @@ function textmateSpec(): string {
 async function loadTextmateHighlighter(themes: string[]): Promise<CodeHighlighter | null> {
     const spec = textmateSpec();
     try {
-        const mod = (spec === DEFAULT_TEXTMATE
-            ? await import('vmz-textmate/shiki')
-            : await import(/* webpackIgnore: true */ spec)) as {
+        const mod = (spec === DEFAULT_TEXTMATE ? await import('vmz-textmate/shiki') : await import(/* webpackIgnore: true */ spec)) as {
             createVmzHighlighter?: (opts: { themes?: string[]; langs?: unknown[] }) => Promise<CodeHighlighter>;
             createHighlighter?: (opts: { themes?: string[]; langs?: unknown[] }) => Promise<CodeHighlighter>;
             default?: { createVmzHighlighter?: (opts: { themes?: string[] }) => Promise<CodeHighlighter> };

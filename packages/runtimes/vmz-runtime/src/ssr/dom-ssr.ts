@@ -535,7 +535,9 @@ function makeVirtualEl(tag) {
     // on the SSR virtual element so the serializer receives the same payload.
     Object.defineProperty(node, 'innerHTML', {
         configurable: true,
-        get() { return this.__rawHtml ?? ''; },
+        get() {
+            return this.__rawHtml ?? '';
+        },
         set(value) {
             this.__rawHtml = value == null ? '' : String(value);
             this.children = [];

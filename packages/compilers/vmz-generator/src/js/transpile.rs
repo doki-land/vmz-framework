@@ -71,6 +71,9 @@ mod tests {
         let source = "import { highlightSync } from 'highlighter';\nimport type { Theme } from 'types';\nexport default class Example { theme: Theme | null = null; }";
         let js = transpile_ts(source, "Example.client.ts").expect("transpile");
         assert!(js.contains("highlightSync"), "value import lost: {js}");
-        assert!(!js.contains("from 'types'") && !js.contains("from \"types\""), "type import leaked: {js}");
+        assert!(
+            !js.contains("from 'types'") && !js.contains("from \"types\""),
+            "type import leaked: {js}"
+        );
     }
 }

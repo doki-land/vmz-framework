@@ -12,7 +12,10 @@ class RawHtml {
     static __vmzDirect = true;
     static __vmzState = ['html'];
     html = '<strong>Rendered</strong>';
-    static __vmzCreate(this: RawHtml, api: { el: (tag: string) => { innerHTML: string }; attr: (el: unknown, name: string, value: string) => void }) {
+    static __vmzCreate(
+        this: RawHtml,
+        api: { el: (tag: string) => { innerHTML: string }; attr: (el: unknown, name: string, value: string) => void },
+    ) {
         const el = api.el('div');
         el.innerHTML = this.html;
         api.attr(el, 'class', 'raw-html');
