@@ -513,12 +513,13 @@ function virtualRemove(node) {
 }
 
 function makeVirtualEl(tag) {
-    return {
+    const node = {
         __kind: 'el',
         tag: tag || 'div',
         attrs: {},
         children: [],
         style: {},
+        __rawHtml: null,
         parentNode: null,
         setAttribute(name, value) {
             applySerializeAttr(this, name, value);
@@ -530,6 +531,17 @@ function makeVirtualEl(tag) {
             virtualInsertBefore(this, node, ref);
         },
     };
+    // Direct emit writes `el.innerHTML` for v-html. Mirror that DOM property
+    // on the SSR virtual element so the serializer receives the same payload.
+    Object.defineProperty(node, 'innerHTML', {
+        configurable: true,
+        get() { return this.__rawHtml ?? ''; },
+        set(value) {
+            this.__rawHtml = value == null ? '' : String(value);
+            this.children = [];
+        },
+    });
+    return node;
 }
 
 const serializeApi = {

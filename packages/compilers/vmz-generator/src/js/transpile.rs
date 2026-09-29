@@ -53,8 +53,24 @@ pub fn transpile_ts_printed(
 
     let mut program = parsed.program;
     let semantic_ret = SemanticBuilder::new().build(&program);
-    let options = TransformOptions::default();
+    let mut options = TransformOptions::default();
+    // Template expressions are lowered after this script transform. A value import
+    // may therefore look unused to oxc while being required by the emitted view.
+    options.typescript.only_remove_type_imports = true;
     let transformer = Transformer::new(&allocator, Path::new(filename), &options);
     let _ = transformer.build_with_scoping(semantic_ret.semantic.into_scoping(), &mut program);
     Ok(print_js_program(&allocator, &mut program, print))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::transpile_ts;
+
+    #[test]
+    fn keeps_value_imports_used_by_later_template_lowering() {
+        let source = "import { highlightSync } from 'highlighter';\nimport type { Theme } from 'types';\nexport default class Example { theme: Theme | null = null; }";
+        let js = transpile_ts(source, "Example.client.ts").expect("transpile");
+        assert!(js.contains("highlightSync"), "value import lost: {js}");
+        assert!(!js.contains("from 'types'") && !js.contains("from \"types\""), "type import leaked: {js}");
+    }
 }
