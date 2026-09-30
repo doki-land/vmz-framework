@@ -28,6 +28,8 @@ export function materializeServeHostRuntime(outDir: string, coreDist: string | n
         if (entry.rewriteVmzRuntimeImport) {
             const text = readFileSync(src, 'utf8')
                 .replace(/from\s+(['"])\.\/vmz-runtime\.js\1/g, 'from $1../../vmz-runtime.js$1')
+                .replace(/from\s+(['"])\.\.\/\.\.\/faces\/vmz-runtime\.js\1/g, 'from $1../../../vmz-runtime.js$1')
+                .replace(/from\s+(['"])\.\.\/\.\.\/faces\/server\.js\1/g, 'from $1../../../vmz-runtime.js$1')
                 .replace(/from\s+(['"])\.\.\/faces\/vmz-runtime\.js\1/g, 'from $1../../vmz-runtime.js$1')
                 .replace(/from\s+(['"])\.\.\/faces\/server\.js\1/g, 'from $1../../vmz-runtime.js$1');
             writeFileSync(dst, text, 'utf8');

@@ -737,6 +737,10 @@ fn copy_runtime_file(
         // Nested under `_vmz/host/`: delivery-root `vmz-runtime.js` is two levels up.
         text = text.replace("from './vmz-runtime.js'", "from '../../vmz-runtime.js'");
         text = text.replace("from \"./vmz-runtime.js\"", "from \"../../vmz-runtime.js\"");
+        text = text.replace("from '../../faces/vmz-runtime.js'", "from '../../../vmz-runtime.js'");
+        text = text.replace("from \"../../faces/vmz-runtime.js\"", "from \"../../../vmz-runtime.js\"");
+        text = text.replace("from '../../faces/server.js'", "from '../../../vmz-runtime.js'");
+        text = text.replace("from \"../../faces/server.js\"", "from \"../../../vmz-runtime.js\"");
         text = text.replace("from '../faces/vmz-runtime.js'", "from '../../vmz-runtime.js'");
         text = text.replace("from \"../faces/vmz-runtime.js\"", "from \"../../vmz-runtime.js\"");
         text = text.replace("from '../faces/server.js'", "from '../../vmz-runtime.js'");
