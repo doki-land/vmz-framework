@@ -79,6 +79,7 @@ import { DEFAULT_STROKE_WIDTH, resolveIconDef } from "./registry.ts";
  * Optional package: apps that only need UI chrome can use `@vmz/ui/Icon` instead.
  */
 export default class Icon {
+    static __vmzHostBox = "contents";
     /** Semantic icon id, e.g. tool.base64 / action.search */
     public name: string = "";
     /** sm | md | lg */
