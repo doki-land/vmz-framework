@@ -99,17 +99,15 @@ export default class Greeting {
     let oak = parse_template_concrete_via_oak(&parsed.template).expect("oak concrete");
     let primary = vmz_compiler::parse_template_concrete_primary(&parsed.template).expect("primary");
     let find_interp = |roots: &[vmz_compiler::ConcreteNode]| {
-        roots
-            .iter()
-            .find_map(|n| match n {
-                vmz_compiler::ConcreteNode::Element { children, .. } => children.iter().find_map(
-                    |c| match c {
-                        vmz_compiler::ConcreteNode::Interpolation { expr, .. } => Some(expr.clone()),
-                        _ => None,
-                    },
-                ),
-                _ => None,
-            })
+        roots.iter().find_map(|n| match n {
+            vmz_compiler::ConcreteNode::Element { children, .. } => {
+                children.iter().find_map(|c| match c {
+                    vmz_compiler::ConcreteNode::Interpolation { expr, .. } => Some(expr.clone()),
+                    _ => None,
+                })
+            }
+            _ => None,
+        })
     };
     assert_eq!(find_interp(&oak.roots).as_deref(), Some("name"));
     assert_eq!(find_interp(&primary.roots).as_deref(), Some("name"));
