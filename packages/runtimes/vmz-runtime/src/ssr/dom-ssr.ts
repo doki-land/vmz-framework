@@ -1,4 +1,4 @@
-/** Barrel ? SSR / resume modules (reshape-runtime.mjs). */
+/** SSR and resume barrel. */
 export { renderToString } from './render.js';
 export { renderToStream } from './render.js';
 export { hydrateRoute } from '../browser/resume/hydrate.js';

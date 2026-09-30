@@ -1,5 +1,7 @@
 import { extractAppHtml } from './extract-html.js';
 import { applyAppAttrs, canRetainLayouts, parseLayoutChain } from './layout-retain.js';
+import { applyLocaleRealization, createLocaleTransition } from './locale-transition.js';
+import { createScrollFocus } from './scroll-focus.js';
 
 export function installClientNavigation(opts: Record<string, any> = {}) {
     const doc = opts.document || (typeof document !== 'undefined' ? document : null);
@@ -17,19 +19,22 @@ export function installClientNavigation(opts: Record<string, any> = {}) {
         win.__vmzBootId = `boot-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     }
     if (win) win.__vmzClientNavInstalled = true;
-    // Route Transition Plan owns scroll; disable browser's automatic restoration.
     try {
         if (hist && 'scrollRestoration' in hist) hist.scrollRestoration = 'manual';
     } catch {
         /* ignore */
     }
 
-    let inflight = null;
+    let inflight: AbortController | null = null;
     let navigating = false;
 
-    const scrollPositions = new Map();
+    const { saveScroll, restoreScroll, restoreFocus } = createScrollFocus({
+        document: doc,
+        window: win!,
+        location: loc,
+    });
 
-    function destroyInst(inst) {
+    function destroyInst(inst: unknown) {
         if (!inst) return;
         if (typeof opts.destroy === 'function') opts.destroy(inst);
         else if (win?.vmzDestroy) win.vmzDestroy(inst);
@@ -39,112 +44,7 @@ export function installClientNavigation(opts: Record<string, any> = {}) {
         return import(/* @vite-ignore */ '/dom.browser.js' as string);
     }
 
-    function navKey(pathname, search) {
-        return `${pathname || '/'}${search || ''}`;
-    }
-
-    function saveScroll() {
-        if (!win) return;
-        scrollPositions.set(navKey(loc.pathname, loc.search), {
-            x: win.scrollX || 0,
-            y: win.scrollY || 0,
-        });
-    }
-
-    /**
-     * Route Transition Plan: restore scroll on popstate; forward nav �?hash or top.
-     * Re-applies across frames until scrollHeight can hold the saved Y (hydrate settle).
-     */
-    async function restoreScroll(target, fromPop) {
-        if (!win) return { mode: 'none', x: 0, y: 0 };
-        const frame = () =>
-            new Promise((resolve) => {
-                if (typeof win.requestAnimationFrame === 'function') win.requestAnimationFrame(resolve);
-                else setTimeout(resolve, 0);
-            });
-        if (fromPop) {
-            const saved = scrollPositions.get(navKey(target.pathname, target.search));
-            if (saved) {
-                const apply = () => {
-                    try {
-                        win.scrollTo(saved.x, saved.y);
-                    } catch {
-                        /* ignore */
-                    }
-                };
-                // Do not claim restored until window.scrollY actually tracks (or we exhaust retries).
-                for (let i = 0; i < 12; i++) {
-                    apply();
-                    const y = win.scrollY || 0;
-                    if (Math.abs(y - saved.y) <= 2) break;
-                    const docEl = doc.documentElement || doc.body;
-                    const maxY = Math.max(0, (docEl?.scrollHeight || 0) - (win.innerHeight || 0));
-                    // Document still short �?wait for hydrate/layout to grow scrollHeight.
-                    if (maxY + 2 < saved.y) {
-                        await frame();
-                        continue;
-                    }
-                    // Tall enough but not yet at target (rare paint lag).
-                    await frame();
-                }
-                apply();
-                return { mode: 'restored', x: saved.x, y: win.scrollY || saved.y };
-            }
-        }
-        if (target.hash) {
-            const id = decodeURIComponent(target.hash.slice(1));
-            const el = id ? doc.getElementById(id) : null;
-            if (el && typeof el.scrollIntoView === 'function') {
-                el.scrollIntoView();
-                return { mode: 'hash', x: win.scrollX || 0, y: win.scrollY || 0 };
-            }
-        }
-        win.scrollTo(0, 0);
-        return { mode: 'top', x: 0, y: 0 };
-    }
-
-    /**
-     * Focus the primary page landmark after SPA swap (not a scattered runtime hook).
-     */
-    function restoreFocus(root, target) {
-        if (!root || !doc) return null;
-        let el = null;
-        if (target.hash) {
-            const id = decodeURIComponent(target.hash.slice(1));
-            el = id ? doc.getElementById(id) : null;
-        }
-        if (!el) el = root.querySelector('[data-vmz-focus]');
-        if (!el) el = root.querySelector('main, h1, [role="main"]');
-        if (!el) el = root;
-        if (el === doc.body) return null;
-        const focusable = el;
-        if (!focusable.hasAttribute('tabindex') && focusable.tabIndex < 0) {
-            focusable.setAttribute('tabindex', '-1');
-        }
-        try {
-            focusable.focus({ preventScroll: true });
-        } catch {
-            /* ignore �?never focus() without preventScroll (would steal restored scrollY) */
-        }
-        return focusable.getAttribute('data-vmz-focus') || focusable.tagName?.toLowerCase() || null;
-    }
-
-    /**
-     * Apply locale realization attributes from SSR `#app` onto `<html>`.
-     */
-    function applyLocaleRealization(root) {
-        if (!root || !doc?.documentElement) return null;
-        const locale = root.getAttribute('data-vmz-locale');
-        const dir = root.getAttribute('data-vmz-dir');
-        if (locale) {
-            doc.documentElement.setAttribute('data-locale', locale);
-            doc.documentElement.lang = locale;
-        }
-        if (dir) doc.documentElement.dir = dir;
-        return locale;
-    }
-
-    async function transitionTo(url: any, { replace = false, fromPop = false, softFail = false }: any = {}) {
+    async function transitionTo(url: string | URL, { replace = false, fromPop = false, softFail = false }: Record<string, unknown> = {}) {
         const target = new URL(url, loc.href);
         if (target.origin !== loc.origin) {
             loc.assign(target.href);
@@ -164,7 +64,6 @@ export function installClientNavigation(opts: Record<string, any> = {}) {
                 signal,
             });
             if (!res.ok) {
-                // LocaleTransition uses softFail �?keep current surface (no full assign).
                 if (!fromPop && !softFail) loc.assign(target.href);
                 return { ok: false, reason: `http ${res.status}` };
             }
@@ -186,7 +85,7 @@ export function installClientNavigation(opts: Record<string, any> = {}) {
             const retainLayouts = canRetainLayouts(root, prevLayout, nextLayout);
 
             const chunkId = nextApp.getAttribute('data-vmz-page') || '';
-            let props = {};
+            let props: Record<string, unknown> = {};
             try {
                 const raw = nextApp.getAttribute('data-vmz-props');
                 if (raw) props = JSON.parse(raw);
@@ -199,14 +98,12 @@ export function installClientNavigation(opts: Record<string, any> = {}) {
                 else hist.pushState({ vmzClientNav: true }, '', target.href);
             }
 
-            const importChunk = opts.importPage || (async (id) => (await import(/* @vite-ignore */ `/${id}.client.js`)).default);
+            const importChunk = opts.importPage || (async (id: string) => (await import(/* @vite-ignore */ `/${id}.client.js`)).default);
 
-            let liveRoot = root;
+            let liveRoot: HTMLElement = root;
             let retainedLayout = false;
 
-            // Apply target LocaleId before hydrate/onMount so `#locales/*` and
-            // retained shells (SiteHeader) see the committed projection.
-            applyLocaleRealization(nextApp);
+            applyLocaleRealization(doc, nextApp);
 
             if (retainLayouts) {
                 applyAppAttrs(root, nextApp);
@@ -225,21 +122,20 @@ export function installClientNavigation(opts: Record<string, any> = {}) {
                             const dom = await loadDomFallback();
                             hydrate = dom.hydrate;
                         }
-                        const pageHost = root.__vmzPageHost || root;
+                        const pageHost = (root as any).__vmzPageHost || root;
                         if (pageHost.__vmzInst) destroyInst(pageHost.__vmzInst);
                         await hydrate(Page, pageHost, props);
-                        root.__vmzPageHost = pageHost;
-                        if (!root.__vmzLayoutInsts?.length) root.__vmzInst = pageHost.__vmzInst;
+                        (root as any).__vmzPageHost = pageHost;
+                        if (!(root as any).__vmzLayoutInsts?.length) (root as any).__vmzInst = pageHost.__vmzInst;
                     }
                 }
                 retainedLayout = true;
             } else {
-                // Dispose previous Direct instance if present (full #app swap).
-                const prev = root.__vmzInst;
+                const prev = (root as any).__vmzInst;
                 destroyInst(prev);
-                root.__vmzInst = null;
-                root.__vmzPageHost = null;
-                root.__vmzLayoutInsts = null;
+                (root as any).__vmzInst = null;
+                (root as any).__vmzPageHost = null;
+                (root as any).__vmzLayoutInsts = null;
 
                 root.outerHTML = nextApp.outerHTML;
                 const fresh = doc.getElementById('app');
@@ -271,7 +167,7 @@ export function installClientNavigation(opts: Record<string, any> = {}) {
                 }
             }
 
-            const localeId = applyLocaleRealization(liveRoot);
+            const localeId = applyLocaleRealization(doc, liveRoot);
             const focusTarget = restoreFocus(liveRoot, target);
 
             if (win) {
@@ -284,19 +180,17 @@ export function installClientNavigation(opts: Record<string, any> = {}) {
                     retainedLayout,
                     focusTarget,
                     localeId,
-                    // Pending until restoreScroll finishes �?never lie as "restored" early (gate race).
                     scrollMode: 'pending',
                     scrollY: null,
                 };
             }
 
-            // Wait for hydrate/layout paint before applying scroll �?otherwise scrollTo is clamped/reset.
             if (win && typeof win.requestAnimationFrame === 'function') {
-                await new Promise((resolve) => {
-                    win.requestAnimationFrame(() => win.requestAnimationFrame(resolve));
+                await new Promise<void>((resolve) => {
+                    win.requestAnimationFrame(() => win.requestAnimationFrame(() => resolve()));
                 });
             }
-            const scroll = await restoreScroll(target, fromPop);
+            const scroll = await restoreScroll(target, Boolean(fromPop));
             if (win && win.__vmzLastClientNav) {
                 win.__vmzLastClientNav.scrollMode = scroll.mode;
                 win.__vmzLastClientNav.scrollY = scroll.y;
@@ -316,348 +210,41 @@ export function installClientNavigation(opts: Record<string, any> = {}) {
         }
     }
 
-    function onClick(ev) {
+    const { transitionLocale, localizeClickHref } = createLocaleTransition({
+        document: doc,
+        window: win,
+        location: loc,
+        transitionTo,
+    });
+
+    function onClick(ev: MouseEvent) {
         if (navigating) return;
         if (ev.defaultPrevented) return;
         if (ev.button !== 0) return;
         if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
-        const a = ev.target?.closest?.('a[data-vmz-route][href]');
+        const a = (ev.target as Element | null)?.closest?.('a[data-vmz-route][href]') as HTMLAnchorElement | null;
         if (!a) return;
         const href = a.getAttribute('href');
         if (!href || href.startsWith('#') || /^(mailto|tel|javascript):/i.test(href)) return;
         const u = new URL(href, loc.href);
         if (u.origin !== loc.origin) return;
-        // Download / new tab
         if (a.hasAttribute('download') || a.getAttribute('target') === '_blank') return;
 
         ev.preventDefault();
-        // Prefer frozen RouteId�LocaleId href table (0.1.30); fall back only when table missing.
         const realized = localizeClickHref(u.pathname + u.search + u.hash, a.getAttribute('data-vmz-route'));
         void transitionTo(realized, {
             replace: a.getAttribute('data-vmz-replace') === 'true',
         });
     }
 
-    function localizeClickHref(href, routeId) {
-        if (!doc?.documentElement) return href;
-        const locale = doc.documentElement.getAttribute('data-locale');
-        if (!locale) return href;
-
-        const frozen = lookupFrozenLocaleHref(routeId, locale);
-        if (frozen) {
-            let search = '';
-            let hash = '';
-            const hashIdx = href.indexOf('#');
-            let pathPart = href;
-            if (hashIdx >= 0) {
-                hash = pathPart.slice(hashIdx);
-                pathPart = pathPart.slice(0, hashIdx);
-            }
-            const qIdx = pathPart.indexOf('?');
-            if (qIdx >= 0) {
-                search = pathPart.slice(qIdx);
-            }
-            return `${frozen}${search}${hash}`;
-        }
-
-        const raw = doc.documentElement.getAttribute('data-vmz-locale-routing');
-        if (!raw) return href;
-        let routing;
-        try {
-            routing = JSON.parse(raw);
-        } catch {
-            return href;
-        }
-        const supported = Array.isArray(routing.locales) ? routing.locales : [];
-        const defaultLocale = routing.defaultLocale;
-        let pathname = href;
-        let search = '';
-        let hash = '';
-        const hashIdx = pathname.indexOf('#');
-        if (hashIdx >= 0) {
-            hash = pathname.slice(hashIdx);
-            pathname = pathname.slice(0, hashIdx);
-        }
-        const qIdx = pathname.indexOf('?');
-        if (qIdx >= 0) {
-            search = pathname.slice(qIdx);
-            pathname = pathname.slice(0, qIdx);
-        }
-        if (!pathname) pathname = '/';
-        const parts = pathname.split('/').filter(Boolean);
-        // Explicit locale prefix in href = intentional locale (switch/deep-link) �?do not rewrite.
-        if (parts.length && supported.includes(parts[0])) {
-            return `${pathname}${search}${hash}`;
-        }
-        // Unprefixed same-app Link �?realize with current LocaleId.
-        let rest = pathname;
-        if (rest.length > 1 && rest.endsWith('/')) rest = rest.slice(0, -1);
-        if (!rest.startsWith('/')) rest = `/${rest}`;
-        const strategy = routing.strategy || 'prefix';
-        const defaultPrefix = routing.defaultPrefix || 'include';
-        if (strategy === 'none' || strategy === 'domain') return `${rest}${search}${hash}`;
-        if (defaultPrefix === 'omit' && locale === defaultLocale) return `${rest}${search}${hash}`;
-        const pathOut = rest === '/' ? `/${locale}` : `/${locale}${rest}`;
-        return `${pathOut}${search}${hash}`;
-    }
-
     function onPopState() {
         void transitionTo(loc.pathname + loc.search + loc.hash, { fromPop: true });
     }
 
-    let localeTransitionGeneration = 0;
-
-    /**
-     * Atomic LocaleTransition (browser host slice):
-     * - prefix: validate �?realize path �?navigate/fetch �?commit locale attrs from SSR HTML
-     * - none: validate �?Host persist (localStorage+cookie) �?commit attrs �?reload (v1; no URL rewrite)
-     * Failure keeps the previous locale surface (no half-page commit).
-     */
-    async function transitionLocale(toLocale: any, opts: any = {}) {
-        const fromLocale = doc.documentElement?.getAttribute('data-locale') || null;
-        const routing = readLocaleRouting();
-        if (!routing) {
-            const out = {
-                status: 'rejected',
-                fromLocale,
-                toLocale,
-                reason: 'missing_routing',
-            };
-            if (win) win.__vmzLastLocaleTransition = out;
-            return out;
-        }
-        const supported = Array.isArray(routing.locales) ? routing.locales : [];
-        if (!supported.includes(toLocale)) {
-            const out = {
-                status: 'rejected',
-                fromLocale,
-                toLocale,
-                reason: 'unsupported',
-            };
-            if (win) win.__vmzLastLocaleTransition = out;
-            return out;
-        }
-        if (toLocale === fromLocale) {
-            const out = {
-                status: 'committed',
-                fromLocale,
-                toLocale,
-                reason: 'noop',
-                href: loc.pathname + loc.search,
-            };
-            if (win) win.__vmzLastLocaleTransition = out;
-            return out;
-        }
-
-        const strategy = routing.strategy || 'prefix';
-        if (strategy === 'none') {
-            return transitionLocaleNone(toLocale, fromLocale, opts);
-        }
-
-        const gen = ++localeTransitionGeneration;
-        const targetHref = realizePathForLocale(loc.pathname + loc.search + loc.hash, toLocale, routing);
-        const result = await transitionTo(targetHref, { replace: opts.replace !== false, softFail: true });
-
-        if (gen !== localeTransitionGeneration) {
-            const out = {
-                status: 'cancelled',
-                fromLocale,
-                toLocale,
-                reason: 'stale_generation',
-                href: targetHref,
-                generation: gen,
-            };
-            if (win) win.__vmzLastLocaleTransition = out;
-            return out;
-        }
-
-        if (!result?.ok) {
-            // transitionTo does not mutate html locale attrs before success �?surface stays fromLocale.
-            const still = doc.documentElement?.getAttribute('data-locale');
-            const out = {
-                status: 'rolled_back',
-                fromLocale,
-                toLocale,
-                reason: result?.reason || 'nav_failed',
-                href: targetHref,
-                retainedLocale: still,
-                generation: gen,
-            };
-            if (win) win.__vmzLastLocaleTransition = out;
-            return out;
-        }
-
-        const committed = doc.documentElement?.getAttribute('data-locale');
-        if (committed !== toLocale) {
-            const out = {
-                status: 'failed',
-                fromLocale,
-                toLocale,
-                reason: 'partial',
-                href: targetHref,
-                committedLocale: committed,
-                generation: gen,
-            };
-            if (win) win.__vmzLastLocaleTransition = out;
-            return out;
-        }
-
-        const out = {
-            status: 'committed',
-            fromLocale,
-            toLocale,
-            reason: 'ok',
-            href: targetHref,
-            generation: gen,
-        };
-        if (win) win.__vmzLastLocaleTransition = out;
-        return out;
-    }
-
-    /**
-     * `routing.strategy: 'none'` �?LocaleId is Host preference, not URL.
-     * Persist �?commit document attrs + hint �?full reload so `#locales/*` re-resolve (I2 v1).
-     */
-    function transitionLocaleNone(toLocale: any, fromLocale: any, opts: any = {}) {
-        const STORE_KEY = 'vmz.locale';
-        try {
-            try {
-                localStorage.setItem(STORE_KEY, toLocale);
-            } catch {
-                /* private mode */
-            }
-            try {
-                doc.cookie = `${STORE_KEY}=${encodeURIComponent(toLocale)}; path=/; max-age=31536000; SameSite=Lax`;
-            } catch {
-                /* ignore */
-            }
-            if (doc.documentElement) {
-                doc.documentElement.setAttribute('data-locale', toLocale);
-                doc.documentElement.setAttribute('lang', toLocale);
-            }
-            if (win) win.__vmzLocaleIdHint = toLocale;
-        } catch (err) {
-            const out = {
-                status: 'rolled_back',
-                fromLocale,
-                toLocale,
-                reason: 'persist_failed',
-                detail: err && err.message ? String(err.message) : String(err),
-            };
-            if (win) win.__vmzLastLocaleTransition = out;
-            return out;
-        }
-
-        const out = {
-            status: 'committed',
-            fromLocale,
-            toLocale,
-            reason: 'ok',
-            strategy: 'none',
-            href: loc.pathname + loc.search,
-            reload: opts.reload !== false,
-        };
-        if (win) win.__vmzLastLocaleTransition = out;
-        // Reload so generated `#locales` modules re-run __vmzLocaleId() with new preference.
-        if (opts.reload !== false && loc && typeof loc.reload === 'function') {
-            loc.reload();
-        }
-        return out;
-    }
-
-    function readLocaleRouting() {
-        const raw = doc.documentElement?.getAttribute('data-vmz-locale-routing');
-        if (!raw) return null;
-        try {
-            return JSON.parse(raw);
-        } catch {
-            return null;
-        }
-    }
-
-    /**
-     * Re-realize current URL under target LocaleId via frozen href table when present.
-     */
-    function realizePathForLocale(href, localeId, routing) {
-        let pathname = href;
-        let search = '';
-        let hash = '';
-        const hashIdx = pathname.indexOf('#');
-        if (hashIdx >= 0) {
-            hash = pathname.slice(hashIdx);
-            pathname = pathname.slice(0, hashIdx);
-        }
-        const qIdx = pathname.indexOf('?');
-        if (qIdx >= 0) {
-            search = pathname.slice(qIdx);
-            pathname = pathname.slice(0, qIdx);
-        }
-        if (!pathname) pathname = '/';
-
-        const fromLocale = doc.documentElement?.getAttribute('data-locale') || null;
-        const routeId =
-            doc.documentElement?.getAttribute('data-vmz-route') ||
-            doc.querySelector?.('[data-vmz-app][data-vmz-route]')?.getAttribute?.('data-vmz-route') ||
-            resolveRouteIdFromHrefTable(pathname, fromLocale);
-        const frozen = lookupFrozenLocaleHref(routeId, localeId);
-        if (frozen) return `${frozen}${search}${hash}`;
-
-        const supported = Array.isArray(routing.locales) ? routing.locales : [];
-        const parts = pathname.split('/').filter(Boolean);
-        let rest = pathname;
-        if (parts.length && supported.includes(parts[0])) {
-            const r = parts.slice(1);
-            rest = r.length ? `/${r.join('/')}` : '/';
-        }
-        if (rest.length > 1 && rest.endsWith('/')) rest = rest.slice(0, -1);
-        if (!rest.startsWith('/')) rest = `/${rest}`;
-        const strategy = routing.strategy || 'prefix';
-        const defaultPrefix = routing.defaultPrefix || 'include';
-        const defaultLocale = routing.defaultLocale;
-        if (strategy === 'none' || strategy === 'domain') return `${rest}${search}${hash}`;
-        if (defaultPrefix === 'omit' && localeId === defaultLocale) return `${rest}${search}${hash}`;
-        const pathOut = rest === '/' ? `/${localeId}` : `/${localeId}${rest}`;
-        return `${pathOut}${search}${hash}`;
-    }
-
-    function readLocaleHrefTable() {
-        const raw = doc.documentElement?.getAttribute('data-vmz-locale-hrefs');
-        if (!raw) return null;
-        try {
-            const table = JSON.parse(raw);
-            return table && typeof table === 'object' ? table : null;
-        } catch {
-            return null;
-        }
-    }
-
-    function lookupFrozenLocaleHref(routeId, localeId) {
-        if (!routeId || !localeId) return null;
-        const table = readLocaleHrefTable();
-        const href = table?.[routeId]?.[localeId];
-        return typeof href === 'string' && href && !/\[[^\]]+\]/.test(href) && !/\/:[^/]+/.test(href) ? href : null;
-    }
-
-    /**
-     * Reverse-lookup RouteId from frozen table when html lacks data-vmz-route.
-     */
-    function resolveRouteIdFromHrefTable(pathname, localeId) {
-        const table = readLocaleHrefTable();
-        if (!table || !localeId) return null;
-        const norm = pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname || '/';
-        for (const [routeId, byLocale] of Object.entries(table)) {
-            const href = byLocale?.[localeId];
-            if (typeof href !== 'string') continue;
-            const h = href.length > 1 && href.endsWith('/') ? href.slice(0, -1) : href;
-            if (h === norm) return routeId;
-        }
-        return null;
-    }
-
     if (win) {
         win.__vmzTransitionLocale = transitionLocale;
-        win.__vmzClientNavSetFetch = (fn) => {
-            fetchImpl = typeof fn === 'function' ? fn : fetchImplDefault;
+        win.__vmzClientNavSetFetch = (fn: unknown) => {
+            fetchImpl = typeof fn === 'function' ? (fn as typeof fetch) : fetchImplDefault;
         };
     }
 
