@@ -15,9 +15,8 @@ use crate::server_calls::collect_server_class_calls;
 use crate::server_slice::ServerSliceProof;
 use crate::sfc::{ScriptKind, ScriptLanguage, parse_vmz};
 use crate::template::{
-    AttrValue, SemanticAstStats, TemplateIr, TemplateNode, lower_concrete_to_ir,
-    lower_concrete_to_semantic, parse_template, parse_template_concrete, semantic_ast_stats,
-    template_parse_to_diagnostic,
+    SemanticAstStats, SemanticIr, SemanticNode, lower_concrete_to_ir, lower_concrete_to_semantic,
+    parse_template, parse_template_concrete, semantic_ast_stats, template_parse_to_diagnostic,
 };
 use crate::virtual_server;
 use vmz_protocol::{DIAG_SERVER_SLICE_NOT_BROWSER_SAFE, SourceSpan};
@@ -146,10 +145,7 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
     let parsed = match parse_vmz(path, source) {
         Ok(p) => p,
         Err(e) => {
-            report.diagnostics.push(
-                ReportedDiagnostic::error(path, "vmz::sfc::parse_failed")
-                    .with_arg("detail", e.to_string()),
-            );
+            report.diagnostics.push(crate::sfc::diagnostic_sfc_parse_failed(path, &e));
             return;
         }
     };
@@ -266,7 +262,7 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
     {
         return;
     }
-    check_each_keys(path, &ir, report);
+    check_each_keys(path, &semantic, content_start, report);
 
     // Program IR A: surface Unknown widenings as advice (never silent).
     let src_root = path
@@ -321,64 +317,91 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
     }
 }
 
-/// `each` key rules
-fn check_each_keys(path: &Path, ir: &TemplateIr, report: &mut CheckReport) {
-    walk_each_keys(path, &ir.roots, report);
+/// `each` key rules (Semantic AST spans → absolute SFC offsets).
+fn check_each_keys(
+    path: &Path,
+    semantic: &SemanticIr,
+    content_start: u32,
+    report: &mut CheckReport,
+) {
+    walk_semantic_each_keys(path, &semantic.roots, content_start, report);
 }
 
-fn walk_each_keys(path: &Path, nodes: &[TemplateNode], report: &mut CheckReport) {
+fn walk_semantic_each_keys(
+    path: &Path,
+    nodes: &[SemanticNode],
+    content_start: u32,
+    report: &mut CheckReport,
+) {
     for node in nodes {
-        let TemplateNode::Element { tag, attrs, children } = node else {
-            continue;
-        };
-        let each = attrs.iter().find(|a| a.name == "each");
-        if each.is_some() {
-            let as_name = attrs.iter().find(|a| a.name == "as").and_then(|a| match &a.value {
-                AttrValue::Static(s) if !s.is_empty() => Some(s.as_str()),
-                AttrValue::Interp(s) => Some(s.trim().trim_matches(|c| c == '"' || c == '\'')),
-                _ => None,
-            });
-            let key = attrs.iter().find(|a| a.name == "key");
-            match key {
-                None => {
-                    report.diagnostics.push(
-                        ReportedDiagnostic::warning(path, "vmz::template::each_missing_key")
-                            .with_arg("tag", tag.clone()),
-                    );
-                }
-                Some(k) => match &k.value {
-                    AttrValue::Static(s) => {
+        match node {
+            SemanticNode::ForNode { key, value_alias, body, span, .. } => {
+                let tag = semantic_element_tag(body.as_ref());
+                let path_s = path.to_string_lossy().into_owned();
+                let (start, end) = span.to_absolute(content_start);
+                let with_span = |row: ReportedDiagnostic| {
+                    row.with_source_span(SourceSpan { path: path_s.clone(), start, end })
+                };
+                match key {
+                    None => {
                         report.diagnostics.push(
-                            ReportedDiagnostic::error(path, "vmz::template::each_static_key")
-                                .with_arg("tag", tag.clone())
-                                .with_arg("key", s.clone()),
+                            with_span(
+                                ReportedDiagnostic::warning(path, "vmz::template::each_missing_key")
+                                    .with_arg("tag", tag),
+                            ),
                         );
                     }
-                    AttrValue::Interp(expr) => {
-                        let e = expr.trim();
+                    Some(k) => {
+                        let e = k.trim();
                         if is_literal_key(e) {
                             report.diagnostics.push(
-                                ReportedDiagnostic::error(path, "vmz::template::each_literal_key")
-                                    .with_arg("tag", tag.clone())
-                                    .with_arg("key", e.to_string()),
+                                with_span(
+                                    ReportedDiagnostic::error(path, "vmz::template::each_literal_key")
+                                        .with_arg("tag", tag)
+                                        .with_arg("key", e.to_string()),
+                                ),
                             );
-                        } else if let Some(as_name) = as_name {
-                            if e == as_name {
-                                report.diagnostics.push(
-                                    ReportedDiagnostic::warning(
-                                        path,
-                                        "vmz::template::each_object_key",
-                                    )
-                                    .with_arg("tag", tag.clone())
-                                    .with_arg("as", as_name.to_string()),
-                                );
-                            }
+                        } else if e == value_alias.as_str() {
+                            report.diagnostics.push(
+                                with_span(
+                                    ReportedDiagnostic::warning(path, "vmz::template::each_object_key")
+                                        .with_arg("tag", tag)
+                                        .with_arg("as", value_alias.clone()),
+                                ),
+                            );
                         }
                     }
-                },
+                }
+                walk_semantic_each_keys(path, std::slice::from_ref(body.as_ref()), content_start, report);
             }
+            SemanticNode::Element { children, .. } => {
+                walk_semantic_each_keys(path, children, content_start, report);
+            }
+            SemanticNode::IfChain { branches, .. } => {
+                for branch in branches {
+                    walk_semantic_each_keys(
+                        path,
+                        std::slice::from_ref(branch.body.as_ref()),
+                        content_start,
+                        report,
+                    );
+                }
+            }
+            SemanticNode::SlotOutlet { children, .. } => {
+                walk_semantic_each_keys(path, children, content_start, report);
+            }
+            SemanticNode::SlotTemplate { body, .. } => {
+                walk_semantic_each_keys(path, &[body.as_ref().clone()], content_start, report);
+            }
+            _ => {}
         }
-        walk_each_keys(path, children, report);
+    }
+}
+
+fn semantic_element_tag(node: &SemanticNode) -> String {
+    match node {
+        SemanticNode::Element { tag, .. } => tag.clone(),
+        _ => "?".into(),
     }
 }
 

@@ -25,14 +25,18 @@ fn check_template_snippet(template: &str) -> CheckReport {
 #[test]
 fn warns_each_without_key() {
     let report = check_template_snippet(r#"<li v-for="tag in tags">{{ tag }}</li>"#);
-    assert!(
-        report
-            .diagnostics
-            .iter()
-            .any(|d| { d.severity() == Severity::Warning && d.code().contains("key") }),
-        "{:?}",
-        report.diagnostics.iter().map(|d| d.code()).collect::<Vec<_>>()
-    );
+    let diag = report
+        .diagnostics
+        .iter()
+        .find(|d| d.severity() == Severity::Warning && d.code().contains("key"))
+        .unwrap_or_else(|| {
+            panic!(
+                "{:?}",
+                report.diagnostics.iter().map(|d| d.code()).collect::<Vec<_>>()
+            )
+        });
+    let span = diag.source_span().expect("each_missing_key should carry SourceSpan");
+    assert!(span.end > span.start, "span={span:?}");
 }
 
 #[test]
@@ -57,6 +61,31 @@ fn ok_property_key() {
         "{:?}",
         report.diagnostics.iter().map(|d| d.code()).collect::<Vec<_>>()
     );
+}
+
+#[test]
+fn sfc_style_order_error_carries_absolute_source_span() {
+    let dir = std::env::temp_dir().join(format!(
+        "vmz-check-sfc-span-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+    ));
+    let _ = fs::create_dir_all(&dir);
+    let path = dir.join("BadOrder.vmz");
+    // style before template — invalid; span should cover the `<style>` open tag.
+    let src = "<style>\n.x{}\n</style>\n<template>\n<p>hi</p>\n</template>\n<script client>\nexport default class BadOrder {}\n</script>\n";
+    fs::write(&path, src).unwrap();
+    let report = check_path(&path, &CheckOptions::default()).unwrap();
+    let diag = report
+        .diagnostics
+        .iter()
+        .find(|d| d.code() == "vmz::sfc::parse_failed")
+        .expect("sfc parse_failed");
+    let span = diag.source_span().expect("SourceSpan on sfc diagnostic");
+    assert_eq!(span.start, 0, "span should start at `<style`");
+    assert!(span.end > span.start, "end-exclusive span");
+    assert!(src.as_bytes()[..span.end as usize].starts_with(b"<style"), "span covers style tag");
+    let _ = fs::remove_dir_all(&dir);
 }
 
 #[test]
