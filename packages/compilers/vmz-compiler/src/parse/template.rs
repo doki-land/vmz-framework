@@ -12,7 +12,11 @@ use vmz_protocol::SourceSpan;
 
 pub use super::template_common::{TemplateParseError, decode_html_entities};
 pub use super::template_concrete::{
-    ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg, parse_template_concrete,
+    classify_concrete_attr, ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg,
+    parse_template_concrete,
+};
+pub use super::template_oak::{
+    parse_template_concrete_primary, parse_template_concrete_via_oak,
 };
 pub use super::template_ir::{AttrValue, TemplateAttr, TemplateIr, TemplateNode};
 pub use super::template_lower::lower_concrete_to_ir;

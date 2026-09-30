@@ -173,6 +173,21 @@ pub enum Directive {
     },
 }
 
+/// Classify one template attribute/directive name + value into [`ConcreteAttr`].
+///
+/// Used by the Oak frontend adapter when lowering Oak Vue AST nodes.
+pub fn classify_concrete_attr(
+    name: &str,
+    value: Option<&str>,
+    span: TemplateSpan,
+) -> Result<ConcreteAttr, TemplateParseError> {
+    classify_one(RawAttr {
+        name: name.to_string(),
+        value: value.map(|s| s.to_string()),
+        span,
+    })
+}
+
 /// Parse a `<template>` body into Concrete AST (comments + structured directives).
 pub fn parse_template_concrete(input: &str) -> Result<ConcreteIr, TemplateParseError> {
     let mut parser = ConcreteParser { input, pos: 0 };
