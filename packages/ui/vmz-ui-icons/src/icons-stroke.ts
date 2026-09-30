@@ -42,12 +42,7 @@ export const STROKE_ICONS: Record<string, IconDef> = {
     'nav.language': {
         kind: 'stroke',
         circles: [{ cx: 12, cy: 12, r: 9 }],
-        paths: [
-            'M12 3V21',
-            'M3 12H21',
-            'M5.5 7.5C8 5.5 16 5.5 18.5 7.5',
-            'M5.5 16.5C8 18.5 16 18.5 18.5 16.5',
-        ],
+        paths: ['M12 3V21', 'M3 12H21', 'M5.5 7.5C8 5.5 16 5.5 18.5 7.5', 'M5.5 16.5C8 18.5 16 18.5 18.5 16.5'],
     },
     'status.info': {
         kind: 'stroke',
@@ -73,7 +68,11 @@ export const STROKE_ICONS: Record<string, IconDef> = {
     },
     'feature.incremental': {
         kind: 'stroke',
-        circles: [{ cx: 5, cy: 12, r: 2 }, { cx: 19, cy: 12, r: 2 }, { cx: 12, cy: 6, r: 2 }],
+        circles: [
+            { cx: 5, cy: 12, r: 2 },
+            { cx: 19, cy: 12, r: 2 },
+            { cx: 12, cy: 6, r: 2 },
+        ],
         paths: ['M7 12H10', 'M14 12H17', 'M12 8V10', 'M8.2 11.2L11 8.5', 'M12.8 8.5L15.6 11.2'],
     },
     'feature.runtime': {
@@ -86,10 +85,7 @@ export const STROKE_ICONS: Record<string, IconDef> = {
     },
     'tool.url': {
         kind: 'stroke',
-        paths: [
-            'M10.5 8.5a3 3 0 0 1 4.2 0l.8.8a3 3 0 0 1 0 4.2l-.8.8',
-            'M13.5 15.5a3 3 0 0 1-4.2 0l-.8-.8a3 3 0 0 1 0-4.2l.8-.8',
-        ],
+        paths: ['M10.5 8.5a3 3 0 0 1 4.2 0l.8.8a3 3 0 0 1 0 4.2l-.8.8', 'M13.5 15.5a3 3 0 0 1-4.2 0l-.8-.8a3 3 0 0 1 0-4.2l.8-.8'],
     },
     'tool.temperature': {
         kind: 'stroke',
@@ -98,17 +94,7 @@ export const STROKE_ICONS: Record<string, IconDef> = {
     },
     'tool.length': {
         kind: 'stroke',
-        paths: [
-            'M4 12H20',
-            'M6 9V15',
-            'M10 10V14',
-            'M14 10V14',
-            'M18 9V15',
-            'M4 12L7 9',
-            'M4 12L7 15',
-            'M20 12L17 9',
-            'M20 12L17 15',
-        ],
+        paths: ['M4 12H20', 'M6 9V15', 'M10 10V14', 'M14 10V14', 'M18 9V15', 'M4 12L7 9', 'M4 12L7 15', 'M20 12L17 9', 'M20 12L17 15'],
     },
     'tool.weight': {
         kind: 'stroke',
@@ -122,11 +108,18 @@ export const STROKE_ICONS: Record<string, IconDef> = {
     'tool.color': {
         kind: 'stroke',
         paths: ['M12 4C8.5 4 6 6.5 6 10s2.5 6 6 6', 'M12 4c3.5 0 6 2.5 6 6s-2.5 6-6 6'],
-        dots: [{ cx: 8, cy: 10, r: 1.2 }, { cx: 12, cy: 8, r: 1.2 }, { cx: 16, cy: 10, r: 1.2 }],
+        dots: [
+            { cx: 8, cy: 10, r: 1.2 },
+            { cx: 12, cy: 8, r: 1.2 },
+            { cx: 16, cy: 10, r: 1.2 },
+        ],
     },
     'tool.percentage': {
         kind: 'stroke',
-        circles: [{ cx: 9.5, cy: 9.5, r: 2 }, { cx: 14.5, cy: 14.5, r: 2 }],
+        circles: [
+            { cx: 9.5, cy: 9.5, r: 2 },
+            { cx: 14.5, cy: 14.5, r: 2 },
+        ],
         paths: ['M16 8L8 16'],
     },
     'tool.area': {
@@ -174,4 +167,3 @@ export const STROKE_ICONS: Record<string, IconDef> = {
         paths: ['M5.5 14A7 7 0 0 1 18.5 14', 'M12 12L15.5 8.5'],
     },
 };
-

@@ -367,7 +367,11 @@ import {
     commercialNavHome,
 } from "#locales/common";
 import ConsolePageServer from "#server/pages/console";
-import { applyStatusToRow, statusAfterHandlingNote, summarizeTicketRows } from "../demo/ticket-rows.ts";
+import {
+    applyStatusToRow,
+    statusAfterHandlingNote,
+    summarizeTicketRows,
+} from "../demo/ticket-rows.ts";
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
 const initialConsoleSummary = { total: 0, running: 0, failed: 0 };
@@ -467,7 +471,11 @@ export default class ConsolePage {
             if (Array.isArray(rows) && rows.length) {
                 this.allRows = rows.map((row) => this.applyRowOverrides(row));
             }
-            if (summary && typeof summary === "object" && !Object.keys(this.statusOverrides).length) {
+            if (
+                summary &&
+                typeof summary === "object" &&
+                !Object.keys(this.statusOverrides).length
+            ) {
                 this.summaryTotal = Number(summary.total) || this.summaryTotal;
                 this.summaryRunning = Number(summary.running) || this.summaryRunning;
                 this.summaryFailed = Number(summary.failed) || this.summaryFailed;
@@ -649,7 +657,9 @@ export default class ConsolePage {
             if (detail && typeof detail === "object") {
                 this.detailProject = String(detail.subject || "");
                 this.detailTarget = String(detail.priorityLabel || "");
-                this.detailStatus = row ? String(row.cells[2] || "") : String(detail.statusLabel || "");
+                this.detailStatus = row
+                    ? String(row.cells[2] || "")
+                    : String(detail.statusLabel || "");
                 this.detailActor = String(detail.owner || "");
                 this.detailUpdated = String(detail.updated || "");
                 this.detailBranch = String(detail.context || "");
@@ -724,7 +734,12 @@ export default class ConsolePage {
 }
 </script>
 <script server>
-import { formatPriority, formatStatus, mapTicketRow, summarizeTicketRows } from "../../demo/ticket-rows.ts";
+import {
+    formatPriority,
+    formatStatus,
+    mapTicketRow,
+    summarizeTicketRows,
+} from "../../demo/ticket-rows.ts";
 import TicketDemo from "#server/demo/TicketDemo";
 
 export default class ConsolePageServer {

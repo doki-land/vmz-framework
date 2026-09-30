@@ -18,7 +18,20 @@ import { emitComponentEvent } from './attributes.js';
 import { directApi } from './direct-api.js';
 import { __vmzCancelTasks } from './lifecycle.js';
 import { flushPending } from '../reactivity/patch-scheduler.js';
-import { __vmzAllowShared, __vmzArrayItemCompoundStride, __vmzArrayMutate, __vmzListTranspose, __vmzReadPath, __vmzTakeShared, __vmzWritePath, __vmzWritePathCompound, __vmzWritePathCompoundItem, __vmzWritePathItem, __vmzWritePathLogical, makeReactive } from '../reactivity/write-barrier.js';
+import {
+    __vmzAllowShared,
+    __vmzArrayItemCompoundStride,
+    __vmzArrayMutate,
+    __vmzListTranspose,
+    __vmzReadPath,
+    __vmzTakeShared,
+    __vmzWritePath,
+    __vmzWritePathCompound,
+    __vmzWritePathCompoundItem,
+    __vmzWritePathItem,
+    __vmzWritePathLogical,
+    makeReactive,
+} from '../reactivity/write-barrier.js';
 
 export async function mount(Component, container, props: any = {}) {
     if (container.__vmzInst) {

@@ -10,21 +10,12 @@ import { createRenderHost } from '../render/render-host.js';
 import { setRoutes } from '../../faces/vmz-runtime.js';
 import { LOCALE_LINK_PLAN_REL } from './constants.js';
 import { loadDeploymentStyle } from './locale-theme.js';
-import {
-    bustUrl,
-    isEventOnlyShell,
-    isEventStrategy,
-    listPageClientFiles,
-    loadPageResumeEntries,
-    pageNeedsReload,
-} from './page-catalog.js';
+import { bustUrl, isEventOnlyShell, isEventStrategy, listPageClientFiles, loadPageResumeEntries, pageNeedsReload } from './page-catalog.js';
 import { serveState } from './state.js';
 
 export function installDevImportTokenHooks() {
     if (!serveState.isDev) return;
-    const distUrlPrefix = pathToFileURL(
-        serveState.distDir.endsWith(path.sep) ? serveState.distDir : `${serveState.distDir}${path.sep}`,
-    ).href;
+    const distUrlPrefix = pathToFileURL(serveState.distDir.endsWith(path.sep) ? serveState.distDir : `${serveState.distDir}${path.sep}`).href;
     registerHooks({
         resolve(specifier, context, nextResolve) {
             const result = nextResolve(specifier, context);
@@ -179,7 +170,9 @@ export async function softReload(opts: { quiet?: boolean; payload?: Record<strin
             setRoutes([]);
         }
         try {
-            serveState.localeArtifact = JSON.parse(await readFile(path.join(serveState.distDir, '_vmz', 'locale-route-realization.json'), 'utf8'));
+            serveState.localeArtifact = JSON.parse(
+                await readFile(path.join(serveState.distDir, '_vmz', 'locale-route-realization.json'), 'utf8'),
+            );
             serveState.localeArtifact = attachLinkRouteAliases(serveState.localeArtifact, serveState.distDir);
         } catch {
             serveState.localeArtifact = null;
@@ -253,7 +246,11 @@ export async function softReload(opts: { quiet?: boolean; payload?: Record<strin
 
         const strategies = resumeEntries.map((e) => e.strategy);
         const eventOnlyShell = isEventOnlyShell(strategies);
-        await writeFile(path.join(serveState.distDir, 'entry-event.js'), emitEntryEvent(skipEntryRewrite ? serveState.reloadToken : nextToken), 'utf8');
+        await writeFile(
+            path.join(serveState.distDir, 'entry-event.js'),
+            emitEntryEvent(skipEntryRewrite ? serveState.reloadToken : nextToken),
+            'utf8',
+        );
 
         serveState.lastDevError = null;
         const mode = islandHmr ? 'island' : eventOnlyShell ? 'event-shell' : 'full';

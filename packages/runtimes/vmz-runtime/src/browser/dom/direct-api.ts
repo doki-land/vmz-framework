@@ -17,7 +17,17 @@ import { applyDomAttr, eventPropHandlerName } from './attributes.js';
 import { createInstance, disposeDomTree, findOwnedDefaultSlotTarget, runDirectCreate, stripFns } from './component.js';
 import { isEventEntryStrategy, noteDomCreate, noteDomRemove, scheduleClientOn } from './lifecycle.js';
 import { components, resolveComponent } from './registry.js';
-import { beginEventFlush, endEventFlush, inferHandlerMethod, methodAllowsSyncEventFlush, registerBind, runDomEventHandler, runPatch, scheduleRefresh, unregisterBind } from '../reactivity/patch-scheduler.js';
+import {
+    beginEventFlush,
+    endEventFlush,
+    inferHandlerMethod,
+    methodAllowsSyncEventFlush,
+    registerBind,
+    runDomEventHandler,
+    runPatch,
+    scheduleRefresh,
+    unregisterBind,
+} from '../reactivity/patch-scheduler.js';
 
 let directPropBindSeq = 0;
 

@@ -146,10 +146,7 @@ export function assertHostRuntimeBoundary(scan: ThinHostScan): string[] {
         const parts = [fs.readFileSync(nestedHost, 'utf8')];
         if (fs.existsSync(nestedBootstrap)) parts.push(fs.readFileSync(nestedBootstrap, 'utf8'));
         const text = parts.join('\n');
-        if (
-            !/from\s+['"]\.\.\/\.\.\/vmz-runtime\.js['"]/.test(text) &&
-            !/from\s+['"]\.\.\/\.\.\/\.\.\/vmz-runtime\.js['"]/.test(text)
-        ) {
+        if (!/from\s+['"]\.\.\/\.\.\/vmz-runtime\.js['"]/.test(text) && !/from\s+['"]\.\.\/\.\.\/\.\.\/vmz-runtime\.js['"]/.test(text)) {
             errors.push('_vmz/host serve entry must reach delivery-root vmz-runtime.js');
         }
         if (/from\s+['"]\.\/vmz-runtime\.js['"]/.test(text)) {

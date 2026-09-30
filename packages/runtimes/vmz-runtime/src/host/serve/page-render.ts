@@ -15,12 +15,7 @@ import {
     siteFaviconHeadHtml,
     themeBootstrapScript,
 } from './locale-theme.js';
-import {
-    isEventOnlyShell,
-    loadPageCtor,
-    loadPageResumeEntries,
-    runRouteGate,
-} from './page-catalog.js';
+import { isEventOnlyShell, loadPageCtor, loadPageResumeEntries, runRouteGate } from './page-catalog.js';
 import { serveState } from './state.js';
 
 export async function renderPage(pathname: string, opts: HostRequestOpts = {}) {
@@ -354,7 +349,10 @@ async function* emitPageHtml(
               `d.innerHTML="<div style='max-width:56rem;margin:0 auto'><p style='color:#f87171;font-weight:700'>Dev Error</p><pre style='white-space:pre-wrap'>"+String(e.message||e).replace(/[<>&]/g,function(c){return {"<":"&lt;",">":"&gt;","&":"&amp;"}[c]})+"</pre></div>";` +
               `document.documentElement.appendChild(d);})();</script>`
             : '';
-    const buildIdBoot = serveState.isDev && serveState.lastDevBuildId ? `\n  <script>window.__VMZ_DEV_BUILD_ID__=${JSON.stringify(serveState.lastDevBuildId)};</script>` : '';
+    const buildIdBoot =
+        serveState.isDev && serveState.lastDevBuildId
+            ? `\n  <script>window.__VMZ_DEV_BUILD_ID__=${JSON.stringify(serveState.lastDevBuildId)};</script>`
+            : '';
     if (signal?.aborted) return;
     const themeId = resolveThemeId(opts.searchParams, opts.cookieHeader);
     const themeBoot = themeBootstrapScript();

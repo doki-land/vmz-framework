@@ -1,4 +1,4 @@
-export type TicketStatus = "open" | "in-progress" | "resolved";
+export type TicketStatus = 'open' | 'in-progress' | 'resolved';
 
 export type TicketRow = {
     id: string;
@@ -13,17 +13,17 @@ export type TicketSummary = {
 };
 
 export function formatPriority(priority: string, locale: string): string {
-    if (locale === "en-us") return priority;
-    if (priority === "high") return "高";
-    if (priority === "medium") return "中";
-    return "低";
+    if (locale === 'en-us') return priority;
+    if (priority === 'high') return '高';
+    if (priority === 'medium') return '中';
+    return '低';
 }
 
 export function formatStatus(status: TicketStatus, locale: string): string {
-    if (locale === "en-us") return status;
-    if (status === "open") return "待处理";
-    if (status === "in-progress") return "处理中";
-    return "已完成";
+    if (locale === 'en-us') return status;
+    if (status === 'open') return '待处理';
+    if (status === 'in-progress') return '处理中';
+    return '已完成';
 }
 
 export function mapTicketRow(
@@ -41,21 +41,15 @@ export function mapTicketRow(
     return {
         id: ticket.id,
         status,
-        cells: [
-            ticket.subject,
-            formatPriority(ticket.priority, locale),
-            formatStatus(status, locale),
-            ticket.owner,
-            ticket.updated,
-        ],
+        cells: [ticket.subject, formatPriority(ticket.priority, locale), formatStatus(status, locale), ticket.owner, ticket.updated],
     };
 }
 
-export function summarizeTicketRows(rows: Pick<TicketRow, "status">[]): TicketSummary {
+export function summarizeTicketRows(rows: Pick<TicketRow, 'status'>[]): TicketSummary {
     return {
         total: rows.length,
-        running: rows.filter((row) => row.status === "in-progress").length,
-        failed: rows.filter((row) => row.status === "open").length,
+        running: rows.filter((row) => row.status === 'in-progress').length,
+        failed: rows.filter((row) => row.status === 'open').length,
     };
 }
 
@@ -66,6 +60,6 @@ export function applyStatusToRow(row: TicketRow, status: TicketStatus, locale: s
 }
 
 export function statusAfterHandlingNote(status: TicketStatus): TicketStatus {
-    if (status === "open") return "in-progress";
+    if (status === 'open') return 'in-progress';
     return status;
 }

@@ -1,5 +1,3 @@
-
-
 export function parseLayoutChain(raw) {
     return String(raw || '')
         .split(',')

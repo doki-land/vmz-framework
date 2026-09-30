@@ -765,7 +765,9 @@ export default class CommercialPage {
             if (detail && typeof detail === "object") {
                 this.detailProject = String(detail.subject || "");
                 this.detailTarget = String(detail.priorityLabel || "");
-                this.detailStatus = row ? String(row.cells[2] || "") : String(detail.statusLabel || "");
+                this.detailStatus = row
+                    ? String(row.cells[2] || "")
+                    : String(detail.statusLabel || "");
                 this.detailActor = String(detail.owner || "");
                 return;
             }

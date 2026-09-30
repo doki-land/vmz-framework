@@ -671,19 +671,8 @@ fn emit_runtime_js(options: &CompileOptions, report: &mut CompileReport) -> crat
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../runtimes/vmz-runtime/dist")
     });
     let delivery_manifest = delivery_runtime_files_manifest();
-    for f in delivery_manifest
-        .flat_barrels
-        .iter()
-        .chain(delivery_manifest.nested.iter())
-    {
-        copy_runtime_file(
-            &runtime_root,
-            &f.src,
-            &f.out,
-            false,
-            options,
-            report,
-        )?;
+    for f in delivery_manifest.flat_barrels.iter().chain(delivery_manifest.nested.iter()) {
+        copy_runtime_file(&runtime_root, &f.src, &f.out, false, options, report)?;
     }
     // Local `vmz serve` / `vmz dev` need the host; production `--release` deploys omit it.
     // 0.1.31: host companions nest under `_vmz/host/` (not delivery root).
@@ -737,7 +726,8 @@ fn copy_runtime_file(
         text = text.replace("from './vmz-runtime.js'", "from '../../vmz-runtime.js'");
         text = text.replace("from \"./vmz-runtime.js\"", "from \"../../vmz-runtime.js\"");
         text = text.replace("from '../../faces/vmz-runtime.js'", "from '../../../vmz-runtime.js'");
-        text = text.replace("from \"../../faces/vmz-runtime.js\"", "from \"../../../vmz-runtime.js\"");
+        text =
+            text.replace("from \"../../faces/vmz-runtime.js\"", "from \"../../../vmz-runtime.js\"");
         text = text.replace("from '../../faces/server.js'", "from '../../../vmz-runtime.js'");
         text = text.replace("from \"../../faces/server.js\"", "from \"../../../vmz-runtime.js\"");
         text = text.replace("from '../faces/vmz-runtime.js'", "from '../../vmz-runtime.js'");

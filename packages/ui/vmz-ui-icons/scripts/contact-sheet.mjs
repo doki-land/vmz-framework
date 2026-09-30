@@ -22,9 +22,7 @@ function renderSvg(def) {
     const parts = [];
     if (def.kind === 'stroke') {
         const sw = def.strokeWidth ?? 1.75;
-        parts.push(
-            `<g fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">`,
-        );
+        parts.push(`<g fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">`);
         for (const d of def.paths ?? []) parts.push(`<path d="${d}"/>`);
         for (const c of def.circles ?? []) parts.push(`<circle cx="${c.cx}" cy="${c.cy}" r="${c.r}"/>`);
         for (const dot of def.dots ?? []) {

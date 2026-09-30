@@ -1,6 +1,8 @@
 <template>
     <span data-vmz-ui="icon" :data-icon="name" :data-size="size" :role="roleAttr" :aria-hidden="hiddenAttr" :aria-label="labelAttr" class="vmz-ui-icon">
-        <span v-if="isTextBadge()" class="vmz-ui-icon__badge">{{ badgeLabel() }}</span>
+        <span v-if="isTextBadge()" class="vmz-ui-icon__badge">
+            {{ badgeLabel() }}
+        </span>
         <svg v-else viewBox="0 0 24 24" focusable="false" aria-hidden="true" class="vmz-ui-icon__svg">
             <g v-if="isStroke()" fill="none" stroke="currentColor" :stroke-width="strokeWidth()" stroke-linecap="round" stroke-linejoin="round">
                 <path v-for="d in strokePaths()" :key="d" :d="d" />
