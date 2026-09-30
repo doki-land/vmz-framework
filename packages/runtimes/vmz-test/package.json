@@ -1,7 +1,6 @@
 {
     "name": "@vmz/test",
     "version": "0.1.0",
-    "private": true,
     "type": "module",
     "description": "VMZ native test protocol + Compile/Logic/Browser/SSR/Resume/Deployment hosts",
     "main": "./dist/index.js",

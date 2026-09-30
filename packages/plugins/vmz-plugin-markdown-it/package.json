@@ -1,7 +1,6 @@
 {
     "name": "@vmz/plugin-markdown-it",
     "version": "0.1.0",
-    "private": true,
     "type": "module",
     "description": "VMZ markdown-it adapter — MarkdownIt + engines.markdown registration",
     "license": "MIT",

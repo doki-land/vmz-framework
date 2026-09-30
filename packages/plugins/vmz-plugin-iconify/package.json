@@ -1,7 +1,6 @@
 {
     "name": "@vmz/plugin-iconify",
     "version": "0.1.0",
-    "private": true,
     "type": "module",
     "description": "VMZ Iconify adapter - <Iconify>",
     "license": "MIT",

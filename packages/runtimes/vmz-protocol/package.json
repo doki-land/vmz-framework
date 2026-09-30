@@ -1,7 +1,6 @@
 {
     "name": "@vmz/protocol",
     "version": "0.1.0",
-    "private": true,
     "type": "module",
     "description": "VMZ versioned wire protocol schema ids (host / program / plugin / dx / test / application)",
     "main": "./dist/index.js",

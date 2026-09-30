@@ -1,7 +1,6 @@
 {
     "name": "vmz",
     "version": "0.1.0",
-    "private": true,
     "type": "module",
     "description": "VMZ Node toolchain — N-API workspace session + CLI (publish name @vmz/vmz)",
     "license": "MIT",
@@ -96,6 +95,10 @@
         "linkedom": "^0.18.13",
         "typescript": "^5.8.3",
         "vmz-plugin-conformance": "workspace:*"
+    },
+    "publishConfig": {
+        "access": "public",
+        "name": "@vmz/vmz"
     },
     "keywords": [
         "vmz",

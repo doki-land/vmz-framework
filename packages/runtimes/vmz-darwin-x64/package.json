@@ -1,7 +1,6 @@
 {
     "name": "@vmz/vmz-darwin-x64",
     "version": "0.1.0",
-    "private": true,
     "description": "VMZ native N-API addon (darwin-x64)",
     "license": "MIT",
     "os": [

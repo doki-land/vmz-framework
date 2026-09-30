@@ -1,7 +1,6 @@
 {
     "name": "@vmz/plugin-katex",
     "version": "0.1.0",
-    "private": true,
     "type": "module",
     "description": "VMZ KaTeX adapter - <Katex> + math engine registration",
     "license": "MIT",

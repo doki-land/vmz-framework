@@ -1,7 +1,6 @@
 {
     "name": "@vmz/plugin-mermaid",
     "version": "0.1.0",
-    "private": true,
     "type": "module",
     "description": "VMZ Mermaid diagram adapter - <Mermaid>",
     "license": "MIT",

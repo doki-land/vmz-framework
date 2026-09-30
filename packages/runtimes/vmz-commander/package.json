@@ -1,7 +1,6 @@
 {
     "name": "@vmz/commander",
     "version": "0.1.0",
-    "private": true,
     "type": "module",
     "description": "i18n-first TypeScript CLI framework (command tree, locales loading, commander.* chrome)",
     "license": "MIT",

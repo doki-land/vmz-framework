@@ -1,7 +1,6 @@
 {
     "name": "@vmz/plugin-shiki",
     "version": "0.1.0",
-    "private": true,
     "type": "module",
     "description": "VMZ Shiki adapter - <Shiki> + code engine registration",
     "license": "MIT",

@@ -1,7 +1,6 @@
 {
     "name": "@vmz/plugin-codemirror",
     "version": "0.1.0",
-    "private": true,
     "type": "module",
     "description": "VMZ CodeMirror 6 editor adapter - <Codemirror>",
     "license": "MIT",

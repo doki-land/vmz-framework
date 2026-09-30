@@ -1,7 +1,6 @@
 {
     "name": "@vmz/plugin-mathjax",
     "version": "0.1.0",
-    "private": true,
     "type": "module",
     "description": "VMZ MathJax adapter - <Mathjax> + math engine",
     "license": "MIT",

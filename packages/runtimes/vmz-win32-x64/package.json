@@ -1,7 +1,6 @@
 {
     "name": "@vmz/vmz-win32-x64",
     "version": "0.1.0",
-    "private": true,
     "description": "VMZ native N-API addon for @vmz/vmz (win32-x64)",
     "license": "MIT",
     "os": [
