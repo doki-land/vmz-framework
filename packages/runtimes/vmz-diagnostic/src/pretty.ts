@@ -37,14 +37,8 @@ function formatLocation(path: string, line: number, column: number): string {
     return paint(`  --> ${where}`, ANSI.bold, ANSI.blue);
 }
 
-function canRenderSnippet(
-    d: DiagnosticInput,
-    opts: FormatOptions & { style?: PrettyStyle },
-): boolean {
-    return (
-        (opts.style ?? 'pretty') === 'pretty' &&
-        Boolean(opts.sourceText && opts.position && d.span && d.span.end > d.span.start)
-    );
+function canRenderSnippet(d: DiagnosticInput, opts: FormatOptions & { style?: PrettyStyle }): boolean {
+    return (opts.style ?? 'pretty') === 'pretty' && Boolean(opts.sourceText && opts.position && d.span && d.span.end > d.span.start);
 }
 
 function renderSnippetLine(
@@ -67,11 +61,7 @@ function renderSnippetLine(
     out.push(marker);
 }
 
-export function formatDiagnosticPretty(
-    d: DiagnosticInput,
-    message: string,
-    opts: FormatOptions & { style?: PrettyStyle },
-): string {
+export function formatDiagnosticPretty(d: DiagnosticInput, message: string, opts: FormatOptions & { style?: PrettyStyle }): string {
     const head = paint(`${severityLabel(d.severity)}[${d.code}]`, ...severityStyle(d.severity));
     const lines: string[] = [`${head}: ${message}`];
 
@@ -101,15 +91,7 @@ export function formatDiagnosticPretty(
     if (startLine.line === endLine.line) {
         renderSnippetLine(lines, gutterWidth, startLine.line, startLine.text, startPos.column, endPos.column, d.severity);
     } else {
-        renderSnippetLine(
-            lines,
-            gutterWidth,
-            startLine.line,
-            startLine.text,
-            startPos.column,
-            startLine.text.length + 1,
-            d.severity,
-        );
+        renderSnippetLine(lines, gutterWidth, startLine.line, startLine.text, startPos.column, startLine.text.length + 1, d.severity);
         if (endLine.line > startLine.line + 1) {
             lines.push(paint(`${' '.repeat(gutterWidth + 3)}...`, ANSI.dim));
         }

@@ -47,9 +47,7 @@ export function unicodeScalarColumn(lineText: string, byteOffsetInLine: number):
     const buf = Buffer.from(lineText, 'utf8');
     const end = Math.max(0, Math.min(byteOffsetInLine, buf.length));
     if (end === 0) return 1;
-    return buf.subarray(0, end).toString('utf8').length > 0
-        ? [...buf.subarray(0, end).toString('utf8')].length
-        : 1;
+    return buf.subarray(0, end).toString('utf8').length > 0 ? [...buf.subarray(0, end).toString('utf8')].length : 1;
 }
 
 /** Map 1-based scalar column to JS string index for underline rendering. */

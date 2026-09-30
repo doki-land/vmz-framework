@@ -30,10 +30,7 @@ fn warns_each_without_key() {
         .iter()
         .find(|d| d.severity() == Severity::Warning && d.code().contains("key"))
         .unwrap_or_else(|| {
-            panic!(
-                "{:?}",
-                report.diagnostics.iter().map(|d| d.code()).collect::<Vec<_>>()
-            )
+            panic!("{:?}", report.diagnostics.iter().map(|d| d.code()).collect::<Vec<_>>())
         });
     let span = diag.source_span().expect("each_missing_key should carry SourceSpan");
     assert!(span.end > span.start, "span={span:?}");

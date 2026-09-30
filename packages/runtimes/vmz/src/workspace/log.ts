@@ -5,13 +5,7 @@
 import { formatDiagnostic } from '@vmz/diagnostic';
 import { loadCliCatalog, resolveVmzLocale, vmzCliLocalize } from '../cli/cli-localize.js';
 import { positionContextForSource, readDiagnosticSource } from './diagnostic-context.js';
-import {
-    type CliLogLevel,
-    diagnosticVisible,
-    getCliLogLevel,
-    progressVisible,
-    warnVisible,
-} from './log-level.js';
+import { type CliLogLevel, diagnosticVisible, getCliLogLevel, progressVisible, warnVisible } from './log-level.js';
 import { getCliLogStyle } from './log-style.js';
 
 function normalizeSeverity(severity: string | undefined): 'error' | 'warning' | 'advice' {

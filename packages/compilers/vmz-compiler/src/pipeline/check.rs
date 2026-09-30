@@ -344,35 +344,34 @@ fn walk_semantic_each_keys(
                 };
                 match key {
                     None => {
-                        report.diagnostics.push(
-                            with_span(
-                                ReportedDiagnostic::warning(path, "vmz::template::each_missing_key")
-                                    .with_arg("tag", tag),
-                            ),
-                        );
+                        report.diagnostics.push(with_span(
+                            ReportedDiagnostic::warning(path, "vmz::template::each_missing_key")
+                                .with_arg("tag", tag),
+                        ));
                     }
                     Some(k) => {
                         let e = k.trim();
                         if is_literal_key(e) {
-                            report.diagnostics.push(
-                                with_span(
-                                    ReportedDiagnostic::error(path, "vmz::template::each_literal_key")
-                                        .with_arg("tag", tag)
-                                        .with_arg("key", e.to_string()),
-                                ),
-                            );
+                            report.diagnostics.push(with_span(
+                                ReportedDiagnostic::error(path, "vmz::template::each_literal_key")
+                                    .with_arg("tag", tag)
+                                    .with_arg("key", e.to_string()),
+                            ));
                         } else if e == value_alias.as_str() {
-                            report.diagnostics.push(
-                                with_span(
-                                    ReportedDiagnostic::warning(path, "vmz::template::each_object_key")
-                                        .with_arg("tag", tag)
-                                        .with_arg("as", value_alias.clone()),
-                                ),
-                            );
+                            report.diagnostics.push(with_span(
+                                ReportedDiagnostic::warning(path, "vmz::template::each_object_key")
+                                    .with_arg("tag", tag)
+                                    .with_arg("as", value_alias.clone()),
+                            ));
                         }
                     }
                 }
-                walk_semantic_each_keys(path, std::slice::from_ref(body.as_ref()), content_start, report);
+                walk_semantic_each_keys(
+                    path,
+                    std::slice::from_ref(body.as_ref()),
+                    content_start,
+                    report,
+                );
             }
             SemanticNode::Element { children, .. } => {
                 walk_semantic_each_keys(path, children, content_start, report);
