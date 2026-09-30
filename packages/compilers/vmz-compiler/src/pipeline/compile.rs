@@ -1380,6 +1380,7 @@ fn emit_file(
                 return Ok(());
             }
         };
+        let server_js = crate::emit::rewrite_ts_spec_imports(&server_js);
         let virtual_rel =
             id.trim_start_matches("#server/").replace('/', std::path::MAIN_SEPARATOR_STR);
         let server_out = options.out_dir.join("#server").join(virtual_rel).with_extension("js");

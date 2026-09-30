@@ -54,7 +54,7 @@ const BODY_KEYS = [
     'statementBody',
     'startTitle',
     'startLede',
-    'build',
+    'heroPrimaryCta',
     'readDocs',
     'start',
     'docs',
@@ -71,7 +71,7 @@ export async function proveHomepageLocaleTransition(opts: {
     const en = loadHomepageCommonCatalog(root, homepageRel, 'en-us');
     assertCatalogKeys(zh, BODY_KEYS, 'zh-hans');
     assertCatalogKeys(en, BODY_KEYS, 'en-us');
-    for (const k of ['heroKicker', 'heroLede', 'statementBody', 'startTitle', 'build', 'start', 'docs']) {
+    for (const k of ['heroKicker', 'heroLede', 'statementBody', 'startTitle', 'heroPrimaryCta', 'start', 'docs']) {
         if (normCopy(zh[k]) === normCopy(en[k])) {
             throw new Error(`catalog ${k} must differ across zh-hans/en-us (got identical)`);
         }
@@ -161,7 +161,7 @@ export async function proveHomepageLocaleTransition(opts: {
                 statementBody: normCopy(catalog.statementBody),
                 startTitle: normCopy(catalog.startTitle),
                 startLede: normCopy(catalog.startLede),
-                build: normCopy(catalog.build),
+                build: normCopy(catalog.heroPrimaryCta),
                 start: normCopy(catalog.start),
                 docs: normCopy(catalog.docs),
                 guideHref: `/d/${localeId}/guide/`,

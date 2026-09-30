@@ -829,7 +829,7 @@ export default class CommercialPage {
 }
 </script>
 <script server>
-import { formatPriority, formatStatus, mapTicketRow } from "../demo/ticket-rows.ts";
+import { formatPriority, formatStatus, mapTicketRow } from "../../demo/ticket-rows.ts";
 import TicketDemo from "#server/demo/TicketDemo";
 
 export default class CommercialPageServer {

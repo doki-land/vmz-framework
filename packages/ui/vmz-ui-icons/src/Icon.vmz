@@ -7,11 +7,11 @@
                 <circle v-for="c in strokeCircles()" :key="circleKey(c)" :cx="c.cx" :cy="c.cy" :r="c.r" />
                 <circle v-for="dot in strokeDots()" :key="dotKey(dot)" :cx="dot.cx" :cy="dot.cy" :r="dot.r" fill="currentColor" stroke="none" />
             </g>
-            <template v-else-if="isMixed()">
+            <g v-else-if="isMixed()">
                 <path v-for="node in mixedPaths()" :key="node.key" :d="node.d" :fill="node.fill" :stroke="node.stroke" :stroke-width="node.strokeWidth" :fill-rule="node.fillRule" />
                 <circle v-for="node in mixedCircles()" :key="node.key" :cx="node.cx" :cy="node.cy" :r="node.r" :fill="node.fill" :stroke="node.stroke" :stroke-width="node.strokeWidth" />
                 <rect v-for="node in mixedRects()" :key="node.key" :x="node.x" :y="node.y" :width="node.width" :height="node.height" :rx="node.rx" :fill="node.fill" :stroke="node.stroke" :stroke-width="node.strokeWidth" />
-            </template>
+            </g>
             <path v-else-if="isFill()" fill="currentColor" :fill-rule="fillRule()" :d="fillD()" />
         </svg>
     </span>
