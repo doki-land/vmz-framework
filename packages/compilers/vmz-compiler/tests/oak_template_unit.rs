@@ -80,3 +80,56 @@ export default class Page {
     };
     assert_eq!(expr.trim(), "title");
 }
+
+#[test]
+fn oak_lowers_v_if_directive() {
+    let source = r#"<template>
+  <p v-if="show">x</p>
+</template>
+<script client>
+export default class Page { show = true; }
+</script>
+"#;
+    let parsed = parse_vmz("If.vmz", source).expect("parse vmz");
+    let oak = parse_template_concrete_via_oak(&parsed.template).expect("oak concrete");
+    let vmz_compiler::ConcreteNode::Element { attrs, .. } = &oak.roots[0] else {
+        panic!("expected element");
+    };
+    let v_if = attrs
+        .iter()
+        .find(|a| {
+            matches!(
+                a,
+                vmz_compiler::ConcreteAttr::Directive {
+                    dir: vmz_compiler::Directive::If { .. },
+                    ..
+                }
+            )
+        })
+        .expect("v-if directive");
+    let vmz_compiler::ConcreteAttr::Directive {
+        dir: vmz_compiler::Directive::If { test },
+        ..
+    } = v_if
+    else {
+        unreachable!();
+    };
+    assert_eq!(test, "show");
+}
+
+#[test]
+fn oak_primary_falls_back_on_dynamic_bind_arg() {
+    let body = r#"<button :[attrName]="val" @[eventName]="onEv">x</button>"#;
+    let source = format!(
+        r#"<template>{body}</template>
+<script client>
+export default class Page {{ val = 1; onEv() {{}} }}
+</script>
+"#,
+        body = body
+    );
+    let parsed = parse_vmz("Dyn.vmz", source).expect("parse vmz");
+    let primary = vmz_compiler::parse_template_concrete_primary(&parsed.template).expect("primary");
+    let legacy = parse_template_concrete(body).expect("legacy");
+    assert_eq!(primary.roots.len(), legacy.roots.len());
+}

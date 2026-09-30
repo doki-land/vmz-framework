@@ -16,7 +16,8 @@ pub use super::template_concrete::{
     parse_template_concrete,
 };
 pub use super::template_oak::{
-    parse_template_concrete_primary, parse_template_concrete_via_oak,
+    parse_template_concrete_body_primary, parse_template_concrete_primary,
+    parse_template_concrete_via_oak,
 };
 pub use super::template_ir::{AttrValue, TemplateAttr, TemplateIr, TemplateNode};
 pub use super::template_lower::lower_concrete_to_ir;
@@ -29,6 +30,9 @@ pub use super::template_span::TemplateSpan;
 /// Parse a `<template>` body as Vue template syntax into legacy VMZ IR.
 ///
 /// Pipeline: [`parse_template_concrete`] → [`lower_concrete_to_ir`].
+///
+/// SFC pipeline uses [`parse_template_concrete_primary`] via `check` / `compile`.
+/// Body-only helpers keep legacy concrete until Oak covers dynamic directive args.
 pub fn parse_template(input: &str) -> Result<TemplateIr, TemplateParseError> {
     let concrete = parse_template_concrete(input)?;
     lower_concrete_to_ir(&concrete)

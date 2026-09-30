@@ -6,13 +6,22 @@ use oak_vue::{VueAttribute, VueNode, VueRoot};
 use vmz_oak_frontend_adapter::{parse_template_ast, TemplateShellInput};
 
 use super::template_concrete::{classify_concrete_attr, ConcreteAttr, ConcreteIr, ConcreteNode};
+use super::template_semantic::lower_concrete_to_semantic;
 use super::template_span::TemplateSpan;
 use crate::sfc::TemplateBlock;
 
 const TEMPLATE_OPEN: &str = "<template>";
 
+/// Dynamic `:[expr]` / `@[expr]` directive args hang current `oak-vue` builder — skip until fixed upstream.
+fn oak_skips_template_body(body: &str) -> bool {
+    body.contains(":[") || body.contains("@[")
+}
+
 /// Build VMZ [`ConcreteIr`] from a VMZ template block via Oak CST + AST.
 pub fn parse_template_concrete_via_oak(template: &TemplateBlock) -> Result<ConcreteIr, String> {
+    if oak_skips_template_body(&template.content) {
+        return Err("Oak template AST: dynamic directive argument not supported yet".into());
+    }
     let shell = TemplateShellInput {
         content: template.content.clone(),
         content_start: template.content_start,
@@ -28,10 +37,20 @@ pub fn parse_template_concrete_via_oak(template: &TemplateBlock) -> Result<Concr
     lower_vue_root_to_concrete(root, &parsed.shell_source)
 }
 
+/// Prefer Oak concrete lowering for a template body string, fall back to legacy.
+pub fn parse_template_concrete_body_primary(input: &str) -> Result<ConcreteIr, super::template_common::TemplateParseError> {
+    parse_template_concrete_primary(&TemplateBlock {
+        content: input.to_string(),
+        content_start: 0,
+    })
+}
+
 /// Prefer Oak concrete lowering, fall back to the legacy scanner when Oak is unavailable.
 pub fn parse_template_concrete_primary(template: &TemplateBlock) -> Result<ConcreteIr, super::template_common::TemplateParseError> {
     if let Ok(ir) = parse_template_concrete_via_oak(template) {
-        return Ok(ir);
+        if lower_concrete_to_semantic(&ir).is_ok() {
+            return Ok(ir);
+        }
     }
     super::template_concrete::parse_template_concrete(&template.content)
 }
@@ -105,22 +124,15 @@ fn lower_attr(shell: &str, attr: &VueAttribute) -> Result<ConcreteAttr, String> 
             classify_concrete_attr(name, value, span).map_err(|e| e.message)
         }
         VueAttribute::Directive(d) => {
-            let (name, value) = attr_name_value_from_span(shell, d.span)?;
+            let raw = slice(shell, d.span);
+            let (name, value) = if let Some((name, rest)) = raw.split_once('=') {
+                (name.trim().to_string(), Some(unquote_attr_value(rest.trim())))
+            } else {
+                (raw.trim().to_string(), None)
+            };
             let span = to_body_span(shell, d.span);
             classify_concrete_attr(&name, value.as_deref(), span).map_err(|e| e.message)
         }
-    }
-}
-
-fn attr_name_value_from_span(shell: &str, span: Range<usize>) -> Result<(String, Option<String>), String> {
-    let raw = shell
-        .get(span.start..span.end)
-        .ok_or_else(|| "directive span out of bounds".to_string())?;
-    if let Some((name, rest)) = raw.split_once('=') {
-        let val = unquote_attr_value(rest.trim());
-        Ok((name.trim().to_string(), Some(val)))
-    } else {
-        Ok((raw.trim().to_string(), None))
     }
 }
 
