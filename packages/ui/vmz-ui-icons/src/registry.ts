@@ -3,12 +3,14 @@ import type { IconDef, IconFillDef } from './icon-types.ts';
 import { DEFAULT_STROKE_WIDTH } from './icon-types.ts';
 import { LEGACY_FILL_ICONS } from './icons-legacy-fill.ts';
 import { STROKE_ICONS } from './icons-stroke.ts';
+import { TEXT_BADGE_ICONS } from './icons-text-badge.ts';
 
-export type { IconDef, IconFillDef, IconMixedDef, IconMixedNode, IconStrokeDef } from './icon-types.ts';
+export type { IconDef, IconFillDef, IconMixedDef, IconMixedNode, IconStrokeDef, IconTextBadgeDef } from './icon-types.ts';
 export { DEFAULT_STROKE_WIDTH } from './icon-types.ts';
 
 export const REGISTRY: Record<string, IconDef> = {
     ...STROKE_ICONS,
+    ...TEXT_BADGE_ICONS,
     ...LEGACY_FILL_ICONS,
 };
 
@@ -27,6 +29,7 @@ export const LEGACY_ICON_ALIASES: Record<string, string> = {
     home: 'nav.home',
     language: 'nav.language',
     copy: 'action.copy',
+    discount: 'tool.percentage',
 };
 
 export function resolveIconName(name: string): string {
@@ -51,6 +54,7 @@ export function resolveIconPath(name: string): string {
     const def = resolveIconDef(name);
     if (!def) return '';
     if (def.kind === 'fill') return def.d;
+    if (def.kind === 'text-badge') return '';
     if (def.kind === 'stroke') return def.paths[0] ?? '';
     const pathNode = def.nodes.find((node) => node.tag === 'path');
     return pathNode?.attrs.d ?? '';

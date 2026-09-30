@@ -1,6 +1,7 @@
 <template>
     <span data-vmz-ui="icon" :data-name="name" :data-size="size" :role='decorative ? "presentation" : "img"' :aria-hidden='decorative ? "true" : "false"' :aria-label='decorative ? "" : label' class="vmz-ui-icon">
-        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true" class="vmz-ui-icon__svg">
+        <span v-if="isTextBadge()" class="vmz-ui-icon__badge">{{ badgeLabel() }}</span>
+        <svg v-else viewBox="0 0 24 24" focusable="false" aria-hidden="true" class="vmz-ui-icon__svg">
             <path v-if="hasExplicitPath()" fill="currentColor" :d="explicitPath()" />
             <g v-else-if="isStroke()" fill="none" stroke="currentColor" :stroke-width="strokeWidth()" stroke-linecap="round" stroke-linejoin="round">
                 <path v-for="d in strokePaths()" :key="d" :d="d" />
@@ -35,6 +36,23 @@
     width: 1em;
     height: 1em;
     display: block;
+}
+.vmz-ui-icon__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-width: 1.65em;
+    padding: 0.12em 0.22em;
+    border: 1.5px solid currentColor;
+    border-radius: 0.2em;
+    font-family: var(--vmz-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    font-size: 0.52em;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    text-align: center;
+    text-transform: uppercase;
 }
 </style>
 <script client>
@@ -74,6 +92,17 @@ export default class Icon {
     isFill() {
         const def = this.iconDef();
         return def?.kind === "fill";
+    }
+
+    isTextBadge() {
+        const def = this.iconDef();
+        return def?.kind === "text-badge";
+    }
+
+    badgeLabel() {
+        const def = this.iconDef();
+        if (def?.kind !== "text-badge") return "";
+        return def.label;
     }
 
     strokeWidth() {

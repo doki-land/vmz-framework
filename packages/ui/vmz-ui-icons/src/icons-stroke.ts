@@ -84,4 +84,62 @@ export const STROKE_ICONS: Record<string, IconDef> = {
         kind: 'stroke',
         paths: ['M4 16H20', 'M12 6V14', 'M8.5 10.5L12 6L15.5 10.5'],
     },
+    'tool.url': {
+        kind: 'stroke',
+        paths: [
+            'M10.5 8.5a3 3 0 0 1 4.2 0l.8.8a3 3 0 0 1 0 4.2l-.8.8',
+            'M13.5 15.5a3 3 0 0 1-4.2 0l-.8-.8a3 3 0 0 1 0-4.2l.8-.8',
+        ],
+    },
+    'tool.temperature': {
+        kind: 'stroke',
+        circles: [{ cx: 12, cy: 18, r: 3 }],
+        paths: ['M12 4V15', 'M10 9H14'],
+    },
+    'tool.length': {
+        kind: 'stroke',
+        paths: [
+            'M4 12H20',
+            'M6 9V15',
+            'M10 10V14',
+            'M14 10V14',
+            'M18 9V15',
+            'M4 12L7 9',
+            'M4 12L7 15',
+            'M20 12L17 9',
+            'M20 12L17 15',
+        ],
+    },
+    'tool.weight': {
+        kind: 'stroke',
+        paths: ['M6 8H18', 'M12 8V16', 'M8 16H16', 'M9 6H15'],
+    },
+    'tool.time-units': {
+        kind: 'stroke',
+        circles: [{ cx: 12, cy: 12, r: 9 }],
+        paths: ['M12 7V12L15.5 14'],
+    },
+    'tool.color': {
+        kind: 'stroke',
+        paths: ['M12 4C8.5 4 6 6.5 6 10s2.5 6 6 6', 'M12 4c3.5 0 6 2.5 6 6s-2.5 6-6 6'],
+        dots: [{ cx: 8, cy: 10, r: 1.2 }, { cx: 12, cy: 8, r: 1.2 }, { cx: 16, cy: 10, r: 1.2 }],
+    },
+    'tool.percentage': {
+        kind: 'stroke',
+        circles: [{ cx: 9.5, cy: 9.5, r: 2 }, { cx: 14.5, cy: 14.5, r: 2 }],
+        paths: ['M16 8L8 16'],
+    },
+    'tool.area': {
+        kind: 'stroke',
+        paths: ['M5 5H19V19H5Z', 'M8 8H16V16H8Z'],
+    },
+    'tool.volume': {
+        kind: 'stroke',
+        paths: ['M5 9H19V19H5Z', 'M8 6H16', 'M8 6V9', 'M16 6V9'],
+    },
+    'tool.data-size': {
+        kind: 'stroke',
+        paths: ['M5 7H19', 'M5 11H15', 'M5 15H19'],
+    },
 };
+

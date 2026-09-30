@@ -24,6 +24,12 @@ export type IconMixedDef = {
     nodes: readonly IconMixedNode[];
 };
 
-export type IconDef = IconStrokeDef | IconFillDef | IconMixedDef;
+/** Monospace text mark for proprietary converter names (2–4 chars). */
+export type IconTextBadgeDef = {
+    kind: 'text-badge';
+    label: string;
+};
+
+export type IconDef = IconStrokeDef | IconFillDef | IconMixedDef | IconTextBadgeDef;
 
 export const DEFAULT_STROKE_WIDTH = 1.75;
