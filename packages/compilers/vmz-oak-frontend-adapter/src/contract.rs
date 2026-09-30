@@ -72,6 +72,26 @@ pub struct TemplateShellInput {
     pub content_start: usize,
 }
 
+/// Client vs server `<script>` role for Oak TypeScript AST.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScriptRole {
+    /// `<script client>`.
+    Client,
+    /// `<script server>`.
+    Server,
+}
+
+/// VMZ script body slice for Oak TypeScript AST.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScriptShellInput {
+    /// TypeScript between `<script>` tags.
+    pub content: String,
+    /// Byte offset of content start in the `.vmz` file.
+    pub content_start: usize,
+    /// Client or server role.
+    pub role: ScriptRole,
+}
+
 /// Diagnostic surfaced from Oak parse (mapped to `.vmz` coordinates when possible).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OakFrontendDiagnostic {

@@ -55,7 +55,7 @@ const proof = readProof(root);
 upsertCheck(proof, {
     id: 'oak-frontend-smoke',
     status: 'passed',
-    detail: 'Oak CST/AST adapter + Oak concrete lowering + Nyar projection stub',
+    detail: 'Oak CST/AST adapter, script TS AST, concrete lowering, Nyar projection stub',
 });
 writeProof(proof, root);
 

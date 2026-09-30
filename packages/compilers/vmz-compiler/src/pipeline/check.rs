@@ -150,6 +150,13 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
         }
     };
 
+    if let Err(detail) = crate::oak::check_oak_script_ts(&parsed.client) {
+        report.diagnostics.push(
+            ReportedDiagnostic::error(path, "vmz::script::oak_client_parse_failed")
+                .with_arg("detail", detail),
+        );
+    }
+
     let client = analyze_script(ScriptKind::Client, &parsed.client.content);
     for err in &client.parse_errors {
         report.diagnostics.push(
@@ -170,6 +177,14 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
     }
 
     if let Some(server) = &parsed.server {
+        if server.lang == ScriptLanguage::Ts {
+            if let Err(detail) = crate::oak::check_oak_script_ts(server) {
+                report.diagnostics.push(
+                    ReportedDiagnostic::error(path, "vmz::script::oak_server_parse_failed")
+                        .with_arg("detail", detail),
+                );
+            }
+        }
         let analyzed = match server.lang {
             ScriptLanguage::Ts => analyze_script(ScriptKind::Server, &server.content),
             ScriptLanguage::Rust => analyze_rust_server_dsl(&server.content),

@@ -1249,6 +1249,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "oak-typescript"
+version = "0.0.12"
+dependencies = [
+ "oak-core",
+ "serde",
+]
+
+[[package]]
 name = "oak-vue"
 version = "0.0.12"
 dependencies = [
@@ -3160,6 +3168,7 @@ name = "vmz-oak-frontend-adapter"
 version = "0.1.0"
 dependencies = [
  "oak-core",
+ "oak-typescript",
  "oak-vue",
  "thiserror",
  "vmz-compiler",
