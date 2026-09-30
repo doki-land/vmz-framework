@@ -61,8 +61,11 @@ const where = formatDiagnostic(
         locale: 'en-US',
         catalog: { 'test.code': 'boom' },
         position: pos,
+        sourceText: source,
+        style: 'pretty',
     },
 );
-assert.match(where, /^demo\.vmz:2:1: error\[test\.code\]: boom$/);
+assert.match(where, /^error\[test\.code\]: boom\n  --> demo\.vmz:2:1\n/);
+assert.match(where, /\n2 \| 中文\n2 \| \^/);
 
 console.log('SPAN-CONTEXT-CONVERSION GATE OK');

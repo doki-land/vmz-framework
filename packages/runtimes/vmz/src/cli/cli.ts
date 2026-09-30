@@ -29,6 +29,8 @@ import { emitLocaleRuntimeModules, localeHasErrors } from '../locale/locale-chec
 import { registerLocaleCommands } from '../locale/locale-cmd.js';
 import { emitLocaleRouteRealization } from '../locale/locale-route-emit.js';
 import { log } from '../workspace/log.js';
+import { resolveCliLogLevel, setCliLogLevel } from '../workspace/log-level.js';
+import { parseCliLogStyle, setCliLogStyle } from '../workspace/log-style.js';
 import { packFromDeploymentIr } from '../workspace/pack.js';
 import { registerPlanCommands } from './plan-cmd.js';
 import { loadVmzConfig } from '../workspace/plugin-host.js';
@@ -85,7 +87,11 @@ function buildProductCli(opts: { mode?: 'global' | 'project' } = {}): Cli {
             .option('--check', 'cli.opt.check')
             .option('--deny-warnings', 'cli.opt.deny-warnings');
 
-    withWorkspaceOpts(cli.command('check', 'cli.cmd.check')).action((options) => cmdCheck(options));
+    withWorkspaceOpts(cli.command('check', 'cli.cmd.check'))
+        .option('--level <level>', 'cli.opt.level')
+        .option('--info', 'cli.opt.info-level')
+        .option('--style <style>', 'cli.opt.diag-style')
+        .action((options) => cmdCheck(options));
     withWorkspaceOpts(cli.command('build', 'cli.cmd.build')).action((options) => cmdBuild(options));
     withWorkspaceOpts(cli.command('serve', 'cli.cmd.serve')).action((options) => cmdServe(options));
     withWorkspaceOpts(cli.command('dev', 'cli.cmd.dev')).action((options) => cmdDev(options));
@@ -94,7 +100,11 @@ function buildProductCli(opts: { mode?: 'global' | 'project' } = {}): Cli {
         .option('--no-rust', 'cli.opt.format-no-rust')
         .option('--no-vmz', 'cli.opt.format-no-vmz')
         .action((options) => cmdFormat(options));
-    withWorkspaceOpts(cli.command('lint', 'cli.cmd.lint')).action((options) => cmdLint(options));
+    withWorkspaceOpts(cli.command('lint', 'cli.cmd.lint'))
+        .option('--level <level>', 'cli.opt.level')
+        .option('--info', 'cli.opt.info-level')
+        .option('--style <style>', 'cli.opt.diag-style')
+        .action((options) => cmdLint(options));
 
     registerTestCommand(cli);
     registerDocumentCommands(cli.command('document|docs', 'cli.cmd.document'));
@@ -155,7 +165,25 @@ function cmdVersion(): number {
     return 0;
 }
 
+function applyInspectLogOptions(args: ParsedOptions): number | null {
+    const level = resolveCliLogLevel({ level: args.level, info: Boolean(args.info) });
+    if (level == null) {
+        log.errorId('cli.err.invalid_level', { level: String(args.level ?? '') });
+        return 1;
+    }
+    setCliLogLevel(level);
+    const style = parseCliLogStyle(args.style);
+    if (style == null) {
+        log.errorId('cli.err.invalid_style', { style: String(args.style ?? '') });
+        return 1;
+    }
+    setCliLogStyle(style);
+    return null;
+}
+
 async function cmdCheck(args: ParsedOptions): Promise<number> {
+    const optsErr = applyInspectLogOptions(args);
+    if (optsErr != null) return optsErr;
     const pathArg = args._[0] ?? '.';
     const { project, outDir } = resolveWorkspaceDirs({
         path: pathArg,
@@ -542,6 +570,8 @@ async function cmdFormat(args: ParsedOptions): Promise<number> {
 }
 
 function cmdLint(args: ParsedOptions): number {
+    const optsErr = applyInspectLogOptions(args);
+    if (optsErr != null) return optsErr;
     const pathArg = args._[0] ?? '.';
     const { project, outDir } = resolveWorkspaceDirs({
         path: pathArg,
