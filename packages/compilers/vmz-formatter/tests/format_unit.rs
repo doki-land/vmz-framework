@@ -312,6 +312,18 @@ export default class Monaco {}
 }
 
 #[test]
+fn autocomplete_page_format_does_not_hang() {
+    let source_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../ui/vmz-ui/src/components/Autocomplete.vmz");
+    if !source_path.exists() {
+        eprintln!("skip autocomplete fixture: {}", source_path.display());
+        return;
+    }
+    let report = format_path(&source_path, &FormatOptions { check: true }).unwrap();
+    assert!(!report.has_errors(), "{:?}", report.diagnostics);
+}
+
+#[test]
 fn deploy_planner_page_format_is_idempotent() {
     let source_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../homepage/src/pages/deploy-planner.vmz");
