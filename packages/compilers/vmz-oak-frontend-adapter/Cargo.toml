@@ -9,6 +9,7 @@ publish = false
 
 [dependencies]
 oak-core.workspace = true
+oak-typescript.workspace = true
 oak-vue.workspace = true
 thiserror.workspace = true
 

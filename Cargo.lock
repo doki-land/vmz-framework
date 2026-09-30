@@ -1240,6 +1240,7 @@ dependencies = [
 [[package]]
 name = "oak-core"
 version = "0.0.12"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#536083e5126e78c6a87651c0aed47cce8c801729"
 dependencies = [
  "serde",
  "smallvec",
@@ -1249,8 +1250,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "oak-typescript"
+version = "0.0.12"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#536083e5126e78c6a87651c0aed47cce8c801729"
+dependencies = [
+ "oak-core",
+ "serde",
+]
+
+[[package]]
 name = "oak-vue"
 version = "0.0.12"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#536083e5126e78c6a87651c0aed47cce8c801729"
 dependencies = [
  "oak-core",
  "serde",
@@ -3160,6 +3171,7 @@ name = "vmz-oak-frontend-adapter"
 version = "0.1.0"
 dependencies = [
  "oak-core",
+ "oak-typescript",
  "oak-vue",
  "thiserror",
  "vmz-compiler",

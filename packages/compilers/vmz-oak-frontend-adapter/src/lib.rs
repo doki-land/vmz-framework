@@ -9,10 +9,11 @@ mod contract;
 mod nyar_contract;
 mod oak_ast;
 mod oak_cst;
+mod oak_script;
 
 pub use contract::{
-    BlockKind, ByteSpan, OakFrontendDiagnostic, SfcBlockRegion, SfcDocumentView,
-    TemplateCstParse, TemplateShellInput,
+    BlockKind, ByteSpan, OakFrontendDiagnostic, ScriptRole, ScriptShellInput, SfcBlockRegion,
+    SfcDocumentView, TemplateCstParse, TemplateShellInput,
 };
 pub use nyar_contract::{
     NyarAnalysisInput, NyarHttpRoute, NyarInternalType, NyarMember, NyarMemberKind,
@@ -20,3 +21,4 @@ pub use nyar_contract::{
 };
 pub use oak_ast::{parse_template_ast, require_template_ast, TemplateAstParse};
 pub use oak_cst::{format_cst_diagnostics, parse_template_cst, require_template_cst};
+pub use oak_script::{parse_script_ast, require_script_ast, ScriptAstParse};

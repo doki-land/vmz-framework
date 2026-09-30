@@ -40,9 +40,10 @@ vmz-plugin-tailwind = { path = "packages/compilers/vmz-plugin-tailwind" }
 vmz-plugin-sasso = { path = "packages/compilers/vmz-plugin-sasso" }
 vmz-oak-frontend-adapter = { path = "packages/compilers/vmz-oak-frontend-adapter" }
 
-# Oaks frontend (Vue SFC / CST). CI uses git, local sibling checkout via `[patch]` below.
-oak-core = { git = "https://github.com/ygg-lang/oaks.git", branch = "master" }
-oak-vue = { git = "https://github.com/ygg-lang/oaks.git", branch = "master" }
+# Oaks frontend (Vue SFC / CST). CI uses git `dev`, local sibling checkout via `[patch]` below.
+oak-core = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
+oak-vue = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
+oak-typescript = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
 
 # All oxc_* locked to one git tag (includes publish=false formatter crates).
 oxc_allocator = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
@@ -86,10 +87,6 @@ tailwind-css = { git = "https://github.com/oovm/tailwind-rs.git", branch = "dev"
 
 [patch.crates-io]
 oxc_allocator = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
-
-[patch."https://github.com/ygg-lang/oaks.git"]
-oak-core = { path = "../../dxo 深度学习/oaks/projects/oak-core" }
-oak-vue = { path = "../../dxo 深度学习/oaks/examples/oak-vue" }
 
 [profile.release]
 lto = true

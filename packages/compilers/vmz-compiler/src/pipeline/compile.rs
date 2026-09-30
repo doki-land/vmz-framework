@@ -1139,6 +1139,22 @@ fn emit_file(
 ) -> crate::Result<()> {
     let source = fs::read_to_string(path)?;
     let parsed = parse_vmz(path, source)?;
+    if let Err(detail) = crate::oak::check_oak_script_ts(&parsed.client) {
+        report.diagnostics.push(
+            ReportedDiagnostic::error(path, "vmz::script::oak_client_parse_failed")
+                .with_arg("detail", detail),
+        );
+        return Ok(());
+    }
+    if let Some(server) = &parsed.server {
+        if let Err(detail) = crate::oak::check_oak_script_ts(server) {
+            report.diagnostics.push(
+                ReportedDiagnostic::error(path, "vmz::script::oak_server_parse_failed")
+                    .with_arg("detail", detail),
+            );
+            return Ok(());
+        }
+    }
     register_tw_from_parsed(&parsed, &mut report.tw_registrations);
     let client = analyze_script(ScriptKind::Client, &parsed.client.content);
     for finding in crate::secrets::collect_client_boundary_findings(&parsed.client.content) {
