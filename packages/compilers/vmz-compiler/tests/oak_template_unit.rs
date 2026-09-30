@@ -56,3 +56,27 @@ export default class Page {{ name = ''; url = '/x'; }}
         .collect();
     assert_eq!(tags, ["input", "img", "br"]);
 }
+
+#[test]
+fn oak_lowers_interpolation_to_concrete() {
+    let source = r#"<template>
+  <p>{{ title }}</p>
+</template>
+<script client>
+export default class Page {
+  title = 'hi';
+}
+</script>
+"#;
+    let parsed = parse_vmz("Interp.vmz", source).expect("parse vmz");
+    let oak = parse_template_concrete_via_oak(&parsed.template).expect("oak concrete");
+    assert_eq!(oak.roots.len(), 1);
+    let vmz_compiler::ConcreteNode::Element { children, .. } = &oak.roots[0] else {
+        panic!("expected element root");
+    };
+    assert_eq!(children.len(), 1);
+    let vmz_compiler::ConcreteNode::Interpolation { expr, .. } = &children[0] else {
+        panic!("expected interpolation child");
+    };
+    assert_eq!(expr.trim(), "title");
+}

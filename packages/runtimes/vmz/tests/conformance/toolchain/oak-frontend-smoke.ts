@@ -15,22 +15,47 @@ function fail(msg: string): never {
 }
 
 console.log('oak-frontend-smoke: cargo test vmz-oak-frontend-adapter…');
-const run = spawnSync('cargo', ['test', '-p', 'vmz-oak-frontend-adapter', '--quiet'], {
+const adapterRun = spawnSync('cargo', ['test', '-p', 'vmz-oak-frontend-adapter', '--quiet'], {
     cwd: root,
     encoding: 'utf8',
     shell: true,
 });
-if (run.status !== 0) {
-    console.error(run.stdout || '');
-    console.error(run.stderr || '');
+if (adapterRun.status !== 0) {
+    console.error(adapterRun.stdout || '');
+    console.error(adapterRun.stderr || '');
     fail('cargo test -p vmz-oak-frontend-adapter');
+}
+
+console.log('oak-frontend-smoke: cargo test vmz-compiler oak + nyar projection…');
+const compilerRun = spawnSync(
+    'cargo',
+    [
+        'test',
+        '-p',
+        'vmz-compiler',
+        '--test',
+        'oak_template_unit',
+        '--test',
+        'nyar_projection_unit',
+        '--quiet',
+    ],
+    {
+        cwd: root,
+        encoding: 'utf8',
+        shell: true,
+    },
+);
+if (compilerRun.status !== 0) {
+    console.error(compilerRun.stdout || '');
+    console.error(compilerRun.stderr || '');
+    fail('cargo test -p vmz-compiler oak_template_unit nyar_projection_unit');
 }
 
 const proof = readProof(root);
 upsertCheck(proof, {
     id: 'oak-frontend-smoke',
     status: 'passed',
-    detail: 'vmz-oak-frontend-adapter region map + Oak Vue CST template parse',
+    detail: 'Oak CST/AST adapter + Oak concrete lowering + Nyar projection stub',
 });
 writeProof(proof, root);
 
