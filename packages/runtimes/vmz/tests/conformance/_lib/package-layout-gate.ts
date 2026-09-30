@@ -11,6 +11,16 @@ const CLI_SRC = 'packages/runtimes/vmz/src';
 
 const CORE_LAYERS = ['browser', 'ssr', 'host', 'faces', 'shared'] as const;
 
+/** Nested layout introduced by Host and Package Contract reshape. */
+const CORE_NESTED_DIRS = [
+    'browser/diagnostics',
+    'browser/dom',
+    'browser/reactivity',
+    'browser/navigation',
+    'browser/resume',
+    'host/serve',
+] as const;
+
 /** Root of @vmz/core/src may only hold these (prefer empty). */
 const CORE_ROOT_ALLOW = new Set<string>();
 
@@ -37,6 +47,12 @@ export function assertPackageLayoutCore(root = repoRoot(import.meta.url)): strin
         const p = path.join(src, layer);
         if (!fs.existsSync(p) || !fs.statSync(p).isDirectory()) {
             errors.push(`missing ${CORE_SRC}/${layer}/`);
+        }
+    }
+    for (const rel of CORE_NESTED_DIRS) {
+        const p = path.join(src, rel);
+        if (!fs.existsSync(p) || !fs.statSync(p).isDirectory()) {
+            errors.push(`missing ${CORE_SRC}/${rel}/`);
         }
     }
     for (const name of listTsFiles(src)) {
