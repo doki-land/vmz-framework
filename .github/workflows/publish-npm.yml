@@ -69,12 +69,21 @@ jobs:
           - os: windows-latest
             short: win32-x64
             triple: win32-x64-msvc
+          - os: windows-11-arm
+            short: win32-arm64
+            triple: win32-arm64-msvc
           - os: ubuntu-latest
             short: linux-x64
             triple: linux-x64-gnu
+          - os: ubuntu-24.04-arm
+            short: linux-arm64
+            triple: linux-arm64-gnu
           - os: macos-latest
             short: darwin-arm64
             triple: darwin-arm64
+          - os: macos-15-intel
+            short: darwin-x64
+            triple: darwin-x64
     steps:
       - name: Checkout tag peel
         uses: actions/checkout@v5
@@ -207,7 +216,7 @@ jobs:
           done
           find dist/native-flat -type f -print
           # Fail early if a matrix platform is missing.
-          for short in win32-x64 linux-x64 darwin-arm64; do
+          for short in win32-x64 win32-arm64 linux-x64 linux-arm64 darwin-arm64 darwin-x64; do
             if ! find "dist/native-flat/$short" -name 'vmz.*.node' -type f | grep -q .; then
               echo "missing native binary for $short under dist/native-flat" >&2
               exit 1
