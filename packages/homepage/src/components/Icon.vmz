@@ -1,7 +1,12 @@
 <template>
     <span data-vmz-ui="icon" :data-name="name" :data-size="size" :role='decorative ? "presentation" : "img"' :aria-hidden='decorative ? "true" : "false"' :aria-label='decorative ? "" : label' class="vmz-ui-icon">
         <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true" class="vmz-ui-icon__svg">
-            <path fill="currentColor" :d="iconPath()" />
+            <g v-if="isStroke()" fill="none" stroke="currentColor" :stroke-width="strokeWidth()" stroke-linecap="round" stroke-linejoin="round">
+                <path v-for="d in strokePaths()" :key="d" :d="d" />
+                <circle v-for="c in strokeCircles()" :key="circleKey(c)" :cx="c.cx" :cy="c.cy" :r="c.r" />
+                <circle v-for="dot in strokeDots()" :key="dotKey(dot)" :cx="dot.cx" :cy="dot.cy" :r="dot.r" fill="currentColor" stroke="none" />
+            </g>
+            <path v-else-if="isFill()" fill="currentColor" :fill-rule="fillRule()" :d="fillD()" />
         </svg>
     </span>
 </template>
@@ -32,7 +37,7 @@
 }
 </style>
 <script client>
-import { FALLBACK_PATH, resolveIconPath } from "@vmz/ui-icons/registry";
+import { DEFAULT_STROKE_WIDTH, resolveIconDef } from "@vmz/ui-icons/registry";
 
 /**
  * Homepage Icon — semantic registry from `@vmz/ui-icons` for official dogfood surfaces.
@@ -45,8 +50,62 @@ export default class Icon {
     public label: string = "";
     public decorative: boolean = true;
 
-    iconPath() {
-        return resolveIconPath(this.name) || FALLBACK_PATH;
+    iconDef() {
+        return resolveIconDef(this.name);
+    }
+
+    isStroke() {
+        const def = this.iconDef();
+        return def?.kind === "stroke";
+    }
+
+    isFill() {
+        const def = this.iconDef();
+        return def?.kind === "fill";
+    }
+
+    strokeWidth() {
+        const def = this.iconDef();
+        if (def?.kind !== "stroke") return DEFAULT_STROKE_WIDTH;
+        return def.strokeWidth ?? DEFAULT_STROKE_WIDTH;
+    }
+
+    strokePaths() {
+        const def = this.iconDef();
+        if (def?.kind !== "stroke") return [];
+        return def.paths ?? [];
+    }
+
+    strokeCircles() {
+        const def = this.iconDef();
+        if (def?.kind !== "stroke") return [];
+        return def.circles ?? [];
+    }
+
+    strokeDots() {
+        const def = this.iconDef();
+        if (def?.kind !== "stroke") return [];
+        return def.dots ?? [];
+    }
+
+    circleKey(c) {
+        return `c-${c.cx}-${c.cy}-${c.r}`;
+    }
+
+    dotKey(dot) {
+        return `d-${dot.cx}-${dot.cy}-${dot.r}`;
+    }
+
+    fillD() {
+        const def = this.iconDef();
+        if (def?.kind !== "fill") return "";
+        return def.d;
+    }
+
+    fillRule() {
+        const def = this.iconDef();
+        if (def?.kind !== "fill" || !def.fillRule) return "";
+        return def.fillRule;
     }
 }
 </script>

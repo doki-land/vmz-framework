@@ -89,11 +89,20 @@ if (!iconSrc.includes('data-vmz-ui="icon"')) fail('Icon missing data-vmz-ui=icon
 if (!iconSrc.includes('data-icon={name}') && !iconSrc.includes('data-icon=')) {
     fail('Icon must expose data-icon from semantic name');
 }
-if (!iconSrc.includes('registry.ts') || !iconSrc.includes('resolveIconPath')) {
-    fail('Icon must import shared registry.ts via resolveIconPath');
+if (!iconSrc.includes('registry.ts') || !iconSrc.includes('resolveIconDef')) {
+    fail('Icon must import shared registry.ts via resolveIconDef');
 }
-if (!registrySrc.includes('export const REGISTRY') || !registrySrc.includes("'tool.base64'") || !registrySrc.includes("'action.search'")) {
-    fail('registry.ts must ship semantic registry (tool.* + action.*), not loose per-page SVG');
+const legacyFillSrc = fs.readFileSync(path.join(iconsRoot, 'src', 'icons-legacy-fill.ts'), 'utf8');
+const strokeSrc = fs.readFileSync(path.join(iconsRoot, 'src', 'icons-stroke.ts'), 'utf8');
+if (
+    !registrySrc.includes('export const REGISTRY') ||
+    !legacyFillSrc.includes("'tool.base64'") ||
+    !strokeSrc.includes("'action.search'")
+) {
+    fail('registry must ship semantic registry (tool.* + action.*), not loose per-page SVG');
+}
+if (!registrySrc.includes('resolveIconDef') || !strokeSrc.includes("kind: 'stroke'")) {
+    fail('registry must use structured IconDef entries via icons-stroke.ts');
 }
 if (!registrySrc.includes('LEGACY_ICON_ALIASES')) fail('registry.ts must export legacy @vmz/ui Icon aliases');
 if (!iconSrc.includes('public name') || !iconSrc.includes('public label') || !iconSrc.includes('public size')) {
@@ -102,8 +111,12 @@ if (!iconSrc.includes('public name') || !iconSrc.includes('public label') || !ic
 if (!iconSrc.includes('aria-hidden') || !iconSrc.includes('aria-label')) {
     fail('Icon must support decorative vs labelled a11y');
 }
-if (!iconSrc.includes('var(--vmz-action-primary-background)') && !iconSrc.includes('var(--vmz-text-ink)')) {
-    fail('Icon color must come from semantic tokens');
+if (
+    !iconSrc.includes('color: inherit') &&
+    !iconSrc.includes('var(--vmz-action-primary-background)') &&
+    !iconSrc.includes('var(--vmz-text-ink)')
+) {
+    fail('Icon color must inherit parent tokens or use semantic token vars');
 }
 
 console.log('ui-icons PASS: package + Icon semantic registry thin gate');

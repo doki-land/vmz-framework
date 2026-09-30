@@ -82,5 +82,8 @@
         "vmz",
         "ui",
         "components"
-    ]
+    ],
+    "dependencies": {
+        "@vmz/ui-icons": "workspace:*"
+    }
 }
