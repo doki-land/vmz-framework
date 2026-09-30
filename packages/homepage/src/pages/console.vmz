@@ -332,6 +332,7 @@ import {
     commercialNavHome,
 } from "#locales/common";
 import ConsolePageServer from "#server/pages/console";
+import { applyStatusToRow, statusAfterHandlingNote, summarizeTicketRows } from "../demo/ticket-rows.ts";
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
 const initialConsoleSummary = { total: 0, running: 0, failed: 0 };
@@ -354,6 +355,7 @@ export default class ConsolePage {
     noteSaved = false;
     selectedTicketId = "";
     notes = {};
+    statusOverrides = {};
     summaryRunning = initialConsoleSummary.running;
     summaryFailed = initialConsoleSummary.failed;
     query = "";
@@ -406,6 +408,7 @@ export default class ConsolePage {
     columns = [];
     allRows = initialConsoleRows.map((row) => ({
         id: row.id,
+        status: row.status,
         cells: row.cells.map((cell) => String(cell)),
     }));
     rows = [];
@@ -424,12 +427,14 @@ export default class ConsolePage {
             const rows = await ConsolePageServer.getConsoleRows(readLocaleId());
             const summary = await ConsolePageServer.getSummary();
             if (Array.isArray(rows) && rows.length) {
-                this.allRows = rows;
+                this.allRows = rows.map((row) => this.applyRowOverrides(row));
             }
-            if (summary && typeof summary === "object") {
+            if (summary && typeof summary === "object" && !Object.keys(this.statusOverrides).length) {
                 this.summaryTotal = Number(summary.total) || this.summaryTotal;
                 this.summaryRunning = Number(summary.running) || this.summaryRunning;
                 this.summaryFailed = Number(summary.failed) || this.summaryFailed;
+            } else {
+                this.recomputeSummary();
             }
             this.loading = false;
             this.refreshPage();
@@ -597,12 +602,13 @@ export default class ConsolePage {
         this.noteError = "";
         this.noteSaved = false;
         this.drawerOpen = true;
+        const row = this.allRows.find((entry) => entry.id === id);
         try {
             const detail = await ConsolePageServer.getTicketDetail(id, readLocaleId());
             if (detail && typeof detail === "object") {
                 this.detailProject = String(detail.subject || "");
                 this.detailTarget = String(detail.priorityLabel || "");
-                this.detailStatus = String(detail.statusLabel || "");
+                this.detailStatus = row ? String(row.cells[2] || "") : String(detail.statusLabel || "");
                 this.detailActor = String(detail.owner || "");
                 this.detailUpdated = String(detail.updated || "");
                 this.detailBranch = String(detail.context || "");
@@ -611,7 +617,6 @@ export default class ConsolePage {
         } catch {
             /* fall back to visible row cells */
         }
-        const row = this.allRows.find((entry) => entry.id === id);
         if (!row) return;
         this.detailProject = String(row.cells[0] || "");
         this.detailTarget = String(row.cells[1] || "");
@@ -627,6 +632,34 @@ export default class ConsolePage {
         this.noteSaved = false;
     }
 
+    effectiveStatus(row) {
+        return this.statusOverrides[row.id] || row.status;
+    }
+
+    applyRowOverrides(row) {
+        const status = this.effectiveStatus(row);
+        return applyStatusToRow(row, status, readLocaleId());
+    }
+
+    recomputeSummary() {
+        const summary = summarizeTicketRows(
+            this.allRows.map((row) => ({ status: this.effectiveStatus(row) })),
+        );
+        this.summaryTotal = summary.total;
+        this.summaryRunning = summary.running;
+        this.summaryFailed = summary.failed;
+    }
+
+    syncTicketStatuses() {
+        this.allRows = this.allRows.map((row) => this.applyRowOverrides(row));
+        this.recomputeSummary();
+        if (this.drawerOpen && this.selectedTicketId) {
+            const row = this.allRows.find((entry) => entry.id === this.selectedTicketId);
+            if (row) this.detailStatus = row.cells[2];
+        }
+        this.refreshPage();
+    }
+
     saveNote() {
         if (this.noteDraft.trim().length < 4) {
             this.noteError =
@@ -639,45 +672,28 @@ export default class ConsolePage {
         this.notes = { ...this.notes, [this.selectedTicketId]: this.noteDraft.trim() };
         this.noteError = "";
         this.noteSaved = true;
+        const row = this.allRows.find((entry) => entry.id === this.selectedTicketId);
+        if (!row) return;
+        const nextStatus = statusAfterHandlingNote(this.effectiveStatus(row));
+        if (nextStatus !== this.effectiveStatus(row)) {
+            this.statusOverrides = { ...this.statusOverrides, [row.id]: nextStatus };
+            this.syncTicketStatuses();
+        }
     }
 }
 </script>
 <script server>
+import { formatPriority, formatStatus, mapTicketRow, summarizeTicketRows } from "../demo/ticket-rows.ts";
 import TicketDemo from "#server/demo/TicketDemo";
 
 export default class ConsolePageServer {
     getConsoleRows(locale) {
-        return new TicketDemo().list(locale).map((ticket) => ({
-            id: ticket.id,
-            cells: [
-                ticket.subject,
-                locale === "en-us"
-                    ? ticket.priority
-                    : ticket.priority === "high"
-                      ? "高"
-                      : ticket.priority === "medium"
-                        ? "中"
-                        : "低",
-                locale === "en-us"
-                    ? ticket.status
-                    : ticket.status === "open"
-                      ? "待处理"
-                      : ticket.status === "in-progress"
-                        ? "处理中"
-                        : "已完成",
-                ticket.owner,
-                ticket.updated,
-            ],
-        }));
+        return new TicketDemo().list(locale).map((ticket) => mapTicketRow(ticket, locale));
     }
 
     getSummary() {
-        const rows = new TicketDemo().list();
-        return {
-            total: rows.length,
-            running: rows.filter((row) => row.status === "in-progress").length,
-            failed: rows.filter((row) => row.status === "open").length,
-        };
+        const rows = new TicketDemo().list().map((ticket) => mapTicketRow(ticket, "zh-hans"));
+        return summarizeTicketRows(rows);
     }
 
     getTicketDetail(id, locale) {
@@ -685,22 +701,8 @@ export default class ConsolePageServer {
         if (!ticket) return null;
         return {
             ...ticket,
-            priorityLabel:
-                locale === "en-us"
-                    ? ticket.priority
-                    : ticket.priority === "high"
-                      ? "高"
-                      : ticket.priority === "medium"
-                        ? "中"
-                        : "低",
-            statusLabel:
-                locale === "en-us"
-                    ? ticket.status
-                    : ticket.status === "open"
-                      ? "待处理"
-                      : ticket.status === "in-progress"
-                        ? "处理中"
-                        : "已完成",
+            priorityLabel: formatPriority(ticket.priority, locale),
+            statusLabel: formatStatus(ticket.status, locale),
         };
     }
 }
