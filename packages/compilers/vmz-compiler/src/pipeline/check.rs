@@ -16,7 +16,7 @@ use crate::server_slice::ServerSliceProof;
 use crate::sfc::{ScriptKind, ScriptLanguage, parse_vmz};
 use crate::template::{
     SemanticAstStats, SemanticIr, SemanticNode, lower_concrete_to_ir, lower_concrete_to_semantic,
-    parse_template, parse_template_concrete, semantic_ast_stats, template_parse_to_diagnostic,
+    parse_template, parse_template_concrete_primary, semantic_ast_stats, template_parse_to_diagnostic,
 };
 use crate::virtual_server;
 use vmz_protocol::{DIAG_SERVER_SLICE_NOT_BROWSER_SAFE, SourceSpan};
@@ -209,7 +209,7 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
         );
     }
 
-    let concrete = match parse_template_concrete(&parsed.template.content) {
+    let concrete = match parse_template_concrete_primary(&parsed.template) {
         Ok(c) => c,
         Err(e) => {
             report.diagnostics.push(template_parse_to_diagnostic(

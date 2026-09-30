@@ -25,6 +25,7 @@ pub mod document;
 pub mod locale;
 pub mod miniprogram;
 pub mod native;
+pub mod oak;
 pub mod parse;
 pub mod pipeline;
 pub mod platform;
@@ -151,7 +152,8 @@ pub use template::{
     AttrValue, ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg, EventTarget,
     IfBranch, SemanticAstStats, SemanticIr, SemanticNode, SemanticProp, TemplateAttr, TemplateIr,
     TemplateNode, TemplateParseError, TemplateSpan, decode_html_entities, lower_concrete_to_ir,
-    lower_concrete_to_semantic, parse_template, parse_template_asts, parse_template_concrete,
+    classify_concrete_attr, lower_concrete_to_semantic, parse_template, parse_template_asts,
+    parse_template_concrete, parse_template_concrete_primary, parse_template_concrete_via_oak,
     semantic_ast_stats, template_parse_to_diagnostic,
 };
 pub use tw::{

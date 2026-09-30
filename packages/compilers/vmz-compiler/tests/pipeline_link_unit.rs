@@ -116,6 +116,8 @@ fn router_attr_shorthand_desugars() {
         content_start: 0,
         lang: None,
         attrs: r#" path="/docs" "#.into(),
+        tag_start: 0,
+        open_end: 0,
     };
     let c = parse_route_contract(&block).unwrap();
     assert_eq!(c.path.as_deref(), Some("/docs"));
@@ -132,6 +134,8 @@ fn router_tab_parses_order_label_icon() {
         content_start: 0,
         lang: None,
         attrs: String::new(),
+        tag_start: 0,
+        open_end: 0,
     };
     let c = parse_route_contract(&block).unwrap();
     let tab = c.tab.expect("tab");
@@ -150,6 +154,8 @@ fn router_tab_rejects_wechat_keys_and_unknown_fields() {
         content_start: 0,
         lang: None,
         attrs: String::new(),
+        tag_start: 0,
+        open_end: 0,
     };
     let err = parse_route_contract(&wechat).unwrap_err();
     assert!(err.contains("tabBar"), "{err}");
@@ -159,6 +165,8 @@ fn router_tab_rejects_wechat_keys_and_unknown_fields() {
         content_start: 0,
         lang: None,
         attrs: String::new(),
+        tag_start: 0,
+        open_end: 0,
     };
     let err = parse_route_contract(&unknown).unwrap_err();
     assert!(err.contains("iconPath"), "{err}");

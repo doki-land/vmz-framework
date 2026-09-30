@@ -1,0 +1,146 @@
+//! Lower Oak Vue AST → VMZ Concrete Template IR.
+
+use core::range::Range;
+
+use oak_vue::{VueAttribute, VueNode, VueRoot};
+use vmz_oak_frontend_adapter::{parse_template_ast, TemplateShellInput};
+
+use super::template_concrete::{classify_concrete_attr, ConcreteAttr, ConcreteIr, ConcreteNode};
+use super::template_span::TemplateSpan;
+use crate::sfc::TemplateBlock;
+
+const TEMPLATE_OPEN: &str = "<template>";
+
+/// Build VMZ [`ConcreteIr`] from a VMZ template block via Oak CST + AST.
+pub fn parse_template_concrete_via_oak(template: &TemplateBlock) -> Result<ConcreteIr, String> {
+    let shell = TemplateShellInput {
+        content: template.content.clone(),
+        content_start: template.content_start,
+    };
+    let parsed = parse_template_ast(&shell);
+    if !parsed.ok {
+        return Err(format_oak_fail(&parsed));
+    }
+    let root = parsed
+        .root
+        .as_ref()
+        .ok_or_else(|| format_oak_fail(&parsed))?;
+    lower_vue_root_to_concrete(root, &parsed.shell_source)
+}
+
+/// Prefer Oak concrete lowering, fall back to the legacy scanner when Oak is unavailable.
+pub fn parse_template_concrete_primary(template: &TemplateBlock) -> Result<ConcreteIr, super::template_common::TemplateParseError> {
+    if let Ok(ir) = parse_template_concrete_via_oak(template) {
+        return Ok(ir);
+    }
+    super::template_concrete::parse_template_concrete(&template.content)
+}
+
+fn format_oak_fail(parsed: &vmz_oak_frontend_adapter::TemplateAstParse) -> String {
+    vmz_oak_frontend_adapter::format_cst_diagnostics(&parsed.diagnostics)
+}
+
+fn lower_vue_root_to_concrete(root: &VueRoot, shell: &str) -> Result<ConcreteIr, String> {
+    let block = root
+        .blocks
+        .iter()
+        .find(|b| slice(shell, b.name) == "template")
+        .ok_or_else(|| "Oak AST missing <template> block".to_string())?;
+    let roots = block
+        .children
+        .iter()
+        .map(|node| lower_node(shell, node))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(ConcreteIr { roots })
+}
+
+fn lower_node(shell: &str, node: &VueNode) -> Result<ConcreteNode, String> {
+    match node {
+        VueNode::Element(el) => {
+            let tag = slice(shell, el.tag_name).to_string();
+            let attrs = el
+                .attributes
+                .iter()
+                .map(|a| lower_attr(shell, a))
+                .collect::<Result<Vec<_>, _>>()?;
+            let children = el
+                .children
+                .iter()
+                .map(|c| lower_node(shell, c))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(ConcreteNode::Element {
+                tag,
+                attrs,
+                children,
+                span: to_body_span(shell, el.span),
+            })
+        }
+        VueNode::Text(t) => {
+            let value = slice(shell, t.span).to_string();
+            Ok(ConcreteNode::Text {
+                value,
+                span: to_body_span(shell, t.span),
+            })
+        }
+        VueNode::Interpolation(i) => {
+            let expr = slice(shell, i.expression).trim().to_string();
+            Ok(ConcreteNode::Interpolation {
+                expr,
+                span: to_body_span(shell, i.span),
+            })
+        }
+        VueNode::Comment(text) => Ok(ConcreteNode::Comment {
+            value: text.clone(),
+            span: TemplateSpan::point(0),
+        }),
+    }
+}
+
+fn lower_attr(shell: &str, attr: &VueAttribute) -> Result<ConcreteAttr, String> {
+    match attr {
+        VueAttribute::Attribute(a) => {
+            let name = slice(shell, a.name);
+            let value = a.value.as_ref().map(|v| slice(shell, v.span));
+            let span = to_body_span(shell, a.span);
+            classify_concrete_attr(name, value, span).map_err(|e| e.message)
+        }
+        VueAttribute::Directive(d) => {
+            let (name, value) = attr_name_value_from_span(shell, d.span)?;
+            let span = to_body_span(shell, d.span);
+            classify_concrete_attr(&name, value.as_deref(), span).map_err(|e| e.message)
+        }
+    }
+}
+
+fn attr_name_value_from_span(shell: &str, span: Range<usize>) -> Result<(String, Option<String>), String> {
+    let raw = shell
+        .get(span.start..span.end)
+        .ok_or_else(|| "directive span out of bounds".to_string())?;
+    if let Some((name, rest)) = raw.split_once('=') {
+        let val = unquote_attr_value(rest.trim());
+        Ok((name.trim().to_string(), Some(val)))
+    } else {
+        Ok((raw.trim().to_string(), None))
+    }
+}
+
+fn unquote_attr_value(raw: &str) -> String {
+    if raw.len() >= 2 {
+        if (raw.starts_with('"') && raw.ends_with('"')) || (raw.starts_with('\'') && raw.ends_with('\'')) {
+            return raw[1..raw.len() - 1].to_string();
+        }
+    }
+    raw.to_string()
+}
+
+fn slice(shell: &str, range: Range<usize>) -> &str {
+    shell.get(range.start..range.end).unwrap_or("")
+}
+
+fn to_body_span(_shell: &str, range: Range<usize>) -> TemplateSpan {
+    let base = TEMPLATE_OPEN.len();
+    TemplateSpan::from_usize(
+        range.start.saturating_sub(base),
+        range.end.saturating_sub(base),
+    )
+}

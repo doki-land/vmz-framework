@@ -3034,6 +3034,7 @@ name = "vmz-compiler"
 version = "0.1.0"
 dependencies = [
  "json5",
+ "oak-vue",
  "oxc_allocator",
  "oxc_ast",
  "oxc_ast_visit",
@@ -3052,6 +3053,7 @@ dependencies = [
  "thiserror",
  "vmz-debugger",
  "vmz-generator",
+ "vmz-oak-frontend-adapter",
  "vmz-protocol",
  "vmz-types",
  "walkdir",
