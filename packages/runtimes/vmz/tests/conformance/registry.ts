@@ -456,6 +456,10 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'production/skip-native-pre.ts',
         description: 'CI: VMZ_SKIP_NATIVE_BUILD must short-circuit pre build:runtimes',
     },
+    'runtime-reshape-manifest': {
+        file: 'production/runtime-reshape-manifest.ts',
+        description: '0.2.4: runtime reshape manifest matches @vmz/core sources',
+    },
     'package-layout-core': {
         file: 'production/package-layout-core.ts',
         description: '0.2.0: @vmz/core src browser/ssr/host/faces/shared',
@@ -466,7 +470,7 @@ export const CHECKS: Record<string, CheckEntry> = {
     },
     'package-layout-hygiene': {
         description: '0.2.0 Package Layout Hygiene composite',
-        composite: ['package-layout-core', 'package-layout-cli', 'host-runtime-manifest'],
+        composite: ['package-layout-core', 'package-layout-cli', 'host-runtime-manifest', 'runtime-reshape-manifest'],
     },
     'runtime-quality-baseline': {
         description: '0.2.0 composite: quality + package layout + thin proof',

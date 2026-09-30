@@ -31,6 +31,7 @@
         "fmt:check": "node scripts/format.mjs --check",
         "fmt:vmz": "pnpm vmz format --no-javascript --no-rust .",
         "fmt:vmz:check": "pnpm vmz format --check --no-javascript --no-rust .",
+        "reshape:runtime:check": "node scripts/refactor/reshape-runtime.mjs --check",
         "clean": "rimraf .turbo packages/examples/*/dist target"
     },
     "pnpm": {
