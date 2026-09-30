@@ -15,13 +15,23 @@ Root automation for **build**, **CI publish**, and **dev sync** only.
 ```text
 scripts/
   build/   napi + post-tsc asset copy
-  ci/      npm publish (publish-npm.yml) / placeholder stubs + trust / Actions status
+  ci/      npm publish (publish-npm.yml) / Actions status
   dev/     editor TextMate sync + tidy (deps/git/tags)
   test/    tiny shared helpers only (expect, TS-from-JS resolve hook)
 ```
 
 `pnpm tidy` → `dev/tidy.mjs` (deps / git gc / tag sync). Not the same as bare `pnpm prune`.
 `pnpm ci:status` → `ci/status.mjs` (GitHub Actions runs/jobs for current or `--branch` / `--sha` / `--run`).
+
+## npm placeholder (0.0.0)
+
+Name claim before Trusted Publisher releases — delegated to `@doki-land/nifty` (non-`private` workspace packages):
+
+```bash
+pnpm placeholder          # nifty publish --placeholder --dry-run
+pnpm placeholder:publish  # publish missing workspace packages @0.0.0
+pnpm placeholder:trust    # configure Trusted Publisher (NPM_TOTP_SECRET in .env.placeholder.local)
+```
 
 Conformance and product-test suites live next to the code (see the table above); `scripts/` stays build / CI / dev
 automation.

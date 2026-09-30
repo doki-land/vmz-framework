@@ -22,9 +22,9 @@
         "test:examples": "pnpm --workspace-concurrency=1 --filter @vmz-examples/counter --filter @vmz-examples/island --filter @vmz-examples/fullstack run test",
         "sync:vscode-textmate": "node scripts/dev/sync-vscode-textmate.mjs",
         "tidy": "node scripts/dev/tidy.mjs",
-        "placeholder": "node scripts/ci/publish-placeholder.mjs",
-        "placeholder:publish": "node scripts/ci/publish-placeholder.mjs publish",
-        "placeholder:trust": "node scripts/ci/publish-placeholder.mjs trust",
+        "placeholder": "nifty publish --placeholder --dry-run",
+        "placeholder:publish": "nifty publish --placeholder",
+        "placeholder:trust": "nifty trust",
         "ci:status": "node scripts/ci/status.mjs",
         "lint": "pnpm exec nifty check",
         "fmt": "node scripts/format.mjs",
@@ -39,7 +39,7 @@
         ]
     },
     "devDependencies": {
-        "@doki-land/nifty": "^0.0.5",
+        "@doki-land/nifty": "^0.0.11",
         "@types/node": "^22.15.30",
         "@vmz/core": "workspace:*",
         "@vmz/plugin": "workspace:*",

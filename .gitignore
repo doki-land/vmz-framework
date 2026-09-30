@@ -39,6 +39,7 @@ compilers/*/dist/
 # Placeholder npm status / trust list cache (OTP window)
 .placeholder-npm-cache.json
 scripts/.placeholder-npm-cache.json
+.cache/npm-placeholder.json
 .env.placeholder.local
 
 # N-API / publish staging (under dist/; never commit)
