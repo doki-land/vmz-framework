@@ -16,7 +16,7 @@ import { createUnknownComponentElement } from '../unknown-component.js';
 import { precision } from '../diagnostics/precision-trace.js';
 import { emitComponentEvent } from './attributes.js';
 import { directApi } from './direct-api.js';
-import { __vmzCancelTasks, noteDomMove } from './lifecycle.js';
+import { __vmzCancelTasks } from './lifecycle.js';
 import { flushPending } from '../reactivity/patch-scheduler.js';
 import { __vmzAllowShared, __vmzArrayItemCompoundStride, __vmzArrayMutate, __vmzListTranspose, __vmzReadPath, __vmzTakeShared, __vmzWritePath, __vmzWritePathCompound, __vmzWritePathCompoundItem, __vmzWritePathItem, __vmzWritePathLogical, makeReactive } from '../reactivity/write-barrier.js';
 
@@ -248,22 +248,4 @@ export function stripFns(obj) {
         out[k] = v;
     }
     return out;
-}
-
-function eachHostApi(start, end) {
-    return {
-        insert(dom) {
-            if (dom.parentNode) noteDomMove();
-            end.parentNode.insertBefore(dom, end);
-        },
-        childrenBetween() {
-            const out = [];
-            let n = start.nextSibling;
-            while (n && n !== end) {
-                if (n.nodeType === 1) out.push(n);
-                n = n.nextSibling;
-            }
-            return out;
-        },
-    };
 }
