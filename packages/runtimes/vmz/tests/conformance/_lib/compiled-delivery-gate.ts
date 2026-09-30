@@ -122,18 +122,33 @@ export function assertCompiledAssetArtifact(scan: CompiledDeliveryScan): string[
     return errors;
 }
 
+function readServeHostSources(root: string): string {
+    const hostRoot = path.join(root, 'packages/runtimes/vmz-runtime/src/host');
+    const parts = [fs.readFileSync(path.join(hostRoot, 'serve-host.ts'), 'utf8')];
+    const serveDir = path.join(hostRoot, 'serve');
+    for (const name of fs.readdirSync(serveDir)) {
+        if (name.endsWith('.ts')) parts.push(fs.readFileSync(path.join(serveDir, name), 'utf8'));
+    }
+    return parts.join('\n');
+}
+
 export function assertNoRuntimeManifestInterpretation(scan: CompiledDeliveryScan, root = repoRoot(import.meta.url)): string[] {
     const errors: string[] = [...assertCompiledRouteArtifact(scan), ...assertCompiledLocaleArtifact(scan)];
     // Serve-host must load compiled catalog (source contract).
-    const serveHost = fs.readFileSync(path.join(root, 'packages/runtimes/vmz-runtime/src/host/serve-host.ts'), 'utf8');
+    const serveHost = readServeHostSources(root);
     if (/listPagesFromDeployment/.test(serveHost)) {
         errors.push('serve-host still defines listPagesFromDeployment (must consume route-catalog)');
     }
     if (!/ROUTE_CATALOG_SCHEMA|route-catalog\.json/.test(serveHost)) {
         errors.push('serve-host missing route-catalog consumption');
     }
-    // Client-nav must prefer frozen href table.
-    const clientNav = fs.readFileSync(path.join(root, 'packages/runtimes/vmz-runtime/src/browser/client-nav.ts'), 'utf8');
+    // Client navigation must prefer frozen href table (barrel or navigation modules).
+    const navRoot = path.join(root, 'packages/runtimes/vmz-runtime/src/browser');
+    const navParts = [
+        fs.readFileSync(path.join(navRoot, 'client-nav.ts'), 'utf8'),
+        fs.readFileSync(path.join(navRoot, 'navigation/locale-transition.ts'), 'utf8'),
+    ];
+    const clientNav = navParts.join('\n');
     if (!/data-vmz-locale-hrefs/.test(clientNav) || !/lookupFrozenLocaleHref/.test(clientNav)) {
         errors.push('client-nav missing frozen locale href table lookup');
     }

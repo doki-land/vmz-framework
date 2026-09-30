@@ -49,11 +49,14 @@ export function buildThinHostFixture(root = repoRoot(import.meta.url)): ThinHost
 
     const hostDir = path.join(serveDist, '_vmz', 'host');
     const hostDirFiles: string[] = [];
-    if (fs.existsSync(hostDir)) {
-        for (const name of fs.readdirSync(hostDir)) {
-            if (name.endsWith('.js') || name.endsWith('.mjs')) hostDirFiles.push(name);
+    const walkHostFiles = (dir: string) => {
+        for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, ent.name);
+            if (ent.isDirectory()) walkHostFiles(full);
+            else if (ent.name.endsWith('.js') || ent.name.endsWith('.mjs')) hostDirFiles.push(ent.name);
         }
-    }
+    };
+    if (fs.existsSync(hostDir)) walkHostFiles(hostDir);
 
     const boundary = recordBrowserArtifactBoundary({
         root,
@@ -136,23 +139,39 @@ export function assertHostRuntimeBoundary(scan: ThinHostScan): string[] {
     if (!fs.existsSync(path.join(scan.serveDist, 'vmz-serve-host.mjs'))) {
         errors.push('missing root vmz-serve-host.mjs launcher stub');
     }
-    // Nested serve-host must reach delivery-root vmz-runtime.js.
+    // Nested serve-host (or serve/bootstrap) must reach delivery-root vmz-runtime.js.
     const nestedHost = path.join(scan.serveDist, '_vmz', 'host', 'vmz-serve-host.mjs');
+    const nestedBootstrap = path.join(scan.serveDist, '_vmz', 'host', 'serve', 'bootstrap.js');
     if (fs.existsSync(nestedHost)) {
-        const text = fs.readFileSync(nestedHost, 'utf8');
-        if (!/from\s+['"]\.\.\/\.\.\/vmz-runtime\.js['"]/.test(text)) {
-            errors.push('_vmz/host/vmz-serve-host.mjs must import ../../vmz-runtime.js');
+        const parts = [fs.readFileSync(nestedHost, 'utf8')];
+        if (fs.existsSync(nestedBootstrap)) parts.push(fs.readFileSync(nestedBootstrap, 'utf8'));
+        const text = parts.join('\n');
+        if (
+            !/from\s+['"]\.\.\/\.\.\/vmz-runtime\.js['"]/.test(text) &&
+            !/from\s+['"]\.\.\/\.\.\/\.\.\/vmz-runtime\.js['"]/.test(text)
+        ) {
+            errors.push('_vmz/host serve entry must reach delivery-root vmz-runtime.js');
         }
         if (/from\s+['"]\.\/vmz-runtime\.js['"]/.test(text)) {
-            errors.push('_vmz/host/vmz-serve-host.mjs must not import ./vmz-runtime.js');
+            errors.push('_vmz/host serve entry must not import ./vmz-runtime.js');
         }
     }
     return errors;
 }
 
+function readServeHostSources(root: string): string {
+    const hostRoot = path.join(root, 'packages/runtimes/vmz-runtime/src/host');
+    const parts = [fs.readFileSync(path.join(hostRoot, 'serve-host.ts'), 'utf8')];
+    const serveDir = path.join(hostRoot, 'serve');
+    for (const name of fs.readdirSync(serveDir)) {
+        if (name.endsWith('.ts')) parts.push(fs.readFileSync(path.join(serveDir, name), 'utf8'));
+    }
+    return parts.join('\n');
+}
+
 export function assertSingleRevisionOwner(root = repoRoot(import.meta.url)): string[] {
     const errors: string[] = [];
-    const serveHost = fs.readFileSync(path.join(root, 'packages/runtimes/vmz-runtime/src/host/serve-host.ts'), 'utf8');
+    const serveHost = readServeHostSources(root);
     if (/function shouldReloadAllPages/.test(serveHost)) {
         errors.push('serve-host must not define shouldReloadAllPages (payload-only reload)');
     }
