@@ -3,7 +3,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import http from 'node:http';
-import { createRequire, registerHooks } from 'node:module';
+import { registerHooks } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { listClientComponents } from './list-client-components.js';
@@ -17,123 +17,59 @@ import { handleNodeRequest, setRoutes, setServerModuleResolver } from '../faces/
 import { LOCALE_LINK_PLAN_REL, LOCALE_STORE_KEY, ROUTE_CATALOG_REL, ROUTE_CATALOG_SCHEMA, SHUTDOWN_TIMEOUT_MS, THEME_STORE_KEY } from './serve/constants.js';
 import { extractRouteParams, findRootCatchAll, isRootCatchAll, isRouteBoundaryStem, matchFileRoute, parsePathPattern } from './serve/route-catalog.js';
 
-const require = createRequire(import.meta.url);
+import { installAppModuleResolveHooks } from './serve/paths.js';
+import { serveState } from './serve/state.js';
 
-function resolveServeDistDir() {
-    if (process.env.VMZ_DIST) return path.resolve(process.env.VMZ_DIST);
-    const here = path.dirname(fileURLToPath(import.meta.url));
-    const norm = here.replace(/\\/g, '/');
-    const marker = '/_vmz/host';
-    const idx = norm.toLowerCase().lastIndexOf(marker);
-    if (idx >= 0) return path.resolve(here.slice(0, idx));
-    return here;
-}
+installAppModuleResolveHooks();
 
-const distDir = resolveServeDistDir();
+globalThis.__VMZ_RPC_ORIGIN = `http://${serveState.host}:${serveState.port}`;
 
-function projectRootForResolve() {
-    const fromEnv = typeof process.env.VMZ_PROJECT_ROOT === 'string' ? process.env.VMZ_PROJECT_ROOT.trim() : '';
-    if (fromEnv) return path.resolve(fromEnv);
-    return process.cwd();
-}
-
-let appPackageRequire = null;
-
-function appPackageRequireResolve() {
-    if (!appPackageRequire) {
-        const root = projectRootForResolve();
-        const pkg = path.join(root, 'package.json');
-        appPackageRequire = existsSync(pkg) ? createRequire(pkg) : require;
-    }
-    return appPackageRequire;
-}
-
-function installAppModuleResolveHooks() {
+if (serveState.isDev) {
+    const distUrlPrefix = pathToFileURL(
+        serveState.distDir.endsWith(path.sep) ? serveState.distDir : `${serveState.distDir}${path.sep}`,
+    ).href;
     registerHooks({
         resolve(specifier, context, nextResolve) {
-            if (
-                !specifier ||
-                specifier.startsWith('.') ||
-                specifier.startsWith('node:') ||
-                specifier.startsWith('file:') ||
-                specifier.startsWith('#')
-            ) {
-                return nextResolve(specifier, context);
+            const result = nextResolve(specifier, context);
+            if (!specifier.startsWith('.') || !context.parentURL || !result?.url) return result;
+            let token = '';
+            try {
+                token = new URL(context.parentURL).searchParams.get('t') || '';
+            } catch {
+                return result;
             }
-            if (context.parentURL?.startsWith('file:')) {
+            if (!token) return result;
+            if (!result.url.startsWith('file:')) return result;
+            if (!result.url.startsWith(distUrlPrefix)) {
                 try {
-                    const parentPath = fileURLToPath(context.parentURL);
-                    if (!parentPath.startsWith(distDir + path.sep)) return nextResolve(specifier, context);
+                    if (!fileURLToPath(result.url).startsWith(serveState.distDir)) return result;
                 } catch {
-                    return nextResolve(specifier, context);
+                    return result;
                 }
             }
-            try {
-                const appParent = pathToFileURL(path.join(projectRootForResolve(), 'package.json')).href;
-                return nextResolve(specifier, { ...context, parentURL: appParent });
-            } catch {
-                // Some legacy packages expose only a CommonJS entry.
-            }
-            try {
-                const resolved = appPackageRequireResolve().resolve(specifier);
-                return { url: pathToFileURL(resolved).href, shortCircuit: true };
-            } catch {
-                return nextResolve(specifier, context);
-            }
-        },
-        load(url, context, nextLoad) {
-            const pathOnly = url.split('?')[0].split('#')[0];
-            if (!pathOnly.endsWith('.json')) return nextLoad(url, context);
-            try {
-                const filePath = fileURLToPath(pathOnly);
-                const raw = readFileSync(filePath, 'utf8');
-                return {
-                    format: 'module',
-                    shortCircuit: true,
-                    source: `export default ${raw}`,
-                };
-            } catch {
-                return nextLoad(url, context);
-            }
+            const u = new URL(result.url);
+            if (u.searchParams.get('t') === token) return result;
+            u.searchParams.set('t', token);
+            return { ...result, url: u.href, shortCircuit: true };
         },
     });
 }
 
-const host = process.env.VMZ_HOST || '127.0.0.1';
+setServerModuleResolver((moduleId) => {
+    const rel = moduleId.replace(/^#server\//, '') + '.js';
+    return bustUrl(pathToFileURL(path.join(serveState.distDir, '#server', rel)).href);
+});
 
-const port = Number(process.env.VMZ_PORT || process.env.PORT || 5173);
+try {
+    await softReload({ quiet: true });
+    serveState.ready = true;
+} catch (err) {
+    serveState.lastDevError = normalizeDevError(err);
+    serveState.ready = true;
+    console.error('vmz serve: initial load failed (dev host stays up)', serveState.lastDevError.message);
+}
 
-const isDev = process.env.VMZ_DEV === '1' || process.env.VMZ_DEV === 'true';
 
-let reloadToken = Date.now();
-
-let ssrRenderHost = null;
-
-let lastDevBuildId = null;
-
-let pageCatalog = [];
-
-const pageCtors = new Map();
-
-let cssEntry = null;
-
-let styleBundleHash = null;
-
-let styleTheme = null;
-
-let localeArtifact = null;
-
-let localeLinkPlan = null;
-
-const sseClients = new Set<SseClient>();
-
-let inFlight = 0;
-
-let shuttingDown = false;
-
-let ready = false;
-
-let lastDevError = null;
 
 function readRequestBody(req) {
     return new Promise((resolve, reject) => {
@@ -163,15 +99,15 @@ async function renderPageStream(pathname, opts: any = {}) {
         return await renderPageStreamInner(pathname, opts);
     } catch (err) {
         const normalized = normalizeDevError(err);
-        lastDevError = normalized;
+        serveState.lastDevError = normalized;
         console.error('vmz serve: renderPageStream failed', normalized.message);
         return { status: 500, stream: emitDevErrorHtml(normalized) };
     }
 }
 
 async function renderPageStreamInner(pathname, opts: any = {}) {
-    if (isDev && lastDevError && pageCtors.size === 0) {
-        return { status: 500, stream: emitDevErrorHtml(lastDevError) };
+    if (serveState.isDev && serveState.lastDevError && serveState.pageCtors.size === 0) {
+        return { status: 500, stream: emitDevErrorHtml(serveState.lastDevError) };
     }
 
     const localePlan = resolveLocalePath(pathname, opts.cookieHeader);
@@ -180,30 +116,30 @@ async function renderPageStreamInner(pathname, opts: any = {}) {
     }
     const routePath = localePlan.restPath || pathname;
 
-    let match = matchFileRoute(routePath, pageCatalog);
+    let match = matchFileRoute(routePath, serveState.pageCatalog);
     let status = 200;
 
     const gated = await runRouteGate(routePath, match?.chunkId);
     if (gated === 'not_found') {
-        match = findRootCatchAll(pageCatalog);
+        match = findRootCatchAll(serveState.pageCatalog);
         status = 404;
     } else if (!match) {
-        match = findRootCatchAll(pageCatalog);
+        match = findRootCatchAll(serveState.pageCatalog);
         status = 404;
     } else if (isRootCatchAll(match)) {
         status = 404;
     }
 
     if (!match) {
-        if (isDev && lastDevError) {
-            return { status: 500, stream: emitDevErrorHtml(lastDevError) };
+        if (serveState.isDev && serveState.lastDevError) {
+            return { status: 500, stream: emitDevErrorHtml(serveState.lastDevError) };
         }
         return null;
     }
     const Page = await loadPageCtor(match.chunkId);
     if (!Page) {
-        if (isDev && lastDevError) {
-            return { status: 500, stream: emitDevErrorHtml(lastDevError) };
+        if (serveState.isDev && serveState.lastDevError) {
+            return { status: 500, stream: emitDevErrorHtml(serveState.lastDevError) };
         }
         return null;
     }
@@ -235,11 +171,11 @@ async function renderPageStreamInner(pathname, opts: any = {}) {
             return { status: 403, stream: emitAccessShell('route-access-deny') };
         }
         if (closed.kind === 'not-found') {
-            const catchAll = findRootCatchAll(pageCatalog);
+            const catchAll = findRootCatchAll(serveState.pageCatalog);
             if (catchAll) {
                 const NotFound = await loadPageCtor(catchAll.chunkId);
                 if (NotFound) {
-                    const resumeEntries = await loadPageResumeEntries(distDir, catchAll.chunkId);
+                    const resumeEntries = await loadPageResumeEntries(serveState.distDir, catchAll.chunkId);
                     const eventOnlyShell = isEventOnlyShell(resumeEntries.map((e) => e.strategy));
                     return {
                         status: 404,
@@ -297,10 +233,10 @@ async function renderPageStreamInner(pathname, opts: any = {}) {
     if (opts.signal?.aborted) {
         return { status: 499, stream: emitAccessShell('route-nav-cancelled') };
     }
-    const resumeEntries = await loadPageResumeEntries(distDir, match.chunkId);
+    const resumeEntries = await loadPageResumeEntries(serveState.distDir, match.chunkId);
     const strategies = resumeEntries.map((e) => e.strategy);
     const eventOnlyShell = isEventOnlyShell(strategies);
-    const layoutChain = resolveRouteLayoutChain(distDir, match.chunkId);
+    const layoutChain = resolveRouteLayoutChain(serveState.distDir, match.chunkId);
     return {
         status,
         stream: emitPageHtml(Page, match.chunkId, eventOnlyShell, props, opts, layoutChain, localeCtx),
@@ -382,7 +318,7 @@ async function* emitPageHtml(
     localeCtx: LocaleHostCtx = {},
 ) {
     const signal = opts.signal;
-    const live = isDev
+    const live = serveState.isDev
         ? `\n  <script>
   (() => {
     const es = new EventSource("/__vmz/events");
@@ -461,8 +397,8 @@ async function* emitPageHtml(
   </script>`
         : '';
     const bootOverlay =
-        isDev && lastDevError
-            ? `\n  <script>window.__VMZ_DEV_ERROR__=${JSON.stringify(lastDevError)};` +
+        serveState.isDev && serveState.lastDevError
+            ? `\n  <script>window.__VMZ_DEV_ERROR__=${JSON.stringify(serveState.lastDevError)};` +
               `(function(){var e=window.__VMZ_DEV_ERROR__;if(!e)return;` +
               `var ev=new Event("message");ev.data=JSON.stringify({type:"error",message:e.message,stack:e.stack});` +
               `/* paint immediately */` +
@@ -471,28 +407,28 @@ async function* emitPageHtml(
               `d.innerHTML="<div style='max-width:56rem;margin:0 auto'><p style='color:#f87171;font-weight:700'>Dev Error</p><pre style='white-space:pre-wrap'>"+String(e.message||e).replace(/[<>&]/g,function(c){return {"<":"&lt;",">":"&gt;","&":"&amp;"}[c]})+"</pre></div>";` +
               `document.documentElement.appendChild(d);})();</script>`
             : '';
-    const buildIdBoot = isDev && lastDevBuildId ? `\n  <script>window.__VMZ_DEV_BUILD_ID__=${JSON.stringify(lastDevBuildId)};</script>` : '';
+    const buildIdBoot = serveState.isDev && serveState.lastDevBuildId ? `\n  <script>window.__VMZ_DEV_BUILD_ID__=${JSON.stringify(serveState.lastDevBuildId)};</script>` : '';
     if (signal?.aborted) return;
     const themeId = resolveThemeId(opts.searchParams, opts.cookieHeader);
     const themeBoot = themeBootstrapScript();
     const localeBoot = localeBootstrapScript();
     const faviconHead = siteFaviconHeadHtml();
     const propsJson = JSON.stringify(props ?? {});
-    const localeId = localeCtx.localeId || localeArtifact?.defaultLocale || 'en';
+    const localeId = localeCtx.localeId || serveState.localeArtifact?.defaultLocale || 'en';
     const dir = localeCtx.dir || 'ltr';
 
     const htmlExtraAttrs = [...htmlThemeAttrPair(themeId)];
-    if (localeArtifact?.routing) {
+    if (serveState.localeArtifact?.routing) {
         htmlExtraAttrs.push(
             'data-vmz-locale-routing',
             JSON.stringify({
-                strategy: localeArtifact.routing.strategy || 'prefix',
-                defaultPrefix: localeArtifact.routing.defaultPrefix || 'include',
-                defaultLocale: localeArtifact.defaultLocale,
-                locales: (localeArtifact.locales || []).map((l) => l.id),
+                strategy: serveState.localeArtifact.routing.strategy || 'prefix',
+                defaultPrefix: serveState.localeArtifact.routing.defaultPrefix || 'include',
+                defaultLocale: serveState.localeArtifact.defaultLocale,
+                locales: (serveState.localeArtifact.locales || []).map((l) => l.id),
             }),
         );
-        const hrefTable = localeHrefTableFromPlan(localeLinkPlan);
+        const hrefTable = localeHrefTableFromPlan(serveState.localeLinkPlan);
         if (hrefTable && Object.keys(hrefTable).length) {
             htmlExtraAttrs.push('data-vmz-locale-hrefs', JSON.stringify(hrefTable));
         }
@@ -500,17 +436,17 @@ async function* emitPageHtml(
     const pageDocMeta = resolvePageDocumentMeta(Page);
     const prevLocaleHint = globalThis.__vmzLocaleIdHint;
     globalThis.__vmzLocaleIdHint = localeId;
-    if (!ssrRenderHost) {
-        ssrRenderHost = await createRenderHost(distDir, {
-            strictDeployment: !isDev,
+    if (!serveState.ssrRenderHost) {
+        serveState.ssrRenderHost = await createRenderHost(serveState.distDir, {
+            strictDeployment: !serveState.isDev,
             preload: 'none',
-            cacheBust: reloadToken,
+            cacheBust: serveState.reloadToken,
         });
     }
-    await ssrRenderHost.ensureComponents([chunkId, ...layoutChain]);
+    await serveState.ssrRenderHost.ensureComponents([chunkId, ...layoutChain]);
     let bodyHtml = '';
     try {
-        for await (const chunk of ssrRenderHost.renderToStream(Page, props, { signal })) {
+        for await (const chunk of serveState.ssrRenderHost.renderToStream(Page, props, { signal })) {
             if (signal?.aborted) return;
             bodyHtml += chunk;
         }
@@ -519,12 +455,12 @@ async function* emitPageHtml(
         for (let i = layoutChain.length - 1; i >= 0; i--) {
             const Layout = await loadPageCtor(layoutChain[i]);
             if (!Layout) continue;
-            bodyHtml = await ssrRenderHost.renderToString(Layout, {}, { signal, slotHtml: bodyHtml });
+            bodyHtml = await serveState.ssrRenderHost.renderToString(Layout, {}, { signal, slotHtml: bodyHtml });
             if (signal?.aborted) return;
         }
         // Locale discipline: apply frozen link plan rows (0.1.30) �?no path algebra.
-        if (localeArtifact && localeId) {
-            bodyHtml = localizeBodyLinks(bodyHtml, localeId, localeArtifact, undefined, localeLinkPlan);
+        if (serveState.localeArtifact && localeId) {
+            bodyHtml = localizeBodyLinks(bodyHtml, localeId, serveState.localeArtifact, undefined, serveState.localeLinkPlan);
         }
     } finally {
         if (prevLocaleHint === undefined) delete globalThis.__vmzLocaleIdHint;
@@ -536,8 +472,8 @@ async function* emitPageHtml(
     if (typeof native.generatePageShell !== 'function') {
         throw new Error('vmz native addon missing generatePageShell �?rebuild with `pnpm napi:build`');
     }
-    const entrySrc = `/${eventOnlyShell ? 'entry-event.js' : 'entry-client.js'}?t=${reloadToken}`;
-    const cssHref = cssEntryWithBust(cssEntry);
+    const entrySrc = `/${eventOnlyShell ? 'entry-event.js' : 'entry-client.js'}?t=${serveState.reloadToken}`;
+    const cssHref = cssEntryWithBust(serveState.cssEntry);
     yield native.generatePageShell({
         bodyHtml,
         chunkId,
@@ -562,37 +498,37 @@ async function* emitPageHtml(
     });
 }
 
-const server = http.createServer((req, res) => {
-    const url = new URL(req.url || '/', `http://${host}:${port}`);
+serveState.server = http.createServer((req, res) => {
+    const url = new URL(req.url || '/', `http://${serveState.host}:${serveState.port}`);
 
     if (url.pathname === '/__vmz/health' && req.method === 'GET') {
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-        res.end(JSON.stringify({ status: 'ok', shuttingDown, inFlight }));
+        res.end(JSON.stringify({ status: "ok", shuttingDown: serveState.shuttingDown, inFlight: serveState.inFlight }));
         return;
     }
     if (url.pathname === '/__vmz/ready' && req.method === 'GET') {
-        if (!ready || shuttingDown) {
+        if (!serveState.ready || serveState.shuttingDown) {
             res.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-            res.end(JSON.stringify({ status: 'not-ready', ready, shuttingDown }));
+            res.end(JSON.stringify({ status: "not-ready", ready: serveState.ready, shuttingDown: serveState.shuttingDown }));
             return;
         }
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-        res.end(JSON.stringify({ status: 'ready', ready: true, inFlight }));
+        res.end(JSON.stringify({ status: "ready", ready: true, inFlight: serveState.inFlight }));
         return;
     }
 
-    if (shuttingDown) {
+    if (serveState.shuttingDown) {
         res.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store' });
         res.end(JSON.stringify({ status: 'shutting-down' }));
         return;
     }
 
-    inFlight += 1;
+    serveState.inFlight += 1;
     let settled = false;
     const done = () => {
         if (settled) return;
         settled = true;
-        inFlight = Math.max(0, inFlight - 1);
+        serveState.inFlight = Math.max(0, serveState.inFlight - 1);
     };
     res.on('finish', done);
     res.on('close', done);
@@ -610,21 +546,21 @@ const server = http.createServer((req, res) => {
             })
             .then((info) => {
                 res.writeHead(200, { 'content-type': 'application/json' });
-                res.end(JSON.stringify({ ok: true, token: reloadToken, ...info }));
+                res.end(JSON.stringify({ ok: true, token: serveState.reloadToken, ...info }));
             })
             .catch((err) => {
                 console.error('vmz serve: soft reload failed', err);
-                lastDevError = normalizeDevError(err);
+                serveState.lastDevError = normalizeDevError(err);
                 notifySse(
                     JSON.stringify({
                         type: 'error',
-                        message: lastDevError.message,
-                        stack: lastDevError.stack,
-                        at: lastDevError.at,
+                        message: serveState.lastDevError.message,
+                        stack: serveState.lastDevError.stack,
+                        at: serveState.lastDevError.at,
                     }),
                 );
                 res.writeHead(500, { 'content-type': 'application/json' });
-                res.end(JSON.stringify({ ok: false, error: lastDevError.message }));
+                res.end(JSON.stringify({ ok: false, error: serveState.lastDevError.message }));
             });
         return;
     }
@@ -635,34 +571,45 @@ const server = http.createServer((req, res) => {
             connection: 'keep-alive',
         });
         res.write(': connected\n\n');
-        sseClients.add(res);
+        serveState.sseClients.add(res);
         req.on('close', () => {
-            sseClients.delete(res);
+            serveState.sseClients.delete(res);
         });
         return;
     }
-    handleNodeRequest(req, res, { distDir, renderPage, renderPageStream });
+    handleNodeRequest(req, res, { distDir: serveState.distDir, renderPage, renderPageStream });
+});
+
+serveState.server.listen(serveState.port, serveState.host, () => {
+    console.log(`vmz serve http://${serveState.host}:${serveState.port} (dist=${serveState.distDir}${serveState.isDev ? ', dev' : ''})`);
+});
+
+process.on('SIGTERM', () => {
+    void gracefulShutdown('SIGTERM');
+});
+process.on('SIGINT', () => {
+    void gracefulShutdown('SIGINT');
 });
 
 async function gracefulShutdown(signal) {
-    if (shuttingDown) return;
-    shuttingDown = true;
-    ready = false;
-    console.log(`vmz serve: ${signal} �?draining in-flight=${inFlight} timeout=${SHUTDOWN_TIMEOUT_MS}ms`);
-    server.close();
+    if (serveState.shuttingDown) return;
+    serveState.shuttingDown = true;
+    serveState.ready = false;
+    console.log(`vmz serve: ${signal} �?draining in-flight=${serveState.inFlight} timeout=${SHUTDOWN_TIMEOUT_MS}ms`);
+    serveState.server?.close();
     const start = Date.now();
-    while (inFlight > 0 && Date.now() - start < SHUTDOWN_TIMEOUT_MS) {
+    while (serveState.inFlight > 0 && Date.now() - start < SHUTDOWN_TIMEOUT_MS) {
         await new Promise((r) => setTimeout(r, 25));
     }
-    for (const client of sseClients) {
+    for (const client of serveState.sseClients) {
         try {
             client.end();
         } catch {
             /* ignore */
         }
     }
-    sseClients.clear();
-    process.exit(inFlight > 0 ? 1 : 0);
+    serveState.sseClients.clear();
+    process.exit(serveState.inFlight > 0 ? 1 : 0);
 }
 
 function attachLinkRouteAliases(artifact, dir) {
@@ -678,11 +625,11 @@ function attachLinkRouteAliases(artifact, dir) {
 }
 
 async function softReload(opts: any = {}) {
-    const prevToken = reloadToken;
-    const prevCatalog = pageCatalog;
-    const prevCtors = new Map(pageCtors);
+    const prevToken = serveState.reloadToken;
+    const prevCatalog = serveState.pageCatalog;
+    const prevCtors = new Map(serveState.pageCtors);
     const nextToken = Date.now();
-    reloadToken = nextToken;
+    serveState.reloadToken = nextToken;
     const affected = opts.payload?.affectedChunks ?? [];
     const seeds = opts.payload?.seedChunks ?? [];
     const full = opts.payload?.full;
@@ -692,37 +639,37 @@ async function softReload(opts: any = {}) {
     const buildId = opts.payload?.buildId != null ? String(opts.payload.buildId) : null;
     const sourceRevision = opts.payload?.sourceRevision != null ? String(opts.payload.sourceRevision) : null;
     const bundleRevision = opts.payload?.bundleRevision != null ? String(opts.payload.bundleRevision) : null;
-    if (buildId) lastDevBuildId = buildId;
-    // 0.1.31: payload-only scope. `reloadToken` is opaque cache-bust �?never invent full/affected here.
+    if (buildId) serveState.lastDevBuildId = buildId;
+    // 0.1.31: payload-only scope. `serveState.reloadToken` is opaque cache-bust �?never invent full/affected here.
     const reloadAllPages = Boolean(full) || (!islandHmr && rerunLoaders.length === 0 && affected.length === 0);
 
     try {
         try {
-            const routes = JSON.parse(await readFile(path.join(distDir, 'vmz-routes.json'), 'utf8'));
+            const routes = JSON.parse(await readFile(path.join(serveState.distDir, 'vmz-routes.json'), 'utf8'));
             setRoutes(routes);
         } catch {
             setRoutes([]);
         }
         try {
-            localeArtifact = JSON.parse(await readFile(path.join(distDir, '_vmz', 'locale-route-realization.json'), 'utf8'));
-            localeArtifact = attachLinkRouteAliases(localeArtifact, distDir);
+            serveState.localeArtifact = JSON.parse(await readFile(path.join(serveState.distDir, '_vmz', 'locale-route-realization.json'), 'utf8'));
+            serveState.localeArtifact = attachLinkRouteAliases(serveState.localeArtifact, serveState.distDir);
         } catch {
-            localeArtifact = null;
+            serveState.localeArtifact = null;
         }
         try {
-            const rawPlan = JSON.parse(await readFile(path.join(distDir, ...LOCALE_LINK_PLAN_REL.split('/')), 'utf8'));
-            localeLinkPlan = rawPlan?.schema === LOCALE_LINK_PLAN_SCHEMA && Array.isArray(rawPlan.rows) ? rawPlan : null;
+            const rawPlan = JSON.parse(await readFile(path.join(serveState.distDir, ...LOCALE_LINK_PLAN_REL.split('/')), 'utf8'));
+            serveState.localeLinkPlan = rawPlan?.schema === LOCALE_LINK_PLAN_SCHEMA && Array.isArray(rawPlan.rows) ? rawPlan : null;
         } catch {
-            localeLinkPlan = null;
+            serveState.localeLinkPlan = null;
         }
 
-        const componentEntries = await listClientComponents(distDir, { strict: !isDev });
-        ssrRenderHost = await createRenderHost(distDir, {
-            strictDeployment: !isDev,
+        const componentEntries = await listClientComponents(serveState.distDir, { strict: !serveState.isDev });
+        serveState.ssrRenderHost = await createRenderHost(serveState.distDir, {
+            strictDeployment: !serveState.isDev,
             preload: 'none',
             cacheBust: nextToken,
         });
-        const nextCatalog = await listPageClientFiles(distDir);
+        const nextCatalog = await listPageClientFiles(serveState.distDir);
         // empty catalog throws inside listPageClientFiles
 
         const nextCtors = new Map();
@@ -737,33 +684,33 @@ async function softReload(opts: any = {}) {
             const pagesToLoad = nextCatalog.filter((p) => reloadSet.includes(p.chunkId));
             for (const p of pagesToLoad) {
                 const pageRel = `${p.chunkId}.client.js`;
-                const href = bustUrl(pathToFileURL(path.join(distDir, pageRel)).href);
+                const href = bustUrl(pathToFileURL(path.join(serveState.distDir, pageRel)).href);
                 const mod = await import(href);
                 nextCtors.set(p.chunkId, mod.default);
             }
         }
 
-        pageCatalog = nextCatalog;
+        serveState.pageCatalog = nextCatalog;
         if (!islandHmr) {
             if (reloadAllPages) {
-                pageCtors.clear();
-                for (const [k, v] of nextCtors) pageCtors.set(k, v);
+                serveState.pageCtors.clear();
+                for (const [k, v] of nextCtors) serveState.pageCtors.set(k, v);
             } else {
                 // Keep unaffected page constructors; only swap what we re-imported.
-                for (const [k, v] of nextCtors) pageCtors.set(k, v);
+                for (const [k, v] of nextCtors) serveState.pageCtors.set(k, v);
                 // Drop ctors for pages that disappeared from catalog.
-                for (const id of [...pageCtors.keys()]) {
-                    if (!nextCatalog.some((p) => p.chunkId === id)) pageCtors.delete(id);
+                for (const id of [...serveState.pageCtors.keys()]) {
+                    if (!nextCatalog.some((p) => p.chunkId === id)) serveState.pageCtors.delete(id);
                 }
             }
         }
 
-        const indexChunk = pageCatalog.find((p) => p.chunkId === 'pages/index')?.chunkId || pageCatalog[0].chunkId;
-        const resumeEntries = await loadPageResumeEntries(distDir, indexChunk);
-        const styleMeta = await loadDeploymentStyle(distDir);
-        cssEntry = styleMeta.cssEntry;
-        styleBundleHash = styleMeta.styleBundleHash;
-        styleTheme = styleMeta.styleTheme;
+        const indexChunk = serveState.pageCatalog.find((p) => p.chunkId === 'pages/index')?.chunkId || serveState.pageCatalog[0].chunkId;
+        const resumeEntries = await loadPageResumeEntries(serveState.distDir, indexChunk);
+        const styleMeta = await loadDeploymentStyle(serveState.distDir);
+        serveState.cssEntry = styleMeta.cssEntry;
+        serveState.styleBundleHash = styleMeta.styleBundleHash;
+        serveState.styleTheme = styleMeta.styleTheme;
         const lazyEventNames = resumeEntries
             .filter((e) => isEventStrategy(e.strategy))
             .map((e) => e.component)
@@ -771,20 +718,20 @@ async function softReload(opts: any = {}) {
         const lazySet = new Set(lazyEventNames);
 
         await writeFile(
-            path.join(distDir, 'entry-client.js'),
+            path.join(serveState.distDir, 'entry-client.js'),
             emitEntryClient(
                 componentEntries.filter((e) => !lazySet.has(e.name)),
                 componentEntries.filter((e) => lazySet.has(e.name)),
-                skipEntryRewrite ? reloadToken : nextToken,
+                skipEntryRewrite ? serveState.reloadToken : nextToken,
             ),
             'utf8',
         );
 
         const strategies = resumeEntries.map((e) => e.strategy);
         const eventOnlyShell = isEventOnlyShell(strategies);
-        await writeFile(path.join(distDir, 'entry-event.js'), emitEntryEvent(skipEntryRewrite ? reloadToken : nextToken), 'utf8');
+        await writeFile(path.join(serveState.distDir, 'entry-event.js'), emitEntryEvent(skipEntryRewrite ? serveState.reloadToken : nextToken), 'utf8');
 
-        lastDevError = null;
+        serveState.lastDevError = null;
         const mode = islandHmr ? 'island' : eventOnlyShell ? 'event-shell' : 'full';
         notifySse(
             JSON.stringify({
@@ -792,11 +739,11 @@ async function softReload(opts: any = {}) {
                 mode,
                 affectedChunks: affected,
                 seedChunks: seeds,
-                token: reloadToken,
-                buildId: buildId || lastDevBuildId,
+                token: serveState.reloadToken,
+                buildId: buildId || serveState.lastDevBuildId,
                 sourceRevision,
                 bundleRevision,
-                serveRevision: String(reloadToken),
+                serveRevision: String(serveState.reloadToken),
                 full: Boolean(full),
                 eventOnlyShell,
             }),
@@ -804,12 +751,12 @@ async function softReload(opts: any = {}) {
         if (!opts.quiet) {
             const aff = affected.length > 0 ? ` affected=[${affected.join(', ')}]` : full === false ? ' affected=[]' : '';
             const scope = islandHmr ? 'island' : reloadAllPages ? 'all-pages' : `pages=${nextCtors.size}`;
-            const bid = buildId || lastDevBuildId;
+            const bid = buildId || serveState.lastDevBuildId;
             const rev =
                 bid || sourceRevision || bundleRevision
-                    ? ` buildId=${bid || '-'} source=${sourceRevision || '-'} bundle=${bundleRevision || '-'} serve=${reloadToken}`
-                    : ` t=${reloadToken}`;
-            console.log(`vmz serve: soft reload ok (mode=${mode}; ${scope}; catalog=${pageCatalog.length};${rev}${aff})`);
+                    ? ` buildId=${bid || '-'} source=${sourceRevision || '-'} bundle=${bundleRevision || '-'} serve=${serveState.reloadToken}`
+                    : ` t=${serveState.reloadToken}`;
+            console.log(`vmz serve: soft reload ok (mode=${mode}; ${scope}; catalog=${serveState.pageCatalog.length};${rev}${aff})`);
         }
         return {
             affectedChunks: affected,
@@ -818,21 +765,21 @@ async function softReload(opts: any = {}) {
             islandHmr,
             mode,
             eventOnlyShell,
-            pageCount: pageCatalog.length,
+            pageCount: serveState.pageCatalog.length,
             reloadedPages: islandHmr ? 0 : nextCtors.size,
             reloadAllPages,
-            buildId: buildId || lastDevBuildId,
+            buildId: buildId || serveState.lastDevBuildId,
             sourceRevision,
             bundleRevision,
-            serveRevision: String(reloadToken),
-            token: reloadToken,
+            serveRevision: String(serveState.reloadToken),
+            token: serveState.reloadToken,
         };
     } catch (err) {
-        reloadToken = prevToken;
-        pageCatalog = prevCatalog;
-        pageCtors.clear();
-        for (const [k, v] of prevCtors) pageCtors.set(k, v);
-        lastDevError = normalizeDevError(err);
+        serveState.reloadToken = prevToken;
+        serveState.pageCatalog = prevCatalog;
+        serveState.pageCtors.clear();
+        for (const [k, v] of prevCtors) serveState.pageCtors.set(k, v);
+        serveState.lastDevError = normalizeDevError(err);
         throw err;
     }
 }
@@ -846,11 +793,11 @@ function pageNeedsReload(chunkId, affected) {
 }
 
 function notifySse(event) {
-    for (const client of [...sseClients]) {
+    for (const client of [...serveState.sseClients]) {
         try {
             client.write(`data: ${event}\n\n`);
         } catch {
-            sseClients.delete(client);
+            serveState.sseClients.delete(client);
         }
     }
 }
@@ -919,13 +866,13 @@ function escapeHtml(s) {
 function resolveLocalePath(pathname, cookieHeader) {
     const raw = String(pathname || '/');
     const normalized = raw.length > 1 && raw.endsWith('/') ? raw.slice(0, -1) : raw || '/';
-    if (!localeArtifact) {
+    if (!serveState.localeArtifact) {
         return { localeId: 'en', dir: 'ltr', restPath: normalized, redirectTo: null };
     }
-    const supported = (localeArtifact.locales || []).map((l) => l.id);
-    const defaultLocale = localeArtifact.defaultLocale || supported[0] || 'en';
-    const directions = Object.fromEntries((localeArtifact.locales || []).map((l) => [l.id, l.direction || 'ltr']));
-    const routing = localeArtifact.routing || {};
+    const supported = (serveState.localeArtifact.locales || []).map((l) => l.id);
+    const defaultLocale = serveState.localeArtifact.defaultLocale || supported[0] || 'en';
+    const directions = Object.fromEntries((serveState.localeArtifact.locales || []).map((l) => [l.id, l.direction || 'ltr']));
+    const routing = serveState.localeArtifact.routing || {};
     const strategy = routing.strategy || 'prefix';
 
     if (strategy === 'none') {
@@ -966,31 +913,31 @@ function resolveLocalePath(pathname, cookieHeader) {
 }
 
 function pageMetaAlternates(chunkId, localeId) {
-    if (!localeArtifact?.pageMetas) return [];
+    if (!serveState.localeArtifact?.pageMetas) return [];
     const meta =
-        localeArtifact.pageMetas.find((m) => m.routeId === chunkId && m.locale === localeId) ||
-        localeArtifact.pageMetas.find((m) => m.routeId === chunkId && m.locale === localeArtifact.defaultLocale);
+        serveState.localeArtifact.pageMetas.find((m) => m.routeId === chunkId && m.locale === localeId) ||
+        serveState.localeArtifact.pageMetas.find((m) => m.routeId === chunkId && m.locale === serveState.localeArtifact.defaultLocale);
     return Array.isArray(meta?.alternates) ? meta.alternates : [];
 }
 
 function bustUrl(href) {
     const u = new URL(href);
-    u.searchParams.set('t', String(reloadToken));
+    u.searchParams.set('t', String(serveState.reloadToken));
     return u.href;
 }
 
 async function loadPageCtor(chunkId) {
     const pageRel = `${chunkId}.client.js`;
-    const href = bustUrl(pathToFileURL(path.join(distDir, pageRel)).href);
+    const href = bustUrl(pathToFileURL(path.join(serveState.distDir, pageRel)).href);
     const mod = await import(href);
-    pageCtors.set(chunkId, mod.default);
+    serveState.pageCtors.set(chunkId, mod.default);
     return mod.default;
 }
 
 async function listPageClientFiles(dir) {
     const fromCatalog = await listPagesFromRouteCatalog(dir);
     if (!fromCatalog.length) {
-        if (isDev) {
+        if (serveState.isDev) {
             console.warn(`vmz dev: missing compiled ${ROUTE_CATALOG_SCHEMA} at ${path.join(dir, ...ROUTE_CATALOG_REL.split('/'))}`);
             return [];
         }
@@ -1028,7 +975,7 @@ async function listPagesFromRouteCatalog(dir) {
 
 async function runRouteGate(pathname, chunkId) {
     try {
-        const href = bustUrl(pathToFileURL(path.join(distDir, 'vmz-route-gate.mjs')).href);
+        const href = bustUrl(pathToFileURL(path.join(serveState.distDir, 'vmz-route-gate.mjs')).href);
         const mod = await import(href);
         if (typeof mod.check !== 'function') return null;
         return await mod.check(pathname, chunkId ?? null);
@@ -1059,8 +1006,8 @@ function cssEntryWithBust(entry) {
     if (!entry) return undefined;
     const base = String(entry).replace(/^\/+/, '');
     const params = new URLSearchParams();
-    params.set('t', String(reloadToken));
-    if (styleBundleHash) params.set('h', styleBundleHash);
+    params.set('t', String(serveState.reloadToken));
+    if (serveState.styleBundleHash) params.set('h', serveState.styleBundleHash);
     return `${base}?${params.toString()}`;
 }
 
@@ -1092,8 +1039,8 @@ async function loadDeploymentStyle(dir) {
 }
 
 function resolveThemeId(searchParams, cookieHeader) {
-    if (!styleTheme) return null;
-    const ids = styleTheme.themeIds || [];
+    if (!serveState.styleTheme) return null;
+    const ids = serveState.styleTheme.themeIds || [];
     const q = searchParams && typeof searchParams.get === 'function' ? searchParams.get('theme') : null;
     if (q && ids.includes(q)) return q;
     const fromCookie = readCookie(cookieHeader, THEME_STORE_KEY);
@@ -1102,25 +1049,25 @@ function resolveThemeId(searchParams, cookieHeader) {
 }
 
 function htmlThemeAttrPair(themeId) {
-    if (!styleTheme || !themeId) return [];
-    const attr = styleTheme.activationAttr || 'data-theme';
-    if (!(styleTheme.themeIds || []).includes(themeId)) return [];
+    if (!serveState.styleTheme || !themeId) return [];
+    const attr = serveState.styleTheme.activationAttr || 'data-theme';
+    if (!(serveState.styleTheme.themeIds || []).includes(themeId)) return [];
     return [attr, themeId];
 }
 
 function themeBootstrapScript() {
-    if (!styleTheme) return '';
-    const attr = JSON.stringify(styleTheme.activationAttr || 'data-theme');
-    const ids = JSON.stringify(styleTheme.themeIds || []);
+    if (!serveState.styleTheme) return '';
+    const attr = JSON.stringify(serveState.styleTheme.activationAttr || 'data-theme');
+    const ids = JSON.stringify(serveState.styleTheme.themeIds || []);
     const key = JSON.stringify(THEME_STORE_KEY);
     return `  <script>(function(){try{var k=${key},attr=${attr},ids=${ids};var id=localStorage.getItem(k);if(!id||ids.indexOf(id)<0)return;document.documentElement.setAttribute(attr,id);}catch(e){}})();</script>\n`;
 }
 
 function localeBootstrapScript() {
-    if (!localeArtifact) return '';
-    const routing = localeArtifact.routing || {};
+    if (!serveState.localeArtifact) return '';
+    const routing = serveState.localeArtifact.routing || {};
     if ((routing.strategy || 'prefix') !== 'none') return '';
-    const ids = (localeArtifact.locales || []).map((l) => l.id).filter(Boolean);
+    const ids = (serveState.localeArtifact.locales || []).map((l) => l.id).filter(Boolean);
     if (!ids.length) return '';
     const key = JSON.stringify(LOCALE_STORE_KEY);
     const idList = JSON.stringify(ids);
@@ -1129,7 +1076,7 @@ function localeBootstrapScript() {
 
 function siteFaviconHeadHtml() {
     try {
-        const p = path.join(distDir, '_vmz', 'site-favicon.json');
+        const p = path.join(serveState.distDir, '_vmz', 'site-favicon.json');
         if (!existsSync(p)) return '';
         // Sync read: head is per-request; file is tiny and rebuilt with dist.
         const raw = readFileSync(p, 'utf8');
