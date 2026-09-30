@@ -62,11 +62,22 @@
                             {{ consoleClearSelectionLabel }}
                         </Button>
                     </BulkActions>
-                    <p class="vmz-console-scroll-hint">
+                    <p v-if="!filterEmpty" class="vmz-console-scroll-hint">
                         {{ scrollHint }}
                     </p>
-                    <Table :columns="columns" :rows="rows" :has-row-action="rowAction" :action-title="consoleActionTitleLabel" :action-label="consoleActionLabel" :on-row-action="openDetail" />
-                    <Pagination :label="consolePaginationLabel" :status="pageStatus" :prev-disabled="prevDisabled" :next-disabled="nextDisabled" :on-prev="goPrev" :on-next="goNext" />
+                    <div v-if="filterEmpty" data-vmz-fixture="console-filter-empty" role="status" class="vmz-console-empty">
+                        <strong>
+                            {{ consoleFilterEmptyTitleLabel }}
+                        </strong>
+                        <p>
+                            {{ consoleFilterEmptyBodyLabel }}
+                        </p>
+                        <Button type="button" variant="secondary" @click="resetFilter">
+                            {{ consoleResetLabel }}
+                        </Button>
+                    </div>
+                    <Table v-if="!filterEmpty" :columns="columns" :rows="rows" :has-row-action="rowAction" :action-title="consoleActionTitleLabel" :action-label="consoleActionLabel" :on-row-action="openDetail" />
+                    <Pagination v-if="!filterEmpty" :label="consolePaginationLabel" :status="pageStatus" :prev-disabled="prevDisabled" :next-disabled="nextDisabled" :on-prev="goPrev" :on-next="goNext" />
                 </section>
                 <Drawer v-if="drawerOpen" :open="drawerOpen" :title="consoleDrawerTitleLabel" title-id="home-console-drawer-title" :on-close="(() => drawerOpen = false)">
                     <div class="vmz-console-drawer-content">
@@ -290,6 +301,28 @@
     background: #fff;
     color: #51565d;
 }
+
+.vmz-console-empty {
+    display: grid;
+    justify-items: start;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 1.5rem 1rem 1.25rem;
+    border-top: 1px solid #e5e6eb;
+    background: #fff;
+    color: #51565d;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.vmz-console-empty strong {
+    color: #1f2329;
+    font-weight: 600;
+}
+
+.vmz-console-empty p {
+    margin: 0;
+}
 </style>
 <script client>
 import {
@@ -303,6 +336,8 @@ import {
     consoleStatPendingReleases,
     consoleStatAffectedRegions,
     consoleFilterLabel,
+    consoleFilterEmptyTitle,
+    consoleFilterEmptyBody,
     consoleFieldNameLabel,
     consoleFieldStatusLabel,
     consoleApply,
@@ -341,6 +376,7 @@ const initialConsoleRows = [];
 export default class ConsolePage {
     summaryTotal = initialConsoleSummary.total;
     loading = true;
+    filterEmpty = false;
     loadError = false;
     demoNote = "";
     loadingLabel = "";
@@ -388,6 +424,8 @@ export default class ConsolePage {
     consoleStatPendingReleasesLabel = "";
     consoleStatAffectedRegionsLabel = "";
     consoleFilterLabel = "";
+    consoleFilterEmptyTitleLabel = "";
+    consoleFilterEmptyBodyLabel = "";
     consoleFieldNameLabel = "";
     consoleFieldStatusLabel = "";
     consoleApplyLabel = "";
@@ -481,6 +519,8 @@ export default class ConsolePage {
         this.consoleStatPendingReleasesLabel = consoleStatPendingReleases();
         this.consoleStatAffectedRegionsLabel = consoleStatAffectedRegions();
         this.consoleFilterLabel = consoleFilterLabel();
+        this.consoleFilterEmptyTitleLabel = consoleFilterEmptyTitle();
+        this.consoleFilterEmptyBodyLabel = consoleFilterEmptyBody();
         this.consoleFieldNameLabel = consoleFieldNameLabel();
         this.consoleFieldStatusLabel = consoleFieldStatusLabel();
         this.consoleApplyLabel = consoleApply();
@@ -563,6 +603,7 @@ export default class ConsolePage {
 
     refreshPage(source) {
         const list = source || this.filteredRows();
+        this.filterEmpty = this.allRows.length > 0 && list.length === 0;
         const pageSize = 4;
         this.pageCount = Math.max(1, Math.ceil(list.length / pageSize) || 1);
         if (this.page > this.pageCount) this.page = this.pageCount;

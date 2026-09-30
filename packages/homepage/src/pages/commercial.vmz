@@ -75,10 +75,21 @@
                         <p v-if="browseError" role="alert" class="vmz-commercial-loading">
                             {{ loadErrorLabel }}
                         </p>
-                        <p v-if="!browseLoading && !browseError" class="vmz-commercial-scroll-hint">
+                        <p v-if="!browseLoading && !browseError && !browseFilterEmpty" class="vmz-commercial-scroll-hint">
                             {{ scrollHint }}
                         </p>
-                        <Table v-if="!browseLoading && !browseError" :columns="browseColumns" :rows="browseRows" :has-row-action="false" />
+                        <div v-if="browseFilterEmpty && !browseLoading && !browseError" data-vmz-fixture="commercial-browse-empty" role="status" class="vmz-commercial-empty">
+                            <strong>
+                                {{ commercialBrowseFilterEmptyTitleLabel }}
+                            </strong>
+                            <p>
+                                {{ commercialBrowseFilterEmptyBodyLabel }}
+                            </p>
+                            <Button type="button" variant="secondary" @click="resetBrowseFilter">
+                                {{ commercialBrowseResetLabel }}
+                            </Button>
+                        </div>
+                        <Table v-if="!browseLoading && !browseError && !browseFilterEmpty" :columns="browseColumns" :rows="browseRows" :has-row-action="false" />
                     </div>
                 </section>
                 <section data-vmz-fixture="commercial-task-detail" aria-labelledby="commercial-task-detail-title" class="vmz-commercial-task">
@@ -425,6 +436,26 @@
     padding: 1.5rem;
     color: #646a73;
 }
+
+.vmz-commercial-empty {
+    display: grid;
+    justify-items: start;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 1.5rem 1rem 1.25rem;
+    color: #51565d;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.vmz-commercial-empty strong {
+    color: #1f2329;
+    font-weight: 600;
+}
+
+.vmz-commercial-empty p {
+    margin: 0;
+}
 .vmz-commercial-scroll-hint {
     display: none;
     margin: 0;
@@ -458,6 +489,8 @@ import {
     commercialFeature3Title,
     commercialFeature3Desc,
     commercialBrowseFilterLabel,
+    commercialBrowseFilterEmptyTitle,
+    commercialBrowseFilterEmptyBody,
     commercialBrowseFieldLabel,
     commercialBrowseApply,
     commercialBrowseReset,
@@ -521,6 +554,8 @@ export default class CommercialPage {
     commercialFeature3TitleLabel = "";
     commercialFeature3DescLabel = "";
     commercialBrowseFilterLabel = "";
+    commercialBrowseFilterEmptyTitleLabel = "";
+    commercialBrowseFilterEmptyBodyLabel = "";
     commercialBrowseFieldLabel = "";
     commercialBrowseApplyLabel = "";
     commercialBrowseResetLabel = "";
@@ -547,6 +582,7 @@ export default class CommercialPage {
         cells: row.cells.map((cell) => String(cell)),
     }));
     browseRows = [];
+    browseFilterEmpty = false;
     browseLoading = true;
     browseError = false;
     demoNote = "";
@@ -626,6 +662,8 @@ export default class CommercialPage {
         this.commercialFeature3TitleLabel = commercialFeature3Title();
         this.commercialFeature3DescLabel = commercialFeature3Desc();
         this.commercialBrowseFilterLabel = commercialBrowseFilterLabel();
+        this.commercialBrowseFilterEmptyTitleLabel = commercialBrowseFilterEmptyTitle();
+        this.commercialBrowseFilterEmptyBodyLabel = commercialBrowseFilterEmptyBody();
         this.commercialBrowseFieldLabel = commercialBrowseFieldLabel();
         this.commercialBrowseApplyLabel = commercialBrowseApply();
         this.commercialBrowseResetLabel = commercialBrowseReset();
@@ -674,6 +712,7 @@ export default class CommercialPage {
             : this.allBrowseRows.filter((row) =>
                   row.cells.some((cell) => String(cell).toLowerCase().includes(q)),
               );
+        this.browseFilterEmpty = this.allBrowseRows.length > 0 && filtered.length === 0;
         this.browseRows = filtered.slice(0, 4);
     }
 
