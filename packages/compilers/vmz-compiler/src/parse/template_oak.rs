@@ -6,7 +6,6 @@ use oak_vue::{VueAttribute, VueNode, VueRoot};
 use vmz_oak_frontend_adapter::{TemplateShellInput, parse_template_ast};
 
 use super::template_concrete::{ConcreteAttr, ConcreteIr, ConcreteNode, classify_concrete_attr};
-use super::template_semantic::lower_concrete_to_semantic;
 use super::template_span::TemplateSpan;
 use crate::sfc::TemplateBlock;
 
@@ -33,15 +32,13 @@ pub fn parse_template_concrete_body_primary(
     parse_template_concrete_primary(&TemplateBlock { content: input.to_string(), content_start: 0 })
 }
 
-/// Prefer Oak concrete lowering, fall back to the legacy scanner when Oak is unavailable.
+/// Production template lowering for `check` / `compile`.
+///
+/// Oak concrete lowering stays on the `oak-frontend-smoke` gate only until `VueParser` /
+/// `VueBuilder` are safe on full monorepo templates (parser loops, `Link` attrs, etc.).
 pub fn parse_template_concrete_primary(
     template: &TemplateBlock,
 ) -> Result<ConcreteIr, super::template_common::TemplateParseError> {
-    if let Ok(ir) = parse_template_concrete_via_oak(template) {
-        if lower_concrete_to_semantic(&ir).is_ok() {
-            return Ok(ir);
-        }
-    }
     super::template_concrete::parse_template_concrete(&template.content)
 }
 

@@ -8,8 +8,7 @@
  * Pass when any completed `ci.yml` run on TAG_SHA has conclusion `success`, after
  * in-flight runs for that commit settle (or timeout waiting for first CI).
  *
- * Fallback: if workflow conclusion is failure but all required jobs succeeded
- * (Format Check is advisory via `continue-on-error`), still pass.
+ * Fallback: if workflow conclusion is failure but all required jobs succeeded, still pass.
  */
 
 import { spawnSync } from 'node:child_process';
