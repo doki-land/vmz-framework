@@ -94,12 +94,17 @@ if (!iconSrc.includes('registry.ts') || !iconSrc.includes('resolveIconDef')) {
 }
 const legacyFillSrc = fs.readFileSync(path.join(iconsRoot, 'src', 'icons-legacy-fill.ts'), 'utf8');
 const strokeSrc = fs.readFileSync(path.join(iconsRoot, 'src', 'icons-stroke.ts'), 'utf8');
+const textBadgeSrc = fs.readFileSync(path.join(iconsRoot, 'src', 'icons-text-badge.ts'), 'utf8');
 if (
     !registrySrc.includes('export const REGISTRY') ||
-    !legacyFillSrc.includes("'tool.base64'") ||
-    !strokeSrc.includes("'action.search'")
+    !textBadgeSrc.includes("'tool.base64'") ||
+    !strokeSrc.includes("'action.search'") ||
+    !strokeSrc.includes("'tool.url'")
 ) {
     fail('registry must ship semantic registry (tool.* + action.*), not loose per-page SVG');
+}
+if (!textBadgeSrc.includes("kind: 'text-badge'") || !iconSrc.includes('vmz-ui-icon__badge')) {
+    fail('proprietary tool.* names must use text-badge marks in Icon');
 }
 if (!registrySrc.includes('resolveIconDef') || !strokeSrc.includes("kind: 'stroke'")) {
     fail('registry must use structured IconDef entries via icons-stroke.ts');
