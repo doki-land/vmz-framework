@@ -7,8 +7,9 @@ VMZ ↔ Oaks frontend bridge (CST + AST entry).
 | `TemplateShellInput` | Template body slice without `vmz-compiler` |
 | `parse_template_cst` / `require_template_cst` | Oak `VueParser` CST (`vmz format` preflight) |
 | `parse_template_ast` / `require_template_ast` | Oak `VueBuilder` AST |
+| `NyarAnalysisInput` | Language-neutral Nyar projection contract (phase D) |
 
-Region map and Oak → Concrete lowering live in `vmz-compiler::oak` and `parse::template_oak`.
+Region map, Oak → Concrete lowering, and Nyar projection builders live in `vmz-compiler::oak`.
 
 Requires **nightly** Rust (`rust-toolchain.toml`). Oaks via git + optional local `[patch]`.
 
