@@ -135,27 +135,36 @@
                             </p>
                             <div>
                                 <span>
-                                    01
+                                    {{ showcasePreviewRow1IdLabel }}
                                 </span>
                                 <strong>
-                                    {{ productNavOverviewLabel }}
+                                    {{ showcasePreviewRow1SubjectLabel }}
                                 </strong>
+                                <span>
+                                    {{ showcasePreviewRow1StatusLabel }}
+                                </span>
                             </div>
                             <div>
                                 <span>
-                                    02
+                                    {{ showcasePreviewRow2IdLabel }}
                                 </span>
                                 <strong>
-                                    {{ productNavProjectsLabel }}
+                                    {{ showcasePreviewRow2SubjectLabel }}
                                 </strong>
+                                <span>
+                                    {{ showcasePreviewRow2StatusLabel }}
+                                </span>
                             </div>
                             <div>
                                 <span>
-                                    03
+                                    {{ showcasePreviewRow3IdLabel }}
                                 </span>
                                 <strong>
-                                    {{ productNavMonitorLabel }}
+                                    {{ showcasePreviewRow3SubjectLabel }}
                                 </strong>
+                                <span>
+                                    {{ showcasePreviewRow3StatusLabel }}
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -295,9 +304,15 @@ import {
     showcaseTitle,
     showcaseBody,
     productCloudName,
-    productNavOverview,
-    productNavProjects,
-    productNavMonitor,
+    showcasePreviewRow1Id,
+    showcasePreviewRow1Subject,
+    showcasePreviewRow1Status,
+    showcasePreviewRow2Id,
+    showcasePreviewRow2Subject,
+    showcasePreviewRow2Status,
+    showcasePreviewRow3Id,
+    showcasePreviewRow3Subject,
+    showcasePreviewRow3Status,
     productWorkspaceLabel,
     productCreateRelease,
     showcaseTabSource,
@@ -343,9 +358,15 @@ export default class IndexPage {
     showcaseTitleLabel = "";
     showcaseBodyLabel = "";
     productCloudNameLabel = "";
-    productNavOverviewLabel = "";
-    productNavProjectsLabel = "";
-    productNavMonitorLabel = "";
+    showcasePreviewRow1IdLabel = "";
+    showcasePreviewRow1SubjectLabel = "";
+    showcasePreviewRow1StatusLabel = "";
+    showcasePreviewRow2IdLabel = "";
+    showcasePreviewRow2SubjectLabel = "";
+    showcasePreviewRow2StatusLabel = "";
+    showcasePreviewRow3IdLabel = "";
+    showcasePreviewRow3SubjectLabel = "";
+    showcasePreviewRow3StatusLabel = "";
     productWorkspaceLabel = "";
     productCreateReleaseLabel = "";
     showcaseTabSourceLabel = "";
@@ -410,9 +431,15 @@ export default class IndexPage {
             "showcaseTitleLabel",
             "showcaseBodyLabel",
             "productCloudNameLabel",
-            "productNavOverviewLabel",
-            "productNavProjectsLabel",
-            "productNavMonitorLabel",
+            "showcasePreviewRow1IdLabel",
+            "showcasePreviewRow1SubjectLabel",
+            "showcasePreviewRow1StatusLabel",
+            "showcasePreviewRow2IdLabel",
+            "showcasePreviewRow2SubjectLabel",
+            "showcasePreviewRow2StatusLabel",
+            "showcasePreviewRow3IdLabel",
+            "showcasePreviewRow3SubjectLabel",
+            "showcasePreviewRow3StatusLabel",
             "productWorkspaceLabel",
             "productCreateReleaseLabel",
             "showcaseTabSourceLabel",
@@ -458,9 +485,15 @@ export default class IndexPage {
         this.showcaseTitleLabel = showcaseTitle();
         this.showcaseBodyLabel = showcaseBody();
         this.productCloudNameLabel = productCloudName();
-        this.productNavOverviewLabel = productNavOverview();
-        this.productNavProjectsLabel = productNavProjects();
-        this.productNavMonitorLabel = productNavMonitor();
+        this.showcasePreviewRow1IdLabel = showcasePreviewRow1Id();
+        this.showcasePreviewRow1SubjectLabel = showcasePreviewRow1Subject();
+        this.showcasePreviewRow1StatusLabel = showcasePreviewRow1Status();
+        this.showcasePreviewRow2IdLabel = showcasePreviewRow2Id();
+        this.showcasePreviewRow2SubjectLabel = showcasePreviewRow2Subject();
+        this.showcasePreviewRow2StatusLabel = showcasePreviewRow2Status();
+        this.showcasePreviewRow3IdLabel = showcasePreviewRow3Id();
+        this.showcasePreviewRow3SubjectLabel = showcasePreviewRow3Subject();
+        this.showcasePreviewRow3StatusLabel = showcasePreviewRow3Status();
         this.productWorkspaceLabel = productWorkspaceLabel();
         this.productCreateReleaseLabel = productCreateRelease();
         this.showcaseTabSourceLabel = showcaseTabSource();

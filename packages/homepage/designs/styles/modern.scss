@@ -383,7 +383,8 @@ html:has([data-vmz-ui='app-shell']) {
 .landing-case__preview-body p { margin: .25rem 0 .5rem; color: var(--v2-subtle); font-size: .78rem; }
 .landing-case__preview-body div { display: flex; align-items: center; gap: 1.25rem; padding: .85rem 0; border-top: 1px solid var(--v2-line); }
 .landing-case__preview-body div span { color: var(--v2-subtle); font: .8rem var(--vmz-font-mono); }
-.landing-case__preview-body div strong { color: var(--v2-ink); font-weight: 500; }
+.landing-case__preview-body div strong { flex: 1; min-width: 0; color: var(--v2-ink); font-weight: 500; }
+.landing-case__preview-body div span:last-child { margin-left: auto; white-space: nowrap; }
 .landing-explain { display: grid; gap: 2rem; width: min(calc(100% - 4rem), var(--v2-content)); margin: 0 auto; padding: 5rem 0; }
 .landing-explain__steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2rem; }
 .landing-explain__steps article { padding-top: 1.5rem; border-top: 1px solid var(--v2-line); }
