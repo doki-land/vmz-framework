@@ -83,7 +83,12 @@
         "ui",
         "components"
     ],
-    "dependencies": {
+    "peerDependencies": {
         "@vmz/ui-icons": "workspace:*"
+    },
+    "peerDependenciesMeta": {
+        "@vmz/ui-icons": {
+            "optional": true
+        }
     }
 }
