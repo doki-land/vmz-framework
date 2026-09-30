@@ -456,20 +456,8 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'production/skip-native-pre.ts',
         description: 'CI: VMZ_SKIP_NATIVE_BUILD must short-circuit pre build:runtimes',
     },
-    'package-layout-core': {
-        file: 'production/package-layout-core.ts',
-        description: '0.2.0: @vmz/core src browser/ssr/host/faces/shared',
-    },
-    'package-layout-cli': {
-        file: 'production/package-layout-cli.ts',
-        description: '0.2.0: vmz CLI src domain folders + thin index',
-    },
-    'package-layout-hygiene': {
-        description: '0.2.0 Package Layout Hygiene composite',
-        composite: ['package-layout-core', 'package-layout-cli', 'host-runtime-manifest'],
-    },
     'runtime-quality-baseline': {
-        description: '0.2.0 composite: quality + package layout + thin proof',
+        description: '0.2.0 composite: quality + host manifest + thin proof',
         composite: [
             'no-type-check-suppression',
             'no-jsdoc-pseudo-types',
@@ -477,7 +465,7 @@ export const CHECKS: Record<string, CheckEntry> = {
             'specialized-bindings',
             'authoring-surface-lint',
             'handler-symbol-resolution',
-            'package-layout-hygiene',
+            'host-runtime-manifest',
             'thin-runtime-production-proof',
         ],
     },
