@@ -1,7 +1,17 @@
 <template>
     <span data-vmz-ui="icon" :data-icon="name" :data-size="size" :role="roleAttr" :aria-hidden="hiddenAttr" :aria-label="labelAttr" class="vmz-ui-icon">
         <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true" class="vmz-ui-icon__svg">
-            <path fill="currentColor" :d="iconPath()" />
+            <g v-if="isStroke()" fill="none" stroke="currentColor" :stroke-width="strokeWidth()" stroke-linecap="round" stroke-linejoin="round">
+                <path v-for="d in strokePaths()" :key="d" :d="d" />
+                <circle v-for="c in strokeCircles()" :key="circleKey(c)" :cx="c.cx" :cy="c.cy" :r="c.r" />
+                <circle v-for="dot in strokeDots()" :key="dotKey(dot)" :cx="dot.cx" :cy="dot.cy" :r="dot.r" fill="currentColor" stroke="none" />
+            </g>
+            <template v-else-if="isMixed()">
+                <path v-for="node in mixedPaths()" :key="node.key" :d="node.d" :fill="node.fill" :stroke="node.stroke" :stroke-width="node.strokeWidth" :fill-rule="node.fillRule" />
+                <circle v-for="node in mixedCircles()" :key="node.key" :cx="node.cx" :cy="node.cy" :r="node.r" :fill="node.fill" :stroke="node.stroke" :stroke-width="node.strokeWidth" />
+                <rect v-for="node in mixedRects()" :key="node.key" :x="node.x" :y="node.y" :width="node.width" :height="node.height" :rx="node.rx" :fill="node.fill" :stroke="node.stroke" :stroke-width="node.strokeWidth" />
+            </template>
+            <path v-else-if="isFill()" fill="currentColor" :fill-rule="fillRule()" :d="fillD()" />
         </svg>
     </span>
 </template>
@@ -12,7 +22,7 @@
     justify-content: center;
     flex-shrink: 0;
     box-sizing: border-box;
-    color: var(--vmz-action-primary-background);
+    color: inherit;
     line-height: 1;
     vertical-align: middle;
     user-select: none;
@@ -43,7 +53,7 @@
 }
 </style>
 <script client>
-import { FALLBACK_PATH, resolveIconPath } from "./registry.ts";
+import { DEFAULT_STROKE_WIDTH, resolveIconDef } from "./registry.ts";
 
 /**
  * VMZ UI Icons — semantic Icon backed by the shared registry export.
@@ -65,8 +75,116 @@ export default class Icon {
         this.syncA11y();
     }
 
-    iconPath() {
-        return resolveIconPath(this.name) || FALLBACK_PATH;
+    iconDef() {
+        return resolveIconDef(this.name);
+    }
+
+    isStroke() {
+        const def = this.iconDef();
+        return def?.kind === "stroke";
+    }
+
+    isFill() {
+        const def = this.iconDef();
+        return def?.kind === "fill";
+    }
+
+    isMixed() {
+        const def = this.iconDef();
+        return def?.kind === "mixed";
+    }
+
+    strokeWidth() {
+        const def = this.iconDef();
+        if (def?.kind !== "stroke") return DEFAULT_STROKE_WIDTH;
+        return def.strokeWidth ?? DEFAULT_STROKE_WIDTH;
+    }
+
+    strokePaths() {
+        const def = this.iconDef();
+        if (def?.kind !== "stroke") return [];
+        return def.paths ?? [];
+    }
+
+    strokeCircles() {
+        const def = this.iconDef();
+        if (def?.kind !== "stroke") return [];
+        return def.circles ?? [];
+    }
+
+    strokeDots() {
+        const def = this.iconDef();
+        if (def?.kind !== "stroke") return [];
+        return def.dots ?? [];
+    }
+
+    circleKey(c) {
+        return `c-${c.cx}-${c.cy}-${c.r}`;
+    }
+
+    dotKey(dot) {
+        return `d-${dot.cx}-${dot.cy}-${dot.r}`;
+    }
+
+    fillD() {
+        const def = this.iconDef();
+        if (def?.kind !== "fill") return "";
+        return def.d;
+    }
+
+    fillRule() {
+        const def = this.iconDef();
+        if (def?.kind !== "fill" || !def.fillRule) return "";
+        return def.fillRule;
+    }
+
+    mixedPaths() {
+        const def = this.iconDef();
+        if (def?.kind !== "mixed") return [];
+        return def.nodes
+            .filter((node) => node.tag === "path")
+            .map((node, index) => ({
+                key: `p-${index}`,
+                d: node.attrs.d ?? "",
+                fill: node.attrs.fill ?? "none",
+                stroke: node.attrs.stroke ?? "currentColor",
+                strokeWidth: node.attrs["stroke-width"] ?? DEFAULT_STROKE_WIDTH,
+                fillRule: node.attrs["fill-rule"] ?? "",
+            }));
+    }
+
+    mixedCircles() {
+        const def = this.iconDef();
+        if (def?.kind !== "mixed") return [];
+        return def.nodes
+            .filter((node) => node.tag === "circle")
+            .map((node, index) => ({
+                key: `c-${index}`,
+                cx: node.attrs.cx ?? "12",
+                cy: node.attrs.cy ?? "12",
+                r: node.attrs.r ?? "9",
+                fill: node.attrs.fill ?? "none",
+                stroke: node.attrs.stroke ?? "currentColor",
+                strokeWidth: node.attrs["stroke-width"] ?? DEFAULT_STROKE_WIDTH,
+            }));
+    }
+
+    mixedRects() {
+        const def = this.iconDef();
+        if (def?.kind !== "mixed") return [];
+        return def.nodes
+            .filter((node) => node.tag === "rect")
+            .map((node, index) => ({
+                key: `r-${index}`,
+                x: node.attrs.x ?? "0",
+                y: node.attrs.y ?? "0",
+                width: node.attrs.width ?? "24",
+                height: node.attrs.height ?? "24",
+                rx: node.attrs.rx ?? "",
+                fill: node.attrs.fill ?? "none",
+                stroke: node.attrs.stroke ?? "currentColor",
+                strokeWidth: node.attrs["stroke-width"] ?? DEFAULT_STROKE_WIDTH,
+            }));
     }
 
     syncA11y() {
