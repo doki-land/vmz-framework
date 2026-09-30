@@ -92,16 +92,23 @@ if (!iconSrc.includes('data-icon={name}') && !iconSrc.includes('data-icon=')) {
 if (!iconSrc.includes('registry.ts') || !iconSrc.includes('resolveIconDef')) {
     fail('Icon must import shared registry.ts via resolveIconDef');
 }
-const legacyFillSrc = fs.readFileSync(path.join(iconsRoot, 'src', 'icons-legacy-fill.ts'), 'utf8');
 const strokeSrc = fs.readFileSync(path.join(iconsRoot, 'src', 'icons-stroke.ts'), 'utf8');
 const textBadgeSrc = fs.readFileSync(path.join(iconsRoot, 'src', 'icons-text-badge.ts'), 'utf8');
+const legacyFillPath = path.join(iconsRoot, 'src', 'icons-legacy-fill.ts');
+if (fs.existsSync(legacyFillPath)) {
+    fail('icons-legacy-fill.ts must be removed — registry uses stroke and text-badge only');
+}
 if (
     !registrySrc.includes('export const REGISTRY') ||
     !textBadgeSrc.includes("'tool.base64'") ||
     !strokeSrc.includes("'action.search'") ||
-    !strokeSrc.includes("'tool.url'")
+    !strokeSrc.includes("'tool.url'") ||
+    !strokeSrc.includes("'tool.speed'")
 ) {
     fail('registry must ship semantic registry (tool.* + action.*), not loose per-page SVG');
+}
+if (registrySrc.includes('LEGACY_FILL_ICONS') || registrySrc.includes('icons-legacy-fill')) {
+    fail('registry.ts must not import legacy fill silhouettes');
 }
 if (!textBadgeSrc.includes("kind: 'text-badge'") || !iconSrc.includes('vmz-ui-icon__badge')) {
     fail('proprietary tool.* names must use text-badge marks in Icon');
