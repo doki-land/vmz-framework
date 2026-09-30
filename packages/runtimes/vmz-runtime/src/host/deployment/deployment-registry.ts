@@ -14,8 +14,8 @@ import type {
     DeploymentDocument,
     ImportComponentEntriesOpts,
     LoadComponentEntriesOpts,
-} from '../shared/host.types.js';
-import { loadNativeAddon, requireNativeFn } from './native-addon.js';
+} from '../../shared/host.types.js';
+import { loadNativeAddon, requireNativeFn } from '../native-addon.js';
 
 export const DEPLOYMENT_SCHEMA = 'vmz.deployment.v0';
 

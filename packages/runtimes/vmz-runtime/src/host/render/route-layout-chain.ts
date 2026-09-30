@@ -2,7 +2,7 @@
  * Layout chain from Deployment Plan only (plan-only host).
  */
 
-import { readDeploymentDocument } from './deployment-registry.js';
+import { readDeploymentDocument } from '../deployment/deployment-registry.js';
 
 /** Chunk id for `src/Application.vmz` emit (`Application.client.js`). */
 export const APPLICATION_SHELL_CHUNK = 'Application';

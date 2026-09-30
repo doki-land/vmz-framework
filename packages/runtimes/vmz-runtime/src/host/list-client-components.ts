@@ -17,7 +17,7 @@ import {
     dedupeComponentEntriesByTag,
     mergeExplicitComponentEntries,
     readDeploymentDocument,
-} from './deployment-registry.js';
+} from './deployment/deployment-registry.js';
 
 export {
     DEPLOYMENT_SCHEMA,
@@ -29,9 +29,9 @@ export {
     loadComponentEntries,
     importAndRegisterComponentEntries,
     bootstrapComponentRegistry,
-} from './deployment-registry.js';
+} from './deployment/deployment-registry.js';
 
-export { createRenderHost } from './render-host.js';
+export { createRenderHost } from './render/render-host.js';
 
 export async function listClientComponents(dir: string, opts: ListClientComponentsOpts = {}): Promise<ClientComponentListEntry[]> {
     const strict = opts.strict === true;
@@ -99,7 +99,7 @@ export async function resolveComponentEntries(
     explicit?: Record<string, string>,
     opts: ListClientComponentsOpts & { closureRoots?: string[] } = {},
 ): Promise<ClientComponentListEntry[]> {
-    const { loadComponentEntries } = await import('./deployment-registry.js');
+    const { loadComponentEntries } = await import('./deployment/deployment-registry.js');
     const entries = await loadComponentEntries(distDir, {
         strict: opts.strict,
         closureRoots: opts.closureRoots,

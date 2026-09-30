@@ -18,6 +18,8 @@ const CORE_NESTED_DIRS = [
     'browser/reactivity',
     'browser/navigation',
     'browser/resume',
+    'host/render',
+    'host/deployment',
     'host/serve',
 ] as const;
 

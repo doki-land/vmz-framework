@@ -1,17 +1,3 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
-import http from 'node:http';
-import { createRequire, registerHooks } from 'node:module';
-import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { listClientComponents } from '../list-client-components.js';
-import type { ClosedAccessResult, HostRequestOpts, LocaleHostCtx, SseClient } from '../../shared/host.types.js';
-import { LOCALE_LINK_PLAN_SCHEMA, linkRouteAliasesFromUnits, localeHrefTableFromPlan, localizeBodyLinks } from '../localize-body-links.js';
-import { loadNativeAddon } from '../native-addon.js';
-import { createRenderHost } from '../render-host.js';
-import { resolveRouteLayoutChain } from '../route-layout-chain.js';
-import { handleNodeRequest, setRoutes, setServerModuleResolver } from '../../faces/vmz-runtime.js';
-
 export function parsePathPattern(pattern) {
     const raw = String(pattern || '').trim();
     if (!raw || raw === '/') return [];
@@ -93,7 +79,6 @@ function scoreRoute(segs, pathParts) {
     while (i < segs.length) {
         const s = segs[i];
         if (s.kind === 'catch') {
-            // Required catch-all `[...slug]` needs �? remaining segment (not `/`).
             if (j >= pathParts.length) return null;
             score += 1;
             return score;

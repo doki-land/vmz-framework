@@ -5,14 +5,14 @@
 
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { BootstrapComponentRegistryOpts } from '../shared/host.types.js';
+import type { BootstrapComponentRegistryOpts } from '../../shared/host.types.js';
 import {
     bootstrapComponentRegistry,
     collectDependsOnClosure,
     importAndRegisterComponentEntries,
     loadComponentEntries,
     readDeploymentDocument,
-} from './deployment-registry.js';
+} from '../deployment/deployment-registry.js';
 
 export async function createRenderHost(distDir: string, opts: Record<string, unknown> = {}) {
     const strict = opts.strictDeployment === true || opts.strict === true;

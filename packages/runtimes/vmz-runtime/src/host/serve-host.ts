@@ -10,8 +10,8 @@ import { listClientComponents } from './list-client-components.js';
 import type { ClosedAccessResult, HostRequestOpts, LocaleHostCtx, SseClient } from '../shared/host.types.js';
 import { LOCALE_LINK_PLAN_SCHEMA, linkRouteAliasesFromUnits, localeHrefTableFromPlan, localizeBodyLinks } from './localize-body-links.js';
 import { loadNativeAddon } from './native-addon.js';
-import { createRenderHost } from './render-host.js';
-import { resolveRouteLayoutChain } from './route-layout-chain.js';
+import { createRenderHost } from './render/render-host.js';
+import { resolveRouteLayoutChain } from './render/route-layout-chain.js';
 import { handleNodeRequest, setRoutes, setServerModuleResolver } from '../faces/vmz-runtime.js';
 
 import { LOCALE_LINK_PLAN_REL, LOCALE_STORE_KEY, ROUTE_CATALOG_REL, ROUTE_CATALOG_SCHEMA, SHUTDOWN_TIMEOUT_MS, THEME_STORE_KEY } from './serve/constants.js';
