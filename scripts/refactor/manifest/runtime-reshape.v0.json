@@ -178,7 +178,7 @@
       }
     },
     "src/browser/client-nav.ts": {
-      "sha256": "096fd252ee992df0",
+      "sha256": "068ee730d0c895be",
       "splitInto": [
         {
           "path": "src/browser/navigation/client-navigation.ts",

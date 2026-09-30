@@ -422,12 +422,25 @@ function applySplitModule(pkgRoot, sourceRel, spec, opts) {
     }
     for (const d of decls) declTextsByName.set(d.name, d.text);
 
+    /** @type {Set<string>} */
+    const needsExport = new Set();
+    for (const mod of spec.splitInto) {
+        const own = new Set(mod.declarations);
+        for (const name of mod.declarations) {
+            const text = declTextsByName.get(name) || '';
+            for (const ref of collectFreeIdentifiers(text, own)) {
+                const owner = ownerPath.get(ref);
+                if (owner && owner !== mod.path) needsExport.add(ref);
+            }
+        }
+    }
+
     for (const mod of spec.splitInto) {
         const parts = [];
         for (const name of mod.declarations) {
             const decl = byName.get(name);
             if (!decl) throw new Error(`${sourceRel}: cannot extract missing declaration ${name}`);
-            parts.push(decl.text);
+            parts.push(ensureDeclarationExported(decl.text, decl.exported || needsExport.has(name)));
         }
         const crossImports = buildCrossImports(mod, ownerPath, importBlock, declTextsByName);
         const body = `${crossImports}\n\n${parts.join('\n\n')}\n`;
@@ -627,6 +640,27 @@ function collectFreeIdentifiers(declText, ownNames) {
         visit(st);
     }
     return refs;
+}
+
+/**
+ * @param {string} declText
+ * @param {boolean} shouldExport
+ */
+function ensureDeclarationExported(declText, shouldExport) {
+    if (!shouldExport || /^\s*export\s/.test(declText)) return declText;
+    if (/^\s*(async\s+)?function\b/.test(declText)) {
+        return declText.replace(/^(\s*)(async\s+)?function\b/, '$1export $2function');
+    }
+    if (/^\s*const\b/.test(declText)) {
+        return declText.replace(/^(\s*)const\b/, '$1export const');
+    }
+    if (/^\s*let\b/.test(declText)) {
+        return declText.replace(/^(\s*)let\b/, '$1export let');
+    }
+    if (/^\s*class\b/.test(declText)) {
+        return declText.replace(/^(\s*)class\b/, '$1export class');
+    }
+    return declText;
 }
 
 /**
