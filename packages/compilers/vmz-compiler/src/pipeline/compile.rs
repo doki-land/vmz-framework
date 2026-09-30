@@ -670,21 +670,20 @@ fn emit_runtime_js(options: &CompileOptions, report: &mut CompileReport) -> crat
     let runtime_root = options.runtime_dist.clone().unwrap_or_else(|| {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../runtimes/vmz-runtime/dist")
     });
-    let browser_copies = [
-        ("faces/server.js", "vmz-runtime.js"),
-        ("faces/dom.js", "vmz-dom.js"),
-        ("browser/dom-core.js", "dom-core.js"),
-        ("ssr/dom-ssr.js", "dom-ssr.js"),
-        ("faces/dom.client.js", "dom.client.js"),
-        ("faces/dom.browser.js", "dom.browser.js"),
-        ("browser/direct-host-box.js", "direct-host-box.js"),
-        ("browser/unknown-component.js", "unknown-component.js"),
-        ("shared/dom-attr-normalize.js", "dom-attr-normalize.js"),
-        ("faces/http.js", "vmz-http.js"),
-        ("browser/client-nav.js", "vmz-client-nav.js"),
-    ];
-    for (src_name, out_name) in browser_copies {
-        copy_runtime_file(&runtime_root, src_name, out_name, false, options, report)?;
+    let delivery_manifest = delivery_runtime_files_manifest();
+    for f in delivery_manifest
+        .flat_barrels
+        .iter()
+        .chain(delivery_manifest.nested.iter())
+    {
+        copy_runtime_file(
+            &runtime_root,
+            &f.src,
+            &f.out,
+            false,
+            options,
+            report,
+        )?;
     }
     // Local `vmz serve` / `vmz dev` need the host; production `--release` deploys omit it.
     // 0.1.31: host companions nest under `_vmz/host/` (not delivery root).
@@ -746,11 +745,25 @@ fn copy_runtime_file(
         text = text.replace("from '../faces/server.js'", "from '../../vmz-runtime.js'");
         text = text.replace("from \"../faces/server.js\"", "from \"../../vmz-runtime.js\"");
     } else if !out_name.starts_with("_vmz/") {
-        text = rewrite_flat_delivery_imports(&text);
+        text = rewrite_delivery_imports(&text, out_name);
     }
     fs::write(&out, text)?;
     report.emitted.push(out);
     Ok(())
+}
+
+fn replace_import_path(text: &str, from: &str, to: &str) -> String {
+    let mut out = text.to_string();
+    out = out.replace(&format!("'{from}'"), &format!("'{to}'"));
+    out = out.replace(&format!("\"{from}\""), &format!("\"{to}\""));
+    out
+}
+
+fn replace_quoted_prefix(text: &str, from: &str, to: &str) -> String {
+    let mut out = text.to_string();
+    out = out.replace(&format!("'{from}"), &format!("'{to}"));
+    out = out.replace(&format!("\"{from}"), &format!("\"{to}"));
+    out
 }
 
 /// `@vmz/core` dist is layered (`browser/`, `ssr/`, `faces/`); delivery root is flat.
@@ -768,10 +781,97 @@ fn rewrite_flat_delivery_imports(text: &str) -> String {
         ("../faces/http.js", "./vmz-http.js"),
     ];
     for (from, to) in PAIRS {
-        out = out.replace(&format!("'{from}'"), &format!("'{to}'"));
-        out = out.replace(&format!("\"{from}\""), &format!("\"{to}\""));
+        out = replace_import_path(&out, from, to);
     }
     out
+}
+
+fn rewrite_nested_ssr_delivery(text: &str) -> String {
+    let mut out = text.to_string();
+    for (from, to) in [
+        ("../browser/dom-core.js", "../dom-core.js"),
+        ("../browser/direct-host-box.js", "../direct-host-box.js"),
+        ("../browser/unknown-component.js", "../unknown-component.js"),
+    ] {
+        out = replace_import_path(&out, from, to);
+    }
+    out
+}
+
+fn rewrite_nested_browser_delivery(text: &str) -> String {
+    let mut out = replace_import_path(
+        text,
+        "../../shared/dom-attr-normalize.js",
+        "../../dom-attr-normalize.js",
+    );
+    for (from, to) in [
+        ("../direct-host-box.js", "../../direct-host-box.js"),
+        ("../unknown-component.js", "../../unknown-component.js"),
+        ("../dom-core.js", "../../dom-core.js"),
+    ] {
+        out = replace_import_path(&out, from, to);
+    }
+    out
+}
+
+fn rewrite_flat_delivery_root(text: &str, out_name: &str) -> String {
+    let mut out = rewrite_flat_delivery_imports(text);
+    match out_name {
+        "dom-core.js" => {
+            for (from, to) in [
+                ("./diagnostics/", "./browser/diagnostics/"),
+                ("./dom/", "./browser/dom/"),
+                ("./reactivity/", "./browser/reactivity/"),
+            ] {
+                out = replace_quoted_prefix(&out, from, to);
+            }
+        }
+        "dom-ssr.js" => {
+            out = replace_import_path(&out, "./render.js", "./ssr/render.js");
+            out = replace_quoted_prefix(&out, "../browser/resume/", "./browser/resume/");
+        }
+        "vmz-client-nav.js" => {
+            out = replace_quoted_prefix(&out, "./navigation/", "./browser/navigation/");
+        }
+        "dom.browser.js" => {
+            out = replace_quoted_prefix(&out, "../browser/resume/", "./browser/resume/");
+        }
+        _ => {}
+    }
+    out
+}
+
+fn rewrite_delivery_imports(text: &str, out_name: &str) -> String {
+    if out_name.starts_with("ssr/") {
+        rewrite_nested_ssr_delivery(text)
+    } else if out_name.starts_with("browser/") {
+        rewrite_nested_browser_delivery(text)
+    } else {
+        rewrite_flat_delivery_root(text, out_name)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct DeliveryRuntimeFilesManifest {
+    #[serde(rename = "flatBarrels")]
+    flat_barrels: Vec<DeliveryRuntimeFileEntry>,
+    nested: Vec<DeliveryRuntimeFileEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DeliveryRuntimeFileEntry {
+    src: String,
+    out: String,
+}
+
+fn delivery_runtime_files_manifest() -> DeliveryRuntimeFilesManifest {
+    const RAW: &str = include_str!("../../../../runtimes/vmz/delivery-runtime-files.json");
+    let manifest: DeliveryRuntimeFilesManifest =
+        serde_json::from_str(RAW).expect("delivery-runtime-files.json must parse");
+    if manifest.flat_barrels.is_empty() || manifest.nested.is_empty() {
+        panic!("delivery-runtime-files.json: flatBarrels and nested must be non-empty");
+    }
+    manifest
 }
 
 #[derive(Debug, Deserialize)]
