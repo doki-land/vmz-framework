@@ -21,5 +21,4 @@ serde_json.workspace = true
 json5.workspace = true
 vmz-compiler.workspace = true
 vmz-generator.workspace = true
-vmz-oak-frontend-adapter.workspace = true
 walkdir.workspace = true

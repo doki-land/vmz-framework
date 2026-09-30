@@ -26,6 +26,24 @@ export default class Icon {}
 }
 
 #[test]
+fn oak_cst_parses_pascal_case_link_component_without_hang() {
+    let source = r#"<template>
+  <main>
+    <Link to="IndexPage">
+      Home
+    </Link>
+  </main>
+</template>
+<script client>
+export default class AboutPage {}
+</script>
+"#;
+    let parsed = parse_vmz("About.vmz", source).expect("parse vmz");
+    let cst = parse_template_cst(&template_shell(&parsed.template));
+    assert!(cst.ok, "PascalCase Link must not be treated as void <link>: {:?}", cst.diagnostics);
+}
+
+#[test]
 fn oak_parses_void_elements_in_template() {
     let source = r#"<template>
   <input v-model="name">

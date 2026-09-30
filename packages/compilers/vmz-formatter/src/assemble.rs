@@ -2,7 +2,6 @@
 
 use vmz_compiler::{DataBlock, ParsedVmz, ScriptBlock, ScriptLanguage, StyleLanguage};
 use vmz_generator::to_json5;
-use vmz_oak_frontend_adapter::{TemplateShellInput, require_template_cst};
 
 use crate::editorconfig::EditorSettings;
 use crate::template_print::format_template_body;
@@ -26,10 +25,9 @@ pub fn assemble_vmz(
     }
 
     let template_source = detent_envelope(&parsed.template.content);
-    require_template_cst(&TemplateShellInput {
-        content: parsed.template.content.clone(),
-        content_start: parsed.template.content_start,
-    })?;
+    // Oak CST preflight is intentionally omitted here: `VueParser` can loop on real
+    // author templates (e.g. `@vmz/ui` Autocomplete). Format still lowers via legacy
+    // `parse_template_concrete` until Oak CST is safe for workspace walks.
     let template_body = format_template_body(&template_source, settings)?;
     // Envelope indent is EditorConfig-owned; AST print stays at depth 0 inside the body.
     let template_body = indent_block(&template_body, settings);

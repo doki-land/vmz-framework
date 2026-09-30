@@ -5,7 +5,7 @@ VMZ ↔ Oaks frontend bridge (CST + AST entry).
 | API | Role |
 |-----|------|
 | `TemplateShellInput` | Template body slice without `vmz-compiler` |
-| `parse_template_cst` / `require_template_cst` | Oak `VueParser` CST (`vmz format` preflight) |
+| `parse_template_cst` / `require_template_cst` | Oak `VueParser` CST (diagnostics only until parser loop is fixed) |
 | `parse_template_ast` / `require_template_ast` | Oak `VueBuilder` template AST |
 | `ScriptShellInput` / `ScriptRole` | Script body slice for Oak TS AST |
 | `parse_script_ast` / `require_script_ast` | Oak `TypeScriptBuilder` for `<script client\|server>` |
