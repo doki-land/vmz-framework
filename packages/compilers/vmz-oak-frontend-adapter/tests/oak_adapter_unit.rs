@@ -41,3 +41,22 @@ export default class Icon {}
     assert!(cst.ok, "oak CST parse failed: {:?}", cst.diagnostics);
     assert!(cst.shell_source.starts_with("<template>"));
 }
+
+#[test]
+fn oak_parses_void_elements_in_template() {
+    let source = r#"<template>
+  <input v-model="name">
+  <img :src="url">
+  <br>
+</template>
+<script client>
+export default class Page {
+  name = '';
+  url = '/x';
+}
+</script>
+"#;
+    let parsed = parse_vmz("Void.vmz", source).expect("parse vmz");
+    let cst = parse_template_cst(&parsed.template);
+    assert!(cst.ok, "void elements should parse: {:?}", cst.diagnostics);
+}

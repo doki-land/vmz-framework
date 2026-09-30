@@ -12,5 +12,5 @@ mod vmz_regions;
 pub use contract::{
     BlockKind, ByteSpan, OakFrontendDiagnostic, SfcBlockRegion, SfcDocumentView, TemplateCstParse,
 };
-pub use oak_cst::parse_template_cst;
+pub use oak_cst::{format_cst_diagnostics, parse_template_cst, require_template_cst};
 pub use vmz_regions::{project_parsed_vmz, project_vmz_regions};
