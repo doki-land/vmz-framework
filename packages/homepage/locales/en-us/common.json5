@@ -24,6 +24,7 @@
   heroTitleEm: 'Let the compiler decide delivery.',
   heroLede: 'Express UI, state, and server boundaries in components. VMZ analyzes the program graph and emits artifacts for supported hosts.',
   heroFootnote: 'Current capabilities and limits are documented',
+  heroPrimaryCta: 'Read the 5-minute guide',
   viewProductUi: 'See how it works',
   heroPreviewDemoLabel: 'From source to interactive UI',
   heroPreviewSiteName: 'Docs site',

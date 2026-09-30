@@ -24,6 +24,7 @@
   heroTitleEm: '让编译器决定交付。',
   heroLede: '在一个组件里表达界面、状态与服务端边界。VMZ 分析程序图，为已支持的宿主生成对应产物。',
   heroFootnote: '当前能力与限制见文档',
+  heroPrimaryCta: '阅读 5 分钟入门',
   viewProductUi: '看代码与产物',
   heroPreviewDemoLabel: '从源码到可交互页面',
   heroPreviewSiteName: '文档站点',

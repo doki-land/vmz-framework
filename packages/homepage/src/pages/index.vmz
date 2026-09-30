@@ -20,7 +20,7 @@
                         </p>
                         <div class="v2-actions">
                             <a data-vmz-fixture="landing-primary-cta" :href="guideHref" class="v2-button v2-button--primary">
-                                {{ buildLabel }}
+                                {{ heroPrimaryCtaLabel }}
                             </a>
                             <a data-vmz-fixture="landing-secondary-cta" href="#how-it-works" class="v2-button v2-button--text">
                                 {{ viewProductUiLabel }}
@@ -259,7 +259,6 @@
 </template>
 <script client>
 import {
-    build,
     readDocs,
     gettingStartedGuide,
     start,
@@ -268,24 +267,11 @@ import {
     heroTitleEm,
     heroLede,
     heroFootnote,
+    heroPrimaryCta,
     viewProductUi,
     heroPreviewDemoLabel,
-    heroPreviewSiteName,
-    heroPreviewAria,
     heroPreviewReleaseCenter,
     heroPreviewProductionReady,
-    heroPreviewBranchMain,
-    heroPreviewTableAria,
-    heroPreviewColTarget,
-    heroPreviewColResult,
-    heroPreviewColStatus,
-    heroSignalAria,
-    heroSignalAuthor,
-    heroSignalAuthorValue,
-    heroSignalUnderstand,
-    heroSignalUnderstandValue,
-    heroSignalDeliver,
-    heroSignalDeliverValue,
     statementIndex,
     statementTitleLead,
     statementTitleEm,
@@ -305,12 +291,6 @@ import {
     flowStep2Desc,
     flowStep3Title,
     flowStep3Desc,
-    flowStep4Title,
-    flowStep4Desc,
-    flowStep5Title,
-    flowStep5Desc,
-    flowStep6Title,
-    flowStep6Desc,
     showcaseIndex,
     showcaseTitle,
     showcaseBody,
@@ -320,45 +300,14 @@ import {
     productNavMonitor,
     productWorkspaceLabel,
     productCreateRelease,
-    showcaseTabsLabel,
-    showcaseTabOverview,
     showcaseTabSource,
-    showcaseTabActivity,
-    showcaseTableColSurface,
-    showcaseTableColResult,
-    showcaseTableColStatus,
-    showcaseRowBrowser,
-    showcaseRowBrowserResult,
-    showcaseRowSsr,
-    showcaseRowSsrResult,
-    showcaseRowNative,
-    showcaseRowNativeResult,
-    showcaseRowEdge,
-    showcaseRowEdgeResult,
-    showcaseStatusReady,
-    showcaseEmptyBadge,
-    showcaseEmptyTitle,
-    showcaseEmptyBody,
     startIndex,
     startTitle,
     startLede,
-    copyCommand,
-    copiedCommand,
-    consoleStatActiveServices,
-    consoleStatPendingReleases,
-    consoleStatAffectedRegions,
-    consoleSummaryAria,
 } from "#locales/common";
-import IndexPageServer from "#server/pages/index";
-import { demoHeroPreview, demoShowcaseOverview } from "../demo/releases.ts";
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
-const initialHeroPreview = demoHeroPreview();
-const initialShowcaseOverview = demoShowcaseOverview();
-
 export default class IndexPage {
-    showcaseTab = "source";
-    copied = false;
     sampleCount = 0;
     localeId = "zh-hans";
     heroKickerLabel = "";
@@ -366,42 +315,11 @@ export default class IndexPage {
     heroTitleEmLabel = "";
     heroLedeLabel = "";
     heroFootnoteLabel = "";
+    heroPrimaryCtaLabel = "";
     viewProductUiLabel = "";
     heroPreviewDemoLabelText = "";
-    heroPreviewSiteNameLabel = "";
-    heroPreviewAriaLabel = "";
     heroPreviewReleaseCenterLabel = "";
     heroPreviewProductionReadyLabel = "";
-    heroPreviewPathLabel = `${initialHeroPreview.workspace} / ${initialHeroPreview.project}`;
-    heroPreviewSummaryLine = initialHeroPreview.summaryLine;
-    showcasePathLabel = initialShowcaseOverview.pathLabel;
-    showcaseSummaryLine = initialShowcaseOverview.summaryLine;
-    showcaseSummaryTotal = initialShowcaseOverview.summary.total;
-    showcaseSummaryRunning = initialShowcaseOverview.summary.running;
-    showcaseSummaryFailed = initialShowcaseOverview.summary.failed;
-    showcaseSummaryTotalLabel = "";
-    showcaseSummaryRunningLabel = "";
-    showcaseSummaryFailedLabel = "";
-    showcaseSummaryAriaLabel = "";
-    heroPreviewTargets = initialHeroPreview.targets.map((target) => ({
-        id: target.id,
-        name: target.name,
-        result: target.result,
-        status: target.status,
-        statusLabel: target.statusLabel,
-    }));
-    heroPreviewBranchMainLabel = "";
-    heroPreviewTableAriaLabel = "";
-    heroPreviewColTargetLabel = "";
-    heroPreviewColResultLabel = "";
-    heroPreviewColStatusLabel = "";
-    heroSignalAriaLabel = "";
-    heroSignalAuthorLabel = "";
-    heroSignalAuthorValueLabel = "";
-    heroSignalUnderstandLabel = "";
-    heroSignalUnderstandValueLabel = "";
-    heroSignalDeliverLabel = "";
-    heroSignalDeliverValueLabel = "";
     statementIndexLabel = "";
     statementTitleLeadLabel = "";
     statementTitleEmLabel = "";
@@ -421,12 +339,6 @@ export default class IndexPage {
     flowStep2DescLabel = "";
     flowStep3TitleLabel = "";
     flowStep3DescLabel = "";
-    flowStep4TitleLabel = "";
-    flowStep4DescLabel = "";
-    flowStep5TitleLabel = "";
-    flowStep5DescLabel = "";
-    flowStep6TitleLabel = "";
-    flowStep6DescLabel = "";
     showcaseIndexLabel = "";
     showcaseTitleLabel = "";
     showcaseBodyLabel = "";
@@ -436,90 +348,23 @@ export default class IndexPage {
     productNavMonitorLabel = "";
     productWorkspaceLabel = "";
     productCreateReleaseLabel = "";
-    showcaseTabsLabel = "";
-    showcaseEmptyBadgeLabel = "";
-    showcaseEmptyTitleLabel = "";
-    showcaseEmptyBodyLabel = "";
     showcaseTabSourceLabel = "";
     startIndexLabel = "";
     startTitleLabel = "";
     startLedeLabel = "";
-    buildLabel = "";
     readDocsLabel = "";
     gettingStartedGuideLabel = "";
     startLabel = "";
-    copyCommandLabel = "";
-    copiedCommandLabel = "";
     docsRootHref = "/d/zh-hans/";
     guideHref = "/d/zh-hans/guide/";
     _unwatchLocale = null;
-    showcaseTabs = [];
     codeSample =
         '<template>\n  <Button @click="() => (count += 1)">\n    Count {{ count }}\n  </Button>\n</template>\n\n<script client>\nexport default class Counter {\n  count = 0;\n}\n</scr' +
         "ipt>";
-    surfaceColumns = [];
-    surfaceRows = [];
 
     onMount() {
         this.applyLocaleCopy();
         this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
-        this.loadDemoFixture();
-    }
-
-    applyHeroPreview(preview) {
-        if (!preview || typeof preview !== "object") return;
-        const workspace = String(preview.workspace || "").trim();
-        const project = String(preview.project || "").trim();
-        if (workspace && project) {
-            this.heroPreviewPathLabel = `${workspace} / ${project}`;
-        }
-        if (preview.summaryLine) {
-            this.heroPreviewSummaryLine = String(preview.summaryLine);
-        }
-        if (Array.isArray(preview.targets) && preview.targets.length) {
-            this.heroPreviewTargets = preview.targets.map((target) => ({
-                id: String(target.id || ""),
-                name: String(target.name || ""),
-                result: String(target.result || ""),
-                status: String(target.status || ""),
-                statusLabel: String(target.statusLabel || ""),
-            }));
-        }
-    }
-
-    applyShowcaseOverview(showcase) {
-        if (!showcase || typeof showcase !== "object") return;
-        if (showcase.pathLabel) {
-            this.showcasePathLabel = String(showcase.pathLabel);
-        }
-        if (showcase.summaryLine) {
-            this.showcaseSummaryLine = String(showcase.summaryLine);
-        }
-        if (showcase.summary && typeof showcase.summary === "object") {
-            this.showcaseSummaryTotal = Number(showcase.summary.total) || this.showcaseSummaryTotal;
-            this.showcaseSummaryRunning =
-                Number(showcase.summary.running) || this.showcaseSummaryRunning;
-            this.showcaseSummaryFailed =
-                Number(showcase.summary.failed) || this.showcaseSummaryFailed;
-        }
-        if (Array.isArray(showcase.surfaceRows) && showcase.surfaceRows.length) {
-            this.surfaceRows = showcase.surfaceRows.map((row) => ({
-                id: String(row.id || ""),
-                cells: Array.isArray(row.cells) ? row.cells.map((cell) => String(cell)) : [],
-            }));
-        }
-    }
-
-    async loadDemoFixture() {
-        try {
-            const server = new IndexPageServer();
-            const preview = await server.getHeroPreview();
-            const showcase = await server.getShowcaseOverview();
-            this.applyHeroPreview(preview);
-            this.applyShowcaseOverview(showcase);
-        } catch {
-            /* SSR defaults mirror the server fixture */
-        }
     }
 
     onDestroy() {
@@ -537,24 +382,11 @@ export default class IndexPage {
             "heroTitleEmLabel",
             "heroLedeLabel",
             "heroFootnoteLabel",
+            "heroPrimaryCtaLabel",
             "viewProductUiLabel",
             "heroPreviewDemoLabelText",
-            "heroPreviewSiteNameLabel",
-            "heroPreviewAriaLabel",
             "heroPreviewReleaseCenterLabel",
             "heroPreviewProductionReadyLabel",
-            "heroPreviewBranchMainLabel",
-            "heroPreviewTableAriaLabel",
-            "heroPreviewColTargetLabel",
-            "heroPreviewColResultLabel",
-            "heroPreviewColStatusLabel",
-            "heroSignalAriaLabel",
-            "heroSignalAuthorLabel",
-            "heroSignalAuthorValueLabel",
-            "heroSignalUnderstandLabel",
-            "heroSignalUnderstandValueLabel",
-            "heroSignalDeliverLabel",
-            "heroSignalDeliverValueLabel",
             "statementIndexLabel",
             "statementTitleLeadLabel",
             "statementTitleEmLabel",
@@ -574,12 +406,6 @@ export default class IndexPage {
             "flowStep2DescLabel",
             "flowStep3TitleLabel",
             "flowStep3DescLabel",
-            "flowStep4TitleLabel",
-            "flowStep4DescLabel",
-            "flowStep5TitleLabel",
-            "flowStep5DescLabel",
-            "flowStep6TitleLabel",
-            "flowStep6DescLabel",
             "showcaseIndexLabel",
             "showcaseTitleLabel",
             "showcaseBodyLabel",
@@ -589,20 +415,13 @@ export default class IndexPage {
             "productNavMonitorLabel",
             "productWorkspaceLabel",
             "productCreateReleaseLabel",
-            "showcaseTabsLabel",
-            "showcaseEmptyBadgeLabel",
-            "showcaseEmptyTitleLabel",
-            "showcaseEmptyBodyLabel",
             "showcaseTabSourceLabel",
             "startIndexLabel",
             "startTitleLabel",
             "startLedeLabel",
-            "buildLabel",
             "readDocsLabel",
             "gettingStartedGuideLabel",
             "startLabel",
-            "copyCommandLabel",
-            "copiedCommandLabel",
         ];
         for (const k of keys) bump(k);
 
@@ -611,24 +430,11 @@ export default class IndexPage {
         this.heroTitleEmLabel = heroTitleEm();
         this.heroLedeLabel = heroLede();
         this.heroFootnoteLabel = heroFootnote();
+        this.heroPrimaryCtaLabel = heroPrimaryCta();
         this.viewProductUiLabel = viewProductUi();
         this.heroPreviewDemoLabelText = heroPreviewDemoLabel();
-        this.heroPreviewSiteNameLabel = heroPreviewSiteName();
-        this.heroPreviewAriaLabel = heroPreviewAria();
         this.heroPreviewReleaseCenterLabel = heroPreviewReleaseCenter();
         this.heroPreviewProductionReadyLabel = heroPreviewProductionReady();
-        this.heroPreviewBranchMainLabel = heroPreviewBranchMain();
-        this.heroPreviewTableAriaLabel = heroPreviewTableAria();
-        this.heroPreviewColTargetLabel = heroPreviewColTarget();
-        this.heroPreviewColResultLabel = heroPreviewColResult();
-        this.heroPreviewColStatusLabel = heroPreviewColStatus();
-        this.heroSignalAriaLabel = heroSignalAria();
-        this.heroSignalAuthorLabel = heroSignalAuthor();
-        this.heroSignalAuthorValueLabel = heroSignalAuthorValue();
-        this.heroSignalUnderstandLabel = heroSignalUnderstand();
-        this.heroSignalUnderstandValueLabel = heroSignalUnderstandValue();
-        this.heroSignalDeliverLabel = heroSignalDeliver();
-        this.heroSignalDeliverValueLabel = heroSignalDeliverValue();
         this.statementIndexLabel = statementIndex();
         this.statementTitleLeadLabel = statementTitleLead();
         this.statementTitleEmLabel = statementTitleEm();
@@ -648,12 +454,6 @@ export default class IndexPage {
         this.flowStep2DescLabel = flowStep2Desc();
         this.flowStep3TitleLabel = flowStep3Title();
         this.flowStep3DescLabel = flowStep3Desc();
-        this.flowStep4TitleLabel = flowStep4Title();
-        this.flowStep4DescLabel = flowStep4Desc();
-        this.flowStep5TitleLabel = flowStep5Title();
-        this.flowStep5DescLabel = flowStep5Desc();
-        this.flowStep6TitleLabel = flowStep6Title();
-        this.flowStep6DescLabel = flowStep6Desc();
         this.showcaseIndexLabel = showcaseIndex();
         this.showcaseTitleLabel = showcaseTitle();
         this.showcaseBodyLabel = showcaseBody();
@@ -663,43 +463,13 @@ export default class IndexPage {
         this.productNavMonitorLabel = productNavMonitor();
         this.productWorkspaceLabel = productWorkspaceLabel();
         this.productCreateReleaseLabel = productCreateRelease();
-        this.showcaseSummaryTotalLabel = consoleStatActiveServices();
-        this.showcaseSummaryRunningLabel = consoleStatPendingReleases();
-        this.showcaseSummaryFailedLabel = consoleStatAffectedRegions();
-        this.showcaseSummaryAriaLabel = consoleSummaryAria();
-        this.showcaseTabsLabel = showcaseTabsLabel();
-        this.showcaseEmptyBadgeLabel = showcaseEmptyBadge();
-        this.showcaseEmptyTitleLabel = showcaseEmptyTitle();
-        this.showcaseEmptyBodyLabel = showcaseEmptyBody();
         this.showcaseTabSourceLabel = showcaseTabSource();
         this.startIndexLabel = startIndex();
         this.startTitleLabel = startTitle();
         this.startLedeLabel = startLede();
-        this.buildLabel = build();
         this.readDocsLabel = readDocs();
         this.gettingStartedGuideLabel = gettingStartedGuide();
         this.startLabel = start();
-        this.copyCommandLabel = copyCommand();
-        this.copiedCommandLabel = copiedCommand();
-
-        this.showcaseTabs = [
-            { id: "overview", title: showcaseTabOverview(), controls: "landing-showcase-panel" },
-            { id: "source", title: showcaseTabSource(), controls: "landing-showcase-panel" },
-            { id: "activity", title: showcaseTabActivity(), controls: "landing-showcase-panel" },
-        ];
-        this.surfaceColumns = [
-            { id: "surface", title: showcaseTableColSurface() },
-            { id: "result", title: showcaseTableColResult() },
-            { id: "status", title: showcaseTableColStatus() },
-        ];
-        this.surfaceRows = [
-            {
-                id: "browser",
-                cells: [showcaseRowBrowser(), showcaseRowBrowserResult(), showcaseStatusReady()],
-            },
-            { id: "ssr", cells: [showcaseRowSsr(), showcaseRowSsrResult(), showcaseStatusReady()] },
-            { id: "edge", cells: [showcaseRowEdge(), showcaseRowEdgeResult(), "Running"] },
-        ];
 
         const paths = docsPaths(this.localeId);
         this.docsRootHref = paths.docsRootHref;
@@ -709,38 +479,6 @@ export default class IndexPage {
     applyLocaleCopy(preferred) {
         this.localeId = readLocaleId(preferred);
         withLocaleHint(this.localeId, () => this.refreshCopy());
-    }
-
-    copyCommand() {
-        const text = "pnpm create vmz-app my-app";
-        const ok = () => {
-            this.copied = true;
-        };
-        const fail = () => {
-            this.copied = false;
-        };
-        if (
-            typeof navigator !== "undefined" &&
-            navigator.clipboard &&
-            navigator.clipboard.writeText
-        ) {
-            navigator.clipboard.writeText(text).then(ok, fail);
-            return;
-        }
-        fail();
-    }
-}
-</script>
-<script server>
-import ReleaseDemo from "#server/demo/ReleaseDemo";
-
-export default class IndexPageServer {
-    getHeroPreview() {
-        return new ReleaseDemo().getHeroPreview();
-    }
-
-    getShowcaseOverview() {
-        return new ReleaseDemo().getShowcaseOverview();
     }
 }
 </script>
