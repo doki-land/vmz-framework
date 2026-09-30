@@ -1,8 +1,8 @@
 //! Oak TypeScript AST build entry for VMZ `<script client|server>` blocks.
 
 use oak_core::{Builder, ParseSession, SourceText};
-use oak_typescript::{TypeScriptBuilder, TypeScriptLanguage, TypeScriptRoot};
 use oak_typescript::ast::Statement;
+use oak_typescript::{TypeScriptBuilder, TypeScriptLanguage, TypeScriptRoot};
 
 use crate::contract::{OakFrontendDiagnostic, ScriptShellInput};
 use crate::oak_cst::{format_cst_diagnostics, map_oak_error};
@@ -40,12 +40,7 @@ pub fn parse_script_ast(script: &ScriptShellInput) -> ScriptAstParse {
     let root = built.result.ok();
     let default_export_class = root.as_ref().and_then(default_export_class_name);
 
-    ScriptAstParse {
-        root,
-        default_export_class,
-        diagnostics,
-        ok,
-    }
+    ScriptAstParse { root, default_export_class, diagnostics, ok }
 }
 
 /// Fail fast when Oak script AST build fails.

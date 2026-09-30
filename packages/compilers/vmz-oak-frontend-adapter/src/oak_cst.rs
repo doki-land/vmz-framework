@@ -1,8 +1,8 @@
 //! Oak CST parse entry for VMZ `<template>` regions.
 
+use crate::contract::{ByteSpan, OakFrontendDiagnostic, TemplateCstParse, TemplateShellInput};
 use oak_core::{ParseSession, Parser, SourceText};
 use oak_vue::{VueLanguage, VueParser};
-use crate::contract::{ByteSpan, OakFrontendDiagnostic, TemplateCstParse, TemplateShellInput};
 
 pub(crate) const TEMPLATE_OPEN: &str = "<template>";
 pub(crate) const TEMPLATE_CLOSE: &str = "</template>";
@@ -21,12 +21,7 @@ pub fn parse_template_cst(template: &TemplateShellInput) -> TemplateCstParse {
     let diagnostics = collect_oak_diagnostics(&output, shell_base_offset);
     let ok = !output.has_errors();
 
-    TemplateCstParse {
-        shell_source,
-        shell_base_offset,
-        diagnostics,
-        ok,
-    }
+    TemplateCstParse { shell_source, shell_base_offset, diagnostics, ok }
 }
 
 /// Fail fast when Oak CST rejects a template body (for `vmz format` preflight).
@@ -67,7 +62,10 @@ fn collect_oak_diagnostics(
     out
 }
 
-pub(crate) fn map_oak_error(err: &oak_core::OakError, shell_base_offset: usize) -> OakFrontendDiagnostic {
+pub(crate) fn map_oak_error(
+    err: &oak_core::OakError,
+    shell_base_offset: usize,
+) -> OakFrontendDiagnostic {
     let message = err.to_string();
     let span = oak_error_offset(err).map(|off| vmz_span_from_shell(off, shell_base_offset));
     OakFrontendDiagnostic { message, span }
@@ -89,8 +87,5 @@ fn oak_error_offset(err: &oak_core::OakError) -> Option<usize> {
 
 fn vmz_span_from_shell(shell_offset: usize, shell_base_offset: usize) -> ByteSpan {
     let start = shell_base_offset + shell_offset;
-    ByteSpan {
-        start,
-        end: start.saturating_add(1),
-    }
+    ByteSpan { start, end: start.saturating_add(1) }
 }

@@ -18,19 +18,11 @@ pub fn project_nyar_analysis_input(
     server: Option<&AnalyzedScript>,
 ) -> NyarAnalysisInput {
     let document = project_parsed_vmz(parsed);
-    let mut programs = vec![program_unit(
-        NyarProgramRole::Client,
-        &parsed.client,
-        &client.decl,
-    )];
+    let mut programs = vec![program_unit(NyarProgramRole::Client, &parsed.client, &client.decl)];
     if let (Some(block), Some(analyzed)) = (&parsed.server, server) {
         programs.push(program_unit(NyarProgramRole::Server, block, &analyzed.decl));
     }
-    NyarAnalysisInput {
-        document,
-        programs,
-        has_server_boundary: parsed.server.is_some(),
-    }
+    NyarAnalysisInput { document, programs, has_server_boundary: parsed.server.is_some() }
 }
 
 /// Parse `.vmz`, analyze scripts, and project for Nyar.
@@ -44,21 +36,18 @@ pub fn project_nyar_from_vmz(
         .server
         .as_ref()
         .map(|s| crate::analyze::analyze_script(ScriptKind::Server, &s.content));
-    Ok(project_nyar_analysis_input(
-        &parsed,
-        &client,
-        server.as_ref(),
-    ))
+    Ok(project_nyar_analysis_input(&parsed, &client, server.as_ref()))
 }
 
-fn program_unit(role: NyarProgramRole, block: &ScriptBlock, decl: &ComponentDecl) -> NyarProgramUnit {
+fn program_unit(
+    role: NyarProgramRole,
+    block: &ScriptBlock,
+    decl: &ComponentDecl,
+) -> NyarProgramUnit {
     let content_end = block.content_start + block.content.len();
     NyarProgramUnit {
         role,
-        content_span: ByteSpan {
-            start: block.content_start,
-            end: content_end,
-        },
+        content_span: ByteSpan { start: block.content_start, end: content_end },
         component_name: decl.name.clone(),
         members: decl
             .properties
@@ -102,16 +91,13 @@ fn member_from_method(content_start: usize, method: &MethodDecl) -> NyarMember {
         decl_span: abs_span(content_start, method.span),
         type_text: None,
         is_async: method.is_async,
-        http_route: method.http.as_ref().map(|h| NyarHttpRoute {
-            verb: h.verb.clone(),
-            path: h.path.clone(),
-        }),
+        http_route: method
+            .http
+            .as_ref()
+            .map(|h| NyarHttpRoute { verb: h.verb.clone(), path: h.path.clone() }),
     }
 }
 
 fn abs_span(content_start: usize, span: Span) -> ByteSpan {
-    ByteSpan {
-        start: content_start + span.start as usize,
-        end: content_start + span.end as usize,
-    }
+    ByteSpan { start: content_start + span.start as usize, end: content_start + span.end as usize }
 }

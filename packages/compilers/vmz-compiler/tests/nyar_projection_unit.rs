@@ -28,26 +28,14 @@ export default class PageServer {
     let client = &input.programs[0];
     assert_eq!(client.role, NyarProgramRole::Client);
     assert_eq!(client.component_name, "Page");
-    let prop = client
-        .members
-        .iter()
-        .find(|m| m.name == "title")
-        .expect("title prop");
+    let prop = client.members.iter().find(|m| m.name == "title").expect("title prop");
     assert_eq!(prop.kind, NyarMemberKind::Prop);
-    let state = client
-        .members
-        .iter()
-        .find(|m| m.name == "count")
-        .expect("count state");
+    let state = client.members.iter().find(|m| m.name == "count").expect("count state");
     assert_eq!(state.kind, NyarMemberKind::State);
 
     let server = &input.programs[1];
     assert_eq!(server.role, NyarProgramRole::Server);
-    let ping = server
-        .members
-        .iter()
-        .find(|m| m.name == "ping")
-        .expect("ping method");
+    let ping = server.members.iter().find(|m| m.name == "ping").expect("ping method");
     assert_eq!(ping.kind, NyarMemberKind::Method);
     assert!(ping.is_async);
     let route = ping.http_route.as_ref().expect("http route");

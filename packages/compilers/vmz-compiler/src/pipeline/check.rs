@@ -16,7 +16,8 @@ use crate::server_slice::ServerSliceProof;
 use crate::sfc::{ScriptKind, ScriptLanguage, parse_vmz};
 use crate::template::{
     SemanticAstStats, SemanticIr, SemanticNode, lower_concrete_to_ir, lower_concrete_to_semantic,
-    parse_template, parse_template_concrete_primary, semantic_ast_stats, template_parse_to_diagnostic,
+    parse_template, parse_template_concrete_primary, semantic_ast_stats,
+    template_parse_to_diagnostic,
 };
 use crate::virtual_server;
 use vmz_protocol::{DIAG_SERVER_SLICE_NOT_BROWSER_SAFE, SourceSpan};

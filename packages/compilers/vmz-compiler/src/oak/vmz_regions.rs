@@ -2,16 +2,17 @@
 
 use std::path::Path;
 
-use vmz_oak_frontend_adapter::{
-    BlockKind, ByteSpan, SfcBlockRegion, SfcDocumentView,
-};
+use vmz_oak_frontend_adapter::{BlockKind, ByteSpan, SfcBlockRegion, SfcDocumentView};
 
 use crate::sfc::{
     DataBlock, ParsedVmz, ScriptBlock, ScriptKind, StyleBlock, TemplateBlock, parse_vmz,
 };
 
 /// Parse `.vmz` and build an ordered region map for Oak/Nyar adapters.
-pub fn project_vmz_regions(path: impl AsRef<Path>, source: impl Into<String>) -> Result<SfcDocumentView, crate::sfc::SfcError> {
+pub fn project_vmz_regions(
+    path: impl AsRef<Path>,
+    source: impl Into<String>,
+) -> Result<SfcDocumentView, crate::sfc::SfcError> {
     let parsed = parse_vmz(path, source)?;
     Ok(project_parsed_vmz(&parsed))
 }
@@ -39,11 +40,7 @@ pub fn project_parsed_vmz(parsed: &ParsedVmz) -> SfcDocumentView {
         blocks.push(script_block_region(&parsed.source, server));
     }
 
-    SfcDocumentView {
-        path: parsed.path.clone(),
-        source: parsed.source.clone(),
-        blocks,
-    }
+    SfcDocumentView { path: parsed.path.clone(), source: parsed.source.clone(), blocks }
 }
 
 fn data_block_region(kind: BlockKind, _source: &str, block: &DataBlock) -> SfcBlockRegion {
@@ -53,11 +50,7 @@ fn data_block_region(kind: BlockKind, _source: &str, block: &DataBlock) -> SfcBl
         BlockKind::Meta => "</meta>",
         _ => "",
     };
-    let block_end = if close.is_empty() {
-        block.open_end
-    } else {
-        content_end + close.len()
-    };
+    let block_end = if close.is_empty() { block.open_end } else { content_end + close.len() };
     SfcBlockRegion {
         kind,
         span: ByteSpan { start: block.tag_start, end: block_end },
@@ -66,7 +59,13 @@ fn data_block_region(kind: BlockKind, _source: &str, block: &DataBlock) -> SfcBl
 }
 
 fn template_block_region(source: &str, block: &TemplateBlock) -> SfcBlockRegion {
-    envelope_region(source, block.content_start, block.content.len(), "template", BlockKind::Template)
+    envelope_region(
+        source,
+        block.content_start,
+        block.content.len(),
+        "template",
+        BlockKind::Template,
+    )
 }
 
 fn style_block_region(source: &str, block: &StyleBlock) -> SfcBlockRegion {

@@ -3,9 +3,9 @@
 use core::range::Range;
 
 use oak_vue::{VueAttribute, VueNode, VueRoot};
-use vmz_oak_frontend_adapter::{parse_template_ast, TemplateShellInput};
+use vmz_oak_frontend_adapter::{TemplateShellInput, parse_template_ast};
 
-use super::template_concrete::{classify_concrete_attr, ConcreteAttr, ConcreteIr, ConcreteNode};
+use super::template_concrete::{ConcreteAttr, ConcreteIr, ConcreteNode, classify_concrete_attr};
 use super::template_semantic::lower_concrete_to_semantic;
 use super::template_span::TemplateSpan;
 use crate::sfc::TemplateBlock;
@@ -22,23 +22,21 @@ pub fn parse_template_concrete_via_oak(template: &TemplateBlock) -> Result<Concr
     if !parsed.ok {
         return Err(format_oak_fail(&parsed));
     }
-    let root = parsed
-        .root
-        .as_ref()
-        .ok_or_else(|| format_oak_fail(&parsed))?;
+    let root = parsed.root.as_ref().ok_or_else(|| format_oak_fail(&parsed))?;
     lower_vue_root_to_concrete(root, &parsed.shell_source)
 }
 
 /// Prefer Oak concrete lowering for a template body string, fall back to legacy.
-pub fn parse_template_concrete_body_primary(input: &str) -> Result<ConcreteIr, super::template_common::TemplateParseError> {
-    parse_template_concrete_primary(&TemplateBlock {
-        content: input.to_string(),
-        content_start: 0,
-    })
+pub fn parse_template_concrete_body_primary(
+    input: &str,
+) -> Result<ConcreteIr, super::template_common::TemplateParseError> {
+    parse_template_concrete_primary(&TemplateBlock { content: input.to_string(), content_start: 0 })
 }
 
 /// Prefer Oak concrete lowering, fall back to the legacy scanner when Oak is unavailable.
-pub fn parse_template_concrete_primary(template: &TemplateBlock) -> Result<ConcreteIr, super::template_common::TemplateParseError> {
+pub fn parse_template_concrete_primary(
+    template: &TemplateBlock,
+) -> Result<ConcreteIr, super::template_common::TemplateParseError> {
     if let Ok(ir) = parse_template_concrete_via_oak(template) {
         if lower_concrete_to_semantic(&ir).is_ok() {
             return Ok(ir);
@@ -57,11 +55,8 @@ fn lower_vue_root_to_concrete(root: &VueRoot, shell: &str) -> Result<ConcreteIr,
         .iter()
         .find(|b| slice(shell, b.name) == "template")
         .ok_or_else(|| "Oak AST missing <template> block".to_string())?;
-    let roots = block
-        .children
-        .iter()
-        .map(|node| lower_node(shell, node))
-        .collect::<Result<Vec<_>, _>>()?;
+    let roots =
+        block.children.iter().map(|node| lower_node(shell, node)).collect::<Result<Vec<_>, _>>()?;
     Ok(ConcreteIr { roots })
 }
 
@@ -74,36 +69,21 @@ fn lower_node(shell: &str, node: &VueNode) -> Result<ConcreteNode, String> {
                 .iter()
                 .map(|a| lower_attr(shell, a))
                 .collect::<Result<Vec<_>, _>>()?;
-            let children = el
-                .children
-                .iter()
-                .map(|c| lower_node(shell, c))
-                .collect::<Result<Vec<_>, _>>()?;
-            Ok(ConcreteNode::Element {
-                tag,
-                attrs,
-                children,
-                span: to_body_span(shell, el.span),
-            })
+            let children =
+                el.children.iter().map(|c| lower_node(shell, c)).collect::<Result<Vec<_>, _>>()?;
+            Ok(ConcreteNode::Element { tag, attrs, children, span: to_body_span(shell, el.span) })
         }
         VueNode::Text(t) => {
             let value = slice(shell, t.span).to_string();
-            Ok(ConcreteNode::Text {
-                value,
-                span: to_body_span(shell, t.span),
-            })
+            Ok(ConcreteNode::Text { value, span: to_body_span(shell, t.span) })
         }
         VueNode::Interpolation(i) => {
             let expr = slice(shell, i.expression).trim().to_string();
-            Ok(ConcreteNode::Interpolation {
-                expr,
-                span: to_body_span(shell, i.span),
-            })
+            Ok(ConcreteNode::Interpolation { expr, span: to_body_span(shell, i.span) })
         }
-        VueNode::Comment(text) => Ok(ConcreteNode::Comment {
-            value: text.clone(),
-            span: TemplateSpan::point(0),
-        }),
+        VueNode::Comment(text) => {
+            Ok(ConcreteNode::Comment { value: text.clone(), span: TemplateSpan::point(0) })
+        }
     }
 }
 
@@ -130,7 +110,9 @@ fn lower_attr(shell: &str, attr: &VueAttribute) -> Result<ConcreteAttr, String> 
 
 fn unquote_attr_value(raw: &str) -> String {
     if raw.len() >= 2 {
-        if (raw.starts_with('"') && raw.ends_with('"')) || (raw.starts_with('\'') && raw.ends_with('\'')) {
+        if (raw.starts_with('"') && raw.ends_with('"'))
+            || (raw.starts_with('\'') && raw.ends_with('\''))
+        {
             return raw[1..raw.len() - 1].to_string();
         }
     }
@@ -143,8 +125,5 @@ fn slice(shell: &str, range: Range<usize>) -> &str {
 
 fn to_body_span(_shell: &str, range: Range<usize>) -> TemplateSpan {
     let base = TEMPLATE_OPEN.len();
-    TemplateSpan::from_usize(
-        range.start.saturating_sub(base),
-        range.end.saturating_sub(base),
-    )
+    TemplateSpan::from_usize(range.start.saturating_sub(base), range.end.saturating_sub(base))
 }

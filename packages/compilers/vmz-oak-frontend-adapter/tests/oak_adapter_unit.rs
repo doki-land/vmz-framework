@@ -1,14 +1,11 @@
-use vmz_compiler::{parse_vmz, TemplateBlock};
+use vmz_compiler::{TemplateBlock, parse_vmz};
 use vmz_oak_frontend_adapter::{
-    parse_script_ast, parse_template_ast, parse_template_cst, ScriptRole, ScriptShellInput,
-    TemplateShellInput,
+    ScriptRole, ScriptShellInput, TemplateShellInput, parse_script_ast, parse_template_ast,
+    parse_template_cst,
 };
 
 fn template_shell(block: &TemplateBlock) -> TemplateShellInput {
-    TemplateShellInput {
-        content: block.content.clone(),
-        content_start: block.content_start,
-    }
+    TemplateShellInput { content: block.content.clone(), content_start: block.content_start }
 }
 
 #[test]
@@ -73,15 +70,8 @@ export default class Page {
     assert!(!template_block.children.is_empty(), "expected void element children");
 }
 
-fn script_shell(
-    block: &vmz_compiler::ScriptBlock,
-    role: ScriptRole,
-) -> ScriptShellInput {
-    ScriptShellInput {
-        content: block.content.clone(),
-        content_start: block.content_start,
-        role,
-    }
+fn script_shell(block: &vmz_compiler::ScriptBlock, role: ScriptRole) -> ScriptShellInput {
+    ScriptShellInput { content: block.content.clone(), content_start: block.content_start, role }
 }
 
 #[test]
