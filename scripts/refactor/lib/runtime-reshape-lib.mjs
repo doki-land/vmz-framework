@@ -532,7 +532,7 @@ function applySplitModule(pkgRoot, sourceRel, spec, opts) {
             if (decl?.exported) exportLines.push(`export { ${name} } from '${rel}';`);
         }
     }
-    const barrel = `${header ? `${header}\n` : ''}${exportLines.join('\n')}\n`;
+    const barrel = `${header ? `${header}\n` : ''}${reexportBlock ? `${reexportBlock}\n` : ''}${exportLines.join('\n')}\n`;
     actions.push(`write barrel ${barrelPath}`);
     if (!opts.dryRun) {
         fs.writeFileSync(path.join(pkgRoot, barrelPath), barrel, 'utf8');
