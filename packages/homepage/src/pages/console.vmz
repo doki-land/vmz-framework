@@ -468,8 +468,8 @@ export default class ConsolePage {
             : "仅保留在当前浏览器会话，不会通知客户。";
         this.noteSaveLabel = english ? "Save note" : "保存备注";
         this.noteSavedLabel = english
-            ? "Note saved in this demo session."
-            : "备注已保存在当前演示会话。";
+            ? "Note saved. Request status updated for this demo session."
+            : "备注已保存，示例请求状态已在当前演示会话内更新。";
         this.consoleNavLabel = consoleNavLabel();
         this.consoleTitleLabel = consoleTitle();
         this.consoleSubtitleLabel = consoleSubtitle();
