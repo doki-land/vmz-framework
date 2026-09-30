@@ -63,6 +63,15 @@ pub struct SfcDocumentView {
     pub blocks: Vec<SfcBlockRegion>,
 }
 
+/// VMZ `<template>` body slice for Oak CST/AST (no `vmz-compiler` dependency).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TemplateShellInput {
+    /// Markup between `<template>` tags.
+    pub content: String,
+    /// Byte offset of content start in the `.vmz` file.
+    pub content_start: usize,
+}
+
 /// Diagnostic surfaced from Oak parse (mapped to `.vmz` coordinates when possible).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OakFrontendDiagnostic {

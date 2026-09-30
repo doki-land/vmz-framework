@@ -1,11 +1,14 @@
 # vmz-oak-frontend-adapter
 
-VMZ ↔ Oaks frontend bridge (phase A).
+VMZ ↔ Oaks frontend bridge (CST + AST entry).
 
 | API | Role |
 |-----|------|
-| `project_vmz_regions` | `.vmz` → ordered `SfcDocumentView` block spans |
-| `parse_template_cst` | `<template>` body → Oak `VueParser` CST (format/highlight path) |
+| `TemplateShellInput` | Template body slice without `vmz-compiler` |
+| `parse_template_cst` / `require_template_cst` | Oak `VueParser` CST (`vmz format` preflight) |
+| `parse_template_ast` / `require_template_ast` | Oak `VueBuilder` AST |
+
+Region map and Oak → Concrete lowering live in `vmz-compiler::oak` and `parse::template_oak`.
 
 Requires **nightly** Rust (`rust-toolchain.toml`). Oaks via git + optional local `[patch]`.
 

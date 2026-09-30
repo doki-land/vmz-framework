@@ -11,7 +11,9 @@ publish = false
 oak-core.workspace = true
 oak-vue.workspace = true
 thiserror.workspace = true
-vmz-compiler.workspace = true
 
 [lib]
 path = "src/lib.rs"
+
+[dev-dependencies]
+vmz-compiler.workspace = true

@@ -2,18 +2,13 @@
 
 use oak_core::{ParseSession, Parser, SourceText};
 use oak_vue::{VueLanguage, VueParser};
-use vmz_compiler::TemplateBlock;
+use crate::contract::{ByteSpan, OakFrontendDiagnostic, TemplateCstParse, TemplateShellInput};
 
-use crate::contract::{ByteSpan, OakFrontendDiagnostic, TemplateCstParse};
-
-const TEMPLATE_OPEN: &str = "<template>";
-const TEMPLATE_CLOSE: &str = "</template>";
+pub(crate) const TEMPLATE_OPEN: &str = "<template>";
+pub(crate) const TEMPLATE_CLOSE: &str = "</template>";
 
 /// Parse a VMZ template body through Oak `VueParser` (CST / Green tree).
-///
-/// Wraps the inner template markup in a Vue `<template>` shell so Oak sees a valid SFC
-/// fragment. Spans in diagnostics are remapped to the original `.vmz` file when possible.
-pub fn parse_template_cst(template: &TemplateBlock) -> TemplateCstParse {
+pub fn parse_template_cst(template: &TemplateShellInput) -> TemplateCstParse {
     let shell_source = format!("{}{}{}", TEMPLATE_OPEN, template.content, TEMPLATE_CLOSE);
     let shell_base_offset = template.content_start.saturating_sub(TEMPLATE_OPEN.len());
 
@@ -35,7 +30,7 @@ pub fn parse_template_cst(template: &TemplateBlock) -> TemplateCstParse {
 }
 
 /// Fail fast when Oak CST rejects a template body (for `vmz format` preflight).
-pub fn require_template_cst(template: &TemplateBlock) -> Result<(), String> {
+pub fn require_template_cst(template: &TemplateShellInput) -> Result<(), String> {
     let parse = parse_template_cst(template);
     if parse.ok {
         return Ok(());
@@ -72,7 +67,7 @@ fn collect_oak_diagnostics(
     out
 }
 
-fn map_oak_error(err: &oak_core::OakError, shell_base_offset: usize) -> OakFrontendDiagnostic {
+pub(crate) fn map_oak_error(err: &oak_core::OakError, shell_base_offset: usize) -> OakFrontendDiagnostic {
     let message = err.to_string();
     let span = oak_error_offset(err).map(|off| vmz_span_from_shell(off, shell_base_offset));
     OakFrontendDiagnostic { message, span }
