@@ -1,20 +1,4 @@
-/**
- * Generic VMZ Node host �?SSR Route Graph pages + dist static + RPC/REST.
- *
- * Invoked by `vmz serve` / `vmz dev` (or: node dist/vmz-serve-host.mjs).
- *
- * Pathname matches compiled `_vmz/route-catalog.json` (frozen segs / pathPattern).
- * Hosts must not re-parse deployment pathPattern into a live catalog.
- * Not an SPA shell.
- *
- * `VMZ_DEV=1`: POST `/__vmz/reload` soft-reloads modules (cache-bust import);
- * GET `/__vmz/events` SSE notifies the browser:
- * - island HMR �?re-import `entry-client.js` (no full document reload)
- * - otherwise �?`location.reload`
- *
- * Dev resolve hook propagates `?t=` onto nested relative `file:` imports under
- * dist so soft reload does not keep a stale `lib/*.js` ESM cache entry.
- */
+/** Partial reshape ? mutable host runtime stays in this file. */
 
 import { existsSync, readFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -30,9 +14,8 @@ import { createRenderHost } from './render-host.js';
 import { resolveRouteLayoutChain } from './route-layout-chain.js';
 import { handleNodeRequest, setRoutes, setServerModuleResolver } from '../faces/vmz-runtime.js';
 
-const ROUTE_CATALOG_SCHEMA = 'vmz.route.catalog.v0';
-const ROUTE_CATALOG_REL = '_vmz/route-catalog.json';
-const LOCALE_LINK_PLAN_REL = '_vmz/locale-link-plan.json';
+import { LOCALE_LINK_PLAN_REL, LOCALE_STORE_KEY, ROUTE_CATALOG_REL, ROUTE_CATALOG_SCHEMA, SHUTDOWN_TIMEOUT_MS, THEME_STORE_KEY } from './serve/constants.js';
+import { extractRouteParams, findRootCatchAll, isRootCatchAll, isRouteBoundaryStem, matchFileRoute, parsePathPattern } from './serve/route-catalog.js';
 
 const require = createRequire(import.meta.url);
 
@@ -65,10 +48,6 @@ function appPackageRequireResolve() {
     return appPackageRequire;
 }
 
-/**
- * Dev/prod serve-host: resolve workspace peers + JSON imports from the app package root.
- * Dist-relative ESM cannot see app `node_modules` without this hook.
- */
 function installAppModuleResolveHooks() {
     registerHooks({
         resolve(specifier, context, nextResolve) {
@@ -120,50 +99,11 @@ function installAppModuleResolveHooks() {
     });
 }
 
-installAppModuleResolveHooks();
-
 const host = process.env.VMZ_HOST || '127.0.0.1';
+
 const port = Number(process.env.VMZ_PORT || process.env.PORT || 5173);
+
 const isDev = process.env.VMZ_DEV === '1' || process.env.VMZ_DEV === 'true';
-
-// Absolute origin for in-process client graphs that fall back to HTTP RPC
-// (separate `dist/vmz-runtime.js` instance without setServerModuleResolver).
-globalThis.__VMZ_RPC_ORIGIN = `http://${host}:${port}`;
-
-/**
- * Soft reload only busts the top-level `import(page?t=token)`. Nested relative
- * imports (`../../lib/units.js`) keep the first-loaded ESM cache entry �?so a
- * page can demand exports that the stale dep never had (or vice versa).
- * Propagate `t` from parentURL onto file: children under this dist.
- */
-if (isDev) {
-    const distUrlPrefix = pathToFileURL(distDir.endsWith(path.sep) ? distDir : `${distDir}${path.sep}`).href;
-    registerHooks({
-        resolve(specifier, context, nextResolve) {
-            const result = nextResolve(specifier, context);
-            if (!specifier.startsWith('.') || !context.parentURL || !result?.url) return result;
-            let token = '';
-            try {
-                token = new URL(context.parentURL).searchParams.get('t') || '';
-            } catch {
-                return result;
-            }
-            if (!token) return result;
-            if (!result.url.startsWith('file:')) return result;
-            if (!result.url.startsWith(distUrlPrefix)) {
-                try {
-                    if (!fileURLToPath(result.url).startsWith(distDir)) return result;
-                } catch {
-                    return result;
-                }
-            }
-            const u = new URL(result.url);
-            if (u.searchParams.get('t') === token) return result;
-            u.searchParams.set('t', token);
-            return { ...result, url: u.href, shortCircuit: true };
-        },
-    });
-}
 
 let reloadToken = Date.now();
 
@@ -184,28 +124,16 @@ let styleTheme = null;
 let localeArtifact = null;
 
 let localeLinkPlan = null;
+
 const sseClients = new Set<SseClient>();
 
 let inFlight = 0;
 
 let shuttingDown = false;
+
 let ready = false;
 
 let lastDevError = null;
-
-setServerModuleResolver((moduleId) => {
-    const rel = moduleId.replace(/^#server\//, '') + '.js';
-    return bustUrl(pathToFileURL(path.join(distDir, '#server', rel)).href);
-});
-
-try {
-    await softReload({ quiet: true });
-    ready = true;
-} catch (err) {
-    lastDevError = normalizeDevError(err);
-    ready = true; // still accept HTTP �?serve error page / recover on next reload
-    console.error('vmz serve: initial load failed (dev host stays up)', lastDevError.message);
-}
 
 function readRequestBody(req) {
     return new Promise((resolve, reject) => {
@@ -230,11 +158,6 @@ async function renderPage(pathname, opts: HostRequestOpts = {}) {
     return html;
 }
 
-/**
- * Stream shell + Direct serialize body for the matched file-route page.
- * Runs Page.access (closed allow/redirect/not-found/deny) before load;
- * POST may run Page.action before re-render.
- */
 async function renderPageStream(pathname, opts: any = {}) {
     try {
         return await renderPageStreamInner(pathname, opts);
@@ -422,9 +345,6 @@ function normalizeActionResult(acted: unknown): ClosedAccessResult {
     return { kind: 'allow' };
 }
 
-/**
- * Minimal HTML for closed access/action results when no NotFound page exists.
- */
 async function* emitAccessShell(marker) {
     const native = loadNativeAddon();
     if (typeof native.generateHtmlShell !== 'function') {
@@ -439,9 +359,6 @@ async function* emitAccessShell(marker) {
     });
 }
 
-/**
- * Prefer page `static meta()` for document title/description �?never brand the framework in business HTML.
- */
 function resolvePageDocumentMeta(Page: { meta?: (() => Record<string, unknown>) | Record<string, unknown> }) {
     try {
         let raw: Record<string, unknown> = {};
@@ -727,12 +644,6 @@ const server = http.createServer((req, res) => {
     handleNodeRequest(req, res, { distDir, renderPage, renderPageStream });
 });
 
-server.listen(port, host, () => {
-    console.log(`vmz serve http://${host}:${port} (dist=${distDir}${isDev ? ', dev' : ''})`);
-});
-
-const SHUTDOWN_TIMEOUT_MS = Number(process.env.VMZ_SHUTDOWN_TIMEOUT_MS || 10000);
-
 async function gracefulShutdown(signal) {
     if (shuttingDown) return;
     shuttingDown = true;
@@ -754,17 +665,6 @@ async function gracefulShutdown(signal) {
     process.exit(inFlight > 0 ? 1 : 0);
 }
 
-process.on('SIGTERM', () => {
-    void gracefulShutdown('SIGTERM');
-});
-process.on('SIGINT', () => {
-    void gracefulShutdown('SIGINT');
-});
-
-/**
- * Attach author Link RouteId aliases so localizeBodyLinks can match `data-vmz-route="IndexPage"`
- * against realization rows keyed by chunk path (`pages/index`).
- */
 function attachLinkRouteAliases(artifact, dir) {
     if (!artifact || typeof artifact !== 'object') return artifact;
     try {
@@ -777,11 +677,6 @@ function attachLinkRouteAliases(artifact, dir) {
     }
 }
 
-/**
- * Re-import routes / pages / components with a new cache-bust token.
- * Keeps the HTTP server process alive (no Node restart).
- * Failed reloads keep the previous in-memory modules (Vite-like resilience).
- */
 async function softReload(opts: any = {}) {
     const prevToken = reloadToken;
     const prevCatalog = pageCatalog;
@@ -1021,12 +916,6 @@ function escapeHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-/**
- * Resolve LocaleId for this request.
- * - `prefix`: LocaleId from URL path (existing).
- * - `none`: Host preference from cookie `vmz.locale` (validated), else defaultLocale.
- *   URL never carries LocaleId.
- */
 function resolveLocalePath(pathname, cookieHeader) {
     const raw = String(pathname || '/');
     const normalized = raw.length > 1 && raw.endsWith('/') ? raw.slice(0, -1) : raw || '/';
@@ -1098,10 +987,6 @@ async function loadPageCtor(chunkId) {
     return mod.default;
 }
 
-/**
- * Load compiled page catalog from `_vmz/route-catalog.json` (0.1.30 authority).
- * Hosts must not re-parse deployment pathPattern into a live catalog.
- */
 async function listPageClientFiles(dir) {
     const fromCatalog = await listPagesFromRouteCatalog(dir);
     if (!fromCatalog.length) {
@@ -1141,120 +1026,6 @@ async function listPagesFromRouteCatalog(dir) {
     return out;
 }
 
-/**
- * Browser HTTP pattern (`/` / `/home` / `/users/:id` / `/blog/[...slug]`).
- */
-function parsePathPattern(pattern) {
-    const raw = String(pattern || '').trim();
-    if (!raw || raw === '/') return [];
-    const parts = raw.replace(/^\/+/, '').split('/').filter(Boolean);
-
-    const segs = [];
-    for (const p of parts) {
-        if (isRouteGroupDir(p)) continue;
-        segs.push(parsePathSegment(p));
-    }
-    return segs;
-}
-
-function parsePathSegment(p) {
-    const catchAll = /^\[\.\.\.([^\]]+)\]$/.exec(p);
-    const param = /^\[([^\]]+)\]$/.exec(p);
-    const colon = /^:([A-Za-z_][\w]*)$/.exec(p);
-    if (catchAll) return { kind: 'catch', name: catchAll[1] };
-    if (param) return { kind: 'param', name: param[1] };
-    if (colon) return { kind: 'param', name: colon[1] };
-    return { kind: 'static', value: p.toLowerCase() };
-}
-
-function isRouteGroupDir(seg) {
-    return typeof seg === 'string' && seg.startsWith('(') && seg.endsWith(')') && seg.length > 2;
-}
-
-function isRouteBoundaryStem(stem) {
-    return stem === 'Layout' || stem === 'Loading' || stem === 'Error' || stem === 'NotFound';
-}
-
-function matchFileRoute(pathname, catalog) {
-    const pathParts = decodeURIComponent(pathname.split('?')[0] || '/')
-        .replace(/\/+$/, '')
-        .split('/')
-        .filter(Boolean)
-        .map((p) => p.toLowerCase());
-
-    let best = null;
-    let bestScore = -1;
-    for (const page of catalog) {
-        const score = scoreRoute(page.segs, pathParts);
-        if (score == null) continue;
-        if (score > bestScore) {
-            bestScore = score;
-            best = page;
-        }
-    }
-    return best;
-}
-
-function extractRouteParams(segs, pathname) {
-    const pathParts = decodeURIComponent(pathname.split('?')[0] || '/')
-        .replace(/\/+$/, '')
-        .split('/')
-        .filter(Boolean);
-
-    const params = {};
-    let j = 0;
-    for (let i = 0; i < segs.length; i++) {
-        const s = segs[i];
-        if (s.kind === 'catch') {
-            if (s.name) params[s.name] = pathParts.slice(j).join('/');
-            return params;
-        }
-        if (j >= pathParts.length) break;
-        if (s.kind === 'param' && s.name) {
-            params[s.name] = pathParts[j];
-        }
-        j++;
-    }
-    return params;
-}
-
-function scoreRoute(segs, pathParts) {
-    let i = 0;
-    let j = 0;
-    let score = 0;
-    while (i < segs.length) {
-        const s = segs[i];
-        if (s.kind === 'catch') {
-            // Required catch-all `[...slug]` needs �? remaining segment (not `/`).
-            if (j >= pathParts.length) return null;
-            score += 1;
-            return score;
-        }
-        if (j >= pathParts.length) return null;
-        if (s.kind === 'static') {
-            if (s.value !== pathParts[j]) return null;
-            score += 1000;
-        } else if (s.kind === 'param') {
-            score += 100;
-        }
-        i++;
-        j++;
-    }
-    if (j !== pathParts.length) return null;
-    return score + segs.length;
-}
-
-function isRootCatchAll(page) {
-    return page?.segs?.length === 1 && page.segs[0].kind === 'catch';
-}
-
-function findRootCatchAll(catalog) {
-    return catalog.find((p) => isRootCatchAll(p)) || null;
-}
-
-/**
- * Optional app gate: `dist/vmz-route-gate.mjs` �?`{ check(pathname, chunkId) => 'not_found' | null }`.
- */
 async function runRouteGate(pathname, chunkId) {
     try {
         const href = bustUrl(pathToFileURL(path.join(distDir, 'vmz-route-gate.mjs')).href);
@@ -1275,10 +1046,6 @@ function emitEntryClient(eager, lazy, token) {
     return native.generateServeEntryClient(eager, lazy, q);
 }
 
-/**
- * EventEntry zero-framework bootstrap: no static import of vmz-dom / page / islands.
- * Framework bytes load only inside the first matching DOM event handler.
- */
 function emitEntryEvent(token) {
     const q = `?t=${token}`;
     const native = loadNativeAddon();
@@ -1288,16 +1055,6 @@ function emitEntryEvent(token) {
     return native.generateServeEntryEvent(q);
 }
 
-/**
- * Style Theme cookie / localStorage key (host contract, not a second theme API).
- */
-const THEME_STORE_KEY = 'vmz-theme';
-
-const LOCALE_STORE_KEY = 'vmz.locale';
-
-/**
- * Cache-bust stylesheet entry for dev reload (token + serve revision).
- */
 function cssEntryWithBust(entry) {
     if (!entry) return undefined;
     const base = String(entry).replace(/^\/+/, '');
@@ -1334,10 +1091,6 @@ async function loadDeploymentStyle(dir) {
     }
 }
 
-/**
- * Priority: `?theme=` �?cookie �?none (CSS `:root` + prefers-color-scheme media).
- * Explicit ids (including default) always win over OS preference via activation attr.
- */
 function resolveThemeId(searchParams, cookieHeader) {
     if (!styleTheme) return null;
     const ids = styleTheme.themeIds || [];
@@ -1348,9 +1101,6 @@ function resolveThemeId(searchParams, cookieHeader) {
     return null;
 }
 
-/**
- * Always emit activation attr for an explicit theme id (incl. default) so it overrides OS media.
- */
 function htmlThemeAttrPair(themeId) {
     if (!styleTheme || !themeId) return [];
     const attr = styleTheme.activationAttr || 'data-theme';
@@ -1358,11 +1108,6 @@ function htmlThemeAttrPair(themeId) {
     return [attr, themeId];
 }
 
-/**
- * Inline boot when SSR had no query/cookie: apply explicit `localStorage` only.
- * No stored choice �?leave bare `<html>` so CSS `@media (prefers-color-scheme)` follows OS live.
- * Explicit ids (incl. default) always set the activation attr so they override OS media.
- */
 function themeBootstrapScript() {
     if (!styleTheme) return '';
     const attr = JSON.stringify(styleTheme.activationAttr || 'data-theme');
@@ -1371,12 +1116,6 @@ function themeBootstrapScript() {
     return `  <script>(function(){try{var k=${key},attr=${attr},ids=${ids};var id=localStorage.getItem(k);if(!id||ids.indexOf(id)<0)return;document.documentElement.setAttribute(attr,id);}catch(e){}})();</script>\n`;
 }
 
-/**
- * LocaleId as client state (routing.strategy = none): apply localStorage before any
- * page/client module runs so `#locales/*` pick the right variant. Prefix strategy
- * keeps LocaleId in the URL �?no boot rewrite.
- * Also mirrors into cookie so the next SSR negotiate sees Host preference.
- */
 function localeBootstrapScript() {
     if (!localeArtifact) return '';
     const routing = localeArtifact.routing || {};
@@ -1388,10 +1127,6 @@ function localeBootstrapScript() {
     return `  <script>(function(){try{var k=${key},ids=${idList};var id=localStorage.getItem(k);if(!id||ids.indexOf(id)<0)return;document.documentElement.setAttribute("data-locale",id);document.documentElement.setAttribute("lang",id);window.__vmzLocaleIdHint=id;document.cookie=k+"="+encodeURIComponent(id)+"; path=/; max-age=31536000; SameSite=Lax";}catch(e){}})();</script>\n`;
 }
 
-/**
- * Site favicon links from build artifact `_vmz/site-favicon.json` (author SVG �?PNG/ICO).
- * Empty when skipped / missing �?do not invent broken <link>s.
- */
 function siteFaviconHeadHtml() {
     try {
         const p = path.join(distDir, '_vmz', 'site-favicon.json');

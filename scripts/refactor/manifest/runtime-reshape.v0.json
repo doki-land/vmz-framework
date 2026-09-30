@@ -282,7 +282,7 @@
       }
     },
     "src/host/serve-host.ts": {
-      "sha256": "8c6720293c63431d",
+      "sha256": "bff0a6d137ee7eef",
       "splitInto": [
         {
           "path": "src/host/serve/constants.ts",
@@ -296,53 +296,8 @@
           ]
         },
         {
-          "path": "src/host/serve/paths.ts",
-          "declarations": [
-            "require",
-            "resolveServeDistDir",
-            "distDir",
-            "projectRootForResolve",
-            "appPackageRequire",
-            "appPackageRequireResolve",
-            "installAppModuleResolveHooks"
-          ]
-        },
-        {
-          "path": "src/host/serve/state.ts",
-          "declarations": [
-            "host",
-            "port",
-            "isDev",
-            "reloadToken",
-            "ssrRenderHost",
-            "lastDevBuildId",
-            "pageCatalog",
-            "pageCtors",
-            "cssEntry",
-            "styleBundleHash",
-            "styleTheme",
-            "localeArtifact",
-            "localeLinkPlan",
-            "sseClients",
-            "inFlight",
-            "shuttingDown",
-            "ready",
-            "lastDevError",
-            "server"
-          ]
-        },
-        {
-          "path": "src/host/serve/http.ts",
-          "declarations": [
-            "readRequestBody",
-            "gracefulShutdown"
-          ]
-        },
-        {
           "path": "src/host/serve/route-catalog.ts",
           "declarations": [
-            "attachLinkRouteAliases",
-            "listPagesFromRouteCatalog",
             "parsePathPattern",
             "parsePathSegment",
             "isRouteGroupDir",
@@ -351,66 +306,18 @@
             "extractRouteParams",
             "scoreRoute",
             "isRootCatchAll",
-            "findRootCatchAll",
-            "runRouteGate"
-          ]
-        },
-        {
-          "path": "src/host/serve/page-render.ts",
-          "declarations": [
-            "renderPage",
-            "renderPageStream",
-            "renderPageStreamInner",
-            "normalizeAccessResult",
-            "normalizeActionResult",
-            "emitAccessShell",
-            "resolvePageDocumentMeta",
-            "emitPageHtml",
-            "loadPageCtor",
-            "listPageClientFiles",
-            "emitEntryClient",
-            "emitEntryEvent",
-            "loadPageResumeEntries",
-            "isEventStrategy",
-            "isEventOnlyShell"
-          ]
-        },
-        {
-          "path": "src/host/serve/hmr-dev.ts",
-          "declarations": [
-            "softReload",
-            "pageNeedsReload",
-            "notifySse",
-            "normalizeDevError",
-            "emitDevErrorHtml"
-          ]
-        },
-        {
-          "path": "src/host/serve/locale-theme.ts",
-          "declarations": [
-            "resolveLocalePath",
-            "pageMetaAlternates",
-            "bustUrl",
-            "cssEntryWithBust",
-            "loadDeploymentStyle",
-            "resolveThemeId",
-            "htmlThemeAttrPair",
-            "themeBootstrapScript",
-            "localeBootstrapScript",
-            "siteFaviconHeadHtml",
-            "readCookie",
-            "loadCssEntry",
-            "escapeHtml",
-            "escapeAttr"
+            "findRootCatchAll"
           ]
         }
       ],
       "barrel": {
         "path": "src/host/serve-host.ts",
+        "mode": "partial",
         "header": [
-          "/** Barrel ? serve host modules (reshape-runtime.mjs). */"
+          "/** Partial reshape ? mutable host runtime stays in this file. */"
         ]
-      }
+      },
+      "completed": true
     }
   },
   "wholeFileMoves": [

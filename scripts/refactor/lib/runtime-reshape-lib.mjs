@@ -172,6 +172,11 @@ export function validateManifest(root, manifest) {
 
         for (const d of decls) {
             if (!manifestNames.has(d.name)) {
+                if (spec.barrel?.mode === 'partial') {
+                    sourceReport.remaining = sourceReport.remaining || [];
+                    sourceReport.remaining.push(d.name);
+                    continue;
+                }
                 sourceReport.unassigned.push(d.name);
                 report.unassignedDeclarations.push({ source: sourceRel, name: d.name, exported: d.exported });
                 errors.push(`${sourceRel}: unassigned declaration ${d.name}`);
@@ -428,6 +433,13 @@ function applySplitModule(pkgRoot, sourceRel, spec, opts) {
     for (const d of decls) declTextsByName.set(d.name, d.text);
 
     /** @type {Set<string>} */
+    const assigned = new Set();
+    for (const mod of spec.splitInto) {
+        for (const name of mod.declarations) assigned.add(name);
+    }
+    const remainingDecls = decls.filter((d) => !assigned.has(d.name));
+
+    /** @type {Set<string>} */
     const needsExport = new Set();
     for (const mod of spec.splitInto) {
         const own = new Set(mod.declarations);
@@ -436,6 +448,14 @@ function applySplitModule(pkgRoot, sourceRel, spec, opts) {
             for (const ref of collectFreeIdentifiers(text, own)) {
                 const owner = ownerPath.get(ref);
                 if (owner && owner !== mod.path) needsExport.add(ref);
+            }
+        }
+    }
+    if (spec.barrel?.mode === 'partial') {
+        const remainingNames = new Set(remainingDecls.map((d) => d.name));
+        for (const d of remainingDecls) {
+            for (const ref of collectFreeIdentifiers(d.text, remainingNames)) {
+                if (ownerPath.has(ref)) needsExport.add(ref);
             }
         }
     }
@@ -465,6 +485,45 @@ function applySplitModule(pkgRoot, sourceRel, spec, opts) {
     }
 
     const barrelPath = spec.barrel?.path || sourceRel;
+    const header = (spec.barrel?.header || []).join('\n');
+
+    if (spec.barrel?.mode === 'partial') {
+        /** @type {Map<string, Set<string>>} */
+        const remainingImports = new Map();
+        const remainingNames = new Set(remainingDecls.map((d) => d.name));
+        for (const d of remainingDecls) {
+            for (const ref of collectFreeIdentifiers(d.text, remainingNames)) {
+                const modPath = ownerPath.get(ref);
+                if (!modPath) continue;
+                if (!remainingImports.has(modPath)) remainingImports.set(modPath, new Set());
+                remainingImports.get(modPath).add(ref);
+            }
+        }
+        /** @type {string[]} */
+        const importLines = [];
+        for (const [modPath, names] of [...remainingImports.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+            const rel = toPosixRelative(path.dirname(barrelPath), modPath).replace(/\.ts$/, '.js');
+            importLines.push(`import { ${[...names].sort().join(', ')} } from '${rel}';`);
+        }
+        const remainingParts = remainingDecls.map((d) =>
+            rewriteRelativeImports(d.text, sourceRel, barrelPath, pkgRoot),
+        );
+        const partialBody = [
+            header,
+            rewriteRelativeImports(importBlock, sourceRel, barrelPath, pkgRoot),
+            rewriteRelativeImports(reexportBlock, sourceRel, barrelPath, pkgRoot),
+            importLines.join('\n'),
+            remainingParts.join('\n\n'),
+        ]
+            .filter(Boolean)
+            .join('\n\n');
+        actions.push(`write partial ${barrelPath} (${remainingDecls.length} remaining decls)`);
+        if (!opts.dryRun) {
+            fs.writeFileSync(path.join(pkgRoot, barrelPath), `${partialBody}\n`, 'utf8');
+        }
+        return actions;
+    }
+
     const exportLines = [];
     for (const mod of spec.splitInto) {
         const rel = toPosixRelative(path.dirname(barrelPath), mod.path).replace(/\.ts$/, '.js');
@@ -473,7 +532,6 @@ function applySplitModule(pkgRoot, sourceRel, spec, opts) {
             if (decl?.exported) exportLines.push(`export { ${name} } from '${rel}';`);
         }
     }
-    const header = (spec.barrel?.header || []).join('\n');
     const barrel = `${header ? `${header}\n` : ''}${exportLines.join('\n')}\n`;
     actions.push(`write barrel ${barrelPath}`);
     if (!opts.dryRun) {
