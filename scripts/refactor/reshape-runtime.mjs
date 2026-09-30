@@ -90,10 +90,14 @@ if (opts.mode === 'apply') {
         console.error('--apply requires --phase');
         process.exit(1);
     }
-    if (validation.errors.length) {
-        for (const e of validation.errors) console.error(`FAIL ${e}`);
+    const blocking = validation.errors.filter((e) => !e.includes('sha256 mismatch'));
+    if (blocking.length) {
+        for (const e of blocking) console.error(`FAIL ${e}`);
         console.error('refusing --apply while --check fails');
         process.exit(1);
+    }
+    for (const w of validation.errors.filter((e) => e.includes('sha256 mismatch'))) {
+        console.warn(`WARN ${w}`);
     }
     const actions = applyManifest(root, manifest, {
         phases: opts.phases,

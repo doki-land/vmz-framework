@@ -118,6 +118,10 @@ export function validateManifest(root, manifest) {
     const owners = new Map();
 
     for (const [sourceRel, spec] of Object.entries(manifest.sources || {})) {
+        if (spec.completed) {
+            report.sources[sourceRel] = { completed: true };
+            continue;
+        }
         const abs = path.join(pkgRoot, sourceRel);
         if (!fs.existsSync(abs)) {
             errors.push(`missing source ${manifest.packageRoot}/${sourceRel}`);
@@ -383,6 +387,7 @@ export function applyManifest(root, manifest, opts = {}) {
 
     if (phases.has('split-modules')) {
         for (const [sourceRel, spec] of Object.entries(manifest.sources || {})) {
+            if (spec.completed) continue;
             if (sourceFilter && sourceRel !== sourceFilter) continue;
             if (!spec.splitInto?.length) continue;
             actions.push(...applySplitModule(pkgRoot, sourceRel, spec, opts));
@@ -440,9 +445,16 @@ function applySplitModule(pkgRoot, sourceRel, spec, opts) {
         for (const name of mod.declarations) {
             const decl = byName.get(name);
             if (!decl) throw new Error(`${sourceRel}: cannot extract missing declaration ${name}`);
-            parts.push(ensureDeclarationExported(decl.text, decl.exported || needsExport.has(name)));
+            parts.push(
+                rewriteRelativeImports(
+                    ensureDeclarationExported(decl.text, decl.exported || needsExport.has(name)),
+                    sourceRel,
+                    mod.path,
+                    pkgRoot,
+                ),
+            );
         }
-        const crossImports = buildCrossImports(mod, ownerPath, importBlock, declTextsByName);
+        const crossImports = buildCrossImports(mod, ownerPath, importBlock, declTextsByName, sourceRel, pkgRoot);
         const body = `${crossImports}\n\n${parts.join('\n\n')}\n`;
         const outAbs = path.join(pkgRoot, mod.path);
         actions.push(`write ${mod.path} (${mod.declarations.length} decls)`);
@@ -535,8 +547,10 @@ const GLOBAL_IDENTIFIERS = new Set([
  * @param {Map<string, string>} ownerPath
  * @param {string} importBlock
  * @param {Map<string, string>} declTextsByName
+ * @param {string} sourceRel
+ * @param {string} pkgRoot
  */
-function buildCrossImports(mod, ownerPath, importBlock, declTextsByName) {
+function buildCrossImports(mod, ownerPath, importBlock, declTextsByName, sourceRel, pkgRoot) {
     const own = new Set(mod.declarations);
     /** @type {Set<string>} */
     const needed = new Set();
@@ -560,7 +574,27 @@ function buildCrossImports(mod, ownerPath, importBlock, declTextsByName) {
         const rel = toPosixRelative(path.dirname(mod.path), modPath).replace(/\.ts$/, '.js');
         importLines.push(`import { ${[...names].sort().join(', ')} } from '${rel}';`);
     }
-    return [importBlock.trim(), ...importLines].filter(Boolean).join('\n');
+    return [rewriteRelativeImports(importBlock.trim(), sourceRel, mod.path, pkgRoot), ...importLines]
+        .filter(Boolean)
+        .join('\n');
+}
+
+/**
+ * @param {string} text
+ * @param {string} sourceRel
+ * @param {string} moduleRel
+ * @param {string} pkgRoot
+ */
+function rewriteRelativeImports(text, sourceRel, moduleRel, pkgRoot) {
+    if (!text) return text;
+    const sourceDir = path.dirname(path.join(pkgRoot, sourceRel));
+    const moduleDir = path.dirname(path.join(pkgRoot, moduleRel));
+    return text.replace(/(from\s+['"]|import\s*\(\s*['"])(\.[^'"]+)(['"])/g, (_m, prefix, spec, suffix) => {
+        const abs = path.resolve(sourceDir, spec);
+        let next = path.relative(moduleDir, abs).replace(/\\/g, '/');
+        if (!next.startsWith('.')) next = `./${next}`;
+        return `${prefix}${next}${suffix}`;
+    });
 }
 
 /**
