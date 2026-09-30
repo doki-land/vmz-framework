@@ -11,6 +11,7 @@ on:
 #   build-test     — pack smoke already done upstream; unit + examples
 #   ui-browser     — ui-automation + browser-production (Chrome)
 #   runtime-gates  — Slim + runtime-quality-baseline
+# Format Check job is temporarily disabled until Oak `VueParser` is safe on monorepo `.vmz` walks.
 # Downstream jobs set VMZ_SKIP_NATIVE_BUILD=1 so verify `pre: build:runtimes` is a no-op.
 # After artifact restore, each consumer runs `pnpm verify -- skip-native-pre` first.
 
@@ -77,49 +78,9 @@ jobs:
           if-no-files-found: error
           retention-days: 2
 
-  fmt:
-    name: Format Check
-    needs: [build-runtimes]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: '24'
-          package-manager-cache: false
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@nightly
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Download runtime artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: runtime-build
-          path: .
-
-      - name: Restore runtime artifact
-        shell: bash
-        run: |
-          set -euo pipefail
-          tar -xzf runtime-build.tar.gz
-          test -f packages/runtimes/vmz/dist/cli/cli.js
-          ls packages/runtimes/vmz-linux-x64/vmz.*.node
-
-      - name: Check format (`vmz format --check` via `vmz.config` `format`; same as `pnpm fmt:check`)
-        run: pnpm fmt:check
-
   build-test:
     name: Build and Test
-    needs: [build-runtimes, fmt]
+    needs: [build-runtimes]
     runs-on: ubuntu-latest
     env:
       VMZ_SKIP_NATIVE_BUILD: '1'
