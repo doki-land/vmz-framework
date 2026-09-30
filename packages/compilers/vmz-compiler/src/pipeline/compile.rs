@@ -424,10 +424,7 @@ fn build_project_route_table(
         let parsed = match parse_vmz(&path, source) {
             Ok(p) => p,
             Err(e) => {
-                report.diagnostics.push(
-                    ReportedDiagnostic::error(&path, "vmz::sfc::parse_failed")
-                        .with_arg("detail", e.to_string()),
-                );
+                report.diagnostics.push(crate::sfc::diagnostic_sfc_parse_failed(&path, &e));
                 continue;
             }
         };

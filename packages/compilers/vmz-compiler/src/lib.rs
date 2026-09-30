@@ -136,7 +136,7 @@ pub use scss::{ScssCompiler, ScssCompilerHandle, ScssEmitRequest, ScssEmitResult
 pub use session_graph::{SessionClientCall, SessionGraph, SessionGraphDocument, SessionUnit};
 pub use sfc::{
     DataBlock, ParsedVmz, ScriptBlock, ScriptKind, ScriptLanguage, SfcError, StyleBlock,
-    StyleLanguage, TemplateBlock, parse_vmz,
+    StyleLanguage, TemplateBlock, diagnostic_sfc_parse_failed, parse_vmz,
 };
 pub use style_emit::{StyleContribution, StyleEmitReport, StyleLayer, emit_style_bundle};
 pub use style_explain::explain_style;

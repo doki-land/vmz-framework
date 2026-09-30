@@ -17,7 +17,23 @@ pub enum SfcError {
         path: PathBuf,
         /// Human-readable rule violation.
         message: String,
+        /// Inclusive UTF-8 start in the SFC file (`0` when unknown).
+        span_start: u32,
+        /// Exclusive UTF-8 end in the SFC file (`0` when unknown).
+        span_end: u32,
     },
+}
+
+impl SfcError {
+    /// Absolute file span when the parser recorded tag offsets.
+    pub fn absolute_span(&self) -> Option<(u32, u32)> {
+        match self {
+            Self::Invalid { span_start, span_end, .. } if *span_end > *span_start => {
+                Some((*span_start, *span_end))
+            }
+            _ => None,
+        }
+    }
 }
 
 /// Which `<script>` slice a block belongs to.
@@ -152,6 +168,10 @@ pub struct DataBlock {
     pub lang: Option<String>,
     /// Opening-tag attributes (e.g. `<router path="/x" />` sugar -> same RouteContract).
     pub attrs: String,
+    /// Opening `<tag` byte offset in the SFC file.
+    pub tag_start: usize,
+    /// Byte offset after the opening `>` (end-exclusive tag highlight).
+    pub open_end: usize,
 }
 
 /// Fully ordered SFC parse of one `.vmz` file.
@@ -206,6 +226,8 @@ pub fn parse_vmz(path: impl AsRef<Path>, source: impl Into<String>) -> Result<Pa
                     content_start: block.content_start,
                     lang: block.lang,
                     attrs: block.attrs,
+                    tag_start: block.tag_start,
+                    open_end: block.open_end,
                 });
                 last_role = BlockRole::Router;
             }
@@ -224,6 +246,8 @@ pub fn parse_vmz(path: impl AsRef<Path>, source: impl Into<String>) -> Result<Pa
                     content_start: block.content_start,
                     lang: block.lang,
                     attrs: block.attrs,
+                    tag_start: block.tag_start,
+                    open_end: block.open_end,
                 });
                 last_role = BlockRole::Meta;
             }
@@ -242,9 +266,11 @@ pub fn parse_vmz(path: impl AsRef<Path>, source: impl Into<String>) -> Result<Pa
             }
             BlockRole::Style => {
                 if !matches!(last_role, BlockRole::Template) {
-                    return Err(err(
+                    return Err(err_at(
                         &path,
                         "`<style>` must follow `<template>` (view before logic)",
+                        block.tag_start,
+                        block.open_end,
                     ));
                 }
                 if style.is_some() {
@@ -356,6 +382,10 @@ struct RawBlock {
     content_start: usize,
     lang: Option<String>,
     attrs: String,
+    /// Opening `<tag` byte offset in the SFC file.
+    tag_start: usize,
+    /// Byte offset after the opening `>` (end-exclusive highlight for the tag).
+    open_end: usize,
 }
 
 fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> {
@@ -369,9 +399,11 @@ fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> 
             break;
         }
         if bytes[i] != b'<' {
-            return Err(err(
+            return Err(err_at(
                 path,
                 format!("unexpected content at byte {i}; expected a SFC block tag"),
+                i,
+                i + 1,
             ));
         }
 
@@ -390,9 +422,15 @@ fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> 
             i += 1;
         }
         if i >= bytes.len() {
-            return Err(err(path, format!("unclosed tag starting at byte {tag_start}")));
+            return Err(err_at(
+                path,
+                format!("unclosed tag starting at byte {tag_start}"),
+                tag_start,
+                tag_start + 1,
+            ));
         }
         i += 1; // '>'
+        let open_end = i;
         let content_start = i;
 
         let self_closing = attrs.trim_end().ends_with('/');
@@ -416,14 +454,21 @@ fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> 
                 }
             }
             other => {
-                return Err(err(path, format!("unknown SFC tag `<{other}>`")));
+                return Err(err_at(
+                    path,
+                    format!("unknown SFC tag `<{other}>`"),
+                    tag_start,
+                    open_end,
+                ));
             }
         };
 
         if self_closing && !matches!(role, BlockRole::Router | BlockRole::Meta) {
-            return Err(err(
+            return Err(err_at(
                 path,
                 format!("self-closing `<{name} />` is only allowed for `<router>` / `<meta>`"),
+                tag_start,
+                open_end,
             ));
         }
 
@@ -431,7 +476,12 @@ fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> 
             (String::new(), content_start)
         } else {
             let Some(rel) = source[content_start..].find(close) else {
-                return Err(err(path, format!("missing closing `{close}`")));
+                return Err(err_at(
+                    path,
+                    format!("missing closing `{close}`"),
+                    tag_start,
+                    open_end,
+                ));
             };
             let content_end = content_start + rel;
             let content = source[content_start..content_end].to_string();
@@ -445,10 +495,31 @@ fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> 
             None
         };
 
-        blocks.push(RawBlock { role, content, content_start, lang, attrs });
+        blocks.push(RawBlock { role, content, content_start, lang, attrs, tag_start, open_end });
     }
 
     Ok(blocks)
+}
+
+/// Map [`SfcError`] to a catalog-backed `vmz::sfc::parse_failed` diagnostic.
+pub fn diagnostic_sfc_parse_failed(
+    path: impl AsRef<Path>,
+    err: &SfcError,
+) -> crate::diagnostic::ReportedDiagnostic {
+    use crate::diagnostic::ReportedDiagnostic;
+    use vmz_protocol::SourceSpan;
+
+    let path = path.as_ref();
+    let mut row = ReportedDiagnostic::error(path, "vmz::sfc::parse_failed")
+        .with_arg("detail", err.to_string());
+    if let Some((start, end)) = err.absolute_span() {
+        row = row.with_source_span(SourceSpan {
+            path: path.to_string_lossy().into_owned(),
+            start,
+            end,
+        });
+    }
+    row
 }
 
 fn parse_lang_attr(attrs: &str) -> Option<String> {
@@ -512,5 +583,14 @@ fn skip_ws_and_comments(bytes: &[u8], i: &mut usize) {
 }
 
 fn err(path: &Path, message: impl Into<String>) -> SfcError {
-    SfcError::Invalid { path: path.to_path_buf(), message: message.into() }
+    err_at(path, message, 0, 0)
+}
+
+fn err_at(path: &Path, message: impl Into<String>, start: usize, end: usize) -> SfcError {
+    SfcError::Invalid {
+        path: path.to_path_buf(),
+        message: message.into(),
+        span_start: start as u32,
+        span_end: end as u32,
+    }
 }
