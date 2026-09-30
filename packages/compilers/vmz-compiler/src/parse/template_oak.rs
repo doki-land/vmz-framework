@@ -12,16 +12,8 @@ use crate::sfc::TemplateBlock;
 
 const TEMPLATE_OPEN: &str = "<template>";
 
-/// Dynamic `:[expr]` / `@[expr]` directive args hang current `oak-vue` builder — skip until fixed upstream.
-fn oak_skips_template_body(body: &str) -> bool {
-    body.contains(":[") || body.contains("@[")
-}
-
 /// Build VMZ [`ConcreteIr`] from a VMZ template block via Oak CST + AST.
 pub fn parse_template_concrete_via_oak(template: &TemplateBlock) -> Result<ConcreteIr, String> {
-    if oak_skips_template_body(&template.content) {
-        return Err("Oak template AST: dynamic directive argument not supported yet".into());
-    }
     let shell = TemplateShellInput {
         content: template.content.clone(),
         content_start: template.content_start,

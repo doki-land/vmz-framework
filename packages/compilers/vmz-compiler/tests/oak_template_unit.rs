@@ -118,7 +118,7 @@ export default class Page { show = true; }
 }
 
 #[test]
-fn oak_primary_falls_back_on_dynamic_bind_arg() {
+fn oak_primary_lowers_dynamic_directive_args() {
     let body = r#"<button :[attrName]="val" @[eventName]="onEv">x</button>"#;
     let source = format!(
         r#"<template>{body}</template>
@@ -130,6 +130,27 @@ export default class Page {{ val = 1; onEv() {{}} }}
     );
     let parsed = parse_vmz("Dyn.vmz", source).expect("parse vmz");
     let primary = vmz_compiler::parse_template_concrete_primary(&parsed.template).expect("primary");
-    let legacy = parse_template_concrete(body).expect("legacy");
-    assert_eq!(primary.roots.len(), legacy.roots.len());
+    let vmz_compiler::ConcreteNode::Element { attrs, .. } = &primary.roots[0] else {
+        panic!("expected element");
+    };
+    assert!(attrs.iter().any(|a| matches!(
+        a,
+        vmz_compiler::ConcreteAttr::Directive {
+            dir: vmz_compiler::Directive::Bind {
+                arg: vmz_compiler::DirectiveArg::Dynamic(e),
+                ..
+            },
+            ..
+        } if e == "attrName"
+    )));
+    assert!(attrs.iter().any(|a| matches!(
+        a,
+        vmz_compiler::ConcreteAttr::Directive {
+            dir: vmz_compiler::Directive::On {
+                arg: vmz_compiler::DirectiveArg::Dynamic(e),
+                ..
+            },
+            ..
+        } if e == "eventName"
+    )));
 }
