@@ -29,16 +29,7 @@ if (adapterRun.status !== 0) {
 console.log('oak-frontend-smoke: cargo test vmz-compiler oak + nyar projection…');
 const compilerRun = spawnSync(
     'cargo',
-    [
-        'test',
-        '-p',
-        'vmz-compiler',
-        '--test',
-        'oak_template_unit',
-        '--test',
-        'nyar_projection_unit',
-        '--quiet',
-    ],
+    ['test', '-p', 'vmz-compiler', '--test', 'oak_template_unit', '--test', 'nyar_projection_unit', '--quiet'],
     {
         cwd: root,
         encoding: 'utf8',

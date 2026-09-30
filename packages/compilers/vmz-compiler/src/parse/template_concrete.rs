@@ -181,11 +181,7 @@ pub fn classify_concrete_attr(
     value: Option<&str>,
     span: TemplateSpan,
 ) -> Result<ConcreteAttr, TemplateParseError> {
-    classify_one(RawAttr {
-        name: name.to_string(),
-        value: value.map(|s| s.to_string()),
-        span,
-    })
+    classify_one(RawAttr { name: name.to_string(), value: value.map(|s| s.to_string()), span })
 }
 
 /// Parse a `<template>` body into Concrete AST (comments + structured directives).

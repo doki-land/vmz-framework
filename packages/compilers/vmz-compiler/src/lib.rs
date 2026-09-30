@@ -151,11 +151,10 @@ pub use style_token_diag::{
 pub use template::{
     AttrValue, ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg, EventTarget,
     IfBranch, SemanticAstStats, SemanticIr, SemanticNode, SemanticProp, TemplateAttr, TemplateIr,
-    TemplateNode, TemplateParseError, TemplateSpan, decode_html_entities, lower_concrete_to_ir,
-    classify_concrete_attr, lower_concrete_to_semantic, parse_template, parse_template_asts,
-    parse_template_concrete, parse_template_concrete_body_primary,
-    parse_template_concrete_primary, parse_template_concrete_via_oak,
-    semantic_ast_stats, template_parse_to_diagnostic,
+    TemplateNode, TemplateParseError, TemplateSpan, classify_concrete_attr, decode_html_entities,
+    lower_concrete_to_ir, lower_concrete_to_semantic, parse_template, parse_template_asts,
+    parse_template_concrete, parse_template_concrete_body_primary, parse_template_concrete_primary,
+    parse_template_concrete_via_oak, semantic_ast_stats, template_parse_to_diagnostic,
 };
 pub use tw::{
     TwCompiler, TwCompilerHandle, TwEmitRequest, TwEmitResult, TwRegKind, TwRegistration,

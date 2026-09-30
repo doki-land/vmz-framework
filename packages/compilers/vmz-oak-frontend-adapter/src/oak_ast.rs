@@ -4,7 +4,7 @@ use oak_core::{Builder, ParseSession, SourceText};
 use oak_vue::{VueBuilder, VueRoot};
 
 use crate::contract::{OakFrontendDiagnostic, TemplateShellInput};
-use crate::oak_cst::{format_cst_diagnostics, map_oak_error, TEMPLATE_CLOSE, TEMPLATE_OPEN};
+use crate::oak_cst::{TEMPLATE_CLOSE, TEMPLATE_OPEN, format_cst_diagnostics, map_oak_error};
 
 /// Result of building Oak Vue AST for a VMZ template region.
 #[derive(Debug, Clone)]
@@ -42,13 +42,7 @@ pub fn parse_template_ast(template: &TemplateShellInput) -> TemplateAstParse {
     let ok = built.result.is_ok() && diagnostics.is_empty();
     let root = built.result.ok();
 
-    TemplateAstParse {
-        shell_source,
-        shell_base_offset,
-        root,
-        diagnostics,
-        ok,
-    }
+    TemplateAstParse { shell_source, shell_base_offset, root, diagnostics, ok }
 }
 
 /// Fail fast when Oak AST build fails.

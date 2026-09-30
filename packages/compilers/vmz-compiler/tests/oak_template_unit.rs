@@ -107,10 +107,8 @@ export default class Page { show = true; }
             )
         })
         .expect("v-if directive");
-    let vmz_compiler::ConcreteAttr::Directive {
-        dir: vmz_compiler::Directive::If { test },
-        ..
-    } = v_if
+    let vmz_compiler::ConcreteAttr::Directive { dir: vmz_compiler::Directive::If { test }, .. } =
+        v_if
     else {
         unreachable!();
     };

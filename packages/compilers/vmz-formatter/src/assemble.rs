@@ -2,7 +2,7 @@
 
 use vmz_compiler::{DataBlock, ParsedVmz, ScriptBlock, ScriptLanguage, StyleLanguage};
 use vmz_generator::to_json5;
-use vmz_oak_frontend_adapter::{require_template_cst, TemplateShellInput};
+use vmz_oak_frontend_adapter::{TemplateShellInput, require_template_cst};
 
 use crate::editorconfig::EditorSettings;
 use crate::template_print::format_template_body;
