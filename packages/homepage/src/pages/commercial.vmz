@@ -486,6 +486,7 @@ import {
     consoleColUpdated,
 } from "#locales/common";
 import CommercialPageServer from "#server/pages/commercial";
+import { applyStatusToRow, statusAfterHandlingNote } from "../demo/ticket-rows.ts";
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
 const initialBrowseRows = [];
@@ -500,6 +501,7 @@ export default class CommercialPage {
     actionSummary = "";
     actionDescribedBy = "";
     reviewSuccess = false;
+    statusOverrides = {};
     drawerOpen = false;
     detailProject = "";
     detailTarget = "";
@@ -541,6 +543,7 @@ export default class CommercialPage {
     browseColumns = [];
     allBrowseRows = initialBrowseRows.map((row) => ({
         id: row.id,
+        status: row.status,
         cells: row.cells.map((cell) => String(cell)),
     }));
     browseRows = [];
@@ -576,17 +579,18 @@ export default class CommercialPage {
         try {
             const rows = await CommercialPageServer.getConsoleRows(readLocaleId());
             if (Array.isArray(rows) && rows.length) {
-                this.allBrowseRows = rows;
+                this.allBrowseRows = rows.map((row) => this.applyRowOverrides(row));
                 this.refreshBrowseRows();
+                const featured = this.allBrowseRows[0];
                 const detail = await CommercialPageServer.getTicketDetail(
-                    rows[0].id,
+                    featured.id,
                     readLocaleId(),
                 );
                 if (detail) {
                     this.featuredId = detail.id;
                     this.featuredSubjectLabel = detail.subject;
                     this.featuredContextLabel = detail.context;
-                    this.featuredStatusLabel = detail.statusLabel;
+                    this.featuredStatusLabel = featured.cells[2];
                     this.featuredOwnerLabel = detail.owner;
                 }
             }
@@ -684,8 +688,36 @@ export default class CommercialPage {
         this.refreshBrowseRows();
     }
 
+    effectiveStatus(row) {
+        return this.statusOverrides[row.id] || row.status;
+    }
+
+    applyRowOverrides(row) {
+        const status = this.effectiveStatus(row);
+        return applyStatusToRow(row, status, readLocaleId());
+    }
+
+    syncFeaturedFromRow(id) {
+        const row = this.allBrowseRows.find((entry) => entry.id === id);
+        if (!row) return;
+        this.featuredStatusLabel = row.cells[2];
+    }
+
+    syncTicketStatuses() {
+        this.allBrowseRows = this.allBrowseRows.map((row) => this.applyRowOverrides(row));
+        this.refreshBrowseRows();
+        this.syncFeaturedFromRow(this.featuredId);
+        if (this.drawerOpen) {
+            const row = this.allBrowseRows.find((entry) => entry.id === this.featuredId);
+            if (row) this.detailStatus = row.cells[2];
+        }
+    }
+
     async openFeaturedDetail() {
         this.drawerOpen = true;
+        const row =
+            this.allBrowseRows.find((entry) => entry.id === this.featuredId) ||
+            this.allBrowseRows[0];
         try {
             const detail = await CommercialPageServer.getTicketDetail(
                 this.featuredId,
@@ -694,16 +726,13 @@ export default class CommercialPage {
             if (detail && typeof detail === "object") {
                 this.detailProject = String(detail.subject || "");
                 this.detailTarget = String(detail.priorityLabel || "");
-                this.detailStatus = String(detail.statusLabel || "");
+                this.detailStatus = row ? String(row.cells[2] || "") : String(detail.statusLabel || "");
                 this.detailActor = String(detail.owner || "");
                 return;
             }
         } catch {
             /* fall back below */
         }
-        const row =
-            this.allBrowseRows.find((entry) => entry.id === this.featuredId) ||
-            this.allBrowseRows[0];
         if (!row) return;
         this.detailProject = String(row.cells[0] || "");
         this.detailTarget = String(row.cells[1] || "");
@@ -739,6 +768,14 @@ export default class CommercialPage {
         this.actionSummary = "";
         this.actionDescribedBy = "";
         this.reviewSuccess = true;
+        const targetId = this.featuredId || this.allBrowseRows[0]?.id;
+        if (!targetId) return;
+        const row = this.allBrowseRows.find((entry) => entry.id === targetId);
+        if (!row) return;
+        const nextStatus = statusAfterHandlingNote(this.effectiveStatus(row));
+        if (nextStatus === this.effectiveStatus(row)) return;
+        this.statusOverrides = { ...this.statusOverrides, [row.id]: nextStatus };
+        this.syncTicketStatuses();
     }
 
     resetReview() {
@@ -753,32 +790,12 @@ export default class CommercialPage {
 }
 </script>
 <script server>
+import { formatPriority, formatStatus, mapTicketRow } from "../demo/ticket-rows.ts";
 import TicketDemo from "#server/demo/TicketDemo";
 
 export default class CommercialPageServer {
     getConsoleRows(locale) {
-        return new TicketDemo().list(locale).map((ticket) => ({
-            id: ticket.id,
-            cells: [
-                ticket.subject,
-                locale === "en-us"
-                    ? ticket.priority
-                    : ticket.priority === "high"
-                      ? "高"
-                      : ticket.priority === "medium"
-                        ? "中"
-                        : "低",
-                locale === "en-us"
-                    ? ticket.status
-                    : ticket.status === "open"
-                      ? "待处理"
-                      : ticket.status === "in-progress"
-                        ? "处理中"
-                        : "已完成",
-                ticket.owner,
-                ticket.updated,
-            ],
-        }));
+        return new TicketDemo().list(locale).map((ticket) => mapTicketRow(ticket, locale));
     }
 
     getTicketDetail(id, locale) {
@@ -786,22 +803,8 @@ export default class CommercialPageServer {
         if (!ticket) return null;
         return {
             ...ticket,
-            priorityLabel:
-                locale === "en-us"
-                    ? ticket.priority
-                    : ticket.priority === "high"
-                      ? "高"
-                      : ticket.priority === "medium"
-                        ? "中"
-                        : "低",
-            statusLabel:
-                locale === "en-us"
-                    ? ticket.status
-                    : ticket.status === "open"
-                      ? "待处理"
-                      : ticket.status === "in-progress"
-                        ? "处理中"
-                        : "已完成",
+            priorityLabel: formatPriority(ticket.priority, locale),
+            statusLabel: formatStatus(ticket.status, locale),
         };
     }
 }
