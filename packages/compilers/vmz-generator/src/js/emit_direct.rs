@@ -10,7 +10,7 @@
 use super::ast_util::{js_string_literal, print_one_stmt};
 use super::emit_ir::IrDepCursor;
 use super::helpers::{
-    HandlerResolution, bind_field_idents, collect_deps_oxc, component_event_name,
+    HandlerResolution, bind_field_idents_ctx, collect_deps_oxc, component_event_name,
     component_prop_wire_name, event_dom_type, is_component_event_attr, is_event_attr, is_html_attr,
     looks_like_ternary, parse_this_method_call_arrow, sanitize_interp, single_field_binding_target,
     split_ternary_parts, wrap_event_handler_body,
@@ -101,6 +101,7 @@ fn emit_merge_attr(
     binds: &[(String, Option<BindingId>)],
     el: &str,
     fields: &[String],
+    methods: &[String],
     scope: &[String],
     aliases: &[(String, String)],
     ir: &IrDepCursor<'_>,
@@ -119,13 +120,13 @@ fn emit_merge_attr(
     let mut bind_bodies: Vec<String> = Vec::new();
     let mut binding_id: Option<u32> = None;
     for (expr, binding) in binds {
-        let (bid, deps, _) = bind_payload(expr, *binding, fields, scope, aliases, ir);
+        let (bid, deps, _) = bind_payload(expr, *binding, fields, methods, scope, aliases, ir);
         for d in deps {
             if !all_deps.iter().any(|x| x == &d) {
                 all_deps.push(d);
             }
         }
-        bind_bodies.push(bind_field_idents(expr, fields, scope, aliases));
+        bind_bodies.push(bind_template_expr(expr, fields, methods, scope, aliases));
         if binding_id.is_none() {
             binding_id = bid;
         }
@@ -288,6 +289,16 @@ fn wrap_handler(
     scope: &[String],
 ) -> Result<String, String> {
     wrap_event_handler_body(body, handler_resolution(handler_ctx, scope))
+}
+
+fn bind_template_expr(
+    expr: &str,
+    fields: &[String],
+    methods: &[String],
+    scope: &[String],
+    aliases: &[(String, String)],
+) -> String {
+    bind_field_idents_ctx(expr, fields, methods, scope, aliases)
 }
 
 /// Emit `__vmzPlan` literal matching `units[].plan` in program.json (shared identity).
@@ -575,7 +586,7 @@ fn emit_if_block(
         )?;
         match &br.cond {
             Some(c) => {
-                let expr = bind_field_idents(c, fields, scope, aliases);
+                let expr = bind_template_expr(c, fields, handler_ctx.methods, scope, aliases);
                 branch_objs.push(format!(
                     "{{ cond: function() {{ return ({expr}); }}, create: {create_fn} }}"
                 ));
@@ -854,7 +865,7 @@ fn emit_plain_element(
             }
             ViewAttrValue::Bare => {}
             ViewAttrValue::Interp { expr: e } if is_event_attr(&a.name) => {
-                let body = bind_field_idents(e, fields, scope, aliases);
+                let body = bind_template_expr(e, fields, handler_ctx.methods, scope, aliases);
                 let type_name = event_dom_type(&a.name);
                 if let Some(method) = parse_this_method_call_arrow(&body) {
                     stmts.push(format!("api.onMethod({el}, {}, {});", q(&type_name), q(&method)));
@@ -872,10 +883,31 @@ fn emit_plain_element(
                 }
             }
             ViewAttrValue::Interp { expr: e } if is_html_attr(&a.name) => {
-                emit_bind_html(e, a.binding, &el, fields, scope, aliases, ir, stmts);
+                emit_bind_html(
+                    e,
+                    a.binding,
+                    &el,
+                    fields,
+                    handler_ctx.methods,
+                    scope,
+                    aliases,
+                    ir,
+                    stmts,
+                );
             }
             ViewAttrValue::Interp { expr: e } => {
-                emit_bind_attr(e, a.binding, &a.name, &el, fields, scope, aliases, ir, stmts);
+                emit_bind_attr(
+                    e,
+                    a.binding,
+                    &a.name,
+                    &el,
+                    fields,
+                    handler_ctx.methods,
+                    scope,
+                    aliases,
+                    ir,
+                    stmts,
+                );
             }
         }
     }
@@ -886,6 +918,7 @@ fn emit_plain_element(
         &merge_plan.class_binds,
         &el,
         fields,
+        handler_ctx.methods,
         scope,
         aliases,
         ir,
@@ -898,6 +931,7 @@ fn emit_plain_element(
         &merge_plan.style_binds,
         &el,
         fields,
+        handler_ctx.methods,
         scope,
         aliases,
         ir,
@@ -952,7 +986,7 @@ fn emit_component(
             let ViewAttrValue::Interp { expr: e } = &a.value else {
                 continue;
             };
-            let body = bind_field_idents(e, fields, scope, aliases);
+            let body = bind_template_expr(e, fields, handler_ctx.methods, scope, aliases);
             let handler = wrap_handler(&body, handler_ctx, scope)?;
             event_parts.push((component_event_name(&a.name), handler));
             continue;
@@ -961,7 +995,7 @@ fn emit_component(
             ViewAttrValue::Static { value: s } => q(s),
             ViewAttrValue::Bare => "true".to_string(),
             ViewAttrValue::Interp { expr: e } => {
-                let body = bind_field_idents(e, fields, scope, aliases);
+                let body = bind_template_expr(e, fields, handler_ctx.methods, scope, aliases);
                 let wire = component_prop_wire_name(&a.name);
                 if wire.starts_with("on")
                     && wire.len() > 2
@@ -1010,7 +1044,7 @@ fn emit_component(
                 continue;
             }
             let deps = deps_js(&deps);
-            let body = bind_field_idents(e, fields, scope, aliases);
+            let body = bind_template_expr(e, fields, handler_ctx.methods, scope, aliases);
             let wire = component_prop_wire_name(&a.name);
             stmts.push(format!(
                 "api.bindComponentProp(this, {v}, {}, [{deps}], function() {{ return {body}; }});",
@@ -1046,6 +1080,7 @@ fn emit_bind_attr(
     attr_name: &str,
     el: &str,
     fields: &[String],
+    methods: &[String],
     scope: &[String],
     aliases: &[(String, String)],
     ir: &IrDepCursor<'_>,
@@ -1053,7 +1088,7 @@ fn emit_bind_attr(
 ) {
     let e = sanitize_interp(expr);
     let name = if attr_name == "className" { "class" } else { attr_name };
-    let (binding_id, deps, cf_js) = bind_payload(&e, binding, fields, scope, aliases, ir);
+    let (binding_id, deps, cf_js) = bind_payload(&e, binding, fields, methods, scope, aliases, ir);
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
     if cf_js.is_none()
         && let Some(field) = single_field_binding_target(&e, fields, scope, aliases)
@@ -1062,7 +1097,7 @@ fn emit_bind_attr(
         return;
     }
     let deps_js = deps_js(&deps);
-    let body = bind_field_idents(&e, fields, scope, aliases);
+    let body = bind_template_expr(&e, fields, methods, scope, aliases);
     let patch_name =
         format!("__patchAttr{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
     if let Some(cf) = cf_js {
@@ -1122,15 +1157,16 @@ fn emit_bind_html(
     binding: Option<BindingId>,
     el: &str,
     fields: &[String],
+    methods: &[String],
     scope: &[String],
     aliases: &[(String, String)],
     ir: &IrDepCursor<'_>,
     stmts: &mut Vec<String>,
 ) {
     let e = sanitize_interp(expr);
-    let (binding_id, deps, cf_js) = bind_payload(&e, binding, fields, scope, aliases, ir);
+    let (binding_id, deps, cf_js) = bind_payload(&e, binding, fields, methods, scope, aliases, ir);
     let deps_js = deps_js(&deps);
-    let body = bind_field_idents(&e, fields, scope, aliases);
+    let body = bind_template_expr(&e, fields, methods, scope, aliases);
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
     let patch_name =
         format!("__patchHtml{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
@@ -1221,15 +1257,24 @@ fn emit_each_block(
         .unwrap_or_else(|| "list".into());
     let deps = deps_js(&dep_list);
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
-    let list_body = bind_field_idents(&each.list_expr, fields, outer_scope, outer_aliases);
+    let list_body = bind_template_expr(
+        &each.list_expr,
+        fields,
+        handler_ctx.methods,
+        outer_scope,
+        outer_aliases,
+    );
     let key_field = if let Some(k) = &each.key_expr {
-        let kbody = bind_field_idents(k, fields, &child_scope, &child_aliases);
+        let kbody =
+            bind_template_expr(k, fields, handler_ctx.methods, &child_scope, &child_aliases);
         format!("key: function({box_id}) {{ return ({kbody}); }}, ")
     } else {
         String::new()
     };
-    let key_bound =
-        each.key_expr.as_ref().map(|k| bind_field_idents(k, fields, &child_scope, &child_aliases));
+    let key_bound = each
+        .key_expr
+        .as_ref()
+        .map(|k| bind_template_expr(k, fields, handler_ctx.methods, &child_scope, &child_aliases));
     let row_kernel = super::row_kernel::try_emit_row_kernel_js(
         tag,
         attrs,
@@ -1459,13 +1504,14 @@ fn emit_bind_text(
     fields: &[String],
     scope: &[String],
     aliases: &[(String, String)],
-    _handler_ctx: ComponentHandlerCtx<'_>,
+    handler_ctx: ComponentHandlerCtx<'_>,
     ir: &IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
 ) -> Result<String, String> {
     let e = sanitize_interp(expr);
-    let (binding_id, deps, cf_js) = bind_payload(&e, binding, fields, scope, aliases, ir);
+    let (binding_id, deps, cf_js) =
+        bind_payload(&e, binding, fields, handler_ctx.methods, scope, aliases, ir);
     let v = fresh("t", next_id);
     stmts.push(format!("var {v} = api.text(\"\");"));
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
@@ -1476,7 +1522,7 @@ fn emit_bind_text(
         return Ok(v);
     }
     let deps = deps_js(&deps);
-    let body = bind_field_idents(&e, fields, scope, aliases);
+    let body = bind_template_expr(&e, fields, handler_ctx.methods, scope, aliases);
     let patch_name =
         format!("__patchText{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
     if let Some(cf) = cf_js {
@@ -1536,6 +1582,7 @@ fn bind_payload(
     expr: &str,
     binding: Option<BindingId>,
     fields: &[String],
+    methods: &[String],
     scope: &[String],
     aliases: &[(String, String)],
     ir: &IrDepCursor<'_>,
@@ -1558,7 +1605,7 @@ fn bind_payload(
         let stable_js = deps_js(&stable);
         let cons_js = deps_js(&cons_deps);
         let alt_js = deps_js(&alt_deps);
-        let test_body = bind_field_idents(&test_src, fields, scope, aliases);
+        let test_body = bind_template_expr(&test_src, fields, methods, scope, aliases);
         let cf_js = format!(
             "{{ stable: [{stable_js}], branches: [{{ cond: function() {{ return ({test_body}); }}, deps: [{cons_js}] }},{{ deps: [{alt_js}] }}] }}"
         );

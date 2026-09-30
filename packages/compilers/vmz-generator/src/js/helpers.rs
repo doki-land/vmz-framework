@@ -281,18 +281,30 @@ pub fn bind_field_idents(
     scope: &[String],
     aliases: &[(String, String)],
 ) -> String {
-    if fields.is_empty() && scope.is_empty() && aliases.is_empty() {
+    bind_field_idents_ctx(expr, fields, &[], scope, aliases)
+}
+
+/// Like [`bind_field_idents`], but also qualifies bare class method calls as `this.method(...)`.
+pub fn bind_field_idents_ctx(
+    expr: &str,
+    fields: &[String],
+    methods: &[String],
+    scope: &[String],
+    aliases: &[(String, String)],
+) -> String {
+    if fields.is_empty() && methods.is_empty() && scope.is_empty() && aliases.is_empty() {
         return expr.trim().to_string();
     }
-    match bind_field_idents_oxc(expr, fields, scope, aliases) {
+    match bind_field_idents_oxc(expr, fields, methods, scope, aliases) {
         Some(s) => s,
-        None => bind_field_idents_legacy(expr, fields, scope, aliases),
+        None => bind_field_idents_legacy(expr, fields, methods, scope, aliases),
     }
 }
 
 fn bind_field_idents_oxc(
     expr: &str,
     fields: &[String],
+    methods: &[String],
     scope: &[String],
     aliases: &[(String, String)],
 ) -> Option<String> {
@@ -324,6 +336,7 @@ fn bind_field_idents_oxc(
     };
 
     let field_set: HashSet<&str> = fields.iter().map(|s| s.as_str()).collect();
+    let method_set: HashSet<&str> = methods.iter().map(|s| s.as_str()).collect();
     let scope_set: HashSet<&str> = scope.iter().map(|s| s.as_str()).collect();
     let alias_map: std::collections::HashMap<&str, &str> =
         aliases.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
@@ -331,6 +344,7 @@ fn bind_field_idents_oxc(
     struct Binder<'a, 'b> {
         ast: JsAst<'a>,
         fields: &'b HashSet<&'b str>,
+        methods: &'b HashSet<&'b str>,
         scope: &'b HashSet<&'b str>,
         aliases: &'b std::collections::HashMap<&'b str, &'b str>,
     }
@@ -338,6 +352,26 @@ fn bind_field_idents_oxc(
     impl<'a, 'b> VisitMut<'a> for Binder<'a, 'b> {
         fn visit_expression(&mut self, expr: &mut Expression<'a>) {
             match expr {
+                Expression::CallExpression(call) => {
+                    if let Expression::Identifier(id) = &call.callee {
+                        let name = id.name.as_str();
+                        if self.methods.contains(name) && !self.scope.contains(name) {
+                            call.callee = Expression::new_static_member_expression(
+                                SPAN,
+                                self.ast.ident("this"),
+                                IdentifierName::new(
+                                    SPAN,
+                                    Ident::from_str_in(name, &self.ast.ast),
+                                    &self.ast.ast,
+                                ),
+                                false,
+                                &self.ast.ast,
+                            );
+                        }
+                    }
+                    walk_mut::walk_call_expression(self, call);
+                    return;
+                }
                 Expression::Identifier(id) => {
                     let name = id.name.as_str();
                     if let Some(to) = self.aliases.get(name) {
@@ -465,7 +499,13 @@ fn bind_field_idents_oxc(
     }
 
     let ast = JsAst::new(&allocator);
-    let mut binder = Binder { ast, fields: &field_set, scope: &scope_set, aliases: &alias_map };
+    let mut binder = Binder {
+        ast,
+        fields: &field_set,
+        methods: &method_set,
+        scope: &scope_set,
+        aliases: &alias_map,
+    };
     binder.visit_expression(&mut es.expression);
 
     let mut top = &es.expression;
@@ -484,6 +524,7 @@ fn bind_field_idents_oxc(
 fn bind_field_idents_legacy(
     expr: &str,
     fields: &[String],
+    methods: &[String],
     scope: &[String],
     aliases: &[(String, String)],
 ) -> String {
@@ -530,7 +571,7 @@ fn bind_field_idents_legacy(
             } else if !preceded_by_this
                 && !preceded_by_dot
                 && !scope.iter().any(|s| s == &ident)
-                && fields.iter().any(|f| f == &ident)
+                && (fields.iter().any(|f| f == &ident) || methods.iter().any(|m| m == &ident))
             {
                 out.push_str("this.");
                 out.push_str(&ident);
@@ -548,9 +589,9 @@ fn bind_field_idents_legacy(
 #[cfg(test)]
 mod tests {
     use super::{
-        HandlerResolution, bind_field_idents, component_event_name, component_prop_wire_name,
-        event_dom_type, is_component_event_attr, is_event_attr, kebab_to_camel,
-        wrap_event_handler_body,
+        HandlerResolution, bind_field_idents, bind_field_idents_ctx, component_event_name,
+        component_prop_wire_name, event_dom_type, is_component_event_attr, is_event_attr,
+        kebab_to_camel, wrap_event_handler_body,
     };
 
     #[test]
@@ -633,6 +674,24 @@ mod tests {
         assert_eq!(event_dom_type("@click"), "click");
         assert_eq!(event_dom_type("onClick"), "click");
         assert_eq!(event_dom_type("on:click"), "click");
+    }
+
+    #[test]
+    fn binds_bare_class_method_call() {
+        let methods = vec!["iconPath".into(), "fillD".into()];
+        let out = bind_field_idents_ctx("iconPath()", &[], &methods, &[], &[]);
+        assert_eq!(out, "this.iconPath()");
+        let out2 = bind_field_idents_ctx("fillD()", &[], &methods, &[], &[]);
+        assert_eq!(out2, "this.fillD()");
+    }
+
+    #[test]
+    fn binds_bare_class_method_in_v_if_cond() {
+        let methods = vec!["isStroke".into(), "strokePaths".into()];
+        let out = bind_field_idents_ctx("isStroke()", &[], &methods, &[], &[]);
+        assert_eq!(out, "this.isStroke()");
+        let out2 = bind_field_idents_ctx("strokePaths()", &[], &methods, &[], &[]);
+        assert_eq!(out2, "this.strokePaths()");
     }
 
     #[test]
