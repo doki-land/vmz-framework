@@ -155,7 +155,7 @@ jobs:
           ls packages/runtimes/vmz-linux-x64/vmz.*.node
 
       - name: Assert skip-native-pre contract
-        run: pnpm verify -- skip-native-pre
+        run: pnpm verify:ci-skip-native-pre
 
       - name: Build tools + examples
         run: pnpm build:examples
@@ -250,7 +250,7 @@ jobs:
           ls packages/runtimes/vmz-linux-x64/vmz.*.node
 
       - name: Assert skip-native-pre contract
-        run: pnpm verify -- skip-native-pre
+        run: pnpm verify:ci-skip-native-pre
 
       - name: Install Chromium (browser host / CDP)
         uses: browser-actions/setup-chrome@v2
@@ -264,7 +264,7 @@ jobs:
           VMZ_BROWSER: ${{ steps.setup-chrome.outputs.chrome-path }}
           PUPPETEER_EXECUTABLE_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
           CI: 'true'
-        run: pnpm verify -- --keep-going ui-automation browser-production
+        run: pnpm verify:ci-ui-browser
 
   runtime-gates:
     name: Slim and Runtime Quality
@@ -303,16 +303,7 @@ jobs:
           ls packages/runtimes/vmz-linux-x64/vmz.*.node
 
       - name: Assert skip-native-pre contract
-        run: pnpm verify -- skip-native-pre
+        run: pnpm verify:ci-skip-native-pre
 
       - name: Slim + runtime-quality-baseline (keep-going)
-        env:
-          CI: 'true'
-        run: >
-          pnpm verify -- --keep-going
-          runtime-boundary
-          specialized-component-artifact
-          compiled-delivery-artifact
-          thin-runtime-host-boundary
-          thin-runtime-production-proof
-          runtime-quality-baseline
+        run: pnpm verify:ci-runtime-gates

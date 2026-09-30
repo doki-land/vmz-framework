@@ -9,6 +9,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { addLimitation, readProof, runVmzBuild, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 import { repoRoot } from '../_lib/repo-root.ts';
+import { fetchHomepageSsrHtml, waitServeReady } from '../_lib/homepage-ssr-fetch.ts';
 import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
 
 const root = repoRoot(import.meta.url);
@@ -62,30 +63,15 @@ const child = spawn(process.execPath, [hostJs], {
 let html = '';
 try {
     const baseUrl = `http://127.0.0.1:${PORT}`;
-    const deadline = Date.now() + 60_000;
-    while (Date.now() < deadline) {
-        try {
-            const res = await fetch(`${baseUrl}/`);
-            if (res.ok) {
-                html = await res.text();
-                break;
-            }
-        } catch {
-            /* retry */
-        }
-        await new Promise((r) => setTimeout(r, 250));
-    }
-    if (!html) {
-        fail(`serve host did not become ready at ${baseUrl}`);
-    }
+    await waitServeReady(child, 15_000);
+    html = await fetchHomepageSsrHtml(baseUrl, inspectSsrHtml);
+} catch (e) {
+    fail(e instanceof Error ? e.message : String(e));
 } finally {
     await stopServeChild(child);
 }
 
 const inspect = inspectSsrHtml(html);
-if (!inspect.ok) {
-    fail(inspect.failures.join('; '));
-}
 
 const detail = 'Button slots, SVG regions, and first-response highlighted code passed on live homepage SSR';
 const proof = readProof(root);

@@ -2,6 +2,19 @@
  * Commercial visual spec R1/R2 checks on homepage SSR HTML.
  */
 
+function iconSvgSlice(html) {
+    const byFeature = html.match(/data-name=["']feature\.incremental["'][\s\S]{0,1600}/i);
+    if (byFeature) return byFeature[0];
+    const byClass = html.match(/vmz-ui-icon__svg[\s\S]{0,1600}/i);
+    return byClass ? byClass[0] : '';
+}
+
+function hasFeatureIconGeometry(html) {
+    const slice = iconSvgSlice(html);
+    if (!slice.includes('vmz-ui-icon__svg')) return false;
+    return /<(?:path|circle)\b/i.test(slice);
+}
+
 export function inspectSsrHtml(html) {
     const failures = [];
 
@@ -15,8 +28,7 @@ export function inspectSsrHtml(html) {
         failures.push(`R2 SVG contains span[data-vmz-region]: ${svgSpanRegion[0].slice(0, 160)}`);
     }
 
-    const iconPath = html.match(/<svg[^>]*class="[^"]*vmz-ui-icon__svg[^"]*"[^>]*>[\s\S]{0,500}?<path[\s\S]{0,200}/i);
-    if (!iconPath) {
+    if (!hasFeatureIconGeometry(html)) {
         failures.push('R2 feature icon path missing from SSR HTML');
     }
 

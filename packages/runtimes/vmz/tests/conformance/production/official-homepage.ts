@@ -12,6 +12,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { addLimitation, readProof, runVmzBuild, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
+import { fetchHomepageSsrHtml, waitServeReady } from '../_lib/homepage-ssr-fetch.ts';
 import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
 import { proveHomepageLocaleTransition as proveHomepageLocaleTransitionImpl } from './homepage-locale-fixture.ts';
 
@@ -340,16 +341,18 @@ if (homeBuild.status === 0) {
             stdio: ['ignore', 'pipe', 'pipe'],
         });
         try {
-            await waitServe(child, 10000);
-            const home = await get(`http://127.0.0.1:${PORT}/`);
-            const ssrInspect = inspectSsrHtml(home.body);
-            if (!ssrInspect.ok) {
-                homeSsrHtmlDetail = ssrInspect.failures.join('; ');
-                errors.push(`homepage SSR HTML inspect: ${homeSsrHtmlDetail}`);
-            } else {
+            const baseUrl = `http://127.0.0.1:${PORT}`;
+            await waitServeReady(child, 15_000);
+            let homeBody = '';
+            try {
+                homeBody = await fetchHomepageSsrHtml(baseUrl, inspectSsrHtml);
                 homeSsrHtmlOk = true;
                 homeSsrHtmlDetail = 'R1 button slot and R2 SVG region checks passed on live homepage SSR';
+            } catch (e) {
+                homeSsrHtmlDetail = e instanceof Error ? e.message : String(e);
+                errors.push(`homepage SSR HTML inspect: ${homeSsrHtmlDetail}`);
             }
+            const home = { status: homeBody ? 200 : 0, body: homeBody };
             const ui = await get(`http://127.0.0.1:${PORT}/ui`);
             const commercial = await get(`http://127.0.0.1:${PORT}/commercial`);
             const formPage = await get(`http://127.0.0.1:${PORT}/form`);
@@ -722,24 +725,5 @@ function getWithHeaders(
             );
         });
         req.on('error', reject);
-    });
-}
-
-function waitServe(child: ReturnType<typeof spawn>, timeoutMs: number): Promise<void> {
-    return new Promise((resolve, reject) => {
-        const t = setTimeout(() => reject(new Error('serve-host start timeout')), timeoutMs);
-        const onData = (buf: Buffer) => {
-            if (String(buf).includes('vmz serve http://')) {
-                clearTimeout(t);
-                child.stdout?.off('data', onData);
-                resolve();
-            }
-        };
-        child.stdout?.on('data', onData);
-        child.stderr?.on('data', (b) => process.stderr.write(b));
-        child.on('exit', (code) => {
-            clearTimeout(t);
-            reject(new Error(`serve-host exited early ${code}`));
-        });
     });
 }
