@@ -1,8 +1,10 @@
 /**
- * `@vmz/diagnostic` — catalog render + pretty printer (skeleton).
+ * `@vmz/diagnostic` — catalog render + pretty printer.
  *
  * Product path: N-API diagnostic wire → `t(code, args)` → layout.
  */
+
+import { formatDiagnosticPretty } from './pretty.js';
 
 /** Message id → template (`{name}` placeholders). */
 export type LocaleCatalog = Record<string, string>;
@@ -40,11 +42,15 @@ export type PositionContext = {
     lineCol(offset: number): { line: number; column: number };
 };
 
+export type PrettyStyle = 'compact' | 'pretty';
+
 export type FormatOptions = {
     locale: string;
     catalog: LocaleCatalog | ((locale: string) => LocaleCatalog);
     sourceText?: string;
     position?: PositionContext;
+    /** `pretty` (default) renders rustc/miette-style snippets when span + source are available. */
+    style?: PrettyStyle;
 };
 
 /**
@@ -70,7 +76,6 @@ function resolveCatalog(locale: string, catalog: LocaleCatalog | ((locale: strin
 
 /**
  * Format one diagnostic for terminal / logs.
- * Skeleton: single-line `path: severity[code]: message` — no snippet yet.
  */
 export function formatDiagnostic(d: DiagnosticInput, opts: FormatOptions): string {
     if (!d.code || typeof d.code !== 'string') {
@@ -82,9 +87,12 @@ export function formatDiagnostic(d: DiagnosticInput, opts: FormatOptions): strin
         : d.message != null && String(d.message).length
           ? String(d.message)
           : t(d.code, d.args, catalog);
-    const where = formatWhere(d, opts);
-    const head = where ? `${where}: ` : '';
-    return `${head}${d.severity}[${d.code}]: ${message}`;
+    if ((opts.style ?? 'pretty') === 'compact') {
+        const where = formatWhere(d, opts);
+        const head = where ? `${where}: ` : '';
+        return `${head}${d.severity}[${d.code}]: ${message}`;
+    }
+    return formatDiagnosticPretty(d, message, opts);
 }
 
 /**
