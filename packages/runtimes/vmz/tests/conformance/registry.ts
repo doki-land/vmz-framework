@@ -336,6 +336,10 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'production/handler-symbol-resolution.ts',
         description: '0.1.29: bare class method handler scope at compile time',
     },
+    'oak-frontend-smoke': {
+        file: 'toolchain/oak-frontend-smoke.ts',
+        description: 'Oak Vue CST adapter: VMZ region map + template CST parse smoke',
+    },
     'generated-component-code': {
         file: 'production/generated-component-code.ts',
         description: '0.1.29: Direct __vmzCreate artifacts for generated client modules',
@@ -465,6 +469,7 @@ export const CHECKS: Record<string, CheckEntry> = {
             'specialized-bindings',
             'authoring-surface-lint',
             'handler-symbol-resolution',
+            'oak-frontend-smoke',
             'host-runtime-manifest',
             'thin-runtime-production-proof',
         ],
