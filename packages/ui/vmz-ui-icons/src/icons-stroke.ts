@@ -141,5 +141,37 @@ export const STROKE_ICONS: Record<string, IconDef> = {
         kind: 'stroke',
         paths: ['M5 7H19', 'M5 11H15', 'M5 15H19'],
     },
+    'tool.ratio': {
+        kind: 'stroke',
+        paths: ['M5 7H19', 'M5 17H19', 'M8 10V14', 'M16 10V14'],
+    },
+    'tool.average': {
+        kind: 'stroke',
+        paths: ['M4 18H20', 'M6 15L10 9L14 13L18 7'],
+    },
+    'tool.tip': {
+        kind: 'stroke',
+        paths: ['M12 4C9.5 4 8 6 8 8.5c0 1.8 1 3.2 2.5 4V15h3v-2.5c1.5-.8 2.5-2.2 2.5-4C16 6 14.5 4 12 4Z', 'M9.5 18H14.5', 'M10 20H14'],
+    },
+    'tool.aspect-ratio': {
+        kind: 'stroke',
+        paths: ['M5 7H19V17H5Z', 'M8 9H16V15H8Z'],
+    },
+    'tool.bandwidth': {
+        kind: 'stroke',
+        paths: ['M4 12H6', 'M8 8V16', 'M11 10V14', 'M14 6V18', 'M17 9V15', 'M20 12H22'],
+    },
+    'tool.percent-change': {
+        kind: 'stroke',
+        paths: ['M5 17L12 9L15 13L19 6', 'M4 19H20'],
+    },
+    'tool.ohm': {
+        kind: 'stroke',
+        paths: ['M8 11c0-2.2 1.8-4 4-4s4 1.8 4 4', 'M8 11V16', 'M16 11V16', 'M8 16H16'],
+    },
+    'tool.speed': {
+        kind: 'stroke',
+        paths: ['M5.5 14A7 7 0 0 1 18.5 14', 'M12 12L15.5 8.5'],
+    },
 };
 

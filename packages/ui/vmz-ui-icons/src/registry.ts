@@ -1,7 +1,6 @@
 /** Shared icon registry for `@vmz/ui-icons` and optional app-level Icon shims. */
 import type { IconDef, IconFillDef } from './icon-types.ts';
 import { DEFAULT_STROKE_WIDTH } from './icon-types.ts';
-import { LEGACY_FILL_ICONS } from './icons-legacy-fill.ts';
 import { STROKE_ICONS } from './icons-stroke.ts';
 import { TEXT_BADGE_ICONS } from './icons-text-badge.ts';
 
@@ -11,7 +10,6 @@ export { DEFAULT_STROKE_WIDTH } from './icon-types.ts';
 export const REGISTRY: Record<string, IconDef> = {
     ...STROKE_ICONS,
     ...TEXT_BADGE_ICONS,
-    ...LEGACY_FILL_ICONS,
 };
 
 export const LEGACY_ICON_ALIASES: Record<string, string> = {
