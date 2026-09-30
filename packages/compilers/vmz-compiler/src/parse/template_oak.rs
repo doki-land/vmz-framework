@@ -78,7 +78,7 @@ fn lower_node(shell: &str, node: &VueNode) -> Result<ConcreteNode, String> {
             Ok(ConcreteNode::Text { value, span: to_body_span(shell, t.span) })
         }
         VueNode::Interpolation(i) => {
-            let expr = slice(shell, i.expression).trim().to_string();
+            let expr = normalize_oak_interpolation_expr(slice(shell, i.expression));
             Ok(ConcreteNode::Interpolation { expr, span: to_body_span(shell, i.span) })
         }
         VueNode::Comment(text) => {
@@ -121,6 +121,15 @@ fn unquote_attr_value(raw: &str) -> String {
 
 fn slice(shell: &str, range: Range<usize>) -> &str {
     shell.get(range.start..range.end).unwrap_or("")
+}
+
+/// Oak `VueNode::Interpolation` expression spans may include closing `}}` on multiline mustaches.
+fn normalize_oak_interpolation_expr(raw: &str) -> String {
+    let mut expr = raw.trim();
+    while expr.ends_with('}') {
+        expr = expr.trim_end_matches('}').trim_end();
+    }
+    expr.trim().to_string()
 }
 
 fn to_body_span(_shell: &str, range: Range<usize>) -> TemplateSpan {
