@@ -55,6 +55,13 @@ export function assertPackageLayoutCore(root = repoRoot(import.meta.url)): strin
             errors.push(`missing ${CORE_SRC}/${rel}/`);
         }
     }
+    const domBrowserFace = path.join(src, 'faces', 'dom.browser.ts');
+    if (fs.existsSync(domBrowserFace)) {
+        const text = fs.readFileSync(domBrowserFace, 'utf8');
+        if (/\.\.\/ssr\/|['"][^'"]*\/ssr\//.test(text)) {
+            errors.push('faces/dom.browser.ts must not import from ssr/ (use browser/resume/*)');
+        }
+    }
     for (const name of listTsFiles(src)) {
         if (!CORE_ROOT_ALLOW.has(name)) {
             errors.push(`${CORE_SRC}/${name}: root .ts forbidden (move under browser|ssr|host|faces|shared)`);
