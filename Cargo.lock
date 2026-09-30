@@ -3082,6 +3082,7 @@ dependencies = [
  "serde_json",
  "vmz-compiler",
  "vmz-generator",
+ "vmz-oak-frontend-adapter",
  "walkdir",
 ]
 
