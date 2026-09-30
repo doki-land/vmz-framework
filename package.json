@@ -39,7 +39,7 @@
         ]
     },
     "devDependencies": {
-        "@doki-land/nifty": "^0.0.11",
+        "@doki-land/nifty": "^0.0.12",
         "@types/node": "^22.15.30",
         "@vmz/core": "workspace:*",
         "@vmz/plugin": "workspace:*",
