@@ -217,3 +217,25 @@ export default class AboutPage {}
         "expected static to=IndexPage, got attrs={attrs:?} static={static_attrs:?}"
     );
 }
+
+#[test]
+fn oak_layers_primary_yields_semantic_if_chain() {
+    let source = r#"<template>
+  <p v-if="show">A</p><p v-else>B</p>
+</template>
+<script client>
+export default class Branch {}
+</script>
+"#;
+    let parsed = parse_vmz("Branch.vmz", source).expect("parse vmz");
+    let (concrete, semantic) =
+        vmz_compiler::parse_template_layers_primary(&parsed.template).expect("layers");
+    assert!(!concrete.roots.is_empty());
+    assert!(matches!(
+        &semantic.roots[0],
+        vmz_compiler::SemanticNode::IfChain { branches, .. } if branches.len() == 2
+    ));
+    let via_semantic =
+        vmz_compiler::parse_template_semantic_primary(&parsed.template).expect("semantic");
+    assert_eq!(via_semantic, semantic);
+}

@@ -1,12 +1,13 @@
-//! Lower Oak Vue AST → VMZ Concrete Template IR.
+//! Lower Oak Vue AST → VMZ Concrete / Semantic Template IR (stage C primary).
 
 use core::range::Range;
 
 use oak_vue::{VueAttribute, VueNode, VueRoot};
 use vmz_oak_frontend_adapter::{TemplateShellInput, parse_template_ast};
 
+use super::template_common::TemplateParseError;
 use super::template_concrete::{ConcreteAttr, ConcreteIr, ConcreteNode, classify_concrete_attr};
-use super::template_semantic::lower_concrete_to_semantic;
+use super::template_semantic::{SemanticIr, lower_concrete_to_semantic};
 use super::template_span::TemplateSpan;
 use crate::sfc::TemplateBlock;
 
@@ -26,24 +27,47 @@ pub fn parse_template_concrete_via_oak(template: &TemplateBlock) -> Result<Concr
     lower_vue_root_to_concrete(root, &parsed.shell_source)
 }
 
-/// Prefer Oak concrete lowering for a template body string, fall back to legacy.
+/// Prefer Oak concrete + semantic for a template body string, fall back to legacy.
 pub fn parse_template_concrete_body_primary(
     input: &str,
-) -> Result<ConcreteIr, super::template_common::TemplateParseError> {
-    parse_template_concrete_primary(&TemplateBlock { content: input.to_string(), content_start: 0 })
+) -> Result<ConcreteIr, TemplateParseError> {
+    Ok(parse_template_layers_primary(&TemplateBlock {
+        content: input.to_string(),
+        content_start: 0,
+    })?
+    .0)
 }
 
 /// Prefer Oak concrete lowering for `check` / `compile`, fall back to legacy when Oak
 /// fails or the Oak IR cannot lower to Semantic (keeps production builds unblocked).
 pub fn parse_template_concrete_primary(
     template: &TemplateBlock,
-) -> Result<ConcreteIr, super::template_common::TemplateParseError> {
-    if let Ok(ir) = parse_template_concrete_via_oak(template) {
-        if lower_concrete_to_semantic(&ir).is_ok() {
-            return Ok(ir);
+) -> Result<ConcreteIr, TemplateParseError> {
+    Ok(parse_template_layers_primary(template)?.0)
+}
+
+/// Oak Vue AST → Concrete → Semantic as one primary unit; legacy XML concrete on failure.
+///
+/// This is the stage-C entry for `check` / `compile`. Concrete remains a temporary
+/// adapter toward Semantic / TemplateIr until emit consumes Semantic directly.
+pub fn parse_template_layers_primary(
+    template: &TemplateBlock,
+) -> Result<(ConcreteIr, SemanticIr), TemplateParseError> {
+    if let Ok(concrete) = parse_template_concrete_via_oak(template) {
+        if let Ok(semantic) = lower_concrete_to_semantic(&concrete) {
+            return Ok((concrete, semantic));
         }
     }
-    super::template_concrete::parse_template_concrete(&template.content)
+    let concrete = super::template_concrete::parse_template_concrete(&template.content)?;
+    let semantic = lower_concrete_to_semantic(&concrete)?;
+    Ok((concrete, semantic))
+}
+
+/// Prefer Oak for Semantic-only consumers (drops concrete after validation).
+pub fn parse_template_semantic_primary(
+    template: &TemplateBlock,
+) -> Result<SemanticIr, TemplateParseError> {
+    Ok(parse_template_layers_primary(template)?.1)
 }
 
 fn format_oak_fail(parsed: &vmz_oak_frontend_adapter::TemplateAstParse) -> String {

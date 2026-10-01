@@ -16,8 +16,7 @@ use crate::project::{VmzModuleKind, discover_vmz_files};
 use crate::scss::{ScssCompilerHandle, ScssEmitRequest};
 use crate::sfc::{ScriptKind, parse_vmz};
 use crate::template::{
-    lower_concrete_to_ir, lower_concrete_to_semantic, parse_template_concrete_primary,
-    template_parse_to_diagnostic,
+    lower_concrete_to_ir, parse_template_layers_primary, template_parse_to_diagnostic,
 };
 use crate::tw::{TwCompilerHandle, TwEmitRequest, register_tw_from_parsed};
 use crate::virtual_server;
@@ -1148,19 +1147,8 @@ fn emit_file(
         );
     }
     let server = parsed.server.as_ref().map(|s| analyze_script(ScriptKind::Server, &s.content));
-    let concrete = match parse_template_concrete_primary(&parsed.template) {
-        Ok(c) => c,
-        Err(e) => {
-            report.diagnostics.push(template_parse_to_diagnostic(
-                path,
-                parsed.template.content_start,
-                &e,
-            ));
-            return Ok(());
-        }
-    };
-    let semantic = match lower_concrete_to_semantic(&concrete) {
-        Ok(s) => s,
+    let (concrete, semantic) = match parse_template_layers_primary(&parsed.template) {
+        Ok(layers) => layers,
         Err(e) => {
             report.diagnostics.push(template_parse_to_diagnostic(
                 path,

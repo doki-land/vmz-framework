@@ -19,7 +19,8 @@ pub use super::template_ir::{AttrValue, TemplateAttr, TemplateIr, TemplateNode};
 pub use super::template_lower::lower_concrete_to_ir;
 pub use super::template_oak::{
     parse_template_concrete_body_primary, parse_template_concrete_primary,
-    parse_template_concrete_via_oak,
+    parse_template_concrete_via_oak, parse_template_layers_primary,
+    parse_template_semantic_primary,
 };
 pub use super::template_semantic::{
     EventTarget, IfBranch, SemanticAstStats, SemanticIr, SemanticNode, SemanticProp,
@@ -31,17 +32,18 @@ pub use super::template_span::TemplateSpan;
 ///
 /// Pipeline: [`parse_template_concrete`] → [`lower_concrete_to_ir`].
 ///
-/// SFC pipeline uses [`parse_template_concrete_primary`] via `check` / `compile`.
-/// Body-only helpers keep legacy concrete until Oak covers dynamic directive args.
+/// SFC `check` / `compile` use [`parse_template_layers_primary`] (Oak → Concrete → Semantic).
 pub fn parse_template(input: &str) -> Result<TemplateIr, TemplateParseError> {
     let concrete = parse_template_concrete(input)?;
     lower_concrete_to_ir(&concrete)
 }
 
-/// Parse once into Semantic AST + legacy TemplateIr (shared Concrete).
+/// Parse once into Semantic AST + legacy TemplateIr (Oak layers primary).
 pub fn parse_template_asts(input: &str) -> Result<(SemanticIr, TemplateIr), TemplateParseError> {
-    let concrete = parse_template_concrete(input)?;
-    let semantic = lower_concrete_to_semantic(&concrete)?;
+    let (concrete, semantic) = parse_template_layers_primary(&crate::sfc::TemplateBlock {
+        content: input.to_string(),
+        content_start: 0,
+    })?;
     let ir = lower_concrete_to_ir(&concrete)?;
     Ok((semantic, ir))
 }
