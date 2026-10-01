@@ -1,6 +1,6 @@
 //! Layer-1 Concrete Template AST: Vue author surface + spans (no emit contract).
 //!
-//! Expressions remain `String` here (oxc `ExprPlan` is P2). Downstream emit still
+//! Expressions remain `String` here (`ExprPlan` is Oak-primary snippet ingress). Downstream emit still
 //! consumes [`super::template::TemplateIr`] via [`super::template_lower`].
 
 use super::template_common::{TemplateParseError, decode_html_entities};

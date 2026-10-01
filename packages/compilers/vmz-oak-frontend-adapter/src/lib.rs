@@ -9,6 +9,7 @@ mod contract;
 mod nyar_contract;
 mod oak_ast;
 mod oak_cst;
+mod oak_expr;
 mod oak_script;
 
 pub use contract::{
@@ -21,4 +22,5 @@ pub use nyar_contract::{
 };
 pub use oak_ast::{TemplateAstParse, parse_template_ast, require_template_ast};
 pub use oak_cst::{format_cst_diagnostics, parse_template_cst, require_template_cst};
+pub use oak_expr::{ExpressionSnippetParse, parse_expression_snippet, require_expression_snippet};
 pub use oak_script::{ScriptAstParse, parse_script_ast, require_script_ast};

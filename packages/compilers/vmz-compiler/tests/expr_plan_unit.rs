@@ -42,7 +42,7 @@ fn field_read_still_plans_under_empty_alias_scope() {
 }
 
 #[test]
-fn invalid_expr_plan_fails_oxc_ingress() {
+fn invalid_expr_plan_fails_snippet_ingress() {
     let err = plan_template_expr("1 +", &[], &[]).unwrap_err();
     assert!(err.message.contains("invalid template expression"), "{err}");
 }

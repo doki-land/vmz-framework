@@ -1,8 +1,8 @@
 //! Thin `ExprPlan` ingress for template expressions (`0.1.19`).
 //!
-//! Expressions remain authored as text on Semantic AST; this plan captures oxc
-//! root span + field reads + each-alias prop paths so scope fixtures do not
-//! re-scan raw strings ad hoc.
+//! Expressions remain authored as text on Semantic AST; this plan captures the
+//! snippet root span (Oak TypeScript primary) + field reads + each-alias prop
+//! paths so scope fixtures do not re-scan raw strings ad hoc.
 
 use vmz_generator::{SnippetSpan, template_expr_root_span, template_expr_snippet_error};
 use vmz_types::DepKey;
@@ -15,7 +15,7 @@ use crate::parse::template_common::TemplateParseError;
 pub struct ExprPlan {
     /// Trimmed expression source.
     pub source: String,
-    /// oxc root span inside the trimmed snippet (`None` when empty / unparsed).
+    /// Root span inside the trimmed snippet (`None` when empty / unparsed).
     pub snippet_span: Option<SnippetSpan>,
     /// Field dependency keys under `fields` (aliases in `scope` are excluded here).
     pub reads: Vec<DepKey>,

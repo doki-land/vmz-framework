@@ -113,7 +113,7 @@ fn template_parse_error_carries_absolute_source_span() {
 }
 
 #[test]
-fn invalid_template_expression_fails_oxc_ingress() {
+fn invalid_template_expression_fails_snippet_ingress() {
     let report = check_template_snippet(r#"<p>{{ 1 + }}</p>"#);
     let diag = report
         .diagnostics

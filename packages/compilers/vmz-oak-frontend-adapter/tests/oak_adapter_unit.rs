@@ -1,7 +1,7 @@
 use vmz_compiler::{TemplateBlock, parse_vmz};
 use vmz_oak_frontend_adapter::{
-    ScriptRole, ScriptShellInput, TemplateShellInput, parse_script_ast, parse_template_ast,
-    parse_template_cst,
+    ScriptRole, ScriptShellInput, TemplateShellInput, parse_expression_snippet, parse_script_ast,
+    parse_template_ast, parse_template_cst,
 };
 
 fn template_shell(block: &TemplateBlock) -> TemplateShellInput {
@@ -168,4 +168,21 @@ export default class PageServer {
     let server_ast = parse_script_ast(&script_shell(server, ScriptRole::Server));
     assert!(server_ast.ok, "server script AST failed: {:?}", server_ast.diagnostics);
     assert_eq!(server_ast.default_export_class.as_deref(), Some("PageServer"));
+}
+
+#[test]
+fn oak_expression_snippet_accepts_member_and_ternary() {
+    for expr in ["user.name", "a ? b : c", "tags.length"] {
+        let parsed = parse_expression_snippet(expr);
+        assert!(parsed.ok, "{expr}: {:?}", parsed.diagnostics);
+        let span = parsed.root_span.expect("span");
+        assert_eq!(&expr[span.start..span.end], expr);
+    }
+}
+
+#[test]
+fn oak_expression_snippet_rejects_incomplete_binary() {
+    let parsed = parse_expression_snippet("1 +");
+    assert!(!parsed.ok, "incomplete binary must fail even if Oak is silent");
+    assert!(!parsed.diagnostics.is_empty());
 }

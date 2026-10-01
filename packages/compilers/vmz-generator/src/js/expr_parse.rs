@@ -1,18 +1,19 @@
-//! Shared oxc parse for template expression snippets.
+//! Shared template expression snippet ingress (Oak TypeScript primary).
 //!
 //! Template IR still stores expression **text**; this module is the single ingress
-//! that wraps `(expr)` and parses with oxc. Emit/`bind_field_idents` may still
-//! re-parse for rewrite — callers should prefer these helpers over ad-hoc
-//! `Parser::new` copies.
+//! that validates / spans snippets. Oak is preferred; oxc remains a temporary
+//! fallback when Oak does not lower a valid expression (keeps production unblock).
+//! Emit/`bind_field_idents` may still re-parse for rewrite — callers should prefer
+//! these helpers over ad-hoc parser copies.
 //!
 //! Spans returned here are **snippet-local UTF-8 byte offsets** relative to the
-//! trimmed expression text (not the wrapped `(…)` source, and not file offsets).
-//! Full `ExprPlan` retention is a `0.1.19` concern.
+//! trimmed expression text (not file offsets).
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::Statement;
 use oxc_parser::Parser;
 use oxc_span::{GetSpan, SourceType, Span};
+use vmz_oak_frontend_adapter::parse_expression_snippet;
 
 /// Inclusive-start / exclusive-end UTF-8 byte range inside the trimmed snippet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,71 +46,55 @@ pub fn map_wrapped_span_to_snippet(span: Span, snippet_len: u32) -> SnippetSpan 
     SnippetSpan { start, end }
 }
 
-/// First human oxc error when `expr` is not a valid TS expression snippet.
+/// First human error when `expr` is not a valid TS expression snippet.
 ///
 /// Empty / whitespace-only expressions are treated as ok (no expression present).
 pub fn template_expr_snippet_error(expr: &str) -> Option<String> {
     template_expr_snippet_error_with_span(expr).map(|(msg, _)| msg)
 }
 
-/// First oxc error plus its snippet-local span (mapped out of the `(…)` wrap).
+/// First parse error plus its snippet-local span.
+///
+/// Oak is tried first. When Oak fails, oxc decides: oxc accept ⇒ treat as ok
+/// (Oak gap); oxc reject ⇒ surface oxc (or Oak) diagnostics.
 pub fn template_expr_snippet_error_with_span(expr: &str) -> Option<(String, SnippetSpan)> {
     let trimmed = expr.trim();
     if trimmed.is_empty() {
         return None;
     }
-    let snippet_len = trimmed.len() as u32;
-    let src = wrap_template_expr_source(trimmed);
-    let allocator = Allocator::default();
-    let ret = Parser::new(&allocator, &src, SourceType::ts()).parse();
-    if ret.panicked {
-        return Some((
-            "oxc panicked while parsing template expression".into(),
-            SnippetSpan { start: 0, end: snippet_len },
-        ));
+    let oak = parse_expression_snippet(trimmed);
+    if oak.ok {
+        return None;
     }
-    let diag = ret.diagnostics.first()?;
-    let msg = diag.message.to_string();
-    let span = diag
-        .labels
-        .first()
-        .map(|label| {
-            let start = label.offset() as u32;
-            let end = start.saturating_add(label.len() as u32);
-            map_wrapped_span_to_snippet(Span::new(start, end), snippet_len)
-        })
-        .unwrap_or(SnippetSpan { start: 0, end: snippet_len });
-    Some((msg, span))
+    if let Some(err) = oxc_template_expr_snippet_error_with_span(trimmed) {
+        return Some(err);
+    }
+    // Oak failed to lower but oxc accepts — transitional Oak gap, not a user error.
+    None
 }
 
-/// Whether oxc accepts the template expression snippet.
+/// Whether the template expression snippet is accepted (Oak primary, oxc fallback).
 pub fn template_expr_snippet_ok(expr: &str) -> bool {
     template_expr_snippet_error(expr).is_none()
 }
 
-/// Root expression span inside the trimmed snippet when oxc accepts the parse.
+/// Root expression span inside the trimmed snippet when parse accepts.
 pub fn template_expr_root_span(expr: &str) -> Option<SnippetSpan> {
     let trimmed = expr.trim();
     if trimmed.is_empty() {
         return None;
     }
-    let snippet_len = trimmed.len() as u32;
-    let src = wrap_template_expr_source(trimmed);
-    let allocator = Allocator::default();
-    let ret = Parser::new(&allocator, &src, SourceType::ts()).parse();
-    if ret.panicked || !ret.diagnostics.is_empty() {
-        return None;
+    let oak = parse_expression_snippet(trimmed);
+    if oak.ok {
+        return oak.root_span.map(|s| SnippetSpan { start: s.start as u32, end: s.end as u32 });
     }
-    let body = ret.program.body.first()?;
-    let Statement::ExpressionStatement(es) = body else {
-        return None;
-    };
-    Some(map_wrapped_span_to_snippet(es.expression.span(), snippet_len))
+    oxc_template_expr_root_span(trimmed)
 }
 
 /// Canonical-print a template expression via oxc parse + codegen (no string replay).
 ///
 /// Empty / whitespace-only input yields an empty string. Invalid expressions return `Err`.
+/// Print stays on oxc until Oak has a stable expression printer.
 pub fn print_template_expr(expr: &str) -> Result<String, String> {
     use oxc_ast::ast::Expression;
     use oxc_codegen::Codegen;
@@ -140,6 +125,46 @@ pub fn print_template_expr(expr: &str) -> Result<String, String> {
     Ok(codegen.into_source_text().trim().to_string())
 }
 
+fn oxc_template_expr_snippet_error_with_span(trimmed: &str) -> Option<(String, SnippetSpan)> {
+    let snippet_len = trimmed.len() as u32;
+    let src = wrap_template_expr_source(trimmed);
+    let allocator = Allocator::default();
+    let ret = Parser::new(&allocator, &src, SourceType::ts()).parse();
+    if ret.panicked {
+        return Some((
+            "oxc panicked while parsing template expression".into(),
+            SnippetSpan { start: 0, end: snippet_len },
+        ));
+    }
+    let diag = ret.diagnostics.first()?;
+    let msg = diag.message.to_string();
+    let span = diag
+        .labels
+        .first()
+        .map(|label| {
+            let start = label.offset() as u32;
+            let end = start.saturating_add(label.len() as u32);
+            map_wrapped_span_to_snippet(Span::new(start, end), snippet_len)
+        })
+        .unwrap_or(SnippetSpan { start: 0, end: snippet_len });
+    Some((msg, span))
+}
+
+fn oxc_template_expr_root_span(trimmed: &str) -> Option<SnippetSpan> {
+    let snippet_len = trimmed.len() as u32;
+    let src = wrap_template_expr_source(trimmed);
+    let allocator = Allocator::default();
+    let ret = Parser::new(&allocator, &src, SourceType::ts()).parse();
+    if ret.panicked || !ret.diagnostics.is_empty() {
+        return None;
+    }
+    let body = ret.program.body.first()?;
+    let Statement::ExpressionStatement(es) = body else {
+        return None;
+    };
+    Some(map_wrapped_span_to_snippet(es.expression.span(), snippet_len))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,6 +179,14 @@ mod tests {
     fn rejects_broken_expr() {
         assert!(template_expr_snippet_error("1 +").is_some());
         assert!(template_expr_snippet_error(";;;").is_some());
+    }
+
+    #[test]
+    fn oak_primary_accepts_member_without_oxc_wrap() {
+        let oak = parse_expression_snippet("tag.label");
+        assert!(oak.ok, "oak diags={:?}", oak.diagnostics);
+        let span = oak.root_span.expect("span");
+        assert_eq!(span, vmz_oak_frontend_adapter::ByteSpan { start: 0, end: 9 });
     }
 
     #[test]

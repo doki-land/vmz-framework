@@ -32,6 +32,7 @@ sha2.workspace = true
 thiserror.workspace = true
 vmz-protocol.workspace = true
 vmz-types.workspace = true
+vmz-oak-frontend-adapter.workspace = true
 
 [dev-dependencies]
 serde = { workspace = true, features = ["derive"] }
