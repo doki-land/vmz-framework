@@ -11,6 +11,7 @@
 *.txt
 
 # Rust
+.cargo/config.toml
 target/
 *.node
 *.wasm

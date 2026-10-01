@@ -9,8 +9,8 @@ VMZ ↔ Oaks frontend bridge (CST + AST entry).
 | `parse_template_ast` / `require_template_ast` | Oak `VueBuilder` template AST |
 | `ScriptShellInput` / `ScriptRole` | Script body slice for Oak TS AST |
 | `parse_script_ast` / `require_script_ast` | Oak `TypeScriptBuilder` for `<script client\|server>` |
-| `NyarAnalysisInput` | Language-neutral Nyar projection contract (phase D) |
+| `NyarAnalysisInput` | Language-neutral Nyar projection from `.vmz` scripts |
 
-Requires **nightly** Rust (`rust-toolchain.toml`). Oaks via `https://github.com/yggdrasil-language/oaks` `dev` + optional local `[patch]`.
+Requires **nightly** Rust (`rust-toolchain.toml`). Oaks via `https://github.com/yggdrasil-language/oaks` `dev` in root `Cargo.toml`. Local sibling override: copy `.cargo/config.toml.example` → `.cargo/config.toml` (gitignored). `cargo tree -p oak-core` should show a path when patch is active.
 
-Design: `规划设计/vmz/handoffs/2026-09-30-vmz-oak-nyar-frontend-integration.md`.
+Oaks supplies Vue/TypeScript CST and AST for VMZ SFC regions; this crate adapts those surfaces and projects scripts into `NyarAnalysisInput` for Nyar analysis. Conformance gate: `pnpm verify -- oak-frontend-smoke`.

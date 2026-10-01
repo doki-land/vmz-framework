@@ -1,4 +1,4 @@
-//! Language-neutral analysis input for Nyar (phase D contract).
+//! Language-neutral analysis input projected from `.vmz` scripts for Nyar.
 //!
 //! No Oak, oxc, or `vmz-compiler` types — VMZ projects into this shape before Nyar analysis.
 

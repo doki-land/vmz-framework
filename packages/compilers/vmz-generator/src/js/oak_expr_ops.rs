@@ -1,4 +1,4 @@
-//! Oak TypeScript walks for template expression deps and `this.` binding (phase B3).
+//! Oak TypeScript walks for template expression deps and `this.` binding.
 
 use std::collections::{HashMap, HashSet};
 

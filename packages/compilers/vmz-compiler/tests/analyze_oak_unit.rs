@@ -1,4 +1,4 @@
-//! Oak-primary script surface analysis (phase B2).
+//! Oak-primary script surface analysis tests.
 
 use vmz_compiler::analyze::analyze_script;
 use vmz_compiler::parse::analyze_oak::try_component_decl_via_oak;

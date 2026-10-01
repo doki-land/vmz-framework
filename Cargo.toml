@@ -40,7 +40,8 @@ vmz-plugin-tailwind = { path = "packages/compilers/vmz-plugin-tailwind" }
 vmz-plugin-sasso = { path = "packages/compilers/vmz-plugin-sasso" }
 vmz-oak-frontend-adapter = { path = "packages/compilers/vmz-oak-frontend-adapter" }
 
-# Oaks frontend (Vue SFC / CST). CI uses git `dev`, local sibling checkout via `[patch]` below.
+# Oaks frontend (Vue SFC / CST). CI / publish resolve git `dev` only.
+# Local sibling override: `.cargo/config.toml` (gitignored, see `.cargo/config.toml.example`).
 oak-core = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
 oak-vue = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
 oak-typescript = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }

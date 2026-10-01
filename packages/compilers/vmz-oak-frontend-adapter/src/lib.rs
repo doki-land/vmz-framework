@@ -3,7 +3,8 @@
 //! - **CST path** (`oak_cst`): Oak `VueParser` on template regions (format / highlight / LSP).
 //! - **AST path** (`oak_ast`): Oak `VueBuilder` for compile-time concrete lowering (via `vmz-compiler`).
 //!
-//! See `规划设计/vmz/handoffs/2026-09-30-vmz-oak-nyar-frontend-integration.md`.
+//! Projects `.vmz` scripts into `NyarAnalysisInput` for Nyar analysis.
+//! Conformance: `pnpm verify -- oak-frontend-smoke`.
 
 mod contract;
 mod nyar_contract;

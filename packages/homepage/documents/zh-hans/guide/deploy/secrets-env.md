@@ -21,7 +21,7 @@ repo/                         ← workspace 根
   packages/web-app/           ← 可选再放包级 .env*.local
 ```
 
-加载顺序（后者覆盖前者；进程已有 env 之后还可叠命令行 `--secret`）见 Living `01`。不必每个 package 复制密钥文件。
+加载顺序为后者覆盖前者；进程已有 env 之后还可叠命令行 `--secret`。不必每个 package 复制密钥文件。
 
 ## 两类键
 

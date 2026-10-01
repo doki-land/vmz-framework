@@ -21,7 +21,7 @@ repo/
   packages/web-app/          # optional package-level overrides
 ```
 
-Load order (later wins; after process env, CLI `--secret` may overlay) is defined in Living `01`. Apps need not duplicate secret files.
+Later sources override earlier ones; after process env, CLI `--secret` may overlay. Apps need not duplicate secret files.
 
 ## Two kinds of keys
 

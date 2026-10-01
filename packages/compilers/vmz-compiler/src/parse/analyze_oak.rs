@@ -1,4 +1,4 @@
-//! Lower Oak TypeScript AST into [`ComponentDecl`] surface (phase B2).
+//! Lower Oak TypeScript AST into [`ComponentDecl`] surface.
 
 use oak_typescript::ast::{
     ClassDeclaration, ClassMember, Expression, ExpressionKind, ImportSpecifier, Statement,
@@ -202,7 +202,7 @@ fn oak_callee_factory_name(expr: &Expression) -> Option<String> {
     }
 }
 
-/// Collect static `import` declarations from Oak TypeScript AST (phase D1).
+/// Collect static `import` declarations from Oak TypeScript AST.
 ///
 /// Spans are relative to `source` (script body). Caller adds `content_start` for `.vmz` abs.
 /// Returns empty when Oak cannot build a root (caller may leave imports empty).

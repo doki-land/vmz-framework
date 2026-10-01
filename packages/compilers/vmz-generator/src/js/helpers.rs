@@ -211,7 +211,7 @@ pub fn event_dom_type(name: &str) -> String {
 }
 
 /// Trim template interp expressions. **Does not** strip leading `this.` —
-/// Living `01` requires explicit `this.method` / `this.field` (no silent rewrite).
+/// VMZ requires explicit `this.method` / `this.field` in templates (no silent rewrite).
 pub fn sanitize_interp(expr: &str) -> String {
     expr.trim().to_string()
 }
