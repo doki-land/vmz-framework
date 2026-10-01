@@ -1,4 +1,4 @@
-//! Analyze `<script client|server>` with oxc: default-export class, fields, and methods.
+//! Analyze `<script client|server>`: Oak TypeScript surface primary, oxc fallback / RW graft.
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
@@ -13,24 +13,43 @@ use vmz_types::{
     ComponentDecl, FieldDecl, FieldKind, HttpRoute, InternalClassDecl, MethodDecl, Visibility,
 };
 
+use crate::parse::analyze_oak::{graft_oxc_method_summaries, try_component_decl_via_oak};
 use crate::field_rw::{FieldRw, ForbiddenFactory};
 use crate::sfc::ScriptKind;
 
-/// Oxc analysis result for one client or server script body.
+/// Script analysis result for one client or server body.
 #[derive(Debug, Clone)]
 pub struct AnalyzedScript {
     /// Whether this body was analyzed as client or server.
     pub kind: ScriptKind,
     /// Default-exported component declaration (Anonymous when missing).
     pub decl: ComponentDecl,
-    /// Oxc parse diagnostics as plain strings.
+    /// Parse diagnostics as plain strings (oxc and/or Oak).
     pub parse_errors: Vec<String>,
-    /// `useX` / `createX` calls found in this script (oxc).
+    /// `useX` / `createX` calls found in this script (still oxc until Oak walk covers it).
     pub forbidden_factories: Vec<ForbiddenFactory>,
 }
 
 /// Parse `source` as TypeScript and lower the default-export class into [`ComponentDecl`].
+///
+/// Prefer Oak TypeScript AST for the class surface (name / props / methods / HTTP).
+/// Oxc still supplies method read/write/call summaries and forbidden-factory scans,
+/// and remains the full fallback when Oak cannot lower a usable default-export class.
 pub fn analyze_script(kind: ScriptKind, source: &str) -> AnalyzedScript {
+    let oxc = analyze_script_oxc(kind, source);
+    if let Some(mut oak_decl) = try_component_decl_via_oak(kind, source) {
+        graft_oxc_method_summaries(&mut oak_decl, &oxc.decl);
+        return AnalyzedScript {
+            kind,
+            decl: oak_decl,
+            parse_errors: oxc.parse_errors,
+            forbidden_factories: oxc.forbidden_factories,
+        };
+    }
+    oxc
+}
+
+fn analyze_script_oxc(kind: ScriptKind, source: &str) -> AnalyzedScript {
     let allocator = Allocator::default();
     let source_type = SourceType::ts();
     let ret = Parser::new(&allocator, source, source_type).parse();

@@ -1240,7 +1240,7 @@ dependencies = [
 [[package]]
 name = "oak-core"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#a78221c4dda35f44735cd383dd2e9d0c12cd8c4c"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#3cfbe122ec3c08d2bc0ffc7e5c7811cb1f0a988a"
 dependencies = [
  "serde",
  "smallvec",
@@ -1252,7 +1252,7 @@ dependencies = [
 [[package]]
 name = "oak-typescript"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#a78221c4dda35f44735cd383dd2e9d0c12cd8c4c"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#3cfbe122ec3c08d2bc0ffc7e5c7811cb1f0a988a"
 dependencies = [
  "oak-core",
  "serde",
@@ -1261,7 +1261,7 @@ dependencies = [
 [[package]]
 name = "oak-vue"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#a78221c4dda35f44735cd383dd2e9d0c12cd8c4c"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#3cfbe122ec3c08d2bc0ffc7e5c7811cb1f0a988a"
 dependencies = [
  "oak-core",
  "serde",
@@ -3045,6 +3045,7 @@ name = "vmz-compiler"
 version = "0.1.0"
 dependencies = [
  "json5",
+ "oak-typescript",
  "oak-vue",
  "oxc_allocator",
  "oxc_ast",
