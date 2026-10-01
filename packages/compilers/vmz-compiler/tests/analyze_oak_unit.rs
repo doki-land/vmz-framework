@@ -22,7 +22,7 @@ export default class Page {
 }
 
 #[test]
-fn analyze_script_prefers_oak_surface_with_oxc_graft() {
+fn analyze_script_prefers_oak_surface_with_method_rw() {
     let src = r#"
 export default class Page {
   public title = 'hi';
@@ -37,8 +37,7 @@ export default class Page {
     assert!(analyzed.decl.properties.iter().any(|f| f.name == "title"));
     assert!(analyzed.decl.fields.iter().any(|f| f.name == "count"));
     let bump = analyzed.decl.methods.iter().find(|m| m.name == "bump").expect("bump");
-    // RW summaries still grafted from oxc until Oak walks method bodies.
-    assert!(!bump.writes.is_empty() || !bump.reads.is_empty() || bump.opaque_callee);
+    assert!(bump.writes.iter().any(|w| w == "count"), "writes={:?}", bump.writes);
 }
 
 #[test]

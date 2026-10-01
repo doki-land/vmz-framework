@@ -2,6 +2,7 @@
 
 pub mod analyze;
 pub mod analyze_oak;
+pub mod field_rw_oak;
 pub mod offset_index;
 pub mod rust_dsl;
 pub mod sfc;

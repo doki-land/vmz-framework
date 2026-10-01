@@ -34,9 +34,10 @@ pub struct AnalyzedScript {
 
 /// Parse `source` as TypeScript and lower the default-export class into [`ComponentDecl`].
 ///
-/// Prefer Oak TypeScript AST for the class surface (name / props / methods / HTTP) and
-/// forbidden-factory scans. Oxc still supplies method read/write/call summaries, and
-/// remains the full fallback when Oak cannot lower a usable default-export class.
+/// Prefer Oak TypeScript AST for the class surface (name / props / methods / HTTP),
+/// forbidden-factory scans, and method read/write/call summaries. Oxc still supplies
+/// RW graft for Oak AST gaps (e.g. object destructure bindings) and remains the full
+/// fallback when Oak cannot lower a usable default-export class.
 pub fn analyze_script(kind: ScriptKind, source: &str) -> AnalyzedScript {
     let oxc = analyze_script_oxc(kind, source);
     if let Some(mut oak_decl) = try_component_decl_via_oak(kind, source) {

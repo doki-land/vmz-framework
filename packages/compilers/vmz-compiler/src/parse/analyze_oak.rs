@@ -15,6 +15,7 @@ use vmz_types::{
 };
 
 use crate::field_rw::{ForbiddenFactory, is_forbidden_factory};
+use crate::parse::field_rw_oak::OakFieldRw;
 use crate::sfc::ScriptKind;
 
 /// Try Oak TypeScript AST → component surface. `None` when Oak fails or yields no usable class.
@@ -584,6 +585,15 @@ fn component_decl_from_root(root: &TypeScriptRoot, source: &str) -> Option<Compo
 }
 
 fn fill_members_from_oak(decl: &mut ComponentDecl, body: &[ClassMember], source: &str) {
+    let mut field_names: Vec<String> = Vec::new();
+    for member in body {
+        if let ClassMember::Property { name, is_static, .. } = member {
+            if !*is_static && !name.is_empty() {
+                field_names.push(name.clone());
+            }
+        }
+    }
+
     for member in body {
         match member {
             ClassMember::Property {
@@ -622,7 +632,7 @@ fn fill_members_from_oak(decl: &mut ComponentDecl, body: &[ClassMember], source:
             }
             ClassMember::Method {
                 name,
-                body: _body,
+                body: method_body,
                 decorators,
                 visibility,
                 is_static,
@@ -636,41 +646,96 @@ fn fill_members_from_oak(decl: &mut ComponentDecl, body: &[ClassMember], source:
                 let is_private = name.starts_with('#')
                     || matches!(visibility, Some(OakVisibility::Private));
                 let http = decorators.iter().find_map(|d| http_route_from_oak_expr(&d.expression));
+                let mut rw = OakFieldRw::new(field_names.iter().cloned());
+                rw.walk_body(method_body);
                 decl.methods.push(MethodDecl {
                     name: name.clone(),
                     is_async: *is_async,
                     is_static: *is_static,
                     is_private,
                     http,
-                    reads: Vec::new(),
-                    writes: Vec::new(),
-                    calls: Vec::new(),
-                    opaque_callee: false,
-                    star_reasons: Vec::new(),
+                    reads: rw.reads,
+                    writes: rw.writes,
+                    calls: rw.calls,
+                    opaque_callee: rw.opaque_callee,
+                    star_reasons: rw.star_reasons,
                     span: range_to_span(span.start, span.end),
                     name_span: name_span_in(source, span.start, span.end, name),
                 });
             }
         }
     }
+
+    // Keep only callees that are known methods; unresolved → opaque.
+    let method_names: Vec<String> = decl.methods.iter().map(|m| m.name.clone()).collect();
+    for m in &mut decl.methods {
+        let mut known = Vec::new();
+        for c in &m.calls {
+            if method_names.iter().any(|n| n == c) {
+                known.push(c.clone());
+            } else {
+                m.opaque_callee = true;
+                for f in &field_names {
+                    if !m.star_reasons.iter().any(|(n, _)| n == f) {
+                        m.star_reasons.push((f.clone(), "unresolved_method".into()));
+                    }
+                }
+            }
+        }
+        m.calls = known;
+    }
+    crate::method_compose::compose_cross_method_rw(&mut decl.methods, &field_names);
 }
 
-/// Copy oxc method read/write/call summaries onto Oak surface methods (matched by name).
+fn method_rw_empty(m: &MethodDecl) -> bool {
+    m.reads.is_empty() && m.writes.is_empty() && m.calls.is_empty() && !m.opaque_callee
+}
+
+/// Prefer Oak method RW; graft oxc when Oak left a method empty (destructure / AST gaps).
+///
+/// When Oak already found signals, union any oxc extras so object-pattern aliases still
+/// land until Oaks models BindingPattern.
 pub fn graft_oxc_method_summaries(oak: &mut ComponentDecl, oxc: &ComponentDecl) {
     for m in &mut oak.methods {
-        if let Some(src) = oxc.methods.iter().find(|o| o.name == m.name) {
+        let Some(src) = oxc.methods.iter().find(|o| o.name == m.name) else {
+            continue;
+        };
+        if method_rw_empty(m) {
             m.reads = src.reads.clone();
             m.writes = src.writes.clone();
             m.calls = src.calls.clone();
             m.opaque_callee = src.opaque_callee;
             m.star_reasons = src.star_reasons.clone();
-            // Prefer oxc async/http when Oak missed them.
-            if !m.is_async {
-                m.is_async = src.is_async;
+        } else {
+            for r in &src.reads {
+                if !m.reads.iter().any(|x| x == r) {
+                    m.reads.push(r.clone());
+                }
             }
-            if m.http.is_none() {
-                m.http = src.http.clone();
+            for w in &src.writes {
+                if !m.writes.iter().any(|x| x == w) {
+                    m.writes.push(w.clone());
+                }
             }
+            for c in &src.calls {
+                if !m.calls.iter().any(|x| x == c) {
+                    m.calls.push(c.clone());
+                }
+            }
+            if src.opaque_callee {
+                m.opaque_callee = true;
+            }
+            for (f, reason) in &src.star_reasons {
+                if !m.star_reasons.iter().any(|(n, _)| n == f) {
+                    m.star_reasons.push((f.clone(), reason.clone()));
+                }
+            }
+        }
+        if !m.is_async {
+            m.is_async = src.is_async;
+        }
+        if m.http.is_none() {
+            m.http = src.http.clone();
         }
     }
 }
