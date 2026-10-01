@@ -27,6 +27,29 @@ pub fn parse_template_concrete_via_oak(template: &TemplateBlock) -> Result<Concr
     lower_vue_root_to_concrete(root, &parsed.shell_source)
 }
 
+/// Oak Vue AST → [`SemanticIr`] (Concrete is a **private** hop, not returned).
+///
+/// Prefer this over calling [`parse_template_concrete_via_oak`] +
+/// [`lower_concrete_to_semantic`] at call sites that only need Semantic.
+pub fn parse_template_semantic_via_oak(template: &TemplateBlock) -> Result<SemanticIr, String> {
+    let shell = TemplateShellInput {
+        content: template.content.clone(),
+        content_start: template.content_start,
+    };
+    let parsed = parse_template_ast(&shell);
+    if !parsed.ok {
+        return Err(format_oak_fail(&parsed));
+    }
+    let root = parsed.root.as_ref().ok_or_else(|| format_oak_fail(&parsed))?;
+    lower_vue_root_to_semantic(root, &parsed.shell_source)
+}
+
+/// Lower an Oak [`VueRoot`] straight to Semantic (private Concrete hop).
+pub fn lower_vue_root_to_semantic(root: &VueRoot, shell: &str) -> Result<SemanticIr, String> {
+    let concrete = lower_vue_root_to_concrete(root, shell)?;
+    lower_concrete_to_semantic(&concrete).map_err(|e| e.message)
+}
+
 /// Prefer Oak concrete + semantic for a template body string, fall back to legacy.
 pub fn parse_template_concrete_body_primary(
     input: &str,
@@ -46,10 +69,11 @@ pub fn parse_template_concrete_primary(
     Ok(parse_template_layers_primary(template)?.0)
 }
 
-/// Oak Vue AST → Concrete → Semantic as one primary unit; legacy XML concrete on failure.
+/// Oak Vue AST → Concrete + Semantic as one primary unit; legacy XML on failure.
 ///
-/// This is the stage-C entry for `check` / `compile`. Concrete remains a temporary
-/// adapter toward Semantic / TemplateIr until emit consumes Semantic directly.
+/// Stage-C entry for `check` / `compile` when both layers are required. Prefer
+/// [`parse_template_semantic_via_oak`] / [`parse_template_semantic_primary`] when
+/// only Semantic is needed.
 pub fn parse_template_layers_primary(
     template: &TemplateBlock,
 ) -> Result<(ConcreteIr, SemanticIr), TemplateParseError> {
@@ -63,11 +87,15 @@ pub fn parse_template_layers_primary(
     Ok((concrete, semantic))
 }
 
-/// Prefer Oak for Semantic-only consumers (drops concrete after validation).
+/// Prefer Oak Semantic (no Concrete in the return type); legacy XML fallback.
 pub fn parse_template_semantic_primary(
     template: &TemplateBlock,
 ) -> Result<SemanticIr, TemplateParseError> {
-    Ok(parse_template_layers_primary(template)?.1)
+    if let Ok(semantic) = parse_template_semantic_via_oak(template) {
+        return Ok(semantic);
+    }
+    let concrete = super::template_concrete::parse_template_concrete(&template.content)?;
+    lower_concrete_to_semantic(&concrete)
 }
 
 fn format_oak_fail(parsed: &vmz_oak_frontend_adapter::TemplateAstParse) -> String {

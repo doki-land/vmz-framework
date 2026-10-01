@@ -238,4 +238,7 @@ export default class Branch {}
     let via_semantic =
         vmz_compiler::parse_template_semantic_primary(&parsed.template).expect("semantic");
     assert_eq!(via_semantic, semantic);
+    let via_oak =
+        vmz_compiler::parse_template_semantic_via_oak(&parsed.template).expect("semantic via oak");
+    assert_eq!(via_oak, semantic);
 }

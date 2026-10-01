@@ -18,9 +18,9 @@ pub use super::template_concrete::{
 pub use super::template_ir::{AttrValue, TemplateAttr, TemplateIr, TemplateNode};
 pub use super::template_lower::lower_concrete_to_ir;
 pub use super::template_oak::{
-    parse_template_concrete_body_primary, parse_template_concrete_primary,
-    parse_template_concrete_via_oak, parse_template_layers_primary,
-    parse_template_semantic_primary,
+    lower_vue_root_to_semantic, parse_template_concrete_body_primary,
+    parse_template_concrete_primary, parse_template_concrete_via_oak, parse_template_layers_primary,
+    parse_template_semantic_primary, parse_template_semantic_via_oak,
 };
 pub use super::template_semantic::{
     EventTarget, IfBranch, SemanticAstStats, SemanticIr, SemanticNode, SemanticProp,
