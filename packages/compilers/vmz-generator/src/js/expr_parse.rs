@@ -91,10 +91,9 @@ pub fn template_expr_root_span(expr: &str) -> Option<SnippetSpan> {
     oxc_template_expr_root_span(trimmed)
 }
 
-/// Canonical-print a template expression via oxc parse + codegen (no string replay).
+/// Canonical-print a template expression (Oak AST primary, oxc codegen fallback).
 ///
 /// Empty / whitespace-only input yields an empty string. Invalid expressions return `Err`.
-/// Print stays on oxc until Oak has a stable expression printer.
 pub fn print_template_expr(expr: &str) -> Result<String, String> {
     use oxc_ast::ast::Expression;
     use oxc_codegen::Codegen;
@@ -102,6 +101,9 @@ pub fn print_template_expr(expr: &str) -> Result<String, String> {
     let trimmed = expr.trim();
     if trimmed.is_empty() {
         return Ok(String::new());
+    }
+    if let Some(out) = super::oak_expr_print::print_template_expr_via_oak(trimmed) {
+        return Ok(out);
     }
     let src = wrap_template_expr_source(trimmed);
     let allocator = Allocator::default();

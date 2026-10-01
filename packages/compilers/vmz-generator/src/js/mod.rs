@@ -11,6 +11,7 @@ pub mod expr_parse;
 /// Shared expression / attr helpers (also used by `vmz-compiler` structural build).
 pub mod helpers;
 mod oak_expr_ops;
+mod oak_expr_print;
 mod locale;
 mod module_rewrite;
 mod print;
