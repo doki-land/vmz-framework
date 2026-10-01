@@ -116,6 +116,7 @@ jobs:
     name: Build and Test
     needs: [build-runtimes]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       VMZ_SKIP_NATIVE_BUILD: '1'
     steps:
@@ -225,8 +226,9 @@ jobs:
 
   ui-browser:
     name: UI and Browser Production
-    needs: [build-runtimes]
+    needs: [build-test]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       VMZ_SKIP_NATIVE_BUILD: '1'
     steps:
@@ -278,8 +280,9 @@ jobs:
 
   runtime-gates:
     name: Slim and Runtime Quality
-    needs: [build-runtimes]
+    needs: [ui-browser]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       VMZ_SKIP_NATIVE_BUILD: '1'
     steps:
