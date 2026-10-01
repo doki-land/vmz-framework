@@ -146,6 +146,20 @@ const AGREED: &[(&str, &str)] = &[
     ("ternary_interp", r#"<span>{{ ok ? 'y' : 'n' }}</span>"#),
     ("hash_slot", r#"<Comp><template #title>T</template></Comp>"#),
     ("v_slot", r#"<Comp><template v-slot:footer>F</template></Comp>"#),
+    ("class_style_plans", r#"<div class="a b" :class="extra" style="color:red" :style="dyn">x</div>"#),
+    ("on_modifier", r#"<button @click.stop.prevent="go">Go</button>"#),
+    ("v_for_aliases", r#"<li v-for="(item, index) in items" :key="index">{{ item }}</li>"#),
+    ("v_model_arg", r#"<input v-model:title="doc.title" />"#),
+    ("bind_object", r#"<div v-bind="attrs">x</div>"#),
+    (
+        "comment_in_if_chain",
+        r#"
+<p v-if="a">A</p>
+<!-- between -->
+<p v-else>B</p>
+"#,
+    ),
+    ("nested_elements", r#"<main><section><p>{{ t }}</p></section></main>"#),
 ];
 
 /// Documented Oak Vue gaps — tracked for oaks, not VMZ XML workarounds.
