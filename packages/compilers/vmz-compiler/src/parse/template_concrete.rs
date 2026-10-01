@@ -1,7 +1,20 @@
-//! Layer-1 Concrete Template AST: Vue author surface + spans (no emit contract).
+//! Layer-1 Concrete Template AST — **deprecated adapter** (stage C).
 //!
-//! Expressions remain `String` here (`ExprPlan` is Oak-primary snippet ingress). Downstream emit still
-//! consumes [`super::template::TemplateIr`] via [`super::template_lower`].
+//! **Primary path**: Oak Vue AST via [`super::template_oak::parse_template_layers_primary`].
+//! This module remains only as:
+//! - IR shape shared by Oak lowering / Semantic / legacy TemplateIr
+//! - **legacy XML string parser** [`parse_template_concrete`] for fallback and fixtures
+//!
+//! # Feature freeze (hard)
+//!
+//! Do **not** extend the self-built XML / string directive parser with new Vue
+//! syntax. Gaps go to Oaks (`oak-vue`) first; VMZ only adapts. Allowed changes:
+//! bugfixes that restore prior behavior, diagnostic clarity, and Oak classify
+//! helpers ([`classify_concrete_attr`]).
+//!
+//! Expressions remain `String` here (`ExprPlan` is Oak-primary snippet ingress).
+//! Downstream emit still consumes [`super::template::TemplateIr`] via
+//! [`super::template_lower`].
 
 use super::template_common::{TemplateParseError, decode_html_entities};
 use super::template_span::TemplateSpan;
@@ -184,7 +197,11 @@ pub fn classify_concrete_attr(
     classify_one(RawAttr { name: name.to_string(), value: value.map(|s| s.to_string()), span })
 }
 
-/// Parse a `<template>` body into Concrete AST (comments + structured directives).
+/// Parse a `<template>` body into Concrete AST via the **legacy XML scanner**.
+///
+/// Prefer [`super::template_oak::parse_template_concrete_via_oak`] /
+/// [`super::template_oak::parse_template_layers_primary`]. Kept for Oak failure
+/// fallback and conformance fixtures — **no new Vue syntax here** (see module freeze).
 pub fn parse_template_concrete(input: &str) -> Result<ConcreteIr, TemplateParseError> {
     let mut parser = ConcreteParser { input, pos: 0 };
     let mut roots = Vec::new();

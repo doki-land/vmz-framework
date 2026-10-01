@@ -2,8 +2,8 @@
 //!
 //! **Author syntax** aims at Vue template isomorphism. **Emit** still consumes
 //! [`TemplateIr`] / [`TemplateAttr`] via [`super::template_lower`]. Layer-1 Concrete
-//! types live in [`super::template_concrete`]; do not add new string directive
-//! specials on the legacy attr model (P0 freeze).
+//! is a **deprecated adapter** (see [`super::template_concrete`]); do not add new
+//! string directive specials on the legacy attr model or XML scanner (P0 / stage C freeze).
 
 use std::path::PathBuf;
 
@@ -30,11 +30,12 @@ pub use super::template_span::TemplateSpan;
 
 /// Parse a `<template>` body as Vue template syntax into legacy VMZ IR.
 ///
-/// Pipeline: [`parse_template_concrete`] → [`lower_concrete_to_ir`].
-///
-/// SFC `check` / `compile` use [`parse_template_layers_primary`] (Oak → Concrete → Semantic).
+/// Uses Oak layers primary (Concrete + Semantic), then lowers Concrete → TemplateIr.
 pub fn parse_template(input: &str) -> Result<TemplateIr, TemplateParseError> {
-    let concrete = parse_template_concrete(input)?;
+    let (concrete, _) = parse_template_layers_primary(&crate::sfc::TemplateBlock {
+        content: input.to_string(),
+        content_start: 0,
+    })?;
     lower_concrete_to_ir(&concrete)
 }
 

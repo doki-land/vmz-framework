@@ -1,19 +1,19 @@
 //! Print Semantic template AST as Vue author syntax (OXC-canonical expressions).
 
 use vmz_compiler::{
-    Directive, DirectiveArg, SemanticIr, SemanticNode, SemanticProp, lower_concrete_to_semantic,
-    parse_template_concrete,
+    Directive, DirectiveArg, SemanticIr, SemanticNode, SemanticProp, TemplateBlock,
+    parse_template_semantic_primary,
 };
 use vmz_generator::print_template_expr;
 
 use crate::editorconfig::EditorSettings;
 
-/// Format a `<template>` body via Concrete → Semantic → Vue print.
+/// Format a `<template>` body via Oak layers Semantic → Vue print.
 ///
-/// Expressions are canonicalized through oxc (no raw string replay).
+/// Expressions are canonicalized through oxc print (no raw string replay).
 pub fn format_template_body(body: &str, settings: &EditorSettings) -> Result<String, String> {
-    let concrete = parse_template_concrete(body).map_err(|e| e.message)?;
-    let semantic = lower_concrete_to_semantic(&concrete).map_err(|e| e.message)?;
+    let block = TemplateBlock { content: body.to_string(), content_start: 0 };
+    let semantic = parse_template_semantic_primary(&block).map_err(|e| e.message)?;
     print_semantic(&semantic, settings)
 }
 

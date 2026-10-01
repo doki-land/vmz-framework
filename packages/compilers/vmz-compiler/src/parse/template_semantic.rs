@@ -1,9 +1,14 @@
 //! Layer-2 Vue Semantic AST (Structured Template Semantics).
 //!
-//! Concrete keeps author form; Semantic structures control flow (`IfChain`) so
-//! generators stop guessing flat `if` / `else-if` attrs. Pipeline emit still
-//! goes through the legacy [`super::template_ir::TemplateIr`] adapter until
-//! Execution IR lands.
+//! **Primary ingress**: [`super::template_oak::parse_template_layers_primary`] /
+//! [`super::template_oak::parse_template_semantic_primary`] (Oak → Concrete → here).
+//!
+//! [`lower_concrete_to_semantic`] is the **deprecated adapter** that structures
+//! control flow (`IfChain` / `ForNode` / …) from Concrete — still required until
+//! Oak Vue AST lowers straight into Semantic without a Concrete hop.
+//!
+//! Pipeline emit still goes through the legacy [`super::template_ir::TemplateIr`]
+//! adapter until Execution IR lands.
 
 use super::template_common::TemplateParseError;
 use super::template_concrete::{ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg};
@@ -201,6 +206,9 @@ pub enum SemanticProp {
 }
 
 /// Lower Concrete → Semantic (IfChain / ForNode / Bind·On plans; comments dropped).
+///
+/// Adapter retained for Oak→Concrete→Semantic and legacy fixtures. New call sites
+/// should prefer [`super::template_oak::parse_template_semantic_primary`].
 pub fn lower_concrete_to_semantic(concrete: &ConcreteIr) -> Result<SemanticIr, TemplateParseError> {
     Ok(SemanticIr { roots: lower_siblings(&concrete.roots)? })
 }
