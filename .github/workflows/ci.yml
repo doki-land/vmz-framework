@@ -157,19 +157,34 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for example in \
-            @vmz-examples/hello \
-            @vmz-examples/counter \
-            @vmz-examples/event-shell \
-            @vmz-examples/fullstack \
-            @vmz-examples/island \
-            @vmz-examples/production-catalog \
-            @vmz-examples/production-inspector \
-            @vmz-examples/production-router \
-            @vmz-examples/vmz-style-tailwind; do
-            echo "==> building $example"
-            pnpm --filter "$example" run build
-          done
+          echo "Example build steps are intentionally isolated below."
+
+      - name: Build example hello
+        run: pnpm --filter @vmz-examples/hello run build
+
+      - name: Build example counter
+        run: pnpm --filter @vmz-examples/counter run build
+
+      - name: Build example event-shell
+        run: pnpm --filter @vmz-examples/event-shell run build
+
+      - name: Build example fullstack
+        run: pnpm --filter @vmz-examples/fullstack run build
+
+      - name: Build example island
+        run: pnpm --filter @vmz-examples/island run build
+
+      - name: Build example production-catalog
+        run: pnpm --filter @vmz-examples/production-catalog run build
+
+      - name: Build example production-inspector
+        run: pnpm --filter @vmz-examples/production-inspector run build
+
+      - name: Build example production-router
+        run: pnpm --filter @vmz-examples/production-router run build
+
+      - name: Build example vmz-style-tailwind
+        run: pnpm --filter @vmz-examples/vmz-style-tailwind run build
 
       - name: Install Chromium (browser host / CDP)
         uses: browser-actions/setup-chrome@v2
