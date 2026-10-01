@@ -159,28 +159,61 @@ export default class Page {{ val = 1; onEv() {{}} }}
         body = body
     );
     let parsed = parse_vmz("Dyn.vmz", source).expect("parse vmz");
+    let oak = parse_template_concrete_via_oak(&parsed.template).expect("oak concrete");
     let primary = vmz_compiler::parse_template_concrete_primary(&parsed.template).expect("primary");
-    let vmz_compiler::ConcreteNode::Element { attrs, .. } = &primary.roots[0] else {
-        panic!("expected element");
+    for ir in [&oak, &primary] {
+        let vmz_compiler::ConcreteNode::Element { attrs, .. } = &ir.roots[0] else {
+            panic!("expected element");
+        };
+        assert!(attrs.iter().any(|a| matches!(
+            a,
+            vmz_compiler::ConcreteAttr::Directive {
+                dir: vmz_compiler::Directive::Bind {
+                    arg: vmz_compiler::DirectiveArg::Dynamic(e),
+                    ..
+                },
+                ..
+            } if e == "attrName"
+        )));
+        assert!(attrs.iter().any(|a| matches!(
+            a,
+            vmz_compiler::ConcreteAttr::Directive {
+                dir: vmz_compiler::Directive::On {
+                    arg: vmz_compiler::DirectiveArg::Dynamic(e),
+                    ..
+                },
+                ..
+            } if e == "eventName"
+        )));
+    }
+}
+
+#[test]
+fn oak_primary_lowers_link_with_static_to() {
+    let source = r#"<template>
+  <Link to="IndexPage">Home</Link>
+</template>
+<script client>
+export default class AboutPage {}
+</script>
+"#;
+    let parsed = parse_vmz("About.vmz", source).expect("parse vmz");
+    let primary = vmz_compiler::parse_template_concrete_primary(&parsed.template).expect("primary");
+    let vmz_compiler::ConcreteNode::Element { tag, attrs, .. } = &primary.roots[0] else {
+        panic!("expected Link element, got {:?}", primary.roots);
     };
-    assert!(attrs.iter().any(|a| matches!(
-        a,
-        vmz_compiler::ConcreteAttr::Directive {
-            dir: vmz_compiler::Directive::Bind {
-                arg: vmz_compiler::DirectiveArg::Dynamic(e),
-                ..
-            },
-            ..
-        } if e == "attrName"
-    )));
-    assert!(attrs.iter().any(|a| matches!(
-        a,
-        vmz_compiler::ConcreteAttr::Directive {
-            dir: vmz_compiler::Directive::On {
-                arg: vmz_compiler::DirectiveArg::Dynamic(e),
-                ..
-            },
-            ..
-        } if e == "eventName"
-    )));
+    assert_eq!(tag, "Link");
+    let static_attrs: Vec<_> = attrs
+        .iter()
+        .filter_map(|a| match a {
+            vmz_compiler::ConcreteAttr::Static { name, value, .. } => {
+                Some((name.as_str(), value.as_str()))
+            }
+            _ => None,
+        })
+        .collect();
+    assert!(
+        static_attrs.iter().any(|(n, v)| *n == "to" && *v == "IndexPage"),
+        "expected static to=IndexPage, got attrs={attrs:?} static={static_attrs:?}"
+    );
 }
