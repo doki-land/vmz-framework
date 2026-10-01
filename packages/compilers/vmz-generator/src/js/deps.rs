@@ -1,11 +1,11 @@
-//! Template expression -> transitional dep strings (oxc).
+//! Template expression -> transitional dep strings (Oak primary, oxc fallback).
 
 use oxc_ast::ast::{Expression, MemberExpression};
 use oxc_ast_visit::{Visit, walk};
 use oxc_span::SourceType;
 use vmz_types::{DepKey, DepPath, PathSegment};
 
-/// Template expression deps via oxc (stable DepKey strings).
+/// Template expression deps (stable DepKey strings).
 pub fn collect_template_deps(expr: &str, fields: &[String], scope: &[String]) -> Vec<String> {
     collect_template_dep_keys(expr, fields, scope)
         .into_iter()
@@ -19,6 +19,14 @@ pub fn collect_template_dep_keys(expr: &str, fields: &[String], scope: &[String]
     if trimmed.is_empty() || fields.is_empty() {
         return Vec::new();
     }
+    if let Some(deps) = super::oak_expr_ops::collect_template_dep_keys_via_oak(trimmed, fields, scope)
+    {
+        return deps;
+    }
+    collect_template_dep_keys_oxc(trimmed, fields, scope)
+}
+
+fn collect_template_dep_keys_oxc(trimmed: &str, fields: &[String], scope: &[String]) -> Vec<DepKey> {
     let src = super::expr_parse::wrap_template_expr_source(trimmed);
     let allocator = oxc_allocator::Allocator::default();
     let ret = oxc_parser::Parser::new(&allocator, &src, SourceType::ts()).parse();

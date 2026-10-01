@@ -678,19 +678,23 @@ pub fn analyze_expr_reads(expr: &Expression<'_>, field_names: &[String]) -> Vec<
     rw.reads
 }
 
-/// Template expression deps via oxc.
+/// Template expression deps (Oak primary via generator).
 /// Emits stable DepKey strings: `user.name` (path) or `user` (field root).
-/// Falls back to a simple scan if the snippet does not parse.
 pub fn collect_template_deps(expr: &str, fields: &[String], scope: &[String]) -> Vec<String> {
     vmz_generator::js::collect_template_deps(expr, fields, scope)
 }
 
-/// Property paths rooted at an `each` alias (`tag` / `tag.label` ?`[]` / `["label"]`).
+/// Property paths rooted at an `each` alias (`tag` / `tag.label` → `[]` / `["label"]`).
 /// Used by Reactive IR build to emit [`vmz_types::IrDepPath::ListItem`] (8.9).
 pub fn collect_each_alias_prop_paths(expr: &str, as_name: &str) -> Vec<Vec<String>> {
     let trimmed = expr.trim();
     if trimmed.is_empty() || as_name.is_empty() {
         return Vec::new();
+    }
+    if let Some(paths) =
+        vmz_generator::js::collect_each_alias_prop_paths_via_oak(trimmed, as_name)
+    {
+        return paths;
     }
     let src = format!("({trimmed})");
     let allocator = oxc_allocator::Allocator::default();
@@ -810,73 +814,7 @@ impl<'a> Visit<'a> for EachAliasPathVisitor {
 
 /// Same as [`collect_template_deps`] but returns structured [`DepKey`]s.
 pub fn collect_template_dep_keys(expr: &str, fields: &[String], scope: &[String]) -> Vec<DepKey> {
-    let trimmed = expr.trim();
-    if trimmed.is_empty() || fields.is_empty() {
-        return Vec::new();
-    }
-    let src = format!("({trimmed})");
-    let allocator = oxc_allocator::Allocator::default();
-    let ret = oxc_parser::Parser::new(&allocator, &src, oxc_span::SourceType::ts()).parse();
-    if !ret.diagnostics.is_empty() {
-        return collect_template_deps_scan(trimmed, fields, scope);
-    }
-    let mut v =
-        TemplateDepVisitor { fields: fields.to_vec(), scope: scope.to_vec(), deps: Vec::new() };
-    v.visit_program(&ret.program);
-    v.deps
-}
-
-struct TemplateDepVisitor {
-    fields: Vec<String>,
-    scope: Vec<String>,
-    deps: Vec<DepKey>,
-}
-
-impl TemplateDepVisitor {
-    fn push(&mut self, key: DepKey) {
-        let s = key.to_stable_string();
-        if !self.deps.iter().any(|d| d.to_stable_string() == s) {
-            self.deps.push(key);
-        }
-    }
-
-    fn is_field(&self, name: &str) -> bool {
-        self.fields.iter().any(|f| f == name)
-    }
-
-    fn in_scope(&self, name: &str) -> bool {
-        self.scope.iter().any(|s| s == name)
-    }
-
-    fn member_to_dep(&self, me: &MemberExpression<'_>) -> Option<DepKey> {
-        let (root, segs) = path_from_member(me)?;
-        if self.in_scope(&root) || !self.is_field(&root) {
-            return None;
-        }
-        Some(DepKey::path(DepPath { root, segments: segs }))
-    }
-}
-
-impl<'a> Visit<'a> for TemplateDepVisitor {
-    fn visit_member_expression(&mut self, it: &MemberExpression<'a>) {
-        if let Some(key) = self.member_to_dep(it) {
-            self.push(key);
-            if let MemberExpression::ComputedMemberExpression(c) = it {
-                // `items[selected].label` ?also depend on `selected` if it is a field.
-                self.visit_expression(&c.expression);
-            }
-            return;
-        }
-        walk::walk_member_expression(self, it);
-    }
-
-    fn visit_identifier_reference(&mut self, it: &oxc_ast::ast::IdentifierReference<'a>) {
-        let name = it.name.as_str();
-        if self.in_scope(name) || !self.is_field(name) {
-            return;
-        }
-        self.push(DepKey::field(name));
-    }
+    vmz_generator::js::collect_template_dep_keys(expr, fields, scope)
 }
 
 fn path_from_member(me: &MemberExpression<'_>) -> Option<(String, Vec<PathSegment>)> {
@@ -942,79 +880,4 @@ fn path_seg_from_index_expr(expr: &Expression<'_>) -> Option<PathSegment> {
         Expression::ParenthesizedExpression(p) => path_seg_from_index_expr(&p.expression),
         _ => None,
     }
-}
-
-fn collect_template_deps_scan(expr: &str, fields: &[String], scope: &[String]) -> Vec<DepKey> {
-    let mut deps: Vec<DepKey> = Vec::new();
-    let chars: Vec<char> = expr.chars().collect();
-    let mut i = 0;
-    while i < chars.len() {
-        let c = chars[i];
-        if c.is_ascii_alphabetic() || c == '_' || c == '$' {
-            let start = i;
-            i += 1;
-            while i < chars.len()
-                && (chars[i].is_ascii_alphanumeric() || chars[i] == '_' || chars[i] == '$')
-            {
-                i += 1;
-            }
-            let ident: String = chars[start..i].iter().collect();
-            if scope.iter().any(|s| s == &ident) {
-                continue;
-            }
-            let preceded_by_dot = start > 0 && chars[start - 1] == '.';
-            if preceded_by_dot {
-                continue;
-            }
-            if !fields.iter().any(|f| f == &ident) {
-                continue;
-            }
-            // Extend `ident.prop.prop` into a path when possible.
-            let mut segs = Vec::new();
-            let mut j = i;
-            loop {
-                while j < chars.len() && chars[j].is_whitespace() {
-                    j += 1;
-                }
-                if j < chars.len() && chars[j] == '?' && j + 1 < chars.len() && chars[j + 1] == '.'
-                {
-                    j += 2;
-                } else if j < chars.len() && chars[j] == '.' {
-                    j += 1;
-                } else {
-                    break;
-                }
-                while j < chars.len() && chars[j].is_whitespace() {
-                    j += 1;
-                }
-                if j >= chars.len()
-                    || !(chars[j].is_ascii_alphabetic() || chars[j] == '_' || chars[j] == '$')
-                {
-                    break;
-                }
-                let ps = j;
-                j += 1;
-                while j < chars.len()
-                    && (chars[j].is_ascii_alphanumeric() || chars[j] == '_' || chars[j] == '$')
-                {
-                    j += 1;
-                }
-                let prop: String = chars[ps..j].iter().collect();
-                segs.push(PathSegment::Ident(prop));
-                i = j;
-            }
-            let key = if segs.is_empty() {
-                DepKey::field(ident)
-            } else {
-                DepKey::path(DepPath { root: ident, segments: segs })
-            };
-            let s = key.to_stable_string();
-            if !deps.iter().any(|d| d.to_stable_string() == s) {
-                deps.push(key);
-            }
-        } else {
-            i += 1;
-        }
-    }
-    deps
 }

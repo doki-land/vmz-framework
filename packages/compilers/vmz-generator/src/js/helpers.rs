@@ -265,16 +265,14 @@ pub fn split_ternary_parts(expr: &str) -> Option<(String, String, String)> {
     Some((test, cons, alt))
 }
 
-/// Collect deps via oxc (generator-owned).
+/// Collect deps (Oak primary, oxc/scan fallback). Name kept for emit call sites.
 pub fn collect_deps_oxc(expr: &str, fields: &[String], scope: &[String]) -> Vec<String> {
     super::deps::collect_template_deps(expr, fields, scope)
 }
 
-/// Rewrite bare field idents to `this.field` via oxc parse + VisitMut + codegen.
+/// Rewrite bare field idents to `this.field` (Oak span rewrite primary).
 ///
-/// String / template literals are untouched by the AST walk (unlike the old
-/// char scanner). Falls back to the legacy scanner only when the expression
-/// fails to parse.
+/// Falls back to oxc VisitMut+codegen, then the legacy scanner.
 pub fn bind_field_idents(
     expr: &str,
     fields: &[String],
@@ -294,6 +292,11 @@ pub fn bind_field_idents_ctx(
 ) -> String {
     if fields.is_empty() && methods.is_empty() && scope.is_empty() && aliases.is_empty() {
         return expr.trim().to_string();
+    }
+    if let Some(s) =
+        super::oak_expr_ops::bind_field_idents_via_oak(expr, fields, methods, scope, aliases)
+    {
+        return s;
     }
     match bind_field_idents_oxc(expr, fields, methods, scope, aliases) {
         Some(s) => s,

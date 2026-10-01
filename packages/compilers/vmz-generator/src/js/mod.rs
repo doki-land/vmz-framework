@@ -6,17 +6,19 @@ mod emit;
 mod emit_direct;
 mod emit_ir;
 mod entry;
-/// Shared oxc parse for template expression snippets.
+/// Shared template expression snippet ingress (Oak primary).
 pub mod expr_parse;
 /// Shared expression / attr helpers (also used by `vmz-compiler` structural build).
 pub mod helpers;
+mod oak_expr_ops;
 mod locale;
 mod module_rewrite;
 mod print;
 mod row_kernel;
 mod transpile;
 
-pub use deps::collect_template_deps;
+pub use deps::{collect_template_dep_keys, collect_template_deps};
+pub use oak_expr_ops::collect_each_alias_prop_paths_via_oak;
 pub use emit::{
     ServerBridge, emit_client_module, emit_entry_client, emit_server_module,
     rewrite_ts_spec_imports, rewrite_virtual_import,

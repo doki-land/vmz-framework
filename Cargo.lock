@@ -3105,6 +3105,7 @@ name = "vmz-generator"
 version = "0.1.0"
 dependencies = [
  "json5",
+ "oak-typescript",
  "oxc-css-parser",
  "oxc_allocator",
  "oxc_ast",

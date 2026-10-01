@@ -1,7 +1,7 @@
 //! Oak TypeScript parse for VMZ template expression snippets.
 
 use oak_core::{Builder, ParseSession, SourceText};
-use oak_typescript::ast::Statement;
+use oak_typescript::ast::{Expression, Statement};
 use oak_typescript::{TypeScriptBuilder, TypeScriptLanguage};
 
 use crate::contract::{ByteSpan, OakFrontendDiagnostic};
@@ -10,6 +10,8 @@ use crate::oak_cst::map_oak_error;
 /// Result of parsing a trimmed template expression via Oak TypeScript AST.
 #[derive(Debug, Clone)]
 pub struct ExpressionSnippetParse {
+    /// Root expression when lowered (snippet-local spans).
+    pub expression: Option<Expression>,
     /// Root expression span in the trimmed snippet when lowered.
     pub root_span: Option<ByteSpan>,
     /// Oak diagnostics (snippet-local offsets).
@@ -26,7 +28,12 @@ pub struct ExpressionSnippetParse {
 pub fn parse_expression_snippet(expr: &str) -> ExpressionSnippetParse {
     let trimmed = expr.trim();
     if trimmed.is_empty() {
-        return ExpressionSnippetParse { root_span: None, diagnostics: Vec::new(), ok: true };
+        return ExpressionSnippetParse {
+            expression: None,
+            root_span: None,
+            diagnostics: Vec::new(),
+            ok: true,
+        };
     }
 
     let source = SourceText::new(trimmed);
@@ -43,24 +50,23 @@ pub fn parse_expression_snippet(expr: &str) -> ExpressionSnippetParse {
         diagnostics.push(map_oak_error(err, 0));
     }
 
-    let expr_span = built.result.as_ref().ok().and_then(|root| {
+    let expression = built.result.as_ref().ok().and_then(|root| {
         root.statements.iter().find_map(|stmt| match stmt {
-            Statement::ExpressionStatement(es) => {
-                Some(ByteSpan { start: es.expression.span.start, end: es.expression.span.end })
-            }
+            Statement::ExpressionStatement(es) => Some(es.expression.clone()),
             _ => None,
         })
     });
+    let expr_span = expression.as_ref().map(|e| ByteSpan { start: e.span.start, end: e.span.end });
 
-    if expr_span.is_none() && diagnostics.is_empty() {
+    if expression.is_none() && diagnostics.is_empty() {
         diagnostics.push(OakFrontendDiagnostic {
             message: "Oak TypeScript did not lower expression snippet".into(),
             span: Some(ByteSpan { start: 0, end: trimmed.len() }),
         });
     }
 
-    let ok = diagnostics.is_empty() && expr_span.is_some();
-    ExpressionSnippetParse { root_span: expr_span, diagnostics, ok }
+    let ok = diagnostics.is_empty() && expression.is_some();
+    ExpressionSnippetParse { expression, root_span: expr_span, diagnostics, ok }
 }
 
 /// Fail fast when Oak rejects a template expression snippet.
