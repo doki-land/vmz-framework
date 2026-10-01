@@ -153,7 +153,22 @@ jobs:
         run: pnpm verify:ci-skip-native-pre
 
       - name: Build tools + examples
-        run: pnpm --workspace-concurrency=1 build:examples
+        shell: bash
+        run: |
+          set -euo pipefail
+          for example in \
+            @vmz-examples/hello \
+            @vmz-examples/counter \
+            @vmz-examples/event-shell \
+            @vmz-examples/fullstack \
+            @vmz-examples/island \
+            @vmz-examples/production-catalog \
+            @vmz-examples/production-inspector \
+            @vmz-examples/production-router \
+            @vmz-examples/vmz-style-tailwind; do
+            echo "==> building $example"
+            pnpm --filter "$example" run build
+          done
 
       - name: Install Chromium (browser host / CDP)
         uses: browser-actions/setup-chrome@v2
