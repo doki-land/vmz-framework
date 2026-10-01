@@ -1240,7 +1240,7 @@ dependencies = [
 [[package]]
 name = "oak-core"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#d93e6a95c0d05d4082f00eeb68f829681c8c723a"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#7975271ff9c334f89eb7f14a58069d45bacfb5ec"
 dependencies = [
  "serde",
  "smallvec",
@@ -1252,7 +1252,7 @@ dependencies = [
 [[package]]
 name = "oak-typescript"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#d93e6a95c0d05d4082f00eeb68f829681c8c723a"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#7975271ff9c334f89eb7f14a58069d45bacfb5ec"
 dependencies = [
  "oak-core",
  "serde",
@@ -1261,7 +1261,7 @@ dependencies = [
 [[package]]
 name = "oak-vue"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#d93e6a95c0d05d4082f00eeb68f829681c8c723a"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#7975271ff9c334f89eb7f14a58069d45bacfb5ec"
 dependencies = [
  "oak-core",
  "serde",
@@ -3095,6 +3095,7 @@ dependencies = [
  "serde_json",
  "vmz-compiler",
  "vmz-generator",
+ "vmz-oak-frontend-adapter",
  "walkdir",
 ]
 

@@ -88,6 +88,56 @@ export default class Page {
     assert!(!template_block.children.is_empty(), "expected void element children");
 }
 
+#[test]
+fn oak_cst_parses_keyword_for_attr_without_hang() {
+    let source = r#"<template>
+  <label :for="controlId">{{ label }}</label>
+</template>
+<script client>
+export default class Field {
+  controlId = 'x';
+  label = 'Name';
+}
+</script>
+"#;
+    let parsed = parse_vmz("Field.vmz", source).expect("parse vmz");
+    let shell = template_shell(&parsed.template);
+    let cst = parse_template_cst(&shell);
+    assert!(cst.ok, "`:for` must not hang CST: {:?}", cst.diagnostics);
+    let ast = parse_template_ast(&shell);
+    assert!(ast.ok, "`:for` must not hang AST: {:?}", ast.diagnostics);
+}
+
+#[test]
+fn oak_cst_parses_ternary_interpolation_without_hang() {
+    let source = r#"<template>
+  <button>{{ armed ? "ON" : "OFF" }}</button>
+</template>
+<script client>
+export default class EventButton {
+  armed = false;
+}
+</script>
+"#;
+    let parsed = parse_vmz("EventButton.vmz", source).expect("parse vmz");
+    let cst = parse_template_cst(&template_shell(&parsed.template));
+    assert!(cst.ok, "ternary interpolation CST failed: {:?}", cst.diagnostics);
+}
+
+#[test]
+fn oak_cst_parses_autocomplete_template_without_hang() {
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../ui/vmz-ui/src/components/Autocomplete.vmz");
+    if !path.exists() {
+        eprintln!("skip autocomplete fixture: {}", path.display());
+        return;
+    }
+    let source = std::fs::read_to_string(&path).expect("read Autocomplete.vmz");
+    let parsed = parse_vmz(&path, source).expect("parse vmz");
+    let cst = parse_template_cst(&template_shell(&parsed.template));
+    assert!(cst.ok, "Autocomplete template CST failed: {:?}", cst.diagnostics);
+}
+
 fn script_shell(block: &vmz_compiler::ScriptBlock, role: ScriptRole) -> ScriptShellInput {
     ScriptShellInput { content: block.content.clone(), content_start: block.content_start, role }
 }
