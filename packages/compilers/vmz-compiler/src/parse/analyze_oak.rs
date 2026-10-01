@@ -60,8 +60,8 @@ pub fn collect_static_imports_via_oak(kind: ScriptKind, source: &str) -> Vec<Nya
 
 /// Oak-primary static imports with oxc fallback when Oak yields empty module specifiers.
 ///
-/// Oaks `ImportDeclaration` builder currently often drops `module_specifier` / clause
-/// structure; oxc keeps cross-file edges usable for Nyar until oaks import CST is fixed.
+/// Prefer Oak after oaks `#f864eaa1` structured `ImportDeclaration`. Oxc remains a
+/// safety net if Oak parse/build fails for a given script body.
 pub fn collect_static_imports(kind: ScriptKind, source: &str) -> Vec<NyarImportDecl> {
     let oak = collect_static_imports_via_oak(kind, source);
     if oak.iter().any(|imp| !imp.module_specifier.is_empty()) {

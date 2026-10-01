@@ -93,3 +93,24 @@ export default class Page {
     assert_eq!(ns.specifiers[0].local, "ns");
     assert_eq!(ns.specifiers[0].binding_kind, NyarBindingKind::Namespace);
 }
+
+#[test]
+fn oak_static_import_collect_fills_module_specifier() {
+    use vmz_compiler::parse::analyze_oak::collect_static_imports_via_oak;
+    use vmz_compiler::sfc::ScriptKind;
+
+    let source = r#"
+import { helper } from './lib';
+import type { T } from '@pkg/types';
+export default class Page {}
+"#;
+    let imports = collect_static_imports_via_oak(ScriptKind::Client, source);
+    assert!(
+        imports.iter().any(|i| i.module_specifier == "./lib"),
+        "expected Oak path to fill module_specifier, got {imports:?}"
+    );
+    assert!(
+        imports.iter().any(|i| i.module_specifier == "@pkg/types" && i.is_type_only),
+        "expected type-only import via Oak, got {imports:?}"
+    );
+}
