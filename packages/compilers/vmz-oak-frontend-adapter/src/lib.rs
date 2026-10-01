@@ -17,8 +17,8 @@ pub use contract::{
     SfcDocumentView, TemplateCstParse, TemplateShellInput,
 };
 pub use nyar_contract::{
-    NyarAnalysisInput, NyarHttpRoute, NyarInternalType, NyarMember, NyarMemberKind,
-    NyarProgramRole, NyarProgramUnit,
+    NyarAnalysisInput, NyarBindingKind, NyarHttpRoute, NyarImportBinding, NyarImportDecl,
+    NyarImportKind, NyarInternalType, NyarMember, NyarMemberKind, NyarProgramRole, NyarProgramUnit,
 };
 pub use oak_ast::{TemplateAstParse, parse_template_ast, require_template_ast};
 pub use oak_cst::{format_cst_diagnostics, parse_template_cst, require_template_cst};

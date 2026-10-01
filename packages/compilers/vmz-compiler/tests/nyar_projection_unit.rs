@@ -1,5 +1,5 @@
 use vmz_compiler::oak::project_nyar_from_vmz;
-use vmz_oak_frontend_adapter::{NyarMemberKind, NyarProgramRole};
+use vmz_oak_frontend_adapter::{NyarBindingKind, NyarImportKind, NyarMemberKind, NyarProgramRole};
 
 #[test]
 fn nyar_projection_maps_client_props_and_server_boundary() {
@@ -54,4 +54,42 @@ export default class Home {}
     let input = project_nyar_from_vmz("Home.vmz", source).expect("project nyar");
     assert!(!input.has_server_boundary);
     assert_eq!(input.document.blocks.len(), 3);
+}
+
+#[test]
+fn nyar_projection_collects_static_imports() {
+    let source = r#"<template><div /></template>
+<script client>
+import { helper } from './lib';
+import type { T } from '@pkg/types';
+import * as ns from '../ns';
+export default class Page {
+  public x = 1;
+}
+</script>
+"#;
+    let input = project_nyar_from_vmz("Page.vmz", source).expect("project nyar");
+    let client = &input.programs[0];
+    assert_eq!(client.imports.len(), 3, "imports={:?}", client.imports);
+
+    let named = &client.imports[0];
+    assert_eq!(named.module_specifier, "./lib");
+    assert!(!named.is_type_only);
+    assert_eq!(named.kind, NyarImportKind::Static);
+    assert_eq!(named.specifiers.len(), 1);
+    assert_eq!(named.specifiers[0].local, "helper");
+    assert_eq!(named.specifiers[0].imported.as_deref(), Some("helper"));
+    assert_eq!(named.specifiers[0].binding_kind, NyarBindingKind::Named);
+    assert!(named.decl_span.start >= client.content_span.start);
+    assert!(named.specifier_span.start >= named.decl_span.start);
+
+    let type_only = &client.imports[1];
+    assert_eq!(type_only.module_specifier, "@pkg/types");
+    assert!(type_only.is_type_only);
+
+    let ns = &client.imports[2];
+    assert_eq!(ns.module_specifier, "../ns");
+    assert_eq!(ns.specifiers.len(), 1);
+    assert_eq!(ns.specifiers[0].local, "ns");
+    assert_eq!(ns.specifiers[0].binding_kind, NyarBindingKind::Namespace);
 }

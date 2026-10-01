@@ -37,6 +37,58 @@ pub struct NyarProgramUnit {
     pub members: Vec<NyarMember>,
     /// Co-located helper classes in the same script block.
     pub internal_types: Vec<NyarInternalType>,
+    /// Static ES module imports (cross-file edges; raw specifiers, unresolved).
+    pub imports: Vec<NyarImportDecl>,
+}
+
+/// Kind of module edge projected for Nyar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NyarImportKind {
+    /// `import … from '…'`.
+    Static,
+    /// `export { … } from '…'` / `export * from '…'` (later peels).
+    ExportFrom,
+}
+
+/// How a local binding is bound from the module.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NyarBindingKind {
+    /// `import local from '…'`.
+    Default,
+    /// `import { name }` / `import { name as local }`.
+    Named,
+    /// `import * as local from '…'`.
+    Namespace,
+}
+
+/// One local binding from an import declaration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NyarImportBinding {
+    /// Local identifier in this script.
+    pub local: String,
+    /// Remote export name when named (`None` for default / namespace).
+    pub imported: Option<String>,
+    /// Default / named / namespace.
+    pub binding_kind: NyarBindingKind,
+    /// Span of the local name in the `.vmz` file (best-effort; may equal `decl_span`).
+    pub name_span: ByteSpan,
+}
+
+/// One static import (or later export-from) declaration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NyarImportDecl {
+    /// Static vs export-from.
+    pub kind: NyarImportKind,
+    /// Module specifier as written (`./lib`, `@pkg/types`, …) without quotes.
+    pub module_specifier: String,
+    /// Local bindings introduced by this declaration.
+    pub specifiers: Vec<NyarImportBinding>,
+    /// `import type` / `export type`.
+    pub is_type_only: bool,
+    /// Full declaration span in the `.vmz` file.
+    pub decl_span: ByteSpan,
+    /// Span covering the module string literal when known (else `decl_span`).
+    pub specifier_span: ByteSpan,
 }
 
 /// Member classification for Nyar symbol tables.
