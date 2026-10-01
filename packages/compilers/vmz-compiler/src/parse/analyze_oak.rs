@@ -14,6 +14,7 @@ use vmz_types::{
     ComponentDecl, FieldDecl, FieldKind, HttpRoute, InternalClassDecl, MethodDecl, Visibility,
 };
 
+use crate::field_rw::{ForbiddenFactory, is_forbidden_factory};
 use crate::sfc::ScriptKind;
 
 /// Try Oak TypeScript AST → component surface. `None` when Oak fails or yields no usable class.
@@ -36,6 +37,168 @@ pub fn try_component_decl_via_oak(kind: ScriptKind, source: &str) -> Option<Comp
         return None;
     }
     Some(decl)
+}
+
+/// Collect forbidden `useX` / `createX` factory calls via Oak TypeScript AST.
+///
+/// Returns `None` when Oak cannot build a script root (caller keeps oxc). Spans are
+/// relative to the script body (same as oxc `analyze_script` today).
+pub fn collect_forbidden_factories_via_oak(
+    kind: ScriptKind,
+    source: &str,
+) -> Option<Vec<ForbiddenFactory>> {
+    if kind != ScriptKind::Client {
+        return Some(Vec::new());
+    }
+    let shell = ScriptShellInput {
+        content: source.to_string(),
+        content_start: 0,
+        role: ScriptRole::Client,
+    };
+    let parsed = parse_script_ast(&shell);
+    let root = parsed.root.as_ref()?;
+    let mut out = Vec::new();
+    for stmt in &root.statements {
+        walk_stmt_forbidden(stmt, &mut out);
+    }
+    Some(out)
+}
+
+fn walk_stmt_forbidden(stmt: &Statement, out: &mut Vec<ForbiddenFactory>) {
+    match stmt {
+        Statement::ClassDeclaration(class) => walk_class_forbidden(class, out),
+        Statement::ExportDeclaration(exp) => {
+            if let Some(inner) = exp.declaration.as_deref() {
+                walk_stmt_forbidden(inner, out);
+            }
+        }
+        Statement::ExpressionStatement(es) => walk_expr_forbidden(&es.expression, out),
+        Statement::VariableDeclaration(v) => {
+            if let Some(init) = &v.value {
+                walk_expr_forbidden(init, out);
+            }
+        }
+        Statement::FunctionDeclaration(f) => {
+            for s in &f.body {
+                walk_stmt_forbidden(s, out);
+            }
+        }
+        Statement::ReturnStatement(r) => {
+            if let Some(e) = &r.argument {
+                walk_expr_forbidden(e, out);
+            }
+        }
+        Statement::IfStatement(i) => {
+            walk_expr_forbidden(&i.test, out);
+            walk_stmt_forbidden(&i.consequent, out);
+            if let Some(alt) = &i.alternate {
+                walk_stmt_forbidden(alt, out);
+            }
+        }
+        Statement::BlockStatement(b) => {
+            for s in &b.statements {
+                walk_stmt_forbidden(s, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn walk_class_forbidden(class: &ClassDeclaration, out: &mut Vec<ForbiddenFactory>) {
+    for member in &class.body {
+        match member {
+            ClassMember::Property { initializer, .. } => {
+                if let Some(init) = initializer {
+                    walk_expr_forbidden(init, out);
+                }
+            }
+            ClassMember::Method { body, .. } => {
+                for s in body {
+                    walk_stmt_forbidden(s, out);
+                }
+            }
+        }
+    }
+}
+
+fn walk_expr_forbidden(expr: &Expression, out: &mut Vec<ForbiddenFactory>) {
+    match expr.kind.as_ref() {
+        ExpressionKind::CallExpression { func, args } => {
+            if let Some(name) = oak_callee_factory_name(func) {
+                if is_forbidden_factory(&name) {
+                    out.push(ForbiddenFactory {
+                        name,
+                        span: Span::new(expr.span.start as u32, expr.span.end as u32),
+                    });
+                }
+            }
+            walk_expr_forbidden(func, out);
+            for a in args {
+                walk_expr_forbidden(a, out);
+            }
+        }
+        ExpressionKind::NewExpression { func, args } => {
+            walk_expr_forbidden(func, out);
+            for a in args {
+                walk_expr_forbidden(a, out);
+            }
+        }
+        ExpressionKind::MemberExpression { object, property, .. } => {
+            walk_expr_forbidden(object, out);
+            walk_expr_forbidden(property, out);
+        }
+        ExpressionKind::BinaryExpression { left, right, .. }
+        | ExpressionKind::AssignmentExpression { left, right, .. } => {
+            walk_expr_forbidden(left, out);
+            walk_expr_forbidden(right, out);
+        }
+        ExpressionKind::UnaryExpression { argument, .. }
+        | ExpressionKind::UpdateExpression { argument, .. }
+        | ExpressionKind::AsExpression { expression: argument, .. } => {
+            walk_expr_forbidden(argument, out);
+        }
+        ExpressionKind::AwaitExpression(inner) | ExpressionKind::SpreadElement(inner) => {
+            walk_expr_forbidden(inner, out);
+        }
+        ExpressionKind::YieldExpression(Some(inner)) => walk_expr_forbidden(inner, out),
+        ExpressionKind::ConditionalExpression { test, consequent, alternate } => {
+            walk_expr_forbidden(test, out);
+            walk_expr_forbidden(consequent, out);
+            walk_expr_forbidden(alternate, out);
+        }
+        ExpressionKind::ArrayLiteral { elements } => {
+            for e in elements {
+                walk_expr_forbidden(e, out);
+            }
+        }
+        ExpressionKind::ObjectLiteral { properties } => {
+            for p in properties {
+                if let oak_typescript::ast::ObjectProperty::Property { value, .. } = p {
+                    walk_expr_forbidden(value, out);
+                }
+            }
+        }
+        ExpressionKind::ArrowFunction { body, .. } => walk_stmt_forbidden(body, out),
+        ExpressionKind::FunctionExpression { body, .. } => {
+            for s in body {
+                walk_stmt_forbidden(s, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn oak_callee_factory_name(expr: &Expression) -> Option<String> {
+    match expr.kind.as_ref() {
+        ExpressionKind::Identifier(name) => Some(name.clone()),
+        ExpressionKind::MemberExpression { property, computed: false, .. } => {
+            match property.kind.as_ref() {
+                ExpressionKind::Identifier(name) => Some(name.clone()),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
 }
 
 /// Collect static `import` declarations from Oak TypeScript AST (phase D1).

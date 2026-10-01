@@ -13,7 +13,9 @@ use vmz_types::{
     ComponentDecl, FieldDecl, FieldKind, HttpRoute, InternalClassDecl, MethodDecl, Visibility,
 };
 
-use crate::parse::analyze_oak::{graft_oxc_method_summaries, try_component_decl_via_oak};
+use crate::parse::analyze_oak::{
+    collect_forbidden_factories_via_oak, graft_oxc_method_summaries, try_component_decl_via_oak,
+};
 use crate::field_rw::{FieldRw, ForbiddenFactory};
 use crate::sfc::ScriptKind;
 
@@ -26,24 +28,26 @@ pub struct AnalyzedScript {
     pub decl: ComponentDecl,
     /// Parse diagnostics as plain strings (oxc and/or Oak).
     pub parse_errors: Vec<String>,
-    /// `useX` / `createX` calls found in this script (still oxc until Oak walk covers it).
+    /// `useX` / `createX` calls found in this script (Oak walk when root exists, else oxc).
     pub forbidden_factories: Vec<ForbiddenFactory>,
 }
 
 /// Parse `source` as TypeScript and lower the default-export class into [`ComponentDecl`].
 ///
-/// Prefer Oak TypeScript AST for the class surface (name / props / methods / HTTP).
-/// Oxc still supplies method read/write/call summaries and forbidden-factory scans,
-/// and remains the full fallback when Oak cannot lower a usable default-export class.
+/// Prefer Oak TypeScript AST for the class surface (name / props / methods / HTTP) and
+/// forbidden-factory scans. Oxc still supplies method read/write/call summaries, and
+/// remains the full fallback when Oak cannot lower a usable default-export class.
 pub fn analyze_script(kind: ScriptKind, source: &str) -> AnalyzedScript {
     let oxc = analyze_script_oxc(kind, source);
     if let Some(mut oak_decl) = try_component_decl_via_oak(kind, source) {
         graft_oxc_method_summaries(&mut oak_decl, &oxc.decl);
+        let forbidden_factories =
+            collect_forbidden_factories_via_oak(kind, source).unwrap_or(oxc.forbidden_factories);
         return AnalyzedScript {
             kind,
             decl: oak_decl,
             parse_errors: oxc.parse_errors,
-            forbidden_factories: oxc.forbidden_factories,
+            forbidden_factories,
         };
     }
     oxc
