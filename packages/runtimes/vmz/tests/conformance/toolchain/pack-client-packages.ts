@@ -20,7 +20,7 @@ function fail(msg: string): never {
 }
 
 const { collectBareSpecs, packClientBareImports, rewriteRelativeTsSpecs } = await import(
-    pathToFileURL(path.join(root, 'packages', 'runtimes', 'vmz', 'dist', 'pack-client-packages.js')).href
+    pathToFileURL(path.join(root, 'packages', 'runtimes', 'vmz', 'dist', 'workspace', 'pack-client-packages.js')).href
 );
 
 console.log('pack-client-packages: collectBareSpecs shapes…');
@@ -50,6 +50,8 @@ console.log('pack-client-packages: collectBareSpecs shapes…');
 
 console.log('pack-client-packages: rewriteRelativeTsSpecs…');
 {
+    const unchanged = `export const runtimeFace = 'server';`;
+    if (rewriteRelativeTsSpecs(unchanged) !== unchanged) fail('plain JavaScript should bypass module parsing');
     const out = rewriteRelativeTsSpecs(`import { x } from './foo.ts';\nexport { y } from "../bar.tsx";`);
     if (out.includes('.ts') || out.includes('.tsx')) fail(`ts specs remain: ${out}`);
 }

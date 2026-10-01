@@ -354,6 +354,9 @@ function rewriteTsExt(p) {
 
 /** oxc AST module specifier rewrite (`.ts`→`.js` + optional exact map). */
 export function rewriteRelativeTsSpecs(js, exactMap = null) {
+    if (!String(js ?? '').includes('.ts') && !String(js ?? '').includes('.tsx') && !Object.keys(exactMap ?? {}).length) {
+        return String(js ?? '');
+    }
     const native = requireNativeAddon();
     if (typeof native.rewriteModuleSpecifiers !== 'function') {
         throw new Error('native missing rewriteModuleSpecifiers — run `pnpm napi:build`');
