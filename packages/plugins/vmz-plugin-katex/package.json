@@ -17,7 +17,8 @@
         }
     },
     "dependencies": {
-        "@vmz/plugin": "workspace:*"
+        "@vmz/plugin": "workspace:*",
+        "katex": "0.18.4"
     },
     "peerDependencies": {
         "katex": ">=0.16"
