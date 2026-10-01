@@ -1,6 +1,8 @@
 //! Project `.vmz` + analyzed scripts into language-neutral [`NyarAnalysisInput`].
+//!
+//! Spans on the wire are adapter [`ByteSpan`] only — no `oxc_span` import here.
+//! Script surfaces come from [`crate::analyze::analyze_script`] (Oak primary, oxc graft).
 
-use oxc_span::Span;
 use vmz_oak_frontend_adapter::{
     ByteSpan, NyarAnalysisInput, NyarHttpRoute, NyarInternalType, NyarMember, NyarMemberKind,
     NyarProgramRole, NyarProgramUnit,
@@ -25,7 +27,7 @@ pub fn project_nyar_analysis_input(
     NyarAnalysisInput { document, programs, has_server_boundary: parsed.server.is_some() }
 }
 
-/// Parse `.vmz`, analyze scripts, and project for Nyar.
+/// Parse `.vmz`, analyze scripts (Oak-primary), and project for Nyar.
 pub fn project_nyar_from_vmz(
     path: impl AsRef<std::path::Path>,
     source: impl Into<String>,
@@ -61,7 +63,7 @@ fn program_unit(
             .iter()
             .map(|c| NyarInternalType {
                 name: c.name.clone(),
-                name_span: abs_span(block.content_start, c.name_span),
+                name_span: abs_span(block.content_start, c.name_span.start, c.name_span.end),
             })
             .collect(),
     }
@@ -75,8 +77,8 @@ fn member_from_field(content_start: usize, field: &FieldDecl) -> NyarMember {
     NyarMember {
         name: field.name.clone(),
         kind,
-        name_span: abs_span(content_start, field.name_span),
-        decl_span: abs_span(content_start, field.span),
+        name_span: abs_span(content_start, field.name_span.start, field.name_span.end),
+        decl_span: abs_span(content_start, field.span.start, field.span.end),
         type_text: field.type_text.clone(),
         is_async: false,
         http_route: None,
@@ -87,8 +89,8 @@ fn member_from_method(content_start: usize, method: &MethodDecl) -> NyarMember {
     NyarMember {
         name: method.name.clone(),
         kind: NyarMemberKind::Method,
-        name_span: abs_span(content_start, method.name_span),
-        decl_span: abs_span(content_start, method.span),
+        name_span: abs_span(content_start, method.name_span.start, method.name_span.end),
+        decl_span: abs_span(content_start, method.span.start, method.span.end),
         type_text: None,
         is_async: method.is_async,
         http_route: method
@@ -98,6 +100,9 @@ fn member_from_method(content_start: usize, method: &MethodDecl) -> NyarMember {
     }
 }
 
-fn abs_span(content_start: usize, span: Span) -> ByteSpan {
-    ByteSpan { start: content_start + span.start as usize, end: content_start + span.end as usize }
+fn abs_span(content_start: usize, start: u32, end: u32) -> ByteSpan {
+    ByteSpan {
+        start: content_start + start as usize,
+        end: content_start + end as usize,
+    }
 }
