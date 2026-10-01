@@ -431,33 +431,30 @@ pub fn rewrite_virtual_import(
     let from_dir = from_file.parent().unwrap_or(Path::new("."));
     let rel = pathdiff_string(from_dir, target);
     let spec = if rel.starts_with('.') { rel } else { format!("./{rel}") };
-    let want = virtual_spec.to_string();
-    super::module_rewrite::rewrite_module_specifiers_required(
-        js,
-        |s| if s == want { Some(spec.clone()) } else { None },
-        "rewrite_virtual_import",
-    )
+    js.replace(&format!("\"{virtual_spec}\""), &format!("\"{spec}\""))
+        .replace(&format!("'{virtual_spec}'"), &format!("'{spec}'"))
 }
 
 /// Author may write `from './foo.ts'`; Node ESM under `dist/` needs `.js` (oxc AST).
 pub fn rewrite_ts_spec_imports(js: &str) -> String {
-    // Generated client modules commonly have no TypeScript specifiers. Avoid
-    // reparsing those modules through the frontend when there is nothing to rewrite.
-    if !js.contains(".ts") && !js.contains(".tsx") {
-        return js.to_string();
-    }
-    super::module_rewrite::rewrite_module_specifiers_required(
-        js,
-        |spec| {
-            if let Some(stem) = spec.strip_suffix(".tsx").or_else(|| spec.strip_suffix(".ts")) {
-                // Keep absolute / protocol / query forms; only rewrite extension.
-                Some(format!("{stem}.js"))
-            } else {
-                None
+    js.lines()
+        .map(|line| {
+            let module_line = line.contains("from \"")
+                || line.contains("from '")
+                || line.contains("import(\"")
+                || line.contains("import('")
+                || line.contains("export \"")
+                || line.contains("export '");
+            if !module_line {
+                return line.to_string();
             }
-        },
-        "rewrite_ts_spec_imports",
-    )
+            line.replace(".tsx\"", ".js\"")
+                .replace(".ts\"", ".js\"")
+                .replace(".tsx'", ".js'")
+                .replace(".ts'", ".js'")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Eager/lazy entry module for serve / static hosts.
