@@ -60,7 +60,7 @@ pub fn collect_static_imports_via_oak(kind: ScriptKind, source: &str) -> Vec<Nya
 
 /// Oak-primary static imports with oxc fallback when Oak yields empty module specifiers.
 ///
-/// Prefer Oak after oaks `#f864eaa1` structured `ImportDeclaration`. Oxc remains a
+/// Prefer Oak after oaks `#a5ac2719` structured import / `export … from`. Oxc remains a
 /// safety net if Oak parse/build fails for a given script body.
 pub fn collect_static_imports(kind: ScriptKind, source: &str) -> Vec<NyarImportDecl> {
     let oak = collect_static_imports_via_oak(kind, source);
@@ -153,6 +153,73 @@ fn collect_static_imports_via_oxc(source: &str) -> Vec<NyarImportDecl> {
             });
             walk::walk_import_declaration(self, decl);
         }
+
+        fn visit_export_from_declaration(
+            &mut self,
+            decl: &oxc_ast::ast::ExportFromDeclaration<'a>,
+        ) {
+            let module_specifier = decl.source.value.as_str().to_string();
+            let decl_span = ByteSpan {
+                start: decl.span.start as usize,
+                end: decl.span.end as usize,
+            };
+            let specifier_span = ByteSpan {
+                start: decl.source.span.start as usize,
+                end: decl.source.span.end as usize,
+            };
+            let mut specifiers = Vec::new();
+            for spec in &decl.specifiers {
+                let imported = match &spec.local {
+                    ModuleExportName::IdentifierName(id) => id.name.as_str().to_string(),
+                    ModuleExportName::IdentifierReference(id) => id.name.as_str().to_string(),
+                    ModuleExportName::StringLiteral(lit) => lit.value.as_str().to_string(),
+                };
+                let local = match &spec.exported {
+                    ModuleExportName::IdentifierName(id) => id.name.as_str().to_string(),
+                    ModuleExportName::IdentifierReference(id) => id.name.as_str().to_string(),
+                    ModuleExportName::StringLiteral(lit) => lit.value.as_str().to_string(),
+                };
+                specifiers.push(NyarImportBinding {
+                    local: local.clone(),
+                    imported: Some(imported),
+                    binding_kind: NyarBindingKind::Named,
+                    name_span: ByteSpan {
+                        start: spec.span.start as usize,
+                        end: spec.span.end as usize,
+                    },
+                });
+            }
+            self.out.push(NyarImportDecl {
+                kind: NyarImportKind::ExportFrom,
+                module_specifier,
+                specifiers,
+                is_type_only: decl.export_kind.is_type(),
+                decl_span,
+                specifier_span,
+            });
+            walk::walk_export_from_declaration(self, decl);
+        }
+
+        fn visit_export_all_declaration(&mut self, decl: &oxc_ast::ast::ExportAllDeclaration<'a>) {
+            let module_specifier = decl.source.value.as_str().to_string();
+            let decl_span = ByteSpan {
+                start: decl.span.start as usize,
+                end: decl.span.end as usize,
+            };
+            let specifier_span = ByteSpan {
+                start: decl.source.span.start as usize,
+                end: decl.source.span.end as usize,
+            };
+            self.out.push(NyarImportDecl {
+                kind: NyarImportKind::ExportFrom,
+                module_specifier,
+                specifiers: Vec::new(),
+                is_type_only: decl.export_kind.is_type(),
+                decl_span,
+                specifier_span,
+            });
+            walk::walk_export_all_declaration(self, decl);
+        }
     }
 
     let allocator = Allocator::default();
@@ -168,68 +235,116 @@ fn collect_static_imports_via_oxc(source: &str) -> Vec<NyarImportDecl> {
 fn imports_from_root(root: &TypeScriptRoot, source: &str) -> Vec<NyarImportDecl> {
     let mut out = Vec::new();
     for stmt in &root.statements {
-        let Statement::ImportDeclaration(decl) = stmt else {
-            continue;
-        };
-        if decl.module_specifier.is_empty() {
-            continue;
-        }
-        let decl_span = ByteSpan { start: decl.span.start, end: decl.span.end };
-        let specifier_span = specifier_span_in(source, decl.span.start, decl.span.end, &decl.module_specifier)
-            .unwrap_or(decl_span);
-        let mut specifiers = Vec::new();
-        for spec in &decl.specifiers {
-            match spec {
-                ImportSpecifier::Default(local) => {
-                    if !is_simple_ident(local) {
-                        continue;
-                    }
-                    specifiers.push(NyarImportBinding {
-                        local: local.clone(),
-                        imported: None,
-                        binding_kind: NyarBindingKind::Default,
-                        name_span: name_byte_span(source, decl.span.start, decl.span.end, local)
-                            .unwrap_or(decl_span),
-                    });
+        match stmt {
+            Statement::ImportDeclaration(decl) => {
+                if decl.module_specifier.is_empty() {
+                    continue;
                 }
-                ImportSpecifier::Namespace(local) => {
-                    // Oak NamedImports builder may emit a bogus Namespace spanning `{…}`;
-                    // keep only simple identifiers (`import * as ns`).
-                    if !is_simple_ident(local) {
-                        continue;
-                    }
-                    specifiers.push(NyarImportBinding {
-                        local: local.clone(),
-                        imported: None,
-                        binding_kind: NyarBindingKind::Namespace,
-                        name_span: name_byte_span(source, decl.span.start, decl.span.end, local)
-                            .unwrap_or(decl_span),
-                    });
-                }
-                ImportSpecifier::Named { local, imported } => {
-                    if !is_simple_ident(local) {
-                        continue;
-                    }
-                    specifiers.push(NyarImportBinding {
-                        local: local.clone(),
-                        imported: Some(imported.clone()),
-                        binding_kind: NyarBindingKind::Named,
-                        name_span: name_byte_span(source, decl.span.start, decl.span.end, local)
-                            .unwrap_or(decl_span),
-                    });
-                }
+                out.push(nyar_from_oak_import(decl, source));
             }
+            Statement::ExportDeclaration(exp) => {
+                let Some(module_specifier) = exp.source.as_ref().filter(|s| !s.is_empty()) else {
+                    continue;
+                };
+                let decl_span = ByteSpan { start: exp.span.start, end: exp.span.end };
+                let specifier_span =
+                    specifier_span_in(source, exp.span.start, exp.span.end, module_specifier)
+                        .unwrap_or(decl_span);
+                let mut specifiers = Vec::new();
+                for spec in &exp.specifiers {
+                    if !is_simple_ident(&spec.local) {
+                        continue;
+                    }
+                    let local_name = if spec.exported.is_empty() {
+                        spec.local.clone()
+                    } else {
+                        spec.exported.clone()
+                    };
+                    specifiers.push(NyarImportBinding {
+                        local: local_name,
+                        imported: Some(spec.local.clone()),
+                        binding_kind: NyarBindingKind::Named,
+                        name_span: name_byte_span(
+                            source,
+                            exp.span.start,
+                            exp.span.end,
+                            &spec.local,
+                        )
+                        .unwrap_or(decl_span),
+                    });
+                }
+                out.push(NyarImportDecl {
+                    kind: NyarImportKind::ExportFrom,
+                    module_specifier: module_specifier.clone(),
+                    specifiers,
+                    is_type_only: exp.is_type_only,
+                    decl_span,
+                    specifier_span,
+                });
+            }
+            _ => {}
         }
-        out.push(NyarImportDecl {
-            kind: NyarImportKind::Static,
-            module_specifier: decl.module_specifier.clone(),
-            specifiers,
-            is_type_only: decl.is_type_only,
-            decl_span,
-            specifier_span,
-        });
     }
     out
+}
+
+fn nyar_from_oak_import(
+    decl: &oak_typescript::ast::ImportDeclaration,
+    source: &str,
+) -> NyarImportDecl {
+    let decl_span = ByteSpan { start: decl.span.start, end: decl.span.end };
+    let specifier_span =
+        specifier_span_in(source, decl.span.start, decl.span.end, &decl.module_specifier)
+            .unwrap_or(decl_span);
+    let mut specifiers = Vec::new();
+    for spec in &decl.specifiers {
+        match spec {
+            ImportSpecifier::Default(local) => {
+                if !is_simple_ident(local) {
+                    continue;
+                }
+                specifiers.push(NyarImportBinding {
+                    local: local.clone(),
+                    imported: None,
+                    binding_kind: NyarBindingKind::Default,
+                    name_span: name_byte_span(source, decl.span.start, decl.span.end, local)
+                        .unwrap_or(decl_span),
+                });
+            }
+            ImportSpecifier::Namespace(local) => {
+                if !is_simple_ident(local) {
+                    continue;
+                }
+                specifiers.push(NyarImportBinding {
+                    local: local.clone(),
+                    imported: None,
+                    binding_kind: NyarBindingKind::Namespace,
+                    name_span: name_byte_span(source, decl.span.start, decl.span.end, local)
+                        .unwrap_or(decl_span),
+                });
+            }
+            ImportSpecifier::Named { local, imported } => {
+                if !is_simple_ident(local) {
+                    continue;
+                }
+                specifiers.push(NyarImportBinding {
+                    local: local.clone(),
+                    imported: Some(imported.clone()),
+                    binding_kind: NyarBindingKind::Named,
+                    name_span: name_byte_span(source, decl.span.start, decl.span.end, local)
+                        .unwrap_or(decl_span),
+                });
+            }
+        }
+    }
+    NyarImportDecl {
+        kind: NyarImportKind::Static,
+        module_specifier: decl.module_specifier.clone(),
+        specifiers,
+        is_type_only: decl.is_type_only,
+        decl_span,
+        specifier_span,
+    }
 }
 
 fn is_simple_ident(name: &str) -> bool {

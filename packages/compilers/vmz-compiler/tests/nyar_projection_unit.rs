@@ -95,6 +95,42 @@ export default class Page {
 }
 
 #[test]
+fn nyar_projection_collects_export_from_and_side_effect_import() {
+    let source = r#"<template><div /></template>
+<script client>
+import './side-effect';
+export { helper as h } from './lib';
+export * from '../star';
+export default class Page {}
+</script>
+"#;
+    let input = project_nyar_from_vmz("Page.vmz", source).expect("project nyar");
+    let client = &input.programs[0];
+    assert!(
+        client.imports.iter().any(|i| {
+            i.kind == NyarImportKind::Static
+                && i.module_specifier == "./side-effect"
+                && i.specifiers.is_empty()
+        }),
+        "side-effect import missing: {:?}",
+        client.imports
+    );
+    let named = client
+        .imports
+        .iter()
+        .find(|i| i.kind == NyarImportKind::ExportFrom && i.module_specifier == "./lib")
+        .expect("named export-from");
+    assert_eq!(named.specifiers.len(), 1);
+    assert_eq!(named.specifiers[0].local, "h");
+    assert_eq!(named.specifiers[0].imported.as_deref(), Some("helper"));
+    assert!(client.imports.iter().any(|i| {
+        i.kind == NyarImportKind::ExportFrom
+            && i.module_specifier == "../star"
+            && i.specifiers.is_empty()
+    }));
+}
+
+#[test]
 fn oak_static_import_collect_fills_module_specifier() {
     use vmz_compiler::parse::analyze_oak::collect_static_imports_via_oak;
     use vmz_compiler::sfc::ScriptKind;
@@ -102,6 +138,7 @@ fn oak_static_import_collect_fills_module_specifier() {
     let source = r#"
 import { helper } from './lib';
 import type { T } from '@pkg/types';
+export { a } from './re';
 export default class Page {}
 "#;
     let imports = collect_static_imports_via_oak(ScriptKind::Client, source);
@@ -112,5 +149,11 @@ export default class Page {}
     assert!(
         imports.iter().any(|i| i.module_specifier == "@pkg/types" && i.is_type_only),
         "expected type-only import via Oak, got {imports:?}"
+    );
+    assert!(
+        imports.iter().any(|i| {
+            i.kind == NyarImportKind::ExportFrom && i.module_specifier == "./re"
+        }),
+        "expected Oak export-from, got {imports:?}"
     );
 }
