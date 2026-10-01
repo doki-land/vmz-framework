@@ -441,6 +441,11 @@ pub fn rewrite_virtual_import(
 
 /// Author may write `from './foo.ts'`; Node ESM under `dist/` needs `.js` (oxc AST).
 pub fn rewrite_ts_spec_imports(js: &str) -> String {
+    // Generated client modules commonly have no TypeScript specifiers. Avoid
+    // reparsing those modules through the frontend when there is nothing to rewrite.
+    if !js.contains(".ts") && !js.contains(".tsx") {
+        return js.to_string();
+    }
     super::module_rewrite::rewrite_module_specifiers_required(
         js,
         |spec| {
