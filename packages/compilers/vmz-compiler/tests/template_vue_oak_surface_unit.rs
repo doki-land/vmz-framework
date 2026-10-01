@@ -144,13 +144,13 @@ const AGREED: &[(&str, &str)] = &[
     ("component_link", r#"<Link to="Home">Go</Link>"#),
     ("dynamic_bind_on", r#"<button :[attrName]="val" @[eventName]="onEv">x</button>"#),
     ("ternary_interp", r#"<span>{{ ok ? 'y' : 'n' }}</span>"#),
+    ("hash_slot", r#"<Comp><template #title>T</template></Comp>"#),
+    ("v_slot", r#"<Comp><template v-slot:footer>F</template></Comp>"#),
 ];
 
 /// Documented Oak Vue gaps — tracked for oaks, not VMZ XML workarounds.
-const OAK_GAPS: &[(&str, &str)] = &[
-    // oak-vue does not yet lower `<template #name>` / `v-slot` into a usable AST.
-    ("hash_slot", r#"<Comp><template #title>T</template></Comp>"#),
-];
+/// Empty when the AGREED matrix covers the current Vue template surface.
+const OAK_GAPS: &[(&str, &str)] = &[];
 
 #[test]
 fn oak_and_legacy_semantic_agree_on_vue_surface_matrix() {
