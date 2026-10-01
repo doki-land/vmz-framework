@@ -1,11 +1,11 @@
 //! Layer-2 Vue Semantic AST (Structured Template Semantics).
 //!
-//! **Primary ingress**: [`super::template_oak::parse_template_layers_primary`] /
-//! [`super::template_oak::parse_template_semantic_primary`] (Oak → Concrete → here).
+//! **Primary ingress**: [`super::template_oak::parse_template_semantic_primary`]
+//! (Oak Vue AST → Semantic; attr classify may use [`ConcreteAttr`] algebra).
 //!
-//! [`lower_concrete_to_semantic`] is the **deprecated adapter** that structures
-//! control flow (`IfChain` / `ForNode` / …) from Concrete — still required until
-//! Oak Vue AST lowers straight into Semantic without a Concrete hop.
+//! [`lower_concrete_to_semantic`] is the **deprecated adapter** for legacy XML
+//! Concrete forests and fixtures. Oak Semantic must not route through
+//! [`super::template_concrete::ConcreteIr`].
 //!
 //! Pipeline emit still goes through the legacy [`super::template_ir::TemplateIr`]
 //! adapter until Execution IR lands.
@@ -207,10 +207,88 @@ pub enum SemanticProp {
 
 /// Lower Concrete → Semantic (IfChain / ForNode / Bind·On plans; comments dropped).
 ///
-/// Adapter retained for Oak→Concrete→Semantic and legacy fixtures. New call sites
-/// should prefer [`super::template_oak::parse_template_semantic_primary`].
+/// Legacy XML / fixture adapter. Oak call sites must use
+/// [`super::template_oak::parse_template_semantic_via_oak`] instead.
 pub fn lower_concrete_to_semantic(concrete: &ConcreteIr) -> Result<SemanticIr, TemplateParseError> {
     Ok(SemanticIr { roots: lower_siblings(&concrete.roots)? })
+}
+
+/// Control-flow kind on classified attrs (shared by Oak direct lower + Concrete adapter).
+#[derive(Debug, Clone)]
+pub(crate) enum ControlFlowKind {
+    /// `v-if`.
+    If(String),
+    /// `v-else-if`.
+    ElseIf(String),
+    /// `v-else`.
+    Else,
+}
+
+/// Read `v-if` / `v-else-if` / `v-else` from classified attrs.
+pub(crate) fn control_flow_kind(attrs: &[ConcreteAttr]) -> Option<ControlFlowKind> {
+    for a in attrs {
+        if let ConcreteAttr::Directive { dir, .. } = a {
+            return match dir {
+                Directive::If { test } => Some(ControlFlowKind::If(test.clone())),
+                Directive::ElseIf { test } => Some(ControlFlowKind::ElseIf(test.clone())),
+                Directive::Else => Some(ControlFlowKind::Else),
+                _ => continue,
+            };
+        }
+    }
+    None
+}
+
+/// Structure one element after children are already Semantic (Oak direct path).
+pub(crate) fn semantic_from_element_parts(
+    tag: &str,
+    attrs: &[ConcreteAttr],
+    children: Vec<SemanticNode>,
+    span: TemplateSpan,
+) -> Result<SemanticNode, TemplateParseError> {
+    let attrs: Vec<ConcreteAttr> = attrs
+        .iter()
+        .filter(|a| {
+            !matches!(
+                a,
+                ConcreteAttr::Directive {
+                    dir: Directive::If { .. } | Directive::ElseIf { .. } | Directive::Else,
+                    ..
+                }
+            )
+        })
+        .cloned()
+        .collect();
+    if for_directive(&attrs).is_some() {
+        return for_node_from_lowered(tag, &attrs, children, span);
+    }
+    if let Some((slot_name, slot_props, slot_span)) = slot_directive(&attrs) {
+        return slot_template_from_lowered(
+            tag,
+            &attrs,
+            children,
+            span,
+            slot_name,
+            slot_props,
+            slot_span,
+        );
+    }
+    if tag == "slot" {
+        return slot_outlet_from_lowered(&attrs, children, span);
+    }
+    Ok(SemanticNode::Element {
+        tag: tag.to_string(),
+        props: lower_props(tag, &attrs),
+        children,
+        span,
+    })
+}
+
+/// Build [`SemanticNode::IfChain`] from already-lowered branch bodies.
+pub(crate) fn if_chain_from_branches(branches: Vec<IfBranch>) -> SemanticNode {
+    let span =
+        TemplateSpan { start: branches[0].span.start, end: branches.last().unwrap().span.end };
+    SemanticNode::IfChain { branches, span }
 }
 
 /// Tooling / compiler shared summary over one Semantic tree (no second template scan).
@@ -280,18 +358,18 @@ fn lower_siblings(nodes: &[ConcreteNode]) -> Result<Vec<SemanticNode>, TemplateP
                 i += 1;
             }
             ConcreteNode::Element { attrs, span, .. } => match control_flow_kind(attrs) {
-                Some(ControlFlow::If(_)) => {
+                Some(ControlFlowKind::If(_)) => {
                     let (chain, consumed) = take_if_chain(&nodes[i..])?;
                     out.push(chain);
                     i += consumed;
                 }
-                Some(ControlFlow::ElseIf(_)) => {
+                Some(ControlFlowKind::ElseIf(_)) => {
                     return Err(TemplateParseError {
                         message: "`v-else-if` requires a preceding `v-if` / `v-else-if`".into(),
                         offset: span.start as usize,
                     });
                 }
-                Some(ControlFlow::Else) => {
+                Some(ControlFlowKind::Else) => {
                     return Err(TemplateParseError {
                         message: "`v-else` requires a preceding `v-if` / `v-else-if`".into(),
                         offset: span.start as usize,
@@ -309,26 +387,6 @@ fn lower_siblings(nodes: &[ConcreteNode]) -> Result<Vec<SemanticNode>, TemplateP
         }
     }
     Ok(out)
-}
-
-enum ControlFlow {
-    If(String),
-    ElseIf(String),
-    Else,
-}
-
-fn control_flow_kind(attrs: &[ConcreteAttr]) -> Option<ControlFlow> {
-    for a in attrs {
-        if let ConcreteAttr::Directive { dir, .. } = a {
-            return match dir {
-                Directive::If { test } => Some(ControlFlow::If(test.clone())),
-                Directive::ElseIf { test } => Some(ControlFlow::ElseIf(test.clone())),
-                Directive::Else => Some(ControlFlow::Else),
-                _ => continue,
-            };
-        }
-    }
-    None
 }
 
 fn take_if_chain(nodes: &[ConcreteNode]) -> Result<(SemanticNode, usize), TemplateParseError> {
@@ -349,19 +407,19 @@ fn take_if_chain(nodes: &[ConcreteNode]) -> Result<(SemanticNode, usize), Templa
         };
         let kind = control_flow_kind(attrs);
         let test = match (&kind, branches.is_empty(), saw_else) {
-            (Some(ControlFlow::If(t)), true, _) => Some(t.clone()),
-            (Some(ControlFlow::ElseIf(t)), false, false) => Some(t.clone()),
-            (Some(ControlFlow::Else), false, false) => {
+            (Some(ControlFlowKind::If(t)), true, _) => Some(t.clone()),
+            (Some(ControlFlowKind::ElseIf(t)), false, false) => Some(t.clone()),
+            (Some(ControlFlowKind::Else), false, false) => {
                 saw_else = true;
                 None
             }
-            (Some(ControlFlow::ElseIf(_)), false, true) => {
+            (Some(ControlFlowKind::ElseIf(_)), false, true) => {
                 return Err(TemplateParseError {
                     message: "`v-else-if` cannot follow `v-else`".into(),
                     offset: span.start as usize,
                 });
             }
-            (Some(ControlFlow::If(_)), false, _) => break,
+            (Some(ControlFlowKind::If(_)), false, _) => break,
             _ => break,
         };
 
@@ -373,9 +431,7 @@ fn take_if_chain(nodes: &[ConcreteNode]) -> Result<(SemanticNode, usize), Templa
         }
     }
 
-    let span =
-        TemplateSpan { start: branches[0].span.start, end: branches.last().unwrap().span.end };
-    Ok((SemanticNode::IfChain { branches, span }, i))
+    Ok((if_chain_from_branches(branches), i))
 }
 
 fn for_directive(attrs: &[ConcreteAttr]) -> Option<&Directive> {
@@ -412,10 +468,10 @@ fn lower_for_element(node: &ConcreteNode) -> Result<SemanticNode, TemplateParseE
     lower_for_from_parts(tag, attrs, children, *span)
 }
 
-fn lower_for_from_parts(
+fn for_node_from_lowered(
     tag: &str,
     attrs: &[ConcreteAttr],
-    children: &[ConcreteNode],
+    children: Vec<SemanticNode>,
     span: TemplateSpan,
 ) -> Result<SemanticNode, TemplateParseError> {
     let Some(Directive::For { source, value_alias, key_alias, index_alias }) =
@@ -444,7 +500,6 @@ fn lower_for_from_parts(
         })
         .cloned()
         .collect();
-    let children = lower_siblings(children)?;
     let body = SemanticNode::Element {
         tag: tag.to_string(),
         props: lower_props(tag, &body_attrs),
@@ -462,41 +517,22 @@ fn lower_for_from_parts(
     })
 }
 
+fn lower_for_from_parts(
+    tag: &str,
+    attrs: &[ConcreteAttr],
+    children: &[ConcreteNode],
+    span: TemplateSpan,
+) -> Result<SemanticNode, TemplateParseError> {
+    for_node_from_lowered(tag, attrs, lower_siblings(children)?, span)
+}
+
 fn lower_element_strip_control_flow(
     node: &ConcreteNode,
 ) -> Result<SemanticNode, TemplateParseError> {
     let ConcreteNode::Element { tag, attrs, children, span } = node else {
         return Err(TemplateParseError { message: "internal: expected element".into(), offset: 0 });
     };
-    let attrs: Vec<ConcreteAttr> = attrs
-        .iter()
-        .filter(|a| {
-            !matches!(
-                a,
-                ConcreteAttr::Directive {
-                    dir: Directive::If { .. } | Directive::ElseIf { .. } | Directive::Else,
-                    ..
-                }
-            )
-        })
-        .cloned()
-        .collect();
-    if for_directive(&attrs).is_some() {
-        return lower_for_from_parts(tag, &attrs, children, *span);
-    }
-    if let Some((slot_name, slot_props, slot_span)) = slot_directive(&attrs) {
-        return lower_slot_template(tag, &attrs, children, *span, slot_name, slot_props, slot_span);
-    }
-    if tag == "slot" {
-        return lower_slot_outlet(&attrs, children, *span);
-    }
-    let children = lower_siblings(children)?;
-    Ok(SemanticNode::Element {
-        tag: tag.clone(),
-        props: lower_props(tag, &attrs),
-        children,
-        span: *span,
-    })
+    semantic_from_element_parts(tag, attrs, lower_siblings(children)?, *span)
 }
 
 fn slot_directive(attrs: &[ConcreteAttr]) -> Option<(DirectiveArg, Option<String>, TemplateSpan)> {
@@ -508,9 +544,9 @@ fn slot_directive(attrs: &[ConcreteAttr]) -> Option<(DirectiveArg, Option<String
     None
 }
 
-fn lower_slot_outlet(
+fn slot_outlet_from_lowered(
     attrs: &[ConcreteAttr],
-    children: &[ConcreteNode],
+    children: Vec<SemanticNode>,
     span: TemplateSpan,
 ) -> Result<SemanticNode, TemplateParseError> {
     let mut name = None;
@@ -523,16 +559,14 @@ fn lower_slot_outlet(
             other => rest.push(other.clone()),
         }
     }
-    // Prefer `:name` bind as static name when literal; dynamic name stays as Bind on props.
     let props = lower_props("slot", &rest);
-    let children = lower_siblings(children)?;
     Ok(SemanticNode::SlotOutlet { name, props, children, span })
 }
 
-fn lower_slot_template(
+fn slot_template_from_lowered(
     tag: &str,
     attrs: &[ConcreteAttr],
-    children: &[ConcreteNode],
+    children: Vec<SemanticNode>,
     span: TemplateSpan,
     slot_name: DirectiveArg,
     slot_props: Option<String>,
@@ -551,15 +585,17 @@ fn lower_slot_template(
         .cloned()
         .collect();
     let body = if tag == "template" {
-        // Fragment: slot filler is the lowered children only (single wrapper element).
-        let kids = lower_siblings(children)?;
-        SemanticNode::Element { tag: "template".into(), props: Vec::new(), children: kids, span }
+        SemanticNode::Element {
+            tag: "template".into(),
+            props: Vec::new(),
+            children,
+            span,
+        }
     } else {
-        let kids = lower_siblings(children)?;
         SemanticNode::Element {
             tag: tag.to_string(),
             props: lower_props(tag, &attrs_no_slot),
-            children: kids,
+            children,
             span,
         }
     };
