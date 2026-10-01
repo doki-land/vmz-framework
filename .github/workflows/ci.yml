@@ -153,7 +153,7 @@ jobs:
         run: pnpm verify:ci-skip-native-pre
 
       - name: Build tools + examples
-        run: pnpm build:examples
+        run: pnpm --workspace-concurrency=1 build:examples
 
       - name: Install Chromium (browser host / CDP)
         uses: browser-actions/setup-chrome@v2
