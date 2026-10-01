@@ -26,10 +26,21 @@ if (adapterRun.status !== 0) {
     fail('cargo test -p vmz-oak-frontend-adapter');
 }
 
-console.log('oak-frontend-smoke: cargo test vmz-compiler oak + nyar projection…');
+console.log('oak-frontend-smoke: cargo test vmz-compiler oak + nyar + vue-oak-surface…');
 const compilerRun = spawnSync(
     'cargo',
-    ['test', '-p', 'vmz-compiler', '--test', 'oak_template_unit', '--test', 'nyar_projection_unit', '--quiet'],
+    [
+        'test',
+        '-p',
+        'vmz-compiler',
+        '--test',
+        'oak_template_unit',
+        '--test',
+        'nyar_projection_unit',
+        '--test',
+        'template_vue_oak_surface_unit',
+        '--quiet',
+    ],
     {
         cwd: root,
         encoding: 'utf8',
@@ -39,14 +50,15 @@ const compilerRun = spawnSync(
 if (compilerRun.status !== 0) {
     console.error(compilerRun.stdout || '');
     console.error(compilerRun.stderr || '');
-    fail('cargo test -p vmz-compiler oak_template_unit nyar_projection_unit');
+    fail('cargo test -p vmz-compiler oak_template_unit nyar_projection_unit template_vue_oak_surface_unit');
 }
 
 const proof = readProof(root);
 upsertCheck(proof, {
     id: 'oak-frontend-smoke',
     status: 'passed',
-    detail: 'Oak CST/AST adapter, script TS AST, concrete lowering, Nyar projection stub',
+    detail:
+        'Oak CST/AST adapter, script TS AST, concrete/semantic layers, vue-oak-surface matrix, Nyar projection stub',
 });
 writeProof(proof, root);
 
