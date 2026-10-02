@@ -16,7 +16,7 @@ pub fn format_source_with_options(
             output,
         });
     }
-    // TODO(P4): remove once Oak print covers this input.
+    // TODO(P4): remove once Oak print covers this input (remaining gaps: class, trivia, etc.).
     oxc::format_source_with_options(path, source, options)
 }
 
@@ -36,6 +36,21 @@ mod tests {
         .expect("format");
         assert!(result.changed);
         assert!(result.output.contains("const x = 1"), "{}", result.output);
+    }
+
+    #[test]
+    fn oak_formats_jsx_via_print_path() {
+        let result = format_source_with_options(
+            Path::new("sample.tsx"),
+            r#"const el = <div className="foo">bar</div>"#,
+            oxc::default_format_options(),
+        )
+        .expect("format");
+        assert!(
+            result.output.contains("<div className='foo'>bar</div>"),
+            "{}",
+            result.output
+        );
     }
 
     #[test]
