@@ -4,7 +4,8 @@
  * Bare npm/workspace imports are legal on the author surface (01/04).
  * Browser ESM cannot resolve them. Pack materializes reachable package
  * modules under `dist/vendor/<pkg>/…` and rewrites importers to relative paths
- * via oxc AST (N-API `rewriteModuleSpecifiers`) — no import-text regex.
+ * via a bounded rewrite of generated module syntax. Pack must not re-enter the
+ * parser pipeline for every emitted JavaScript file.
  *
  * Not full oxc chunk-split/minify (`oxc-pending` remains for release minify).
  */
@@ -71,7 +72,7 @@ export function packClientBareImports(outDir: string, opts: PackClientBareImport
         const before = readFileSync(file, 'utf8');
         let after = rewriteBareImports(before, file, bareToVendor);
         try {
-            after = rewriteRelativeTsSpecs(after);
+            after = rewritePackModuleSpecifiers(after);
         } catch (error) {
             throw new Error(`pack module ${file}: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -318,7 +319,7 @@ function materializeModule(sourceFile) {
     if (ext === '.json') return raw;
     if (ext === '.ts' || ext === '.tsx') return transpileTs(raw, sourceFile);
     try {
-        return rewriteRelativeTsSpecs(raw);
+        return rewritePackModuleSpecifiers(raw);
     } catch (error) {
         throw new Error(`pack source ${sourceFile}: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -338,10 +339,10 @@ function transpileTs(source, filename) {
                 skipLibCheck: true,
             },
         });
-        return rewriteRelativeTsSpecs(out.outputText || '');
+        return rewritePackModuleSpecifiers(out.outputText || '');
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        return `/* vmz-pack: typescript transpile failed (${msg}) */\n${rewriteRelativeTsSpecs(source)}`;
+        return `/* vmz-pack: typescript transpile failed (${msg}) */\n${rewritePackModuleSpecifiers(source)}`;
     }
 }
 
@@ -402,5 +403,22 @@ function rewriteBareImports(js, fromFile, bareToVendor) {
         if (!rel.startsWith('.')) rel = `./${rel}`;
         exact[spec] = rel;
     }
-    return rewriteRelativeTsSpecs(js, exact);
+    return rewritePackModuleSpecifiers(js, exact);
+}
+
+function rewritePackModuleSpecifiers(source, exactMap = null) {
+    const rewrite = (spec) => {
+        const exact = exactMap && exactMap[spec];
+        if (typeof exact === 'string') return exact;
+        return /\.tsx?$/i.test(spec) ? spec.replace(/\.tsx?$/i, '.js') : spec;
+    };
+    const replace = (match, quote, spec) => {
+        const next = rewrite(spec);
+        return next === spec ? match : match.replace(`${quote}${spec}${quote}`, `${quote}${next}${quote}`);
+    };
+
+    let out = source.replace(/\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g, replace);
+    out = out.replace(/\bimport\s+[^;\n]*?\sfrom\s+(['"])([^'"]+)\1/g, replace);
+    out = out.replace(/\bimport\s+(['"])([^'"]+)\1/g, replace);
+    return out.replace(/\bfrom\s+(['"])([^'"]+)\1/g, replace);
 }
