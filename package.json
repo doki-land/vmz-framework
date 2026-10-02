@@ -18,6 +18,8 @@
         "verify:ci-skip-native-pre": "node scripts/ci/verify-parity.mjs skip-native-pre",
         "verify:ci-runtime-gates": "node scripts/ci/verify-parity.mjs runtime-gates",
         "verify:ci-ui-browser": "node scripts/ci/verify-parity.mjs ui-browser",
+        "verify:clean-build": "node scripts/ci/verify-clean-build.mjs",
+        "verify:clean-build:skip-native": "node scripts/ci/verify-clean-build.mjs --skip-build",
         "verify:list": "node --import ./scripts/test/resolve-ts-from-js.mjs --experimental-strip-types packages/runtimes/vmz/tests/conformance/run.ts --list",
         "test": "pnpm test:unit && pnpm test:examples",
         "test:unit": "pnpm build:runtimes && pnpm test:unit:only",
