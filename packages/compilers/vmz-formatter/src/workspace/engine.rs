@@ -39,6 +39,17 @@ mod tests {
     }
 
     #[test]
+    fn cst_format_preserves_leading_line_comment() {
+        let result = format_source_with_options(
+            Path::new("sample.ts"),
+            "// keep\nconst  x=1",
+            oxc::default_format_options(),
+        )
+        .expect("format");
+        assert_eq!(result.output, "// keep\nconst x = 1");
+    }
+
+    #[test]
     fn oak_formats_jsx_via_print_path() {
         let result = format_source_with_options(
             Path::new("sample.tsx"),

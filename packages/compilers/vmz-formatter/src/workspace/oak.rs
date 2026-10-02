@@ -1,9 +1,10 @@
 use std::path::Path;
 
-use oak_typescript::print::{FormatOptions, format_source as oak_format_source};
+use oak_typescript::cst_format::{CstFormatOptions, format_source as cst_format_source};
+use oak_typescript::print::{FormatOptions, format_source as ast_print_source};
 
-/// Transitional Oak AST print (`oak_typescript::print`). Not CST-faithful — see Oaks
-/// `format_print_contract` and VMZ capability matrix. Returns `Err` when Oak cannot print.
+/// Oak CST format first, then transitional AST print. Neither is full CST-faithful yet.
 pub fn format_source(_path: &Path, source: &str) -> Result<String, String> {
-    oak_format_source(source, &FormatOptions::default())
+    cst_format_source(source, &CstFormatOptions::default())
+        .or_else(|_| ast_print_source(source, &FormatOptions::default()))
 }
