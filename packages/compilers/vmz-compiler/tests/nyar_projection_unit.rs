@@ -168,3 +168,17 @@ fn oak_static_import_collect_ignores_at_in_comments_and_strings() {
     assert_eq!(imports.len(), 1, "imports={imports:?}");
     assert_eq!(imports[0].module_specifier, "@pkg/value");
 }
+
+#[test]
+fn oak_button_surface_preserves_runtime_prop_defaults() {
+    use vmz_compiler::parse::analyze_oak::try_component_decl_via_oak;
+    use vmz_compiler::sfc::ScriptKind;
+
+    let component = include_str!("../../../ui/vmz-ui/src/components/Button.vmz");
+    let source = component.split("<script client>").nth(1).unwrap().split("</script>").next().unwrap();
+    let decl = try_component_decl_via_oak(ScriptKind::Client, source).expect("Button Oak surface");
+    for (name, expected) in [("type", "\"button\""), ("disabled", "false"), ("loading", "false"), ("onClick", "null")] {
+        let prop = decl.properties.iter().find(|prop| prop.name == name).unwrap_or_else(|| panic!("missing {name}: {decl:?}"));
+        assert_eq!(prop.init_text.as_deref(), Some(expected), "{name}: {prop:?}");
+    }
+}
