@@ -42,6 +42,8 @@ console.log(`rustc ${read('rustc', ['-V'])}`);
 if (!skipBuild) {
     run('pnpm', ['build:runtimes']);
     run('node', ['scripts/ci/assert-vmz-pack.mjs']);
+} else {
+    run('pnpm', ['napi:build']);
 }
 
 run('cargo', [
@@ -70,5 +72,6 @@ run('cargo', [
     '--',
     '--nocapture',
 ]);
+run('pnpm', ['fmt:vmz:check']);
 
 console.log('\nverify-clean-build: bounded gates passed');
