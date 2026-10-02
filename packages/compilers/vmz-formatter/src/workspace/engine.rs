@@ -2,6 +2,8 @@ use std::path::Path;
 
 use oxc_formatter::JsFormatOptions;
 
+use oak_typescript::cst_format::CstFormatOptions;
+
 use super::{FormatFileResult, oak, oxc};
 
 /// Format JS/TS via Oak. `oxc_formatter` below is legacy debt for uncovered inputs and must shrink to zero.
@@ -10,7 +12,8 @@ pub fn format_source_with_options(
     source: &str,
     options: JsFormatOptions,
 ) -> Result<FormatFileResult, String> {
-    if let Ok(output) = oak::format_source(path, source) {
+    let cst_options = cst_format_options_from_js(&options);
+    if let Ok(output) = oak::format_source(path, source, &cst_options) {
         return Ok(FormatFileResult {
             changed: output != source,
             output,
@@ -18,6 +21,13 @@ pub fn format_source_with_options(
     }
     // TODO(P4): remove once Oak print covers this input (remaining gaps: class, trivia, etc.).
     oxc::format_source_with_options(path, source, options)
+}
+
+fn cst_format_options_from_js(options: &oxc_formatter::JsFormatOptions) -> CstFormatOptions {
+    CstFormatOptions {
+        indent_width: options.indent_width.value(),
+        line_width: usize::from(options.line_width.value()),
+    }
 }
 
 #[cfg(test)]
@@ -64,6 +74,18 @@ mod tests {
     #[test]
     fn cst_format_preserves_asi_sensitive_continuation() {
         let input = "const total = base\n+ extra";
+        let result = format_source_with_options(
+            Path::new("sample.ts"),
+            input,
+            oxc::default_format_options(),
+        )
+        .expect("format");
+        assert_eq!(result.output, input);
+    }
+
+    #[test]
+    fn cst_format_preserves_decorated_const_statement() {
+        let input = "@Component()\nconst  x=1";
         let result = format_source_with_options(
             Path::new("sample.ts"),
             input,

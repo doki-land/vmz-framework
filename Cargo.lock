@@ -1297,6 +1297,7 @@ dependencies = [
 [[package]]
 name = "oak-core"
 version = "0.0.12"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#f34a5366221d3c6f9d043ac3334e9426ef0f3405"
 dependencies = [
  "serde",
  "smallvec",
@@ -1307,6 +1308,7 @@ dependencies = [
 [[package]]
 name = "oak-macros"
 version = "0.0.12"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#f34a5366221d3c6f9d043ac3334e9426ef0f3405"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1316,6 +1318,7 @@ dependencies = [
 [[package]]
 name = "oak-pretty-print"
 version = "0.0.12"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#f34a5366221d3c6f9d043ac3334e9426ef0f3405"
 dependencies = [
  "oak-core",
  "oak-macros",
@@ -1326,6 +1329,7 @@ dependencies = [
 [[package]]
 name = "oak-typescript"
 version = "0.0.12"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#f34a5366221d3c6f9d043ac3334e9426ef0f3405"
 dependencies = [
  "oak-core",
  "oak-pretty-print",
@@ -1335,6 +1339,7 @@ dependencies = [
 [[package]]
 name = "oak-vue"
 version = "0.0.12"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#f34a5366221d3c6f9d043ac3334e9426ef0f3405"
 dependencies = [
  "oak-core",
  "serde",
