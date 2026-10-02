@@ -319,7 +319,26 @@ fn autocomplete_page_format_does_not_hang() {
         eprintln!("skip autocomplete fixture: {}", source_path.display());
         return;
     }
-    let report = format_path(&source_path, &FormatOptions { check: true }).unwrap();
+    let dir = temp_dir("autocomplete-format");
+    write(
+        &dir.join(".editorconfig"),
+        "root = true\n[*]\nindent_style = space\nindent_size = 4\nend_of_line = lf\ninsert_final_newline = true\n",
+    );
+    let file = dir.join("Autocomplete.vmz");
+    fs::write(&file, fs::read_to_string(&source_path).unwrap()).unwrap();
+
+    format_path(&file, &FormatOptions { check: false }).unwrap();
+    let once = fs::read_to_string(&file).unwrap();
+    assert!(
+        !once.contains("\\\"true\\\"") && !once.contains(":aria-invalid=\"\""),
+        "formatter must not corrupt aria-invalid ternary: {once}"
+    );
+
+    format_path(&file, &FormatOptions { check: false }).unwrap();
+    let twice = fs::read_to_string(&file).unwrap();
+    assert_eq!(once, twice, "autocomplete format must be idempotent");
+
+    let report = format_path(&file, &FormatOptions { check: true }).unwrap();
     assert!(!report.has_errors(), "{:?}", report.diagnostics);
 }
 
