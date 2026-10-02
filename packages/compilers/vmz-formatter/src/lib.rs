@@ -18,4 +18,7 @@ mod workspace;
 pub use document::VmzDocument;
 pub use path::{FormatOptions, FormatReport, format_path};
 pub use template_print::format_template_body;
-pub use workspace::{WorkspaceFormatOptions, WorkspaceFormatReport, run_workspace_format};
+pub use workspace::{
+    default_format_options, format_source_with_options, run_workspace_format, WorkspaceFormatOptions,
+    WorkspaceFormatReport,
+};

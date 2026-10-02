@@ -4,6 +4,9 @@ mod oak;
 mod oxc;
 mod walk;
 
+pub use engine::format_source_with_options;
+pub use oxc::{default_format_options, load_format_options};
+
 use std::fs;
 use std::path::{Path, PathBuf};
 

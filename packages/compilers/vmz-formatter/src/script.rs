@@ -2,7 +2,7 @@
 
 use oxc_allocator::Allocator;
 use oxc_span::SourceType;
-use oak_typescript::format_source as oak_format_source;
+use oak_typescript::formatter::format_source as oak_format_source;
 use vmz_compiler::{ScriptBlock, ScriptLanguage};
 
 use crate::editorconfig::EditorSettings;

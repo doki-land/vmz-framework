@@ -1,8 +1,8 @@
 use std::path::Path;
 
-use oak_typescript::{FormatOptions, format_source as oak_format_source};
+use oak_typescript::formatter::{FormatOptions, format_source as oak_format_source};
 
-/// Format via Oak public `format` API (`oak_typescript::format`).
+/// Format via Oak public formatter API (`oak_typescript::formatter`).
 pub fn format_source(
     _path: &Path,
     source: &str,

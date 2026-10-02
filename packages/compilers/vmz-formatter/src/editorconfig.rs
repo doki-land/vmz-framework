@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use oak_typescript::FormatOptions;
+use oak_typescript::formatter::FormatOptions;
 use oxc_formatter::JsFormatOptions;
 use oxc_formatter_core::{IndentStyle, IndentWidth, LineEnding, LineWidth};
 use oxc_formatter_css::{CssFormatOptions, CssVariant};
