@@ -190,12 +190,12 @@ export function collectBareSpecs(js) {
     };
     // `from 'x'` covers import/export … from
     let m;
-    const fromRe = /\bfrom\s+['"]([^'"]+)['"]/g;
+    const fromRe = /\bfrom\s*['"]([^'"]+)['"]/g;
     while ((m = fromRe.exec(js))) add(m[1]);
     const dynRe = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
     while ((m = dynRe.exec(js))) add(m[1]);
     // side-effect: import 'x' (not import( and not import … from)
-    const sideRe = /\bimport\s+['"]([^'"]+)['"]/g;
+    const sideRe = /\bimport\s*['"]([^'"]+)['"]/g;
     while ((m = sideRe.exec(js))) add(m[1]);
     return [...specs];
 }
@@ -203,7 +203,7 @@ export function collectBareSpecs(js) {
 function collectRelativeSpecs(js) {
     /** @type {Set<string>} */
     const specs = new Set();
-    const re = /(?:from\s+|import\s*\(\s*)['"](\.[^'"]+)['"]/g;
+    const re = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s*)['"](\.[^'"]+)['"]/g;
     let m;
     while ((m = re.exec(js))) specs.add(m[1]);
     return [...specs];
@@ -419,6 +419,6 @@ function rewritePackModuleSpecifiers(source, exactMap = null) {
 
     let out = source.replace(/\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g, replace);
     out = out.replace(/\bimport\s+[^;\n]*?\sfrom\s+(['"])([^'"]+)\1/g, replace);
-    out = out.replace(/\bimport\s+(['"])([^'"]+)\1/g, replace);
-    return out.replace(/\bfrom\s+(['"])([^'"]+)\1/g, replace);
+    out = out.replace(/\bimport\s*(['"])([^'"]+)\1/g, replace);
+    return out.replace(/\bfrom\s*(['"])([^'"]+)\1/g, replace);
 }
