@@ -1,4 +1,4 @@
-//! Format `<script>` bodies with Oak AST print (TS) or envelope-only (other langs).
+//! Format `<script>` bodies via Oak (TS). Legacy `oxc_formatter` only until Oak coverage closes.
 
 use oxc_allocator::Allocator;
 use oxc_span::SourceType;
@@ -25,6 +25,7 @@ fn format_ts(source: &str, settings: &EditorSettings) -> Result<String, String> 
         return Ok(normalize_body(&formatted, settings));
     }
 
+    // TODO(P4): remove once Oak print covers this script body.
     let allocator = Allocator::new();
     let options = settings.js_options();
     let formatted = oxc_formatter::format(&allocator, source, SourceType::ts(), options)

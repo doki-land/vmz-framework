@@ -4,7 +4,7 @@ use oxc_formatter::JsFormatOptions;
 
 use super::{FormatFileResult, oak, oxc};
 
-/// Format JavaScript/TypeScript source: Oak AST print first, `oxc_formatter` fallback.
+/// Format JS/TS via Oak. `oxc_formatter` below is legacy debt for uncovered inputs and must shrink to zero.
 pub fn format_source_with_options(
     path: &Path,
     source: &str,
@@ -16,6 +16,7 @@ pub fn format_source_with_options(
             output,
         });
     }
+    // TODO(P4): remove once Oak print covers this input.
     oxc::format_source_with_options(path, source, options)
 }
 
