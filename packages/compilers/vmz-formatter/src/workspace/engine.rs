@@ -50,6 +50,30 @@ mod tests {
     }
 
     #[test]
+    fn cst_format_preserves_trailing_comment_in_statement() {
+        let input = "const x = 1 // keep";
+        let result = format_source_with_options(
+            Path::new("sample.ts"),
+            input,
+            oxc::default_format_options(),
+        )
+        .expect("format");
+        assert_eq!(result.output, input);
+    }
+
+    #[test]
+    fn cst_format_preserves_asi_sensitive_continuation() {
+        let input = "const total = base\n+ extra";
+        let result = format_source_with_options(
+            Path::new("sample.ts"),
+            input,
+            oxc::default_format_options(),
+        )
+        .expect("format");
+        assert_eq!(result.output, input);
+    }
+
+    #[test]
     fn oak_formats_jsx_via_print_path() {
         let result = format_source_with_options(
             Path::new("sample.tsx"),
