@@ -1240,7 +1240,6 @@ dependencies = [
 [[package]]
 name = "oak-core"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#31208be728f2f9d0bffe5fb6d63bc7b5f893a813"
 dependencies = [
  "serde",
  "smallvec",
@@ -1251,7 +1250,6 @@ dependencies = [
 [[package]]
 name = "oak-typescript"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#31208be728f2f9d0bffe5fb6d63bc7b5f893a813"
 dependencies = [
  "oak-core",
  "serde",
@@ -1260,7 +1258,6 @@ dependencies = [
 [[package]]
 name = "oak-vue"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#31208be728f2f9d0bffe5fb6d63bc7b5f893a813"
 dependencies = [
  "oak-core",
  "serde",
@@ -3086,6 +3083,7 @@ version = "0.1.0"
 dependencies = [
  "editorconfig",
  "json5",
+ "oak-typescript",
  "oxc_allocator",
  "oxc_formatter",
  "oxc_formatter_core",

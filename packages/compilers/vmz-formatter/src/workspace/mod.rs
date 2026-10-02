@@ -1,4 +1,6 @@
 mod cargo;
+mod engine;
+mod oak;
 mod oxc;
 mod walk;
 
@@ -42,7 +44,7 @@ pub struct WorkspaceFormatOptions {
     pub excludes: Option<Vec<String>>,
     /// Run `cargo fmt` when a Cargo workspace is present.
     pub rust: Option<bool>,
-    /// Run `oxc_formatter` on JS/TS targets.
+    /// Run Oak (with `oxc_formatter` fallback) on JS/TS targets.
     pub javascript: Option<bool>,
     /// Style config path relative to `cwd` (default: `biome.json`).
     pub style_config: Option<PathBuf>,
@@ -58,7 +60,7 @@ fn cargo_workspace_root(root: &Path) -> PathBuf {
     root.to_path_buf()
 }
 
-/// Format JavaScript/TypeScript via `oxc_formatter` and Rust via `cargo fmt`.
+/// Format JavaScript/TypeScript via Oak (with `oxc_formatter` fallback) and Rust via `cargo fmt`.
 pub fn run_workspace_format(options: WorkspaceFormatOptions) -> Result<WorkspaceFormatReport> {
     let cwd = options.cwd.clone().unwrap_or_else(|| std::env::current_dir().expect("current dir"));
     let hybrid = detect_hybrid_monorepo(&cwd);
@@ -91,7 +93,7 @@ fn format_path(
     options: &JsFormatOptions,
 ) -> Result<()> {
     let source = fs::read_to_string(path).map_err(|err| format!("{}: {err}", path.display()))?;
-    let result = oxc::format_source_with_options(path, &source, options.clone())?;
+    let result = engine::format_source_with_options(path, &source, options.clone())?;
 
     if !result.changed {
         report.unchanged += 1;

@@ -1,7 +1,8 @@
-//! Format `<script>` bodies with oxc_formatter (TS) or envelope-only (other langs).
+//! Format `<script>` bodies with Oak AST print (TS) or envelope-only (other langs).
 
 use oxc_allocator::Allocator;
 use oxc_span::SourceType;
+use oak_typescript::print::{FormatOptions, format_source as oak_format_source};
 use vmz_compiler::{ScriptBlock, ScriptLanguage};
 
 use crate::editorconfig::EditorSettings;
@@ -20,6 +21,10 @@ pub fn format_script_block(
 }
 
 fn format_ts(source: &str, settings: &EditorSettings) -> Result<String, String> {
+    if let Ok(formatted) = oak_format_source(source, &FormatOptions::default()) {
+        return Ok(normalize_body(&formatted, settings));
+    }
+
     let allocator = Allocator::new();
     let options = settings.js_options();
     let formatted = oxc_formatter::format(&allocator, source, SourceType::ts(), options)
