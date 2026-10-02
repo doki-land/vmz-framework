@@ -289,7 +289,21 @@ fn lower_attr(shell: &str, attr: &VueAttribute) -> Result<ConcreteAttr, String> 
             classify_concrete_attr(name, value, span).map_err(|e| e.message)
         }
         VueAttribute::Directive(d) => {
-            let raw = slice(shell, d.span);
+            let mut raw = slice(shell, d.span).to_string();
+            if let Some(arg) = &d.arg {
+                let argument = slice(shell, arg.span);
+                if !argument.is_empty() && !raw.contains(argument) {
+                    raw.push(':');
+                    raw.push_str(argument);
+                }
+            }
+            for modifier in &d.modifiers {
+                let name = slice(shell, modifier.name);
+                if !name.is_empty() && !raw.contains(name) {
+                    raw.push('.');
+                    raw.push_str(name);
+                }
+            }
             let (name, value) = if let Some((name, rest)) = raw.split_once('=') {
                 (name.trim().to_string(), Some(unquote_attr_value(rest.trim())))
             } else {
