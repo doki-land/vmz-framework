@@ -48,7 +48,7 @@ function platformInfo() {
     return { triple, short: triple, os: [platform], cpu: [arch] };
 }
 
-const cargoArgs = ['build', '--manifest-path', path.join(root, 'Cargo.toml'), '-p', 'vmz-napi'];
+const cargoArgs = ['build', '--locked', '--manifest-path', path.join(root, 'Cargo.toml'), '-p', 'vmz-napi'];
 if (release) cargoArgs.push('--release');
 
 console.log(`cargo ${cargoArgs.join(' ')}`);
