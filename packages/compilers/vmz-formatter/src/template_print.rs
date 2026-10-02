@@ -396,4 +396,16 @@ mod tests {
         assert_eq!(once, twice);
         assert!(once.contains("{{"), "{once}");
     }
+
+    #[test]
+    fn aria_invalid_ternary_roundtrips_without_quote_corruption() {
+        let src = r#"<input :aria-invalid='error ? "true" : "false"' />"#;
+        let out = format_template_body(src, &settings()).unwrap();
+        assert!(
+            !out.contains("\\\"true\\\"") && !out.contains(":aria-invalid=\"\""),
+            "corrupted nested quotes: {out}"
+        );
+        let twice = format_template_body(&out, &settings()).unwrap();
+        assert_eq!(out, twice, "idempotent: {out}");
+    }
 }

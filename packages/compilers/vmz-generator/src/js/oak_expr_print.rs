@@ -338,6 +338,9 @@ fn print_number(n: f64) -> String {
 
 #[cfg(test)]
 mod tests {
+    use oak_typescript::ast::ExpressionKind;
+    use vmz_oak_frontend_adapter::parse_expression_snippet;
+
     use super::*;
 
     #[test]
@@ -350,5 +353,29 @@ mod tests {
         let once = print_template_expr_via_oak("a+b").expect("print");
         let twice = print_template_expr_via_oak(&once).expect("reprint");
         assert_eq!(once, twice);
+    }
+
+    #[test]
+    fn oak_parses_ternary_string_literals() {
+        let parse = parse_expression_snippet(r#"error ? "true" : "false""#);
+        assert!(parse.ok, "{:?}", parse.diagnostics);
+        let expr = parse.expression.expect("expression");
+        match expr.kind.as_ref() {
+            ExpressionKind::ConditionalExpression { consequent, alternate, .. } => {
+                match consequent.kind.as_ref() {
+                    ExpressionKind::StringLiteral(s) => assert_eq!(s, "true", "consequent literal"),
+                    other => panic!("consequent: {other:?}"),
+                }
+                match alternate.kind.as_ref() {
+                    ExpressionKind::StringLiteral(s) => assert_eq!(s, "false", "alternate literal"),
+                    other => panic!("alternate: {other:?}"),
+                }
+            }
+            other => panic!("root: {other:?}"),
+        }
+        assert_eq!(
+            print_template_expr_via_oak(r#"error ? "true" : "false""#).as_deref(),
+            Some("error ? 'true' : 'false'")
+        );
     }
 }
