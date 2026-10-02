@@ -1,5 +1,5 @@
 <template>
-    <div data-vmz-ui="space" :data-direction="direction" :data-size="size" :data-wrap='wrap ? "true" : "false"' class="vmz-ui-space">
+    <div data-vmz-ui="space" :data-direction="direction" :data-size="size" :data-wrap="wrap ? 'true' : 'false'" class="vmz-ui-space">
         <slot />
     </div>
 </template>

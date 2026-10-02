@@ -1,5 +1,5 @@
 <template>
-    <div data-vmz-ui="grid" class="vmz-ui-grid" :style='"--ui-grid-columns:" + columns + ";--ui-grid-gap:" + gap'>
+    <div data-vmz-ui="grid" class="vmz-ui-grid" :style="'--ui-grid-columns:' + columns + ';--ui-grid-gap:' + gap">
         <slot />
     </div>
 </template>

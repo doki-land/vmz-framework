@@ -4,7 +4,7 @@
             {{ label }}
         </label>
         <div data-vmz-upload="zone" class="vmz-ui-upload__zone">
-            <input :id="controlId" type="file" :accept="accept" :multiple="multiple" :disabled="inputDisabled" :aria-invalid='error ? "true" : "false"' :aria-describedby="describedBy" :data-vmz-upload-directory="directoryAttr" @change="onPick" class="vmz-ui-upload__control" />
+            <input :id="controlId" type="file" :accept="accept" :multiple="multiple" :disabled="inputDisabled" :aria-invalid="error ? 'true' : 'false'" :aria-describedby="describedBy" :data-vmz-upload-directory="directoryAttr" @change="onPick" class="vmz-ui-upload__control" />
             <p data-vmz-upload="hint" class="vmz-ui-upload__hint">
                 {{ zoneHint }}
             </p>

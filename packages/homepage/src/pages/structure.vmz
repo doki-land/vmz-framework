@@ -5,13 +5,13 @@
                 <Alert tone="info" role-name="status" title="Structure composition" description="Accordion / Steps / List / Tree — parent owns open, current, selection, and expand state." />
                 <p data-vmz-fixture="structure-state">
                     faq:
-                    {{ faqOpen || "none" }}
+                    {{ faqOpen || 'none' }}
                     ;step:
                     {{ stepCurrent }}
                     ;list:
-                    {{ listSelected || "none" }}
+                    {{ listSelected || 'none' }}
                     ;tree:
-                    {{ treeSelected || "none" }}
+                    {{ treeSelected || 'none' }}
                     ;expanded:
                     {{ treeExpandedAttr }}
                 </p>

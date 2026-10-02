@@ -36,7 +36,7 @@
         <section data-vmz-fixture="motion-interrupt">
             <p data-vmz-fixture="motion-interrupt-state">
                 interrupt-dialog:
-                {{ interruptDialogOpen ? "open" : "closed" }}
+                {{ interruptDialogOpen ? 'open' : 'closed' }}
             </p>
             <Button type="button" @click="openInterruptDialog">
                 Open interrupt dialog
@@ -50,7 +50,7 @@
         <section data-vmz-fixture="motion-resume">
             <p data-vmz-fixture="motion-resume-state">
                 ssr-dialog:
-                {{ ssrDialogOpen ? "open" : "closed" }}
+                {{ ssrDialogOpen ? 'open' : 'closed' }}
             </p>
             <Button type="button" @click="(() => ssrDialogOpen = true)">
                 Reopen SSR dialog

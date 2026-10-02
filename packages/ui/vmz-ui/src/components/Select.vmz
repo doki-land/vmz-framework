@@ -3,7 +3,7 @@
         <label v-if="label" :for="controlId" class="vmz-ui-select__label">
             {{ label }}
         </label>
-        <button type="button" :id="controlId" role="combobox" :disabled="disabled" aria-haspopup="listbox" :aria-expanded='open ? "true" : "false"' :aria-controls="listId" :aria-invalid='error ? "true" : "false"' :aria-describedby="describedBy" :aria-multiselectable='isMultiple ? "true" : "false"' @click="toggle" :onKeyDown="onTriggerKeyDown" class="vmz-ui-select__control">
+        <button type="button" :id="controlId" role="combobox" :disabled="disabled" aria-haspopup="listbox" :aria-expanded="open ? 'true' : 'false'" :aria-controls="listId" :aria-invalid="error ? 'true' : 'false'" :aria-describedby="describedBy" :aria-multiselectable="isMultiple ? 'true' : 'false'" @click="toggle" :onKeyDown="onTriggerKeyDown" class="vmz-ui-select__control">
             <span class="vmz-ui-select__value">
                 {{ displayLabel }}
             </span>
@@ -13,12 +13,12 @@
             <div v-if="searchable" class="vmz-ui-select__search">
                 <input type="search" data-vmz-select="search" :value="searchQuery" :placeholder="searchPlaceholder" :aria-label="searchPlaceholder" @input="onSearchInput" :onKeyDown="onSearchKeyDown" class="vmz-ui-select__search-input" />
             </div>
-            <ul role="listbox" :aria-multiselectable='isMultiple ? "true" : "false"' tabindex="-1" :onKeyDown="onListKeyDown" class="vmz-ui-select__list">
+            <ul role="listbox" :aria-multiselectable="isMultiple ? 'true' : 'false'" tabindex="-1" :onKeyDown="onListKeyDown" class="vmz-ui-select__list">
                 <li v-if="showEmpty" role="presentation" class="vmz-ui-select__empty">
                     {{ emptyText }}
                 </li>
                 <li v-for="opt in visibleOptions" :key="opt.value" role="presentation">
-                    <button type="button" role="option" :data-vmz-option="opt.value" :aria-selected='opt.selected ? "true" : "false"' @click="onOptionClick" :class='"vmz-ui-select__option" + (opt.selected ? " is-on" : "")'>
+                    <button type="button" role="option" :data-vmz-option="opt.value" :aria-selected="opt.selected ? 'true' : 'false'" @click="onOptionClick" :class='"vmz-ui-select__option" + (opt.selected ? " is-on" : "")'>
                         {{ opt.label }}
                     </button>
                 </li>

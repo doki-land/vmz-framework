@@ -5,7 +5,7 @@
                 {{ brand }}
             </a>
             <nav class="vmz-ui-console-shell__nav">
-                <a v-for="item in nav" :key="item.id" :href="item.href" :data-vmz-nav="item.id" :data-active='item.id === activeNavId ? "true" : null' :aria-current='item.id === activeNavId ? "page" : null'>
+                <a v-for="item in nav" :key="item.id" :href="item.href" :data-vmz-nav="item.id" :data-active="item.id === activeNavId ? 'true' : null" :aria-current="item.id === activeNavId ? 'page' : null">
                     {{ item.title }}
                 </a>
             </nav>

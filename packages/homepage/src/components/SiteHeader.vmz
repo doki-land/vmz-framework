@@ -43,10 +43,10 @@
                     {{ langSummary }}
                 </summary>
                 <div class="site-language__menu">
-                    <button type="button" data-vmz-fixture="locale-zh-hans" :aria-current='localeId === "zh-hans" ? "true" : null' @click='(() => switchLocale("zh-hans"))'>
+                    <button type="button" data-vmz-fixture="locale-zh-hans" :aria-current="localeId === 'zh-hans' ? 'true' : null" @click='(() => switchLocale("zh-hans"))'>
                         {{ langZhFullLabel }}
                     </button>
-                    <button type="button" data-vmz-fixture="locale-en-us" :aria-current='localeId === "en-us" ? "true" : null' @click='(() => switchLocale("en-us"))'>
+                    <button type="button" data-vmz-fixture="locale-en-us" :aria-current="localeId === 'en-us' ? 'true' : null" @click='(() => switchLocale("en-us"))'>
                         {{ langEnLabel }}
                     </button>
                 </div>

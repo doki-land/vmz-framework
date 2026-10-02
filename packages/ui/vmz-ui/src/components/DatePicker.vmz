@@ -3,7 +3,7 @@
         <label v-if="label" :for="controlId" class="vmz-ui-date-picker__label">
             {{ label }}
         </label>
-        <button type="button" :id="controlId" :disabled="disabled" aria-haspopup="dialog" :aria-expanded='open ? "true" : "false"' :aria-controls="panelId" :aria-invalid='error ? "true" : "false"' :aria-describedby="describedBy" @click="toggle" :onKeyDown="onTriggerKeyDown" class="vmz-ui-date-picker__control">
+        <button type="button" :id="controlId" :disabled="disabled" aria-haspopup="dialog" :aria-expanded="open ? 'true' : 'false'" :aria-controls="panelId" :aria-invalid="error ? 'true' : 'false'" :aria-describedby="describedBy" @click="toggle" :onKeyDown="onTriggerKeyDown" class="vmz-ui-date-picker__control">
             <span data-vmz-date="value" class="vmz-ui-date-picker__value">
                 {{ displayLabel }}
             </span>
@@ -45,7 +45,7 @@
                 </span>
             </div>
             <div role="grid" :aria-labelledby="panelId" class="vmz-ui-date-picker__grid">
-                <button v-for="day in days" :key="day.key" type="button" role="gridcell" :data-vmz-date-iso="day.iso" :aria-selected='day.selected ? "true" : "false"' :aria-disabled='day.disabled ? "true" : "false"' :disabled="day.disabled" @click="onDayClick" :class='"vmz-ui-date-picker__day" + (day.inMonth ? "" : " is-outside") + (day.selected ? " is-on" : "") + (day.inRange ? " is-in-range" : "") + (day.rangeEdge ? " is-range-edge" : "") + (day.disabled ? " is-disabled" : "")'>
+                <button v-for="day in days" :key="day.key" type="button" role="gridcell" :data-vmz-date-iso="day.iso" :aria-selected="day.selected ? 'true' : 'false'" :aria-disabled="day.disabled ? 'true' : 'false'" :disabled="day.disabled" @click="onDayClick" :class='"vmz-ui-date-picker__day" + (day.inMonth ? "" : " is-outside") + (day.selected ? " is-on" : "") + (day.inRange ? " is-in-range" : "") + (day.rangeEdge ? " is-range-edge" : "") + (day.disabled ? " is-disabled" : "")'>
                     {{ day.label }}
                 </button>
             </div>

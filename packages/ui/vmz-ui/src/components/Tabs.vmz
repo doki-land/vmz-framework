@@ -1,7 +1,7 @@
 <template>
     <div data-vmz-ui="tabs" class="vmz-ui-tabs">
         <div role="tablist" :aria-label="label" :onKeyDown="onListKeyDown" @click="onListClick" class="vmz-ui-tabs__list">
-            <button v-for="item in items" :key="item.id" type="button" role="tab" :id="item.id" :data-vmz-tab="item.id" :aria-selected='selected === item.id ? "true" : "false"' :aria-controls="item.controls" :tabindex="selected === item.id ? 0 : -1" class="vmz-ui-tabs__tab">
+            <button v-for="item in items" :key="item.id" type="button" role="tab" :id="item.id" :data-vmz-tab="item.id" :aria-selected="selected === item.id ? 'true' : 'false'" :aria-controls="item.controls" :tabindex="selected === item.id ? 0 : -1" class="vmz-ui-tabs__tab">
                 {{ item.title }}
             </button>
         </div>

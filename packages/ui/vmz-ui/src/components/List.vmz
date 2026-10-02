@@ -4,7 +4,7 @@
             {{ label }}
         </p>
         <ul role="listbox" :aria-labelledby="labelId" :aria-label="label" @click="onListClick" :onKeyDown="onListKeyDown" class="vmz-ui-list__items">
-            <li v-for="item in items" :key="item.id" role="option" :id="item.id" :data-vmz-list-item="item.id" :aria-selected='selected === item.id ? "true" : "false"' :tabindex="selected === item.id ? 0 : -1" class="vmz-ui-list__item">
+            <li v-for="item in items" :key="item.id" role="option" :id="item.id" :data-vmz-list-item="item.id" :aria-selected="selected === item.id ? 'true' : 'false'" :tabindex="selected === item.id ? 0 : -1" class="vmz-ui-list__item">
                 {{ item.title }}
             </li>
         </ul>

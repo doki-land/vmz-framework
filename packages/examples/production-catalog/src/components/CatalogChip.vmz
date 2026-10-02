@@ -1,7 +1,7 @@
 <template>
     <button type="button" @click="(() => open = !open)">
         chip:
-        {{ open ? "on" : "off" }}
+        {{ open ? 'on' : 'off' }}
     </button>
 </template>
 <script client>

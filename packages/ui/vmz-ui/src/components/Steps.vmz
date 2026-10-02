@@ -1,6 +1,6 @@
 <template>
     <ol data-vmz-ui="steps" :aria-label="label" class="vmz-ui-steps">
-        <li v-for="item in items" :key="item.id" :data-vmz-step="item.id" :data-status="item.status" :aria-current='current === item.id ? "step" : "false"' class="vmz-ui-steps__item">
+        <li v-for="item in items" :key="item.id" :data-vmz-step="item.id" :data-status="item.status" :aria-current="current === item.id ? 'step' : 'false'" class="vmz-ui-steps__item">
             <span :data-vmz-step-index="item.id" class="vmz-ui-steps__index">
                 {{ item.index }}
             </span>

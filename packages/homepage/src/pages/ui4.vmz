@@ -23,7 +23,7 @@
                 </Result>
                 <p data-vmz-fixture="ui4-done">
                     done:
-                    {{ done ? "yes" : "no" }}
+                    {{ done ? 'yes' : 'no' }}
                 </p>
                 <Empty title="No extras" description="UI4 still includes Empty on the Commercial Surface." />
             </div>

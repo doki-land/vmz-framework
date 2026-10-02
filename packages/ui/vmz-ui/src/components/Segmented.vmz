@@ -1,6 +1,6 @@
 <template>
     <div data-vmz-ui="segmented" role="group" :aria-label="label" class="vmz-ui-segmented">
-        <button v-for="opt in options" :key="opt.value" type="button" :data-vmz-segment="opt.value" :aria-pressed='opt.value === value ? "true" : "false"' @click="(() => onPick(opt.value))">
+        <button v-for="opt in options" :key="opt.value" type="button" :data-vmz-segment="opt.value" :aria-pressed="opt.value === value ? 'true' : 'false'" @click="(() => onPick(opt.value))">
             {{ opt.label }}
         </button>
     </div>

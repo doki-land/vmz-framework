@@ -67,7 +67,7 @@
                         ;plan:
                         {{ plan }}
                         ;agree:
-                        {{ agree ? "yes" : "no" }}
+                        {{ agree ? 'yes' : 'no' }}
                         ;submitted:
                         {{ submitted }}
                     </p>

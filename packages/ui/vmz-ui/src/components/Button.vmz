@@ -1,9 +1,9 @@
 <template>
-    <a v-if="href" data-vmz-ui="button" data-vmz-motion="control" data-vmz-motion-token="motion.control" :data-variant="variant" :data-size="size" :data-block='block ? "true" : "false"' :href="href" :target="target" :rel="rel" @click="onDomClick" class="vmz-ui-btn">
+    <a v-if="href" data-vmz-ui="button" data-vmz-motion="control" data-vmz-motion-token="motion.control" :data-variant="variant" :data-size="size" :data-block="block ? 'true' : 'false'" :href="href" :target="target" :rel="rel" @click="onDomClick" class="vmz-ui-btn">
         <span v-if="loading" aria-hidden="true" class="vmz-ui-btn__spinner" />
         <slot />
     </a>
-    <button v-else :type="type" data-vmz-ui="button" data-vmz-motion="control" data-vmz-motion-token="motion.control" :data-variant="variant" :data-size="size" :data-block='block ? "true" : "false"' :data-loading='loading ? "true" : "false"' :disabled="disabled" :aria-busy='loading ? "true" : "false"' :aria-haspopup="ariaHaspopup" :aria-controls="ariaControls" @click="onDomClick" class="vmz-ui-btn">
+    <button v-else :type="type" data-vmz-ui="button" data-vmz-motion="control" data-vmz-motion-token="motion.control" :data-variant="variant" :data-size="size" :data-block="block ? 'true' : 'false'" :data-loading="loading ? 'true' : 'false'" :disabled="disabled" :aria-busy="loading ? 'true' : 'false'" :aria-haspopup="ariaHaspopup" :aria-controls="ariaControls" @click="onDomClick" class="vmz-ui-btn">
         <span v-if="loading" aria-hidden="true" class="vmz-ui-btn__spinner" />
         <slot />
     </button>

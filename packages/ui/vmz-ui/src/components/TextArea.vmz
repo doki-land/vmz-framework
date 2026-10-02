@@ -3,7 +3,7 @@
         <label v-if="label" :for="controlId" class="vmz-ui-textarea__label">
             {{ label }}
         </label>
-        <textarea :id="controlId" :rows="rows" :value="value" :disabled="disabled" :readonly="readonly" :aria-invalid='error ? "true" : "false"' :aria-describedby="describedBy" @input="onDomInput" class="vmz-ui-textarea__control" />
+        <textarea :id="controlId" :rows="rows" :value="value" :disabled="disabled" :readonly="readonly" :aria-invalid="error ? 'true' : 'false'" :aria-describedby="describedBy" @input="onDomInput" class="vmz-ui-textarea__control" />
         <p v-if="description" :id="descriptionId" class="vmz-ui-textarea__description">
             {{ description }}
         </p>

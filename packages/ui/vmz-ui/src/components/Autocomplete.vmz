@@ -3,7 +3,7 @@
         <label v-if="label" :for="controlId" class="vmz-ui-autocomplete__label">
             {{ label }}
         </label>
-        <input :id="controlId" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" :aria-expanded="openAttr" :aria-controls="listId" :aria-invalid='error ? "true" : "false"' :aria-describedby="describedBy" :value="value" :disabled="disabled" @input="onDomInput" :onKeyDown="onKeyDown" class="vmz-ui-autocomplete__control" />
+        <input :id="controlId" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" :aria-expanded="openAttr" :aria-controls="listId" :aria-invalid="error ? 'true' : 'false'" :aria-describedby="describedBy" :value="value" :disabled="disabled" @input="onDomInput" :onKeyDown="onKeyDown" class="vmz-ui-autocomplete__control" />
         <ul v-if="listOpen" :id="listId" role="listbox" data-vmz-autocomplete="list" @click="onListClick" class="vmz-ui-autocomplete__list">
             <li v-for="opt in options" :key="opt.value" role="option" :data-vmz-option="opt.value" tabindex="-1" class="vmz-ui-autocomplete__option">
                 {{ opt.label }}

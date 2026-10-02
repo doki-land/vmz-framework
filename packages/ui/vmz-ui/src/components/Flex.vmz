@@ -1,5 +1,5 @@
 <template>
-    <div data-vmz-ui="flex" :data-vertical='vertical ? "true" : "false"' :data-wrap='wrap ? "true" : "false"' class="vmz-ui-flex">
+    <div data-vmz-ui="flex" :data-vertical="vertical ? 'true' : 'false'" :data-wrap="wrap ? 'true' : 'false'" class="vmz-ui-flex">
         <slot />
     </div>
 </template>

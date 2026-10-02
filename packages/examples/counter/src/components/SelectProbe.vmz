@@ -3,7 +3,7 @@
         <Select label="Plan" controlId="probe-plan" :value="plan" :options="planOptions" :onChange="onPlan" />
         <p data-testid="select-probe-value">
             plan:
-            {{ plan || "none" }}
+            {{ plan || 'none' }}
         </p>
     </div>
 </template>

@@ -27,7 +27,7 @@
                 </p>
                 <p data-vmz-fixture="ui5-perm">
                     write:
-                    {{ writeDisabled ? "denied" : "allowed" }}
+                    {{ writeDisabled ? 'denied' : 'allowed' }}
                 </p>
                 <Button type="button" @click="toggleLoading">
                     Toggle loading

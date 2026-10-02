@@ -1,6 +1,6 @@
 <template>
     <div data-vmz-ui="menu" :data-vmz-overlay-open="open" class="vmz-ui-menu">
-        <button type="button" data-vmz-menu="trigger" aria-haspopup="menu" :aria-expanded='open ? "true" : "false"' :aria-controls="menuId" @click="toggle" :onKeyDown="onTriggerKeyDown" class="vmz-ui-menu__trigger">
+        <button type="button" data-vmz-menu="trigger" aria-haspopup="menu" :aria-expanded="open ? 'true' : 'false'" :aria-controls="menuId" @click="toggle" :onKeyDown="onTriggerKeyDown" class="vmz-ui-menu__trigger">
             {{ label }}
         </button>
         <div v-if="open" :id="menuId" role="menu" data-vmz-overlay="menu" data-vmz-overlay-owner="menu" data-vmz-focus="enter" tabindex="-1" :onKeyDown="onMenuKeyDown" class="vmz-ui-menu__panel">

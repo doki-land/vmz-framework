@@ -1,5 +1,5 @@
 <template>
-    <section data-vmz-ui="card" :data-size="size" :data-bordered='bordered ? "true" : "false"' :data-hoverable='hoverable ? "true" : "false"' class="vmz-ui-card">
+    <section data-vmz-ui="card" :data-size="size" :data-bordered="bordered ? 'true' : 'false'" :data-hoverable="hoverable ? 'true' : 'false'" class="vmz-ui-card">
         <header v-if="title" class="vmz-ui-card__header">
             <h2 class="vmz-ui-card__title">
                 {{ title }}

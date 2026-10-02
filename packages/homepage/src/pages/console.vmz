@@ -24,7 +24,7 @@
                             <span class="vmz-console-summary__label">
                                 {{ consoleStatAffectedRegionsLabel }}
                             </span>
-                            <strong class="vmz-console-summary__value" :class='summaryFailed > 0 ? "is-failed" : ""'>
+                            <strong class="vmz-console-summary__value" :class="summaryFailed > 0 ? 'is-failed' : ''">
                                 {{ summaryFailed }}
                             </strong>
                         </div>

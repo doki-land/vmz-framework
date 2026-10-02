@@ -17,7 +17,7 @@
                     -
                     {{ windowEnd }}
                     ;selected:
-                    {{ selectedAttr || "none" }}
+                    {{ selectedAttr || 'none' }}
                     ;count:
                     {{ selectedCount }}
                     ;sort:
@@ -39,9 +39,9 @@
                     ;treeExpanded:
                     {{ treeExpandedAttr }}
                     ;editing:
-                    {{ editingKey || "none" }}
+                    {{ editingKey || 'none' }}
                     ;draft:
-                    {{ editDraft || "-" }}
+                    {{ editDraft || '-' }}
                     ;scoreSample:
                     {{ scoreSample }}
                     ;pivot:

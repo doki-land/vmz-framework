@@ -5,7 +5,7 @@
                 <Alert tone="info" role-name="status" title="DataTable thin gate" description="Ordinary HTML table with parent-owned selection + sticky header. Large-grid package is separate." />
                 <p data-vmz-fixture="datatable-state">
                     selected:
-                    {{ selectedAttr || "none" }}
+                    {{ selectedAttr || 'none' }}
                     ;count:
                     {{ selectedCount }}
                     ;sort:
@@ -13,7 +13,7 @@
                     :
                     {{ sortDir }}
                     ;detail:
-                    {{ detailId || "none" }}
+                    {{ detailId || 'none' }}
                 </p>
                 <BulkActions label="Bulk actions" :selected-count="selectedCount" :count-label="bulkLabel">
                     <Button type="button" variant="secondary" @click="clearSelection">

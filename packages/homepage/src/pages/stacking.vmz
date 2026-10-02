@@ -5,11 +5,11 @@
                 <Alert tone="info" role-name="status" title="Overlay stacking" description="Drawer → Dialog → Popover with rising stackLevel; Escape closes topmost only. Parent owns the stack." />
                 <p data-vmz-fixture="stacking-state">
                     drawer:
-                    {{ drawerOpen ? "open" : "closed" }}
+                    {{ drawerOpen ? 'open' : 'closed' }}
                     ;dialog:
-                    {{ dialogOpen ? "open" : "closed" }}
+                    {{ dialogOpen ? 'open' : 'closed' }}
                     ;popover:
-                    {{ popoverOpen ? "open" : "closed" }}
+                    {{ popoverOpen ? 'open' : 'closed' }}
                 </p>
                 <div class="vmz-stacking-actions">
                     <Button type="button" @click="openDrawer">

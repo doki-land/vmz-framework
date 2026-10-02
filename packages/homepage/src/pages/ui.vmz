@@ -24,12 +24,12 @@
                             <Checkbox :label="uiLabCheckboxLabel" control-id="home-ui-agree" :checked="agree" @change="((v) => agree = v)" />
                             <p data-vmz-fixture="checkbox-value" class="vmz-sr-only">
                                 agree:
-                                {{ agree ? "yes" : "no" }}
+                                {{ agree ? 'yes' : 'no' }}
                             </p>
                             <Switch :label="uiLabSwitchLabel" control-id="home-ui-notify" :checked="notify" @change="((v) => notify = v)" />
                             <p data-vmz-fixture="switch-value" class="vmz-sr-only">
                                 notify:
-                                {{ notify ? "on" : "off" }}
+                                {{ notify ? 'on' : 'off' }}
                             </p>
                         </Card>
                     </div>
@@ -51,7 +51,7 @@
                             <Menu :label="uiLabMenuLabel" menu-id="home-ui-menu" :open="menuOpen" :items="menuItems" :on-open-change="((v) => menuOpen = v)" :on-select="((id) => menuChoice = id)" />
                             <p data-vmz-fixture="menu-choice" class="vmz-sr-only">
                                 menu:
-                                {{ menuChoice || "none" }}
+                                {{ menuChoice || 'none' }}
                             </p>
                         </Card>
                     </div>

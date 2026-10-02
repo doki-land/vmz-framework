@@ -1,5 +1,5 @@
 <template>
-    <span data-vmz-ui="icon" :data-name="name" :data-size="size" :role='decorative ? "presentation" : "img"' :aria-hidden='decorative ? "true" : "false"' :aria-label='decorative ? "" : label' class="vmz-ui-icon">
+    <span data-vmz-ui="icon" :data-name="name" :data-size="size" :role="decorative ? 'presentation' : 'img'" :aria-hidden="decorative ? 'true' : 'false'" :aria-label="decorative ? '' : label" class="vmz-ui-icon">
         <span v-if="isTextBadge()" class="vmz-ui-icon__badge">
             {{ badgeLabel() }}
         </span>

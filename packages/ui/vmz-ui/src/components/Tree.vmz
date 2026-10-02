@@ -4,9 +4,9 @@
             {{ label }}
         </p>
         <ul role="tree" :aria-labelledby="labelId" :aria-label="label" @click="onTreeClick" :onKeyDown="onTreeKeyDown" class="vmz-ui-tree__items">
-            <li v-for="item in items" :key="item.id" role="treeitem" :id="item.id" :data-vmz-tree-item="item.id" :data-depth="item.depth" :aria-selected='selected === item.id ? "true" : "false"' :aria-expanded="item.expandedAttr" :tabindex="selected === item.id ? 0 : -1" class="vmz-ui-tree__item" :style="item.padStyle">
+            <li v-for="item in items" :key="item.id" role="treeitem" :id="item.id" :data-vmz-tree-item="item.id" :data-depth="item.depth" :aria-selected="selected === item.id ? 'true' : 'false'" :aria-expanded="item.expandedAttr" :tabindex="selected === item.id ? 0 : -1" class="vmz-ui-tree__item" :style="item.padStyle">
                 <button v-if="item.expandable" type="button" :data-vmz-tree-twist="item.id" :aria-label="item.twistLabel" tabindex="-1" class="vmz-ui-tree__twist">
-                    {{ item.expanded ? "−" : "+" }}
+                    {{ item.expanded ? '−' : '+' }}
                 </button>
                 <span v-if="!item.expandable" aria-hidden="true" class="vmz-ui-tree__twist-spacer" />
                 <span :data-vmz-tree-title="item.id" class="vmz-ui-tree__title">

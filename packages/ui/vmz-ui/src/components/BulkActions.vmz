@@ -1,5 +1,5 @@
 <template>
-    <div data-vmz-ui="bulk-actions" role="region" :aria-label="label" :data-open='selectedCount ? "true" : "false"' class="vmz-ui-bulk-actions">
+    <div data-vmz-ui="bulk-actions" role="region" :aria-label="label" :data-open="selectedCount ? 'true' : 'false'" class="vmz-ui-bulk-actions">
         <p data-vmz-fixture="bulk-count" class="vmz-ui-bulk-actions__count">
             {{ countLabel }}
         </p>
