@@ -90,9 +90,32 @@ export async function proveHomepageLocaleTransition(opts: {
     });
     try {
         const page = await browser.newPage();
+        const browserErrors: string[] = [];
+        const failedResources: string[] = [];
+        page.on('pageerror', (error: Error) => {
+            if (browserErrors.length < 20) browserErrors.push(error.message);
+        });
+        page.on('response', (response: any) => {
+            if (response.status() >= 400 && failedResources.length < 20) {
+                failedResources.push(`${response.status()} ${response.url()}`);
+            }
+        });
+        const waitLocaleApi = async (stage: string) => {
+            try {
+                await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 20_000 });
+            } catch (error) {
+                const state = await page.evaluate(() => ({
+                    url: location.href,
+                    locale: document.documentElement.getAttribute('data-locale'),
+                    body: document.body.innerText.slice(0, 500),
+                    scripts: [...document.scripts].map((script) => script.src).filter(Boolean),
+                }));
+                throw new Error(`locale API ${stage}: ${error instanceof Error ? error.message : error}, ${JSON.stringify({ state, browserErrors, failedResources })}`);
+            }
+        };
         // Prefer load over networkidle0: production pages may keep connections that never go idle.
         await page.goto(`${baseUrl}/ui`, { waitUntil: 'load', timeout: 60_000 });
-        await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 20_000 });
+        await waitLocaleApi('initial /ui');
         const before = await page.evaluate(() => ({
             path: location.pathname,
             locale: document.documentElement.getAttribute('data-locale'),
@@ -120,7 +143,7 @@ export async function proveHomepageLocaleTransition(opts: {
         }
 
         await page.goto(`${baseUrl}/`, { waitUntil: 'load', timeout: 60_000 });
-        await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 20_000 });
+        await waitLocaleApi('landing /');
         await page.waitForSelector('[data-vmz-fixture="site-header"]', { timeout: 15_000 });
         await page.waitForSelector('[data-vmz-fixture="landing-hero-lede"]', { timeout: 15_000 });
 
@@ -226,7 +249,7 @@ export async function proveHomepageLocaleTransition(opts: {
             await waitBodyMatches(en, 'en-us');
         } catch {
             await page.goto(`${baseUrl}/en-us`, { waitUntil: 'load', timeout: 60_000 });
-            await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 20_000 });
+            await waitLocaleApi('fallback /en-us');
             await page.waitForSelector('[data-vmz-fixture="landing-hero-lede"]', { timeout: 15_000 });
             await waitBodyMatches(en, 'en-us');
         }
