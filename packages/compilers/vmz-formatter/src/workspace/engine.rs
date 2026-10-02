@@ -2,7 +2,7 @@ use std::path::Path;
 
 use oxc_formatter::JsFormatOptions;
 
-use oak_typescript::cst_format::CstFormatOptions;
+use oak_typescript::FormatOptions;
 
 use super::{FormatFileResult, oak, oxc};
 
@@ -12,19 +12,19 @@ pub fn format_source_with_options(
     source: &str,
     options: JsFormatOptions,
 ) -> Result<FormatFileResult, String> {
-    let cst_options = cst_format_options_from_js(&options);
-    if let Ok(output) = oak::format_source(path, source, &cst_options) {
+    let format_options = format_options_from_js(&options);
+    if let Ok(output) = oak::format_source(path, source, &format_options) {
         return Ok(FormatFileResult {
             changed: output != source,
             output,
         });
     }
-    // TODO(P4): remove once Oak print covers this input (remaining gaps: class, trivia, etc.).
+    // TODO(P4): remove once Oak `format` covers this input (remaining gaps: class, quote style, etc.).
     oxc::format_source_with_options(path, source, options)
 }
 
-fn cst_format_options_from_js(options: &oxc_formatter::JsFormatOptions) -> CstFormatOptions {
-    CstFormatOptions {
+fn format_options_from_js(options: &oxc_formatter::JsFormatOptions) -> FormatOptions {
+    FormatOptions {
         indent_width: options.indent_width.value(),
         line_width: usize::from(options.line_width.value()),
     }
@@ -49,7 +49,7 @@ mod tests {
     }
 
     #[test]
-    fn cst_format_preserves_leading_line_comment() {
+    fn format_preserves_leading_line_comment() {
         let result = format_source_with_options(
             Path::new("sample.ts"),
             "// keep\nconst  x=1",
@@ -60,7 +60,7 @@ mod tests {
     }
 
     #[test]
-    fn cst_format_preserves_trailing_comment_in_statement() {
+    fn format_preserves_trailing_comment_in_statement() {
         let input = "const x = 1 // keep";
         let result = format_source_with_options(
             Path::new("sample.ts"),
@@ -72,7 +72,7 @@ mod tests {
     }
 
     #[test]
-    fn cst_format_preserves_asi_sensitive_continuation() {
+    fn format_preserves_asi_sensitive_continuation() {
         let input = "const total = base\n+ extra";
         let result = format_source_with_options(
             Path::new("sample.ts"),
@@ -84,7 +84,7 @@ mod tests {
     }
 
     #[test]
-    fn cst_format_preserves_decorated_const_statement() {
+    fn format_preserves_decorated_const_statement() {
         let input = "@Component()\nconst  x=1";
         let result = format_source_with_options(
             Path::new("sample.ts"),
@@ -96,7 +96,7 @@ mod tests {
     }
 
     #[test]
-    fn oak_formats_jsx_via_print_path() {
+    fn oak_formats_jsx_via_format_api() {
         let result = format_source_with_options(
             Path::new("sample.tsx"),
             r#"const el = <div className="foo">bar</div>"#,

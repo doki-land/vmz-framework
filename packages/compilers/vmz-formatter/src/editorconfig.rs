@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use oak_typescript::cst_format::CstFormatOptions;
+use oak_typescript::FormatOptions;
 use oxc_formatter::JsFormatOptions;
 use oxc_formatter_core::{IndentStyle, IndentWidth, LineEnding, LineWidth};
 use oxc_formatter_css::{CssFormatOptions, CssVariant};
@@ -84,9 +84,9 @@ impl EditorSettings {
         self.line_width.and_then(|w| LineWidth::try_from(w).ok())
     }
 
-    /// Map into Oak `cst_format` options for the JS/TS workspace path.
-    pub fn cst_format_options(&self) -> CstFormatOptions {
-        CstFormatOptions {
+    /// Map into Oak `FormatOptions` for the JS/TS workspace path.
+    pub fn format_options(&self) -> FormatOptions {
+        FormatOptions {
             indent_width: self.indent_width,
             line_width: self.line_width.map(usize::from).unwrap_or(144),
         }

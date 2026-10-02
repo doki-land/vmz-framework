@@ -2,7 +2,7 @@
 
 use oxc_allocator::Allocator;
 use oxc_span::SourceType;
-use oak_typescript::print::{FormatOptions, format_source as oak_format_source};
+use oak_typescript::format_source as oak_format_source;
 use vmz_compiler::{ScriptBlock, ScriptLanguage};
 
 use crate::editorconfig::EditorSettings;
@@ -21,11 +21,11 @@ pub fn format_script_block(
 }
 
 fn format_ts(source: &str, settings: &EditorSettings) -> Result<String, String> {
-    if let Ok(formatted) = oak_format_source(source, &FormatOptions::default()) {
+    if let Ok(formatted) = oak_format_source(source, &settings.format_options()) {
         return Ok(normalize_body(&formatted, settings));
     }
 
-    // TODO(P4): remove once Oak print covers this script body.
+    // TODO(P4): remove once Oak `format` covers this script body.
     let allocator = Allocator::new();
     let options = settings.js_options();
     let formatted = oxc_formatter::format(&allocator, source, SourceType::ts(), options)

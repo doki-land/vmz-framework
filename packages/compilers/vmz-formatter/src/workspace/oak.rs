@@ -1,14 +1,12 @@
 use std::path::Path;
 
-use oak_typescript::cst_format::{CstFormatOptions, format_source as cst_format_source};
-use oak_typescript::print::{FormatOptions, format_source as ast_print_source};
+use oak_typescript::{FormatOptions, format_source as oak_format_source};
 
-/// Oak CST format first, then transitional AST print. Neither is full CST-faithful yet.
+/// Format via Oak public `format` API (`oak_typescript::format`).
 pub fn format_source(
     _path: &Path,
     source: &str,
-    cst: &CstFormatOptions,
+    options: &FormatOptions,
 ) -> Result<String, String> {
-    cst_format_source(source, cst)
-        .or_else(|_| ast_print_source(source, &FormatOptions::default()))
+    oak_format_source(source, options).map_err(|err| err.to_string())
 }
