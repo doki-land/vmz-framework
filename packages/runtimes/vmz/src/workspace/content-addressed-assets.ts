@@ -10,7 +10,6 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { requireNativeAddon } from './native-addon.js';
 import { canonicalJson, sha256Hex } from './release-pack.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 
@@ -94,23 +93,17 @@ export function rewriteCssImports(cssText, rewrites) {
  * @param {Record<string, string>} [_rewrites]
  */
 export function rewriteJsEntryRelativeImports(jsText, _rewrites = {}) {
-    const native = requireNativeAddon();
-    if (typeof native.rewriteModuleSpecifiers !== 'function') {
-        throw new Error('native missing rewriteModuleSpecifiers — run `pnpm napi:build`');
-    }
-    // Static import/export specs via oxc AST (`./x` → `../x`). Dynamic
-    // `import("./"+id)` is not a literal specifier — rewrite that codegen form only.
-    let out = String(
-        native.rewriteModuleSpecifiers(
-            String(jsText ?? ''),
-            JSON.stringify({
-                tsExtToJs: false,
-                dotSlashToParent: true,
-            }),
-        ),
+    // These files are already generated JavaScript. Re-parsing them through
+    // the native module parser here creates a second parser boundary during
+    // static assembly and can re-enter the generated graph indefinitely.
+    // Restrict the rewrite to import/export module-specifier positions and
+    // keep it bounded to the source text.
+    let out = String(jsText ?? '').replace(
+        /(\b(?:from|import)\s*)(["'])\.\/([^"'\\]+)\2/g,
+        (_match, prefix, quote, specifier) => `${prefix}${quote}../${specifier}${quote}`,
     );
-    out = out.replace(/import\(\s*"\.\/"\s*\+/g, 'import("../"+');
-    out = out.replace(/import\(\s*'\.\/'\s*\+/g, "import('../'+");
+    out = out.replace(/import\(\s*(["'])\.\/([^"'\\]+)\1\s*\)/g, (_match, quote, specifier) => `import(${quote}../${specifier}${quote})`);
+    out = out.replace(/import\(\s*(["'])\.\/\1\s*\+/g, (_match, quote) => `import(${quote}../${quote}+`);
     return out;
 }
 
