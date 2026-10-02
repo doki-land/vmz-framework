@@ -157,3 +157,14 @@ export default class Page {}
         "expected Oak export-from, got {imports:?}"
     );
 }
+
+#[test]
+fn oak_static_import_collect_ignores_at_in_comments_and_strings() {
+    use vmz_compiler::parse::analyze_oak::collect_static_imports_via_oak;
+    use vmz_compiler::sfc::ScriptKind;
+
+    let source = "// @decorator is only a comment\nimport value from '@pkg/value';\nexport default class Page { label = '@label'; }";
+    let imports = collect_static_imports_via_oak(ScriptKind::Client, source);
+    assert_eq!(imports.len(), 1, "imports={imports:?}");
+    assert_eq!(imports[0].module_specifier, "@pkg/value");
+}

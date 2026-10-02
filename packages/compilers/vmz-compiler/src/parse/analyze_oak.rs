@@ -5,6 +5,9 @@ use oak_typescript::ast::{
     TypeAnnotation, Visibility as OakVisibility,
 };
 use oak_typescript::TypeScriptRoot;
+use oak_core::{Lexer, ParseSession, SourceText};
+use oak_typescript::lexer::{TypeScriptLexer, TypeScriptTokenType};
+use oak_typescript::TypeScriptLanguage;
 use oxc_span::Span;
 use vmz_oak_frontend_adapter::{
     ByteSpan, NyarBindingKind, NyarImportBinding, NyarImportDecl, NyarImportKind, ScriptRole,
@@ -234,13 +237,22 @@ pub fn collect_static_imports_via_oak(kind: ScriptKind, source: &str) -> Vec<Nya
 fn oak_script_safe_for_analysis(source: &str) -> bool {
     if source.len() > 4096
         || source.contains("async ")
-        || source.contains('@')
         || source.contains("export type ")
         || source.contains("[]")
         || source.contains("||=")
         || source.contains("??=")
         || source.contains("&&=")
     {
+        return false;
+    }
+    let language = TypeScriptLanguage::default();
+    let text = SourceText::new(source);
+    let mut session = ParseSession::default();
+    let lexed = TypeScriptLexer::new(&language).lex(&text, &[], &mut session);
+    let Ok(tokens) = lexed.result else {
+        return false;
+    };
+    if tokens.iter().any(|token| token.kind == TypeScriptTokenType::At) {
         return false;
     }
     !source.lines().any(|line| {

@@ -3044,6 +3044,7 @@ name = "vmz-compiler"
 version = "0.1.0"
 dependencies = [
  "json5",
+ "oak-core",
  "oak-typescript",
  "oak-vue",
  "oxc_allocator",
