@@ -52,6 +52,12 @@ console.log('pack-client-packages: rewriteRelativeTsSpecs…');
 {
     const unchanged = `export const runtimeFace = 'server';`;
     if (rewriteRelativeTsSpecs(unchanged) !== unchanged) fail('plain JavaScript should bypass module parsing');
+    const sourceMap = `const source = './generated.ts';`;
+    if (rewriteRelativeTsSpecs(sourceMap) !== sourceMap) fail('non-module strings should bypass module parsing');
+    const exactMap = `const text = '@vmz/missing-package';`;
+    if (rewriteRelativeTsSpecs(exactMap, { '@vmz/missing-package': './vendor/missing.js' }) !== exactMap) {
+        fail('exact maps without a matching module specifier should bypass module parsing');
+    }
     const out = rewriteRelativeTsSpecs(`import { x } from './foo.ts';\nexport { y } from "../bar.tsx";`);
     if (out.includes('.ts') || out.includes('.tsx')) fail(`ts specs remain: ${out}`);
 }
