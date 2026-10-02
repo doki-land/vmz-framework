@@ -46,32 +46,9 @@ if (!skipBuild) {
     run('pnpm', ['napi:build']);
 }
 
-run('cargo', [
-    'test',
-    '-p',
-    'vmz-formatter',
-    '--lib',
-    'aria_invalid_ternary',
-    '--',
-    '--nocapture',
-]);
-run('cargo', [
-    'test',
-    '-p',
-    'vmz-generator',
-    'oak_parses_ternary',
-    '--',
-    '--nocapture',
-]);
-run('cargo', [
-    'test',
-    '-p',
-    'vmz-compiler',
-    '--test',
-    'event_shell_check_unit',
-    '--',
-    '--nocapture',
-]);
-run('pnpm', ['fmt:vmz:check']);
+run('cargo', ['test', '-p', 'vmz-formatter', '--lib', 'aria_invalid_ternary', '--', '--nocapture']);
+run('cargo', ['test', '-p', 'vmz-generator', 'oak_parses_ternary', '--', '--nocapture']);
+run('cargo', ['test', '-p', 'vmz-compiler', '--test', 'event_shell_check_unit', '--', '--nocapture']);
+run('pnpm', ['fmt:check']);
 
 console.log('\nverify-clean-build: bounded gates passed');
