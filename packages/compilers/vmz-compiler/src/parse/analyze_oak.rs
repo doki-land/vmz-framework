@@ -20,10 +20,7 @@ use crate::sfc::ScriptKind;
 
 /// Try Oak TypeScript AST → component surface. `None` when Oak fails or yields no usable class.
 pub fn try_component_decl_via_oak(kind: ScriptKind, source: &str) -> Option<ComponentDecl> {
-    if source.len() > 4096 || source.lines().any(|line| {
-        let line = line.trim_start();
-        line.starts_with("function ") || line.starts_with("async function ")
-    }) {
+    if !oak_script_safe_for_analysis(source) {
         return None;
     }
     let shell = ScriptShellInput {
@@ -56,6 +53,9 @@ pub fn collect_forbidden_factories_via_oak(
 ) -> Option<Vec<ForbiddenFactory>> {
     if kind != ScriptKind::Client {
         return Some(Vec::new());
+    }
+    if !oak_script_safe_for_analysis(source) {
+        return None;
     }
     let shell = ScriptShellInput {
         content: source.to_string(),
@@ -213,6 +213,9 @@ fn oak_callee_factory_name(expr: &Expression) -> Option<String> {
 /// Spans are relative to `source` (script body). Caller adds `content_start` for `.vmz` abs.
 /// Returns empty when Oak cannot build a root (caller may leave imports empty).
 pub fn collect_static_imports_via_oak(kind: ScriptKind, source: &str) -> Vec<NyarImportDecl> {
+    if !oak_script_safe_for_analysis(source) {
+        return Vec::new();
+    }
     let shell = ScriptShellInput {
         content: source.to_string(),
         content_start: 0,
@@ -226,6 +229,24 @@ pub fn collect_static_imports_via_oak(kind: ScriptKind, source: &str) -> Vec<Nya
         return Vec::new();
     };
     imports_from_root(root, source)
+}
+
+fn oak_script_safe_for_analysis(source: &str) -> bool {
+    if source.len() > 4096
+        || source.contains("async ")
+        || source.contains('@')
+        || source.contains("export type ")
+        || source.contains("[]")
+        || source.contains("||=")
+        || source.contains("??=")
+        || source.contains("&&=")
+    {
+        return false;
+    }
+    !source.lines().any(|line| {
+        let line = line.trim_start();
+        line.starts_with("function ") || line.starts_with("async function ")
+    })
 }
 
 /// Oak-primary static imports with oxc fallback when Oak yields empty module specifiers.

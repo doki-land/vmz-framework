@@ -617,12 +617,13 @@ impl JsWorkspace {
         let root = PathBuf::from(options.root);
         let out_dir = options.out_dir.map(PathBuf::from).unwrap_or_else(|| root.join("dist"));
 
+        let has_style_inputs = project_has_style_inputs(&root);
         Ok(Self {
             inner: Mutex::new(Workspace::create(WorkspaceOptions {
                 root,
                 out_dir,
-                tw: Some(vmz_plugin_tailwind::default_tw_compiler()),
-                scss: Some(vmz_plugin_sasso::default_scss_compiler()),
+                tw: has_style_inputs.then(vmz_plugin_tailwind::default_tw_compiler),
+                scss: has_style_inputs.then(vmz_plugin_sasso::default_scss_compiler),
                 runtime_dist: options.runtime_dist.map(PathBuf::from),
             })),
         })
@@ -1202,6 +1203,45 @@ impl JsWorkspace {
         ws.clear_dirty();
         Ok(())
     }
+}
+
+fn project_has_style_inputs(root: &std::path::Path) -> bool {
+    fn visit(path: &std::path::Path) -> bool {
+        let Ok(entries) = std::fs::read_dir(path) else {
+            return false;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if visit(&path) {
+                    return true;
+                }
+                continue;
+            }
+            let ext = path.extension().and_then(|value| value.to_str());
+            if matches!(ext, Some("scss" | "sass" | "css")) {
+                return true;
+            }
+            if ext == Some("vmz") {
+                if let Ok(source) = std::fs::read_to_string(&path)
+                    && (source.contains("<style")
+                        || source.contains("class=")
+                        || source.contains(":class")
+                        || source.contains("style:tw"))
+                {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    let src = root.join("src");
+    if src.is_dir() && visit(&src) {
+        return true;
+    }
+    let designs = root.join("designs");
+    designs.is_dir() && visit(&designs)
 }
 
 /// One component entry for [`generate_serve_entry_client`].
