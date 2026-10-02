@@ -20,6 +20,12 @@ use crate::sfc::ScriptKind;
 
 /// Try Oak TypeScript AST → component surface. `None` when Oak fails or yields no usable class.
 pub fn try_component_decl_via_oak(kind: ScriptKind, source: &str) -> Option<ComponentDecl> {
+    if source.len() > 4096 || source.lines().any(|line| {
+        let line = line.trim_start();
+        line.starts_with("function ") || line.starts_with("async function ")
+    }) {
+        return None;
+    }
     let shell = ScriptShellInput {
         content: source.to_string(),
         content_start: 0,
