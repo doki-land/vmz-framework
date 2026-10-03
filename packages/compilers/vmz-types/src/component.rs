@@ -1,4 +1,4 @@
-//! Component surface extracted from `.vmz` (oxc-parsed TypeScript).
+//! Component surface extracted from `.vmz` authoring scripts.
 //!
 //! Convention:
 //! - `export default class` is the component entry.
@@ -15,9 +15,10 @@
 //! - `src/components/**` - auto-available in templates by file name
 //! - `src/server/**` - server implementation libraries (`#server/...`)
 
-use oxc_span::Span;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use crate::SourceRange;
 
 /// TypeScript visibility on a class member (`public` / `private` / `protected`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -64,9 +65,9 @@ pub struct FieldDecl {
     /// Source visibility keyword.
     pub visibility: Visibility,
     /// Source span of the field declaration.
-    pub span: Span,
+    pub span: SourceRange,
     /// Source span of the field **name** (rename / xref target).
-    pub name_span: Span,
+    pub name_span: SourceRange,
 }
 
 /// REST surface from `@Get` / `@Post` / ... on a server method.
@@ -107,9 +108,9 @@ pub struct MethodDecl {
     /// `computed_member` | `rest_destructure` | `closure_boundary` | `field_star`.
     pub star_reasons: Vec<(String, String)>,
     /// Source span of the method declaration.
-    pub span: Span,
+    pub span: SourceRange,
     /// Source span of the method **name** (rename / xref target).
-    pub name_span: Span,
+    pub name_span: SourceRange,
 }
 
 /// Non-default class declared in the same `.vmz` file (helper, not a component).
@@ -118,9 +119,9 @@ pub struct InternalClassDecl {
     /// Class name.
     pub name: String,
     /// Source span of the class declaration.
-    pub span: Span,
+    pub span: SourceRange,
     /// Source span of the class **name**.
-    pub name_span: Span,
+    pub name_span: SourceRange,
 }
 
 /// Default-exported component class extracted from one `.vmz` file.
@@ -137,14 +138,14 @@ pub struct ComponentDecl {
     /// Other classes in the same file (not separately mountable).
     pub internal_classes: Vec<InternalClassDecl>,
     /// Source span of the class declaration.
-    pub span: Span,
+    pub span: SourceRange,
     /// Source span of the class **name** (rename / xref target).
-    pub name_span: Span,
+    pub name_span: SourceRange,
 }
 
 impl ComponentDecl {
     /// Empty component shell with a name and spans; lists filled by analyze.
-    pub fn new(name: impl Into<String>, span: Span, name_span: Span) -> Self {
+    pub fn new(name: impl Into<String>, span: SourceRange, name_span: SourceRange) -> Self {
         Self {
             name: name.into(),
             properties: Vec::new(),

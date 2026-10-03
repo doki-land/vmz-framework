@@ -8,13 +8,13 @@ use oak_typescript::TypeScriptRoot;
 use oak_core::{Lexer, ParseSession, SourceText};
 use oak_typescript::lexer::TypeScriptLexer;
 use oak_typescript::TypeScriptLanguage;
-use oxc_span::Span;
 use vmz_oak_frontend_adapter::{
     ByteSpan, NyarBindingKind, NyarImportBinding, NyarImportDecl, NyarImportKind, ScriptRole,
     ScriptShellInput, parse_script_ast,
 };
 use vmz_types::{
-    ComponentDecl, FieldDecl, FieldKind, HttpRoute, InternalClassDecl, MethodDecl, Visibility,
+    ComponentDecl, FieldDecl, FieldKind, HttpRoute, InternalClassDecl, MethodDecl, SourceRange,
+    Visibility,
 };
 
 use crate::field_rw::{ForbiddenFactory, is_forbidden_factory};
@@ -139,7 +139,7 @@ fn walk_expr_forbidden(expr: &Expression, out: &mut Vec<ForbiddenFactory>) {
                 if is_forbidden_factory(&name) {
                     out.push(ForbiddenFactory {
                         name,
-                        span: Span::new(expr.span.start as u32, expr.span.end as u32),
+                        span: oxc_span::Span::new(expr.span.start as u32, expr.span.end as u32),
                     });
                 }
             }
@@ -604,7 +604,7 @@ pub(crate) fn component_decl_from_root(root: &TypeScriptRoot, source: &str) -> O
 
     let class = default_class?;
     let name = if class.name.is_empty() { "Default".to_string() } else { class.name.clone() };
-    let class_span = range_to_span(class.span.start, class.span.end);
+    let class_span = range_to_source_range(class.span.start, class.span.end);
     let name_span = name_span_in(source, class.span.start, class.span.end, &name);
     let mut decl = ComponentDecl::new(name, class_span, name_span);
     fill_members_from_oak(&mut decl, &class.body, source);
@@ -613,7 +613,7 @@ pub(crate) fn component_decl_from_root(root: &TypeScriptRoot, source: &str) -> O
         .filter(|c| c.name != decl.name)
         .map(|c| InternalClassDecl {
             name: c.name.clone(),
-            span: range_to_span(c.span.start, c.span.end),
+            span: range_to_source_range(c.span.start, c.span.end),
             name_span: name_span_in(source, c.span.start, c.span.end, &c.name),
         })
         .collect();
@@ -658,7 +658,7 @@ fn fill_members_from_oak(decl: &mut ComponentDecl, body: &[ClassMember], source:
                     }),
                     kind,
                     visibility,
-                    span: range_to_span(span.start, span.end),
+                    span: range_to_source_range(span.start, span.end),
                     name_span: name_span_in(source, span.start, span.end, name),
                 };
                 match kind {
@@ -695,7 +695,7 @@ fn fill_members_from_oak(decl: &mut ComponentDecl, body: &[ClassMember], source:
                     calls: rw.calls,
                     opaque_callee: rw.opaque_callee,
                     star_reasons: rw.star_reasons,
-                    span: range_to_span(span.start, span.end),
+                    span: range_to_source_range(span.start, span.end),
                     name_span: name_span_in(source, span.start, span.end, name),
                 });
             }
@@ -821,17 +821,17 @@ fn type_annotation_text(ty: &TypeAnnotation) -> String {
     }
 }
 
-fn range_to_span(start: usize, end: usize) -> Span {
-    Span::new(start as u32, end as u32)
+fn range_to_source_range(start: usize, end: usize) -> SourceRange {
+    start as u32..end as u32
 }
 
-fn name_span_in(source: &str, start: usize, end: usize, name: &str) -> Span {
+fn name_span_in(source: &str, start: usize, end: usize, name: &str) -> SourceRange {
     let end = end.min(source.len());
     let start = start.min(end);
     let slice = &source[start..end];
     if let Some(rel) = slice.find(name) {
         let s = (start + rel) as u32;
-        return Span::new(s, s + name.len() as u32);
+        return s..s + name.len() as u32;
     }
-    range_to_span(start, end)
+    range_to_source_range(start, end)
 }

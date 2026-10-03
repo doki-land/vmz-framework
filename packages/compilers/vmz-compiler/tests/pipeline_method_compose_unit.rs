@@ -1,6 +1,6 @@
 //! Moved from `src/pipeline/method_compose.rs` (cargo-cry: tests next to Cargo.toml).
 
-use oxc_span::Span;
+use vmz_types::SourceRange as Span;
 use vmz_compiler::pipeline::method_compose::*;
 use vmz_types::MethodDecl;
 

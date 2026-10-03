@@ -3,7 +3,7 @@
 //! Lowers `struct` / `impl` capability methods into [`ComponentDecl`] so the
 //! shared Server DSL semantics match the TS `export default class` path.
 
-use oxc_span::Span;
+use vmz_types::SourceRange as Span;
 
 use vmz_types::{ComponentDecl, MethodDecl};
 

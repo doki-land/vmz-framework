@@ -40,7 +40,6 @@ fn program_wraps_reactive_as_one_view() {
 
 #[test]
 fn resource_and_call_edges_from_server_attach() {
-    use oxc_span::SPAN;
     let mut b = ReactiveComponentBuilder::new("Card");
     b.add_field("user", FieldKind::State);
     b.add_effect("onMount", vec![], vec![], true, vec![], false, vec![]);
@@ -60,8 +59,8 @@ fn resource_and_call_edges_from_server_attach() {
             calls: vec![],
             opaque_callee: false,
             star_reasons: Vec::new(),
-            span: SPAN,
-            name_span: SPAN,
+            span: 0..0,
+            name_span: 0..0,
         }],
         client_calls: vec![ClientServerCall {
             server_method: "fetchUser".into(),

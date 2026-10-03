@@ -1,7 +1,8 @@
-//! VMZ-specific types on top of the oxc toolchain.
+//! VMZ semantic types and neutral source ranges.
 //!
-//! Spans, source ids, diagnostics, AST, and parsing come from oxc.
-//! This crate only models `.vmz` component conventions that oxc does not own.
+//! Parser ASTs, parser diagnostics, and source-type configuration remain
+//! frontend implementation details. This crate owns the semantic contracts
+//! exchanged by the compiler and generators.
 //! Versioned wire protocols live in `vmz-protocol`.
 //!
 //! Wire conventions (pick the smallest form that fits):
@@ -29,6 +30,7 @@
 //! Skip empty payloads: `Option` / empty `String` / empty `Vec` via [`serde_util`].
 
 #![deny(missing_docs)]
+
 mod component;
 mod dep_key;
 mod program_ir;
@@ -67,7 +69,5 @@ pub use vmz_protocol::{
     MOTION_SCHEMA, MOTION_TRANSITION_SCHEMA, PLAN_SCHEMA, PROGRAM_SCHEMA, REACTIVE_SCHEMA,
 };
 
-/// Re-export the oxc span primitives we standardize on.
-pub mod span {
-    pub use oxc_span::{GetSpan, SourceType, Span};
-}
+/// UTF-8 byte range within one source unit.
+pub type SourceRange = std::ops::Range<u32>;

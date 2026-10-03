@@ -1,7 +1,7 @@
 //! Analyze script bodies through Oak TypeScript AST.
 
 use vmz_oak_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
-use vmz_types::{ComponentDecl, span::Span};
+use vmz_types::{ComponentDecl, SourceRange};
 
 use crate::field_rw::ForbiddenFactory;
 use crate::parse::analyze_oak::{component_decl_from_root, forbidden_factories_from_root};
@@ -39,7 +39,7 @@ pub fn analyze_script(kind: ScriptKind, source: &str) -> AnalyzedScript {
             None => diagnostic.message.clone(),
         })
         .collect();
-    let mut decl = ComponentDecl::new("Anonymous", Span::default(), Span::default());
+    let mut decl = ComponentDecl::new("Anonymous", SourceRange::default(), SourceRange::default());
     let mut forbidden_factories = Vec::new();
     if parsed.ok {
         if let Some(root) = parsed.root.as_ref() {

@@ -177,8 +177,8 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
                 kind: ScriptKind::Server,
                 decl: ComponentDecl::new(
                     "Anonymous",
-                    oxc_span::Span::default(),
-                    oxc_span::Span::default(),
+                    vmz_types::SourceRange::default(),
+                    vmz_types::SourceRange::default(),
                 ),
                 parse_errors: vec![format!(
                     "`<script server lang=\"{}\">` is registered but not implemented yet",

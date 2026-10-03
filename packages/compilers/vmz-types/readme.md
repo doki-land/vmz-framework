@@ -1,6 +1,6 @@
 # vmz-types
 
-VMZ-specific **semantic types** layered on the [oxc](https://github.com/oxc-project/oxc) toolchain.
+VMZ semantic types shared by the compiler and artifact generators.
 
 |             |                              |
 |-------------|------------------------------|
@@ -10,12 +10,13 @@ VMZ-specific **semantic types** layered on the [oxc](https://github.com/oxc-proj
 
 ## Features
 
-- Types oxc does not provide: component/field kinds, program-IR oriented structures, VMZ-facing enums, etc.
+- Component and field kinds, program IR, and VMZ-facing enums
 - Shared vocabulary for [`vmz-compiler`](../vmz-compiler/) and downstream crates
 
 ## Scope
 
-- Reuses oxc `Span`, source-file, and diagnostic primitives rather than defining parallel ones
+- Source locations use standard-library UTF-8 byte ranges within a source unit
+- Parser AST and source-type configuration remain frontend implementation details
 - Types only — no compile / check / explain pipelines
 - Wire-schema catalogs live in [`vmz-protocol`](../vmz-protocol/)
 

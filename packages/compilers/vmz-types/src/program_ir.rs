@@ -1098,7 +1098,7 @@ pub struct ServerCallEdge {
     pub from_client_method: Option<String>,
 }
 
-/// Proven client -> server method call (filled by compiler oxc walk).
+/// Proven client -> server method call discovered by compiler analysis.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ClientServerCall {
     /// Server method name invoked from the client.
@@ -1116,7 +1116,7 @@ pub struct ServerAttach {
     pub class_name: String,
     /// Analyzed server methods.
     pub methods: Vec<crate::MethodDecl>,
-    /// oxc-discovered `Class.method` calls with enclosing client method when known.
+    /// Discovered `Class.method` calls with enclosing client method when known.
     pub client_calls: Vec<ClientServerCall>,
     /// Secret bindings collected from server script (`secret('NAME')`).
     pub secret_requirements: Vec<SecretRequirement>,
