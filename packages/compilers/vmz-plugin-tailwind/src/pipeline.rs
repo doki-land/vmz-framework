@@ -17,7 +17,7 @@ pub struct PipelineOptions {
     pub project_root: Option<PathBuf>,
 }
 
-/// Full experimental result: collection + designs + engine module/CSS + oxc diagnostics.
+/// Full experimental result: collection + designs + engine module/CSS + diagnostics.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PipelineResult {
     /// Static TW sites collected from the `.vmz` source.
@@ -28,7 +28,7 @@ pub struct PipelineResult {
     pub theme_entry_count: usize,
     /// Engine compile response + reference CSS.
     pub lowering: EngineLowering,
-    /// Collect advice/errors + mapped engine diagnostics (oxc).
+    /// Collect advice/errors plus mapped engine diagnostics.
     #[serde(skip)]
     pub diagnostics: Vec<ReportedDiagnostic>,
 }

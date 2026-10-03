@@ -1,6 +1,5 @@
 //! Bridge to `tailwind-rs` (git `dev`): Canonical Style Module + reference CSS.
 
-use oxc_span::Span;
 use serde::{Deserialize, Serialize};
 use tailwind::{
     CandidateInput, CompileRequest, CompileResponse, Engine, EngineOptions, SourceRef, ThemeInput,
@@ -10,6 +9,7 @@ use vmz_compiler::ReportedDiagnostic;
 use vmz_compiler::Severity;
 
 use crate::TwCollection;
+use std::ops::Range;
 
 /// Result of lowering a collection through the neutral TW engine.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -62,7 +62,7 @@ pub fn compile_collection(collection: &TwCollection, theme: ThemeInput) -> Engin
     compile_registrations(&regs, theme)
 }
 
-/// Map engine diagnostics onto oxc [`ReportedDiagnostic`], attaching token spans when known.
+/// Map engine diagnostics onto VMZ diagnostics, attaching token spans when known.
 pub fn map_engine_diagnostics(
     collection: &TwCollection,
     lowering: &EngineLowering,
@@ -92,11 +92,11 @@ pub fn map_engine_diagnostics(
     out
 }
 
-fn span_for_token(collection: &TwCollection, candidate_key: &str) -> Option<Span> {
+fn span_for_token(collection: &TwCollection, candidate_key: &str) -> Option<Range<u32>> {
     for site in &collection.sites {
         for hit in &site.tokens {
             if hit.token == candidate_key {
-                return Some(hit.span);
+                return Some(hit.span.clone());
             }
         }
     }

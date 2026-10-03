@@ -1,8 +1,8 @@
 //! Collect `style:tw` and `@tailwind` sites from a `.vmz` source (experimental).
 
 use std::path::{Path, PathBuf};
+use std::ops::Range;
 
-use oxc_span::Span;
 use serde::{Deserialize, Serialize};
 use vmz_compiler::{
     AttrValue, ParsedVmz, ReportedDiagnostic, TemplateNode, parse_template, parse_vmz,
@@ -23,22 +23,22 @@ pub enum TwTokenKind {
 pub struct TwTokenHit {
     /// Utility class text (e.g. `px-4`).
     pub token: String,
-    /// Byte span in the original `.vmz` file (oxc `Span`).
+    /// Byte span in the original `.vmz` file.
     #[serde(with = "span_serde")]
-    pub span: Span,
+    pub span: Range<u32>,
 }
 
 mod span_serde {
-    use oxc_span::Span;
+    use std::ops::Range;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-    pub fn serialize<S: Serializer>(span: &Span, s: S) -> Result<S::Ok, S::Error> {
-        (span.start, span.end).serialize(s)
+    pub fn serialize<S: Serializer>(span: &Range<u32>, serializer: S) -> Result<S::Ok, S::Error> {
+        (span.start, span.end).serialize(serializer)
     }
 
-    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Span, D::Error> {
-        let (start, end) = <(u32, u32)>::deserialize(d)?;
-        Ok(Span::new(start, end))
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Range<u32>, D::Error> {
+        let (start, end) = <(u32, u32)>::deserialize(deserializer)?;
+        Ok(start..end)
     }
 }
 
@@ -51,7 +51,7 @@ pub struct TwSite {
     pub path: PathBuf,
     /// Byte span covering the site in the source file.
     #[serde(with = "span_serde")]
-    pub span: Span,
+    pub span: Range<u32>,
     /// Static tokens when the value is a string literal / block body.
     pub tokens: Vec<TwTokenHit>,
     /// True when the site uses `{…}` interpolation — engine cannot resolve statically.
@@ -147,9 +147,9 @@ fn walk_nodes(
                         let span =
                             locate_attr_value_span(template, template_start, "style:tw", raw)
                                 .unwrap_or_else(|| {
-                                    Span::new(template_start as u32, template_start as u32)
+                                    template_start as u32..template_start as u32
                                 });
-                        let tokens = split_tokens(raw, span);
+                        let tokens = split_tokens(raw, &span);
                         sites.push(TwSite {
                             kind: TwTokenKind::StyleTw,
                             path: path.to_path_buf(),
@@ -162,7 +162,7 @@ fn walk_nodes(
                     AttrValue::Interp(expr) => {
                         let span = locate_attr_name_span(template, template_start, "style:tw")
                             .unwrap_or_else(|| {
-                                Span::new(template_start as u32, template_start as u32)
+                                template_start as u32..template_start as u32
                             });
                         diagnostics.push(
                             ReportedDiagnostic::advice(path, "vmz::tw::dynamic_style_tw")
@@ -170,7 +170,6 @@ fn walk_nodes(
                         );
                         // Attach span via error_at-style advice isn't available — use warning_at pattern:
                         // ReportedDiagnostic::advice has no span; upgrade to warning with label.
-                        let _ = span;
                         sites.push(TwSite {
                             kind: TwTokenKind::StyleTw,
                             path: path.to_path_buf(),
@@ -219,7 +218,7 @@ fn collect_at_tailwind(
             // Bare `@tailwind` marker (directives like base/components/utilities TBD).
             (String::new(), after)
         };
-        let span = Span::new(name_start as u32, (style_start + end_in_style) as u32);
+        let span = name_start as u32..(style_start + end_in_style) as u32;
         let tokens = if raw.is_empty() {
             Vec::new()
         } else {
@@ -250,7 +249,7 @@ fn collect_apply_tokens(block: &str, approx_start: usize) -> Vec<TwTokenHit> {
         for tok in chunk.split_whitespace() {
             let start = offset as u32;
             let end = start + tok.len() as u32;
-            out.push(TwTokenHit { token: tok.to_string(), span: Span::new(start, end) });
+            out.push(TwTokenHit { token: tok.to_string(), span: start..end });
             offset += tok.len() + 1;
         }
         search = end.min(block.len().saturating_sub(1)) + 1;
@@ -282,7 +281,7 @@ fn find_matching_brace(s: &str, open_idx: usize) -> Option<usize> {
     None
 }
 
-fn split_tokens(raw: &str, parent: Span) -> Vec<TwTokenHit> {
+fn split_tokens(raw: &str, parent: &Range<u32>) -> Vec<TwTokenHit> {
     let mut out = Vec::new();
     let mut byte = 0usize;
     for part in raw.split_whitespace() {
@@ -291,7 +290,7 @@ fn split_tokens(raw: &str, parent: Span) -> Vec<TwTokenHit> {
             let end = start + part.len();
             out.push(TwTokenHit {
                 token: part.to_string(),
-                span: Span::new(start as u32, end as u32),
+                span: start as u32..end as u32,
             });
             byte += rel + part.len();
         }
@@ -304,7 +303,7 @@ fn locate_attr_value_span(
     template_start: usize,
     name: &str,
     value: &str,
-) -> Option<Span> {
+) -> Option<Range<u32>> {
     // Prefer `name="value"` then `name='value'`.
     let patterns = [format!("{name}=\"{value}\""), format!("{name}='{value}'")];
     for pat in &patterns {
@@ -312,16 +311,16 @@ fn locate_attr_value_span(
             let value_off = pat.find(value)?;
             let start = template_start + rel + value_off;
             let end = start + value.len();
-            return Some(Span::new(start as u32, end as u32));
+            return Some(start as u32..end as u32);
         }
     }
     locate_attr_name_span(template, template_start, name)
 }
 
-fn locate_attr_name_span(template: &str, template_start: usize, name: &str) -> Option<Span> {
+fn locate_attr_name_span(template: &str, template_start: usize, name: &str) -> Option<Range<u32>> {
     let rel = template.find(name)?;
     let start = template_start + rel;
-    Some(Span::new(start as u32, (start + name.len()) as u32))
+    Some(start as u32..(start + name.len()) as u32)
 }
 
 fn flatten_tokens(sites: &[TwSite]) -> Vec<String> {
