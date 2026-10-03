@@ -2,7 +2,7 @@
 //!
 //! Mirrors [`crate::pipeline::field_rw::FieldRw`] for the Oak AST surface.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use oak_typescript::ast::{Expression, ExpressionKind, ObjectProperty, Statement};
 use vmz_types::{DepKey, DepPath, PathSegment};
@@ -22,6 +22,7 @@ pub struct OakFieldRw {
     /// Provenance for FieldStar widenings: `(field, reason)`.
     pub star_reasons: Vec<(String, String)>,
     aliases: HashMap<String, DepKey>,
+    read_only_aliases: HashSet<String>,
     writing: bool,
 }
 
@@ -36,6 +37,11 @@ impl OakFieldRw {
         for stmt in body {
             self.walk_stmt(stmt);
         }
+    }
+
+    /// Report whether a local alias is currently bound in this visitor scope.
+    pub fn has_alias(&self, name: &str) -> bool {
+        self.aliases.contains_key(name)
     }
 
     fn is_field(&self, name: &str) -> bool {
@@ -106,10 +112,13 @@ impl OakFieldRw {
                 let key = extend_key(&base, property);
                 self.push_read_key(&key);
                 self.aliases.insert(local.to_string(), key);
+                self.read_only_aliases.insert(local.to_string());
             }
             return;
         }
         if pattern.starts_with('[') && pattern.ends_with(']') {
+            self.note_star_reason(base.root_field(), "array_destructure");
+            self.push_read_key(&DepKey::FieldStar(base.root_field().to_string()));
             for (index, local) in pattern[1..pattern.len() - 1].split(',').enumerate() {
                 let local = local.trim();
                 if local.is_empty() || local.starts_with("...") {
@@ -122,6 +131,7 @@ impl OakFieldRw {
                 };
                 self.push_read_key(&key);
                 self.aliases.insert(local.to_string(), key);
+                self.read_only_aliases.insert(local.to_string());
             }
             return;
         }
@@ -354,6 +364,9 @@ impl OakFieldRw {
             }
             ExpressionKind::Identifier(name) => {
                 if self.writing {
+                    if self.read_only_aliases.contains(name) {
+                        return;
+                    }
                     if let Some(key) = self.aliases.get(name).cloned() {
                         self.note_key(key);
                     } else {

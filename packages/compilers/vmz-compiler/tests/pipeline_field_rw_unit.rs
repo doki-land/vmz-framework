@@ -1,9 +1,8 @@
-//! Moved from `src/pipeline/field_rw.rs` (cargo-cry: tests next to Cargo.toml).
+//! Oak-backed field read/write and template dependency contracts.
 
-use oxc_allocator::Allocator;
-use oxc_ast_visit::Visit;
-use oxc_parser::Parser;
-use oxc_span::SourceType;
+use oak_typescript::ast::{ClassMember, Statement};
+use vmz_compiler::parse::field_rw_oak::OakFieldRw;
+use vmz_oak_frontend_adapter::{require_script_ast, ScriptRole, ScriptShellInput};
 use vmz_compiler::pipeline::field_rw::*;
 
 #[test]
@@ -16,11 +15,9 @@ fn flags_use_and_create_factories() {
 
 #[test]
 fn tracks_this_field_write_and_read() {
-    let allocator = Allocator::default();
     let src = "class C { async onMount() { this.user = await f(); this.tags.push(1); let x = this.user.name; this.user.bio = x; } }";
-    let ret = Parser::new(&allocator, src, SourceType::ts()).parse();
-    let mut rw = FieldRw::new(["user".into(), "tags".into()]);
-    rw.visit_program(&ret.program);
+    let mut rw = OakFieldRw::new(["user".into(), "tags".into()]);
+    walk_script(&mut rw, src);
     assert!(rw.writes.iter().any(|w| w == "user"), "writes={:?}", rw.writes);
     assert!(rw.writes.iter().any(|w| w == "tags"), "writes={:?}", rw.writes);
     assert!(rw.writes.iter().any(|w| w == "user.bio"), "writes={:?}", rw.writes);
@@ -28,7 +25,7 @@ fn tracks_this_field_write_and_read() {
 }
 
 #[test]
-fn template_deps_oxc_paths_and_scope() {
+fn template_deps_oak_paths_and_scope() {
     let fields = vec!["user".into(), "count".into(), "tags".into()];
     let deps = collect_template_deps("!user || count", &fields, &[]);
     assert!(deps.contains(&"user".into()));
@@ -45,7 +42,6 @@ fn template_deps_oxc_paths_and_scope() {
 
 #[test]
 fn tracks_alias_member_read_and_write() {
-    let allocator = Allocator::default();
     let src = r#"
         class C {
           rename() {
@@ -55,9 +51,8 @@ fn tracks_alias_member_read_and_write() {
           }
         }
     "#;
-    let ret = Parser::new(&allocator, src, SourceType::ts()).parse();
-    let mut rw = FieldRw::new(["user".into()]);
-    rw.visit_program(&ret.program);
+    let mut rw = OakFieldRw::new(["user".into()]);
+    walk_script(&mut rw, src);
     assert!(rw.reads.iter().any(|r| r == "user" || r == "user.name"), "reads={:?}", rw.reads);
     assert!(rw.reads.iter().any(|r| r == "user.name"), "reads={:?}", rw.reads);
     assert!(rw.writes.iter().any(|w| w == "user.bio"), "writes={:?}", rw.writes);
@@ -65,7 +60,6 @@ fn tracks_alias_member_read_and_write() {
 
 #[test]
 fn tracks_nested_alias_and_object_destructure() {
-    let allocator = Allocator::default();
     let src = r#"
         class C {
           label() {
@@ -75,16 +69,14 @@ fn tracks_nested_alias_and_object_destructure() {
           }
         }
     "#;
-    let ret = Parser::new(&allocator, src, SourceType::ts()).parse();
-    let mut rw = FieldRw::new(["user".into()]);
-    rw.visit_program(&ret.program);
+    let mut rw = OakFieldRw::new(["user".into()]);
+    walk_script(&mut rw, src);
     assert!(rw.reads.iter().any(|r| r == "user.profile"), "reads={:?}", rw.reads);
     assert!(rw.reads.iter().any(|r| r == "user.profile.name"), "reads={:?}", rw.reads);
 }
 
 #[test]
 fn tracks_direct_destructure_from_this() {
-    let allocator = Allocator::default();
     let src = r#"
         class C {
           label() {
@@ -93,16 +85,14 @@ fn tracks_direct_destructure_from_this() {
           }
         }
     "#;
-    let ret = Parser::new(&allocator, src, SourceType::ts()).parse();
-    let mut rw = FieldRw::new(["user".into()]);
-    rw.visit_program(&ret.program);
+    let mut rw = OakFieldRw::new(["user".into()]);
+    walk_script(&mut rw, src);
     assert!(rw.reads.iter().any(|r| r == "user.name"), "reads={:?}", rw.reads);
     assert!(rw.reads.iter().any(|r| r == "user.bio"), "reads={:?}", rw.reads);
 }
 
 #[test]
 fn local_rebind_does_not_write_field() {
-    let allocator = Allocator::default();
     let src = r#"
         class C {
           f() {
@@ -111,15 +101,13 @@ fn local_rebind_does_not_write_field() {
           }
         }
     "#;
-    let ret = Parser::new(&allocator, src, SourceType::ts()).parse();
-    let mut rw = FieldRw::new(["user".into()]);
-    rw.visit_program(&ret.program);
+    let mut rw = OakFieldRw::new(["user".into()]);
+    walk_script(&mut rw, src);
     assert!(!rw.writes.iter().any(|w| w == "user.name"), "writes={:?}", rw.writes);
 }
 
 #[test]
 fn tracks_this_method_calls() {
-    let allocator = Allocator::default();
     let src = r#"
         class C {
           onClick() {
@@ -129,9 +117,8 @@ fn tracks_this_method_calls() {
           }
         }
     "#;
-    let ret = Parser::new(&allocator, src, SourceType::ts()).parse();
-    let mut rw = FieldRw::new(["tags".into()]);
-    rw.visit_program(&ret.program);
+    let mut rw = OakFieldRw::new(["tags".into()]);
+    walk_script(&mut rw, src);
     assert!(rw.calls.iter().any(|c| c == "refresh"), "calls={:?}", rw.calls);
     assert!(rw.calls.iter().any(|c| c == "#load"), "calls={:?}", rw.calls);
     assert!(
@@ -144,7 +131,6 @@ fn tracks_this_method_calls() {
 
 #[test]
 fn marks_dynamic_this_callee_opaque() {
-    let allocator = Allocator::default();
     let src = r#"
         class C {
           run(name) {
@@ -152,9 +138,8 @@ fn marks_dynamic_this_callee_opaque() {
           }
         }
     "#;
-    let ret = Parser::new(&allocator, src, SourceType::ts()).parse();
-    let mut rw = FieldRw::new(["user".into()]);
-    rw.visit_program(&ret.program);
+    let mut rw = OakFieldRw::new(["user".into()]);
+    walk_script(&mut rw, src);
     assert!(rw.opaque_callee, "this[name]() must set opaque_callee");
     assert!(rw.calls.is_empty());
     assert!(
@@ -166,7 +151,6 @@ fn marks_dynamic_this_callee_opaque() {
 
 #[test]
 fn array_destructure_widens_with_reason() {
-    let allocator = Allocator::default();
     let src = r#"
         class C {
           f() {
@@ -175,9 +159,8 @@ fn array_destructure_widens_with_reason() {
           }
         }
     "#;
-    let ret = Parser::new(&allocator, src, SourceType::ts()).parse();
-    let mut rw = FieldRw::new(["tags".into()]);
-    rw.visit_program(&ret.program);
+    let mut rw = OakFieldRw::new(["tags".into()]);
+    walk_script(&mut rw, src);
     assert!(
         rw.star_reasons.iter().any(|(f, r)| f == "tags" && r == "array_destructure"),
         "star_reasons={:?}",
@@ -188,7 +171,6 @@ fn array_destructure_widens_with_reason() {
 
 #[test]
 fn nested_arrow_captures_alias_into_owner() {
-    let allocator = Allocator::default();
     let src = r#"
         class C {
           onClick() {
@@ -204,18 +186,17 @@ fn nested_arrow_captures_alias_into_owner() {
           }
         }
     "#;
-    let ret = Parser::new(&allocator, src, SourceType::ts()).parse();
-    let mut rw = FieldRw::new(["user".into()]);
-    rw.visit_program(&ret.program);
+    let mut rw = OakFieldRw::new(["user".into()]);
+    walk_script(&mut rw, src);
     assert!(
         rw.writes.iter().any(|w| w == "user.name"),
         "closure write must compose into owner: writes={:?}",
         rw.writes
     );
     assert!(
-        !rw.aliases.contains_key("local"),
+        !rw.has_alias("local"),
         "nested local must not leak: aliases={:?}",
-        rw.aliases
+        rw
     );
 }
 
@@ -225,4 +206,21 @@ fn each_alias_prop_paths_for_list_item() {
     assert_eq!(paths, vec![vec!["label".to_string()]]);
     let whole = collect_each_alias_prop_paths("tag", "tag");
     assert_eq!(whole, vec![Vec::<String>::new()]);
+}
+
+fn walk_script(visitor: &mut OakFieldRw, source: &str) {
+    let root = require_script_ast(&ScriptShellInput {
+        content: source.to_string(),
+        content_start: 0,
+        role: ScriptRole::Client,
+    }).expect("Oak must parse the original read/write fixture");
+    for statement in &root.statements {
+        if let Statement::ClassDeclaration(class) = statement {
+            for member in &class.body {
+                if let ClassMember::Method { body, .. } = member {
+                    visitor.walk_body(body);
+                }
+            }
+        }
+    }
 }

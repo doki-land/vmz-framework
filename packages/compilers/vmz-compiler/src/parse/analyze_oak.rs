@@ -136,7 +136,7 @@ fn walk_expr_forbidden(expr: &Expression, out: &mut Vec<ForbiddenFactory>) {
                 if is_forbidden_factory(&name) {
                     out.push(ForbiddenFactory {
                         name,
-                        span: oxc_span::Span::new(expr.span.start as u32, expr.span.end as u32),
+                        span: expr.span.start as u32..expr.span.end as u32,
                     });
                 }
             }
