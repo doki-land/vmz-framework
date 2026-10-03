@@ -380,7 +380,7 @@ pub fn compile_project_with_dirty(
     let (_graph_src, graph, _catalog) = crate::affected::component_graph_for(root);
 
     for unit in &plan.units {
-        let child_ctors = child_ctors_for_chunk(&unit.chunk_id, &graph.by_tag);
+        let child_ctors = graph.child_ctors_for_chunk(&unit.chunk_id);
         emit_file(
             &unit.source,
             &src_root,
@@ -1083,47 +1083,6 @@ fn finalize_output_revision(
     report.reload_required = !dirty.is_empty()
         && report.diagnostics.iter().all(|d| !d.is_error())
         && (!report.affected_chunks.is_empty() || report.full || report.island_hmr);
-}
-
-/// Map `ComponentGraph.by_tag` → relative import specs for a parent chunk.
-///
-/// Skips the parent’s own chunk. Ensures a `./` prefix when the relative path
-/// does not already start with `.`.
-fn child_ctors_for_chunk(
-    parent_chunk_id: &str,
-    by_tag: &HashMap<String, String>,
-) -> HashMap<String, String> {
-    let parent_dir = Path::new(parent_chunk_id).parent().unwrap_or(Path::new(""));
-    let mut out = HashMap::new();
-    for (tag, child_chunk) in by_tag {
-        if child_chunk == parent_chunk_id {
-            continue;
-        }
-        let target = format!("{child_chunk}.client.js");
-        let rel = pathdiff_chunk(parent_dir, Path::new(&target));
-        let rel = if rel.starts_with('.') { rel } else { format!("./{rel}") };
-        out.insert(tag.clone(), rel);
-    }
-    out
-}
-
-fn pathdiff_chunk(from_dir: &Path, target: &Path) -> String {
-    let from_parts: Vec<_> = from_dir
-        .components()
-        .filter_map(|c| c.as_os_str().to_str())
-        .filter(|s| !s.is_empty())
-        .collect();
-    let to_parts: Vec<_> = target.components().filter_map(|c| c.as_os_str().to_str()).collect();
-    let mut i = 0;
-    while i < from_parts.len() && i < to_parts.len() && from_parts[i] == to_parts[i] {
-        i += 1;
-    }
-    let mut out = Vec::new();
-    out.extend(std::iter::repeat_n("..", from_parts.len() - i));
-    for p in &to_parts[i..] {
-        out.push(*p);
-    }
-    if out.is_empty() { ".".into() } else { out.join("/") }
 }
 
 fn emit_file(

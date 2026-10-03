@@ -1018,11 +1018,9 @@ fn emit_component(
     let v = fresh("c", next_id);
     let ctor_arg = if child_ctors.contains_key(tag) {
         tag.to_string()
-    } else if child_ctors.is_empty() {
-        // Unit / no-graph path: keep string tag for registry lookup.
-        q(tag)
     } else {
-        return Err(format!("vmz: unknown component tag `{tag}` (not in ComponentGraph.by_tag)"));
+        // Registry lookup: self-reference, lazy edges, or unit fixtures without a graph.
+        q(tag)
     };
     stmts.push(format!("var {v} = api.component(this, {ctor_arg}, {props}, {client_arg});"));
     for (ev, handler) in &event_parts {

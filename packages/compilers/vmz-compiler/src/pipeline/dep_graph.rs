@@ -2,6 +2,7 @@
 //!
 //! Convention: `<UserCard />` depends on a `.vmz` whose file stem is `UserCard`
 //! (prefer `src/components/`). No ES `import '*.vmz'` — tags are the authoring edge.
+//! Self-reference resolves via deployment registry at emit time (not a static import edge).
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -82,6 +83,28 @@ impl ComponentGraph {
         Self { deps, reverse, by_tag }
     }
 
+    /// Static child ctor imports for a parent chunk (tag → relative `.client.js` specifier).
+    ///
+    /// Only includes **non-self** template dependencies from [`deps`]. Self-reference and
+    /// other registry-resolved tags are emitted as string tags at codegen time.
+    pub fn child_ctors_for_chunk(&self, parent_chunk_id: &str) -> HashMap<String, String> {
+        let parent_dir = Path::new(parent_chunk_id).parent().unwrap_or(Path::new(""));
+        let mut out = HashMap::new();
+        let child_chunks = self.deps.get(parent_chunk_id).map(|v| v.as_slice()).unwrap_or(&[]);
+        for child_chunk in child_chunks {
+            for (tag, chunk) in &self.by_tag {
+                if chunk != child_chunk {
+                    continue;
+                }
+                let target = format!("{child_chunk}.client.js");
+                let rel = pathdiff_chunk(parent_dir, Path::new(&target));
+                let rel = if rel.starts_with('.') { rel } else { format!("./{rel}") };
+                out.insert(tag.clone(), rel);
+            }
+        }
+        out
+    }
+
     /// Expand a set of seed chunk ids through reverse edges (importers).
     pub fn expand_importers(&self, seeds: impl IntoIterator<Item = String>) -> HashSet<String> {
         let mut out: HashSet<String> = seeds.into_iter().collect();
@@ -125,6 +148,25 @@ fn walk(
         }
         TemplateNode::Text(_) | TemplateNode::Interp(_) => {}
     }
+}
+
+fn pathdiff_chunk(from_dir: &Path, target: &Path) -> String {
+    let from_parts: Vec<_> = from_dir
+        .components()
+        .filter_map(|c| c.as_os_str().to_str())
+        .filter(|s| !s.is_empty())
+        .collect();
+    let to_parts: Vec<_> = target.components().filter_map(|c| c.as_os_str().to_str()).collect();
+    let mut i = 0;
+    while i < from_parts.len() && i < to_parts.len() && from_parts[i] == to_parts[i] {
+        i += 1;
+    }
+    let mut out = Vec::new();
+    out.extend(std::iter::repeat_n("..", from_parts.len() - i));
+    for p in &to_parts[i..] {
+        out.push(*p);
+    }
+    if out.is_empty() { ".".into() } else { out.join("/") }
 }
 
 fn is_component_tag(tag: &str, by_tag: &HashMap<String, String>) -> bool {
