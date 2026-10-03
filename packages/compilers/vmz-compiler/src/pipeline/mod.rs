@@ -20,3 +20,4 @@ pub mod server_slice;
 pub mod structural_build;
 pub mod virtual_server;
 pub mod write_barrier;
+pub mod write_barrier_oak;

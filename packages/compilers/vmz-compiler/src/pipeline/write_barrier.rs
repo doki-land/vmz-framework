@@ -91,6 +91,13 @@ pub fn rewrite_array_item_strides(
         return WriteBarrierRewrite { source: source.to_string(), rewritten: 0 };
     }
 
+    if let Some(result) = super::write_barrier_oak::rewrite_array_item_strides(source, owned_fields)
+    {
+        if result.rewritten > 0 {
+            return result;
+        }
+    }
+
     let allocator = Allocator::default();
     let parsed = Parser::new(&allocator, source, SourceType::ts()).parse();
     if parsed.panicked {
