@@ -96,7 +96,7 @@ fn class_default_route_id_survives_path_rename() {
 }
 
 #[test]
-fn oxc_params_static_strings() {
+fn oak_params_static_strings() {
     let p = parse_static_link_params("id: 'sku-1'").unwrap();
     assert_eq!(p.get("id").map(String::as_str), Some("sku-1"));
     assert_eq!(realize_path_pattern("/users/:id", &p).unwrap(), "/users/sku-1");
@@ -105,6 +105,20 @@ fn oxc_params_static_strings() {
     assert_eq!(p2.get("tab").map(String::as_str), Some("security"));
     let p3 = parse_static_link_params("({ id: \"sku-3\" })").unwrap();
     assert_eq!(p3.get("id").map(String::as_str), Some("sku-3"));
+}
+
+#[test]
+fn static_params_reject_nonliteral_members() {
+    for expression in ["{ id }", "{ id: record.id }", "{ id: 42 }", "{ ...record }", "{ id: 'sku', ...record }"] {
+        assert!(parse_static_link_params(expression).is_none(), "accepted: {expression}");
+    }
+}
+
+#[test]
+fn static_params_preserve_quoted_keys_and_escapes() {
+    let params = parse_static_link_params(r#"{ 'route:id': 'sku\u002d1', tab: 'a\'b' }"#).unwrap();
+    assert_eq!(params.get("route:id").map(String::as_str), Some("sku-1"));
+    assert_eq!(params.get("tab").map(String::as_str), Some("a'b"));
 }
 
 #[test]
