@@ -25,7 +25,7 @@ pub use css::{
 };
 pub use js::{
     EmittedJs, JsPrintOptions, ServerBridge, SnippetSpan, bind_field_idents, emit_client_module,
-    emit_server_module, is_direct_eligible, map_wrapped_span_to_snippet, print_js_source,
+    emit_server_module, is_direct_eligible, print_js_source,
     print_template_expr, template_expr_root_span, template_expr_snippet_error,
     template_expr_snippet_error_with_span, template_expr_snippet_ok, transpile_ts,
     transpile_ts_printed, transpile_ts_with_map, wrap_template_expr_source,
