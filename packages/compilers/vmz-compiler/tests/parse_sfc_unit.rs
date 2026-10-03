@@ -47,6 +47,21 @@ export default class Application {}
 }
 
 #[test]
+fn preserves_script_language_attribute() {
+    let src = r#"
+<template><h1>hi</h1></template>
+<script client>
+export default class Application {}
+</script>
+<script server lang="rust">
+fn main() {}
+</script>
+"#;
+    let parsed = parse_vmz("x.vmz", src).unwrap();
+    assert_eq!(parsed.server.unwrap().lang, ScriptLanguage::Rust);
+}
+
+#[test]
 fn rejects_server_before_client() {
     let src = r#"
 <template></template>

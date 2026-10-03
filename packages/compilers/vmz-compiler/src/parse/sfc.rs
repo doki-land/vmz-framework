@@ -489,7 +489,7 @@ fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> 
             (content, content_start)
         };
 
-        let lang = if matches!(role, BlockRole::Style | BlockRole::Router | BlockRole::Meta) {
+        let lang = if matches!(role, BlockRole::Style | BlockRole::Router | BlockRole::Meta | BlockRole::Client | BlockRole::Server | BlockRole::BareScript) {
             parse_lang_attr(&attrs)
         } else {
             None
