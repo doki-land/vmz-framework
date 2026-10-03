@@ -2,7 +2,7 @@
 //!
 //! Final `.vmz` text exits through [`VmzDocument`]. `<template>` prints from the
 //! Semantic AST with OXC-canonical expressions. Script/style bodies go through
-//! `oxc_formatter` / `oxc_formatter_css`.
+//! Oak TypeScript and the VMZ CSS formatter.
 
 #![deny(missing_docs)]
 

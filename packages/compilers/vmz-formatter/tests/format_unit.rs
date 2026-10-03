@@ -20,7 +20,7 @@ fn write(path: &std::path::Path, text: &str) {
 }
 
 #[test]
-fn formats_script_with_oxc_formatter_keeps_comment() {
+fn formats_script_with_oak_keeps_comment() {
     let dir = temp_dir("script");
     write(
         &dir.join(".editorconfig"),

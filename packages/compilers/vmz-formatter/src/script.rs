@@ -1,7 +1,5 @@
-//! Format `<script>` bodies via Oak (TS). Legacy `oxc_formatter` only until Oak coverage closes.
+//! Format `<script>` bodies via Oak TypeScript.
 
-use oxc_allocator::Allocator;
-use oxc_span::SourceType;
 use oak_typescript::formatter::format_source as oak_format_source;
 use vmz_compiler::{ScriptBlock, ScriptLanguage};
 
@@ -13,25 +11,15 @@ pub fn format_script_block(
     settings: &EditorSettings,
 ) -> Result<String, String> {
     match block.lang {
-        ScriptLanguage::Ts => format_ts(&block.content, settings),
+        ScriptLanguage::Ts => {
+            let formatted = oak_format_source(&block.content, &settings.format_options())
+                .map_err(|error| error.to_string())?;
+            Ok(normalize_body(&formatted, settings))
+        }
         ScriptLanguage::Rust | ScriptLanguage::Python | ScriptLanguage::Java => {
             Ok(envelope_only(&block.content, settings))
         }
     }
-}
-
-fn format_ts(source: &str, settings: &EditorSettings) -> Result<String, String> {
-    if let Ok(formatted) = oak_format_source(source, &settings.format_options()) {
-        return Ok(normalize_body(&formatted, settings));
-    }
-
-    // TODO(P4): remove once Oak `format` covers this script body.
-    let allocator = Allocator::new();
-    let options = settings.js_options();
-    let formatted = oxc_formatter::format(&allocator, source, SourceType::ts(), options)
-        .map_err(|d| d.to_string())?;
-    let code = formatted.print().map_err(|e| e.to_string())?.into_code();
-    Ok(normalize_body(&code, settings))
 }
 
 fn envelope_only(source: &str, settings: &EditorSettings) -> String {
@@ -42,19 +30,19 @@ fn normalize_body(source: &str, settings: &EditorSettings) -> String {
     let nl = settings.newline();
     let mut lines: Vec<String> = source
         .lines()
-        .map(|l| {
-            if settings.trim_trailing_whitespace { l.trim_end().to_string() } else { l.to_string() }
+        .map(|line| {
+            if settings.trim_trailing_whitespace { line.trim_end().to_string() } else { line.to_string() }
         })
         .collect();
-    while lines.last().is_some_and(|l| l.is_empty()) {
+    while lines.last().is_some_and(|line| line.is_empty()) {
         lines.pop();
     }
+    while lines.first().is_some_and(|line| line.is_empty()) {
+        lines.remove(0);
+    }
     let mut out = lines.join(nl);
-    if settings.insert_final_newline || !out.is_empty() {
-        // Script body inside tags always ends with newline before `</script>`.
-        if !out.is_empty() {
-            out.push_str(nl);
-        }
+    if settings.insert_final_newline && !out.is_empty() {
+        out.push_str(nl);
     }
     out
 }

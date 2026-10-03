@@ -12,9 +12,45 @@ use crate::editorconfig::EditorSettings;
 ///
 /// Expressions are canonicalized through oxc print (no raw string replay).
 pub fn format_template_body(body: &str, settings: &EditorSettings) -> Result<String, String> {
+    reject_unquoted_brace_attributes(body)?;
     let block = TemplateBlock { content: body.to_string(), content_start: 0 };
     let semantic = parse_template_semantic_primary(&block).map_err(|e| e.message)?;
     print_semantic(&semantic, settings)
+}
+
+fn reject_unquoted_brace_attributes(body: &str) -> Result<(), String> {
+    let mut in_tag = false;
+    let mut quote = None;
+    let mut chars = body.char_indices().peekable();
+    while let Some((index, ch)) = chars.next() {
+        if let Some(active) = quote {
+            if ch == active {
+                quote = None;
+            } else if ch == '\\' {
+                let _ = chars.next();
+            }
+            continue;
+        }
+        if ch == '<' {
+            in_tag = true;
+            continue;
+        }
+        if !in_tag {
+            continue;
+        }
+        if ch == '>' {
+            in_tag = false;
+            continue;
+        }
+        if ch == '"' || ch == '\'' {
+            quote = Some(ch);
+            continue;
+        }
+        if ch == '=' && body[index + ch.len_utf8()..].starts_with('{') {
+            return Err("unquoted brace attribute values are not valid Vue author syntax".to_string());
+        }
+    }
+    Ok(())
 }
 
 /// Canonical expression text for Vue attr / interpolation slots.

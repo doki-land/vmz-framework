@@ -4,9 +4,6 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use oak_typescript::formatter::FormatOptions;
-use oxc_formatter::JsFormatOptions;
-use oxc_formatter_core::{IndentStyle, IndentWidth, LineEnding, LineWidth};
-use oxc_formatter_css::{CssFormatOptions, CssVariant};
 
 /// Resolved EditorConfig (+ defaults) for one file.
 #[derive(Debug, Clone)]
@@ -64,26 +61,6 @@ impl EditorSettings {
         }
     }
 
-    fn core_indent_style(&self) -> IndentStyle {
-        if self.use_tabs { IndentStyle::Tab } else { IndentStyle::Space }
-    }
-
-    fn core_indent_width(&self) -> IndentWidth {
-        IndentWidth::try_from(self.indent_width).unwrap_or_default()
-    }
-
-    fn core_line_ending(&self) -> LineEnding {
-        match self.end_of_line {
-            EndOfLine::Lf => LineEnding::Lf,
-            EndOfLine::Crlf => LineEnding::Crlf,
-            EndOfLine::Cr => LineEnding::Cr,
-        }
-    }
-
-    fn core_line_width(&self) -> Option<LineWidth> {
-        self.line_width.and_then(|w| LineWidth::try_from(w).ok())
-    }
-
     /// Map into Oak `FormatOptions` for the JS/TS workspace path.
     pub fn format_options(&self) -> FormatOptions {
         FormatOptions {
@@ -92,30 +69,6 @@ impl EditorSettings {
         }
     }
 
-    /// Map into oxc JS/TS format options.
-    pub fn js_options(&self) -> JsFormatOptions {
-        let mut options = JsFormatOptions::default();
-        options.indent_style = self.core_indent_style();
-        options.indent_width = self.core_indent_width();
-        options.line_ending = self.core_line_ending();
-        if let Some(lw) = self.core_line_width() {
-            options.line_width = lw;
-        }
-        options
-    }
-
-    /// Map into oxc CSS format options for the given dialect.
-    pub fn css_options(&self, variant: CssVariant) -> CssFormatOptions {
-        let mut options = CssFormatOptions::default();
-        options.indent_style = self.core_indent_style();
-        options.indent_width = self.core_indent_width();
-        options.line_ending = self.core_line_ending();
-        options.variant = variant;
-        if let Some(lw) = self.core_line_width() {
-            options.line_width = lw;
-        }
-        options
-    }
 }
 
 /// Resolve EditorConfig for `path` (must be a file path). Falls back to defaults on error.

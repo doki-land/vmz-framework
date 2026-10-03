@@ -1,16 +1,15 @@
 mod cargo;
 mod engine;
 mod oak;
-mod oxc;
+mod style;
 mod walk;
 
 pub use engine::format_source_with_options;
-pub use oxc::{default_format_options, load_format_options};
+pub use style::{default_format_options, load_format_options};
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use oxc_formatter::JsFormatOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -47,7 +46,7 @@ pub struct WorkspaceFormatOptions {
     pub excludes: Option<Vec<String>>,
     /// Run `cargo fmt` when a Cargo workspace is present.
     pub rust: Option<bool>,
-    /// Run Oak on JS/TS targets (legacy `oxc_formatter` only until Oak coverage closes).
+    /// Run Oak on JS/TS targets (Oak-only).
     pub javascript: Option<bool>,
     /// Style config path relative to `cwd` (default: `biome.json`).
     pub style_config: Option<PathBuf>,
@@ -63,7 +62,7 @@ fn cargo_workspace_root(root: &Path) -> PathBuf {
     root.to_path_buf()
 }
 
-/// Format JS/TS via Oak (legacy `oxc_formatter` only until P4 removal) and Rust via `cargo fmt`.
+/// Format JS/TS via Oak and Rust via `cargo fmt`.
 pub fn run_workspace_format(options: WorkspaceFormatOptions) -> Result<WorkspaceFormatReport> {
     let cwd = options.cwd.clone().unwrap_or_else(|| std::env::current_dir().expect("current dir"));
     let hybrid = detect_hybrid_monorepo(&cwd);
@@ -80,7 +79,7 @@ pub fn run_workspace_format(options: WorkspaceFormatOptions) -> Result<Workspace
             includes: options.includes.clone(),
             excludes: options.excludes.clone(),
         };
-        let format_options = oxc::load_format_options(&cwd, options.style_config.as_deref());
+        let format_options = style::load_format_options(&cwd, options.style_config.as_deref())?;
         for path in walk::discover_format_targets(&cwd, &discover)? {
             format_path(&path, options.check, &mut report, &format_options)?;
         }
@@ -93,7 +92,7 @@ fn format_path(
     path: &Path,
     check: bool,
     report: &mut WorkspaceFormatReport,
-    options: &JsFormatOptions,
+    options: &oak_typescript::formatter::FormatOptions,
 ) -> Result<()> {
     let source = fs::read_to_string(path).map_err(|err| format!("{}: {err}", path.display()))?;
     let result = engine::format_source_with_options(path, &source, options.clone())?;

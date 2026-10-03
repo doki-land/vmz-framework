@@ -15,8 +15,8 @@ Authoring formatter for `.vmz` SFCs: **oxc IR formatter** (not codegen pretty-pr
 - Discover / format a file or project tree (`format_path`)
 - Hybrid monorepo JS/TS + `cargo fmt` (`run_workspace_format`; read `vmz.config` `format` from CLI)
 - Default **write**; `--check` only reports drift (cargo-fmt style — no `--write`)
-- `<script lang=ts>` → `oxc_formatter::format` (text-in IR)
-- `<style>` → `oxc_formatter_css` (`css` / `scss` / `sass`)
+- `<script lang=ts>` → Oak `format` (text-in IR)
+- `<style>` → VMZ CSS formatter (`css` / `scss` / `sass`)
 - Non-TS server DSL bodies are left alone (envelope trim / EOL only)
 - Faithful SFC reassembly: `<router>` / `<meta>` / `lang` / attrs / block order
 - Per-file **EditorConfig**: `indent_style`, `indent_size`, `tab_width`, `max_line_length`, `end_of_line`, `insert_final_newline`, `trim_trailing_whitespace`
