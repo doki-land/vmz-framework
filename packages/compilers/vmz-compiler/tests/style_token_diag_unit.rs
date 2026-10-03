@@ -83,6 +83,9 @@ export default class X {}
     let diags = validate_style_tw_design_token_refs(&theme, &parsed);
     assert_eq!(diags.len(), 1, "{diags:?}");
     assert_eq!(diags[0].code(), DIAG_UNKNOWN_DESIGN_TOKEN);
+    let token_start = source.find("bg-nope").unwrap() as u32;
+    let span = diags[0].source_span().expect("unknown token has a source span");
+    assert_eq!((span.start, span.end), (token_start, token_start + 7));
     assert!(
         diags[0].args().is_some_and(|a| a.get("token").is_some_and(|t| t.contains("bg-nope"))),
         "args={:?}",

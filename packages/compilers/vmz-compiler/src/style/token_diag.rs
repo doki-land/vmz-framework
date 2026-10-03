@@ -8,7 +8,7 @@
 use std::collections::{BTreeSet, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
-use oxc_span::Span;
+use std::ops::Range;
 
 use crate::designs::{DesignsBundle, StyleTheme, css_var_name};
 use crate::diagnostic::ReportedDiagnostic;
@@ -564,9 +564,9 @@ pub fn collect_vmz_css_var_refs(text: &str) -> Vec<String> {
     out
 }
 
-fn locate_token_span(source: &str, token: &str) -> Option<Span> {
+fn locate_token_span(source: &str, token: &str) -> Option<Range<u32>> {
     source.find(token).map(|rel| {
         let start = rel as u32;
-        Span::new(start, start + token.len() as u32)
+        start..start + token.len() as u32
     })
 }
