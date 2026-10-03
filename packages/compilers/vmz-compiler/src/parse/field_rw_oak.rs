@@ -1,8 +1,6 @@
 //! Oak TypeScript FieldRw: `this.field` reads/writes + sibling calls (method RW peel).
 //!
-//! Mirrors [`crate::pipeline::field_rw::FieldRw`] for the Oak AST surface Oaks can
-//! currently build (simple bindings; object/array destructure still falls through
-//! to oxc graft when Oak leaves a method empty).
+//! Mirrors [`crate::pipeline::field_rw::FieldRw`] for the Oak AST surface.
 
 use std::collections::HashMap;
 
@@ -91,6 +89,45 @@ impl OakFieldRw {
         }
     }
 
+    fn bind_pattern(&mut self, pattern: &str, base: DepKey) {
+        let pattern = pattern.trim();
+        if pattern.starts_with('{') && pattern.ends_with('}') {
+            for item in pattern[1..pattern.len() - 1].split(',') {
+                let item = item.trim();
+                if item.is_empty() || item.starts_with("...") {
+                    continue;
+                }
+                let mut names = item.splitn(2, ':').map(str::trim);
+                let property = names.next().unwrap_or_default();
+                let local = names.next().unwrap_or(property);
+                if property.is_empty() || local.is_empty() {
+                    continue;
+                }
+                let key = extend_key(&base, property);
+                self.push_read_key(&key);
+                self.aliases.insert(local.to_string(), key);
+            }
+            return;
+        }
+        if pattern.starts_with('[') && pattern.ends_with(']') {
+            for (index, local) in pattern[1..pattern.len() - 1].split(',').enumerate() {
+                let local = local.trim();
+                if local.is_empty() || local.starts_with("...") {
+                    continue;
+                }
+                let key = DepKey::IndexPath {
+                    root: base.root_field().to_string(),
+                    index: PathSegment::Ident(index.to_string()),
+                    segments: Vec::new(),
+                };
+                self.push_read_key(&key);
+                self.aliases.insert(local.to_string(), key);
+            }
+            return;
+        }
+        self.aliases.insert(pattern.to_string(), base);
+    }
+
     fn walk_stmt(&mut self, stmt: &Statement) {
         match stmt {
             Statement::ExpressionStatement(es) => self.walk_expr(&es.expression),
@@ -99,7 +136,7 @@ impl OakFieldRw {
                     self.walk_expr(init);
                     if !v.name.is_empty() {
                         if let Some(base) = self.expr_to_key(init) {
-                            self.aliases.insert(v.name.clone(), base);
+                            self.bind_pattern(&v.name, base);
                         }
                     }
                 }

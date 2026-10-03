@@ -6,7 +6,7 @@ use oak_typescript::ast::{
 };
 use oak_typescript::TypeScriptRoot;
 use oak_core::{Lexer, ParseSession, SourceText};
-use oak_typescript::lexer::{TypeScriptLexer, TypeScriptTokenType};
+use oak_typescript::lexer::TypeScriptLexer;
 use oak_typescript::TypeScriptLanguage;
 use oxc_span::Span;
 use vmz_oak_frontend_adapter::{
@@ -23,9 +23,6 @@ use crate::sfc::ScriptKind;
 
 /// Try Oak TypeScript AST → component surface. `None` when Oak fails or yields no usable class.
 pub fn try_component_decl_via_oak(kind: ScriptKind, source: &str) -> Option<ComponentDecl> {
-    if !oak_script_safe_for_analysis(source) {
-        return None;
-    }
     let shell = ScriptShellInput {
         content: source.to_string(),
         content_start: 0,
@@ -57,21 +54,25 @@ pub fn collect_forbidden_factories_via_oak(
     if kind != ScriptKind::Client {
         return Some(Vec::new());
     }
-    if !oak_script_safe_for_analysis(source) {
-        return None;
-    }
     let shell = ScriptShellInput {
         content: source.to_string(),
         content_start: 0,
         role: ScriptRole::Client,
     };
     let parsed = parse_script_ast(&shell);
+    if !parsed.ok {
+        return None;
+    }
     let root = parsed.root.as_ref()?;
+    Some(forbidden_factories_from_root(root))
+}
+
+pub(crate) fn forbidden_factories_from_root(root: &TypeScriptRoot) -> Vec<ForbiddenFactory> {
     let mut out = Vec::new();
     for stmt in &root.statements {
         walk_stmt_forbidden(stmt, &mut out);
     }
-    Some(out)
+    out
 }
 
 fn walk_stmt_forbidden(stmt: &Statement, out: &mut Vec<ForbiddenFactory>) {
@@ -236,7 +237,6 @@ pub fn collect_static_imports_via_oak(kind: ScriptKind, source: &str) -> Vec<Nya
 
 fn oak_script_safe_for_analysis(source: &str) -> bool {
     if source.len() > 4096
-        || source.contains("async ")
         || source.contains("export type ")
         || source.contains("[]")
         || source.contains("||=")
@@ -249,12 +249,9 @@ fn oak_script_safe_for_analysis(source: &str) -> bool {
     let text = SourceText::new(source);
     let mut session = ParseSession::default();
     let lexed = TypeScriptLexer::new(&language).lex(&text, &[], &mut session);
-    let Ok(tokens) = lexed.result else {
+    let Ok(_tokens) = lexed.result else {
         return false;
     };
-    if tokens.iter().any(|token| token.kind == TypeScriptTokenType::At) {
-        return false;
-    }
     !source.lines().any(|line| {
         let line = line.trim_start();
         line.starts_with("function ") || line.starts_with("async function ")
@@ -578,7 +575,7 @@ fn name_byte_span(source: &str, start: usize, end: usize, name: &str) -> Option<
     Some(ByteSpan { start: start + rel, end: start + rel + name.len() })
 }
 
-fn component_decl_from_root(root: &TypeScriptRoot, source: &str) -> Option<ComponentDecl> {
+pub(crate) fn component_decl_from_root(root: &TypeScriptRoot, source: &str) -> Option<ComponentDecl> {
     let mut default_class: Option<&ClassDeclaration> = None;
     let mut internals = Vec::new();
 
