@@ -5,9 +5,6 @@ use oak_typescript::ast::{
     TypeAnnotation, Visibility as OakVisibility,
 };
 use oak_typescript::TypeScriptRoot;
-use oak_core::{Lexer, ParseSession, SourceText};
-use oak_typescript::lexer::TypeScriptLexer;
-use oak_typescript::TypeScriptLanguage;
 use vmz_oak_frontend_adapter::{
     ByteSpan, NyarBindingKind, NyarImportBinding, NyarImportDecl, NyarImportKind, ScriptRole,
     ScriptShellInput, parse_script_ast,
@@ -217,9 +214,6 @@ fn oak_callee_factory_name(expr: &Expression) -> Option<String> {
 /// Spans are relative to `source` (script body). Caller adds `content_start` for `.vmz` abs.
 /// Returns empty when Oak cannot build a root (caller may leave imports empty).
 pub fn collect_static_imports_via_oak(kind: ScriptKind, source: &str) -> Vec<NyarImportDecl> {
-    if !oak_script_safe_for_analysis(source) {
-        return Vec::new();
-    }
     let shell = ScriptShellInput {
         content: source.to_string(),
         content_start: 0,
@@ -235,201 +229,12 @@ pub fn collect_static_imports_via_oak(kind: ScriptKind, source: &str) -> Vec<Nya
     imports_from_root(root, source)
 }
 
-fn oak_script_safe_for_analysis(source: &str) -> bool {
-    if source.len() > 4096
-        || source.contains("export type ")
-        || source.contains("[]")
-        || source.contains("||=")
-        || source.contains("??=")
-        || source.contains("&&=")
-    {
-        return false;
-    }
-    let language = TypeScriptLanguage::default();
-    let text = SourceText::new(source);
-    let mut session = ParseSession::default();
-    let lexed = TypeScriptLexer::new(&language).lex(&text, &[], &mut session);
-    let Ok(_tokens) = lexed.result else {
-        return false;
-    };
-    !source.lines().any(|line| {
-        let line = line.trim_start();
-        line.starts_with("function ") || line.starts_with("async function ")
-    })
-}
-
-/// Oak-primary static imports with oxc fallback when Oak yields empty module specifiers.
+/// Collect static imports from Oak TypeScript AST.
 ///
-/// Prefer Oak after oaks `#a5ac2719` structured import / `export … from`. Oxc remains a
-/// safety net if Oak parse/build fails for a given script body.
+/// Oak parse failure produces an empty result. There is intentionally no secondary parser
+/// here because this is the compiler's frontend contract.
 pub fn collect_static_imports(kind: ScriptKind, source: &str) -> Vec<NyarImportDecl> {
-    let oak = collect_static_imports_via_oak(kind, source);
-    if oak.iter().any(|imp| !imp.module_specifier.is_empty()) {
-        return oak;
-    }
-    collect_static_imports_via_oxc(source)
-}
-
-fn collect_static_imports_via_oxc(source: &str) -> Vec<NyarImportDecl> {
-    use oxc_allocator::Allocator;
-    use oxc_ast::ast::{ImportDeclarationSpecifier, ModuleExportName};
-    use oxc_ast_visit::{Visit, walk};
-    use oxc_parser::Parser;
-    use oxc_span::SourceType;
-
-    struct ImportCollector {
-        out: Vec<NyarImportDecl>,
-    }
-
-    impl<'a> Visit<'a> for ImportCollector {
-        fn visit_import_declaration(&mut self, decl: &oxc_ast::ast::ImportDeclaration<'a>) {
-            let module_specifier = decl.source.value.as_str().to_string();
-            let decl_span = ByteSpan {
-                start: decl.span.start as usize,
-                end: decl.span.end as usize,
-            };
-            let specifier_span = ByteSpan {
-                start: decl.source.span.start as usize,
-                end: decl.source.span.end as usize,
-            };
-            let is_type_only = decl.import_kind.is_type();
-            let mut specifiers = Vec::new();
-            if let Some(specs) = &decl.specifiers {
-                for spec in specs {
-                    match spec {
-                        ImportDeclarationSpecifier::ImportDefaultSpecifier(s) => {
-                            let local = s.local.name.as_str().to_string();
-                            specifiers.push(NyarImportBinding {
-                                local: local.clone(),
-                                imported: None,
-                                binding_kind: NyarBindingKind::Default,
-                                name_span: ByteSpan {
-                                    start: s.local.span.start as usize,
-                                    end: s.local.span.end as usize,
-                                },
-                            });
-                        }
-                        ImportDeclarationSpecifier::ImportNamespaceSpecifier(s) => {
-                            let local = s.local.name.as_str().to_string();
-                            specifiers.push(NyarImportBinding {
-                                local: local.clone(),
-                                imported: None,
-                                binding_kind: NyarBindingKind::Namespace,
-                                name_span: ByteSpan {
-                                    start: s.local.span.start as usize,
-                                    end: s.local.span.end as usize,
-                                },
-                            });
-                        }
-                        ImportDeclarationSpecifier::ImportSpecifier(s) => {
-                            let local = s.local.name.as_str().to_string();
-                            let imported = match &s.imported {
-                                ModuleExportName::IdentifierName(id) => id.name.as_str().to_string(),
-                                ModuleExportName::IdentifierReference(id) => {
-                                    id.name.as_str().to_string()
-                                }
-                                ModuleExportName::StringLiteral(lit) => lit.value.as_str().to_string(),
-                            };
-                            specifiers.push(NyarImportBinding {
-                                local: local.clone(),
-                                imported: Some(imported),
-                                binding_kind: NyarBindingKind::Named,
-                                name_span: ByteSpan {
-                                    start: s.local.span.start as usize,
-                                    end: s.local.span.end as usize,
-                                },
-                            });
-                        }
-                    }
-                }
-            }
-            self.out.push(NyarImportDecl {
-                kind: NyarImportKind::Static,
-                module_specifier,
-                specifiers,
-                is_type_only,
-                decl_span,
-                specifier_span,
-            });
-            walk::walk_import_declaration(self, decl);
-        }
-
-        fn visit_export_from_declaration(
-            &mut self,
-            decl: &oxc_ast::ast::ExportFromDeclaration<'a>,
-        ) {
-            let module_specifier = decl.source.value.as_str().to_string();
-            let decl_span = ByteSpan {
-                start: decl.span.start as usize,
-                end: decl.span.end as usize,
-            };
-            let specifier_span = ByteSpan {
-                start: decl.source.span.start as usize,
-                end: decl.source.span.end as usize,
-            };
-            let mut specifiers = Vec::new();
-            for spec in &decl.specifiers {
-                let imported = match &spec.local {
-                    ModuleExportName::IdentifierName(id) => id.name.as_str().to_string(),
-                    ModuleExportName::IdentifierReference(id) => id.name.as_str().to_string(),
-                    ModuleExportName::StringLiteral(lit) => lit.value.as_str().to_string(),
-                };
-                let local = match &spec.exported {
-                    ModuleExportName::IdentifierName(id) => id.name.as_str().to_string(),
-                    ModuleExportName::IdentifierReference(id) => id.name.as_str().to_string(),
-                    ModuleExportName::StringLiteral(lit) => lit.value.as_str().to_string(),
-                };
-                specifiers.push(NyarImportBinding {
-                    local: local.clone(),
-                    imported: Some(imported),
-                    binding_kind: NyarBindingKind::Named,
-                    name_span: ByteSpan {
-                        start: spec.span.start as usize,
-                        end: spec.span.end as usize,
-                    },
-                });
-            }
-            self.out.push(NyarImportDecl {
-                kind: NyarImportKind::ExportFrom,
-                module_specifier,
-                specifiers,
-                is_type_only: decl.export_kind.is_type(),
-                decl_span,
-                specifier_span,
-            });
-            walk::walk_export_from_declaration(self, decl);
-        }
-
-        fn visit_export_all_declaration(&mut self, decl: &oxc_ast::ast::ExportAllDeclaration<'a>) {
-            let module_specifier = decl.source.value.as_str().to_string();
-            let decl_span = ByteSpan {
-                start: decl.span.start as usize,
-                end: decl.span.end as usize,
-            };
-            let specifier_span = ByteSpan {
-                start: decl.source.span.start as usize,
-                end: decl.source.span.end as usize,
-            };
-            self.out.push(NyarImportDecl {
-                kind: NyarImportKind::ExportFrom,
-                module_specifier,
-                specifiers: Vec::new(),
-                is_type_only: decl.export_kind.is_type(),
-                decl_span,
-                specifier_span,
-            });
-            walk::walk_export_all_declaration(self, decl);
-        }
-    }
-
-    let allocator = Allocator::default();
-    let ret = Parser::new(&allocator, source, SourceType::ts()).parse();
-    if !ret.diagnostics.is_empty() && ret.program.body.is_empty() {
-        return Vec::new();
-    }
-    let mut v = ImportCollector { out: Vec::new() };
-    v.visit_program(&ret.program);
-    v.out
+    collect_static_imports_via_oak(kind, source)
 }
 
 fn imports_from_root(root: &TypeScriptRoot, source: &str) -> Vec<NyarImportDecl> {
