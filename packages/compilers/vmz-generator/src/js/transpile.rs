@@ -1,15 +1,22 @@
-//! Transpile TypeScript script blocks through Oak type erasure.
+//! Transpile TypeScript script blocks to JS via oxc parser + transformer + codegen.
 
 use std::path::Path;
 
-use oak_typescript::{FormatOptions, format_source};
+use oxc_allocator::Allocator;
+use oxc_parser::Parser;
+use oxc_semantic::SemanticBuilder;
+use oxc_span::SourceType;
+use oxc_transformer::{TransformOptions, Transformer};
 
-use super::print::{EmittedJs, JsPrintOptions};
+use super::print::{EmittedJs, JsPrintOptions, print_js_program};
 
 /// Transpile result with optional source map JSON.
 pub type TranspileOutput = EmittedJs;
 
-/// Transpile a TypeScript source string to JavaScript through Oak type erasure.
+/// Transpile a TypeScript source string to JavaScript via oxc parse/transform/codegen.
+///
+/// `filename` is used only for transform diagnostics paths. Returns an error when
+/// the parser panics; non-fatal parse diagnostics are ignored and codegen still runs.
 pub fn transpile_ts(source: &str, filename: &str) -> Result<String, String> {
     Ok(transpile_ts_printed(source, filename, &JsPrintOptions::default())?.code)
 }
@@ -30,22 +37,29 @@ pub fn transpile_ts_with_map(
     )
 }
 
-/// Erase TypeScript syntax through Oak and return an emitted module.
+/// Parse + transform TypeScript, then [`print_js_program`] (minify and map are independent).
 pub fn transpile_ts_printed(
     source: &str,
     filename: &str,
     print: &JsPrintOptions,
 ) -> Result<EmittedJs, String> {
-    if print.minify {
-        return Err("Oak TypeScript erasure does not provide minification yet".into());
+    let allocator = Allocator::default();
+    let source_type = SourceType::ts();
+    let parsed = Parser::new(&allocator, source, source_type).parse();
+    if parsed.panicked {
+        let msgs: Vec<_> = parsed.diagnostics.iter().map(|d| d.to_string()).collect();
+        return Err(msgs.join("; "));
     }
-    if print.source_map_path.is_some() {
-        return Err("Oak TypeScript erasure does not provide source maps yet".into());
-    }
-    let _ = filename;
-    let code = format_source(source, &FormatOptions::default().with_type_erasure(true))
-        .map_err(|error| error.to_string())?;
-    Ok(EmittedJs { code, map: None })
+
+    let mut program = parsed.program;
+    let semantic_ret = SemanticBuilder::new().build(&program);
+    let mut options = TransformOptions::default();
+    // Template expressions are lowered after this script transform. A value import
+    // may therefore look unused to oxc while being required by the emitted view.
+    options.typescript.only_remove_type_imports = true;
+    let transformer = Transformer::new(&allocator, Path::new(filename), &options);
+    let _ = transformer.build_with_scoping(semantic_ret.semantic.into_scoping(), &mut program);
+    Ok(print_js_program(&allocator, &mut program, print))
 }
 
 #[cfg(test)]
