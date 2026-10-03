@@ -1,36 +1,19 @@
-//! Rewrite ESM module specifiers (Oak-primary span splice; oxc AST mutate fallback).
+//! Rewrite ESM module specifiers with Oak CST span patches.
 
 use oak_typescript::ast::{Expression, ExpressionKind, Statement};
-use oxc_allocator::Allocator;
-use oxc_ast::ast::{
-    ExportAllDeclaration, ExportFromDeclaration, Expression as OxcExpression, ImportDeclaration,
-    StringLiteral,
-};
-use oxc_ast::builder::AstBuilder;
-use oxc_ast_visit::{VisitMut, walk_mut};
-use oxc_codegen::Codegen;
-use oxc_parser::Parser;
-use oxc_span::{SPAN, SourceType};
-use oxc_str::Str;
 use vmz_oak_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
 
-/// Rewrite `import` / `export … from` / `import()` module strings with `map`.
+/// Rewrite import, export-from, and dynamic-import module strings with Oak CST spans.
 ///
-/// Prefers Oak TypeScript AST + in-place specifier splice (preserves surrounding
-/// formatting). Falls back to oxc parse/mutate/codegen when Oak cannot lower a root.
-///
-/// Returns `None` only when both Oak and oxc fail to parse as a module.
+/// Returns None when Oak cannot safely parse the module.
 pub fn rewrite_module_specifiers(
     source: &str,
     mut map: impl FnMut(&str) -> Option<String>,
 ) -> Option<String> {
-    if let Some(out) = rewrite_module_specifiers_via_oak(source, &mut map) {
-        return Some(out);
-    }
-    rewrite_module_specifiers_via_oxc(source, map)
+    rewrite_module_specifiers_via_oak(source, &mut map)
 }
 
-/// Like [`rewrite_module_specifiers`], panicking when parse fails.
+/// Like [`rewrite_module_specifiers`], panicking when Oak cannot parse the module.
 pub fn rewrite_module_specifiers_required(
     source: &str,
     map: impl FnMut(&str) -> Option<String>,
@@ -320,130 +303,4 @@ fn apply_span_patches(source: &str, patches: &mut [(usize, usize, String)]) -> S
         }
     }
     out
-}
-
-fn rewrite_module_specifiers_via_oxc(
-    source: &str,
-    mut map: impl FnMut(&str) -> Option<String>,
-) -> Option<String> {
-    let allocator = Allocator::default();
-    let mut program = {
-        let ret = Parser::new(&allocator, source, SourceType::mjs()).parse();
-        if ret.panicked {
-            return None;
-        }
-        ret.program
-    };
-
-    struct Rewriter<'a, F> {
-        ast: AstBuilder<'a>,
-        map: F,
-    }
-
-    impl<'a, F> Rewriter<'a, F>
-    where
-        F: FnMut(&str) -> Option<String>,
-    {
-        fn rewrite_lit(&mut self, lit: &mut StringLiteral<'a>) {
-            if let Some(next) = (self.map)(lit.value.as_str()) {
-                *lit =
-                    StringLiteral::new(SPAN, Str::from_str_in(&next, &self.ast), None, &self.ast);
-            }
-        }
-    }
-
-    impl<'a, F> VisitMut<'a> for Rewriter<'a, F>
-    where
-        F: FnMut(&str) -> Option<String>,
-    {
-        fn visit_import_declaration(&mut self, decl: &mut ImportDeclaration<'a>) {
-            self.rewrite_lit(&mut decl.source);
-            walk_mut::walk_import_declaration(self, decl);
-        }
-
-        fn visit_export_all_declaration(&mut self, decl: &mut ExportAllDeclaration<'a>) {
-            self.rewrite_lit(&mut decl.source);
-            walk_mut::walk_export_all_declaration(self, decl);
-        }
-
-        fn visit_export_from_declaration(&mut self, decl: &mut ExportFromDeclaration<'a>) {
-            self.rewrite_lit(&mut decl.source);
-            walk_mut::walk_export_from_declaration(self, decl);
-        }
-
-        fn visit_import_expression(&mut self, expr: &mut oxc_ast::ast::ImportExpression<'a>) {
-            if let OxcExpression::StringLiteral(lit) = &mut expr.source {
-                self.rewrite_lit(lit);
-            } else {
-                walk_mut::walk_expression(self, &mut expr.source);
-            }
-            if let Some(options) = expr.options.as_mut() {
-                walk_mut::walk_expression(self, options);
-            }
-        }
-    }
-
-    let mut visitor = Rewriter { ast: AstBuilder::new(&allocator), map: &mut map };
-    visitor.visit_program(&mut program);
-    Some(Codegen::new().build(&program).code)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn rewrites_static_and_dynamic_imports() {
-        let src = r#"
-import a from "vmz:runtime";
-import "./foo.ts";
-export { b } from './bar.tsx';
-export * from "vmz:dom";
-const x = import("./baz.ts");
-"#;
-        let out = rewrite_module_specifiers(src, |spec| {
-            if spec == "vmz:runtime" {
-                Some("./runtime.js".into())
-            } else if spec == "vmz:dom" {
-                Some("./dom.js".into())
-            } else if let Some(stem) =
-                spec.strip_suffix(".tsx").or_else(|| spec.strip_suffix(".ts"))
-            {
-                Some(format!("{stem}.js"))
-            } else {
-                None
-            }
-        })
-        .expect("parse");
-        assert!(out.contains("./runtime.js"), "{out}");
-        assert!(out.contains("./dom.js"), "{out}");
-        assert!(out.contains("./foo.js"), "{out}");
-        assert!(out.contains("./bar.js"), "{out}");
-        assert!(out.contains("./baz.js"), "{out}");
-        assert!(!out.contains("vmz:runtime"), "{out}");
-        assert!(!out.contains(".tsx"), "{out}");
-        assert!(!out.contains(".ts\""), "{out}");
-        assert!(!out.contains(".ts'"), "{out}");
-    }
-
-    #[test]
-    fn oak_rewrites_zero_arg_dynamic_import() {
-        let src = "const x = import(\"./baz.ts\");\n";
-        let out = rewrite_module_specifiers(src, |spec| {
-            spec.strip_suffix(".ts").map(|stem| format!("{stem}.js"))
-        })
-        .expect("parse");
-        assert!(out.contains("./baz.js"), "{out}");
-        assert!(!out.contains(".ts"), "{out}");
-    }
-
-    #[test]
-    fn oak_path_preserves_surrounding_layout() {
-        let src = "import a from \"vmz:runtime\";\n";
-        let out = rewrite_module_specifiers_via_oak(src, &mut |spec| {
-            (spec == "vmz:runtime").then(|| "./runtime.js".into())
-        })
-        .expect("oak");
-        assert_eq!(out, "import a from \"./runtime.js\";\n");
-    }
 }
