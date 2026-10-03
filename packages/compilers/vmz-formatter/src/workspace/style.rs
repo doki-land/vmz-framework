@@ -4,7 +4,7 @@ use oak_typescript::formatter::FormatOptions;
 
 /// Default style aligned with the VMZ workspace contract.
 pub fn default_format_options() -> FormatOptions {
-    FormatOptions { indent_width: 4, line_width: 144 }
+    FormatOptions { indent_width: 4, line_width: 144, type_erasure: false }
 }
 
 pub fn load_format_options(root: &Path, style_config: Option<&Path>) -> Result<FormatOptions, String> {
@@ -35,5 +35,5 @@ pub fn load_format_options(root: &Path, style_config: Option<&Path>) -> Result<F
         .and_then(|v| v.as_u64())
         .and_then(|v| usize::try_from(v).ok())
         .unwrap_or(144);
-    Ok(FormatOptions { indent_width, line_width })
+    Ok(FormatOptions { indent_width, line_width, type_erasure: false })
 }
