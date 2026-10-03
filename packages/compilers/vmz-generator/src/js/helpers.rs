@@ -1,7 +1,5 @@
 //! Shared JS emit helpers (events, field binding, ternary split).
 
-use oxc_span::GetSpan;
-
 /// Trusted raw HTML binding (`html={expr}`) - not a DOM attribute.
 pub fn is_html_attr(name: &str) -> bool {
     name == "html"
@@ -234,45 +232,28 @@ pub fn looks_like_ternary(expr: &str) -> bool {
 
 /// Top-level `a ? b : c` -> (test, consequent, alternate).
 pub fn split_ternary_parts(expr: &str) -> Option<(String, String, String)> {
-    let src = super::expr_parse::wrap_template_expr_source(expr);
-    let allocator = oxc_allocator::Allocator::default();
-    let ret = oxc_parser::Parser::new(&allocator, &src, oxc_span::SourceType::ts()).parse();
-    if !ret.diagnostics.is_empty() || ret.panicked {
+    let parsed = vmz_oak_frontend_adapter::parse_expression_snippet(expr.trim());
+    if !parsed.ok {
         return None;
     }
-    let body = ret.program.body.first()?;
-    let oxc_ast::ast::Statement::ExpressionStatement(es) = body else {
+    let root = parsed.expression?;
+    let oak_typescript::ast::ExpressionKind::ConditionalExpression {
+        test,
+        consequent,
+        alternate,
+    } = root.kind.as_ref()
+    else {
         return None;
     };
-    let mut top = &es.expression;
-    while let oxc_ast::ast::Expression::ParenthesizedExpression(p) = top {
-        top = &p.expression;
-    }
-    let oxc_ast::ast::Expression::ConditionalExpression(cond) = top else {
-        return None;
+    let print = |part: &oak_typescript::ast::Expression| {
+        super::oak_expr_print::print_oak_expression(part).filter(|s| !s.is_empty())
     };
-    let slice = |span: oxc_span::Span| -> Option<String> {
-        let s = span.start as usize;
-        let e = span.end as usize;
-        if s < e && e <= src.len() { Some(src[s..e].trim().to_string()) } else { None }
-    };
-    let test = slice(cond.test.span())?;
-    let cons = slice(cond.consequent.span())?;
-    let alt = slice(cond.alternate.span())?;
-    if test.is_empty() || cons.is_empty() || alt.is_empty() {
-        return None;
-    }
-    Some((test, cons, alt))
-}
-
-/// Collect deps (Oak primary, oxc/scan fallback). Name kept for emit call sites.
-pub fn collect_deps_oxc(expr: &str, fields: &[String], scope: &[String]) -> Vec<String> {
-    super::deps::collect_template_deps(expr, fields, scope)
+    Some((print(test)?, print(consequent)?, print(alternate)?))
 }
 
 /// Rewrite bare field idents to `this.field` (Oak span rewrite primary).
 ///
-/// Falls back to oxc VisitMut+codegen, then the legacy scanner.
+/// Falls back to the legacy scanner when Oak cannot lower the snippet.
 pub fn bind_field_idents(
     expr: &str,
     fields: &[String],

@@ -15,7 +15,7 @@ use crate::structural_build::build_native_view;
 use crate::template::{AttrValue, TemplateAttr, TemplateIr};
 
 pub use vmz_generator::js::{
-    bind_field_idents, collect_deps_oxc, emit_direct_create, emit_vmz_plan, event_dom_type,
+    bind_field_idents, collect_template_deps, emit_direct_create, emit_vmz_plan, event_dom_type,
     is_component_tag, is_direct_eligible, is_event_attr, is_html_attr, looks_like_ternary,
     rewrite_ts_spec_imports, rewrite_virtual_import, sanitize_interp, split_ternary_parts,
 };

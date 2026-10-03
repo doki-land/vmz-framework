@@ -31,7 +31,7 @@ pub use expr_parse::{
     template_expr_snippet_error_with_span, template_expr_snippet_ok, wrap_template_expr_source,
 };
 pub use helpers::{
-    HandlerResolution, bind_field_idents, collect_deps_oxc, event_dom_type, is_component_tag,
+    HandlerResolution, bind_field_idents, event_dom_type, is_component_tag,
     is_event_attr, is_html_attr, looks_like_ternary, parse_this_method_call_arrow, sanitize_interp,
     single_field_binding_target, split_ternary_parts, wrap_event_handler_body,
 };

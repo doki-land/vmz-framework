@@ -8,9 +8,10 @@
 #![allow(clippy::too_many_arguments)]
 
 use super::ast_util::{js_string_literal, print_one_stmt};
+use super::deps::collect_template_deps;
 use super::emit_ir::IrDepCursor;
 use super::helpers::{
-    HandlerResolution, bind_field_idents_ctx, collect_deps_oxc, component_event_name,
+    HandlerResolution, bind_field_idents_ctx, component_event_name,
     component_prop_wire_name, event_dom_type, is_component_event_attr, is_event_attr, is_html_attr,
     looks_like_ternary, parse_this_method_call_arrow, sanitize_interp, single_field_binding_target,
     split_ternary_parts, wrap_event_handler_body,
@@ -424,7 +425,7 @@ fn binding_deps(
         let deps = ir.deps_for_binding(bid.0).unwrap_or_default();
         return (Some(bid.0), deps);
     }
-    (None, collect_deps_oxc(fallback_expr, fields, scope))
+    (None, collect_template_deps(fallback_expr, fields, scope))
 }
 
 fn emit_nodes(
@@ -1037,7 +1038,7 @@ fn emit_component(
             let ViewAttrValue::Interp { expr: e } = &a.value else {
                 continue;
             };
-            let deps = collect_deps_oxc(e, fields, scope);
+            let deps = collect_template_deps(e, fields, scope);
             if deps.is_empty() {
                 continue;
             }
