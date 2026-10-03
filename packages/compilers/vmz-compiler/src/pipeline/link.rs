@@ -3,15 +3,13 @@
 //! `to` is a stable RouteId. Renaming a page file or changing `path` must not require
 //! editing Links; only RouteId rename (or class default-id change) does.
 //!
-//! Params object literals are parsed with oxc AST — no string-scan/splice for values.
+//! Params object literals are parsed with Oak AST — no string-scan/splice for values.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use oxc_allocator::Allocator;
-use oxc_ast::ast::{Expression, ObjectPropertyKind, PropertyKey};
-use oxc_parser::Parser;
-use oxc_span::SourceType;
+use oak_typescript::ast::{ExpressionKind, ObjectProperty, Statement};
+use vmz_oak_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
 
 use crate::sfc::{DataBlock, ParsedVmz};
 use crate::template::{AttrValue, TemplateIr, TemplateNode};
@@ -484,7 +482,7 @@ pub fn realize_path_pattern(
     if out.is_empty() { Ok("/".into()) } else { Ok(format!("/{}", out.join("/"))) }
 }
 
-/// Parse static string entries from a params object expression via oxc AST.
+/// Parse static string entries from a params object expression via Oak AST.
 /// Returns `None` when the expression is not a fully static object of string literals.
 pub fn parse_static_link_params(expr: &str) -> Option<BTreeMap<String, String>> {
     let trimmed = strip_outer_parens(expr.trim());
@@ -492,21 +490,42 @@ pub fn parse_static_link_params(expr: &str) -> Option<BTreeMap<String, String>> 
         return Some(BTreeMap::new());
     }
     let src = if trimmed.starts_with('{') {
-        format!("({trimmed})")
+        format!("const __vmzLinkParams = {trimmed};")
     } else {
-        format!("({{ {trimmed} }})")
+        format!("const __vmzLinkParams = {{ {trimmed} }};")
     };
-    let allocator = Allocator::default();
-    let ret = Parser::new(&allocator, &src, SourceType::ts()).parse();
-    if ret.panicked {
+    let parsed = parse_script_ast(&ScriptShellInput {
+        content: src,
+        content_start: 0,
+        role: ScriptRole::Client,
+    });
+    if !parsed.ok {
         return None;
     }
-    let mut visitor = StaticParamsVisitor { result: None, failed: false };
-    oxc_ast_visit::Visit::visit_program(&mut visitor, &ret.program);
-    if visitor.failed {
+    let root = parsed.root?;
+    let expression = root.statements.iter().find_map(|statement| match statement {
+        Statement::VariableDeclaration(declaration) if declaration.name == "__vmzLinkParams" => {
+            declaration.value.as_ref()
+        }
+        _ => None,
+    })?;
+    let ExpressionKind::ObjectLiteral { properties } = expression.kind.as_ref() else {
         return None;
+    };
+    let mut out = BTreeMap::new();
+    for property in properties {
+        let ObjectProperty::Property { name, value, shorthand, .. } = property else {
+            return None;
+        };
+        if *shorthand {
+            return None;
+        }
+        let ExpressionKind::StringLiteral(value) = value.kind.as_ref() else {
+            return None;
+        };
+        out.insert(name.clone(), value.clone());
     }
-    visitor.result
+    Some(out)
 }
 
 fn strip_outer_parens(expr: &str) -> &str {
@@ -519,45 +538,6 @@ fn strip_outer_parens(expr: &str) -> &str {
         t = inner;
     }
     t
-}
-
-struct StaticParamsVisitor {
-    result: Option<BTreeMap<String, String>>,
-    failed: bool,
-}
-
-impl<'a> oxc_ast_visit::Visit<'a> for StaticParamsVisitor {
-    fn visit_object_expression(&mut self, it: &oxc_ast::ast::ObjectExpression<'a>) {
-        if self.result.is_some() || self.failed {
-            return;
-        }
-        let mut out = BTreeMap::new();
-        for prop in &it.properties {
-            let ObjectPropertyKind::ObjectProperty(p) = prop else {
-                self.failed = true;
-                return;
-            };
-            if p.method || p.shorthand || p.kind != oxc_ast::ast::PropertyKind::Init {
-                self.failed = true;
-                return;
-            }
-            let key = match &p.key {
-                PropertyKey::StaticIdentifier(id) => id.name.to_string(),
-                PropertyKey::StringLiteral(s) => s.value.as_str().to_string(),
-                PropertyKey::Identifier(id) => id.name.to_string(),
-                _ => {
-                    self.failed = true;
-                    return;
-                }
-            };
-            let Expression::StringLiteral(lit) = &p.value else {
-                self.failed = true;
-                return;
-            };
-            out.insert(key, lit.value.as_str().to_string());
-        }
-        self.result = Some(out);
-    }
 }
 
 /// Validate same-app `<Link>` against RouteTable (graph identity, not filesystem probes).
