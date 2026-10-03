@@ -197,3 +197,31 @@ fn resolve_root(
 fn text(source: &str, expr: &Expression) -> String {
     source.get(expr.span.clone()).unwrap_or_default().trim().to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::rewrite_array_item_strides;
+    use std::collections::HashSet;
+
+    #[test]
+    fn lowers_alias_stride_loop_without_oxc() {
+        let source = r#"
+export default class Demo {
+  rows = [];
+  update() {
+    const rows = this.rows;
+    for (let i = 0; i < rows.length; i += 10) {
+      rows[i].label += " !!!";
+    }
+  }
+}
+"#;
+        let owned = HashSet::from([String::from("rows")]);
+        let result = rewrite_array_item_strides(source, &owned).expect("Oak parse");
+        assert_eq!(result.rewritten, 1);
+        assert!(result.source.contains(
+            "__vmzArrayItemCompoundStride(this, \"rows\", \"label\", \"+\", \" !!!\", 0, 10)"
+        ));
+        assert!(!result.source.contains("for ("));
+    }
+}
