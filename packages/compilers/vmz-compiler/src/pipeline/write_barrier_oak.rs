@@ -152,7 +152,7 @@ fn match_for(
     let operation = operator.strip_suffix('=')?;
     if !matches!(operation, "+" | "-" | "*" | "/" | "%") { return None }
     let (indexed, leaf) = member(left)?;
-    let (array, index_name_from_path) = member(indexed)?;
+    let (array, index_name_from_path) = indexed_member(indexed)?;
     if index_name_from_path != index_name { return None }
     if resolve_root(array, aliases, owned)? != root { return None }
     Some(StrideHit {
@@ -175,6 +175,11 @@ fn ident(expr: &Expression) -> Option<&str> {
 
 fn member(expr: &Expression) -> Option<(&Expression, String)> {
     let ExpressionKind::MemberExpression { object, property, computed: false, .. } = expr.kind.as_ref() else { return None };
+    Some((object, ident(property)?.to_string()))
+}
+
+fn indexed_member(expr: &Expression) -> Option<(&Expression, String)> {
+    let ExpressionKind::MemberExpression { object, property, computed: true, .. } = expr.kind.as_ref() else { return None };
     Some((object, ident(property)?.to_string()))
 }
 
