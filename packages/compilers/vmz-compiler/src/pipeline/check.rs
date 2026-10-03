@@ -204,7 +204,11 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
 
     for finding in collect_client_boundary_findings(&parsed.client.content) {
         report.diagnostics.push(
-            ReportedDiagnostic::error_at(path, finding.code, finding.span)
+            ReportedDiagnostic::error_at(
+                path,
+                finding.code,
+                (finding.span.start, finding.span.end),
+            )
                 .with_arg("detail", finding.message.clone()),
         );
     }

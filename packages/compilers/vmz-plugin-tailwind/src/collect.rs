@@ -210,7 +210,7 @@ fn collect_at_tailwind(
                     diagnostics.push(ReportedDiagnostic::error_at(
                         path,
                         "vmz::tw::unbalanced_at_tailwind",
-                        Span::new(name_start as u32, (name_start + 9) as u32),
+                        (name_start as u32, (name_start + 9) as u32),
                     ));
                     return;
                 }

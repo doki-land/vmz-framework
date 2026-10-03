@@ -2,8 +2,8 @@
 //!
 //! Batch payloads and the contribution store live in the compiler crate; this
 //! module owns the **wire labels** shared with DX explain rows and N-API hosts.
-//! Analyzer severity is **not** redefined here — use oxc `Severity` at the
-//! compiler / contribution boundary.
+//! Analyzer severity is shared through the protocol's language-neutral
+//! `Severity` type at the compiler and contribution boundary.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

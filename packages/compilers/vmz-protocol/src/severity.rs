@@ -1,18 +1,21 @@
-//! oxc diagnostic severity on the wire — no parallel VMZ severity enum.
-//!
-//! [`Severity`] is [`oxc_diagnostics::Severity`] (`Error` | `Warning` | `Advice`).
-//! Wire labels are kebab-case (`error` | `warning` | `advice`); miette's default
-//! PascalCase serde is not used.
+//! Language-neutral diagnostic severity.
 
-use serde::{Deserialize, Deserializer, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-pub use oxc_diagnostics::Severity;
+/// Diagnostic severity carried by VMZ wire protocols.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Severity {
+    /// A compilation or validation error.
+    Error,
+    /// A non-fatal warning.
+    Warning,
+    /// Informational guidance.
+    Advice,
+}
 
-/// Parse host / wire severity labels into oxc [`Severity`].
-///
-/// Accepts `error` | `warning` | `warn` | `advice`. Host alias `info` → [`Severity::Advice`].
-pub fn parse_severity(s: &str) -> Option<Severity> {
-    match s.trim().to_ascii_lowercase().as_str() {
+/// Parse host and wire severity labels.
+pub fn parse_severity(value: &str) -> Option<Severity> {
+    match value.trim().to_ascii_lowercase().as_str() {
         "error" => Some(Severity::Error),
         "warning" | "warn" => Some(Severity::Warning),
         "advice" | "info" => Some(Severity::Advice),
@@ -20,26 +23,25 @@ pub fn parse_severity(s: &str) -> Option<Severity> {
     }
 }
 
-/// kebab-case wire encoding for oxc [`Severity`].
+/// Encode severity as the stable kebab-case wire label.
 pub mod severity_wire {
     use super::*;
 
-    /// Serialize as `error` | `warning` | `advice`.
+    /// Serialize `Severity` as `error`, `warning`, or `advice`.
     pub fn serialize<S: Serializer>(value: &Severity, serializer: S) -> Result<S::Ok, S::Error> {
-        let label = match value {
+        serializer.serialize_str(match value {
             Severity::Error => "error",
             Severity::Warning => "warning",
             Severity::Advice => "advice",
-        };
-        serializer.serialize_str(label)
+        })
     }
 
-    /// Deserialize from kebab-case (plus host aliases).
+    /// Deserialize a stable wire label.
     pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Severity, D::Error> {
-        let s = String::deserialize(deserializer)?;
-        parse_severity(&s).ok_or_else(|| {
+        let value = String::deserialize(deserializer)?;
+        parse_severity(&value).ok_or_else(|| {
             serde::de::Error::custom(format!(
-                "unknown severity `{s}` (expected error|warning|advice)"
+                "unknown severity `{value}` (expected error|warning|advice)"
             ))
         })
     }

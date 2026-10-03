@@ -1101,7 +1101,11 @@ fn emit_file(
     let client = analyze_script(ScriptKind::Client, &parsed.client.content);
     for finding in crate::secrets::collect_client_boundary_findings(&parsed.client.content) {
         report.diagnostics.push(
-            ReportedDiagnostic::error_at(path, finding.code, finding.span)
+            ReportedDiagnostic::error_at(
+                path,
+                finding.code,
+                (finding.span.start, finding.span.end),
+            )
                 .with_arg("detail", finding.message.clone()),
         );
     }

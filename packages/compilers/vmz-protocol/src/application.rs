@@ -418,7 +418,8 @@ pub type ApplicationSourceSpan = SourceSpan;
 /// One diagnostic from application composition / isolation / reloc checks.
 ///
 /// Alias of [`ReportedDiagnostic`] — no parallel severity algebra. Wire shape
-/// is `{ path, severity, message, code?, span? }` (oxc severity kebab-case).
+/// is `{ path, severity, message, code?, span? }` with stable kebab-case
+/// severity labels.
 pub type ApplicationDiagnostic = ReportedDiagnostic;
 
 /// Aggregate result of `vmz application check` / N-API composition validation.

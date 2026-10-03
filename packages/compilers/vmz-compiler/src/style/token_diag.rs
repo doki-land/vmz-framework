@@ -140,7 +140,11 @@ fn validate_tw_registrations(
             continue;
         }
         let mut diag = if let Some(span) = locate_token_span(source, &reg.token) {
-            ReportedDiagnostic::error_at(&reg.path, DIAG_UNKNOWN_DESIGN_TOKEN, span)
+            ReportedDiagnostic::error_at(
+                &reg.path,
+                DIAG_UNKNOWN_DESIGN_TOKEN,
+                (span.start, span.end),
+            )
         } else {
             ReportedDiagnostic::error(&reg.path, DIAG_UNKNOWN_DESIGN_TOKEN)
         };

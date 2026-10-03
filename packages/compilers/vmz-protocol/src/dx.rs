@@ -423,14 +423,15 @@ impl CausalReplayCheckStatus {
     }
 }
 
-/// Source location shared across DX documents (oxc Span as offsets; path is workspace-relative).
+/// Source location shared across DX documents as byte offsets with a
+/// workspace-relative path.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 pub struct SourceSpan {
     /// Workspace-relative file path.
     pub path: String,
-    /// Inclusive UTF-8 byte offset start (oxc-compatible; **not** line/column).
+    /// Inclusive UTF-8 byte offset start, not a line and column pair.
     pub start: u32,
-    /// Exclusive UTF-8 byte offset end (oxc-compatible; **not** line/column).
+    /// Exclusive UTF-8 byte offset end, not a line and column pair.
     pub end: u32,
 }
 

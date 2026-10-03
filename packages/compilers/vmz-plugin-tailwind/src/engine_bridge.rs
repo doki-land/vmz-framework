@@ -85,7 +85,7 @@ pub fn map_engine_diagnostics(
             diag = diag.with_arg("token", key.clone());
         }
         if let Some(span) = span {
-            diag.diagnostic = diag.diagnostic.with_label(span);
+            diag.diagnostic.span = Some((span.start, span.end));
         }
         out.push(diag);
     }
