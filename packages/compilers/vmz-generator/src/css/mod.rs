@@ -1,4 +1,4 @@
-//! CSS CodeGenerator: StyleEmitter + oxc-css-parser validation + oxc_formatter_css print.
+//! CSS CodeGenerator: StyleEmitter plus the VMZ CSS lexer and printer.
 
 mod print;
 mod theme;

@@ -119,7 +119,7 @@ mod tests {
         ];
         let css = emit_theme_css(&rules);
         assert!(css.contains(":root"));
-        // oxc_formatter_css may rewrite `"a\"b"` to `'a"b'`; either form is escaped.
+        // CSS output may choose either quote style, and both forms remain escaped.
         assert!(
             css.contains("[data-theme=")
                 && (css.contains("\\\"") || css.contains("'a\"b'") || css.contains(r#""a\"b""#)),

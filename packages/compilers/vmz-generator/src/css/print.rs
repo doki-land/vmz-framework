@@ -3,8 +3,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use oxc_css_parser::{Allocator, Parser, Syntax};
-
 use crate::core::{GeneratorError, Result};
 
 /// Stable emit order (lower first).
@@ -39,53 +37,29 @@ pub struct StyleEmitReport {
     pub written: Vec<PathBuf>,
 }
 
-/// Validate CSS with oxc-css-parser (Syntax::Css).
+/// Validate CSS with the VMZ CSS lexer.
 ///
 /// Not used as a hard gate on StyleEmitter write (TW/`@tailwind` and SCSS
 /// intermediates may not be pure CSS yet). Call from checks / tests.
 pub fn validate_css(css: &str) -> Result<()> {
-    let allocator = Allocator::default();
-    let mut parser = Parser::new(&allocator, css, Syntax::Css);
-    match parser.parse::<oxc_css_parser::ast::Stylesheet>() {
-        Ok(_) => Ok(()),
-        Err(e) => Err(GeneratorError::msg(format!("css parse: {e:?}"))),
-    }
+    scan_css(css, ScanMode::Validate).map(|_| ())
 }
 
-/// Canonical CSS print via `oxc_formatter_css` when the body is pure CSS.
-///
-/// Falls back to trim + trailing newline when the formatter rejects the input
-/// (TW/`@tailwind` / SCSS intermediates that are not yet pure CSS).
+/// Canonical CSS print through the VMZ CSS lexer and stable brace layout.
 pub fn format_css(css: &str) -> String {
     let trimmed = css.trim();
     if trimmed.is_empty() {
         return String::new();
     }
 
-    let allocator = oxc_allocator::Allocator::new();
-    let options = oxc_formatter_css::CssFormatOptions {
-        variant: oxc_formatter_css::CssVariant::Css,
-        ..oxc_formatter_css::CssFormatOptions::default()
-    };
-    if let Ok(formatted) = oxc_formatter_css::format(&allocator, trimmed, options)
-        && let Ok(printed) = formatted.print()
-    {
-        let mut body = printed.into_code();
-        if !body.ends_with('\n') {
-            body.push('\n');
-        }
-        return body;
-    }
-
-    let mut body = trimmed.to_string();
+    let mut body = format_css_body(trimmed);
     if !body.ends_with('\n') {
         body.push('\n');
     }
     body
 }
 
-/// Production CSS print: parse/validate via oxc-css-parser when possible, then
-/// drop comments and collapse whitespace (strings / `url()` kept intact).
+/// Production CSS print: validate, then drop comments and collapse whitespace.
 pub fn minify_css(css: &str) -> String {
     let trimmed = css.trim();
     if trimmed.is_empty() {
@@ -93,6 +67,206 @@ pub fn minify_css(css: &str) -> String {
     }
     let _ = validate_css(trimmed);
     compact_css(trimmed)
+}
+
+#[derive(Clone, Copy)]
+enum ScanMode {
+    Validate,
+}
+
+fn scan_css(source: &str, _mode: ScanMode) -> Result<String> {
+    let mut braces = 0usize;
+    let mut parens = 0usize;
+    let mut brackets = 0usize;
+    let mut quote = None;
+    let mut escaped = false;
+    let mut block_comment = false;
+    let mut index = 0usize;
+    let chars: Vec<char> = source.replace("\r\n", "\n").replace('\r', "\n").chars().collect();
+    while index < chars.len() {
+        let ch = chars[index];
+        let next = chars.get(index + 1).copied();
+        if block_comment {
+            if ch == '*' && next == Some('/') {
+                block_comment = false;
+                index += 2;
+                continue;
+            }
+            index += 1;
+            continue;
+        }
+        if let Some(active) = quote {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == active {
+                quote = None;
+            }
+            index += 1;
+            continue;
+        }
+        if ch == '/' && next == Some('*') {
+            block_comment = true;
+            index += 2;
+            continue;
+        }
+        if ch == '\'' || ch == '"' {
+            quote = Some(ch);
+            index += 1;
+            continue;
+        }
+        match ch {
+            '{' => braces += 1,
+            '}' if braces > 0 => braces -= 1,
+            '}' => return Err(GeneratorError::msg("css parse: unmatched closing brace")),
+            '(' => parens += 1,
+            ')' if parens > 0 => parens -= 1,
+            ')' => return Err(GeneratorError::msg("css parse: unmatched closing parenthesis")),
+            '[' => brackets += 1,
+            ']' if brackets > 0 => brackets -= 1,
+            ']' => return Err(GeneratorError::msg("css parse: unmatched closing bracket")),
+            _ => {}
+        }
+        index += 1;
+    }
+    if quote.is_some() {
+        return Err(GeneratorError::msg("css parse: unterminated string"));
+    }
+    if block_comment {
+        return Err(GeneratorError::msg("css parse: unterminated comment"));
+    }
+    if braces != 0 || parens != 0 || brackets != 0 {
+        return Err(GeneratorError::msg("css parse: unclosed delimiter"));
+    }
+    Ok(source.to_string())
+}
+
+fn format_css_body(source: &str) -> String {
+    let nl = "\n";
+    let unit = "  ";
+    let mut output = String::new();
+    let mut current = String::new();
+    let mut depth = 0usize;
+    let mut quote = None;
+    let mut escaped = false;
+    let mut block_comment = false;
+    let mut line_comment = false;
+    let chars: Vec<char> = source.replace("\r\n", "\n").replace('\r', "\n").chars().collect();
+    let mut index = 0usize;
+    while index < chars.len() {
+        let ch = chars[index];
+        let next = chars.get(index + 1).copied();
+        if block_comment {
+            current.push(ch);
+            if ch == '*' && next == Some('/') {
+                current.push('/');
+                index += 2;
+                block_comment = false;
+                continue;
+            }
+            index += 1;
+            continue;
+        }
+        if line_comment {
+            if ch == '\n' {
+                line_comment = false;
+                flush_css_line(&mut output, &mut current, depth, unit, nl);
+            } else {
+                current.push(ch);
+            }
+            index += 1;
+            continue;
+        }
+        if let Some(active) = quote {
+            current.push(ch);
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == active {
+                quote = None;
+            }
+            index += 1;
+            continue;
+        }
+        if ch == '/' && next == Some('*') {
+            current.push(ch);
+            current.push('*');
+            block_comment = true;
+            index += 2;
+            continue;
+        }
+        if ch == '/' && next == Some('/') {
+            current.push(ch);
+            current.push('/');
+            line_comment = true;
+            index += 2;
+            continue;
+        }
+        if ch == '\'' || ch == '"' {
+            quote = Some(ch);
+            current.push(ch);
+            index += 1;
+            continue;
+        }
+        match ch {
+            '{' => {
+                let header = normalize_css_fragment(&current, false);
+                if header.is_empty() {
+                    return source.trim().to_string();
+                }
+                write_css_line(&mut output, depth, unit, &format!("{header} {{"), nl);
+                current.clear();
+                depth += 1;
+            }
+            '}' => {
+                flush_css_line(&mut output, &mut current, depth, unit, nl);
+                depth = depth.saturating_sub(1);
+                write_css_line(&mut output, depth, unit, "}", nl);
+            }
+            ';' => {
+                current.push(';');
+                flush_css_line(&mut output, &mut current, depth, unit, nl);
+            }
+            '\n' => {
+                if depth == 0 && !current.trim().is_empty() {
+                    flush_css_line(&mut output, &mut current, depth, unit, nl);
+                } else {
+                    current.push(' ');
+                }
+            }
+            _ => current.push(ch),
+        }
+        index += 1;
+    }
+    flush_css_line(&mut output, &mut current, depth, unit, nl);
+    output
+}
+
+fn normalize_css_fragment(fragment: &str, declaration: bool) -> String {
+    let mut value = fragment.split_whitespace().collect::<Vec<_>>().join(" ");
+    if declaration && let Some(colon) = value.find(':') {
+        let (left, right) = value.split_at(colon);
+        value = format!("{}: {}", left.trim(), right[1..].trim());
+    }
+    value.trim().to_string()
+}
+
+fn flush_css_line(output: &mut String, current: &mut String, depth: usize, unit: &str, nl: &str) {
+    let value = normalize_css_fragment(current, true);
+    current.clear();
+    if !value.is_empty() {
+        write_css_line(output, depth, unit, &value, nl);
+    }
+}
+
+fn write_css_line(output: &mut String, depth: usize, unit: &str, value: &str, nl: &str) {
+    for _ in 0..depth {
+        output.push_str(unit);
+    }
+    output.push_str(value);
+    output.push_str(nl);
 }
 
 fn compact_css(src: &str) -> String {
@@ -169,7 +343,7 @@ pub fn print_css(css: &str, minify: bool) -> String {
     if minify { minify_css(css) } else { format_css(css) }
 }
 
-/// Print WXSS from Canonical CSS. Same oxc CSS path as [`print_css`]; `rpx` is kept.
+/// Print WXSS from Canonical CSS; `rpx` units are kept by the lexical printer.
 pub fn print_wxss(css: &str, minify: bool) -> String {
     print_css(css, minify)
 }
@@ -249,6 +423,21 @@ mod tests {
         assert!(min.contains("color:red") || min.contains("color: red"), "{min}");
         assert!(min.len() < src.len(), "min={} src={}", min.len(), src.len());
         assert!(min.contains("1px 2px"), "keep ident spaces: {min}");
+    }
+
+    #[test]
+    fn validate_css_rejects_unclosed_literals_and_delimiters() {
+        assert!(validate_css(".a { color: \"red; }").is_err());
+        assert!(validate_css(".a { color: red;").is_err());
+        assert!(validate_css(".a { color: rgb(1, 2, 3; }").is_err());
+    }
+
+    #[test]
+    fn format_css_is_idempotent_and_keeps_data_urls() {
+        let source = ".a{background:url(data:image/svg+xml,%3Csvg%3E);content:\"a;b\";}";
+        let once = format_css(source);
+        assert!(once.contains("data:image/svg+xml"));
+        assert_eq!(format_css(&once), once);
     }
 
     #[test]
