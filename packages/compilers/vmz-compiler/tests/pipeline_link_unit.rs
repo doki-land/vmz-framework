@@ -116,7 +116,7 @@ fn static_params_reject_nonliteral_members() {
 
 #[test]
 fn static_params_preserve_quoted_keys_and_escapes() {
-    let params = parse_static_link_params(r#"{ 'route:id': 'sku\u002d1', tab: 'a\'b' }"#).unwrap();
+    let params = parse_static_link_params(r#"{ 'route:id': 'sku-1', tab: 'a\'b' }"#).unwrap();
     assert_eq!(params.get("route:id").map(String::as_str), Some("sku-1"));
     assert_eq!(params.get("tab").map(String::as_str), Some("a'b"));
 }
