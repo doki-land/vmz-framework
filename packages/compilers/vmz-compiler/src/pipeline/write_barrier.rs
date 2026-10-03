@@ -48,9 +48,17 @@ pub fn rewrite_static_path_writes(
     out = st.source;
     rewritten += st.rewritten;
 
-    let needs_barrier = out.contains("this.")
-        || ARRAY_MUTATOR_NAMES.iter().any(|m| out.contains(&format!(".{m}(")));
-    if needs_barrier {
+    let tp = rewrite_list_transpose(&out, owned_fields);
+    out = tp.source;
+    rewritten += tp.rewritten;
+
+    if let Some(oak) = super::write_barrier_oak::rewrite_static_path_writes(&out, owned_fields) {
+        out = oak.source;
+        rewritten += oak.rewritten;
+    } else {
+        let needs_barrier = out.contains("this.")
+            || ARRAY_MUTATOR_NAMES.iter().any(|m| out.contains(&format!(".{m}(")));
+        if needs_barrier {
         let allocator = Allocator::default();
         let parsed = Parser::new(&allocator, &out, SourceType::ts()).parse();
         if !parsed.panicked {
@@ -72,11 +80,8 @@ pub fn rewrite_static_path_writes(
                 }
             }
         }
+        }
     }
-
-    let tp = rewrite_list_transpose(&out, owned_fields);
-    out = tp.source;
-    rewritten += tp.rewritten;
 
     WriteBarrierRewrite { source: out, rewritten }
 }
