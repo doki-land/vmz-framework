@@ -932,37 +932,7 @@ fn add_expr_binding(
 
 /// Split top-level `a ? b : c` into (test, consequent, alternate).
 fn split_ternary(expr: &str) -> Option<(String, String, String)> {
-    use oxc_span::GetSpan;
-
-    let src = vmz_generator::js::wrap_template_expr_source(expr);
-    let allocator = oxc_allocator::Allocator::default();
-    let ret = oxc_parser::Parser::new(&allocator, &src, oxc_span::SourceType::ts()).parse();
-    if !ret.diagnostics.is_empty() || ret.panicked {
-        return None;
-    }
-    let body = ret.program.body.first()?;
-    let oxc_ast::ast::Statement::ExpressionStatement(es) = body else {
-        return None;
-    };
-    let mut top = &es.expression;
-    while let oxc_ast::ast::Expression::ParenthesizedExpression(p) = top {
-        top = &p.expression;
-    }
-    let oxc_ast::ast::Expression::ConditionalExpression(cond) = top else {
-        return None;
-    };
-    let slice = |span: oxc_span::Span| -> Option<String> {
-        let s = span.start as usize;
-        let e = span.end as usize;
-        if s < e && e <= src.len() { Some(src[s..e].trim().to_string()) } else { None }
-    };
-    let test = slice(cond.test.span())?;
-    let cons = slice(cond.consequent.span())?;
-    let alt = slice(cond.alternate.span())?;
-    if test.is_empty() || cons.is_empty() || alt.is_empty() {
-        return None;
-    }
-    Some((test, cons, alt))
+    vmz_generator::js::split_ternary_parts(expr)
 }
 
 /// Field deps + keyed each-alias props as [`IrDepPath::ListItem`] (flat or nested).

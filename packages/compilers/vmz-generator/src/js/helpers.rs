@@ -282,7 +282,7 @@ pub fn bind_field_idents_ctx(
     bind_field_idents_legacy(expr, fields, methods, scope, aliases)
 }
 
-/// Legacy char scanner (fallback when oxc parse fails).
+/// Conservative char scanner for snippets Oak cannot lower.
 fn bind_field_idents_legacy(
     expr: &str,
     fields: &[String],
