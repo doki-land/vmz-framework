@@ -1,6 +1,6 @@
 //! Oak TypeScript AST → canonical expression text (template print peel).
 //!
-//! Returns `None` when the AST shape is not yet printable — caller keeps oxc codegen.
+//! Returns `None` when the AST shape is not yet printable.
 
 use oak_typescript::ast::{
     Expression, ExpressionKind, FunctionParam, ObjectProperty, Statement, TypeAnnotation,

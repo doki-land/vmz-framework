@@ -1,6 +1,6 @@
 //! DX: semantic transaction, cancel, affected preview, HMR plan, route/chunk budget.
 //!
-//! Algebraic first version — not live mid-oxc cancel or byte-budget enforcement.
+//! Algebraic first version — not live parser cancellation or byte-budget enforcement.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;

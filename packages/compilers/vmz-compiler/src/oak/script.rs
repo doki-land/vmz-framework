@@ -19,7 +19,7 @@ pub fn script_shell_from_block(block: &ScriptBlock) -> ScriptShellInput {
 /// Validate TypeScript script bodies through Oak AST (no-op for non-TS langs).
 ///
 /// Shares the Oak path with [`crate::analyze::analyze_script`] surface lowering.
-/// Production `check` / `compile` still tolerate Oak gaps via oxc fallback there;
+/// Production `check` / `compile` use Oak surface lowering;
 /// this helper remains strict for smoke / adapter gates.
 pub fn check_oak_script_ts(block: &ScriptBlock) -> Result<(), String> {
     if block.lang != ScriptLanguage::Ts {

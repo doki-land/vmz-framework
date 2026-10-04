@@ -1,7 +1,7 @@
 //! Project `.vmz` + analyzed scripts into language-neutral [`NyarAnalysisInput`].
 //!
-//! Spans on the wire are adapter [`ByteSpan`] only — no `oxc_span` import here.
-//! Script surfaces come from [`crate::analyze::analyze_script`] (Oak primary, oxc graft).
+//! Spans on the wire are adapter [`ByteSpan`] only.
+//! Script surfaces come from [`crate::analyze::analyze_script`] through Oak.
 //! Static imports come from Oak TypeScript AST ([`collect_static_imports_via_oak`]).
 
 use vmz_oak_frontend_adapter::{

@@ -64,7 +64,7 @@ fn pathdiff_fallback(from_dir: &Path, target: &Path) -> String {
     if out.is_empty() { ".".into() } else { out.join("/") }
 }
 
-/// Rewrite `from '#server/...'` / `"#server/..."` to relative paths for Node ESM (oxc AST).
+/// Rewrite `from '#server/...'` / `"#server/..."` to relative paths for Node ESM.
 pub fn rewrite_imports_to_relative(js: &str, from_module_id: &str) -> String {
     let from = from_module_id.to_string();
     vmz_generator::js::rewrite_module_specifiers_required(

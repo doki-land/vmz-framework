@@ -102,11 +102,11 @@ export interface VmzFormatConfig {
     excludes?: string[];
     /** Run `cargo fmt` when a Cargo workspace is present. */
     rust?: boolean;
-    /** Run `oxc_formatter` on JS/TS targets. */
+    /** Run the Oak CST formatter on JS/TS targets. */
     javascript?: boolean;
     /** Format `.vmz` author files via `vmz-formatter`. */
     vmz?: boolean;
-    /** Biome-style formatter config for oxc (default: `biome.json` at project root). */
+    /** Biome-style formatter config (default: `biome.json` at project root). */
     style?: string;
 }
 
