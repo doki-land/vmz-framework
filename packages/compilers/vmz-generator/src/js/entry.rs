@@ -2,8 +2,9 @@
 
 use std::collections::BTreeMap;
 
-use super::ast_util::{js_string_literal, oxc_reprint_module_required};
 use super::print::EmittedJs;
+
+fn js_string_literal(value: &str) -> String { serde_json::to_string(value).unwrap_or_else(|_| "\"\"".into()) }
 
 /// Component entry descriptor for [`emit_serve_entry_client`].
 #[derive(Debug, Clone)]
@@ -79,7 +80,6 @@ installClientNavigation({{
 }});
 "#
     );
-    let code = oxc_reprint_module_required(&code, "serve entry-client");
     EmittedJs { code, map: None }
 }
 
@@ -123,6 +123,5 @@ pub fn emit_serve_entry_event(cache_query: &str) -> EmittedJs {
 }})();
 "#
     );
-    let code = oxc_reprint_module_required(&code, "serve entry-event");
     EmittedJs { code, map: None }
 }
