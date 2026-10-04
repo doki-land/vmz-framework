@@ -2,7 +2,7 @@ use std::path::Path;
 
 use oak_typescript::formatter::FormatOptions;
 
-use super::{oak, FormatFileResult};
+use super::{FormatFileResult, oak};
 
 /// Format JS/TS through Oak without a legacy fallback.
 pub fn format_source_with_options(

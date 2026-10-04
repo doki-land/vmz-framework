@@ -528,59 +528,6 @@ fn fill_members_from_oak(decl: &mut ComponentDecl, body: &[ClassMember], source:
     crate::method_compose::compose_cross_method_rw(&mut decl.methods, &field_names);
 }
 
-fn method_rw_empty(m: &MethodDecl) -> bool {
-    m.reads.is_empty() && m.writes.is_empty() && m.calls.is_empty() && !m.opaque_callee
-}
-
-/// Prefer Oak method RW; graft oxc when Oak left a method empty (destructure / AST gaps).
-///
-/// When Oak already found signals, union any oxc extras so object-pattern aliases still
-/// land until Oaks models BindingPattern.
-pub fn graft_oxc_method_summaries(oak: &mut ComponentDecl, oxc: &ComponentDecl) {
-    for m in &mut oak.methods {
-        let Some(src) = oxc.methods.iter().find(|o| o.name == m.name) else {
-            continue;
-        };
-        if method_rw_empty(m) {
-            m.reads = src.reads.clone();
-            m.writes = src.writes.clone();
-            m.calls = src.calls.clone();
-            m.opaque_callee = src.opaque_callee;
-            m.star_reasons = src.star_reasons.clone();
-        } else {
-            for r in &src.reads {
-                if !m.reads.iter().any(|x| x == r) {
-                    m.reads.push(r.clone());
-                }
-            }
-            for w in &src.writes {
-                if !m.writes.iter().any(|x| x == w) {
-                    m.writes.push(w.clone());
-                }
-            }
-            for c in &src.calls {
-                if !m.calls.iter().any(|x| x == c) {
-                    m.calls.push(c.clone());
-                }
-            }
-            if src.opaque_callee {
-                m.opaque_callee = true;
-            }
-            for (f, reason) in &src.star_reasons {
-                if !m.star_reasons.iter().any(|(n, _)| n == f) {
-                    m.star_reasons.push((f.clone(), reason.clone()));
-                }
-            }
-        }
-        if !m.is_async {
-            m.is_async = src.is_async;
-        }
-        if m.http.is_none() {
-            m.http = src.http.clone();
-        }
-    }
-}
-
 fn http_route_from_oak_expr(expr: &Expression) -> Option<HttpRoute> {
     let ExpressionKind::CallExpression { func, args } = expr.kind.as_ref() else {
         return None;

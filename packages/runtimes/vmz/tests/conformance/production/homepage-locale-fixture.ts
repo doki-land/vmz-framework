@@ -110,7 +110,9 @@ export async function proveHomepageLocaleTransition(opts: {
                     body: document.body.innerText.slice(0, 500),
                     scripts: [...document.scripts].map((script) => script.src).filter(Boolean),
                 }));
-                throw new Error(`locale API ${stage}: ${error instanceof Error ? error.message : error}, ${JSON.stringify({ state, browserErrors, failedResources })}`);
+                throw new Error(
+                    `locale API ${stage}: ${error instanceof Error ? error.message : error}, ${JSON.stringify({ state, browserErrors, failedResources })}`,
+                );
             }
         };
         // Prefer load over networkidle0: production pages may keep connections that never go idle.

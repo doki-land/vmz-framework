@@ -69,7 +69,6 @@ impl EditorSettings {
             type_erasure: false,
         }
     }
-
 }
 
 /// Resolve EditorConfig for `path` (must be a file path). Falls back to defaults on error.

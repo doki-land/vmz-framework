@@ -13,11 +13,7 @@ fn examples_root() -> PathBuf {
 #[test]
 fn event_shell_files_check_without_hang() {
     let root = examples_root().join("event-shell");
-    for rel in [
-        "src/Application.vmz",
-        "src/components/EventButton.vmz",
-        "src/pages/index.vmz",
-    ] {
+    for rel in ["src/Application.vmz", "src/components/EventButton.vmz", "src/pages/index.vmz"] {
         let path = root.join(rel);
         let start = Instant::now();
         let report = check_path(&path, &CheckOptions::default()).unwrap();
@@ -40,7 +36,11 @@ fn event_shell_project_check_without_hang() {
         "event-shell check_project took {:?}",
         start.elapsed()
     );
-    eprintln!("event-shell: {} file(s), {} diagnostic(s)", report.files_checked, report.diagnostics.len());
+    eprintln!(
+        "event-shell: {} file(s), {} diagnostic(s)",
+        report.files_checked,
+        report.diagnostics.len()
+    );
 }
 
 #[test]
@@ -49,10 +49,7 @@ fn event_button_compile_without_hang() {
     let out = std::env::temp_dir().join(format!(
         "vmz-event-button-compile-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
     ));
     let _ = std::fs::create_dir_all(&out);
     let options = CompileOptions {
@@ -84,10 +81,7 @@ fn hello_greeting_compile_without_hang() {
     let out = std::env::temp_dir().join(format!(
         "vmz-hello-greeting-compile-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
     ));
     let _ = std::fs::create_dir_all(&out);
     let options = CompileOptions {
@@ -118,10 +112,7 @@ fn hello_project_compile_without_hang() {
     let out = std::env::temp_dir().join(format!(
         "vmz-hello-project-compile-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
     ));
     let _ = std::fs::create_dir_all(&out);
     let options = CompileOptions {
@@ -152,10 +143,7 @@ fn event_shell_compile_project_without_hang() {
     let out = std::env::temp_dir().join(format!(
         "vmz-event-shell-compile-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
     ));
     let _ = std::fs::create_dir_all(&out);
     let options = CompileOptions {

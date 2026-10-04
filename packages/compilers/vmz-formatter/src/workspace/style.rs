@@ -7,7 +7,10 @@ pub fn default_format_options() -> FormatOptions {
     FormatOptions { indent_width: 4, line_width: 144, type_erasure: false }
 }
 
-pub fn load_format_options(root: &Path, style_config: Option<&Path>) -> Result<FormatOptions, String> {
+pub fn load_format_options(
+    root: &Path,
+    style_config: Option<&Path>,
+) -> Result<FormatOptions, String> {
     let biome_path = style_config
         .map(|path| if path.is_absolute() { path.to_path_buf() } else { root.join(path) })
         .unwrap_or_else(|| root.join("biome.json"));
@@ -19,9 +22,13 @@ pub fn load_format_options(root: &Path, style_config: Option<&Path>) -> Result<F
     };
 
     if value.pointer("/formatter/indentStyle").and_then(|v| v.as_str()) == Some("tab") {
-        return Err(format!("{}: Oak format does not support tab indentation", biome_path.display()));
+        return Err(format!(
+            "{}: Oak format does not support tab indentation",
+            biome_path.display()
+        ));
     }
-    if value.pointer("/javascript/formatter/quoteStyle").and_then(|v| v.as_str()) == Some("double") {
+    if value.pointer("/javascript/formatter/quoteStyle").and_then(|v| v.as_str()) == Some("double")
+    {
         return Err(format!("{}: Oak format does not support double quotes", biome_path.display()));
     }
 

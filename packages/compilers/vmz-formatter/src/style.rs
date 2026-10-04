@@ -130,7 +130,14 @@ fn format_css(source: &str, settings: &EditorSettings) -> Result<String, String>
     Ok(output)
 }
 
-fn flush_line(output: &mut String, current: &mut String, depth: usize, unit: &str, nl: &str, declaration: bool) {
+fn flush_line(
+    output: &mut String,
+    current: &mut String,
+    depth: usize,
+    unit: &str,
+    nl: &str,
+    declaration: bool,
+) {
     let value = normalize_fragment(current, declaration);
     current.clear();
     if !value.is_empty() {

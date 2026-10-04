@@ -57,8 +57,7 @@ const proof = readProof(root);
 upsertCheck(proof, {
     id: 'oak-frontend-smoke',
     status: 'passed',
-    detail:
-        'Oak CST/AST adapter, script TS AST, concrete/semantic layers, vue-oak-surface matrix, Nyar projection stub',
+    detail: 'Oak CST/AST adapter, script TS AST, concrete/semantic layers, vue-oak-surface matrix, Nyar projection stub',
 });
 writeProof(proof, root);
 

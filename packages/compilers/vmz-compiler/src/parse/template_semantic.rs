@@ -264,13 +264,7 @@ pub(crate) fn semantic_from_element_parts(
     }
     if let Some((slot_name, slot_props, slot_span)) = slot_directive(&attrs) {
         return slot_template_from_lowered(
-            tag,
-            &attrs,
-            children,
-            span,
-            slot_name,
-            slot_props,
-            slot_span,
+            tag, &attrs, children, span, slot_name, slot_props, slot_span,
         );
     }
     if tag == "slot" {
@@ -585,12 +579,7 @@ fn slot_template_from_lowered(
         .cloned()
         .collect();
     let body = if tag == "template" {
-        SemanticNode::Element {
-            tag: "template".into(),
-            props: Vec::new(),
-            children,
-            span,
-        }
+        SemanticNode::Element { tag: "template".into(), props: Vec::new(), children, span }
     } else {
         SemanticNode::Element {
             tag: tag.to_string(),

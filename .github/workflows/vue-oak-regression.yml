@@ -1,0 +1,25 @@
+name: Vue Oak Directive Regression
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
+
+jobs:
+  vue-directive-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - name: Compile isolated regression
+        run: cargo test -p vmz-oak-frontend-adapter --test vue_directive_regression --no-run --message-format=json > regression-build.json
+      - name: Run isolated regression with resource bounds
+        shell: bash
+        run: |
+          set -euo pipefail
+          binary="$(python3 -c 'import json; print(next(item["executable"] for line in open("regression-build.json") if (item := json.loads(line)).get("reason") == "compiler-artifact" and item.get("executable") and item["target"]["name"] == "vue_directive_regression"))')"
+          ulimit -v 524288
+          timeout 30s "$binary" event_shell_directive_has_bounded_allocations_and_exact_spans --nocapture

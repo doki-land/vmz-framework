@@ -1,10 +1,10 @@
-# Copy to `config.toml` (gitignored) for local Oaks sibling checkout.
+# Copy to `config.toml` (gitignored) for local Oaks checkout.
+# Canonical tree: E:\dxo 深度学习\oaks
 # CI / publish: no `config.toml` — root `Cargo.toml` git `dev` only.
-# Verify: `cargo tree -p oak-core` → filesystem path = patch active.
 
 [patch."https://github.com/yggdrasil-language/oaks.git"]
-oak-core = { path = "../../path/to/oaks/projects/oak-core" }
-oak-vue = { path = "../../path/to/oaks/examples/oak-vue" }
-oak-typescript = { path = "../../path/to/oaks/examples/oak-typescript" }
+oak-core = { path = "../../../dxo 深度学习/oaks/projects/oak-core" }
+oak-vue = { path = "../../../dxo 深度学习/oaks/examples/oak-vue" }
+oak-typescript = { path = "../../../dxo 深度学习/oaks/examples/oak-typescript" }
 
 [alias]
