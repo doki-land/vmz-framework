@@ -9,12 +9,6 @@ description = "VMZ .vmz compiler pipeline"
 publish = false
 
 [dependencies]
-oxc_allocator.workspace = true
-oxc_ast.workspace = true
-oxc_ast_visit.workspace = true
-oxc_parser.workspace = true
-oxc_span.workspace = true
-oxc_syntax.workspace = true
 oak-vue.workspace = true
 oak-core.workspace = true
 oak-typescript.workspace = true
