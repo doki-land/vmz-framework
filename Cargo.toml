@@ -46,24 +46,17 @@ oak-core = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "d
 oak-vue = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
 oak-typescript = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
 
-# All oxc_* locked to one git tag (includes publish=false formatter crates).
+# Remaining generator OXC crates are pinned to one git tag during migration.
 oxc_allocator = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
 oxc_ast = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
-oxc_ast_visit = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
 oxc_codegen = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0", features = ["sourcemap"] }
 oxc_minifier = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
-oxc_diagnostics = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
 oxc_parser = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
 oxc_semantic = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
-oxc_sourcemap = "8.1.2"
 oxc_span = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
 oxc_str = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
 oxc_syntax = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
 oxc_transformer = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
-oxc_formatter = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
-oxc_formatter_core = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
-oxc_formatter_css = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
-oxc-css-parser = "0.0.11"
 editorconfig = "1.0.0"
 
 clap = { version = "4.6.6", features = ["derive"] }
