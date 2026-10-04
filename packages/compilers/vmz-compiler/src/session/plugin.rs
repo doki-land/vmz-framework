@@ -65,7 +65,7 @@ pub enum ContributionKind {
     Analyzer {
         /// Workspace-relative path the diagnostic applies to.
         path: PathBuf,
-        /// oxc [`Severity`] on the wire as kebab-case (`error` | `warning` | `advice`).
+        /// Compiler [`Severity`] on the wire as kebab-case (`error` | `warning` | `advice`).
         #[serde(with = "severity_wire")]
         #[schemars(with = "String")]
         severity: Severity,

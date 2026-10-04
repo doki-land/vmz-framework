@@ -17,7 +17,7 @@ pub struct TakenBinding {
     pub deps: Vec<String>,
 }
 
-/// Control-flow slice taken from IR (no oxc re-scan).
+/// Control-flow slice taken directly from IR.
 #[derive(Debug, Clone)]
 pub struct TakenControlFlow {
     /// Owning IfCond (or similar) binding when the slice was taken via a binding.

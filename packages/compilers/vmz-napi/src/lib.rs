@@ -741,7 +741,7 @@ impl JsWorkspace {
         })
     }
 
-    /// Format workspace `.vmz` files via `vmz-formatter` (oxc IR + EditorConfig).
+    /// Format workspace `.vmz` files via `vmz-formatter` and EditorConfig.
     #[napi]
     pub fn format(&self, check_only: Option<bool>) -> Result<JsFormatReport> {
         let ws = self.inner.lock().map_err(|_| Error::from_reason("workspace lock"))?;
@@ -1253,7 +1253,7 @@ pub struct JsEntryComponent {
     pub entry: String,
 }
 
-/// Generate `entry-client.js` via `vmz-generator` (oxc reprint).
+/// Generate `entry-client.js` via `vmz-generator`.
 #[napi]
 pub fn generate_serve_entry_client(
     eager: Vec<JsEntryComponent>,
@@ -1271,7 +1271,7 @@ pub fn generate_serve_entry_client(
     vmz_generator::js::emit_serve_entry_client(&eager, &lazy, &cache_query).code
 }
 
-/// Generate `entry-event.js` via `vmz-generator` (oxc reprint).
+/// Generate `entry-event.js` via `vmz-generator`.
 #[napi]
 pub fn generate_serve_entry_event(cache_query: String) -> String {
     vmz_generator::js::emit_serve_entry_event(&cache_query).code
@@ -1463,7 +1463,7 @@ pub struct JsLocaleExport {
     pub has_params: bool,
 }
 
-/// Generate `dist/locales/*.js` via JsCodeGenerator (oxc reprint).
+/// Generate `dist/locales/*.js` via JsCodeGenerator.
 #[napi]
 pub fn generate_locale_runtime_module(
     default_locale: String,
@@ -1544,7 +1544,7 @@ pub fn generate_pretty_json(json_text: String) -> Result<String> {
         .map_err(|e| Error::from_reason(format!("generatePrettyJson: {e}")))
 }
 
-/// Rewrite ESM module specifiers via oxc AST.
+/// Rewrite ESM module specifiers through the VMZ module rewrite path.
 ///
 /// `rules_json` is optional JSON:
 /// `{ "exact": Record<string,string>, "tsExtToJs": bool, "dotSlashToParent": bool }`.
@@ -1588,7 +1588,7 @@ pub fn rewrite_module_specifiers(source: String, rules_json: Option<String>) -> 
         }
         None
     })
-    .ok_or_else(|| Error::from_reason("rewriteModuleSpecifiers: oxc failed to parse module"))
+    .ok_or_else(|| Error::from_reason("rewriteModuleSpecifiers: module could not be parsed"))
 }
 
 /// Compact JSON via JsonCodeGenerator (same parse → print contract as pretty).
@@ -1613,7 +1613,7 @@ pub struct FormatWorkspaceRunOptions {
     pub excludes: Option<Vec<String>>,
     /// Run `cargo fmt` when a Cargo workspace is present.
     pub rust: Option<bool>,
-    /// Run `oxc_formatter` on JS/TS targets.
+    /// Run the Oak CST formatter on JS/TS targets.
     pub javascript: Option<bool>,
     /// Style config path relative to `cwd` (default: `biome.json`).
     pub style_config: Option<String>,

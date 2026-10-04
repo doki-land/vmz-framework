@@ -1,4 +1,4 @@
-//! VMZ compiler: `.vmz` SFC + oxc analysis + Program Graph / Execution Plan + Workspace.
+//! VMZ compiler: `.vmz` SFC + Oak analysis + Program Graph / Execution Plan + Workspace.
 //!
 //! Text artifact printers live in **`vmz-generator`** (CodeGenerators). This crate
 //! orchestrates analyze → IR → `vmz_generator::*` → disk layout.

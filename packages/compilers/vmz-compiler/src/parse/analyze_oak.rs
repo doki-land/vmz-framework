@@ -42,8 +42,8 @@ pub fn try_component_decl_via_oak(kind: ScriptKind, source: &str) -> Option<Comp
 
 /// Collect forbidden `useX` / `createX` factory calls via Oak TypeScript AST.
 ///
-/// Returns `None` when Oak cannot build a script root (caller keeps oxc). Spans are
-/// relative to the script body (same as oxc `analyze_script` today).
+/// Returns `None` when Oak cannot build a script root. Spans are relative to the
+/// script body.
 pub fn collect_forbidden_factories_via_oak(
     kind: ScriptKind,
     source: &str,
