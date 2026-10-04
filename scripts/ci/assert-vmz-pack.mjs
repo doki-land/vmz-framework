@@ -174,4 +174,17 @@ if (!fs.existsSync(localesManifest)) {
     fail('missing packages/runtimes/vmz/locales/locales.json');
 }
 
+const hostRuntimeManifest = path.join(dist, '..', 'host-runtime-files.json');
+if (!fs.existsSync(hostRuntimeManifest)) {
+    fail('missing host-runtime-files.json beside the published dist directory');
+}
+try {
+    const host = JSON.parse(fs.readFileSync(hostRuntimeManifest, 'utf8'));
+    if (host.schema !== 'vmz.host-runtime-files.v0' || !Array.isArray(host.files) || !host.files.length) {
+        fail('host-runtime-files.json has an invalid publish manifest');
+    }
+} catch (error) {
+    fail(`cannot parse host-runtime-files.json: ${error instanceof Error ? error.message : String(error)}`);
+}
+
 console.log(`assert-vmz-pack: OK (${path.relative(ROOT, dist) || dist})`);

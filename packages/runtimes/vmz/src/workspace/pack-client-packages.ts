@@ -298,7 +298,11 @@ function resolveExportFile(pkgRoot, subpath) {
 function flattenExportTarget(entry) {
     if (typeof entry === 'string') return entry;
     if (!entry || typeof entry !== 'object') return null;
-    const v = entry.import || entry.default || entry.require || entry.module || null;
+    // Package authors commonly put browser-first TypeScript sources behind a
+    // conditional export. Resolve conditions before falling back to Node's
+    // import/default branches so the pack stage can transpile the source into
+    // the browser-safe vendor tree before static SSR imports it.
+    const v = entry.browser || entry.import || entry.default || entry.require || entry.module || entry.node || null;
     if (typeof v === 'string') return v;
     if (v && typeof v === 'object') return flattenExportTarget(v);
     return null;

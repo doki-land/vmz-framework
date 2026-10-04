@@ -3,8 +3,8 @@
 # Verify: `cargo tree -p oak-core` → filesystem path = patch active.
 
 [patch."https://github.com/yggdrasil-language/oaks.git"]
-oak-core = { path = "../../path/to/oaks/projects/oak-core" }
-oak-vue = { path = "../../path/to/oaks/examples/oak-vue" }
-oak-typescript = { path = "../../path/to/oaks/examples/oak-typescript" }
+oak-core = { path = "../oaks/projects/oak-core" }
+oak-vue = { path = "../oaks/examples/oak-vue" }
+oak-typescript = { path = "../oaks/examples/oak-typescript" }
 
 [alias]
