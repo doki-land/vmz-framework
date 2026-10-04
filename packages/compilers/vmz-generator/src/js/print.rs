@@ -17,7 +17,36 @@ impl JsPrintOptions { /// Mapped development output.
 }
 /// Parse and print a TypeScript source module with Oak type erasure.
 pub fn print_js_source(source: &str, _filename: &str, options: &JsPrintOptions) -> Result<EmittedJs, String> {
-    let formatted = oak_typescript::formatter::format_source(source, &oak_typescript::formatter::FormatOptions::default().with_type_erasure(true)).map_err(|e| format!("Oak TypeScript print failed: {e}"))?;
+    let shell = vmz_oak_frontend_adapter::ScriptShellInput { content: source.to_string(), content_start: 0, role: vmz_oak_frontend_adapter::ScriptRole::Client };
+    if !vmz_oak_frontend_adapter::parse_script_ast(&shell).ok { return Err("Oak TypeScript parse failed".into()); }
+    let formatted = erase_types(source);
     let code = if options.minify { formatted.lines().map(str::trim).filter(|l| !l.is_empty()).collect::<Vec<_>>().join("\n") } else { formatted };
     Ok(EmittedJs { code, map: options.source_map_path.as_ref().map(|_| "{}".into()) })
+}
+
+fn erase_types(source: &str) -> String {
+    let mut out = String::with_capacity(source.len());
+    for line in source.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("interface ") || trimmed.starts_with("type ") { continue; }
+        let mut line = line.to_string();
+        for keyword in ["public ", "private ", "protected ", "readonly "] { line = line.replace(keyword, ""); }
+        line = strip_as_type(&line);
+        out.push_str(&line);
+        out.push('\n');
+    }
+    out
+}
+
+fn strip_as_type(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut rest = line;
+    while let Some(pos) = rest.find(" as ") {
+        out.push_str(&rest[..pos]);
+        let tail = &rest[pos + 4..];
+        let end = tail.find(|c: char| matches!(c, ',' | ';' | ')' | '}' | '\n')).unwrap_or(tail.len());
+        rest = &tail[end..];
+    }
+    out.push_str(rest);
+    out
 }
