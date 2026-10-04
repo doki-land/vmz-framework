@@ -420,6 +420,12 @@ pub fn rewrite_list_transpose(source: &str, owned_fields: &HashSet<String>) -> W
         return WriteBarrierRewrite { source: source.to_string(), rewritten: 0 };
     }
 
+    if let Some(result) = super::write_barrier_oak::rewrite_list_transpose(source, owned_fields)
+        && result.rewritten > 0
+    {
+        return result;
+    }
+
     let allocator = Allocator::default();
     let parsed = Parser::new(&allocator, source, SourceType::ts()).parse();
     if parsed.panicked {

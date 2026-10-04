@@ -334,6 +334,180 @@ pub fn rewrite_array_item_strides(
     Some(WriteBarrierRewrite { source: output, rewritten: hits.len() })
 }
 
+/// Rewrite the idiomatic copy-and-swap list pattern through Oak AST spans.
+pub fn rewrite_list_transpose(
+    source: &str,
+    owned_fields: &HashSet<String>,
+) -> Option<WriteBarrierRewrite> {
+    if owned_fields.is_empty() {
+        return Some(WriteBarrierRewrite { source: source.to_string(), rewritten: 0 });
+    }
+    let parsed = parse_script_ast(&ScriptShellInput {
+        content: source.to_string(),
+        content_start: 0,
+        role: ScriptRole::Client,
+    });
+    let root = parsed.root.as_ref().filter(|_| parsed.ok)?;
+    let mut hits = Vec::new();
+    collect_transpose_statements(&root.statements, source, owned_fields, &mut hits);
+    hits.sort_by_key(|hit: &TransposeHit| std::cmp::Reverse(hit.span.start));
+    let mut output = source.to_string();
+    for hit in &hits {
+        output.replace_range(hit.span.clone(), &hit.replacement);
+    }
+    Some(WriteBarrierRewrite { source: output, rewritten: hits.len() })
+}
+
+struct TransposeHit {
+    span: std::ops::Range<usize>,
+    replacement: String,
+}
+
+fn collect_transpose_statements(
+    statements: &[Statement],
+    source: &str,
+    owned: &HashSet<String>,
+    hits: &mut Vec<TransposeHit>,
+) {
+    let mut index = 0;
+    while index < statements.len() {
+        if index + 1 < statements.len()
+            && let Some(hit) = match_transpose_pair(&statements[index], &statements[index + 1], source, owned)
+        {
+            hits.push(hit);
+            index += 2;
+            continue;
+        }
+        match &statements[index] {
+            Statement::BlockStatement(block) => {
+                collect_transpose_statements(&block.statements, source, owned, hits)
+            }
+            Statement::ClassDeclaration(class) => {
+                for member in &class.body {
+                    if let ClassMember::Method { body, .. } = member {
+                        collect_transpose_statements(body, source, owned, hits);
+                    }
+                }
+            }
+            Statement::FunctionDeclaration(function) => {
+                collect_transpose_statements(&function.body, source, owned, hits)
+            }
+            Statement::IfStatement(if_stmt) => {
+                collect_transpose_statement(&if_stmt.consequent, source, owned, hits);
+                if let Some(alternate) = if_stmt.alternate.as_deref() {
+                    collect_transpose_statement(alternate, source, owned, hits);
+                }
+            }
+            Statement::ExportDeclaration(export) => {
+                if let Some(inner) = export.declaration.as_deref() {
+                    collect_transpose_statement(inner, source, owned, hits);
+                }
+            }
+            _ => {}
+        }
+        index += 1;
+    }
+}
+
+fn collect_transpose_statement(
+    statement: &Statement,
+    source: &str,
+    owned: &HashSet<String>,
+    hits: &mut Vec<TransposeHit>,
+) {
+    collect_transpose_statements(std::slice::from_ref(statement), source, owned, hits);
+}
+
+fn match_transpose_pair(
+    first: &Statement,
+    second: &Statement,
+    source: &str,
+    owned: &HashSet<String>,
+) -> Option<TransposeHit> {
+    let Statement::VariableDeclaration(decl) = first else { return None };
+    let local = decl.name.as_str();
+    let Some((field, _)) = slice_source(decl.value.as_ref()?, owned) else { return None };
+    let Statement::IfStatement(if_stmt) = second else { return None };
+    let (op, rhs) = transpose_length_test(&if_stmt.test, source, local)?;
+    let Statement::BlockStatement(body) = if_stmt.consequent.as_ref() else { return None };
+    if body.statements.len() != 4 || if_stmt.alternate.is_some() { return None }
+    let (tmp, index_a) = transpose_tmp_read(&body.statements[0], source, local)?;
+    let index_b = transpose_swap_write(&body.statements[1], source, local, &index_a)?;
+    if !transpose_tmp_write(&body.statements[2], source, local, &index_b, &tmp) {
+        return None;
+    }
+    if !transpose_assign_back(&body.statements[3], source, &field, local) || index_a == index_b {
+        return None;
+    }
+    let start = first.span().start;
+    let end = if_stmt.span.end;
+    Some(TransposeHit {
+        span: start..end,
+        replacement: format!(
+            "if (this.{field}.length {op} {rhs}) {{\n      this.constructor.__vmzListTranspose(this, {field:?}, {index_a}, {index_b});\n    }}",
+        ),
+    })
+}
+
+fn slice_source(expression: &Expression, owned: &HashSet<String>) -> Option<(String, String)> {
+    let ExpressionKind::CallExpression { func, args } = expression.kind.as_ref() else { return None };
+    if !args.is_empty() { return None }
+    let ExpressionKind::MemberExpression { object, property, computed: false, .. } = func.kind.as_ref() else {
+        return None;
+    };
+    if ident(property) != Some("slice") { return None }
+    let (object, field) = member(object)?;
+    if ident(object) != Some("this") || !owned.contains(&field) { return None }
+    Some((field, String::new()))
+}
+
+fn transpose_length_test(expression: &Expression, source: &str, local: &str) -> Option<(String, String)> {
+    let ExpressionKind::BinaryExpression { left, operator, right } = expression.kind.as_ref() else { return None };
+    if !matches!(operator.as_str(), ">" | ">=") {
+        return None;
+    }
+    let (object, property) = member(left)?;
+    (ident(object) == Some(local) && property == "length")
+        .then(|| (operator.clone(), text(source, right)))
+}
+
+fn transpose_tmp_read(statement: &Statement, _source: &str, local: &str) -> Option<(String, String)> {
+    let Statement::VariableDeclaration(decl) = statement else { return None };
+    let value = decl.value.as_ref()?;
+    let (object, index) = indexed_member(value)?;
+    (ident(object) == Some(local)).then(|| (decl.name.clone(), index))
+}
+
+fn transpose_swap_write(statement: &Statement, _source: &str, local: &str, index_a: &str) -> Option<String> {
+    let (left, right) = assignment_statement(statement)?;
+    let (object, index) = indexed_member(left)?;
+    let (value_object, value_index) = indexed_member(right)?;
+    (ident(object) == Some(local)
+        && index == index_a
+        && ident(value_object) == Some(local))
+        .then(|| value_index)
+}
+
+fn transpose_tmp_write(statement: &Statement, _source: &str, local: &str, index_b: &str, tmp: &str) -> bool {
+    let Some((left, right)) = assignment_statement(statement) else { return false };
+    let Some((object, index)) = indexed_member(left) else { return false };
+    ident(object) == Some(local) && index == index_b && ident(right) == Some(tmp)
+}
+
+fn transpose_assign_back(statement: &Statement, _source: &str, field: &str, local: &str) -> bool {
+    let Some((left, right)) = assignment_statement(statement) else { return false };
+    let Some((object, property)) = member(left) else { return false };
+    ident(object) == Some("this") && property == field && ident(right) == Some(local)
+}
+
+fn assignment_statement(statement: &Statement) -> Option<(&Expression, &Expression)> {
+    let Statement::ExpressionStatement(expr) = statement else { return None };
+    let ExpressionKind::AssignmentExpression { left, operator, right } = expr.expression.kind.as_ref() else {
+        return None;
+    };
+    (operator == "=").then(|| (left.as_ref(), right.as_ref()))
+}
+
 fn walk_statements(
     statements: &[Statement],
     source: &str,
