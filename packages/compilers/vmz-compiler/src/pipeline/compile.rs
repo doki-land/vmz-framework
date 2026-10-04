@@ -1494,7 +1494,7 @@ struct ProgramDeploymentExtras {
 }
 
 /// Load deployment extras from emitted `*.program.json` via typed Program IR parse.
-/// Source `.vmz` still goes through oxc; this only re-reads our own Program IR artifact
+/// Source `.vmz` is validated through the Oak frontend; this only re-reads our own Program IR artifact
 /// for incremental deployment aggregation.
 fn read_program_deployment_extras(path: &Path) -> ProgramDeploymentExtras {
     let Ok(text) = fs::read_to_string(path) else {

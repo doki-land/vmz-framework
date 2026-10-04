@@ -1,6 +1,6 @@
 # vmz-formatter
 
-Authoring formatter for `.vmz` SFCs: **oxc IR formatter** (not codegen pretty-print) plus **EditorConfig**.
+Authoring formatter for `.vmz` SFCs: **Oak CST formatting** plus **EditorConfig**.
 
 |                |                                                          |
 |----------------|----------------------------------------------------------|
@@ -25,7 +25,7 @@ Authoring formatter for `.vmz` SFCs: **oxc IR formatter** (not codegen pretty-pr
 
 | Capability                         | Owner / note                                      |
 |------------------------------------|---------------------------------------------------|
-| Runtime JS emit / sourcemaps       | [`vmz-generator`](../vmz-generator/) (codegen)    |
+| Runtime JS emit / sourcemaps       | compiler artifact pipeline, outside this formatter |
 | Soft/hard inspect                  | [`vmz-inspector`](../vmz-inspector/)              |
 | Biome / Node `oxfmt` for `.vmz`    | Out of scope                                      |
 | Parallel SFC parser                | Uses `vmz_compiler::parse_vmz`                    |
@@ -38,7 +38,7 @@ Authoring formatter for `.vmz` SFCs: **oxc IR formatter** (not codegen pretty-pr
 `@vmz/vmz`  `vmz format`  →  vmz-napi  →  vmz_formatter::format_path
 ```
 
-oxc crates (including publish=false formatters) are locked to one git tag in the workspace root `Cargo.toml`.
+JavaScript and TypeScript source formatting is delegated to Oak.
 
 ## Development
 

@@ -1,4 +1,4 @@
-//! Unit tests for vmz-formatter (oxc IR formatter + EditorConfig + SFC assemble).
+//! Unit tests for vmz-formatter (Oak CST formatting + EditorConfig + SFC assemble).
 
 use std::fs;
 use std::path::PathBuf;
