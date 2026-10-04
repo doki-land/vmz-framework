@@ -79,7 +79,7 @@ try {
                 name: '@vmz/fixture-client-lib',
                 type: 'module',
                 exports: {
-                    '.': './src/index.ts',
+                    '.': { browser: './src/index.ts', default: './src/index.ts' },
                     './query': './src/query.ts',
                 },
             },

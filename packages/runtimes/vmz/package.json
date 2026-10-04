@@ -75,6 +75,7 @@
         "bin",
         "dist",
         "locales",
+        "host-runtime-files.json",
         "README.md"
     ],
     "scripts": {
