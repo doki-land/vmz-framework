@@ -199,7 +199,9 @@ fn collect_expression(
 }
 
 fn static_member(expression: &Expression) -> Option<(&Expression, String)> {
-    let ExpressionKind::MemberExpression { object, property, computed: false, .. } = expression.kind.as_ref() else {
+    let ExpressionKind::MemberExpression { object, property, computed: false, .. } =
+        expression.kind.as_ref()
+    else {
         return None;
     };
     Some((object, ident(property)?.to_string()))
@@ -214,17 +216,18 @@ fn owned_path(
     match expression.kind.as_ref() {
         ExpressionKind::Identifier(name) => aliases.get(name).cloned(),
         ExpressionKind::MemberExpression { object, property, computed, .. } => {
-            let (root, mut segments) = if let Some(path) = owned_path(object, owned, aliases, source) {
-                path
-            } else if ident(object) == Some("this")
-                && !*computed
-                && let Some(field) = ident(property)
-                && owned.contains(field)
-            {
-                return Some((field.to_string(), Vec::new()));
-            } else {
-                return None;
-            };
+            let (root, mut segments) =
+                if let Some(path) = owned_path(object, owned, aliases, source) {
+                    path
+                } else if ident(object) == Some("this")
+                    && !*computed
+                    && let Some(field) = ident(property)
+                    && owned.contains(field)
+                {
+                    return Some((field.to_string(), Vec::new()));
+                } else {
+                    return None;
+                };
             let segment = if *computed {
                 source.get(property.span.clone())?.trim().to_string()
             } else {
@@ -238,7 +241,8 @@ fn owned_path(
 }
 
 fn render_barrier(source: &str, hit: &OakBarrierHit) -> String {
-    let path = hit.segments.iter().map(|segment| format!("{segment:?}")).collect::<Vec<_>>().join(", ");
+    let path =
+        hit.segments.iter().map(|segment| format!("{segment:?}")).collect::<Vec<_>>().join(", ");
     match &hit.kind {
         OakBarrierKind::Path { operator, rhs } => {
             let rhs = source.get(rhs.clone()).unwrap_or_default().trim();
@@ -246,10 +250,17 @@ fn render_barrier(source: &str, hit: &OakBarrierHit) -> String {
                 let index = &hit.segments[0];
                 let leaf = &hit.segments[1];
                 let item = match operator.as_str() {
-                    "=" => Some(format!("this.constructor.__vmzWritePathItem(this, {:?}, {}, {:?}, {})", hit.root, index, leaf, rhs)),
+                    "=" => Some(format!(
+                        "this.constructor.__vmzWritePathItem(this, {:?}, {}, {:?}, {})",
+                        hit.root, index, leaf, rhs
+                    )),
                     "+=" | "-=" | "*=" | "/=" | "%=" => Some(format!(
                         "this.constructor.__vmzWritePathCompoundItem(this, {:?}, {}, {:?}, {:?}, {})",
-                        hit.root, index, leaf, &operator[..operator.len() - 1], rhs
+                        hit.root,
+                        index,
+                        leaf,
+                        &operator[..operator.len() - 1],
+                        rhs
                     )),
                     _ => None,
                 };
@@ -258,14 +269,23 @@ fn render_barrier(source: &str, hit: &OakBarrierHit) -> String {
                 }
             }
             match operator.as_str() {
-                "=" => format!("this.constructor.__vmzWritePath(this, {:?}, [{}], {})", hit.root, path, rhs),
+                "=" => format!(
+                    "this.constructor.__vmzWritePath(this, {:?}, [{}], {})",
+                    hit.root, path, rhs
+                ),
                 "+=" | "-=" | "*=" | "/=" | "%=" => format!(
                     "this.constructor.__vmzWritePathCompound(this, {:?}, [{}], {:?}, {})",
-                    hit.root, path, &operator[..operator.len() - 1], rhs
+                    hit.root,
+                    path,
+                    &operator[..operator.len() - 1],
+                    rhs
                 ),
                 "||=" | "&&=" | "??=" => format!(
                     "this.constructor.__vmzWritePathLogical(this, {:?}, [{}], {:?}, {})",
-                    hit.root, path, &operator[..operator.len() - 1], rhs
+                    hit.root,
+                    path,
+                    &operator[..operator.len() - 1],
+                    rhs
                 ),
                 _ => source.get(hit.span.clone()).unwrap_or_default().to_string(),
             }
@@ -277,8 +297,18 @@ fn render_barrier(source: &str, hit: &OakBarrierHit) -> String {
             if operator == "++" { "+" } else { "-" }
         ),
         OakBarrierKind::Mutator { method, args } => {
-            let args = if args.is_empty() { String::new() } else { source.get(args.clone()).unwrap_or_default().trim().to_string() };
-            format!("this.constructor.__vmzArrayMutate(this, {:?}, [{}], {:?}{})", hit.root, path, method, if args.is_empty() { String::new() } else { format!(", {args}") })
+            let args = if args.is_empty() {
+                String::new()
+            } else {
+                source.get(args.clone()).unwrap_or_default().trim().to_string()
+            };
+            format!(
+                "this.constructor.__vmzArrayMutate(this, {:?}, [{}], {:?}{})",
+                hit.root,
+                path,
+                method,
+                if args.is_empty() { String::new() } else { format!(", {args}") }
+            )
         }
     }
 }
@@ -372,7 +402,8 @@ fn collect_transpose_statements(
     let mut index = 0;
     while index < statements.len() {
         if index + 1 < statements.len()
-            && let Some(hit) = match_transpose_pair(&statements[index], &statements[index + 1], source, owned)
+            && let Some(hit) =
+                match_transpose_pair(&statements[index], &statements[index + 1], source, owned)
         {
             hits.push(hit);
             index += 2;
@@ -430,7 +461,9 @@ fn match_transpose_pair(
     let Statement::IfStatement(if_stmt) = second else { return None };
     let (op, rhs) = transpose_length_test(&if_stmt.test, source, local)?;
     let Statement::BlockStatement(body) = if_stmt.consequent.as_ref() else { return None };
-    if body.statements.len() != 4 || if_stmt.alternate.is_some() { return None }
+    if body.statements.len() != 4 || if_stmt.alternate.is_some() {
+        return None;
+    }
     let (tmp, index_a) = transpose_tmp_read(&body.statements[0], source, local)?;
     let index_b = transpose_swap_write(&body.statements[1], source, local, &index_a)?;
     if !transpose_tmp_write(&body.statements[2], source, local, &index_b, &tmp) {
@@ -450,19 +483,36 @@ fn match_transpose_pair(
 }
 
 fn slice_source(expression: &Expression, owned: &HashSet<String>) -> Option<(String, String)> {
-    let ExpressionKind::CallExpression { func, args } = expression.kind.as_ref() else { return None };
-    if !args.is_empty() { return None }
-    let ExpressionKind::MemberExpression { object, property, computed: false, .. } = func.kind.as_ref() else {
+    let ExpressionKind::CallExpression { func, args } = expression.kind.as_ref() else {
         return None;
     };
-    if ident(property) != Some("slice") { return None }
-    let (object, field) = member(object)?;
-    if ident(object) != Some("this") || !owned.contains(&field) { return None }
+    if !args.is_empty() {
+        return None;
+    }
+    let ExpressionKind::MemberExpression { object, property, computed: false, .. } =
+        func.kind.as_ref()
+    else {
+        return None;
+    };
+    if ident(property) != Some("slice") {
+        return None;
+    }
+    let (root, field) = member(object)?;
+    if ident(root) != Some("this") || !owned.contains(&field) {
+        return None;
+    }
     Some((field, String::new()))
 }
 
-fn transpose_length_test(expression: &Expression, source: &str, local: &str) -> Option<(String, String)> {
-    let ExpressionKind::BinaryExpression { left, operator, right } = expression.kind.as_ref() else { return None };
+fn transpose_length_test(
+    expression: &Expression,
+    source: &str,
+    local: &str,
+) -> Option<(String, String)> {
+    let ExpressionKind::BinaryExpression { left, operator, right } = expression.kind.as_ref()
+    else {
+        return None;
+    };
     if !matches!(operator.as_str(), ">" | ">=") {
         return None;
     }
@@ -471,27 +521,51 @@ fn transpose_length_test(expression: &Expression, source: &str, local: &str) -> 
         .then(|| (operator.clone(), text(source, right)))
 }
 
-fn transpose_tmp_read(statement: &Statement, _source: &str, local: &str) -> Option<(String, String)> {
+fn transpose_tmp_read(
+    statement: &Statement,
+    source: &str,
+    local: &str,
+) -> Option<(String, String)> {
     let Statement::VariableDeclaration(decl) = statement else { return None };
     let value = decl.value.as_ref()?;
-    let (object, index) = indexed_member(value)?;
-    (ident(object) == Some(local)).then(|| (decl.name.clone(), index))
+    let (object, index) = transpose_indexed_member(value)?;
+    (ident(object) == Some(local)).then(|| (decl.name.clone(), text(source, index)))
 }
 
-fn transpose_swap_write(statement: &Statement, _source: &str, local: &str, index_a: &str) -> Option<String> {
+fn transpose_swap_write(
+    statement: &Statement,
+    source: &str,
+    local: &str,
+    index_a: &str,
+) -> Option<String> {
     let (left, right) = assignment_statement(statement)?;
-    let (object, index) = indexed_member(left)?;
-    let (value_object, value_index) = indexed_member(right)?;
+    let (object, index) = transpose_indexed_member(left)?;
+    let (value_object, value_index) = transpose_indexed_member(right)?;
     (ident(object) == Some(local)
-        && index == index_a
+        && text(source, index) == index_a
         && ident(value_object) == Some(local))
-        .then(|| value_index)
+    .then(|| text(source, value_index))
 }
 
-fn transpose_tmp_write(statement: &Statement, _source: &str, local: &str, index_b: &str, tmp: &str) -> bool {
+fn transpose_tmp_write(
+    statement: &Statement,
+    source: &str,
+    local: &str,
+    index_b: &str,
+    tmp: &str,
+) -> bool {
     let Some((left, right)) = assignment_statement(statement) else { return false };
-    let Some((object, index)) = indexed_member(left) else { return false };
-    ident(object) == Some(local) && index == index_b && ident(right) == Some(tmp)
+    let Some((object, index)) = transpose_indexed_member(left) else { return false };
+    ident(object) == Some(local) && text(source, index) == index_b && ident(right) == Some(tmp)
+}
+
+fn transpose_indexed_member(expression: &Expression) -> Option<(&Expression, &Expression)> {
+    let ExpressionKind::MemberExpression { object, property, computed: true, optional: false } =
+        expression.kind.as_ref()
+    else {
+        return None;
+    };
+    Some((object, property))
 }
 
 fn transpose_assign_back(statement: &Statement, _source: &str, field: &str, local: &str) -> bool {
@@ -502,7 +576,9 @@ fn transpose_assign_back(statement: &Statement, _source: &str, field: &str, loca
 
 fn assignment_statement(statement: &Statement) -> Option<(&Expression, &Expression)> {
     let Statement::ExpressionStatement(expr) = statement else { return None };
-    let ExpressionKind::AssignmentExpression { left, operator, right } = expr.expression.kind.as_ref() else {
+    let ExpressionKind::AssignmentExpression { left, operator, right } =
+        expr.expression.kind.as_ref()
+    else {
         return None;
     };
     (operator == "=").then(|| (left.as_ref(), right.as_ref()))
@@ -558,7 +634,9 @@ fn walk_statement(
     hits: &mut Vec<StrideHit>,
 ) {
     match statement {
-        Statement::BlockStatement(block) => walk_statements(&block.statements, source, owned, aliases, hits),
+        Statement::BlockStatement(block) => {
+            walk_statements(&block.statements, source, owned, aliases, hits)
+        }
         Statement::ClassDeclaration(class) => {
             for member in &class.body {
                 if let ClassMember::Method { body, .. } = member {
@@ -571,7 +649,9 @@ fn walk_statement(
                 walk_statement(inner, source, owned, aliases, hits);
             }
         }
-        Statement::FunctionDeclaration(function) => walk_statements(&function.body, source, owned, aliases, hits),
+        Statement::FunctionDeclaration(function) => {
+            walk_statements(&function.body, source, owned, aliases, hits)
+        }
         Statement::IfStatement(if_stmt) => {
             walk_statement(&if_stmt.consequent, source, owned, aliases, hits);
             if let Some(alternate) = if_stmt.alternate.as_deref() {
@@ -588,29 +668,59 @@ fn match_for(
     owned: &HashSet<String>,
     aliases: &HashMap<String, String>,
 ) -> Option<StrideHit> {
-    let Statement::VariableDeclaration(init) = statement.initializer.as_deref()? else { return None };
+    let Statement::VariableDeclaration(init) = statement.initializer.as_deref()? else {
+        return None;
+    };
     let index_name = init.name.clone();
     let start = init.value.as_ref().map(|expr| text(source, expr)).unwrap_or_default();
-    let ExpressionKind::BinaryExpression { left, operator, right } = statement.test.as_ref()?.kind.as_ref() else { return None };
-    if operator != "<" || ident(left)? != index_name { return None }
+    let ExpressionKind::BinaryExpression { left, operator, right } =
+        statement.test.as_ref()?.kind.as_ref()
+    else {
+        return None;
+    };
+    if operator != "<" || ident(left)? != index_name {
+        return None;
+    }
     let (length_object, length_property) = member(right)?;
-    if length_property != "length" { return None }
+    if length_property != "length" {
+        return None;
+    }
     let root = resolve_root(length_object, aliases, owned)?;
     let step = match statement.incrementor.as_ref()?.kind.as_ref() {
-        ExpressionKind::UpdateExpression { operator, argument, .. } if operator == "++" && ident(argument) == Some(index_name.as_str()) => "1".to_string(),
-        ExpressionKind::AssignmentExpression { left, operator, right } if operator == "+=" && ident(left) == Some(index_name.as_str()) => text(source, right),
+        ExpressionKind::UpdateExpression { operator, argument, .. }
+            if operator == "++" && ident(argument) == Some(index_name.as_str()) =>
+        {
+            "1".to_string()
+        }
+        ExpressionKind::AssignmentExpression { left, operator, right }
+            if operator == "+=" && ident(left) == Some(index_name.as_str()) =>
+        {
+            text(source, right)
+        }
         _ => return None,
     };
     let Statement::BlockStatement(body) = statement.body.as_ref() else { return None };
-    if body.statements.len() != 1 { return None }
+    if body.statements.len() != 1 {
+        return None;
+    }
     let Statement::ExpressionStatement(expr_stmt) = &body.statements[0] else { return None };
-    let ExpressionKind::AssignmentExpression { left, operator, right } = expr_stmt.expression.kind.as_ref() else { return None };
+    let ExpressionKind::AssignmentExpression { left, operator, right } =
+        expr_stmt.expression.kind.as_ref()
+    else {
+        return None;
+    };
     let operation = operator.strip_suffix('=')?;
-    if !matches!(operation, "+" | "-" | "*" | "/" | "%") { return None }
+    if !matches!(operation, "+" | "-" | "*" | "/" | "%") {
+        return None;
+    }
     let (indexed, leaf) = member(left)?;
     let (array, index_name_from_path) = indexed_member(indexed)?;
-    if index_name_from_path != index_name { return None }
-    if resolve_root(array, aliases, owned)? != root { return None }
+    if index_name_from_path != index_name {
+        return None;
+    }
+    if resolve_root(array, aliases, owned)? != root {
+        return None;
+    }
     Some(StrideHit {
         full: statement.span.clone().into(),
         root,
@@ -630,12 +740,20 @@ fn ident(expr: &Expression) -> Option<&str> {
 }
 
 fn member(expr: &Expression) -> Option<(&Expression, String)> {
-    let ExpressionKind::MemberExpression { object, property, computed: false, .. } = expr.kind.as_ref() else { return None };
+    let ExpressionKind::MemberExpression { object, property, computed: false, .. } =
+        expr.kind.as_ref()
+    else {
+        return None;
+    };
     Some((object, ident(property)?.to_string()))
 }
 
 fn indexed_member(expr: &Expression) -> Option<(&Expression, String)> {
-    let ExpressionKind::MemberExpression { object, property, computed: true, .. } = expr.kind.as_ref() else { return None };
+    let ExpressionKind::MemberExpression { object, property, computed: true, .. } =
+        expr.kind.as_ref()
+    else {
+        return None;
+    };
     Some((object, ident(property)?.to_string()))
 }
 
@@ -650,7 +768,10 @@ fn resolve_root(
     owned: &HashSet<String>,
 ) -> Option<String> {
     if let Some(name) = ident(expr) {
-        return aliases.get(name).cloned().or_else(|| owned.contains(name).then(|| name.to_string()));
+        return aliases
+            .get(name)
+            .cloned()
+            .or_else(|| owned.contains(name).then(|| name.to_string()));
     }
     this_root(expr)
 }

@@ -228,6 +228,29 @@ export default class Demo {
 }
 
 #[test]
+fn oak_transpose_rewrites_numeric_indices_without_fallback() {
+    let source = r#"export default class Demo {
+  swapRows() {
+    const rows = this.rows.slice();
+    if (rows.length > 998) {
+      const tmp = rows[1];
+      rows[1] = rows[998];
+      rows[998] = tmp;
+      this.rows = rows;
+    }
+  }
+}"#;
+    let result = vmz_compiler::pipeline::write_barrier_oak::rewrite_list_transpose(
+        source,
+        &owned(&["rows"]),
+    )
+    .expect("Oak parse");
+    assert_eq!(result.rewritten, 1, "{}", result.source);
+    assert!(result.source.contains("__vmzListTranspose(this, \"rows\", 1, 998)"));
+    assert!(!result.source.contains(".slice()"));
+}
+
+#[test]
 fn rewrites_alias_compound_array_item() {
     let src = r#"
 export default class Demo {
