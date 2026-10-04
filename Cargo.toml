@@ -45,18 +45,6 @@ vmz-oak-frontend-adapter = { path = "packages/compilers/vmz-oak-frontend-adapter
 oak-core = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
 oak-vue = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
 oak-typescript = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
-
-# Remaining generator OXC crates are pinned to one git tag during migration.
-oxc_allocator = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
-oxc_ast = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
-oxc_codegen = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0", features = ["sourcemap"] }
-oxc_minifier = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
-oxc_parser = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
-oxc_semantic = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
-oxc_span = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
-oxc_str = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
-oxc_syntax = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
-oxc_transformer = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
 editorconfig = "1.0.0"
 
 clap = { version = "4.6.6", features = ["derive"] }
@@ -78,9 +66,6 @@ napi-derive = "3.6.3"
 sasso = "0.8.1"
 tailwind = { git = "https://github.com/oovm/tailwind-rs.git", branch = "dev" }
 tailwind-css = { git = "https://github.com/oovm/tailwind-rs.git", branch = "dev" }
-
-[patch.crates-io]
-oxc_allocator = { git = "https://github.com/oxc-project/oxc", tag = "crates_v0.144.0" }
 
 [profile.release]
 lto = true
