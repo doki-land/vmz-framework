@@ -1,16 +1,16 @@
-//! Print Semantic template AST as Vue author syntax (OXC-canonical expressions).
+//! Print Semantic template AST as Vue author syntax with Oak expressions.
 
+use oak_typescript::formatter::{FormatOptions, format_source};
 use vmz_compiler::{
     Directive, DirectiveArg, SemanticIr, SemanticNode, SemanticProp, TemplateBlock,
     parse_template_semantic_primary,
 };
-use vmz_generator::print_template_expr;
 
 use crate::editorconfig::EditorSettings;
 
 /// Format a `<template>` body via Oak layers Semantic → Vue print.
 ///
-/// Expressions are canonicalized through oxc print (no raw string replay).
+/// Expressions are normalized through Oak CST formatting.
 pub fn format_template_body(body: &str, settings: &EditorSettings) -> Result<String, String> {
     reject_unquoted_brace_attributes(body)?;
     let block = TemplateBlock { content: body.to_string(), content_start: 0 };
@@ -47,20 +47,24 @@ fn reject_unquoted_brace_attributes(body: &str) -> Result<(), String> {
             continue;
         }
         if ch == '=' && body[index + ch.len_utf8()..].starts_with('{') {
-            return Err("unquoted brace attribute values are not valid Vue author syntax".to_string());
+            return Err(
+                "unquoted brace attribute values are not valid Vue author syntax".to_string()
+            );
         }
     }
     Ok(())
 }
 
 /// Canonical expression text for Vue attr / interpolation slots.
-fn oxc_expr(expr: &str) -> Result<String, String> {
-    print_template_expr(expr)
+fn oak_expr(expr: &str) -> Result<String, String> {
+    format_source(expr.trim(), &FormatOptions::default())
+        .map(|formatted| formatted.trim().to_owned())
+        .map_err(|error| error.to_string())
 }
 
 /// Delimit a printed JS expression for a Vue/HTML attribute value.
 ///
-/// oxc codegen prefers double-quoted string literals. Inside `attr="…"` that breaks
+/// Oak formatting may prefer double-quoted string literals. Inside `attr="…"` that breaks
 /// when the expression itself contains `"`. Prefer single-quoted attribute delimiters
 /// in that case (Vue author surface).
 fn delimit_vue_attr_value(printed: &str) -> String {
@@ -95,7 +99,7 @@ fn escape_js_double_quotes(s: &str) -> String {
 }
 
 fn vue_attr_assignment(expr: &str) -> Result<String, String> {
-    Ok(format!("={}", delimit_vue_attr_value(&oxc_expr(expr)?)))
+    Ok(format!("={}", delimit_vue_attr_value(&oak_expr(expr)?)))
 }
 
 fn print_semantic(sem: &SemanticIr, settings: &EditorSettings) -> Result<String, String> {
@@ -126,7 +130,7 @@ fn print_node(
         }
         SemanticNode::Interpolation { expr, .. } => {
             let pad = settings.indent_unit().repeat(depth);
-            let e = oxc_expr(expr)?;
+            let e = oak_expr(expr)?;
             lines.push(format!("{pad}{{{{ {e} }}}}"));
         }
         SemanticNode::Element { tag, props, children, .. } => {
@@ -153,7 +157,7 @@ fn print_node(
             };
             let mut cf = vec![format!(
                 "v-for={}",
-                delimit_vue_attr_value(&format!("{alias} in {}", oxc_expr(source)?))
+                delimit_vue_attr_value(&format!("{alias} in {}", oak_expr(source)?))
             )];
             if let Some(k) = key {
                 cf.push(format!(":key{}", vue_attr_assignment(k)?));
@@ -183,7 +187,7 @@ fn print_node(
             let pad = settings.indent_unit().repeat(depth);
             let name_s = match name {
                 DirectiveArg::Static(s) => s.clone(),
-                DirectiveArg::Dynamic(e) => format!("[{}]", oxc_expr(e)?),
+                DirectiveArg::Dynamic(e) => format!("[{}]", oak_expr(e)?),
             };
             let mut open = format!("{pad}<template #{name_s}");
             if let Some(p) = slot_props {
@@ -337,7 +341,7 @@ fn format_props(props: &[SemanticProp]) -> Result<String, String> {
 fn format_arg(arg: &DirectiveArg) -> Result<String, String> {
     match arg {
         DirectiveArg::Static(n) => Ok(n.clone()),
-        DirectiveArg::Dynamic(e) => Ok(format!("[{}]", oxc_expr(e)?)),
+        DirectiveArg::Dynamic(e) => Ok(format!("[{}]", oak_expr(e)?)),
     }
 }
 
@@ -425,7 +429,7 @@ mod tests {
     }
 
     #[test]
-    fn oxc_expr_print_is_idempotent_inside_template() {
+    fn oak_expr_format_is_idempotent_inside_template() {
         let src = r#"<p>{{ a+b }}</p>"#;
         let once = format_template_body(src, &settings()).unwrap();
         let twice = format_template_body(&once, &settings()).unwrap();

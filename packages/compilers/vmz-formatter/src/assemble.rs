@@ -1,7 +1,6 @@
 //! Faithful `.vmz` reassembly: preserve router/meta/lang/attrs/block order.
 
 use vmz_compiler::{DataBlock, ParsedVmz, ScriptBlock, ScriptLanguage, StyleLanguage};
-use vmz_generator::to_json5;
 use vmz_oak_frontend_adapter::{TemplateShellInput, require_template_cst};
 
 use crate::editorconfig::EditorSettings;
@@ -116,7 +115,7 @@ fn format_data_body(
     let relative = normalize_relative_lines(body).join("\n");
     let value: serde_json::Value = json5::from_str(&relative)
         .map_err(|e| format!("invalid JSON5 in `<{lang}>` block: {e}"))?;
-    let canonical = to_json5(&value).map_err(|e| e.to_string())?;
+    let canonical = json5::to_string(&value).map_err(|e| e.to_string())?;
     Ok(indent_block(canonical.trim(), settings))
 }
 

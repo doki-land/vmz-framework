@@ -36,7 +36,7 @@ impl<'a> VmzDocument<'a> {
         } else {
             None
         };
-        // `assemble_vmz` formats `<template>` from Semantic AST (OXC expr print).
+        // `assemble_vmz` formats `<template>` from Semantic AST with Oak expressions.
         assemble_vmz(parsed, &client, server.as_deref(), style.as_deref(), settings)
     }
 }
