@@ -1,9 +1,9 @@
 //! Semantic AST fixtures (`IfChain` grouping; emit still via legacy TemplateIr).
 
 use vmz_compiler::{
-    DirectiveArg, EventTarget, SemanticNode, SemanticProp, TemplateBlock, lower_concrete_to_semantic,
-    parse_template, parse_template_asts, parse_template_concrete, parse_template_semantic_primary,
-    semantic_ast_stats,
+    DirectiveArg, EventTarget, SemanticNode, SemanticProp, TemplateBlock,
+    lower_concrete_to_semantic, parse_template, parse_template_asts, parse_template_concrete,
+    parse_template_semantic_primary, semantic_ast_stats,
 };
 use vmz_generator::print_template_expr;
 
@@ -405,7 +405,9 @@ fn aria_invalid_bind_expr_survives_semantic_and_print() {
     .unwrap();
     let expr = match &sem.roots[0] {
         SemanticNode::Element { props, .. } => props.iter().find_map(|p| match p {
-            SemanticProp::Bind { arg: DirectiveArg::Static(name), expr, .. } if name == "aria-invalid" => {
+            SemanticProp::Bind { arg: DirectiveArg::Static(name), expr, .. }
+                if name == "aria-invalid" =>
+            {
                 Some(expr.clone())
             }
             _ => None,

@@ -151,9 +151,9 @@ export default class Page {}
         "expected type-only import via Oak, got {imports:?}"
     );
     assert!(
-        imports.iter().any(|i| {
-            i.kind == NyarImportKind::ExportFrom && i.module_specifier == "./re"
-        }),
+        imports
+            .iter()
+            .any(|i| { i.kind == NyarImportKind::ExportFrom && i.module_specifier == "./re" }),
         "expected Oak export-from, got {imports:?}"
     );
 }
@@ -175,10 +175,17 @@ fn oak_button_surface_preserves_runtime_prop_defaults() {
     use vmz_compiler::sfc::ScriptKind;
 
     let component = include_str!("../../../ui/vmz-ui/src/components/Button.vmz");
-    let source = component.split("<script client>").nth(1).unwrap().split("</script>").next().unwrap();
+    let source =
+        component.split("<script client>").nth(1).unwrap().split("</script>").next().unwrap();
     let decl = try_component_decl_via_oak(ScriptKind::Client, source).expect("Button Oak surface");
-    for (name, expected) in [("type", "\"button\""), ("disabled", "false"), ("loading", "false"), ("onClick", "null")] {
-        let prop = decl.properties.iter().find(|prop| prop.name == name).unwrap_or_else(|| panic!("missing {name}: {decl:?}"));
+    for (name, expected) in
+        [("type", "\"button\""), ("disabled", "false"), ("loading", "false"), ("onClick", "null")]
+    {
+        let prop = decl
+            .properties
+            .iter()
+            .find(|prop| prop.name == name)
+            .unwrap_or_else(|| panic!("missing {name}: {decl:?}"));
         assert_eq!(prop.init_text.as_deref(), Some(expected), "{name}: {prop:?}");
     }
 }

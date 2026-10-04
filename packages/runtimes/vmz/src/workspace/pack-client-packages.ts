@@ -356,7 +356,9 @@ function rewriteTsExt(p) {
 /** oxc AST module specifier rewrite (`.ts`→`.js` + optional exact map). */
 export function rewriteRelativeTsSpecs(js, exactMap = null) {
     const source = String(js ?? '');
-    const hasModuleTsSpecifier = /(?:import\s*(?:[^'"()]*?\s*from\s*)?|export\s+[^'"()]*?\s*from\s*|import\s*\()(['"])[^'"\r\n]+\.tsx?\1/i.test(source);
+    const hasModuleTsSpecifier = /(?:import\s*(?:[^'"()]*?\s*from\s*)?|export\s+[^'"()]*?\s*from\s*|import\s*\()(['"])[^'"\r\n]+\.tsx?\1/i.test(
+        source,
+    );
     const exactKeys = Object.keys(exactMap ?? {});
     const hasExactSpecifier = exactKeys.some((spec) => source.includes(`'${spec}'`) || source.includes(`"${spec}"`));
     if (!hasModuleTsSpecifier && !hasExactSpecifier) {

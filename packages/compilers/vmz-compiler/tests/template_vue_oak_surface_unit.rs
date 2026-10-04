@@ -41,8 +41,15 @@ fn assert_semantic_shape_eq(oak: &SemanticIr, legacy: &SemanticIr, case: &str) {
 enum Shape {
     Text(String),
     Interp(String),
-    Element { tag: String, props: Vec<String>, children: Vec<Shape> },
-    IfChain { branch_tests: Vec<Option<String>>, bodies: Vec<Shape> },
+    Element {
+        tag: String,
+        props: Vec<String>,
+        children: Vec<Shape>,
+    },
+    IfChain {
+        branch_tests: Vec<Option<String>>,
+        bodies: Vec<Shape>,
+    },
     For {
         source: String,
         value_alias: String,
@@ -51,8 +58,14 @@ enum Shape {
         key: Option<String>,
         body: Box<Shape>,
     },
-    SlotOutlet { name: Option<String>, children: Vec<Shape> },
-    SlotTemplate { name: String, body: Box<Shape> },
+    SlotOutlet {
+        name: Option<String>,
+        children: Vec<Shape>,
+    },
+    SlotTemplate {
+        name: String,
+        body: Box<Shape>,
+    },
 }
 
 fn shape_nodes(nodes: &[SemanticNode]) -> Vec<Shape> {
@@ -73,13 +86,7 @@ fn shape_node(node: &SemanticNode) -> Shape {
             bodies: branches.iter().map(|b| shape_node(&b.body)).collect(),
         },
         SemanticNode::ForNode {
-            source,
-            value_alias,
-            key_alias,
-            index_alias,
-            key,
-            body,
-            ..
+            source, value_alias, key_alias, index_alias, key, body, ..
         } => Shape::For {
             source: source.clone(),
             value_alias: value_alias.clone(),
@@ -146,7 +153,10 @@ const AGREED: &[(&str, &str)] = &[
     ("ternary_interp", r#"<span>{{ ok ? 'y' : 'n' }}</span>"#),
     ("hash_slot", r#"<Comp><template #title>T</template></Comp>"#),
     ("v_slot", r#"<Comp><template v-slot:footer>F</template></Comp>"#),
-    ("class_style_plans", r#"<div class="a b" :class="extra" style="color:red" :style="dyn">x</div>"#),
+    (
+        "class_style_plans",
+        r#"<div class="a b" :class="extra" style="color:red" :style="dyn">x</div>"#,
+    ),
     ("on_modifier", r#"<button @click.stop.prevent="go">Go</button>"#),
     ("v_for_aliases", r#"<li v-for="(item, index) in items" :key="index">{{ item }}</li>"#),
     ("v_model_arg", r#"<input v-model:title="doc.title" />"#),
@@ -178,8 +188,7 @@ fn oak_and_legacy_semantic_agree_on_vue_surface_matrix() {
 #[test]
 fn layers_primary_concrete_lowers_to_same_semantic_as_oak_primary() {
     for (name, body) in AGREED {
-        let (concrete, semantic) =
-            parse_template_layers_primary(&body_block(body)).expect(name);
+        let (concrete, semantic) = parse_template_layers_primary(&body_block(body)).expect(name);
         let from_concrete = lower_concrete_to_semantic(&concrete).expect(name);
         assert_eq!(
             shape_nodes(&semantic.roots),

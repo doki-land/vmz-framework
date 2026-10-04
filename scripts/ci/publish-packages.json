@@ -1,0 +1,31 @@
+{
+    "js": [
+        "@vmz/vmz",
+        "@vmz/core",
+        "@vmz/test",
+        "@vmz/protocol",
+        "@vmz/commander",
+        "@vmz/diagnostic",
+        "@vmz/ui",
+        "@vmz/plugin",
+        "@vmz/plugin-katex",
+        "@vmz/plugin-mathjax",
+        "@vmz/plugin-shiki",
+        "@vmz/plugin-markdown-it",
+        "@vmz/plugin-monaco",
+        "@vmz/plugin-codemirror",
+        "@vmz/plugin-mermaid",
+        "@vmz/plugin-echarts",
+        "@vmz/plugin-iconify",
+        "@vmz/ui-icons",
+        "@vmz/vmz-skills"
+    ],
+    "native": [
+        "@vmz/vmz-win32-x64",
+        "@vmz/vmz-win32-arm64",
+        "@vmz/vmz-darwin-x64",
+        "@vmz/vmz-darwin-arm64",
+        "@vmz/vmz-linux-x64",
+        "@vmz/vmz-linux-arm64"
+    ]
+}

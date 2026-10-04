@@ -1267,7 +1267,6 @@ dependencies = [
 [[package]]
 name = "oak-core"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#97d1c3a99f1a9f1ea85a877be7b5b326cb7d2758"
 dependencies = [
  "serde",
  "smallvec",
@@ -1278,7 +1277,6 @@ dependencies = [
 [[package]]
 name = "oak-formatter"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#97d1c3a99f1a9f1ea85a877be7b5b326cb7d2758"
 dependencies = [
  "oak-core",
 ]
@@ -1286,7 +1284,6 @@ dependencies = [
 [[package]]
 name = "oak-typescript"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#97d1c3a99f1a9f1ea85a877be7b5b326cb7d2758"
 dependencies = [
  "oak-core",
  "oak-formatter",
@@ -1296,7 +1293,6 @@ dependencies = [
 [[package]]
 name = "oak-vue"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#97d1c3a99f1a9f1ea85a877be7b5b326cb7d2758"
 dependencies = [
  "oak-core",
  "serde",
@@ -2992,12 +2988,6 @@ dependencies = [
  "oak-core",
  "oak-typescript",
  "oak-vue",
- "oxc_allocator",
- "oxc_ast",
- "oxc_ast_visit",
- "oxc_parser",
- "oxc_span",
- "oxc_syntax",
  "resvg",
  "schemars",
  "serde",
@@ -3032,7 +3022,6 @@ dependencies = [
  "serde",
  "serde_json",
  "vmz-compiler",
- "vmz-generator",
  "vmz-oak-frontend-adapter",
  "walkdir",
 ]

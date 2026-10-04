@@ -1,0 +1,26 @@
+{
+    "name": "@vmz/serverless",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "VMZ edge Fetch host — Cloudflare Workers entry consuming ServerArtifact dist",
+    "scripts": {
+        "stage": "node scripts/stage-vmz-dist.mjs",
+        "dry-run": "wrangler deploy --dry-run",
+        "deploy": "wrangler deploy",
+        "dev": "wrangler dev",
+        "typecheck": "tsc -p tsconfig.json --noEmit",
+        "check:imports": "node scripts/check-worker-imports.mjs"
+    },
+    "devDependencies": {
+        "@cloudflare/workers-types": "^4.20250317.0",
+        "typescript": "^5.8.3",
+        "wrangler": "^4.14.0"
+    },
+    "keywords": [
+        "vmz",
+        "serverless",
+        "cloudflare",
+        "workers"
+    ]
+}

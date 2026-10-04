@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use vmz_compiler::pipeline::compile::{compile_path, CompileOptions};
+use vmz_compiler::pipeline::compile::{CompileOptions, compile_path};
 
 #[test]
 fn counter_button_compile_path_completes() {
@@ -8,5 +8,9 @@ fn counter_button_compile_path_completes() {
     let mut options = CompileOptions::default();
     options.out_dir = std::env::temp_dir().join("vmz-counter-compile");
     let report = compile_path(&path, &options).expect("compile_path");
-    assert!(report.diagnostics.iter().all(|d| !d.is_error()), "diagnostics: {:?}", report.diagnostics);
+    assert!(
+        report.diagnostics.iter().all(|d| !d.is_error()),
+        "diagnostics: {:?}",
+        report.diagnostics
+    );
 }

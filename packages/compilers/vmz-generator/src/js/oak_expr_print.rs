@@ -65,11 +65,8 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
         }
         ExpressionKind::UpdateExpression { operator, argument, prefix } => {
             let inner = print_expr(argument, Prec::Postfix)?;
-            let text = if *prefix {
-                format!("{operator}{inner}")
-            } else {
-                format!("{inner}{operator}")
-            };
+            let text =
+                if *prefix { format!("{operator}{inner}") } else { format!("{inner}{operator}") };
             wrap_prec(text, Prec::Postfix, min_prec)
         }
         ExpressionKind::BinaryExpression { left, operator, right } => {
@@ -162,13 +159,11 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
             };
             wrap_prec(text, Prec::Unary, min_prec)
         }
-        ExpressionKind::ImportExpression { module_specifier } => {
-            wrap_prec(
-                format!("import({})", print_expr(module_specifier, Prec::Lowest)?),
-                Prec::Call,
-                min_prec,
-            )
-        }
+        ExpressionKind::ImportExpression { module_specifier } => wrap_prec(
+            format!("import({})", print_expr(module_specifier, Prec::Lowest)?),
+            Prec::Call,
+            min_prec,
+        ),
         ExpressionKind::ArrowFunction { params, body, async_, .. } => {
             let prefix = if *async_ { "async " } else { "" };
             let params_s = print_params(params)?;
@@ -193,11 +188,7 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
 }
 
 fn wrap_prec(text: String, prec: Prec, min_prec: Prec) -> Option<String> {
-    if prec < min_prec {
-        Some(format!("({text})"))
-    } else {
-        Some(text)
-    }
+    if prec < min_prec { Some(format!("({text})")) } else { Some(text) }
 }
 
 fn binary_prec(op: &str) -> Option<(Prec, Prec)> {

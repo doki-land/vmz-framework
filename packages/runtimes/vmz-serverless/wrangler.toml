@@ -1,0 +1,10 @@
+name = "vmz-homepage-api"
+compatibility_date = "2024-11-01"
+main = "worker/index.ts"
+workers_dev = true
+
+# Staged by `pnpm home:server` → packages/runtimes/vmz-serverless/worker/vmz-dist/
+# Cloudflare Workers Builds: repo root build `pnpm home:server`, deploy `npx wrangler deploy` here.
+
+[vars]
+VMZ_SERVERLESS = "1"

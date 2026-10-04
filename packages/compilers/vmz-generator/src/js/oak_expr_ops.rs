@@ -31,7 +31,10 @@ pub fn collect_template_dep_keys_via_oak(
 }
 
 /// Each-alias property paths via Oak; `None` when Oak cannot lower the snippet.
-pub fn collect_each_alias_prop_paths_via_oak(expr: &str, as_name: &str) -> Option<Vec<Vec<String>>> {
+pub fn collect_each_alias_prop_paths_via_oak(
+    expr: &str,
+    as_name: &str,
+) -> Option<Vec<Vec<String>>> {
     let trimmed = expr.trim();
     if trimmed.is_empty() || as_name.is_empty() {
         return Some(Vec::new());
@@ -168,7 +171,8 @@ fn collect_bind_rewrites(
                                     end: span.end,
                                     text: format!("{name}: {to}"),
                                 });
-                            } else if fields.contains(name.as_str()) && !scope.contains(name.as_str())
+                            } else if fields.contains(name.as_str())
+                                && !scope.contains(name.as_str())
                             {
                                 out.push(Patch::Replace {
                                     start: span.start,
@@ -382,7 +386,8 @@ impl AliasPathCollector<'_> {
             ExpressionKind::MemberExpression { object, property, computed, .. } => {
                 if let Some((root, segs)) = path_from_member(expr) {
                     if root == self.as_name {
-                        let dynamic = segs.iter().any(|s| matches!(s, PathSegment::DynamicIndex(_)));
+                        let dynamic =
+                            segs.iter().any(|s| matches!(s, PathSegment::DynamicIndex(_)));
                         if dynamic {
                             self.push_path(Vec::new());
                         } else {

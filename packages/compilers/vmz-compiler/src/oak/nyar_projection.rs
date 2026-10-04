@@ -132,8 +132,5 @@ fn member_from_method(content_start: usize, method: &MethodDecl) -> NyarMember {
 }
 
 fn abs_span(content_start: usize, start: u32, end: u32) -> ByteSpan {
-    ByteSpan {
-        start: content_start + start as usize,
-        end: content_start + end as usize,
-    }
+    ByteSpan { start: content_start + start as usize, end: content_start + end as usize }
 }

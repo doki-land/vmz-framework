@@ -31,7 +31,11 @@ fn normalize_body(source: &str, settings: &EditorSettings) -> String {
     let mut lines: Vec<String> = source
         .lines()
         .map(|line| {
-            if settings.trim_trailing_whitespace { line.trim_end().to_string() } else { line.to_string() }
+            if settings.trim_trailing_whitespace {
+                line.trim_end().to_string()
+            } else {
+                line.to_string()
+            }
         })
         .collect();
     while lines.last().is_some_and(|line| line.is_empty()) {

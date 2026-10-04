@@ -59,9 +59,7 @@ pub fn lower_vue_root_to_semantic(root: &VueRoot, shell: &str) -> Result<Semanti
 }
 
 /// Prefer Oak concrete + semantic for a template body string, fall back to legacy.
-pub fn parse_template_concrete_body_primary(
-    input: &str,
-) -> Result<ConcreteIr, TemplateParseError> {
+pub fn parse_template_concrete_body_primary(input: &str) -> Result<ConcreteIr, TemplateParseError> {
     Ok(parse_template_layers_primary(&TemplateBlock {
         content: input.to_string(),
         content_start: 0,
@@ -142,10 +140,7 @@ fn lower_oak_siblings(
             VueNode::Text(t) => {
                 let value = slice(shell, t.span).to_string();
                 if !value.trim().is_empty() {
-                    out.push(SemanticNode::Text {
-                        value,
-                        span: to_body_span(shell, t.span),
-                    });
+                    out.push(SemanticNode::Text { value, span: to_body_span(shell, t.span) });
                 }
                 i += 1;
             }
@@ -168,8 +163,7 @@ fn lower_oak_siblings(
                     }
                     Some(ControlFlowKind::ElseIf(_)) => {
                         return Err(TemplateParseError {
-                            message: "`v-else-if` requires a preceding `v-if` / `v-else-if`"
-                                .into(),
+                            message: "`v-else-if` requires a preceding `v-if` / `v-else-if`".into(),
                             offset: span.start as usize,
                         });
                     }
