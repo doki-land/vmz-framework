@@ -1,6 +1,5 @@
 //! Locale runtime modules (`dist/locales/*.js`).
 
-use super::ast_util::oxc_reprint_module_required;
 use super::print::EmittedJs;
 
 /// One exported message function in a locale module.
@@ -86,8 +85,7 @@ pub fn emit_locale_runtime_module(default_locale: &str, exports: &[LocaleExport]
     }
     lines.push(String::new());
     let raw = lines.join("\n");
-    let code = oxc_reprint_module_required(&raw, "locale runtime module");
-    EmittedJs { code, map: None }
+    EmittedJs { code: raw, map: None }
 }
 
 /// One typed-module parameter for [`emit_locale_typed_module`].
