@@ -172,9 +172,28 @@ fn is_excluded(root: &Path, path: &Path, excludes: &[String]) -> bool {
 }
 
 fn glob_matches(relative: &str, pattern: &str) -> bool {
+    if let Some(suffix) = pattern.strip_prefix("**/") {
+        if let Some(suffix) = suffix.strip_suffix("/**") {
+            return relative == suffix
+                || relative.starts_with(&format!("{suffix}/"))
+                || relative.contains(&format!("/{suffix}/"));
+        }
+    }
     if pattern.ends_with("/**") {
         let prefix = pattern.trim_end_matches("/**");
         return relative == prefix || relative.starts_with(&format!("{prefix}/"));
     }
     relative == pattern
+}
+
+#[cfg(test)]
+mod tests {
+    use super::glob_matches;
+
+    #[test]
+    fn matches_nested_generated_directories() {
+        assert!(glob_matches("packages/runtimes/vmz/dist/cli.js", "**/dist/**"));
+        assert!(glob_matches("packages/ui/node_modules/pkg/index.js", "**/node_modules/**"));
+        assert!(!glob_matches("packages/runtimes/vmz/src/cli.ts", "**/dist/**"));
+    }
 }
