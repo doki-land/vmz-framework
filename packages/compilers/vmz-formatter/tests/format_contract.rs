@@ -65,6 +65,7 @@ fn preserves_authoring_boundaries_and_operator_tokens() {
         "type Rows = Array<{ id: string }>;",
         "function fetchRows(): Promise<Row[]> { return load(); }",
         "const suffix = value.slice(0, -suffix.length);",
+        "const isReady = current > threshold;",
         "const value = ready\n    ? load()\n    : fallback;",
     ] {
         let output = format_sample("sample.ts", input);
