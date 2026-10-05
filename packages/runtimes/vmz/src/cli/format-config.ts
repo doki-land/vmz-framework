@@ -31,7 +31,7 @@ export const VMZ_FRAMEWORK_INCLUDES = [
     'nifty.config.ts',
 ] as const;
 
-const DEFAULT_EXCLUDES = ['**/fixtures/**'] as const;
+const DEFAULT_EXCLUDES = ['**/fixtures/**', '**/dist/**', '**/node_modules/**', '**/target/**'] as const;
 
 function isFrameworkMonorepoRoot(projectRoot: string): boolean {
     return existsSync(path.join(projectRoot, 'packages', 'runtimes'));

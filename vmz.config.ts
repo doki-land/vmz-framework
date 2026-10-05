@@ -17,7 +17,7 @@ export default defineConfig({
             'vmz.config.ts',
             'nifty.config.ts',
         ],
-        excludes: ['**/fixtures/**'],
+        excludes: ['**/fixtures/**', '**/dist/**', '**/node_modules/**', '**/target/**'],
         rust: true,
         javascript: true,
         vmz: true,
