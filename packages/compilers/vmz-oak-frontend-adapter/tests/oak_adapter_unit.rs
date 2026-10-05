@@ -181,6 +181,14 @@ fn oak_expression_snippet_accepts_member_and_ternary() {
 }
 
 #[test]
+fn oak_expression_snippet_accepts_vue_expression_boundaries() {
+    for expr in ["type", "(() => toggle(item.id))", "({ id: \"sku-1\" })"] {
+        let parsed = parse_expression_snippet(expr);
+        assert!(parsed.ok, "{expr}: {:?}", parsed.diagnostics);
+    }
+}
+
+#[test]
 fn oak_expression_snippet_rejects_incomplete_binary() {
     let parsed = parse_expression_snippet("1 +");
     assert!(!parsed.ok, "incomplete binary must fail even if Oak is silent");
