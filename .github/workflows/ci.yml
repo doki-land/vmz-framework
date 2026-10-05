@@ -116,8 +116,8 @@ jobs:
           ls packages/runtimes/vmz-linux-x64/vmz.*.node
 
       - name: Check format (`vmz format --check` via `vmz.config` `format`; same as `pnpm fmt:check`)
-        # JS/TS formatter behavior is owned by downstream Nifty contracts.
-        run: pnpm fmt:vmz:check
+        # Formatter behavior is verified by the downstream Rust contract below.
+        run: pnpm vmz format --check --no-javascript --no-rust --no-vmz .
 
   build-test:
     name: Build and Test
@@ -210,6 +210,9 @@ jobs:
 
       - name: Unit tests (textmate / shared packages)
         run: pnpm test:unit:only
+
+      - name: VMZ formatter contract
+        run: cargo test --locked -p vmz-formatter --test format_contract
 
       - name: Verify Chromium
         env:
