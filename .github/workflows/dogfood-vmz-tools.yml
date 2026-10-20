@@ -1,6 +1,6 @@
 # Dogfood — official downstream template `vmz-tools` (engineering bypass).
 # Uses workspace-latest `vmz` (not a published registry pin).
-# Primary tool: monitor GitHub Actions via `vmz github-actions` → Rust octocrab.
+# Primary tool: monitor GitHub Actions via `vmz github-actions` → Rust GitHub REST monitor.
 
 name: Dogfood VMZ Tools
 

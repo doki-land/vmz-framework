@@ -1867,7 +1867,7 @@ pub fn author_json5_to_canonical_json(source: String) -> Result<String> {
     vmz_compiler::locale::author_json5_to_canonical_json(&source).map_err(Error::from_reason)
 }
 
-/// Monitor GitHub Actions via `vmz-github` (octocrab). Request/result are JSON strings.
+/// Monitor GitHub Actions via `vmz-github` (GitHub REST). Request/result are JSON strings.
 ///
 /// Never spawns the `gh` CLI. See `MonitorRequest` / `MonitorResult` in `vmz-github`.
 #[napi(js_name = "githubActionsMonitorJson")]

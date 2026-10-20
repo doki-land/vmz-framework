@@ -1,8 +1,8 @@
 name: VMZ Tools
 description: >-
   Downstream template for the VMZ tool collection. First tool monitors GitHub
-  Actions by spawning the product CLI (`vmz github-actions`), which calls Rust
-  octocrab via N-API. No Octokit / gh CLI inside this Action.
+  Actions by spawning the product CLI (`vmz github-actions`), which calls the
+  Rust GitHub REST monitor via N-API. No Octokit / gh CLI inside this Action.
   uses: doki-land/vmz-framework/.github/actions/vmz-tools@<ref>
 
 inputs:

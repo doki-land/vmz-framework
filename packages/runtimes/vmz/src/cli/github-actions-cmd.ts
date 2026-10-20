@@ -1,5 +1,5 @@
 /**
- * `vmz github-actions` — monitor workflow runs via N-API → Rust `vmz-github` (octocrab).
+ * `vmz github-actions` — monitor workflow runs via N-API → Rust `vmz-github` (GitHub REST).
  */
 
 import type { Cli, ParsedOptions } from '@vmz/commander';

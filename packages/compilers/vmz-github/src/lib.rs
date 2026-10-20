@@ -1,9 +1,8 @@
-//! GitHub Actions monitoring via `octocrab` (GitHub REST). Never spawns `gh`.
+//! GitHub Actions monitoring over the GitHub REST API. Never spawns `gh`.
 
 use std::time::{Duration, Instant};
 
-use octocrab::Octocrab;
-use octocrab::models::RunId;
+use request::{HttpTransport, Method, Request, Transport, Url};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -68,7 +67,7 @@ pub enum MonitorError {
     #[error("{0}")]
     Message(String),
     #[error(transparent)]
-    Octocrab(#[from] octocrab::Error),
+    Request(#[from] request::RequestError),
     #[error(transparent)]
     Serde(#[from] serde_json::Error),
 }
@@ -79,18 +78,10 @@ impl MonitorError {
     }
 }
 
-/// Run monitor (blocking). Builds a current-thread Tokio runtime.
+/// Run monitor on the calling thread.
 pub fn monitor_blocking(request: MonitorRequest) -> Result<MonitorResult, MonitorError> {
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| MonitorError::msg(format!("tokio runtime: {e}")))?;
-    rt.block_on(monitor(request))
-}
-
-pub async fn monitor(request: MonitorRequest) -> Result<MonitorResult, MonitorError> {
-    let crab = build_client(request.token.as_deref())?;
-    let mut run = resolve_run(&crab, &request).await?;
+    let transport = HttpTransport::new();
+    let mut run = resolve_run(&transport, &request)?;
 
     if request.mode == MonitorMode::Status {
         return Ok(run);
@@ -107,8 +98,8 @@ pub async fn monitor(request: MonitorRequest) -> Result<MonitorResult, MonitorEr
                 request.timeout_secs, run.run_id, run.status
             )));
         }
-        tokio::time::sleep(interval).await;
-        run = fetch_run(&crab, &request.owner, &request.repo, run.run_id).await?;
+        std::thread::sleep(interval);
+        run = fetch_run(&transport, &request, run.run_id)?;
     }
 
     let required = request.required_conclusion.trim().to_ascii_lowercase();
@@ -122,19 +113,12 @@ pub async fn monitor(request: MonitorRequest) -> Result<MonitorResult, MonitorEr
     Ok(run)
 }
 
-fn build_client(token: Option<&str>) -> Result<Octocrab, MonitorError> {
-    match token.map(str::trim).filter(|t| !t.is_empty()) {
-        Some(t) => Ok(Octocrab::builder().personal_token(t.to_string()).build()?),
-        None => Ok(Octocrab::builder().build()?),
-    }
-}
-
-async fn resolve_run(
-    crab: &Octocrab,
+fn resolve_run(
+    transport: &HttpTransport,
     request: &MonitorRequest,
 ) -> Result<MonitorResult, MonitorError> {
     if let Some(id) = request.run_id {
-        return fetch_run(crab, &request.owner, &request.repo, id).await;
+        return fetch_run(transport, request, id);
     }
 
     let workflow = request
@@ -144,20 +128,31 @@ async fn resolve_run(
         .filter(|s| !s.is_empty())
         .ok_or_else(|| MonitorError::msg("provide workflow (file name or id) or runId"))?;
 
-    let workflows = crab.workflows(&request.owner, &request.repo);
-    let mut builder = workflows.list_runs(workflow).per_page(30u8);
-
-    if let Some(branch) = request.branch.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-        builder = builder.branch(branch);
+    let mut url = api_url(&[
+        "repos",
+        &request.owner,
+        &request.repo,
+        "actions",
+        "workflows",
+        workflow,
+        "runs",
+    ])?;
+    {
+        let mut query = url.query_pairs_mut();
+        query.append_pair("per_page", "30");
+        if let Some(branch) = request.branch.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            query.append_pair("branch", branch);
+        }
     }
 
-    let page = builder.send().await?;
-    let mut runs = page.items;
+    let body = get_json(transport, request.token.as_deref(), url)?;
+    let page: RunsJson = serde_json::from_value(body)?;
+    let mut runs = page.workflow_runs;
     if let Some(sha) = request.head_sha.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         let sha_lower = sha.to_ascii_lowercase();
-        runs.retain(|r| {
-            r.head_sha.to_ascii_lowercase().starts_with(&sha_lower)
-                || sha_lower.starts_with(&r.head_sha.to_ascii_lowercase())
+        runs.retain(|run| {
+            run.head_sha.to_ascii_lowercase().starts_with(&sha_lower)
+                || sha_lower.starts_with(&run.head_sha.to_ascii_lowercase())
         });
     }
 
@@ -165,26 +160,75 @@ async fn resolve_run(
         .into_iter()
         .next()
         .ok_or_else(|| MonitorError::msg("no matching workflow run found"))?;
-
     Ok(map_workflow_run(&first))
 }
 
-async fn fetch_run(
-    crab: &Octocrab,
-    owner: &str,
-    repo: &str,
+fn fetch_run(
+    transport: &HttpTransport,
+    request: &MonitorRequest,
     run_id: u64,
 ) -> Result<MonitorResult, MonitorError> {
-    let run = crab.workflows(owner, repo).get(RunId(run_id)).await?;
+    let run_id = run_id.to_string();
+    let url = api_url(&["repos", &request.owner, &request.repo, "actions", "runs", &run_id])?;
+    let body = get_json(transport, request.token.as_deref(), url)?;
+    let run: RunJson = serde_json::from_value(body)?;
     Ok(map_workflow_run(&run))
 }
 
-fn map_workflow_run(run: &octocrab::models::workflows::Run) -> MonitorResult {
+fn api_url(segments: &[&str]) -> Result<Url, MonitorError> {
+    let mut url =
+        Url::parse("https://api.github.com/").map_err(|err| MonitorError::msg(err.to_string()))?;
+    url.path_segments_mut()
+        .map_err(|_| MonitorError::msg("GitHub API base URL cannot carry path segments"))?
+        .extend(segments);
+    Ok(url)
+}
+
+fn get_json(
+    transport: &HttpTransport,
+    token: Option<&str>,
+    url: Url,
+) -> Result<serde_json::Value, MonitorError> {
+    let mut request = Request::new(Method::Get, url)
+        .with_header("Accept", "application/vnd.github+json")
+        .with_header("User-Agent", "vmz-github");
+    if let Some(token) = token.map(str::trim).filter(|token| !token.is_empty()) {
+        request.set_header("Authorization", format!("Bearer {token}"));
+    }
+    let response = transport.send(&request)?;
+    if !response.is_success() {
+        return Err(MonitorError::msg(format!(
+            "GitHub API {}: {}",
+            response.status,
+            String::from_utf8_lossy(&response.body)
+        )));
+    }
+    serde_json::from_slice(&response.body).map_err(MonitorError::Serde)
+}
+
+#[derive(Debug, Deserialize)]
+struct RunsJson {
+    workflow_runs: Vec<RunJson>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RunJson {
+    id: u64,
+    status: String,
+    #[serde(default)]
+    conclusion: Option<String>,
+    html_url: String,
+    name: String,
+    #[serde(default)]
+    head_sha: String,
+}
+
+fn map_workflow_run(run: &RunJson) -> MonitorResult {
     MonitorResult {
-        run_id: run.id.0,
+        run_id: run.id,
         status: run.status.clone(),
         conclusion: run.conclusion.clone(),
-        html_url: run.html_url.to_string(),
+        html_url: run.html_url.clone(),
         name: Some(run.name.clone()),
     }
 }
@@ -217,6 +261,18 @@ mod tests {
         assert_eq!(back.mode, MonitorMode::Status);
         assert_eq!(back.workflow.as_deref(), Some("ci.yml"));
         assert_eq!(back.timeout_secs, 60);
+    }
+
+    #[test]
+    fn maps_a_workflow_run_payload() {
+        let run: RunJson = serde_json::from_str(
+            r#"{"id":7,"status":"completed","conclusion":"success","html_url":"https://github.com/o/r/actions/runs/7","name":"CI","head_sha":"abc"}"#,
+        )
+        .unwrap();
+        let result = map_workflow_run(&run);
+        assert_eq!(result.run_id, 7);
+        assert_eq!(result.conclusion.as_deref(), Some("success"));
+        assert_eq!(result.name.as_deref(), Some("CI"));
     }
 
     #[test]

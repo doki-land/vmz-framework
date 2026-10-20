@@ -46,7 +46,7 @@
     "cli.cmd.refactor": "DX rename plans / apply",
     "cli.cmd.refactor.rename": "Plan or apply a workspace rename",
     "cli.cmd.explain": "DX causal explain",
-    "cli.cmd.github-actions": "Monitor GitHub Actions via Rust octocrab (status|wait)",
+    "cli.cmd.github-actions": "Monitor GitHub Actions via Rust GitHub REST monitor (status|wait)",
     "cli.cmd.plan": "Dump frozen Rust plans via N-API",
     "cli.cmd.plan.locale": "LocalePlan from locales/",
     "cli.cmd.plan.document-route": "DocumentRoutePlan from documents/",

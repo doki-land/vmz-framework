@@ -58,7 +58,7 @@ yaml_serde = "0.10.6"
 sha2 = "0.11.0"
 thiserror = "2.0.20"
 walkdir = "2.5.0"
-octocrab = "0.44"
+request = { git = "https://github.com/oovm/rust-boost", branch = "dev" }
 tokio = { version = "1", features = ["rt", "time", "macros"] }
 
 napi = { version = "3.12.1", default-features = true, features = ["napi4"] }
