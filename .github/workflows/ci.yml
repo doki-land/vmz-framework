@@ -205,7 +205,7 @@ jobs:
         run: pnpm test:unit:only
 
       - name: VMZ formatter contract
-        run: cargo test --locked -p vmz-formatter --test format_contract
+        run: cargo test -p vmz-formatter --test format_contract
 
       - name: Verify Chromium
         env:

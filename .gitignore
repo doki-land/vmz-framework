@@ -13,6 +13,7 @@
 # Rust
 .cargo/config.toml
 .cargo/config.toml.local
+Cargo.lock
 target/
 *.node
 *.wasm
