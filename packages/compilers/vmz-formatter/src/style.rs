@@ -167,6 +167,9 @@ fn flush_line(
 
 fn normalize_fragment(fragment: &str, declaration: bool) -> String {
     let mut value = fragment.split_whitespace().collect::<Vec<_>>().join(" ");
+    // Joining a multi-line value inserts a space after `(` and before `)`, so
+    // `color-mix(\n  in srgb` would become `color-mix( in srgb`.
+    value = value.replace("( ", "(").replace(" )", ")");
     if declaration {
         if let Some(colon) = value.find(':') {
             let (left, right) = value.split_at(colon);

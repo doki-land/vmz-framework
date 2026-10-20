@@ -390,3 +390,21 @@ fn non_ts_server_lang_is_not_rewritten_by_js_formatter() {
     assert!(out.contains("lang=\"rust\""), "{out}");
     assert!(out.contains("fn  weird"), "non-TS body must stay: {out}");
 }
+
+#[test]
+fn style_keeps_rule_gaps_and_compacts_function_parens() {
+    let dir = temp_dir("style-gaps");
+    write(&dir.join(".editorconfig"), "root = true\n[*]\nindent_size = 4\nend_of_line = lf\ninsert_final_newline = true\n");
+    let file = dir.join("Card.vmz");
+    write(
+        &file,
+        "<template>\n  <div class=\"a\" />\n</template>\n<style>\n.a {\n    background: color-mix(\n        in srgb,\n        var(--paper) 12%,\n        transparent\n    );\n}\n\n.b {\n    display: block;\n}\n</style>\n<script client>\nexport default class Card {}\n</script>\n",
+    );
+
+    format_path(&file, &FormatOptions { check: false }).unwrap();
+    let out = fs::read_to_string(&file).unwrap();
+    assert!(out.contains("color-mix(in srgb, var(--paper) 12%, transparent)"), "join must not pad parens: {out}");
+    assert!(out.contains("}\n\n.b {"), "blank line between rules must survive: {out}");
+    format_path(&file, &FormatOptions { check: false }).unwrap();
+    assert_eq!(out, fs::read_to_string(&file).unwrap(), "style gaps must be idempotent");
+}
