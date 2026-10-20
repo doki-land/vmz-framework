@@ -7,13 +7,13 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use fs_tools::walk::Walker;
 use vmz_protocol::{
     APPLICATION_CROSS_LINK_SCHEMA, APPLICATION_HOST_COMPOSITION_SCHEMA, ApplicationArtifact,
     ApplicationCatalog, ApplicationDiagnostic, ApplicationHostCompositionReport, ApplicationId,
     ApplicationMountTable, CrossApplicationLink, DIAG_MOUNT_UNREACHABLE, DIAG_ROUTE_NOT_PUBLIC,
     DIAG_UNKNOWN_REFERENCE,
 };
-use walkdir::WalkDir;
 
 use crate::application_artifact::check_application_artifact_boundary;
 use crate::application_reloc::join_application_base;
@@ -88,7 +88,7 @@ fn scan_cross_application_links(host_root: &Path) -> Vec<RawLink> {
     let mut out = Vec::new();
     let src = host_root.join("src");
     let walk_root = if src.is_dir() { src } else { host_root.to_path_buf() };
-    for entry in WalkDir::new(&walk_root).into_iter().filter_map(|e| e.ok()) {
+    for entry in Walker::new(&walk_root).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         if !path.is_file() {
             continue;

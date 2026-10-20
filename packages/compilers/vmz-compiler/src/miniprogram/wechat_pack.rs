@@ -11,9 +11,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use fs_tools::walk::Walker;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use walkdir::WalkDir;
 
 use vmz_protocol::{
     CheckReportStatus, DIAG_ARTIFACT_INVALID, Severity, TargetDiagnostic, VmzModuleKind,
@@ -178,7 +178,7 @@ fn collect_program_json(root: &Path) -> Vec<PathBuf> {
         if !search.exists() {
             continue;
         }
-        for entry in WalkDir::new(search).into_iter().filter_map(|e| e.ok()) {
+        for entry in Walker::new(search).into_iter().filter_map(|e| e.ok()) {
             let p = entry.path();
             if p.starts_with(&pack) {
                 continue;

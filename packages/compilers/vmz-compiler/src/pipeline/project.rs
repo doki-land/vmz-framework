@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use walkdir::WalkDir;
+use fs_tools::walk::{Filter, Walker};
 
 /// Closed `.vmz` module kind — owned by `vmz-protocol` (wire / DX shared).
 pub use vmz_protocol::VmzModuleKind;
@@ -14,10 +14,17 @@ pub fn discover_vmz_files(root: impl AsRef<Path>) -> Vec<(PathBuf, VmzModuleKind
     let root = root.as_ref();
     let mut out = Vec::new();
     let mut seen = BTreeSet::new();
+    let walk_root = root.to_path_buf();
 
-    for entry in WalkDir::new(root)
+    for entry in Walker::new(root)
+        .filter(move |entry| {
+            if should_skip_dir(entry.path(), &walk_root) {
+                Filter::IgnoreFolder
+            } else {
+                Filter::Continue
+            }
+        })
         .into_iter()
-        .filter_entry(|e| !should_skip_dir(e.path(), root))
         .filter_map(|e| e.ok())
     {
         let path = entry.path();
@@ -109,7 +116,7 @@ fn discover_dependency_components(root: &Path) -> Vec<(PathBuf, VmzModuleKind)> 
         if !components.is_dir() {
             continue;
         }
-        for entry in WalkDir::new(&components).into_iter().filter_map(|e| e.ok()) {
+        for entry in Walker::new(&components).into_iter().filter_map(|e| e.ok()) {
             let path = entry.path();
             if !path.is_file() {
                 continue;

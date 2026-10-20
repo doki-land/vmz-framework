@@ -7,6 +7,7 @@
 use std::fs;
 use std::path::Path;
 
+use fs_tools::walk::Walker;
 use vmz_protocol::{
     APPLICATION_BASE_SCHEMA, APPLICATION_RELOCATABLE_CHECK_SCHEMA, APPLICATION_RELOCATED_SCHEMA,
     APPLICATION_RELOCATION_SCHEMA, ApplicationBase, ApplicationDescriptor, ApplicationDiagnostic,
@@ -14,7 +15,6 @@ use vmz_protocol::{
     ApplicationSourceSpan, DIAG_INVALID_BASE, DIAG_INVALID_DESCRIPTOR, DIAG_NON_RELOCATABLE_URL,
     LogicalUrlEntry, LogicalUrlKind, RelocatedApplicationUrls, RelocatedUrlEntry,
 };
-use walkdir::WalkDir;
 
 use crate::application::{check_applications, normalize_route_base};
 
@@ -343,7 +343,7 @@ pub fn scan_non_relocatable_urls(
         if !root.exists() {
             continue;
         }
-        for entry in WalkDir::new(&root).into_iter().filter_map(|e| e.ok()) {
+        for entry in Walker::new(&root).into_iter().filter_map(|e| e.ok()) {
             let path = entry.path();
             if !path.is_file() {
                 continue;

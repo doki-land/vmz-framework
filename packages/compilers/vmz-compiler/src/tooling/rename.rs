@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use walkdir::WalkDir;
+use fs_tools::walk::Walker;
 
 use vmz_protocol::{
     ExplainEdge, REFERENCE_SCHEMA, Reference, RenameIntent, ReportedDiagnostic, SYMBOL_SCHEMA,
@@ -179,7 +179,7 @@ pub fn apply_workspace_edits(root: &Path, plan: &WorkspaceEditPlan) -> Workspace
 pub fn index_test_chunk_edges(root: &Path) -> Vec<(String, String, String)> {
     // (chunkId, testId, manifestRel)
     let mut out = Vec::new();
-    for entry in WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
+    for entry in Walker::new(root).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         if !path.is_file() {
             continue;
@@ -434,7 +434,7 @@ fn collect_field_refs(
 
 fn iter_source_files(root: &Path, scope: Option<&str>) -> Vec<(String, String)> {
     let mut out = Vec::new();
-    for entry in WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
+    for entry in Walker::new(root).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         if !path.is_file() {
             continue;

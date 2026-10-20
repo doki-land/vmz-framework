@@ -8,8 +8,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use fs_tools::walk::Walker;
 use serde_json::Value;
-use walkdir::WalkDir;
 
 use vmz_protocol::{
     DIAG_DOM_LEAK_IN_PLAN, DIAG_UNKNOWN_VIEW_OP, MiniProgramArtifact, PlatformCapabilityProfile,
@@ -116,7 +116,7 @@ fn collect_program_json(root: &Path) -> Vec<PathBuf> {
         if !search.exists() {
             continue;
         }
-        for entry in WalkDir::new(search).into_iter().filter_map(|e| e.ok()) {
+        for entry in Walker::new(search).into_iter().filter_map(|e| e.ok()) {
             let p = entry.path();
             let name = p.file_name().and_then(|s| s.to_str()).unwrap_or("");
             if p.is_file() && name.ends_with(".program.json") {

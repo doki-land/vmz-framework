@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use fs_tools::walk::Walker;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -22,7 +23,6 @@ use crate::tw::{TwCompilerHandle, TwEmitRequest, register_tw_from_parsed};
 use crate::virtual_server;
 use vmz_protocol::SourceSpan;
 use vmz_types::{DeploymentClientCall, DeploymentView, ProgramModule, StubStatus};
-use walkdir::WalkDir;
 
 /// Schema id written into `vmz-deployment.json`.
 pub const DEPLOYMENT_SCHEMA: &str = "vmz.deployment.v0";
@@ -900,7 +900,7 @@ fn emit_server_tree(
     if !server_root.is_dir() {
         return Ok(());
     }
-    for entry in WalkDir::new(&server_root).into_iter().filter_map(|e| e.ok()) {
+    for entry in Walker::new(&server_root).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) != Some("ts") {
             continue;
@@ -958,7 +958,7 @@ fn emit_client_modules(
     let dirty_set: std::collections::BTreeSet<PathBuf> =
         dirty.iter().map(|p| std::fs::canonicalize(p).unwrap_or_else(|_| p.clone())).collect();
     let server_root = src_root.join("server");
-    for entry in WalkDir::new(src_root).into_iter().filter_map(|e| e.ok()) {
+    for entry in Walker::new(src_root).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         if !path.is_file() {
             continue;

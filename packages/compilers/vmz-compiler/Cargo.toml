@@ -24,4 +24,4 @@ vmz-types.workspace = true
 vmz-generator.workspace = true
 vmz-oak-frontend-adapter.workspace = true
 resvg = "0.45.1"
-walkdir.workspace = true
+fs-tools.workspace = true

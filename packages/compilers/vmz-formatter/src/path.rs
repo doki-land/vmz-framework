@@ -3,10 +3,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use fs_tools::walk::{Filter, Walker};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use vmz_compiler::{ReportedDiagnostic, parse_vmz};
-use walkdir::WalkDir;
 
 use crate::document::VmzDocument;
 use crate::editorconfig::{EditorSettings, resolve_for_path};
@@ -61,10 +61,13 @@ pub fn format_path(
 
 fn discover_local_vmz_files(root: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
-    for entry in WalkDir::new(root)
-        .into_iter()
-        .filter_entry(|e| !should_skip_dir(e.path()))
-        .filter_map(|e| e.ok())
+    for entry in
+        Walker::new(root)
+            .filter(|entry| {
+                if should_skip_dir(entry.path()) { Filter::IgnoreFolder } else { Filter::Continue }
+            })
+            .into_iter()
+            .filter_map(|e| e.ok())
     {
         let path = entry.path();
         if !path.is_file() {

@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use walkdir::WalkDir;
+use fs_tools::walk::Walker;
 
 use vmz_protocol::{
     CODE_ACTION_SCHEMA, CodeAction, CodeActionKind, REFERENCE_SCHEMA, Reference, RenameIntent,
@@ -577,7 +577,7 @@ fn collect_capability_edits(
 
 fn list_vmz_files(root: &Path) -> Vec<(String, PathBuf)> {
     let mut out = Vec::new();
-    for entry in WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
+    for entry in Walker::new(root).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         if !path.is_file() {
             continue;

@@ -9,9 +9,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use fs_tools::walk::Walker;
 use serde::Serialize;
 use serde_json::{Value, json};
-use walkdir::WalkDir;
 
 use vmz_generator::MiniTemplateProfile;
 use vmz_protocol::{
@@ -218,7 +218,7 @@ fn collect_program_json(root: &Path) -> Vec<PathBuf> {
         if !search.exists() {
             continue;
         }
-        for entry in WalkDir::new(search).into_iter().filter_map(|e| e.ok()) {
+        for entry in Walker::new(search).into_iter().filter_map(|e| e.ok()) {
             let p = entry.path();
             let name = p.file_name().and_then(|s| s.to_str()).unwrap_or("");
             if p.is_file() && name.ends_with(".program.json") {

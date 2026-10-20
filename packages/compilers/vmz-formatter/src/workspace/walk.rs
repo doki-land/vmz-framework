@@ -1,8 +1,16 @@
 use std::path::{Path, PathBuf};
 
-use walkdir::WalkDir;
+use fs_tools::walk::{Filter, Walker};
 
 const SKIP_DIRS: &[&str] = &["node_modules", "target", ".git", "dist", ".cache", "fixtures"];
+
+fn skip_dir(entry: &fs_tools::walk::Entry) -> Filter {
+    let name = entry.file_name().to_string_lossy();
+    if SKIP_DIRS.iter().any(|skip| skip == &name) {
+        return Filter::IgnoreFolder;
+    }
+    Filter::Continue
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct DiscoverOptions {
@@ -120,30 +128,16 @@ fn collect_root_sources(root: &Path, out: &mut Vec<PathBuf>) {
 }
 
 fn collect_full_repo(root: &Path, out: &mut Vec<PathBuf>) {
-    for entry in WalkDir::new(root)
-        .into_iter()
-        .filter_entry(|e| {
-            let name = e.file_name().to_string_lossy();
-            !SKIP_DIRS.iter().any(|skip| skip == &name)
-        })
-        .filter_map(Result::ok)
-    {
-        if entry.file_type().is_file() && is_format_target(entry.path()) {
+    for entry in Walker::new(root).filter(skip_dir).into_iter().filter_map(Result::ok) {
+        if entry.is_file() && is_format_target(entry.path()) {
             out.push(entry.path().to_path_buf());
         }
     }
 }
 
 fn collect_tree(root: &Path, out: &mut Vec<PathBuf>) {
-    for entry in WalkDir::new(root)
-        .into_iter()
-        .filter_entry(|e| {
-            let name = e.file_name().to_string_lossy();
-            !SKIP_DIRS.iter().any(|skip| skip == &name)
-        })
-        .filter_map(Result::ok)
-    {
-        if !entry.file_type().is_file() {
+    for entry in Walker::new(root).filter(skip_dir).into_iter().filter_map(Result::ok) {
+        if !entry.is_file() {
             continue;
         }
         let path = entry.path().to_path_buf();

@@ -326,6 +326,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "fs-tools"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?branch=dev#0b47ed7965a42e566d611f3439c2327b6d591df0"
+dependencies = [
+ "random",
+]
+
+[[package]]
 name = "futures"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -928,6 +936,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
 
 [[package]]
+name = "random"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?branch=dev#0b47ed7965a42e566d611f3439c2327b6d591df0"
+
+[[package]]
 name = "rayon"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1036,7 +1049,7 @@ dependencies = [
  "getrandom 0.2.17",
  "libc",
  "untrusted",
- "windows-sys 0.52.0",
+ "windows-sys",
 ]
 
 [[package]]
@@ -1108,15 +1121,6 @@ name = "ryu"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
-
-[[package]]
-name = "same-file"
-version = "1.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
-dependencies = [
- "winapi-util",
-]
 
 [[package]]
 name = "sasso"
@@ -1639,6 +1643,7 @@ dependencies = [
 name = "vmz-compiler"
 version = "0.1.0"
 dependencies = [
+ "fs-tools",
  "json5",
  "oak-core",
  "oak-typescript",
@@ -1654,7 +1659,6 @@ dependencies = [
  "vmz-oak-frontend-adapter",
  "vmz-protocol",
  "vmz-types",
- "walkdir",
 ]
 
 [[package]]
@@ -1671,6 +1675,7 @@ name = "vmz-formatter"
 version = "0.1.0"
 dependencies = [
  "editorconfig",
+ "fs-tools",
  "json5",
  "oak-typescript",
  "schemars",
@@ -1678,7 +1683,6 @@ dependencies = [
  "serde_json",
  "vmz-compiler",
  "vmz-oak-frontend-adapter",
- "walkdir",
 ]
 
 [[package]]
@@ -1785,16 +1789,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "walkdir"
-version = "2.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29790946404f91d9c5d06f9874efddea1dc06c5efe94541a7d6863108e3a5e4b"
-dependencies = [
- "same-file",
- "winapi-util",
-]
-
-[[package]]
 name = "wasi"
 version = "0.11.1+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1816,15 +1810,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a28ac98ddc8b9274cb41bb4d9d4d5c425b6020c50c46f25559911905610b4a88"
 
 [[package]]
-name = "winapi-util"
-version = "0.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
-dependencies = [
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "windows-link"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1837,15 +1822,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d"
 dependencies = [
  "windows-targets",
-]
-
-[[package]]
-name = "windows-sys"
-version = "0.61.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
-dependencies = [
- "windows-link",
 ]
 
 [[package]]
