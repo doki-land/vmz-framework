@@ -2,6 +2,7 @@
 mod deps;
 mod emit_compat;
 mod emit_ir;
+mod erase;
 pub mod expr_parse;
 pub mod helpers;
 mod locale;
@@ -17,6 +18,7 @@ pub use emit_compat::{
     rewrite_ts_spec_imports, rewrite_virtual_import,
 };
 pub use emit_ir::{IrDepCursor, TakenBinding, TakenCfBranch, TakenControlFlow};
+pub use erase::erase_types;
 pub use entry::{EntryComponent, emit_serve_entry_client, emit_serve_entry_event};
 pub use expr_parse::{
     SnippetSpan, print_template_expr, template_expr_root_span, template_expr_snippet_error,

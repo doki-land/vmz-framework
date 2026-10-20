@@ -1,4 +1,5 @@
 //! JavaScript artifact printing through Oak TypeScript parsing.
+use super::erase::erase_types;
 use std::path::PathBuf;
 /// JS output.
 #[derive(Debug, Clone)]
@@ -40,43 +41,11 @@ pub fn print_js_source(
     if !vmz_oak_frontend_adapter::parse_script_ast(&shell).ok {
         return Err("Oak TypeScript parse failed".into());
     }
-    let formatted = erase_types(source);
+    let formatted = erase_types(source)?;
     let code = if options.minify {
         formatted.lines().map(str::trim).filter(|l| !l.is_empty()).collect::<Vec<_>>().join("\n")
     } else {
         formatted
     };
     Ok(EmittedJs { code, map: options.source_map_path.as_ref().map(|_| "{}".into()) })
-}
-
-fn erase_types(source: &str) -> String {
-    let mut out = String::with_capacity(source.len());
-    for line in source.lines() {
-        let trimmed = line.trim_start();
-        if trimmed.starts_with("interface ") || trimmed.starts_with("type ") {
-            continue;
-        }
-        let mut line = line.to_string();
-        for keyword in ["public ", "private ", "protected ", "readonly "] {
-            line = line.replace(keyword, "");
-        }
-        line = strip_as_type(&line);
-        out.push_str(&line);
-        out.push('\n');
-    }
-    out
-}
-
-fn strip_as_type(line: &str) -> String {
-    let mut out = String::with_capacity(line.len());
-    let mut rest = line;
-    while let Some(pos) = rest.find(" as ") {
-        out.push_str(&rest[..pos]);
-        let tail = &rest[pos + 4..];
-        let end =
-            tail.find(|c: char| matches!(c, ',' | ';' | ')' | '}' | '\n')).unwrap_or(tail.len());
-        rest = &tail[end..];
-    }
-    out.push_str(rest);
-    out
 }

@@ -18,6 +18,7 @@ thiserror.workspace = true
 vmz-protocol.workspace = true
 vmz-types.workspace = true
 vmz-oak-frontend-adapter.workspace = true
+oak-core.workspace = true
 oak-typescript.workspace = true
 
 [dev-dependencies]
