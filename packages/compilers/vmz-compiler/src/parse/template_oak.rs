@@ -5,7 +5,7 @@ use core::range::Range;
 use oak_vue::{VueAttribute, VueElement, VueNode, VueRoot};
 use vmz_oak_frontend_adapter::{TemplateShellInput, parse_template_ast};
 
-use super::template_common::TemplateParseError;
+use super::template_common::{TemplateParseError, decode_html_entities};
 use super::template_concrete::{ConcreteAttr, ConcreteIr, ConcreteNode, classify_concrete_attr};
 use super::template_semantic::{
     ControlFlowKind, IfBranch, SemanticIr, SemanticNode, control_flow_kind, if_chain_from_branches,
@@ -138,7 +138,7 @@ fn lower_oak_siblings(
         match &nodes[i] {
             VueNode::Comment(_) => i += 1,
             VueNode::Text(t) => {
-                let value = slice(shell, t.span).to_string();
+                let value = decode_html_entities(slice(shell, t.span));
                 if !value.trim().is_empty() {
                     out.push(SemanticNode::Text { value, span: to_body_span(shell, t.span) });
                 }
@@ -261,7 +261,7 @@ fn lower_node(shell: &str, node: &VueNode) -> Result<ConcreteNode, String> {
             Ok(ConcreteNode::Element { tag, attrs, children, span: to_body_span(shell, el.span) })
         }
         VueNode::Text(t) => {
-            let value = slice(shell, t.span).to_string();
+            let value = decode_html_entities(slice(shell, t.span));
             Ok(ConcreteNode::Text { value, span: to_body_span(shell, t.span) })
         }
         VueNode::Interpolation(i) => {
@@ -278,9 +278,9 @@ fn lower_attr(shell: &str, attr: &VueAttribute) -> Result<ConcreteAttr, String> 
     match attr {
         VueAttribute::Attribute(a) => {
             let name = slice(shell, a.name);
-            let value = a.value.as_ref().map(|v| slice(shell, v.span));
+            let value = a.value.as_ref().map(|v| decode_html_entities(slice(shell, v.span)));
             let span = to_body_span(shell, a.span);
-            classify_concrete_attr(name, value, span).map_err(|e| e.message)
+            classify_concrete_attr(name, value.as_deref(), span).map_err(|e| e.message)
         }
         VueAttribute::Directive(d) => {
             let mut raw = slice(shell, d.span).to_string();
@@ -299,7 +299,10 @@ fn lower_attr(shell: &str, attr: &VueAttribute) -> Result<ConcreteAttr, String> 
                 }
             }
             let (name, value) = if let Some((name, rest)) = raw.split_once('=') {
-                (name.trim().to_string(), Some(unquote_attr_value(rest.trim())))
+                (
+                    name.trim().to_string(),
+                    Some(decode_html_entities(&unquote_attr_value(rest.trim()))),
+                )
             } else {
                 (raw.trim().to_string(), None)
             };
