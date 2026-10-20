@@ -27,6 +27,7 @@ fn format_css(source: &str, settings: &EditorSettings) -> Result<String, String>
     let mut escaped = false;
     let mut block_comment = false;
     let mut line_comment = false;
+    let mut layout = LineState::default();
     let chars: Vec<char> = source.replace("\r\n", "\n").replace('\r', "\n").chars().collect();
     let mut index = 0usize;
 
@@ -47,7 +48,7 @@ fn format_css(source: &str, settings: &EditorSettings) -> Result<String, String>
         if line_comment {
             if ch == '\n' {
                 line_comment = false;
-                flush_line(&mut output, &mut current, depth, &unit, nl, false);
+                flush_line(&mut output, &mut current, depth, &unit, nl, false, &mut layout);
             } else {
                 current.push(ch);
             }
@@ -92,25 +93,35 @@ fn format_css(source: &str, settings: &EditorSettings) -> Result<String, String>
                 if header.is_empty() {
                     return Err("style block contains an empty rule header".to_string());
                 }
-                write_line(&mut output, depth, &unit, &format!("{header} {{"), nl);
+                write_line(&mut output, depth, &unit, &format!("{header} {{"), nl, &mut layout);
                 current.clear();
                 depth += 1;
             }
             '}' => {
-                flush_line(&mut output, &mut current, depth, &unit, nl, false);
+                flush_line(&mut output, &mut current, depth, &unit, nl, false, &mut layout);
                 if depth == 0 {
                     return Err("style block contains an unmatched closing brace".to_string());
                 }
                 depth -= 1;
-                write_line(&mut output, depth, &unit, "}", nl);
+                layout.blank_line = false;
+                write_line(&mut output, depth, &unit, "}", nl, &mut layout);
             }
             ';' => {
                 current.push(';');
-                flush_line(&mut output, &mut current, depth, &unit, nl, true);
+                flush_line(&mut output, &mut current, depth, &unit, nl, true, &mut layout);
             }
             '\n' => {
-                if !current.trim().is_empty() && depth == 0 {
-                    flush_line(&mut output, &mut current, depth, &unit, nl, false);
+                if current.trim().is_empty() {
+                    current.clear();
+                    // A single newline only terminates the line just written.
+                    // A second one is a blank line and is kept as one gap.
+                    if layout.at_line_start {
+                        layout.at_line_start = false;
+                    } else if !output.is_empty() {
+                        layout.blank_line = true;
+                    }
+                } else if depth == 0 {
+                    flush_line(&mut output, &mut current, depth, &unit, nl, false, &mut layout);
                 } else {
                     current.push(' ');
                 }
@@ -123,11 +134,19 @@ fn format_css(source: &str, settings: &EditorSettings) -> Result<String, String>
     if block_comment || quote.is_some() {
         return Err("style block contains an unterminated comment or string".to_string());
     }
-    flush_line(&mut output, &mut current, depth, &unit, nl, false);
+    flush_line(&mut output, &mut current, depth, &unit, nl, false, &mut layout);
     if depth != 0 {
         return Err("style block contains an unclosed brace".to_string());
     }
     Ok(output)
+}
+
+/// Tracks whether the emitter is at the start of a line and whether the next
+/// line still owes one blank separator.
+#[derive(Default)]
+struct LineState {
+    blank_line: bool,
+    at_line_start: bool,
 }
 
 fn flush_line(
@@ -137,11 +156,12 @@ fn flush_line(
     unit: &str,
     nl: &str,
     declaration: bool,
+    layout: &mut LineState,
 ) {
     let value = normalize_fragment(current, declaration);
     current.clear();
     if !value.is_empty() {
-        write_line(output, depth, unit, &value, nl);
+        write_line(output, depth, unit, &value, nl, layout);
     }
 }
 
@@ -156,10 +176,22 @@ fn normalize_fragment(fragment: &str, declaration: bool) -> String {
     value.trim().to_string()
 }
 
-fn write_line(output: &mut String, depth: usize, unit: &str, value: &str, nl: &str) {
+fn write_line(
+    output: &mut String,
+    depth: usize,
+    unit: &str,
+    value: &str,
+    nl: &str,
+    layout: &mut LineState,
+) {
+    if layout.blank_line && !output.is_empty() {
+        output.push_str(nl);
+    }
+    layout.blank_line = false;
     for _ in 0..depth {
         output.push_str(unit);
     }
     output.push_str(value);
     output.push_str(nl);
+    layout.at_line_start = true;
 }
