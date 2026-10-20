@@ -1,6 +1,7 @@
 //! JavaScript generation through Oak validation and source emitters.
 mod deps;
 mod emit_compat;
+mod emit_direct;
 mod emit_ir;
 mod erase;
 pub mod expr_parse;
@@ -39,4 +40,4 @@ pub use print::{EmittedJs, JsPrintOptions, print_js_source};
 pub use row_kernel::try_emit_row_kernel_js;
 pub use transpile::{transpile_ts, transpile_ts_printed, transpile_ts_with_map};
 mod entry;
-pub use emit_compat::{ComponentHandlerCtx, emit_direct_create, emit_vmz_plan, is_direct_eligible};
+pub use emit_direct::{ComponentHandlerCtx, emit_direct_create, emit_vmz_plan, is_direct_eligible};

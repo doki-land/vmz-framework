@@ -113,12 +113,14 @@ fn emit_consumes_shared_reactive_view_deps() {
         .map(|b| b.id().0)
         .expect("user.bio binding");
     assert!(
-        js.contains(&format!("api.trackPatch(this, [{name_id}]"))
+        js.contains(&format!("api.trackPatch(this, ["))
+            && js.contains(&format!("}}, {name_id});"))
             || js.contains(&format!("api.specFieldText(this, {name_id},")),
         "missing bindingId {name_id}: {js}"
     );
     assert!(
-        js.contains(&format!("api.trackPatch(this, [{bio_id}]"))
+        js.contains(&format!("api.trackPatch(this, ["))
+            && js.contains(&format!("}}, {bio_id});"))
             || js.contains(&format!("api.specFieldText(this, {bio_id},")),
         "missing bindingId {bio_id}: {js}"
     );
@@ -248,7 +250,11 @@ export default class Page {
     let client = analyze_script(ScriptKind::Client, src);
     let ir = parse_template(r#"<Select :onChange="this.onSelect" />"#).unwrap();
     let js = emit_client_js(src, &client, &ir, None).unwrap();
-    assert!(js.contains(r#""onChange": (ev) => this.onSelect(ev)"#), "{js}");
+    assert!(
+        js.contains(r#""onChange": (ev) => this.onSelect(ev)"#)
+            || js.contains(r#""onChange":(ev) => this.onSelect(ev)"#),
+        "{js}"
+    );
 }
 
 #[test]
