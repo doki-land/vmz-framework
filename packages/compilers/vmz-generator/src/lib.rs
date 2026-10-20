@@ -24,7 +24,9 @@ pub use css::{
     print_wxss, theme_attr_selector, validate_css,
 };
 pub use js::{JsPrintOptions, print_js_source, transpile_ts_printed};
-pub use js::{SnippetSpan, template_expr_root_span, template_expr_snippet_error};
+pub use js::{
+    SnippetSpan, print_template_expr, template_expr_root_span, template_expr_snippet_error,
+};
 pub use json::{
     DataFormat, emit_data, emit_data_artifact, to_json, to_json5, to_pretty_json, to_yaml,
 };
