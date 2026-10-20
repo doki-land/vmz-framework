@@ -1,6 +1,9 @@
 # Copy to `config.toml` (gitignored) for local Oaks sibling checkout.
 # CI / publish: no `config.toml` — root `Cargo.toml` git `dev` only.
 # Verify: `cargo tree -p oak-core` → filesystem path = patch active.
+# Warning: an active patch rewrites the tracked `Cargo.lock` against the sibling
+# tree and drops the Oak git `source` pins, so local builds stop matching CI.
+# Restore the tracked lock before staging, or verify in a clean checkout.
 
 [patch."https://github.com/yggdrasil-language/oaks.git"]
 oak-core = { path = "../oaks/projects/oak-core" }
