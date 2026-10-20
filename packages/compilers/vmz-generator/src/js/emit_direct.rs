@@ -10,9 +10,9 @@
 use super::deps::collect_template_deps;
 use super::emit_ir::IrDepCursor;
 use super::helpers::{
-    HandlerResolution, bind_field_idents_ctx, component_event_name,
-    component_prop_wire_name, event_dom_type, is_component_event_attr, is_event_attr, is_html_attr,
-    looks_like_ternary, parse_this_method_call_arrow, sanitize_interp, single_field_binding_target,
+    HandlerResolution, bind_field_idents_ctx, component_event_name, component_prop_wire_name,
+    event_dom_type, is_component_event_attr, is_event_attr, is_html_attr, looks_like_ternary,
+    parse_this_method_call_arrow, sanitize_interp, single_field_binding_target,
     split_ternary_parts, wrap_event_handler_body,
 };
 use std::collections::HashMap;

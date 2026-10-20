@@ -113,14 +113,12 @@ fn emit_consumes_shared_reactive_view_deps() {
         .map(|b| b.id().0)
         .expect("user.bio binding");
     assert!(
-        js.contains(&format!("api.trackPatch(this, ["))
-            && js.contains(&format!("}}, {name_id});"))
+        js.contains(&format!("api.trackPatch(this, [")) && js.contains(&format!("}}, {name_id});"))
             || js.contains(&format!("api.specFieldText(this, {name_id},")),
         "missing bindingId {name_id}: {js}"
     );
     assert!(
-        js.contains(&format!("api.trackPatch(this, ["))
-            && js.contains(&format!("}}, {bio_id});"))
+        js.contains(&format!("api.trackPatch(this, [")) && js.contains(&format!("}}, {bio_id});"))
             || js.contains(&format!("api.specFieldText(this, {bio_id},")),
         "missing bindingId {bio_id}: {js}"
     );

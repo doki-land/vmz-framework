@@ -7,7 +7,9 @@ use vmz_types::{
     ComponentDecl, ExecutionPlan, MethodDecl, PlanStatus, ReactiveComponent, ViewNode, ViewView,
 };
 
-use super::emit_direct::{ComponentHandlerCtx, emit_direct_create, emit_vmz_plan, is_direct_eligible};
+use super::emit_direct::{
+    ComponentHandlerCtx, emit_direct_create, emit_vmz_plan, is_direct_eligible,
+};
 use super::emit_ir::IrDepCursor;
 use super::print::EmittedJs;
 use super::transpile::transpile_ts;
@@ -101,8 +103,7 @@ pub fn emit_client_module(
         .map(|m| m.name.clone())
         .collect();
     let prop_names: Vec<String> = decl.properties.iter().map(|f| f.name.clone()).collect();
-    let handler_ctx =
-        ComponentHandlerCtx { methods: &method_names, props: &prop_names };
+    let handler_ctx = ComponentHandlerCtx { methods: &method_names, props: &prop_names };
 
     if !is_direct_eligible(view) {
         return Err(format!(

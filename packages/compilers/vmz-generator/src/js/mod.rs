@@ -19,8 +19,8 @@ pub use emit_compat::{
     rewrite_ts_spec_imports, rewrite_virtual_import,
 };
 pub use emit_ir::{IrDepCursor, TakenBinding, TakenCfBranch, TakenControlFlow};
-pub use erase::erase_types;
 pub use entry::{EntryComponent, emit_serve_entry_client, emit_serve_entry_event};
+pub use erase::erase_types;
 pub use expr_parse::{
     SnippetSpan, print_template_expr, template_expr_root_span, template_expr_snippet_error,
     template_expr_snippet_error_with_span, template_expr_snippet_ok, wrap_template_expr_source,
