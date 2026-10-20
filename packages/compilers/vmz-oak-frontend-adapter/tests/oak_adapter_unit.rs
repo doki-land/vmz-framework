@@ -189,6 +189,15 @@ fn oak_expression_snippet_accepts_vue_expression_boundaries() {
 }
 
 #[test]
+fn oak_expression_snippet_spans_are_absolute_inside_outer_parens() {
+    let expr = "(() => armed = !armed)";
+    let parsed = parse_expression_snippet(expr);
+    assert!(parsed.ok, "{:?}", parsed.diagnostics);
+    let span = parsed.root_span.expect("span");
+    assert_eq!(&expr[span.start..span.end], "() => armed = !armed");
+}
+
+#[test]
 fn oak_expression_snippet_rejects_incomplete_binary() {
     let parsed = parse_expression_snippet("1 +");
     assert!(!parsed.ok, "incomplete binary must fail even if Oak is silent");

@@ -48,13 +48,6 @@ pub fn parse_expression_snippet(expr: &str) -> ExpressionSnippetParse {
         };
     }
 
-    if let Some(inner) = strip_outer_parens(trimmed) {
-        let reparsed = parse_expression_snippet(inner);
-        if reparsed.ok {
-            return reparsed;
-        }
-    }
-
     let source = SourceText::new(trimmed);
     let language = TypeScriptLanguage::default();
     let builder = TypeScriptBuilder::new(&language);
@@ -118,26 +111,6 @@ pub fn parse_expression_snippet(expr: &str) -> ExpressionSnippetParse {
 
 fn is_vue_contextual_identifier(value: &str) -> bool {
     matches!(value, "type" | "readonly" | "default" | "static" | "get" | "set")
-}
-
-fn strip_outer_parens(value: &str) -> Option<&str> {
-    if !value.starts_with('(') || !value.ends_with(')') {
-        return None;
-    }
-    let mut depth = 0usize;
-    for (index, ch) in value.char_indices() {
-        match ch {
-            '(' => depth += 1,
-            ')' => {
-                depth = depth.checked_sub(1)?;
-                if depth == 0 && index + ch.len_utf8() != value.len() {
-                    return None;
-                }
-            }
-            _ => {}
-        }
-    }
-    (depth == 0).then(|| &value[1..value.len() - 1])
 }
 
 /// Fail fast when Oak rejects a template expression snippet.
