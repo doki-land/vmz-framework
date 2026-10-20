@@ -9,8 +9,8 @@
 
 pub mod core;
 pub mod css;
-pub mod json;
 pub mod js;
+pub mod json;
 pub mod lang;
 pub mod markup;
 
@@ -23,12 +23,12 @@ pub use css::{
     emit_style_bundle, emit_style_bundle_opts, emit_theme_css, format_css, minify_css, print_css,
     print_wxss, theme_attr_selector, validate_css,
 };
+pub use js::{JsPrintOptions, print_js_source, transpile_ts_printed};
+pub use js::{SnippetSpan, template_expr_root_span, template_expr_snippet_error};
 pub use json::{
     DataFormat, emit_data, emit_data_artifact, to_json, to_json5, to_pretty_json, to_yaml,
 };
 pub use lang::emit_rust_server_unit;
-pub use js::{JsPrintOptions, print_js_source, transpile_ts_printed};
-pub use js::{SnippetSpan, template_expr_root_span, template_expr_snippet_error};
 pub use markup::{
     HreflangAlternate, HtmlShellInput, MINI_TEMPLATE_DIALECT, MarkupDocument, MarkupNode,
     MiniEmitError, MiniEmitErrorKind, MiniEventHandler, MiniTemplateEmit, MiniTemplateProfile,

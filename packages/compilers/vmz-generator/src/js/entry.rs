@@ -4,7 +4,9 @@ use std::collections::BTreeMap;
 
 use super::print::EmittedJs;
 
-fn js_string_literal(value: &str) -> String { serde_json::to_string(value).unwrap_or_else(|_| "\"\"".into()) }
+fn js_string_literal(value: &str) -> String {
+    serde_json::to_string(value).unwrap_or_else(|_| "\"\"".into())
+}
 
 /// Component entry descriptor for [`emit_serve_entry_client`].
 #[derive(Debug, Clone)]

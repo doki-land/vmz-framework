@@ -2,8 +2,8 @@
 
 use oak_typescript::ast::{ClassMember, Statement};
 use vmz_compiler::parse::field_rw_oak::OakFieldRw;
-use vmz_oak_frontend_adapter::{require_script_ast, ScriptRole, ScriptShellInput};
 use vmz_compiler::pipeline::field_rw::*;
+use vmz_oak_frontend_adapter::{ScriptRole, ScriptShellInput, require_script_ast};
 
 #[test]
 fn flags_use_and_create_factories() {
@@ -193,11 +193,7 @@ fn nested_arrow_captures_alias_into_owner() {
         "closure write must compose into owner: writes={:?}",
         rw.writes
     );
-    assert!(
-        !rw.has_alias("local"),
-        "nested local must not leak: aliases={:?}",
-        rw
-    );
+    assert!(!rw.has_alias("local"), "nested local must not leak: aliases={:?}", rw);
 }
 
 #[test]
@@ -213,7 +209,8 @@ fn walk_script(visitor: &mut OakFieldRw, source: &str) {
         content: source.to_string(),
         content_start: 0,
         role: ScriptRole::Client,
-    }).expect("Oak must parse the original read/write fixture");
+    })
+    .expect("Oak must parse the original read/write fixture");
     for statement in &root.statements {
         if let Statement::ClassDeclaration(class) = statement {
             for member in &class.body {

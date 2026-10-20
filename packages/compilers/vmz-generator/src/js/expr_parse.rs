@@ -61,10 +61,7 @@ pub fn template_expr_root_span(expr: &str) -> Option<SnippetSpan> {
         return None;
     }
     let parsed = parse_expression_snippet(trimmed);
-    parsed.root_span.map(|span| SnippetSpan {
-        start: span.start as u32,
-        end: span.end as u32,
-    })
+    parsed.root_span.map(|span| SnippetSpan { start: span.start as u32, end: span.end as u32 })
 }
 
 /// Canonical-print a template expression through the Oak expression printer.

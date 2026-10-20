@@ -1,8 +1,8 @@
 //! Moved from `src/pipeline/reactive_build.rs` (cargo-cry: tests next to Cargo.toml).
 
-use vmz_types::SourceRange as Span;
 use vmz_compiler::pipeline::reactive_build::*;
 use vmz_compiler::template::parse_template;
+use vmz_types::SourceRange as Span;
 use vmz_types::{BindingKind, ComponentDecl, FieldDecl, FieldKind, Visibility};
 
 #[test]

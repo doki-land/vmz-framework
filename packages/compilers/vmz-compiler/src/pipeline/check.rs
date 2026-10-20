@@ -209,7 +209,7 @@ fn check_file(path: &Path, report: &mut CheckReport, options: &CheckOptions) {
                 finding.code,
                 (finding.span.start, finding.span.end),
             )
-                .with_arg("detail", finding.message.clone()),
+            .with_arg("detail", finding.message.clone()),
         );
     }
 

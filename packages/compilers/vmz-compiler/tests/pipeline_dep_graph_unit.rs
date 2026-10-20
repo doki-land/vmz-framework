@@ -105,7 +105,8 @@ fn self_reference_has_no_static_deps() {
     assert_eq!(
         g.deps.get("pages/index").map(|v| v.as_slice()),
         Some(
-            vec!["components/ProjectTree".to_string(), "components/UserCard".to_string()].as_slice(),
+            vec!["components/ProjectTree".to_string(), "components/UserCard".to_string()]
+                .as_slice(),
         ),
     );
     let tree_ctors = g.child_ctors_for_chunk("components/ProjectTree");

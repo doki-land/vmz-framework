@@ -85,11 +85,7 @@ impl ReportedDiagnostic {
     }
 
     /// Error with a primary byte span.
-    pub fn error_at(
-        path: impl Into<PathBuf>,
-        code: impl Into<String>,
-        span: (u32, u32),
-    ) -> Self {
+    pub fn error_at(path: impl Into<PathBuf>, code: impl Into<String>, span: (u32, u32)) -> Self {
         let mut row = Self::error(path, code);
         row.diagnostic.span = Some(span);
         row

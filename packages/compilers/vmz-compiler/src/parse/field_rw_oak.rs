@@ -442,7 +442,15 @@ fn is_this(expr: &Expression) -> bool {
 fn is_array_mutator(name: &str) -> bool {
     matches!(
         name,
-        "push" | "pop" | "shift" | "unshift" | "splice" | "sort" | "reverse" | "fill" | "copyWithin"
+        "push"
+            | "pop"
+            | "shift"
+            | "unshift"
+            | "splice"
+            | "sort"
+            | "reverse"
+            | "fill"
+            | "copyWithin"
     )
 }
 

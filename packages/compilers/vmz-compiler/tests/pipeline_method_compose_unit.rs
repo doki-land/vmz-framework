@@ -1,8 +1,8 @@
 //! Moved from `src/pipeline/method_compose.rs` (cargo-cry: tests next to Cargo.toml).
 
-use vmz_types::SourceRange as Span;
 use vmz_compiler::pipeline::method_compose::*;
 use vmz_types::MethodDecl;
+use vmz_types::SourceRange as Span;
 
 fn method(name: &str, reads: &[&str], writes: &[&str], calls: &[&str]) -> MethodDecl {
     method_opaque(name, reads, writes, calls, false)

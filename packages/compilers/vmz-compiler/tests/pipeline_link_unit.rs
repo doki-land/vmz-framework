@@ -109,7 +109,9 @@ fn oak_params_static_strings() {
 
 #[test]
 fn static_params_reject_nonliteral_members() {
-    for expression in ["{ id }", "{ id: record.id }", "{ id: 42 }", "{ ...record }", "{ id: 'sku', ...record }"] {
+    for expression in
+        ["{ id }", "{ id: record.id }", "{ id: 42 }", "{ ...record }", "{ id: 'sku', ...record }"]
+    {
         assert!(parse_static_link_params(expression).is_none(), "accepted: {expression}");
     }
 }

@@ -1,7 +1,7 @@
 //! Collect `style:tw` and `@tailwind` sites from a `.vmz` source (experimental).
 
-use std::path::{Path, PathBuf};
 use std::ops::Range;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use vmz_compiler::{
@@ -29,8 +29,8 @@ pub struct TwTokenHit {
 }
 
 mod span_serde {
-    use std::ops::Range;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::ops::Range;
 
     pub fn serialize<S: Serializer>(span: &Range<u32>, serializer: S) -> Result<S::Ok, S::Error> {
         (span.start, span.end).serialize(serializer)
@@ -146,9 +146,7 @@ fn walk_nodes(
                     AttrValue::Static(raw) => {
                         let span =
                             locate_attr_value_span(template, template_start, "style:tw", raw)
-                                .unwrap_or_else(|| {
-                                    template_start as u32..template_start as u32
-                                });
+                                .unwrap_or_else(|| template_start as u32..template_start as u32);
                         let tokens = split_tokens(raw, &span);
                         sites.push(TwSite {
                             kind: TwTokenKind::StyleTw,
@@ -161,9 +159,7 @@ fn walk_nodes(
                     }
                     AttrValue::Interp(expr) => {
                         let span = locate_attr_name_span(template, template_start, "style:tw")
-                            .unwrap_or_else(|| {
-                                template_start as u32..template_start as u32
-                            });
+                            .unwrap_or_else(|| template_start as u32..template_start as u32);
                         diagnostics.push(
                             ReportedDiagnostic::advice(path, "vmz::tw::dynamic_style_tw")
                                 .with_arg("expr", expr.clone()),
@@ -288,10 +284,7 @@ fn split_tokens(raw: &str, parent: &Range<u32>) -> Vec<TwTokenHit> {
         if let Some(rel) = raw[byte..].find(part) {
             let start = parent.start as usize + byte + rel;
             let end = start + part.len();
-            out.push(TwTokenHit {
-                token: part.to_string(),
-                span: start as u32..end as u32,
-            });
+            out.push(TwTokenHit { token: part.to_string(), span: start as u32..end as u32 });
             byte += rel + part.len();
         }
     }

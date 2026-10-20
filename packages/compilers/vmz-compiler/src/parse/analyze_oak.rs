@@ -1,10 +1,10 @@
 //! Lower Oak TypeScript AST into [`ComponentDecl`] surface.
 
+use oak_typescript::TypeScriptRoot;
 use oak_typescript::ast::{
     ClassDeclaration, ClassMember, Expression, ExpressionKind, ImportSpecifier, Statement,
     TypeAnnotation, Visibility as OakVisibility,
 };
-use oak_typescript::TypeScriptRoot;
 use vmz_oak_frontend_adapter::{
     ByteSpan, NyarBindingKind, NyarImportBinding, NyarImportDecl, NyarImportKind, ScriptRole,
     ScriptShellInput, parse_script_ast,
@@ -380,7 +380,10 @@ fn name_byte_span(source: &str, start: usize, end: usize, name: &str) -> Option<
     Some(ByteSpan { start: start + rel, end: start + rel + name.len() })
 }
 
-pub(crate) fn component_decl_from_root(root: &TypeScriptRoot, source: &str) -> Option<ComponentDecl> {
+pub(crate) fn component_decl_from_root(
+    root: &TypeScriptRoot,
+    source: &str,
+) -> Option<ComponentDecl> {
     let mut default_class: Option<&ClassDeclaration> = None;
     let mut internals = Vec::new();
 
@@ -438,13 +441,7 @@ fn fill_members_from_oak(decl: &mut ComponentDecl, body: &[ClassMember], source:
     for member in body {
         match member {
             ClassMember::Property {
-                name,
-                ty,
-                initializer,
-                visibility,
-                is_static,
-                span,
-                ..
+                name, ty, initializer, visibility, is_static, span, ..
             } => {
                 if *is_static || name.is_empty() {
                     continue;
@@ -458,9 +455,9 @@ fn fill_members_from_oak(decl: &mut ComponentDecl, body: &[ClassMember], source:
                 let field = FieldDecl {
                     name: name.clone(),
                     type_text: ty.as_ref().map(type_annotation_text),
-                    init_text: initializer.as_ref().map(|e| {
-                        source[e.span.start..e.span.end.min(source.len())].to_string()
-                    }),
+                    init_text: initializer
+                        .as_ref()
+                        .map(|e| source[e.span.start..e.span.end.min(source.len())].to_string()),
                     kind,
                     visibility,
                     span: range_to_source_range(span.start, span.end),
@@ -484,8 +481,8 @@ fn fill_members_from_oak(decl: &mut ComponentDecl, body: &[ClassMember], source:
                 if name.is_empty() || name == "constructor" {
                     continue;
                 }
-                let is_private = name.starts_with('#')
-                    || matches!(visibility, Some(OakVisibility::Private));
+                let is_private =
+                    name.starts_with('#') || matches!(visibility, Some(OakVisibility::Private));
                 let http = decorators.iter().find_map(|d| http_route_from_oak_expr(&d.expression));
                 let mut rw = OakFieldRw::new(field_names.iter().cloned());
                 rw.walk_body(method_body);

@@ -73,7 +73,12 @@ fn preserves_authoring_boundaries_and_operator_tokens() {
     ] {
         let output = format_sample("sample.ts", input);
         assert_eq!(format_sample("sample.ts", &output), output, "input={input:?}");
-        assert!(output.contains("const") || output.contains("function") || output.contains("type") || output.contains("for"));
+        assert!(
+            output.contains("const")
+                || output.contains("function")
+                || output.contains("type")
+                || output.contains("for")
+        );
     }
 }
 

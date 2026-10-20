@@ -1106,7 +1106,7 @@ fn emit_file(
                 finding.code,
                 (finding.span.start, finding.span.end),
             )
-                .with_arg("detail", finding.message.clone()),
+            .with_arg("detail", finding.message.clone()),
         );
     }
     let server = parsed.server.as_ref().map(|s| analyze_script(ScriptKind::Server, &s.content));

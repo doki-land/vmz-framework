@@ -109,7 +109,8 @@ fn event_shell_directive_has_bounded_allocations_and_exact_spans() {
 
 #[test]
 fn builder_preserves_directive_arguments() {
-    let source = SourceText::new(r#"<template><Like client:idle @click="armed = !armed" /></template>"#);
+    let source =
+        SourceText::new(r#"<template><Like client:idle @click="armed = !armed" /></template>"#);
     let language = VueLanguage::default();
     let parser = VueParser::new(&language);
     let mut parse_session = ParseSession::default();
@@ -134,12 +135,12 @@ fn builder_preserves_directive_arguments() {
 
 #[test]
 fn valueless_directive_does_not_consume_next_attribute() {
-    let source = SourceText::new(r#"<template><button v-else :type="type" disabled @click="run" /></template>"#);
+    let source = SourceText::new(
+        r#"<template><button v-else :type="type" disabled @click="run" /></template>"#,
+    );
     let mut session = ParseSession::default();
     let root = VueBuilder::new().build(&source, &[], &mut session).result.unwrap();
-    let VueNode::Element(element) = &root.blocks[0].children[0] else {
-        panic!("expected button")
-    };
+    let VueNode::Element(element) = &root.blocks[0].children[0] else { panic!("expected button") };
     assert_eq!(element.attributes.len(), 4);
     let VueAttribute::Directive(otherwise) = &element.attributes[0] else {
         panic!("expected else");
@@ -198,7 +199,9 @@ fn counter_directive_expressions_do_not_stall() {
 
 #[test]
 fn keyword_attr_name_for_does_not_hang() {
-    let source = SourceText::new(r#"<template><label :for="controlId" class="x">{{ label }}</label></template>"#);
+    let source = SourceText::new(
+        r#"<template><label :for="controlId" class="x">{{ label }}</label></template>"#,
+    );
     let language = VueLanguage::default();
     let parser = VueParser::new(&language);
     let mut session = ParseSession::default();

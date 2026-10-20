@@ -30,7 +30,9 @@ fn collect_template_deps_scan(expr: &str, fields: &[String], scope: &[String]) -
             let start = index;
             index += 1;
             while index < chars.len()
-                && (chars[index].is_ascii_alphanumeric() || chars[index] == '_' || chars[index] == '$')
+                && (chars[index].is_ascii_alphanumeric()
+                    || chars[index] == '_'
+                    || chars[index] == '$')
             {
                 index += 1;
             }

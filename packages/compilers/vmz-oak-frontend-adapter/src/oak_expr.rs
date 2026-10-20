@@ -88,7 +88,9 @@ pub fn parse_expression_snippet(expr: &str) -> ExpressionSnippetParse {
             let wrapped_built = Builder::build(&builder, &wrapped_source, &[], &mut cache);
             if let Ok(root) = &wrapped_built.result {
                 if let Some(value) = root.statements.iter().find_map(|stmt| match stmt {
-                    Statement::VariableDeclaration(decl) if decl.name == "__vmz_expr" => decl.value.clone(),
+                    Statement::VariableDeclaration(decl) if decl.name == "__vmz_expr" => {
+                        decl.value.clone()
+                    }
                     _ => None,
                 }) {
                     return ExpressionSnippetParse {
