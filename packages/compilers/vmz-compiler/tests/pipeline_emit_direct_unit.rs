@@ -52,7 +52,7 @@ export default class BranchDemo {
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
-    assert!(js.contains("api.comment('vmz-if')"), "{js}");
+    assert!(js.contains(r#"api.comment("vmz-if")"#), "{js}");
     assert!(js.contains("api.trackPatch(inst,"), "{js}");
     assert!(js.contains("__vmzDirect = true"), "{js}");
 }

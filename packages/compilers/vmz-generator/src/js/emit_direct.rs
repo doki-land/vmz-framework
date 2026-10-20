@@ -519,8 +519,8 @@ fn emit_if_block(
     stmts.push(format!(
         "var {v} = (function() {{
   var inst = this;
-  var start = api.comment('vmz-if');
-  var end = api.comment('/vmz-if');
+  var start = api.comment(\"vmz-if\");
+  var end = api.comment(\"/vmz-if\");
   if ({region_arg} != null) start.__vmzRegion = {region_arg};
   var frag = api.frag();
   frag.appendChild(start);
@@ -1353,8 +1353,8 @@ fn emit_each_block(
         "var {v} = (function() {{
   var inst = this;
   var spec = {{ list: function() {{ return ({list_body}); }}, {key_field}{row_kernel}{serialize_item_field}createItem: {create_item} }};
-  var start = api.comment('vmz-each:' + (spec.as || ''));
-  var end = api.comment('/vmz-each');
+  var start = api.comment(\"vmz-each:\" + (spec.as || \"\"));
+  var end = api.comment(\"/vmz-each\");
   if ({region_arg} != null) start.__vmzRegion = {region_arg};
   var frag = api.frag();
   frag.appendChild(start);
