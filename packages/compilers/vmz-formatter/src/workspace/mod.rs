@@ -95,7 +95,13 @@ fn format_path(
     options: &oak_typescript::formatter::FormatOptions,
 ) -> Result<()> {
     let source = fs::read_to_string(path).map_err(|err| format!("{}: {err}", path.display()))?;
-    let result = engine::format_source_with_options(path, &source, options.clone())?;
+    let result = match engine::format_source_with_options(path, &source, options.clone()) {
+        Ok(result) => result,
+        Err(err) => {
+            report.errors.push(format!("{}: {err}", path.display()));
+            return Ok(());
+        }
+    };
 
     if !result.changed {
         report.unchanged += 1;

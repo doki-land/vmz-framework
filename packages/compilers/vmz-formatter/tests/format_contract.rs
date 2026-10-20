@@ -2,7 +2,10 @@
 
 use std::path::Path;
 
-use vmz_formatter::{default_format_options, format_source_with_options};
+use vmz_formatter::{
+    WorkspaceFormatOptions, default_format_options, format_source_with_options,
+    run_workspace_format,
+};
 
 fn format_sample(path: &str, input: &str) -> String {
     format_source_with_options(Path::new(path), input, default_format_options())
@@ -121,4 +124,27 @@ fn jsx_cases_format_and_idempotent() {
         }
         assert_eq!(format_sample("sample.tsx", &out), out, "input={input:?}");
     }
+}
+
+#[test]
+fn workspace_reports_each_failed_file_with_its_path() {
+    let root = std::env::temp_dir().join(format!("vmz-format-per-file-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).expect("temp root");
+    std::fs::write(root.join("broken.ts"), "function f() {").expect("write broken");
+    std::fs::write(root.join("ok.ts"), "const x = 1\n").expect("write ok");
+
+    let report = run_workspace_format(WorkspaceFormatOptions {
+        cwd: Some(root.clone()),
+        check: true,
+        rust: Some(false),
+        javascript: Some(true),
+        ..WorkspaceFormatOptions::default()
+    });
+    let _ = std::fs::remove_dir_all(&root);
+    let report = report.expect("a single unparsable file must not abort the scan");
+
+    assert_eq!(report.errors.len(), 1, "errors={:?}", report.errors);
+    assert!(report.errors[0].contains("broken.ts"), "errors={:?}", report.errors);
+    assert_eq!(report.unchanged, 1, "ok.ts was still scanned");
 }
