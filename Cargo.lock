@@ -1084,7 +1084,7 @@ dependencies = [
 [[package]]
 name = "oak-core"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#7db299935454e17f9ccd9c72c4183e31498cb23e"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#b499a1555ff5052f4210fdf6dfafbe5289f16504"
 dependencies = [
  "serde",
  "smallvec",
@@ -1095,7 +1095,7 @@ dependencies = [
 [[package]]
 name = "oak-formatter"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#7db299935454e17f9ccd9c72c4183e31498cb23e"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#b499a1555ff5052f4210fdf6dfafbe5289f16504"
 dependencies = [
  "oak-core",
 ]
@@ -1103,7 +1103,7 @@ dependencies = [
 [[package]]
 name = "oak-typescript"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#7db299935454e17f9ccd9c72c4183e31498cb23e"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#b499a1555ff5052f4210fdf6dfafbe5289f16504"
 dependencies = [
  "oak-core",
  "oak-formatter",
@@ -1113,7 +1113,7 @@ dependencies = [
 [[package]]
 name = "oak-vue"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#7db299935454e17f9ccd9c72c4183e31498cb23e"
+source = "git+https://github.com/yggdrasil-language/oaks.git?branch=dev#b499a1555ff5052f4210fdf6dfafbe5289f16504"
 dependencies = [
  "oak-core",
  "serde",
