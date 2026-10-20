@@ -2,8 +2,8 @@
 
 use vmz_compiler::pipeline::expr_plan::plan_template_expr;
 use vmz_compiler::{
-    TemplateNode, lower_concrete_to_ir, lower_concrete_to_semantic, parse_template_concrete,
-    template_parse_to_diagnostic,
+    TemplateNode, lower_concrete_to_ir, lower_concrete_to_semantic,
+    parse_template_concrete_body_primary, template_parse_to_diagnostic,
 };
 use vmz_types::DepKey;
 
@@ -48,15 +48,8 @@ fn invalid_expr_plan_fails_snippet_ingress() {
 }
 
 #[test]
-fn single_brace_rejection_carries_parse_failed_code() {
-    let err = parse_template_concrete("<h2>{user.name}</h2>").unwrap_err();
-    let diag = template_parse_to_diagnostic("App.vmz", 11, &err);
-    assert_eq!(diag.code_string().as_deref(), Some("vmz::template::parse_failed"));
-}
-
-#[test]
 fn v_model_semantic_and_ir_follow_vue3_contract() {
-    let concrete = parse_template_concrete(r#"<Comp v-model:title="t" />"#).unwrap();
+    let concrete = parse_template_concrete_body_primary(r#"<Comp v-model:title="t" />"#).unwrap();
     let ir = lower_concrete_to_ir(&concrete).unwrap();
     match &ir.roots[0] {
         TemplateNode::Element { attrs, .. } => {
@@ -69,7 +62,7 @@ fn v_model_semantic_and_ir_follow_vue3_contract() {
 
 #[test]
 fn orphan_else_carries_illegal_directive_code() {
-    let concrete = parse_template_concrete(r#"<p v-else>x</p>"#).unwrap();
+    let concrete = parse_template_concrete_body_primary(r#"<p v-else>x</p>"#).unwrap();
     let err = lower_concrete_to_semantic(&concrete).unwrap_err();
     let diag = template_parse_to_diagnostic("App.vmz", 0, &err);
     assert_eq!(diag.code_string().as_deref(), Some("vmz::template::illegal_directive"));

@@ -1,6 +1,4 @@
-use vmz_compiler::{
-    oak::project_parsed_vmz, parse_template_concrete, parse_template_concrete_via_oak, parse_vmz,
-};
+use vmz_compiler::{oak::project_parsed_vmz, parse_template_concrete_via_oak, parse_vmz};
 use vmz_oak_frontend_adapter::BlockKind;
 
 #[test]
@@ -34,7 +32,6 @@ fn oak_lowers_to_concrete_ir_for_void_elements() {
   <img :src="url">
   <br>
 "#;
-    let _legacy = parse_template_concrete(body).expect("legacy concrete");
     let source = format!(
         r#"<template>{body}</template>
 <script client>

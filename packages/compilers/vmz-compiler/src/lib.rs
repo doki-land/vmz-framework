@@ -153,10 +153,10 @@ pub use template::{
     IfBranch, SemanticAstStats, SemanticIr, SemanticNode, SemanticProp, TemplateAttr, TemplateIr,
     TemplateNode, TemplateParseError, TemplateSpan, classify_concrete_attr, decode_html_entities,
     lower_concrete_to_ir, lower_concrete_to_semantic, lower_vue_root_to_semantic, parse_template,
-    parse_template_asts, parse_template_concrete, parse_template_concrete_body_primary,
-    parse_template_concrete_primary, parse_template_concrete_via_oak,
-    parse_template_layers_primary, parse_template_semantic_primary,
-    parse_template_semantic_via_oak, semantic_ast_stats, template_parse_to_diagnostic,
+    parse_template_asts, parse_template_concrete_body_primary, parse_template_concrete_primary,
+    parse_template_concrete_via_oak, parse_template_layers_primary,
+    parse_template_semantic_primary, parse_template_semantic_via_oak, semantic_ast_stats,
+    template_parse_to_diagnostic,
 };
 pub use tw::{
     TwCompiler, TwCompilerHandle, TwEmitRequest, TwEmitResult, TwRegKind, TwRegistration,

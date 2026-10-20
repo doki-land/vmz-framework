@@ -3,9 +3,9 @@
 //! **Primary ingress**: [`super::template_oak::parse_template_semantic_primary`]
 //! (Oak Vue AST → Semantic; attr classify may use [`ConcreteAttr`] algebra).
 //!
-//! [`lower_concrete_to_semantic`] is the **deprecated adapter** for legacy XML
-//! Concrete forests and fixtures. Oak Semantic must not route through
-//! [`super::template_concrete::ConcreteIr`].
+//! [`lower_concrete_to_semantic`] is the Concrete adapter used by
+//! [`super::template_oak::parse_template_layers_primary`] and layer tests. Oak direct
+//! Semantic must not route through [`super::template_concrete::ConcreteIr`].
 //!
 //! Pipeline emit still goes through the legacy [`super::template_ir::TemplateIr`]
 //! adapter until Execution IR lands.
@@ -207,8 +207,8 @@ pub enum SemanticProp {
 
 /// Lower Concrete → Semantic (IfChain / ForNode / Bind·On plans; comments dropped).
 ///
-/// Legacy XML / fixture adapter. Oak call sites must use
-/// [`super::template_oak::parse_template_semantic_via_oak`] instead.
+/// Concrete comes from Oak via [`super::template_oak::parse_template_concrete_primary`].
+/// [`super::template_oak::parse_template_semantic_primary`] walks Oak directly and must agree.
 pub fn lower_concrete_to_semantic(concrete: &ConcreteIr) -> Result<SemanticIr, TemplateParseError> {
     Ok(SemanticIr { roots: lower_siblings(&concrete.roots)? })
 }

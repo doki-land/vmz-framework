@@ -1,28 +1,27 @@
 //! Layer-1 Concrete Template AST — **deprecated adapter** (stage C).
 //!
-//! **Primary path**: Oak Vue AST via [`super::template_oak::parse_template_layers_primary`].
+//! **Only path**: Oak Vue AST via [`super::template_oak::parse_template_layers_primary`].
 //! This module remains only as:
 //! - IR shape shared by Oak lowering / Semantic / legacy TemplateIr
-//! - **legacy XML string parser** [`parse_template_concrete`] for fallback and fixtures
+//! - shared attribute classification algebra ([`classify_concrete_attr`])
 //!
 //! # Feature freeze (hard)
 //!
-//! Do **not** extend the self-built XML / string directive parser with new Vue
-//! syntax. Gaps go to Oaks (`oak-vue`) first; VMZ only adapts. Allowed changes:
-//! bugfixes that restore prior behavior, diagnostic clarity, and Oak classify
-//! helpers ([`classify_concrete_attr`]).
+//! Do **not** extend this module with new Vue syntax. Gaps go to Oaks (`oak-vue`)
+//! first; VMZ only adapts. Allowed changes: bugfixes that restore prior behavior,
+//! diagnostic clarity, and Oak classify helpers ([`classify_concrete_attr`]).
 //!
 //! Expressions remain `String` here (`ExprPlan` is Oak-primary snippet ingress).
 //! Downstream emit still consumes [`super::template::TemplateIr`] via
 //! [`super::template_lower`].
 
-use super::template_common::{TemplateParseError, decode_html_entities};
+use super::template_common::TemplateParseError;
 use super::template_span::TemplateSpan;
 
 /// Forest of concrete roots for one `<template>` body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConcreteIr {
-    /// Top-level nodes in document order (comments retained).
+    /// Top-level nodes in document order.
     pub roots: Vec<ConcreteNode>,
 }
 
@@ -197,323 +196,11 @@ pub fn classify_concrete_attr(
     classify_one(RawAttr { name: name.to_string(), value: value.map(|s| s.to_string()), span })
 }
 
-/// Parse a `<template>` body into Concrete AST via the **legacy XML scanner**.
-///
-/// Prefer [`super::template_oak::parse_template_concrete_via_oak`] /
-/// [`super::template_oak::parse_template_layers_primary`]. Kept for Oak failure
-/// fallback and conformance fixtures — **no new Vue syntax here** (see module freeze).
-pub fn parse_template_concrete(input: &str) -> Result<ConcreteIr, TemplateParseError> {
-    let mut parser = ConcreteParser { input, pos: 0 };
-    let mut roots = Vec::new();
-    while parser.pos < parser.input.len() {
-        match parser.parse_node()? {
-            Some(node) => roots.push(node),
-            None => break,
-        }
-    }
-    Ok(ConcreteIr { roots })
-}
-
-struct ConcreteParser<'a> {
-    input: &'a str,
-    pos: usize,
-}
-
 #[derive(Debug)]
 struct RawAttr {
     name: String,
     value: Option<String>,
     span: TemplateSpan,
-}
-
-impl<'a> ConcreteParser<'a> {
-    fn err(&self, message: impl Into<String>) -> TemplateParseError {
-        TemplateParseError { message: message.into(), offset: self.pos }
-    }
-
-    fn err_at(&self, offset: usize, message: impl Into<String>) -> TemplateParseError {
-        TemplateParseError { message: message.into(), offset }
-    }
-
-    fn rest(&self) -> &'a str {
-        &self.input[self.pos..]
-    }
-
-    fn peek(&self) -> Option<char> {
-        self.rest().chars().next()
-    }
-
-    fn starts_with(&self, s: &str) -> bool {
-        self.rest().starts_with(s)
-    }
-
-    fn bump(&mut self) -> Option<char> {
-        let ch = self.peek()?;
-        self.pos += ch.len_utf8();
-        Some(ch)
-    }
-
-    fn skip_ws(&mut self) {
-        while matches!(self.peek(), Some(c) if c.is_whitespace()) {
-            self.bump();
-        }
-    }
-
-    fn parse_node(&mut self) -> Result<Option<ConcreteNode>, TemplateParseError> {
-        self.skip_ws();
-        if self.pos >= self.input.len() {
-            return Ok(None);
-        }
-        if self.starts_with("<!--") {
-            return Ok(Some(self.parse_comment()?));
-        }
-        if self.starts_with("{{") {
-            return Ok(Some(self.parse_mustache()?));
-        }
-        if self.starts_with("{") {
-            return Err(self.err(
-                "single-brace `{…}` is not valid VMZ template syntax; use Vue `{{ … }}` or `:attr=\"…\"`",
-            ));
-        }
-        if self.starts_with("</") {
-            return Ok(None);
-        }
-        if self.starts_with("<") {
-            return Ok(Some(self.parse_element()?));
-        }
-        Ok(self.parse_text()?)
-    }
-
-    fn parse_comment(&mut self) -> Result<ConcreteNode, TemplateParseError> {
-        let start = self.pos;
-        self.pos += 4; // <!--
-        let body_start = self.pos;
-        if let Some(end) = self.rest().find("-->") {
-            let value = self.input[body_start..body_start + end].to_string();
-            self.pos += end + 3;
-            Ok(ConcreteNode::Comment { value, span: TemplateSpan::from_usize(start, self.pos) })
-        } else {
-            self.pos = self.input.len();
-            Ok(ConcreteNode::Comment {
-                value: self.input[body_start..].to_string(),
-                span: TemplateSpan::from_usize(start, self.pos),
-            })
-        }
-    }
-
-    fn parse_mustache(&mut self) -> Result<ConcreteNode, TemplateParseError> {
-        let start = self.pos;
-        self.pos += 2; // {{
-        let expr_start = self.pos;
-        let mut depth = 0usize;
-        while self.pos < self.input.len() {
-            if self.starts_with("}}") && depth == 0 {
-                let expr = self.input[expr_start..self.pos].trim().to_string();
-                self.pos += 2;
-                if expr.is_empty() {
-                    return Err(self.err_at(start, "empty mustache `{{ }}`"));
-                }
-                return Ok(ConcreteNode::Interpolation {
-                    expr,
-                    span: TemplateSpan::from_usize(start, self.pos),
-                });
-            }
-            let c = self.bump().ok_or_else(|| self.err_at(start, "unclosed mustache `{{`"))?;
-            match c {
-                '{' => depth += 1,
-                '}' => depth = depth.saturating_sub(1),
-                '\'' | '"' | '`' => self.skip_js_string(c)?,
-                _ => {}
-            }
-        }
-        Err(self.err_at(start, "unclosed mustache `{{`"))
-    }
-
-    fn skip_js_string(&mut self, quote: char) -> Result<(), TemplateParseError> {
-        let start = self.pos.saturating_sub(quote.len_utf8());
-        while let Some(c) = self.bump() {
-            if c == '\\' {
-                self.bump();
-                continue;
-            }
-            if c == quote {
-                return Ok(());
-            }
-        }
-        Err(self.err_at(start, "unclosed string in mustache expression"))
-    }
-
-    fn parse_text(&mut self) -> Result<Option<ConcreteNode>, TemplateParseError> {
-        let start = self.pos;
-        while let Some(c) = self.peek() {
-            if c == '<' {
-                break;
-            }
-            if c == '{' {
-                if self.starts_with("{{") {
-                    break;
-                }
-                return Err(self.err(
-                    "single-brace `{…}` is not valid VMZ template syntax; use Vue `{{ … }}`",
-                ));
-            }
-            self.bump();
-        }
-        let end = self.pos;
-        let text = decode_html_entities(&self.input[start..end]);
-        if text.trim().is_empty() {
-            return self.parse_node();
-        }
-        Ok(Some(ConcreteNode::Text { value: text, span: TemplateSpan::from_usize(start, end) }))
-    }
-
-    fn parse_element(&mut self) -> Result<ConcreteNode, TemplateParseError> {
-        let elem_start = self.pos;
-        self.bump(); // <
-        let tag = self
-            .parse_tag_name()?
-            .ok_or_else(|| self.err_at(elem_start, "expected tag name after `<`"))?;
-        let mut raw_attrs = Vec::new();
-        loop {
-            self.skip_ws();
-            if self.starts_with("/>") {
-                self.pos += 2;
-                let attrs = classify_attrs(raw_attrs)?;
-                return Ok(ConcreteNode::Element {
-                    tag,
-                    attrs,
-                    children: Vec::new(),
-                    span: TemplateSpan::from_usize(elem_start, self.pos),
-                });
-            }
-            if self.starts_with(">") {
-                self.bump();
-                break;
-            }
-            if self.pos >= self.input.len() {
-                return Err(self.err_at(elem_start, format!("unclosed start tag `<{tag}`")));
-            }
-            raw_attrs.push(self.parse_raw_attr()?);
-        }
-
-        let mut children = Vec::new();
-        loop {
-            self.skip_ws();
-            if self.starts_with(&format!("</{tag}>")) {
-                self.pos += tag.len() + 3;
-                break;
-            }
-            if self.pos >= self.input.len() {
-                break;
-            }
-            match self.parse_node()? {
-                Some(child) => children.push(child),
-                None if self.starts_with("</") => break,
-                None => break,
-            }
-        }
-
-        let attrs = classify_attrs(raw_attrs)?;
-        Ok(ConcreteNode::Element {
-            tag,
-            attrs,
-            children,
-            span: TemplateSpan::from_usize(elem_start, self.pos),
-        })
-    }
-
-    fn parse_tag_name(&mut self) -> Result<Option<String>, TemplateParseError> {
-        let start = self.pos;
-        while let Some(c) = self.peek() {
-            if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' {
-                self.bump();
-            } else {
-                break;
-            }
-        }
-        if start == self.pos {
-            return Ok(None);
-        }
-        Ok(Some(self.input[start..self.pos].to_string()))
-    }
-
-    fn parse_attr_name(&mut self) -> Result<String, TemplateParseError> {
-        let start = self.pos;
-        if matches!(self.peek(), Some('@' | '#' | ':')) {
-            self.bump();
-        }
-        while let Some(c) = self.peek() {
-            if c.is_ascii_alphanumeric()
-                || c == '-'
-                || c == '_'
-                || c == ':'
-                || c == '.'
-                || c == '['
-                || c == ']'
-            {
-                self.bump();
-            } else {
-                break;
-            }
-        }
-        if start == self.pos {
-            return Err(self.err("expected attribute name"));
-        }
-        Ok(self.input[start..self.pos].to_string())
-    }
-
-    fn parse_raw_attr(&mut self) -> Result<RawAttr, TemplateParseError> {
-        let name_start = self.pos;
-        let name = self.parse_attr_name()?;
-        self.skip_ws();
-        if !self.starts_with("=") {
-            return Ok(RawAttr {
-                name,
-                value: None,
-                span: TemplateSpan::from_usize(name_start, self.pos),
-            });
-        }
-        self.bump();
-        self.skip_ws();
-        if self.starts_with("{") {
-            return Err(self.err(format!(
-                "unquoted `{}={{…}}` is not valid VMZ template syntax; use `:{}=\"…\"` or a Vue directive",
-                name,
-                name.trim_start_matches([':', '@', '#'])
-            )));
-        }
-        if self.starts_with("\"") || self.starts_with("'") {
-            let value = self.parse_quoted()?;
-            return Ok(RawAttr {
-                name,
-                value: Some(value),
-                span: TemplateSpan::from_usize(name_start, self.pos),
-            });
-        }
-        Err(self.err(format!("attribute `{name}` value must be a quoted string (Vue template)")))
-    }
-
-    fn parse_quoted(&mut self) -> Result<String, TemplateParseError> {
-        let quote = self.bump().ok_or_else(|| self.err("expected quote"))?;
-        let start = self.pos;
-        while let Some(c) = self.peek() {
-            if c == quote {
-                let val = decode_html_entities(&self.input[start..self.pos]);
-                self.bump();
-                return Ok(val);
-            }
-            self.bump();
-        }
-        Err(self.err_at(start.saturating_sub(1), "unclosed attribute string"))
-    }
-}
-
-fn classify_attrs(raw: Vec<RawAttr>) -> Result<Vec<ConcreteAttr>, TemplateParseError> {
-    let mut out = Vec::new();
-    for attr in raw {
-        out.push(classify_one(attr)?);
-    }
-    Ok(out)
 }
 
 fn classify_one(attr: RawAttr) -> Result<ConcreteAttr, TemplateParseError> {

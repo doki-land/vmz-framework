@@ -3,7 +3,7 @@
 //! **Author syntax** aims at Vue template isomorphism. **Emit** still consumes
 //! [`TemplateIr`] / [`TemplateAttr`] via [`super::template_lower`]. Layer-1 Concrete
 //! is a **deprecated adapter** (see [`super::template_concrete`]); do not add new
-//! string directive specials on the legacy attr model or XML scanner (P0 / stage C freeze).
+//! string directive specials on the legacy attr model (P0 / stage C freeze).
 
 use std::path::PathBuf;
 
@@ -13,7 +13,6 @@ use vmz_protocol::SourceSpan;
 pub use super::template_common::{TemplateParseError, decode_html_entities};
 pub use super::template_concrete::{
     ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg, classify_concrete_attr,
-    parse_template_concrete,
 };
 pub use super::template_ir::{AttrValue, TemplateAttr, TemplateIr, TemplateNode};
 pub use super::template_lower::lower_concrete_to_ir;

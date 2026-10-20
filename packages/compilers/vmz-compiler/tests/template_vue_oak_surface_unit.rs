@@ -1,19 +1,19 @@
-//! `template-vue-oak-surface` — Oak layers Semantic must match legacy Concrete→Semantic
-//! on a Vue author-syntax matrix (stage C conformance).
+//! `template-vue-oak-surface` — Oak direct Semantic must match Concrete→Semantic on a
+//! Vue author-syntax matrix (stage C conformance).
 
 use vmz_compiler::{
     SemanticIr, SemanticNode, SemanticProp, TemplateBlock, lower_concrete_to_semantic,
-    parse_template_concrete, parse_template_layers_primary, parse_template_semantic_primary,
-    semantic_ast_stats,
+    parse_template_concrete_body_primary, parse_template_layers_primary,
+    parse_template_semantic_primary, semantic_ast_stats,
 };
 
 fn body_block(body: &str) -> TemplateBlock {
     TemplateBlock { content: body.to_string(), content_start: 0 }
 }
 
-fn legacy_semantic(body: &str) -> SemanticIr {
-    let concrete = parse_template_concrete(body).expect("legacy concrete");
-    lower_concrete_to_semantic(&concrete).expect("legacy semantic")
+fn concrete_semantic(body: &str) -> SemanticIr {
+    let concrete = parse_template_concrete_body_primary(body).expect("concrete");
+    lower_concrete_to_semantic(&concrete).expect("concrete semantic")
 }
 
 fn oak_semantic(body: &str) -> SemanticIr {
@@ -21,19 +21,19 @@ fn oak_semantic(body: &str) -> SemanticIr {
 }
 
 /// Compare Semantic shape (tags / control-flow / prop kinds), ignoring span offsets
-/// which may differ between Oak shell mapping and the legacy body scanner.
-fn assert_semantic_shape_eq(oak: &SemanticIr, legacy: &SemanticIr, case: &str) {
+/// which may differ between the direct Oak walk and the Concrete adapter.
+fn assert_semantic_shape_eq(oak: &SemanticIr, from_concrete: &SemanticIr, case: &str) {
     assert_eq!(
         semantic_ast_stats(oak),
-        semantic_ast_stats(legacy),
-        "{case}: semantic_ast_stats mismatch oak={oak:?} legacy={legacy:?}"
+        semantic_ast_stats(from_concrete),
+        "{case}: semantic_ast_stats mismatch oak={oak:?} concrete={from_concrete:?}"
     );
     assert_eq!(
         shape_nodes(&oak.roots),
-        shape_nodes(&legacy.roots),
-        "{case}: shape mismatch\noak={:?}\nlegacy={:?}",
+        shape_nodes(&from_concrete.roots),
+        "{case}: shape mismatch\noak={:?}\nconcrete={:?}",
         oak.roots,
-        legacy.roots
+        from_concrete.roots
     );
 }
 
@@ -131,7 +131,7 @@ fn prop_label(p: &SemanticProp) -> String {
     }
 }
 
-/// Cases where Oak layers Semantic must match legacy Concrete→Semantic today.
+/// Vue author-syntax matrix: Oak direct Semantic must match Concrete→Semantic.
 const AGREED: &[(&str, &str)] = &[
     ("text_interp", r#"<p>Hi {{ name }}</p>"#),
     ("void_input", r#"<input type="text" />"#),
@@ -172,16 +172,12 @@ const AGREED: &[(&str, &str)] = &[
     ("nested_elements", r#"<main><section><p>{{ t }}</p></section></main>"#),
 ];
 
-/// Documented Oak Vue gaps — tracked for oaks, not VMZ XML workarounds.
-/// Empty when the AGREED matrix covers the current Vue template surface.
-const OAK_GAPS: &[(&str, &str)] = &[];
-
 #[test]
-fn oak_and_legacy_semantic_agree_on_vue_surface_matrix() {
+fn oak_direct_and_concrete_semantic_agree_on_vue_surface_matrix() {
     for (name, body) in AGREED {
         let oak = oak_semantic(body);
-        let legacy = legacy_semantic(body);
-        assert_semantic_shape_eq(&oak, &legacy, name);
+        let concrete = concrete_semantic(body);
+        assert_semantic_shape_eq(&oak, &concrete, name);
     }
 }
 
@@ -197,18 +193,5 @@ fn layers_primary_concrete_lowers_to_same_semantic_as_oak_primary() {
         );
         let oak_only = oak_semantic(body);
         assert_semantic_shape_eq(&semantic, &oak_only, name);
-    }
-}
-
-#[test]
-fn oak_gaps_are_documented_not_silently_equal() {
-    for (name, body) in OAK_GAPS {
-        let oak = oak_semantic(body);
-        let legacy = legacy_semantic(body);
-        assert_ne!(
-            shape_nodes(&oak.roots),
-            shape_nodes(&legacy.roots),
-            "{name}: unexpectedly matches legacy — remove from OAK_GAPS"
-        );
     }
 }

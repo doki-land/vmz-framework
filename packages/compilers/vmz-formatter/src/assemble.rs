@@ -25,7 +25,7 @@ pub fn assemble_vmz(
     }
 
     let template_source = detent_envelope(&parsed.template.content);
-    // CST preflight only — print still uses legacy concrete → Semantic.
+    // CST preflight — print goes through Oak Semantic.
     require_template_cst(&TemplateShellInput {
         content: parsed.template.content.clone(),
         content_start: parsed.template.content_start,

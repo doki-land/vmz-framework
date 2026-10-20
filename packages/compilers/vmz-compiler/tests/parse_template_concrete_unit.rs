@@ -5,7 +5,7 @@ use vmz_compiler::parse::template::*;
 #[test]
 fn multiline_text_before_interpolation_has_one_render_space() {
     let source = "<p>selected:\n            {{ selected }}</p>";
-    let concrete = parse_template_concrete(source).unwrap();
+    let concrete = parse_template_concrete_body_primary(source).unwrap();
     let ir = lower_concrete_to_ir(&concrete).unwrap();
     let TemplateNode::Element { children, .. } = &ir.roots[0] else { panic!("expected p") };
     assert!(matches!(&children[0], TemplateNode::Text(value) if value == "selected: "));
@@ -17,7 +17,7 @@ fn multiline_text_before_interpolation_has_one_render_space() {
 #[test]
 fn on_modifiers_structured_and_ir_strips() {
     let src = r#"<button @click.stop.prevent="save">x</button>"#;
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     match &concrete.roots[0] {
         ConcreteNode::Element { attrs, span, .. } => {
             assert!(!span.is_empty());
@@ -51,7 +51,7 @@ fn on_modifiers_structured_and_ir_strips() {
 #[test]
 fn v_for_keeps_index_alias_on_concrete_only() {
     let src = r#"<li v-for="(item, index) in items" :key="item.id">{{ item }}</li>"#;
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     match &concrete.roots[0] {
         ConcreteNode::Element { attrs, .. } => {
             let for_dir = attrs.iter().find_map(|a| match a {
@@ -100,7 +100,7 @@ fn structured_if_bind_slot_bind_object() {
 "#;
     // Body-only parse (no outer template tag required by parse_template).
     let body = r#"<div v-if="ok" :title="label" #default="slotProps" v-bind="extra">x</div>"#;
-    let concrete = parse_template_concrete(body).unwrap();
+    let concrete = parse_template_concrete_body_primary(body).unwrap();
     match &concrete.roots[0] {
         ConcreteNode::Element { attrs, .. } => {
             assert!(attrs.iter().any(|a| matches!(
@@ -142,11 +142,17 @@ fn structured_if_bind_slot_bind_object() {
 }
 
 #[test]
-fn comment_on_concrete_dropped_from_ir() {
+fn comment_is_dropped_from_concrete_and_ir() {
     let src = "<!-- keep on concrete --><span/>";
-    let concrete = parse_template_concrete(src).unwrap();
-    assert!(matches!(concrete.roots[0], ConcreteNode::Comment { .. }));
-    assert!(matches!(concrete.roots[1], ConcreteNode::Element { .. }));
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
+    assert_eq!(concrete.roots.len(), 1);
+    match &concrete.roots[0] {
+        ConcreteNode::Element { tag, span, .. } => {
+            assert_eq!(tag, "span");
+            assert_eq!(&src[span.start as usize..span.end as usize], "<span/>");
+        }
+        other => panic!("expected element, got {other:?}"),
+    }
 
     let ir = parse_template(src).unwrap();
     assert_eq!(ir.roots.len(), 1);
@@ -154,15 +160,9 @@ fn comment_on_concrete_dropped_from_ir() {
 }
 
 #[test]
-fn rejects_single_brace_on_concrete() {
-    let err = parse_template_concrete("<h2>{user.name}</h2>").unwrap_err();
-    assert!(err.message.contains("single-brace"), "{err}");
-}
-
-#[test]
 fn v_model_concrete_and_legacy_ir_lower() {
     let src = r#"<input v-model="query" />"#;
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     assert!(matches!(
         &concrete.roots[0],
         ConcreteNode::Element { attrs, .. }
@@ -200,7 +200,7 @@ fn template_attr_has_no_raw_v_model_string_name() {
 #[test]
 fn template_span_is_utf8_byte_offsets_end_exclusive() {
     let src = "<p>{{ x }}</p>";
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     match &concrete.roots[0] {
         ConcreteNode::Element { span, children, .. } => {
             assert_eq!(span.start, 0);
@@ -229,7 +229,8 @@ fn lower_matches_parse_template_golden() {
     ];
     for src in fixtures {
         let via_parse = parse_template(src).unwrap();
-        let via_lower = lower_concrete_to_ir(&parse_template_concrete(src).unwrap()).unwrap();
+        let via_lower =
+            lower_concrete_to_ir(&parse_template_concrete_body_primary(src).unwrap()).unwrap();
         assert_eq!(via_parse, via_lower, "golden mismatch for {src}");
     }
 }

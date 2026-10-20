@@ -9,7 +9,7 @@ use super::template_common::{TemplateParseError, decode_html_entities};
 use super::template_concrete::{ConcreteAttr, ConcreteIr, ConcreteNode, classify_concrete_attr};
 use super::template_semantic::{
     ControlFlowKind, IfBranch, SemanticIr, SemanticNode, control_flow_kind, if_chain_from_branches,
-    lower_concrete_to_semantic, semantic_from_element_parts,
+    semantic_from_element_parts,
 };
 use super::template_span::TemplateSpan;
 use crate::sfc::TemplateBlock;
@@ -58,27 +58,34 @@ pub fn lower_vue_root_to_semantic(root: &VueRoot, shell: &str) -> Result<Semanti
     Ok(SemanticIr { roots })
 }
 
-/// Prefer Oak concrete + semantic for a template body string, fall back to legacy.
+/// Parse a template **body** string into [`ConcreteIr`] through Oak (body-relative spans).
 pub fn parse_template_concrete_body_primary(input: &str) -> Result<ConcreteIr, TemplateParseError> {
-    Ok(parse_template_layers_primary(&TemplateBlock {
-        content: input.to_string(),
-        content_start: 0,
-    })?
-    .0)
+    parse_template_concrete_primary(&TemplateBlock { content: input.to_string(), content_start: 0 })
 }
 
-/// Prefer Oak concrete lowering for `check` / `compile`, fall back to legacy when Oak
-/// fails or the Oak IR cannot lower to Semantic (keeps production builds unblocked).
+/// Parse the `<template>` region of a `.vmz` file into [`ConcreteIr`] through Oak.
+///
+/// Concrete only — Semantic is not lowered here, so callers that inspect raw
+/// directives (or report control-flow errors later) keep the two layers separate.
 pub fn parse_template_concrete_primary(
     template: &TemplateBlock,
 ) -> Result<ConcreteIr, TemplateParseError> {
-    Ok(parse_template_layers_primary(template)?.0)
+    let shell = TemplateShellInput {
+        content: template.content.clone(),
+        content_start: template.content_start,
+    };
+    let parsed = parse_template_ast(&shell);
+    let root = ast_root_or_fail(&parsed)?;
+    lower_vue_root_to_concrete(root, &parsed.shell_source)
+        .map_err(|message| TemplateParseError { message, offset: 0 })
 }
 
-/// Oak Vue AST → Concrete + Semantic as one primary unit; legacy XML on failure.
+/// Oak Vue AST → Concrete + Semantic in one parse.
 ///
-/// Semantic is lowered **directly** from Oak (no Concrete→Semantic hop). Concrete
-/// is still produced for legacy TemplateIr emit until Execution IR lands.
+/// Oak is the only template parser: a rejection is returned as [`TemplateParseError`],
+/// there is no string-scanner fallback. Semantic is lowered **directly** from Oak (no
+/// Concrete→Semantic hop). Concrete is still produced for legacy TemplateIr emit until
+/// Execution IR lands.
 pub fn parse_template_layers_primary(
     template: &TemplateBlock,
 ) -> Result<(ConcreteIr, SemanticIr), TemplateParseError> {
@@ -87,30 +94,49 @@ pub fn parse_template_layers_primary(
         content_start: template.content_start,
     };
     let parsed = parse_template_ast(&shell);
-    if parsed.ok {
-        if let Some(root) = parsed.root.as_ref() {
-            if let (Ok(concrete), Ok(semantic)) = (
-                lower_vue_root_to_concrete(root, &parsed.shell_source),
-                lower_vue_root_to_semantic(root, &parsed.shell_source),
-            ) {
-                return Ok((concrete, semantic));
-            }
-        }
-    }
-    let concrete = super::template_concrete::parse_template_concrete(&template.content)?;
-    let semantic = lower_concrete_to_semantic(&concrete)?;
+    let root = ast_root_or_fail(&parsed)?;
+    let concrete = lower_vue_root_to_concrete(root, &parsed.shell_source)
+        .map_err(|message| TemplateParseError { message, offset: 0 })?;
+    let semantic = lower_vue_root_to_semantic(root, &parsed.shell_source)
+        .map_err(|message| TemplateParseError { message, offset: 0 })?;
     Ok((concrete, semantic))
 }
 
-/// Prefer Oak Semantic (no Concrete in the return type); legacy XML fallback.
+/// Oak Semantic (no Concrete in the return type); Oak failure is an error.
 pub fn parse_template_semantic_primary(
     template: &TemplateBlock,
 ) -> Result<SemanticIr, TemplateParseError> {
-    if let Ok(semantic) = parse_template_semantic_via_oak(template) {
-        return Ok(semantic);
+    let shell = TemplateShellInput {
+        content: template.content.clone(),
+        content_start: template.content_start,
+    };
+    let parsed = parse_template_ast(&shell);
+    let root = ast_root_or_fail(&parsed)?;
+    lower_vue_root_to_semantic(root, &parsed.shell_source)
+        .map_err(|message| TemplateParseError { message, offset: 0 })
+}
+
+fn ast_root_or_fail(
+    parsed: &vmz_oak_frontend_adapter::TemplateAstParse,
+) -> Result<&VueRoot, TemplateParseError> {
+    match &parsed.root {
+        Some(root) if parsed.ok => Ok(root),
+        _ => Err(TemplateParseError {
+            message: format_oak_fail(parsed),
+            offset: oak_fail_offset(parsed),
+        }),
     }
-    let concrete = super::template_concrete::parse_template_concrete(&template.content)?;
-    lower_concrete_to_semantic(&concrete)
+}
+
+/// First Oak diagnostic remapped into a template-body-relative offset.
+fn oak_fail_offset(parsed: &vmz_oak_frontend_adapter::TemplateAstParse) -> usize {
+    let body_start = parsed.shell_base_offset + TEMPLATE_OPEN.len();
+    parsed
+        .diagnostics
+        .iter()
+        .filter_map(|d| d.span.as_ref().map(|s| s.start.saturating_sub(body_start)))
+        .next()
+        .unwrap_or(0)
 }
 
 fn format_oak_fail(parsed: &vmz_oak_frontend_adapter::TemplateAstParse) -> String {

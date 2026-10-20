@@ -315,13 +315,13 @@ fn is_component_tag(tag: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parse::template_concrete::parse_template_concrete;
+    use crate::parse::template::parse_template_concrete_body_primary;
     use crate::parse::template_semantic::lower_concrete_to_semantic;
 
     #[test]
     fn field_span_comes_from_interpolation_not_jsx_braces() {
         let src = r#"<p>{{ count }}</p><span :title="count">x</span>"#;
-        let concrete = parse_template_concrete(src).unwrap();
+        let concrete = parse_template_concrete_body_primary(src).unwrap();
         let sem = lower_concrete_to_semantic(&concrete).unwrap();
         let spans = semantic_field_spans(&sem, src, "count");
         assert!(spans.len() >= 2, "{spans:?}");
@@ -335,7 +335,7 @@ mod tests {
     #[test]
     fn handler_span_from_on_plan() {
         let src = r#"<button @click="save">ok</button>"#;
-        let concrete = parse_template_concrete(src).unwrap();
+        let concrete = parse_template_concrete_body_primary(src).unwrap();
         let sem = lower_concrete_to_semantic(&concrete).unwrap();
         let spans = semantic_handler_spans(&sem, src, "save");
         assert_eq!(spans.len(), 1, "{spans:?}");
@@ -345,7 +345,7 @@ mod tests {
     #[test]
     fn component_tag_spans_from_element_nodes() {
         let src = r#"<Card title="t"><Card /></Card>"#;
-        let concrete = parse_template_concrete(src).unwrap();
+        let concrete = parse_template_concrete_body_primary(src).unwrap();
         let sem = lower_concrete_to_semantic(&concrete).unwrap();
         assert_eq!(semantic_component_tags(&sem), vec!["Card".to_string()]);
         let spans = semantic_tag_spans(&sem, src, "Card");

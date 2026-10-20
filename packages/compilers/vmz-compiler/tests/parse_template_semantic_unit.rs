@@ -2,8 +2,8 @@
 
 use vmz_compiler::{
     DirectiveArg, EventTarget, SemanticNode, SemanticProp, TemplateBlock,
-    lower_concrete_to_semantic, parse_template, parse_template_asts, parse_template_concrete,
-    parse_template_semantic_primary, semantic_ast_stats,
+    lower_concrete_to_semantic, parse_template, parse_template_asts,
+    parse_template_concrete_body_primary, parse_template_semantic_primary, semantic_ast_stats,
 };
 use vmz_generator::print_template_expr;
 
@@ -14,7 +14,7 @@ fn groups_if_elseif_else_into_one_chain() {
 <p v-else-if="b">B</p>
 <p v-else>C</p>
 "#;
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     let sem = lower_concrete_to_semantic(&concrete).unwrap();
     assert_eq!(sem.roots.len(), 1);
     match &sem.roots[0] {
@@ -31,14 +31,14 @@ fn groups_if_elseif_else_into_one_chain() {
 
 #[test]
 fn orphan_else_is_error() {
-    let concrete = parse_template_concrete(r#"<p v-else>x</p>"#).unwrap();
+    let concrete = parse_template_concrete_body_primary(r#"<p v-else>x</p>"#).unwrap();
     let err = lower_concrete_to_semantic(&concrete).unwrap_err();
     assert!(err.message.contains("v-else"), "{err}");
 }
 
 #[test]
 fn orphan_else_if_is_error() {
-    let concrete = parse_template_concrete(r#"<p v-else-if="x">y</p>"#).unwrap();
+    let concrete = parse_template_concrete_body_primary(r#"<p v-else-if="x">y</p>"#).unwrap();
     let err = lower_concrete_to_semantic(&concrete).unwrap_err();
     assert!(err.message.contains("v-else-if"), "{err}");
 }
@@ -46,7 +46,7 @@ fn orphan_else_if_is_error() {
 #[test]
 fn two_separate_ifs_are_two_chains() {
     let src = r#"<p v-if="a">A</p><p v-if="b">B</p>"#;
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     let sem = lower_concrete_to_semantic(&concrete).unwrap();
     assert_eq!(sem.roots.len(), 2);
     assert!(matches!(sem.roots[0], SemanticNode::IfChain { .. }));
@@ -60,7 +60,7 @@ fn comment_between_chain_members_still_groups() {
 <!-- skip -->
 <p v-else>B</p>
 "#;
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     let sem = lower_concrete_to_semantic(&concrete).unwrap();
     assert_eq!(sem.roots.len(), 1);
     match &sem.roots[0] {
@@ -76,7 +76,7 @@ fn comment_between_chain_members_still_groups() {
 #[test]
 fn for_node_keeps_aliases_and_key() {
     let src = r#"<li v-for="(item, index) in items" :key="item.id">{{ item }}</li>"#;
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     let sem = lower_concrete_to_semantic(&concrete).unwrap();
     assert_eq!(sem.roots.len(), 1);
     match &sem.roots[0] {
@@ -122,7 +122,7 @@ fn for_node_keeps_aliases_and_key() {
 #[test]
 fn three_alias_for_retained() {
     let src = r#"<li v-for="(v, k, i) in map" :key="k">{{ v }}</li>"#;
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     let sem = lower_concrete_to_semantic(&concrete).unwrap();
     match &sem.roots[0] {
         SemanticNode::ForNode { value_alias, key_alias, index_alias, key, .. } => {
@@ -138,7 +138,7 @@ fn three_alias_for_retained() {
 #[test]
 fn on_modifiers_survive_semantic_event_plan() {
     let src = r#"<button @click.stop.prevent="save">x</button>"#;
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     let sem = lower_concrete_to_semantic(&concrete).unwrap();
     match &sem.roots[0] {
         SemanticNode::Element { props, .. } => match &props[0] {
@@ -168,7 +168,7 @@ fn on_modifiers_survive_semantic_event_plan() {
 #[test]
 fn component_on_targets_component_event() {
     let src = r#"<Counter @bump.stop="onBump" />"#;
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     let sem = lower_concrete_to_semantic(&concrete).unwrap();
     match &sem.roots[0] {
         SemanticNode::Element { props, .. } => match &props[0] {
@@ -185,7 +185,7 @@ fn component_on_targets_component_event() {
 #[test]
 fn bind_plan_keeps_modifiers() {
     let src = r#"<input :value.sync="q" />"#;
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     let sem = lower_concrete_to_semantic(&concrete).unwrap();
     match &sem.roots[0] {
         SemanticNode::Element { props, .. } => match &props[0] {
@@ -222,7 +222,7 @@ fn slot_outlet_and_named_fallback() {
   <slot />
 </button>
 "#;
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     let sem = lower_concrete_to_semantic(&concrete).unwrap();
     match &sem.roots[0] {
         SemanticNode::Element { tag, children, .. } => {
@@ -257,7 +257,7 @@ fn template_hash_slot_becomes_slot_template() {
   </template>
 </Card>
 "#;
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     let sem = lower_concrete_to_semantic(&concrete).unwrap();
     match &sem.roots[0] {
         SemanticNode::Element { tag, children, .. } => {
@@ -299,14 +299,14 @@ fn template_hash_slot_becomes_slot_template() {
 
 #[test]
 fn dynamic_slot_arg_is_structured_error() {
-    let concrete = parse_template_concrete(r#"<Comp v-slot:[name]>x</Comp>"#).unwrap();
+    let concrete = parse_template_concrete_body_primary(r#"<Comp v-slot:[name]>x</Comp>"#).unwrap();
     let err = lower_concrete_to_semantic(&concrete).unwrap_err();
     assert!(err.message.contains("dynamic") && err.message.contains("slot"), "{err}");
 }
 
 #[test]
 fn v_model_becomes_semantic_model_plan() {
-    let concrete = parse_template_concrete(r#"<input v-model.number="q" />"#).unwrap();
+    let concrete = parse_template_concrete_body_primary(r#"<input v-model.number="q" />"#).unwrap();
     let sem = lower_concrete_to_semantic(&concrete).unwrap();
     match &sem.roots[0] {
         SemanticNode::Element { props, .. } => match &props[0] {
@@ -336,7 +336,7 @@ fn v_model_arg_lower_uses_named_prop() {
 #[test]
 fn dynamic_bind_and_on_args_survive_semantic_and_ir() {
     let src = r#"<button :[attrName]="val" @[eventName]="onEv">x</button>"#;
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     let sem = lower_concrete_to_semantic(&concrete).unwrap();
     match &sem.roots[0] {
         SemanticNode::Element { props, .. } => {
@@ -364,7 +364,7 @@ fn dynamic_bind_and_on_args_survive_semantic_and_ir() {
 #[test]
 fn class_and_style_merge_into_plans() {
     let src = r#"<div class="a b" :class="{ active }" style="color:red" :style="dyn">x</div>"#;
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     let sem = lower_concrete_to_semantic(&concrete).unwrap();
     match &sem.roots[0] {
         SemanticNode::Element { props, .. } => {

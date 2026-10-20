@@ -3,7 +3,9 @@
 //! Each case asserts that every recorded `TemplateSpan` slices the source to the
 //! expected substring. Spans are end-exclusive `[start, end)` into the template body.
 
-use vmz_compiler::parse::template::{ConcreteAttr, ConcreteNode, parse_template_concrete};
+use vmz_compiler::parse::template::{
+    ConcreteAttr, ConcreteNode, parse_template_concrete_body_primary,
+};
 
 struct SpanCase {
     name: &'static str,
@@ -102,7 +104,7 @@ fn concrete_span_fixture_pack_utf8_and_structure() {
     ];
 
     for case in cases {
-        let concrete = parse_template_concrete(case.source)
+        let concrete = parse_template_concrete_body_primary(case.source)
             .unwrap_or_else(|e| panic!("{}: parse failed: {e}", case.name));
         assert_all_spans_valid_slices(case.source, &concrete.roots);
 
@@ -125,7 +127,7 @@ fn concrete_span_fixture_pack_utf8_and_structure() {
 fn concrete_span_fixture_interpolation_exact_bytes() {
     // Multi-byte: "中" is 3 UTF-8 bytes; offsets must not land mid-codepoint.
     let src = "<p>{{ 中 }}</p>";
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     let ConcreteNode::Element { children, .. } = &concrete.roots[0] else {
         panic!("element");
     };
@@ -141,7 +143,7 @@ fn concrete_span_fixture_interpolation_exact_bytes() {
 #[test]
 fn concrete_span_fixture_attr_covers_directive_text() {
     let src = r#"<a :href="url" @click.stop="go">x</a>"#;
-    let concrete = parse_template_concrete(src).unwrap();
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
     let ConcreteNode::Element { attrs, .. } = &concrete.roots[0] else {
         panic!("element");
     };
