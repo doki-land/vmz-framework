@@ -38,8 +38,12 @@ pub fn print_js_source(
         content_start: 0,
         role: vmz_oak_frontend_adapter::ScriptRole::Client,
     };
-    if !vmz_oak_frontend_adapter::parse_script_ast(&shell).ok {
-        return Err("Oak TypeScript parse failed".into());
+    let parsed = vmz_oak_frontend_adapter::parse_script_ast(&shell);
+    if !parsed.ok {
+        return Err(format!(
+            "Oak TypeScript parse failed: {}",
+            vmz_oak_frontend_adapter::format_cst_diagnostics(&parsed.diagnostics)
+        ));
     }
     let formatted = erase_types(source)?;
     let code = if options.minify {
