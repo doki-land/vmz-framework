@@ -119,10 +119,9 @@ fn erases_annotations_on_keyword_named_members() {
 
 #[test]
 fn erases_keyword_named_parameter_and_return_types() {
-    let js = erase_types(
-        "class Picker {\n  get(keyof: string): string {\n    return keyof;\n  }\n}\n",
-    )
-    .unwrap();
+    let js =
+        erase_types("class Picker {\n  get(keyof: string): string {\n    return keyof;\n  }\n}\n")
+            .unwrap();
     assert!(!js.contains("keyof: string"), "{js}");
     assert!(js.contains("get(keyof)"), "{js}");
 }
