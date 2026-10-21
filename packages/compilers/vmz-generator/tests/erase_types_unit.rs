@@ -57,6 +57,20 @@ fn erases_as_casts_and_non_null_assertions() {
 }
 
 #[test]
+fn erases_union_and_intersection_casts() {
+    let js = erase_types(
+        "const target = ev?.target as Element | null;\nconst el = (target as HTMLElement).closest('[data-vmz-option]') as HTMLElement | null;\nconst merged = value as A & B;\n",
+    )
+    .unwrap();
+    assert!(!js.contains("as Element"), "{js}");
+    assert!(!js.contains("as HTMLElement"), "{js}");
+    assert!(!js.contains("as A"), "{js}");
+    assert!(!js.contains("| null"), "{js}");
+    assert!(!js.contains("& B"), "{js}");
+    assert!(js.contains("ev?.target;") || js.contains("ev?.target"), "{js}");
+}
+
+#[test]
 fn erases_generic_declarations_and_calls() {
     let js = erase_types(
         "function identity<T>(value: T): T {\n  return value;\n}\nconst list = identity<string>('x');\nclass Box<T> {\n  value: T;\n}\n",

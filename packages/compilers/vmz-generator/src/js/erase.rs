@@ -819,7 +819,10 @@ fn is_type_terminator(kind: T, expr: bool, type_start: T) -> bool {
         T::EqualEqual | T::NotEqual | T::EqualEqualEqual | T::NotEqualEqual => expr,
         T::AmpersandAmpersand | T::PipePipe | T::QuestionQuestion => expr,
         T::LessEqual | T::GreaterEqual => expr,
-        T::Pipe | T::Ampersand => expr,
+        // `as A | null` / `as A & B` are casts to union / intersection types, so a
+        // single separator must stay inside the erased type. Logical `||` / `&&`
+        // still terminate above.
+        T::Pipe | T::Ampersand => false,
         T::In | T::Instanceof => expr,
         _ => false,
     }
