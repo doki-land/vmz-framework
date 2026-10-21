@@ -165,7 +165,7 @@ fn if_deps_come_from_control_region_only() {
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
     // Structural if deps = stable cond only (show), not body texts.
     assert!(
-        js.contains("api.comment('vmz-if')") && js.contains("[\"show\"]"),
+        js.contains(r#"api.comment("vmz-if")"#) && js.contains("[\"show\"]"),
         "if deps must be region stable only: {js}"
     );
     assert!(!js.contains("prototype.render"), "{js}");
