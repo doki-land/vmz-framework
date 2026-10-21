@@ -413,28 +413,16 @@ impl<'a> Eraser<'a> {
                     i += 1;
                 }
                 T::Public | T::Private | T::Protected | T::Readonly | T::Abstract | T::Override => {
-                    let name_like = matches!(
-                        self.kind(i + 1),
-                        Some(
+                    let name_like = self.kind(i + 1).is_some_and(|kind| {
+                        matches!(
+                            kind,
                             T::IdentifierName
                                 | T::StringLiteral
                                 | T::NumericLiteral
                                 | T::LeftBracket
                                 | T::Star
-                                | T::Async
-                                | T::Get
-                                | T::Set
-                                | T::Static
-                                | T::Constructor
-                                | T::Public
-                                | T::Private
-                                | T::Protected
-                                | T::Readonly
-                                | T::Abstract
-                                | T::Override
-                                | T::Class
-                        )
-                    );
+                        ) || is_member_name_keyword(kind)
+                    });
                     let property_access = matches!(prev, Some(T::Dot | T::QuestionDot));
                     if name_like && !property_access {
                         self.delete_token(i);
@@ -618,7 +606,9 @@ impl<'a> Eraser<'a> {
         let Some(prev) = prev else {
             return false;
         };
-        if !can_end_binding(prev) {
+        let keyword_member = matches!(frame, Some(FrameKind::ClassBody | FrameKind::Params))
+            && is_member_name_keyword(prev);
+        if !can_end_binding(prev) && !keyword_member {
             return false;
         }
         if prev == T::RightParen {
@@ -934,6 +924,59 @@ fn can_end_binding(kind: T) -> bool {
             | T::Get
             | T::Set
             | T::Constructor
+    )
+}
+
+/// Keyword tokens that are legal class member names once the modifier prefix is
+/// stripped (`public type`, `public readonly`, `static get`, ...).
+///
+/// Structural keywords that drive frame or statement tracking in [`Eraser::run`]
+/// (`class`, `interface`, `enum`, `namespace`, `case`, `default`, ...) are
+/// intentionally absent so a member named like them cannot corrupt that state.
+fn is_member_name_keyword(kind: T) -> bool {
+    matches!(
+        kind,
+        T::Type
+            | T::Readonly
+            | T::Get
+            | T::Set
+            | T::Static
+            | T::Async
+            | T::New
+            | T::Constructor
+            | T::Public
+            | T::Private
+            | T::Protected
+            | T::Abstract
+            | T::Override
+            | T::Implements
+            | T::Extends
+            | T::Keyof
+            | T::Infer
+            | T::Is
+            | T::As
+            | T::Asserts
+            | T::Unique
+            | T::Any
+            | T::Boolean
+            | T::Number
+            | T::Object
+            | T::String
+            | T::Symbol
+            | T::Unknown
+            | T::Never
+            | T::Void
+            | T::Null
+            | T::True
+            | T::False
+            | T::This
+            | T::Super
+            | T::Delete
+            | T::Typeof
+            | T::Instanceof
+            | T::In
+            | T::Of
+            | T::From
     )
 }
 

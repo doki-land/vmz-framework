@@ -104,6 +104,30 @@ fn erases_arrow_parameter_and_return_types() {
 }
 
 #[test]
+fn erases_annotations_on_keyword_named_members() {
+    let js = erase_types(
+        "class Button {\n  public type: string = 'button';\n  variant = 'primary';\n}\nclass TextArea {\n  public readonly: boolean = false;\n  readonly = true;\n}\n",
+    )
+    .unwrap();
+    assert!(!js.contains("public"), "{js}");
+    assert!(!js.contains(": string"), "{js}");
+    assert!(!js.contains(": boolean"), "{js}");
+    assert!(js.contains("type = 'button';"), "{js}");
+    assert!(js.contains("readonly = false;"), "{js}");
+    assert!(js.contains("readonly = true;"), "{js}");
+}
+
+#[test]
+fn erases_keyword_named_parameter_and_return_types() {
+    let js = erase_types(
+        "class Picker {\n  get(keyof: string): string {\n    return keyof;\n  }\n}\n",
+    )
+    .unwrap();
+    assert!(!js.contains("keyof: string"), "{js}");
+    assert!(js.contains("get(keyof)"), "{js}");
+}
+
+#[test]
 fn rejects_enums_and_namespaces() {
     assert!(erase_types("enum Color {\n  Red,\n}\n").is_err());
     assert!(erase_types("namespace App {\n  export const x = 1;\n}\n").is_err());
