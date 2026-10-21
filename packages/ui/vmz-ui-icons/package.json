@@ -1,5 +1,10 @@
 {
     "name": "@vmz/ui-icons",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/doki-land/vmz-framework.git",
+        "directory": "packages/ui/vmz-ui-icons"
+    },
     "version": "0.0.0",
     "type": "module",
     "description": "VMZ UI Icons — semantic icon names + glyph registry. Reuses @vmz/ui tokens; not a second Button/Tooltip shell or loose SVG dump.",

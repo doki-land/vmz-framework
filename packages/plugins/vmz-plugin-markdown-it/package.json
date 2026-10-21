@@ -1,5 +1,10 @@
 {
     "name": "@vmz/plugin-markdown-it",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/doki-land/vmz-framework.git",
+        "directory": "packages/plugins/vmz-plugin-markdown-it"
+    },
     "version": "0.1.0",
     "type": "module",
     "description": "VMZ markdown-it adapter — MarkdownIt + engines.markdown registration",

@@ -1,5 +1,10 @@
 {
     "name": "@vmz/plugin-shiki",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/doki-land/vmz-framework.git",
+        "directory": "packages/plugins/vmz-plugin-shiki"
+    },
     "version": "0.1.0",
     "type": "module",
     "description": "VMZ Shiki adapter - <Shiki> + code engine registration",

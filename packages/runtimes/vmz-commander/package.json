@@ -1,5 +1,10 @@
 {
     "name": "@vmz/commander",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/doki-land/vmz-framework.git",
+        "directory": "packages/runtimes/vmz-commander"
+    },
     "version": "0.1.0",
     "type": "module",
     "description": "i18n-first TypeScript CLI framework (command tree, locales loading, commander.* chrome)",

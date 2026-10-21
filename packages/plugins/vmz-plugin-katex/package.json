@@ -1,5 +1,10 @@
 {
     "name": "@vmz/plugin-katex",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/doki-land/vmz-framework.git",
+        "directory": "packages/plugins/vmz-plugin-katex"
+    },
     "version": "0.1.0",
     "type": "module",
     "description": "VMZ KaTeX adapter - <Katex> + math engine registration",

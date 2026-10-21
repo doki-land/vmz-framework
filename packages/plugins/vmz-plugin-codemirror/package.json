@@ -1,5 +1,10 @@
 {
     "name": "@vmz/plugin-codemirror",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/doki-land/vmz-framework.git",
+        "directory": "packages/plugins/vmz-plugin-codemirror"
+    },
     "version": "0.1.0",
     "type": "module",
     "description": "VMZ CodeMirror 6 editor adapter - <Codemirror>",

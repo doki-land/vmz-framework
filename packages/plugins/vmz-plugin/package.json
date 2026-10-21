@@ -1,5 +1,10 @@
 {
     "name": "@vmz/plugin",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/doki-land/vmz-framework.git",
+        "directory": "packages/plugins/vmz-plugin"
+    },
     "version": "0.1.0",
     "type": "module",
     "description": "VMZ plugin protocol types and definePlugin / defineConfig helpers (no N-API)",

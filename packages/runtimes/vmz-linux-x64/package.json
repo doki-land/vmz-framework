@@ -1,5 +1,10 @@
 {
     "name": "@vmz/vmz-linux-x64",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/doki-land/vmz-framework.git",
+        "directory": "packages/runtimes/vmz-linux-x64"
+    },
     "version": "0.1.0",
     "description": "VMZ native N-API addon (linux-x64)",
     "license": "MIT",
