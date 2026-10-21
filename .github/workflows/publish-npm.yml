@@ -244,8 +244,16 @@ jobs:
             fi
           done
 
-      - name: Publish real packages
-        env:
-          VMZ_NATIVE_ARTIFACTS: ${{ github.workspace }}/dist/native-flat
-          GITHUB_REF: refs/tags/v${{ needs.provenance.outputs.version }}
-        run: node scripts/ci/publish-npm.mjs --version=${{ needs.provenance.outputs.version }}
+      - name: Stage native artifacts into platform packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          for short in win32-x64 win32-arm64 linux-x64 linux-arm64 darwin-arm64 darwin-x64; do
+            dir="packages/runtimes/vmz-$short"
+            mkdir -p "$dir"
+            cp -r "dist/native-flat/$short"/. "$dir/"
+            ls -la "$dir"
+          done
+
+      - name: Publish packages to npm
+        run: pnpm exec nifty publish --access public --version=${{ needs.provenance.outputs.version }}
