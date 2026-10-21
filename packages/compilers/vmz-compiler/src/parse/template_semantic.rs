@@ -246,13 +246,14 @@ pub(crate) fn semantic_from_element_parts(
     children: Vec<SemanticNode>,
     span: TemplateSpan,
 ) -> Result<SemanticNode, TemplateParseError> {
+    validate_vue_element_syntax(tag, attrs, &children)?;
     let attrs: Vec<ConcreteAttr> = attrs
         .iter()
         .filter(|a| {
             !matches!(
                 a,
                 ConcreteAttr::Directive {
-                    dir: Directive::If { .. } | Directive::ElseIf { .. } | Directive::Else,
+                    dir: Directive::If { .. } | Directive::ElseIf { .. } | Directive::Else { .. },
                     ..
                 }
             )
@@ -276,6 +277,131 @@ pub(crate) fn semantic_from_element_parts(
         children,
         span,
     })
+}
+
+/// HTML / SVG / MathML element names, mirroring Vue `isNativeTag` (`@vue/shared` 3.5).
+const NATIVE_TAGS: &str = "html,body,base,head,link,meta,style,title,address,article,aside,footer,\
+header,hgroup,h1,h2,h3,h4,h5,h6,nav,section,div,dd,dl,dt,figcaption,figure,picture,hr,img,li,\
+main,ol,p,pre,ul,a,b,abbr,bdi,bdo,br,cite,code,data,dfn,em,i,kbd,mark,q,rp,rt,ruby,s,samp,small,\
+span,strong,sub,sup,time,u,var,wbr,area,audio,map,track,video,embed,object,param,source,canvas,\
+script,noscript,del,ins,caption,col,colgroup,table,thead,tbody,td,th,tr,button,datalist,fieldset,\
+form,input,label,legend,meter,optgroup,option,output,progress,select,textarea,details,dialog,menu,\
+summary,template,blockquote,iframe,tfoot,svg,animate,animateMotion,animateTransform,circle,\
+clipPath,color-profile,defs,desc,discard,ellipse,feBlend,feColorMatrix,feComponentTransfer,\
+feComposite,feConvolveMatrix,feDiffuseLighting,feDisplacementMap,feDistantLight,feDropShadow,\
+feFlood,feFuncA,feFuncB,feFuncG,feFuncR,feGaussianBlur,feImage,feMerge,feMergeNode,feMorphology,\
+feOffset,fePointLight,feSpecularLighting,feSpotLight,feTile,feTurbulence,filter,foreignObject,g,\
+hatch,hatchpath,image,line,linearGradient,marker,mask,mesh,meshgradient,meshpatch,meshrow,\
+metadata,mpath,path,pattern,polygon,polyline,radialGradient,rect,set,solidcolor,stop,switch,\
+symbol,text,textPath,tspan,unknown,use,view,annotation,annotation-xml,maction,maligngroup,\
+malignmark,math,menclose,merror,mfenced,mfrac,mfraction,mglyph,mi,mlabeledtr,mlongdiv,\
+mmultiscripts,mn,mo,mover,mpadded,mphantom,mprescripts,mroot,mrow,ms,mscarries,mscarry,msgroup,\
+msline,mspace,msqrt,msrow,mstack,mstyle,msub,msubsup,msup,mtable,mtd,mtext,mtr,munder,munderover,\
+none,semantics";
+
+/// `true` for tags Vue renders as plain elements (native HTML / SVG / MathML, plus `<slot>`).
+fn is_non_component_tag(tag: &str) -> bool {
+    tag == "slot" || NATIVE_TAGS.split(',').any(|t| t == tag)
+}
+
+/// Reject element syntax that Vue's compiler rejects.
+///
+/// VMZ semantics are reinterpreted, but the authoring surface must stay inside Vue: accepting a
+/// template Vue errors on would make `.vmz` a superset dialect instead of a compatible one.
+fn validate_vue_element_syntax(
+    tag: &str,
+    attrs: &[ConcreteAttr],
+    children: &[SemanticNode],
+) -> Result<(), TemplateParseError> {
+    check_duplicate_attrs(attrs)?;
+    let non_component = is_non_component_tag(tag);
+    for attr in attrs {
+        let ConcreteAttr::Directive { dir, span } = attr else {
+            continue;
+        };
+        let fail = |message: &str| TemplateParseError {
+            message: message.to_string(),
+            offset: span.start as usize,
+        };
+        match dir {
+            Directive::Slot { .. } if non_component && tag != "template" => {
+                return Err(fail("`v-slot` can only be used on components or `<template>` tags"));
+            }
+            Directive::Html { .. } if !children.is_empty() => {
+                return Err(fail("`v-html` will override element children"));
+            }
+            Directive::Custom { name, arg: None, .. } if name == "text" && !children.is_empty() => {
+                return Err(fail("`v-text` will override element children"));
+            }
+            Directive::Model { .. }
+                if non_component && !matches!(tag, "input" | "textarea" | "select") =>
+            {
+                return Err(fail(
+                    "`v-model` can only be used on `<input>`, `<textarea>` and `<select>` elements",
+                ));
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+/// Vue reports repeated attribute names as a compile error (case-sensitive, `class` included).
+fn check_duplicate_attrs(attrs: &[ConcreteAttr]) -> Result<(), TemplateParseError> {
+    let mut seen = std::collections::HashSet::new();
+    for attr in attrs {
+        let Some(name) = attr_source_name(attr) else {
+            continue;
+        };
+        if !seen.insert(name.clone()) {
+            return Err(TemplateParseError {
+                message: format!("duplicate attribute `{name}`"),
+                offset: concrete_attr_span(attr).start as usize,
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Source spelling of an attribute, used only for duplicate detection.
+fn attr_source_name(attr: &ConcreteAttr) -> Option<String> {
+    let dir = match attr {
+        ConcreteAttr::Static { name, .. } => return Some(name.clone()),
+        ConcreteAttr::Directive { dir, .. } => dir,
+    };
+    Some(match dir {
+        Directive::If { .. } => "v-if".to_string(),
+        Directive::ElseIf { .. } => "v-else-if".to_string(),
+        Directive::Else => "v-else".to_string(),
+        Directive::Html { .. } => "v-html".to_string(),
+        Directive::Show { .. } => "v-show".to_string(),
+        Directive::For { .. } => "v-for".to_string(),
+        Directive::BindObject { .. } => "v-bind".to_string(),
+        Directive::OnObject { .. } => "v-on".to_string(),
+        Directive::Bind { arg, .. } => format!(":{}", directive_arg_key(arg)),
+        Directive::On { arg, .. } => format!("@{}", directive_arg_key(arg)),
+        Directive::Model { arg: Some(arg), .. } => format!("v-model:{arg}"),
+        Directive::Model { arg: None, .. } => "v-model".to_string(),
+        // Vue reports repeated slot names through a separate diagnostic.
+        Directive::Slot { .. } => return None,
+        Directive::Custom { name, arg, .. } => match arg {
+            Some(arg) => format!("v-{name}:{}", directive_arg_key(arg)),
+            None => format!("v-{name}"),
+        },
+    })
+}
+
+fn directive_arg_key(arg: &DirectiveArg) -> String {
+    match arg {
+        DirectiveArg::Static(name) => name.clone(),
+        DirectiveArg::Dynamic(expr) => format!("[{expr}]"),
+    }
+}
+
+fn concrete_attr_span(attr: &ConcreteAttr) -> TemplateSpan {
+    match attr {
+        ConcreteAttr::Static { span, .. } | ConcreteAttr::Directive { span, .. } => *span,
+    }
 }
 
 /// Build [`SemanticNode::IfChain`] from already-lowered branch bodies.

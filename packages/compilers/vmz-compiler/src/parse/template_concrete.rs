@@ -255,7 +255,7 @@ fn classify_one(attr: RawAttr) -> Result<ConcreteAttr, TemplateParseError> {
 
     if let Some(rest) = name.strip_prefix(':') {
         let (arg, modifiers) = split_arg_modifiers(rest);
-        let expr = require_expr(&name, val, offset)?;
+        let expr = bind_expr(&name, &arg, val, offset)?;
         return Ok(ConcreteAttr::Directive {
             dir: Directive::Bind { arg: parse_directive_arg(&arg), expr, modifiers },
             span,
@@ -263,7 +263,7 @@ fn classify_one(attr: RawAttr) -> Result<ConcreteAttr, TemplateParseError> {
     }
     if let Some(rest) = name.strip_prefix("v-bind:") {
         let (arg, modifiers) = split_arg_modifiers(rest);
-        let expr = require_expr(&name, val, offset)?;
+        let expr = bind_expr(&name, &arg, val, offset)?;
         return Ok(ConcreteAttr::Directive {
             dir: Directive::Bind { arg: parse_directive_arg(&arg), expr, modifiers },
             span,
@@ -321,6 +321,51 @@ fn classify_one(attr: RawAttr) -> Result<ConcreteAttr, TemplateParseError> {
     }
 
     Ok(ConcreteAttr::Static { name, value: val.unwrap_or("").to_string(), span })
+}
+
+/// `v-bind` value, including the Vue 3.4+ same-name shorthand (`:title` → `:title="title"`).
+///
+/// The shorthand only applies to static arguments. Vue rejects `:[key]` without a value
+/// (`X_V_BIND_INVALID_SAME_NAME_ARGUMENT`) because there is no name to expand.
+fn bind_expr(
+    name: &str,
+    arg: &str,
+    val: Option<&str>,
+    offset: usize,
+) -> Result<String, TemplateParseError> {
+    if let Some(value) = val.filter(|s| !s.is_empty()) {
+        return Ok(value.to_string());
+    }
+    if arg.starts_with('[') {
+        return Err(TemplateParseError {
+            message: "`v-bind` with same-name shorthand only allows a static argument".into(),
+            offset,
+        });
+    }
+    if arg.is_empty() {
+        return Err(TemplateParseError {
+            message: format!("directive `{name}` requires an expression value"),
+            offset,
+        });
+    }
+    Ok(camelize_arg(arg))
+}
+
+/// `foo-bar` → `fooBar` (Vue expands `:foo-bar` to the camelCase binding name).
+fn camelize_arg(arg: &str) -> String {
+    let mut out = String::with_capacity(arg.len());
+    let mut capitalize = false;
+    for ch in arg.chars() {
+        if ch == '-' {
+            capitalize = true;
+        } else if capitalize {
+            out.extend(ch.to_uppercase());
+            capitalize = false;
+        } else {
+            out.push(ch);
+        }
+    }
+    out
 }
 
 fn require_expr(
