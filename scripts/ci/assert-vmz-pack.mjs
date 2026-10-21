@@ -187,4 +187,33 @@ try {
     fail(`cannot parse host-runtime-files.json: ${error instanceof Error ? error.message : String(error)}`);
 }
 
+// `workspace/pack.js` resolves this manifest as `<package root>/delivery-runtime-files.json`,
+// so a tarball that omits it builds every page and then fails at `pack`.
+const deliveryRuntimeManifest = path.join(dist, '..', 'delivery-runtime-files.json');
+if (!fs.existsSync(deliveryRuntimeManifest)) {
+    fail('missing delivery-runtime-files.json beside the published dist directory');
+}
+try {
+    const delivery = JSON.parse(fs.readFileSync(deliveryRuntimeManifest, 'utf8'));
+    if (
+        delivery.schema !== 'vmz.delivery-runtime-files.v0'
+        || !Array.isArray(delivery.flatBarrels)
+        || !delivery.flatBarrels.length
+        || !Array.isArray(delivery.nested)
+        || !delivery.nested.length
+    ) {
+        fail('delivery-runtime-files.json has an invalid publish manifest');
+    }
+} catch (error) {
+    fail(`cannot parse delivery-runtime-files.json: ${error instanceof Error ? error.message : String(error)}`);
+}
+
+const packManifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages/runtimes/vmz/package.json'), 'utf8'));
+const files = Array.isArray(packManifest.files) ? packManifest.files : [];
+for (const basename of ['host-runtime-files.json', 'delivery-runtime-files.json']) {
+    if (!files.includes(basename)) {
+        fail(`packages/runtimes/vmz/package.json#files must ship ${basename}`);
+    }
+}
+
 console.log(`assert-vmz-pack: OK (${path.relative(ROOT, dist) || dist})`);

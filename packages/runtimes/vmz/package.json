@@ -81,6 +81,7 @@
         "dist",
         "locales",
         "host-runtime-files.json",
+        "delivery-runtime-files.json",
         "README.md"
     ],
     "scripts": {
