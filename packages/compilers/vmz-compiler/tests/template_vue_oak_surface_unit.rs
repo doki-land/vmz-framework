@@ -159,7 +159,8 @@ const AGREED: &[(&str, &str)] = &[
     ),
     ("on_modifier", r#"<button @click.stop.prevent="go">Go</button>"#),
     ("v_for_aliases", r#"<li v-for="(item, index) in items" :key="index">{{ item }}</li>"#),
-    ("v_model_arg", r#"<input v-model:title="doc.title" />"#),
+    // Vue rejects `v-model:arg` on plain elements, so the argument form is component-only.
+    ("v_model_arg", r#"<Comp v-model:title="doc.title" />"#),
     ("bind_object", r#"<div v-bind="attrs">x</div>"#),
     (
         "comment_in_if_chain",

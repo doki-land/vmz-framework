@@ -55,6 +55,88 @@ fn rejects_v_slot_on_native_elements() {
 }
 
 #[test]
+fn rejects_template_v_slot_outside_a_component() {
+    // Vue has no slot host here: it reports `X_V_SLOT_MISPLACED` or fails in codegen.
+    assert_rejected(r#"<template v-slot="p">x</template>"#, "inside a component");
+    assert_rejected(r#"<template v-slot:footer="p">x</template>"#, "inside a component");
+    assert_rejected(r#"<div><template v-slot:x="p">x</template></div>"#, "inside a component");
+    assert_rejected(
+        r#"<div><section><template v-slot="p">x</template></section></div>"#,
+        "inside a component",
+    );
+}
+
+#[test]
+fn rejects_mixed_v_slot_usage() {
+    // `X_V_SLOT_MIXED_SLOT_USAGE`: `<Comp v-slot>` plus nested `<template #x>`.
+    assert_rejected(r#"<Comp v-slot="p"><template #a>x</template></Comp>"#, "mixed `v-slot` usage");
+    assert_rejected(
+        r#"<Comp v-slot="p"><template #default>x</template></Comp>"#,
+        "mixed `v-slot` usage",
+    );
+}
+
+#[test]
+fn rejects_duplicate_slot_names() {
+    assert_rejected(
+        r#"<Comp><template #a>1</template><template #a>2</template></Comp>"#,
+        "duplicate slot name `a`",
+    );
+    assert_rejected(
+        r#"<Comp><template #a>1</template><template v-slot:a>2</template></Comp>"#,
+        "duplicate slot name `a`",
+    );
+    // Vue's slot analysis ignores slot templates wrapped in control flow.
+    assert_accepted(
+        r#"<Comp><template v-if="ok" #x>1</template><template v-else #x>2</template></Comp>"#,
+    );
+    // Sibling components keep their own slot namespace.
+    assert_accepted(
+        r#"<Comp><template #a>1</template><Inner><template #a>2</template></Inner></Comp>"#,
+    );
+}
+
+#[test]
+fn rejects_extraneous_children_next_to_an_explicit_default_slot() {
+    assert_rejected(
+        r#"<Comp><template #default>1</template>{{ x }}</Comp>"#,
+        "extraneous children",
+    );
+    assert_rejected(r#"<Comp><template #default>1</template>text</Comp>"#, "extraneous children");
+    assert_rejected(
+        r#"<Comp><template #default>1</template><template>2</template></Comp>"#,
+        "extraneous children",
+    );
+    // Whitespace-only text and comments are not children for this check.
+    assert_accepted(r#"<Comp><template #default>1</template> </Comp>"#);
+    assert_accepted(r#"<Comp><template #default>1</template><!-- c --></Comp>"#);
+    // Only an explicit `default` slot makes siblings dead.
+    assert_accepted(r#"<Comp><template #a>1</template>text</Comp>"#);
+}
+
+#[test]
+fn rejects_slash_inside_start_tags() {
+    // Vue reports `Illegal '/' in tags`; only `/>` may close a start tag.
+    assert_rejected(r#"<div a/b="c"></div>"#, "illegal `/` in tags");
+    assert_rejected(r#"<div a/b></div>"#, "illegal `/` in tags");
+    assert_accepted(r#"<div a=b/c></div>"#);
+}
+
+#[test]
+fn accepts_source_spelling_variants_of_bind_and_on() {
+    // Vue compares raw attribute names, so `:` and `v-bind:` coexist.
+    assert_accepted(r#"<p :title="a" v-bind:title="b"></p>"#);
+    assert_accepted(r#"<p @click="a" v-on:click="b"></p>"#);
+}
+
+#[test]
+fn rejects_illegal_directive_names() {
+    assert_rejected(r#"<p v-="a"></p>"#, "not a legal directive name");
+    assert_rejected(r#"<p v-></p>"#, "not a legal directive name");
+    assert_rejected(r#"<p v-.mod="a"></p>"#, "not a legal directive name");
+}
+
+#[test]
 fn rejects_v_html_and_v_text_with_children() {
     assert_rejected(r#"<p v-html="h">x</p>"#, "`v-html` will override element children");
     assert_rejected(r#"<p v-html="h"><b>x</b></p>"#, "`v-html` will override element children");

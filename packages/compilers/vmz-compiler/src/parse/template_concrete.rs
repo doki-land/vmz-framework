@@ -309,6 +309,12 @@ fn classify_one(attr: RawAttr) -> Result<ConcreteAttr, TemplateParseError> {
     if let Some(rest) = name.strip_prefix("v-") {
         let (base_and_arg, modifiers) = split_trailing_modifiers(rest);
         let (dir_name, arg) = split_v_name_arg(base_and_arg);
+        if dir_name.is_empty() {
+            return Err(TemplateParseError {
+                message: format!("`{name}` is not a legal directive name"),
+                offset,
+            });
+        }
         return Ok(ConcreteAttr::Directive {
             dir: Directive::Custom {
                 name: dir_name,

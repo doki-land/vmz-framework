@@ -9,7 +9,7 @@ use super::template_common::{TemplateParseError, decode_html_entities};
 use super::template_concrete::{ConcreteAttr, ConcreteIr, ConcreteNode, classify_concrete_attr};
 use super::template_semantic::{
     ControlFlowKind, IfBranch, SemanticIr, SemanticNode, control_flow_kind, if_chain_from_branches,
-    semantic_from_element_parts,
+    semantic_from_element_parts, validate_root_slot_templates,
 };
 use super::template_span::TemplateSpan;
 use crate::sfc::TemplateBlock;
@@ -55,6 +55,7 @@ pub fn lower_vue_root_to_semantic(root: &VueRoot, shell: &str) -> Result<Semanti
         .find(|b| slice(shell, b.name) == "template")
         .ok_or_else(|| "Oak AST missing <template> block".to_string())?;
     let roots = lower_oak_siblings(shell, &block.children).map_err(|e| e.message)?;
+    validate_root_slot_templates(&roots).map_err(|e| e.message)?;
     Ok(SemanticIr { roots })
 }
 
@@ -202,7 +203,13 @@ fn lower_oak_siblings(
                     None => {
                         let children = lower_oak_siblings(shell, &el.children)?;
                         let tag = slice(shell, el.tag_name);
-                        out.push(semantic_from_element_parts(tag, &attrs, children, span)?);
+                        out.push(semantic_from_element_parts(
+                            tag,
+                            &attrs,
+                            children,
+                            span,
+                            !el.children.is_empty(),
+                        )?);
                         i += 1;
                     }
                 }
@@ -252,7 +259,8 @@ fn take_oak_if_chain(
 
         let children = lower_oak_siblings(shell, &el.children)?;
         let tag = slice(shell, el.tag_name);
-        let body = semantic_from_element_parts(tag, &attrs, children, span)?;
+        let body =
+            semantic_from_element_parts(tag, &attrs, children, span, !el.children.is_empty())?;
         branches.push(IfBranch { test, body: Box::new(body), span });
         i += 1;
         if saw_else {
@@ -267,15 +275,56 @@ fn classify_oak_attrs(
     shell: &str,
     el: &VueElement,
 ) -> Result<Vec<ConcreteAttr>, TemplateParseError> {
+    check_duplicate_attributes(shell, el)?;
     el.attributes
         .iter()
         .map(|a| lower_attr(shell, a).map_err(|message| TemplateParseError { message, offset: 0 }))
         .collect()
 }
 
+/// Vue reports repeated attribute names as a compile error (case-sensitive, `class` included).
+///
+/// The comparison is on the **source** spelling: `:title` and `v-bind:title` are distinct names
+/// and therefore coexist, exactly like Vue. `ConcreteAttr` cannot answer this because it folds
+/// both spellings into one `Bind`.
+fn check_duplicate_attributes(shell: &str, el: &VueElement) -> Result<(), TemplateParseError> {
+    let mut seen = std::collections::HashSet::new();
+    for attr in &el.attributes {
+        let name = source_attr_name(shell, attr);
+        if !seen.insert(name.clone()) {
+            return Err(TemplateParseError {
+                message: format!("duplicate attribute `{name}`"),
+                offset: to_body_span(shell, attr_span(attr)).start as usize,
+            });
+        }
+    }
+    Ok(())
+}
+
+fn attr_span(attr: &VueAttribute) -> Range<usize> {
+    match attr {
+        VueAttribute::Attribute(a) => a.span,
+        VueAttribute::Directive(d) => d.span,
+    }
+}
+
+/// Source spelling of one attribute (`title`, `:title`, `v-bind:title`, `@click`, …).
+fn source_attr_name(shell: &str, attr: &VueAttribute) -> String {
+    match attr {
+        VueAttribute::Attribute(a) => slice(shell, a.name).to_string(),
+        VueAttribute::Directive(d) => {
+            let raw = directive_source_text(shell, d);
+            raw.split_once('=')
+                .map(|(name, _)| name.trim().to_string())
+                .unwrap_or_else(|| raw.trim().to_string())
+        }
+    }
+}
+
 fn lower_node(shell: &str, node: &VueNode) -> Result<ConcreteNode, String> {
     match node {
         VueNode::Element(el) => {
+            check_duplicate_attributes(shell, el).map_err(|e| e.message)?;
             let tag = slice(shell, el.tag_name).to_string();
             let attrs = el
                 .attributes
@@ -309,21 +358,7 @@ fn lower_attr(shell: &str, attr: &VueAttribute) -> Result<ConcreteAttr, String> 
             classify_concrete_attr(name, value.as_deref(), span).map_err(|e| e.message)
         }
         VueAttribute::Directive(d) => {
-            let mut raw = slice(shell, d.span).to_string();
-            if let Some(arg) = &d.arg {
-                let argument = slice(shell, arg.span);
-                if !argument.is_empty() && !raw.contains(argument) {
-                    raw.push(':');
-                    raw.push_str(argument);
-                }
-            }
-            for modifier in &d.modifiers {
-                let name = slice(shell, modifier.name);
-                if !name.is_empty() && !raw.contains(name) {
-                    raw.push('.');
-                    raw.push_str(name);
-                }
-            }
+            let raw = directive_source_text(shell, d);
             let (name, value) = if let Some((name, rest)) = raw.split_once('=') {
                 (
                     name.trim().to_string(),
@@ -336,6 +371,27 @@ fn lower_attr(shell: &str, attr: &VueAttribute) -> Result<ConcreteAttr, String> 
             classify_concrete_attr(&name, value.as_deref(), span).map_err(|e| e.message)
         }
     }
+}
+
+/// Directive text as written in the source, including argument and modifiers when the Oak span
+/// does not cover them.
+fn directive_source_text(shell: &str, d: &oak_vue::Directive) -> String {
+    let mut raw = slice(shell, d.span).to_string();
+    if let Some(arg) = &d.arg {
+        let argument = slice(shell, arg.span);
+        if !argument.is_empty() && !raw.contains(argument) {
+            raw.push(':');
+            raw.push_str(argument);
+        }
+    }
+    for modifier in &d.modifiers {
+        let name = slice(shell, modifier.name);
+        if !name.is_empty() && !raw.contains(name) {
+            raw.push('.');
+            raw.push_str(name);
+        }
+    }
+    raw
 }
 
 fn unquote_attr_value(raw: &str) -> String {

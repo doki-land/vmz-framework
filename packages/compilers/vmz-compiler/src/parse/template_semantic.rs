@@ -210,7 +210,9 @@ pub enum SemanticProp {
 /// Concrete comes from Oak via [`super::template_oak::parse_template_concrete_primary`].
 /// [`super::template_oak::parse_template_semantic_primary`] walks Oak directly and must agree.
 pub fn lower_concrete_to_semantic(concrete: &ConcreteIr) -> Result<SemanticIr, TemplateParseError> {
-    Ok(SemanticIr { roots: lower_siblings(&concrete.roots)? })
+    let roots = lower_siblings(&concrete.roots)?;
+    validate_root_slot_templates(&roots)?;
+    Ok(SemanticIr { roots })
 }
 
 /// Control-flow kind on classified attrs (shared by Oak direct lower + Concrete adapter).
@@ -240,13 +242,19 @@ pub(crate) fn control_flow_kind(attrs: &[ConcreteAttr]) -> Option<ControlFlowKin
 }
 
 /// Structure one element after children are already Semantic (Oak direct path).
+///
+/// `has_author_children` mirrors Vue's `children.length`: whitespace-only text is not a child,
+/// while comments and interpolations are. The lowered `children` list cannot answer that itself
+/// because comments are dropped before Semantic.
 pub(crate) fn semantic_from_element_parts(
     tag: &str,
     attrs: &[ConcreteAttr],
     children: Vec<SemanticNode>,
     span: TemplateSpan,
+    has_author_children: bool,
 ) -> Result<SemanticNode, TemplateParseError> {
-    validate_vue_element_syntax(tag, attrs, &children)?;
+    validate_vue_element_syntax(tag, attrs, has_author_children)?;
+    validate_slot_usage(tag, attrs, &children)?;
     let attrs: Vec<ConcreteAttr> = attrs
         .iter()
         .filter(|a| {
@@ -311,9 +319,8 @@ fn is_non_component_tag(tag: &str) -> bool {
 fn validate_vue_element_syntax(
     tag: &str,
     attrs: &[ConcreteAttr],
-    children: &[SemanticNode],
+    has_author_children: bool,
 ) -> Result<(), TemplateParseError> {
-    check_duplicate_attrs(attrs)?;
     let non_component = is_non_component_tag(tag);
     for attr in attrs {
         let ConcreteAttr::Directive { dir, span } = attr else {
@@ -327,10 +334,10 @@ fn validate_vue_element_syntax(
             Directive::Slot { .. } if non_component && tag != "template" => {
                 return Err(fail("`v-slot` can only be used on components or `<template>` tags"));
             }
-            Directive::Html { .. } if !children.is_empty() => {
+            Directive::Html { .. } if has_author_children => {
                 return Err(fail("`v-html` will override element children"));
             }
-            Directive::Custom { name, arg: None, .. } if name == "text" && !children.is_empty() => {
+            Directive::Custom { name, arg: None, .. } if name == "text" && has_author_children => {
                 return Err(fail("`v-text` will override element children"));
             }
             Directive::Model { .. }
@@ -340,68 +347,112 @@ fn validate_vue_element_syntax(
                     "`v-model` can only be used on `<input>`, `<textarea>` and `<select>` elements",
                 ));
             }
+            Directive::Model { arg: Some(_), .. } if non_component => {
+                return Err(fail("`v-model` argument is not supported on plain elements"));
+            }
             _ => {}
         }
     }
     Ok(())
 }
 
-/// Vue reports repeated attribute names as a compile error (case-sensitive, `class` included).
-fn check_duplicate_attrs(attrs: &[ConcreteAttr]) -> Result<(), TemplateParseError> {
+/// Reject slot syntax Vue rejects: misplaced `v-slot`, duplicate names, mixed forms and
+/// extraneous children next to an explicit default slot.
+///
+/// `children` is already lowered, so only direct slot templates are visible. That matches Vue:
+/// its slot analysis ignores slot templates wrapped by `v-if` / `v-for`, and comments or
+/// whitespace-only text are not "extraneous" children.
+fn validate_slot_usage(
+    tag: &str,
+    attrs: &[ConcreteAttr],
+    children: &[SemanticNode],
+) -> Result<(), TemplateParseError> {
+    let non_component = is_non_component_tag(tag);
+    let mut slots: Vec<(&DirectiveArg, TemplateSpan)> = Vec::new();
+    let mut template_slots: Vec<TemplateSpan> = Vec::new();
+    for child in children {
+        let SemanticNode::SlotTemplate { name, body, span, .. } = child else {
+            continue;
+        };
+        // Only a `<template #x>` filler produces a `template` body; `<Comp v-slot>` keeps the
+        // component as its body, so the two forms stay distinguishable here.
+        if matches!(body.as_ref(), SemanticNode::Element { tag, .. } if tag == "template") {
+            template_slots.push(*span);
+        }
+        slots.push((name, *span));
+    }
+
+    // A `<template v-slot>` filler is only meaningful directly inside a component. Vue reports
+    // `X_V_SLOT_MISPLACED` for elements and crashes in codegen for the remaining placements.
+    if non_component {
+        if let Some(span) = template_slots.first() {
+            return Err(TemplateParseError {
+                message: "`v-slot` can only be used on a `<template>` inside a component".into(),
+                offset: span.start as usize,
+            });
+        }
+    }
+
+    // `X_V_SLOT_MIXED_SLOT_USAGE`: `<Comp v-slot>` plus nested `<template #x>` children.
+    if tag != "template" && slot_directive(attrs).is_some() {
+        if let Some((_, span)) = slots.first() {
+            return Err(TemplateParseError {
+                message: "mixed `v-slot` usage on both the component and nested `<template>`"
+                    .into(),
+                offset: span.start as usize,
+            });
+        }
+    }
+
+    // `X_V_SLOT_DUPLICATE_SLOT_NAMES` (static names only; dynamic slots are rejected earlier).
     let mut seen = std::collections::HashSet::new();
-    for attr in attrs {
-        let Some(name) = attr_source_name(attr) else {
+    for (name, span) in &slots {
+        let DirectiveArg::Static(name) = name else {
             continue;
         };
         if !seen.insert(name.clone()) {
             return Err(TemplateParseError {
-                message: format!("duplicate attribute `{name}`"),
-                offset: concrete_attr_span(attr).start as usize,
+                message: format!("duplicate slot name `{name}`"),
+                offset: span.start as usize,
+            });
+        }
+    }
+
+    // `X_V_SLOT_EXTRANEOUS_DEFAULT_SLOT_CHILDREN`: an explicit `#default` makes siblings dead.
+    if !non_component {
+        let default_span = slots
+            .iter()
+            .find(|(name, _)| matches!(name, DirectiveArg::Static(n) if n == "default"))
+            .map(|(_, span)| *span);
+        if let Some(span) = default_span {
+            if children.iter().any(|c| !matches!(c, SemanticNode::SlotTemplate { .. })) {
+                return Err(TemplateParseError {
+                    message: "extraneous children found next to an explicit default slot".into(),
+                    offset: span.start as usize,
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Root `<template v-slot>` fills no component slot; Vue fails in codegen instead.
+pub(crate) fn validate_root_slot_templates(
+    roots: &[SemanticNode],
+) -> Result<(), TemplateParseError> {
+    for node in roots {
+        let SemanticNode::SlotTemplate { body, span, .. } = node else {
+            continue;
+        };
+        if matches!(body.as_ref(), SemanticNode::Element { tag, .. } if tag == "template") {
+            return Err(TemplateParseError {
+                message: "`v-slot` can only be used on a `<template>` inside a component".into(),
+                offset: span.start as usize,
             });
         }
     }
     Ok(())
-}
-
-/// Source spelling of an attribute, used only for duplicate detection.
-fn attr_source_name(attr: &ConcreteAttr) -> Option<String> {
-    let dir = match attr {
-        ConcreteAttr::Static { name, .. } => return Some(name.clone()),
-        ConcreteAttr::Directive { dir, .. } => dir,
-    };
-    Some(match dir {
-        Directive::If { .. } => "v-if".to_string(),
-        Directive::ElseIf { .. } => "v-else-if".to_string(),
-        Directive::Else => "v-else".to_string(),
-        Directive::Html { .. } => "v-html".to_string(),
-        Directive::Show { .. } => "v-show".to_string(),
-        Directive::For { .. } => "v-for".to_string(),
-        Directive::BindObject { .. } => "v-bind".to_string(),
-        Directive::OnObject { .. } => "v-on".to_string(),
-        Directive::Bind { arg, .. } => format!(":{}", directive_arg_key(arg)),
-        Directive::On { arg, .. } => format!("@{}", directive_arg_key(arg)),
-        Directive::Model { arg: Some(arg), .. } => format!("v-model:{arg}"),
-        Directive::Model { arg: None, .. } => "v-model".to_string(),
-        // Vue reports repeated slot names through a separate diagnostic.
-        Directive::Slot { .. } => return None,
-        Directive::Custom { name, arg, .. } => match arg {
-            Some(arg) => format!("v-{name}:{}", directive_arg_key(arg)),
-            None => format!("v-{name}"),
-        },
-    })
-}
-
-fn directive_arg_key(arg: &DirectiveArg) -> String {
-    match arg {
-        DirectiveArg::Static(name) => name.clone(),
-        DirectiveArg::Dynamic(expr) => format!("[{expr}]"),
-    }
-}
-
-fn concrete_attr_span(attr: &ConcreteAttr) -> TemplateSpan {
-    match attr {
-        ConcreteAttr::Static { span, .. } | ConcreteAttr::Directive { span, .. } => *span,
-    }
 }
 
 /// Build [`SemanticNode::IfChain`] from already-lowered branch bodies.
@@ -652,7 +703,21 @@ fn lower_element_strip_control_flow(
     let ConcreteNode::Element { tag, attrs, children, span } = node else {
         return Err(TemplateParseError { message: "internal: expected element".into(), offset: 0 });
     };
-    semantic_from_element_parts(tag, attrs, lower_siblings(children)?, *span)
+    semantic_from_element_parts(
+        tag,
+        attrs,
+        lower_siblings(children)?,
+        *span,
+        concrete_has_author_children(children),
+    )
+}
+
+/// Vue counts comments and interpolations as children and drops whitespace-only text.
+fn concrete_has_author_children(children: &[ConcreteNode]) -> bool {
+    children.iter().any(|child| match child {
+        ConcreteNode::Text { value, .. } => !value.trim().is_empty(),
+        _ => true,
+    })
 }
 
 fn slot_directive(attrs: &[ConcreteAttr]) -> Option<(DirectiveArg, Option<String>, TemplateSpan)> {
