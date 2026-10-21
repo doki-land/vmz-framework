@@ -69,6 +69,12 @@ pub fn template_parse_to_diagnostic(
 
 /// Stable diagnostic codes for structured template parse / semantic failures.
 fn template_error_code(message: &str) -> Option<&'static str> {
+    // Oak rejects a mustache whose expression cannot be parsed with `InterpolationEnd`
+    // before concrete expression checks run. Surface it as an expression error so
+    // authors get the same code as other invalid mustaches.
+    if message.contains("InterpolationEnd") {
+        return Some("vmz::template::invalid_expr");
+    }
     if message.contains("`v-else")
         || message.contains("v-else-if")
         || message.contains("dynamic `v-bind`")

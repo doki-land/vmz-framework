@@ -94,8 +94,8 @@ fn template_parse_error_carries_absolute_source_span() {
     ));
     let _ = fs::create_dir_all(&dir);
     let path = dir.join("Bad.vmz");
-    // `<template>\n` is 11 UTF-8 bytes; illegal `{` sits in the body.
-    let src = "<template>\n<h2>{user.name}</h2>\n</template>\n\n<script client>\nexport default class Bad {}\n</script>\n";
+    // `<template>\n` is 11 UTF-8 bytes; the unparsable mustache sits in the body.
+    let src = "<template>\n<h2>{{ 1 + }}</h2>\n</template>\n\n<script client>\nexport default class Bad {}\n</script>\n";
     fs::write(&path, src).unwrap();
     let report = check_path(&path, &CheckOptions::default()).unwrap();
     let diag = report
