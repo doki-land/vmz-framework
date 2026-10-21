@@ -475,7 +475,14 @@ fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> 
         let (content, content_start) = if self_closing {
             (String::new(), content_start)
         } else {
-            let Some(rel) = source[content_start..].find(close) else {
+            // `<template>` nests (slot fillers, fragment roots), so its closing tag must be
+            // depth-matched instead of taking the first `</template>` in the body.
+            let found = if matches!(role, BlockRole::Template) {
+                find_template_close(source, content_start)
+            } else {
+                source[content_start..].find(close).map(|rel| content_start + rel)
+            };
+            let Some(content_end) = found else {
                 return Err(err_at(
                     path,
                     format!("missing closing `{close}`"),
@@ -483,7 +490,6 @@ fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> 
                     open_end,
                 ));
             };
-            let content_end = content_start + rel;
             let content = source[content_start..content_end].to_string();
             i = content_end + close.len();
             (content, content_start)
@@ -507,6 +513,80 @@ fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> 
     }
 
     Ok(blocks)
+}
+
+/// Byte offset of the `</template>` closing the SFC template block whose body starts at
+/// `content_start`.
+///
+/// Nested `<template>` elements (slot fillers, fragment roots) are depth-matched. Comments and
+/// quoted attribute values are skipped so a `</template>` inside either is not mistaken for the
+/// block close.
+fn find_template_close(source: &str, content_start: usize) -> Option<usize> {
+    let bytes = source.as_bytes();
+    let mut i = content_start;
+    let mut depth = 0usize;
+    while i < bytes.len() {
+        if bytes[i] != b'<' {
+            i += 1;
+            continue;
+        }
+        if source[i..].starts_with("<!--") {
+            i = i + 4 + source[i + 4..].find("-->")? + 3;
+            continue;
+        }
+        let closing = source[i..].starts_with("</");
+        let name_start = if closing { i + 2 } else { i + 1 };
+        let name_end = tag_name_end(bytes, name_start);
+        if name_end == name_start {
+            i += 1;
+            continue;
+        }
+        let is_template = &source[name_start..name_end] == "template";
+        if closing {
+            if is_template {
+                if depth == 0 {
+                    return Some(i);
+                }
+                depth -= 1;
+            }
+            i = name_end;
+            continue;
+        }
+        let tag_end = tag_end_after_attrs(source, name_end)?;
+        if is_template && !source[name_end..tag_end].trim_end().ends_with('/') {
+            depth += 1;
+        }
+        i = tag_end;
+    }
+    None
+}
+
+/// Index just past the tag name starting at `from`.
+fn tag_name_end(bytes: &[u8], from: usize) -> usize {
+    let mut i = from;
+    while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'-') {
+        i += 1;
+    }
+    i
+}
+
+/// Index just past the `>` that closes the tag whose attributes start at `from`.
+fn tag_end_after_attrs(source: &str, from: usize) -> Option<usize> {
+    let bytes = source.as_bytes();
+    let mut quote: Option<u8> = None;
+    let mut i = from;
+    while i < bytes.len() {
+        let b = bytes[i];
+        match quote {
+            Some(q) if b == q => quote = None,
+            Some(_) => {}
+            None if b == b'"' || b == b'\'' => quote = Some(b),
+            None if b == b'>' => return Some(i + 1),
+            None => {}
+        }
+        i += 1;
+    }
+    None
 }
 
 /// Map [`SfcError`] to a catalog-backed `vmz::sfc::parse_failed` diagnostic.

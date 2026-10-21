@@ -74,3 +74,54 @@ export default class C {}
 "#;
     assert!(parse_vmz("x.vmz", src).is_err());
 }
+
+#[test]
+fn keeps_nested_template_slot_fillers_in_the_template_block() {
+    let src = r#"
+<template>
+  <Comp>
+    <template #header><h1>t</h1></template>
+    <template v-slot:footer="p"><p>{{ p.n }}</p></template>
+  </Comp>
+</template>
+<script client>
+export default class IndexPage {}
+</script>
+"#;
+    let parsed = parse_vmz("x.vmz", src).unwrap();
+    assert!(parsed.template.content.contains("#header"));
+    assert!(parsed.template.content.contains("v-slot:footer"));
+    assert!(parsed.template.content.contains("{{ p.n }}"));
+}
+
+#[test]
+fn keeps_nested_template_fragment_roots_in_the_template_block() {
+    let src = r#"
+<template>
+  <template v-if="ok"><p>a</p></template>
+  <template v-for="i in xs" :key="i"><p>{{ i }}</p></template>
+</template>
+<script client>
+export default class IndexPage {}
+</script>
+"#;
+    let parsed = parse_vmz("x.vmz", src).unwrap();
+    assert!(parsed.template.content.contains("v-if=\"ok\""));
+    assert!(parsed.template.content.contains("v-for=\"i in xs\""));
+}
+
+#[test]
+fn ignores_template_closing_text_inside_comments_and_attribute_values() {
+    let src = r#"
+<template>
+  <!-- </template> -->
+  <p :title="'</template>'">x</p>
+</template>
+<script client>
+export default class IndexPage {}
+</script>
+"#;
+    let parsed = parse_vmz("x.vmz", src).unwrap();
+    assert!(parsed.template.content.contains("</template>"));
+    assert!(parsed.template.content.contains("x</p>"));
+}
