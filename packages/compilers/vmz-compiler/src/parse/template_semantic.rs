@@ -253,6 +253,14 @@ pub(crate) fn semantic_from_element_parts(
     span: TemplateSpan,
     has_author_children: bool,
 ) -> Result<SemanticNode, TemplateParseError> {
+    // Vue rejects side-effect tags in a template (`X_...SIDE_EFFECT`). Accepting them would
+    // let a `.vmz` template ship `<script>` / `<style>` the compiler never accounted for.
+    if tag.eq_ignore_ascii_case("script") || tag.eq_ignore_ascii_case("style") {
+        return Err(TemplateParseError {
+            message: format!("`<{tag}>` is ignored in client component templates"),
+            offset: span.start as usize,
+        });
+    }
     validate_vue_element_syntax(tag, attrs, has_author_children)?;
     validate_slot_usage(tag, attrs, &children)?;
     let attrs: Vec<ConcreteAttr> = attrs
@@ -336,6 +344,11 @@ fn validate_vue_element_syntax(
             }
             Directive::Html { .. } if has_author_children => {
                 return Err(fail("`v-html` will override element children"));
+            }
+            Directive::Custom { name, .. } if name == "pre" => {
+                // `v-pre` skips compilation of the subtree. VMZ still compiles `{{ … }}`, so
+                // accepting it would render interpolations Vue shows verbatim.
+                return Err(fail("`v-pre` is not supported by VMZ"));
             }
             Directive::Custom { name, arg: None, .. } if name == "text" && has_author_children => {
                 return Err(fail("`v-text` will override element children"));

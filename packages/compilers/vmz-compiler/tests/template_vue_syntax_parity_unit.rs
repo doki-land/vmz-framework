@@ -137,6 +137,81 @@ fn rejects_illegal_directive_names() {
 }
 
 #[test]
+fn rejects_attribute_names_with_quotes_or_a_leading_equals() {
+    // Vue: `X_INVALID_ATTRIBUTE_NAME` and `X_ATTRIBUTE_NAME_CANNOT_START_WITH_EQUAL`.
+    assert_rejected(r#"<div "x"></div>"#, "attribute name cannot contain quotes");
+    assert_rejected("<div 'x'></div>", "attribute name cannot contain quotes");
+    assert_rejected(r#"<div a"b"></div>"#, "attribute name cannot contain quotes");
+    assert_rejected("<div =x></div>", "attribute name cannot start with `=`");
+    // Vue's tokenizer keeps a quoted directive argument legal, so that spelling must pass.
+    assert_accepted(r#"<div :"x"></div>"#);
+}
+
+#[test]
+fn rejects_unquoted_attribute_values_with_forbidden_characters() {
+    // Vue: `X_UNEXPECTED_CHARACTER_IN_UNQUOTED_ATTRIBUTE_VALUE`.
+    assert_rejected(r#"<div a=b"c></div>"#, "unquoted attribute value cannot contain");
+    assert_rejected("<div a=b`c></div>", "unquoted attribute value cannot contain");
+    assert_accepted(r#"<div a=b></div>"#);
+    assert_accepted(r#"<div a=b/c></div>"#);
+}
+
+#[test]
+fn rejects_compound_equals_in_attributes() {
+    assert_rejected("<div a==b></div>", "unexpected `=` in attribute");
+}
+
+#[test]
+fn rejects_an_unterminated_start_tag() {
+    // A `<` inside a start tag means the tag was never closed, so the next tag must not be
+    // swallowed as attributes.
+    assert_rejected(r#"<div a="1""#, "unexpected `<` in tag");
+}
+
+#[test]
+fn rejects_invalid_end_tags() {
+    assert_rejected("</div>", "invalid end tag");
+    assert_rejected("<div></section>", "invalid end tag");
+}
+
+#[test]
+fn rejects_an_unclosed_element() {
+    // Vue: `X_MISSING_END_TAG`.
+    assert_rejected("<div>x", "element is missing end tag");
+    assert_rejected("<div>", "element is missing end tag");
+}
+
+#[test]
+fn accepts_quoted_values_and_adjacent_attributes() {
+    assert_accepted(r#"<div a="<b>">x</div>"#);
+    assert_accepted(r#"<div a=">">x</div>"#);
+    assert_accepted(r#"<div a="1"b="2"></div>"#);
+    assert_accepted(r#"<div .foo="1"></div>"#);
+    assert_accepted(r#"<div @="x"></div>"#);
+}
+
+#[test]
+fn accepts_void_element_close_tags() {
+    // Browsers drop `</img>` and Vue reports no diagnostic for it.
+    assert_accepted("<img></img>");
+    assert_accepted("<br></br>");
+    assert_accepted("<input></input>");
+    assert_accepted("<template><img></img></template>");
+}
+
+#[test]
+fn rejects_side_effect_tags_in_templates() {
+    assert_rejected("<script>x</script>", "is ignored in client component templates");
+    assert_rejected("<style>x</style>", "is ignored in client component templates");
+}
+
+#[test]
+fn rejects_v_pre() {
+    // `v-pre` skips compilation, so accepting it would still render `{{ … }}` here.
+    assert_rejected(r#"<div v-pre>{{ x }}</div>"#, "`v-pre` is not supported");
+}
+
+#[test]
 fn rejects_v_html_and_v_text_with_children() {
     assert_rejected(r#"<p v-html="h">x</p>"#, "`v-html` will override element children");
     assert_rejected(r#"<p v-html="h"><b>x</b></p>"#, "`v-html` will override element children");
