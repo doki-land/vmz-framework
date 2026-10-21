@@ -7,7 +7,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use fs_tools::walk::Walker;
+use boost_fs::walk::Walker;
 use vmz_protocol::{
     APPLICATION_CROSS_LINK_SCHEMA, APPLICATION_HOST_COMPOSITION_SCHEMA, ApplicationArtifact,
     ApplicationCatalog, ApplicationDiagnostic, ApplicationHostCompositionReport, ApplicationId,

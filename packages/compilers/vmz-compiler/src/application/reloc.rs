@@ -7,7 +7,7 @@
 use std::fs;
 use std::path::Path;
 
-use fs_tools::walk::Walker;
+use boost_fs::walk::Walker;
 use vmz_protocol::{
     APPLICATION_BASE_SCHEMA, APPLICATION_RELOCATABLE_CHECK_SCHEMA, APPLICATION_RELOCATED_SCHEMA,
     APPLICATION_RELOCATION_SCHEMA, ApplicationBase, ApplicationDescriptor, ApplicationDiagnostic,

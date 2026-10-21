@@ -9,7 +9,7 @@ description = "GitHub Actions monitor via the GitHub REST API (no gh CLI)"
 publish = false
 
 [dependencies]
-request = { workspace = true }
+boost-http = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

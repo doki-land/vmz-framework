@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use fs_tools::walk::{Filter, Walker};
+use boost_fs::walk::{Filter, Walker};
 
 /// Closed `.vmz` module kind — owned by `vmz-protocol` (wire / DX shared).
 pub use vmz_protocol::VmzModuleKind;

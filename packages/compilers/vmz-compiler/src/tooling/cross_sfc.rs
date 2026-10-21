@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use fs_tools::walk::Walker;
+use boost_fs::walk::Walker;
 
 use vmz_protocol::{
     CODE_ACTION_SCHEMA, CodeAction, CodeActionKind, REFERENCE_SCHEMA, Reference, RenameIntent,

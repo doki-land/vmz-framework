@@ -41,7 +41,7 @@ vmz-plugin-sasso = { path = "packages/compilers/vmz-plugin-sasso" }
 vmz-oak-frontend-adapter = { path = "packages/compilers/vmz-oak-frontend-adapter" }
 
 # Oaks frontend (Vue SFC / CST). CI / publish resolve git `dev` only.
-# Local sibling override: `.cargo/config.toml` (gitignored, see `.cargo/config.toml.example`).
+# Overlaid by local path `.cargo/config.toml` (git ignored).
 oak-core = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
 oak-vue = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
 oak-typescript = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
@@ -57,8 +57,9 @@ json5 = "1.3.1"
 yaml_serde = "0.10.6"
 sha2 = "0.11.0"
 thiserror = "2.0.20"
-fs-tools = { git = "https://github.com/oovm/rust-boost", branch = "dev" }
-request = { git = "https://github.com/oovm/rust-boost", branch = "dev" }
+# Overlaid by local path `.cargo/config.toml` (git ignored).
+boost-fs = { git = "https://github.com/oovm/rust-boost", branch = "dev" }
+boost-http = { git = "https://github.com/oovm/rust-boost", branch = "dev" }
 tokio = { version = "1", features = ["rt", "time", "macros"] }
 
 napi = { version = "3.12.1", default-features = true, features = ["napi4"] }

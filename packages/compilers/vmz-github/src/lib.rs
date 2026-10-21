@@ -2,7 +2,7 @@
 
 use std::time::{Duration, Instant};
 
-use request::{HttpTransport, Method, Request, Transport, Url};
+use boost_http::{HttpTransport, Method, Request, Transport, Url};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -67,7 +67,7 @@ pub enum MonitorError {
     #[error("{0}")]
     Message(String),
     #[error(transparent)]
-    Request(#[from] request::RequestError),
+    Request(#[from] boost_http::RequestError),
     #[error(transparent)]
     Serde(#[from] serde_json::Error),
 }

@@ -1,4 +1,4 @@
-# Copy to `config.toml` (gitignored) for local Oaks sibling checkout.
+# Copy to `config.toml` (git ignored) and replace `<your-path>` with your local absolute path.
 # CI / publish: no `config.toml` — root `Cargo.toml` git `dev` only.
 # Verify: `cargo tree -p oak-core` → filesystem path = patch active.
 # Warning: an active patch rewrites the tracked `Cargo.lock` against the sibling
@@ -6,8 +6,6 @@
 # Restore the tracked lock before staging, or verify in a clean checkout.
 
 [patch."https://github.com/yggdrasil-language/oaks.git"]
-oak-core = { path = "../oaks/projects/oak-core" }
-oak-vue = { path = "../oaks/examples/oak-vue" }
-oak-typescript = { path = "../oaks/examples/oak-typescript" }
-
-[alias]
+oak-core = { path = "<your-path>/oaks/projects/oak-core" }
+oak-vue = { path = "<your-path>/oaks/examples/oak-vue" }
+oak-typescript = { path = "<your-path>/oaks/examples/oak-typescript" }

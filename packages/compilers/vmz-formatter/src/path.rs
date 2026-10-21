@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use fs_tools::walk::{Filter, Walker};
+use boost_fs::walk::{Filter, Walker};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use vmz_compiler::{ReportedDiagnostic, parse_vmz};

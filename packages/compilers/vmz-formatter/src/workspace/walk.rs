@@ -1,10 +1,10 @@
 use std::path::{Path, PathBuf};
 
-use fs_tools::walk::{Filter, Walker};
+use boost_fs::walk::{Filter, Walker};
 
 const SKIP_DIRS: &[&str] = &["node_modules", "target", ".git", "dist", ".cache", "fixtures"];
 
-fn skip_dir(entry: &fs_tools::walk::Entry) -> Filter {
+fn skip_dir(entry: &boost_fs::walk::Entry) -> Filter {
     let name = entry.file_name().to_string_lossy();
     if SKIP_DIRS.iter().any(|skip| skip == &name) {
         return Filter::IgnoreFolder;

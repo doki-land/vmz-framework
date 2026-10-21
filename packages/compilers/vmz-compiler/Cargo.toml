@@ -24,4 +24,4 @@ vmz-types.workspace = true
 vmz-generator.workspace = true
 vmz-oak-frontend-adapter.workspace = true
 resvg = "0.45.1"
-fs-tools.workspace = true
+boost-fs.workspace = true

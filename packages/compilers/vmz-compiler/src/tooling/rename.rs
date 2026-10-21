@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use fs_tools::walk::Walker;
+use boost_fs::walk::Walker;
 
 use vmz_protocol::{
     ExplainEdge, REFERENCE_SCHEMA, Reference, RenameIntent, ReportedDiagnostic, SYMBOL_SCHEMA,

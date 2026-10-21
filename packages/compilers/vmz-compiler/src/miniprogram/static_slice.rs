@@ -11,7 +11,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use fs_tools::walk::Walker;
+use boost_fs::walk::Walker;
 use serde::Serialize;
 use serde_json::{Value, json};
 
