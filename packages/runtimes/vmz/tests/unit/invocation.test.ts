@@ -193,11 +193,11 @@ describe('vmz invocation gate', () => {
 
     it('removed native-forward commands are unknown', async () => {
         const codeNew = await runCli(['new', 'demo'], { cwd: packageRoot, thisPackageRoot: packageRoot });
-        expect(codeNew).toBe(1);
+        expect(codeNew).toBe(2);
         const codeLsp = await runCli(['lsp'], { cwd: packageRoot, thisPackageRoot: packageRoot });
-        expect(codeLsp).toBe(1);
+        expect(codeLsp).toBe(2);
         const codeMcp = await runCli(['mcp'], { cwd: packageRoot, thisPackageRoot: packageRoot });
-        expect(codeMcp).toBe(1);
+        expect(codeMcp).toBe(2);
     });
 
     it('global help is derived intro + version only (no scaffold / project walls)', async () => {
