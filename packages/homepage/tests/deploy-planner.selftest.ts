@@ -19,7 +19,7 @@ assert(
     'recipe deep link slug',
 );
 assert(
-    staticPlan.cautions.some((c) => c.includes('advice') && c.includes('--secret')),
+    staticPlan.cautions.some((c) => c.includes('.env.secrets') && c.includes('--secret')),
     'default ship advice',
 );
 
@@ -34,7 +34,7 @@ assert(
     'platform kind',
 );
 assert(
-    secretsPlan.cautions.some((c) => c.includes('advice') && c.includes('--secret')),
+    secretsPlan.cautions.some((c) => c.includes('.env.secrets') && c.includes('--secret')),
     'ship advice always',
 );
 

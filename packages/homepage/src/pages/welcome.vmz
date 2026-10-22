@@ -18,17 +18,17 @@
         </header>
         <section class="welcome-v2__main">
             <p class="welcome-v2__kicker">
-                Full-stack application compiler
+                {{ kickerLabel }}
             </p>
             <h1 id="welcome-title">
-                让编译器
+                {{ titleLeadLabel }}
                 <br />
                 <em>
-                    理解整套应用。
+                    {{ titleEmLabel }}
                 </em>
             </h1>
             <p class="welcome-v2__lede">
-                一份程序图，连接组件、状态与服务端边界。开发时获得更快反馈，交付时让每个运行环境只得到它真正需要的部分。
+                {{ ledeLabel }}
             </p>
             <div class="welcome-v2__actions">
                 <a href="/" class="welcome-v2__primary">
@@ -42,16 +42,16 @@
                 </a>
             </div>
         </section>
-        <div aria-label="VMZ core capabilities" class="welcome-v2__rail">
+        <div :aria-label="railAriaLabel" class="welcome-v2__rail">
             <div>
                 <span>
                     01
                 </span>
                 <strong>
-                    Analyze
+                    {{ rail1TitleLabel }}
                 </strong>
                 <small>
-                    理解依赖与边界
+                    {{ rail1DescLabel }}
                 </small>
             </div>
             <div>
@@ -59,10 +59,10 @@
                     02
                 </span>
                 <strong>
-                    Compile
+                    {{ rail2TitleLabel }}
                 </strong>
                 <small>
-                    生成精确更新路径
+                    {{ rail2DescLabel }}
                 </small>
             </div>
             <div>
@@ -70,17 +70,33 @@
                     03
                 </span>
                 <strong>
-                    Deliver
+                    {{ rail3TitleLabel }}
                 </strong>
                 <small>
-                    面向 Web、SSR、Native 与 Edge
+                    {{ rail3DescLabel }}
                 </small>
             </div>
         </div>
     </main>
 </template>
 <script client>
-import { brand, docs, explore, start } from "#locales/common";
+import {
+    brand,
+    docs,
+    explore,
+    start,
+    welcomeKicker,
+    welcomeLede,
+    welcomeRail1Desc,
+    welcomeRail1Title,
+    welcomeRail2Desc,
+    welcomeRail2Title,
+    welcomeRail3Desc,
+    welcomeRail3Title,
+    welcomeRailAria,
+    welcomeTitleEm,
+    welcomeTitleLead,
+} from "#locales/common";
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
 export default class WelcomePage {
@@ -89,6 +105,17 @@ export default class WelcomePage {
     docsLabel = "";
     exploreLabel = "";
     startLabel = "";
+    kickerLabel = "";
+    titleLeadLabel = "";
+    titleEmLabel = "";
+    ledeLabel = "";
+    railAriaLabel = "";
+    rail1TitleLabel = "";
+    rail1DescLabel = "";
+    rail2TitleLabel = "";
+    rail2DescLabel = "";
+    rail3TitleLabel = "";
+    rail3DescLabel = "";
     docsRootHref = "/d/zh-hans/";
     guideHref = "/d/zh-hans/guide/";
     _unwatchLocale = null;
@@ -108,6 +135,17 @@ export default class WelcomePage {
         this.docsLabel = docs();
         this.exploreLabel = explore();
         this.startLabel = start();
+        this.kickerLabel = welcomeKicker();
+        this.titleLeadLabel = welcomeTitleLead();
+        this.titleEmLabel = welcomeTitleEm();
+        this.ledeLabel = welcomeLede();
+        this.railAriaLabel = welcomeRailAria();
+        this.rail1TitleLabel = welcomeRail1Title();
+        this.rail1DescLabel = welcomeRail1Desc();
+        this.rail2TitleLabel = welcomeRail2Title();
+        this.rail2DescLabel = welcomeRail2Desc();
+        this.rail3TitleLabel = welcomeRail3Title();
+        this.rail3DescLabel = welcomeRail3Desc();
         const paths = docsPaths(this.localeId);
         this.docsRootHref = paths.docsRootHref;
         this.guideHref = paths.guideHref;
@@ -119,3 +157,4 @@ export default class WelcomePage {
     }
 }
 </script>
+

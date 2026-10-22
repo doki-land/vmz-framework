@@ -5,14 +5,14 @@
             <header class="planner__hero">
                 <p class="planner__kicker">
                     <span />
-                    Deploy planner
+                    交付前自查
                 </p>
                 <h1 id="planner-title">
                     部署计划器
                 </h1>
                 <p class="planner__lede">
-                    回答拓扑与托管意向，生成一份可交给编码 agent 的落地提示词。
-            提示词说明怎么装；能不能行仍交给
+                    回答几个部署问题，生成一份可直接交给 AI 编码助手的实施提示词。
+                    提示词负责说明怎么装；能否跑通仍以
                     <code>
                         vmz check
                     </code>
@@ -20,30 +20,30 @@
                     <code>
                         vmz build
                     </code>
-                    。不要手抄 JSON。
+                    为准，不必手写 JSON。
                 </p>
             </header>
             <div class="planner__grid">
                 <section aria-labelledby="quiz-title" class="planner__quiz">
                     <h2 id="quiz-title">
-                        拓扑问卷
+                        部署问卷
                     </h2>
                     <fieldset class="planner__field">
                         <legend>
-                            T.secrets · 密钥 / 会话是否必须留在可信服务器？
+                            密钥与会话是否必须留在可信服务器？
                         </legend>
                         <div role="group" class="planner__chips">
                             <button type="button" @click='(() => setSecrets("none"))' :class="secretsNoneClass">
                                 无（公开内容）
                             </button>
                             <button type="button" @click='(() => setSecrets("yes"))' :class="secretsYesClass">
-                                是（需可信 server）
+                                是（需要可信服务端）
                             </button>
                         </div>
                     </fieldset>
                     <fieldset class="planner__field">
                         <legend>
-                            T.html · 首屏 HTML 从哪来？
+                            首屏 HTML 从哪来？
                         </legend>
                         <div role="group" class="planner__chips">
                             <button type="button" @click='(() => setHtml("cdn-prebuild"))' :class="htmlCdnClass">
@@ -59,7 +59,7 @@
                     </fieldset>
                     <fieldset class="planner__field">
                         <legend>
-                            T.assets · 静态资源放哪？
+                            静态资源放在哪里？
                         </legend>
                         <div role="group" class="planner__chips">
                             <button type="button" @click='(() => setAssets("same-host"))' :class="assetsSameClass">
@@ -75,7 +75,7 @@
                     </fieldset>
                     <fieldset class="planner__field">
                         <legend>
-                            T.server · 服务端进程？
+                            需要服务端进程吗？
                         </legend>
                         <div role="group" class="planner__chips">
                             <button type="button" @click='(() => setServer("none"))' :class="serverNoneClass">
@@ -94,20 +94,20 @@
                     </fieldset>
                     <fieldset class="planner__field">
                         <legend>
-                            T.update · 嵌入基线 + 远程整包更新？
+                            需要嵌入基线 + 远程整包更新吗？
                         </legend>
                         <div role="group" class="planner__chips">
                             <button type="button" @click='(() => setUpdate("no"))' :class="updateNoClass">
                                 否
                             </button>
                             <button type="button" @click='(() => setUpdate("release-fallback"))' :class="updateYesClass">
-                                是（release-fallback）
+                                是（基线 + 整包回退）
                             </button>
                         </div>
                     </fieldset>
                     <fieldset class="planner__field">
                         <legend>
-                            T.ship · 怎么发布？（与平台正交）
+                            怎么发布？
                         </legend>
                         <div role="group" class="planner__chips">
                             <button type="button" @click='(() => setShip("git-ci"))' :class="shipCiClass">
@@ -120,7 +120,7 @@
                     </fieldset>
                     <fieldset class="planner__field">
                         <legend>
-                            T.vendor · 外部托管平台（可多选）
+                            部署到哪个平台？（可多选）
                         </legend>
                         <div role="group" class="planner__chips planner__chips--wrap">
                             <button type="button" @click='(() => toggleVendor("cloudflare-pages"))' :class="vendorPagesClass">
@@ -156,7 +156,7 @@
                 <section aria-labelledby="plan-title" class="planner__result">
                     <div class="planner__result-head">
                         <h2 id="plan-title">
-                            Agent 提示词
+                            实施提示词
                         </h2>
                         <div class="planner__copy-row">
                             <Button type="button" variant="secondary" @click="copyPrompt">
@@ -173,9 +173,10 @@
                     <dl class="planner__meta">
                         <div>
                             <dt>
-                                profile
+                                交付配方
                             </dt>
                             <dd>
+                                {{ profileLabel }}
                                 <code>
                                     {{ profileId }}
                                 </code>
@@ -183,9 +184,10 @@
                         </div>
                         <div>
                             <dt>
-                                assembly
+                                组装方式
                             </dt>
                             <dd>
+                                {{ assemblyLabel }}
                                 <code>
                                     {{ assembly }}
                                 </code>
@@ -193,9 +195,10 @@
                         </div>
                         <div>
                             <dt>
-                                ship
+                                发布方式
                             </dt>
                             <dd>
+                                {{ shipLabel }}
                                 <code>
                                     {{ ship }}
                                 </code>
@@ -203,9 +206,10 @@
                         </div>
                         <div v-if="hasServerRuntime">
                             <dt>
-                                serverRuntime
+                                服务端运行时
                             </dt>
                             <dd>
+                                {{ serverRuntimeLabel }}
                                 <code>
                                     {{ serverRuntime }}
                                 </code>
@@ -213,7 +217,7 @@
                         </div>
                         <div>
                             <dt>
-                                requiredEnv
+                                需要配置的环境变量名
                             </dt>
                             <dd>
                                 <code>
@@ -242,7 +246,7 @@
                     </pre>
                     <details class="planner__summary">
                         <summary>
-                            扫一眼摘要（命令 · 外部清单 · delivery 意图）
+                            摘要：建议命令、外部清单与 delivery 配置
                         </summary>
                         <h4>
                             建议命令
@@ -289,7 +293,7 @@
                             </article>
                         </div>
                         <h4>
-                            delivery 意图
+                            delivery 配置
                         </h4>
                         <pre class="planner__code">
                             <code>
@@ -298,7 +302,7 @@
                         </pre>
                     </details>
                     <h3>
-                        深链
+                        相关文档
                     </h3>
                     <ul class="planner__links">
                         <li v-for="link in deepLinkItems" :key="link.href">
@@ -564,6 +568,27 @@
 <script client>
 import { buildDeployPlan, DEFAULT_ANSWERS } from "../deploy/planner.ts";
 
+/** Human labels for the recipe ids; the raw id stays visible for copy-paste. */
+const PROFILE_LABELS = {
+    static: "纯静态托管",
+    "web-ssr": "单机全栈",
+    "web-hybrid": "CDN + 独立服务端",
+    "web-client": "纯前端 + 本机静态",
+    "panel-embedded": "面板嵌入（基线 + 整包回退）",
+};
+const ASSEMBLY_LABELS = {
+    "web-static": "静态托管",
+    "server-host": "单机服务端",
+    "cdn+server": "CDN + 服务端",
+    "local-static": "本机静态",
+    "rust-embedded": "Rust 嵌入",
+};
+const RUNTIME_LABELS = {
+    node: "Node",
+    worker: "Worker",
+    "rust-host": "Rust 宿主",
+};
+
 export default class DeployPlannerPage {
     secrets = DEFAULT_ANSWERS.secrets;
     html = DEFAULT_ANSWERS.html;
@@ -586,6 +611,10 @@ export default class DeployPlannerPage {
     assembly = "";
     serverRuntime = "";
     hasServerRuntime = false;
+    profileLabel = "";
+    assemblyLabel = "";
+    shipLabel = "";
+    serverRuntimeLabel = "";
     requiredEnvLabel = "（无）";
     agentPrompt = "";
     vmzConfigSnippet = "";
@@ -625,8 +654,14 @@ export default class DeployPlannerPage {
     vendorNodeClass = "";
     vendorRustClass = "";
 
-    constructor(props = {}) {
-        if (typeof this.__vmzApplyProps === "function") this.__vmzApplyProps(props);
+    /**
+     * Derived plan must exist before the first render: the route render path
+     * evaluates field initializers, so a constructor-only call would leave the
+     * whole result panel empty in the server HTML.
+     */
+    planReady = this.refresh();
+
+    onMount() {
         this.refresh();
     }
 
@@ -688,6 +723,10 @@ export default class DeployPlannerPage {
         this.ship = plan.ship;
         this.serverRuntime = plan.serverRuntime || "";
         this.hasServerRuntime = !!plan.serverRuntime;
+        this.profileLabel = PROFILE_LABELS[plan.profileId] || "自定义配方";
+        this.assemblyLabel = ASSEMBLY_LABELS[plan.assembly] || "自定义组装";
+        this.shipLabel = plan.ship === "git-ci" ? "Git CI 发布" : "本机直传";
+        this.serverRuntimeLabel = RUNTIME_LABELS[plan.serverRuntime] || "自定义运行时";
         this.requiredEnvLabel =
             plan.requiredEnv.length > 0 ? plan.requiredEnv.join(", ") : "（无）";
         this.agentPrompt = plan.agentPrompt;

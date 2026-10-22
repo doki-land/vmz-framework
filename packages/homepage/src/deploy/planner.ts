@@ -73,7 +73,7 @@ export type DeployPlanView = {
 };
 
 const DISCLAIMER =
-    '本提示词 ≠ 已通过 vmz check / vmz build。把它交给编码 agent 落地配置与脚手架；可行性以 check/build 为准。git-ci = 只配流水线 + 手动 push；direct-upload = 本机直传。永不要求人手抄 JSON；产物中永不含密钥值。';
+    '这份提示词只描述配置怎么落地，不代表项目已经通过 vmz check 或 vmz build。请把它交给编码助手完成脚手架与配置；能否上线以两条命令的实际结果为准。提示词里只有环境变量名，不含任何密钥值。';
 
 const DOC_LOCALE = 'zh-hans';
 const DEPLOY_GUIDE = `/d/${DOC_LOCALE}/guide/deploy`;
@@ -104,11 +104,11 @@ function mapServerRuntime(server: ServerAnswer): string | undefined {
 
 function pushShipCautions(ship: ShipMode, cautions: string[]) {
     if (ship === 'git-ci') {
-        cautions.push('发布方式 git-ci：vmz deploy 只配 CI；真发布靠手动 git push。');
-        cautions.push('advice：管理 key 默认可读 .env.secrets*；配 CI 更建议 --secret NAME=VALUE 一次性传入（不写盘、不进 report）。');
+        cautions.push('发布方式为 Git CI：vmz deploy 只生成流水线与密钥名，真正上线由你手动 git push 触发。');
+        cautions.push('管理密钥默认可从 .env.secrets* 读取；接入 CI 时建议用 --secret NAME=VALUE 一次性传入，既不落盘也不写进报告。');
     } else {
         cautions.push(
-            '发布方式 direct-upload：本机直传——适合私有仓或托管方无/不用 Git 集成；token 默认可读 .env.secrets*，也可用 --secret 一次性。',
+            '发布方式为本机直传：适合私有仓库或托管方没有接入 Git 的场景；令牌默认可从 .env.secrets* 读取，也可用 --secret 一次性传入。',
         );
     }
 }
@@ -122,7 +122,7 @@ function hasStaticVendor(vendors: VendorId[]): boolean {
 }
 
 function publishDirNote(profileId: string): string {
-    return `Publish / Output directory：以 StaticDeliveryManifest 为准（常见 dist；profile=${profileId}）`;
+    return `发布目录：以静态交付清单为准，通常是 dist（当前 profile 为 ${profileId}）`;
 }
 
 function buildCmd(profileId: string): string {
@@ -134,10 +134,10 @@ function pickRecipe(answers: PlannerAnswers, cautions: string[]): RecipePick {
 
     if (update === 'release-fallback' || assets === 'embedded-binary') {
         if (secrets === 'yes' && assets === 'embedded-binary') {
-            cautions.push('嵌入二进制仍需要可信宿主进程持有密钥；密钥只通过 env 名绑定，不得写进嵌入产物。');
+            cautions.push('把资源嵌入二进制后，密钥仍必须由可信宿主进程持有：只按环境变量名绑定，不得写入嵌入产物。');
         }
         if (html === 'browser-only') {
-            cautions.push('已选嵌入/整包更新：仍按 rust-embedded 配方；纯浏览器拓扑被覆盖。');
+            cautions.push('已选择嵌入或整包更新，按面板嵌入配方出包；纯浏览器拓扑不适用于这种交付方式。');
         }
         return {
             recipeId: 'panel-embedded',
@@ -148,10 +148,10 @@ function pickRecipe(answers: PlannerAnswers, cautions: string[]): RecipePick {
 
     if (secrets === 'yes') {
         if (html === 'cdn-prebuild' || html === 'browser-only' || server === 'none') {
-            cautions.push('T.secrets=yes：不得推荐纯 web-static / local-static 作为生产配方，已改选含可信 server 的配方。');
+            cautions.push('既然密钥必须留在服务端，生产环境就不能只用纯静态托管；这里已改选带可信服务端的配方。');
         }
         if (hasStaticVendor(vendors)) {
-            cautions.push('已选静态托管平台，但 secrets=yes：静态面只能挂公开壳；密钥须另有可信 server（hybrid）或改掉 secrets。');
+            cautions.push('所选静态平台只能承载公开外壳；密钥相关请求需要另配可信服务端，或重新考虑密钥边界。');
         }
         const runtime = forceServer(server);
         if (assets === 'cdn' && runtime !== 'none') {
@@ -172,9 +172,9 @@ function pickRecipe(answers: PlannerAnswers, cautions: string[]): RecipePick {
 
     if (hasStaticVendor(vendors) && html !== 'request-ssr') {
         if (server !== 'none') {
-            cautions.push('已选纯静态托管：推荐 static。源码可有 <script server>，该 profile 只交付可静态证明的面。');
+            cautions.push('已选择纯静态托管：源码里可以有服务端脚本，但这个 profile 只交付能静态证明的部分。');
         } else {
-            cautions.push('纯静态托管：static。源码可有 <script server>；依赖运行时 server / secret() 的 route 以 check/build 为准。');
+            cautions.push('已选择纯静态托管：源码里可以有服务端脚本，依赖运行时服务端或 secret() 的路由请以 check / build 结果为准。');
         }
         return {
             recipeId: 'static',
@@ -184,13 +184,13 @@ function pickRecipe(answers: PlannerAnswers, cautions: string[]): RecipePick {
     }
 
     if (hasStaticVendor(vendors) && html === 'request-ssr') {
-        cautions.push('静态托管 + 请求时 SSR：平台只能挂静态壳；完整 SSR 请改 hybrid/server，或 HTML 改「CDN 预生成」。');
+        cautions.push('静态托管无法按请求生成 HTML：要么改用混合或服务端配方，要么把首屏改成 CDN 预生成。');
     }
 
     if (html === 'request-ssr') {
         const runtime = forceServer(server);
         if (server === 'none') {
-            cautions.push('请求时 SSR 需要服务端进程：已默认 serverRuntime=node。');
+            cautions.push('请求时 SSR 需要服务端进程，这里默认使用 Node 运行时。');
         }
         if (assets === 'cdn') {
             return {
@@ -210,7 +210,7 @@ function pickRecipe(answers: PlannerAnswers, cautions: string[]): RecipePick {
 
     if (html === 'browser-only') {
         if (server !== 'none') {
-            cautions.push('纯浏览器拓扑下服务端进程不进入 local-static；需要 API/SSR 请改选「请求时 SSR」或开启密钥边界。');
+            cautions.push('纯浏览器拓扑不包含服务端进程；需要接口或 SSR 时，请改选「请求时 SSR」并明确密钥边界。');
         }
         return {
             recipeId: 'web-client',
@@ -228,7 +228,7 @@ function pickRecipe(answers: PlannerAnswers, cautions: string[]): RecipePick {
         };
     }
     if (server !== 'none') {
-        cautions.push('已选服务端进程且 HTML 预生成：按 server-host 组装；分机请把资源选为 CDN。');
+        cautions.push('首屏预生成又有服务端进程时，按单机全栈组装；如果服务端部署在另一台机器，请把静态资源改选为 CDN。');
         return {
             recipeId: 'web-ssr',
             profileId: 'web-ssr',
@@ -258,7 +258,7 @@ function buildSnippet(pick: RecipePick): string {
             `      '${pick.profileId}': {`,
             "        host: 'browser',",
             "        assembly: 'rust-embedded',",
-            '        // sources: defineSite({ ... }) — 见 recipes#rust-embedded',
+            '        // sources: defineSite({ ... }) — 详见 recipes#rust-embedded',
             '      },',
         );
     } else if (pick.serverRuntime) {
@@ -277,7 +277,7 @@ function buildSnippet(pick: RecipePick): string {
 
     lines.push(
         '    },',
-        '    // 可选机器面：agent 可写出 deploy.plan.json 供 vmz deploy --plan；人手勿手抄 JSON',
+        '    // 可选机器可读配置：由编码助手生成 deploy.plan.json 供 vmz deploy --plan 使用，无需手工抄写',
         "    // deploy: { plan: './deploy.plan.json' },",
         '  },',
         '})',
@@ -327,11 +327,12 @@ function collectRequiredEnv(answers: PlannerAnswers, _pick: RecipePick): string[
 
 function buildAdapters(answers: PlannerAnswers, pick: RecipePick): { kind: string; note?: string }[] {
     const adapters: { kind: string; note?: string }[] = [];
-    const shipNote = answers.ship === 'git-ci' ? 'ship=git-ci：deploy 配 CI，push 才发布' : 'ship=direct-upload：deploy 本机直传';
+    const shipNote =
+        answers.ship === 'git-ci' ? '由 CI 发布，push 后自动执行' : '本机直接上传，不经过 CI';
 
     for (const v of answers.vendors) {
         if (v === 'cloudflare-pages') {
-            adapters.push({ kind: 'cloudflare-pages', note: `${shipNote}；勿 SPA fallback` });
+            adapters.push({ kind: 'cloudflare-pages', note: `${shipNote}；不要配置 SPA 回退` });
         } else if (v === 'github-pages') {
             adapters.push({ kind: 'github-pages', note: shipNote });
         } else if (v === 'vercel') {
@@ -339,23 +340,23 @@ function buildAdapters(answers: PlannerAnswers, pick: RecipePick): { kind: strin
         } else if (v === 'netlify') {
             adapters.push({ kind: 'netlify', note: shipNote });
         } else if (v === 'tencent-edgeone') {
-            adapters.push({ kind: 'tencent-edgeone', note: `${shipNote}；CLI 以腾讯文档为准` });
+            adapters.push({ kind: 'tencent-edgeone', note: `${shipNote}；CLI 参数以腾讯云文档为准` });
         } else if (v === 'cloudflare-workers') {
-            adapters.push({ kind: 'cloudflare-workers', note: 'bindings 仅名' });
+            adapters.push({ kind: 'cloudflare-workers', note: '绑定只登记变量名，不写入值' });
         } else if (v === 's3-cloudfront') {
-            adapters.push({ kind: 's3-cloudfront', note: '默认可按 direct-upload 理解' });
+            adapters.push({ kind: 's3-cloudfront', note: '默认按本机直传处理' });
         } else if (v === 'node-vps') {
-            adapters.push({ kind: 'node-vps', note: 'filesystem-release / CURRENT' });
+            adapters.push({ kind: 'node-vps', note: '发布目录配合 CURRENT 指针切换' });
         } else if (v === 'rust-bin') {
-            adapters.push({ kind: 'rust-bin', note: '嵌入基线 + 远程整包' });
+            adapters.push({ kind: 'rust-bin', note: '嵌入基线，配合远程整包更新' });
         }
     }
 
     if (adapters.length === 0) {
         if (pick.assembly === 'server-host' || pick.assembly === 'rust-embedded') {
-            adapters.push({ kind: 'filesystem-release', note: '本地 release 指针' });
+            adapters.push({ kind: 'filesystem-release', note: '本机 release 目录切换' });
         } else {
-            adapters.push({ kind: 'filesystem-release', note: '无外部平台时默认本地 release' });
+            adapters.push({ kind: 'filesystem-release', note: '未选外部平台时默认使用本机 release 目录' });
         }
     }
     return adapters;
@@ -369,13 +370,13 @@ function buildExternalSteps(answers: PlannerAnswers, pick: RecipePick, requiredE
     const steps: ExternalStep[] = [];
     const envList =
         requiredEnv.length > 0
-            ? `凭证/标识 env 名（无值）：${requiredEnv.join(', ')}`
-            : '公开 env：如 VMZ_SITE_ORIGIN；禁止把 secret 写入静态产物';
+            ? `需要准备的环境变量名（只登记名称）：${requiredEnv.join('、')}`
+            : '公开环境变量即可，例如 VMZ_SITE_ORIGIN；不要把密钥写进静态产物';
     const cmd = buildCmd(pick.profileId);
     const pub = publishDirNote(pick.profileId);
     const ship = answers.ship;
-    const naCi = '当前 ship=direct-upload：不配 Git CI；若要流水线请改选「Git CI」。';
-    const naUp = '当前 ship=git-ci：不在本机上传；若要直传请改选「本机直传」。';
+    const naCi = '当前选择本机直传，不生成 CI 流水线；需要流水线时改选「Git CI」。';
+    const naUp = '当前选择 Git CI，不在本机上传；需要本机直传时改选「本机直传」。';
 
     for (const v of answers.vendors) {
         if (v === 'cloudflare-pages') {
@@ -384,18 +385,18 @@ function buildExternalSteps(answers: PlannerAnswers, pick: RecipePick, requiredE
                     v,
                     'Cloudflare Pages',
                     'cloudflare-pages',
-                    ['项目名；域名 / HTTPS', ship === 'git-ci' ? '生产分支（push 触发）' : '可不绑 Git', cmd, pub],
+                    ['项目名；绑定域名与 HTTPS', ship === 'git-ci' ? '生产分支，push 后触发构建' : '可以不绑定 Git 仓库', cmd, pub],
                     ship === 'git-ci'
                         ? [
-                              'vmz deploy：写 Actions + 登记 CF_* secrets 名',
-                              '管理 key：默认 .env.secrets*；advice 建议 --secret NAME=VALUE 一次性',
-                              'workflow 内 wrangler pages deploy',
-                              '然后手动 git push',
+                              '运行 vmz deploy 生成 Actions 工作流，并登记 CF_* 变量名',
+                              '密钥默认可从 .env.secrets* 读取；CI 场景建议 --secret NAME=VALUE 一次性传入',
+                              '工作流内执行 wrangler pages deploy',
+                              '完成后手动 git push',
                               envList,
                           ]
                         : [naCi],
                     ship === 'direct-upload'
-                        ? ['vmz deploy：本机 check/build + wrangler/API 直传', 'token：默认 .env.secrets* 或 --secret', envList]
+                        ? ['运行 vmz deploy：本机 check / build 后通过 wrangler 或 API 直传', '令牌默认可从 .env.secrets* 读取，或用 --secret 传入', envList]
                         : [naUp],
                 ),
             );
@@ -407,15 +408,15 @@ function buildExternalSteps(answers: PlannerAnswers, pick: RecipePick, requiredE
                     'GitHub Pages',
                     'github-pages',
                     [
-                        ship === 'git-ci' ? 'Pages source = Actions' : 'Pages 接受 artifact / gh-pages',
-                        '自定义域名；base path 对齐 VMZ_SITE_ORIGIN',
+                        ship === 'git-ci' ? 'Pages 来源设为 Actions' : 'Pages 接受 artifact 或 gh-pages 分支',
+                        '自定义域名；base path 与 VMZ_SITE_ORIGIN 保持一致',
                         cmd,
                         pub,
                     ],
                     ship === 'git-ci'
-                        ? ['vmz deploy：写 workflow（OIDC）', '管理 key：默认 .env.secrets*；advice 建议 --secret 一次性', '然后手动 git push']
+                        ? ['运行 vmz deploy 生成工作流（OIDC 授权）', '密钥默认可从 .env.secrets* 读取，或用 --secret 一次性传入', '完成后手动 git push']
                         : [naCi],
-                    ship === 'direct-upload' ? ['vmz deploy：本机上传（GH_TOKEN）；默认 secrets 文件或 --secret', envList] : [naUp],
+                    ship === 'direct-upload' ? ['运行 vmz deploy 从本机上传（GH_TOKEN）；令牌来自 secrets 文件或 --secret', envList] : [naUp],
                 ),
             );
         }
@@ -425,17 +426,17 @@ function buildExternalSteps(answers: PlannerAnswers, pick: RecipePick, requiredE
                     v,
                     'Vercel',
                     'vercel',
-                    ['Framework=Other；Output Directory；域名', cmd, pub],
+                    ['Framework 选 Other；确认 Output Directory 与域名', cmd, pub],
                     ship === 'git-ci'
                         ? [
-                              'vmz deploy：写 workflow + 登记 VERCEL_*',
-                              '管理 key：默认 .env.secrets*；advice 建议 --secret 一次性',
-                              '然后手动 git push',
+                              '运行 vmz deploy 生成工作流，并登记 VERCEL_* 变量名',
+                              '密钥默认可从 .env.secrets* 读取，或用 --secret 一次性传入',
+                              '完成后手动 git push',
                               envList,
                           ]
                         : [naCi],
                     ship === 'direct-upload'
-                        ? ['vmz deploy：vercel deploy --prebuilt --prod', 'token：默认 .env.secrets* 或 --secret', envList]
+                        ? ['运行 vmz deploy：vercel deploy --prebuilt --prod', '令牌默认可从 .env.secrets* 读取，或用 --secret 传入', envList]
                         : [naUp],
                 ),
             );
@@ -446,17 +447,17 @@ function buildExternalSteps(answers: PlannerAnswers, pick: RecipePick, requiredE
                     v,
                     'Netlify',
                     'netlify',
-                    ['Publish directory；域名', cmd, pub],
+                    ['确认 Publish directory 与域名', cmd, pub],
                     ship === 'git-ci'
                         ? [
-                              'vmz deploy：登记 NETLIFY_*',
-                              '管理 key：默认 .env.secrets*；advice 建议 --secret 一次性',
-                              '然后手动 git push',
+                              '运行 vmz deploy 登记 NETLIFY_* 变量名',
+                              '密钥默认可从 .env.secrets* 读取，或用 --secret 一次性传入',
+                              '完成后手动 git push',
                               envList,
                           ]
                         : [naCi],
                     ship === 'direct-upload'
-                        ? ['vmz deploy：netlify deploy --prod --dir=<publish>', 'token：默认 .env.secrets* 或 --secret', envList]
+                        ? ['运行 vmz deploy：netlify deploy --prod --dir=<publish>', '令牌默认可从 .env.secrets* 读取，或用 --secret 传入', envList]
                         : [naUp],
                 ),
             );
@@ -467,18 +468,18 @@ function buildExternalSteps(answers: PlannerAnswers, pick: RecipePick, requiredE
                     v,
                     'Tencent EdgeOne',
                     'tencent-edgeone',
-                    ['站点 / 加速域名；证书', cmd, pub],
+                    ['站点与加速域名；上传证书', cmd, pub],
                     ship === 'git-ci'
                         ? [
-                              'vmz deploy：登记 TENCENTCLOUD_* + EDGEONE_*',
-                              '管理 key：默认 .env.secrets*；advice 建议 --secret 一次性',
-                              '然后手动 git push',
-                              'CLI 以腾讯文档为准',
+                              '运行 vmz deploy 登记 TENCENTCLOUD_* 与 EDGEONE_* 变量名',
+                              '密钥默认可从 .env.secrets* 读取，或用 --secret 一次性传入',
+                              '完成后手动 git push',
+                              'CLI 参数以腾讯云文档为准',
                               envList,
                           ]
                         : [naCi],
                     ship === 'direct-upload'
-                        ? ['vmz deploy：本机直传；CLI 以腾讯文档为准', 'token：默认 .env.secrets* 或 --secret', envList]
+                        ? ['运行 vmz deploy 从本机直传；CLI 参数以腾讯云文档为准', '令牌默认可从 .env.secrets* 读取，或用 --secret 传入', envList]
                         : [naUp],
                 ),
             );
@@ -490,17 +491,17 @@ function buildExternalSteps(answers: PlannerAnswers, pick: RecipePick, requiredE
                     'Cloudflare Workers',
                     'cloudflare-workers',
                     [
-                        '脚本名 / 入口；Bindings 仅名',
-                        answers.vendors.includes('cloudflare-pages') ? '与 Pages：静态壳 vs SSR/RPC' : '若仅 Worker：确认 HTML 来源',
+                        '脚本名与入口；绑定只登记变量名',
+                        answers.vendors.includes('cloudflare-pages') ? '与 Pages 分工：静态外壳交给 Pages，接口交给 Worker' : '只用 Worker 时先确认首屏 HTML 来源',
                     ],
                     [envList],
-                    ['本地 wrangler / vmz deploy', envList],
+                    ['本机 wrangler 或 vmz deploy 发布', envList],
                 ),
             );
         }
         if (v === 's3-cloudfront') {
             steps.push(
-                axisStep(v, 'S3 + CloudFront', 's3-cloudfront', ['Bucket、区域、Distribution ID', pub], ['CI runner 亦可 sync'], [envList]),
+                axisStep(v, 'S3 + CloudFront', 's3-cloudfront', ['Bucket、区域与 Distribution ID', pub], ['也可以在 CI runner 内同步'], [envList]),
             );
         }
         if (v === 'node-vps') {
@@ -509,22 +510,22 @@ function buildExternalSteps(answers: PlannerAnswers, pick: RecipePick, requiredE
                     v,
                     'Node VPS',
                     'node-vps',
-                    ['发布目录 / CURRENT；PORT', '反向代理仅转发'],
-                    ['可选自建 runner'],
-                    [envList, 'filesystem-release'],
+                    ['发布目录与 CURRENT 指针；确认 PORT', '反向代理只做转发，不改写路由'],
+                    ['可选：自建 runner'],
+                    [envList, '本机 release 目录切换'],
                 ),
             );
         }
         if (v === 'rust-bin') {
-            steps.push(axisStep(v, 'Rust binary', 'rust-bin', ['嵌入 artifact；UPDATE_BASE_URL 仅名'], ['可选 CI 打 release'], [envList]));
+            steps.push(axisStep(v, 'Rust binary', 'rust-bin', ['嵌入构建产物；只登记 UPDATE_BASE_URL 变量名'], ['也可以在 CI 里打包 release'], [envList]));
         }
     }
 
     if (steps.length === 0) {
         steps.push(
-            axisStep('local', 'local', 'filesystem-release', [cmd, '无外部平台'], ship === 'git-ci' ? ['可先选平台再配 CI'] : ['无'], [
-                'vmz deploy（filesystem-release）',
-                '工作区根 .env.secrets* 仅本地',
+            axisStep('local', 'local', 'filesystem-release', [cmd, '未选择外部平台'], ship === 'git-ci' ? ['可以先选平台，再配 CI'] : ['无需额外步骤'], [
+                '运行 vmz deploy 走本机 release 目录',
+                '项目根目录的 .env.secrets* 仅在本机使用',
             ]),
         );
     }
@@ -568,25 +569,29 @@ function buildAgentPrompt(input: {
     const platformLine =
         adapters.length > 0
             ? adapters.map((a) => (a.note ? `${a.kind}（${a.note}）` : a.kind)).join('、')
-            : '（未选外部平台 → filesystem-release / 本地）';
+            : '未选择外部平台，使用本机 release 目录';
 
-    const envLine = requiredEnv.length > 0 ? requiredEnv.join(', ') : '（无额外发布 token 名；公开 env 如 VMZ_SITE_ORIGIN 按需）';
+    const envLine =
+        requiredEnv.length > 0 ? requiredEnv.join('、') : '无需额外发布变量；公开变量如 VMZ_SITE_ORIGIN 按需配置';
 
     const shipBlock =
         ship === 'git-ci'
             ? [
-                  '发布方式 **git-ci**：',
-                  '- 只配 CI 工作流 + 登记 secrets **名**；**禁止**在作者机上 publish 并宣称已上线',
-                  '- 作者随后 **手动 `git push`**，由 CI 执行 check/build/publish',
-                  '- 管理 key：默认可读 `.env.secrets*`；更建议 `vmz deploy --secret NAME=VALUE` 一次性（不写盘、不进 report）',
+                  '发布方式为 **git-ci**：',
+                  '- 只生成 CI 工作流并登记密钥名；不要在作者机器上直接发布并声称已上线',
+                  '- 作者随后手动 `git push`，由 CI 完成 check、build 与发布',
+                  '- 密钥默认可从 `.env.secrets*` 读取；更推荐用 `vmz deploy --secret NAME=VALUE` 一次性传入，既不落盘也不写进报告',
               ].join('\n')
             : [
-                  '发布方式 **direct-upload**：',
-                  '- 本机 `vmz check` → `vmz build` → adapter 直传',
-                  '- token 默认可读 `.env.secrets*`，也可用 `--secret NAME=VALUE` 一次性',
+                  '发布方式为 **direct-upload**：',
+                  '- 本机依次执行 `vmz check`、`vmz build`，再由 adapter 直传',
+                  '- 令牌默认可从 `.env.secrets*` 读取，也可以用 `--secret NAME=VALUE` 一次性传入',
               ].join('\n');
 
-    const cautionBlock = cautions.length > 0 ? ['## 选型警告（不是 check 诊断）', '', bullet(cautions)].join('\n') : '## 选型警告\n\n- （无）';
+    const cautionBlock =
+        cautions.length > 0
+            ? ['## 选型提醒（与 check 诊断无关）', '', bullet(cautions)].join('\n')
+            : '## 选型提醒\n\n- 无';
 
     const stepsBlock = externalSteps.map(formatStepBlock).join('\n\n');
 
@@ -597,18 +602,18 @@ function buildAgentPrompt(input: {
         '',
         disclaimer,
         '',
-        '你是本仓库的编码助手。根据下列合同**改配置、写脚手架、准备发布**；完成后跑验证命令。不要发明第二套路由/MIME/SPA fallback 语义；厂商 `_headers` / `vercel.json` rewrites 等不是 VMZ 真相源。',
+        '你是这个仓库的编码助手。请按下面的结论修改配置、补齐脚手架并准备发布，最后运行验证命令。不要另造一套路由、MIME 或 SPA 回退规则；厂商侧的 `_headers`、`vercel.json` rewrites 都不是 VMZ 的事实来源。',
         '',
         '## 拓扑结论',
         '',
         bullet([
-            `recipe：${pick.recipeId}`,
+            `配方：${pick.recipeId}`,
             `profile：${pick.profileId}`,
-            `assembly：${pick.assembly}`,
-            ...(pick.serverRuntime ? [`serverRuntime：${pick.serverRuntime}`] : []),
-            `ship：${ship}`,
-            `平台 adapters：${platformLine}`,
-            `requiredEnv（仅名）：${envLine}`,
+            `组装方式：${pick.assembly}`,
+            ...(pick.serverRuntime ? [`服务端运行时：${pick.serverRuntime}`] : []),
+            `发布方式：${ship}`,
+            `平台 adapter：${platformLine}`,
+            `所需环境变量（只有名称）：${envLine}`,
         ]),
         '',
         '## 硬约束',
@@ -616,20 +621,20 @@ function buildAgentPrompt(input: {
         shipBlock,
         '',
         bullet([
-            '密钥值永不写入 `vmz.config.ts`、Web 产物、Resume、日志、workflow、DeployPlan 正文',
-            '可行性只认 `vmz check` / `vmz build`；本提示词不是上线证明',
-            '若需要机器可读 DeployPlan 供 `vmz deploy --plan`，由你生成文件——**不要**让用户手抄 JSON',
-            '未安装对应 `@vmz/plugin-deploy-*` 时失败并提示安装，不得静默跳过',
+            '密钥值不得写进 `vmz.config.ts`、Web 产物、报告、日志、工作流或本计划正文',
+            '能否上线只认 `vmz check` 与 `vmz build` 的结果；这份提示词不构成上线证明',
+            '如果 `vmz deploy --plan` 需要机器可读的 DeployPlan，由你生成文件，不要让用户手抄 JSON',
+            '缺少对应的 `@vmz/plugin-deploy-*` 时应当报错并提示安装，不得静默跳过',
         ]),
         '',
         '## 请你完成',
         '',
-        '1. 合并/写入 `vmz.config.ts` 的 `delivery`（意图如下；按仓库既有 `defineConfig` 风格改，勿平行 `vmz.site.ts`）。',
-        '2. 按 `ship` 准备 `vmz deploy`：git-ci → 脚手架 CI + 登记 secrets 名；direct-upload → 本机直传路径。',
-        '3. 按下方「外部填写清单」核对控制台字段（只填名与路径类信息）。',
-        '4. 运行建议命令；缺绑定只报名、不回显值；git-ci 结束后明确「请手动 git push」。',
+        '1. 合并或写入 `vmz.config.ts` 的 `delivery` 配置（形状见下）；沿用仓库已有的 `defineConfig` 风格，不要另建 `vmz.site.ts`。',
+        '2. 按发布方式准备 `vmz deploy`：git-ci 生成 CI 工作流并登记密钥名；direct-upload 走本机直传路径。',
+        '3. 对照下方「外部平台清单」核对控制台字段，只填名称与路径类信息。',
+        '4. 运行建议命令；缺少绑定只报告变量名，不回显值；git-ci 结束后明确提示用户手动 git push。',
         '',
-        '### delivery 意图（参考形状）',
+        '### delivery 配置（参考形状）',
         '',
         '```ts',
         vmzConfigSnippet.trimEnd(),
@@ -639,13 +644,13 @@ function buildAgentPrompt(input: {
         '',
         bullet(commandsSuggested),
         '',
-        '## 外部填写清单',
+        '## 外部平台清单',
         '',
         stepsBlock,
         '',
         cautionBlock,
         '',
-        '## 深链',
+        '## 相关文档',
         '',
         linksBlock,
         '',
@@ -665,11 +670,11 @@ export function buildDeployPlan(answers: PlannerAnswers): DeployPlanView {
     const commandsSuggested: string[] = [`vmz check`, `vmz build --release --profile ${pick.profileId}`];
     if (ship === 'git-ci') {
         commandsSuggested.push(
-            `vmz deploy [--secret NAME=VALUE]…   # git-ci：默认读 .env.secrets*；管理 key 建议一次性 --secret；不本机发布`,
-            `git push   # 之后由 CI check/build/publish`,
+            `vmz deploy [--secret NAME=VALUE]…   # git-ci：默认读 .env.secrets*；管理密钥建议一次性传入；不在本机发布`,
+            `git push   # 之后由 CI 完成 check、build 与发布`,
         );
     } else {
-        commandsSuggested.push(`vmz deploy [--secret NAME=VALUE]…   # direct-upload：默认读 .env.secrets*；也可一次性传参`);
+        commandsSuggested.push(`vmz deploy [--secret NAME=VALUE]…   # direct-upload：默认读 .env.secrets*；也可以一次性传参`);
     }
 
     const deepHref = RECIPE_DOCS[pick.recipeId] ?? `${DEPLOY_GUIDE}/recipes`;

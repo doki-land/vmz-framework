@@ -183,7 +183,7 @@ import {
     productDocCopyCommand,
     productDocCopiedCommand,
     productDocNavForm,
-    productDocNavUi6,
+    productDocNavComponents,
     productDocNavWelcome,
     commercialNavCommercial,
     commercialNavConsole,
@@ -233,7 +233,7 @@ export default class ProductPage {
         { id: "commercial", title: "Commercial", href: "/commercial" },
         { id: "console", title: "Console", href: "/console" },
         { id: "form", title: "Form", href: "/form" },
-        { id: "ui6", title: "UI6", href: "/ui6" },
+        { id: "ui", title: "Components", href: "/ui" },
         { id: "welcome", title: "Welcome", href: "/welcome" },
     ];
     tocAll = [
@@ -291,7 +291,7 @@ export default class ProductPage {
             { id: "commercial", title: commercialNavCommercial(), href: "/commercial" },
             { id: "console", title: commercialNavConsole(), href: "/console" },
             { id: "form", title: productDocNavForm(), href: "/form" },
-            { id: "ui6", title: productDocNavUi6(), href: "/ui6" },
+            { id: "ui", title: productDocNavComponents(), href: "/ui" },
             { id: "welcome", title: productDocNavWelcome(), href: "/welcome" },
         ];
         this.tocAll = [
