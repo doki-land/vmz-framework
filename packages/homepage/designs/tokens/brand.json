@@ -25,7 +25,7 @@
     },
     "text": {
         "ink": "#141414",
-        "steel": "#8C8C8C",
+        "steel": "#595959",
         "on-brand": "#FFFFFF",
         "on-ink": "#FAFAFA"
     },
@@ -42,8 +42,8 @@
         "runtime": "#13C2C2"
     },
     "font": {
-        "sans": "\"Microsoft YaHei\", \"PingFang SC\", \"Noto Sans CJK SC\", \"IBM Plex Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+        "sans": "\"IBM Plex Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
         "mono": "\"IBM Plex Mono\", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-        "display": "\"Microsoft YaHei\", \"PingFang SC\", \"Noto Sans CJK SC\", \"IBM Plex Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
+        "display": "\"IBM Plex Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif"
     }
 }
