@@ -151,10 +151,18 @@
     color: var(--vmz-status-danger-foreground);
 }
 
+/* The native file input already announces "no file chosen"; keep this node for
+   assistive tech without repeating the same line visually. */
 .vmz-ui-upload__empty {
-    margin: 0;
-    color: var(--vmz-text-steel);
-    font-size: 0.9em;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
 }
 
 .vmz-ui-upload__progress {
