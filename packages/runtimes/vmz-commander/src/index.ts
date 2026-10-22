@@ -7,6 +7,7 @@
  */
 
 export type { CatalogLoader, CommandDiagnostic, DiagnosticContext, DiagnosticHandler, LocaleCatalog, LocalizePlugin } from './types.js';
+export { CliError } from './types.js';
 
 export {
     COMMANDER_FALLBACK_EN_US,
@@ -22,6 +23,7 @@ export {
 export type { CreateLocalizeFromLocalesOptions, LocalesManifest } from './locales.js';
 
 import type { CatalogLoader, CommandDiagnostic, DiagnosticContext, DiagnosticHandler, LocaleCatalog, LocalizePlugin } from './types.js';
+import { CliError } from './types.js';
 import { COMMANDER_FALLBACK_EN_US, createLocalizeFromLocales, translate, translateWithFallback } from './locales.js';
 
 type Color = 'bold' | 'dim' | 'cyan' | 'blue' | 'green' | 'yellow' | 'red';
@@ -174,7 +176,7 @@ class CliBuilder implements Cli {
 
     use(plugin: LocalizePlugin): this {
         if (!plugin || typeof plugin.t !== 'function') {
-            throw new Error('@vmz/commander: LocalizePlugin.t is required');
+            throw CliError.configError('commander::config::invalid_localize_plugin', { detail: 'LocalizePlugin.t is required' });
         }
         this.localesRoot = null;
         this.localesEnvKeys = undefined;
@@ -184,13 +186,13 @@ class CliBuilder implements Cli {
 
     catalog(loader: CatalogLoader): this {
         if (typeof loader !== 'function') {
-            throw new Error('@vmz/commander: catalog(loader) requires a function');
+            throw CliError.configError('commander::config::catalog_loader_not_function');
         }
         return this.use({
             t: (id, args) => {
                 const table = loader('en-US');
                 if (table && typeof (table as Promise<LocaleCatalog>).then === 'function') {
-                    throw new Error('@vmz/commander: async CatalogLoader via .catalog() is not supported; use .use({ t })');
+                    throw CliError.configError('commander::config::async_catalog_unsupported');
                 }
                 return translateWithFallback(id, args, table as LocaleCatalog);
             },
@@ -199,7 +201,7 @@ class CliBuilder implements Cli {
 
     locales(root: string, opts: { envKeys?: string[] } = {}): this {
         if (!root || typeof root !== 'string') {
-            throw new Error('@vmz/commander: locales(root) requires a non-empty path');
+            throw CliError.configError('commander::config::invalid_locales_root');
         }
         this.localesRoot = root;
         this.localesEnvKeys = opts.envKeys;
@@ -234,7 +236,7 @@ class CliBuilder implements Cli {
     }
 
     onDiagnostic(handler: DiagnosticHandler): this {
-        if (typeof handler !== 'function') throw new Error('@vmz/commander: diagnostic handler must be a function');
+        if (typeof handler !== 'function') throw CliError.configError('commander::config::diagnostic_handler_not_function');
         this.diagnosticHandler = handler;
         return this;
     }
@@ -271,7 +273,7 @@ class CliBuilder implements Cli {
             );
         }
         if (!localize) {
-            throw new Error(translate('commander.err.localize_required', undefined, COMMANDER_FALLBACK_EN_US));
+            throw CliError.configError('commander::config::localize_required');
         }
         const t = localize.t.bind(localize);
         const diagnosticContext: DiagnosticContext = {
@@ -287,12 +289,30 @@ class CliBuilder implements Cli {
         const cmdToken = argv[0]!;
         const matched = this.roots.find((c) => c.def.names.includes(cmdToken));
         if (!matched) {
-            console.error(errorText(t('commander.err.unknown_command', { cmd: cmdToken })));
+            this.emitDiagnostic(
+                { code: 'commander::unknown_command', severity: 'error', args: { cmd: cmdToken } },
+                diagnosticContext,
+                t,
+            );
             console.log(this.formatRootHelp(t));
-            return 1;
+            return 2;
         }
 
         return await this.dispatch(matched.def, argv.slice(1), t, [cmdToken], globalOpts, diagnosticContext);
+    }
+
+    /** Emit a diagnostic through `onDiagnostic` when registered, else console.error. */
+    private emitDiagnostic(
+        diag: CommandDiagnostic,
+        ctx: DiagnosticContext,
+        t: LocalizePlugin['t'],
+    ): void {
+        if (this.diagnosticHandler) {
+            this.diagnosticHandler(diag, ctx);
+        } else {
+            const msg = diag.message ?? (diag.code ? t(diag.code, diag.args) : '');
+            console.error(errorText(msg || diag.code || String(diag)));
+        }
     }
 
     /** Derived root help: optional intro + commands/options from the registration tree. */
@@ -338,35 +358,50 @@ class CliBuilder implements Cli {
                 return await this.dispatch(child, rest.slice(1), t, [...path, childTok], globalOpts, diagnosticContext);
             }
             if (!def.action) {
-                console.error(errorText(t('commander.err.unknown_command', { cmd: [...path, childTok].join(' ') })));
+                this.emitDiagnostic(
+                    {
+                        code: 'commander::unknown_command',
+                        severity: 'error',
+                        args: { cmd: [...path, childTok].join(' ') },
+                    },
+                    diagnosticContext,
+                    t,
+                );
                 console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
-                return 1;
+                return 2;
             }
         }
 
         if (!def.action) {
+            if (rest.length) {
+                this.emitDiagnostic(
+                    {
+                        code: 'commander::unknown_command',
+                        severity: 'error',
+                        args: { cmd: [...path, ...rest].join(' ') },
+                    },
+                    diagnosticContext,
+                    t,
+                );
+                console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
+                return 2;
+            }
             console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
-            return rest.length ? 1 : 0;
+            return 0;
         }
 
         let options: ParsedOptions;
         try {
             options = def.passthrough ? { _: rest.slice() } : parseOptions(rest, def.options);
         } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            if (msg.startsWith('unknown_option:')) {
-                console.error(errorText(t('commander.err.unknown_option', { option: msg.slice('unknown_option:'.length) })));
-            } else if (msg.startsWith('missing_value:')) {
-                console.error(
-                    errorText(t('commander.err.missing_option_value', {
-                        option: msg.slice('missing_value:'.length),
-                    })),
-                );
-            } else {
-                console.error(errorText(msg));
-            }
+            const cliErr = CliError.from(err, 'commander::parse_failed');
+            this.emitDiagnostic(
+                { code: cliErr.code, severity: 'error', args: cliErr.args, message: cliErr.message },
+                diagnosticContext,
+                t,
+            );
             console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
-            return 1;
+            return cliErr.exitCode; // 2 for parse/validation failures
         }
 
         for (const [k, v] of Object.entries(globalOpts)) {
@@ -380,8 +415,7 @@ class CliBuilder implements Cli {
             return 0;
         } catch (err) {
             const diagnostic = normalizeDiagnostic(err);
-            if (this.diagnosticHandler) this.diagnosticHandler(diagnostic, diagnosticContext);
-            else console.error(errorText(diagnostic.message || diagnostic.code || String(err)));
+            this.emitDiagnostic(diagnostic, diagnosticContext, t);
             return 1;
         }
     }
@@ -432,7 +466,7 @@ function collectRootOptions(roots: CommandDef[]): OptionDef[] {
  */
 export function createCli(name: string): Cli {
     if (!name || typeof name !== 'string') {
-        throw new Error('@vmz/commander: createCli(name) requires a non-empty program name');
+        throw CliError.configError('commander::config::invalid_cli_name', { detail: String(name) });
     }
     return new CliBuilder(name);
 }
@@ -446,7 +480,7 @@ export function assertCatalogCoverage(cli: Cli, catalog: LocaleCatalog): void {
         (id) => !Object.prototype.hasOwnProperty.call(catalog, id) && !Object.prototype.hasOwnProperty.call(COMMANDER_FALLBACK_EN_US, id),
     );
     if (missing.length) {
-        throw new Error(`@vmz/commander: catalog missing help ids:\n  ${missing.sort().join('\n  ')}`);
+        throw CliError.configError('commander::config::catalog_missing_help_ids', { ids: missing.sort().join(', ') });
     }
 }
 
@@ -465,16 +499,41 @@ function wrapWithCommanderFallback(plugin: LocalizePlugin): LocalizePlugin {
 }
 
 /**
- * Consume known root options; leave unknown flags and positionals in `rest`
- * (unlike {@link parseOptions}, which throws on unknown options).
+ * Shared argv → { options, rest } parser used by both strict and permissive modes.
+ *
+ * - `strict: true` — throws {@link CliError} (exit code 2) on unknown option or
+ *   missing required value. Used by {@link parseOptions} before dispatching to an action.
+ * - `strict: false` — unknown flags / bare tokens stay in `rest`. Used by
+ *   {@link peelKnownOptions} so `.locales(root)` / other early-bound global options
+ *   never reject argv that belongs to a later subcommand.
  */
-export function peelKnownOptions(argv: string[], optionDefs: OptionDef[]): { options: ParsedOptions; rest: string[] } {
+function parseArgvCore(
+    argv: string[],
+    optionDefs: OptionDef[],
+    strict: boolean,
+): { options: ParsedOptions; rest: string[] } {
     const byAlias = new Map<string, OptionDef>();
     for (const def of optionDefs) {
         for (const a of def.aliases) byAlias.set(a, def);
     }
     const options: ParsedOptions = { _: [] };
     const rest: string[] = [];
+
+    const handleMissing = (flagName: string) => {
+        if (strict) {
+            throw CliError.parseError('commander::missing_option_value', { option: flagName });
+        }
+        rest.push(flagName);
+        return true;
+    };
+    const handleUnknown = (token: string): boolean => {
+        if (strict) {
+            throw CliError.parseError('commander::unknown_option', { option: token });
+        }
+        rest.push(token);
+        return true;
+    };
+
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i]!;
         if (a === '--') {
@@ -486,7 +545,7 @@ export function peelKnownOptions(argv: string[], optionDefs: OptionDef[]): { opt
             const long = eq === -1 ? a.slice(2) : a.slice(2, eq);
             const def = byAlias.get(long);
             if (!def) {
-                rest.push(a);
+                if (!handleUnknown(`--${long}`)) continue;
                 continue;
             }
             if (def.takesValue) {
@@ -500,7 +559,8 @@ export function peelKnownOptions(argv: string[], optionDefs: OptionDef[]): { opt
                     } else if (def.optionalValue) {
                         assignOption(options, def, true);
                     } else {
-                        throw new Error(`missing_value:--${long}`);
+                        if (!handleMissing(`--${long}`)) continue;
+                        continue;
                     }
                 }
             } else {
@@ -512,7 +572,7 @@ export function peelKnownOptions(argv: string[], optionDefs: OptionDef[]): { opt
             const short = a.slice(1);
             const def = byAlias.get(short);
             if (!def) {
-                rest.push(a);
+                if (!handleUnknown(`-${short}`)) continue;
                 continue;
             }
             if (def.takesValue) {
@@ -523,7 +583,8 @@ export function peelKnownOptions(argv: string[], optionDefs: OptionDef[]): { opt
                 } else if (def.optionalValue) {
                     assignOption(options, def, true);
                 } else {
-                    throw new Error(`missing_value:-${short}`);
+                    if (!handleMissing(`-${short}`)) continue;
+                    continue;
                 }
             } else {
                 assignOption(options, def, true);
@@ -533,6 +594,14 @@ export function peelKnownOptions(argv: string[], optionDefs: OptionDef[]): { opt
         rest.push(a);
     }
     return { options, rest };
+}
+
+/**
+ * Consume known root options; leave unknown flags and positionals in `rest`
+ * (unlike {@link parseOptions}, which throws on unknown options).
+ */
+export function peelKnownOptions(argv: string[], optionDefs: OptionDef[]): { options: ParsedOptions; rest: string[] } {
+    return parseArgvCore(argv, optionDefs, false);
 }
 
 /** Strip `node` + script when callers pass full `process.argv`. */
@@ -565,10 +634,10 @@ function splitNames(rawName: string): string[] {
 
 function assertHelpId(helpId: string, kind: string): void {
     if (!helpId || typeof helpId !== 'string' || !helpId.trim()) {
-        throw new Error(`@vmz/commander: ${kind} helpId must be a non-empty catalog key`);
+        throw CliError.configError('commander::config::help_id_empty', { kind });
     }
     if (/\s/.test(helpId)) {
-        throw new Error(`@vmz/commander: ${kind} helpId must be a catalog key (no spaces); got ${JSON.stringify(helpId)}`);
+        throw CliError.configError('commander::config::help_id_has_spaces', { kind, id: helpId });
     }
 }
 
@@ -591,7 +660,7 @@ export function parseOptionDef(rawName: string, helpId: string): OptionDef {
         else if (p.startsWith('-') && p.length > 1) aliases.push(p.slice(1));
     }
     if (!aliases.length) {
-        throw new Error(`@vmz/commander: invalid option rawName ${JSON.stringify(rawName)}`);
+        throw CliError.configError('commander::config::invalid_option_raw', { raw: rawName });
     }
     const key = aliases.find((a) => a.length > 1) ?? aliases[0]!;
     return { rawName, helpId, key, aliases, takesValue, optionalValue, repeatable };
@@ -616,66 +685,16 @@ function normalizeDiagnostic(error: unknown): CommandDiagnostic {
 }
 
 /**
- * Parse argv against registered options. Throws `unknown_option:…` / `missing_value:…`.
+ * Parse argv against registered options (strict mode).
+ *
+ * Throws {@link CliError} with stable code `commander::unknown_option` /
+ * `commander::missing_option_value` (exit code 2) on validation failure.
+ * Non-option tokens become positionals under `options._`.
  */
 export function parseOptions(argv: string[], optionDefs: OptionDef[]): ParsedOptions {
-    const byAlias = new Map<string, OptionDef>();
-    for (const def of optionDefs) {
-        for (const a of def.aliases) byAlias.set(a, def);
-    }
-    const out: ParsedOptions = { _: [] };
-    for (let i = 0; i < argv.length; i++) {
-        const a = argv[i]!;
-        if (a === '--') {
-            out._.push(...argv.slice(i + 1));
-            break;
-        }
-        if (a.startsWith('--')) {
-            const eq = a.indexOf('=');
-            const long = eq === -1 ? a.slice(2) : a.slice(2, eq);
-            const def = byAlias.get(long);
-            if (!def) throw new Error(`unknown_option:--${long}`);
-            if (def.takesValue) {
-                if (eq !== -1) {
-                    assignOption(out, def, a.slice(eq + 1));
-                } else {
-                    const next = argv[i + 1];
-                    if (next != null && !next.startsWith('-')) {
-                        assignOption(out, def, next);
-                        i += 1;
-                    } else if (def.optionalValue) {
-                        assignOption(out, def, true);
-                    } else {
-                        throw new Error(`missing_value:--${long}`);
-                    }
-                }
-            } else {
-                assignOption(out, def, true);
-            }
-            continue;
-        }
-        if (a.startsWith('-') && a.length === 2) {
-            const short = a.slice(1);
-            const def = byAlias.get(short);
-            if (!def) throw new Error(`unknown_option:-${short}`);
-            if (def.takesValue) {
-                const next = argv[i + 1];
-                if (next != null && !next.startsWith('-')) {
-                    assignOption(out, def, next);
-                    i += 1;
-                } else if (def.optionalValue) {
-                    assignOption(out, def, true);
-                } else {
-                    throw new Error(`missing_value:-${short}`);
-                }
-            } else {
-                assignOption(out, def, true);
-            }
-            continue;
-        }
-        out._.push(a);
-    }
-    return out;
+    const { options, rest } = parseArgvCore(argv, optionDefs, true);
+    options._.push(...rest);
+    return options;
 }
 
 function assignOption(out: ParsedOptions, def: OptionDef, value: string | boolean): void {

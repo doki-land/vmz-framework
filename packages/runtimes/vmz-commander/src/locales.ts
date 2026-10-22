@@ -7,6 +7,7 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { CliError } from './types.js';
 import type { LocaleCatalog, LocalizePlugin } from './types.js';
 
 export type LocalesManifest = {
@@ -21,10 +22,22 @@ export const COMMANDER_FALLBACK_EN_US: LocaleCatalog = {
     'commander.ui.commands': 'Commands:',
     'commander.ui.options': 'Options:',
     'commander.opt.locale': 'Locale id',
+    // Legacy dotted ids (product catalogs may override these).
     'commander.err.unknown_command': 'unknown command `{cmd}`',
     'commander.err.unknown_option': 'unknown option `{option}`',
     'commander.err.missing_option_value': 'missing value for `{option}`',
     'commander.err.localize_required': 'call .use(LocalizePlugin) or .locales(root) before parse()',
+    // New stable `::` codes — used when the framework itself emits diagnostics.
+    'commander::unknown_command': 'unknown command `{cmd}`',
+    'commander::unknown_option': 'unknown option `{option}`',
+    'commander::missing_option_value': 'missing value for `{option}`',
+    'commander::parse_failed': 'parse failed: {detail}',
+    'commander::action_failed': 'action failed: {detail}',
+    'commander::config::invalid_cli_name': 'invalid CLI name: {detail}',
+    'commander::config::localize_required': 'call .use(LocalizePlugin) or .locales(root) before parse()',
+    'commander::config::missing_locales_manifest': 'missing locales manifest at {file}',
+    'commander::config::invalid_locales_manifest': 'invalid locales manifest at {file}',
+    'commander::config::empty_locale_catalog': 'empty catalog for locale {locale} under {root}',
 };
 
 const catalogCache = new Map<string, LocaleCatalog>();
@@ -35,11 +48,11 @@ export function loadLocalesManifest(root: string): LocalesManifest {
     if (cached) return cached;
     const file = path.join(root, 'locales.json');
     if (!existsSync(file)) {
-        throw new Error(`@vmz/commander: missing locales manifest at ${file}`);
+        throw CliError.configError('commander::config::missing_locales_manifest', { file });
     }
     const raw = JSON.parse(readFileSync(file, 'utf8')) as LocalesManifest;
     if (!raw?.defaultLocale || !Array.isArray(raw.locales) || !raw.locales.length) {
-        throw new Error(`@vmz/commander: invalid locales manifest ${file}`);
+        throw CliError.configError('commander::config::invalid_locales_manifest', { file });
     }
     manifestCache.set(root, raw);
     return raw;
@@ -90,7 +103,7 @@ export function loadCatalog(locale: string, root: string): LocaleCatalog {
         Object.assign(merged, loadLocaleDir(root, id));
     }
     if (!Object.keys(merged).length) {
-        throw new Error(`@vmz/commander: empty catalog for locale ${JSON.stringify(locale)} under ${root}`);
+        throw CliError.configError('commander::config::empty_locale_catalog', { locale, root });
     }
     catalogCache.set(cacheKey, merged);
     return merged;
