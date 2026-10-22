@@ -60,6 +60,28 @@ export async function runDirectSerializeTreeWithMounts(Component, inst) {
     throw new Error('vmz:dom SSR child onMount expansion exceeded 32 rounds');
 }
 
+/** HTML void elements never take a closing tag; `</br>` is parsed as another `<br>`. */
+const VOID_TAGS = new Set([
+    'area',
+    'base',
+    'br',
+    'col',
+    'embed',
+    'hr',
+    'img',
+    'input',
+    'link',
+    'meta',
+    'param',
+    'source',
+    'track',
+    'wbr',
+]);
+
+function isVoidTag(tag) {
+    return VOID_TAGS.has(String(tag).toLowerCase());
+}
+
 function serializeOpenTag(node) {
     const tag = node.tag || 'div';
     let attrs = '';
@@ -90,10 +112,10 @@ export function flattenSerializeNode(node) {
         if (node.__rawOuter && node.__rawHtml != null) return String(node.__rawHtml);
         const { open } = serializeOpenTag(node);
         if (node.__rawHtml != null) {
-            return `${open}${String(node.__rawHtml)}</${tag}>`;
+            return isVoidTag(tag) ? `${open}${String(node.__rawHtml)}` : `${open}${String(node.__rawHtml)}</${tag}>`;
         }
         const inner = (node.children || []).map(flattenSerializeNode).join('');
-        return `${open}${inner}</${tag}>`;
+        return isVoidTag(tag) ? `${open}${inner}` : `${open}${inner}</${tag}>`;
     }
     return '';
 }
@@ -138,7 +160,7 @@ export function* streamSerializeChunks(node) {
         } else {
             for (const c of node.children || []) yield* streamSerializeChunks(c);
         }
-        yield `</${tag}>`;
+        if (!isVoidTag(tag)) yield `</${tag}>`;
     }
 }
 
