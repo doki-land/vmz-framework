@@ -1,10 +1,12 @@
 <template>
     <figure data-vmz-ui="code-block" class="vmz-ui-code-block">
-        <div class="vmz-ui-code-block__bar">
-            <figcaption v-if="caption" class="vmz-ui-code-block__caption">
-                {{ caption }}
-            </figcaption>
-            <Button type="button" variant="ghost" @click="onCopy">
+        <div v-if="barVisible()" class="vmz-ui-code-block__bar">
+            <div class="vmz-ui-code-block__heading">
+                <span v-if="language" class="vmz-ui-code-block__lang">{{ language }}</span>
+                <span v-if="title" class="vmz-ui-code-block__caption">{{ title }}</span>
+                <span v-else-if="caption" class="vmz-ui-code-block__caption">{{ caption }}</span>
+            </div>
+            <Button type="button" variant="text" size="sm" class="vmz-ui-code-block__copy" @click="onCopy">
                 {{ copyLabel }}
             </Button>
         </div>
@@ -20,43 +22,91 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.45rem;
     border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
+    border-radius: var(--vmz-radius-lg, 8px);
     background: var(--vmz-surface-mist);
     overflow: hidden;
 }
 
 .vmz-ui-code-block__bar {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.45rem;
-    padding: 0.35rem 0.55rem;
-    border-bottom: 1px solid var(--vmz-line-default);
+    gap: 0.5rem;
+    min-height: 2.25rem;
+    padding: 0 0.5rem 0 0.75rem;
+    border-bottom: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
     background: var(--vmz-surface-paper);
 }
 
-.vmz-ui-code-block__caption {
-    margin: 0;
-    font-family: var(--vmz-font-mono);
-    font-size: 0.8rem;
+.vmz-ui-code-block__heading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.vmz-ui-code-block__lang {
+    flex: none;
+    padding: 0.0625rem 0.4375rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-xs, 2px);
+    background: var(--vmz-surface-mist);
     color: var(--vmz-text-steel);
+    font-family: var(--vmz-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.vmz-ui-code-block__caption {
+    overflow: hidden;
+    color: var(--vmz-text-steel);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vmz-ui-code-block__copy {
+    flex: none;
+    opacity: 0.72;
+    transition: opacity var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+}
+
+.vmz-ui-code-block:hover .vmz-ui-code-block__copy,
+.vmz-ui-code-block__copy:focus-visible {
+    opacity: 1;
 }
 
 .vmz-ui-code-block__pre {
     margin: 0;
-    padding: 0.85rem 1rem;
+    padding: 0.875rem 1rem;
     overflow-x: auto;
+    overflow-y: auto;
+    max-height: 32rem;
 }
 
 .vmz-ui-code-block__code {
-    font-family: var(--vmz-font-mono);
-    font-size: 0.88rem;
-    line-height: 1.5;
+    display: block;
     color: var(--vmz-text-ink);
+    font-family: var(--vmz-font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.65;
     white-space: pre;
+    tab-size: 2;
+}
+
+.vmz-ui-code-block__pre::-webkit-scrollbar {
+    width: 0.5rem;
+    height: 0.5rem;
+}
+
+.vmz-ui-code-block__pre::-webkit-scrollbar-thumb {
+    border-radius: var(--vmz-radius-pill, 999px);
+    background: var(--vmz-line-default);
 }
 </style>
 <script client>
@@ -67,7 +117,16 @@
 export default class CodeBlock {
     public code: string = "";
     public caption: string = "";
+    /** Preferred heading text; falls back to `caption` when absent. */
+    public title: string = "";
+    /** Optional syntax label rendered as a chip in the bar (e.g. `ts`, `bash`). */
+    public language: string = "";
     public copyLabel: string = "Copy";
     public onCopy: ((e: Event) => void) | null = null;
+
+    /** The bar renders when there is anything to show in it. */
+    public barVisible(): boolean {
+        return !!(this.title || this.caption || this.language || this.onCopy);
+    }
 }
 </script>
