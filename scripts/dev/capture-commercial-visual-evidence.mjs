@@ -19,8 +19,22 @@ const VIEWPORTS = [
 
 const PAGES = [
     { id: 'home', path: '/' },
+    { id: 'product', path: '/product' },
     { id: 'console', path: '/console' },
     { id: 'commercial', path: '/commercial' },
+    { id: 'welcome', path: '/welcome' },
+    { id: 'lab', path: '/lab' },
+    { id: 'lab-components', path: '/lab/components' },
+    { id: 'lab-form', path: '/lab/form' },
+    { id: 'lab-feedback', path: '/lab/feedback' },
+    { id: 'lab-structure', path: '/lab/structure' },
+    { id: 'lab-choice', path: '/lab/choice' },
+    { id: 'lab-overlay-stack', path: '/lab/overlay-stack' },
+    { id: 'lab-console-patterns', path: '/lab/console-patterns' },
+    { id: 'lab-datatable', path: '/lab/datatable' },
+    { id: 'lab-datagrid', path: '/lab/datagrid' },
+    { id: 'lab-density-theme', path: '/lab/density-theme' },
+    { id: 'lab-motion', path: '/lab/motion' },
 ];
 
 function resolveDist() {

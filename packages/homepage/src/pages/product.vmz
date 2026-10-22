@@ -1,11 +1,13 @@
 <template>
     <SiteShell page="product" variant="product-page">
         <main id="main" data-vmz-fixture="product" class="vmz-product-content">
-            <div class="vmz-product-search">
-                <Field :label="searchLabel" control-id="home-product-search" description-id="home-product-search-desc" error-id="home-product-search-err" described-by="home-product-search-desc" :value="search" @input="onSearch" />
-            </div>
             <div class="vmz-product-layout">
-                <Toc :label="tocLabel" :items="tocItems" />
+                <aside class="vmz-product-aside">
+                    <div class="vmz-product-search">
+                        <Field :label="searchLabel" control-id="home-product-search" description-id="home-product-search-desc" error-id="home-product-search-err" described-by="home-product-search-desc" :value="search" @input="onSearch" />
+                    </div>
+                    <Toc :label="tocLabel" :items="tocItems" />
+                </aside>
                 <Prose>
                     <div>
                         <h1 id="overview">
@@ -23,12 +25,7 @@
                         <p>
                             {{ installBody }}
                         </p>
-                        <div v-if="isV1">
-                            <CodeBlock caption="shell" :code="installCode" :copy-label="copyLabel" :on-copy="copyInstall" />
-                        </div>
-                        <div v-if="isV0">
-                            <CodeBlock caption="shell" :code="installCode" :copy-label="copyLabel" :on-copy="copyInstall" />
-                        </div>
+                        <CodeBlock caption="shell" :code="installCode" :copy-label="copyLabel" :on-copy="copyInstall" />
                         <p v-if="copiedYes" data-vmz-fixture="product-copied" role="status">
                             {{ copiedStatus }}
                         </p>
@@ -39,8 +36,8 @@
                         </h2>
                         <p>
                             {{ contractBodyLead }}
-                            <Link href="/d/">
-                                文档站
+                            <Link :href="docsRootHref">
+                                {{ docsLinkLabel }}
                             </Link>
                             {{ contractBodyTail }}
                         </p>
@@ -73,24 +70,26 @@
     </SiteShell>
 </template>
 <style>
-.vmz-product-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 0.65rem 0.85rem;
-    margin: 0.5rem 0 2.5rem;
-    padding: 1rem 1.25rem;
-    border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md);
-    background: var(--vmz-surface-mist);
-}
-
 .vmz-product-layout {
     display: grid;
     grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
     gap: 2rem;
     align-items: start;
 }
+.vmz-product-aside {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+}
+
+/* Search belongs to the sidebar column: fill it instead of the Field's form default. */
+.vmz-product-aside .vmz-ui-field,
+.vmz-product-aside .vmz-ui-toc {
+    max-width: none;
+    min-width: 0;
+}
+
 .vmz-product-layout h1 {
     margin: 0 0 0.75rem;
     font-size: clamp(1.9rem, 3vw, 2.45rem);
@@ -121,13 +120,7 @@
 </style>
 <script client>
 import {
-    productNav,
-    productDocSwitchVersion,
-    productDocLocalePrefix,
-    productDocLocaleEn,
-    productDocLocaleZh,
-    productDocCycleDensity,
-    productDocToggleRtl,
+    docs,
     productDocSearchLabel,
     productDocTocLabel,
     productDocTitle,
@@ -150,37 +143,23 @@ import {
     productDocTocContract,
     productDocCopyCommand,
     productDocCopiedCommand,
-    productDocNavForm,
-    productDocNavComponents,
-    productDocNavWelcome,
     commercialNavCommercial,
     commercialNavConsole,
 } from "#locales/common";
-import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
+import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
 export default class ProductPage {
-    version = "v1";
-    locale = "zh";
-    density = "comfortable";
-    dir = "ltr";
+    localeId = "zh-hans";
     search = "";
-    copied = "no";
     copiedYes = false;
     copyLabel = "Copy";
     installCode = "pnpm add @vmz/ui";
-    isV1 = true;
-    isV0 = false;
-    productNavLabel = "Product";
-    switchVersionLabel = "Switch version";
-    localePrefixLabel = "Locale:";
-    localeLabel = "en-US";
-    cycleDensityLabel = "Cycle density";
-    toggleRtlLabel = "Toggle RTL";
     searchLabel = "Search";
     tocLabel = "On this page";
-    titleText = "VMZ Product surface";
-    leadText =
-        "One composition for documentation and product guides — Prose measure, Toc outline, Callout guidance, CodeBlock with copy.";
+    titleText = "";
+    leadText = "";
+    docsLinkLabel = "";
+    docsRootHref = "/d/zh-hans/";
     calloutZeroJsTitle = "";
     calloutZeroJsDesc = "";
     installHeading = "";
@@ -196,26 +175,8 @@ export default class ProductPage {
     contractLi3 = "";
     navCommercialLabel = "";
     navConsoleLabel = "";
-    navItems = [
-        { id: "product", title: "Product", href: "/product" },
-        { id: "commercial", title: "Commercial", href: "/commercial" },
-        { id: "console", title: "Console", href: "/console" },
-        { id: "form", title: "Form", href: "/form" },
-        { id: "ui", title: "Components", href: "/ui" },
-        { id: "welcome", title: "Welcome", href: "/welcome" },
-    ];
-    tocAll = [
-        { id: "overview", title: "Overview", href: "#overview" },
-        { id: "install", title: "Install", href: "#install" },
-        { id: "contract", title: "Composition contract", href: "#contract" },
-    ];
-    tocItems = [
-        { id: "overview", title: "Overview", href: "#overview" },
-        { id: "install", title: "Install", href: "#install" },
-        { id: "contract", title: "Composition contract", href: "#contract" },
-    ];
-    versionLabel = "v1";
-    _demoLocaleId = "zh-hans";
+    tocAll = [];
+    tocItems = [];
     _unwatchLocale = null;
 
     onMount() {
@@ -229,11 +190,6 @@ export default class ProductPage {
     }
 
     refreshCopy() {
-        this.productNavLabel = productNav();
-        this.switchVersionLabel = productDocSwitchVersion();
-        this.localePrefixLabel = productDocLocalePrefix();
-        this.cycleDensityLabel = productDocCycleDensity();
-        this.toggleRtlLabel = productDocToggleRtl();
         this.searchLabel = productDocSearchLabel();
         this.tocLabel = productDocTocLabel();
         this.titleText = productDocTitle();
@@ -254,70 +210,19 @@ export default class ProductPage {
         this.navCommercialLabel = commercialNavCommercial();
         this.navConsoleLabel = commercialNavConsole();
         this.copyLabel = productDocCopyCommand();
-        this.navItems = [
-            { id: "product", title: productNav(), href: "/product" },
-            { id: "commercial", title: commercialNavCommercial(), href: "/commercial" },
-            { id: "console", title: commercialNavConsole(), href: "/console" },
-            { id: "form", title: productDocNavForm(), href: "/form" },
-            { id: "ui", title: productDocNavComponents(), href: "/ui" },
-            { id: "welcome", title: productDocNavWelcome(), href: "/welcome" },
-        ];
+        this.docsLinkLabel = docs();
         this.tocAll = [
             { id: "overview", title: productDocTocOverview(), href: "#overview" },
             { id: "install", title: productDocTocInstall(), href: "#install" },
             { id: "contract", title: productDocTocContract(), href: "#contract" },
         ];
-        this.syncLocaleMeta(this._demoLocaleId);
+        this.docsRootHref = docsPaths(readLocaleId(this.localeId)).docsRootHref;
         this.onSearch({ target: { value: this.search } });
     }
 
-    syncLocaleMeta(localeId) {
-        if (localeId === "en-us") {
-            this.locale = "en";
-            this.localeLabel = productDocLocaleEn();
-        } else {
-            this.locale = "zh";
-            this.localeLabel = productDocLocaleZh();
-        }
-    }
-
     applyLocaleCopy(preferred) {
-        const localeId = readLocaleId(preferred);
-        this._demoLocaleId = localeId === "en-us" ? "en-us" : "zh-hans";
-        withLocaleHint(this._demoLocaleId, () => this.refreshCopy());
-    }
-
-    toggleVersion() {
-        if (this.version === "v1") {
-            this.version = "v0";
-            this.isV1 = false;
-            this.isV0 = true;
-            this.installCode = "pnpm add @vmz/ui@0.0.0";
-        } else {
-            this.version = "v1";
-            this.isV1 = true;
-            this.isV0 = false;
-            this.installCode = "pnpm add @vmz/ui";
-        }
-        this.versionLabel = this.version;
-        this.copied = "no";
-        this.copiedYes = false;
-        this.copyLabel = productDocCopyCommand();
-    }
-
-    toggleLocale() {
-        this._demoLocaleId = this._demoLocaleId === "en-us" ? "zh-hans" : "en-us";
-        withLocaleHint(this._demoLocaleId, () => this.refreshCopy());
-    }
-
-    cycleDensity() {
-        if (this.density === "comfortable") this.density = "compact";
-        else if (this.density === "compact") this.density = "dense";
-        else this.density = "comfortable";
-    }
-
-    toggleDir() {
-        this.dir = this.dir === "rtl" ? "ltr" : "rtl";
+        this.localeId = readLocaleId(preferred);
+        withLocaleHint(this.localeId, () => this.refreshCopy());
     }
 
     onSearch(e) {
@@ -349,7 +254,6 @@ export default class ProductPage {
         } catch {
             /* ignore */
         }
-        this.copied = "yes";
         this.copiedYes = true;
         this.copyLabel = productDocCopiedCommand();
     }
