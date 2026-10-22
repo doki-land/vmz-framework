@@ -1,13 +1,13 @@
 <template>
     <nav data-vmz-ui="pagination" :aria-label="label" class="vmz-ui-pagination">
         <button type="button" :disabled="prevDisabled" @click="onPrevClick" class="vmz-ui-pagination__btn">
-            Previous
+            {{ prevLabel }}
         </button>
         <p data-vmz-fixture="page-status" class="vmz-ui-pagination__status">
             {{ status }}
         </p>
         <button type="button" :disabled="nextDisabled" @click="onNextClick" class="vmz-ui-pagination__btn">
-            Next
+            {{ nextLabel }}
         </button>
     </nav>
 </template>
@@ -52,6 +52,8 @@
  */
 export default class Pagination {
     public label: string = "Pagination";
+    public prevLabel: string = "Previous";
+    public nextLabel: string = "Next";
     public status: string = "Page 1 / 1";
     public prevDisabled: boolean = true;
     public nextDisabled: boolean = true;

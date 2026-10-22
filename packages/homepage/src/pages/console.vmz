@@ -77,7 +77,7 @@
                         </Button>
                     </div>
                     <Table v-if="!filterEmpty" :columns="columns" :rows="rows" :has-row-action="rowAction" :action-title="consoleActionTitleLabel" :action-label="consoleActionLabel" :on-row-action="openDetail" />
-                    <Pagination v-if="!filterEmpty" :label="consolePaginationLabel" :status="pageStatus" :prev-disabled="prevDisabled" :next-disabled="nextDisabled" :on-prev="goPrev" :on-next="goNext" />
+                    <Pagination v-if="!filterEmpty" :label="consolePaginationLabel" :prev-label="consolePagePrevLabel" :next-label="consolePageNextLabel" :status="pageStatus" :prev-disabled="prevDisabled" :next-disabled="nextDisabled" :on-prev="goPrev" :on-next="goNext" />
                 </section>
                 <Drawer v-if="drawerOpen" :open="drawerOpen" :title="consoleDrawerTitleLabel" title-id="home-console-drawer-title" :on-close="(() => drawerOpen = false)">
                     <div class="vmz-console-drawer-content">
@@ -354,6 +354,8 @@ import {
     consoleActionTitle,
     consoleActionLabel,
     consolePaginationLabel,
+    consolePagePrev,
+    consolePageNext,
     consoleDrawerTitle,
     consoleDrawerProject,
     consoleDrawerTarget,
@@ -440,6 +442,8 @@ export default class ConsolePage {
     consoleActionTitleLabel = "";
     consoleActionLabel = "";
     consolePaginationLabel = "";
+    consolePagePrevLabel = "";
+    consolePageNextLabel = "";
     consoleDrawerTitleLabel = "";
     consoleDrawerProjectLabel = "";
     consoleDrawerTargetLabel = "";
@@ -539,6 +543,8 @@ export default class ConsolePage {
         this.consoleActionTitleLabel = consoleActionTitle();
         this.consoleActionLabel = consoleActionLabel();
         this.consolePaginationLabel = consolePaginationLabel();
+        this.consolePagePrevLabel = consolePagePrev();
+        this.consolePageNextLabel = consolePageNext();
         this.consoleDrawerTitleLabel = consoleDrawerTitle();
         this.consoleDrawerProjectLabel = consoleDrawerProject();
         this.consoleDrawerTargetLabel = consoleDrawerTarget();
