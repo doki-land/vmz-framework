@@ -156,10 +156,13 @@ fn valueless_directive_does_not_consume_next_attribute() {
 
 #[test]
 fn counter_directive_expressions_do_not_stall() {
+    // Each probe is self-contained and fully closed. Leaving the tag open would
+    // produce Vue diagnostic 24 (`element is missing end tag`), which masks the
+    // stall guard we actually care about.
     let cases = [
-        r#"<button @input="((e) => note = e.target.value)">"#,
-        r#"<button @click="(() => count++)">"#,
-        r#"<select @change="((e) => plan = e.target.value)">"#,
+        r#"<button @input="((e) => note = e.target.value)"></button>"#,
+        r#"<button @click="(() => count++)"></button>"#,
+        r#"<select @change="((e) => plan = e.target.value)"></select>"#,
     ];
     let language = VueLanguage::default();
     let parser = VueParser::new(&language);
