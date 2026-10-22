@@ -1,9 +1,9 @@
 <template>
     <div data-vmz-fixture="ui6" :data-density="density" :dir="dir">
-        <AppShell brand="VMZ" home-href="/" nav-label="UI6" :nav="navItems">
+        <AppShell brand="VMZ" home-href="/" nav-label="Density and theme" :nav="navItems">
             <div class="vmz-slot-content">
-                <Alert tone="info" role-name="status" title="UI6 Density / RTL / Preset" description="comfortable → compact → dense; dir ltr/rtl; high-contrast theme overlay from /designs." />
-                <p data-vmz-fixture="ui6-state">
+                <Alert tone="info" role-name="status" title="Density / RTL / preset" description="comfortable → compact → dense; dir ltr/rtl; high-contrast theme overlay from /designs." />
+                <p data-vmz-fixture="ui6-state" class="vmz-sr-only">
                     density:
                     {{ density }}
                     ;dir:
@@ -40,17 +40,14 @@
 }
 </style>
 <script client>
-export default class Ui6Page {
+import { labNav } from "../../lab-nav.ts";
+
+export default class DensityThemePage {
     density = "comfortable";
     dir = "ltr";
     theme = "default";
     sample = "";
-    navItems = [
-        { id: "ui6", title: "UI6", href: "/ui6" },
-        { id: "ui4", title: "UI4", href: "/ui4" },
-        { id: "ui5", title: "UI5", href: "/ui5" },
-        { id: "commercial", title: "Commercial", href: "/commercial" },
-    ];
+    navItems = labNav();
 
     cycleDensity() {
         if (this.density === "comfortable") this.density = "compact";

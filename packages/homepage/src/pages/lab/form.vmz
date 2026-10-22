@@ -10,6 +10,7 @@
                         联系请求、校验反馈与多种上传方式的最小业务场景。
                     </p>
                 </header>
+                <div class="vmz-form-lab__body">
                 <Card title="请求信息">
                     <Form label="联系请求" :error-summary="errorSummary" summary-id="home-form-summary" :described-by="formDescribedBy" :disabled="submitting" :disabled-attr="disabledAttr" @submit="submit" @reset="reset">
                         <div data-vmz-fixture="form-email-row" class="vmz-form-email-row">
@@ -130,6 +131,7 @@
                         {{ resumeHead }}
                     </p>
                 </Card>
+                </div>
             </div>
         </AppShell>
     </div>
@@ -151,6 +153,13 @@
     max-width: 42rem;
 }
 
+.vmz-form-lab__body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 44rem;
+}
+
 .vmz-form-email-row {
     display: flex;
     flex-wrap: wrap;
@@ -159,6 +168,8 @@
 }
 </style>
 <script client>
+import { labNav } from "../../lab-nav.ts";
+
 export default class FormPage {
     email = "";
     role = "";
@@ -247,11 +258,7 @@ export default class FormPage {
         { id: "home-form-plan-pro", value: "pro", label: "专业版" },
         { id: "home-form-plan-ent", value: "enterprise", label: "企业版" },
     ];
-    navItems = [
-        { id: "commercial", title: "应用案例", href: "/commercial" },
-        { id: "console", title: "工单工作台", href: "/console" },
-        { id: "home", title: "返回官网", href: "/" },
-    ];
+    navItems = labNav("组件演示");
 
     toggleTip() {
         this.tipOpen = !this.tipOpen;

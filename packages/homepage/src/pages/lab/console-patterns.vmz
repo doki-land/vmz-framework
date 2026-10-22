@@ -1,6 +1,6 @@
 <template>
     <div data-vmz-fixture="ui5" data-density="compact">
-        <ConsoleShell brand="VMZ" home-href="/" title="Console UI5" nav-label="Console" :nav="navItems">
+        <ConsoleShell brand="VMZ" home-href="/" title="Console patterns" nav-label="Console" :nav="navItems">
             <div class="vmz-slot-content">
                 <Breadcrumb label="Console path" :items="crumbs" />
                 <QueryForm label="Dense query" @submit="applyQuery">
@@ -13,19 +13,19 @@
                         Export
                     </Button>
                 </QueryForm>
-                <p data-vmz-fixture="ui5-query">
+                <p data-vmz-fixture="ui5-query" class="vmz-sr-only">
                     name:
                     {{ nameQuery }}
                     ;status:
                     {{ statusQuery }}
                 </p>
-                <p data-vmz-fixture="ui5-sort">
+                <p data-vmz-fixture="ui5-sort" class="vmz-sr-only">
                     sort:
                     {{ sortKey }}
                     :
                     {{ sortDir }}
                 </p>
-                <p data-vmz-fixture="ui5-perm">
+                <p data-vmz-fixture="ui5-perm" class="vmz-sr-only">
                     write:
                     {{ writeDisabled ? 'denied' : 'allowed' }}
                 </p>
@@ -50,7 +50,9 @@
     </div>
 </template>
 <script client>
-export default class Ui5Page {
+import { labNav } from "../../lab-nav.ts";
+
+export default class ConsolePatternsPage {
     nameQuery = "";
     statusQuery = "";
     loading = true;
@@ -78,17 +80,13 @@ export default class Ui5Page {
     crumbs = [
         { id: "home", title: "Home", href: "/" },
         { id: "console", title: "Console", href: "/console" },
-        { id: "ui5", title: "UI5" },
+        { id: "patterns", title: "Console patterns" },
     ];
     auditItems = [
         { id: "a1", time: "10:01", title: "Filter applied", detail: "Initial console load" },
         { id: "a2", time: "10:02", title: "Permission check", detail: "Export denied" },
     ];
-    navItems = [
-        { id: "ui5", title: "UI5", href: "/ui5" },
-        { id: "console", title: "Console", href: "/console" },
-        { id: "ui4", title: "UI4", href: "/ui4" },
-    ];
+    navItems = labNav();
 
     applyQuery() {
         const name = (this.nameQuery || "").trim().toLowerCase();

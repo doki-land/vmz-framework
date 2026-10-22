@@ -3,7 +3,7 @@
         <AppShell brand="VMZ" home-href="/" nav-label="Structure" :nav="navItems">
             <div class="vmz-slot-content">
                 <Alert tone="info" role-name="status" title="Structure composition" description="Accordion / Steps / List / Tree — parent owns open, current, selection, and expand state." />
-                <p data-vmz-fixture="structure-state">
+                <p data-vmz-fixture="structure-state" class="vmz-sr-only">
                     faq:
                     {{ faqOpen || 'none' }}
                     ;step:
@@ -48,6 +48,8 @@
 }
 </style>
 <script client>
+import { labNav } from "../../lab-nav.ts";
+
 export default class StructurePage {
     faqOpen = "billing";
     stepCurrent = "account";
@@ -55,12 +57,7 @@ export default class StructurePage {
     treeSelected = "platform";
     treeExpandedAttr = "platform";
 
-    navItems = [
-        { id: "structure", title: "Structure", href: "/structure" },
-        { id: "ui6", title: "UI6", href: "/ui6" },
-        { id: "form", title: "Form", href: "/form" },
-        { id: "console", title: "Console", href: "/console" },
-    ];
+    navItems = labNav();
 
     faqItems = [
         {

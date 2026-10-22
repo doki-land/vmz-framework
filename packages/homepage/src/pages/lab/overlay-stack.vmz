@@ -3,7 +3,7 @@
         <AppShell brand="VMZ" home-href="/" nav-label="Stacking" :nav="navItems">
             <div class="vmz-slot-content">
                 <Alert tone="info" role-name="status" title="Overlay stacking" description="Drawer → Dialog → Popover with rising stackLevel; Escape closes topmost only. Parent owns the stack." />
-                <p data-vmz-fixture="stacking-state">
+                <p data-vmz-fixture="stacking-state" class="vmz-sr-only">
                     drawer:
                     {{ drawerOpen ? 'open' : 'closed' }}
                     ;dialog:
@@ -49,17 +49,14 @@
 }
 </style>
 <script client>
+import { labNav } from "../../lab-nav.ts";
+
 export default class StackingPage {
     drawerOpen = false;
     dialogOpen = false;
     popoverOpen = false;
 
-    navItems = [
-        { id: "stacking", title: "Stacking", href: "/stacking" },
-        { id: "structure", title: "Structure", href: "/structure" },
-        { id: "ui", title: "UI lab", href: "/ui" },
-        { id: "motion", title: "Motion", href: "/motion" },
-    ];
+    navItems = labNav();
 
     openDrawer() {
         this.drawerOpen = true;

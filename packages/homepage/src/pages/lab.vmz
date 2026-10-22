@@ -1,0 +1,275 @@
+<template>
+    <SiteShell page="lab" variant="lab-index-page">
+        <main id="main" data-vmz-fixture="lab-index" class="lab-index">
+            <header class="lab-index__head">
+                <p class="v2-kicker">
+                    {{ kickerLabel }}
+                </p>
+                <h1>
+                    {{ titleLabel }}
+                </h1>
+                <p class="lab-index__lead">
+                    {{ leadLabel }}
+                </p>
+            </header>
+            <section v-for="group in groups" :key="group.id" :aria-labelledby="'lab-' + group.id" class="lab-index__group">
+                <h2 :id="'lab-' + group.id">
+                    {{ group.title }}
+                </h2>
+                <div class="lab-index__grid">
+                    <a v-for="card in group.cards" :key="card.id" :href="card.href" class="lab-card">
+                        <span class="lab-card__title">
+                            {{ card.title }}
+                        </span>
+                        <span class="lab-card__desc">
+                            {{ card.desc }}
+                        </span>
+                        <span aria-hidden="true" class="lab-card__arrow" />
+                    </a>
+                </div>
+            </section>
+        </main>
+    </SiteShell>
+</template>
+<style>
+.lab-index {
+    width: min(calc(100% - var(--v2-gutter) * 2), var(--v2-content));
+    margin: 0 auto;
+    padding: calc(var(--v2-section-pad) * 0.9) 0 var(--v2-section-pad);
+}
+.lab-index__head {
+    display: grid;
+    gap: 0.75rem;
+    max-width: 46rem;
+    margin-bottom: 3rem;
+}
+.lab-index__head h1 {
+    margin: 0;
+    color: var(--v2-ink);
+    font: 600 clamp(2rem, 4vw, 2.75rem) / 1.2 var(--vmz-font-display);
+}
+.lab-index__lead {
+    margin: 0;
+    color: var(--v2-muted);
+    font: 400 1rem / 1.7 var(--vmz-font-sans);
+}
+.lab-index__group + .lab-index__group {
+    margin-top: 3rem;
+}
+.lab-index__group h2 {
+    margin: 0 0 1rem;
+    color: var(--v2-ink);
+    font: 600 1.25rem / 1.6 var(--vmz-font-display);
+}
+.lab-index__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+    gap: 1rem;
+}
+.lab-card {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 0.5rem;
+    padding: 1.25rem;
+    border: 1px solid var(--v2-line);
+    border-radius: var(--v2-radius-lg);
+    color: inherit;
+    background: var(--v2-surface);
+    text-decoration: none;
+    transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+.lab-card:hover {
+    border-color: color-mix(in srgb, var(--v2-blue) 45%, var(--v2-line));
+    box-shadow: var(--v2-elevation-2);
+    transform: translateY(-2px);
+}
+.lab-card:focus-visible {
+    outline: 2px solid var(--v2-blue);
+    outline-offset: 2px;
+}
+.lab-card__title {
+    color: var(--v2-ink);
+    font: 600 1rem / 1.5 var(--vmz-font-display);
+}
+.lab-card__desc {
+    color: var(--v2-muted);
+    font: 400 0.9rem / 1.6 var(--vmz-font-sans);
+}
+.lab-card__arrow {
+    position: relative;
+    justify-self: end;
+    width: 1rem;
+    height: 1rem;
+    color: var(--v2-blue);
+}
+.lab-card__arrow::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    width: 0.45rem;
+    height: 0.45rem;
+    margin: auto;
+    border-top: 1.5px solid currentColor;
+    border-right: 1.5px solid currentColor;
+    transform: rotate(45deg);
+}
+@media (prefers-reduced-motion: reduce) {
+    .lab-card {
+        transition: none;
+    }
+    .lab-card:hover {
+        transform: none;
+    }
+}
+</style>
+<script client>
+import {
+    labCatalogTitle,
+    labCatalogLead,
+    labGroupApplications,
+    labGroupComponents,
+    labGroupSystem,
+    labCardChoiceTitle,
+    labCardChoiceDesc,
+    labCardOverviewTitle,
+    labCardOverviewDesc,
+    labCardConsoleTitle,
+    labCardConsoleDesc,
+    labCardDatagridTitle,
+    labCardDatagridDesc,
+    labCardDatatableTitle,
+    labCardDatatableDesc,
+    labCardDensityTitle,
+    labCardDensityDesc,
+    labCardFeedbackTitle,
+    labCardFeedbackDesc,
+    labCardFormTitle,
+    labCardFormDesc,
+    labCardMotionTitle,
+    labCardMotionDesc,
+    labCardOverlayTitle,
+    labCardOverlayDesc,
+    labCardStructureTitle,
+    labCardStructureDesc,
+    navLab,
+} from "#locales/common";
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
+import { localePrefix } from "../nav.ts";
+
+export default class LabIndexPage {
+    localeId = "zh-hans";
+    kickerLabel = "";
+    titleLabel = "";
+    leadLabel = "";
+    groups = [];
+    _unwatchLocale = null;
+
+    onMount() {
+        this.applyLocaleCopy();
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+    }
+
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
+    }
+
+    refreshCopy() {
+        const prefix = localePrefix(this.localeId);
+        this.kickerLabel = navLab();
+        this.titleLabel = labCatalogTitle();
+        this.leadLabel = labCatalogLead();
+        this.groups = [
+            {
+                id: "components",
+                title: labGroupComponents(),
+                cards: [
+                    {
+                        id: "components",
+                        href: `${prefix}/lab/components`,
+                        title: labCardOverviewTitle(),
+                        desc: labCardOverviewDesc(),
+                    },
+                    {
+                        id: "form",
+                        href: `${prefix}/lab/form`,
+                        title: labCardFormTitle(),
+                        desc: labCardFormDesc(),
+                    },
+                    {
+                        id: "feedback",
+                        href: `${prefix}/lab/feedback`,
+                        title: labCardFeedbackTitle(),
+                        desc: labCardFeedbackDesc(),
+                    },
+                    {
+                        id: "structure",
+                        href: `${prefix}/lab/structure`,
+                        title: labCardStructureTitle(),
+                        desc: labCardStructureDesc(),
+                    },
+                    {
+                        id: "choice",
+                        href: `${prefix}/lab/choice`,
+                        title: labCardChoiceTitle(),
+                        desc: labCardChoiceDesc(),
+                    },
+                    {
+                        id: "overlay",
+                        href: `${prefix}/lab/overlay-stack`,
+                        title: labCardOverlayTitle(),
+                        desc: labCardOverlayDesc(),
+                    },
+                ],
+            },
+            {
+                id: "applications",
+                title: labGroupApplications(),
+                cards: [
+                    {
+                        id: "console",
+                        href: `${prefix}/lab/console-patterns`,
+                        title: labCardConsoleTitle(),
+                        desc: labCardConsoleDesc(),
+                    },
+                    {
+                        id: "datatable",
+                        href: `${prefix}/lab/datatable`,
+                        title: labCardDatatableTitle(),
+                        desc: labCardDatatableDesc(),
+                    },
+                    {
+                        id: "datagrid",
+                        href: `${prefix}/lab/datagrid`,
+                        title: labCardDatagridTitle(),
+                        desc: labCardDatagridDesc(),
+                    },
+                ],
+            },
+            {
+                id: "system",
+                title: labGroupSystem(),
+                cards: [
+                    {
+                        id: "density",
+                        href: `${prefix}/lab/density-theme`,
+                        title: labCardDensityTitle(),
+                        desc: labCardDensityDesc(),
+                    },
+                    {
+                        id: "motion",
+                        href: `${prefix}/lab/motion`,
+                        title: labCardMotionTitle(),
+                        desc: labCardMotionDesc(),
+                    },
+                ],
+            },
+        ];
+    }
+
+    applyLocaleCopy(preferred) {
+        this.localeId = readLocaleId(preferred);
+        withLocaleHint(this.localeId, () => this.refreshCopy());
+    }
+}
+</script>

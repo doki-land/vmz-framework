@@ -266,7 +266,6 @@
     font-size: 0.8125rem;
 }
 .vmz-commercial-content {
-    width: 100%;
     min-width: 0;
 }
 
@@ -473,9 +472,6 @@
 <script client>
 import {
     commercialNavLabel,
-    commercialNavCommercial,
-    commercialNavConsole,
-    commercialNavHome,
     commercialHeroTitle,
     commercialHeroLead,
     commercialCtaContact,
@@ -593,7 +589,6 @@ export default class CommercialPage {
     featuredContextLabel = "";
     featuredStatusLabel = "";
     featuredOwnerLabel = "";
-    navItems = [];
     _unwatchLocale = null;
 
     onMount() {
@@ -687,11 +682,6 @@ export default class CommercialPage {
             { id: "status", title: consoleColStatus() },
             { id: "actor", title: consoleColActor() },
             { id: "updated", title: consoleColUpdated() },
-        ];
-        this.navItems = [
-            { id: "commercial", title: commercialNavCommercial(), href: "/commercial" },
-            { id: "console", title: commercialNavConsole(), href: "/console" },
-            { id: "home", title: commercialNavHome(), href: "/" },
         ];
         const paths = docsPaths(this.localeId);
         this.guideHref = paths.guideHref;

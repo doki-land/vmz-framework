@@ -3,7 +3,7 @@
         <ConsoleShell brand="VMZ" home-href="/" title="DataTable" nav-label="Console" :nav="navItems">
             <div class="vmz-slot-content">
                 <Alert tone="info" role-name="status" title="DataTable thin gate" description="Ordinary HTML table with parent-owned selection + sticky header. Large-grid package is separate." />
-                <p data-vmz-fixture="datatable-state">
+                <p data-vmz-fixture="datatable-state" class="vmz-sr-only">
                     selected:
                     {{ selectedAttr || 'none' }}
                     ;count:
@@ -32,6 +32,8 @@
     </div>
 </template>
 <script client>
+import { labNav } from "../../lab-nav.ts";
+
 export default class DatatablePage {
     selectedAttr = "";
     selectedCount = 0;
@@ -92,11 +94,7 @@ export default class DatatablePage {
             selectLabel: "Select Epsilon",
         },
     ];
-    navItems = [
-        { id: "datatable", title: "DataTable", href: "/datatable" },
-        { id: "console", title: "Console", href: "/console" },
-        { id: "ui5", title: "UI5", href: "/ui5" },
-    ];
+    navItems = labNav();
 
     selectedSet() {
         return new Set(

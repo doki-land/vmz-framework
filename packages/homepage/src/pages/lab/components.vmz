@@ -140,6 +140,7 @@
 <script client>
 import {
     uiLabNavLabel,
+    navLab,
     uiLabPageTitle,
     uiLabPageLead,
     uiLabCardFieldTitle,
@@ -176,11 +177,9 @@ import {
     uiLabOpenPopover,
     uiLabPopoverTitle,
     uiLabPopoverBody,
-    commercialNavCommercial,
-    commercialNavConsole,
-    commercialNavHome,
 } from "#locales/common";
-import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
+import { labNav } from "../../lab-nav.ts";
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
 export default class UiLabPage {
     name = "";
@@ -292,11 +291,7 @@ export default class UiLabPage {
             { id: "share", title: uiLabMenuShare() },
             { id: "archive", title: uiLabMenuArchive() },
         ];
-        this.navItems = [
-            { id: "commercial", title: commercialNavCommercial(), href: "/commercial" },
-            { id: "console", title: commercialNavConsole(), href: "/console" },
-            { id: "home", title: commercialNavHome(), href: "/" },
-        ];
+        this.navItems = labNav(navLab());
     }
 
     applyLocaleCopy(preferred) {

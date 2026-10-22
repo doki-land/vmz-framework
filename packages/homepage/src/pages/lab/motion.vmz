@@ -1,16 +1,18 @@
 <template>
     <div data-vmz-fixture="motion">
-        <h1>
-            Motion lab
-        </h1>
-        <p>
-            Motion continuity lab: exit, interrupt/cancel, and SSR resume adopt.
-        </p>
+        <AppShell brand="VMZ" home-href="/" nav-label="Motion" :nav="navItems">
+            <div class="vmz-slot-content">
+                <h1>
+                    Motion lab
+                </h1>
+                <p>
+                    Motion continuity lab: exit, interrupt/cancel, and SSR resume adopt.
+                </p>
         <section data-vmz-fixture="motion-feedback">
             <Button type="button" @click="(() => clicks += 1)">
                 Pulse
             </Button>
-            <p data-vmz-fixture="motion-clicks">
+            <p data-vmz-fixture="motion-clicks" class="vmz-sr-only">
                 clicks:
                 {{ clicks }}
             </p>
@@ -34,7 +36,7 @@
             </Drawer>
         </section>
         <section data-vmz-fixture="motion-interrupt">
-            <p data-vmz-fixture="motion-interrupt-state">
+            <p data-vmz-fixture="motion-interrupt-state" class="vmz-sr-only">
                 interrupt-dialog:
                 {{ interruptDialogOpen ? 'open' : 'closed' }}
             </p>
@@ -48,7 +50,7 @@
             </Dialog>
         </section>
         <section data-vmz-fixture="motion-resume">
-            <p data-vmz-fixture="motion-resume-state">
+            <p data-vmz-fixture="motion-resume-state" class="vmz-sr-only">
                 ssr-dialog:
                 {{ ssrDialogOpen ? 'open' : 'closed' }}
             </p>
@@ -69,15 +71,20 @@
                 Reset rows
             </Button>
             <Table :columns="columns" :rows="rows" :has-row-action="rowAction" />
-            <p data-vmz-fixture="motion-row-count">
+            <p data-vmz-fixture="motion-row-count" class="vmz-sr-only">
                 rows:
                 {{ rowCount }}
             </p>
         </section>
+            </div>
+        </AppShell>
     </div>
 </template>
 <script client>
+import { labNav } from "../../lab-nav.ts";
+
 export default class MotionPage {
+    navItems = labNav();
     clicks = 0;
     dialogOpen = false;
     drawerOpen = false;

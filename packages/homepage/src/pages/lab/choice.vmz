@@ -3,7 +3,7 @@
         <AppShell brand="VMZ" home-href="/" nav-label="Choice" :nav="navItems">
             <div class="vmz-slot-content">
                 <Alert tone="info" role-name="status" title="Choice / disclosure" description="Segmented / Dropdown / Collapse / Tag — Chrome automation covers pick, open, expand." />
-                <p data-vmz-fixture="choice-state">
+                <p data-vmz-fixture="choice-state" class="vmz-sr-only">
                     segment:
                     {{ segment }}
                 </p>
@@ -44,14 +44,12 @@
 }
 </style>
 <script client>
+import { labNav } from "../../lab-nav.ts";
+
 export default class ChoicePage {
     segment = "comfortable";
 
-    navItems = [
-        { id: "choice", title: "Choice", href: "/choice" },
-        { id: "structure", title: "Structure", href: "/structure" },
-        { id: "ui", title: "UI", href: "/ui" },
-    ];
+    navItems = labNav();
 
     segmentOptions = [
         { value: "comfortable", label: "Comfortable" },

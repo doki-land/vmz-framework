@@ -1,8 +1,8 @@
 <template>
     <div data-vmz-fixture="ui4" :data-density="density">
-        <AppShell brand="VMZ" home-href="/" nav-label="UI4" :nav="navItems">
+        <AppShell brand="VMZ" home-href="/" nav-label="Feedback" :nav="navItems">
             <div class="vmz-slot-content">
-                <p data-vmz-fixture="ui4-density">
+                <p data-vmz-fixture="ui4-density" class="vmz-sr-only">
                     density:
                     {{ density }}
                 </p>
@@ -21,24 +21,22 @@
                         Continue
                     </Button>
                 </Result>
-                <p data-vmz-fixture="ui4-done">
+                <p data-vmz-fixture="ui4-done" class="vmz-sr-only">
                     done:
                     {{ done ? 'yes' : 'no' }}
                 </p>
-                <Empty title="No extras" description="UI4 still includes Empty on the Commercial Surface." />
+                <Empty title="No extras" description="Empty state on the commercial surface." />
             </div>
         </AppShell>
     </div>
 </template>
 <script client>
-export default class Ui4Page {
+import { labNav } from "../../lab-nav.ts";
+
+export default class FeedbackPage {
     density = "comfortable";
     done = false;
-    navItems = [
-        { id: "ui4", title: "UI4", href: "/ui4" },
-        { id: "commercial", title: "Commercial", href: "/commercial" },
-        { id: "motion", title: "Motion", href: "/motion" },
-    ];
+    navItems = labNav();
 
     toggleDensity() {
         this.density = this.density === "compact" ? "comfortable" : "compact";
