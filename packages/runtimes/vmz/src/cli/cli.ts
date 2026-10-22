@@ -5,7 +5,7 @@
 import { spawn } from 'node:child_process';
 import { copyFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import type { Cli, Command, ParsedOptions } from '@vmz/commander';
+import type { Cli, Command, CommandDiagnostic, ParsedOptions } from '@vmz/commander';
 import { createCli } from '@vmz/commander';
 import { registerApplicationCommands } from './application-cmd.js';
 import { assembleDelivery, emitBuildProof } from '../workspace/build-assemble.js';
@@ -53,8 +53,6 @@ export function printProjectHelp(): Promise<number> {
 export function printHelp(): Promise<number> {
     return printProjectHelp();
 }
-
-type Diagnostic = { code?: string; path?: string; message?: string; severity?: string };
 
 type Workspace = ReturnType<typeof createWorkspace>;
 
@@ -213,9 +211,9 @@ async function cmdCheck(args: ParsedOptions): Promise<number> {
 }
 
 /** Dedupe locale/build diagnostics by code+path+message (runtime + route emit both report missing manifest). */
-function dedupeDiagnostics(list: Diagnostic[]): Diagnostic[] {
+function dedupeDiagnostics(list: CommandDiagnostic[]): CommandDiagnostic[] {
     const seen = new Set<string>();
-    const out: Diagnostic[] = [];
+    const out: CommandDiagnostic[] = [];
     for (const d of list || []) {
         const key = `${d.code || ''}\0${d.path || ''}\0${d.message || ''}\0${d.severity || ''}`;
         if (seen.has(key)) continue;
