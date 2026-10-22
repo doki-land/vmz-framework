@@ -1,0 +1,160 @@
+<template>
+    <details class="site-preferences">
+        <summary :aria-label="preferencesLabel">
+            {{ preferencesShortLabel }}
+        </summary>
+        <div class="site-preferences__menu">
+            <div :aria-label="appearanceLabel" role="group" class="site-preferences__group">
+                <b>
+                    {{ appearanceLabel }}
+                </b>
+                <button type="button" :aria-pressed="theme === 'auto' ? 'true' : 'false'" @click='(() => chooseTheme("auto"))'>
+                    {{ themeAutoLabel }}
+                </button>
+                <button type="button" :aria-pressed="theme === 'light' ? 'true' : 'false'" @click='(() => chooseTheme("light"))'>
+                    {{ themeLightLabel }}
+                </button>
+                <button type="button" :aria-pressed="theme === 'dark' ? 'true' : 'false'" @click='(() => chooseTheme("dark"))'>
+                    {{ themeDarkLabel }}
+                </button>
+            </div>
+            <div :aria-label="densityLabel" role="group" class="site-preferences__group">
+                <b>
+                    {{ densityLabel }}
+                </b>
+                <button type="button" :aria-pressed="density === 'comfort' ? 'true' : 'false'" @click='(() => chooseDensity("comfort"))'>
+                    {{ densityComfortLabel }}
+                </button>
+                <button type="button" :aria-pressed="density === 'compact' ? 'true' : 'false'" @click='(() => chooseDensity("compact"))'>
+                    {{ densityCompactLabel }}
+                </button>
+            </div>
+        </div>
+    </details>
+</template>
+<script client>
+import {
+    preferences,
+    preferencesShort,
+    preferencesAppearance,
+    preferencesDensity,
+    themeAuto,
+    themeLight,
+    themeDark,
+    densityComfort,
+    densityCompact,
+} from "#locales/common";
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
+
+/**
+ * Appearance + density switch. Theme ids come from /designs/theme.json, so the
+ * element attribute is the only activation surface; density follows the same
+ * contract via `data-density`.
+ */
+export default class SitePreferences {
+    preferencesLabel = "";
+    preferencesShortLabel = "";
+    appearanceLabel = "";
+    densityLabel = "";
+    themeAutoLabel = "";
+    themeLightLabel = "";
+    themeDarkLabel = "";
+    densityComfortLabel = "";
+    densityCompactLabel = "";
+    theme = "auto";
+    density = "comfort";
+    _unwatchLocale = null;
+
+    onMount() {
+        this.applyLocaleCopy();
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+        this.restorePreferences();
+    }
+
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
+    }
+
+    refreshCopy() {
+        this.preferencesLabel = preferences();
+        this.preferencesShortLabel = preferencesShort();
+        this.appearanceLabel = preferencesAppearance();
+        this.densityLabel = preferencesDensity();
+        this.themeAutoLabel = themeAuto();
+        this.themeLightLabel = themeLight();
+        this.themeDarkLabel = themeDark();
+        this.densityComfortLabel = densityComfort();
+        this.densityCompactLabel = densityCompact();
+    }
+
+    applyLocaleCopy(preferred) {
+        const localeId = readLocaleId(preferred);
+        withLocaleHint(localeId, () => this.refreshCopy());
+    }
+
+    restorePreferences() {
+        if (typeof document === "undefined") return;
+        const storedTheme = this.readStored("vmz-theme");
+        this.theme = storedTheme === "dark" ? "dark" : storedTheme === "default" ? "light" : "auto";
+        this.density = this.readStored("vmz-density") === "compact" ? "compact" : "comfort";
+        this.applyDensity();
+    }
+
+    chooseTheme(mode) {
+        if (typeof document === "undefined") return;
+        this.theme = mode;
+        const root = document.documentElement;
+        if (mode === "auto") {
+            root.removeAttribute("data-theme");
+            this.store("vmz-theme", null);
+        } else {
+            const id = mode === "dark" ? "dark" : "default";
+            root.setAttribute("data-theme", id);
+            this.store("vmz-theme", id);
+        }
+        this.closeMenu();
+    }
+
+    chooseDensity(mode) {
+        if (typeof document === "undefined") return;
+        this.density = mode;
+        this.applyDensity();
+        this.store("vmz-density", mode === "compact" ? "compact" : null);
+        this.closeMenu();
+    }
+
+    applyDensity() {
+        const root = document.documentElement;
+        if (this.density === "compact") root.setAttribute("data-density", "compact");
+        else root.removeAttribute("data-density");
+    }
+
+    readStored(key) {
+        try {
+            return window.localStorage.getItem(key);
+        } catch {
+            return null;
+        }
+    }
+
+    store(key, value) {
+        try {
+            if (value) window.localStorage.setItem(key, value);
+            else window.localStorage.removeItem(key);
+        } catch {
+            /* storage disabled: keep the current page state only */
+        }
+        if (key !== "vmz-theme") return;
+        // Cookie mirrors the theme so the SSR host paints the right table.
+        document.cookie = value
+            ? `vmz-theme=${value}; path=/; max-age=31536000; SameSite=Lax`
+            : "vmz-theme=; path=/; max-age=0; SameSite=Lax";
+    }
+
+    closeMenu() {
+        const el = document.querySelector(".site-preferences");
+        if (el) el.removeAttribute("open");
+    }
+}
+</script>

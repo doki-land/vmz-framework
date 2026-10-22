@@ -158,9 +158,9 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1rem;
     padding: 1rem 1.15rem;
-    border: 1px solid #e5e6eb;
-    border-radius: 8px;
-    background: #fff;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-paper);
 }
 
 .vmz-console-summary__item {
@@ -170,7 +170,7 @@
 }
 
 .vmz-console-summary__label {
-    color: #646a73;
+    color: var(--vmz-text-steel);
     font-size: 0.8125rem;
     line-height: 1.25rem;
 }
@@ -181,36 +181,36 @@
     font-weight: 600;
     line-height: 2.25rem;
     font-variant-numeric: tabular-nums;
-    color: #1f2329;
+    color: var(--vmz-text-ink);
 }
 
 .vmz-console-summary__value.is-failed {
-    color: #a8071a;
+    color: var(--vmz-status-danger-foreground);
 }
 
 .vmz-console-data-panel {
     display: grid;
     gap: 0;
     overflow: hidden;
-    border: 1px solid #e5e6eb;
-    border-radius: 8px;
-    background: #fff;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-paper);
 }
 
 .vmz-console-data-panel .vmz-ui-filter-bar {
     margin: 0;
     border: 0;
-    border-bottom: 1px solid #e5e6eb;
+    border-bottom: 1px solid var(--vmz-line-default);
     border-radius: 0;
-    background: #fff;
+    background: var(--vmz-surface-paper);
 }
 
 .vmz-console-data-panel .vmz-ui-bulk-actions {
     margin: 0;
     border: 0;
-    border-bottom: 1px solid #e5e6eb;
+    border-bottom: 1px solid var(--vmz-line-default);
     border-radius: 0;
-    background: #f7f8fa;
+    background: var(--vmz-surface-mist);
 }
 
 .vmz-console-data-panel .vmz-ui-table-wrap {
@@ -222,9 +222,9 @@
 .vmz-console-data-panel .vmz-ui-pagination {
     margin: 0;
     padding: 0.75rem 1rem;
-    border-top: 1px solid #e5e6eb;
+    border-top: 1px solid var(--vmz-line-default);
     border-radius: 0;
-    background: #fff;
+    background: var(--vmz-surface-paper);
 }
 
 .vmz-console-detail {
@@ -240,14 +240,14 @@
 
 .vmz-console-detail dt {
     margin: 0;
-    color: #646a73;
+    color: var(--vmz-text-steel);
     font-size: 0.8125rem;
     line-height: 1.25rem;
 }
 
 .vmz-console-detail dd {
     margin: 0;
-    color: #1f2329;
+    color: var(--vmz-text-ink);
     font-size: 0.875rem;
     line-height: 1.375rem;
 }
@@ -257,21 +257,21 @@
     gap: 0.75rem;
     margin-top: 1.5rem;
     padding-top: 1.25rem;
-    border-top: 1px solid #e5e6eb;
+    border-top: 1px solid var(--vmz-line-default);
 }
 .vmz-console-note .vmz-ui-textarea {
     width: 100%;
 }
 .vmz-console-note__saved {
     margin: 0;
-    color: #16773f;
+    color: var(--vmz-status-success-foreground);
     font-size: 0.875rem;
 }
 .vmz-console-scroll-hint {
     display: none;
     margin: 0;
     padding: 0.65rem 1rem 0;
-    color: #646a73;
+    color: var(--vmz-text-steel);
     font-size: 0.75rem;
 }
 @media (max-width: 720px) {
@@ -290,16 +290,16 @@
 }
 .vmz-console-demo-note {
     margin: 0;
-    color: #646a73;
+    color: var(--vmz-text-steel);
     font-size: 0.82rem;
 }
 .vmz-console-state {
     margin: 0;
     padding: 2rem;
-    border: 1px solid #e5e6eb;
-    border-radius: 8px;
-    background: #fff;
-    color: #51565d;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-steel);
 }
 
 .vmz-console-empty {
@@ -308,15 +308,15 @@
     gap: 0.75rem;
     margin: 0;
     padding: 1.5rem 1rem 1.25rem;
-    border-top: 1px solid #e5e6eb;
-    background: #fff;
-    color: #51565d;
+    border-top: 1px solid var(--vmz-line-default);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-steel);
     font-size: 0.875rem;
     line-height: 1.5;
 }
 
 .vmz-console-empty strong {
-    color: #1f2329;
+    color: var(--vmz-text-ink);
     font-weight: 600;
 }
 

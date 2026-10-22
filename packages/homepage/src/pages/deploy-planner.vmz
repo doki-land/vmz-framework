@@ -319,7 +319,7 @@
 </template>
 <style>
 .planner-page {
-    background: #fff;
+    background: var(--vmz-surface-paper);
 }
 .planner {
     width: min(calc(100% - 2rem), 80rem);
@@ -335,27 +335,27 @@
     align-items: center;
     gap: 0.55rem;
     margin: 0 0 0.85rem;
-    color: #4d535b;
+    color: var(--vmz-text-steel);
     font: 500 0.73rem/1.2 var(--vmz-font-mono);
     text-transform: uppercase;
 }
 .planner__kicker span {
     width: 0.55rem;
     height: 0.55rem;
-    border-radius: 2px;
-    background: #faad14;
-    box-shadow: 0 0 0 5px rgb(250 173 20 / 14%);
+    border-radius: var(--vmz-radius-xs);
+    background: var(--vmz-brand-energy);
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--vmz-brand-energy) 14%, transparent);
 }
 .planner__hero h1 {
     margin: 0 0 0.75rem;
     font-family: var(--vmz-font-display);
     font-size: clamp(2.2rem, 4vw, 3.2rem);
     letter-spacing: -0.03em;
-    color: #15171a;
+    color: var(--vmz-text-ink);
 }
 .planner__lede {
     margin: 0;
-    color: #62676f;
+    color: var(--vmz-text-steel);
     font-size: 1.05rem;
     line-height: 1.65;
 }
@@ -367,13 +367,13 @@
 }
 .planner__quiz,
 .planner__result {
-    border: 1px solid #dfe2e6;
-    border-radius: 8px;
-    background: #f7faff;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-mist);
     padding: 1.25rem 1.35rem 1.5rem;
 }
 .planner__result {
-    background: #fff;
+    background: var(--vmz-surface-paper);
 }
 .planner__quiz h2,
 .planner__result h2 {
@@ -387,7 +387,7 @@
     font-family: var(--vmz-font-mono);
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: #62676f;
+    color: var(--vmz-text-steel);
 }
 .planner__field {
     margin: 0 0 1.15rem;
@@ -398,7 +398,7 @@
     margin-bottom: 0.55rem;
     font-size: 0.9rem;
     font-weight: 600;
-    color: #15171a;
+    color: var(--vmz-text-ink);
 }
 .planner__chips {
     display: flex;
@@ -407,22 +407,22 @@
 }
 .planner__chips button {
     appearance: none;
-    border: 1px solid #dfe2e6;
-    border-radius: 6px;
-    background: #fff;
-    color: #454a51;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-sm);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-steel);
     padding: 0.5rem 0.75rem;
     font: 500 0.86rem/1.2 var(--vmz-font-sans);
     cursor: pointer;
 }
 .planner__chips button:hover {
-    border-color: #91caff;
-    color: #0958d9;
+    border-color: color-mix(in srgb, var(--vmz-action-primary-background) 40%, var(--vmz-surface-paper));
+    color: var(--vmz-action-link-foreground);
 }
 .planner__chips button.is-active {
-    border-color: #1677ff;
-    background: #e6f4ff;
-    color: #0958d9;
+    border-color: var(--vmz-action-primary-background);
+    background: color-mix(in srgb, var(--vmz-action-primary-background) 10%, var(--vmz-surface-paper));
+    color: var(--vmz-action-link-foreground);
 }
 .planner__result-head {
     display: flex;
@@ -439,9 +439,9 @@
 .planner__disclaimer {
     margin: 0.85rem 0 1rem;
     padding: 0.75rem 0.9rem;
-    border-left: 3px solid #faad14;
-    background: #fffbe6;
-    color: #614700;
+    border-left: 3px solid var(--vmz-brand-energy);
+    background: color-mix(in srgb, var(--vmz-status-warning-accent) 12%, var(--vmz-surface-paper));
+    color: var(--vmz-status-warning-foreground);
     font-size: 0.9rem;
     line-height: 1.5;
 }
@@ -458,7 +458,7 @@
     margin: 0;
     font: 500 0.7rem/1.2 var(--vmz-font-mono);
     text-transform: uppercase;
-    color: #8b929c;
+    color: var(--vmz-text-steel);
 }
 .planner__meta dd {
     margin: 0.2rem 0 0;
@@ -467,13 +467,13 @@
 .planner__cautions {
     margin-top: 1rem;
     padding: 0.75rem 0.9rem;
-    border: 1px solid #ffd591;
-    border-radius: 6px;
-    background: #fff7e6;
+    border: 1px solid color-mix(in srgb, var(--vmz-status-warning-accent) 35%, var(--vmz-surface-paper));
+    border-radius: var(--vmz-radius-sm);
+    background: color-mix(in srgb, var(--vmz-status-warning-accent) 12%, var(--vmz-surface-paper));
 }
 .planner__cautions h3 {
     margin: 0 0 0.4rem;
-    color: #ad6800;
+    color: var(--vmz-status-warning-foreground);
 }
 .planner__cautions ul,
 .planner__commands,
@@ -493,10 +493,10 @@
     margin: 0;
     padding: 0.9rem 1rem;
     overflow: auto;
-    border: 1px solid #e1e6ed;
-    border-radius: 6px;
-    background: #15171a;
-    color: #e8ecf1;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-sm);
+    background: var(--vmz-surface-code);
+    color: var(--vmz-text-on-inverse);
     font: 0.82rem/1.5 var(--vmz-font-mono);
     white-space: pre-wrap;
 }
@@ -506,22 +506,22 @@
 .planner__copy-error {
     margin: 0 0 1rem;
     padding: 0.55rem 0.75rem;
-    border-radius: 6px;
-    background: #fff1f0;
-    color: #a8071a;
+    border-radius: var(--vmz-radius-sm);
+    background: color-mix(in srgb, var(--vmz-status-danger-accent) 8%, var(--vmz-surface-paper));
+    color: var(--vmz-status-danger-foreground);
     font-size: 0.88rem;
 }
 .planner__summary {
     margin: 1.25rem 0 0;
     padding: 0.75rem 1rem 1rem;
-    border: 1px solid #e1e6ed;
-    border-radius: 6px;
-    background: #f7faff;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-sm);
+    background: var(--vmz-surface-mist);
 }
 .planner__summary summary {
     cursor: pointer;
     font: 600 0.85rem/1.4 var(--vmz-font-mono);
-    color: #4d535b;
+    color: var(--vmz-text-steel);
 }
 .planner__summary h4 {
     margin: 1rem 0 0.45rem;
@@ -529,7 +529,7 @@
     font-family: var(--vmz-font-mono);
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: #62676f;
+    color: var(--vmz-text-steel);
 }
 .planner__summary h5 {
     margin: 0 0 0.4rem;
@@ -541,16 +541,16 @@
 }
 .planner__step {
     padding: 0.75rem 0.9rem;
-    border: 1px solid #e1e6ed;
-    border-radius: 6px;
-    background: #fff;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-sm);
+    background: var(--vmz-surface-paper);
 }
 .planner__axis-label {
     margin: 0.55rem 0 0.2rem;
     font: 600 0.7rem/1.2 var(--vmz-font-mono);
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: #8b929c;
+    color: var(--vmz-text-steel);
 }
 .planner__commands {
     margin: 0;

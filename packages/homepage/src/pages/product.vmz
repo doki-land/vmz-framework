@@ -112,9 +112,9 @@
     gap: 0.65rem 0.85rem;
     margin: 0.5rem 0 2.5rem;
     padding: 1rem 1.25rem;
-    border: 1px solid #e5e6eb;
-    border-radius: 8px;
-    background: #f8fafc;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-mist);
 }
 
 .vmz-product-layout {
@@ -138,7 +138,7 @@
 }
 .vmz-product-layout .lead {
     max-width: 48rem;
-    color: #51565d;
+    color: var(--vmz-text-steel);
     font-size: 1rem;
 }
 .vmz-product-layout .vmz-ui-callout {

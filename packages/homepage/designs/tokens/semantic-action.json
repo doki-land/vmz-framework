@@ -33,6 +33,14 @@
             "value": "#F5F5F5"
         },
         {
+            "key": { "path": ["action", "link", "foreground"] },
+            "value": "#0958D9"
+        },
+        {
+            "key": { "path": ["action", "link", "hover"] },
+            "value": "#003EB3"
+        },
+        {
             "key": { "path": ["focus", "ring"] },
             "value": "color-mix(in srgb, #1677FF 20%, transparent)"
         }

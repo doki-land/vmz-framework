@@ -21,13 +21,16 @@
         "mist": "#F5F5F5",
         "page": "#F5F5F5",
         "ink": "#141414",
-        "graphite": "#434343"
+        "graphite": "#434343",
+        "code": "#121212",
+        "inverse": "#141414"
     },
     "text": {
         "ink": "#141414",
         "steel": "#595959",
         "on-brand": "#FFFFFF",
-        "on-ink": "#FAFAFA"
+        "on-ink": "#FAFAFA",
+        "on-inverse": "#FAFAFA"
     },
     "line": {
         "default": "#D9D9D9",

@@ -206,9 +206,9 @@
     gap: 3rem;
     margin: 1rem 0 2.5rem;
     padding: 3rem;
-    border: 1px solid #e5e6eb;
-    border-radius: 10px;
-    background: #f8fafc;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-mist);
 }
 .vmz-commercial-hero__copy {
     display: grid;
@@ -217,7 +217,7 @@
 }
 .vmz-commercial-hero__eyebrow {
     margin: 0;
-    color: #0958d9;
+    color: var(--vmz-action-link-foreground);
     font-size: 0.8rem;
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -226,10 +226,10 @@
     display: grid;
     gap: 1rem;
     padding: 1.5rem;
-    border: 1px solid #dce3ec;
-    border-radius: 8px;
-    background: #fff;
-    box-shadow: 0 12px 28px rgb(31 35 41 / 6%);
+    border: 1px solid var(--vmz-line-subtle);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-paper);
+    box-shadow: var(--vmz-elevation-2);
 }
 .vmz-commercial-hero__preview-head,
 .vmz-commercial-hero__preview-foot {
@@ -240,31 +240,31 @@
 }
 .vmz-commercial-hero__preview-head {
     padding-bottom: 0.75rem;
-    border-bottom: 1px solid #e5e6eb;
-    color: #646a73;
+    border-bottom: 1px solid var(--vmz-line-default);
+    color: var(--vmz-text-steel);
     font: 500 0.8rem var(--vmz-font-mono);
 }
 .vmz-commercial-hero__preview-head span:last-child {
     padding: 0.25rem 0.55rem;
-    border-radius: 4px;
-    color: #8d4f00;
-    background: #fff7e6;
+    border-radius: var(--vmz-radius-xs);
+    color: var(--vmz-status-warning-foreground);
+    background: color-mix(in srgb, var(--vmz-status-warning-accent) 12%, var(--vmz-surface-paper));
     font: 500 0.75rem var(--vmz-font-sans);
 }
 .vmz-commercial-hero__preview strong {
-    color: #1f2329;
+    color: var(--vmz-text-ink);
     font: 600 1.15rem/1.4 var(--vmz-font-display);
 }
 .vmz-commercial-hero__preview p {
     margin: 0;
-    color: #51565d;
+    color: var(--vmz-text-steel);
     font-size: 0.875rem;
     line-height: 1.6;
 }
 .vmz-commercial-hero__preview-foot {
     padding-top: 1rem;
-    border-top: 1px solid #e5e6eb;
-    color: #646a73;
+    border-top: 1px solid var(--vmz-line-default);
+    color: var(--vmz-text-steel);
     font-size: 0.8125rem;
 }
 .vmz-commercial-content {
@@ -278,7 +278,7 @@
     font-size: clamp(1.5rem, 3.6vw, 1.875rem);
     font-weight: 600;
     line-height: 1.35;
-    color: #1f2329;
+    color: var(--vmz-text-ink);
     max-width: 24ch;
 }
 
@@ -287,7 +287,7 @@
     max-width: 40rem;
     font-size: 1rem;
     line-height: 1.625;
-    color: #51565d;
+    color: var(--vmz-text-steel);
 }
 
 .vmz-commercial-hero__actions,
@@ -302,20 +302,20 @@
     align-items: center;
     min-height: 2.5rem;
     padding: 0.5rem 0.9rem;
-    border-radius: 6px;
-    color: #0958d9;
+    border-radius: var(--vmz-radius-sm);
+    color: var(--vmz-action-link-foreground);
     font-weight: 600;
     text-decoration: none;
 }
 .vmz-commercial-hero__actions a:first-child {
-    color: #fff;
-    background: #1677ff;
+    color: var(--vmz-action-primary-foreground);
+    background: var(--vmz-action-primary-background);
 }
 .vmz-commercial-hero__actions a:first-child:hover {
-    background: #0958d9;
+    background: var(--vmz-action-primary-active);
 }
 .vmz-commercial-hero__actions a:not(:first-child):hover {
-    background: #e6f4ff;
+    background: color-mix(in srgb, var(--vmz-action-primary-background) 10%, var(--vmz-surface-paper));
 }
 
 .vmz-commercial-task {
@@ -324,7 +324,7 @@
     gap: 2rem;
     align-items: start;
     padding: 2.5rem 0;
-    border-top: 1px solid #e5e6eb;
+    border-top: 1px solid var(--vmz-line-default);
 }
 
 .vmz-commercial-task__copy {
@@ -338,12 +338,12 @@
     font-size: 1.25rem;
     font-weight: 600;
     line-height: 1.4;
-    color: #1f2329;
+    color: var(--vmz-text-ink);
 }
 
 .vmz-commercial-task__copy p {
     margin: 0;
-    color: #51565d;
+    color: var(--vmz-text-steel);
     font-size: 0.875rem;
     line-height: 1.375rem;
 }
@@ -352,15 +352,15 @@
     display: grid;
     gap: 0;
     overflow: hidden;
-    border: 1px solid #e5e6eb;
-    border-radius: 8px;
-    background: #fff;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-paper);
 }
 
 .vmz-commercial-panel .vmz-ui-filter-bar {
     margin: 0;
     border: 0;
-    border-bottom: 1px solid #e5e6eb;
+    border-bottom: 1px solid var(--vmz-line-default);
     border-radius: 0;
 }
 
@@ -385,7 +385,7 @@
 
 .vmz-commercial-detail-line {
     margin: 0;
-    color: #51565d;
+    color: var(--vmz-text-steel);
     font-size: 0.875rem;
     line-height: 1.375rem;
 }
@@ -403,14 +403,14 @@
 
 .vmz-commercial-detail dt {
     margin: 0;
-    color: #646a73;
+    color: var(--vmz-text-steel);
     font-size: 0.8125rem;
     line-height: 1.25rem;
 }
 
 .vmz-commercial-detail dd {
     margin: 0;
-    color: #1f2329;
+    color: var(--vmz-text-ink);
     font-size: 0.875rem;
     line-height: 1.375rem;
 }
@@ -428,13 +428,13 @@
 }
 .vmz-commercial-demo-note {
     margin: 0.25rem 0 0;
-    color: #646a73;
+    color: var(--vmz-text-steel);
     font-size: 0.82rem;
 }
 .vmz-commercial-loading {
     margin: 0;
     padding: 1.5rem;
-    color: #646a73;
+    color: var(--vmz-text-steel);
 }
 
 .vmz-commercial-empty {
@@ -443,13 +443,13 @@
     gap: 0.75rem;
     margin: 0;
     padding: 1.5rem 1rem 1.25rem;
-    color: #51565d;
+    color: var(--vmz-text-steel);
     font-size: 0.875rem;
     line-height: 1.5;
 }
 
 .vmz-commercial-empty strong {
-    color: #1f2329;
+    color: var(--vmz-text-ink);
     font-weight: 600;
 }
 
@@ -460,7 +460,7 @@
     display: none;
     margin: 0;
     padding: 0.65rem 1rem 0;
-    color: #646a73;
+    color: var(--vmz-text-steel);
     font-size: 0.75rem;
 }
 @media (max-width: 720px) {

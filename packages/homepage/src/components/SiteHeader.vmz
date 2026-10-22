@@ -37,6 +37,7 @@
                     </a>
                 </div>
             </details>
+            <SitePreferences />
             <details class="site-language">
                 <summary :aria-label="selectLanguageLabel">
                     <Icon name="nav.language" size="sm" />
