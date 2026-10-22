@@ -72,9 +72,9 @@
     cursor: pointer;
     transition:
         border-color var(--vmz-motion-control-duration, 120ms)
-            var(--vmz-motion-control-easing, linear),
+            var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
         box-shadow var(--vmz-motion-control-duration, 120ms)
-            var(--vmz-motion-control-easing, linear);
+            var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
 }
 
 .vmz-ui-select[data-invalid="true"] .vmz-ui-select__control {

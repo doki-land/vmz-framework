@@ -10,7 +10,7 @@
     min-height: 1.5rem;
     padding: 0 0.45rem;
     border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-sm, 2px);
+    border-radius: var(--vmz-radius-sm, 4px);
     background: var(--vmz-surface-mist);
     color: var(--vmz-text-steel);
     font-size: 0.75rem;
