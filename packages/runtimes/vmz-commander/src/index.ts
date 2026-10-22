@@ -305,7 +305,13 @@ class CliBuilder implements Cli {
             t,
         };
 
-        if (argv.length === 0 || isHelpToken(argv[0]!)) {
+        // `help <cmd> ...` 路由：把 help 后面的 token 当命令路径查找帮助
+        if (argv.length && argv[0] === 'help') {
+            const pathTokens = argv.slice(1);
+            return this.routeHelp(pathTokens, t, diagnosticContext);
+        }
+
+        if (argv.length === 0 || argv.every(isHelpToken)) {
             console.log(this.formatRootHelp(t));
             return 0;
         }
@@ -313,8 +319,15 @@ class CliBuilder implements Cli {
         const cmdToken = argv[0]!;
         const matched = this.roots.find((c) => c.def.names.includes(cmdToken));
         if (!matched) {
+            // 未知命令：加上 suggestion
+            const names = this.roots.flatMap((r) => r.def.names);
+            const suggest = closestMatch(cmdToken, names);
             return this.emitAndHelp(
-                { code: 'commander::unknown_command', severity: 'error', args: { cmd: cmdToken } },
+                {
+                    code: 'commander::unknown_command',
+                    severity: 'error',
+                    args: suggest ? { cmd: cmdToken, suggest } : { cmd: cmdToken },
+                },
                 diagnosticContext,
                 t,
                 this.formatRootHelp(t),
@@ -323,6 +336,32 @@ class CliBuilder implements Cli {
         }
 
         return await this.dispatch(matched.def, argv.slice(1), t, [cmdToken], globalOpts, diagnosticContext);
+    }
+
+    /** 路由 `help <cmd> [subcmd] ...` 到对应命令的帮助文本。 */
+    private routeHelp(pathTokens: string[], t: LocalizePlugin['t'], _ctx: DiagnosticContext): number {
+        if (!pathTokens.length) {
+            console.log(this.formatRootHelp(t));
+            return 0;
+        }
+        let pool: CommandDef[] | undefined = this.roots.map((r) => r.def);
+        let matched: CommandDef | undefined;
+        let consumed = 0;
+        for (const tok of pathTokens) {
+            const found: CommandDef | undefined = pool?.find((c) => c.names.includes(tok));
+            if (!found) break;
+            matched = found;
+            consumed += 1;
+            pool = found.children;
+        }
+        if (!matched) {
+            // 路径里没有一个有效命令 → 仍显示根帮助
+            console.log(this.formatRootHelp(t));
+            return 0;
+        }
+        const path = pathTokens.slice(0, consumed);
+        console.log(formatCommandHelp(this.name, matched, t, path, this.rootOptions));
+        return 0;
     }
 
     /** Emit a diagnostic through `onDiagnostic` when registered, else console.error. */
@@ -388,7 +427,8 @@ class CliBuilder implements Cli {
         globalOpts: ParsedOptions,
         diagnosticContext: DiagnosticContext,
     ): Promise<number> {
-        if (rest.length && isHelpToken(rest[0]!)) {
+        // 在任何解析前先扫描 --help / -h（任何位置，跳过 -- 后面）
+        if (hasHelpToken(rest)) {
             console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
             return 0;
         }
@@ -400,8 +440,14 @@ class CliBuilder implements Cli {
                 return await this.dispatch(child, rest.slice(1), t, [...path, childTok], globalOpts, diagnosticContext);
             }
             if (!def.action) {
+                const childNames = def.children.flatMap((c) => c.names);
+                const suggest = closestMatch(childTok, childNames);
                 return this.emitAndHelp(
-                    { code: 'commander::unknown_command', severity: 'error', args: { cmd: [...path, childTok].join(' ') } },
+                    {
+                        code: 'commander::unknown_command',
+                        severity: 'error',
+                        args: suggest ? { cmd: [...path, childTok].join(' '), suggest } : { cmd: [...path, childTok].join(' ') },
+                    },
                     diagnosticContext,
                     t,
                     formatCommandHelp(this.name, def, t, path, this.rootOptions),
@@ -576,8 +622,13 @@ function parseArgvCore(
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i]!;
         if (a === '--') {
-            rest.push(...argv.slice(i));
+            // 消费 -- 分隔符本身，后面的原样进 positional
+            rest.push(...argv.slice(i + 1));
             break;
+        }
+        if (isHelpToken(a)) {
+            // 框架级保留：--help / -h 不进 options 也不进 rest，让上层 dispatch 处理
+            continue;
         }
         if (a.startsWith('--')) {
             const eq = a.indexOf('=');
@@ -607,7 +658,8 @@ function parseArgvCore(
             }
             continue;
         }
-        if (a.startsWith('-') && a.length === 2) {
+        // 短参数：-x 或 -xyz（多字符），只要不以 -- 开头且以 - 开头且长度 > 1 就认作短选项
+        if (a.startsWith('-') && a.length > 1) {
             const short = a.slice(1);
             const def = byAlias.get(short);
             if (!def) {
@@ -747,4 +799,55 @@ function assignOption(out: ParsedOptions, def: OptionDef, value: string | boolea
         return;
     }
     out[def.key] = value;
+}
+
+/** 扫描 argv 是否包含 help token（跳过 -- 后面的内容）。 */
+function hasHelpToken(argv: string[]): boolean {
+    for (const tok of argv) {
+        if (tok === '--') return false;
+        if (isHelpToken(tok)) return true;
+    }
+    return false;
+}
+
+/**
+ * 简单 Levenshtein 距离：找最接近的候选字符串。
+ * 返回值是建议的命令名（可能有多个用逗号连接），找不到返回空字符串。
+ */
+function closestMatch(input: string, candidates: string[]): string {
+    if (!input || !candidates.length) return '';
+    const lower = input.toLowerCase();
+    let best: { name: string; dist: number }[] = [];
+    for (const c of candidates) {
+        const d = levenshtein(lower, c.toLowerCase());
+        // 只接受距离 ≤ 3 且不超过输入长度 60% 的候选，避免把完全不相关的命令也建议出来
+        const threshold = Math.max(2, Math.floor(input.length * 0.6) + 1);
+        if (d <= threshold) {
+            best.push({ name: c, dist: d });
+        }
+    }
+    if (!best.length) return '';
+    best.sort((a, b) => a.dist - b.dist);
+    // 最多返回前 3 个
+    return best.slice(0, 3).map((b) => b.name).join(', ');
+}
+
+function levenshtein(a: string, b: string): number {
+    const m = a.length;
+    const n = b.length;
+    if (m === 0) return n;
+    if (n === 0) return m;
+    // 只维护两行，节省内存
+    let prev = new Array<number>(n + 1);
+    let curr = new Array<number>(n + 1);
+    for (let j = 0; j <= n; j++) prev[j] = j;
+    for (let i = 1; i <= m; i++) {
+        curr[0] = i;
+        for (let j = 1; j <= n; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+        }
+        [prev, curr] = [curr, prev];
+    }
+    return prev[n]!;
 }

@@ -154,3 +154,70 @@ test('root factory errors are CliError (exit code 1) — not thrown during parse
         return true;
     });
 });
+
+// --- --help 任意位置识别 ---
+
+test('--help 在命令选项后面也能触发帮助', async () => {
+    const cli = mockCli();
+    cli.command('build', 'cmd.build').option('--profile <p>', 'opt.profile').action(() => 0);
+    // --help 在 --profile prod 后面，应该触发帮助而不是报 unknown_option
+    const code = await cli.parse(['build', '--profile', 'prod', '--help']);
+    assert.equal(code, 0);
+});
+
+test('-h 在任意位置也触发帮助', async () => {
+    const cli = mockCli();
+    cli.command('build', 'cmd.build').action(() => 0);
+    const code = await cli.parse(['build', '-h']);
+    assert.equal(code, 0);
+});
+
+test('help <cmd> 路由到子命令帮助', async () => {
+    const cli = mockCli();
+    cli.command('build', 'cmd.build').action(() => 0);
+    cli.command('check', 'cmd.check').action(() => 0);
+    // 不抛 unknown_command，exit 0
+    const code = await cli.parse(['help', 'build']);
+    assert.equal(code, 0);
+});
+
+// --- 短参数：-abc 必须报错 ---
+
+test('多字符短参数 -abc 必须报 unknown_option，不能静默变 positional', () => {
+    let caught: CliError | undefined;
+    try {
+        parseOptions(['-abc'], []);
+    } catch (e) {
+        caught = e as CliError;
+    }
+    assert.ok(caught, 'expected CliError');
+    assert.equal(caught.code, 'commander::unknown_option');
+    assert.equal(caught.exitCode, 2);
+});
+
+// --- -- 消费语义 ---
+
+test('-- 分隔符本身不进入 positional，后面内容进入 _', () => {
+    const options = parseOptions(['--profile', 'prod', '--', '--anything', 'file'], [
+        { rawName: '--profile <p>', helpId: 'h', key: 'profile', aliases: ['profile'], takesValue: true, optionalValue: false, repeatable: false },
+    ]);
+    assert.deepEqual(options.profile, 'prod');
+    // -- 本身不进 _，后面的原样进
+    assert.deepEqual(options._, ['--anything', 'file']);
+    assert.ok(!options._.includes('--'), '-- separator must not appear in positional');
+});
+
+// --- 命令建议 ---
+
+test('未知命令给出 suggestion', async () => {
+    const cli = mockCli();
+    cli.command('build', 'cmd.build').action(() => 0);
+    cli.command('check', 'cmd.check').action(() => 0);
+    const received = collect(cli);
+    await cli.parse(['buid']); // 拼写错误
+    assert.equal(received[0]!.code, 'commander::unknown_command');
+    // suggestion 通过 args.suggest 传递给渲染器
+    const args = (received[0]! as any).args as Record<string, string>;
+    assert.ok(args?.suggest, 'args.suggest should exist for close matches');
+    assert.ok(args.suggest.includes('build'), `suggest should mention build, got: ${args.suggest}`);
+});
