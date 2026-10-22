@@ -66,6 +66,30 @@ export function scheduleRefresh(inst, notice) {
     });
 }
 
+const ARROW_SIGNATURE = /^(?:async\s*)?(?:\(([^)]*)\)|([A-Za-z_$][\w$]*))\s*=>\s*([\s\S]*)$/;
+const EVENT_PASSTHROUGH_CALL = /^this\.([A-Za-z_$][\w$]*)\s*\(([^)]*)\)\s*;?$/;
+
+/**
+ * Direct-bind hint for `(ev) => this.method(ev)` handlers only. The closure is
+ * replaced by `method.call(inst, ev)`, so the shape must forward exactly the
+ * event: a handler that passes its own literal arguments (`() => this.pick("dark")`)
+ * must keep running as a closure, otherwise the event would overwrite the argument.
+ */
+function inferEventPassthroughMethod(src: string): string | null {
+    const arrow = src.match(ARROW_SIGNATURE);
+    if (!arrow) return null;
+    const params = (arrow[1] ?? arrow[2] ?? '')
+        .split(',')
+        .map((p) => p.trim())
+        .filter(Boolean);
+    if (params.length !== 1) return null;
+    let body = arrow[3].trim();
+    if (body.startsWith('{') && body.endsWith('}')) body = body.slice(1, -1).trim();
+    const call = body.match(EVENT_PASSTHROUGH_CALL);
+    if (!call || call[2].trim() !== params[0]) return null;
+    return call[1];
+}
+
 export function inferHandlerMethod(handler) {
     if (typeof handler !== 'function') return null;
     if (Object.hasOwn(handler, '__vmzMethod')) {
@@ -74,8 +98,7 @@ export function inferHandlerMethod(handler) {
     let name = null;
     try {
         const src = Function.prototype.toString.call(handler);
-        const m = src.match(/this\.([A-Za-z_$][\w$]*)\s*\(/);
-        name = m ? m[1] : null;
+        name = inferEventPassthroughMethod(src);
     } catch {
         name = null;
     }
