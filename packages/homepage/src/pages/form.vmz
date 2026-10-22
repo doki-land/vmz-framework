@@ -1,51 +1,51 @@
 <template>
     <div data-vmz-fixture="form">
-        <AppShell brand="VMZ" home-href="/" nav-label="Form lab" :nav="navItems">
+        <AppShell brand="VMZ" home-href="/" nav-label="表单与上传" :nav="navItems">
             <div class="vmz-slot-content">
-                <Alert tone="info" role-name="status" title="内部表单深度实验台" description="此页面用于 Form 与 Upload 符合性验证，不代表对外产品成品。公开展示请查看首页与 Commercial。" />
+                <Alert tone="info" role-name="status" title="表单与上传演示" description="覆盖校验、错误反馈与多种上传方式。示例数据不会写入真实服务。" />
                 <header class="vmz-form-lab__head">
                     <h1>
-                        表单与上传验收
+                        表单与上传
                     </h1>
                     <p>
-                        联系请求、校验反馈与多种上传模式的最小业务场景。
+                        联系请求、校验反馈与多种上传方式的最小业务场景。
                     </p>
                 </header>
                 <Card title="联系请求">
-                    <Form label="Contact request" :error-summary="errorSummary" summary-id="home-form-summary" :described-by="formDescribedBy" :disabled="submitting" :disabled-attr="disabledAttr" @submit="submit" @reset="reset">
+                    <Form label="联系请求" :error-summary="errorSummary" summary-id="home-form-summary" :described-by="formDescribedBy" :disabled="submitting" :disabled-attr="disabledAttr" @submit="submit" @reset="reset">
                         <div data-vmz-fixture="form-email-row" class="vmz-form-email-row">
-                            <Field label="Work email" description="Required for reply" control-id="home-form-email" description-id="home-form-email-desc" error-id="home-form-email-err" :described-by="emailDescribedBy" :error="emailError" :invalid-attr="emailInvalid" :value="email" @input="onEmail" />
+                            <Field label="工作邮箱" description="用于回复，请填写常用邮箱" control-id="home-form-email" description-id="home-form-email-desc" error-id="home-form-email-err" :described-by="emailDescribedBy" :error="emailError" :invalid-attr="emailInvalid" :value="email" @input="onEmail" />
                             <div data-vmz-fixture="form-tip-toggle">
                                 <Button type="button" variant="ghost" @click="toggleTip">
-                                    Why?
+                                    为什么？
                                 </Button>
                             </div>
-                            <Tooltip :open="tipOpen" :open-attr="tipOpenAttr" content="Use your company domain when possible." tooltip-id="home-form-email-tip">
+                            <Tooltip :open="tipOpen" :open-attr="tipOpenAttr" content="尽量使用公司域名邮箱。" tooltip-id="home-form-email-tip">
                                 <span data-vmz-tooltip="anchor" aria-hidden="true" />
                             </Tooltip>
                         </div>
-                        <FormItem label="Role" description="Who should we route this to" :required="roleRequired" required-attr="true" :error="roleError" :invalid-attr="roleInvalid" control-id="home-form-role" description-id="home-form-role-desc" error-id="home-form-role-err">
+                        <FormItem label="角色" description="决定由谁跟进" :required="roleRequired" required-attr="true" :error="roleError" :invalid-attr="roleInvalid" control-id="home-form-role" description-id="home-form-role-desc" error-id="home-form-role-err">
                             <Select label control-id="home-form-role" :described-by="roleDescribedBy" error :invalid-attr="roleInvalid" :value="role" :options="roleOptions" @change="onRole" />
                         </FormItem>
-                        <Autocomplete label="Team" description="Parent filters options — no query runtime" control-id="home-form-team" list-id="home-form-team-list" description-id="home-form-team-desc" error-id="home-form-team-err" :described-by="teamDescribedBy" :error="teamError" :invalid-attr="teamInvalid" :value="team" :options="teamOptions" :list-open="teamListOpen" :open-attr="teamOpenAttr" :show-empty="teamEmpty" empty-text="No matching team" @input="onTeamInput" :on-select="onTeamSelect" :on-close="closeTeamList" />
+                        <Autocomplete label="团队" description="选项由页面筛选，不发起远程查询" control-id="home-form-team" list-id="home-form-team-list" description-id="home-form-team-desc" error-id="home-form-team-err" :described-by="teamDescribedBy" :error="teamError" :invalid-attr="teamInvalid" :value="team" :options="teamOptions" :list-open="teamListOpen" :open-attr="teamOpenAttr" :show-empty="teamEmpty" empty-text="没有匹配的团队" @input="onTeamInput" :on-select="onTeamSelect" :on-close="closeTeamList" />
                         <p data-vmz-fixture="form-team" class="vmz-sr-only">
                             team:
                             {{ team }}
                         </p>
-                        <DatePicker label="Preferred date" description="ISO date from owned calendar overlay" control-id="home-form-date" description-id="home-form-date-desc" error-id="home-form-date-err" :described-by="dateDescribedBy" :error="dateError" :invalid-attr="dateInvalid" :value="preferredDate" @change="onDate" />
-                        <Upload label="Attachment" description="All-in-one server upload — component owns multipart + progress + cancel" destination="server" action="/api/form/attachment" accept=".txt,.md,.pdf" :max-bytes="262144" :max-count="1" control-id="home-form-file" description-id="home-form-file-desc" error-id="home-form-file-err" :described-by="fileDescribedBy" :error="fileError" :invalid-attr="fileInvalid" empty-text="No file selected" cancel-label="Cancel upload" :clear-token="uploadClearToken" :on-value="onUploadValue" :on-status="onUploadStatus" />
-                        <TextArea label="Message" description="Optional context" control-id="home-form-message" description-id="home-form-message-desc" error-id="home-form-message-err" described-by="home-form-message-desc" :value="message" @input="((e) => message = e.target.value)" />
-                        <RadioGroup label="Plan" name="home-form-plan" description="Billing intent" description-id="home-form-plan-desc" error-id="home-form-plan-err" :described-by="planDescribedBy" :error="planError" :invalid-attr="planInvalid" :value="plan" :items="planItems" @change="onPlan" />
-                        <Checkbox label="I agree to be contacted" control-id="home-form-agree" :checked="agree" @change="onAgree" />
+                        <DatePicker label="期望日期" description="从日历浮层中选择日期" control-id="home-form-date" description-id="home-form-date-desc" error-id="home-form-date-err" :described-by="dateDescribedBy" :error="dateError" :invalid-attr="dateInvalid" :value="preferredDate" @change="onDate" />
+                        <Upload label="附件" description="一次请求完成上传，进度与取消由组件处理" hint="选择文件或拖到这里" destination="server" action="/api/form/attachment" accept=".txt,.md,.pdf" :max-bytes="262144" :max-count="1" control-id="home-form-file" description-id="home-form-file-desc" error-id="home-form-file-err" :described-by="fileDescribedBy" :error="fileError" :invalid-attr="fileInvalid" empty-text="未选择文件" cancel-label="取消上传" :clear-token="uploadClearToken" :on-value="onUploadValue" :on-status="onUploadStatus" />
+                        <TextArea label="说明" description="补充信息，可不填" control-id="home-form-message" description-id="home-form-message-desc" error-id="home-form-message-err" described-by="home-form-message-desc" :value="message" @input="((e) => message = e.target.value)" />
+                        <RadioGroup label="套餐" name="home-form-plan" description="计费意向" description-id="home-form-plan-desc" error-id="home-form-plan-err" :described-by="planDescribedBy" :error="planError" :invalid-attr="planInvalid" :value="plan" :items="planItems" @change="onPlan" />
+                        <Checkbox label="同意我们与你联系" control-id="home-form-agree" :checked="agree" @change="onAgree" />
                         <p v-if="agreeError" data-vmz-fixture="form-agree-error" role="alert">
                             {{ agreeError }}
                         </p>
                         <div data-vmz-fixture="form-actions">
                             <Button type="submit">
-                                Send request
+                                提交请求
                             </Button>
                             <Button type="reset" variant="secondary">
-                                Reset
+                                重置
                             </Button>
                         </div>
                     </Form>
@@ -72,12 +72,12 @@
                         {{ submitted }}
                     </p>
                     <div v-if="submitted" data-vmz-fixture="form-success">
-                        <Result status="success" title="Request accepted" description="Validation cleared — form depth complete." />
+                        <Result status="success" title="请求已提交" description="校验全部通过，表单流程已完成。" />
                     </div>
                 </Card>
-                <Card title="附件上传场景">
-                    <Alert tone="info" role-name="status" title="多种交付模式" description="本地预览、对象存储预签名、多文件服务端、目录选择与可恢复分片上传。" />
-                    <Upload label="本地文件（客户端）" description="选择文件后仅在浏览器侧处理，适合工具站与离线预览。" destination="client" accept="image/*,.txt,.md,.pdf" :max-bytes="262144" :max-count="1" control-id="home-upload-client" description-id="home-upload-client-desc" error-id="home-upload-client-err" empty-text="No local file" :clear-token="clientClearToken" :on-value="onClientValue" :on-status="onClientStatus" />
+                <Card title="上传方式">
+                    <Alert tone="info" role-name="status" title="五种上传方式" description="本地预览、对象存储预签名直传、多文件服务端上传、目录选择与可恢复分片。" />
+                    <Upload label="本地文件（客户端）" description="选择文件后仅在浏览器侧处理，适合工具站与离线预览。" hint="选择文件或拖到这里" destination="client" accept="image/*,.txt,.md,.pdf" :max-bytes="262144" :max-count="1" control-id="home-upload-client" description-id="home-upload-client-desc" error-id="home-upload-client-err" empty-text="未选择文件" :clear-token="clientClearToken" :on-value="onClientValue" :on-status="onClientStatus" />
                     <p data-vmz-fixture="upload-client-state" class="vmz-sr-only">
                         client:
                         {{ clientStatus }}
@@ -88,7 +88,7 @@
                         ;bytes:
                         {{ clientBytes }}
                     </p>
-                    <Upload label="对象存储（预签名）" description="通过服务端预签名 URL 直传对象，UI 不嵌入云厂商 SDK。" destination="object" accept=".txt,.md,.pdf" :max-bytes="262144" :max-count="1" control-id="home-upload-object" description-id="home-upload-object-desc" error-id="home-upload-object-err" empty-text="No object file" cancel-label="Cancel object upload" :clear-token="objectClearToken" :on-presign="presignObject" :on-value="onObjectValue" :on-status="onObjectStatus" />
+                    <Upload label="对象存储（预签名）" description="通过服务端预签名 URL 直传对象，UI 不嵌入云厂商 SDK。" hint="选择文件或拖到这里" destination="object" accept=".txt,.md,.pdf" :max-bytes="262144" :max-count="1" control-id="home-upload-object" description-id="home-upload-object-desc" error-id="home-upload-object-err" empty-text="未选择文件" cancel-label="取消上传" :clear-token="objectClearToken" :on-presign="presignObject" :on-value="onObjectValue" :on-status="onObjectStatus" />
                     <p data-vmz-fixture="upload-object-state" class="vmz-sr-only">
                         object:
                         {{ objectStatus }}
@@ -97,7 +97,7 @@
                         ;bytes:
                         {{ objectBytes }}
                     </p>
-                    <Upload label="多文件（服务端）" description="一次请求上传多个附件，服务端返回 items 列表。" destination="server" action="/api/form/attachment" accept=".txt,.md,.pdf" :multiple="true" :max-count="3" :max-bytes="262144" control-id="home-upload-multi" description-id="home-upload-multi-desc" error-id="home-upload-multi-err" empty-text="No files selected" cancel-label="Cancel multi upload" :clear-token="multiClearToken" :on-value="onMultiValue" :on-status="onMultiStatus" />
+                    <Upload label="多文件（服务端）" description="一次请求上传多个附件，服务端返回 items 列表。" hint="选择文件或拖到这里" destination="server" action="/api/form/attachment" accept=".txt,.md,.pdf" :multiple="true" :max-count="3" :max-bytes="262144" control-id="home-upload-multi" description-id="home-upload-multi-desc" error-id="home-upload-multi-err" empty-text="未选择文件" cancel-label="取消上传" :clear-token="multiClearToken" :on-value="onMultiValue" :on-status="onMultiStatus" />
                     <p data-vmz-fixture="upload-multi-state" class="vmz-sr-only">
                         multi:
                         {{ multiStatus }}
@@ -106,7 +106,7 @@
                         ;ids:
                         {{ multiIds }}
                     </p>
-                    <Upload label="文件夹（客户端）" description="选择整个目录，在浏览器侧展开为文件列表（依赖浏览器能力）。" destination="client" accept=".txt,.md,.pdf" :directory="true" :max-count="8" :max-bytes="262144" control-id="home-upload-dir" description-id="home-upload-dir-desc" error-id="home-upload-dir-err" empty-text="No folder files" :clear-token="dirClearToken" :on-value="onDirValue" :on-status="onDirStatus" />
+                    <Upload label="文件夹（客户端）" description="选择整个目录，在浏览器侧展开为文件列表（依赖浏览器能力）。" hint="选择目录" destination="client" accept=".txt,.md,.pdf" :directory="true" :max-count="8" :max-bytes="262144" control-id="home-upload-dir" description-id="home-upload-dir-desc" error-id="home-upload-dir-err" empty-text="未选择目录" :clear-token="dirClearToken" :on-value="onDirValue" :on-status="onDirStatus" />
                     <p data-vmz-fixture="upload-dir-state" class="vmz-sr-only">
                         dir:
                         {{ dirStatus }}
@@ -117,7 +117,7 @@
                         ;names:
                         {{ dirNames }}
                     </p>
-                    <Upload label="可恢复分片（服务端）" description="大文件分片上传，支持暂停与在同一文件会话中恢复。" destination="server" action="/api/form/resumable" :chunk-size="8" accept=".txt,.md,.pdf" :max-bytes="262144" :max-count="1" control-id="home-upload-resume" description-id="home-upload-resume-desc" error-id="home-upload-resume-err" empty-text="No resumable file" cancel-label="Pause upload" resume-label="Resume upload" :clear-token="resumeClearToken" :on-value="onResumeValue" :on-status="onResumeStatus" />
+                    <Upload label="可恢复分片（服务端）" description="大文件分片上传，支持暂停与在同一文件会话中恢复。" hint="选择文件或拖到这里" destination="server" action="/api/form/resumable" :chunk-size="8" accept=".txt,.md,.pdf" :max-bytes="262144" :max-count="1" control-id="home-upload-resume" description-id="home-upload-resume-desc" error-id="home-upload-resume-err" empty-text="未选择文件" cancel-label="暂停上传" resume-label="继续上传" :clear-token="resumeClearToken" :on-value="onResumeValue" :on-status="onResumeStatus" />
                     <p data-vmz-fixture="upload-resume-state" class="vmz-sr-only">
                         resume:
                         {{ resumeStatus }}
@@ -228,10 +228,10 @@ export default class FormPage {
     resumeHead = "";
     resumeClearToken = 0;
     roleOptions = [
-        { value: "", label: "Select a role" },
-        { value: "ops", label: "Operations" },
-        { value: "eng", label: "Engineering" },
-        { value: "sales", label: "Sales" },
+        { value: "", label: "选择角色" },
+        { value: "ops", label: "运营" },
+        { value: "eng", label: "研发" },
+        { value: "sales", label: "销售" },
     ];
     teamAll = [
         { value: "alpha", label: "Alpha Platform" },
@@ -249,9 +249,9 @@ export default class FormPage {
         { id: "home-form-plan-ent", value: "enterprise", label: "Enterprise" },
     ];
     navItems = [
-        { id: "commercial", title: "Commercial", href: "/commercial" },
-        { id: "console", title: "Console", href: "/console" },
-        { id: "home", title: "Homepage", href: "/" },
+        { id: "commercial", title: "应用案例", href: "/commercial" },
+        { id: "console", title: "工单工作台", href: "/console" },
+        { id: "home", title: "返回官网", href: "/" },
     ];
 
     toggleTip() {
@@ -557,25 +557,25 @@ export default class FormPage {
         const planOk = !!this.plan;
         const agreeOk = !!this.agree;
 
-        this.emailError = emailOk ? "" : "Enter a valid work email";
+        this.emailError = emailOk ? "" : "请填写有效的工作邮箱";
         this.emailInvalid = emailOk ? "false" : "true";
         this.emailDescribedBy = emailOk
             ? "home-form-email-desc"
             : "home-form-email-desc home-form-email-err";
 
-        this.roleError = roleOk ? "" : "Choose a role";
+        this.roleError = roleOk ? "" : "请选择角色";
         this.roleInvalid = roleOk ? "false" : "true";
         this.roleDescribedBy = roleOk
             ? "home-form-role-desc"
             : "home-form-role-desc home-form-role-err";
 
-        this.teamError = teamOk ? "" : "Pick a team";
+        this.teamError = teamOk ? "" : "请选择团队";
         this.teamInvalid = teamOk ? "false" : "true";
         this.teamDescribedBy = teamOk
             ? "home-form-team-desc"
             : "home-form-team-desc home-form-team-err";
 
-        this.dateError = dateOk ? "" : "Pick a preferred date";
+        this.dateError = dateOk ? "" : "请选择期望日期";
         this.dateInvalid = dateOk ? "false" : "true";
         this.dateDescribedBy = dateOk
             ? "home-form-date-desc"
@@ -584,25 +584,25 @@ export default class FormPage {
         this.fileError = fileOk
             ? ""
             : this.uploadStatus === "uploading"
-              ? "Wait for upload to finish"
+              ? "请等待上传完成"
               : this.uploadStatus === "error"
-                ? this.fileError || "Upload failed"
-                : "Attach and upload a file";
+                ? this.fileError || "上传失败"
+                : "请选择并上传附件";
         this.fileInvalid = fileOk ? "false" : "true";
         this.fileDescribedBy = fileOk
             ? "home-form-file-desc"
             : "home-form-file-desc home-form-file-err";
 
-        this.planError = planOk ? "" : "Pick a plan";
+        this.planError = planOk ? "" : "请选择套餐";
         this.planInvalid = planOk ? "false" : "true";
         this.planDescribedBy = planOk
             ? "home-form-plan-desc"
             : "home-form-plan-desc home-form-plan-err";
 
-        this.agreeError = agreeOk ? "" : "Consent is required";
+        this.agreeError = agreeOk ? "" : "需要同意后才能提交";
 
         const ok = emailOk && roleOk && teamOk && dateOk && fileOk && planOk && agreeOk;
-        this.errorSummary = ok ? "" : "Fix the highlighted fields before sending";
+        this.errorSummary = ok ? "" : "请先修正标出的字段再提交";
         this.formDescribedBy = ok ? "" : "home-form-summary";
         this.submitted = ok;
         this.closeTeamList();
@@ -707,7 +707,7 @@ export default class FormPageServer {
                 return { ok: false, error: "Invalid file size" };
             }
             if (size > 256 * 1024) {
-                return { ok: false, error: "Attachment too large" };
+                return { ok: false, error: "附件超过大小限制" };
             }
             const bytes = new Uint8Array(await part.arrayBuffer());
             if (bytes.byteLength !== size) {
@@ -750,7 +750,7 @@ export default class FormPageServer {
         }
         const size = Number(payload.size);
         if (!Number.isFinite(size) || size < 0) return { ok: false, error: "Invalid file size" };
-        if (size > 256 * 1024) return { ok: false, error: "Attachment too large" };
+        if (size > 256 * 1024) return { ok: false, error: "附件超过大小限制" };
         const chunkSize = Math.max(1, Number(payload.chunkSize) || 0);
         if (!Number.isFinite(chunkSize) || chunkSize < 1)
             return { ok: false, error: "Invalid chunkSize" };
@@ -890,7 +890,7 @@ export default class FormPageServer {
         }
         const size = Number(payload.size);
         if (Number.isFinite(size) && size > 256 * 1024) {
-            return { ok: false, error: "Object too large to presign" };
+            return { ok: false, error: "对象超过预签名大小限制" };
         }
         const type = String(payload.type || "application/octet-stream");
         const objectKey = `obj-${Date.now().toString(36)}-${Math.abs(hashString(name)).toString(36)}`;
@@ -931,7 +931,7 @@ export default class FormPageServer {
             return { ok: false, error: "Truncated object body" };
         }
         if (bytes.byteLength > 256 * 1024) {
-            return { ok: false, error: "Object too large" };
+            return { ok: false, error: "对象超过大小限制" };
         }
         await new Promise((r) => setTimeout(r, 200));
         let headHex = "";

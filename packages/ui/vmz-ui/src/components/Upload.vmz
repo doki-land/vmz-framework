@@ -6,7 +6,7 @@
         <div data-vmz-upload="zone" class="vmz-ui-upload__zone">
             <input :id="controlId" type="file" :accept="accept" :multiple="multiple" :disabled="inputDisabled" :aria-invalid="error ? 'true' : 'false'" :aria-describedby="describedBy" :data-vmz-upload-directory="directoryAttr" @change="onPick" class="vmz-ui-upload__control" />
             <p data-vmz-upload="hint" class="vmz-ui-upload__hint">
-                {{ zoneHint }}
+                {{ hint || zoneHint }}
             </p>
         </div>
         <ul v-if="hasItems" data-vmz-upload="queue" class="vmz-ui-upload__queue">
@@ -304,6 +304,8 @@ export default class Upload {
     public onStatus: ((status: string) => void) | null = null;
     public cancelLabel: string = "Cancel upload";
     public resumeLabel: string = "Resume upload";
+    /** Caller-supplied drop-zone hint; empty keeps the mode-aware default. */
+    public hint: string = "";
     // presentation (component-owned — NOT public props)
     status: string = "idle";
     progress: string = "0";
