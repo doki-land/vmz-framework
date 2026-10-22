@@ -40,7 +40,7 @@ pub fn template_expr_snippet_error_with_span(expr: &str) -> Option<(String, Snip
     }
     let diagnostic = parsed.diagnostics.first();
     let message = diagnostic
-        .map(|diagnostic| diagnostic.message.clone())
+        .map(|diagnostic| diagnostic.render_plain())
         .unwrap_or_else(|| "Oak TypeScript expression parse failed".to_string());
     let span = diagnostic
         .and_then(|diagnostic| diagnostic.span)

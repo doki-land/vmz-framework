@@ -1,21 +1,65 @@
 //! Shared template parse error + HTML entity decode (no AST).
 
+use std::collections::BTreeMap;
 use std::fmt;
 
 /// Parse failure for Vue template syntax.
+///
+/// Parser layers only carry a stable catalog code, structured args, and a byte
+/// offset. Rendering that into a language-specific sentence is owned by the
+/// diagnostic catalog, never by the template parser.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateParseError {
-    /// Human-readable diagnostic.
-    pub message: String,
+    /// Stable diagnostic code (`vmz::template::*`, or a forwarded `oak::*` code).
+    pub code: &'static str,
+    /// Catalog template arguments.
+    pub args: BTreeMap<String, String>,
     /// Byte offset into the template body.
     pub offset: usize,
 }
 
+impl TemplateParseError {
+    /// Generic template failure with an optional legacy detail string.
+    pub fn parse_failed(message: impl Into<String>, offset: usize) -> Self {
+        Self::coded("vmz::template::parse_failed", offset).with_arg("detail", message)
+    }
+
+    /// Failure identified only by its catalog code.
+    pub fn coded(code: &'static str, offset: usize) -> Self {
+        Self { code, args: BTreeMap::new(), offset }
+    }
+
+    /// Attach one catalog argument.
+    pub fn with_arg(mut self, key: &str, value: impl Into<String>) -> Self {
+        let value = value.into();
+        if !value.is_empty() {
+            self.args.insert(key.to_string(), value);
+        }
+        self
+    }
+
+    /// Flat text for surfaces that have no message catalog yet (formatter, CLI).
+    ///
+    /// Callers that own a localized catalog should render [`Self::code`] and
+    /// [`Self::args`] themselves instead.
+    pub fn render_plain(&self) -> String {
+        if self.args.is_empty() {
+            return self.code.to_string();
+        }
+        let args = self
+            .args
+            .iter()
+            .map(|(key, value)| format!("{key}={value}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("{} ({args})", self.code)
+    }
+}
+
 impl fmt::Display for TemplateParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Position is carried as UTF-8 byte offset on this type / protocol
-        // `SourceSpan` — not embedded in the message string.
-        write!(f, "{}", self.message)
+        // Identity only — no rendered prose; position lives on `offset`.
+        write!(f, "{}", self.code)
     }
 }
 

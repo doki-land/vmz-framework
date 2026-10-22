@@ -1,7 +1,7 @@
 //! Faithful `.vmz` reassembly: preserve router/meta/lang/attrs/block order.
 
 use vmz_compiler::{DataBlock, ParsedVmz, ScriptBlock, ScriptLanguage, StyleLanguage};
-use vmz_oak_frontend_adapter::{TemplateShellInput, require_template_cst};
+use vmz_oak_frontend_adapter::{TemplateShellInput, format_cst_diagnostics, require_template_cst};
 
 use crate::editorconfig::EditorSettings;
 use crate::template_print::format_template_body;
@@ -29,7 +29,8 @@ pub fn assemble_vmz(
     require_template_cst(&TemplateShellInput {
         content: parsed.template.content.clone(),
         content_start: parsed.template.content_start,
-    })?;
+    })
+    .map_err(|diagnostics| format_cst_diagnostics(&diagnostics))?;
     let template_body = format_template_body(&template_source, settings)?;
     // Envelope indent is EditorConfig-owned; AST print stays at depth 0 inside the body.
     let template_body = indent_block(&template_body, settings);

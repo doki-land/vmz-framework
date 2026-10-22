@@ -1,6 +1,7 @@
 //! Language-neutral contracts between VMZ, Oaks CST, and future Nyar projection.
 
 use oak_core::Range;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 /// Inclusive-exclusive byte span in the original `.vmz` source.
@@ -92,13 +93,57 @@ pub struct ScriptShellInput {
     pub role: ScriptRole,
 }
 
-/// Diagnostic surfaced from Oak parse (mapped to `.vmz` coordinates when possible).
+/// Language-neutral diagnostic surfaced from an Oak parse.
+///
+/// Carries a stable code, structured catalog arguments, and an optional span —
+/// never a rendered sentence. Terminal/localized text is the caller's catalog job.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OakFrontendDiagnostic {
-    /// Message text.
-    pub message: String,
+    /// Stable diagnostic code (`oak::*` or a VMZ-owned `vmz::*` code).
+    pub code: &'static str,
+    /// Catalog template arguments.
+    pub args: BTreeMap<String, String>,
     /// Span in the original `.vmz` file when known.
     pub span: Option<ByteSpan>,
+}
+
+impl OakFrontendDiagnostic {
+    /// Diagnostic with no arguments or span yet.
+    pub fn new(code: &'static str) -> Self {
+        Self { code, args: BTreeMap::new(), span: None }
+    }
+
+    /// Attach one catalog argument (empty values are dropped).
+    pub fn with_arg(mut self, key: &str, value: impl Into<String>) -> Self {
+        let value = value.into();
+        if !value.is_empty() {
+            self.args.insert(key.to_string(), value);
+        }
+        self
+    }
+
+    /// Attach a source span.
+    pub fn with_span(mut self, span: ByteSpan) -> Self {
+        self.span = Some(span);
+        self
+    }
+
+    /// Flat text for surfaces that have no message catalog yet.
+    ///
+    /// Callers that own a localized catalog should render [`Self::code`] and
+    /// [`Self::args`] themselves instead.
+    pub fn render_plain(&self) -> String {
+        if self.args.is_empty() {
+            return self.code.to_string();
+        }
+        let args = self
+            .args
+            .iter()
+            .map(|(key, value)| format!("{key}={value}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("{} ({args})", self.code)
+    }
 }
 
 /// Result of parsing a VMZ template region through Oak CST.

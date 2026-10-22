@@ -17,16 +17,15 @@ use crate::sfc::TemplateBlock;
 const TEMPLATE_OPEN: &str = "<template>";
 
 /// Build VMZ [`ConcreteIr`] from a VMZ template block via Oak CST + AST.
-pub fn parse_template_concrete_via_oak(template: &TemplateBlock) -> Result<ConcreteIr, String> {
+pub fn parse_template_concrete_via_oak(
+    template: &TemplateBlock,
+) -> Result<ConcreteIr, TemplateParseError> {
     let shell = TemplateShellInput {
         content: template.content.clone(),
         content_start: template.content_start,
     };
     let parsed = parse_template_ast(&shell);
-    if !parsed.ok {
-        return Err(format_oak_fail(&parsed));
-    }
-    let root = parsed.root.as_ref().ok_or_else(|| format_oak_fail(&parsed))?;
+    let root = ast_root_or_fail(&parsed)?;
     lower_vue_root_to_concrete(root, &parsed.shell_source)
 }
 
@@ -34,28 +33,30 @@ pub fn parse_template_concrete_via_oak(template: &TemplateBlock) -> Result<Concr
 ///
 /// Attr strings are classified with [`classify_concrete_attr`] (shared algebra);
 /// control flow is structured while walking Oak [`VueNode`]s.
-pub fn parse_template_semantic_via_oak(template: &TemplateBlock) -> Result<SemanticIr, String> {
+pub fn parse_template_semantic_via_oak(
+    template: &TemplateBlock,
+) -> Result<SemanticIr, TemplateParseError> {
     let shell = TemplateShellInput {
         content: template.content.clone(),
         content_start: template.content_start,
     };
     let parsed = parse_template_ast(&shell);
-    if !parsed.ok {
-        return Err(format_oak_fail(&parsed));
-    }
-    let root = parsed.root.as_ref().ok_or_else(|| format_oak_fail(&parsed))?;
+    let root = ast_root_or_fail(&parsed)?;
     lower_vue_root_to_semantic(root, &parsed.shell_source)
 }
 
 /// Lower an Oak [`VueRoot`] straight to Semantic (no Concrete forest).
-pub fn lower_vue_root_to_semantic(root: &VueRoot, shell: &str) -> Result<SemanticIr, String> {
+pub fn lower_vue_root_to_semantic(
+    root: &VueRoot,
+    shell: &str,
+) -> Result<SemanticIr, TemplateParseError> {
     let block = root
         .blocks
         .iter()
         .find(|b| slice(shell, b.name) == "template")
-        .ok_or_else(|| "Oak AST missing <template> block".to_string())?;
-    let roots = lower_oak_siblings(shell, &block.children).map_err(|e| e.message)?;
-    validate_root_slot_templates(&roots).map_err(|e| e.message)?;
+        .ok_or_else(|| TemplateParseError::coded("vmz::template::missing_block", 0))?;
+    let roots = lower_oak_siblings(shell, &block.children)?;
+    validate_root_slot_templates(&roots)?;
     Ok(SemanticIr { roots })
 }
 
@@ -78,7 +79,6 @@ pub fn parse_template_concrete_primary(
     let parsed = parse_template_ast(&shell);
     let root = ast_root_or_fail(&parsed)?;
     lower_vue_root_to_concrete(root, &parsed.shell_source)
-        .map_err(|message| TemplateParseError { message, offset: 0 })
 }
 
 /// Oak Vue AST → Concrete + Semantic in one parse.
@@ -96,10 +96,8 @@ pub fn parse_template_layers_primary(
     };
     let parsed = parse_template_ast(&shell);
     let root = ast_root_or_fail(&parsed)?;
-    let concrete = lower_vue_root_to_concrete(root, &parsed.shell_source)
-        .map_err(|message| TemplateParseError { message, offset: 0 })?;
-    let semantic = lower_vue_root_to_semantic(root, &parsed.shell_source)
-        .map_err(|message| TemplateParseError { message, offset: 0 })?;
+    let concrete = lower_vue_root_to_concrete(root, &parsed.shell_source)?;
+    let semantic = lower_vue_root_to_semantic(root, &parsed.shell_source)?;
     Ok((concrete, semantic))
 }
 
@@ -114,7 +112,6 @@ pub fn parse_template_semantic_primary(
     let parsed = parse_template_ast(&shell);
     let root = ast_root_or_fail(&parsed)?;
     lower_vue_root_to_semantic(root, &parsed.shell_source)
-        .map_err(|message| TemplateParseError { message, offset: 0 })
 }
 
 fn ast_root_or_fail(
@@ -122,10 +119,9 @@ fn ast_root_or_fail(
 ) -> Result<&VueRoot, TemplateParseError> {
     match &parsed.root {
         Some(root) if parsed.ok => Ok(root),
-        _ => Err(TemplateParseError {
-            message: format_oak_fail(parsed),
-            offset: oak_fail_offset(parsed),
-        }),
+        _ => {
+            Err(TemplateParseError::parse_failed(format_oak_fail(parsed), oak_fail_offset(parsed)))
+        }
     }
 }
 
@@ -144,12 +140,15 @@ fn format_oak_fail(parsed: &vmz_oak_frontend_adapter::TemplateAstParse) -> Strin
     vmz_oak_frontend_adapter::format_cst_diagnostics(&parsed.diagnostics)
 }
 
-fn lower_vue_root_to_concrete(root: &VueRoot, shell: &str) -> Result<ConcreteIr, String> {
+fn lower_vue_root_to_concrete(
+    root: &VueRoot,
+    shell: &str,
+) -> Result<ConcreteIr, TemplateParseError> {
     let block = root
         .blocks
         .iter()
         .find(|b| slice(shell, b.name) == "template")
-        .ok_or_else(|| "Oak AST missing <template> block".to_string())?;
+        .ok_or_else(|| TemplateParseError::coded("vmz::template::missing_block", 0))?;
     let roots =
         block.children.iter().map(|node| lower_node(shell, node)).collect::<Result<Vec<_>, _>>()?;
     Ok(ConcreteIr { roots })
@@ -189,16 +188,16 @@ fn lower_oak_siblings(
                         i += consumed;
                     }
                     Some(ControlFlowKind::ElseIf(_)) => {
-                        return Err(TemplateParseError {
-                            message: "`v-else-if` requires a preceding `v-if` / `v-else-if`".into(),
-                            offset: span.start as usize,
-                        });
+                        return Err(TemplateParseError::coded(
+                            "vmz::template::illegal_directive",
+                            span.start as usize,
+                        ));
                     }
                     Some(ControlFlowKind::Else) => {
-                        return Err(TemplateParseError {
-                            message: "`v-else` requires a preceding `v-if` / `v-else-if`".into(),
-                            offset: span.start as usize,
-                        });
+                        return Err(TemplateParseError::coded(
+                            "vmz::template::illegal_directive",
+                            span.start as usize,
+                        ));
                     }
                     None => {
                         let children = lower_oak_siblings(shell, &el.children)?;
@@ -248,10 +247,10 @@ fn take_oak_if_chain(
                 None
             }
             (Some(ControlFlowKind::ElseIf(_)), false, true) => {
-                return Err(TemplateParseError {
-                    message: "`v-else-if` cannot follow `v-else`".into(),
-                    offset: span.start as usize,
-                });
+                return Err(TemplateParseError::coded(
+                    "vmz::template::illegal_directive",
+                    span.start as usize,
+                ));
             }
             (Some(ControlFlowKind::If(_)), false, _) => break,
             _ => break,
@@ -276,10 +275,7 @@ fn classify_oak_attrs(
     el: &VueElement,
 ) -> Result<Vec<ConcreteAttr>, TemplateParseError> {
     check_duplicate_attributes(shell, el)?;
-    el.attributes
-        .iter()
-        .map(|a| lower_attr(shell, a).map_err(|message| TemplateParseError { message, offset: 0 }))
-        .collect()
+    el.attributes.iter().map(|a| lower_attr(shell, a)).collect()
 }
 
 /// Vue reports repeated attribute names as a compile error (case-sensitive, `class` included).
@@ -292,10 +288,10 @@ fn check_duplicate_attributes(shell: &str, el: &VueElement) -> Result<(), Templa
     for attr in &el.attributes {
         let name = source_attr_name(shell, attr);
         if !seen.insert(name.clone()) {
-            return Err(TemplateParseError {
-                message: format!("duplicate attribute `{name}`"),
-                offset: to_body_span(shell, attr_span(attr)).start as usize,
-            });
+            return Err(TemplateParseError::parse_failed(
+                format!("duplicate attribute `{name}`"),
+                to_body_span(shell, attr_span(attr)).start as usize,
+            ));
         }
     }
     Ok(())
@@ -321,10 +317,10 @@ fn source_attr_name(shell: &str, attr: &VueAttribute) -> String {
     }
 }
 
-fn lower_node(shell: &str, node: &VueNode) -> Result<ConcreteNode, String> {
+fn lower_node(shell: &str, node: &VueNode) -> Result<ConcreteNode, TemplateParseError> {
     match node {
         VueNode::Element(el) => {
-            check_duplicate_attributes(shell, el).map_err(|e| e.message)?;
+            check_duplicate_attributes(shell, el)?;
             let tag = slice(shell, el.tag_name).to_string();
             let attrs = el
                 .attributes
@@ -349,13 +345,13 @@ fn lower_node(shell: &str, node: &VueNode) -> Result<ConcreteNode, String> {
     }
 }
 
-fn lower_attr(shell: &str, attr: &VueAttribute) -> Result<ConcreteAttr, String> {
+fn lower_attr(shell: &str, attr: &VueAttribute) -> Result<ConcreteAttr, TemplateParseError> {
     match attr {
         VueAttribute::Attribute(a) => {
             let name = slice(shell, a.name);
             let value = a.value.as_ref().map(|v| decode_html_entities(slice(shell, v.span)));
             let span = to_body_span(shell, a.span);
-            classify_concrete_attr(name, value.as_deref(), span).map_err(|e| e.message)
+            classify_concrete_attr(name, value.as_deref(), span)
         }
         VueAttribute::Directive(d) => {
             let raw = directive_source_text(shell, d);
@@ -368,7 +364,7 @@ fn lower_attr(shell: &str, attr: &VueAttribute) -> Result<ConcreteAttr, String> 
                 (raw.trim().to_string(), None)
             };
             let span = to_body_span(shell, d.span);
-            classify_concrete_attr(&name, value.as_deref(), span).map_err(|e| e.message)
+            classify_concrete_attr(&name, value.as_deref(), span)
         }
     }
 }

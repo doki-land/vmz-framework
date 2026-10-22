@@ -39,10 +39,10 @@ pub fn plan_template_expr(
         });
     }
     if let Some(msg) = template_expr_snippet_error(&source) {
-        return Err(TemplateParseError {
-            message: format!("invalid template expression `{source}`: {msg}"),
-            offset: 0,
-        });
+        return Err(TemplateParseError::parse_failed(
+            format!("invalid template expression `{source}`: {msg}"),
+            0,
+        ));
     }
     let snippet_span = template_expr_root_span(&source);
     let reads = collect_template_dep_keys(&source, fields, scope);

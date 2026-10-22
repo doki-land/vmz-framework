@@ -14,13 +14,14 @@ fn body_block(body: &str) -> TemplateBlock {
 
 /// Oak-direct Semantic parse (the production ingress).
 fn oak_semantic(body: &str) -> Result<vmz_compiler::SemanticIr, String> {
-    parse_template_semantic_primary(&body_block(body)).map_err(|e| e.message)
+    parse_template_semantic_primary(&body_block(body)).map_err(|e| e.render_plain())
 }
 
 /// Concrete → Semantic adapter parse (must agree with the Oak-direct path).
 fn adapter_semantic(body: &str) -> Result<vmz_compiler::SemanticIr, String> {
-    let concrete = parse_template_concrete_body_primary(body).map_err(|e| e.message)?;
-    lower_concrete_to_semantic(&concrete).map_err(|e| e.message)
+    let concrete =
+        parse_template_concrete_body_primary(body).map_err(|e| e.render_plain())?;
+    lower_concrete_to_semantic(&concrete).map_err(|e| e.render_plain())
 }
 
 /// Vue rejects the template, so both VMZ layers must fail with the same diagnostic.

@@ -116,12 +116,11 @@ fn lower_directive(
             let slot_name = match name {
                 DirectiveArg::Static(s) => s.clone(),
                 DirectiveArg::Dynamic(_) => {
-                    return Err(TemplateParseError {
-                        message:
-                            "dynamic `v-slot` argument is not supported in legacy IR adapter yet"
-                                .into(),
+                    return Err(TemplateParseError::coded(
+                        "vmz::template::illegal_directive",
                         offset,
-                    });
+                    )
+                    .with_arg("detail", "dynamic `v-slot` argument"));
                 }
             };
             Ok(vec![TemplateAttr {
@@ -153,12 +152,11 @@ fn lower_directive(
                 None => format!("v-{name}"),
                 Some(DirectiveArg::Static(a)) => format!("v-{name}:{a}"),
                 Some(DirectiveArg::Dynamic(_)) => {
-                    return Err(TemplateParseError {
-                        message: format!(
-                            "dynamic argument on custom directive `v-{name}` is not supported in legacy IR adapter yet"
-                        ),
+                    return Err(TemplateParseError::coded(
+                        "vmz::template::illegal_directive",
                         offset,
-                    });
+                    )
+                    .with_arg("directive", format!("v-{name}")));
                 }
             };
             Ok(vec![TemplateAttr {

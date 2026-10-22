@@ -5,7 +5,7 @@ use oak_typescript::ast::Statement;
 use oak_typescript::{TypeScriptBuilder, TypeScriptLanguage, TypeScriptRoot};
 
 use crate::contract::{OakFrontendDiagnostic, ScriptShellInput};
-use crate::oak_cst::{format_cst_diagnostics, map_oak_error};
+use crate::oak_cst::{map_oak_error, non_empty};
 
 /// Result of building Oak TypeScript AST for a VMZ script region.
 #[derive(Debug, Clone)]
@@ -44,12 +44,14 @@ pub fn parse_script_ast(script: &ScriptShellInput) -> ScriptAstParse {
 }
 
 /// Fail fast when Oak script AST build fails.
-pub fn require_script_ast(script: &ScriptShellInput) -> Result<TypeScriptRoot, String> {
+pub fn require_script_ast(
+    script: &ScriptShellInput,
+) -> Result<TypeScriptRoot, Vec<OakFrontendDiagnostic>> {
     let parse = parse_script_ast(script);
     if let Some(root) = parse.root.filter(|_| parse.ok) {
         return Ok(root);
     }
-    Err(format_cst_diagnostics(&parse.diagnostics))
+    Err(non_empty(parse.diagnostics, "vmz::script::parse_failed"))
 }
 
 fn default_export_class_name(root: &TypeScriptRoot) -> Option<String> {

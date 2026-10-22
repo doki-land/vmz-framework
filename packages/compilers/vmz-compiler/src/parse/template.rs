@@ -61,28 +61,7 @@ pub fn template_parse_to_diagnostic(
     let path = path.into();
     let (start, end) = TemplateSpan::from_usize(err.offset, err.offset.saturating_add(1))
         .to_absolute(content_start as u32);
-    let code = template_error_code(&err.message).unwrap_or("vmz::template::parse_failed");
-    ReportedDiagnostic::error(&path, code)
-        .with_arg("detail", err.message.clone())
+    ReportedDiagnostic::error(&path, err.code)
+        .with_args(err.args.clone())
         .with_source_span(SourceSpan { path: path.to_string_lossy().into_owned(), start, end })
-}
-
-/// Stable diagnostic codes for structured template parse / semantic failures.
-fn template_error_code(message: &str) -> Option<&'static str> {
-    // Oak rejects a mustache whose expression cannot be parsed with `InterpolationEnd`
-    // before concrete expression checks run. Surface it as an expression error so
-    // authors get the same code as other invalid mustaches.
-    if message.contains("InterpolationEnd") {
-        return Some("vmz::template::invalid_expr");
-    }
-    if message.contains("`v-else")
-        || message.contains("v-else-if")
-        || message.contains("dynamic `v-bind`")
-        || message.contains("dynamic `v-on`")
-        || message.contains("dynamic argument")
-        || message.contains("dynamic `v-slot`")
-    {
-        return Some("vmz::template::illegal_directive");
-    }
-    None
 }

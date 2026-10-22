@@ -35,8 +35,10 @@ pub fn analyze_script(kind: ScriptKind, source: &str) -> AnalyzedScript {
         .diagnostics
         .iter()
         .map(|diagnostic| match diagnostic.span {
-            Some(span) => format!("{} (byte {}..{})", diagnostic.message, span.start, span.end),
-            None => diagnostic.message.clone(),
+            Some(span) => {
+                format!("{} (byte {}..{})", diagnostic.render_plain(), span.start, span.end)
+            }
+            None => diagnostic.render_plain(),
         })
         .collect();
     let mut decl = ComponentDecl::new("Anonymous", SourceRange::default(), SourceRange::default());

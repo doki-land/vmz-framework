@@ -33,14 +33,14 @@ fn groups_if_elseif_else_into_one_chain() {
 fn orphan_else_is_error() {
     let concrete = parse_template_concrete_body_primary(r#"<p v-else>x</p>"#).unwrap();
     let err = lower_concrete_to_semantic(&concrete).unwrap_err();
-    assert!(err.message.contains("v-else"), "{err}");
+    assert_eq!(err.code, "vmz::template::illegal_directive");
 }
 
 #[test]
 fn orphan_else_if_is_error() {
     let concrete = parse_template_concrete_body_primary(r#"<p v-else-if="x">y</p>"#).unwrap();
     let err = lower_concrete_to_semantic(&concrete).unwrap_err();
-    assert!(err.message.contains("v-else-if"), "{err}");
+    assert_eq!(err.code, "vmz::template::illegal_directive");
 }
 
 #[test]
@@ -301,7 +301,13 @@ fn template_hash_slot_becomes_slot_template() {
 fn dynamic_slot_arg_is_structured_error() {
     let concrete = parse_template_concrete_body_primary(r#"<Comp v-slot:[name]>x</Comp>"#).unwrap();
     let err = lower_concrete_to_semantic(&concrete).unwrap_err();
-    assert!(err.message.contains("dynamic") && err.message.contains("slot"), "{err}");
+    assert_eq!(err.code, "vmz::template::illegal_directive");
+    assert!(
+        err.args
+            .get("detail")
+            .is_some_and(|v| v.contains("dynamic") && v.contains("slot")),
+        "{err:?}",
+    );
 }
 
 #[test]

@@ -256,10 +256,10 @@ pub(crate) fn semantic_from_element_parts(
     // Vue rejects side-effect tags in a template (`X_...SIDE_EFFECT`). Accepting them would
     // let a `.vmz` template ship `<script>` / `<style>` the compiler never accounted for.
     if tag.eq_ignore_ascii_case("script") || tag.eq_ignore_ascii_case("style") {
-        return Err(TemplateParseError {
-            message: format!("`<{tag}>` is ignored in client component templates"),
-            offset: span.start as usize,
-        });
+        return Err(TemplateParseError::parse_failed(
+            format!("`<{tag}>` is ignored in client component templates"),
+            span.start as usize,
+        ));
     }
     validate_vue_element_syntax(tag, attrs, has_author_children)?;
     validate_slot_usage(tag, attrs, &children)?;
@@ -334,9 +334,8 @@ fn validate_vue_element_syntax(
         let ConcreteAttr::Directive { dir, span } = attr else {
             continue;
         };
-        let fail = |message: &str| TemplateParseError {
-            message: message.to_string(),
-            offset: span.start as usize,
+        let fail = |message: &str| {
+            TemplateParseError::parse_failed(message.to_string(), span.start as usize)
         };
         match dir {
             Directive::Slot { .. } if non_component && tag != "template" => {
@@ -394,21 +393,20 @@ fn validate_slot_usage(
     // `X_V_SLOT_MISPLACED` for elements and crashes in codegen for the remaining placements.
     if non_component {
         if let Some(span) = template_slots.first() {
-            return Err(TemplateParseError {
-                message: "`v-slot` can only be used on a `<template>` inside a component".into(),
-                offset: span.start as usize,
-            });
+            return Err(TemplateParseError::parse_failed(
+                "`v-slot` can only be used on a `<template>` inside a component",
+                span.start as usize,
+            ));
         }
     }
 
     // `X_V_SLOT_MIXED_SLOT_USAGE`: `<Comp v-slot>` plus nested `<template #x>` children.
     if tag != "template" && slot_directive(attrs).is_some() {
         if let Some((_, span)) = slots.first() {
-            return Err(TemplateParseError {
-                message: "mixed `v-slot` usage on both the component and nested `<template>`"
-                    .into(),
-                offset: span.start as usize,
-            });
+            return Err(TemplateParseError::parse_failed(
+                "mixed `v-slot` usage on both the component and nested `<template>`",
+                span.start as usize,
+            ));
         }
     }
 
@@ -419,10 +417,10 @@ fn validate_slot_usage(
             continue;
         };
         if !seen.insert(name.clone()) {
-            return Err(TemplateParseError {
-                message: format!("duplicate slot name `{name}`"),
-                offset: span.start as usize,
-            });
+            return Err(TemplateParseError::parse_failed(
+                format!("duplicate slot name `{name}`"),
+                span.start as usize,
+            ));
         }
     }
 
@@ -434,10 +432,10 @@ fn validate_slot_usage(
             .map(|(_, span)| *span);
         if let Some(span) = default_span {
             if children.iter().any(|c| !matches!(c, SemanticNode::SlotTemplate { .. })) {
-                return Err(TemplateParseError {
-                    message: "extraneous children found next to an explicit default slot".into(),
-                    offset: span.start as usize,
-                });
+                return Err(TemplateParseError::parse_failed(
+                    "extraneous children found next to an explicit default slot",
+                    span.start as usize,
+                ));
             }
         }
     }
@@ -454,10 +452,10 @@ pub(crate) fn validate_root_slot_templates(
             continue;
         };
         if matches!(body.as_ref(), SemanticNode::Element { tag, .. } if tag == "template") {
-            return Err(TemplateParseError {
-                message: "`v-slot` can only be used on a `<template>` inside a component".into(),
-                offset: span.start as usize,
-            });
+            return Err(TemplateParseError::parse_failed(
+                "`v-slot` can only be used on a `<template>` inside a component",
+                span.start as usize,
+            ));
         }
     }
     Ok(())
@@ -543,16 +541,16 @@ fn lower_siblings(nodes: &[ConcreteNode]) -> Result<Vec<SemanticNode>, TemplateP
                     i += consumed;
                 }
                 Some(ControlFlowKind::ElseIf(_)) => {
-                    return Err(TemplateParseError {
-                        message: "`v-else-if` requires a preceding `v-if` / `v-else-if`".into(),
-                        offset: span.start as usize,
-                    });
+                    return Err(TemplateParseError::coded(
+                        "vmz::template::illegal_directive",
+                        span.start as usize,
+                    ));
                 }
                 Some(ControlFlowKind::Else) => {
-                    return Err(TemplateParseError {
-                        message: "`v-else` requires a preceding `v-if` / `v-else-if`".into(),
-                        offset: span.start as usize,
-                    });
+                    return Err(TemplateParseError::coded(
+                        "vmz::template::illegal_directive",
+                        span.start as usize,
+                    ));
                 }
                 None if for_directive(attrs).is_some() => {
                     out.push(lower_for_element(&nodes[i])?);
@@ -593,10 +591,10 @@ fn take_if_chain(nodes: &[ConcreteNode]) -> Result<(SemanticNode, usize), Templa
                 None
             }
             (Some(ControlFlowKind::ElseIf(_)), false, true) => {
-                return Err(TemplateParseError {
-                    message: "`v-else-if` cannot follow `v-else`".into(),
-                    offset: span.start as usize,
-                });
+                return Err(TemplateParseError::coded(
+                    "vmz::template::illegal_directive",
+                    span.start as usize,
+                ));
             }
             (Some(ControlFlowKind::If(_)), false, _) => break,
             _ => break,
@@ -642,7 +640,7 @@ fn bind_key_expr(attrs: &[ConcreteAttr]) -> Option<String> {
 
 fn lower_for_element(node: &ConcreteNode) -> Result<SemanticNode, TemplateParseError> {
     let ConcreteNode::Element { tag, attrs, children, span } = node else {
-        return Err(TemplateParseError { message: "internal: expected element".into(), offset: 0 });
+        return Err(TemplateParseError::parse_failed("internal: expected element", 0));
     };
     lower_for_from_parts(tag, attrs, children, *span)
 }
@@ -656,10 +654,10 @@ fn for_node_from_lowered(
     let Some(Directive::For { source, value_alias, key_alias, index_alias }) =
         for_directive(attrs).cloned()
     else {
-        return Err(TemplateParseError {
-            message: "internal: expected `v-for`".into(),
-            offset: span.start as usize,
-        });
+        return Err(TemplateParseError::parse_failed(
+            "internal: expected `v-for`",
+            span.start as usize,
+        ));
     };
     let key = bind_key_expr(attrs);
     let body_attrs: Vec<ConcreteAttr> = attrs
@@ -709,7 +707,7 @@ fn lower_element_strip_control_flow(
     node: &ConcreteNode,
 ) -> Result<SemanticNode, TemplateParseError> {
     let ConcreteNode::Element { tag, attrs, children, span } = node else {
-        return Err(TemplateParseError { message: "internal: expected element".into(), offset: 0 });
+        return Err(TemplateParseError::parse_failed("internal: expected element", 0));
     };
     semantic_from_element_parts(
         tag,
@@ -766,11 +764,11 @@ fn slot_template_from_lowered(
     slot_span: TemplateSpan,
 ) -> Result<SemanticNode, TemplateParseError> {
     if matches!(slot_name, DirectiveArg::Dynamic(_)) {
-        return Err(TemplateParseError {
-            message: "dynamic `v-slot` / `#` argument is not supported yet (`vmz::template/unsupported-dynamic-arg`)"
-                .into(),
-            offset: slot_span.start as usize,
-        });
+        return Err(TemplateParseError::coded(
+            "vmz::template::illegal_directive",
+            slot_span.start as usize,
+        )
+        .with_arg("detail", "dynamic `v-slot` / `#` argument"));
     }
     let attrs_no_slot: Vec<ConcreteAttr> = attrs
         .iter()

@@ -66,13 +66,11 @@ pub fn parse_expression_snippet(expr: &str) -> ExpressionSnippetParse {
         // Reject multi-statement snippets — a template expression must lower to exactly
         // one expression; anything after the first is illegal trailing input.
         if root.statements.len() > 1 {
-            diagnostics.push(OakFrontendDiagnostic {
-                message: format!(
-                    "template expression has {} statements; expected exactly one expression",
-                    root.statements.len()
-                ),
-                span: Some(ByteSpan { start: 0, end: trimmed.len() }),
-            });
+            diagnostics.push(
+                OakFrontendDiagnostic::new("vmz::expression::multiple_statements")
+                    .with_arg("count", root.statements.len().to_string())
+                    .with_span(ByteSpan { start: 0, end: trimmed.len() }),
+            );
             return None;
         }
         root.statements.iter().find_map(|stmt| match stmt {
@@ -124,10 +122,10 @@ pub fn parse_expression_snippet(expr: &str) -> ExpressionSnippetParse {
     let expr_span = expression.as_ref().map(|e| ByteSpan { start: e.span.start, end: e.span.end });
 
     if expression.is_none() && diagnostics.is_empty() {
-        diagnostics.push(OakFrontendDiagnostic {
-            message: "Oak TypeScript did not lower expression snippet".into(),
-            span: Some(ByteSpan { start: 0, end: trimmed.len() }),
-        });
+        diagnostics.push(
+            OakFrontendDiagnostic::new("vmz::expression::not_lowered")
+                .with_span(ByteSpan { start: 0, end: trimmed.len() }),
+        );
     }
 
     let ok = diagnostics.is_empty() && expression.is_some();
@@ -160,29 +158,19 @@ fn map_oak_error_with_prefix_offset(
     err: &oak_core::OakError,
     prefix_len: usize,
 ) -> OakFrontendDiagnostic {
-    let message = err.to_string();
-    use oak_core::OakErrorKind;
-    let span = match err.kind() {
-        OakErrorKind::SyntaxError { offset, .. }
-        | OakErrorKind::UnexpectedCharacter { offset, .. }
-        | OakErrorKind::UnexpectedToken { offset, .. }
-        | OakErrorKind::UnexpectedEof { offset, .. }
-        | OakErrorKind::ExpectedToken { offset, .. }
-        | OakErrorKind::ExpectedName { offset, .. }
-        | OakErrorKind::TrailingCommaNotAllowed { offset, .. } => {
-            let start = offset.saturating_sub(prefix_len);
-            Some(ByteSpan { start, end: start.saturating_add(1) })
-        }
-        _ => None,
-    };
-    OakFrontendDiagnostic { message, span }
+    let mut diagnostic = crate::oak_cst::describe(err);
+    if let Some(span) = diagnostic.span.take() {
+        let start = span.start.saturating_sub(prefix_len);
+        diagnostic.span = Some(ByteSpan { start, end: start.saturating_add(1) });
+    }
+    diagnostic
 }
 
 /// Fail fast when Oak rejects a template expression snippet.
-pub fn require_expression_snippet(expr: &str) -> Result<ByteSpan, String> {
+pub fn require_expression_snippet(expr: &str) -> Result<ByteSpan, Vec<OakFrontendDiagnostic>> {
     let parse = parse_expression_snippet(expr);
     if parse.ok {
         return Ok(parse.root_span.unwrap_or(ByteSpan::empty_at(0)));
     }
-    Err(crate::oak_cst::format_cst_diagnostics(&parse.diagnostics))
+    Err(crate::oak_cst::non_empty(parse.diagnostics, "vmz::expression::parse_failed"))
 }

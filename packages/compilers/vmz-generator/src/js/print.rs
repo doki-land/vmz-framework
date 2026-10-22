@@ -81,11 +81,7 @@ pub fn print_js_source(
         ));
     }
     let formatted = erase_types(source)?;
-    let code = if options.minify {
-        minify_whitespace(&formatted)
-    } else {
-        formatted
-    };
+    let code = if options.minify { minify_whitespace(&formatted) } else { formatted };
     // Intentionally `None`: we do not fabricate an empty `{}` source map when no
     // real map has been generated. Downstream consumers should read `source_map_path`
     // from `options` and attach an actual map themselves if they want one.

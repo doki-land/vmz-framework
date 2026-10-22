@@ -1,6 +1,8 @@
 //! Oak TypeScript script validation for VMZ `<script client|server>` blocks.
 
-use vmz_oak_frontend_adapter::{ScriptRole, ScriptShellInput, require_script_ast};
+use vmz_oak_frontend_adapter::{
+    ScriptRole, ScriptShellInput, format_cst_diagnostics, require_script_ast,
+};
 
 use crate::sfc::{ScriptBlock, ScriptKind, ScriptLanguage};
 
@@ -25,5 +27,7 @@ pub fn check_oak_script_ts(block: &ScriptBlock) -> Result<(), String> {
     if block.lang != ScriptLanguage::Ts {
         return Ok(());
     }
-    require_script_ast(&script_shell_from_block(block)).map(|_| ())
+    require_script_ast(&script_shell_from_block(block))
+        .map(|_| ())
+        .map_err(|diagnostics| format_cst_diagnostics(&diagnostics))
 }

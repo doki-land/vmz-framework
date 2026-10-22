@@ -310,10 +310,10 @@ fn classify_one(attr: RawAttr) -> Result<ConcreteAttr, TemplateParseError> {
         let (base_and_arg, modifiers) = split_trailing_modifiers(rest);
         let (dir_name, arg) = split_v_name_arg(base_and_arg);
         if dir_name.is_empty() {
-            return Err(TemplateParseError {
-                message: format!("`{name}` is not a legal directive name"),
+            return Err(TemplateParseError::parse_failed(
+                format!("`{name}` is not a legal directive name"),
                 offset,
-            });
+            ));
         }
         return Ok(ConcreteAttr::Directive {
             dir: Directive::Custom {
@@ -343,16 +343,16 @@ fn bind_expr(
         return Ok(value.to_string());
     }
     if arg.starts_with('[') {
-        return Err(TemplateParseError {
-            message: "`v-bind` with same-name shorthand only allows a static argument".into(),
+        return Err(TemplateParseError::parse_failed(
+            "`v-bind` with same-name shorthand only allows a static argument",
             offset,
-        });
+        ));
     }
     if arg.is_empty() {
-        return Err(TemplateParseError {
-            message: format!("directive `{name}` requires an expression value"),
+        return Err(TemplateParseError::parse_failed(
+            format!("directive `{name}` requires an expression value"),
             offset,
-        });
+        ));
     }
     Ok(camelize_arg(arg))
 }
@@ -381,10 +381,10 @@ fn require_expr(
 ) -> Result<String, TemplateParseError> {
     match val {
         Some(s) if !s.is_empty() => Ok(s.to_string()),
-        _ => Err(TemplateParseError {
-            message: format!("directive `{name}` requires an expression value"),
+        _ => Err(TemplateParseError::parse_failed(
+            format!("directive `{name}` requires an expression value"),
             offset,
-        }),
+        )),
     }
 }
 
@@ -459,20 +459,21 @@ fn parse_v_model(
 }
 
 fn parse_v_for_concrete(expr: &str, offset: usize) -> Result<Directive, TemplateParseError> {
-    let (alias_part, list_part) = split_v_for(expr).ok_or_else(|| TemplateParseError {
-        message: format!("invalid `v-for` expression `{expr}` (expected `alias in list`)"),
-        offset,
+    let (alias_part, list_part) = split_v_for(expr).ok_or_else(|| {
+        TemplateParseError::parse_failed(
+            format!("invalid `v-for` expression `{expr}` (expected `alias in list`)"),
+            offset,
+        )
     })?;
-    let aliases = parse_for_aliases(alias_part).ok_or_else(|| TemplateParseError {
-        message: format!("invalid `v-for` alias in `{expr}`"),
-        offset,
+    let aliases = parse_for_aliases(alias_part).ok_or_else(|| {
+        TemplateParseError::parse_failed(format!("invalid `v-for` alias in `{expr}`"), offset)
     })?;
     let source = list_part.trim();
     if source.is_empty() {
-        return Err(TemplateParseError {
-            message: format!("invalid `v-for` list in `{expr}`"),
+        return Err(TemplateParseError::parse_failed(
+            format!("invalid `v-for` list in `{expr}`"),
             offset,
-        });
+        ));
     }
     Ok(Directive::For {
         source: source.to_string(),

@@ -13,7 +13,7 @@ use crate::editorconfig::EditorSettings;
 /// Expressions are normalized through Oak CST formatting.
 pub fn format_template_body(body: &str, settings: &EditorSettings) -> Result<String, String> {
     let block = TemplateBlock { content: body.to_string(), content_start: 0 };
-    let semantic = parse_template_semantic_primary(&block).map_err(|e| e.message)?;
+    let semantic = parse_template_semantic_primary(&block).map_err(|e| e.render_plain())?;
     print_semantic(&semantic, settings)
 }
 
