@@ -289,13 +289,13 @@ class CliBuilder implements Cli {
         const cmdToken = argv[0]!;
         const matched = this.roots.find((c) => c.def.names.includes(cmdToken));
         if (!matched) {
-            this.emitDiagnostic(
+            return this.emitAndHelp(
                 { code: 'commander::unknown_command', severity: 'error', args: { cmd: cmdToken } },
                 diagnosticContext,
                 t,
+                this.formatRootHelp(t),
+                2,
             );
-            console.log(this.formatRootHelp(t));
-            return 2;
         }
 
         return await this.dispatch(matched.def, argv.slice(1), t, [cmdToken], globalOpts, diagnosticContext);
@@ -313,6 +313,19 @@ class CliBuilder implements Cli {
             const msg = diag.message ?? (diag.code ? t(diag.code, diag.args) : '');
             console.error(errorText(msg || diag.code || String(diag)));
         }
+    }
+
+    /** Emit diagnostic, show help text, return exit code. Shorthand for parse/dispatch error paths. */
+    private emitAndHelp(
+        diag: CommandDiagnostic,
+        ctx: DiagnosticContext,
+        t: LocalizePlugin['t'],
+        helpText: string,
+        exitCode: number,
+    ): number {
+        this.emitDiagnostic(diag, ctx, t);
+        console.log(helpText);
+        return exitCode;
     }
 
     /** Derived root help: optional intro + commands/options from the registration tree. */
@@ -358,33 +371,25 @@ class CliBuilder implements Cli {
                 return await this.dispatch(child, rest.slice(1), t, [...path, childTok], globalOpts, diagnosticContext);
             }
             if (!def.action) {
-                this.emitDiagnostic(
-                    {
-                        code: 'commander::unknown_command',
-                        severity: 'error',
-                        args: { cmd: [...path, childTok].join(' ') },
-                    },
+                return this.emitAndHelp(
+                    { code: 'commander::unknown_command', severity: 'error', args: { cmd: [...path, childTok].join(' ') } },
                     diagnosticContext,
                     t,
+                    formatCommandHelp(this.name, def, t, path, this.rootOptions),
+                    2,
                 );
-                console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
-                return 2;
             }
         }
 
         if (!def.action) {
             if (rest.length) {
-                this.emitDiagnostic(
-                    {
-                        code: 'commander::unknown_command',
-                        severity: 'error',
-                        args: { cmd: [...path, ...rest].join(' ') },
-                    },
+                return this.emitAndHelp(
+                    { code: 'commander::unknown_command', severity: 'error', args: { cmd: [...path, ...rest].join(' ') } },
                     diagnosticContext,
                     t,
+                    formatCommandHelp(this.name, def, t, path, this.rootOptions),
+                    2,
                 );
-                console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
-                return 2;
             }
             console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
             return 0;
@@ -395,13 +400,13 @@ class CliBuilder implements Cli {
             options = def.passthrough ? { _: rest.slice() } : parseOptions(rest, def.options);
         } catch (err) {
             const cliErr = CliError.from(err, 'commander::parse_failed');
-            this.emitDiagnostic(
+            return this.emitAndHelp(
                 { code: cliErr.code, severity: 'error', args: cliErr.args, message: cliErr.message },
                 diagnosticContext,
                 t,
+                formatCommandHelp(this.name, def, t, path, this.rootOptions),
+                cliErr.exitCode,
             );
-            console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
-            return cliErr.exitCode; // 2 for parse/validation failures
         }
 
         for (const [k, v] of Object.entries(globalOpts)) {
