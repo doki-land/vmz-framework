@@ -71,7 +71,7 @@
                             <p>
                                 {{ contractBodyLead }}
                                 <Link href="/d/">
-                                    /d/
+                                    文档站
                                 </Link>
                                 {{ contractBodyTail }}
                             </p>

@@ -2,7 +2,6 @@
     <div data-vmz-fixture="ui-lab" class="ui-lab-page">
         <AppShell brand="VMZ" home-href="/" :nav-label="uiLabNavLabel" :nav="navItems">
             <div class="vmz-slot-content">
-                <Alert tone="info" role-name="status" :title="uiLabAlertTitleLabel" :description="uiLabAlertDescLabel" />
                 <header class="ui-lab-page__head">
                     <h1>
                         {{ uiLabPageTitleLabel }}
@@ -121,6 +120,7 @@
 .ui-lab-page__grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    align-items: start;
     gap: 0.85rem;
 }
 
@@ -140,8 +140,6 @@
 <script client>
 import {
     uiLabNavLabel,
-    uiLabAlertTitle,
-    uiLabAlertDesc,
     uiLabPageTitle,
     uiLabPageLead,
     uiLabCardFieldTitle,
@@ -206,8 +204,6 @@ export default class UiLabPage {
     popoverOpen = false;
     navItems = [];
     uiLabNavLabel = "UI lab";
-    uiLabAlertTitleLabel = "Internal component lab";
-    uiLabAlertDescLabel = "";
     uiLabPageTitleLabel = "UI lab";
     uiLabPageLeadLabel = "";
     uiLabCardFieldTitleLabel = "";
@@ -252,8 +248,6 @@ export default class UiLabPage {
 
     refreshCopy() {
         this.uiLabNavLabel = uiLabNavLabel();
-        this.uiLabAlertTitleLabel = uiLabAlertTitle();
-        this.uiLabAlertDescLabel = uiLabAlertDesc();
         this.uiLabPageTitleLabel = uiLabPageTitle();
         this.uiLabPageLeadLabel = uiLabPageLead();
         this.uiLabCardFieldTitleLabel = uiLabCardFieldTitle();

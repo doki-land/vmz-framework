@@ -2,7 +2,6 @@
     <div data-vmz-fixture="form">
         <AppShell brand="VMZ" home-href="/" nav-label="表单与上传" :nav="navItems">
             <div class="vmz-slot-content">
-                <Alert tone="info" role-name="status" title="表单与上传演示" description="覆盖校验、错误反馈与多种上传方式。示例数据不会写入真实服务。" />
                 <header class="vmz-form-lab__head">
                     <h1>
                         表单与上传
@@ -11,7 +10,7 @@
                         联系请求、校验反馈与多种上传方式的最小业务场景。
                     </p>
                 </header>
-                <Card title="联系请求">
+                <Card title="请求信息">
                     <Form label="联系请求" :error-summary="errorSummary" summary-id="home-form-summary" :described-by="formDescribedBy" :disabled="submitting" :disabled-attr="disabledAttr" @submit="submit" @reset="reset">
                         <div data-vmz-fixture="form-email-row" class="vmz-form-email-row">
                             <Field label="工作邮箱" description="用于回复，请填写常用邮箱" control-id="home-form-email" description-id="home-form-email-desc" error-id="home-form-email-err" :described-by="emailDescribedBy" :error="emailError" :invalid-attr="emailInvalid" :value="email" @input="onEmail" />
@@ -33,7 +32,7 @@
                             {{ team }}
                         </p>
                         <DatePicker label="期望日期" description="从日历浮层中选择日期" control-id="home-form-date" description-id="home-form-date-desc" error-id="home-form-date-err" :described-by="dateDescribedBy" :error="dateError" :invalid-attr="dateInvalid" :value="preferredDate" @change="onDate" />
-                        <Upload label="附件" description="一次请求完成上传，进度与取消由组件处理" hint="选择文件或拖到这里" destination="server" action="/api/form/attachment" accept=".txt,.md,.pdf" :max-bytes="262144" :max-count="1" control-id="home-form-file" description-id="home-form-file-desc" error-id="home-form-file-err" :described-by="fileDescribedBy" :error="fileError" :invalid-attr="fileInvalid" empty-text="未选择文件" cancel-label="取消上传" :clear-token="uploadClearToken" :on-value="onUploadValue" :on-status="onUploadStatus" />
+                        <Upload label="附件" description="一次请求完成上传，进度与取消由组件处理" hint="或将文件拖到这里" destination="server" action="/api/form/attachment" accept=".txt,.md,.pdf" :max-bytes="262144" :max-count="1" control-id="home-form-file" description-id="home-form-file-desc" error-id="home-form-file-err" :described-by="fileDescribedBy" :error="fileError" :invalid-attr="fileInvalid" empty-text="未选择文件" cancel-label="取消上传" :clear-token="uploadClearToken" :on-value="onUploadValue" :on-status="onUploadStatus" />
                         <TextArea label="说明" description="补充信息，可不填" control-id="home-form-message" description-id="home-form-message-desc" error-id="home-form-message-err" described-by="home-form-message-desc" :value="message" @input="((e) => message = e.target.value)" />
                         <RadioGroup label="套餐" name="home-form-plan" description="计费意向" description-id="home-form-plan-desc" error-id="home-form-plan-err" :described-by="planDescribedBy" :error="planError" :invalid-attr="planInvalid" :value="plan" :items="planItems" @change="onPlan" />
                         <Checkbox label="同意我们与你联系" control-id="home-form-agree" :checked="agree" @change="onAgree" />
@@ -77,7 +76,7 @@
                 </Card>
                 <Card title="上传方式">
                     <Alert tone="info" role-name="status" title="五种上传方式" description="本地预览、对象存储预签名直传、多文件服务端上传、目录选择与可恢复分片。" />
-                    <Upload label="本地文件（客户端）" description="选择文件后仅在浏览器侧处理，适合工具站与离线预览。" hint="选择文件或拖到这里" destination="client" accept="image/*,.txt,.md,.pdf" :max-bytes="262144" :max-count="1" control-id="home-upload-client" description-id="home-upload-client-desc" error-id="home-upload-client-err" empty-text="未选择文件" :clear-token="clientClearToken" :on-value="onClientValue" :on-status="onClientStatus" />
+                    <Upload label="本地文件（客户端）" description="选择文件后仅在浏览器侧处理，适合工具站与离线预览。" hint="或将文件拖到这里" destination="client" accept="image/*,.txt,.md,.pdf" :max-bytes="262144" :max-count="1" control-id="home-upload-client" description-id="home-upload-client-desc" error-id="home-upload-client-err" empty-text="未选择文件" :clear-token="clientClearToken" :on-value="onClientValue" :on-status="onClientStatus" />
                     <p data-vmz-fixture="upload-client-state" class="vmz-sr-only">
                         client:
                         {{ clientStatus }}
@@ -88,7 +87,7 @@
                         ;bytes:
                         {{ clientBytes }}
                     </p>
-                    <Upload label="对象存储（预签名）" description="通过服务端预签名 URL 直传对象，UI 不嵌入云厂商 SDK。" hint="选择文件或拖到这里" destination="object" accept=".txt,.md,.pdf" :max-bytes="262144" :max-count="1" control-id="home-upload-object" description-id="home-upload-object-desc" error-id="home-upload-object-err" empty-text="未选择文件" cancel-label="取消上传" :clear-token="objectClearToken" :on-presign="presignObject" :on-value="onObjectValue" :on-status="onObjectStatus" />
+                    <Upload label="对象存储（预签名）" description="通过服务端预签名 URL 直传对象，UI 不嵌入云厂商 SDK。" hint="或将文件拖到这里" destination="object" accept=".txt,.md,.pdf" :max-bytes="262144" :max-count="1" control-id="home-upload-object" description-id="home-upload-object-desc" error-id="home-upload-object-err" empty-text="未选择文件" cancel-label="取消上传" :clear-token="objectClearToken" :on-presign="presignObject" :on-value="onObjectValue" :on-status="onObjectStatus" />
                     <p data-vmz-fixture="upload-object-state" class="vmz-sr-only">
                         object:
                         {{ objectStatus }}
@@ -97,7 +96,7 @@
                         ;bytes:
                         {{ objectBytes }}
                     </p>
-                    <Upload label="多文件（服务端）" description="一次请求上传多个附件，服务端返回 items 列表。" hint="选择文件或拖到这里" destination="server" action="/api/form/attachment" accept=".txt,.md,.pdf" :multiple="true" :max-count="3" :max-bytes="262144" control-id="home-upload-multi" description-id="home-upload-multi-desc" error-id="home-upload-multi-err" empty-text="未选择文件" cancel-label="取消上传" :clear-token="multiClearToken" :on-value="onMultiValue" :on-status="onMultiStatus" />
+                    <Upload label="多文件（服务端）" description="一次请求上传多个附件，服务端返回 items 列表。" hint="或将文件拖到这里" destination="server" action="/api/form/attachment" accept=".txt,.md,.pdf" :multiple="true" :max-count="3" :max-bytes="262144" control-id="home-upload-multi" description-id="home-upload-multi-desc" error-id="home-upload-multi-err" empty-text="未选择文件" cancel-label="取消上传" :clear-token="multiClearToken" :on-value="onMultiValue" :on-status="onMultiStatus" />
                     <p data-vmz-fixture="upload-multi-state" class="vmz-sr-only">
                         multi:
                         {{ multiStatus }}
@@ -106,7 +105,7 @@
                         ;ids:
                         {{ multiIds }}
                     </p>
-                    <Upload label="文件夹（客户端）" description="选择整个目录，在浏览器侧展开为文件列表（依赖浏览器能力）。" hint="选择目录" destination="client" accept=".txt,.md,.pdf" :directory="true" :max-count="8" :max-bytes="262144" control-id="home-upload-dir" description-id="home-upload-dir-desc" error-id="home-upload-dir-err" empty-text="未选择目录" :clear-token="dirClearToken" :on-value="onDirValue" :on-status="onDirStatus" />
+                    <Upload label="文件夹（客户端）" description="选择整个目录，在浏览器侧展开为文件列表（依赖浏览器能力）。" hint="点击选择目录" destination="client" accept=".txt,.md,.pdf" :directory="true" :max-count="8" :max-bytes="262144" control-id="home-upload-dir" description-id="home-upload-dir-desc" error-id="home-upload-dir-err" empty-text="未选择目录" :clear-token="dirClearToken" :on-value="onDirValue" :on-status="onDirStatus" />
                     <p data-vmz-fixture="upload-dir-state" class="vmz-sr-only">
                         dir:
                         {{ dirStatus }}
@@ -117,7 +116,7 @@
                         ;names:
                         {{ dirNames }}
                     </p>
-                    <Upload label="可恢复分片（服务端）" description="大文件分片上传，支持暂停与在同一文件会话中恢复。" hint="选择文件或拖到这里" destination="server" action="/api/form/resumable" :chunk-size="8" accept=".txt,.md,.pdf" :max-bytes="262144" :max-count="1" control-id="home-upload-resume" description-id="home-upload-resume-desc" error-id="home-upload-resume-err" empty-text="未选择文件" cancel-label="暂停上传" resume-label="继续上传" :clear-token="resumeClearToken" :on-value="onResumeValue" :on-status="onResumeStatus" />
+                    <Upload label="可恢复分片（服务端）" description="大文件分片上传，支持暂停与在同一文件会话中恢复。" hint="或将文件拖到这里" destination="server" action="/api/form/resumable" :chunk-size="8" accept=".txt,.md,.pdf" :max-bytes="262144" :max-count="1" control-id="home-upload-resume" description-id="home-upload-resume-desc" error-id="home-upload-resume-err" empty-text="未选择文件" cancel-label="暂停上传" resume-label="继续上传" :clear-token="resumeClearToken" :on-value="onResumeValue" :on-status="onResumeStatus" />
                     <p data-vmz-fixture="upload-resume-state" class="vmz-sr-only">
                         resume:
                         {{ resumeStatus }}
@@ -244,9 +243,9 @@ export default class FormPage {
         { value: "gamma", label: "Gamma Docs" },
     ];
     planItems = [
-        { id: "home-form-plan-starter", value: "starter", label: "Starter" },
-        { id: "home-form-plan-pro", value: "pro", label: "Pro" },
-        { id: "home-form-plan-ent", value: "enterprise", label: "Enterprise" },
+        { id: "home-form-plan-starter", value: "starter", label: "基础版" },
+        { id: "home-form-plan-pro", value: "pro", label: "专业版" },
+        { id: "home-form-plan-ent", value: "enterprise", label: "企业版" },
     ];
     navItems = [
         { id: "commercial", title: "应用案例", href: "/commercial" },
