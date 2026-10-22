@@ -78,6 +78,47 @@ fn accepts_source_target_and_diffs() {
 }
 
 #[test]
+fn materialize_sources_reports_only_changed_files() {
+    let dir = std::env::temp_dir().join(format!("vmz-plug-materialize-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let content = "export default class Generated {}";
+    let mut store = ContributionStore::default();
+    let mut batch = ContributionBatch {
+        plugin: PluginIdentity { name: "gen".into(), version: "0.1.0".into() },
+        protocol: PLUGIN_PROTOCOL_V1.into(),
+        stage: PluginStage::WorkspaceResolve,
+        cache_key: "materialize".into(),
+        deterministic: true,
+        items: vec![ContributionItem {
+            id: "generated".into(),
+            kind: ContributionKind::Source {
+                path: PathBuf::from("src/generated.vmz"),
+                content: content.into(),
+                content_hash: sha256_hex(content.as_bytes()),
+                materialize: true,
+            },
+        }],
+    };
+    assert_eq!(store.apply_batch(&batch, &dir).accepted, 1);
+    assert_eq!(store.materialize_sources(&dir).unwrap().len(), 1);
+    // Re-running the same materialization must not look like a source edit,
+    // or every build degrades into an affected build.
+    assert!(store.materialize_sources(&dir).unwrap().is_empty());
+
+    let next = "export default class Generated { again = true; }";
+    batch.items[0].kind = ContributionKind::Source {
+        path: PathBuf::from("src/generated.vmz"),
+        content: next.into(),
+        content_hash: sha256_hex(next.as_bytes()),
+        materialize: true,
+    };
+    assert_eq!(store.apply_batch(&batch, &dir).accepted, 1);
+    assert_eq!(store.materialize_sources(&dir).unwrap().len(), 1);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn emit_targets_writes_typed_json_not_hand_built_strings() {
     let dir = std::env::temp_dir().join(format!("vmz-plug-emit-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);

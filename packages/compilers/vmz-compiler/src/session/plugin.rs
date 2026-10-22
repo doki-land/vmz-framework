@@ -303,7 +303,11 @@ impl ContributionStore {
         report
     }
 
-    /// Write materializable sources under `root` (sandbox). Returns written paths.
+    /// Write materializable sources under `root` (sandbox). Returns paths whose
+    /// bytes actually changed.
+    ///
+    /// Session callers feed the result into the dirty set. Reporting an
+    /// unchanged file would turn every full build into an affected build.
     pub fn materialize_sources(&self, root: &Path) -> crate::Result<Vec<PathBuf>> {
         let mut written = Vec::new();
         for stored in self.items.values() {
@@ -312,6 +316,9 @@ impl ContributionStore {
                     continue;
                 }
                 let abs = sandbox_join(root, path)?;
+                if std::fs::read(&abs).is_ok_and(|existing| existing == content.as_bytes()) {
+                    continue;
+                }
                 if let Some(parent) = abs.parent() {
                     std::fs::create_dir_all(parent)?;
                 }
