@@ -246,11 +246,59 @@ fn format_css_body(source: &str) -> String {
 
 fn normalize_css_fragment(fragment: &str, declaration: bool) -> String {
     let mut value = fragment.split_whitespace().collect::<Vec<_>>().join(" ");
-    if declaration && let Some(colon) = value.find(':') {
+    let trimmed = value.trim();
+    // Selectors, at-rules, and comments are flushed through the same path as
+    // declarations; only real `property: value` fragments may have their colon
+    // respaced.
+    let is_declaration = declaration
+        && !trimmed.ends_with(',')
+        && !trimmed.starts_with('@')
+        && !trimmed.starts_with("/*")
+        && !trimmed.ends_with("*/");
+    if is_declaration && let Some(colon) = declaration_colon(&value) {
         let (left, right) = value.split_at(colon);
         value = format!("{}: {}", left.trim(), right[1..].trim());
     }
     value.trim().to_string()
+}
+
+/// Byte offset of the first `:` that separates a property from its value.
+/// Colons inside strings, comments, or at-rules (`@import url("https://…")`)
+/// are not declaration separators; rewriting them corrupts the stylesheet.
+fn declaration_colon(fragment: &str) -> Option<usize> {
+    let bytes = fragment.as_bytes();
+    let mut quote = None;
+    let mut escaped = false;
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if let Some(q) = quote {
+            if escaped {
+                escaped = false;
+            } else if b == b'\\' {
+                escaped = true;
+            } else if b == q {
+                quote = None;
+            }
+            i += 1;
+            continue;
+        }
+        if b == b'/' && bytes.get(i + 1) == Some(&b'*') {
+            i += 2;
+            while i + 1 < bytes.len() && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
+                i += 1;
+            }
+            i = (i + 2).min(bytes.len());
+            continue;
+        }
+        match b {
+            b'"' | b'\'' => quote = Some(b),
+            b':' => return Some(i),
+            _ => {}
+        }
+        i += 1;
+    }
+    None
 }
 
 fn flush_css_line(output: &mut String, current: &mut String, depth: usize, unit: &str, nl: &str) {
