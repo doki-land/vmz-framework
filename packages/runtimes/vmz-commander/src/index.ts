@@ -6,7 +6,7 @@
  * `commander.*` with tiny English fallbacks — no product language packs here.
  */
 
-export type { CatalogLoader, LocaleCatalog, LocalizePlugin } from './types.js';
+export type { CatalogLoader, CommandDiagnostic, DiagnosticContext, DiagnosticHandler, LocaleCatalog, LocalizePlugin } from './types.js';
 
 export {
     COMMANDER_FALLBACK_EN_US,
@@ -21,7 +21,7 @@ export {
 } from './locales.js';
 export type { CreateLocalizeFromLocalesOptions, LocalesManifest } from './locales.js';
 
-import type { CatalogLoader, LocaleCatalog, LocalizePlugin } from './types.js';
+import type { CatalogLoader, CommandDiagnostic, DiagnosticContext, DiagnosticHandler, LocaleCatalog, LocalizePlugin } from './types.js';
 import { COMMANDER_FALLBACK_EN_US, createLocalizeFromLocales, translate, translateWithFallback } from './locales.js';
 
 /** Options bag passed to actions (`_` = positionals). */
@@ -87,6 +87,8 @@ export interface Cli {
      */
     help(helpId: string): this;
     command(rawName: string, helpId: string): Command;
+    /** Route structured action failures to a product-owned renderer. */
+    onDiagnostic(handler: DiagnosticHandler): this;
     parse(argv?: string[]): Promise<number>;
 }
 
@@ -134,6 +136,7 @@ class CliBuilder implements Cli {
     /** When set, `parse` rebuilds localize from this root (argv/env/`--locale`). */
     private localesRoot: string | null = null;
     private localesEnvKeys: string[] | undefined;
+    private diagnosticHandler: DiagnosticHandler | undefined;
     private introId: string | null = null;
     private readonly roots: CommandBuilder[] = [];
     private readonly rootOptions: OptionDef[] = [];
@@ -203,6 +206,12 @@ class CliBuilder implements Cli {
         return cmd;
     }
 
+    onDiagnostic(handler: DiagnosticHandler): this {
+        if (typeof handler !== 'function') throw new Error('@vmz/commander: diagnostic handler must be a function');
+        this.diagnosticHandler = handler;
+        return this;
+    }
+
     /** Help ids registered on this CLI (for {@link assertCatalogCoverage}). */
     collectHelpIds(): string[] {
         const ids: string[] = [];
@@ -238,6 +247,10 @@ class CliBuilder implements Cli {
             throw new Error(translate('commander.err.localize_required', undefined, COMMANDER_FALLBACK_EN_US));
         }
         const t = localize.t.bind(localize);
+        const diagnosticContext: DiagnosticContext = {
+            locale: localize.resolveLocale?.({ argv: argv0, env: process.env }) ?? 'en-US',
+            t,
+        };
 
         if (argv.length === 0 || isHelpToken(argv[0]!)) {
             console.log(this.formatRootHelp(t));
@@ -252,7 +265,7 @@ class CliBuilder implements Cli {
             return 1;
         }
 
-        return await this.dispatch(matched.def, argv.slice(1), t, [cmdToken], globalOpts);
+        return await this.dispatch(matched.def, argv.slice(1), t, [cmdToken], globalOpts, diagnosticContext);
     }
 
     /** Derived root help: optional intro + commands/options from the registration tree. */
@@ -284,6 +297,7 @@ class CliBuilder implements Cli {
         t: LocalizePlugin['t'],
         path: string[],
         globalOpts: ParsedOptions,
+        diagnosticContext: DiagnosticContext,
     ): Promise<number> {
         if (rest.length && isHelpToken(rest[0]!)) {
             console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
@@ -294,7 +308,7 @@ class CliBuilder implements Cli {
             const childTok = rest[0]!;
             const child = def.children.find((c) => c.names.includes(childTok));
             if (child) {
-                return await this.dispatch(child, rest.slice(1), t, [...path, childTok], globalOpts);
+                return await this.dispatch(child, rest.slice(1), t, [...path, childTok], globalOpts, diagnosticContext);
             }
             if (!def.action) {
                 console.error(t('commander.err.unknown_command', { cmd: [...path, childTok].join(' ') }));
@@ -333,9 +347,16 @@ class CliBuilder implements Cli {
             if (options[k] === undefined) options[k] = v as string | boolean | string[];
         }
 
-        const result = await def.action(options, ...options._);
-        if (typeof result === 'number') return result;
-        return 0;
+        try {
+            const result = await def.action(options, ...options._);
+            if (typeof result === 'number') return result;
+            return 0;
+        } catch (err) {
+            const diagnostic = normalizeDiagnostic(err);
+            if (this.diagnosticHandler) this.diagnosticHandler(diagnostic, diagnosticContext);
+            else console.error(diagnostic.message || diagnostic.code || String(err));
+            return 1;
+        }
     }
 }
 
@@ -547,6 +568,24 @@ export function parseOptionDef(rawName: string, helpId: string): OptionDef {
     }
     const key = aliases.find((a) => a.length > 1) ?? aliases[0]!;
     return { rawName, helpId, key, aliases, takesValue, optionalValue, repeatable };
+}
+
+function normalizeDiagnostic(error: unknown): CommandDiagnostic {
+    if (error && typeof error === 'object') {
+        const value = error as Record<string, unknown>;
+        const candidate = value.diagnostic && typeof value.diagnostic === 'object' ? value.diagnostic as Record<string, unknown> : value;
+        if (typeof candidate.code === 'string' || typeof candidate.severity === 'string' || typeof candidate.path === 'string') {
+            return {
+                code: typeof candidate.code === 'string' ? candidate.code : undefined,
+                severity: typeof candidate.severity === 'string' ? candidate.severity : 'error',
+                args: candidate.args && typeof candidate.args === 'object' ? candidate.args as Record<string, string> : undefined,
+                path: typeof candidate.path === 'string' ? candidate.path : undefined,
+                span: candidate.span && typeof candidate.span === 'object' ? candidate.span as { start: number; end: number } : undefined,
+                message: typeof candidate.message === 'string' ? candidate.message : undefined,
+            };
+        }
+    }
+    return { severity: 'error', code: 'commander::action_failed', message: error instanceof Error ? error.message : String(error) };
 }
 
 /**

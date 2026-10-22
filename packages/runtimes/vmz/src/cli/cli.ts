@@ -65,6 +65,9 @@ function buildProductCli(opts: { mode?: 'global' | 'project' } = {}): Cli {
         .locales(resolveCliLocalesRoot(), {
             envKeys: ['VMZ_LOCALE', 'LOCALE', 'LANG', 'LC_ALL'],
         })
+        .onDiagnostic((diagnostic, context) => {
+            log.diagnostic(diagnostic, { locale: context.locale });
+        })
         .intro(introId);
 
     // Global install: only version (help is derived). Project commands need a project bin.

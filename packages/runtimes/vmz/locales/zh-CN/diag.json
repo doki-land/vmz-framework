@@ -1,6 +1,7 @@
 {
     "diag.message": "{message}",
     "diag.detail": "{detail}",
+    "commander::action_failed": "命令执行失败：{message}",
 
     "vmz::template::illegal_directive": "`<template>` 中存在非法或不支持的指令：{detail}",
     "vmz::template::parse_failed": "解析 `<template>` 失败：{detail}",

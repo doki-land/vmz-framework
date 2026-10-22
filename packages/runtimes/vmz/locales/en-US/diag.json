@@ -1,6 +1,7 @@
 {
     "diag.message": "{message}",
     "diag.detail": "{detail}",
+    "commander::action_failed": "Command failed: {message}",
 
     "vmz::template::illegal_directive": "Illegal or unsupported directive in `<template>`: {detail}",
     "vmz::template::parse_failed": "Failed to parse `<template>`: {detail}",

@@ -14,7 +14,7 @@ import {
     loadCatalog,
     loadLocalesManifest,
     translateWithFallback,
-} from '@vmz/commander';
+} from '../src/index.ts';
 
 const fixturesRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'locales');
 
@@ -100,6 +100,52 @@ describe('@vmz/commander locales + parse', () => {
         } finally {
             console.log = origLog;
         }
+    });
+
+    it('routes structured action failures to the product diagnostic handler', async () => {
+        const received: Array<{ diagnostic: unknown; locale: string }> = [];
+        const cli = createCli('diagnostic')
+            .locales(fixturesRoot)
+            .onDiagnostic((diagnostic, context) => received.push({ diagnostic, locale: context.locale }));
+        cli.command('build', 'cli.cmd.build').action(() => {
+            throw {
+                code: 'vmz::template::parse_failed',
+                severity: 'error',
+                path: 'src/App.vmz',
+                args: { detail: 'unexpected token' },
+                span: { start: 4, end: 5 },
+            };
+        });
+
+        expect(await cli.parse(['build'])).toBe(1);
+        expect(received).toEqual([{
+            locale: 'en-US',
+            diagnostic: {
+                code: 'vmz::template::parse_failed',
+                severity: 'error',
+                path: 'src/App.vmz',
+                args: { detail: 'unexpected token' },
+                span: { start: 4, end: 5 },
+                message: undefined,
+            },
+        }]);
+    });
+
+    it('wraps legacy action exceptions as a language-neutral diagnostic', async () => {
+        const received: unknown[] = [];
+        const cli = createCli('diagnostic')
+            .locales(fixturesRoot)
+            .onDiagnostic((diagnostic) => received.push(diagnostic));
+        cli.command('build', 'cli.cmd.build').action(() => {
+            throw new Error('old parser prose');
+        });
+
+        expect(await cli.parse(['build'])).toBe(1);
+        expect(received).toEqual([{
+            severity: 'error',
+            code: 'commander::action_failed',
+            message: 'old parser prose',
+        }]);
     });
 
     it('createLocalizeFromLocales + assertCatalogCoverage', () => {

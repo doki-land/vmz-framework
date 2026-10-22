@@ -26,6 +26,7 @@ export type DiagnosticLike = {
 export type DiagnosticLogOptions = {
     denyWarnings?: boolean;
     level?: CliLogLevel;
+    locale?: string;
 };
 
 export const log = {
@@ -44,13 +45,13 @@ export const log = {
     errorId(id: string, args?: Record<string, string>): void {
         console.error(vmzCliLocalize.t(id, args));
     },
-    diagnostic(d: DiagnosticLike, opts: { level?: CliLogLevel } = {}): boolean {
+    diagnostic(d: DiagnosticLike, opts: { level?: CliLogLevel; locale?: string } = {}): boolean {
         const level = opts.level ?? getCliLogLevel();
         const severity = normalizeSeverity(d.severity);
         if (!diagnosticVisible(severity, level)) return false;
         const hasCode = Boolean(d.code && String(d.code).length);
         const code = hasCode ? String(d.code) : 'diag.message';
-        const locale = resolveVmzLocale();
+        const locale = opts.locale ?? resolveVmzLocale();
         const catalog = loadCliCatalog(locale);
         const path = d.path || '';
         const style = getCliLogStyle();
@@ -83,7 +84,7 @@ export const log = {
         const items = diagnostics ?? [];
         const visible = items.filter((d) => diagnosticVisible(normalizeSeverity(d.severity), level));
         for (let i = 0; i < visible.length; i += 1) {
-            this.diagnostic(visible[i]!, { level });
+            this.diagnostic(visible[i]!, { level, locale: opts.locale });
             if (style === 'pretty' && i + 1 < visible.length) console.error('');
         }
         for (const d of items) {

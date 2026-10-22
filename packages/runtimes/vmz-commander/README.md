@@ -45,12 +45,15 @@ Locales layout (any product):
 | `.intro(id)` | Short banner only |
 | `.locales(root)` / `.use(plugin)` / `.catalog(loader)` | Localization (later `.use` wins) |
 | `.option` on CLI | Global flags (merged into action options) |
+| `.onDiagnostic(handler)` | Route structured action failures to a product-owned renderer |
 | `loadLocalesManifest` / `loadCatalog` / `flattenCatalog` | Filesystem catalog helpers |
 | `createLocalizeFromLocales` | Build a `LocalizePlugin` from a root |
 | `assertCatalogCoverage(cli, catalog)` | Dev/CI: registered helpIds must exist |
 | `COMMANDER_FALLBACK_EN_US` | Minimal `commander.ui.*` / `commander.err.*` / `commander.opt.locale` |
 
 `t` resolution: product catalog → `commander` English fallback → `{{id}}`.
+
+Action failures may throw a language-neutral diagnostic object with `code`, `args`, `path`, `span`, `severity`, and optional legacy `message`. The configured handler receives the structured row and resolved locale context. Without a handler, commander prints the legacy message or code. Plain `Error` exceptions are wrapped as `commander::action_failed` during migration. Commander does not own diagnostic formatting; products should connect `@vmz/diagnostic`.
 
 ## Layering
 
