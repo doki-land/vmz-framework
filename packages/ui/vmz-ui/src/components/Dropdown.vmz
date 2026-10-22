@@ -1,12 +1,13 @@
 <template>
-    <details data-vmz-ui="dropdown" class="vmz-ui-dropdown">
-        <summary data-vmz-dropdown-trigger="1">
+    <details data-vmz-ui="dropdown" data-vmz-motion="overlay" data-vmz-motion-token="motion.overlay" class="vmz-ui-dropdown">
+        <summary data-vmz-dropdown-trigger="1" class="vmz-ui-dropdown__trigger">
             {{ label }}
         </summary>
-        <div data-vmz-dropdown-menu="1" class="vmz-ui-dropdown__menu">
-            <a v-for="item in items" :key="item.id" :href="item.href" :data-vmz-dropdown-item="item.id">
-                {{ item.title }}
-            </a>
+        <div data-vmz-dropdown-menu="1" role="menu" class="vmz-ui-dropdown__menu">
+            <div v-for="item in items" :key="item.id" class="vmz-ui-dropdown__row">
+                <div v-if="item.divider" role="separator" class="vmz-ui-dropdown__divider"></div>
+                <a v-else :href="item.href" role="menuitem" :data-vmz-dropdown-item="item.id" :data-danger="item.danger ? 'true' : 'false'" :data-disabled="item.disabled ? 'true' : 'false'" :aria-disabled="item.disabled ? 'true' : null" :tabindex="item.disabled ? -1 : null" class="vmz-ui-dropdown__item">{{ item.title }}</a>
+            </div>
         </div>
     </details>
 </template>
@@ -15,47 +16,165 @@
     position: relative;
     display: inline-block;
 }
-.vmz-ui-dropdown summary {
+
+.vmz-ui-dropdown__trigger {
     list-style: none;
     min-height: 2.5rem;
     display: inline-flex;
     align-items: center;
-    padding: 0 0.85rem;
+    gap: 0.375rem;
+    padding: 0 0.9375rem;
     border: 1px solid var(--vmz-line-default);
     border-radius: var(--vmz-radius-md, 6px);
     background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
     cursor: pointer;
     font-weight: 550;
+    outline: none;
+    transition:
+        border-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+        background-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+        box-shadow var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
 }
+
+/* Chevron: affordance that the trigger opens a surface, not a page. */
+.vmz-ui-dropdown__trigger::after {
+    content: "";
+    width: 0.4375rem;
+    height: 0.4375rem;
+    margin-top: -0.1875rem;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    opacity: 0.55;
+    transform: rotate(45deg);
+    transition: transform var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+}
+
 .vmz-ui-dropdown summary::-webkit-details-marker {
     display: none;
 }
+
+.vmz-ui-dropdown__trigger:hover {
+    border-color: var(--vmz-action-primary-hover);
+    background: var(--vmz-surface-mist);
+}
+
+.vmz-ui-dropdown__trigger:focus-visible {
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+}
+
+.vmz-ui-dropdown[open] > .vmz-ui-dropdown__trigger {
+    border-color: var(--vmz-action-primary-background);
+}
+
+.vmz-ui-dropdown[open] > .vmz-ui-dropdown__trigger::after {
+    margin-top: 0.125rem;
+    transform: rotate(-135deg);
+}
+
 .vmz-ui-dropdown__menu {
     position: absolute;
-    top: calc(100% + 0.35rem);
+    top: calc(100% + 0.375rem);
     right: 0;
     z-index: 50;
     min-width: 11rem;
-    padding: 0.3rem;
-    border: 1px solid var(--vmz-line-default);
+    padding: 0.25rem;
+    border: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
     border-radius: var(--vmz-radius-lg, 8px);
     background: var(--vmz-surface-paper);
     box-shadow: var(--vmz-shadow-popup);
+    transform-origin: top right;
+    animation: vmz-dropdown-in var(--vmz-motion-overlay-duration, 180ms) var(--vmz-motion-overlay-easing, cubic-bezier(0.2, 0, 0, 1));
 }
-.vmz-ui-dropdown__menu a {
+
+@keyframes vmz-dropdown-in {
+    from {
+        opacity: 0;
+        transform: translateY(-0.25rem) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vmz-ui-dropdown__menu {
+        animation: none;
+    }
+    .vmz-ui-dropdown__trigger,
+    .vmz-ui-dropdown__trigger::after {
+        transition: none;
+    }
+}
+
+.vmz-ui-dropdown__row {
+    display: contents;
+}
+
+.vmz-ui-dropdown__item {
     display: block;
-    padding: 0.55rem 0.7rem;
-    border-radius: var(--vmz-radius-sm, 2px);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--vmz-radius-sm, 4px);
     color: var(--vmz-text-ink);
+    font-size: 0.875rem;
+    line-height: 1.4286;
     text-decoration: none;
+    outline: none;
+    transition:
+        background-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+        color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
 }
-.vmz-ui-dropdown__menu a:hover {
+
+.vmz-ui-dropdown__item:hover {
     background: var(--vmz-surface-mist);
+}
+
+.vmz-ui-dropdown__item:focus-visible {
+    background: var(--vmz-surface-mist);
+    box-shadow: inset 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-dropdown__item[data-danger="true"] {
+    color: var(--vmz-status-danger-foreground);
+}
+
+.vmz-ui-dropdown__item[data-danger="true"]:hover {
+    background: color-mix(in srgb, var(--vmz-status-danger-accent) 12%, transparent);
+}
+
+.vmz-ui-dropdown__item[data-disabled="true"] {
+    color: var(--vmz-text-steel);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.vmz-ui-dropdown__divider {
+    height: 1px;
+    margin: 0.25rem 0.5rem;
+    background: var(--vmz-line-subtle, var(--vmz-line-default));
 }
 </style>
 <script client>
+/**
+ * VMZ UI — Dropdown (Menu).
+ * Native `<details>` disclosure: works without JS, menu items are plain links
+ * unless a host attaches selection handlers.
+ */
+export type DropdownItem = {
+    id: string;
+    title: string;
+    href?: string;
+    /** Destructive action styling. */
+    danger?: boolean;
+    /** Non-interactive state. */
+    disabled?: boolean;
+    /** Render a separator instead of a row (title/href are ignored). */
+    divider?: boolean;
+};
+
 export default class Dropdown {
     public label: string = "Menu";
-    public items: Array<{ id: string; title: string; href: string }> = [];
+    public items: DropdownItem[] = [];
 }
 </script>
