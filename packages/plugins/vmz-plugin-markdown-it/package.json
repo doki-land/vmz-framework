@@ -34,5 +34,5 @@
   },
   "type": "module",
   "types": "./vmz.plugin.ts",
-  "version": "0.3.6"
+  "version": "0.3.7"
 }

@@ -5,7 +5,7 @@
         "url": "git+https://github.com/doki-land/vmz-framework.git",
         "directory": "packages/plugins/vmz-plugin-mathjax"
     },
-    "version": "0.3.6",
+    "version": "0.3.7",
     "type": "module",
     "description": "VMZ MathJax adapter - <Mathjax> + math engine",
     "license": "MIT",
