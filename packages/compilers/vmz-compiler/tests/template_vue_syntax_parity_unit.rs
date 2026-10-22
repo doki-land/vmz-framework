@@ -206,9 +206,13 @@ fn rejects_side_effect_tags_in_templates() {
 }
 
 #[test]
-fn rejects_v_pre() {
-    // `v-pre` skips compilation, so accepting it would still render `{{ … }}` here.
-    assert_rejected(r#"<div v-pre>{{ x }}</div>"#, "`v-pre` is not supported");
+fn accepts_v_pre() {
+    // `v-pre` is valid Vue syntax. VMZ accepts it as `Directive::Custom`; the
+    // runtime still compiles `{{ … }}`, so the author must know the directive is
+    // treated as an attribute rather than a verbatim block.
+    assert_accepted(r#"<div v-pre>{{ x }}</div>"#);
+    assert_accepted(r#"<div v-pre>plain</div>"#);
+    assert_accepted(r#"<p v-pre :id="x">{{ y }}</p>"#);
 }
 
 #[test]

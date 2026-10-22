@@ -345,11 +345,6 @@ fn validate_vue_element_syntax(
             Directive::Html { .. } if has_author_children => {
                 return Err(fail("`v-html` will override element children"));
             }
-            Directive::Custom { name, .. } if name == "pre" => {
-                // `v-pre` skips compilation of the subtree. VMZ still compiles `{{ … }}`, so
-                // accepting it would render interpolations Vue shows verbatim.
-                return Err(fail("`v-pre` is not supported by VMZ"));
-            }
             Directive::Custom { name, arg: None, .. } if name == "text" && has_author_children => {
                 return Err(fail("`v-text` will override element children"));
             }
