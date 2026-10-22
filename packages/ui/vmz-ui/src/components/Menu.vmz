@@ -36,7 +36,7 @@
 }
 
 .vmz-ui-menu__trigger:focus-visible {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-menu__panel {
@@ -55,7 +55,7 @@
 }
 
 .vmz-ui-menu__panel:focus-visible {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-menu__item {
@@ -78,7 +78,7 @@
 }
 
 .vmz-ui-menu__item:focus-visible {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 </style>
 <script client>

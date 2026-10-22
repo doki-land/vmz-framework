@@ -89,7 +89,7 @@
 }
 
 .vmz-ui-drawer__panel:focus-visible {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-drawer__title {
@@ -125,7 +125,7 @@
 }
 
 .vmz-ui-drawer__close:focus-visible {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 @keyframes vmz-ui-drawer-fade-in {

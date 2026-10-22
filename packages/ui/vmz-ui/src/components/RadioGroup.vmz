@@ -59,7 +59,7 @@
 }
 
 .vmz-ui-radio-group__input:focus-visible {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-radio-group__input:disabled {

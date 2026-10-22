@@ -90,7 +90,7 @@
 }
 
 .vmz-ui-upload__control:focus-visible {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-upload__control:disabled {
@@ -221,7 +221,7 @@
 
 .vmz-ui-upload__cancel:focus-visible,
 .vmz-ui-upload__resume:focus-visible {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-upload__resume {

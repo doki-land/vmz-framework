@@ -56,7 +56,7 @@
 }
 
 .vmz-ui-accordion__trigger:focus-visible {
-    box-shadow: inset 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: inset 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-accordion__trigger[aria-expanded="true"] {

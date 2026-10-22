@@ -72,7 +72,7 @@
 }
 
 .vmz-ui-popover__panel:focus-visible {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-popover__title {
@@ -96,7 +96,7 @@
 }
 
 .vmz-ui-popover__close:focus-visible {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 </style>
 <script client>

@@ -70,7 +70,7 @@
 
 .vmz-ui-console-shell__brand:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-console-shell__nav {
@@ -99,7 +99,7 @@
 
 .vmz-ui-console-shell__nav a:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-console-shell__body {
@@ -175,7 +175,7 @@
 
 .vmz-ui-console-shell__action:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-console-shell__main {

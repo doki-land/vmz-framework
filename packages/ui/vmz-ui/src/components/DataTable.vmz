@@ -80,7 +80,7 @@
 }
 
 .vmz-ui-datatable__box:focus-visible {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-datatable tr[data-selected="true"] {
@@ -99,7 +99,7 @@
 }
 
 .vmz-ui-datatable__sort:focus-visible {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-datatable__row-action {
@@ -115,7 +115,7 @@
 }
 
 .vmz-ui-datatable__row-action:focus-visible {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-datatable__row-action:disabled {

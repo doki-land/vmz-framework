@@ -64,7 +64,7 @@
 
 .vmz-ui-textarea__control:focus-visible {
     border-color: var(--vmz-action-primary-background);
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-textarea__control:disabled,

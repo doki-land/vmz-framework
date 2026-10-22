@@ -88,7 +88,7 @@
 .vmz-ui-select__control:focus-visible,
 .vmz-ui-select.is-opened .vmz-ui-select__control {
     border-color: var(--vmz-action-primary-background);
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-select__control:disabled {
@@ -156,7 +156,7 @@
 }
 
 .vmz-ui-select__search-input:focus-visible {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-select__list {

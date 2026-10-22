@@ -96,7 +96,7 @@
 
 .vmz-ui-date-picker__control:focus-visible,
 .vmz-ui-date-picker.is-opened .vmz-ui-date-picker__control {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-date-picker__control:disabled {
@@ -176,7 +176,7 @@
 .vmz-ui-date-picker__nav:hover,
 .vmz-ui-date-picker__nav:focus-visible {
     border-color: var(--vmz-action-primary-background);
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-date-picker__weekdays {
@@ -211,7 +211,7 @@
 .vmz-ui-date-picker__day:hover,
 .vmz-ui-date-picker__day:focus-visible {
     background: color-mix(in srgb, var(--vmz-action-primary-background) 18%, transparent);
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-date-picker__day.is-outside {
