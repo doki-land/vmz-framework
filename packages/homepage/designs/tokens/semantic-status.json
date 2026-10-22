@@ -14,7 +14,7 @@
         },
         {
             "key": { "path": ["status", "success", "foreground"] },
-            "value": "#389E0D"
+            "value": "#237804"
         },
         {
             "key": { "path": ["status", "warning", "accent"] },
@@ -22,7 +22,7 @@
         },
         {
             "key": { "path": ["status", "warning", "foreground"] },
-            "value": "#D48806"
+            "value": "#874D00"
         },
         {
             "key": { "path": ["status", "danger", "accent"] },
