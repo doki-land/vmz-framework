@@ -79,6 +79,52 @@ describe('@vmz/commander locales + parse', () => {
         }
     });
 
+    it('uses ANSI theme for interactive help when color is forced', async () => {
+        const logs: string[] = [];
+        const origLog = console.log;
+        const priorForceColor = process.env.FORCE_COLOR;
+        const priorNoColor = process.env.NO_COLOR;
+        console.log = (...a: unknown[]) => logs.push(a.map(String).join(' '));
+        process.env.FORCE_COLOR = '1';
+        delete process.env.NO_COLOR;
+        try {
+            const cli = createCli('color-cli').locales(fixturesRoot).intro('cli.intro');
+            cli.command('build', 'cli.cmd.build').option('--out-dir <dir>', 'cli.opt.out-dir').action(() => 0);
+            expect(await cli.parse(['help'])).toBe(0);
+            expect(logs.join('\n')).toContain('\u001b[1m');
+            expect(logs.join('\n')).toContain('\u001b[32m');
+            expect(logs.join('\n')).toContain('\u001b[33m');
+        } finally {
+            console.log = origLog;
+            if (priorForceColor === undefined) delete process.env.FORCE_COLOR;
+            else process.env.FORCE_COLOR = priorForceColor;
+            if (priorNoColor === undefined) delete process.env.NO_COLOR;
+            else process.env.NO_COLOR = priorNoColor;
+        }
+    });
+
+    it('honors NO_COLOR even when color is forced', async () => {
+        const logs: string[] = [];
+        const origLog = console.log;
+        const priorForceColor = process.env.FORCE_COLOR;
+        const priorNoColor = process.env.NO_COLOR;
+        console.log = (...a: unknown[]) => logs.push(a.map(String).join(' '));
+        process.env.FORCE_COLOR = '1';
+        process.env.NO_COLOR = '1';
+        try {
+            const cli = createCli('plain-cli').locales(fixturesRoot).intro('cli.intro');
+            cli.command('build', 'cli.cmd.build').action(() => 0);
+            expect(await cli.parse(['help'])).toBe(0);
+            expect(logs.join('\n')).not.toContain('\u001b[');
+        } finally {
+            console.log = origLog;
+            if (priorForceColor === undefined) delete process.env.FORCE_COLOR;
+            else process.env.FORCE_COLOR = priorForceColor;
+            if (priorNoColor === undefined) delete process.env.NO_COLOR;
+            else process.env.NO_COLOR = priorNoColor;
+        }
+    });
+
     it('later .use overrides .locales', async () => {
         const logs: string[] = [];
         const origLog = console.log;

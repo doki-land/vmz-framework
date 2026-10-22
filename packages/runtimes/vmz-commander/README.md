@@ -6,6 +6,7 @@ i18n-first TypeScript CLI framework under the `@vmz` scope. **Not** bound to `@v
 - **Help is derived** from the command tree — do not paste Usage walls into catalogs
 - **Locales directory loading**: `locales.json` + `<locale>/*.json` → flatten → `LocalizePlugin`
 - Framework chrome/err ids are `commander.*` with tiny English fallbacks (products may override)
+- Interactive help uses a small ANSI theme for headings, commands, options, and errors; `NO_COLOR` disables it, `FORCE_COLOR` enables it outside a TTY
 - **No product language packs** in this package
 
 ## Quick start

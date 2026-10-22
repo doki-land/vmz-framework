@@ -24,6 +24,33 @@ export type { CreateLocalizeFromLocalesOptions, LocalesManifest } from './locale
 import type { CatalogLoader, CommandDiagnostic, DiagnosticContext, DiagnosticHandler, LocaleCatalog, LocalizePlugin } from './types.js';
 import { COMMANDER_FALLBACK_EN_US, createLocalizeFromLocales, translate, translateWithFallback } from './locales.js';
 
+type Color = 'bold' | 'dim' | 'cyan' | 'blue' | 'green' | 'yellow' | 'red';
+const ANSI: Record<Color, string> = {
+    bold: '\u001b[1m',
+    dim: '\u001b[2m',
+    cyan: '\u001b[36m',
+    blue: '\u001b[34m',
+    green: '\u001b[32m',
+    yellow: '\u001b[33m',
+    red: '\u001b[31m',
+};
+const ANSI_RESET = '\u001b[0m';
+
+/** Keep CI and redirected output plain while making interactive help scannable. */
+function colorEnabled(): boolean {
+    if (process.env.NO_COLOR !== undefined) return false;
+    if (process.env.FORCE_COLOR && process.env.FORCE_COLOR !== '0') return true;
+    return Boolean(process.stdout?.isTTY || process.stderr?.isTTY);
+}
+
+function paint(value: string, ...colors: Color[]): string {
+    return colorEnabled() && colors.length ? `${colors.map((color) => ANSI[color]).join('')}${value}${ANSI_RESET}` : value;
+}
+
+function errorText(value: string): string {
+    return paint(value, 'bold', 'red');
+}
+
 /** Options bag passed to actions (`_` = positionals). */
 export type ParsedOptions = Record<string, string | boolean | string[]> & { _: string[] };
 
@@ -260,7 +287,7 @@ class CliBuilder implements Cli {
         const cmdToken = argv[0]!;
         const matched = this.roots.find((c) => c.def.names.includes(cmdToken));
         if (!matched) {
-            console.error(t('commander.err.unknown_command', { cmd: cmdToken }));
+            console.error(errorText(t('commander.err.unknown_command', { cmd: cmdToken })));
             console.log(this.formatRootHelp(t));
             return 1;
         }
@@ -274,18 +301,18 @@ class CliBuilder implements Cli {
         if (this.introId) {
             lines.push(t(this.introId), '');
         }
-        lines.push(t('commander.ui.usage', { name: this.name }), '', t('commander.ui.commands'));
+        lines.push(paint(t('commander.ui.usage', { name: this.name }), 'bold', 'cyan'), '', paint(t('commander.ui.commands'), 'bold', 'blue'));
         for (const c of this.roots) {
-            lines.push(`  ${c.def.rawName.padEnd(28)} ${t(c.def.helpId)}`);
+            lines.push(`  ${paint(c.def.rawName.padEnd(28), 'green')} ${t(c.def.helpId)}`);
         }
         const opts = [
             ...this.rootOptions,
             ...collectRootOptions(this.roots.map((c) => c.def)).filter((o) => !this.rootOptions.some((r) => r.key === o.key)),
         ];
         if (opts.length) {
-            lines.push('', t('commander.ui.options'));
+            lines.push('', paint(t('commander.ui.options'), 'bold', 'blue'));
             for (const o of opts) {
-                lines.push(`  ${o.rawName.padEnd(28)} ${t(o.helpId)}`);
+                lines.push(`  ${paint(o.rawName.padEnd(28), 'yellow')} ${t(o.helpId)}`);
             }
         }
         return lines.join('\n');
@@ -311,7 +338,7 @@ class CliBuilder implements Cli {
                 return await this.dispatch(child, rest.slice(1), t, [...path, childTok], globalOpts, diagnosticContext);
             }
             if (!def.action) {
-                console.error(t('commander.err.unknown_command', { cmd: [...path, childTok].join(' ') }));
+                console.error(errorText(t('commander.err.unknown_command', { cmd: [...path, childTok].join(' ') })));
                 console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
                 return 1;
             }
@@ -328,15 +355,15 @@ class CliBuilder implements Cli {
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             if (msg.startsWith('unknown_option:')) {
-                console.error(t('commander.err.unknown_option', { option: msg.slice('unknown_option:'.length) }));
+                console.error(errorText(t('commander.err.unknown_option', { option: msg.slice('unknown_option:'.length) })));
             } else if (msg.startsWith('missing_value:')) {
                 console.error(
-                    t('commander.err.missing_option_value', {
+                    errorText(t('commander.err.missing_option_value', {
                         option: msg.slice('missing_value:'.length),
-                    }),
+                    })),
                 );
             } else {
-                console.error(msg);
+                console.error(errorText(msg));
             }
             console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
             return 1;
@@ -354,7 +381,7 @@ class CliBuilder implements Cli {
         } catch (err) {
             const diagnostic = normalizeDiagnostic(err);
             if (this.diagnosticHandler) this.diagnosticHandler(diagnostic, diagnosticContext);
-            else console.error(diagnostic.message || diagnostic.code || String(err));
+            else console.error(errorText(diagnostic.message || diagnostic.code || String(err)));
             return 1;
         }
     }
@@ -368,19 +395,19 @@ export function formatCommandHelp(
     path: string[],
     rootOptions: OptionDef[] = [],
 ): string {
-    const lines = [`${cliName} ${path.join(' ')} — ${t(def.helpId)}`, ''];
+    const lines = [paint(`${cliName} ${path.join(' ')}`, 'bold', 'cyan') + ` — ${t(def.helpId)}`, ''];
     if (def.children.length) {
-        lines.push(t('commander.ui.commands'));
+        lines.push(paint(t('commander.ui.commands'), 'bold', 'blue'));
         for (const c of def.children) {
-            lines.push(`  ${c.rawName.padEnd(28)} ${t(c.helpId)}`);
+            lines.push(`  ${paint(c.rawName.padEnd(28), 'green')} ${t(c.helpId)}`);
         }
         lines.push('');
     }
     const opts = [...rootOptions, ...def.options.filter((o) => !rootOptions.some((r) => r.key === o.key))];
     if (opts.length) {
-        lines.push(t('commander.ui.options'));
+        lines.push(paint(t('commander.ui.options'), 'bold', 'blue'));
         for (const o of opts) {
-            lines.push(`  ${o.rawName.padEnd(28)} ${t(o.helpId)}`);
+            lines.push(`  ${paint(o.rawName.padEnd(28), 'yellow')} ${t(o.helpId)}`);
         }
     }
     return lines.join('\n').trimEnd();
