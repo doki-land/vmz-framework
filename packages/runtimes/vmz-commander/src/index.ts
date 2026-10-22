@@ -731,7 +731,7 @@ function parseArgvCore(
             const long = eq === -1 ? a.slice(2) : a.slice(2, eq);
             const def = byAlias.get(long);
             if (!def) {
-                if (!handleUnknown(`--${long}`)) continue;
+                if (!handleUnknown(a)) continue;
                 continue;
             }
             if (def.takesValue) {
@@ -759,7 +759,7 @@ function parseArgvCore(
             const short = a.slice(1);
             const def = byAlias.get(short);
             if (!def) {
-                if (!handleUnknown(`-${short}`)) continue;
+                if (!handleUnknown(a)) continue;
                 continue;
             }
             if (def.takesValue) {
