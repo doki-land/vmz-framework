@@ -117,10 +117,10 @@ if (!fs.existsSync(projectPath)) fail(`missing ${projectPath}`);
 const wxml = fs.readFileSync(wxmlPath, 'utf8');
 if (!wxml.includes('<view class="page">')) fail(`page view missing: ${wxml}`);
 if (!wxml.includes('bindtap="onStore"')) fail(`bindtap missing: ${wxml}`);
-if (!/wx:for="\{\{b\.B_\d+\}\}"/.test(wxml)) {
+if (! /wx:for="\{\{b\.B_\d+\}\}"/.test(wxml)) {
     fail(`wx:for must use BindingId path b.B_*: ${wxml}`);
 }
-if (!/wx:if="\{\{b\.B_\d+\}\}"/.test(wxml)) {
+if (! /wx:if="\{\{b\.B_\d+\}\}"/.test(wxml)) {
     fail(`wx:if must use BindingId path b.B_*: ${wxml}`);
 }
 if (wxml.includes('@click')) fail(`author event leaked: ${wxml}`);
@@ -137,9 +137,9 @@ if (meWxss.includes('24rpx')) fail(`me wxss leaked home padding: ${meWxss}`);
 
 const pageJs = fs.readFileSync(pageJsPath, 'utf8');
 if (!pageJs.includes('b:')) fail(`page data missing BindingId root b: ${pageJs}`);
-if (!/B_\d+\s*:/.test(pageJs)) fail(`page data missing B_* seeds: ${pageJs}`);
+if (! /B_\d+\s*:/.test(pageJs)) fail(`page data missing B_* seeds: ${pageJs}`);
 if (!pageJs.includes('Waitrose')) fail(`page data/share missing Waitrose: ${pageJs}`);
-if (!/B_\d+\s*:\s*true/.test(pageJs) && !/B_\d+\s*:\s*\[/.test(pageJs)) {
+if (! /B_\d+\s*:\s*true/.test(pageJs) && ! /B_\d+\s*:\s*\[/.test(pageJs)) {
     fail(`page BindingId seeds should include literal inits (bool/array): ${pageJs}`);
 }
 if (/\bstore\s*:/.test(pageJs)) {

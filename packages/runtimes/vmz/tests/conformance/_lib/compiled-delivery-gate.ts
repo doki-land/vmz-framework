@@ -94,7 +94,7 @@ export function assertCompiledLocaleArtifact(scan: CompiledDeliveryScan): string
     if (!rows.length) errors.push('locale-link-plan.rows empty');
     const hasStaticHref = rows.some((r: Record<string, unknown>) => {
         const href = String(r?.href || '');
-        return href && !/\[[^\]]+\]/.test(href) && !/\/:[^/]+/.test(href);
+        return href && ! /\[[^\]]+\]/.test(href) && ! /\/:[^/]+/.test(href);
     });
     if (!hasStaticHref) errors.push('locale-link-plan has no static href rows');
     return errors;
@@ -139,7 +139,7 @@ export function assertNoRuntimeManifestInterpretation(scan: CompiledDeliveryScan
     if (/listPagesFromDeployment/.test(serveHost)) {
         errors.push('serve-host still defines listPagesFromDeployment (must consume route-catalog)');
     }
-    if (!/ROUTE_CATALOG_SCHEMA|route-catalog\.json/.test(serveHost)) {
+    if (! /ROUTE_CATALOG_SCHEMA|route-catalog\.json/.test(serveHost)) {
         errors.push('serve-host missing route-catalog consumption');
     }
     // Client navigation must prefer frozen href table (barrel or navigation modules).
@@ -149,11 +149,11 @@ export function assertNoRuntimeManifestInterpretation(scan: CompiledDeliveryScan
         fs.readFileSync(path.join(navRoot, 'navigation/locale-transition.ts'), 'utf8'),
     ];
     const clientNav = navParts.join('\n');
-    if (!/data-vmz-locale-hrefs/.test(clientNav) || !/lookupFrozenLocaleHref/.test(clientNav)) {
+    if (! /data-vmz-locale-hrefs/.test(clientNav) || ! /lookupFrozenLocaleHref/.test(clientNav)) {
         errors.push('client-nav missing frozen locale href table lookup');
     }
     // Dist entry / client-nav copy should carry the attribute writer side (SSR) via serve-host emit.
-    if (!/data-vmz-locale-hrefs/.test(serveHost)) {
+    if (! /data-vmz-locale-hrefs/.test(serveHost)) {
         errors.push('serve-host must emit data-vmz-locale-hrefs');
     }
     return errors;
@@ -162,12 +162,12 @@ export function assertNoRuntimeManifestInterpretation(scan: CompiledDeliveryScan
 export function assertNoPostEmitSemanticRewrite(scan: CompiledDeliveryScan, root = repoRoot(import.meta.url)): string[] {
     const errors: string[] = [...assertCompiledAssetArtifact(scan)];
     const caModule = fs.readFileSync(path.join(root, 'packages/runtimes/vmz/src/workspace/content-addressed-assets.ts'), 'utf8');
-    if (!/rewrittenHtml:\s*0/.test(caModule)) {
+    if (! /rewrittenHtml:\s*0/.test(caModule)) {
         errors.push('content-addressed-assets must record rewrittenHtml: 0');
     }
     // localizeBodyLinks must apply plan rows, not invent path algebra inside apply.
     const localize = fs.readFileSync(path.join(root, 'packages/runtimes/vmz-runtime/src/host/localize-body-links.ts'), 'utf8');
-    if (!/applyLocaleLinkPlan/.test(localize) || !/LOCALE_LINK_PLAN_SCHEMA/.test(localize)) {
+    if (! /applyLocaleLinkPlan/.test(localize) || ! /LOCALE_LINK_PLAN_SCHEMA/.test(localize)) {
         errors.push('localize-body-links must center on locale link plan rows');
     }
     return errors;

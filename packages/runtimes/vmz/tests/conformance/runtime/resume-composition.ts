@@ -42,7 +42,7 @@ class SiblingHost {
         api.attr(btn, 'type', 'button');
         api.attr(btn, 'data-fixture', 'sibling-btn');
         btn.appendChild(api.text('Sibling action'));
-        api.on(btn, 'click', function () {
+        api.on(btn, 'click', function() {
             this.clicks = (this.clicks || 0) + 1;
             const out = rootEl.querySelector('[data-fixture="sibling-count"]');
             if (out) out.textContent = String(this.clicks);
@@ -82,7 +82,7 @@ class CompositionPage {
                         api.attr(btn, 'type', 'button');
                         api.attr(btn, 'data-fixture', 'create-btn');
                         btn.appendChild(api.text('Create'));
-                        api.on(btn, 'click', function () {
+                        api.on(btn, 'click', function() {
                             this.showEmpty = false;
                         });
                         wrap.appendChild(btn);
@@ -147,7 +147,7 @@ class SlotCompositionPage {
                         api.attr(btn, 'type', 'button');
                         api.attr(btn, 'data-fixture', 'slot-create-btn');
                         btn.appendChild(api.text('Create'));
-                        api.on(btn, 'click', function () {
+                        api.on(btn, 'click', function() {
                             this.showEmpty = false;
                         });
                         wrap.appendChild(btn);

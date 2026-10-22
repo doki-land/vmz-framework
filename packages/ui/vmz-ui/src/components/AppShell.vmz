@@ -6,7 +6,9 @@
                     {{ brand }}
                 </a>
                 <nav :aria-label="navLabel" class="vmz-ui-app-shell__nav">
-                    <a v-for="item in nav" :key="item.id" :href="item.href" :data-vmz-nav="item.id" :data-active="item.id === activeId ? 'true' : 'false'" :aria-current="item.id === activeId ? 'page' : null" class="vmz-ui-app-shell__nav-item">{{ item.title }}</a>
+                    <a v-for="item in nav" :key="item.id" :href="item.href" :data-vmz-nav="item.id" :data-active="item.id === activeId ? 'true' : 'false'" :aria-current="item.id === activeId ? 'page' : null" class="vmz-ui-app-shell__nav-item">
+                        {{ item.title }}
+                    </a>
                 </nav>
                 <div class="vmz-ui-app-shell__actions">
                     <slot name="actions" />

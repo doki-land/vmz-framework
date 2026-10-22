@@ -394,7 +394,7 @@ export async function runLogicManifest(
                     continue;
                 }
                 const Comp = host.Component;
-                Comp.prototype.onMount = async function () {};
+                Comp.prototype.onMount = async function() {};
                 continue;
             }
             if (kind === 'capture_child') {

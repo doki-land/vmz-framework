@@ -92,13 +92,13 @@ try {
     if (/EventButton\.client\.js/.test(entryClient) && /import\s+EventButton\s+from/.test(entryClient)) {
         fail('entry-client.js must not statically import EventButton.client.js');
     }
-    if (!/import\s+LikeButton\s+from/.test(entryClient)) {
+    if (! /import\s+LikeButton\s+from/.test(entryClient)) {
         fail('entry-client.js must statically import LikeButton (idle)');
     }
     if (!entryClient.includes('__vmzLoadComponent')) {
         fail('entry-client.js must set __vmzLoadComponent for event islands');
     }
-    if (!/\bhydrate(?:Route|RoutePage)?\b/.test(entryClient)) {
+    if (! /\bhydrate(?:Route|RoutePage)?\b/.test(entryClient)) {
         fail('entry-client.js must hydrate for idle/mixed shell');
     }
 

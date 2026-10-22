@@ -35,7 +35,7 @@ if (!Array.isArray(manifest.files) || manifest.files.length < 5) fail('files too
 if (!fs.existsSync(path.join(root, LOADER_REL))) fail(`missing ${LOADER_REL}`);
 
 const materialize = fs.readFileSync(path.join(root, MATERIALIZE_REL), 'utf8');
-if (!/loadHostRuntimeFilesManifest|serveHostRuntimeFilePairs/.test(materialize)) {
+if (! /loadHostRuntimeFilesManifest|serveHostRuntimeFilePairs/.test(materialize)) {
     fail('serve-host-runtime.ts must load host-runtime-files manifest');
 }
 if (/\[\s*['"]serve-host\.mjs['"]\s*,\s*['"]_vmz\/host\//.test(materialize)) {
@@ -43,7 +43,7 @@ if (/\[\s*['"]serve-host\.mjs['"]\s*,\s*['"]_vmz\/host\//.test(materialize)) {
 }
 
 const compileRs = fs.readFileSync(path.join(root, 'packages/compilers/vmz-compiler/src/pipeline/compile.rs'), 'utf8');
-if (!/include_str!\s*\(\s*"\.\.\/\.\.\/\.\.\/\.\.\/runtimes\/vmz\/host-runtime-files\.json"\s*\)/.test(compileRs)) {
+if (! /include_str!\s*\(\s*"\.\.\/\.\.\/\.\.\/\.\.\/runtimes\/vmz\/host-runtime-files\.json"\s*\)/.test(compileRs)) {
     fail('compile.rs must include_str! host-runtime-files.json');
 }
 if (/copies\.push\(\s*\(\s*"serve-host\.mjs"/.test(compileRs) || /"serve-host\.mjs",\s*"_vmz\/host\/vmz-serve-host\.mjs"/.test(compileRs)) {

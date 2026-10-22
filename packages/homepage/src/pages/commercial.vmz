@@ -1,202 +1,200 @@
 <template>
-    <div data-vmz-fixture="commercial">
-        <AppShell brand="VMZ" home-href="/" :nav-label="commercialNavLabel" :nav="navItems">
-            <div class="vmz-commercial-content">
-                <section data-vmz-fixture="commercial-hero" aria-labelledby="commercial-hero-title" class="vmz-commercial-hero">
-                    <div class="vmz-commercial-hero__copy">
-                        <p class="vmz-commercial-hero__eyebrow">
-                            {{ commercialNavLabel }}
-                        </p>
-                        <h1 id="commercial-hero-title" class="vmz-commercial-hero__title">
-                            {{ commercialHeroTitleLabel }}
-                        </h1>
-                        <p class="vmz-commercial-hero__lead">
-                            {{ commercialHeroLeadLabel }}
-                        </p>
-                        <div class="vmz-commercial-hero__actions">
-                            <Link href="/console">
-                                {{ commercialCtaContactLabel }}
-                            </Link>
-                            <Link :href="guideHref">
-                                {{ commercialCtaDocsLabel }}
-                            </Link>
-                        </div>
-                        <p class="vmz-commercial-demo-note">
-                            {{ demoNote }}
-                        </p>
+    <SiteShell page="commercial" variant="commercial-page">
+        <main id="main" data-vmz-fixture="commercial" class="vmz-commercial-content">
+            <section data-vmz-fixture="commercial-hero" aria-labelledby="commercial-hero-title" class="vmz-commercial-hero">
+                <div class="vmz-commercial-hero__copy">
+                    <p class="vmz-commercial-hero__eyebrow">
+                        {{ commercialNavLabel }}
+                    </p>
+                    <h1 id="commercial-hero-title" class="vmz-commercial-hero__title">
+                        {{ commercialHeroTitleLabel }}
+                    </h1>
+                    <p class="vmz-commercial-hero__lead">
+                        {{ commercialHeroLeadLabel }}
+                    </p>
+                    <div class="vmz-commercial-hero__actions">
+                        <Link href="/console">
+                            {{ commercialCtaContactLabel }}
+                        </Link>
+                        <Link :href="guideHref">
+                            {{ commercialCtaDocsLabel }}
+                        </Link>
                     </div>
-                    <div :aria-label="previewAriaLabel" class="vmz-commercial-hero__preview">
-                        <div class="vmz-commercial-hero__preview-head">
-                            <span>
-                                {{ featuredId }}
-                            </span>
-                            <span>
-                                {{ featuredStatusLabel }}
-                            </span>
-                        </div>
-                        <strong>
-                            {{ browseLoading ? loadingLabel : browseError ? loadErrorLabel : featuredSubjectLabel }}
-                        </strong>
-                        <p v-if="!browseLoading && !browseError">
-                            {{ featuredContextLabel }}
-                        </p>
-                        <div class="vmz-commercial-hero__preview-foot">
-                            <span>
-                                {{ featuredOwnerLabel }}
-                            </span>
-                            <Button type="button" variant="secondary" @click="openFeaturedDetail">
-                                {{ commercialDetailOpenLabel }}
-                            </Button>
-                        </div>
-                    </div>
-                </section>
-                <section data-vmz-fixture="commercial-task-browse" aria-labelledby="commercial-task-browse-title" class="vmz-commercial-task">
-                    <div class="vmz-commercial-task__copy">
-                        <h2 id="commercial-task-browse-title">
-                            {{ commercialFeature1TitleLabel }}
-                        </h2>
-                        <p>
-                            {{ commercialFeature1DescLabel }}
-                        </p>
-                    </div>
-                    <div class="vmz-commercial-task__demo vmz-commercial-panel">
-                        <FilterBar :label="commercialBrowseFilterLabel">
-                            <Field :label="commercialBrowseFieldLabel" control-id="home-commercial-browse-query" description-id="home-commercial-browse-desc" error-id="home-commercial-browse-err" described-by="home-commercial-browse-desc" :value="browseQuery" @input="((e) => browseQuery = e.target.value)" />
-                            <Button type="button" variant="primary" @click="applyBrowseFilter">
-                                {{ commercialBrowseApplyLabel }}
-                            </Button>
-                            <Button type="button" variant="secondary" @click="resetBrowseFilter">
-                                {{ commercialBrowseResetLabel }}
-                            </Button>
-                        </FilterBar>
-                        <p v-if="browseLoading" role="status" class="vmz-commercial-loading">
-                            {{ loadingLabel }}
-                        </p>
-                        <p v-if="browseError" role="alert" class="vmz-commercial-loading">
-                            {{ loadErrorLabel }}
-                        </p>
-                        <p v-if="!browseLoading && !browseError && !browseFilterEmpty" class="vmz-commercial-scroll-hint">
-                            {{ scrollHint }}
-                        </p>
-                        <div v-if="browseFilterEmpty && !browseLoading && !browseError" data-vmz-fixture="commercial-browse-empty" role="status" class="vmz-commercial-empty">
-                            <strong>
-                                {{ commercialBrowseFilterEmptyTitleLabel }}
-                            </strong>
-                            <p>
-                                {{ commercialBrowseFilterEmptyBodyLabel }}
-                            </p>
-                            <Button type="button" variant="secondary" @click="resetBrowseFilter">
-                                {{ commercialBrowseResetLabel }}
-                            </Button>
-                        </div>
-                        <Table v-if="!browseLoading && !browseError && !browseFilterEmpty" :columns="browseColumns" :rows="browseRows" :has-row-action="false" />
-                    </div>
-                </section>
-                <section data-vmz-fixture="commercial-task-detail" aria-labelledby="commercial-task-detail-title" class="vmz-commercial-task">
-                    <div class="vmz-commercial-task__copy">
-                        <h2 id="commercial-task-detail-title">
-                            {{ commercialFeature2TitleLabel }}
-                        </h2>
-                        <p>
-                            {{ commercialFeature2DescLabel }}
-                        </p>
-                    </div>
-                    <div class="vmz-commercial-task__demo vmz-commercial-panel">
-                        <p v-if="featuredId" class="vmz-commercial-detail-line">
+                    <p class="vmz-commercial-demo-note">
+                        {{ demoNote }}
+                    </p>
+                </div>
+                <div :aria-label="previewAriaLabel" class="vmz-commercial-hero__preview">
+                    <div class="vmz-commercial-hero__preview-head">
+                        <span>
                             {{ featuredId }}
-                            ·
-                            {{ featuredSubjectLabel }}
-                            ·
+                        </span>
+                        <span>
                             {{ featuredStatusLabel }}
+                        </span>
+                    </div>
+                    <strong>
+                        {{ browseLoading ? loadingLabel : browseError ? loadErrorLabel : featuredSubjectLabel }}
+                    </strong>
+                    <p v-if="!browseLoading && !browseError">
+                        {{ featuredContextLabel }}
+                    </p>
+                    <div class="vmz-commercial-hero__preview-foot">
+                        <span>
+                            {{ featuredOwnerLabel }}
+                        </span>
+                        <Button type="button" variant="secondary" @click="openFeaturedDetail">
+                            {{ commercialDetailOpenLabel }}
+                        </Button>
+                    </div>
+                </div>
+            </section>
+            <section data-vmz-fixture="commercial-task-browse" aria-labelledby="commercial-task-browse-title" class="vmz-commercial-task">
+                <div class="vmz-commercial-task__copy">
+                    <h2 id="commercial-task-browse-title">
+                        {{ commercialFeature1TitleLabel }}
+                    </h2>
+                    <p>
+                        {{ commercialFeature1DescLabel }}
+                    </p>
+                </div>
+                <div class="vmz-commercial-task__demo vmz-commercial-panel">
+                    <FilterBar :label="commercialBrowseFilterLabel">
+                        <Field :label="commercialBrowseFieldLabel" control-id="home-commercial-browse-query" description-id="home-commercial-browse-desc" error-id="home-commercial-browse-err" described-by="home-commercial-browse-desc" :value="browseQuery" @input="((e) => browseQuery = e.target.value)" />
+                        <Button type="button" variant="primary" @click="applyBrowseFilter">
+                            {{ commercialBrowseApplyLabel }}
+                        </Button>
+                        <Button type="button" variant="secondary" @click="resetBrowseFilter">
+                            {{ commercialBrowseResetLabel }}
+                        </Button>
+                    </FilterBar>
+                    <p v-if="browseLoading" role="status" class="vmz-commercial-loading">
+                        {{ loadingLabel }}
+                    </p>
+                    <p v-if="browseError" role="alert" class="vmz-commercial-loading">
+                        {{ loadErrorLabel }}
+                    </p>
+                    <p v-if="!browseLoading && !browseError && !browseFilterEmpty" class="vmz-commercial-scroll-hint">
+                        {{ scrollHint }}
+                    </p>
+                    <div v-if="browseFilterEmpty && !browseLoading && !browseError" data-vmz-fixture="commercial-browse-empty" role="status" class="vmz-commercial-empty">
+                        <strong>
+                            {{ commercialBrowseFilterEmptyTitleLabel }}
+                        </strong>
+                        <p>
+                            {{ commercialBrowseFilterEmptyBodyLabel }}
                         </p>
-                        <p v-if="!featuredId" class="vmz-commercial-detail-line">
-                            {{ loadingLabel }}
+                        <Button type="button" variant="secondary" @click="resetBrowseFilter">
+                            {{ commercialBrowseResetLabel }}
+                        </Button>
+                    </div>
+                    <Table v-if="!browseLoading && !browseError && !browseFilterEmpty" :columns="browseColumns" :rows="browseRows" :has-row-action="false" />
+                </div>
+            </section>
+            <section data-vmz-fixture="commercial-task-detail" aria-labelledby="commercial-task-detail-title" class="vmz-commercial-task">
+                <div class="vmz-commercial-task__copy">
+                    <h2 id="commercial-task-detail-title">
+                        {{ commercialFeature2TitleLabel }}
+                    </h2>
+                    <p>
+                        {{ commercialFeature2DescLabel }}
+                    </p>
+                </div>
+                <div class="vmz-commercial-task__demo vmz-commercial-panel">
+                    <p v-if="featuredId" class="vmz-commercial-detail-line">
+                        {{ featuredId }}
+                        ·
+                        {{ featuredSubjectLabel }}
+                        ·
+                        {{ featuredStatusLabel }}
+                    </p>
+                    <p v-if="!featuredId" class="vmz-commercial-detail-line">
+                        {{ loadingLabel }}
+                    </p>
+                    <div data-vmz-fixture="commercial-drawer-open">
+                        <Button type="button" variant="secondary" @click="openFeaturedDetail">
+                            {{ commercialDetailOpenLabel }}
+                        </Button>
+                    </div>
+                    <Drawer v-if="drawerOpen" :open="drawerOpen" :title="commercialDrawerTitleLabel" title-id="home-commercial-drawer-title" :on-close="(() => drawerOpen = false)">
+                        <div class="vmz-commercial-drawer-content">
+                            <dl data-vmz-fixture="commercial-drawer-body" class="vmz-commercial-detail">
+                                <div>
+                                    <dt>
+                                        {{ commercialDrawerProjectLabel }}
+                                    </dt>
+                                    <dd data-vmz-fixture="commercial-drawer-project">
+                                        {{ detailProject }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt>
+                                        {{ commercialDrawerTargetLabel }}
+                                    </dt>
+                                    <dd data-vmz-fixture="commercial-drawer-target">
+                                        {{ detailTarget }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt>
+                                        {{ commercialDrawerStatusLabel }}
+                                    </dt>
+                                    <dd data-vmz-fixture="commercial-drawer-status">
+                                        {{ detailStatus }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt>
+                                        {{ commercialDrawerActorLabel }}
+                                    </dt>
+                                    <dd data-vmz-fixture="commercial-drawer-actor">
+                                        {{ detailActor }}
+                                    </dd>
+                                </div>
+                            </dl>
+                            <Link href="/console">
+                                {{ commercialOpenConsoleLabel }}
+                            </Link>
+                        </div>
+                    </Drawer>
+                </div>
+            </section>
+            <section data-vmz-fixture="commercial-task-action" aria-labelledby="commercial-task-action-title" class="vmz-commercial-task">
+                <div class="vmz-commercial-task__copy">
+                    <h2 id="commercial-task-action-title">
+                        {{ commercialFeature3TitleLabel }}
+                    </h2>
+                    <p>
+                        {{ commercialFeature3DescLabel }}
+                    </p>
+                </div>
+                <div class="vmz-commercial-task__demo vmz-commercial-panel">
+                    <Form :label="commercialFormLabel" :error-summary="actionSummary" summary-id="home-commercial-summary" :described-by="actionDescribedBy" @submit="confirmReview" @reset="resetReview">
+                        <Field :label="commercialReviewNoteLabel" :description="commercialReviewNoteDescLabel" control-id="home-commercial-review" description-id="home-commercial-review-desc" error-id="home-commercial-review-err" :described-by="reviewDescribedBy" :error="reviewError" :invalid-attr="reviewInvalid" :value="reviewNote" @input="onReviewNote" />
+                        <p data-vmz-fixture="commercial-review-note" class="vmz-sr-only">
+                            note:
+                            {{ reviewNote }}
                         </p>
-                        <div data-vmz-fixture="commercial-drawer-open">
-                            <Button type="button" variant="secondary" @click="openFeaturedDetail">
-                                {{ commercialDetailOpenLabel }}
+                        <div data-vmz-fixture="commercial-form-actions" class="vmz-commercial-actions">
+                            <Button type="submit">
+                                {{ commercialConfirmLabel }}
+                            </Button>
+                            <Button type="reset" variant="secondary">
+                                {{ commercialResetLabel }}
                             </Button>
                         </div>
-                        <Drawer v-if="drawerOpen" :open="drawerOpen" :title="commercialDrawerTitleLabel" title-id="home-commercial-drawer-title" :on-close="(() => drawerOpen = false)">
-                            <div class="vmz-commercial-drawer-content">
-                                <dl data-vmz-fixture="commercial-drawer-body" class="vmz-commercial-detail">
-                                    <div>
-                                        <dt>
-                                            {{ commercialDrawerProjectLabel }}
-                                        </dt>
-                                        <dd data-vmz-fixture="commercial-drawer-project">
-                                            {{ detailProject }}
-                                        </dd>
-                                    </div>
-                                    <div>
-                                        <dt>
-                                            {{ commercialDrawerTargetLabel }}
-                                        </dt>
-                                        <dd data-vmz-fixture="commercial-drawer-target">
-                                            {{ detailTarget }}
-                                        </dd>
-                                    </div>
-                                    <div>
-                                        <dt>
-                                            {{ commercialDrawerStatusLabel }}
-                                        </dt>
-                                        <dd data-vmz-fixture="commercial-drawer-status">
-                                            {{ detailStatus }}
-                                        </dd>
-                                    </div>
-                                    <div>
-                                        <dt>
-                                            {{ commercialDrawerActorLabel }}
-                                        </dt>
-                                        <dd data-vmz-fixture="commercial-drawer-actor">
-                                            {{ detailActor }}
-                                        </dd>
-                                    </div>
-                                </dl>
-                                <Link href="/console">
-                                    {{ commercialOpenConsoleLabel }}
-                                </Link>
-                            </div>
-                        </Drawer>
+                    </Form>
+                    <div v-if="reviewSuccess" data-vmz-fixture="commercial-notify">
+                        <Notification tone="success" role-name="status" :title="commercialNotifyTitleLabel" :description="commercialNotifyDescLabel">
+                            <Button type="button" variant="ghost" @click="(() => reviewSuccess = false)">
+                                {{ commercialNotifyCloseLabel }}
+                            </Button>
+                        </Notification>
                     </div>
-                </section>
-                <section data-vmz-fixture="commercial-task-action" aria-labelledby="commercial-task-action-title" class="vmz-commercial-task">
-                    <div class="vmz-commercial-task__copy">
-                        <h2 id="commercial-task-action-title">
-                            {{ commercialFeature3TitleLabel }}
-                        </h2>
-                        <p>
-                            {{ commercialFeature3DescLabel }}
-                        </p>
-                    </div>
-                    <div class="vmz-commercial-task__demo vmz-commercial-panel">
-                        <Form :label="commercialFormLabel" :error-summary="actionSummary" summary-id="home-commercial-summary" :described-by="actionDescribedBy" @submit="confirmReview" @reset="resetReview">
-                            <Field :label="commercialReviewNoteLabel" :description="commercialReviewNoteDescLabel" control-id="home-commercial-review" description-id="home-commercial-review-desc" error-id="home-commercial-review-err" :described-by="reviewDescribedBy" :error="reviewError" :invalid-attr="reviewInvalid" :value="reviewNote" @input="onReviewNote" />
-                            <p data-vmz-fixture="commercial-review-note" class="vmz-sr-only">
-                                note:
-                                {{ reviewNote }}
-                            </p>
-                            <div data-vmz-fixture="commercial-form-actions" class="vmz-commercial-actions">
-                                <Button type="submit">
-                                    {{ commercialConfirmLabel }}
-                                </Button>
-                                <Button type="reset" variant="secondary">
-                                    {{ commercialResetLabel }}
-                                </Button>
-                            </div>
-                        </Form>
-                        <div v-if="reviewSuccess" data-vmz-fixture="commercial-notify">
-                            <Notification tone="success" role-name="status" :title="commercialNotifyTitleLabel" :description="commercialNotifyDescLabel">
-                                <Button type="button" variant="ghost" @click="(() => reviewSuccess = false)">
-                                    {{ commercialNotifyCloseLabel }}
-                                </Button>
-                            </Notification>
-                        </div>
-                    </div>
-                </section>
-            </div>
-        </AppShell>
-    </div>
+                </div>
+            </section>
+        </main>
+    </SiteShell>
 </template>
 <style>
 .vmz-commercial-hero {

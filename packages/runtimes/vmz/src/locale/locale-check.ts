@@ -182,11 +182,11 @@ export function extractMessageParams(template: string): {
         }
         const parts = splitTopLevel(inner, ',');
         const name = (parts[0] || '').trim();
-        if (!name || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+        if (!name || ! /^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
             return { ok: false, params: [], error: `invalid argument name in {${inner}}` };
         }
         const kind = (parts[1] || 'string').trim().toLowerCase() || 'string';
-        if ((kind === 'plural' || kind === 'select' || kind === 'selectordinal') && !/\bother\b/.test(inner)) {
+        if ((kind === 'plural' || kind === 'select' || kind === 'selectordinal') && ! /\bother\b/.test(inner)) {
             return { ok: false, params: [], error: `${kind} requires other` };
         }
         const prev = params.get(name);

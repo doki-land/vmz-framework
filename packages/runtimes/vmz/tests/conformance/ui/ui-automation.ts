@@ -66,7 +66,7 @@ async function waitForFixtureTextIncludes(page, selector, needle, timeout = 5000
 /** True when build output has a product unknown-token diagnostic (not rustc quoting the const). */
 function productUnknownTokenDiag(out) {
     const text = String(out || '');
-    if (!text.includes(DIAG_UNKNOWN) && !/unknown design token/i.test(text)) return false;
+    if (!text.includes(DIAG_UNKNOWN) && ! /unknown design token/i.test(text)) return false;
     // rustc `missing documentation for a constant` blocks quote the DIAG_* source line.
     const lines = text.split(/\r?\n/);
     return lines.some((l) => {
@@ -889,22 +889,22 @@ async function proveFormDepth(page) {
     if (/XMLHttpRequest|startUpload\s*\(/.test(formSrcText)) {
         fail('Form depth: form.vmz must not hand-roll upload XHR — use @vmz/ui Upload destination/action');
     }
-    if (!/destination="server"/.test(formSrcText) || !/action="\/api\/form\/attachment"/.test(formSrcText)) {
+    if (! /destination="server"/.test(formSrcText) || ! /action="\/api\/form\/attachment"/.test(formSrcText)) {
         fail('Form depth: form.vmz must compose Upload destination=server + action');
     }
-    if (!/destination="client"/.test(formSrcText) || !/destination="object"/.test(formSrcText)) {
+    if (! /destination="client"/.test(formSrcText) || ! /destination="object"/.test(formSrcText)) {
         fail('Form depth: form.vmz must compose Upload destination=client and destination=object');
     }
-    if (!/:on-presign="presignObject"/.test(formSrcText) || !/\/api\/form\/presign/.test(formSrcText)) {
+    if (! /:on-presign="presignObject"/.test(formSrcText) || ! /\/api\/form\/presign/.test(formSrcText)) {
         fail('Form depth: form.vmz must bind Upload onPresign via #server /api/form/presign');
     }
-    if (!/:on-value="/.test(formSrcText)) {
+    if (! /:on-value="/.test(formSrcText)) {
         fail('Form depth: form.vmz must bind Upload onValue (result ownership)');
     }
-    if (!/:chunk-size="8"/.test(formSrcText) || !/action="\/api\/form\/resumable"/.test(formSrcText)) {
+    if (! /:chunk-size="8"/.test(formSrcText) || ! /action="\/api\/form\/resumable"/.test(formSrcText)) {
         fail('Form depth: form.vmz must compose Upload chunkSize + /api/form/resumable');
     }
-    if (!/\/api\/form\/resumable\/init/.test(formSrcText) || !/\/api\/form\/resumable\/chunk/.test(formSrcText)) {
+    if (! /\/api\/form\/resumable\/init/.test(formSrcText) || ! /\/api\/form\/resumable\/chunk/.test(formSrcText)) {
         fail('Form depth: form.vmz #server must expose resumable init/chunk routes');
     }
 
@@ -1984,7 +1984,7 @@ async function proveMotionContinuity(page) {
     if (!feedback.hasMotionAttr) fail('Motion: Button missing data-vmz-motion=control');
     if (feedback.duration !== '120ms') fail(`Motion: expected control duration 120ms, got ${feedback.duration}`);
     if (!feedback.easing) fail('Motion: missing control easing token on Button');
-    if (!/background/i.test(feedback.transition) && feedback.transition !== 'all') {
+    if (! /background/i.test(feedback.transition) && feedback.transition !== 'all') {
         // Some engines report shorthand; accept non-empty transition when duration token is present.
         if (!feedback.transition || feedback.transition === 'none') {
             fail(`Motion: Button transition missing immediate feedback path: ${feedback.transition}`);

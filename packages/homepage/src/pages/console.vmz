@@ -1,6 +1,6 @@
 <template>
     <div data-vmz-fixture="console" class="vmz-console-page">
-        <ConsoleShell brand="VMZ" home-href="/" active-nav-id="console" :title="consoleTitleLabel" :subtitle="consoleSubtitleLabel" :breadcrumb-label="consoleBreadcrumbLabel" :primary-action-label="consolePrimaryActionLabel" primary-action-href="/commercial" :nav-label="consoleNavLabel" :nav="navItems">
+        <ConsoleShell brand="VMZ" home-href="/" :active-nav-id="activeId" :title="consoleTitleLabel" :subtitle="consoleSubtitleLabel" :breadcrumb-label="consoleBreadcrumbLabel" :primary-action-label="consolePrimaryActionLabel" primary-action-href="/commercial" :nav-label="consoleNavLabel" :nav="navItems">
             <div class="vmz-console-content">
                 <section :aria-label="consoleSummaryAriaLabel" class="vmz-console-summary">
                     <div class="vmz-console-summary__panel">
@@ -364,9 +364,11 @@ import {
     consoleDrawerUpdated,
     consoleDrawerBranch,
     consolePageStatus,
-    commercialNavCommercial,
-    commercialNavConsole,
-    commercialNavHome,
+    navAbout,
+    navDocs,
+    navLab,
+    navProduct,
+    navShowcase,
 } from "#locales/common";
 import ConsolePageServer from "#server/pages/console";
 import {
@@ -374,7 +376,8 @@ import {
     statusAfterHandlingNote,
     summarizeTicketRows,
 } from "../demo/ticket-rows.ts";
-import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
+import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
+import { activeNavId, shellNav, siteNavItems } from "../nav.ts";
 
 const initialConsoleSummary = { total: 0, running: 0, failed: 0 };
 const initialConsoleRows = [];
@@ -459,6 +462,7 @@ export default class ConsolePage {
     }));
     rows = [];
     navItems = [];
+    activeId = "showcase";
     _unwatchLocale = null;
 
     onMount() {
@@ -559,15 +563,29 @@ export default class ConsolePage {
             { id: "actor", title: consoleColActor() },
             { id: "updated", title: consoleColUpdated() },
         ];
-        this.navItems = [
-            { id: "console", title: commercialNavConsole(), href: "/console" },
-            { id: "ui", title: commercialNavCommercial(), href: "/ui" },
-            { id: "home", title: commercialNavHome(), href: "/" },
-        ];
+        this.navItems = shellNav(
+            siteNavItems(
+                this.localeId,
+                {
+                    product: navProduct(),
+                    docs: navDocs(),
+                    showcase: navShowcase(),
+                    lab: navLab(),
+                    about: navAbout(),
+                },
+                docsPaths(this.localeId).docsRootHref,
+            ),
+        );
+        this.activeId = activeNavId(this.currentPath(), this.localeId);
         if (this.selectedCount > 0) {
             this.bulkLabel = consoleBulkSelected().replace("{count}", String(this.selectedCount));
         }
         this.refreshPageStatus();
+    }
+
+    currentPath() {
+        if (typeof window === "undefined" || !window.location) return "/console";
+        return window.location.pathname || "/console";
     }
 
     applyLocaleCopy(preferred) {

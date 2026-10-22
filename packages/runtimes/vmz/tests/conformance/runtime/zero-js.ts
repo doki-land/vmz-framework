@@ -116,7 +116,7 @@ try {
 
     const entryClient = fs.readFileSync(path.join(dist, 'entry-client.js'), 'utf8');
     // Idle/client entry uses hydrate / hydrateRoute (generator may emit either).
-    if (!/\bhydrate(?:Route|RoutePage)?\b/.test(entryClient)) {
+    if (! /\bhydrate(?:Route|RoutePage)?\b/.test(entryClient)) {
         fail('entry-client.js should still exist for mixed/idle pages');
     }
 

@@ -20,7 +20,7 @@ function dealSerializeItem(api: any, box: { item: { title: string; note: string 
     api.trackPatch(
         this,
         [],
-        function () {
+        function() {
             tTitle.value = String(box.item.title ?? '');
         },
         null,
@@ -32,7 +32,7 @@ function dealSerializeItem(api: any, box: { item: { title: string; note: string 
     api.trackPatch(
         this,
         [],
-        function () {
+        function() {
             tNote.value = String(box.item.note ?? '');
         },
         null,
@@ -109,13 +109,13 @@ describe('rowKernel SSR (serializeItem / IR)', () => {
                         this,
                         'rows',
                         (box) => box.item.id,
-                        function (apiInner: any, box: { item: { label: string } }) {
+                        function(apiInner: any, box: { item: { label: string } }) {
                             const li = apiInner.el('li');
                             const t = apiInner.text('');
                             apiInner.trackPatch(
                                 this,
                                 [],
-                                function () {
+                                function() {
                                     t.value = String(box.item.label ?? '');
                                 },
                                 null,

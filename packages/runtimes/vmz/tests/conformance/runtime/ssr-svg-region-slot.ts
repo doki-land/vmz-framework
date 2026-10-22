@@ -148,7 +148,7 @@ if (!htmlSvg.includes('<path')) fail(`SSR SVG icon missing <path>: ${htmlSvg}`);
 if (/<svg[\s\S]*<span[^>]*data-vmz-region/.test(htmlSvg)) {
     fail(`SSR SVG icon must not use HTML <span> region host inside <svg>: ${htmlSvg}`);
 }
-if (!/<svg[\s\S]*<path[^>]*\bd=/.test(htmlSvg)) {
+if (! /<svg[\s\S]*<path[^>]*\bd=/.test(htmlSvg)) {
     fail(`SSR SVG icon missing path d attribute: ${htmlSvg}`);
 }
 

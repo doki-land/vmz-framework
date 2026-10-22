@@ -8,6 +8,14 @@
                 {{ footerTagLabel }}
             </p>
         </div>
+        <nav :aria-label="pagesNavLabel" class="site-footer__group">
+            <b>
+                {{ pagesNavLabel }}
+            </b>
+            <a v-for="item in navItems" :key="item.id" :href="item.href">
+                {{ item.label }}
+            </a>
+        </nav>
         <nav :aria-label="productNavLabel" class="site-footer__group">
             <b>
                 {{ productNavLabel }}
@@ -21,22 +29,22 @@
             <a :href="deployDocHref">
                 {{ deployGuideLabel }}
             </a>
-            <a href="/#showcase">
-                {{ showcaseLabel }}
+            <a :href="pluginsHref">
+                {{ pluginsLabel }}
             </a>
         </nav>
         <nav :aria-label="resourcesNavLabel" class="site-footer__group">
             <b>
                 {{ resourcesNavLabel }}
             </b>
-            <a href="/welcome">
-                {{ welcomeLinkLabel }}
-            </a>
-            <a :href="pluginsHref">
-                {{ pluginsLabel }}
-            </a>
-            <a href="https://github.com/doki-land/vmz-framework">
+            <a :href="githubHref">
                 {{ githubLabel }}
+            </a>
+            <a :href="issuesHref">
+                {{ issuesLabel }}
+            </a>
+            <a :href="discussionsHref">
+                {{ discussionsLabel }}
             </a>
         </nav>
         <p class="site-footer__note">
@@ -48,37 +56,50 @@
 import {
     brand,
     docs,
-    showcase,
     gettingStartedGuide,
     deployGuide,
     plugins,
     footerTag,
+    footerPages,
     productNav,
     resourcesNav,
-    welcomeLink,
+    issues,
+    discussions,
     github,
     footerNote,
+    navProduct,
+    navShowcase,
+    navLab,
+    navAbout,
 } from "#locales/common";
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
+import { siteNavItems } from "../nav.ts";
+
+const REPO_HREF = "https://github.com/doki-land/vmz-framework";
 
 export default class SiteFooter {
     localeId = "zh-hans";
     brandLabel = "";
     footerTagLabel = "";
+    pagesNavLabel = "";
     docsLabel = "";
     gettingStartedGuideLabel = "";
     deployGuideLabel = "";
-    showcaseLabel = "";
     pluginsLabel = "";
     productNavLabel = "";
     resourcesNavLabel = "";
-    welcomeLinkLabel = "";
+    issuesLabel = "";
+    discussionsLabel = "";
     githubLabel = "";
     footerNoteLabel = "";
     docsRootHref = "/d/zh-hans/";
     guideHref = "/d/zh-hans/guide/";
     deployDocHref = "/d/zh-hans/guide/deploy/";
     pluginsHref = "/d/zh-hans/plugins/";
+    githubHref = REPO_HREF;
+    issuesHref = `${REPO_HREF}/issues`;
+    discussionsHref = `${REPO_HREF}/discussions`;
+    navItems = [];
     _unwatchLocale = null;
 
     onMount() {
@@ -94,14 +115,15 @@ export default class SiteFooter {
     refreshCopy() {
         this.brandLabel = brand();
         this.footerTagLabel = footerTag();
+        this.pagesNavLabel = footerPages();
         this.docsLabel = docs();
         this.gettingStartedGuideLabel = gettingStartedGuide();
         this.deployGuideLabel = deployGuide();
-        this.showcaseLabel = showcase();
         this.pluginsLabel = plugins();
         this.productNavLabel = productNav();
         this.resourcesNavLabel = resourcesNav();
-        this.welcomeLinkLabel = welcomeLink();
+        this.issuesLabel = issues();
+        this.discussionsLabel = discussions();
         this.githubLabel = github();
         this.footerNoteLabel = footerNote();
         const paths = docsPaths(this.localeId);
@@ -109,6 +131,17 @@ export default class SiteFooter {
         this.guideHref = paths.guideHref;
         this.deployDocHref = paths.deployDocHref;
         this.pluginsHref = paths.pluginsHref;
+        this.navItems = siteNavItems(
+            this.localeId,
+            {
+                product: navProduct(),
+                docs: docs(),
+                showcase: navShowcase(),
+                lab: navLab(),
+                about: navAbout(),
+            },
+            paths.docsRootHref,
+        ).filter((item) => item.id !== "docs");
     }
 
     applyLocaleCopy(preferred) {

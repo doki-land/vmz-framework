@@ -1,7 +1,6 @@
 <template>
-    <div class="site planner-page">
-        <SiteHeader />
-        <main class="planner">
+    <SiteShell page="deploy-planner" variant="planner-page">
+        <main id="main" class="planner">
             <header class="planner__hero">
                 <p class="planner__kicker">
                     <span />
@@ -314,8 +313,7 @@
                 </section>
             </div>
         </main>
-        <SiteFooter />
-    </div>
+    </SiteShell>
 </template>
 <style>
 .planner-page {

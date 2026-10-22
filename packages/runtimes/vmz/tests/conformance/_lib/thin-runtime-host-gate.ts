@@ -88,7 +88,7 @@ export function assertThinRuntimeImports(scan: ThinHostScan): string[] {
         errors.push('missing entry-client.js (static profile)');
         return errors;
     }
-    if (!/from\s+["']\.\/dom\.browser\.js/.test(scan.entryClient)) {
+    if (! /from\s+["']\.\/dom\.browser\.js/.test(scan.entryClient)) {
         errors.push('entry-client must import hydrate face from ./dom.browser.js');
     }
     if (/from\s+["']\.\/vmz-dom\.js/.test(scan.entryClient)) {
@@ -105,7 +105,7 @@ export function assertThinRuntimeImports(scan: ThinHostScan): string[] {
                 errors.push(`${name} still imports vmz-dom.js for __vmzRunTask`);
                 break;
             }
-            if (!/from\s+["'][^"']*dom-core\.js["']/.test(text) && !/from\s+["'][^"']*dom\.browser\.js["']/.test(text)) {
+            if (! /from\s+["'][^"']*dom-core\.js["']/.test(text) && ! /from\s+["'][^"']*dom\.browser\.js["']/.test(text)) {
                 errors.push(`${name} __vmzRunTask must resolve to dom-core.js or dom.browser.js`);
                 break;
             }
@@ -146,7 +146,7 @@ export function assertHostRuntimeBoundary(scan: ThinHostScan): string[] {
         const parts = [fs.readFileSync(nestedHost, 'utf8')];
         if (fs.existsSync(nestedBootstrap)) parts.push(fs.readFileSync(nestedBootstrap, 'utf8'));
         const text = parts.join('\n');
-        if (!/from\s+['"]\.\.\/\.\.\/vmz-runtime\.js['"]/.test(text) && !/from\s+['"]\.\.\/\.\.\/\.\.\/vmz-runtime\.js['"]/.test(text)) {
+        if (! /from\s+['"]\.\.\/\.\.\/vmz-runtime\.js['"]/.test(text) && ! /from\s+['"]\.\.\/\.\.\/\.\.\/vmz-runtime\.js['"]/.test(text)) {
             errors.push('_vmz/host serve entry must reach delivery-root vmz-runtime.js');
         }
         if (/from\s+['"]\.\/vmz-runtime\.js['"]/.test(text)) {
@@ -175,11 +175,11 @@ export function assertSingleRevisionOwner(root = repoRoot(import.meta.url)): str
     if (/emitted.*\/lib\//.test(serveHost) || /includes\('\/lib\/'\)/.test(serveHost)) {
         errors.push('serve-host must not guess full reload from emitted /lib/ paths');
     }
-    if (!/Boolean\(full\)/.test(serveHost) && !/opts\.payload\?\.full/.test(serveHost)) {
+    if (! /Boolean\(full\)/.test(serveHost) && ! /opts\.payload\?\.full/.test(serveHost)) {
         errors.push('serve-host softReload must honor payload.full');
     }
     const incremental = fs.readFileSync(path.join(root, 'packages/runtimes/vmz/src/dev/dev-incremental.ts'), 'utf8');
-    if (!/shouldSoftReload/.test(incremental) || !/outputRevision/.test(incremental)) {
+    if (! /shouldSoftReload/.test(incremental) || ! /outputRevision/.test(incremental)) {
         errors.push('dev-incremental must own shouldSoftReload(outputRevision)');
     }
     return errors;
@@ -191,7 +191,7 @@ export function assertNoBrowserPlanDispatch(root = repoRoot(import.meta.url), sc
     if (/shouldReloadAllPages|affectedChunks\s*=/.test(clientNav)) {
         errors.push('client-nav must not invent reload scope');
     }
-    if (/\/vmz-dom\.js/.test(clientNav) && !/dom\.browser\.js/.test(clientNav)) {
+    if (/\/vmz-dom\.js/.test(clientNav) && ! /dom\.browser\.js/.test(clientNav)) {
         errors.push('client-nav must load thin /dom.browser.js face');
     }
     if (scan) {

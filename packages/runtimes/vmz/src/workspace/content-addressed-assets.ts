@@ -286,7 +286,7 @@ function ingestCandidate(
  */
 export function resolveAssetByDigest(distDir, digest, ext = '') {
     const d = String(digest || '').trim();
-    if (!/^[a-f0-9]{64}$/i.test(d)) return null;
+    if (! /^[a-f0-9]{64}$/i.test(d)) return null;
     const suffix = ext && !ext.startsWith('.') ? `.${ext}` : ext;
     const rel = `assets/${d}${suffix}`;
     const abs = path.join(distDir, ...rel.split('/'));

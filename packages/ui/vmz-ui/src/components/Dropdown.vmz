@@ -5,8 +5,10 @@
         </summary>
         <div data-vmz-dropdown-menu="1" role="menu" class="vmz-ui-dropdown__menu">
             <div v-for="item in items" :key="item.id" class="vmz-ui-dropdown__row">
-                <div v-if="item.divider" role="separator" class="vmz-ui-dropdown__divider"></div>
-                <a v-else :href="item.href" role="menuitem" :data-vmz-dropdown-item="item.id" :data-danger="item.danger ? 'true' : 'false'" :data-disabled="item.disabled ? 'true' : 'false'" :aria-disabled="item.disabled ? 'true' : null" :tabindex="item.disabled ? -1 : null" class="vmz-ui-dropdown__item">{{ item.title }}</a>
+                <div v-if="item.divider" role="separator" class="vmz-ui-dropdown__divider" />
+                <a v-else :href="item.href" role="menuitem" :data-vmz-dropdown-item="item.id" :data-danger="item.danger ? 'true' : 'false'" :data-disabled="item.disabled ? 'true' : 'false'" :aria-disabled="item.disabled ? 'true' : null" :tabindex="item.disabled ? -1 : null" class="vmz-ui-dropdown__item">
+                    {{ item.title }}
+                </a>
             </div>
         </div>
     </details>

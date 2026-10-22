@@ -1,7 +1,6 @@
 <template>
-    <div class="site landing-page landing-v2">
-        <SiteHeader />
-        <main>
+    <SiteShell page="home" variant="landing-page landing-v2">
+        <main id="main">
             <section aria-labelledby="landing-title" data-vmz-fixture="landing-brand" class="v2-hero">
                 <div class="v2-hero__inner">
                     <div class="v2-hero__copy">
@@ -263,8 +262,7 @@
                 </div>
             </section>
         </main>
-        <SiteFooter />
-    </div>
+    </SiteShell>
 </template>
 <script client>
 import {

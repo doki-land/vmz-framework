@@ -89,7 +89,7 @@ export function assertThinRuntimeProduction(scan: ThinProductionScan): string[] 
         if (/\bbootstrapComponentRegistry\b/.test(scan.entryClient)) {
             errors.push('entry-client must not call bootstrapComponentRegistry');
         }
-        if (!/from\s+["']\.\/dom\.browser\.js/.test(scan.entryClient)) {
+        if (! /from\s+["']\.\/dom\.browser\.js/.test(scan.entryClient)) {
             errors.push('entry-client must import ./dom.browser.js');
         }
     }
@@ -99,7 +99,7 @@ export function assertThinRuntimeProduction(scan: ThinProductionScan): string[] 
         if (/api\.component\(this,\s*["'][A-Z]/.test(scan.serveIndexClient)) {
             errors.push('pages/index.client.js must pass Ctor to api.component (not string tag)');
         }
-        if (!/import\s+[A-Z]\w+\s+from\s+["'][./]/.test(scan.serveIndexClient)) {
+        if (! /import\s+[A-Z]\w+\s+from\s+["'][./]/.test(scan.serveIndexClient)) {
             errors.push('pages/index.client.js must static-import child components');
         }
     }

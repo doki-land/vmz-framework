@@ -1,0 +1,45 @@
+<template>
+    <div :data-page="page" :class="rootClass">
+        <a href="#main" class="skip-link">
+            {{ skipLabel }}
+        </a>
+        <SiteHeader />
+        <slot />
+        <SiteFooter />
+    </div>
+</template>
+<script client>
+import { skipToContent } from "#locales/common";
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
+
+/**
+ * Public page chrome: one header, one footer, one skip link. Pages own the
+ * content inside the slot, so section rhythm never depends on the shell.
+ */
+export default class SiteShell {
+    public page: string = "";
+    /** Extra page classes appended to the shell root, e.g. `landing-page landing-v2`. */
+    public variant: string = "";
+    rootClass = "site";
+    skipLabel = "";
+    _unwatchLocale = null;
+
+    onMount() {
+        this.rootClass = this.variant ? `site ${this.variant}` : "site";
+        this.applyLocaleCopy();
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+    }
+
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
+    }
+
+    applyLocaleCopy(preferred) {
+        const localeId = readLocaleId(preferred);
+        withLocaleHint(localeId, () => {
+            this.skipLabel = skipToContent();
+        });
+    }
+}
+</script>

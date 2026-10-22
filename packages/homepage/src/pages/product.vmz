@@ -1,108 +1,76 @@
 <template>
-    <div data-vmz-fixture="product" :data-density="density" :dir="dir">
-        <AppShell brand="VMZ" home-href="/" :nav-label="productNavLabel" :nav="navItems">
-            <div class="vmz-slot-content">
-                <div data-vmz-fixture="product-toolbar" class="vmz-product-toolbar">
-                    <Badge tone="brand">
-                        {{ versionLabel }}
-                    </Badge>
-                    <Button type="button" variant="secondary" @click="toggleVersion">
-                        {{ switchVersionLabel }}
-                    </Button>
-                    <Button type="button" variant="ghost" @click="toggleLocale">
-                        {{ localePrefixLabel }}
-                        {{ localeLabel }}
-                    </Button>
-                    <Button type="button" @click="cycleDensity">
-                        {{ cycleDensityLabel }}
-                    </Button>
-                    <Button type="button" variant="secondary" @click="toggleDir">
-                        {{ toggleRtlLabel }}
-                    </Button>
-                    <Field :label="searchLabel" control-id="home-product-search" description-id="home-product-search-desc" error-id="home-product-search-err" described-by="home-product-search-desc" :value="search" @input="onSearch" />
-                    <p data-vmz-fixture="product-meta" class="vmz-sr-only">
-                        version:
-                        {{ version }}
-                        ;locale:
-                        {{ locale }}
-                        ;search:
-                        {{ search }}
-                        ;copied:
-                        {{ copied }}
-                        ;density:
-                        {{ density }}
-                        ;dir:
-                        {{ dir }}
-                    </p>
-                </div>
-                <div class="vmz-product-layout">
-                    <Toc :label="tocLabel" :items="tocItems" />
-                    <Prose>
-                        <div>
-                            <h1 id="overview">
-                                {{ titleText }}
-                            </h1>
-                            <p class="lead">
-                                {{ leadText }}
-                            </p>
-                            <Callout tone="info" role-name="note" :title="calloutZeroJsTitle" :description="calloutZeroJsDesc" />
-                        </div>
-                        <div>
-                            <h2 id="install">
-                                {{ installHeading }}
-                            </h2>
-                            <p>
-                                {{ installBody }}
-                            </p>
-                            <div v-if="isV1">
-                                <CodeBlock caption="shell" :code="installCode" :copy-label="copyLabel" :on-copy="copyInstall" />
-                            </div>
-                            <div v-if="isV0">
-                                <CodeBlock caption="shell" :code="installCode" :copy-label="copyLabel" :on-copy="copyInstall" />
-                            </div>
-                            <p v-if="copiedYes" data-vmz-fixture="product-copied" role="status">
-                                {{ copiedStatus }}
-                            </p>
-                        </div>
-                        <div>
-                            <h2 id="contract">
-                                {{ contractHeading }}
-                            </h2>
-                            <p>
-                                {{ contractBodyLead }}
-                                <Link href="/d/">
-                                    文档站
-                                </Link>
-                                {{ contractBodyTail }}
-                            </p>
-                            <Callout tone="warning" role-name="note" :title="calloutNoThemeTitle" :description="calloutNoThemeDesc" />
-                            <ul>
-                                <li>
-                                    {{ contractLi1 }}
-                                </li>
-                                <li>
-                                    {{ contractLi2 }}
-                                </li>
-                                <li>
-                                    {{ contractLi3 }}
-                                </li>
-                            </ul>
-                        </div>
-                        <hr />
-                        <p>
-                            <Link href="/commercial">
-                                {{ navCommercialLabel }}
-                            </Link>
-                            ·
-                            <Link href="/console">
-                                {{ navConsoleLabel }}
-                            </Link>
-                        </p>
-                    </Prose>
-                </div>
+    <SiteShell page="product" variant="product-page">
+        <main id="main" data-vmz-fixture="product" class="vmz-product-content">
+            <div class="vmz-product-search">
+                <Field :label="searchLabel" control-id="home-product-search" description-id="home-product-search-desc" error-id="home-product-search-err" described-by="home-product-search-desc" :value="search" @input="onSearch" />
             </div>
-        </AppShell>
-    </div>
+            <div class="vmz-product-layout">
+                <Toc :label="tocLabel" :items="tocItems" />
+                <Prose>
+                    <div>
+                        <h1 id="overview">
+                            {{ titleText }}
+                        </h1>
+                        <p class="lead">
+                            {{ leadText }}
+                        </p>
+                        <Callout tone="info" role-name="note" :title="calloutZeroJsTitle" :description="calloutZeroJsDesc" />
+                    </div>
+                    <div>
+                        <h2 id="install">
+                            {{ installHeading }}
+                        </h2>
+                        <p>
+                            {{ installBody }}
+                        </p>
+                        <div v-if="isV1">
+                            <CodeBlock caption="shell" :code="installCode" :copy-label="copyLabel" :on-copy="copyInstall" />
+                        </div>
+                        <div v-if="isV0">
+                            <CodeBlock caption="shell" :code="installCode" :copy-label="copyLabel" :on-copy="copyInstall" />
+                        </div>
+                        <p v-if="copiedYes" data-vmz-fixture="product-copied" role="status">
+                            {{ copiedStatus }}
+                        </p>
+                    </div>
+                    <div>
+                        <h2 id="contract">
+                            {{ contractHeading }}
+                        </h2>
+                        <p>
+                            {{ contractBodyLead }}
+                            <Link href="/d/">
+                                文档站
+                            </Link>
+                            {{ contractBodyTail }}
+                        </p>
+                        <Callout tone="warning" role-name="note" :title="calloutNoThemeTitle" :description="calloutNoThemeDesc" />
+                        <ul>
+                            <li>
+                                {{ contractLi1 }}
+                            </li>
+                            <li>
+                                {{ contractLi2 }}
+                            </li>
+                            <li>
+                                {{ contractLi3 }}
+                            </li>
+                        </ul>
+                    </div>
+                    <hr />
+                    <p>
+                        <Link href="/commercial">
+                            {{ navCommercialLabel }}
+                        </Link>
+                        ·
+                        <Link href="/console">
+                            {{ navConsoleLabel }}
+                        </Link>
+                    </p>
+                </Prose>
+            </div>
+        </main>
+    </SiteShell>
 </template>
 <style>
 .vmz-product-toolbar {

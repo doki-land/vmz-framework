@@ -2,11 +2,17 @@
     <figure data-vmz-ui="code-block" class="vmz-ui-code-block">
         <div v-if="barVisible()" class="vmz-ui-code-block__bar">
             <div class="vmz-ui-code-block__heading">
-                <span v-if="language" class="vmz-ui-code-block__lang">{{ language }}</span>
-                <span v-if="title" class="vmz-ui-code-block__caption">{{ title }}</span>
-                <span v-else-if="caption" class="vmz-ui-code-block__caption">{{ caption }}</span>
+                <span v-if="language" class="vmz-ui-code-block__lang">
+                    {{ language }}
+                </span>
+                <span v-if="title" class="vmz-ui-code-block__caption">
+                    {{ title }}
+                </span>
+                <span v-else-if="caption" class="vmz-ui-code-block__caption">
+                    {{ caption }}
+                </span>
             </div>
-            <Button type="button" variant="text" size="sm" class="vmz-ui-code-block__copy" @click="onCopy">
+            <Button type="button" variant="text" size="sm" @click="onCopy" class="vmz-ui-code-block__copy">
                 {{ copyLabel }}
             </Button>
         </div>

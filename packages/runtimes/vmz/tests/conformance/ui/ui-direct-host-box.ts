@@ -84,7 +84,7 @@ class Page {
 
 const html = await renderToString(Page, {});
 if (!html.includes('data-vmz="Button"')) fail(`SSR missing Button host: ${html.slice(0, 400)}`);
-if (!/data-vmz="Button"[^>]*style="display:contents"/.test(html) && !/style="display:contents"[^>]*data-vmz="Button"/.test(html)) {
+if (! /data-vmz="Button"[^>]*style="display:contents"/.test(html) && ! /style="display:contents"[^>]*data-vmz="Button"/.test(html)) {
     // attribute order may vary
     const buttonHost = html.match(/<div[^>]*data-vmz="Button"[^>]*>/);
     if (!buttonHost || !buttonHost[0].includes('display:contents')) {

@@ -123,7 +123,7 @@ console.log('locale-none: serve none fixture…');
 await withServe(noneDist, 18781, async () => {
     const bare = await fetchText(18781, '/');
     if (bare.status !== 200) fail(`GET / status=${bare.status}`);
-    if (!/<html[^>]*\sdata-locale="en-us"/.test(bare.body) && !/<html[^>]*\slang="en-us"/.test(bare.body)) {
+    if (! /<html[^>]*\sdata-locale="en-us"/.test(bare.body) && ! /<html[^>]*\slang="en-us"/.test(bare.body)) {
         fail(`default SSR must be en-us: ${bare.body.slice(0, 400)}`);
     }
     if (!bare.body.includes('vmz.locale') || !bare.body.includes('localStorage')) {
@@ -132,10 +132,10 @@ await withServe(noneDist, 18781, async () => {
 
     const pref = await fetchText(18781, '/', { cookie: 'vmz.locale=zh-hans' });
     if (pref.status !== 200) fail(`cookie GET status=${pref.status}`);
-    if (!/<html[^>]*\sdata-locale="zh-hans"/.test(pref.body) && !/<html[^>]*\slang="zh-hans"/.test(pref.body)) {
+    if (! /<html[^>]*\sdata-locale="zh-hans"/.test(pref.body) && ! /<html[^>]*\slang="zh-hans"/.test(pref.body)) {
         fail(`cookie preference must negotiate SSR locale zh-hans: ${pref.body.slice(0, 500)}`);
     }
-    if (/data-locale="en-us"/.test(pref.body) && !/data-locale="zh-hans"/.test(pref.body)) {
+    if (/data-locale="en-us"/.test(pref.body) && ! /data-locale="zh-hans"/.test(pref.body)) {
         fail('SSR still en-us despite preference cookie');
     }
 });
@@ -148,7 +148,7 @@ const prefixDist = path.join(prefixExample, 'dist');
 await withServe(prefixDist, 18782, async () => {
     const en = await fetchText(18782, '/en-us/', { cookie: 'vmz.locale=zh-hans' });
     if (en.status !== 200) fail(`prefix GET status=${en.status}`);
-    if (!/<html[^>]*\s(data-locale|lang)="en-us"/.test(en.body)) {
+    if (! /<html[^>]*\s(data-locale|lang)="en-us"/.test(en.body)) {
         fail(`prefix URL must win over stale vmz.locale cookie: ${en.body.slice(0, 500)}`);
     }
     if (/data-locale="zh-hans"/.test(en.body)) {

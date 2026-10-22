@@ -94,7 +94,7 @@ if (tagRef.status !== 0) {
 }
 
 const peel = run(['rev-parse', `${tag}^{}`]);
-if (peel.status !== 0 || !/^[0-9a-f]{40}$/i.test(peel.stdout)) {
+if (peel.status !== 0 || ! /^[0-9a-f]{40}$/i.test(peel.stdout)) {
     fail(`could not peel ${tag}: ${peel.stderr || peel.stdout}`);
 }
 const tagSha = peel.stdout.toLowerCase();

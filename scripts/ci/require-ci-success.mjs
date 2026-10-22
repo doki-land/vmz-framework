@@ -165,7 +165,7 @@ function sleep(ms) {
 }
 
 async function main() {
-    if (!/^[0-9a-f]{40}$/.test(TAG_SHA)) {
+    if (! /^[0-9a-f]{40}$/.test(TAG_SHA)) {
         fail(`TAG_SHA must be 40-char hex (got '${TAG_SHA || '(empty)'}')`);
     }
 

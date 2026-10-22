@@ -176,7 +176,7 @@ export function scanForbiddenHotPath(distDir: string): string[] {
             }
             if (skipNames.has(name)) continue;
             // Application Direct emit only — ignore shared runtime copies.
-            if (!/\.client\.js$/.test(name)) continue;
+            if (! /\.client\.js$/.test(name)) continue;
             const text = fs.readFileSync(full, 'utf8');
             if (/\brender\s*\(/.test(text) && /__vmz|blueprint|kind:\s*"if"/.test(text)) {
                 hits.push(`${path.relative(distDir, full)}: render(`);

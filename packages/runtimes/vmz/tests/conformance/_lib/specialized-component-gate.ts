@@ -38,8 +38,8 @@ export function buildAndScanSpecialized(root = repoRoot(import.meta.url)): Gener
     const missingCreate: string[] = [];
     for (const rel of directModules) {
         const text = fs.readFileSync(path.join(build.dist, ...rel.split('/')), 'utf8');
-        if (!/__vmzDirect\s*=\s*true/.test(text)) missingDirect.push(rel);
-        if (!/__vmzCreate\b/.test(text)) missingCreate.push(rel);
+        if (! /__vmzDirect\s*=\s*true/.test(text)) missingDirect.push(rel);
+        if (! /__vmzCreate\b/.test(text)) missingCreate.push(rel);
         if (/prototype\.render\b/.test(text)) missingDirect.push(`${rel}:prototype.render`);
     }
 

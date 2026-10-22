@@ -318,7 +318,7 @@ proof.securityChecks = [
     {
         id: 'cookie-nonce-profile',
         status:
-            sec.cookieNamespace && sec.sessionNamespace && sec.requireNonceForInline === true && !/nonce-/.test(profileCsp)
+            sec.cookieNamespace && sec.sessionNamespace && sec.requireNonceForInline === true && ! /nonce-/.test(profileCsp)
                 ? 'passed'
                 : 'failed',
         detail: 'namespaces declared; CSP header-level only (no runtime nonce bind in this profile)',
@@ -363,7 +363,7 @@ upsertCheck(proof, {
 upsertCheck(proof, {
     id: 'production-observability.cookie-nonce-boundary',
     status:
-        sec.cookieNamespace && sec.sessionNamespace && sec.requireNonceForInline === true && !/nonce-/.test(profileCsp) ? 'passed' : 'failed',
+        sec.cookieNamespace && sec.sessionNamespace && sec.requireNonceForInline === true && ! /nonce-/.test(profileCsp) ? 'passed' : 'failed',
     detail: 'profile = CSP header-level; cookie/session/nonce runtime bind deferred',
 });
 upsertCheck(proof, {

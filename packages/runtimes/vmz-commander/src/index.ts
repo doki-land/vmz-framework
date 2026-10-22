@@ -856,12 +856,12 @@ export function parseOptionDef(rawName: string, helpId: string): OptionDef {
 function normalizeDiagnostic(error: unknown): CommandDiagnostic {
     if (error && typeof error === 'object') {
         const value = error as Record<string, unknown>;
-        const candidate = value.diagnostic && typeof value.diagnostic === 'object' ? value.diagnostic as Record<string, unknown> : value;
+        const candidate = value.diagnostic && typeof value.diagnostic === 'object' ? value.diagnostic as Record<string, unknown>: value;
         if (typeof candidate.code === 'string' || typeof candidate.severity === 'string' || typeof candidate.path === 'string') {
             return {
                 code: typeof candidate.code === 'string' ? candidate.code : undefined,
                 severity: typeof candidate.severity === 'string' ? candidate.severity : 'error',
-                args: candidate.args && typeof candidate.args === 'object' ? candidate.args as Record<string, string> : undefined,
+                args: candidate.args && typeof candidate.args === 'object' ? candidate.args as Record<string, string>: undefined,
                 path: typeof candidate.path === 'string' ? candidate.path : undefined,
                 span: candidate.span && typeof candidate.span === 'object' ? candidate.span as { start: number; end: number } : undefined,
                 message: typeof candidate.message === 'string' ? candidate.message : undefined,
