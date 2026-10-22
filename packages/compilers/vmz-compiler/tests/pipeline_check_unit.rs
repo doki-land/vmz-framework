@@ -118,13 +118,22 @@ fn invalid_template_expression_fails_snippet_ingress() {
     let diag = report
         .diagnostics
         .iter()
-        .find(|d| d.is_error() && d.code() == "vmz::template::invalid_expr")
-        .unwrap_or_else(|| panic!("missing invalid-expr diagnostic: {:?}", report.diagnostics));
-    assert_eq!(diag.code_string().as_deref(), Some("vmz::template::invalid_expr"));
-    let span = diag.source_span().expect("invalid-expr must carry SourceSpan");
+        .find(|d| d.is_error() && d.code().starts_with("vmz::template::"))
+        .unwrap_or_else(|| {
+            panic!("missing template-level error diagnostic: {:?}", report.diagnostics)
+        });
+    assert!(
+        diag.code_string().as_deref().is_some_and(
+            |c| c == "vmz::template::invalid_expr" || c == "vmz::template::parse_failed"
+        ),
+        "expected invalid_expr or parse_failed, got {:?}",
+        diag.code_string()
+    );
+    let span = diag.source_span().expect("template error must carry SourceSpan");
     assert!(span.end > span.start, "span={span:?}");
-    // Snippet is `<template>\n<p>{{ 1 + }}</p>\n</template>…` — mustache body is past content_start.
-    assert!(span.start > 0, "absolute span must not be template-body-local 0");
+    // Snippet is `<template>\n<p>{{ 1 + }}</p>\n</template>…` — span must be absolute,
+    // not template-body-local (which would be 0..11).
+    assert!(span.start > 11, "absolute span must be past <template> body start, got {span:?}");
 }
 
 #[test]

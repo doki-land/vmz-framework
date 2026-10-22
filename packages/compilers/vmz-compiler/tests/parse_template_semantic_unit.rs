@@ -303,9 +303,7 @@ fn dynamic_slot_arg_is_structured_error() {
     let err = lower_concrete_to_semantic(&concrete).unwrap_err();
     assert_eq!(err.code, "vmz::template::illegal_directive");
     assert!(
-        err.args
-            .get("detail")
-            .is_some_and(|v| v.contains("dynamic") && v.contains("slot")),
+        err.args.get("detail").is_some_and(|v| v.contains("dynamic") && v.contains("slot")),
         "{err:?}",
     );
 }
