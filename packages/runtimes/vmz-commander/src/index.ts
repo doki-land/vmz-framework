@@ -42,7 +42,32 @@ const ANSI_RESET = '\u001b[0m';
 function colorEnabled(): boolean {
     if (process.env.NO_COLOR !== undefined) return false;
     if (process.env.FORCE_COLOR && process.env.FORCE_COLOR !== '0') return true;
+
+    // Node.js reports `isTTY` as `undefined` in many Windows shells (PowerShell,
+    // Git Bash) even when the host (Windows Terminal, ConEmu, mintty) does emit
+    // ANSI. `tty.isatty(fd)` is reliable on every platform because it asks the
+    // OS directly. On top of that we also check well-known Windows-terminal
+    // env vars (`WT_SESSION`, `ConEmuANSI`, `ANSICON`) that legacy clients use
+    // to declare ANSI support. A `TERM=dumb` redirect still falls through.
+    const tty = tryImportTty();
+    if (tty && tty.isatty(process.stdout?.fd ?? 0)) return true;
+    if (tty && tty.isatty(process.stderr?.fd ?? 2)) return true;
+    if (process.env.WT_SESSION) return true;
+    if (process.env.ConEmuANSI === 'ON') return true;
+    if (process.env.ANSICON) return true;
+    if (process.env.TERM && process.env.TERM !== 'dumb') return true;
+
     return Boolean(process.stdout?.isTTY || process.stderr?.isTTY);
+}
+
+/** Dynamically resolve Node's `node:tty` module — safe in non-Node runners. */
+function tryImportTty(): typeof import('node:tty') | undefined {
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        return require('node:tty');
+    } catch {
+        return undefined;
+    }
 }
 
 function paint(value: string, ...colors: Color[]): string {
