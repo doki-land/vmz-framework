@@ -123,6 +123,21 @@ test('action-handler failure stays exit code 1 (not 2)', async () => {
     assert.equal(received[0]!.code, 'commander::action_failed');
 });
 
+test('action-handler failure preserves error text in args for catalog templates', async () => {
+    // 产品 catalog 模板常用 {message} 或 {detail} 占位符，正文必须在 args 里
+    // 而不是只放在 diagnostic.message 字段里（渲染器只做 template + args 替换）
+    const cli = mockCli();
+    cli.command('boom', 'cmd.boom').action(() => { throw new Error('reactor meltdown'); });
+    const received = collect(cli);
+    await cli.parse(['boom']);
+    const args = (received[0]! as any).args as Record<string, string>;
+    assert.ok(args, 'args should exist');
+    assert.equal(args.message, 'reactor meltdown', 'args.message must carry the error text');
+    assert.equal(args.detail, 'reactor meltdown', 'args.detail must also carry it for templates using {detail}');
+    // diagnostic.message 字段也保留，给没有 catalog 的兜底渲染器用
+    assert.equal((received[0]! as any).message, 'reactor meltdown');
+});
+
 test('action-handler returns number exit code wins over framework default', async () => {
     const cli = mockCli();
     cli.command('skip', 'cmd.skip').action(() => 7);

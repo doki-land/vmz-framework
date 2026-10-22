@@ -720,7 +720,9 @@ function normalizeDiagnostic(error: unknown): CommandDiagnostic {
             };
         }
     }
-    return { severity: 'error', code: 'commander::action_failed', message: error instanceof Error ? error.message : String(error) };
+    const text = error instanceof Error ? error.message : String(error);
+    // 同时放 message 和 detail：不同产品 catalog 模板可能用 {message} 或 {detail}
+    return { severity: 'error', code: 'commander::action_failed', args: { message: text, detail: text }, message: text };
 }
 
 /**

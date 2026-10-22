@@ -42,7 +42,8 @@ export class CliError extends Error {
     static from(err: unknown, fallbackCode = 'commander::action_failed'): CliError {
         if (err instanceof CliError) return err;
         const message = err instanceof Error ? err.message : String(err);
-        return new CliError({ code: fallbackCode, exitCode: 1, cause: err, args: { detail: message } });
+        // 同时放 message 和 detail：不同产品 catalog 模板可能用 {message} 或 {detail}
+        return new CliError({ code: fallbackCode, exitCode: 1, cause: err, args: { detail: message, message } });
     }
 }
 

@@ -204,6 +204,7 @@ describe('@vmz/commander locales + parse', () => {
         expect(received).toEqual([{
             severity: 'error',
             code: 'commander::action_failed',
+            args: { message: 'old parser prose', detail: 'old parser prose' },
             message: 'old parser prose',
         }]);
     });
