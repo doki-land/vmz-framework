@@ -1,6 +1,6 @@
 {
     "name": "@vmz/markdown-unknown-wasm32",
-    "version": "0.1.0",
+    "version": "0.3.6",
     "private": true,
     "type": "module",
     "description": "wasm32-oriented markdown fallback (thin stub; no .wasm binary required)",

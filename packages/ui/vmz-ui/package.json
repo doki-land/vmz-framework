@@ -5,7 +5,7 @@
         "url": "git+https://github.com/doki-land/vmz-framework.git",
         "directory": "packages/ui/vmz-ui"
     },
-    "version": "0.1.0",
+    "version": "0.3.6",
     "type": "module",
     "description": "VMZ UI — official UI framework (component contracts + semantic token requirements). Not a theme. Not a plugin.",
     "license": "MIT",

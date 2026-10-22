@@ -1,35 +1,38 @@
 {
-    "name": "@vmz/plugin-markdown-it",
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/doki-land/vmz-framework.git",
-        "directory": "packages/plugins/vmz-plugin-markdown-it"
+  "dependencies": {
+    "@vmz/plugin": "0.3.6",
+    "markdown-it": "^14.1.0"
+  },
+  "description": "VMZ markdown-it adapter — MarkdownIt + engines.markdown registration",
+  "exports": {
+    ".": {
+      "default": "./vmz.plugin.ts",
+      "types": "./vmz.plugin.ts"
     },
-    "version": "0.1.0",
-    "type": "module",
-    "description": "VMZ markdown-it adapter — MarkdownIt + engines.markdown registration",
-    "license": "MIT",
-    "main": "./vmz.plugin.ts",
-    "types": "./vmz.plugin.ts",
-    "exports": {
-        ".": {
-            "types": "./vmz.plugin.ts",
-            "default": "./vmz.plugin.ts"
-        },
-        "./runtime": {
-            "types": "./runtime.ts",
-            "default": "./runtime.ts"
-        },
-        "./package.json": "./package.json"
-    },
-    "dependencies": {
-        "@vmz/plugin": "workspace:*",
-        "markdown-it": "^14.1.0"
-    },
-    "keywords": [
-        "vmz",
-        "plugin",
-        "markdown",
-        "markdown-it"
-    ]
+    "./package.json": "./package.json",
+    "./runtime": {
+      "default": "./runtime.ts",
+      "types": "./runtime.ts"
+    }
+  },
+  "keywords": [
+    "vmz",
+    "plugin",
+    "markdown",
+    "markdown-it"
+  ],
+  "license": "MIT",
+  "main": "./vmz.plugin.ts",
+  "name": "@vmz/plugin-markdown-it",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "directory": "packages/plugins/vmz-plugin-markdown-it",
+    "type": "git",
+    "url": "git+https://github.com/doki-land/vmz-framework.git"
+  },
+  "type": "module",
+  "types": "./vmz.plugin.ts",
+  "version": "0.3.6"
 }

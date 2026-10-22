@@ -5,7 +5,7 @@
         "url": "git+https://github.com/doki-land/vmz-framework.git",
         "directory": "packages/runtimes/vmz-linux-arm64"
     },
-    "version": "0.1.0",
+    "version": "0.3.6",
     "description": "VMZ native N-API addon (linux-arm64)",
     "license": "MIT",
     "os": [
