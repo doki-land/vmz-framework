@@ -10,7 +10,7 @@
 .vmz-ui-checkbox {
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
+    gap: 0.5rem;
     font: inherit;
     cursor: pointer;
 }

@@ -14,8 +14,8 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.65rem 1rem;
-    padding: 0.65rem 0.85rem;
+    gap: 0.625rem 1rem;
+    padding: 0.625rem 0.85rem;
     border: 1px solid var(--vmz-line-default);
     border-radius: var(--vmz-radius-md, 6px);
     background: transparent;

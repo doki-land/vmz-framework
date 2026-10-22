@@ -63,7 +63,7 @@
     width: 100%;
     text-align: left;
     font: inherit;
-    padding: 0.4rem 0.65rem;
+    padding: 0.375rem 0.625rem;
     border: 0;
     border-radius: var(--vmz-radius-md, 6px);
     background: transparent;

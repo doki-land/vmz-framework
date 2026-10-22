@@ -105,7 +105,7 @@
 .vmz-ui-datatable__row-action {
     font: inherit;
     font-weight: 600;
-    padding: 0.3rem 0.55rem;
+    padding: 0.25rem 0.5rem;
     border: 1px solid var(--vmz-line-default);
     border-radius: var(--vmz-radius-md, 6px);
     background: transparent;

@@ -16,7 +16,7 @@
 }
 .vmz-ui-segmented button {
     min-height: 2rem;
-    padding: 0.3rem 0.75rem;
+    padding: 0.25rem 0.75rem;
     border: 0;
     border-radius: calc(var(--vmz-radius-md, 6px) - 2px);
     background: transparent;

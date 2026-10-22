@@ -15,7 +15,7 @@
 .vmz-ui-callout {
     display: flex;
     flex-direction: column;
-    gap: 0.45rem;
+    gap: 0.5rem;
     padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
     border: 1px solid var(--vmz-status-info-accent);
     border-left-width: 1px;

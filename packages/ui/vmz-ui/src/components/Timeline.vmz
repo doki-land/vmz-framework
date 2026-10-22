@@ -26,7 +26,7 @@
 
 .vmz-ui-timeline__item {
     position: relative;
-    padding: 0.15rem 0 0.15rem 0.85rem;
+    padding: 0.125rem 0 0.125rem 0.85rem;
 }
 
 .vmz-ui-timeline__item::before {
@@ -48,7 +48,7 @@
 }
 
 .vmz-ui-timeline__title {
-    margin: 0.15rem 0 0;
+    margin: 0.125rem 0 0;
     font-weight: 700;
     color: var(--vmz-action-primary-active);
 }

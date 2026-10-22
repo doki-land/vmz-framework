@@ -111,7 +111,7 @@
     font-size: 0.875rem;
     font-weight: 400;
     min-height: var(--vmz-control-height, 2rem);
-    padding: 0.25rem 0.95rem;
+    padding: 0.25rem 1rem;
     border: 1px solid var(--vmz-line-default);
     border-radius: var(--vmz-radius-md, 6px);
     cursor: pointer;

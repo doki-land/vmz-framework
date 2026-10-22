@@ -105,19 +105,22 @@
 .vmz-ui-dialog__close {
     font: inherit;
     font-size: 0.875rem;
-    font-weight: 400;
+    font-weight: 500;
     min-height: var(--vmz-control-height, 2rem);
-    padding: 0.25rem 0.95rem;
+    padding: 0.25rem 0.9375rem;
     border: 1px solid var(--vmz-line-default);
     border-radius: var(--vmz-radius-md, 6px);
     cursor: pointer;
-    background: var(--vmz-surface-paper, #fff);
+    background: var(--vmz-surface-paper);
     color: var(--vmz-text-ink);
+    transition:
+        color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+        border-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
 }
 
 .vmz-ui-dialog__close:hover {
-    color: var(--vmz-action-primary-background);
-    border-color: var(--vmz-action-primary-background);
+    color: var(--vmz-action-primary-hover);
+    border-color: var(--vmz-action-primary-hover);
 }
 
 .vmz-ui-dialog__close:focus-visible {

@@ -87,7 +87,7 @@
 .vmz-ui-popover__close {
     font: inherit;
     font-weight: 600;
-    padding: 0.4rem 0.7rem;
+    padding: 0.375rem 0.7rem;
     border: 1px solid transparent;
     border-radius: var(--vmz-radius-md, 6px);
     cursor: pointer;
