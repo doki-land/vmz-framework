@@ -10,9 +10,9 @@ import { expect } from '../../../../../scripts/test/expect.mjs';
 import { createDevSession, createWorkspace, resolveWorkspaceDirs, runCli, srcFingerprint } from 'vmz';
 
 describe('vmz Node CLI host (N2)', () => {
-    it('runCli routes argv through @vmz/commander (unknown command exits 1)', async () => {
+    it('runCli routes argv through @vmz/commander (unknown command exits 2)', async () => {
         const code = await runCli(['no-such-command']);
-        expect(code).toBe(1);
+        expect(code).toBe(2);
     });
 
     it('resolveWorkspaceDirs joins relative out-dir', () => {

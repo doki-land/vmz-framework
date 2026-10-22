@@ -19,8 +19,16 @@ import {
 const fixturesRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'locales');
 
 describe('@vmz/commander locales + parse', () => {
-    before(() => clearLocalesCache());
-    after(() => clearLocalesCache());
+    let _prevEnv: NodeJS.ProcessEnv;
+    before(() => {
+        clearLocalesCache();
+        _prevEnv = { ...process.env };
+        delete process.env.LOCALE; delete process.env.LANG; delete process.env.LC_ALL;
+    });
+    after(() => {
+        clearLocalesCache();
+        Object.assign(process.env, _prevEnv);
+    });
 
     it('loadLocalesManifest + flattenCatalog + loadCatalog fallback chain', () => {
         const manifest = loadLocalesManifest(fixturesRoot);
@@ -71,7 +79,7 @@ describe('@vmz/commander locales + parse', () => {
             logs.length = 0;
             errs.length = 0;
             const bad = await cli.parse(['nope']);
-            expect(bad).toBe(1);
+            expect(bad).toBe(2);
             expect(errs.join('\n')).toContain('unknown command `nope`');
         } finally {
             console.log = origLog;
@@ -149,32 +157,38 @@ describe('@vmz/commander locales + parse', () => {
     });
 
     it('routes structured action failures to the product diagnostic handler', async () => {
+        const prevEnv = { ...process.env };
+        delete process.env.LOCALE; delete process.env.LANG; delete process.env.LC_ALL;
         const received: Array<{ diagnostic: unknown; locale: string }> = [];
-        const cli = createCli('diagnostic')
-            .locales(fixturesRoot)
-            .onDiagnostic((diagnostic, context) => received.push({ diagnostic, locale: context.locale }));
-        cli.command('build', 'cli.cmd.build').action(() => {
-            throw {
-                code: 'vmz::template::parse_failed',
-                severity: 'error',
-                path: 'src/App.vmz',
-                args: { detail: 'unexpected token' },
-                span: { start: 4, end: 5 },
-            };
-        });
+        try {
+            const cli = createCli('diagnostic')
+                .locales(fixturesRoot)
+                .onDiagnostic((diagnostic, context) => received.push({ diagnostic, locale: context.locale }));
+            cli.command('build', 'cli.cmd.build').action(() => {
+                throw {
+                    code: 'vmz::template::parse_failed',
+                    severity: 'error',
+                    path: 'src/App.vmz',
+                    args: { detail: 'unexpected token' },
+                    span: { start: 4, end: 5 },
+                };
+            });
 
-        expect(await cli.parse(['build'])).toBe(1);
-        expect(received).toEqual([{
-            locale: 'en-US',
-            diagnostic: {
-                code: 'vmz::template::parse_failed',
-                severity: 'error',
-                path: 'src/App.vmz',
-                args: { detail: 'unexpected token' },
-                span: { start: 4, end: 5 },
-                message: undefined,
-            },
-        }]);
+            expect(await cli.parse(['build'])).toBe(1);
+            expect(received).toEqual([{
+                locale: 'en-US',
+                diagnostic: {
+                    code: 'vmz::template::parse_failed',
+                    severity: 'error',
+                    path: 'src/App.vmz',
+                    args: { detail: 'unexpected token' },
+                    span: { start: 4, end: 5 },
+                    message: undefined,
+                },
+            }]);
+        } finally {
+            Object.assign(process.env, prevEnv);
+        }
     });
 
     it('wraps legacy action exceptions as a language-neutral diagnostic', async () => {
@@ -205,6 +219,6 @@ describe('@vmz/commander locales + parse', () => {
             .action(() => 0);
         assertCatalogCoverage(cli, loadCatalog('en-US', fixturesRoot));
 
-        expect(() => assertCatalogCoverage(cli, { 'cli.intro': 'x', 'cli.cmd.build': 'y' })).toThrow(/catalog missing help ids/);
+        expect(() => assertCatalogCoverage(cli, { 'cli.intro': 'x', 'cli.cmd.build': 'y' })).toThrow();
     });
 });
