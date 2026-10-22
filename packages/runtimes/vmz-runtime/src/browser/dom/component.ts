@@ -197,6 +197,79 @@ export function destroy(inst) {
     }
 }
 
+export function insertProjectedSlotNode(target, node) {
+    if (!target || !node) return null;
+    if (String(target.tagName || '').toLowerCase() === 'slot') {
+        target.replaceWith(node);
+        return node;
+    }
+    target.appendChild(node);
+    return node;
+}
+
+/**
+ * Hold projected children until the component's default slot exists.
+ *
+ * A slot inside an unmounted `v-if` branch (closed drawer/dialog, loading
+ * skeleton) is absent at projection time. Appending to the component root would
+ * paint the child into the live page, so keep it detached and splice it in when
+ * the slot is mounted.
+ */
+export function parkSlotNode(hostEl, node) {
+    if (!hostEl || !node) return;
+    if (typeof MutationObserver === 'undefined') {
+        // Non-browser DOM (unit hosts): preserve the legacy root fallback.
+        const child = hostEl.__vmzInst;
+        const root = (child && child.__vmzDomRoot) || hostEl;
+        if (root && root.nodeType === 1 && typeof root.appendChild === 'function') root.appendChild(node);
+        else if (typeof hostEl.appendChild === 'function') hostEl.appendChild(node);
+        return;
+    }
+    const parked = hostEl.__vmzSlotParked || (hostEl.__vmzSlotParked = []);
+    parked.push(node);
+    if (hostEl.__vmzSlotObserver) return;
+    hostEl.__vmzSlotObserver = new MutationObserver(() => {
+        flushParkedSlotNodes(hostEl);
+    });
+    const scope = (hostEl.__vmzInst && hostEl.__vmzInst.__vmzDomRoot) || hostEl;
+    if (scope && scope.nodeType === 1) {
+        hostEl.__vmzSlotObserver.observe(scope, { childList: true, subtree: true });
+    }
+}
+
+/** Move parked children into the now-mounted default slot. Returns true when drained. */
+export function flushParkedSlotNodes(hostEl) {
+    if (!hostEl) return false;
+    const parked = hostEl.__vmzSlotParked;
+    if (!parked || !parked.length) return false;
+    const child = hostEl.__vmzInst;
+    const root = (child && child.__vmzDomRoot) || hostEl;
+    if (!root || root.nodeType !== 1) return false;
+    const target = findOwnedDefaultSlotTarget(root);
+    if (!target || !target.parentNode) return false;
+    if (hostEl.__vmzSlotObserver) {
+        hostEl.__vmzSlotObserver.disconnect();
+        hostEl.__vmzSlotObserver = null;
+    }
+    hostEl.__vmzSlotParked = [];
+    const tag = String(target.tagName || '').toLowerCase();
+    if (tag === 'slot') {
+        const frag = typeof document !== 'undefined' ? document.createDocumentFragment() : null;
+        if (!frag) {
+            target.replaceWith(parked[0]);
+            hostEl.__vmzSlotAnchor = parked[parked.length - 1];
+            return true;
+        }
+        for (const node of parked) frag.appendChild(node);
+        target.replaceWith(frag);
+        hostEl.__vmzSlotAnchor = parked[parked.length - 1];
+        return true;
+    }
+    for (const node of parked) target.appendChild(node);
+    hostEl.__vmzSlotAnchor = parked[parked.length - 1];
+    return true;
+}
+
 export function disposeDomTree(root) {
     if (!root) return;
     const seen = new Set();
@@ -216,6 +289,12 @@ export function disposeDomTree(root) {
             node.__vmzInst = null;
             destroy(child);
         }
+        if (node.__vmzSlotObserver) {
+            node.__vmzSlotObserver.disconnect();
+            node.__vmzSlotObserver = null;
+        }
+        if (node.__vmzSlotParked) node.__vmzSlotParked = [];
+        if (node.__vmzSlotAnchor) node.__vmzSlotAnchor = null;
         let child = node.firstChild;
         while (child) {
             const next = child.nextSibling;

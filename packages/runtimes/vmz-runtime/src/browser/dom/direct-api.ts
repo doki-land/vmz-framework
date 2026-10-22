@@ -14,7 +14,15 @@ import type {
 } from '../dom-core.types.js';
 import { createUnknownComponentElement } from '../unknown-component.js';
 import { applyDomAttr, eventPropHandlerName } from './attributes.js';
-import { createInstance, disposeDomTree, findOwnedDefaultSlotTarget, runDirectCreate, stripFns } from './component.js';
+import {
+    createInstance,
+    disposeDomTree,
+    findOwnedDefaultSlotTarget,
+    insertProjectedSlotNode,
+    parkSlotNode,
+    runDirectCreate,
+    stripFns,
+} from './component.js';
 import { isEventEntryStrategy, noteDomCreate, noteDomRemove, scheduleClientOn } from './lifecycle.js';
 import { components, resolveComponent } from './registry.js';
 import {
@@ -441,14 +449,20 @@ export const directApi = {
 
         const target = root && root.nodeType === 1 ? findOwnedDefaultSlotTarget(root) : null;
         if (target && target.parentNode) {
-            if (String(target.tagName || '').toLowerCase() === 'slot') {
-                target.replaceWith(node);
-                return;
-            }
-            target.appendChild(node);
+            hostEl.__vmzSlotAnchor = insertProjectedSlotNode(target, node);
             return;
         }
-        if (root && root.nodeType === 1 && typeof root.appendChild === 'function') root.appendChild(node);
-        else hostEl.appendChild(node);
+        // The `<slot>` was already replaced by an earlier projected child, so this
+        // call appends after the last one instead of re-searching for a slot.
+        const anchor = hostEl.__vmzSlotAnchor;
+        if (anchor && anchor.parentNode) {
+            anchor.parentNode.insertBefore(node, anchor.nextSibling);
+            hostEl.__vmzSlotAnchor = node;
+            return;
+        }
+        // Component slot may live inside an unmounted `v-if` branch (closed overlay,
+        // loading skeleton). Parking the child until the slot appears keeps it out of
+        // the component root, where it would otherwise leak into the rendered page.
+        parkSlotNode(hostEl, node);
     },
 };

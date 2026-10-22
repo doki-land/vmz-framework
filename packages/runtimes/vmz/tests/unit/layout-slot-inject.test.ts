@@ -74,4 +74,38 @@ describe('layout slotHtml injection', () => {
         const mainInner = html.match(/layout__main[^>]*>([\s\S]*?)<\/main>/)?.[1] ?? '';
         expect(mainInner).toContain('<div class="home">PAGE</div>');
     });
+
+    it('omits projected children when the component has no mounted default slot', async () => {
+        const { window } = parseHTML('<!doctype html><html><body></body></html>');
+        globalThis.document = window.document;
+        globalThis.HTMLElement = window.HTMLElement;
+        globalThis.Node = window.Node;
+
+        class ClosedSurface {
+            static __vmzDirect = true;
+            static __vmzCreate(api) {
+                const root = api.el('div');
+                api.attr(root, 'class', 'closed');
+                return root;
+            }
+        }
+
+        class Page {
+            static __vmzDirect = true;
+            static __vmzCreate(api) {
+                const root = api.el('main');
+                const surface = api.component(this, 'ClosedSurface', {}, null);
+                api.projectDefaultSlot(surface, api.text('LEAKED'));
+                root.appendChild(surface);
+                return root;
+            }
+        }
+
+        const { registerComponents } = await import('@vmz/core/dom');
+        registerComponents({ ClosedSurface });
+
+        const html = await renderToString(Page, {});
+        expect(html).toContain('class="closed"');
+        expect(html).not.toContain('LEAKED');
+    });
 });

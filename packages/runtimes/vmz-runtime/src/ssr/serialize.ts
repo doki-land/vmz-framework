@@ -536,7 +536,9 @@ const serializeApi = {
             target.children.push(node);
             return;
         }
-        if (root) root.appendChild(node);
+        // No default slot in this render: children belong to a branch that is not
+        // mounted (closed overlay, loading skeleton). Mirror the browser runtime and
+        // drop them instead of painting them into the component root.
     },
     setHtml(el, value) {
         if (!el || el.__kind !== 'el') return;
