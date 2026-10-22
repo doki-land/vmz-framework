@@ -40,11 +40,9 @@ vmz-plugin-tailwind = { path = "packages/compilers/vmz-plugin-tailwind" }
 vmz-plugin-sasso = { path = "packages/compilers/vmz-plugin-sasso" }
 vmz-oak-frontend-adapter = { path = "packages/compilers/vmz-oak-frontend-adapter" }
 
-# Oaks frontend (Vue SFC / CST). CI / publish resolve git `dev` only.
-# Overlaid by local path `.cargo/config.toml` (git ignored).
-oak-core = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
-oak-vue = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
-oak-typescript = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
+oak-core = { path = "../oaks/projects/oak-core" }
+oak-vue = { path = "../oaks/examples/oak-vue" }
+oak-typescript = { path = "../oaks/examples/oak-typescript" }
 editorconfig = "1.0.0"
 
 clap = { version = "4.6.6", features = ["derive"] }
@@ -57,9 +55,8 @@ json5 = "1.3.1"
 yaml_serde = "0.10.6"
 sha2 = "0.11.0"
 thiserror = "2.0.20"
-# Overlaid by local path `.cargo/config.toml` (git ignored).
-boost-fs = { git = "https://github.com/oovm/rust-boost", branch = "dev" }
-boost-http = { git = "https://github.com/oovm/rust-boost", branch = "dev" }
+boost-fs = { path = "../rust-boost/projects/boost-fs" }
+boost-http = { path = "../rust-boost/projects/boost-http" }
 tokio = { version = "1", features = ["rt", "time", "macros"] }
 
 napi = { version = "3.12.1", default-features = true, features = ["napi4"] }
