@@ -18,7 +18,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    padding: 1rem 1.25rem;
+    padding: 1.25rem 1.5rem;
     border: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
     border-radius: var(--vmz-radius-lg, 8px);
     background: var(--vmz-surface-paper);
@@ -30,19 +30,33 @@
 }
 .vmz-ui-card[data-hoverable="true"] {
     transition:
-        border-color var(--vmz-motion-control-duration, 0.16s),
-        box-shadow var(--vmz-motion-control-duration, 0.16s);
+        border-color var(--vmz-motion-emphasis-duration, 240ms) var(--vmz-motion-emphasis-easing, cubic-bezier(0.16, 1, 0.3, 1)),
+        box-shadow var(--vmz-motion-emphasis-duration, 240ms) var(--vmz-motion-emphasis-easing, cubic-bezier(0.16, 1, 0.3, 1)),
+        transform var(--vmz-motion-emphasis-duration, 240ms) var(--vmz-motion-emphasis-easing, cubic-bezier(0.16, 1, 0.3, 1));
 }
 .vmz-ui-card[data-hoverable="true"]:hover {
+    border-color: var(--vmz-line-default);
     box-shadow: var(
         --vmz-shadow-card-hover,
         0 1px 2px -2px rgba(0, 0, 0, 0.08),
         0 3px 6px 0 rgba(0, 0, 0, 0.06)
     );
+    transform: translateY(-1px);
+}
+.vmz-ui-card[data-hoverable="true"]:focus-within {
+    border-color: var(--vmz-action-primary-background);
+}
+@media (prefers-reduced-motion: reduce) {
+    .vmz-ui-card[data-hoverable="true"] {
+        transition: none;
+    }
+    .vmz-ui-card[data-hoverable="true"]:hover {
+        transform: none;
+    }
 }
 .vmz-ui-card[data-size="small"] {
     gap: 0.5rem;
-    padding: 0.75rem 1rem;
+    padding: 0.875rem 1rem;
 }
 
 :where([data-density="compact"]) .vmz-ui-card {
