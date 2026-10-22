@@ -74,34 +74,33 @@ function buildProductCli(opts: { mode?: 'global' | 'project' } = {}): Cli {
         return cli;
     }
 
-    const withWorkspaceOpts = (cmd: Command) =>
+    const withCoreOpts = (cmd: Command) =>
         cmd
             .option('--out-dir, -o <dir>', 'cli.opt.out-dir')
             .option('--release', 'cli.opt.release')
             .option('--profile <name>', 'cli.opt.profile')
             .option('--target <id>', 'cli.opt.target')
             .option('--origin <url>', 'cli.opt.origin')
-            .option('--host <host>', 'cli.opt.host')
-            .option('--port <port>', 'cli.opt.port')
-            .option('--poll-ms <ms>', 'cli.opt.poll-ms')
-            .option('--build', 'cli.opt.build')
             .option('--check', 'cli.opt.check')
             .option('--deny-warnings', 'cli.opt.deny-warnings');
 
-    withWorkspaceOpts(cli.command('check', 'cli.cmd.check'))
+    const withServeExtras = (cmd: Command) =>
+        cmd.option('--host <host>', 'cli.opt.host').option('--port <port>', 'cli.opt.port').option('--poll-ms <ms>', 'cli.opt.poll-ms').option('--build', 'cli.opt.build');
+
+    withCoreOpts(cli.command('check', 'cli.cmd.check'))
         .option('--level <level>', 'cli.opt.level')
         .option('--info', 'cli.opt.info-level')
         .option('--style <style>', 'cli.opt.diag-style')
         .action((options) => cmdCheck(options));
-    withWorkspaceOpts(cli.command('build', 'cli.cmd.build')).action((options) => cmdBuild(options));
-    withWorkspaceOpts(cli.command('serve', 'cli.cmd.serve')).action((options) => cmdServe(options));
-    withWorkspaceOpts(cli.command('dev', 'cli.cmd.dev')).action((options) => cmdDev(options));
-    withWorkspaceOpts(cli.command('format', 'cli.cmd.format'))
+    withCoreOpts(cli.command('build', 'cli.cmd.build')).action((options) => cmdBuild(options));
+    withServeExtras(withCoreOpts(cli.command('serve', 'cli.cmd.serve'))).action((options) => cmdServe(options));
+    withServeExtras(withCoreOpts(cli.command('dev', 'cli.cmd.dev'))).action((options) => cmdDev(options));
+    withCoreOpts(cli.command('format', 'cli.cmd.format'))
         .option('--no-javascript', 'cli.opt.format-no-javascript')
         .option('--no-rust', 'cli.opt.format-no-rust')
         .option('--no-vmz', 'cli.opt.format-no-vmz')
         .action((options) => cmdFormat(options));
-    withWorkspaceOpts(cli.command('lint', 'cli.cmd.lint'))
+    withCoreOpts(cli.command('lint', 'cli.cmd.lint'))
         .option('--level <level>', 'cli.opt.level')
         .option('--info', 'cli.opt.info-level')
         .option('--style <style>', 'cli.opt.diag-style')
