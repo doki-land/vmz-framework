@@ -9,3 +9,7 @@
 oak-core = { path = "<your-path>/oaks/projects/oak-core" }
 oak-vue = { path = "<your-path>/oaks/examples/oak-vue" }
 oak-typescript = { path = "<your-path>/oaks/examples/oak-typescript" }
+
+[patch."https://github.com/oovm/rust-boost"]
+boost-fs = { path = "<your-path>/rust-boost/projects/boost-fs" }
+boost-http = { path = "<your-path>/rust-boost/projects/boost-http" }
