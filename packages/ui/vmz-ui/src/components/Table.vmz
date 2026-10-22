@@ -31,59 +31,91 @@
 <style>
 .vmz-ui-table-wrap {
     overflow-x: auto;
-    border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
+    border: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
+    border-radius: var(--vmz-radius-lg, 8px);
+    background: var(--vmz-surface-paper);
 }
 
 .vmz-ui-table {
     width: 100%;
     border-collapse: collapse;
     font: inherit;
+    font-size: 0.875rem;
 }
 
 .vmz-ui-table th,
 .vmz-ui-table td {
-    padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+    padding: 0.75rem 1rem;
     text-align: left;
     border-bottom: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
     vertical-align: middle;
 }
 
+/* Header is structure, not brand: quiet ink on a tinted band. */
 .vmz-ui-table th {
-    font-weight: 700;
-    color: var(--vmz-action-primary-active);
-    background: transparent;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    letter-spacing: 0.01em;
+    color: var(--vmz-text-steel);
+    background: var(--vmz-surface-mist);
+    white-space: nowrap;
+}
+
+.vmz-ui-table tbody tr {
+    transition: background-color var(--vmz-motion-control-duration, 150ms)
+        var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+}
+
+.vmz-ui-table tbody tr:hover {
+    background: var(--vmz-surface-mist);
+}
+
+.vmz-ui-table tbody tr:last-child td {
+    border-bottom: 0;
 }
 
 .vmz-ui-table__sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
     font: inherit;
-    font-weight: 700;
+    font-weight: 600;
     padding: 0;
     border: 0;
     background: transparent;
     color: inherit;
     cursor: pointer;
     outline: none;
+    border-radius: var(--vmz-radius-xs, 2px);
 }
 
 .vmz-ui-table__sort:focus-visible {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-table__row-action {
     font: inherit;
-    font-weight: 600;
-    padding: 0.3rem 0.55rem;
+    font-weight: 500;
+    padding: 0.25rem 0.625rem;
     border: 1px solid var(--vmz-line-default);
     border-radius: var(--vmz-radius-md, 6px);
-    background: transparent;
-    color: var(--vmz-action-primary-active);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-action-primary-background);
     cursor: pointer;
     outline: none;
+    transition:
+        color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+        border-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+        background-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+}
+
+.vmz-ui-table__row-action:hover:not(:disabled) {
+    color: var(--vmz-action-primary-hover);
+    border-color: var(--vmz-action-primary-hover);
 }
 
 .vmz-ui-table__row-action:focus-visible {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-table__row-action:disabled {
