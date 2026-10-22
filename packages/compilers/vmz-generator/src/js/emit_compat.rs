@@ -11,6 +11,7 @@ use super::emit_direct::{
     ComponentHandlerCtx, emit_direct_create, emit_vmz_plan, is_direct_eligible,
 };
 use super::emit_ir::IrDepCursor;
+use super::module_rewrite::rewrite_module_specifiers;
 use super::print::EmittedJs;
 use super::transpile::transpile_ts;
 
@@ -391,7 +392,29 @@ pub fn rewrite_virtual_import(
 }
 
 /// Author may write `from './foo.ts'`; Node ESM under `dist/` needs `.js`.
+///
+/// Uses Oak CST-level [`rewrite_module_specifiers`] so that module strings inside
+/// comments or regular string literals are not mistaken for import specifiers.
+/// Gracefully falls back to a conservative text-level pass when Oak cannot parse
+/// the module (e.g. malformed TS/JS).
 pub fn rewrite_ts_spec_imports(js: &str) -> String {
+    let remap = |spec: &str| -> Option<String> {
+        if let Some(without_ext) = spec.strip_suffix(".tsx") {
+            Some(format!("{without_ext}.js"))
+        } else if let Some(without_ext) = spec.strip_suffix(".ts") {
+            Some(format!("{without_ext}.js"))
+        } else {
+            None
+        }
+    };
+
+    if let Some(oak_version) = rewrite_module_specifiers(js, remap) {
+        return oak_version;
+    }
+
+    // Oak parse failed — conservative line-level fallback that only touches
+    // lines known to contain import/export statements. This is the previous
+    // implementation; we keep it here so malformed source does not crash.
     js.lines()
         .map(|line| {
             let module_line = line.contains("from \"")
