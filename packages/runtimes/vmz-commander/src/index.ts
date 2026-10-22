@@ -322,7 +322,7 @@ class CliBuilder implements Cli {
             // 未知命令：加上 suggestion
             const names = this.roots.flatMap((r) => r.def.names);
             const suggest = closestMatch(cmdToken, names);
-            return this.emitAndHelp(
+            this.emitDiagnostic(
                 {
                     code: 'commander::unknown_command',
                     severity: 'error',
@@ -330,9 +330,8 @@ class CliBuilder implements Cli {
                 },
                 diagnosticContext,
                 t,
-                this.formatRootHelp(t),
-                2,
             );
+            return 2;
         }
 
         return await this.dispatch(matched.def, argv.slice(1), t, [cmdToken], globalOpts, diagnosticContext);
@@ -364,31 +363,32 @@ class CliBuilder implements Cli {
         return 0;
     }
 
-    /** Emit a diagnostic through `onDiagnostic` when registered, else console.error. */
+    /** Emit a diagnostic through `onDiagnostic` when registered, else console.error with a short hint. */
     private emitDiagnostic(
         diag: CommandDiagnostic,
         ctx: DiagnosticContext,
-        t: LocalizePlugin['t'],
+        _t: LocalizePlugin['t'],
     ): void {
         if (this.diagnosticHandler) {
             this.diagnosticHandler(diag, ctx);
         } else {
-            const msg = diag.message ?? (diag.code ? t(diag.code, diag.args) : '');
+            const msg = diag.message ?? (_t(diag.code!, diag.args) ?? '');
             console.error(errorText(msg || diag.code || String(diag)));
+            // parse/validation 错误加一行简短 hint
+            if (diag.code === 'commander::unknown_command'
+                || diag.code === 'commander::unknown_option'
+                || diag.code === 'commander::missing_option_value'
+                || diag.code === 'commander::parse_failed') {
+                const path = (diag.args?.cmd ?? '').split(' ');
+                const hintTarget = path.length > 1 ? path.join(' ') : this.name;
+                console.error(paint(`Run '${hintTarget} --help' for available options.`, 'dim'));
+            }
+            // suggestion 也打印出来（没有 handler 的 fallback）
+            const suggest = diag.args?.suggest;
+            if (suggest) {
+                console.error(paint(`Did you mean: ${suggest}`, 'dim'));
+            }
         }
-    }
-
-    /** Emit diagnostic, show help text, return exit code. Shorthand for parse/dispatch error paths. */
-    private emitAndHelp(
-        diag: CommandDiagnostic,
-        ctx: DiagnosticContext,
-        t: LocalizePlugin['t'],
-        helpText: string,
-        exitCode: number,
-    ): number {
-        this.emitDiagnostic(diag, ctx, t);
-        console.log(helpText);
-        return exitCode;
     }
 
     /** Derived root help: optional intro + commands/options from the registration tree. */
@@ -442,7 +442,7 @@ class CliBuilder implements Cli {
             if (!def.action) {
                 const childNames = def.children.flatMap((c) => c.names);
                 const suggest = closestMatch(childTok, childNames);
-                return this.emitAndHelp(
+                this.emitDiagnostic(
                     {
                         code: 'commander::unknown_command',
                         severity: 'error',
@@ -450,21 +450,19 @@ class CliBuilder implements Cli {
                     },
                     diagnosticContext,
                     t,
-                    formatCommandHelp(this.name, def, t, path, this.rootOptions),
-                    2,
                 );
+                return 2;
             }
         }
 
         if (!def.action) {
             if (rest.length) {
-                return this.emitAndHelp(
+                this.emitDiagnostic(
                     { code: 'commander::unknown_command', severity: 'error', args: { cmd: [...path, ...rest].join(' ') } },
                     diagnosticContext,
                     t,
-                    formatCommandHelp(this.name, def, t, path, this.rootOptions),
-                    2,
                 );
+                return 2;
             }
             console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
             return 0;
@@ -475,13 +473,12 @@ class CliBuilder implements Cli {
             options = def.passthrough ? { _: rest.slice() } : parseOptions(rest, def.options);
         } catch (err) {
             const cliErr = CliError.from(err, 'commander::parse_failed');
-            return this.emitAndHelp(
+            this.emitDiagnostic(
                 { code: cliErr.code, severity: 'error', args: cliErr.args, message: cliErr.message },
                 diagnosticContext,
                 t,
-                formatCommandHelp(this.name, def, t, path, this.rootOptions),
-                cliErr.exitCode,
             );
+            return cliErr.exitCode;
         }
 
         for (const [k, v] of Object.entries(globalOpts)) {
