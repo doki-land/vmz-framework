@@ -63,34 +63,59 @@ pub fn parse_expression_snippet(expr: &str) -> ExpressionSnippetParse {
     }
 
     let expression = built.result.as_ref().ok().and_then(|root| {
+        // Reject multi-statement snippets — a template expression must lower to exactly
+        // one expression; anything after the first is illegal trailing input.
+        if root.statements.len() > 1 {
+            diagnostics.push(OakFrontendDiagnostic {
+                message: format!(
+                    "template expression has {} statements; expected exactly one expression",
+                    root.statements.len()
+                ),
+                span: Some(ByteSpan { start: 0, end: trimmed.len() }),
+            });
+            return None;
+        }
         root.statements.iter().find_map(|stmt| match stmt {
             Statement::ExpressionStatement(es) => Some(es.expression.clone()),
             _ => None,
         })
     });
     if expression.is_none() {
-        let wrappers = if trimmed.contains("=>") {
-            vec![format!("const __vmz_expr = {trimmed};")]
-        } else if trimmed.starts_with("({") && trimmed.ends_with("})") {
-            vec![format!("const __vmz_expr = {} ;", &trimmed[1..trimmed.len() - 1])]
-        } else {
-            vec![format!("const __vmz_expr = ({trimmed});")]
-        };
-        for wrapped in wrappers {
+        let wrappers = wrapper_variants(trimmed);
+        for (wrapped, prefix_len) in &wrappers {
             let wrapped_source = SourceText::new(wrapped.as_str());
             let wrapped_built = Builder::build(&builder, &wrapped_source, &[], &mut cache);
+
+            // Preserve any diagnostics Oak emitted inside the wrapper (warnings about
+            // shadowing, unused vars, etc. — the old code dropped them).
+            let mut wrapper_diags = Vec::new();
+            if let Err(err) = &wrapped_built.result {
+                wrapper_diags.push(map_oak_error_with_prefix_offset(err, *prefix_len));
+            }
+            for err in &wrapped_built.diagnostics {
+                wrapper_diags.push(map_oak_error_with_prefix_offset(err, *prefix_len));
+            }
+
             if let Ok(root) = &wrapped_built.result {
+                // Same multi-statement guard inside the wrapper — we expect exactly
+                // the `const __vmz_expr = ...;` declaration, no trailing junk.
+                if root.statements.len() != 1 {
+                    continue;
+                }
                 if let Some(value) = root.statements.iter().find_map(|stmt| match stmt {
                     Statement::VariableDeclaration(decl) if decl.name == "__vmz_expr" => {
                         decl.value.clone()
                     }
                     _ => None,
                 }) {
+                    // `root_span` is intentionally snippet-local (0..trimmed.len()):
+                    // the expression we extracted occupies exactly the trimmed input.
+                    let ok = wrapper_diags.is_empty();
                     return ExpressionSnippetParse {
                         expression: Some(value),
                         root_span: Some(ByteSpan { start: 0, end: trimmed.len() }),
-                        diagnostics: Vec::new(),
-                        ok: true,
+                        diagnostics: wrapper_diags,
+                        ok,
                     };
                 }
             }
@@ -111,6 +136,46 @@ pub fn parse_expression_snippet(expr: &str) -> ExpressionSnippetParse {
 
 fn is_vue_contextual_identifier(value: &str) -> bool {
     matches!(value, "type" | "readonly" | "default" | "static" | "get" | "set")
+}
+
+/// Build wrapper strings and their `const __vmz_expr = …` prefix offsets.
+///
+/// The prefix length is added to every diagnostic that Oak emits inside the
+/// wrapper, so that offsets map back to snippet-local coordinates.
+fn wrapper_variants(trimmed: &str) -> Vec<(String, usize)> {
+    const PREFIX: &str = "const __vmz_expr = ";
+    if trimmed.contains("=>") {
+        vec![(format!("{PREFIX}{trimmed};"), PREFIX.len())]
+    } else if trimmed.starts_with("({") && trimmed.ends_with("})") {
+        let inner = &trimmed[1..trimmed.len() - 1];
+        vec![(format!("{PREFIX}{inner} ;"), PREFIX.len())]
+    } else {
+        vec![(format!("{PREFIX}({trimmed});"), PREFIX.len() + 1)] // +1 for '('
+    }
+}
+
+/// Offset an Oak error's diagnostic span back from wrapper-relative
+/// coordinates to snippet-local coordinates by subtracting `prefix_len`.
+fn map_oak_error_with_prefix_offset(
+    err: &oak_core::OakError,
+    prefix_len: usize,
+) -> OakFrontendDiagnostic {
+    let message = err.to_string();
+    use oak_core::OakErrorKind;
+    let span = match err.kind() {
+        OakErrorKind::SyntaxError { offset, .. }
+        | OakErrorKind::UnexpectedCharacter { offset, .. }
+        | OakErrorKind::UnexpectedToken { offset, .. }
+        | OakErrorKind::UnexpectedEof { offset, .. }
+        | OakErrorKind::ExpectedToken { offset, .. }
+        | OakErrorKind::ExpectedName { offset, .. }
+        | OakErrorKind::TrailingCommaNotAllowed { offset, .. } => {
+            let start = offset.saturating_sub(prefix_len);
+            Some(ByteSpan { start, end: start.saturating_add(1) })
+        }
+        _ => None,
+    };
+    OakFrontendDiagnostic { message, span }
 }
 
 /// Fail fast when Oak rejects a template expression snippet.
