@@ -53,6 +53,30 @@ function errorText(value: string): string {
     return paint(value, 'bold', 'red');
 }
 
+/**
+ * Render one help section (header + padded table).
+ *
+ * Both the root help and the command-node help share the same 3-line pattern:
+ * push section header (`paint(t(headerId), 'bold', 'blue')`), then a loop of
+ * `  ${paint(raw.padEnd(colWidth), color)} ${t(helpId)}`.
+ *
+ * Returns `lines[]` so callers can spread-append without trailing-empty concerns.
+ */
+function renderHelpSection(
+    t: LocalizePlugin['t'],
+    headerId: string,
+    rows: ReadonlyArray<{ rawName: string; helpId: string }>,
+    color: Color,
+    colWidth = 28,
+): string[] {
+    if (!rows.length) return [];
+    const out: string[] = [paint(t(headerId), 'bold', 'blue')];
+    for (const r of rows) {
+        out.push(`  ${paint(r.rawName.padEnd(colWidth), color)} ${t(r.helpId)}`);
+    }
+    return out;
+}
+
 /** Options bag passed to actions (`_` = positionals). */
 export type ParsedOptions = Record<string, string | boolean | string[]> & { _: string[] };
 
@@ -334,20 +358,25 @@ class CliBuilder implements Cli {
         if (this.introId) {
             lines.push(t(this.introId), '');
         }
-        lines.push(paint(t('commander.ui.usage', { name: this.name }), 'bold', 'cyan'), '', paint(t('commander.ui.commands'), 'bold', 'blue'));
-        for (const c of this.roots) {
-            lines.push(`  ${paint(c.def.rawName.padEnd(28), 'green')} ${t(c.def.helpId)}`);
-        }
+        lines.push(paint(t('commander.ui.usage', { name: this.name }), 'bold', 'cyan'));
+        lines.push('');
+        lines.push(...renderHelpSection(
+            t,
+            'commander.ui.commands',
+            this.roots.map((c) => ({ rawName: c.def.rawName, helpId: c.def.helpId })),
+            'green',
+        ));
         const opts = [
             ...this.rootOptions,
             ...collectRootOptions(this.roots.map((c) => c.def)).filter((o) => !this.rootOptions.some((r) => r.key === o.key)),
         ];
-        if (opts.length) {
-            lines.push('', paint(t('commander.ui.options'), 'bold', 'blue'));
-            for (const o of opts) {
-                lines.push(`  ${paint(o.rawName.padEnd(28), 'yellow')} ${t(o.helpId)}`);
-            }
-        }
+        lines.push('');
+        lines.push(...renderHelpSection(
+            t,
+            'commander.ui.options',
+            opts.map((o) => ({ rawName: o.rawName, helpId: o.helpId })),
+            'yellow',
+        ));
         return lines.join('\n');
     }
 
@@ -434,20 +463,25 @@ export function formatCommandHelp(
     path: string[],
     rootOptions: OptionDef[] = [],
 ): string {
-    const lines = [paint(`${cliName} ${path.join(' ')}`, 'bold', 'cyan') + ` — ${t(def.helpId)}`, ''];
+    const lines: string[] = [paint(`${cliName} ${path.join(' ')}`, 'bold', 'cyan') + ` — ${t(def.helpId)}`];
     if (def.children.length) {
-        lines.push(paint(t('commander.ui.commands'), 'bold', 'blue'));
-        for (const c of def.children) {
-            lines.push(`  ${paint(c.rawName.padEnd(28), 'green')} ${t(c.helpId)}`);
-        }
         lines.push('');
+        lines.push(...renderHelpSection(
+            t,
+            'commander.ui.commands',
+            def.children.map((c) => ({ rawName: c.rawName, helpId: c.helpId })),
+            'green',
+        ));
     }
     const opts = [...rootOptions, ...def.options.filter((o) => !rootOptions.some((r) => r.key === o.key))];
     if (opts.length) {
-        lines.push(paint(t('commander.ui.options'), 'bold', 'blue'));
-        for (const o of opts) {
-            lines.push(`  ${paint(o.rawName.padEnd(28), 'yellow')} ${t(o.helpId)}`);
-        }
+        lines.push('');
+        lines.push(...renderHelpSection(
+            t,
+            'commander.ui.options',
+            opts.map((o) => ({ rawName: o.rawName, helpId: o.helpId })),
+            'yellow',
+        ));
     }
     return lines.join('\n').trimEnd();
 }
