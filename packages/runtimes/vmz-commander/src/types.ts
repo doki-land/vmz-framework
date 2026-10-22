@@ -77,3 +77,58 @@ export type DiagnosticContext = { locale: string; t: LocalizePlugin['t'] };
 
 /** Product-owned sink. Formatting remains outside commander. */
 export type DiagnosticHandler = (diagnostic: CommandDiagnostic, context: DiagnosticContext) => void;
+
+/**
+ * Option registration config (additive — `.option(rawName, helpId, config?)`).
+ *
+ * Existing `parseOptionDef(rawName)` already extracts `<required>` / `[optional]` / `...repeatable`
+ * from the raw name string. This config adds runtime constraints that cannot be expressed in the DSL.
+ */
+export type OptionConfig = {
+    /** 默认值（不传时 options[key] = default） */
+    default?: string | boolean | string[];
+    /** 允许值集合；parse 时 strict 校验（失败 exit code 2） */
+    enum?: string[];
+    /** 是否必须（parse 时缺失 → CliError，exit code 2） */
+    required?: boolean;
+    /** 自定义转换（parse 后对值执行，coerce 失败 → CliError.exitCode 2） */
+    coerce?: (raw: string | boolean | string[]) => unknown;
+    /** 帮助文本中的简短示例（显示在 `--profile <name>` 后） */
+    example?: string;
+    /** 选项分组（帮助里的 section header） */
+    group?: string;
+    /** 标记 deprecated — 帮助里划线显示，调用时走 warn */
+    deprecated?: boolean | string;
+    /** 标记 hidden — 不显示在帮助（但仍可解析） */
+    hidden?: boolean;
+};
+
+/**
+ * Command action context — constructed by the framework before dispatching to `.actionCtx()`.
+ *
+ * Provides everything a command handler needs without re-parsing argv or re-discovering
+ * product internals. Error paths (`fail` / `warn` / `note`) route through the configured
+ * DiagnosticHandler (or stderr fallback) so downstream code never needs ad-hoc `console.error`.
+ */
+export type CommandContext = {
+    /** 完整命令路径（根命令在 [0]）— e.g. `['vmz', 'application', 'check']` */
+    commandPath: string[];
+    /** 命令路径的人类可读串 — e.g. `'vmz application check'` */
+    commandName: string;
+    /** 当前 locale id — e.g. `'en-US'` */
+    locale: string;
+    /** 产品 LocalizePlugin.t — action 可以用它渲染 helpId / 错误 id */
+    t: LocalizePlugin['t'];
+    /** 打印当前命令的帮助文本（框架级，从 command tree 自动派生） */
+    help: () => void;
+    /** 写入 stderr（正常错误输出） */
+    stderr: (...msgs: string[]) => void;
+    /** 写入 stdout（正常进度 / 结果输出） */
+    stdout: (...msgs: string[]) => void;
+    /** 框架级 fail：走 onDiagnostic + 退出码 2（parse/validation 错误） */
+    fail: (code: string, args?: Record<string, string>) => never;
+    /** 框架级 warn：走 onDiagnostic（warning severity，不退出） */
+    warn: (code: string, args?: Record<string, string>) => void;
+    /** 框架级 note：走 onDiagnostic（advice severity，不退出） */
+    note: (code: string, args?: Record<string, string>) => void;
+};

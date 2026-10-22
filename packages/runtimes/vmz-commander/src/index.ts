@@ -6,7 +6,7 @@
  * `commander.*` with tiny English fallbacks — no product language packs here.
  */
 
-export type { CatalogLoader, CommandDiagnostic, DiagnosticContext, DiagnosticHandler, LocaleCatalog, LocalizePlugin } from './types.js';
+export type { CatalogLoader, CommandContext, CommandDiagnostic, DiagnosticContext, DiagnosticHandler, LocaleCatalog, LocalizePlugin, OptionConfig } from './types.js';
 export { CliError } from './types.js';
 
 export {
@@ -22,7 +22,7 @@ export {
 } from './locales.js';
 export type { CreateLocalizeFromLocalesOptions, LocalesManifest } from './locales.js';
 
-import type { CatalogLoader, CommandDiagnostic, DiagnosticContext, DiagnosticHandler, LocaleCatalog, LocalizePlugin } from './types.js';
+import type { CatalogLoader, CommandContext, CommandDiagnostic, DiagnosticContext, DiagnosticHandler, LocaleCatalog, LocalizePlugin, OptionConfig } from './types.js';
 import { CliError } from './types.js';
 import { COMMANDER_FALLBACK_EN_US, createLocalizeFromLocales, translate, translateWithFallback } from './locales.js';
 
@@ -105,8 +105,11 @@ function renderHelpSection(
 /** Options bag passed to actions (`_` = positionals). */
 export type ParsedOptions = Record<string, string | boolean | string[]> & { _: string[] };
 
-/** Command action after argv is parsed. */
+/** Command action after argv is parsed (legacy API — no context). */
 export type ActionHandler = (options: ParsedOptions, ...args: string[]) => void | number | Promise<void | number>;
+
+/** Command action with full framework context (preferred API — additive, no break). */
+export type ActionCtxHandler = (options: ParsedOptions, args: string[], ctx: CommandContext) => void | number | Promise<void | number>;
 
 /** Registered option (structure only). */
 export type OptionDef = {
@@ -122,6 +125,9 @@ export type OptionDef = {
     optionalValue: boolean;
     /** True when the option may repeat (`--dirty <path>...` ⇒ `string[]`). */
     repeatable: boolean;
+    // --- Phase 3 additive ---
+    /** Runtime constraints (enum / required / default / coerce / deprecated). */
+    config?: OptionConfig;
 };
 
 /** Registered command node. */
@@ -131,15 +137,21 @@ export type CommandDef = {
     /** Match tokens from `rawName` split on `|`. */
     names: string[];
     options: OptionDef[];
+    /** Legacy action handler (no ctx). */
     action?: ActionHandler;
+    /** Phase 3 action handler (with ctx — preferred). */
+    actionCtx?: ActionCtxHandler;
     children: CommandDef[];
     /** If true, do not parse options; remaining argv is positionals / raw rest. */
     passthrough: boolean;
 };
 
 export interface Command {
-    option(rawName: string, helpId: string): this;
+    option(rawName: string, helpId: string, config?: OptionConfig): this;
+    /** Legacy API — handler receives `(options, ...args)` without ctx. */
     action(handler: ActionHandler): this;
+    /** Phase 3 API — handler receives `(options, args[], ctx)` with full command context. */
+    actionCtx(handler: ActionCtxHandler): this;
     command(rawName: string, helpId: string): Command;
     /** Leave remaining argv unparsed (for nested domain CLIs). */
     passthrough(): this;
@@ -185,14 +197,23 @@ class CommandBuilder implements Command {
         };
     }
 
-    option(rawName: string, helpId: string): this {
+    option(rawName: string, helpId: string, config?: OptionConfig): this {
         assertHelpId(helpId, 'option');
-        this.def.options.push(parseOptionDef(rawName, helpId));
+        const def = parseOptionDef(rawName, helpId);
+        if (config) def.config = config;
+        this.def.options.push(def);
         return this;
     }
 
     action(handler: ActionHandler): this {
+        if (this.def.actionCtx) throw CliError.configError('commander::config::action_conflict', { detail: 'Cannot set both .action() and .actionCtx()' });
         this.def.action = handler;
+        return this;
+    }
+
+    actionCtx(handler: ActionCtxHandler): this {
+        if (this.def.action) throw CliError.configError('commander::config::action_conflict', { detail: 'Cannot set both .action() and .actionCtx()' });
+        this.def.actionCtx = handler;
         return this;
     }
 
@@ -520,14 +541,62 @@ class CliBuilder implements Cli {
         }
 
         try {
-            const result = await def.action(options, ...options._);
+            let result: void | number;
+            if (def.actionCtx) {
+                const ctx = this.buildCommandContext(def, path, diagnosticContext.locale, t);
+                result = await def.actionCtx(options, options._, ctx);
+            } else if (def.action) {
+                result = await def.action(options, ...options._);
+            } else {
+                console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
+                return 0;
+            }
             if (typeof result === 'number') return result;
             return 0;
         } catch (err) {
             const diagnostic = normalizeDiagnostic(err);
             this.emitDiagnostic(diagnostic, diagnosticContext, t);
+            // CliError.exitCode is POSIX-correct (2 for parse/validation, 1 for config/action)
+            if (err instanceof CliError) return err.exitCode;
             return 1;
         }
+    }
+
+    /** Build a CommandContext for .actionCtx() handlers. */
+    private buildCommandContext(def: CommandDef, path: string[], locale: string, t: LocalizePlugin['t']): CommandContext {
+        const self = this;
+        const name = path.join(' ');
+        return {
+            commandPath: [this.name, ...path],
+            commandName: name,
+            locale,
+            t,
+            help: () => console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions)),
+            stderr: (...msgs) => { for (const m of msgs) console.error(m); },
+            stdout: (...msgs) => { for (const m of msgs) console.log(m); },
+            fail: (code, args) => {
+                self.emitDiagnostic(
+                    { code, severity: 'error', args: args ?? {}, message: args ? (args.message ?? '') : '' },
+                    { locale, t },
+                    t,
+                );
+                throw CliError.configError(code, args ?? {});
+            },
+            warn: (code, args) => {
+                self.emitDiagnostic(
+                    { code, severity: 'warning', args: args ?? {}, message: args ? (args.message ?? '') : '' },
+                    { locale, t },
+                    t,
+                );
+            },
+            note: (code, args) => {
+                self.emitDiagnostic(
+                    { code, severity: 'advice', args: args ?? {}, message: args ? (args.message ?? '') : '' },
+                    { locale, t },
+                    t,
+                );
+            },
+        };
     }
 }
 
