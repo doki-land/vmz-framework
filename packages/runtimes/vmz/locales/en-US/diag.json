@@ -2,6 +2,10 @@
     "diag.message": "{message}",
     "diag.detail": "{detail}",
     "commander::action_failed": "Command failed: {message}",
+    "commander::unknown_command": "Unknown command `{cmd}`.",
+    "commander::unknown_option": "Unknown option `{option}`.",
+    "commander::missing_option_value": "Missing value for option `{option}`.",
+    "commander::parse_failed": "Parse failed: {detail}",
 
     "vmz::template::illegal_directive": "Illegal or unsupported directive in `<template>`: {detail}",
     "vmz::template::parse_failed": "Failed to parse `<template>`: {detail}",

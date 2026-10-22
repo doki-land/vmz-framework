@@ -399,20 +399,27 @@ class CliBuilder implements Cli {
         } else {
             const msg = diag.message ?? (_t(diag.code!, diag.args) ?? '');
             console.error(errorText(msg || diag.code || String(diag)));
-            // parse/validation 错误加一行简短 hint
-            if (diag.code === 'commander::unknown_command'
-                || diag.code === 'commander::unknown_option'
-                || diag.code === 'commander::missing_option_value'
-                || diag.code === 'commander::parse_failed') {
-                const path = (diag.args?.cmd ?? '').split(' ');
-                const hintTarget = path.length > 1 ? path.join(' ') : this.name;
-                console.error(paint(`Run '${hintTarget} --help' for available options.`, 'dim'));
+        }
+        // hint 和 suggestion 是框架级 UI，无论 handler 是否存在都统一追加
+        if (diag.code === 'commander::unknown_command'
+            || diag.code === 'commander::unknown_option'
+            || diag.code === 'commander::missing_option_value'
+            || diag.code === 'commander::parse_failed') {
+            // unknown_command: hint 指向根命令（因为命令不存在）
+            // 其他: hint 指向 cmd args 里的命令路径
+            let hintTarget: string;
+            if (diag.code === 'commander::unknown_command') {
+                hintTarget = this.name;
+            } else {
+                hintTarget = typeof diag.args?.cmd === 'string' && diag.args.cmd
+                    ? diag.args.cmd.split(' ').join(' ')
+                    : this.name;
             }
-            // suggestion 也打印出来（没有 handler 的 fallback）
-            const suggest = diag.args?.suggest;
-            if (suggest) {
-                console.error(paint(`Did you mean: ${suggest}`, 'dim'));
-            }
+            console.error(paint(`Run '${hintTarget} --help' for available options.`, 'dim'));
+        }
+        const suggest = typeof diag.args?.suggest === 'string' ? diag.args.suggest : '';
+        if (suggest) {
+            console.error(paint(`Did you mean '${suggest}'?`, 'dim'));
         }
     }
 
@@ -498,8 +505,9 @@ class CliBuilder implements Cli {
             options = def.passthrough ? { _: rest.slice() } : parseOptions(rest, def.options);
         } catch (err) {
             const cliErr = CliError.from(err, 'commander::parse_failed');
+            const args = { ...(cliErr.args ?? {}), cmd: path.join(' ') };
             this.emitDiagnostic(
-                { code: cliErr.code, severity: 'error', args: cliErr.args, message: cliErr.message },
+                { code: cliErr.code, severity: 'error', args, message: cliErr.message },
                 diagnosticContext,
                 t,
             );
@@ -648,10 +656,7 @@ function parseArgvCore(
             rest.push(...argv.slice(i + 1));
             break;
         }
-        if (isHelpToken(a)) {
-            // 框架级保留：--help / -h 不进 options 也不进 rest，让上层 dispatch 处理
-            continue;
-        }
+        // help token 不在这里 skip：让它进 rest，由上层 dispatch 的 hasHelpToken 路由
         if (a.startsWith('--')) {
             const eq = a.indexOf('=');
             const long = eq === -1 ? a.slice(2) : a.slice(2, eq);
@@ -850,8 +855,8 @@ function closestMatch(input: string, candidates: string[]): string {
     }
     if (!best.length) return '';
     best.sort((a, b) => a.dist - b.dist);
-    // 最多返回前 3 个
-    return best.slice(0, 3).map((b) => b.name).join(', ');
+    // 只返回 top 1：多候选用逗号分隔看起来像一个命令
+    return best[0]!.name;
 }
 
 function levenshtein(a: string, b: string): number {
