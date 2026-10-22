@@ -56,7 +56,7 @@
     border-right: 1px solid var(--vmz-line-subtle, #e5e6eb);
     min-height: 100%;
     align-self: stretch;
-    background: #fff;
+    background: var(--vmz-surface-paper);
 }
 
 .vmz-ui-console-shell__brand {
@@ -65,7 +65,7 @@
     font-size: 1rem;
     letter-spacing: 0;
     text-decoration: none;
-    color: #1f2329;
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-console-shell__brand:focus-visible {
@@ -86,15 +86,15 @@
     font-size: 0.875rem;
     line-height: 1.375rem;
     text-decoration: none;
-    color: #51565d;
+    color: var(--vmz-text-steel);
     padding: 0.5rem 0.5rem;
-    border-radius: 6px;
+    border-radius: var(--vmz-radius-sm);
 }
 
 .vmz-ui-console-shell__nav a[data-active="true"] {
-    color: #0958d9;
+    color: var(--vmz-action-link-foreground);
     font-weight: 500;
-    background: #e6f4ff;
+    background: color-mix(in srgb, var(--vmz-action-primary-background) 10%, var(--vmz-surface-paper));
 }
 
 .vmz-ui-console-shell__nav a:focus-visible {
@@ -122,7 +122,7 @@
     min-height: 3.5rem;
     padding: 0.75rem 1.5rem;
     border-bottom: 1px solid var(--vmz-line-subtle, #e5e6eb);
-    background: #fff;
+    background: var(--vmz-surface-paper);
 }
 
 .vmz-ui-console-shell__header-copy {
@@ -133,7 +133,7 @@
 
 .vmz-ui-console-shell__breadcrumb {
     margin: 0;
-    color: #646a73;
+    color: var(--vmz-text-steel);
     font-size: 0.8125rem;
     line-height: 1.25rem;
 }
@@ -143,12 +143,12 @@
     font-size: 1.5rem;
     line-height: 2rem;
     font-weight: 600;
-    color: #1f2329;
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-console-shell__subtitle {
     margin: 0;
-    color: #51565d;
+    color: var(--vmz-text-steel);
     font-size: 0.875rem;
     line-height: 1.375rem;
 }
@@ -159,9 +159,9 @@
     justify-content: center;
     min-height: 2rem;
     padding: 0.25rem 0.75rem;
-    border-radius: 6px;
-    background: #1677ff;
-    color: #fff;
+    border-radius: var(--vmz-radius-sm);
+    background: var(--vmz-action-primary-background);
+    color: var(--vmz-action-primary-foreground);
     font-size: 0.875rem;
     font-weight: 500;
     text-decoration: none;
@@ -169,8 +169,8 @@
 }
 
 .vmz-ui-console-shell__action:hover {
-    color: #fff;
-    background: #0958d9;
+    color: var(--vmz-action-primary-foreground);
+    background: var(--vmz-action-primary-active);
 }
 
 .vmz-ui-console-shell__action:focus-visible {
@@ -192,7 +192,7 @@
     border-top: 1px solid var(--vmz-line-subtle, #e5e6eb);
     color: var(--vmz-text-steel, #646a73);
     font-size: 0.82rem;
-    background: #fff;
+    background: var(--vmz-surface-paper);
 }
 
 @media (max-width: 40rem) {
