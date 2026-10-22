@@ -11,6 +11,8 @@ import { pageHtmlRel } from './document-enrich.js';
 import { loadLocalesRouting } from './document-routing-config.js';
 import type { DocumentManifest } from './document-schema.js';
 import { ensureLocaleImportsRewritten } from '../locale/locale-check.js';
+import { ensureRuntimeCompanions } from '../workspace/pack.js';
+import { resolveCoreRuntimeDist } from '../workspace/runtime-dist.js';
 import { log } from '../workspace/log.js';
 import { requireNativeAddon } from '../workspace/native-addon.js';
 
@@ -47,6 +49,10 @@ export async function buildIntegratedDocuments(opts: BuildIntegratedDocumentsOpt
             log.error(locales.error || 'locale import rewrite incomplete');
             return { ok: false, error: locales.error || 'locale rewrite', pages: 0 };
         }
+        // Document layout chunks import the delivery runtime (dom-core.js) at mount
+        // time, but pack only materializes it afterwards. Ensure companions first so
+        // a clean or partially-written outDir does not fail with an opaque module error.
+        ensureRuntimeCompanions(outDir, resolveCoreRuntimeDist());
         const result = await buildDocuments({
             projectRoot,
             outDir,
