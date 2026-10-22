@@ -69,21 +69,27 @@ jobs:
           - os: windows-latest
             short: win32-x64
             triple: win32-x64-msvc
+            cross_target: ''
           - os: windows-11-arm
             short: win32-arm64
             triple: win32-arm64-msvc
+            cross_target: ''
           - os: ubuntu-latest
             short: linux-x64
             triple: linux-x64-gnu
+            cross_target: ''
           - os: ubuntu-24.04-arm
             short: linux-arm64
             triple: linux-arm64-gnu
+            cross_target: ''
           - os: macos-latest
             short: darwin-arm64
             triple: darwin-arm64
-          - os: macos-15-intel
+            cross_target: ''
+          - os: macos-latest
             short: darwin-x64
             triple: darwin-x64
+            cross_target: 'x86_64-apple-darwin'
     steps:
       - name: Checkout tag peel
         uses: actions/checkout@v5
@@ -105,6 +111,10 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@nightly
 
+      - name: Add cross-compile target
+        if: matrix.cross_target != ''
+        run: rustup target add ${{ matrix.cross_target }}
+
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
         with:
@@ -124,7 +134,7 @@ jobs:
         run: pnpm install
 
       - name: Build native (release)
-        run: node scripts/build/napi.mjs --release
+        run: node scripts/build/napi.mjs --release ${{ matrix.cross_target && format('--target {0}', matrix.cross_target) || '' }}
 
       - name: Stage native artifact
         shell: bash

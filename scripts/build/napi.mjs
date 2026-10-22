@@ -18,6 +18,15 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const release = process.argv.includes('--release');
 const profile = release ? 'release' : 'debug';
 
+// Optional `--target <triple>` for cross-compilation (e.g. x86_64-apple-darwin on macOS arm64 host).
+// When set, cargo build is passed `--target`, artifacts land in target/<triple>/<profile>/,
+// and platform info is derived from the target triple (not process.arch).
+const targetTriple = (() => {
+    const idx = process.argv.indexOf('--target');
+    if (idx !== -1 && process.argv[idx + 1]) return process.argv[idx + 1];
+    return '';
+})();
+
 if (process.env.VMZ_SKIP_NAPI === '1' || process.env.VMZ_SKIP_NAPI === 'true') {
     console.log('napi: skip (VMZ_SKIP_NAPI)');
     process.exit(0);
@@ -25,6 +34,18 @@ if (process.env.VMZ_SKIP_NAPI === '1' || process.env.VMZ_SKIP_NAPI === 'true') {
 
 /** @returns {{ triple: string, short: string, os: string[], cpu: string[] }} */
 function platformInfo() {
+    // Cross-compile: derive from --target triple instead of host process.arch.
+    if (targetTriple) {
+        const known = {
+            'x86_64-apple-darwin': { triple: 'darwin-x64', short: 'darwin-x64', os: ['darwin'], cpu: ['x64'] },
+            'aarch64-apple-darwin': { triple: 'darwin-arm64', short: 'darwin-arm64', os: ['darwin'], cpu: ['arm64'] },
+            'x86_64-pc-windows-msvc': { triple: 'win32-x64-msvc', short: 'win32-x64', os: ['win32'], cpu: ['x64'] },
+            'aarch64-pc-windows-msvc': { triple: 'win32-arm64-msvc', short: 'win32-arm64', os: ['win32'], cpu: ['arm64'] },
+            'x86_64-unknown-linux-gnu': { triple: 'linux-x64-gnu', short: 'linux-x64', os: ['linux'], cpu: ['x64'] },
+            'aarch64-unknown-linux-gnu': { triple: 'linux-arm64-gnu', short: 'linux-arm64', os: ['linux'], cpu: ['arm64'] },
+        };
+        if (known[targetTriple]) return known[targetTriple];
+    }
     const { platform, arch } = process;
     if (platform === 'win32' && arch === 'x64') {
         return { triple: 'win32-x64-msvc', short: 'win32-x64', os: ['win32'], cpu: ['x64'] };
@@ -50,6 +71,7 @@ function platformInfo() {
 
 const cargoArgs = ['build', '--manifest-path', path.join(root, 'Cargo.toml'), '-p', 'vmz-napi'];
 if (release) cargoArgs.push('--release');
+if (targetTriple) cargoArgs.push('--target', targetTriple);
 
 console.log(`cargo ${cargoArgs.join(' ')}`);
 const build = spawnSync('cargo', cargoArgs, { cwd: root, stdio: 'inherit' });
@@ -57,7 +79,10 @@ if (build.status !== 0) {
     process.exit(build.status ?? 1);
 }
 
-const targetDir = path.join(root, 'target', profile);
+// Cross-compile: artifacts live under target/<triple>/<profile>/
+const targetDir = targetTriple
+    ? path.join(root, 'target', targetTriple, profile)
+    : path.join(root, 'target', profile);
 const stem = 'vmz_napi';
 const candidates = [];
 if (process.platform === 'win32') {
