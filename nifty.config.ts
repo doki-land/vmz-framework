@@ -7,4 +7,11 @@ export default defineConfig({
         repo: 'doki-land/vmz-framework',
         releasesDir: 'documentation/maintenance/releases',
     },
+    trust: {
+        npm: {
+            repo: 'doki-land/vmz-framework',
+            file: 'publish-npm.yml',
+            environment: 'NPM_PUBLISH',
+        },
+    },
 });
