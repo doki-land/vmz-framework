@@ -49,8 +49,12 @@
             "value": "2.5rem"
         },
         {
-            "key": { "path": ["radius", "sm"] },
+            "key": { "path": ["radius", "xs"] },
             "value": "2px"
+        },
+        {
+            "key": { "path": ["radius", "sm"] },
+            "value": "4px"
         },
         {
             "key": { "path": ["radius", "md"] },
@@ -59,6 +63,10 @@
         {
             "key": { "path": ["radius", "lg"] },
             "value": "8px"
+        },
+        {
+            "key": { "path": ["radius", "pill"] },
+            "value": "999px"
         },
         {
             "key": { "path": ["shadow", "card"] },
