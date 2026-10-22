@@ -45,5 +45,24 @@
         "sans": "\"IBM Plex Sans\", \"Segoe UI\", sans-serif",
         "mono": "\"IBM Plex Mono\", ui-monospace, monospace",
         "display": "\"Space Grotesk\", \"IBM Plex Sans\", sans-serif"
+    },
+    "radius": {
+        "xs": "2px",
+        "pill": "999px"
+    },
+    "motion": {
+        "emphasis-duration": "240ms",
+        "emphasis-easing": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "control-duration": "150ms",
+        "control-easing": "cubic-bezier(0.4, 0, 0.2, 1)"
+    },
+    "action": {
+        "link-foreground": "#176BFF"
+    },
+    "layout": {
+        "max-width": "75rem"
+    },
+    "focus": {
+        "ring": "#176BFF4D"
     }
 }

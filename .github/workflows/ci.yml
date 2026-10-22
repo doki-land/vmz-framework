@@ -188,7 +188,6 @@ jobs:
 
       - name: Build example production-inspector
         run: pnpm --filter @vmz-examples/production-inspector run build
-        continue-on-error: true  # TODO: fix unknown_design_token on AppShell-radius-pill etc.
 
       - name: Build example production-router
         run: pnpm --filter @vmz-examples/production-router run build
