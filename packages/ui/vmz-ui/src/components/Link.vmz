@@ -1,5 +1,5 @@
 <template>
-    <a data-vmz-ui="link" :href="href" :target="target" :rel="rel" class="vmz-ui-link">
+    <a data-vmz-ui="link" :data-variant="variant" :href="href" :target="target" :rel="rel" class="vmz-ui-link">
         <slot />
     </a>
 </template>
@@ -9,13 +9,19 @@
     font-weight: 600;
     color: var(--vmz-action-primary-background);
     text-decoration: underline;
-    text-underline-offset: 0.15em;
+    text-underline-offset: 0.2em;
     text-decoration-thickness: 1px;
+    text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
     outline: none;
+    border-radius: var(--vmz-radius-sm, 4px);
+    transition:
+        color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+        text-decoration-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
 }
 
 .vmz-ui-link:hover {
     color: var(--vmz-action-primary-hover);
+    text-decoration-color: currentColor;
 }
 
 .vmz-ui-link:active {
@@ -23,8 +29,30 @@
 }
 
 .vmz-ui-link:focus-visible {
-    box-shadow: 0 0 0 2px var(--vmz-focus-ring);
-    border-radius: var(--vmz-radius-md, 6px);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+}
+
+/* Quiet inline link: neutral ink, underline appears only on intent. */
+.vmz-ui-link[data-variant="muted"] {
+    color: var(--vmz-text-steel);
+    text-decoration-color: transparent;
+}
+
+.vmz-ui-link[data-variant="muted"]:hover {
+    color: var(--vmz-action-primary-background);
+    text-decoration-color: currentColor;
+}
+
+/* Navigation link: chrome, not prose — underline is the hover affordance. */
+.vmz-ui-link[data-variant="nav"] {
+    font-weight: 500;
+    text-decoration: none;
+    text-decoration-color: transparent;
+}
+
+.vmz-ui-link[data-variant="nav"]:hover {
+    text-decoration: underline;
+    text-decoration-color: currentColor;
 }
 </style>
 <script client>
@@ -37,5 +65,7 @@ export default class Link {
     public href: string = "#";
     public target: string = "";
     public rel: string = "";
+    /** `default` inline prose link · `muted` quiet inline link · `nav` chrome link. */
+    public variant: string = "default";
 }
 </script>
