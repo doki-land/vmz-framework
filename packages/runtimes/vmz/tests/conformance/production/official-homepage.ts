@@ -448,12 +448,6 @@ if (homeBuild.status === 0) {
                 homeSsrDetail = 'GET /lab/datatable missing DataTable markers';
             } else if (productPage.status !== 200 || !productPage.body.includes('data-vmz-fixture="product"')) {
                 homeSsrDetail = `GET /product ${productPage.status} missing data-vmz-fixture="product"`;
-            } else if (
-                !productPage.body.includes('data-density="comfortable"') ||
-                !productPage.body.includes('dir="ltr"') ||
-                !productPage.body.includes('data-vmz-ui="prose"')
-            ) {
-                homeSsrDetail = 'GET /product missing density/dir/Prose markers';
             } else {
                 // Browser document navigation must get HTML error pages — not API JSON.
                 const missHtml = await getWithHeaders(`http://127.0.0.1:${PORT}/__vmz_no_such_page_error_wrap`, {

@@ -819,10 +819,7 @@ async function proveCommercialComposition(page) {
         input.dispatchEvent(new Event('input', { bubbles: true }));
     }, browseNeedle);
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="commercial-task-browse"] button.vmz-ui-btn')].find((b) => {
-            const text = (b.textContent || '').replace(/\s+/g, '');
-            return text.includes('Search') || text.includes('查询');
-        });
+        const btn = document.querySelector('[data-vmz-fixture="commercial-task-browse"] button[data-variant="primary"]');
         if (!(btn instanceof HTMLElement)) throw new Error('Commercial search button missing');
         btn.click();
     });
