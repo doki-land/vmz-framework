@@ -49,7 +49,9 @@ pub fn parse_expression_snippet(expr: &str) -> ExpressionSnippetParse {
     }
 
     let source = SourceText::new(trimmed);
-    let language = TypeScriptLanguage::default();
+    // VMZ template expressions are plain TypeScript and VMZ forbids JSX, so a
+    // leading `<` must read as a generic arrow or a type parameter list.
+    let language = TypeScriptLanguage { jsx: false, ..TypeScriptLanguage::standard() };
     let builder = TypeScriptBuilder::new(&language);
     let mut cache = ParseSession::default();
     let built = Builder::build(&builder, &source, &[], &mut cache);
@@ -154,6 +156,10 @@ fn wrapper_variants(trimmed: &str) -> Vec<(String, usize)> {
 
 /// Offset an Oak error's diagnostic span back from wrapper-relative
 /// coordinates to snippet-local coordinates by subtracting `prefix_len`.
+///
+/// Preserves the original span's width — only the start is shifted, because
+/// the wrapper prefix is always a leading byte slice that does not appear in
+/// the user's trimmed snippet.
 fn map_oak_error_with_prefix_offset(
     err: &oak_core::OakError,
     prefix_len: usize,
@@ -161,7 +167,8 @@ fn map_oak_error_with_prefix_offset(
     let mut diagnostic = crate::oak_cst::describe(err);
     if let Some(span) = diagnostic.span.take() {
         let start = span.start.saturating_sub(prefix_len);
-        diagnostic.span = Some(ByteSpan { start, end: start.saturating_add(1) });
+        let end = span.end.saturating_sub(prefix_len);
+        diagnostic.span = Some(ByteSpan { start, end });
     }
     diagnostic
 }

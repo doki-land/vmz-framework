@@ -20,10 +20,18 @@ pub struct ScriptAstParse {
     pub ok: bool,
 }
 
+/// VMZ script blocks are plain TypeScript, and VMZ forbids JSX.
+///
+/// With JSX enabled, `<T extends object>() => …` is read as a JSX element and
+/// the parser stalls on the attributes, so generic arrows never build.
+fn script_language() -> TypeScriptLanguage {
+    TypeScriptLanguage { jsx: false, ..TypeScriptLanguage::standard() }
+}
+
 /// Parse + build Oak TypeScript AST for a VMZ script body.
 pub fn parse_script_ast(script: &ScriptShellInput) -> ScriptAstParse {
     let source = SourceText::new(script.content.as_str());
-    let language = TypeScriptLanguage::default();
+    let language = script_language();
     let builder = TypeScriptBuilder::new(&language);
     let mut cache = ParseSession::default();
     let built = Builder::build(&builder, &source, &[], &mut cache);

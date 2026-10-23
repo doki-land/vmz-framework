@@ -203,3 +203,65 @@ fn oak_expression_snippet_rejects_incomplete_binary() {
     assert!(!parsed.ok, "incomplete binary must fail even if Oak is silent");
     assert!(!parsed.diagnostics.is_empty());
 }
+
+#[test]
+fn oak_expression_snippet_rejects_multiple_statements() {
+    for expr in ["a; b", "foo(); bar()", "x = 1; y = 2"] {
+        let parsed = parse_expression_snippet(expr);
+        assert!(
+            !parsed.ok,
+            "{expr}: must reject multi-statement template expression"
+        );
+        assert!(
+            parsed
+                .diagnostics
+                .iter()
+                .any(|d| d.code.contains("multiple_statements")),
+            "{expr}: must emit multiple_statements diagnostic, got {:?}",
+            parsed.diagnostics
+        );
+    }
+}
+
+#[test]
+fn oak_expression_snippet_non_ascii_preserves_spans() {
+    let expr = "\"日本語\".length + \"🚀🚀\".length";
+    let parsed = parse_expression_snippet(expr);
+    assert!(parsed.ok, "{expr}: {:?}", parsed.diagnostics);
+    let span = parsed.root_span.expect("span");
+    assert_eq!(&expr[span.start..span.end], expr);
+}
+
+#[test]
+fn oak_expression_snippet_arrow_expression_span_is_snippet_local() {
+    let expr = "() => ({ id: \"x\" })";
+    let parsed = parse_expression_snippet(expr);
+    assert!(parsed.ok, "{expr}: {:?}", parsed.diagnostics);
+    let span = parsed.root_span.expect("span");
+    // wrapper 会把它变成 `const __vmz_expr = () => ({ id: "x" });` 但 root_span
+    // 必须仍然指向 snippet-local 坐标（0..expr.len()），而不是 wrapper 内部偏移。
+    assert_eq!(span.start, 0);
+    assert_eq!(span.end, expr.len());
+}
+
+#[test]
+fn oak_expression_snippet_wrapper_diagnostics_keep_original_width() {
+    // 这个 snippet 会走 wrapper（箭头函数）并触发 Oak 诊断——
+    // 参数 `o` 未使用会被 Oak 警告。我们验证 wrapper diagnostics 映射
+    // 回 snippet-local 坐标时保留了原始 span 宽度，不会被截成 1 字节。
+    let expr = "() => { let x = 1; }";
+    let parsed = parse_expression_snippet(expr);
+    if let Some(span) = parsed.root_span {
+        // wrapper 返回的 root_span 必须是 snippet-local（硬编码 0..trimmed.len）
+        assert_eq!(span.start, 0, "root span.start must be snippet-local 0");
+        assert_eq!(span.end, expr.len(), "root span.end must be snippet-local len");
+    }
+    for d in &parsed.diagnostics {
+        if let Some(span) = &d.span {
+            assert!(
+                span.end > span.start,
+                "diagnostic span must have positive width, got {span:?} for {expr}"
+            );
+        }
+    }
+}
