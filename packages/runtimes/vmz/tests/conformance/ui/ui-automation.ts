@@ -883,8 +883,8 @@ async function proveFormDepth(page) {
         if (!contract.components?.[name]) fail(`Form depth token contract missing ${name}`);
     }
 
-    const formSrc = path.join(homepage, 'src', 'pages', 'form.vmz');
-    if (!fs.existsSync(formSrc)) fail('homepage missing src/pages/form.vmz');
+    const formSrc = path.join(homepage, 'src', 'pages', 'lab', 'form.vmz');
+    if (!fs.existsSync(formSrc)) fail('homepage missing src/pages/lab/form.vmz');
     const formSrcText = fs.readFileSync(formSrc, 'utf8');
     if (/XMLHttpRequest|startUpload\s*\(/.test(formSrcText)) {
         fail('Form depth: form.vmz must not hand-roll upload XHR — use @vmz/ui Upload destination/action');
@@ -908,7 +908,7 @@ async function proveFormDepth(page) {
         fail('Form depth: form.vmz #server must expose resumable init/chunk routes');
     }
 
-    await page.goto(`http://127.0.0.1:18781/form`, { waitUntil: 'networkidle0', timeout: 60000 });
+    await page.goto(`http://127.0.0.1:18781/lab/form`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="form"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
@@ -1883,8 +1883,8 @@ async function proveConsoleComposition(page) {
 async function proveMotionContinuity(page) {
     console.log('ui-automation: Motion control/overlay continuity…');
 
-    const motionSrc = path.join(homepage, 'src', 'pages', 'motion.vmz');
-    if (!fs.existsSync(motionSrc)) fail('homepage missing src/pages/motion.vmz');
+    const motionSrc = path.join(homepage, 'src', 'pages', 'lab', 'motion.vmz');
+    if (!fs.existsSync(motionSrc)) fail('homepage missing src/pages/lab/motion.vmz');
     for (const name of ['Button', 'Dialog', 'Drawer', 'Switch']) {
         const src = fs.readFileSync(path.join(uiRoot, 'src', 'components', `${name}.vmz`), 'utf8');
         if (name === 'Button' || name === 'Switch') {
@@ -1911,7 +1911,7 @@ async function proveMotionContinuity(page) {
     }
     if (!buttonSrc.includes('data-vmz-motion="control"')) fail('Button must mark control motion');
 
-    await page.goto(`http://127.0.0.1:18781/motion`, { waitUntil: 'networkidle0', timeout: 60000 });
+    await page.goto(`http://127.0.0.1:18781/lab/motion`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="motion"]', { timeout: 10000 });
     await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
 
@@ -2217,10 +2217,10 @@ async function proveUi4Surface(page) {
         fail('Button must use density.control.padding-y');
     }
 
-    const ui4Src = path.join(homepage, 'src', 'pages', 'ui4.vmz');
-    if (!fs.existsSync(ui4Src)) fail('homepage missing src/pages/ui4.vmz');
+    const ui4Src = path.join(homepage, 'src', 'pages', 'lab', 'feedback.vmz');
+    if (!fs.existsSync(ui4Src)) fail('homepage missing src/pages/lab/feedback.vmz');
 
-    await page.goto(`http://127.0.0.1:18781/ui4`, { waitUntil: 'networkidle0', timeout: 60000 });
+    await page.goto(`http://127.0.0.1:18781/lab/feedback`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="ui4"]', { timeout: 10000 });
 
     const tones = await page.evaluate(() => {
@@ -2329,10 +2329,10 @@ async function proveUi5Console(page) {
     }
     if (!tableSrc.includes('rowActionDisabled')) fail('UI5 Table must support permission disable');
 
-    const ui5Src = path.join(homepage, 'src', 'pages', 'ui5.vmz');
-    if (!fs.existsSync(ui5Src)) fail('homepage missing src/pages/ui5.vmz');
+    const ui5Src = path.join(homepage, 'src', 'pages', 'lab', 'console-patterns.vmz');
+    if (!fs.existsSync(ui5Src)) fail('homepage missing src/pages/lab/console-patterns.vmz');
 
-    await page.goto(`http://127.0.0.1:18781/ui5`, { waitUntil: 'networkidle0', timeout: 60000 });
+    await page.goto(`http://127.0.0.1:18781/lab/console-patterns`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="ui5"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
@@ -2650,10 +2650,10 @@ async function proveUi6DensityRtlPreset(page) {
         fail('Button token contract must require density.dense.padding-y');
     }
 
-    const ui6Src = path.join(homepage, 'src', 'pages', 'ui6.vmz');
-    if (!fs.existsSync(ui6Src)) fail('homepage missing src/pages/ui6.vmz');
+    const ui6Src = path.join(homepage, 'src', 'pages', 'lab', 'density-theme.vmz');
+    if (!fs.existsSync(ui6Src)) fail('homepage missing src/pages/lab/density-theme.vmz');
 
-    await page.goto(`http://127.0.0.1:18781/ui6`, { waitUntil: 'networkidle0', timeout: 60000 });
+    await page.goto(`http://127.0.0.1:18781/lab/density-theme`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="ui6"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
@@ -2827,10 +2827,10 @@ async function proveStructureComposition(page) {
         if (!contract.components?.[name]) fail(`Structure token contract missing ${name}`);
     }
 
-    const structureSrc = path.join(homepage, 'src', 'pages', 'structure.vmz');
-    if (!fs.existsSync(structureSrc)) fail('homepage missing src/pages/structure.vmz');
+    const structureSrc = path.join(homepage, 'src', 'pages', 'lab', 'structure.vmz');
+    if (!fs.existsSync(structureSrc)) fail('homepage missing src/pages/lab/structure.vmz');
 
-    await page.goto(`http://127.0.0.1:18781/structure`, { waitUntil: 'networkidle0', timeout: 60000 });
+    await page.goto(`http://127.0.0.1:18781/lab/structure`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="structure"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
@@ -2956,10 +2956,10 @@ async function proveChoiceDisclosure(page) {
         if (!contract.components?.[name]) fail(`Choice token contract missing ${name}`);
     }
 
-    const choiceSrc = path.join(homepage, 'src', 'pages', 'choice.vmz');
-    if (!fs.existsSync(choiceSrc)) fail('homepage missing src/pages/choice.vmz');
+    const choiceSrc = path.join(homepage, 'src', 'pages', 'lab', 'choice.vmz');
+    if (!fs.existsSync(choiceSrc)) fail('homepage missing src/pages/lab/choice.vmz');
 
-    await page.goto(`http://127.0.0.1:18781/choice`, { waitUntil: 'networkidle0', timeout: 60000 });
+    await page.goto(`http://127.0.0.1:18781/lab/choice`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="choice"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
@@ -3061,10 +3061,10 @@ async function proveOverlayStacking(page) {
         if (!src.includes('stackLevel')) fail(`${name} must accept stackLevel`);
     }
 
-    const stackingSrc = path.join(homepage, 'src', 'pages', 'stacking.vmz');
-    if (!fs.existsSync(stackingSrc)) fail('homepage missing src/pages/stacking.vmz');
+    const stackingSrc = path.join(homepage, 'src', 'pages', 'lab', 'overlay-stack.vmz');
+    if (!fs.existsSync(stackingSrc)) fail('homepage missing src/pages/lab/overlay-stack.vmz');
 
-    await page.goto(`http://127.0.0.1:18781/stacking`, { waitUntil: 'networkidle0', timeout: 60000 });
+    await page.goto(`http://127.0.0.1:18781/lab/overlay-stack`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="stacking"]', { timeout: 10000 });
 
     // Programmatic .click() — overlays cover page chrome; CDP mouse would hit backdrop.
@@ -3198,10 +3198,10 @@ async function proveDataTable(page) {
         fail('DataTable must not claim data-grid deep capabilities');
     }
 
-    const pageSrc = path.join(homepage, 'src', 'pages', 'datatable.vmz');
-    if (!fs.existsSync(pageSrc)) fail('homepage missing src/pages/datatable.vmz');
+    const pageSrc = path.join(homepage, 'src', 'pages', 'lab', 'datatable.vmz');
+    if (!fs.existsSync(pageSrc)) fail('homepage missing src/pages/lab/datatable.vmz');
 
-    await page.goto(`http://127.0.0.1:18781/datatable`, { waitUntil: 'networkidle0', timeout: 60000 });
+    await page.goto(`http://127.0.0.1:18781/lab/datatable`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="datatable"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => {

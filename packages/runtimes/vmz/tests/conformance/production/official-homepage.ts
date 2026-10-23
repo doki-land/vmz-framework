@@ -139,17 +139,17 @@ if (homeBuild.status !== 0) {
     if (!existsRel(HOMEPAGE, 'documents', 'documents.config.ts')) {
         errors.push('homepage missing documents.config.ts');
     }
-    if (!existsRel(HOMEPAGE, 'src', 'pages', 'ui.vmz')) {
-        errors.push('homepage missing /ui lab page');
+    if (!existsRel(HOMEPAGE, 'src', 'pages', 'lab', 'components.vmz')) {
+        errors.push('homepage missing /lab/components page');
     }
     const indexVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/index.vmz'), 'utf8');
     if (!indexVmz.includes('<Button')) errors.push('homepage index must compose Button');
-    const uiVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/ui.vmz'), 'utf8');
+    const uiVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/lab/components.vmz'), 'utf8');
     if (!uiVmz.includes('<Field') || !uiVmz.includes('<Dialog')) {
-        errors.push('homepage /ui must compose Field + Dialog');
+        errors.push('homepage /lab/components must compose Field + Dialog');
     }
     for (const tag of ['Checkbox', 'Switch', 'Tabs', 'Menu', 'Drawer', 'Popover']) {
-        if (!uiVmz.includes(`<${tag}`)) errors.push(`homepage /ui must compose <${tag}>`);
+        if (!uiVmz.includes(`<${tag}`)) errors.push(`homepage /lab/components must compose <${tag}>`);
     }
     if (!existsRel(HOMEPAGE, 'src', 'pages', 'commercial.vmz')) {
         errors.push('homepage missing /commercial composition page');
@@ -161,10 +161,10 @@ if (homeBuild.status !== 0) {
             }
         }
     }
-    if (!existsRel(HOMEPAGE, 'src', 'pages', 'form.vmz')) {
-        errors.push('homepage missing /form composition page');
+    if (!existsRel(HOMEPAGE, 'src', 'pages', 'lab', 'form.vmz')) {
+        errors.push('homepage missing /lab/form composition page');
     } else {
-        const formVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/form.vmz'), 'utf8');
+        const formVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/lab/form.vmz'), 'utf8');
         for (const tag of [
             'Form',
             'FormItem',
@@ -194,10 +194,10 @@ if (homeBuild.status !== 0) {
             }
         }
     }
-    if (!existsRel(HOMEPAGE, 'src', 'pages', 'motion.vmz')) {
-        errors.push('homepage missing /motion continuity page');
+    if (!existsRel(HOMEPAGE, 'src', 'pages', 'lab', 'motion.vmz')) {
+        errors.push('homepage missing /lab/motion continuity page');
     } else {
-        const motionVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/motion.vmz'), 'utf8');
+        const motionVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/lab/motion.vmz'), 'utf8');
         for (const tag of ['Button', 'Dialog', 'Drawer', 'Table']) {
             if (!motionVmz.includes(`<${tag}`)) {
                 errors.push(`homepage /motion must compose <${tag}>`);
@@ -207,37 +207,37 @@ if (homeBuild.status !== 0) {
             errors.push('homepage /motion must compose interrupt/cancel section');
         }
     }
-    if (!existsRel(HOMEPAGE, 'src', 'pages', 'ui4.vmz')) {
-        errors.push('homepage missing /ui4 surface page');
+    if (!existsRel(HOMEPAGE, 'src', 'pages', 'lab', 'feedback.vmz')) {
+        errors.push('homepage missing /lab/feedback surface page');
     } else {
-        const ui4Vmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/ui4.vmz'), 'utf8');
+        const ui4Vmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/lab/feedback.vmz'), 'utf8');
         for (const tag of ['AppShell', 'Alert', 'Notification', 'Result', 'Empty', 'Card', 'Button']) {
             if (!ui4Vmz.includes(`<${tag}`)) {
-                errors.push(`homepage /ui4 must compose <${tag}>`);
+                errors.push(`homepage /lab/feedback must compose <${tag}>`);
             }
         }
     }
-    if (!existsRel(HOMEPAGE, 'src', 'pages', 'ui5.vmz')) {
-        errors.push('homepage missing /ui5 console surface page');
+    if (!existsRel(HOMEPAGE, 'src', 'pages', 'lab', 'console-patterns.vmz')) {
+        errors.push('homepage missing /lab/console-patterns console surface page');
     } else {
-        const ui5Vmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/ui5.vmz'), 'utf8');
+        const ui5Vmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/lab/console-patterns.vmz'), 'utf8');
         for (const tag of ['ConsoleShell', 'Breadcrumb', 'QueryForm', 'Skeleton', 'Table', 'Timeline', 'Field', 'Drawer']) {
             if (!ui5Vmz.includes(`<${tag}`)) {
-                errors.push(`homepage /ui5 must compose <${tag}>`);
+                errors.push(`homepage /lab/console-patterns must compose <${tag}>`);
             }
         }
     }
-    if (!existsRel(HOMEPAGE, 'src', 'pages', 'ui6.vmz')) {
-        errors.push('homepage missing /ui6 density/rtl/preset page');
+    if (!existsRel(HOMEPAGE, 'src', 'pages', 'lab', 'density-theme.vmz')) {
+        errors.push('homepage missing /lab/density-theme density/rtl/preset page');
     } else {
-        const ui6Vmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/ui6.vmz'), 'utf8');
+        const ui6Vmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/lab/density-theme.vmz'), 'utf8');
         for (const tag of ['AppShell', 'Alert', 'Card', 'Field', 'Button']) {
             if (!ui6Vmz.includes(`<${tag}`)) {
-                errors.push(`homepage /ui6 must compose <${tag}>`);
+                errors.push(`homepage /lab/density-theme must compose <${tag}>`);
             }
         }
         if (!ui6Vmz.includes('data-density') || (!ui6Vmz.includes(':dir="dir"') && !ui6Vmz.includes('dir={dir}'))) {
-            errors.push('homepage /ui6 must bind data-density and dir');
+            errors.push('homepage /lab/density-theme must bind data-density and dir');
         }
     }
     if (!existsRel(HOMEPAGE, 'designs', 'themes', 'high-contrast.json')) {
@@ -246,46 +246,46 @@ if (homeBuild.status !== 0) {
     if (!existsRel('packages/ui/vmz-ui', 'presets', 'web-surface.v0.json')) {
         errors.push('@vmz/ui missing presets/web-surface.v0.json');
     }
-    if (!existsRel(HOMEPAGE, 'src', 'pages', 'structure.vmz')) {
-        errors.push('homepage missing /structure composition page');
+    if (!existsRel(HOMEPAGE, 'src', 'pages', 'lab', 'structure.vmz')) {
+        errors.push('homepage missing /lab/structure composition page');
     } else {
-        const structureVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/structure.vmz'), 'utf8');
+        const structureVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/lab/structure.vmz'), 'utf8');
         for (const tag of ['Accordion', 'Steps', 'List', 'Tree', 'AppShell', 'Card']) {
             if (!structureVmz.includes(`<${tag}`)) {
-                errors.push(`homepage /structure must compose <${tag}>`);
+                errors.push(`homepage /lab/structure must compose <${tag}>`);
             }
         }
     }
-    if (!existsRel(HOMEPAGE, 'src', 'pages', 'choice.vmz')) {
-        errors.push('homepage missing /choice Segmented/Dropdown/Collapse/Tag page');
+    if (!existsRel(HOMEPAGE, 'src', 'pages', 'lab', 'choice.vmz')) {
+        errors.push('homepage missing /lab/choice Segmented/Dropdown/Collapse/Tag page');
     } else {
-        const choiceVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/choice.vmz'), 'utf8');
+        const choiceVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/lab/choice.vmz'), 'utf8');
         for (const tag of ['Segmented', 'Dropdown', 'Collapse', 'Tag', 'AppShell', 'Card']) {
             if (!choiceVmz.includes(`<${tag}`)) {
-                errors.push(`homepage /choice must compose <${tag}>`);
+                errors.push(`homepage /lab/choice must compose <${tag}>`);
             }
         }
     }
-    if (!existsRel(HOMEPAGE, 'src', 'pages', 'stacking.vmz')) {
-        errors.push('homepage missing /stacking overlay page');
+    if (!existsRel(HOMEPAGE, 'src', 'pages', 'lab', 'overlay-stack.vmz')) {
+        errors.push('homepage missing /lab/overlay-stack page');
     } else {
-        const stackingVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/stacking.vmz'), 'utf8');
+        const stackingVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/lab/overlay-stack.vmz'), 'utf8');
         for (const tag of ['Drawer', 'Dialog', 'Popover']) {
             if (!stackingVmz.includes(`<${tag}`)) {
-                errors.push(`homepage /stacking must compose <${tag}>`);
+                errors.push(`homepage /lab/overlay-stack must compose <${tag}>`);
             }
         }
         if (!stackingVmz.includes('stackLevel')) {
-            errors.push('homepage /stacking must set stackLevel');
+            errors.push('homepage /lab/overlay-stack must set stackLevel');
         }
     }
-    if (!existsRel(HOMEPAGE, 'src', 'pages', 'datatable.vmz')) {
-        errors.push('homepage missing /datatable page');
+    if (!existsRel(HOMEPAGE, 'src', 'pages', 'lab', 'datatable.vmz')) {
+        errors.push('homepage missing /lab/datatable page');
     } else {
-        const dtVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/datatable.vmz'), 'utf8');
+        const dtVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/lab/datatable.vmz'), 'utf8');
         for (const tag of ['DataTable', 'BulkActions', 'ConsoleShell', 'Drawer']) {
             if (!dtVmz.includes(`<${tag}`)) {
-                errors.push(`homepage /datatable must compose <${tag}>`);
+                errors.push(`homepage /lab/datatable must compose <${tag}>`);
             }
         }
     }
@@ -353,25 +353,25 @@ if (homeBuild.status === 0) {
                 errors.push(`homepage SSR HTML inspect: ${homeSsrHtmlDetail}`);
             }
             const home = { status: homeBody ? 200 : 0, body: homeBody };
-            const ui = await get(`http://127.0.0.1:${PORT}/ui`);
+            const ui = await get(`http://127.0.0.1:${PORT}/lab/components`);
             const commercial = await get(`http://127.0.0.1:${PORT}/commercial`);
-            const formPage = await get(`http://127.0.0.1:${PORT}/form`);
+            const formPage = await get(`http://127.0.0.1:${PORT}/lab/form`);
             const consolePage = await get(`http://127.0.0.1:${PORT}/console`);
-            const motionPage = await get(`http://127.0.0.1:${PORT}/motion`);
-            const ui4Page = await get(`http://127.0.0.1:${PORT}/ui4`);
-            const ui5Page = await get(`http://127.0.0.1:${PORT}/ui5`);
-            const ui6Page = await get(`http://127.0.0.1:${PORT}/ui6`);
-            const structurePage = await get(`http://127.0.0.1:${PORT}/structure`);
-            const choicePage = await get(`http://127.0.0.1:${PORT}/choice`);
-            const stackingPage = await get(`http://127.0.0.1:${PORT}/stacking`);
-            const datatablePage = await get(`http://127.0.0.1:${PORT}/datatable`);
+            const motionPage = await get(`http://127.0.0.1:${PORT}/lab/motion`);
+            const ui4Page = await get(`http://127.0.0.1:${PORT}/lab/feedback`);
+            const ui5Page = await get(`http://127.0.0.1:${PORT}/lab/console-patterns`);
+            const ui6Page = await get(`http://127.0.0.1:${PORT}/lab/density-theme`);
+            const structurePage = await get(`http://127.0.0.1:${PORT}/lab/structure`);
+            const choicePage = await get(`http://127.0.0.1:${PORT}/lab/choice`);
+            const stackingPage = await get(`http://127.0.0.1:${PORT}/lab/overlay-stack`);
+            const datatablePage = await get(`http://127.0.0.1:${PORT}/lab/datatable`);
             const productPage = await get(`http://127.0.0.1:${PORT}/product`);
             if (home.status !== 200 || !home.body.includes('landing-brand')) {
                 homeSsrDetail = `GET / ${home.status}`;
             } else if (ui.status !== 200 || !ui.body.includes('data-vmz-fixture="ui-lab"')) {
-                homeSsrDetail = `GET /ui ${ui.status} missing ui-lab`;
+                homeSsrDetail = `GET /lab/components ${ui.status} missing ui-lab`;
             } else if (!ui.body.includes('data-vmz-ui="field"')) {
-                homeSsrDetail = 'GET /ui missing Field marker';
+                homeSsrDetail = 'GET /lab/components missing Field marker';
             } else if (commercial.status !== 200 || !commercial.body.includes('data-vmz-fixture="commercial"')) {
                 homeSsrDetail = `GET /commercial ${commercial.status} missing commercial fixture`;
             } else if (!commercial.body.includes('data-vmz-ui="app-shell"')) {
@@ -379,7 +379,7 @@ if (homeBuild.status === 0) {
             } else if (!commercial.body.includes('data-vmz-ui="form"')) {
                 homeSsrDetail = 'GET /commercial missing Form marker';
             } else if (formPage.status !== 200 || !formPage.body.includes('data-vmz-fixture="form"')) {
-                homeSsrDetail = `GET /form ${formPage.status} missing form fixture`;
+                homeSsrDetail = `GET /lab/form ${formPage.status} missing form fixture`;
             } else if (
                 !formPage.body.includes('data-vmz-ui="form-item"') ||
                 !formPage.body.includes('data-vmz-ui="select"') ||
@@ -388,61 +388,61 @@ if (homeBuild.status === 0) {
                 !formPage.body.includes('data-vmz-ui="date-picker"') ||
                 !formPage.body.includes('data-vmz-ui="upload"')
             ) {
-                homeSsrDetail = 'GET /form missing FormItem/Select/TextArea/RadioGroup/DatePicker/Upload markers';
+                homeSsrDetail = 'GET /lab/form missing FormItem/Select/TextArea/RadioGroup/DatePicker/Upload markers';
             } else if (consolePage.status !== 200 || !consolePage.body.includes('data-vmz-fixture="console"')) {
                 homeSsrDetail = `GET /console ${consolePage.status} missing console fixture`;
             } else if (!consolePage.body.includes('data-vmz-ui="console-shell"')) {
                 homeSsrDetail = 'GET /console missing ConsoleShell marker';
             } else if (motionPage.status !== 200 || !motionPage.body.includes('data-vmz-fixture="motion"')) {
-                homeSsrDetail = `GET /motion ${motionPage.status} missing motion fixture`;
+                homeSsrDetail = `GET /lab/motion ${motionPage.status} missing motion fixture`;
             } else if (!motionPage.body.includes('data-vmz-motion="control"')) {
-                homeSsrDetail = 'GET /motion missing Button motion marker';
+                homeSsrDetail = 'GET /lab/motion missing Button motion marker';
             } else if (ui4Page.status !== 200 || !ui4Page.body.includes('data-vmz-fixture="ui4"')) {
-                homeSsrDetail = `GET /ui4 ${ui4Page.status} missing ui4 fixture`;
+                homeSsrDetail = `GET /lab/feedback ${ui4Page.status} missing ui4 fixture`;
             } else if (!ui4Page.body.includes('data-vmz-ui="notification"') || !ui4Page.body.includes('data-vmz-ui="result"')) {
-                homeSsrDetail = 'GET /ui4 missing Notification/Result markers';
+                homeSsrDetail = 'GET /lab/feedback missing Notification/Result markers';
             } else if (ui5Page.status !== 200 || !ui5Page.body.includes('data-vmz-fixture="ui5"')) {
-                homeSsrDetail = `GET /ui5 ${ui5Page.status} missing ui5 fixture`;
+                homeSsrDetail = `GET /lab/console-patterns ${ui5Page.status} missing ui5 fixture`;
             } else if (
                 !ui5Page.body.includes('data-vmz-ui="breadcrumb"') ||
                 !ui5Page.body.includes('data-vmz-ui="query-form"') ||
                 !ui5Page.body.includes('data-vmz-ui="timeline"')
             ) {
-                homeSsrDetail = 'GET /ui5 missing Breadcrumb/QueryForm/Timeline markers';
+                homeSsrDetail = 'GET /lab/console-patterns missing Breadcrumb/QueryForm/Timeline markers';
             } else if (ui6Page.status !== 200 || !ui6Page.body.includes('data-vmz-fixture="ui6"')) {
-                homeSsrDetail = `GET /ui6 ${ui6Page.status} missing ui6 fixture`;
+                homeSsrDetail = `GET /lab/density-theme ${ui6Page.status} missing ui6 fixture`;
             } else if (
                 !ui6Page.body.includes('data-density="comfortable"') ||
                 !ui6Page.body.includes('dir="ltr"') ||
                 !ui6Page.body.includes('data-vmz-ui="field"')
             ) {
-                homeSsrDetail = 'GET /ui6 missing density/dir/Field markers';
+                homeSsrDetail = 'GET /lab/density-theme missing density/dir/Field markers';
             } else if (structurePage.status !== 200 || !structurePage.body.includes('data-vmz-fixture="structure"')) {
-                homeSsrDetail = `GET /structure ${structurePage.status} missing structure fixture`;
+                homeSsrDetail = `GET /lab/structure ${structurePage.status} missing structure fixture`;
             } else if (
                 !structurePage.body.includes('data-vmz-ui="accordion"') ||
                 !structurePage.body.includes('data-vmz-ui="steps"') ||
                 !structurePage.body.includes('data-vmz-ui="list"') ||
                 !structurePage.body.includes('data-vmz-ui="tree"')
             ) {
-                homeSsrDetail = 'GET /structure missing Accordion/Steps/List/Tree markers';
+                homeSsrDetail = 'GET /lab/structure missing Accordion/Steps/List/Tree markers';
             } else if (choicePage.status !== 200 || !choicePage.body.includes('data-vmz-fixture="choice"')) {
-                homeSsrDetail = `GET /choice ${choicePage.status} missing choice fixture`;
+                homeSsrDetail = `GET /lab/choice ${choicePage.status} missing choice fixture`;
             } else if (
                 !choicePage.body.includes('data-vmz-ui="segmented"') ||
                 !choicePage.body.includes('data-vmz-ui="dropdown"') ||
                 !choicePage.body.includes('data-vmz-ui="collapse"') ||
                 !choicePage.body.includes('data-vmz-ui="tag"')
             ) {
-                homeSsrDetail = 'GET /choice missing Segmented/Dropdown/Collapse/Tag markers';
+                homeSsrDetail = 'GET /lab/choice missing Segmented/Dropdown/Collapse/Tag markers';
             } else if (stackingPage.status !== 200 || !stackingPage.body.includes('data-vmz-fixture="stacking"')) {
-                homeSsrDetail = `GET /stacking ${stackingPage.status} missing data-vmz-fixture="stacking"`;
+                homeSsrDetail = `GET /lab/overlay-stack ${stackingPage.status} missing data-vmz-fixture="stacking"`;
             } else if (!stackingPage.body.includes('Open drawer (stack 0)')) {
-                homeSsrDetail = 'GET /stacking missing stacking controls';
+                homeSsrDetail = 'GET /lab/overlay-stack missing stacking controls';
             } else if (datatablePage.status !== 200 || !datatablePage.body.includes('data-vmz-fixture="datatable"')) {
-                homeSsrDetail = `GET /datatable ${datatablePage.status} missing data-vmz-fixture="datatable"`;
+                homeSsrDetail = `GET /lab/datatable ${datatablePage.status} missing data-vmz-fixture="datatable"`;
             } else if (!datatablePage.body.includes('data-vmz-ui="data-table"') || !datatablePage.body.includes('data-vmz-select-all')) {
-                homeSsrDetail = 'GET /datatable missing DataTable markers';
+                homeSsrDetail = 'GET /lab/datatable missing DataTable markers';
             } else if (productPage.status !== 200 || !productPage.body.includes('data-vmz-fixture="product"')) {
                 homeSsrDetail = `GET /product ${productPage.status} missing data-vmz-fixture="product"`;
             } else if (
@@ -470,7 +470,7 @@ if (homeBuild.status === 0) {
                 } else {
                     homeSsrOk = true;
                     homeSsrDetail =
-                        'SSR / + /ui + /commercial + /form + /console + /motion + /ui4 + /ui5 + /ui6 + /structure + /choice + /stacking + /datatable + /product + HTML/JSON error wrap';
+                        'SSR / + /lab/components + /commercial + /lab/form + /console + /lab/motion + /lab/feedback + /lab/console-patterns + /lab/density-theme + /lab/structure + /lab/choice + /lab/overlay-stack + /lab/datatable + /product + HTML/JSON error wrap';
                 }
             }
 
