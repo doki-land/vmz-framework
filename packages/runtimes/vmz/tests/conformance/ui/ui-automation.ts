@@ -1282,12 +1282,10 @@ async function proveFormDepth(page, PORT) {
         fail(`Form depth: valid submit did not clear errors / mark submitted: ${JSON.stringify(snap)}`);
     }
 
-    // Reset clears values + success.
+    // Reset clears values + success (native form.reset() bypasses locale-dependent button text).
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="form"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Reset'),
-        );
-        btn?.click();
+        const form = document.querySelector('[data-vmz-ui="form"]');
+        if (form instanceof HTMLFormElement) form.reset();
     });
     await page.waitForFunction(
         () => {
