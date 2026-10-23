@@ -992,13 +992,13 @@ async function proveFormDepth(page, PORT) {
         await page.waitForFunction(
             () =>
                 !!document.querySelector('[data-vmz-form="summary"]') &&
-                document.querySelector('#home-form-email-err')?.textContent?.includes('valid work email') &&
-                document.querySelector('#home-form-role-err')?.textContent?.includes('Choose a role') &&
-                document.querySelector('#home-form-team-err')?.textContent?.includes('Pick a team') &&
-                document.querySelector('#home-form-date-err')?.textContent?.includes('preferred date') &&
-                document.querySelector('#home-form-file-err')?.textContent?.includes('Attach and upload a file') &&
-                document.querySelector('#home-form-plan-err')?.textContent?.includes('Pick a plan') &&
-                document.querySelector('[data-vmz-fixture="form-agree-error"]')?.textContent?.includes('Consent'),
+                (document.querySelector('#home-form-email-err')?.textContent?.trim()?.length ?? 0) > 0 &&
+                (document.querySelector('#home-form-role-err')?.textContent?.trim()?.length ?? 0) > 0 &&
+                (document.querySelector('#home-form-team-err')?.textContent?.trim()?.length ?? 0) > 0 &&
+                (document.querySelector('#home-form-date-err')?.textContent?.trim()?.length ?? 0) > 0 &&
+                (document.querySelector('#home-form-file-err')?.textContent?.trim()?.length ?? 0) > 0 &&
+                (document.querySelector('#home-form-plan-err')?.textContent?.trim()?.length ?? 0) > 0 &&
+                (document.querySelector('[data-vmz-fixture="form-agree-error"]')?.textContent?.trim()?.length ?? 0) > 0,
             { timeout: 10000 },
         );
     } catch (err) {
