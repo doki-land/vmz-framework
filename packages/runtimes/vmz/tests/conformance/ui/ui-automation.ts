@@ -358,16 +358,16 @@ async function proveUi1FocusOverlay() {
             });
         });
 
-        // Warm first SSR compile before Puppeteer navigation (cold /ui can exceed 20s).
+        // Warm first SSR compile before Puppeteer navigation (cold /lab/components can exceed 20s).
         {
-            const warm = await fetch(`http://127.0.0.1:${PORT}/ui`);
-            if (!warm.ok) fail(`UI1 warm GET /ui failed: ${warm.status}`);
+            const warm = await fetch(`http://127.0.0.1:${PORT}/lab/components`);
+            if (!warm.ok) fail(`UI1 warm GET /lab/components failed: ${warm.status}`);
         }
 
         // Sanity: live prop binder present in page emit.
-        const uiClient = fs.readFileSync(path.join(dist, 'pages', 'ui.client.js'), 'utf8');
+        const uiClient = fs.readFileSync(path.join(dist, 'pages', 'lab', 'components.client.js'), 'utf8');
         if (!uiClient.includes('bindComponentProp')) {
-            fail('ui.client.js missing bindComponentProp for live Dialog open / Field value');
+            fail('components.client.js missing bindComponentProp for live Dialog open / Field value');
         }
 
         const browser = await puppeteer.launch({
@@ -378,7 +378,7 @@ async function proveUi1FocusOverlay() {
         try {
             const page = await browser.newPage();
             page.setDefaultTimeout(30000);
-            await page.goto(`http://127.0.0.1:${PORT}/ui`, { waitUntil: 'networkidle0', timeout: 60000 });
+            await page.goto(`http://127.0.0.1:${PORT}/lab/components`, { waitUntil: 'networkidle0', timeout: 60000 });
             await page.waitForSelector('#home-ui-name', { timeout: 15000 });
             const pageProbe = await page.evaluate(() => ({
                 title: document.title,

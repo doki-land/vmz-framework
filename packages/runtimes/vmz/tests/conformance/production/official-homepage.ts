@@ -440,7 +440,7 @@ if (homeBuild.status === 0) {
                 homeSsrDetail = 'GET /lab/choice missing Segmented/Dropdown/Collapse/Tag markers';
             } else if (stackingPage.status !== 200 || !stackingPage.body.includes('data-vmz-fixture="stacking"')) {
                 homeSsrDetail = `GET /lab/overlay-stack ${stackingPage.status} missing data-vmz-fixture="stacking"`;
-            } else if (!stackingPage.body.includes('Open drawer (stack 0)')) {
+            } else if (!stackingPage.body.includes('Open drawer (first layer)') && !stackingPage.body.includes('Open drawer (stack 0)')) {
                 homeSsrDetail = 'GET /lab/overlay-stack missing stacking controls';
             } else if (datatablePage.status !== 200 || !datatablePage.body.includes('data-vmz-fixture="datatable"')) {
                 homeSsrDetail = `GET /lab/datatable ${datatablePage.status} missing data-vmz-fixture="datatable"`;
