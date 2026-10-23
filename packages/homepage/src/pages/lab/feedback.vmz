@@ -50,8 +50,8 @@ import {
     labFeedbackContinue,
     labFeedbackEmptyTitle,
     labFeedbackEmptyDesc,
-    navLab,
-} from "#locales/common";
+} from "#locales/lab-feedback";
+import { navLab } from "#locales/common";
 import { labNav } from "../../lab-nav.ts";
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 

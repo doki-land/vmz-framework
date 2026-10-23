@@ -126,7 +126,7 @@ const buttonSrc = fs.readFileSync(buttonSrcPath, 'utf8');
 
 for (const tok of button.tokens) {
     const cssVar = dottedToCssVar(tok);
-    if (!buttonSrc.includes(`var(${cssVar})`)) {
+    if (!buttonSrc.includes(`var(${cssVar})`) && !buttonSrc.includes(`var(${cssVar},`)) {
         fail(`Button must reference ${cssVar} for token ${tok}`);
     }
 }

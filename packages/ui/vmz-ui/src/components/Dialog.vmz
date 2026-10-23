@@ -115,7 +115,23 @@
     color: var(--vmz-text-ink);
     transition:
         color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
-        border-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+        border-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+        background-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+}
+
+.vmz-ui-dialog__close[data-variant="primary"] {
+    background: var(--vmz-action-primary-background);
+    color: var(--vmz-action-primary-foreground);
+    border-color: transparent;
+}
+
+.vmz-ui-dialog__close[data-variant="primary"]:hover {
+    background: var(--vmz-action-primary-hover);
+    border-color: transparent;
+}
+
+.vmz-ui-dialog__close[data-variant="primary"]:active {
+    background: var(--vmz-action-primary-active);
 }
 
 .vmz-ui-dialog__close:hover {
