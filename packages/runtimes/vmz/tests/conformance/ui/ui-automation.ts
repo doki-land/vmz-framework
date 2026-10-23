@@ -982,17 +982,12 @@ async function proveFormDepth(page, PORT) {
     });
 
     // Empty submit → summary + field errors (parent-owned validation).
-    // Use real browser click (evaluate click bypasses VMZ form submit handling).
-    try {
-        await page.click('[data-vmz-fixture="form-actions"] button.vmz-ui-btn', { timeout: 3000 });
-    } catch {
-        await page.evaluate(() => {
-            const btn = [...document.querySelectorAll('[data-vmz-fixture="form"] button.vmz-ui-btn')].find((b) =>
-                (b.textContent || '').includes('Send request'),
-            );
-            btn?.click();
-        });
-    }
+    // Form is <script client> — submit handling fully client-side after hydration.
+    // requestSubmit() fires the native submit event reliably (bypasses button click quirks).
+    await page.evaluate(() => {
+        const form = document.querySelector('[data-vmz-ui="form"]');
+        if (form instanceof HTMLFormElement) form.requestSubmit();
+    });
     try {
         await page.waitForFunction(
             () =>
