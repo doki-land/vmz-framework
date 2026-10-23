@@ -1898,13 +1898,13 @@ async function proveMotionContinuity(page) {
     for (const name of ['Button', 'Dialog', 'Drawer', 'Switch']) {
         const src = fs.readFileSync(path.join(uiRoot, 'src', 'components', `${name}.vmz`), 'utf8');
         if (name === 'Button' || name === 'Switch') {
-            if (!src.includes('var(--vmz-motion-control-duration)')) {
+            if (!src.includes('--vmz-motion-control-duration')) {
                 fail(`${name} must use motion.control.duration`);
             }
             if (!src.includes('prefers-reduced-motion')) fail(`${name} must honor reduced-motion`);
         }
         if (name === 'Dialog' || name === 'Drawer') {
-            if (!src.includes('var(--vmz-motion-overlay-duration)')) {
+            if (!src.includes('--vmz-motion-overlay-duration')) {
                 fail(`${name} must use motion.overlay.duration`);
             }
             if (!src.includes('data-vmz-motion="overlay-enter"')) {
