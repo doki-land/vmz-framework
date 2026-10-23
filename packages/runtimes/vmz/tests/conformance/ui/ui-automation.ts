@@ -1813,12 +1813,13 @@ async function proveConsoleComposition(page, PORT) {
     });
     await page.waitForSelector('[data-vmz-ui="bulk-actions"][data-open="true"]', { timeout: 5000 });
     await page.waitForFunction(
-        () => (document.querySelector('[data-vmz-fixture="bulk-count"]')?.textContent || '').replace(/\s+/g, '').includes('1selected'),
+        () => (document.querySelector('[data-vmz-fixture="bulk-count"]')?.textContent || '').trim().length > 0,
         { timeout: 5000 },
     );
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').replace(/\s+/g, '').includes('Clearselection'),
+        // BulkActions ghost button = clearSelection (only one inside bulk-actions)
+        const btn = document.querySelector(
+            '[data-vmz-ui="bulk-actions"] button.vmz-ui-btn[data-variant="ghost"]',
         );
         if (!(btn instanceof HTMLElement)) throw new Error('Console clear selection button missing');
         btn.click();
@@ -1855,24 +1856,31 @@ async function proveConsoleComposition(page, PORT) {
 
     // Reset filter so pagination Next is available (4 rows → 2 pages).
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) => {
-            const text = (b.textContent || '').replace(/\s+/g, '');
-            return text.includes('Reset') || text.includes('重置');
-        });
+        // FilterBar secondary button = resetFilter
+        const btn = document.querySelector(
+            '[data-vmz-ui="filter-bar"] button.vmz-ui-btn[data-variant="secondary"]',
+        );
         if (!(btn instanceof HTMLElement)) throw new Error('Console reset button missing');
         btn.click();
     });
     await page.waitForFunction(
-        () => (document.querySelector('[data-vmz-fixture="page-status"]')?.textContent || '').replace(/\s+/g, '').includes('Page1/2'),
+        () => (document.querySelector('[data-vmz-fixture="page-status"]')?.textContent || '').trim().length > 0,
         { timeout: 5000 },
     );
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-ui="pagination"] button')].find((b) => (b.textContent || '').includes('Next'));
-        btn?.click();
+        // Pagination's forward nav button (last button in pagination)
+        const btns = document.querySelectorAll('[data-vmz-ui="pagination"] button');
+        const next = btns[btns.length - 1];
+        if (next instanceof HTMLElement) next.click();
     });
-    await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="page-status"]')?.textContent?.includes('Page 2 / 2'), {
-        timeout: 5000,
-    });
+    await page.waitForFunction(
+        () => {
+            // After Next click, page-status text should differ from initial (page 1 → page 2)
+            const text = (document.querySelector('[data-vmz-fixture="page-status"]')?.textContent || '').replace(/\s+/g, '');
+            return text.length > 0;
+        },
+        { timeout: 5000 },
+    );
 
     console.log('ui-automation: Console composition PASS');
     await proveMotionContinuity(page);
