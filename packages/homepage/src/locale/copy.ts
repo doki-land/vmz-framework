@@ -7,7 +7,9 @@ export function readLocaleId(preferred?: string | null): LocaleId {
     if (typeof document !== 'undefined') {
         return document.documentElement.getAttribute('data-locale') || 'zh-hans';
     }
-    return 'zh-hans';
+    // Server render sets __vmzLocaleIdHint per request; without it /en-us ships zh copy.
+    const hint = typeof globalThis !== 'undefined' ? (globalThis as any).__vmzLocaleIdHint : undefined;
+    return hint || 'zh-hans';
 }
 
 export function docsPaths(localeId: LocaleId) {

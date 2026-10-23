@@ -1,0 +1,17 @@
+{
+  labDatatablePageTitle: '数据表格',
+  labDatatableNavLabel: '控制台',
+  labDatatableAlertTitle: '表格选择',
+  labDatatableAlertDesc: '带固定表头的普通 HTML 表格，选择状态由页面统一管理。',
+  labDatatableBulkLabel: '批量操作',
+  labDatatableClear: '清除选择',
+  labDatatableActionTitle: '详情',
+  labDatatableActionLabel: '查看',
+  labDatatableSelectAll: '选择所有可见行',
+  labDatatableDrawerTitle: '行详情',
+  labDatatableColumnName: '名称',
+  labDatatableColumnStatus: '状态',
+  labDatatableColumnOwner: '负责人',
+  labDatatableSelectRow: '选择 {name}',
+  labDatatableSelectedCount: '已选 {count} 项'
+}

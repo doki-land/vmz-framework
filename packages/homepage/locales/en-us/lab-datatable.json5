@@ -1,0 +1,18 @@
+{
+  labDatatablePageTitle: 'Data table',
+  labDatatableNavLabel: 'Console',
+  labDatatableAlertTitle: 'Table selection',
+  labDatatableAlertDesc:
+    'A plain HTML table with a sticky header where the page owns the selection state.',
+  labDatatableBulkLabel: 'Bulk actions',
+  labDatatableClear: 'Clear',
+  labDatatableActionTitle: 'Details',
+  labDatatableActionLabel: 'Open',
+  labDatatableSelectAll: 'Select all visible rows',
+  labDatatableDrawerTitle: 'Row details',
+  labDatatableColumnName: 'Name',
+  labDatatableColumnStatus: 'Status',
+  labDatatableColumnOwner: 'Owner',
+  labDatatableSelectRow: 'Select {name}',
+  labDatatableSelectedCount: '{count} selected'
+}

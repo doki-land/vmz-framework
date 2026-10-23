@@ -1,0 +1,13 @@
+{
+  labDensityNavLabel: 'Density and theme',
+  labDensityAlertTitle: 'Density, direction, and theme',
+  labDensityAlertDesc: 'Move between comfortable, compact, and dense spacing, flip the reading direction, and layer a high-contrast theme.',
+  labDensityCycle: 'Change density',
+  labDensityToggleDir: 'Flip direction',
+  labDensityToggleTheme: 'Toggle high contrast',
+  labDensityCardTitle: 'Density sample',
+  labDensityCardDesc: 'Control spacing follows the density setting, while the look comes from the active theme.',
+  labDensityFieldLabel: 'Sample input',
+  labDensityFieldDesc: 'Control spacing follows the current density setting',
+  labDensityProbe: 'Sample button',
+}

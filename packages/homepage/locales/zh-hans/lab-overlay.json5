@@ -1,0 +1,14 @@
+{
+  labOverlayNavLabel: '浮层堆叠',
+  labOverlayAlertTitle: '浮层堆叠',
+  labOverlayAlertDesc: '抽屉、对话框与提示浮层依次叠放，每一层都盖在上一层之上；按 Esc 只关闭最上面那层。',
+  labOverlayOpenDrawer: '打开抽屉（第一层）',
+  labOverlayOpenDialog: '打开对话框（第二层）',
+  labOverlayOpenPopover: '打开提示浮层（第三层）',
+  labOverlayDrawerTitle: '底层抽屉',
+  labOverlayDrawerBody: '最底层，后面打开的浮层都会盖在它上面。',
+  labOverlayDialogTitle: '中层对话框',
+  labOverlayDialogBody: '中间层，位于抽屉之上、提示浮层之下。',
+  labOverlayPopoverTitle: '顶层提示',
+  labOverlayPopoverBody: '最上层，按 Esc 时最先关闭。',
+}

@@ -1,0 +1,14 @@
+{
+  labOverlayNavLabel: 'Layer stacking',
+  labOverlayAlertTitle: 'Layer stacking',
+  labOverlayAlertDesc: 'A drawer, a dialog, and a popover stack in order, each above the one before it. Escape closes only the top layer.',
+  labOverlayOpenDrawer: 'Open drawer (first layer)',
+  labOverlayOpenDialog: 'Open dialog (second layer)',
+  labOverlayOpenPopover: 'Open popover (third layer)',
+  labOverlayDrawerTitle: 'Base drawer',
+  labOverlayDrawerBody: 'The bottom layer, with anything opened later appearing above it.',
+  labOverlayDialogTitle: 'Middle dialog',
+  labOverlayDialogBody: 'The middle layer, above the drawer and below the popover.',
+  labOverlayPopoverTitle: 'Top popover',
+  labOverlayPopoverBody: 'The top layer, closed first when you press Escape.',
+}

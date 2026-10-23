@@ -168,7 +168,8 @@
   productDocCalloutNoThemeTitle: 'One theme source',
   productDocCalloutZeroJsDesc: 'Headings, copy, and code ship in the first HTML. Copy buttons and locale switching are extras.',
   productDocCalloutZeroJsTitle: 'Content before script',
-  productDocContractBodyLead: 'Headings, outline, callouts, and copyable code form a page you can read immediately. The full framework docs live at',
+  // Trailing space keeps the inline docs link from touching "live at".
+  productDocContractBodyLead: 'Headings, outline, callouts, and copyable code form a page you can read immediately. The full framework docs live at ',
   productDocContractBodyTail: '; this page shows how these components compose.',
   productDocContractHeading: 'Page composition',
   productDocContractLi1: 'The case study runs a complete workflow',

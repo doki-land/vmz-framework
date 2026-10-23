@@ -1,0 +1,13 @@
+{
+  labDensityNavLabel: '密度与主题',
+  labDensityAlertTitle: '密度、书写方向与主题',
+  labDensityAlertDesc: '在舒适、紧凑、密集三档之间切换间距，翻转左右书写方向，并叠加高对比主题。',
+  labDensityCycle: '切换密度',
+  labDensityToggleDir: '切换书写方向',
+  labDensityToggleTheme: '切换高对比主题',
+  labDensityCardTitle: '密度示例',
+  labDensityCardDesc: '控件间距随密度档位变化，外观则来自当前主题。',
+  labDensityFieldLabel: '示例输入',
+  labDensityFieldDesc: '控件间距由当前密度档位决定',
+  labDensityProbe: '示例按钮',
+}
