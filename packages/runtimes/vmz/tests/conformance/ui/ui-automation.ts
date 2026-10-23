@@ -523,7 +523,7 @@ async function proveUi1FocusOverlay() {
                 fail(`Dialog: backdrop dismiss + focus restore timed out: ${JSON.stringify(snap)}`);
             }
 
-            await proveUi2InPage(page);
+            await proveUi2InPage(page, PORT);
         } finally {
             await browser.close();
         }
@@ -536,7 +536,7 @@ async function proveUi1FocusOverlay() {
  * UI2 Form & Disclosure browser proof (same /ui session as UI1).
  * @param {import('puppeteer-core').Page} page
  */
-async function proveUi2InPage(page) {
+async function proveUi2InPage(page, PORT) {
     console.log('ui-automation: UI2 Checkbox/Switch/Tabs/Menu/Drawer/Popover…');
 
     // Contract surface: components + exports present (static, cheap).
@@ -749,14 +749,14 @@ async function proveUi2InPage(page) {
     await page.focus(popoverOpener);
 
     console.log('ui-automation: UI2 form/disclosure PASS');
-    await proveCommercialComposition(page);
+    await proveCommercialComposition(page, PORT);
 }
 
 /**
  * Commercial composition thin proof — one ordinary page, not single-component screenshots.
  * @param {import('puppeteer-core').Page} page
  */
-async function proveCommercialComposition(page) {
+async function proveCommercialComposition(page, PORT) {
     console.log('ui-automation: Commercial AppShell task-surface composition…');
 
     for (const name of ['AppShell', 'FilterBar', 'Table', 'Form', 'Drawer', 'Notification']) {
