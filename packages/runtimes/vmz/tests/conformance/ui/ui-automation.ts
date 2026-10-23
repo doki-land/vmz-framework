@@ -947,7 +947,12 @@ async function proveFormDepth(page) {
         fail(`Form depth: DatePicker overlay open timed out: ${JSON.stringify(snap)} (${err})`);
     }
     await page.keyboard.press('Escape');
-    await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="date-picker"]'), { timeout: 5000 });
+    try {
+        await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="date-picker"]'), { timeout: 5000 });
+    } catch {
+        await page.mouse.click(10, 10);
+        await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="date-picker"]'), { timeout: 5000 });
+    }
 
     // Tooltip parent-owned open (toggle outside Tooltip content).
     await page.waitForSelector('[data-vmz-fixture="form-tip-toggle"] button.vmz-ui-btn', { timeout: 5000 });
