@@ -849,8 +849,8 @@ async function proveCommercialComposition(page) {
     });
 
     console.log('ui-automation: Commercial composition PASS');
-    await proveFormDepth(page);
-    await proveConsoleComposition(page);
+    await proveFormDepth(page, PORT);
+    await proveConsoleComposition(page, PORT);
 }
 
 /**
@@ -858,8 +858,10 @@ async function proveCommercialComposition(page) {
  * Upload all-in-one (component-owned server multipart; page must not hand-roll XHR).
  * @param {import('puppeteer-core').Page} page
  */
-async function proveFormDepth(page) {
+async function proveFormDepth(page, PORT) {
     console.log('ui-automation: Form depth (+ Autocomplete/Tooltip/DatePicker overlay/Upload all-in-one)…');
+    await page.goto(`http://127.0.0.1:${PORT}/lab/form`, { waitUntil: 'networkidle0', timeout: 60000 });
+    await page.waitForSelector('[data-vmz-fixture="form"]', { timeout: 10000 });
 
     for (const name of ['Form', 'FormItem', 'TextArea', 'Select', 'RadioGroup', 'Autocomplete', 'Tooltip', 'DatePicker', 'Upload']) {
         const src = path.join(uiRoot, 'src', 'components', `${name}.vmz`);
@@ -1724,8 +1726,10 @@ async function proveUploadResumable(page) {
  * Console composition thin proof — Sidebar/Filter/Table/Bulk/Pagination/detail.
  * @param {import('puppeteer-core').Page} page
  */
-async function proveConsoleComposition(page) {
+async function proveConsoleComposition(page, PORT) {
     console.log('ui-automation: Console ConsoleShell/FilterBar/Table composition…');
+    await page.goto(`http://127.0.0.1:${PORT}/console`, { waitUntil: 'networkidle0', timeout: 60000 });
+    await page.waitForSelector('[data-vmz-fixture="console"]', { timeout: 10000 });
 
     for (const name of ['ConsoleShell', 'FilterBar', 'Table', 'BulkActions', 'Pagination']) {
         const src = path.join(uiRoot, 'src', 'components', `${name}.vmz`);
