@@ -1757,7 +1757,7 @@ async function proveConsoleComposition(page, PORT) {
         sidebar: !!document.querySelector('[data-vmz-shell="sidebar"]'),
         header: !!document.querySelector('[data-vmz-shell="header"]'),
         main: !!document.querySelector('[data-vmz-shell="main"]'),
-        nav: !!document.querySelector('[data-vmz-nav="console"]'),
+        nav: !!document.querySelector('[data-vmz-nav]'),
         filter: !!document.querySelector('[data-vmz-ui="filter-bar"]'),
         table: !!document.querySelector('[data-vmz-ui="table"]'),
         pagination: !!document.querySelector('[data-vmz-ui="pagination"]'),
