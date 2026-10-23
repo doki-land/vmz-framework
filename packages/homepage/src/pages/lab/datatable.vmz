@@ -1,8 +1,8 @@
 <template>
     <div data-vmz-fixture="datatable" data-density="compact">
-        <ConsoleShell brand="VMZ" home-href="/" title="DataTable" nav-label="Console" :nav="navItems">
+        <ConsoleShell brand="VMZ" home-href="/" :title="pageTitle" :nav-label="navLabel" :nav="navItems">
             <div class="vmz-slot-content">
-                <Alert tone="info" role-name="status" title="DataTable thin gate" description="Ordinary HTML table with parent-owned selection + sticky header. Large-grid package is separate." />
+                <Alert tone="info" role-name="status" :title="alertTitle" :description="alertDesc" />
                 <p data-vmz-fixture="datatable-state" class="vmz-sr-only">
                     selected:
                     {{ selectedAttr || 'none' }}
@@ -15,13 +15,13 @@
                     ;detail:
                     {{ detailId || 'none' }}
                 </p>
-                <BulkActions label="Bulk actions" :selected-count="selectedCount" :count-label="bulkLabel">
+                <BulkActions :label="bulkActionsLabel" :selected-count="selectedCount" :count-label="bulkLabel">
                     <Button type="button" variant="secondary" @click="clearSelection">
-                        Clear
+                        {{ clearLabel }}
                     </Button>
                 </BulkActions>
-                <DataTable :columns="columns" :rows="rows" :has-row-action="rowAction" action-title="Detail" action-label="Open" :sort-key="sortKey" :sort-dir="sortDir" :selected-count="selectedCountLabel" :all-selected="allSelected" select-all-label="Select all visible rows" :on-sort="sortBy" :on-toggle-row="toggleRow" :on-toggle-all="toggleAll" :on-row-action="openDetail" />
-                <Drawer :open="drawerOpen" title="Row detail" title-id="home-datatable-drawer-title" :on-close="(() => drawerOpen = false)">
+                <DataTable :columns="columns" :rows="rows" :has-row-action="rowAction" :action-title="actionTitle" :action-label="actionLabel" :sort-key="sortKey" :sort-dir="sortDir" :selected-count="selectedCountLabel" :all-selected="allSelected" :select-all-label="selectAllLabel" :on-sort="sortBy" :on-toggle-row="toggleRow" :on-toggle-all="toggleAll" :on-row-action="openDetail" />
+                <Drawer :open="drawerOpen" :title="drawerTitle" title-id="home-datatable-drawer-title" :on-close="(() => drawerOpen = false)">
                     <p data-vmz-fixture="datatable-drawer-body">
                         detail:
                         {{ detailId }}
@@ -32,7 +32,26 @@
     </div>
 </template>
 <script client>
+import { navLab } from "#locales/common";
+import {
+    labDatatablePageTitle,
+    labDatatableNavLabel,
+    labDatatableAlertTitle,
+    labDatatableAlertDesc,
+    labDatatableBulkLabel,
+    labDatatableClear,
+    labDatatableActionTitle,
+    labDatatableActionLabel,
+    labDatatableSelectAll,
+    labDatatableDrawerTitle,
+    labDatatableColumnName,
+    labDatatableColumnStatus,
+    labDatatableColumnOwner,
+    labDatatableSelectRow,
+    labDatatableSelectedCount,
+} from "#locales/lab-datatable";
 import { labNav } from "../../lab-nav.ts";
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
 export default class DatatablePage {
     selectedAttr = "";
@@ -45,11 +64,22 @@ export default class DatatablePage {
     rowAction = true;
     drawerOpen = false;
     detailId = "";
-    columns = [
-        { id: "name", title: "Name" },
-        { id: "status", title: "Status" },
-        { id: "owner", title: "Owner" },
-    ];
+    navItems = [];
+    pageTitle = "";
+    navLabel = "";
+    alertTitle = "";
+    alertDesc = "";
+    bulkActionsLabel = "";
+    clearLabel = "";
+    actionTitle = "";
+    actionLabel = "";
+    selectAllLabel = "";
+    drawerTitle = "";
+    columnName = "";
+    columnStatus = "";
+    columnOwner = "";
+    _unwatchLocale = null;
+    columns = [];
     baseRows = [
         { id: "r1", cells: ["Alpha", "Active", "Ops"] },
         { id: "r2", cells: ["Beta", "Paused", "Docs"] },
@@ -57,44 +87,44 @@ export default class DatatablePage {
         { id: "r4", cells: ["Delta", "Draft", "Design"] },
         { id: "r5", cells: ["Epsilon", "Active", "QA"] },
     ];
-    rows = [
-        {
-            id: "r1",
-            cells: ["Alpha", "Active", "Ops"],
-            selected: false,
-            selectedAttr: "false",
-            selectLabel: "Select Alpha",
-        },
-        {
-            id: "r2",
-            cells: ["Beta", "Paused", "Docs"],
-            selected: false,
-            selectedAttr: "false",
-            selectLabel: "Select Beta",
-        },
-        {
-            id: "r3",
-            cells: ["Gamma", "Active", "Runtime"],
-            selected: false,
-            selectedAttr: "false",
-            selectLabel: "Select Gamma",
-        },
-        {
-            id: "r4",
-            cells: ["Delta", "Draft", "Design"],
-            selected: false,
-            selectedAttr: "false",
-            selectLabel: "Select Delta",
-        },
-        {
-            id: "r5",
-            cells: ["Epsilon", "Active", "QA"],
-            selected: false,
-            selectedAttr: "false",
-            selectLabel: "Select Epsilon",
-        },
-    ];
-    navItems = labNav();
+    rows = [];
+
+    onMount() {
+        this.applyLocaleCopy();
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+    }
+
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
+    }
+
+    refreshCopy() {
+        this.pageTitle = labDatatablePageTitle();
+        this.navLabel = labDatatableNavLabel();
+        this.alertTitle = labDatatableAlertTitle();
+        this.alertDesc = labDatatableAlertDesc();
+        this.bulkActionsLabel = labDatatableBulkLabel();
+        this.clearLabel = labDatatableClear();
+        this.actionTitle = labDatatableActionTitle();
+        this.actionLabel = labDatatableActionLabel();
+        this.selectAllLabel = labDatatableSelectAll();
+        this.drawerTitle = labDatatableDrawerTitle();
+        this.columnName = labDatatableColumnName();
+        this.columnStatus = labDatatableColumnStatus();
+        this.columnOwner = labDatatableColumnOwner();
+        this.columns = [
+            { id: "name", title: this.columnName },
+            { id: "status", title: this.columnStatus },
+            { id: "owner", title: this.columnOwner },
+        ];
+        this.refreshRows();
+        this.navItems = labNav(navLab());
+    }
+
+    applyLocaleCopy(preferred) {
+        withLocaleHint(readLocaleId(preferred), () => this.refreshCopy());
+    }
 
     selectedSet() {
         return new Set(
@@ -121,13 +151,15 @@ export default class DatatablePage {
                 cells: row.cells.slice(),
                 selected: isOn,
                 selectedAttr: isOn ? "true" : "false",
-                selectLabel: `Select ${row.cells[0]}`,
+                selectLabel: labDatatableSelectRow({ name: row.cells[0] }),
             };
         });
         this.selectedCount = selected.size;
         this.selectedCountLabel = String(selected.size);
         this.allSelected = this.rows.length > 0 && this.rows.every((r) => r.selected);
-        this.bulkLabel = selected.size ? `${selected.size} selected` : "";
+        this.bulkLabel = selected.size
+            ? labDatatableSelectedCount({ count: selected.size })
+            : "";
     }
 
     toggleRow(id) {

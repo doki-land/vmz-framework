@@ -1,90 +1,137 @@
 <template>
     <div data-vmz-fixture="motion">
-        <AppShell brand="VMZ" home-href="/" nav-label="Motion" :nav="navItems">
+        <AppShell brand="VMZ" home-href="/" :nav-label="navLabel" :nav="navItems">
             <div class="vmz-slot-content">
                 <h1>
-                    Motion lab
+                    {{ pageTitle }}
                 </h1>
                 <p>
-                    Motion continuity lab: exit, interrupt/cancel, and SSR resume adopt.
+                    {{ pageLead }}
                 </p>
-        <section data-vmz-fixture="motion-feedback">
-            <Button type="button" @click="(() => clicks += 1)">
-                Pulse
-            </Button>
-            <p data-vmz-fixture="motion-clicks" class="vmz-sr-only">
-                clicks:
-                {{ clicks }}
-            </p>
-        </section>
-        <section data-vmz-fixture="motion-overlay">
-            <Button type="button" @click="(() => dialogOpen = true)">
-                Open dialog
-            </Button>
-            <Dialog :open="dialogOpen" title="Motion dialog" title-id="home-motion-dialog-title" :on-close="(() => dialogOpen = false)">
-                <p data-vmz-fixture="motion-dialog-body">
-                    Overlay enter/exit uses motion.overlay tokens.
-                </p>
-            </Dialog>
-            <Button type="button" @click="(() => drawerOpen = true)">
-                Open drawer
-            </Button>
-            <Drawer :open="drawerOpen" title="Motion drawer" title-id="home-motion-drawer-title" :on-close="(() => drawerOpen = false)">
-                <p data-vmz-fixture="motion-drawer-body">
-                    Drawer enter/exit uses motion.overlay tokens.
-                </p>
-            </Drawer>
-        </section>
-        <section data-vmz-fixture="motion-interrupt">
-            <p data-vmz-fixture="motion-interrupt-state" class="vmz-sr-only">
-                interrupt-dialog:
-                {{ interruptDialogOpen ? 'open' : 'closed' }}
-            </p>
-            <Button type="button" @click="openInterruptDialog">
-                Open interrupt dialog
-            </Button>
-            <Dialog :open="interruptDialogOpen" title="Interrupt dialog" title-id="home-motion-interrupt-dialog-title" :on-close="onInterruptDialogClose">
-                <p data-vmz-fixture="motion-interrupt-body">
-                    Escape starts exit; Escape again cancels exit (motion generation / cancel edge).
-                </p>
-            </Dialog>
-        </section>
-        <section data-vmz-fixture="motion-resume">
-            <p data-vmz-fixture="motion-resume-state" class="vmz-sr-only">
-                ssr-dialog:
-                {{ ssrDialogOpen ? 'open' : 'closed' }}
-            </p>
-            <Button type="button" @click="(() => ssrDialogOpen = true)">
-                Reopen SSR dialog
-            </Button>
-            <Dialog :open="ssrDialogOpen" title="SSR resume dialog" title-id="home-motion-ssr-dialog-title" :on-close="(() => ssrDialogOpen = false)">
-                <p data-vmz-fixture="motion-resume-body">
-                    SSR-stable overlay — resume keeps enter from replaying.
-                </p>
-            </Dialog>
-        </section>
-        <section data-vmz-fixture="motion-list">
-            <Button type="button" @click="filterAlpha">
-                Filter Alpha
-            </Button>
-            <Button type="button" @click="resetRows">
-                Reset rows
-            </Button>
-            <Table :columns="columns" :rows="rows" :has-row-action="rowAction" />
-            <p data-vmz-fixture="motion-row-count" class="vmz-sr-only">
-                rows:
-                {{ rowCount }}
-            </p>
-        </section>
+                <section data-vmz-fixture="motion-feedback">
+                    <Button type="button" @click="(() => clicks += 1)">
+                        {{ pulseLabel }}
+                    </Button>
+                    <p data-vmz-fixture="motion-clicks" class="vmz-sr-only">
+                        clicks:
+                        {{ clicks }}
+                    </p>
+                </section>
+                <section data-vmz-fixture="motion-overlay">
+                    <Button type="button" @click="(() => dialogOpen = true)">
+                        {{ openDialogLabel }}
+                    </Button>
+                    <Dialog :open="dialogOpen" :title="dialogTitle" title-id="home-motion-dialog-title" :on-close="(() => dialogOpen = false)">
+                        <p data-vmz-fixture="motion-dialog-body">
+                            {{ dialogBody }}
+                        </p>
+                    </Dialog>
+                    <Button type="button" @click="(() => drawerOpen = true)">
+                        {{ openDrawerLabel }}
+                    </Button>
+                    <Drawer :open="drawerOpen" :title="drawerTitle" title-id="home-motion-drawer-title" :on-close="(() => drawerOpen = false)">
+                        <p data-vmz-fixture="motion-drawer-body">
+                            {{ drawerBody }}
+                        </p>
+                    </Drawer>
+                </section>
+                <section data-vmz-fixture="motion-interrupt">
+                    <p data-vmz-fixture="motion-interrupt-state" class="vmz-sr-only">
+                        interrupt-dialog:
+                        {{ interruptDialogOpen ? 'open' : 'closed' }}
+                    </p>
+                    <Button type="button" @click="openInterruptDialog">
+                        {{ openInterruptLabel }}
+                    </Button>
+                    <Dialog :open="interruptDialogOpen" :title="interruptTitle" title-id="home-motion-interrupt-dialog-title" :on-close="onInterruptDialogClose">
+                        <p data-vmz-fixture="motion-interrupt-body">
+                            {{ interruptBody }}
+                        </p>
+                    </Dialog>
+                </section>
+                <section data-vmz-fixture="motion-resume">
+                    <p data-vmz-fixture="motion-resume-state" class="vmz-sr-only">
+                        ssr-dialog:
+                        {{ ssrDialogOpen ? 'open' : 'closed' }}
+                    </p>
+                    <Button type="button" @click="(() => ssrDialogOpen = true)">
+                        {{ reopenSsrLabel }}
+                    </Button>
+                    <Dialog :open="ssrDialogOpen" :title="ssrTitle" title-id="home-motion-ssr-dialog-title" :on-close="(() => ssrDialogOpen = false)">
+                        <p data-vmz-fixture="motion-resume-body">
+                            {{ ssrBody }}
+                        </p>
+                    </Dialog>
+                </section>
+                <section data-vmz-fixture="motion-list">
+                    <Button type="button" @click="filterAlpha">
+                        {{ filterAlphaLabel }}
+                    </Button>
+                    <Button type="button" @click="resetRows">
+                        {{ resetRowsLabel }}
+                    </Button>
+                    <Table :columns="columns" :rows="rows" :has-row-action="rowAction" />
+                    <p data-vmz-fixture="motion-row-count" class="vmz-sr-only">
+                        rows:
+                        {{ rowCount }}
+                    </p>
+                </section>
             </div>
         </AppShell>
     </div>
 </template>
 <script client>
+import { navLab } from "#locales/common";
+import {
+    labMotionNavLabel,
+    labMotionPageTitle,
+    labMotionPageLead,
+    labMotionPulse,
+    labMotionOpenDialog,
+    labMotionDialogTitle,
+    labMotionDialogBody,
+    labMotionOpenDrawer,
+    labMotionDrawerTitle,
+    labMotionDrawerBody,
+    labMotionOpenInterrupt,
+    labMotionInterruptTitle,
+    labMotionInterruptBody,
+    labMotionReopenSsr,
+    labMotionSsrTitle,
+    labMotionSsrBody,
+    labMotionFilterAlpha,
+    labMotionResetRows,
+    labMotionColName,
+    labMotionColStatus,
+    labMotionRowAlpha,
+    labMotionRowBeta,
+    labMotionRowGamma,
+    labMotionStatusActive,
+    labMotionStatusPaused,
+} from "#locales/lab-motion";
 import { labNav } from "../../lab-nav.ts";
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
 export default class MotionPage {
-    navItems = labNav();
+    navItems = [];
+    navLabel = "";
+    pageTitle = "";
+    pageLead = "";
+    pulseLabel = "";
+    openDialogLabel = "";
+    dialogTitle = "";
+    dialogBody = "";
+    openDrawerLabel = "";
+    drawerTitle = "";
+    drawerBody = "";
+    openInterruptLabel = "";
+    interruptTitle = "";
+    interruptBody = "";
+    reopenSsrLabel = "";
+    ssrTitle = "";
+    ssrBody = "";
+    filterAlphaLabel = "";
+    resetRowsLabel = "";
     clicks = 0;
     dialogOpen = false;
     drawerOpen = false;
@@ -107,6 +154,54 @@ export default class MotionPage {
         { id: "r2", cells: ["Beta", "Paused"] },
         { id: "r3", cells: ["Gamma", "Active"] },
     ];
+    _unwatchLocale = null;
+
+    onMount() {
+        this.applyLocaleCopy();
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+    }
+
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
+    }
+
+    refreshCopy() {
+        this.navLabel = labMotionNavLabel();
+        this.pageTitle = labMotionPageTitle();
+        this.pageLead = labMotionPageLead();
+        this.pulseLabel = labMotionPulse();
+        this.openDialogLabel = labMotionOpenDialog();
+        this.dialogTitle = labMotionDialogTitle();
+        this.dialogBody = labMotionDialogBody();
+        this.openDrawerLabel = labMotionOpenDrawer();
+        this.drawerTitle = labMotionDrawerTitle();
+        this.drawerBody = labMotionDrawerBody();
+        this.openInterruptLabel = labMotionOpenInterrupt();
+        this.interruptTitle = labMotionInterruptTitle();
+        this.interruptBody = labMotionInterruptBody();
+        this.reopenSsrLabel = labMotionReopenSsr();
+        this.ssrTitle = labMotionSsrTitle();
+        this.ssrBody = labMotionSsrBody();
+        this.filterAlphaLabel = labMotionFilterAlpha();
+        this.resetRowsLabel = labMotionResetRows();
+        this.columns = [
+            { id: "name", title: labMotionColName() },
+            { id: "status", title: labMotionColStatus() },
+        ];
+        this.allRows = [
+            { id: "r1", cells: [labMotionRowAlpha(), labMotionStatusActive()] },
+            { id: "r2", cells: [labMotionRowBeta(), labMotionStatusPaused()] },
+            { id: "r3", cells: [labMotionRowGamma(), labMotionStatusActive()] },
+        ];
+        this.rows = this.allRows.slice();
+        this.rowCount = this.rows.length;
+        this.navItems = labNav(navLab());
+    }
+
+    applyLocaleCopy(preferred) {
+        withLocaleHint(readLocaleId(preferred), () => this.refreshCopy());
+    }
 
     openInterruptDialog() {
         this.interruptDialogOpen = true;

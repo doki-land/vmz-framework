@@ -4,14 +4,13 @@
             <header class="planner__hero">
                 <p class="planner__kicker">
                     <span />
-                    交付前自查
+                    {{ kicker }}
                 </p>
                 <h1 id="planner-title">
-                    部署计划器
+                    {{ titleText }}
                 </h1>
                 <p class="planner__lede">
-                    回答几个部署问题，生成一份可直接交给 AI 编码助手的实施提示词。
-                    提示词负责说明怎么装；能否跑通仍以
+                    {{ ledeLead }}
                     <code>
                         vmz check
                     </code>
@@ -19,107 +18,107 @@
                     <code>
                         vmz build
                     </code>
-                    为准，不必手写 JSON。
+                    {{ ledeTail }}
                 </p>
             </header>
             <div class="planner__grid">
                 <section aria-labelledby="quiz-title" class="planner__quiz">
                     <h2 id="quiz-title">
-                        部署问卷
+                        {{ quizTitle }}
                     </h2>
                     <fieldset class="planner__field">
                         <legend>
-                            密钥与会话是否必须留在可信服务器？
+                            {{ qSecrets }}
                         </legend>
                         <div role="group" class="planner__chips">
                             <button type="button" @click='(() => setSecrets("none"))' :class="secretsNoneClass">
-                                无（公开内容）
+                                {{ optSecretsNone }}
                             </button>
                             <button type="button" @click='(() => setSecrets("yes"))' :class="secretsYesClass">
-                                是（需要可信服务端）
+                                {{ optSecretsYes }}
                             </button>
                         </div>
                     </fieldset>
                     <fieldset class="planner__field">
                         <legend>
-                            首屏 HTML 从哪来？
+                            {{ qHtml }}
                         </legend>
                         <div role="group" class="planner__chips">
                             <button type="button" @click='(() => setHtml("cdn-prebuild"))' :class="htmlCdnClass">
-                                CDN 预生成
+                                {{ optHtmlCdn }}
                             </button>
                             <button type="button" @click='(() => setHtml("request-ssr"))' :class="htmlSsrClass">
-                                请求时 SSR
+                                {{ optHtmlSsr }}
                             </button>
                             <button type="button" @click='(() => setHtml("browser-only"))' :class="htmlBrowserClass">
-                                纯浏览器
+                                {{ optHtmlBrowser }}
                             </button>
                         </div>
                     </fieldset>
                     <fieldset class="planner__field">
                         <legend>
-                            静态资源放在哪里？
+                            {{ qAssets }}
                         </legend>
                         <div role="group" class="planner__chips">
                             <button type="button" @click='(() => setAssets("same-host"))' :class="assetsSameClass">
-                                同机
+                                {{ optAssetsSame }}
                             </button>
                             <button type="button" @click='(() => setAssets("cdn"))' :class="assetsCdnClass">
-                                CDN
+                                {{ optAssetsCdn }}
                             </button>
                             <button type="button" @click='(() => setAssets("embedded-binary"))' :class="assetsEmbedClass">
-                                嵌进二进制
+                                {{ optAssetsEmbed }}
                             </button>
                         </div>
                     </fieldset>
                     <fieldset class="planner__field">
                         <legend>
-                            需要服务端进程吗？
+                            {{ qServer }}
                         </legend>
                         <div role="group" class="planner__chips">
                             <button type="button" @click='(() => setServer("none"))' :class="serverNoneClass">
-                                无
+                                {{ optNone }}
                             </button>
                             <button type="button" @click='(() => setServer("node"))' :class="serverNodeClass">
-                                Node
+                                {{ optNode }}
                             </button>
                             <button type="button" @click='(() => setServer("worker"))' :class="serverWorkerClass">
-                                Worker
+                                {{ optWorker }}
                             </button>
                             <button type="button" @click='(() => setServer("rust-host"))' :class="serverRustClass">
-                                Rust
+                                {{ optRust }}
                             </button>
                         </div>
                     </fieldset>
                     <fieldset class="planner__field">
                         <legend>
-                            需要嵌入基线 + 远程整包更新吗？
+                            {{ qUpdate }}
                         </legend>
                         <div role="group" class="planner__chips">
                             <button type="button" @click='(() => setUpdate("no"))' :class="updateNoClass">
-                                否
+                                {{ optNo }}
                             </button>
                             <button type="button" @click='(() => setUpdate("release-fallback"))' :class="updateYesClass">
-                                是（基线 + 整包回退）
+                                {{ optUpdateYes }}
                             </button>
                         </div>
                     </fieldset>
                     <fieldset class="planner__field">
                         <legend>
-                            怎么发布？
+                            {{ qShip }}
                         </legend>
                         <div role="group" class="planner__chips">
                             <button type="button" @click='(() => setShip("git-ci"))' :class="shipCiClass">
-                                Git CI（配流水线 + push）
+                                {{ optShipCi }}
                             </button>
                             <button type="button" @click='(() => setShip("direct-upload"))' :class="shipUploadClass">
-                                本机直传
+                                {{ optShipUpload }}
                             </button>
                         </div>
                     </fieldset>
                     <fieldset class="planner__field">
                         <legend>
-                            部署到哪个平台？（可多选）
+                            {{ qVendor }}
                         </legend>
                         <div role="group" class="planner__chips planner__chips--wrap">
                             <button type="button" @click='(() => toggleVendor("cloudflare-pages"))' :class="vendorPagesClass">
@@ -135,7 +134,7 @@
                                 Netlify
                             </button>
                             <button type="button" @click='(() => toggleVendor("tencent-edgeone"))' :class="vendorEdgeoneClass">
-                                腾讯 EdgeOne
+                                {{ vendorEdgeone }}
                             </button>
                             <button type="button" @click='(() => toggleVendor("cloudflare-workers"))' :class="vendorWorkersClass">
                                 CF Workers
@@ -144,10 +143,10 @@
                                 S3 + CloudFront
                             </button>
                             <button type="button" @click='(() => toggleVendor("node-vps"))' :class="vendorNodeClass">
-                                自建 Node
+                                {{ vendorNode }}
                             </button>
                             <button type="button" @click='(() => toggleVendor("rust-bin"))' :class="vendorRustClass">
-                                Rust 二进制
+                                {{ vendorRust }}
                             </button>
                         </div>
                     </fieldset>
@@ -155,7 +154,7 @@
                 <section aria-labelledby="plan-title" class="planner__result">
                     <div class="planner__result-head">
                         <h2 id="plan-title">
-                            实施提示词
+                            {{ resultTitle }}
                         </h2>
                         <div class="planner__copy-row">
                             <Button type="button" variant="secondary" @click="copyPrompt">
@@ -167,12 +166,12 @@
                         {{ disclaimer }}
                     </p>
                     <p v-if="promptCopyFailed" role="alert" class="planner__copy-error">
-                        复制失败：请手动选中下方提示词，或检查剪贴板权限。
+                        {{ copyError }}
                     </p>
                     <dl class="planner__meta">
                         <div>
                             <dt>
-                                交付配方
+                                {{ metaProfile }}
                             </dt>
                             <dd>
                                 {{ profileLabel }}
@@ -183,7 +182,7 @@
                         </div>
                         <div>
                             <dt>
-                                组装方式
+                                {{ metaAssembly }}
                             </dt>
                             <dd>
                                 {{ assemblyLabel }}
@@ -194,7 +193,7 @@
                         </div>
                         <div>
                             <dt>
-                                发布方式
+                                {{ metaShip }}
                             </dt>
                             <dd>
                                 {{ shipLabel }}
@@ -205,7 +204,7 @@
                         </div>
                         <div v-if="hasServerRuntime">
                             <dt>
-                                服务端运行时
+                                {{ metaRuntime }}
                             </dt>
                             <dd>
                                 {{ serverRuntimeLabel }}
@@ -216,7 +215,7 @@
                         </div>
                         <div>
                             <dt>
-                                需要配置的环境变量名
+                                {{ metaEnv }}
                             </dt>
                             <dd>
                                 <code>
@@ -227,7 +226,7 @@
                     </dl>
                     <div v-if="hasCautions" role="status" class="planner__cautions">
                         <h3>
-                            选型警告
+                            {{ cautionsTitle }}
                         </h3>
                         <ul>
                             <li v-for="item in cautionItems" :key="item.id">
@@ -236,7 +235,7 @@
                         </ul>
                     </div>
                     <h3>
-                        完整提示词
+                        {{ promptHeading }}
                     </h3>
                     <pre class="planner__code planner__code--prompt">
                         <code>
@@ -245,10 +244,10 @@
                     </pre>
                     <details class="planner__summary">
                         <summary>
-                            摘要：建议命令、外部清单与 delivery 配置
+                            {{ summary }}
                         </summary>
                         <h4>
-                            建议命令
+                            {{ commandsHeading }}
                         </h4>
                         <ul class="planner__commands">
                             <li v-for="item in commandItems" :key="item.id">
@@ -258,7 +257,7 @@
                             </li>
                         </ul>
                         <h4>
-                            外部填写清单
+                            {{ externalHeading }}
                         </h4>
                         <div class="planner__steps">
                             <article v-for="step in stepItems" :key="step.id" class="planner__step">
@@ -266,7 +265,7 @@
                                     {{ step.title }}
                                 </h5>
                                 <p class="planner__axis-label">
-                                    控制台
+                                    {{ axisConsole }}
                                 </p>
                                 <ul>
                                     <li v-for="field in step.console">
@@ -274,7 +273,7 @@
                                     </li>
                                 </ul>
                                 <p class="planner__axis-label">
-                                    Git CI
+                                    {{ axisCi }}
                                 </p>
                                 <ul>
                                     <li v-for="field in step.ci">
@@ -282,7 +281,7 @@
                                     </li>
                                 </ul>
                                 <p class="planner__axis-label">
-                                    本机直传
+                                    {{ axisUpload }}
                                 </p>
                                 <ul>
                                     <li v-for="field in step.localPush">
@@ -292,7 +291,7 @@
                             </article>
                         </div>
                         <h4>
-                            delivery 配置
+                            {{ deliveryHeading }}
                         </h4>
                         <pre class="planner__code">
                             <code>
@@ -301,7 +300,7 @@
                         </pre>
                     </details>
                     <h3>
-                        相关文档
+                        {{ docsHeading }}
                     </h3>
                     <ul class="planner__links">
                         <li v-for="link in deepLinkItems" :key="link.href">
@@ -462,6 +461,9 @@
     margin: 0.2rem 0 0;
     font-size: 0.95rem;
 }
+.planner__meta dd code {
+    margin-inline-start: 0.35rem;
+}
 .planner__cautions {
     margin-top: 1rem;
     padding: 0.75rem 0.9rem;
@@ -564,30 +566,67 @@
 }
 </style>
 <script client>
+import {
+    plannerKicker,
+    plannerTitle,
+    plannerLedeLead,
+    plannerLedeTail,
+    plannerQuizTitle,
+    plannerQSecrets,
+    plannerOptSecretsNone,
+    plannerOptSecretsYes,
+    plannerQHtml,
+    plannerOptHtmlCdn,
+    plannerOptHtmlSsr,
+    plannerOptHtmlBrowser,
+    plannerQAssets,
+    plannerOptAssetsSame,
+    plannerOptAssetsCdn,
+    plannerOptAssetsEmbed,
+    plannerQServer,
+    plannerOptNone,
+    plannerOptNode,
+    plannerOptWorker,
+    plannerOptRust,
+    plannerQUpdate,
+    plannerOptNo,
+    plannerOptUpdateYes,
+    plannerQShip,
+    plannerOptShipCi,
+    plannerOptShipUpload,
+    plannerQVendor,
+    plannerVendorEdgeone,
+    plannerVendorNode,
+    plannerVendorRust,
+    plannerResultTitle,
+    plannerCopy,
+    plannerCopied,
+    plannerCopyFailedLabel,
+    plannerCopyError,
+    plannerMetaProfile,
+    plannerMetaAssembly,
+    plannerMetaShip,
+    plannerMetaRuntime,
+    plannerMetaEnv,
+    plannerCautionsTitle,
+    plannerPromptHeading,
+    plannerSummary,
+    plannerCommands,
+    plannerExternal,
+    plannerDelivery,
+    plannerDocs,
+    plannerAxisConsole,
+    plannerAxisCi,
+    plannerAxisUpload,
+} from "#locales/planner";
 import { buildDeployPlan, DEFAULT_ANSWERS } from "../deploy/planner.ts";
-
-/** Human labels for the recipe ids; the raw id stays visible for copy-paste. */
-const PROFILE_LABELS = {
-    static: "纯静态托管",
-    "web-ssr": "单机全栈",
-    "web-hybrid": "CDN + 独立服务端",
-    "web-client": "纯前端 + 本机静态",
-    "panel-embedded": "面板嵌入（基线 + 整包回退）",
-};
-const ASSEMBLY_LABELS = {
-    "web-static": "静态托管",
-    "server-host": "单机服务端",
-    "cdn+server": "CDN + 服务端",
-    "local-static": "本机静态",
-    "rust-embedded": "Rust 嵌入",
-};
-const RUNTIME_LABELS = {
-    node: "Node",
-    worker: "Worker",
-    "rust-host": "Rust 宿主",
-};
+import { plannerCopy as plannerLabels } from "../deploy/planner-copy.ts";
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
 export default class DeployPlannerPage {
+    localeId = readLocaleId();
+    _unwatchLocale = null;
+
     secrets = DEFAULT_ANSWERS.secrets;
     html = DEFAULT_ANSWERS.html;
     assets = DEFAULT_ANSWERS.assets;
@@ -605,6 +644,55 @@ export default class DeployPlannerPage {
     vendorNode = false;
     vendorRust = false;
 
+    kicker = "";
+    titleText = "";
+    ledeLead = "";
+    ledeTail = "";
+    quizTitle = "";
+    qSecrets = "";
+    optSecretsNone = "";
+    optSecretsYes = "";
+    qHtml = "";
+    optHtmlCdn = "";
+    optHtmlSsr = "";
+    optHtmlBrowser = "";
+    qAssets = "";
+    optAssetsSame = "";
+    optAssetsCdn = "";
+    optAssetsEmbed = "";
+    qServer = "";
+    optNone = "";
+    optNode = "";
+    optWorker = "";
+    optRust = "";
+    qUpdate = "";
+    optNo = "";
+    optUpdateYes = "";
+    qShip = "";
+    optShipCi = "";
+    optShipUpload = "";
+    qVendor = "";
+    vendorEdgeone = "";
+    vendorNode = "";
+    vendorRust = "";
+    resultTitle = "";
+    copyError = "";
+    metaProfile = "";
+    metaAssembly = "";
+    metaShip = "";
+    metaRuntime = "";
+    metaEnv = "";
+    cautionsTitle = "";
+    promptHeading = "";
+    summary = "";
+    commandsHeading = "";
+    externalHeading = "";
+    deliveryHeading = "";
+    docsHeading = "";
+    axisConsole = "";
+    axisCi = "";
+    axisUpload = "";
+
     profileId = "";
     assembly = "";
     serverRuntime = "";
@@ -613,7 +701,7 @@ export default class DeployPlannerPage {
     assemblyLabel = "";
     shipLabel = "";
     serverRuntimeLabel = "";
-    requiredEnvLabel = "（无）";
+    requiredEnvLabel = "";
     agentPrompt = "";
     vmzConfigSnippet = "";
     disclaimer = "";
@@ -624,7 +712,8 @@ export default class DeployPlannerPage {
     deepLinkItems = [];
     promptCopied = false;
     promptCopyFailed = false;
-    copyLabel = "复制提示词";
+    copyLabel = "";
+    copyLabelDefault = "";
 
     secretsNoneClass = "is-active";
     secretsYesClass = "";
@@ -652,6 +741,9 @@ export default class DeployPlannerPage {
     vendorNodeClass = "";
     vendorRustClass = "";
 
+    /** Localized chrome must exist before first render for SSR. */
+    copyReady = this.applyLocale(this.localeId);
+
     /**
      * Derived plan must exist before the first render: the route render path
      * evaluates field initializers, so a constructor-only call would leave the
@@ -660,7 +752,72 @@ export default class DeployPlannerPage {
     planReady = this.refresh();
 
     onMount() {
+        this.applyLocale(readLocaleId());
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocale(id));
+    }
+
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
+    }
+
+    applyLocale(preferred) {
+        this.localeId = readLocaleId(preferred);
+        withLocaleHint(this.localeId, () => this.refreshCopy());
         this.refresh();
+    }
+
+    refreshCopy() {
+        this.kicker = plannerKicker();
+        this.titleText = plannerTitle();
+        this.ledeLead = plannerLedeLead();
+        this.ledeTail = plannerLedeTail();
+        this.quizTitle = plannerQuizTitle();
+        this.qSecrets = plannerQSecrets();
+        this.optSecretsNone = plannerOptSecretsNone();
+        this.optSecretsYes = plannerOptSecretsYes();
+        this.qHtml = plannerQHtml();
+        this.optHtmlCdn = plannerOptHtmlCdn();
+        this.optHtmlSsr = plannerOptHtmlSsr();
+        this.optHtmlBrowser = plannerOptHtmlBrowser();
+        this.qAssets = plannerQAssets();
+        this.optAssetsSame = plannerOptAssetsSame();
+        this.optAssetsCdn = plannerOptAssetsCdn();
+        this.optAssetsEmbed = plannerOptAssetsEmbed();
+        this.qServer = plannerQServer();
+        this.optNone = plannerOptNone();
+        this.optNode = plannerOptNode();
+        this.optWorker = plannerOptWorker();
+        this.optRust = plannerOptRust();
+        this.qUpdate = plannerQUpdate();
+        this.optNo = plannerOptNo();
+        this.optUpdateYes = plannerOptUpdateYes();
+        this.qShip = plannerQShip();
+        this.optShipCi = plannerOptShipCi();
+        this.optShipUpload = plannerOptShipUpload();
+        this.qVendor = plannerQVendor();
+        this.vendorEdgeone = plannerVendorEdgeone();
+        this.vendorNode = plannerVendorNode();
+        this.vendorRust = plannerVendorRust();
+        this.resultTitle = plannerResultTitle();
+        this.copyError = plannerCopyError();
+        this.metaProfile = plannerMetaProfile();
+        this.metaAssembly = plannerMetaAssembly();
+        this.metaShip = plannerMetaShip();
+        this.metaRuntime = plannerMetaRuntime();
+        this.metaEnv = plannerMetaEnv();
+        this.cautionsTitle = plannerCautionsTitle();
+        this.promptHeading = plannerPromptHeading();
+        this.summary = plannerSummary();
+        this.commandsHeading = plannerCommands();
+        this.externalHeading = plannerExternal();
+        this.deliveryHeading = plannerDelivery();
+        this.docsHeading = plannerDocs();
+        this.axisConsole = plannerAxisConsole();
+        this.axisCi = plannerAxisCi();
+        this.axisUpload = plannerAxisUpload();
+        this.copyLabelDefault = plannerCopy();
+        this.copyLabel = this.copyLabelDefault;
     }
 
     vendors() {
@@ -707,6 +864,7 @@ export default class DeployPlannerPage {
 
     refresh() {
         this.refreshChipClasses();
+        const labels = plannerLabels(this.localeId);
         const plan = buildDeployPlan({
             secrets: this.secrets,
             html: this.html,
@@ -715,23 +873,26 @@ export default class DeployPlannerPage {
             update: this.update,
             ship: this.ship,
             vendors: this.vendors(),
+            locale: this.localeId,
         });
         this.profileId = plan.profileId;
         this.assembly = plan.assembly;
         this.ship = plan.ship;
         this.serverRuntime = plan.serverRuntime || "";
         this.hasServerRuntime = !!plan.serverRuntime;
-        this.profileLabel = PROFILE_LABELS[plan.profileId] || "自定义配方";
-        this.assemblyLabel = ASSEMBLY_LABELS[plan.assembly] || "自定义组装";
-        this.shipLabel = plan.ship === "git-ci" ? "Git CI 发布" : "本机直传";
-        this.serverRuntimeLabel = RUNTIME_LABELS[plan.serverRuntime] || "自定义运行时";
+        this.profileLabel = labels.labels.profiles[plan.profileId] || labels.labels.customProfile;
+        this.assemblyLabel = labels.labels.assemblies[plan.assembly] || labels.labels.customAssembly;
+        this.shipLabel = plan.ship === "git-ci" ? labels.labels.shipGitCi : labels.labels.shipUpload;
+        this.serverRuntimeLabel =
+            labels.labels.runtimes[plan.serverRuntime] || labels.labels.customRuntime;
         this.requiredEnvLabel =
-            plan.requiredEnv.length > 0 ? plan.requiredEnv.join(", ") : "（无）";
+            plan.requiredEnv.length > 0 ? plan.requiredEnv.join(labels.listSeparator) : labels.labels.none;
         this.agentPrompt = plan.agentPrompt;
         this.vmzConfigSnippet = plan.vmzConfigSnippet;
-        this.disclaimer = plan.disclaimer;
+        // Prompt keeps markdown backticks; the page shows plain prose.
+        this.disclaimer = plan.disclaimer.split("`").join("");
         this.hasCautions = plan.cautions.length > 0;
-        this.cautionItems = plan.cautions.map((text, i) => ({ id: `c${i}`, text }));
+        this.cautionItems = plan.cautions.map((text, i) => ({ id: `c${i}`, text: text.split("`").join("") }));
         this.commandItems = plan.commandsSuggested.map((text, i) => ({ id: `cmd${i}`, text }));
         this.stepItems = plan.externalSteps.map((step) => ({
             id: step.id,
@@ -743,7 +904,7 @@ export default class DeployPlannerPage {
         this.deepLinkItems = plan.deepLinks;
         this.promptCopied = false;
         this.promptCopyFailed = false;
-        this.copyLabel = "复制提示词";
+        this.copyLabel = this.copyLabelDefault;
     }
 
     setSecrets(v) {
@@ -789,12 +950,16 @@ export default class DeployPlannerPage {
         const ok = () => {
             this.promptCopied = true;
             this.promptCopyFailed = false;
-            this.copyLabel = "已复制提示词";
+            withLocaleHint(this.localeId, () => {
+                this.copyLabel = plannerCopied();
+            });
         };
         const fail = () => {
             this.promptCopied = false;
             this.promptCopyFailed = true;
-            this.copyLabel = "复制失败，请手动选中";
+            withLocaleHint(this.localeId, () => {
+                this.copyLabel = plannerCopyFailedLabel();
+            });
         };
         if (
             typeof navigator !== "undefined" &&

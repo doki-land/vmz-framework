@@ -1,8 +1,8 @@
 <template>
     <div data-vmz-fixture="ui6" :data-density="density" :dir="dir">
-        <AppShell brand="VMZ" home-href="/" nav-label="Density and theme" :nav="navItems">
+        <AppShell brand="VMZ" home-href="/" :nav-label="navLabel" :nav="navItems">
             <div class="vmz-slot-content">
-                <Alert tone="info" role-name="status" title="Density / RTL / preset" description="comfortable → compact → dense; dir ltr/rtl; high-contrast theme overlay from /designs." />
+                <Alert tone="info" role-name="status" :title="alertTitle" :description="alertDesc" />
                 <p data-vmz-fixture="ui6-state" class="vmz-sr-only">
                     density:
                     {{ density }}
@@ -13,19 +13,19 @@
                 </p>
                 <div class="vmz-ui6-actions">
                     <Button type="button" @click="cycleDensity">
-                        Cycle density
+                        {{ cycleLabel }}
                     </Button>
                     <Button type="button" variant="secondary" @click="toggleDir">
-                        Toggle RTL
+                        {{ toggleDirLabel }}
                     </Button>
                     <Button type="button" variant="ghost" @click="toggleTheme">
-                        Toggle high-contrast
+                        {{ toggleThemeLabel }}
                     </Button>
                 </div>
-                <Card title="Density sample" description="Button padding follows data-density; chrome from Style Theme.">
-                    <Field label="Sample field" description="Control spacing from density tokens" control-id="home-ui6-sample" description-id="home-ui6-sample-desc" :value="sample" @input="onSample" />
+                <Card :title="cardTitle" :description="cardDesc">
+                    <Field :label="fieldLabel" :description="fieldDesc" control-id="home-ui6-sample" description-id="home-ui6-sample-desc" :value="sample" @input="onSample" />
                     <Button type="button">
-                        Probe control
+                        {{ probeLabel }}
                     </Button>
                 </Card>
             </div>
@@ -40,14 +40,70 @@
 }
 </style>
 <script client>
+import { navLab } from "#locales/common";
+import {
+    labDensityNavLabel,
+    labDensityAlertTitle,
+    labDensityAlertDesc,
+    labDensityCycle,
+    labDensityToggleDir,
+    labDensityToggleTheme,
+    labDensityCardTitle,
+    labDensityCardDesc,
+    labDensityFieldLabel,
+    labDensityFieldDesc,
+    labDensityProbe,
+} from "#locales/lab-density";
 import { labNav } from "../../lab-nav.ts";
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
 export default class DensityThemePage {
     density = "comfortable";
     dir = "ltr";
     theme = "default";
     sample = "";
-    navItems = labNav();
+    navItems = [];
+    navLabel = "";
+    alertTitle = "";
+    alertDesc = "";
+    cycleLabel = "";
+    toggleDirLabel = "";
+    toggleThemeLabel = "";
+    cardTitle = "";
+    cardDesc = "";
+    fieldLabel = "";
+    fieldDesc = "";
+    probeLabel = "";
+    _unwatchLocale = null;
+
+    onMount() {
+        this.applyLocaleCopy();
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+    }
+
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
+    }
+
+    refreshCopy() {
+        this.navLabel = labDensityNavLabel();
+        this.alertTitle = labDensityAlertTitle();
+        this.alertDesc = labDensityAlertDesc();
+        this.cycleLabel = labDensityCycle();
+        this.toggleDirLabel = labDensityToggleDir();
+        this.toggleThemeLabel = labDensityToggleTheme();
+        this.cardTitle = labDensityCardTitle();
+        this.cardDesc = labDensityCardDesc();
+        this.fieldLabel = labDensityFieldLabel();
+        this.fieldDesc = labDensityFieldDesc();
+        this.probeLabel = labDensityProbe();
+        this.navItems = labNav(navLab());
+    }
+
+    applyLocaleCopy(preferred) {
+        withLocaleHint(readLocaleId(preferred), () => this.refreshCopy());
+    }
 
     cycleDensity() {
         if (this.density === "comfortable") this.density = "compact";

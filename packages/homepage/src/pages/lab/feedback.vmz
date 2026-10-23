@@ -1,42 +1,119 @@
 <template>
     <div data-vmz-fixture="ui4" :data-density="density">
-        <AppShell brand="VMZ" home-href="/" nav-label="Feedback" :nav="navItems">
+        <AppShell brand="VMZ" home-href="/" :nav-label="navLabel" :nav="navItems">
             <div class="vmz-slot-content">
                 <p data-vmz-fixture="ui4-density" class="vmz-sr-only">
                     density:
                     {{ density }}
                 </p>
                 <Button type="button" @click="toggleDensity">
-                    Toggle density
+                    {{ densityToggleLabel }}
                 </Button>
-                <Card title="Status tones">
-                    <Alert tone="info" role-name="status" title="Info" description="status.info tokens" />
-                    <Alert tone="success" role-name="status" title="Success" description="status.success tokens" />
-                    <Alert tone="warning" role-name="status" title="Warning" description="status.warning tokens" />
-                    <Alert tone="danger" role-name="alert" title="Danger" description="status.danger tokens" />
+                <Card :title="cardTonesLabel">
+                    <Alert tone="info" role-name="status" :title="infoTitle" :description="infoDesc" />
+                    <Alert tone="success" role-name="status" :title="successTitle" :description="successDesc" />
+                    <Alert tone="warning" role-name="status" :title="warningTitle" :description="warningDesc" />
+                    <Alert tone="danger" role-name="alert" :title="dangerTitle" :description="dangerDesc" />
                 </Card>
-                <Notification tone="warning" role-name="status" title="Deploy pending" description="Notification shares the status tone matrix." />
-                <Result status="success" title="Payment complete" description="Result outcome uses status.success tokens.">
+                <Notification tone="warning" role-name="status" :title="notificationTitle" :description="notificationDesc" />
+                <Result status="success" :title="resultTitle" :description="resultDesc">
                     <Button type="button" @click="(() => done = true)">
-                        Continue
+                        {{ continueLabel }}
                     </Button>
                 </Result>
                 <p data-vmz-fixture="ui4-done" class="vmz-sr-only">
                     done:
                     {{ done ? 'yes' : 'no' }}
                 </p>
-                <Empty title="No extras" description="Empty state on the commercial surface." />
+                <Empty :title="emptyTitle" :description="emptyDesc" />
             </div>
         </AppShell>
     </div>
 </template>
 <script client>
+import {
+    labFeedbackNavLabel,
+    labFeedbackDensityToggle,
+    labFeedbackCardTones,
+    labFeedbackInfoTitle,
+    labFeedbackInfoDesc,
+    labFeedbackSuccessTitle,
+    labFeedbackSuccessDesc,
+    labFeedbackWarningTitle,
+    labFeedbackWarningDesc,
+    labFeedbackDangerTitle,
+    labFeedbackDangerDesc,
+    labFeedbackNotificationTitle,
+    labFeedbackNotificationDesc,
+    labFeedbackResultTitle,
+    labFeedbackResultDesc,
+    labFeedbackContinue,
+    labFeedbackEmptyTitle,
+    labFeedbackEmptyDesc,
+    navLab,
+} from "#locales/common";
 import { labNav } from "../../lab-nav.ts";
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
 export default class FeedbackPage {
     density = "comfortable";
     done = false;
-    navItems = labNav();
+    navItems = [];
+    navLabel = "";
+    densityToggleLabel = "";
+    cardTonesLabel = "";
+    infoTitle = "";
+    infoDesc = "";
+    successTitle = "";
+    successDesc = "";
+    warningTitle = "";
+    warningDesc = "";
+    dangerTitle = "";
+    dangerDesc = "";
+    notificationTitle = "";
+    notificationDesc = "";
+    resultTitle = "";
+    resultDesc = "";
+    continueLabel = "";
+    emptyTitle = "";
+    emptyDesc = "";
+    _unwatchLocale = null;
+
+    onMount() {
+        this.applyLocaleCopy();
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+    }
+
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
+    }
+
+    refreshCopy() {
+        this.navLabel = labFeedbackNavLabel();
+        this.densityToggleLabel = labFeedbackDensityToggle();
+        this.cardTonesLabel = labFeedbackCardTones();
+        this.infoTitle = labFeedbackInfoTitle();
+        this.infoDesc = labFeedbackInfoDesc();
+        this.successTitle = labFeedbackSuccessTitle();
+        this.successDesc = labFeedbackSuccessDesc();
+        this.warningTitle = labFeedbackWarningTitle();
+        this.warningDesc = labFeedbackWarningDesc();
+        this.dangerTitle = labFeedbackDangerTitle();
+        this.dangerDesc = labFeedbackDangerDesc();
+        this.notificationTitle = labFeedbackNotificationTitle();
+        this.notificationDesc = labFeedbackNotificationDesc();
+        this.resultTitle = labFeedbackResultTitle();
+        this.resultDesc = labFeedbackResultDesc();
+        this.continueLabel = labFeedbackContinue();
+        this.emptyTitle = labFeedbackEmptyTitle();
+        this.emptyDesc = labFeedbackEmptyDesc();
+        this.navItems = labNav(navLab());
+    }
+
+    applyLocaleCopy(preferred) {
+        withLocaleHint(readLocaleId(preferred), () => this.refreshCopy());
+    }
 
     toggleDensity() {
         this.density = this.density === "compact" ? "comfortable" : "compact";

@@ -1,8 +1,8 @@
 <template>
     <div data-vmz-fixture="stacking">
-        <AppShell brand="VMZ" home-href="/" nav-label="Stacking" :nav="navItems">
+        <AppShell brand="VMZ" home-href="/" :nav-label="navLabel" :nav="navItems">
             <div class="vmz-slot-content">
-                <Alert tone="info" role-name="status" title="Overlay stacking" description="Drawer → Dialog → Popover with rising stackLevel; Escape closes topmost only. Parent owns the stack." />
+                <Alert tone="info" role-name="status" :title="alertTitle" :description="alertDesc" />
                 <p data-vmz-fixture="stacking-state" class="vmz-sr-only">
                     drawer:
                     {{ drawerOpen ? 'open' : 'closed' }}
@@ -13,28 +13,28 @@
                 </p>
                 <div class="vmz-stacking-actions">
                     <Button type="button" @click="openDrawer">
-                        Open drawer (stack 0)
+                        {{ openDrawerLabel }}
                     </Button>
                     <Button type="button" variant="secondary" @click="openDialog">
-                        Open dialog (stack 1)
+                        {{ openDialogLabel }}
                     </Button>
                     <Button type="button" variant="ghost" @click="openPopover">
-                        Open popover (stack 2)
+                        {{ openPopoverLabel }}
                     </Button>
                 </div>
-                <Drawer :open="drawerOpen" title="Base drawer" title-id="home-stack-drawer-title" stack-level="0" :on-close="closeDrawer">
+                <Drawer :open="drawerOpen" :title="drawerTitle" title-id="home-stack-drawer-title" stack-level="0" :on-close="closeDrawer">
                     <p data-vmz-fixture="stacking-drawer-body">
-                        Base layer stack-level=0
+                        {{ drawerBody }}
                     </p>
                 </Drawer>
-                <Dialog :open="dialogOpen" title="Stacked dialog" title-id="home-stack-dialog-title" stack-level="1" :on-close="closeDialog">
+                <Dialog :open="dialogOpen" :title="dialogTitle" title-id="home-stack-dialog-title" stack-level="1" :on-close="closeDialog">
                     <p data-vmz-fixture="stacking-dialog-body">
-                        Middle layer stack-level=1
+                        {{ dialogBody }}
                     </p>
                 </Dialog>
-                <Popover :open="popoverOpen" title="Top popover" title-id="home-stack-popover-title" stack-level="2" :on-close="closePopover">
+                <Popover :open="popoverOpen" :title="popoverTitle" title-id="home-stack-popover-title" stack-level="2" :on-close="closePopover">
                     <p data-vmz-fixture="stacking-popover-body">
-                        Top layer stack-level=2
+                        {{ popoverBody }}
                     </p>
                 </Popover>
             </div>
@@ -49,14 +49,73 @@
 }
 </style>
 <script client>
+import { navLab } from "#locales/common";
+import {
+    labOverlayNavLabel,
+    labOverlayAlertTitle,
+    labOverlayAlertDesc,
+    labOverlayOpenDrawer,
+    labOverlayOpenDialog,
+    labOverlayOpenPopover,
+    labOverlayDrawerTitle,
+    labOverlayDrawerBody,
+    labOverlayDialogTitle,
+    labOverlayDialogBody,
+    labOverlayPopoverTitle,
+    labOverlayPopoverBody,
+} from "#locales/lab-overlay";
 import { labNav } from "../../lab-nav.ts";
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
 export default class StackingPage {
     drawerOpen = false;
     dialogOpen = false;
     popoverOpen = false;
 
-    navItems = labNav();
+    navItems = [];
+    navLabel = "";
+    alertTitle = "";
+    alertDesc = "";
+    openDrawerLabel = "";
+    openDialogLabel = "";
+    openPopoverLabel = "";
+    drawerTitle = "";
+    drawerBody = "";
+    dialogTitle = "";
+    dialogBody = "";
+    popoverTitle = "";
+    popoverBody = "";
+    _unwatchLocale = null;
+
+    onMount() {
+        this.applyLocaleCopy();
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+    }
+
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
+    }
+
+    refreshCopy() {
+        this.navLabel = labOverlayNavLabel();
+        this.alertTitle = labOverlayAlertTitle();
+        this.alertDesc = labOverlayAlertDesc();
+        this.openDrawerLabel = labOverlayOpenDrawer();
+        this.openDialogLabel = labOverlayOpenDialog();
+        this.openPopoverLabel = labOverlayOpenPopover();
+        this.drawerTitle = labOverlayDrawerTitle();
+        this.drawerBody = labOverlayDrawerBody();
+        this.dialogTitle = labOverlayDialogTitle();
+        this.dialogBody = labOverlayDialogBody();
+        this.popoverTitle = labOverlayPopoverTitle();
+        this.popoverBody = labOverlayPopoverBody();
+        this.navItems = labNav(navLab());
+    }
+
+    applyLocaleCopy(preferred) {
+        withLocaleHint(readLocaleId(preferred), () => this.refreshCopy());
+    }
 
     openDrawer() {
         this.drawerOpen = true;

@@ -1,34 +1,34 @@
 <template>
     <div data-vmz-fixture="choice">
-        <AppShell brand="VMZ" home-href="/" nav-label="Choice" :nav="navItems">
+        <AppShell brand="VMZ" home-href="/" :nav-label="navLabel" :nav="navItems">
             <div class="vmz-slot-content">
-                <Alert tone="info" role-name="status" title="Choice / disclosure" description="Segmented / Dropdown / Collapse / Tag — Chrome automation covers pick, open, expand." />
+                <Alert tone="info" role-name="status" :title="alertTitle" :description="alertDesc" />
                 <p data-vmz-fixture="choice-state" class="vmz-sr-only">
                     segment:
                     {{ segment }}
                 </p>
-                <Card title="Segmented" description="Parent owns value via onChange.">
-                    <Segmented label="Density" :value="segment" :options="segmentOptions" :on-change="onSegment" />
+                <Card :title="segmentedTitle" :description="segmentedDesc">
+                    <Segmented :label="segmentedLabel" :value="segment" :options="segmentOptions" :on-change="onSegment" />
                 </Card>
-                <Card title="Dropdown" description="Native details disclosure.">
-                    <Dropdown label="Actions" :items="dropdownItems" />
+                <Card :title="dropdownTitle" :description="dropdownDesc">
+                    <Dropdown :label="dropdownLabel" :items="dropdownItems" />
                 </Card>
-                <Card title="Collapse" description="Independent details panels.">
+                <Card :title="collapseTitle" :description="collapseDesc">
                     <Collapse :items="collapseItems" />
                 </Card>
-                <Card title="Tag" description="Status chip surface.">
+                <Card :title="tagTitle" :description="tagDesc">
                     <div data-vmz-fixture="choice-tags">
                         <Tag>
-                            Default
+                            {{ tagDefault }}
                         </Tag>
                         <Tag status="success">
-                            Ready
+                            {{ tagReady }}
                         </Tag>
                         <Tag status="warning">
-                            Review
+                            {{ tagReview }}
                         </Tag>
                         <Tag status="error">
-                            Blocked
+                            {{ tagBlocked }}
                         </Tag>
                     </div>
                 </Card>
@@ -44,12 +44,61 @@
 }
 </style>
 <script client>
+import { navLab } from "#locales/common";
+import {
+    labChoiceNavLabel,
+    labChoiceAlertTitle,
+    labChoiceAlertDesc,
+    labChoiceSegmentedTitle,
+    labChoiceSegmentedDesc,
+    labChoiceSegmentedLabel,
+    labChoiceOptComfortable,
+    labChoiceOptCompact,
+    labChoiceOptDense,
+    labChoiceDropdownTitle,
+    labChoiceDropdownDesc,
+    labChoiceDropdownLabel,
+    labChoiceMenuEdit,
+    labChoiceMenuShare,
+    labChoiceMenuArchive,
+    labChoiceCollapseTitle,
+    labChoiceCollapseDesc,
+    labChoiceCollapseAlphaTitle,
+    labChoiceCollapseAlphaBody,
+    labChoiceCollapseBetaTitle,
+    labChoiceCollapseBetaBody,
+    labChoiceTagTitle,
+    labChoiceTagDesc,
+    labChoiceTagDefault,
+    labChoiceTagReady,
+    labChoiceTagReview,
+    labChoiceTagBlocked,
+} from "#locales/lab-choice";
 import { labNav } from "../../lab-nav.ts";
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
 export default class ChoicePage {
     segment = "comfortable";
 
-    navItems = labNav();
+    navItems = [];
+    navLabel = "";
+    alertTitle = "";
+    alertDesc = "";
+    segmentedTitle = "";
+    segmentedDesc = "";
+    segmentedLabel = "";
+    dropdownTitle = "";
+    dropdownDesc = "";
+    dropdownLabel = "";
+    collapseTitle = "";
+    collapseDesc = "";
+    tagTitle = "";
+    tagDesc = "";
+    tagDefault = "";
+    tagReady = "";
+    tagReview = "";
+    tagBlocked = "";
+    _unwatchLocale = null;
 
     segmentOptions = [
         { value: "comfortable", label: "Comfortable" },
@@ -64,9 +113,58 @@ export default class ChoicePage {
     ];
 
     collapseItems = [
-        { id: "alpha", title: "Alpha", body: "Alpha panel body for automation." },
-        { id: "beta", title: "Beta", body: "Beta panel body for automation." },
+        { id: "alpha", title: "Alpha", body: "" },
+        { id: "beta", title: "Beta", body: "" },
     ];
+
+    onMount() {
+        this.applyLocaleCopy();
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+    }
+
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
+    }
+
+    refreshCopy() {
+        this.navLabel = labChoiceNavLabel();
+        this.alertTitle = labChoiceAlertTitle();
+        this.alertDesc = labChoiceAlertDesc();
+        this.segmentedTitle = labChoiceSegmentedTitle();
+        this.segmentedDesc = labChoiceSegmentedDesc();
+        this.segmentedLabel = labChoiceSegmentedLabel();
+        this.dropdownTitle = labChoiceDropdownTitle();
+        this.dropdownDesc = labChoiceDropdownDesc();
+        this.dropdownLabel = labChoiceDropdownLabel();
+        this.collapseTitle = labChoiceCollapseTitle();
+        this.collapseDesc = labChoiceCollapseDesc();
+        this.tagTitle = labChoiceTagTitle();
+        this.tagDesc = labChoiceTagDesc();
+        this.tagDefault = labChoiceTagDefault();
+        this.tagReady = labChoiceTagReady();
+        this.tagReview = labChoiceTagReview();
+        this.tagBlocked = labChoiceTagBlocked();
+        this.segmentOptions = [
+            { value: "comfortable", label: labChoiceOptComfortable() },
+            { value: "compact", label: labChoiceOptCompact() },
+            { value: "dense", label: labChoiceOptDense() },
+        ];
+        this.dropdownItems = [
+            { id: "edit", title: labChoiceMenuEdit(), href: "#edit" },
+            { id: "share", title: labChoiceMenuShare(), href: "#share" },
+            { id: "archive", title: labChoiceMenuArchive(), href: "#archive" },
+        ];
+        this.collapseItems = [
+            { id: "alpha", title: labChoiceCollapseAlphaTitle(), body: labChoiceCollapseAlphaBody() },
+            { id: "beta", title: labChoiceCollapseBetaTitle(), body: labChoiceCollapseBetaBody() },
+        ];
+        this.navItems = labNav(navLab());
+    }
+
+    applyLocaleCopy(preferred) {
+        withLocaleHint(readLocaleId(preferred), () => this.refreshCopy());
+    }
 
     onSegment(v) {
         this.segment = v;

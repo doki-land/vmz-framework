@@ -1,8 +1,8 @@
 <template>
     <div data-vmz-fixture="datagrid" data-density="compact" :data-grid-mode="viewMode">
-        <ConsoleShell brand="VMZ" home-href="/" title="DataGrid" nav-label="Console" :nav="navItems">
+        <ConsoleShell brand="VMZ" home-href="/" :title="pageTitle" :nav-label="navLabel" :nav="navItems">
             <div class="vmz-slot-content">
-                <Alert tone="info" role-name="status" title="DataGrid group + tree + edit + pivot" description="@vmz/ui-data-grid — virtualized + pinned + group/tree/edit + parent-owned pivot matrix (row×col→sum). Not a second spreadsheet runtime." />
+                <Alert tone="info" role-name="status" :title="introTitle" :description="introDesc" />
                 <p data-vmz-fixture="datagrid-state" class="vmz-sr-only">
                     mode:
                     {{ viewMode }}
@@ -58,35 +58,68 @@
                 <div data-vmz-fixture="datagrid-modes">
                     <span data-vmz-fixture="mode-group">
                         <Button type="button" variant="secondary" @click='(() => setMode("group"))'>
-                            Group mode
+                            {{ modeGroupLabel }}
                         </Button>
                     </span>
                     <span data-vmz-fixture="mode-tree">
                         <Button type="button" variant="secondary" @click='(() => setMode("tree"))'>
-                            Tree mode
+                            {{ modeTreeLabel }}
                         </Button>
                     </span>
                     <span data-vmz-fixture="mode-pivot">
                         <Button type="button" variant="secondary" @click='(() => setMode("pivot"))'>
-                            Pivot mode
+                            {{ modePivotLabel }}
                         </Button>
                     </span>
                 </div>
                 <div v-if="showEditField" data-vmz-fixture="datagrid-edit-field">
-                    <Field label="Cell draft (Field mirror)" control-id="datagrid-edit-draft" description-id="datagrid-edit-draft-desc" error-id="datagrid-edit-draft-err" description="Parent-owned draft mirrored via @vmz/ui Field — DataGrid does not ship Field." :value="editDraft" @input="onFieldDraft" />
+                    <Field :label="draftLabel" control-id="datagrid-edit-draft" description-id="datagrid-edit-draft-desc" error-id="datagrid-edit-draft-err" :description="draftDesc" :value="editDraft" @input="onFieldDraft" />
                 </div>
-                <BulkActions label="Bulk actions" :selected-count="selectedCount" :count-label="bulkLabel">
+                <BulkActions :label="bulkActionsLabel" :selected-count="selectedCount" :count-label="bulkLabel">
                     <Button type="button" variant="secondary" @click="clearSelection">
-                        Clear
+                        {{ clearLabel }}
                     </Button>
                 </BulkActions>
-                <DataGrid :columns="columns" :rows="rows" :total-rows="totalRowsLabel" :visible-count="visibleCountLabel" pinned-cols="1" :sort-key="sortKey" :sort-dir="sortDir" :selected-count="selectedCountLabel" :all-selected="allSelected" select-all-label="Select all leaf rows in dataset" :group-by-attr="groupBy" :group-count="groupCountLabel" :tree-attr="treeAttr" :pivot-attr="pivotAttr" :pivot-cols-attr="pivotColsLabel" :editing-attr="editingKey" :row-layout-style="rowLayoutStyle" :canvas-style="canvasStyle" :pad-top-style="padTopStyle" :pad-bottom-style="padBottomStyle" :on-scroll="onScroll" :on-sort="sortBy" :on-toggle-row="toggleRow" :on-toggle-all="toggleAll" :on-toggle-group="toggleGroup" :on-toggle-tree="toggleTree" :on-start-edit="startEdit" :on-edit-input="onEditInput" :on-commit-edit="commitEdit" :on-cancel-edit="cancelEdit" />
+                <DataGrid :columns="columns" :rows="rows" :total-rows="totalRowsLabel" :visible-count="visibleCountLabel" pinned-cols="1" :sort-key="sortKey" :sort-dir="sortDir" :selected-count="selectedCountLabel" :all-selected="allSelected" :select-all-label="selectAllLabel" :group-by-attr="groupBy" :group-count="groupCountLabel" :tree-attr="treeAttr" :pivot-attr="pivotAttr" :pivot-cols-attr="pivotColsLabel" :editing-attr="editingKey" :row-layout-style="rowLayoutStyle" :canvas-style="canvasStyle" :pad-top-style="padTopStyle" :pad-bottom-style="padBottomStyle" :on-scroll="onScroll" :on-sort="sortBy" :on-toggle-row="toggleRow" :on-toggle-all="toggleAll" :on-toggle-group="toggleGroup" :on-toggle-tree="toggleTree" :on-start-edit="startEdit" :on-edit-input="onEditInput" :on-commit-edit="commitEdit" :on-cancel-edit="cancelEdit" />
             </div>
         </ConsoleShell>
     </div>
 </template>
 <script client>
+import { navLab } from "#locales/common";
+import {
+    labDatagridNavLabel,
+    labDatagridPageTitle,
+    labDatagridIntroTitle,
+    labDatagridIntroDesc,
+    labDatagridModeGroup,
+    labDatagridModeTree,
+    labDatagridModePivot,
+    labDatagridDraftLabel,
+    labDatagridDraftDesc,
+    labDatagridBulkActions,
+    labDatagridClear,
+    labDatagridSelectAll,
+    labDatagridColName,
+    labDatagridColStatus,
+    labDatagridColOwner,
+    labDatagridColRegion,
+    labDatagridColScore,
+    labDatagridColTotal,
+    labDatagridStatusActive,
+    labDatagridStatusPaused,
+    labDatagridStatusDraft,
+    labDatagridStatusArchived,
+    labDatagridStatusFolder,
+    labDatagridStatusTeam,
+    labDatagridBulkSelected,
+    labDatagridSelectRow,
+    labDatagridCollapseRow,
+    labDatagridExpandRow,
+    labDatagridEditCell,
+} from "#locales/lab-datagrid";
 import { labNav } from "../../lab-nav.ts";
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
 const ROW_H = 36;
 const OVERSCAN = 4;
@@ -96,13 +129,32 @@ const REGIONS = ["APAC", "EMEA", "AMER", "LATAM"];
 
 export default class DatagridPage {
     viewMode = "group";
+    navItems = [];
+    navLabel = "";
+    pageTitle = "";
+    introTitle = "";
+    introDesc = "";
+    modeGroupLabel = "";
+    modeTreeLabel = "";
+    modePivotLabel = "";
+    draftLabel = "";
+    draftDesc = "";
+    bulkActionsLabel = "";
+    bulkLabel = "";
+    clearLabel = "";
+    selectAllLabel = "";
+    statusActiveLabel = "";
+    statusPausedLabel = "";
+    statusDraftLabel = "";
+    statusArchivedLabel = "";
+    statusFolderLabel = "";
+    statusTeamLabel = "";
     totalRows = 200;
     totalRowsLabel = "200";
     flatCount = 0;
     selectedAttr = "";
     selectedCount = 0;
     selectedCountLabel = "0";
-    bulkLabel = "";
     allSelected = false;
     sortKey = "name";
     sortDir = "asc";
@@ -133,44 +185,7 @@ export default class DatagridPage {
     showEditField = false;
     scoreSample = "";
     leafIds = [];
-    longFormColumns = [
-        {
-            id: "name",
-            title: "Name",
-            pinnedAttr: "true",
-            cellClass:
-                "vmz-ui-datagrid__cell vmz-ui-datagrid__cell--pinned vmz-ui-datagrid__cell--pinned-data",
-            pivotColAttr: "false",
-        },
-        {
-            id: "status",
-            title: "Status",
-            pinnedAttr: "false",
-            cellClass: "vmz-ui-datagrid__cell",
-            pivotColAttr: "false",
-        },
-        {
-            id: "owner",
-            title: "Owner",
-            pinnedAttr: "false",
-            cellClass: "vmz-ui-datagrid__cell",
-            pivotColAttr: "false",
-        },
-        {
-            id: "region",
-            title: "Region",
-            pinnedAttr: "false",
-            cellClass: "vmz-ui-datagrid__cell",
-            pivotColAttr: "false",
-        },
-        {
-            id: "score",
-            title: "Score",
-            pinnedAttr: "false",
-            cellClass: "vmz-ui-datagrid__cell",
-            pivotColAttr: "false",
-        },
-    ];
+    longFormColumns = [];
     columns = [];
     baseRows = [];
     /** @type {{ id: string, parentId: string, depth: number, expandable: boolean, name: string, status: string, owner: string, region: string, score: string }[]} */
@@ -178,12 +193,103 @@ export default class DatagridPage {
     /** @type {{ id: string, owner: string, measures: Record<string, number>, total: number }[]} */
     pivotRows = [];
     rows = [];
-    navItems = labNav();
+    _unwatchLocale = null;
 
     onMount() {
-        this.columns = this.longFormColumns.slice();
-        this.ensureDataset();
+        this.applyLocaleCopy();
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+    }
+
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
+    }
+
+    refreshCopy() {
+        this.navLabel = labDatagridNavLabel();
+        this.pageTitle = labDatagridPageTitle();
+        this.introTitle = labDatagridIntroTitle();
+        this.introDesc = labDatagridIntroDesc();
+        this.modeGroupLabel = labDatagridModeGroup();
+        this.modeTreeLabel = labDatagridModeTree();
+        this.modePivotLabel = labDatagridModePivot();
+        this.draftLabel = labDatagridDraftLabel();
+        this.draftDesc = labDatagridDraftDesc();
+        this.bulkActionsLabel = labDatagridBulkActions();
+        this.clearLabel = labDatagridClear();
+        this.selectAllLabel = labDatagridSelectAll();
+        this.statusActiveLabel = labDatagridStatusActive();
+        this.statusPausedLabel = labDatagridStatusPaused();
+        this.statusDraftLabel = labDatagridStatusDraft();
+        this.statusArchivedLabel = labDatagridStatusArchived();
+        this.statusFolderLabel = labDatagridStatusFolder();
+        this.statusTeamLabel = labDatagridStatusTeam();
+        this.navItems = labNav(navLab());
+        this.longFormColumns = this.buildLongFormColumns();
+        if (this.viewMode === "pivot") this.applyPivotColumns();
+        else this.columns = this.longFormColumns.slice();
         this.refreshWindow();
+    }
+
+    applyLocaleCopy(preferred) {
+        withLocaleHint(readLocaleId(preferred), () => this.refreshCopy());
+    }
+
+    buildLongFormColumns() {
+        return [
+            {
+                id: "name",
+                title: labDatagridColName(),
+                pinnedAttr: "true",
+                cellClass:
+                    "vmz-ui-datagrid__cell vmz-ui-datagrid__cell--pinned vmz-ui-datagrid__cell--pinned-data",
+                pivotColAttr: "false",
+            },
+            {
+                id: "status",
+                title: labDatagridColStatus(),
+                pinnedAttr: "false",
+                cellClass: "vmz-ui-datagrid__cell",
+                pivotColAttr: "false",
+            },
+            {
+                id: "owner",
+                title: labDatagridColOwner(),
+                pinnedAttr: "false",
+                cellClass: "vmz-ui-datagrid__cell",
+                pivotColAttr: "false",
+            },
+            {
+                id: "region",
+                title: labDatagridColRegion(),
+                pinnedAttr: "false",
+                cellClass: "vmz-ui-datagrid__cell",
+                pivotColAttr: "false",
+            },
+            {
+                id: "score",
+                title: labDatagridColScore(),
+                pinnedAttr: "false",
+                cellClass: "vmz-ui-datagrid__cell",
+                pivotColAttr: "false",
+            },
+        ];
+    }
+
+    statusText(value) {
+        const key = String(value ?? "");
+        if (key === "Active") return this.statusActiveLabel || key;
+        if (key === "Paused") return this.statusPausedLabel || key;
+        if (key === "Draft") return this.statusDraftLabel || key;
+        if (key === "Archived") return this.statusArchivedLabel || key;
+        if (key === "Folder") return this.statusFolderLabel || key;
+        if (key === "Team") return this.statusTeamLabel || key;
+        return key;
+    }
+
+    columnTitle(colId) {
+        const col = this.columns.find((item) => item && item.id === colId);
+        return col && col.title ? col.title : String(colId ?? "");
     }
 
     ensureDataset() {
@@ -362,7 +468,7 @@ export default class DatagridPage {
         this.columns = [
             {
                 id: "owner",
-                title: "Owner",
+                title: labDatagridColOwner(),
                 pinnedAttr: "true",
                 cellClass:
                     "vmz-ui-datagrid__cell vmz-ui-datagrid__cell--pinned vmz-ui-datagrid__cell--pinned-data",
@@ -377,7 +483,7 @@ export default class DatagridPage {
             })),
             {
                 id: "total",
-                title: "Total",
+                title: labDatagridColTotal(),
                 pinnedAttr: "false",
                 cellClass:
                     "vmz-ui-datagrid__cell vmz-ui-datagrid__cell--pivot-measure vmz-ui-datagrid__cell--agg",
@@ -547,7 +653,9 @@ export default class DatagridPage {
             startEditKey: editable && !editing ? cellKey : "",
             cellKey,
             editValue: editing ? this.editDraft : String(text ?? ""),
-            editLabel: `Edit ${colId} for ${rowId}`,
+            editLabel: labDatagridEditCell()
+                .replace("{column}", this.columnTitle(colId))
+                .replace("{row}", String(opts.name ?? rowId)),
             cellClass: pinned
                 ? "vmz-ui-datagrid__cell vmz-ui-datagrid__cell--pinned vmz-ui-datagrid__cell--pinned-data"
                 : measure
@@ -587,7 +695,7 @@ export default class DatagridPage {
                 twistLabel: "",
                 selected: isOn,
                 selectedAttr: isOn ? "true" : "false",
-                selectLabel: `Select pivot ${prow.owner}`,
+                selectLabel: labDatagridSelectRow().replace("{name}", prow.owner),
                 pivotRowAttr: prow.owner,
                 cells,
             };
@@ -607,8 +715,8 @@ export default class DatagridPage {
                 expandedAttr: entry.expanded ? "true" : "false",
                 twist,
                 twistLabel: entry.expanded
-                    ? `Collapse ${entry.groupKey}`
-                    : `Expand ${entry.groupKey}`,
+                    ? labDatagridCollapseRow().replace("{name}", entry.groupKey)
+                    : labDatagridExpandRow().replace("{name}", entry.groupKey),
                 selected: false,
                 selectedAttr: "false",
                 selectLabel: "",
@@ -652,17 +760,24 @@ export default class DatagridPage {
                 twist: expandable ? twist : "",
                 twistLabel: expandable
                     ? isOpen
-                        ? `Collapse ${node.name}`
-                        : `Expand ${node.name}`
+                        ? labDatagridCollapseRow().replace("{name}", node.name)
+                        : labDatagridExpandRow().replace("{name}", node.name)
                     : "",
                 selected: isOn,
                 selectedAttr: isOn ? "true" : "false",
-                selectLabel: expandable ? "" : `Select ${node.name}`,
+                selectLabel: expandable
+                    ? ""
+                    : labDatagridSelectRow().replace("{name}", node.name),
                 pivotRowAttr: "",
                 cells: COL_IDS.map((id) => {
                     const indent = id === "name" ? `padding-left:${0.45 + depth * 0.9}rem` : "";
                     const editable = !expandable && id === "score";
-                    return this.mapCell(node.id, id, node[id], { cellStyle: indent, editable });
+                    const text = id === "status" ? this.statusText(node[id]) : node[id];
+                    return this.mapCell(node.id, id, text, {
+                        cellStyle: indent,
+                        editable,
+                        name: node.name,
+                    });
                 }),
             };
         }
@@ -683,11 +798,12 @@ export default class DatagridPage {
             twistLabel: "",
             selected: isOn,
             selectedAttr: isOn ? "true" : "false",
-            selectLabel: `Select ${row.name}`,
+            selectLabel: labDatagridSelectRow().replace("{name}", row.name),
             pivotRowAttr: "",
             cells: COL_IDS.map((id) => {
                 const editable = this.viewMode === "group" && id === "score";
-                return this.mapCell(row.id, id, row[id], { editable });
+                const text = id === "status" ? this.statusText(row[id]) : row[id];
+                return this.mapCell(row.id, id, text, { editable, name: row.name });
             }),
         };
     }
@@ -725,7 +841,9 @@ export default class DatagridPage {
         this.selectedCount = selected.size;
         this.selectedCountLabel = String(selected.size);
         this.allSelected = leafTotal > 0 && selected.size === leafTotal;
-        this.bulkLabel = selected.size ? `${selected.size} selected` : "";
+        this.bulkLabel = selected.size
+            ? labDatagridBulkSelected().replace("{count}", String(selected.size))
+            : "";
         this.showEditField = !!this.editingKey;
         const sample = this.baseRows.find((r) => r.id === "r1") || this.baseRows[0];
         this.scoreSample = sample ? `${sample.id}=${sample.score}` : "";

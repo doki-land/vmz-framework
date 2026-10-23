@@ -1,16 +1,16 @@
 <template>
     <div data-vmz-fixture="ui5" data-density="compact">
-        <ConsoleShell brand="VMZ" home-href="/" title="Console patterns" nav-label="Console" :nav="navItems">
+        <ConsoleShell brand="VMZ" home-href="/" :title="pageTitle" :nav-label="navLabel" :nav="navItems">
             <div class="vmz-slot-content">
-                <Breadcrumb label="Console path" :items="crumbs" />
-                <QueryForm label="Dense query" @submit="applyQuery">
-                    <Field label="Name" control-id="home-ui5-name" description-id="home-ui5-name-desc" error-id="home-ui5-name-err" described-by="home-ui5-name-desc" :value="nameQuery" @input="((e) => nameQuery = e.target.value)" />
-                    <Field label="Status" control-id="home-ui5-status" description-id="home-ui5-status-desc" error-id="home-ui5-status-err" described-by="home-ui5-status-desc" :value="statusQuery" @input="((e) => statusQuery = e.target.value)" />
+                <Breadcrumb :label="breadcrumbLabel" :items="crumbs" />
+                <QueryForm :label="queryLabel" @submit="applyQuery">
+                    <Field :label="fieldNameLabel" control-id="home-ui5-name" description-id="home-ui5-name-desc" error-id="home-ui5-name-err" described-by="home-ui5-name-desc" :value="nameQuery" @input="((e) => nameQuery = e.target.value)" />
+                    <Field :label="fieldStatusLabel" control-id="home-ui5-status" description-id="home-ui5-status-desc" error-id="home-ui5-status-err" described-by="home-ui5-status-desc" :value="statusQuery" @input="((e) => statusQuery = e.target.value)" />
                     <Button type="button" @click="applyQuery">
-                        Search
+                        {{ searchLabel }}
                     </Button>
                     <Button type="button" :disabled="writeDisabled">
-                        Export
+                        {{ exportLabel }}
                     </Button>
                 </QueryForm>
                 <p data-vmz-fixture="ui5-query" class="vmz-sr-only">
@@ -30,16 +30,16 @@
                     {{ writeDisabled ? 'denied' : 'allowed' }}
                 </p>
                 <Button type="button" @click="toggleLoading">
-                    Toggle loading
+                    {{ toggleLoadingLabel }}
                 </Button>
                 <Button type="button" @click="toggleWrite">
-                    Toggle write
+                    {{ toggleWriteLabel }}
                 </Button>
                 <Skeleton :loading="loading" :loading-attr="loadingAttr">
-                    <Table :columns="columns" :rows="rows" :has-row-action="rowAction" :row-action-disabled="writeDisabled" action-title="Detail" action-label="Open" :sort-key="sortKey" :sort-dir="sortDir" :on-sort="sortBy" :on-row-action="openDetail" />
+                    <Table :columns="columns" :rows="rows" :has-row-action="rowAction" :row-action-disabled="writeDisabled" :action-title="actionTitle" :action-label="actionLabel" :sort-key="sortKey" :sort-dir="sortDir" :on-sort="sortBy" :on-row-action="openDetail" />
                 </Skeleton>
-                <Timeline label="Audit" :items="auditItems" />
-                <Drawer :open="drawerOpen" title="Row detail" title-id="home-ui5-drawer-title" :on-close="(() => drawerOpen = false)">
+                <Timeline :label="timelineLabel" :items="auditItems" />
+                <Drawer :open="drawerOpen" :title="drawerTitle" title-id="home-ui5-drawer-title" :on-close="(() => drawerOpen = false)">
                     <p data-vmz-fixture="ui5-drawer-body">
                         detail:
                         {{ detailId }}
@@ -50,7 +50,34 @@
     </div>
 </template>
 <script client>
+import { navLab } from "#locales/common";
+import {
+    labConsolePageTitle,
+    labConsoleNavLabel,
+    labConsoleBreadcrumbLabel,
+    labConsoleQueryLabel,
+    labConsoleFieldName,
+    labConsoleFieldStatus,
+    labConsoleSearch,
+    labConsoleExport,
+    labConsoleToggleLoading,
+    labConsoleToggleWrite,
+    labConsoleColumnName,
+    labConsoleColumnStatus,
+    labConsoleActionTitle,
+    labConsoleActionLabel,
+    labConsoleTimelineLabel,
+    labConsoleDrawerTitle,
+    labConsoleCrumbHome,
+    labConsoleCrumbConsole,
+    labConsoleCrumbPatterns,
+    labConsoleAuditFilterTitle,
+    labConsoleAuditFilterDetail,
+    labConsoleAuditPermTitle,
+    labConsoleAuditPermDetail,
+} from "#locales/lab-console";
 import { labNav } from "../../lab-nav.ts";
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
 export default class ConsolePatternsPage {
     nameQuery = "";
@@ -63,10 +90,30 @@ export default class ConsolePatternsPage {
     detailId = "";
     sortKey = "name";
     sortDir = "asc";
-    columns = [
-        { id: "name", title: "Name" },
-        { id: "status", title: "Status" },
-    ];
+    navItems = [];
+    pageTitle = "";
+    navLabel = "";
+    breadcrumbLabel = "";
+    queryLabel = "";
+    fieldNameLabel = "";
+    fieldStatusLabel = "";
+    searchLabel = "";
+    exportLabel = "";
+    toggleLoadingLabel = "";
+    toggleWriteLabel = "";
+    actionTitle = "";
+    actionLabel = "";
+    timelineLabel = "";
+    drawerTitle = "";
+    crumbHome = "";
+    crumbConsole = "";
+    crumbPatterns = "";
+    auditFilterTitle = "";
+    auditFilterDetail = "";
+    auditPermTitle = "";
+    auditPermDetail = "";
+    _unwatchLocale = null;
+    columns = [];
     allRows = [
         { id: "r1", cells: ["Alpha", "Active"] },
         { id: "r2", cells: ["Beta", "Paused"] },
@@ -77,16 +124,60 @@ export default class ConsolePatternsPage {
         { id: "r2", cells: ["Beta", "Paused"] },
         { id: "r3", cells: ["Gamma", "Active"] },
     ];
-    crumbs = [
-        { id: "home", title: "Home", href: "/" },
-        { id: "console", title: "Console", href: "/console" },
-        { id: "patterns", title: "Console patterns" },
-    ];
-    auditItems = [
-        { id: "a1", time: "10:01", title: "Filter applied", detail: "Initial console load" },
-        { id: "a2", time: "10:02", title: "Permission check", detail: "Export denied" },
-    ];
-    navItems = labNav();
+    crumbs = [];
+    auditItems = [];
+
+    onMount() {
+        this.applyLocaleCopy();
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+    }
+
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
+    }
+
+    refreshCopy() {
+        this.pageTitle = labConsolePageTitle();
+        this.navLabel = labConsoleNavLabel();
+        this.breadcrumbLabel = labConsoleBreadcrumbLabel();
+        this.queryLabel = labConsoleQueryLabel();
+        this.fieldNameLabel = labConsoleFieldName();
+        this.fieldStatusLabel = labConsoleFieldStatus();
+        this.searchLabel = labConsoleSearch();
+        this.exportLabel = labConsoleExport();
+        this.toggleLoadingLabel = labConsoleToggleLoading();
+        this.toggleWriteLabel = labConsoleToggleWrite();
+        this.actionTitle = labConsoleActionTitle();
+        this.actionLabel = labConsoleActionLabel();
+        this.timelineLabel = labConsoleTimelineLabel();
+        this.drawerTitle = labConsoleDrawerTitle();
+        this.crumbHome = labConsoleCrumbHome();
+        this.crumbConsole = labConsoleCrumbConsole();
+        this.crumbPatterns = labConsoleCrumbPatterns();
+        this.auditFilterTitle = labConsoleAuditFilterTitle();
+        this.auditFilterDetail = labConsoleAuditFilterDetail();
+        this.auditPermTitle = labConsoleAuditPermTitle();
+        this.auditPermDetail = labConsoleAuditPermDetail();
+        this.columns = [
+            { id: "name", title: labConsoleColumnName() },
+            { id: "status", title: labConsoleColumnStatus() },
+        ];
+        this.crumbs = [
+            { id: "home", title: this.crumbHome, href: "/" },
+            { id: "console", title: this.crumbConsole, href: "/console" },
+            { id: "patterns", title: this.crumbPatterns },
+        ];
+        this.auditItems = [
+            { id: "a1", time: "10:01", title: this.auditFilterTitle, detail: this.auditFilterDetail },
+            { id: "a2", time: "10:02", title: this.auditPermTitle, detail: this.auditPermDetail },
+        ];
+        this.navItems = labNav(navLab());
+    }
+
+    applyLocaleCopy(preferred) {
+        withLocaleHint(readLocaleId(preferred), () => this.refreshCopy());
+    }
 
     applyQuery() {
         const name = (this.nameQuery || "").trim().toLowerCase();

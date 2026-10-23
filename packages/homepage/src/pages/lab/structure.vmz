@@ -1,8 +1,8 @@
 <template>
     <div data-vmz-fixture="structure">
-        <AppShell brand="VMZ" home-href="/" nav-label="Structure" :nav="navItems">
+        <AppShell brand="VMZ" home-href="/" :nav-label="navLabel" :nav="navItems">
             <div class="vmz-slot-content">
-                <Alert tone="info" role-name="status" title="Structure composition" description="Accordion / Steps / List / Tree — parent owns open, current, selection, and expand state." />
+                <Alert tone="info" role-name="status" :title="alertTitle" :description="alertDesc" />
                 <p data-vmz-fixture="structure-state" class="vmz-sr-only">
                     faq:
                     {{ faqOpen || 'none' }}
@@ -15,25 +15,25 @@
                     ;expanded:
                     {{ treeExpandedAttr }}
                 </p>
-                <Card title="Accordion" description="Exclusive open; toggle same id closes.">
-                    <Accordion label="FAQ" :open-id="faqOpen" :items="faqItems" :on-toggle="onFaqToggle" />
+                <Card :title="accordionTitle" :description="accordionDesc">
+                    <Accordion :label="accordionLabel" :open-id="faqOpen" :items="faqItems" :on-toggle="onFaqToggle" />
                 </Card>
-                <Card title="Steps" description="Parent owns current id and status flags.">
-                    <Steps label="Onboarding" :current="stepCurrent" :items="stepItems" />
+                <Card :title="stepsTitle" :description="stepsDesc">
+                    <Steps :label="stepsLabel" :current="stepCurrent" :items="stepItems" />
                     <div class="vmz-structure-actions">
                         <Button type="button" variant="secondary" @click="stepBack">
-                            Back
+                            {{ backLabel }}
                         </Button>
                         <Button type="button" @click="stepNext">
-                            Next
+                            {{ nextLabel }}
                         </Button>
                     </div>
                 </Card>
-                <Card title="List" description="Selectable listbox; Arrow/Home/End.">
-                    <List label="Teams" label-id="home-structure-list-label" :selected="listSelected" :items="listItems" :on-select="onListSelect" />
+                <Card :title="listTitle" :description="listDesc">
+                    <List :label="listLabel" label-id="home-structure-list-label" :selected="listSelected" :items="listItems" :on-select="onListSelect" />
                 </Card>
-                <Card title="Tree" description="Flat visible rows; parent expands/collapses.">
-                    <Tree label="Repos" label-id="home-structure-tree-label" :selected="treeSelected" :items="treeItems" :on-select="onTreeSelect" :on-toggle="onTreeToggle" />
+                <Card :title="treeTitle" :description="treeDesc">
+                    <Tree :label="treeLabel" label-id="home-structure-tree-label" :selected="treeSelected" :items="treeItems" :on-select="onTreeSelect" :on-toggle="onTreeToggle" />
                 </Card>
             </div>
         </AppShell>
@@ -48,7 +48,48 @@
 }
 </style>
 <script client>
+import { navLab } from "#locales/common";
+import {
+    labStructureNavLabel,
+    labStructureAlertTitle,
+    labStructureAlertDesc,
+    labStructureAccordionTitle,
+    labStructureAccordionDesc,
+    labStructureStepsTitle,
+    labStructureStepsDesc,
+    labStructureListTitle,
+    labStructureListDesc,
+    labStructureTreeTitle,
+    labStructureTreeDesc,
+    labStructureAccordionLabel,
+    labStructureStepsLabel,
+    labStructureListLabel,
+    labStructureTreeLabel,
+    labStructureBack,
+    labStructureNext,
+    labStructureFaqBillingTitle,
+    labStructureFaqBillingBody,
+    labStructureFaqAccessTitle,
+    labStructureFaqAccessBody,
+    labStructureFaqSupportTitle,
+    labStructureFaqSupportBody,
+    labStructureStepAccountTitle,
+    labStructureStepAccountDesc,
+    labStructureStepWorkspaceTitle,
+    labStructureStepWorkspaceDesc,
+    labStructureStepInviteTitle,
+    labStructureStepInviteDesc,
+    labStructureTreePlatform,
+    labStructureTreeRuntime,
+    labStructureTreeUi,
+    labStructureTreeDocuments,
+    labStructureTreeGuide,
+    labStructureTreeBrowser,
+    labStructureTwistCollapse,
+    labStructureTwistExpand,
+} from "#locales/lab-structure";
 import { labNav } from "../../lab-nav.ts";
+import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
 export default class StructurePage {
     faqOpen = "billing";
@@ -57,31 +98,45 @@ export default class StructurePage {
     treeSelected = "platform";
     treeExpandedAttr = "platform";
 
-    navItems = labNav();
+    navItems = [];
+    navLabel = "";
+    alertTitle = "";
+    alertDesc = "";
+    accordionTitle = "";
+    accordionDesc = "";
+    accordionLabel = "";
+    stepsTitle = "";
+    stepsDesc = "";
+    stepsLabel = "";
+    backLabel = "";
+    nextLabel = "";
+    listTitle = "";
+    listDesc = "";
+    listLabel = "";
+    treeTitle = "";
+    treeDesc = "";
+    treeLabel = "";
+    faqBillingTitle = "";
+    faqBillingBody = "";
+    faqAccessTitle = "";
+    faqAccessBody = "";
+    faqSupportTitle = "";
+    faqSupportBody = "";
+    stepAccountTitle = "";
+    stepAccountDesc = "";
+    stepWorkspaceTitle = "";
+    stepWorkspaceDesc = "";
+    stepInviteTitle = "";
+    stepInviteDesc = "";
+    treePlatformTitle = "";
+    treeRuntimeTitle = "";
+    treeUiTitle = "";
+    treeDocumentsTitle = "";
+    treeGuideTitle = "";
+    treeBrowserTitle = "";
+    _unwatchLocale = null;
 
-    faqItems = [
-        {
-            id: "billing",
-            title: "Billing",
-            body: "Invoices land on the first of each month.",
-            triggerId: "home-faq-billing-trigger",
-            panelId: "home-faq-billing-panel",
-        },
-        {
-            id: "access",
-            title: "Access",
-            body: "Invite teammates from the workspace settings page.",
-            triggerId: "home-faq-access-trigger",
-            panelId: "home-faq-access-panel",
-        },
-        {
-            id: "support",
-            title: "Support",
-            body: "Open a ticket from the console help drawer.",
-            triggerId: "home-faq-support-trigger",
-            panelId: "home-faq-support-panel",
-        },
-    ];
+    faqItems = [];
 
     listItems = [
         { id: "alpha", title: "Alpha Platform" },
@@ -89,72 +144,87 @@ export default class StructurePage {
         { id: "gamma", title: "Gamma Docs" },
     ];
 
-    stepItems = [
-        {
-            id: "account",
-            index: "1",
-            title: "Account",
-            description: "Verify work email",
-            status: "current",
-        },
-        {
-            id: "workspace",
-            index: "2",
-            title: "Workspace",
-            description: "Name the project",
-            status: "upcoming",
-        },
-        {
-            id: "invite",
-            index: "3",
-            title: "Invite",
-            description: "Add teammates",
-            status: "upcoming",
-        },
-    ];
+    stepItems = [];
 
-    treeItems = [
-        {
-            id: "platform",
-            title: "Platform",
-            depth: "0",
-            expandable: true,
-            expanded: true,
-            expandedAttr: "true",
-            twistLabel: "Collapse Platform",
-            padStyle: "padding-inline-start: 0.35rem",
-        },
-        {
-            id: "runtime",
-            title: "Runtime",
-            depth: "1",
-            expandable: true,
-            expanded: false,
-            expandedAttr: "false",
-            twistLabel: "Expand Runtime",
-            padStyle: "padding-inline-start: 1.25rem",
-        },
-        {
-            id: "ui",
-            title: "UI kit",
-            depth: "1",
-            expandable: false,
-            expanded: false,
-            expandedAttr: "",
-            twistLabel: "",
-            padStyle: "padding-inline-start: 1.25rem",
-        },
-        {
-            id: "docs",
-            title: "Documents",
-            depth: "0",
-            expandable: true,
-            expanded: false,
-            expandedAttr: "false",
-            twistLabel: "Expand Documents",
-            padStyle: "padding-inline-start: 0.35rem",
-        },
-    ];
+    treeItems = [];
+
+    onMount() {
+        this.applyLocaleCopy();
+        this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+    }
+
+    onDestroy() {
+        if (typeof this._unwatchLocale === "function") this._unwatchLocale();
+        this._unwatchLocale = null;
+    }
+
+    refreshCopy() {
+        this.navLabel = labStructureNavLabel();
+        this.alertTitle = labStructureAlertTitle();
+        this.alertDesc = labStructureAlertDesc();
+        this.accordionTitle = labStructureAccordionTitle();
+        this.accordionDesc = labStructureAccordionDesc();
+        this.accordionLabel = labStructureAccordionLabel();
+        this.stepsTitle = labStructureStepsTitle();
+        this.stepsDesc = labStructureStepsDesc();
+        this.stepsLabel = labStructureStepsLabel();
+        this.backLabel = labStructureBack();
+        this.nextLabel = labStructureNext();
+        this.listTitle = labStructureListTitle();
+        this.listDesc = labStructureListDesc();
+        this.listLabel = labStructureListLabel();
+        this.treeTitle = labStructureTreeTitle();
+        this.treeDesc = labStructureTreeDesc();
+        this.treeLabel = labStructureTreeLabel();
+        this.faqBillingTitle = labStructureFaqBillingTitle();
+        this.faqBillingBody = labStructureFaqBillingBody();
+        this.faqAccessTitle = labStructureFaqAccessTitle();
+        this.faqAccessBody = labStructureFaqAccessBody();
+        this.faqSupportTitle = labStructureFaqSupportTitle();
+        this.faqSupportBody = labStructureFaqSupportBody();
+        this.stepAccountTitle = labStructureStepAccountTitle();
+        this.stepAccountDesc = labStructureStepAccountDesc();
+        this.stepWorkspaceTitle = labStructureStepWorkspaceTitle();
+        this.stepWorkspaceDesc = labStructureStepWorkspaceDesc();
+        this.stepInviteTitle = labStructureStepInviteTitle();
+        this.stepInviteDesc = labStructureStepInviteDesc();
+        this.treePlatformTitle = labStructureTreePlatform();
+        this.treeRuntimeTitle = labStructureTreeRuntime();
+        this.treeUiTitle = labStructureTreeUi();
+        this.treeDocumentsTitle = labStructureTreeDocuments();
+        this.treeGuideTitle = labStructureTreeGuide();
+        this.treeBrowserTitle = labStructureTreeBrowser();
+        this.faqItems = [
+            {
+                id: "billing",
+                title: this.faqBillingTitle,
+                body: this.faqBillingBody,
+                triggerId: "home-faq-billing-trigger",
+                panelId: "home-faq-billing-panel",
+            },
+            {
+                id: "access",
+                title: this.faqAccessTitle,
+                body: this.faqAccessBody,
+                triggerId: "home-faq-access-trigger",
+                panelId: "home-faq-access-panel",
+            },
+            {
+                id: "support",
+                title: this.faqSupportTitle,
+                body: this.faqSupportBody,
+                triggerId: "home-faq-support-trigger",
+                panelId: "home-faq-support-panel",
+            },
+        ];
+        this.refreshSteps();
+        this.refreshTree();
+        this.navItems = labNav(navLab());
+    }
+
+    applyLocaleCopy(preferred) {
+        withLocaleHint(readLocaleId(preferred), () => this.refreshCopy());
+    }
 
     onFaqToggle(id) {
         this.faqOpen = this.faqOpen === id ? "" : id;
@@ -167,22 +237,22 @@ export default class StructurePage {
             {
                 id: "account",
                 index: "1",
-                title: "Account",
-                description: "Verify work email",
+                title: this.stepAccountTitle,
+                description: this.stepAccountDesc,
                 status: cur > 0 ? "done" : cur === 0 ? "current" : "upcoming",
             },
             {
                 id: "workspace",
                 index: "2",
-                title: "Workspace",
-                description: "Name the project",
+                title: this.stepWorkspaceTitle,
+                description: this.stepWorkspaceDesc,
                 status: cur > 1 ? "done" : cur === 1 ? "current" : "upcoming",
             },
             {
                 id: "invite",
                 index: "3",
-                title: "Invite",
-                description: "Add teammates",
+                title: this.stepInviteTitle,
+                description: this.stepInviteDesc,
                 status: cur > 2 ? "done" : cur === 2 ? "current" : "upcoming",
             },
         ];
@@ -232,7 +302,9 @@ export default class StructurePage {
                 expandable,
                 expanded: isOpen,
                 expandedAttr: expandable ? (isOpen ? "true" : "false") : "",
-                twistLabel: isOpen ? `Collapse ${title}` : `Expand ${title}`,
+                twistLabel: isOpen
+                    ? labStructureTwistCollapse({ name: title })
+                    : labStructureTwistExpand({ name: title }),
                 padStyle: `padding-inline-start: ${0.35 + depth * 0.9}rem`,
             });
             if (expandable && isOpen) {
@@ -240,11 +312,15 @@ export default class StructurePage {
                     push(child.id, child.title, depth + 1, child.children || []);
             }
         };
-        push("platform", "Platform", 0, [
-            { id: "runtime", title: "Runtime", children: [{ id: "browser", title: "Browser" }] },
-            { id: "ui", title: "UI kit" },
+        push("platform", this.treePlatformTitle, 0, [
+            {
+                id: "runtime",
+                title: this.treeRuntimeTitle,
+                children: [{ id: "browser", title: this.treeBrowserTitle }],
+            },
+            { id: "ui", title: this.treeUiTitle },
         ]);
-        push("docs", "Documents", 0, [{ id: "guide", title: "Guide" }]);
+        push("docs", this.treeDocumentsTitle, 0, [{ id: "guide", title: this.treeGuideTitle }]);
         this.treeItems = rows;
     }
 
