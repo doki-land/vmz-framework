@@ -1,5 +1,5 @@
 <template>
-    <div :data-page="page" :class="rootClass">
+    <div data-vmz-ui="site-shell" :data-page="page" :class="rootClass">
         <a href="#main" class="skip-link">
             {{ skipLabel }}
         </a>

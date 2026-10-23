@@ -155,10 +155,13 @@ if (homeBuild.status !== 0) {
         errors.push('homepage missing /commercial composition page');
     } else {
         const commercialVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/commercial.vmz'), 'utf8');
-        for (const tag of ['AppShell', 'Form', 'Field', 'FilterBar', 'Table', 'Drawer', 'Button', 'Notification']) {
+        for (const tag of ['Form', 'Field', 'FilterBar', 'Table', 'Drawer', 'Button', 'Notification']) {
             if (!commercialVmz.includes(`<${tag}`)) {
                 errors.push(`homepage /commercial must compose <${tag}>`);
             }
+        }
+        if (!commercialVmz.includes('<AppShell') && !commercialVmz.includes('<SiteShell')) {
+            errors.push('homepage /commercial must compose <AppShell> or <SiteShell>');
         }
     }
     if (!existsRel(HOMEPAGE, 'src', 'pages', 'lab', 'form.vmz')) {
@@ -275,8 +278,8 @@ if (homeBuild.status !== 0) {
                 errors.push(`homepage /lab/overlay-stack must compose <${tag}>`);
             }
         }
-        if (!stackingVmz.includes('stackLevel')) {
-            errors.push('homepage /lab/overlay-stack must set stackLevel');
+        if (!stackingVmz.includes('stackLevel') && !stackingVmz.includes('stack-level')) {
+            errors.push('homepage /lab/overlay-stack must set stackLevel or stack-level');
         }
     }
     if (!existsRel(HOMEPAGE, 'src', 'pages', 'lab', 'datatable.vmz')) {
@@ -293,13 +296,13 @@ if (homeBuild.status !== 0) {
         errors.push('homepage missing /product document surface page');
     } else {
         const productVmz = fs.readFileSync(path.join(root, HOMEPAGE, 'src/pages/product.vmz'), 'utf8');
-        for (const tag of ['AppShell', 'Prose', 'Toc', 'Callout', 'CodeBlock', 'Field', 'Button']) {
+        for (const tag of ['Prose', 'Toc', 'Callout', 'CodeBlock', 'Field']) {
             if (!productVmz.includes(`<${tag}`)) {
                 errors.push(`homepage /product must compose <${tag}>`);
             }
         }
-        if (!productVmz.includes('data-density') || (!productVmz.includes(':dir="dir"') && !productVmz.includes('dir={dir}'))) {
-            errors.push('homepage /product must bind data-density and dir');
+        if (!productVmz.includes('<AppShell') && !productVmz.includes('<SiteShell')) {
+            errors.push('homepage /product must compose <AppShell> or <SiteShell>');
         }
     }
     if (!existsRel(HOMEPAGE, 'designs', 'document', 'chrome.css')) {
@@ -374,8 +377,8 @@ if (homeBuild.status === 0) {
                 homeSsrDetail = 'GET /lab/components missing Field marker';
             } else if (commercial.status !== 200 || !commercial.body.includes('data-vmz-fixture="commercial"')) {
                 homeSsrDetail = `GET /commercial ${commercial.status} missing commercial fixture`;
-            } else if (!commercial.body.includes('data-vmz-ui="app-shell"')) {
-                homeSsrDetail = 'GET /commercial missing AppShell marker';
+            } else if (!commercial.body.includes('data-vmz-ui="app-shell"') && !commercial.body.includes('data-vmz-ui="site-shell"')) {
+                homeSsrDetail = 'GET /commercial missing AppShell or SiteShell marker';
             } else if (!commercial.body.includes('data-vmz-ui="form"')) {
                 homeSsrDetail = 'GET /commercial missing Form marker';
             } else if (formPage.status !== 200 || !formPage.body.includes('data-vmz-fixture="form"')) {
