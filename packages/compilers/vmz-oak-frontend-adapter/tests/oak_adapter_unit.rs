@@ -208,15 +208,9 @@ fn oak_expression_snippet_rejects_incomplete_binary() {
 fn oak_expression_snippet_rejects_multiple_statements() {
     for expr in ["a; b", "foo(); bar()", "x = 1; y = 2"] {
         let parsed = parse_expression_snippet(expr);
+        assert!(!parsed.ok, "{expr}: must reject multi-statement template expression");
         assert!(
-            !parsed.ok,
-            "{expr}: must reject multi-statement template expression"
-        );
-        assert!(
-            parsed
-                .diagnostics
-                .iter()
-                .any(|d| d.code.contains("multiple_statements")),
+            parsed.diagnostics.iter().any(|d| d.code.contains("multiple_statements")),
             "{expr}: must emit multiple_statements diagnostic, got {:?}",
             parsed.diagnostics
         );
