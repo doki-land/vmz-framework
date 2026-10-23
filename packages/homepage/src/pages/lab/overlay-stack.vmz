@@ -12,13 +12,13 @@
                     {{ popoverOpen ? 'open' : 'closed' }}
                 </p>
                 <div class="vmz-stacking-actions">
-                    <Button type="button" @click="openDrawer">
+                    <Button type="button" data-vmz-action="open-drawer" @click="openDrawer">
                         {{ openDrawerLabel }}
                     </Button>
-                    <Button type="button" variant="secondary" @click="openDialog">
+                    <Button type="button" variant="secondary" data-vmz-action="open-dialog" @click="openDialog">
                         {{ openDialogLabel }}
                     </Button>
-                    <Button type="button" variant="ghost" @click="openPopover">
+                    <Button type="button" variant="ghost" data-vmz-action="open-popover" @click="openPopover">
                         {{ openPopoverLabel }}
                     </Button>
                 </div>

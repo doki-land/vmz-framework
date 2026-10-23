@@ -6,10 +6,10 @@
                 <QueryForm :label="queryLabel" @submit="applyQuery">
                     <Field :label="fieldNameLabel" control-id="home-ui5-name" description-id="home-ui5-name-desc" error-id="home-ui5-name-err" described-by="home-ui5-name-desc" :value="nameQuery" @input="((e) => nameQuery = e.target.value)" />
                     <Field :label="fieldStatusLabel" control-id="home-ui5-status" description-id="home-ui5-status-desc" error-id="home-ui5-status-err" described-by="home-ui5-status-desc" :value="statusQuery" @input="((e) => statusQuery = e.target.value)" />
-                    <Button type="button" @click="applyQuery">
+                    <Button type="button" data-vmz-action="ui5-search" @click="applyQuery">
                         {{ searchLabel }}
                     </Button>
-                    <Button type="button" :disabled="writeDisabled">
+                    <Button type="button" data-vmz-action="ui5-export" :disabled="writeDisabled">
                         {{ exportLabel }}
                     </Button>
                 </QueryForm>
@@ -29,10 +29,10 @@
                     write:
                     {{ writeDisabled ? 'denied' : 'allowed' }}
                 </p>
-                <Button type="button" @click="toggleLoading">
+                <Button type="button" data-vmz-action="ui5-toggle-loading" @click="toggleLoading">
                     {{ toggleLoadingLabel }}
                 </Button>
-                <Button type="button" @click="toggleWrite">
+                <Button type="button" data-vmz-action="ui5-toggle-write" @click="toggleWrite">
                     {{ toggleWriteLabel }}
                 </Button>
                 <Skeleton :loading="loading" :loading-attr="loadingAttr">

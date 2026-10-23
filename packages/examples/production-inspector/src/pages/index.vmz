@@ -14,15 +14,15 @@
                 {{ dir }}
             </p>
             <div class="inspector-actions">
-                <Button type="button" @click="cycleDensity">
+                <Button type="button" data-vmz-action="inspector-cycle-density" @click="cycleDensity">
                     Cycle density
                 </Button>
-                <Button type="button" variant="secondary" @click="toggleDir">
+                <Button type="button" variant="secondary" data-vmz-action="inspector-toggle-rtl" @click="toggleDir">
                     Toggle RTL
                 </Button>
             </div>
             <Field label="Query" description="StableId or diagnostic code" :error="queryError" controlId="inspector-query" descriptionId="inspector-query-desc" errorId="inspector-query-err" :describedBy="queryDescribedBy" :value="query" @input="onQueryInput" />
-            <Button type="button" @click="openDialog">
+            <Button type="button" data-vmz-action="inspector-replay-error" @click="openDialog">
                 Replay error
             </Button>
             <Dialog :open="open" title="Error replay" titleId="inspector-dialog-title" :onClose="closeDialog">

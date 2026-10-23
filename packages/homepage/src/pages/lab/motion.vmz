@@ -9,7 +9,7 @@
                     {{ pageLead }}
                 </p>
                 <section data-vmz-fixture="motion-feedback">
-                    <Button type="button" @click="(() => clicks += 1)">
+                    <Button type="button" data-vmz-action="pulse" @click="(() => clicks += 1)">
                         {{ pulseLabel }}
                     </Button>
                     <p data-vmz-fixture="motion-clicks" class="vmz-sr-only">
@@ -18,7 +18,7 @@
                     </p>
                 </section>
                 <section data-vmz-fixture="motion-overlay">
-                    <Button type="button" @click="(() => dialogOpen = true)">
+                    <Button type="button" data-vmz-action="open-dialog" @click="(() => dialogOpen = true)">
                         {{ openDialogLabel }}
                     </Button>
                     <Dialog :open="dialogOpen" :title="dialogTitle" title-id="home-motion-dialog-title" :on-close="(() => dialogOpen = false)">
@@ -26,7 +26,7 @@
                             {{ dialogBody }}
                         </p>
                     </Dialog>
-                    <Button type="button" @click="(() => drawerOpen = true)">
+                    <Button type="button" data-vmz-action="open-drawer" @click="(() => drawerOpen = true)">
                         {{ openDrawerLabel }}
                     </Button>
                     <Drawer :open="drawerOpen" :title="drawerTitle" title-id="home-motion-drawer-title" :on-close="(() => drawerOpen = false)">
@@ -40,7 +40,7 @@
                         interrupt-dialog:
                         {{ interruptDialogOpen ? 'open' : 'closed' }}
                     </p>
-                    <Button type="button" @click="openInterruptDialog">
+                    <Button type="button" data-vmz-action="open-interrupt" @click="openInterruptDialog">
                         {{ openInterruptLabel }}
                     </Button>
                     <Dialog :open="interruptDialogOpen" :title="interruptTitle" title-id="home-motion-interrupt-dialog-title" :on-close="onInterruptDialogClose">
@@ -54,7 +54,7 @@
                         ssr-dialog:
                         {{ ssrDialogOpen ? 'open' : 'closed' }}
                     </p>
-                    <Button type="button" @click="(() => ssrDialogOpen = true)">
+                    <Button type="button" data-vmz-action="reopen-ssr" @click="(() => ssrDialogOpen = true)">
                         {{ reopenSsrLabel }}
                     </Button>
                     <Dialog :open="ssrDialogOpen" :title="ssrTitle" title-id="home-motion-ssr-dialog-title" :on-close="(() => ssrDialogOpen = false)">
@@ -64,10 +64,10 @@
                     </Dialog>
                 </section>
                 <section data-vmz-fixture="motion-list">
-                    <Button type="button" @click="filterAlpha">
+                    <Button type="button" data-vmz-action="filter-alpha" @click="filterAlpha">
                         {{ filterAlphaLabel }}
                     </Button>
-                    <Button type="button" @click="resetRows">
+                    <Button type="button" data-vmz-action="reset-rows" @click="resetRows">
                         {{ resetRowsLabel }}
                     </Button>
                     <Table :columns="columns" :rows="rows" :has-row-action="rowAction" />

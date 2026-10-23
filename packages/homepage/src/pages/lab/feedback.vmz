@@ -6,7 +6,7 @@
                     density:
                     {{ density }}
                 </p>
-                <Button type="button" @click="toggleDensity">
+                <Button type="button" data-vmz-action="toggle-density" @click="toggleDensity">
                     {{ densityToggleLabel }}
                 </Button>
                 <Card :title="cardTonesLabel">
@@ -17,7 +17,7 @@
                 </Card>
                 <Notification tone="warning" role-name="status" :title="notificationTitle" :description="notificationDesc" />
                 <Result status="success" :title="resultTitle" :description="resultDesc">
-                    <Button type="button" @click="(() => done = true)">
+                    <Button type="button" data-vmz-action="continue" @click="(() => done = true)">
                         {{ continueLabel }}
                     </Button>
                 </Result>

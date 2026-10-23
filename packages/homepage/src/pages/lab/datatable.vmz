@@ -16,7 +16,7 @@
                     {{ detailId || 'none' }}
                 </p>
                 <BulkActions :label="bulkActionsLabel" :selected-count="selectedCount" :count-label="bulkLabel">
-                    <Button type="button" variant="secondary" @click="clearSelection">
+                    <Button type="button" variant="secondary" data-vmz-action="clear-selection" @click="clearSelection">
                         {{ clearLabel }}
                     </Button>
                 </BulkActions>
