@@ -116,8 +116,8 @@ export async function proveHomepageLocaleTransition(opts: {
             }
         };
         // Prefer load over networkidle0: production pages may keep connections that never go idle.
-        await page.goto(`${baseUrl}/ui`, { waitUntil: 'load', timeout: 60_000 });
-        await waitLocaleApi('initial /ui');
+        await page.goto(`${baseUrl}/lab/components`, { waitUntil: 'load', timeout: 60_000 });
+        await waitLocaleApi('initial /lab/components');
         const before = await page.evaluate(() => ({
             path: location.pathname,
             locale: document.documentElement.getAttribute('data-locale'),
@@ -140,8 +140,8 @@ export async function proveHomepageLocaleTransition(opts: {
         if (committed.status !== 'committed' || committed.locale !== 'en-us') {
             throw new Error(`LocaleTransition commit failed: ${JSON.stringify(committed)}`);
         }
-        if (committed.path !== '/en-us/ui' && committed.path !== '/en-us/ui/') {
-            throw new Error(`LocaleTransition path want /en-us/ui, got ${committed.path}`);
+        if (committed.path !== '/en-us/lab/components' && committed.path !== '/en-us/lab/components/') {
+            throw new Error(`LocaleTransition path want /en-us/lab/components, got ${committed.path}`);
         }
 
         await page.goto(`${baseUrl}/`, { waitUntil: 'load', timeout: 60_000 });

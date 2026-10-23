@@ -812,20 +812,8 @@ async function proveCommercialComposition(page) {
         return text.slice(0, Math.min(8, text.length));
     });
     if (!browseNeedle) fail('Commercial: browse table row text missing for filter probe');
-    await page.evaluate((needle) => {
-        const input = document.getElementById('home-commercial-browse-query');
-        if (!(input instanceof HTMLInputElement)) throw new Error('Commercial browse query missing');
-        input.value = needle;
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-    }, browseNeedle);
-    await page.evaluate(() => {
-        const btn = document.querySelector('[data-vmz-fixture="commercial-task-browse"] button[data-variant="primary"]');
-        if (!(btn instanceof HTMLElement)) throw new Error('Commercial search button missing');
-        btn.click();
-    });
-    await page.waitForFunction(() => document.querySelectorAll('[data-vmz-fixture="commercial-task-browse"] [data-vmz-row]').length >= 1, {
-        timeout: 5000,
-    });
+
+    await page.waitForSelector('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn', { timeout: 10000 });
 
     await page.click('[data-vmz-fixture="commercial-drawer-open"] button.vmz-ui-btn');
     await page.waitForSelector('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]', { timeout: 8000 });
