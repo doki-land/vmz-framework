@@ -1794,20 +1794,20 @@ async function proveConsoleComposition(page, PORT) {
         consoleNeedle,
     );
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) => {
-            const text = (b.textContent || '').replace(/\s+/g, '');
-            return text.includes('Search') || text.includes('Apply') || text.includes('查询');
-        });
+        // FilterBar primary button is always the first vmz-ui-btn[variant="primary"] inside filter-bar
+        const btn = document.querySelector(
+            '[data-vmz-ui="filter-bar"] button.vmz-ui-btn[data-variant="primary"]',
+        );
         if (!(btn instanceof HTMLElement)) throw new Error('Console search button missing');
         btn.click();
     });
     await page.waitForFunction(() => document.querySelectorAll('[data-vmz-row]').length >= 1, { timeout: 5000 });
 
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="console"] button.vmz-ui-btn')].find((b) => {
-            const text = (b.textContent || '').replace(/\s+/g, '');
-            return text.includes('Selectthispage') || text.includes('Selectvisible') || text.includes('选择当前页');
-        });
+        // FilterBar ghost button = selectVisible (only one ghost button inside filter-bar)
+        const btn = document.querySelector(
+            '[data-vmz-ui="filter-bar"] button.vmz-ui-btn[data-variant="ghost"]',
+        );
         if (!(btn instanceof HTMLElement)) throw new Error('Console bulk select button missing');
         btn.click();
     });
