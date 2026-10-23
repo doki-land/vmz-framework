@@ -3,8 +3,12 @@
         <a href="#main" class="skip-link">
             {{ skipLabel }}
         </a>
-        <SiteHeader />
-        <slot />
+        <header data-vmz-shell="header">
+            <SiteHeader />
+        </header>
+        <main data-vmz-shell="main">
+            <slot />
+        </main>
         <SiteFooter />
     </div>
 </template>

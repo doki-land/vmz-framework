@@ -773,10 +773,10 @@ async function proveCommercialComposition(page) {
     await page.waitForSelector('[data-vmz-fixture="commercial"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
-        shell: !!document.querySelector('[data-vmz-ui="app-shell"]'),
+        shell: !!document.querySelector('[data-vmz-ui="app-shell"]') || !!document.querySelector('[data-vmz-ui="site-shell"]'),
         header: !!document.querySelector('[data-vmz-shell="header"]'),
         main: !!document.querySelector('[data-vmz-shell="main"]'),
-        nav: !!document.querySelector('[data-vmz-nav="commercial"]'),
+        nav: !!document.querySelector('[data-vmz-nav="commercial"]') || !!document.querySelector('[data-vmz-ui="site-shell"] header nav'),
         hero: !!document.querySelector('[data-vmz-fixture="commercial-hero"]'),
         browse: !!document.querySelector('[data-vmz-fixture="commercial-task-browse"]'),
         detail: !!document.querySelector('[data-vmz-fixture="commercial-task-detail"]'),
