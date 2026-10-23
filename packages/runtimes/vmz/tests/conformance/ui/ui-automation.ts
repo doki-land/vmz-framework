@@ -982,24 +982,43 @@ async function proveFormDepth(page, PORT) {
     });
 
     // Empty submit → summary + field errors (parent-owned validation).
-    await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="form"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Send request'),
+    // Use real browser click (evaluate click bypasses VMZ form submit handling).
+    try {
+        await page.click('[data-vmz-fixture="form-actions"] button.vmz-ui-btn', { timeout: 3000 });
+    } catch {
+        await page.evaluate(() => {
+            const btn = [...document.querySelectorAll('[data-vmz-fixture="form"] button.vmz-ui-btn')].find((b) =>
+                (b.textContent || '').includes('Send request'),
+            );
+            btn?.click();
+        });
+    }
+    try {
+        await page.waitForFunction(
+            () =>
+                !!document.querySelector('[data-vmz-form="summary"]') &&
+                document.querySelector('#home-form-email-err')?.textContent?.includes('valid work email') &&
+                document.querySelector('#home-form-role-err')?.textContent?.includes('Choose a role') &&
+                document.querySelector('#home-form-team-err')?.textContent?.includes('Pick a team') &&
+                document.querySelector('#home-form-date-err')?.textContent?.includes('preferred date') &&
+                document.querySelector('#home-form-file-err')?.textContent?.includes('Attach and upload a file') &&
+                document.querySelector('#home-form-plan-err')?.textContent?.includes('Pick a plan') &&
+                document.querySelector('[data-vmz-fixture="form-agree-error"]')?.textContent?.includes('Consent'),
+            { timeout: 10000 },
         );
-        btn?.click();
-    });
-    await page.waitForFunction(
-        () =>
-            !!document.querySelector('[data-vmz-form="summary"]') &&
-            document.querySelector('#home-form-email-err')?.textContent?.includes('valid work email') &&
-            document.querySelector('#home-form-role-err')?.textContent?.includes('Choose a role') &&
-            document.querySelector('#home-form-team-err')?.textContent?.includes('Pick a team') &&
-            document.querySelector('#home-form-date-err')?.textContent?.includes('preferred date') &&
-            document.querySelector('#home-form-file-err')?.textContent?.includes('Attach and upload a file') &&
-            document.querySelector('#home-form-plan-err')?.textContent?.includes('Pick a plan') &&
-            document.querySelector('[data-vmz-fixture="form-agree-error"]')?.textContent?.includes('Consent'),
-        { timeout: 5000 },
-    );
+    } catch (err) {
+        const snap = await page.evaluate(() => ({
+            summary: !!document.querySelector('[data-vmz-form="summary"]'),
+            emailErr: document.querySelector('#home-form-email-err')?.textContent || '',
+            roleErr: document.querySelector('#home-form-role-err')?.textContent || '',
+            teamErr: document.querySelector('#home-form-team-err')?.textContent || '',
+            dateErr: document.querySelector('#home-form-date-err')?.textContent || '',
+            fileErr: document.querySelector('#home-form-file-err')?.textContent || '',
+            planErr: document.querySelector('#home-form-plan-err')?.textContent || '',
+            consentErr: document.querySelector('[data-vmz-fixture="form-agree-error"]')?.textContent || '',
+        }));
+        fail(`Form depth: empty submit validation timed out: ${JSON.stringify(snap)} (${err})`);
+    }
     const invalid = await page.evaluate(() => ({
         email: document.querySelector('[data-vmz-ui="field"]')?.getAttribute('data-invalid') || '',
         roleItem: document.querySelector('[data-vmz-ui="form-item"]')?.getAttribute('data-invalid') || '',
