@@ -860,8 +860,6 @@ async function proveCommercialComposition(page, PORT) {
  */
 async function proveFormDepth(page, PORT) {
     console.log('ui-automation: Form depth (+ Autocomplete/Tooltip/DatePicker overlay/Upload all-in-one)…');
-    await page.goto(`http://127.0.0.1:${PORT}/lab/form`, { waitUntil: 'networkidle0', timeout: 60000 });
-    await page.waitForSelector('[data-vmz-fixture="form"]', { timeout: 10000 });
 
     for (const name of ['Form', 'FormItem', 'TextArea', 'Select', 'RadioGroup', 'Autocomplete', 'Tooltip', 'DatePicker', 'Upload']) {
         const src = path.join(uiRoot, 'src', 'components', `${name}.vmz`);
@@ -895,7 +893,7 @@ async function proveFormDepth(page, PORT) {
         fail('Form depth: form.vmz #server must expose resumable init/chunk routes');
     }
 
-    await page.goto(`http://127.0.0.1:18781/lab/form`, { waitUntil: 'networkidle0', timeout: 60000 });
+    await page.goto(`http://127.0.0.1:${PORT}/lab/form`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="form"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
@@ -1728,8 +1726,6 @@ async function proveUploadResumable(page) {
  */
 async function proveConsoleComposition(page, PORT) {
     console.log('ui-automation: Console ConsoleShell/FilterBar/Table composition…');
-    await page.goto(`http://127.0.0.1:${PORT}/console`, { waitUntil: 'networkidle0', timeout: 60000 });
-    await page.waitForSelector('[data-vmz-fixture="console"]', { timeout: 10000 });
 
     for (const name of ['ConsoleShell', 'FilterBar', 'Table', 'BulkActions', 'Pagination']) {
         const src = path.join(uiRoot, 'src', 'components', `${name}.vmz`);
@@ -1741,7 +1737,7 @@ async function proveConsoleComposition(page, PORT) {
     const consoleSrc = path.join(homepage, 'src', 'pages', 'console.vmz');
     if (!fs.existsSync(consoleSrc)) fail('homepage missing src/pages/console.vmz');
 
-    await page.goto(`http://127.0.0.1:18781/console`, { waitUntil: 'networkidle0', timeout: 60000 });
+    await page.goto(`http://127.0.0.1:${PORT}/console`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('[data-vmz-fixture="console"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
