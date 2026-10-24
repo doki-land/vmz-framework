@@ -369,8 +369,13 @@ if (homeBuild.status === 0) {
             const stackingPage = await get(`http://127.0.0.1:${PORT}/lab/overlay-stack`);
             const datatablePage = await get(`http://127.0.0.1:${PORT}/lab/datatable`);
             const productPage = await get(`http://127.0.0.1:${PORT}/product`);
+            const homeEnPage = await get(`http://127.0.0.1:${PORT}/en-us/`);
             if (home.status !== 200 || !home.body.includes('landing-brand')) {
                 homeSsrDetail = `GET / ${home.status}`;
+            } else if (!home.body.includes('<title>VMZ · 全栈应用编译器</title>')) {
+                homeSsrDetail = 'GET / <title> must come from the page meta export';
+            } else if (homeEnPage.status !== 200 || !homeEnPage.body.includes('<title>VMZ · Full-stack app compiler</title>')) {
+                homeSsrDetail = `GET /en-us/ ${homeEnPage.status} <title> must resolve the page meta for the request locale`;
             } else if (ui.status !== 200 || !ui.body.includes('data-vmz-fixture="ui-lab"')) {
                 homeSsrDetail = `GET /lab/components ${ui.status} missing ui-lab`;
             } else if (!ui.body.includes('data-vmz-ui="field"')) {

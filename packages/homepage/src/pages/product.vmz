@@ -160,7 +160,11 @@ import {
 } from "#locales/common";
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
+import { pageMeta } from "../page-meta.ts";
+
 export default class ProductPage {
+    static meta = pageMeta("在应用里使用 @vmz/ui · VMZ", "Use @vmz/ui in your app · VMZ");
+
     localeId = "zh-hans";
     search = "";
     copiedYes = false;

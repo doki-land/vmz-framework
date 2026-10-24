@@ -77,7 +77,11 @@ import {
 import { labNav } from "../../lab-nav.ts";
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
+import { pageMeta } from "../../page-meta.ts";
+
 export default class ChoicePage {
+    static meta = pageMeta("选择与展开 · VMZ", "Selection and disclosure · VMZ");
+
     segment = "comfortable";
 
     navItems = [];

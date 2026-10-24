@@ -73,7 +73,11 @@ import {
 import { labNav } from "../../lab-nav.ts";
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
+import { pageMeta } from "../../page-meta.ts";
+
 export default class StackingPage {
+    static meta = pageMeta("浮层堆叠 · VMZ", "Stacked overlays · VMZ");
+
     drawerOpen = false;
     dialogOpen = false;
     popoverOpen = false;

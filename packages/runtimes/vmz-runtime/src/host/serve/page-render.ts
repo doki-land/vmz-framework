@@ -240,10 +240,17 @@ async function* emitAccessShell(marker: string) {
     });
 }
 
-function resolvePageDocumentMeta(Page: { meta?: (() => Record<string, unknown>) | Record<string, unknown> }) {
+function resolvePageDocumentMeta(
+    Page: {
+        meta?:
+            | ((ctx: { pathname?: string; localeId?: string }) => Record<string, unknown>)
+            | Record<string, unknown>;
+    },
+    ctx: { pathname?: string; localeId?: string } = {},
+) {
     try {
         let raw: Record<string, unknown> = {};
-        if (typeof Page?.meta === 'function') raw = Page.meta() || {};
+        if (typeof Page?.meta === 'function') raw = Page.meta(ctx) || {};
         else if (Page?.meta && typeof Page.meta === 'object') raw = Page.meta;
         const title = String(raw.title || '').trim();
         const description = String(raw.description || '').trim();
@@ -378,7 +385,9 @@ async function* emitPageHtml(
             htmlExtraAttrs.push('data-vmz-locale-hrefs', JSON.stringify(hrefTable));
         }
     }
-    const pageDocMeta = resolvePageDocumentMeta(Page as { meta?: (() => Record<string, unknown>) | Record<string, unknown> });
+    const pageDocMeta = resolvePageDocumentMeta(Page as {
+        meta?: (ctx: { pathname?: string; localeId?: string }) => Record<string, unknown>;
+    }, { localeId });
     const prevLocaleHint = globalThis.__vmzLocaleIdHint;
     globalThis.__vmzLocaleIdHint = localeId;
     if (!serveState.ssrRenderHost) {

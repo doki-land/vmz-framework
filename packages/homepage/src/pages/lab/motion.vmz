@@ -112,7 +112,11 @@ import {
 import { labNav } from "../../lab-nav.ts";
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
+import { pageMeta } from "../../page-meta.ts";
+
 export default class MotionPage {
+    static meta = pageMeta("动效与中断 · VMZ", "Motion and interruption · VMZ");
+
     navItems = [];
     navLabel = "";
     pageTitle = "";

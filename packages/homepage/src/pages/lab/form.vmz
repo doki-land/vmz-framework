@@ -238,7 +238,11 @@ import { navLab } from "#locales/common";
 import { labNav } from "../../lab-nav.ts";
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
+import { pageMeta } from "../../page-meta.ts";
+
 export default class FormPage {
+    static meta = pageMeta("表单与上传 · VMZ", "Forms and upload · VMZ");
+
     email = "";
     role = "";
     team = "";

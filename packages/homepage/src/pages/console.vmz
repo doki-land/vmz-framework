@@ -392,7 +392,11 @@ import { activeNavId, shellNav, siteNavItems } from "../nav.ts";
 const initialConsoleSummary = { total: 0, running: 0, failed: 0 };
 const initialConsoleRows = [];
 
+import { pageMeta } from "../page-meta.ts";
+
 export default class ConsolePage {
+    static meta = pageMeta("客户请求 · VMZ", "Customer requests · VMZ");
+
     summaryTotal = initialConsoleSummary.total;
     loading = true;
     filterEmpty = false;

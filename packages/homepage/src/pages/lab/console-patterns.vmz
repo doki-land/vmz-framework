@@ -87,7 +87,11 @@ import {
 import { labNav } from "../../lab-nav.ts";
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
+import { pageMeta } from "../../page-meta.ts";
+
 export default class ConsolePatternsPage {
+    static meta = pageMeta("工作台 · VMZ", "Workbench · VMZ");
+
     nameQuery = "";
     statusQuery = "";
     loading = true;

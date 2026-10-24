@@ -65,7 +65,11 @@ import {
 import { labNav } from "../../lab-nav.ts";
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
+import { pageMeta } from "../../page-meta.ts";
+
 export default class DensityThemePage {
+    static meta = pageMeta("密度与主题 · VMZ", "Density and themes · VMZ");
+
     density = "comfortable";
     dir = "ltr";
     theme = "default";

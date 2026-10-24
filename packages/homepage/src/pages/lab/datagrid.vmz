@@ -76,7 +76,11 @@ const VIEWPORT_H = 288;
 const COL_IDS = ["name", "status", "owner", "region", "score"];
 const REGIONS = ["APAC", "EMEA", "AMER", "LATAM"];
 
+import { pageMeta } from "../../page-meta.ts";
+
 export default class DatagridPage {
+    static meta = pageMeta("数据网格 · VMZ", "Data grid · VMZ");
+
     viewMode = "group";
     navItems = [];
     navLabel = "";

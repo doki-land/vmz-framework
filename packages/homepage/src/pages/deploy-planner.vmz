@@ -611,7 +611,11 @@ import { buildDeployPlan, DEFAULT_ANSWERS } from "../deploy/planner.ts";
 import { plannerCopy as plannerLabels } from "../deploy/planner-copy.ts";
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
+import { pageMeta } from "../page-meta.ts";
+
 export default class DeployPlannerPage {
+    static meta = pageMeta("部署计划器 · VMZ", "Deploy planner · VMZ");
+
     localeId = readLocaleId();
     _unwatchLocale = null;
 

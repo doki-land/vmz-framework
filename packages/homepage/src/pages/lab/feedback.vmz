@@ -59,7 +59,11 @@ import { navLab } from "#locales/common";
 import { labNav } from "../../lab-nav.ts";
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
+import { pageMeta } from "../../page-meta.ts";
+
 export default class FeedbackPage {
+    static meta = pageMeta("状态与反馈 · VMZ", "Feedback and states · VMZ");
+
     density = "comfortable";
     done = false;
     navItems = [];

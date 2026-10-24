@@ -529,7 +529,11 @@ import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from "..
 
 const initialBrowseRows = [];
 
+import { pageMeta } from "../page-meta.ts";
+
 export default class CommercialPage {
+    static meta = pageMeta("应用案例 · VMZ", "Case study · VMZ");
+
     browseQuery = "";
     appliedBrowseQuery = "";
     reviewNote = "";

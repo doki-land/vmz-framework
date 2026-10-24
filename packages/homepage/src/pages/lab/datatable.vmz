@@ -55,7 +55,11 @@ import {
 import { labNav } from "../../lab-nav.ts";
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
+import { pageMeta } from "../../page-meta.ts";
+
 export default class DatatablePage {
+    static meta = pageMeta("数据表格 · VMZ", "Data table · VMZ");
+
     selectedAttr = "";
     selectedCount = 0;
     selectedCountLabel = "0";

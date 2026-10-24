@@ -95,7 +95,11 @@ import {
 import { labNav } from "../../lab-nav.ts";
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
+import { pageMeta } from "../../page-meta.ts";
+
 export default class StructurePage {
+    static meta = pageMeta("结构与导航 · VMZ", "Structure and navigation · VMZ");
+
     faqOpen = "billing";
     stepCurrent = "account";
     listSelected = "alpha";

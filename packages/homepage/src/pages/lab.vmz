@@ -167,7 +167,11 @@ import {
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 import { localePrefix } from "../nav.ts";
 
+import { pageMeta } from "../page-meta.ts";
+
 export default class LabIndexPage {
+    static meta = pageMeta("组件演示 · VMZ", "Components · VMZ");
+
     localeId = "zh-hans";
     kickerLabel = "";
     titleLabel = "";

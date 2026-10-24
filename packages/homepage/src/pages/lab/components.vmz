@@ -193,7 +193,11 @@ import {
 import { labNav } from "../../lab-nav.ts";
 import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../../locale/copy.ts";
 
+import { pageMeta } from "../../page-meta.ts";
+
 export default class UiLabPage {
+    static meta = pageMeta("基础组件 · VMZ", "Basic components · VMZ");
+
     name = "";
     open = false;
     agree = false;

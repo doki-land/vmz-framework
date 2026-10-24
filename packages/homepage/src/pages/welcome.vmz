@@ -86,7 +86,11 @@ import {
 } from "#locales/common";
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
+import { pageMeta } from "../page-meta.ts";
+
 export default class WelcomePage {
+    static meta = pageMeta("关于 VMZ", "About VMZ");
+
     localeId = "zh-hans";
     brandLabel = "";
     docsLabel = "";

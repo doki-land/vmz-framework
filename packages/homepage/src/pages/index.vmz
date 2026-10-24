@@ -342,7 +342,16 @@ import {
 } from "#locales/common";
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
 
+import { pageMeta } from "../page-meta.ts";
+
 export default class IndexPage {
+    static meta = pageMeta(
+        "VMZ · 全栈应用编译器",
+        "VMZ · Full-stack app compiler",
+        "用 Vue 语法写全栈应用，编译到浏览器、SSR 与服务端。",
+        "Write full-stack apps in Vue syntax and compile to browser, SSR, and server.",
+    );
+
     sampleCount = 0;
     localeId = "zh-hans";
     heroKickerLabel = "";
