@@ -6,22 +6,21 @@
 <style>
 .vmz-ui-link {
     font: inherit;
-    font-weight: 600;
-    color: var(--vmz-action-primary-background);
+    font-weight: 500;
+    color: var(--vmz-action-link-foreground);
     text-decoration: underline;
     text-underline-offset: 0.2em;
     text-decoration-thickness: 1px;
-    text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+    text-decoration-color: currentColor;
     outline: none;
-    border-radius: var(--vmz-radius-sm, 4px);
+    border-radius: var(--vmz-radius-sm);
     transition:
-        color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
-        text-decoration-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+        color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        text-decoration-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
 }
 
 .vmz-ui-link:hover {
-    color: var(--vmz-action-primary-hover);
-    text-decoration-color: currentColor;
+    color: var(--vmz-action-link-hover);
 }
 
 .vmz-ui-link:active {
@@ -39,20 +38,32 @@
 }
 
 .vmz-ui-link[data-variant="muted"]:hover {
-    color: var(--vmz-action-primary-background);
+    color: var(--vmz-action-link-hover);
     text-decoration-color: currentColor;
 }
 
 /* Navigation link: chrome, not prose — underline is the hover affordance. */
 .vmz-ui-link[data-variant="nav"] {
     font-weight: 500;
+    color: var(--vmz-text-ink);
     text-decoration: none;
     text-decoration-color: transparent;
 }
 
 .vmz-ui-link[data-variant="nav"]:hover {
+    color: var(--vmz-action-link-hover);
     text-decoration: underline;
     text-decoration-color: currentColor;
+}
+
+.vmz-ui-link[data-variant="nav"]:active {
+    color: var(--vmz-action-primary-active);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vmz-ui-link {
+        transition: none;
+    }
 }
 </style>
 <script client>

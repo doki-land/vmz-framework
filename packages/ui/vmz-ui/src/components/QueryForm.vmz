@@ -5,22 +5,44 @@
 </template>
 <style>
 .vmz-ui-query-form {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: var(--vmz-density-compact-gap);
-    padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    align-items: end;
+    gap: 0.75rem;
+    padding: 1rem;
     border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
+    border-radius: var(--vmz-radius-lg, 8px);
+    background: var(--vmz-surface-paper);
+}
+
+.vmz-ui-query-form .vmz-ui-field__control,
+.vmz-ui-query-form .vmz-ui-select__control,
+.vmz-ui-query-form .vmz-ui-btn {
+    min-height: 2rem;
+}
+
+.vmz-ui-query-form > :has(.vmz-ui-btn),
+.vmz-ui-query-form > button.vmz-ui-btn {
+    justify-self: end;
+}
+
+.vmz-ui-query-form .vmz-ui-field {
+    min-width: 0;
+}
+
+@media (max-width: 640px) {
+    .vmz-ui-query-form {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 <script client>
 /**
- * VMZ UI — QueryForm (UI5 Console Surface).
- * Dense multi-field query landmark; spacing from density.compact.* tokens.
+ * VMZ UI — QueryForm (Console composition).
+ * Dense multi-field query landmark; single column on narrow screens.
  */
 export default class QueryForm {
-    public label: string = "Query";
+    public label: string = "";
     public onSubmit: (() => void) | null = null;
     onSubmitGuard(ev) {
         if (ev && typeof ev.preventDefault === "function") ev.preventDefault();

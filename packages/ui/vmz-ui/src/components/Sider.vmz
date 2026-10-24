@@ -1,23 +1,136 @@
 <template>
-    <aside data-vmz-ui="sider" class="vmz-ui-sider">
-        <slot />
+    <aside data-vmz-ui="sider" class="vmz-ui-sider" :onKeyDown="onKeyDown">
+        <div class="vmz-ui-sider__head">
+            <button type="button" class="vmz-ui-sider__toggle" :aria-label="label" :aria-expanded="open ? 'true' : 'false'" :aria-controls="bodyId" @click="toggle">
+                <Icon :name="open ? 'action.close' : 'action.menu'" size="md" decorative />
+            </button>
+        </div>
+        <div :id="bodyId" class="vmz-ui-sider__body" :data-open="open ? 'true' : null">
+            <slot />
+        </div>
     </aside>
 </template>
 <style>
 .vmz-ui-sider {
-    width: 16rem;
-    padding: 1rem;
-    border-right: 1px solid var(--vmz-line-default);
+    flex: none;
+    width: 13rem;
+    padding: var(--vmz-space-3, 0.75rem);
+    border-right: 1px solid var(--vmz-line-subtle);
     background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
+    overflow-y: auto;
+}
+.vmz-ui-sider__head {
+    display: none;
+}
+.vmz-ui-sider__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vmz-space-1, 0.25rem);
+    min-width: 0;
+}
+.vmz-ui-sider__body :where(nav) {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vmz-space-1, 0.25rem);
+}
+.vmz-ui-sider__body :where(nav a, .vmz-ui-sider__item) {
+    display: flex;
+    align-items: center;
+    min-height: 2.25rem;
+    padding: 0 var(--vmz-space-3, 0.75rem);
+    border-radius: var(--vmz-radius-md, 6px);
+    color: var(--vmz-text-steel);
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    text-decoration: none;
+    outline: none;
+    transition:
+        color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+        background-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+}
+.vmz-ui-sider__body :where(nav a, .vmz-ui-sider__item):hover {
+    color: var(--vmz-text-ink);
+    background: var(--vmz-surface-mist);
+}
+.vmz-ui-sider__body :where(nav a, .vmz-ui-sider__item)[data-active="true"],
+.vmz-ui-sider__body :where(nav a, .vmz-ui-sider__item)[aria-current="page"] {
+    color: var(--vmz-action-primary-background);
+    background: var(--vmz-action-primary-soft);
+    font-weight: 600;
+    box-shadow: inset 2px 0 0 var(--vmz-action-primary-background);
+}
+.vmz-ui-sider__body :where(nav a, .vmz-ui-sider__item):focus-visible {
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+}
+.vmz-ui-sider__group-title {
+    margin: var(--vmz-space-3, 0.75rem) 0 var(--vmz-space-1, 0.25rem);
+    padding: 0 var(--vmz-space-3, 0.75rem);
+    color: var(--vmz-text-tertiary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+    letter-spacing: 0.02em;
 }
 @media (max-width: 720px) {
     .vmz-ui-sider {
         width: 100%;
+        padding: var(--vmz-space-2, 0.5rem) var(--vmz-space-4, 1rem);
         border-right: 0;
-        border-bottom: 1px solid var(--vmz-line-default);
+        border-bottom: 1px solid var(--vmz-line-subtle);
+        overflow-y: visible;
+    }
+    .vmz-ui-sider__head {
+        display: flex;
+        justify-content: flex-end;
+    }
+    .vmz-ui-sider__toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        padding: 0;
+        border: 0;
+        border-radius: var(--vmz-radius-md, 6px);
+        background: transparent;
+        color: var(--vmz-text-ink);
+        cursor: pointer;
+        outline: none;
+    }
+    .vmz-ui-sider__toggle:hover {
+        background: var(--vmz-surface-mist);
+    }
+    .vmz-ui-sider__toggle:focus-visible {
+        box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+    }
+    .vmz-ui-sider__body {
+        display: none;
+        padding-top: var(--vmz-space-2, 0.5rem);
+    }
+    .vmz-ui-sider__body[data-open="true"] {
+        display: flex;
     }
 }
 </style>
 <script client>
-export default class Sider {}
+/**
+ * VMZ UI — Sider (Navigation column).
+ * Parent supplies grouped links; item 36px / radius 6 / selected soft-blue rail.
+ * Below 720px the column collapses behind a 40x40 menu control.
+ */
+export default class Sider {
+    public label: string = "";
+    public bodyId: string = "vmz-ui-sider-body";
+    open = true;
+
+    toggle() {
+        this.open = !this.open;
+    }
+
+    onKeyDown(e) {
+        if (e && e.key === "Escape") this.open = false;
+    }
+}
 </script>

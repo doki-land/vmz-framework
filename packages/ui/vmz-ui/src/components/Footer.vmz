@@ -5,9 +5,12 @@
 </template>
 <style>
 .vmz-ui-footer {
-    padding: 1.5rem;
-    color: var(--vmz-text-steel, #646a73);
-    font-size: 0.875rem;
+    padding: var(--vmz-space-6, 2rem) var(--vmz-space-5, 1.5rem);
+    border-top: 1px solid var(--vmz-line-subtle);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-tertiary);
+    font-size: 0.8125rem;
+    line-height: 1.5;
     text-align: center;
 }
 </style>

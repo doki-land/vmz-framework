@@ -1,18 +1,205 @@
 <template>
-    <header data-vmz-ui="header" class="vmz-ui-header">
+    <header data-vmz-ui="header" :data-structured="hasNav() ? 'true' : 'false'" class="vmz-ui-header" :onKeyDown="onMenuKeyDown">
+        <div v-if="hasNav()" class="vmz-ui-header__inner">
+            <a v-if="brand" :href="homeHref" class="vmz-ui-header__brand">
+                {{ brand }}
+            </a>
+            <nav :id="navId" :aria-label="navLabel" :data-open="menuOpen ? 'true' : null" class="vmz-ui-header__nav">
+                <a v-for="item in nav" :key="item.id" :href="item.href" :data-vmz-nav="item.id" :data-active="item.id === activeId ? 'true' : 'false'" :aria-current="item.id === activeId ? 'page' : null" class="vmz-ui-header__nav-item" @click="closeMenu">
+                    {{ item.title }}
+                </a>
+            </nav>
+            <div class="vmz-ui-header__actions">
+                <slot name="actions" />
+            </div>
+            <button type="button" class="vmz-ui-header__menu" :aria-label="menuLabel ? menuLabel : navLabel" :aria-expanded="menuOpen ? 'true' : 'false'" :aria-controls="navId" @click="toggleMenu">
+                <Icon :name="menuOpen ? 'action.close' : 'action.menu'" size="md" decorative />
+            </button>
+        </div>
         <slot />
     </header>
 </template>
 <style>
 .vmz-ui-header {
-    min-height: 4rem;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: var(--vmz-surface-paper);
+    border-bottom: 1px solid var(--vmz-line-subtle);
+}
+.vmz-ui-header[data-structured="false"] {
     display: flex;
     align-items: center;
-    padding: 0 1.5rem;
-    border-bottom: 1px solid var(--vmz-line-default, #d9d9d9);
-    background: var(--vmz-surface-paper, #fff);
+    gap: var(--vmz-space-6, 2rem);
+    min-height: var(--vmz-layout-header-height, 4rem);
+    padding: 0 var(--vmz-layout-gutter, 1rem);
+}
+.vmz-ui-header__inner {
+    width: min(var(--vmz-layout-max-width, 75rem), calc(100% - (var(--vmz-layout-gutter, 1rem) * 2)));
+    height: var(--vmz-layout-header-height, 4rem);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: var(--vmz-space-6, 2rem);
+}
+.vmz-ui-header__brand {
+    flex: none;
+    color: var(--vmz-text-ink);
+    font-family: var(--vmz-font-sans);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+    border-radius: var(--vmz-radius-sm, 4px);
+    outline: none;
+    transition: color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+}
+.vmz-ui-header__brand:hover {
+    color: var(--vmz-action-primary-background);
+}
+.vmz-ui-header__brand:focus-visible {
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+}
+.vmz-ui-header__nav {
+    flex: 0 1 auto;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--vmz-space-5, 1.5rem);
+}
+.vmz-ui-header__nav-item {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
+    box-sizing: border-box;
+    border-bottom: 2px solid transparent;
+    color: var(--vmz-text-steel);
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    outline: none;
+    transition:
+        color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+        border-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+}
+.vmz-ui-header__nav-item:hover {
+    color: var(--vmz-action-primary-background);
+}
+.vmz-ui-header__nav-item[data-active="true"] {
+    color: var(--vmz-action-primary-background);
+    border-bottom-color: var(--vmz-action-primary-background);
+}
+.vmz-ui-header__nav-item:focus-visible {
+    border-radius: var(--vmz-radius-sm, 4px);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+}
+.vmz-ui-header__actions {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: var(--vmz-space-2, 0.5rem);
+    margin-left: auto;
+}
+.vmz-ui-header__menu {
+    display: none;
+}
+@media (max-width: 720px) {
+    .vmz-ui-header[data-structured="false"] {
+        min-height: var(--vmz-layout-header-height-compact, 3.5rem);
+        gap: var(--vmz-space-3, 0.75rem);
+    }
+    .vmz-ui-header__inner {
+        height: var(--vmz-layout-header-height-compact, 3.5rem);
+        gap: var(--vmz-space-3, 0.75rem);
+    }
+    .vmz-ui-header__nav {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        height: auto;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        padding: var(--vmz-space-2, 0.5rem) var(--vmz-layout-gutter, 1rem) var(--vmz-space-4, 1rem);
+        border-bottom: 1px solid var(--vmz-line-subtle);
+        background: var(--vmz-surface-paper);
+        box-shadow: var(--vmz-shadow-popup);
+    }
+    .vmz-ui-header__nav[data-open="true"] {
+        display: flex;
+    }
+    .vmz-ui-header__nav-item {
+        height: 2.5rem;
+        padding: 0 var(--vmz-space-1, 0.25rem);
+        border-bottom: 0;
+    }
+    .vmz-ui-header__menu {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        padding: 0;
+        border: 0;
+        border-radius: var(--vmz-radius-md, 6px);
+        background: transparent;
+        color: var(--vmz-text-ink);
+        cursor: pointer;
+        outline: none;
+        transition: background-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+    }
+    .vmz-ui-header__menu:hover {
+        background: var(--vmz-surface-mist);
+    }
+    .vmz-ui-header__menu:focus-visible {
+        box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+    }
 }
 </style>
 <script client>
-export default class Header {}
+/**
+ * VMZ UI — Header (Commercial chrome).
+ * Flat nav links plus a named `actions` slot. With no `nav` items the default
+ * slot renders as a plain padded bar. Copy stays with the parent.
+ */
+export default class Header {
+    public brand: string = "";
+    public homeHref: string = "/";
+    public navLabel: string = "";
+    public menuLabel: string = "";
+    /** Id of the nav item representing the current page. */
+    public activeId: string = "";
+    public navId: string = "vmz-ui-header-nav";
+    /** Parent-supplied labels; the component never hardcodes copy. */
+    public nav: {
+        id: string;
+        title: string;
+        href: string;
+    }[] = [];
+    menuOpen = false;
+
+    hasNav() {
+        return Array.isArray(this.nav) && this.nav.length > 0;
+    }
+
+    toggleMenu() {
+        this.menuOpen = !this.menuOpen;
+    }
+
+    closeMenu() {
+        if (this.menuOpen) this.menuOpen = false;
+    }
+
+    onMenuKeyDown(e) {
+        if (e && e.key === "Escape") this.closeMenu();
+    }
+}
 </script>

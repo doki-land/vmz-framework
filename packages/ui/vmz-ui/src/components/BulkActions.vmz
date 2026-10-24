@@ -14,11 +14,12 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.625rem 1rem;
-    padding: 0.625rem 0.85rem;
-    border: 1px solid var(--vmz-line-default);
+    gap: 0.5rem 1rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--vmz-action-primary-background);
     border-radius: var(--vmz-radius-md, 6px);
-    background: transparent;
+    background: var(--vmz-action-primary-soft);
+    color: var(--vmz-text-ink);
 }
 
 /* Keep host+slot mounted so default slot projects at create time (not inside v-if). */
@@ -28,23 +29,27 @@
 
 .vmz-ui-bulk-actions__count {
     margin: 0;
-    font-weight: 700;
-    color: var(--vmz-action-primary-active);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-bulk-actions__actions {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 0.5rem;
+    margin-left: auto;
 }
 </style>
 <script client>
 /**
- * VMZ UI — BulkActions (Console composition).
+ * VMZ UI — BulkActions (selection toolbar).
  * Hides when selectedCount is falsy but keeps the tree mounted so parent slot children project.
+ * Count copy is parent-owned via `count-label`.
  */
 export default class BulkActions {
-    public label: string = "Bulk actions";
+    public label: string = "";
     public selectedCount: number = 0;
     public countLabel: string = "";
 }
