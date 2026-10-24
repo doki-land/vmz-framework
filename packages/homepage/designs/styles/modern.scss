@@ -181,6 +181,7 @@ html:has([data-vmz-ui='app-shell']) {
 .v2-kicker {
   display: inline-flex;
   align-items: center;
+  justify-self: start;
   gap: .45rem;
   margin: 0;
   padding: .35rem .75rem .35rem .6rem;
