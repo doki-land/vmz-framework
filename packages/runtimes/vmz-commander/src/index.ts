@@ -544,8 +544,14 @@ class CliBuilder implements Cli {
         globalOpts: ParsedOptions,
         diagnosticContext: DiagnosticContext,
     ): Promise<number> {
-        // 在任何解析前先扫描 --help / -h（任何位置，跳过 -- 后面）
-        if (hasHelpToken(rest)) {
+        // `--` ends option parsing. Keep head (options + command tokens) separate
+        // from tail (raw positionals) before help scanning or option parsing.
+        const separatorAt = rest.indexOf('--');
+        const head = separatorAt === -1 ? rest : rest.slice(0, separatorAt);
+        const tail = separatorAt === -1 ? [] : rest.slice(separatorAt + 1);
+
+        // 在任何解析前先扫描 --help / -h（只扫 `--` 之前的 head）
+        if (hasHelpToken(head)) {
             console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
             return 0;
         }
@@ -589,9 +595,10 @@ class CliBuilder implements Cli {
         let usedOptions: Set<OptionDef> = new Set();
         try {
             if (def.passthrough) {
-                options = { _: rest.slice() };
+                options = { _: [...head, ...tail] };
             } else {
-                ({ options, used: usedOptions } = parseOptionsDetailed(rest, def.options));
+                ({ options, used: usedOptions } = parseOptionsDetailed(head, def.options));
+                options._.push(...tail);
             }
         } catch (err) {
             const cliErr = CliError.from(err, 'commander::parse_failed');
@@ -802,8 +809,11 @@ function parseArgvCore(
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i]!;
         if (a === '--') {
-            // 消费 -- 分隔符本身，后面的原样进 positional
-            rest.push(...argv.slice(i + 1));
+            // Strict parsing consumes the separator. Permissive peeling must keep
+            // both `--` and its tail so dispatch can split head/tail and never
+            // interpret tail tokens as options or help markers.
+            if (strict) rest.push(...argv.slice(i + 1));
+            else rest.push('--', ...argv.slice(i + 1));
             break;
         }
         // help token 不在这里 skip：让它进 rest，由上层 dispatch 的 hasHelpToken 路由
