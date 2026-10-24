@@ -24,9 +24,11 @@ import {
     classifyWatchRoot,
     isDependencyPath,
     mergeDirtySets,
-    collectDevConfigPaths,
+    collectConfigDependencies,
+    configCandidatePaths,
     configFingerprintMap,
 } from './dev-watch-roots.js';
+import { createConfigCycle, type ConfigCycle, type ConfigCycleReport } from './config-cycle.js';
 import {
     buildReloadPayload,
     filterGenerationIgnore,
@@ -53,6 +55,16 @@ interface DevSessionOptions {
     createWorkspaceFn?: typeof createWorkspace;
     spawnHostFn?: (opts: { project: string; outDir: string; host: string; port: number }) => import('node:child_process').ChildProcess;
     softReloadFn?: (host: string, port: number, payload?: object) => Promise<void>;
+    /** Override the detached config build process (tests). */
+    configCycleFn?: (opts: { project: string; outDir: string; workerPath?: string }) => ConfigCycle;
+    /** Built config cycle worker path (defaults to `dist/dev/config-cycle-worker.js`). */
+    configCycleWorkerPath?: string;
+}
+
+function cycleFailure(report: ConfigCycleReport): Error {
+    const detail = report.error?.args?.detail ?? 'config build process failed';
+    const error = new Error(detail);
+    return report.error ? Object.assign(error, { diagnostic: report.error }) : error;
 }
 
 export function createDevSession(options: DevSessionOptions) {
@@ -66,6 +78,9 @@ export function createDevSession(options: DevSessionOptions) {
     const createWs = options.createWorkspaceFn ?? createWorkspace;
     const spawnHost = options.spawnHostFn ?? defaultSpawnHost;
     const softReload = options.softReloadFn ?? defaultSoftReload;
+    const makeConfigCycle = options.configCycleFn ?? createConfigCycle;
+    const configCandidates = configCandidatePaths(project);
+    let configCycle: ConfigCycle | null = null;
 
     const ws = createWs({ root: project, outDir });
     let child: import('node:child_process').ChildProcess | null = null;
@@ -232,15 +247,16 @@ export function createDevSession(options: DevSessionOptions) {
             throw new Error(`vmz dev: missing src/ under ${project}`);
         }
 
-        // Same as `vmz build`: materialize plugin sources (e.g. `<Shiki>`) before compile.
-        // Soft rebuilds reuse the workspace; config/plugin changes still need a process restart
-        // until `vmz.config.*` is watched.
-        {
-            const { loadVmzConfig, applyPlugins } = await import('../workspace/plugin-host.js');
-            const { plugins, engines } = await loadVmzConfig(project);
-            if (plugins.length) {
-                await applyPlugins(ws, plugins, { project, outDir, engines });
-            }
+        // Config evaluation + plugin contributions run in a detached build process.
+        // Functions/plugin objects never cross the boundary; only the data report does.
+        if (configCandidates.some((p) => existsSync(p))) {
+            configCycle = makeConfigCycle({ project, outDir, ...(options.configCycleWorkerPath ? { workerPath: options.configCycleWorkerPath } : {}) });
+            const report = await configCycle.start();
+            if (!report.ok) throw cycleFailure(report);
+            delivery = report.delivery ?? delivery;
+            log.info(
+                `config build process ready${report.plugins.length ? ` (${report.plugins.map((p) => p.name).join(', ')})` : ''}`,
+            );
         }
 
         log.info('initial build (N-API workspace, full)…');
@@ -284,7 +300,14 @@ export function createDevSession(options: DevSessionOptions) {
         const designsRoot = path.join(project, 'designs');
         const watched = collectDevWatchRoots({ project, outDir });
         const publicRoot = watched.publicRoot;
-        const configPaths = watched.configPaths.length ? watched.configPaths : collectDevConfigPaths(project);
+        /** Candidate config files plus their local reachable deps; refreshed after each cycle. */
+        const refreshConfigPaths = () => {
+            const deps = configCandidates
+                .filter((p) => existsSync(p))
+                .flatMap((p) => collectConfigDependencies(p, project));
+            return [...new Set([...configCandidates, ...deps])];
+        };
+        let configPaths = refreshConfigPaths();
         /** @type {string[]} */
         const watchRoots = [...watched.roots];
         /** @type {string[]} */
@@ -405,14 +428,57 @@ export function createDevSession(options: DevSessionOptions) {
                 }
 
                 if (batch.configDirty) {
-                    log.info('vmz.config change detected — respawn required (devControl)');
-                    configFingerprints = configFingerprintMap(configPaths);
-                    commitFingerprints();
-                    await respawnHost('config-changed');
+                    log.info('vmz.config change detected — restarting the config build process…');
+                    let cycleReport: ConfigCycleReport | null = null;
+                    if (configCandidates.some((p) => existsSync(p))) {
+                        let failure: Error | null = null;
+                        try {
+                            if (!configCycle) {
+                                configCycle = makeConfigCycle({
+                                    project,
+                                    outDir,
+                                    ...(options.configCycleWorkerPath ? { workerPath: options.configCycleWorkerPath } : {}),
+                                });
+                                cycleReport = await configCycle.start();
+                            } else {
+                                // Old process is cancelled and awaited before the new one writes artifacts.
+                                cycleReport = await configCycle.restart();
+                            }
+                        } catch (err) {
+                            failure = err instanceof Error ? err : new Error(String(err));
+                        }
+                        configPaths = refreshConfigPaths();
+                        configFingerprints = configFingerprintMap(configPaths);
+                        commitFingerprints();
+                        if (failure) {
+                            log.warn(`config build process restart failed: ${failure.message}`);
+                            continue;
+                        }
+                        if (cycleReport && !cycleReport.ok) {
+                            if (cycleReport.error) log.diagnostic(cycleReport.error);
+                            else log.error('config build process failed');
+                            continue;
+                        }
+                        if (cycleReport) delivery = cycleReport.delivery ?? delivery;
+                    } else if (configCycle) {
+                        await configCycle.cancel();
+                        configCycle = null;
+                        configPaths = refreshConfigPaths();
+                        configFingerprints = configFingerprintMap(configPaths);
+                        commitFingerprints();
+                        log.warn('vmz.config removed — config build process stopped, last artifacts kept');
+                        continue;
+                    } else {
+                        configFingerprints = configFingerprintMap(configPaths);
+                        commitFingerprints();
+                        continue;
+                    }
                     const report = rebuild();
                     if (printReport(report, 'rebuild')) {
                         lastOutputRevision = report.outputRevision ?? report.output_revision ?? null;
                         await emitPublicAndTrack();
+                        if (wechatPreview) packWechatPreview();
+                        else await respawnHost('config-changed');
                     }
                     continue;
                 }
@@ -666,6 +732,8 @@ export function createDevSession(options: DevSessionOptions) {
         stopped = true;
         killChild(child);
         child = null;
+        await configCycle?.cancel().catch(() => {});
+        configCycle = null;
         clearDevHostPid(outDir, null);
         try {
             ws.dispose();

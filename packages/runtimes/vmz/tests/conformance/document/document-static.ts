@@ -93,4 +93,4 @@ if (!`${bad.stdout}\n${bad.stderr}`.includes('document::link::broken')) {
 }
 
 console.log(' GATE PASS');
-console.log(' runtime.ts · build HTML/view · designs · nav/anchors · no-JS readable');
+console.log(' runtime JS export · build HTML/view · designs · nav/anchors · no-JS readable');

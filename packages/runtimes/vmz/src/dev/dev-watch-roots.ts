@@ -13,12 +13,69 @@ import { diffFingerprints, fileFingerprintMap } from '../workspace/watch-diff.js
 /** Author-facing vs generated dev input bucket. */
 export type DevInputKind = 'author' | 'dependency' | 'public' | 'devControl' | 'locales' | 'docs' | 'designs' | 'other';
 
-const CONFIG_BASENAMES = ['vmz.config.ts', 'vmz.config.js', 'vmz.config.mjs', 'vmz.config.cjs'] as const;
+const CONFIG_BASENAMES = ['vmz.config.ts', 'vmz.config.mts', 'vmz.config.js', 'vmz.config.mjs', 'vmz.config.cjs'] as const;
+const LOCAL_MODULE_EXTENSIONS = ['.ts', '.mts', '.js', '.mjs', '.cts', '.cjs'] as const;
+
+/** All supported `vmz.config.*` candidate paths, existing or not (so creation is detected). */
+export function configCandidatePaths(project: string): string[] {
+    const root = path.resolve(project);
+    return CONFIG_BASENAMES.map((name) => path.join(root, name));
+}
 
 /** `vmz.config.*` at project root (devControl). */
 export function collectDevConfigPaths(project: string): string[] {
+    return configCandidatePaths(project).filter((p) => existsSync(p));
+}
+
+/**
+ * Reachable local ESM dependencies of a config file (bounded, project-root only).
+ * These changes restart the dev config build process.
+ */
+export function collectConfigDependencies(configPath: string, project: string): string[] {
     const root = path.resolve(project);
-    return CONFIG_BASENAMES.map((name) => path.join(root, name)).filter((p) => existsSync(p));
+    const underRoot = (file: string) => file === root || file.startsWith(root + path.sep);
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const visit = (file: string, depth: number) => {
+        if (depth > 24 || seen.size > 200 || !existsSync(file) || !underRoot(file)) return;
+        if (seen.has(file)) return;
+        seen.add(file);
+        let text: string;
+        try {
+            text = readFileSync(file, 'utf8');
+        } catch {
+            return;
+        }
+        const specs = new Set<string>();
+        for (const match of text.matchAll(/\b(?:import|export)\s+(?:[^'";]*?\s+from\s+)?['"]([^'"]+)['"]/g)) {
+            if (match[1]) specs.add(match[1]);
+        }
+        for (const match of text.matchAll(/\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g)) {
+            if (match[1]) specs.add(match[1]);
+        }
+        for (const spec of specs) {
+            if (!spec.startsWith('.')) continue;
+            const base = path.resolve(path.dirname(file), spec);
+            const candidates = [
+                base,
+                ...LOCAL_MODULE_EXTENSIONS.map((ext) => base + ext),
+                ...LOCAL_MODULE_EXTENSIONS.map((ext) => path.join(base, `index${ext}`)),
+            ];
+            for (const candidate of candidates) {
+                try {
+                    if (existsSync(candidate) && statSync(candidate).isFile()) {
+                        if (!seen.has(candidate)) out.push(candidate);
+                        visit(candidate, depth + 1);
+                        break;
+                    }
+                } catch {
+                    /* keep looking */
+                }
+            }
+        }
+    };
+    visit(path.resolve(configPath), 0);
+    return out;
 }
 
 /** Fingerprint map for explicit config files (not directory walks). */

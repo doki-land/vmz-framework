@@ -548,6 +548,8 @@ async function cmdDev(args: ParsedOptions): Promise<number> {
         return 0;
     } catch (err) {
         if (ac.signal.aborted) return 0;
+        // Config/plugin failures carry a product diagnostic: let the CLI boundary print once.
+        if (err && typeof err === 'object' && 'diagnostic' in err) throw err;
         log.error(String(err));
         return 1;
     } finally {

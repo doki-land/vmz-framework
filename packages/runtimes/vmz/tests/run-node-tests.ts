@@ -19,6 +19,7 @@ const files = [
     'plugin.test.ts',
     'config-host.test.ts',
     'wechat-packaging.test.ts',
+    'dev-config-restart.test.ts',
     'port.test.ts',
     'delivery-profile.test.ts',
     'test-delivery-static-html.test.ts',
