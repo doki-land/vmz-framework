@@ -1,9 +1,9 @@
 import { definePlugin, loadPluginSource } from '@vmz/plugin';
 
-const source = loadPluginSource(import.meta.url, 'components/Codemirror.vmz');
+const source = loadPluginSource(import.meta.url, '../components/Echarts.vmz');
 
 export default definePlugin({
-    name: '@vmz/plugin-codemirror',
+    name: '@vmz/plugin-echarts',
     version: '0.1.0',
     protocol: '0.1.0',
     stages: ['workspace_resolve', 'analyzer'],
@@ -12,12 +12,12 @@ export default definePlugin({
         if (ctx.stage === 'workspace_resolve') {
             return {
                 stage: 'workspace_resolve',
-                cacheKey: `@vmz/plugin-codemirror:Codemirror.vmz:${source.contentHash.slice(0, 12)}`,
+                cacheKey: `@vmz/plugin-echarts:Echarts.vmz:${source.contentHash.slice(0, 12)}`,
                 items: [
                     {
-                        id: 'component-codemirror',
+                        id: 'component-echarts',
                         kind: 'source',
-                        path: 'src/components/Codemirror.vmz',
+                        path: 'src/components/Echarts.vmz',
                         content: source.content,
                         contentHash: source.contentHash,
                         materialize: true,
@@ -28,15 +28,15 @@ export default definePlugin({
         if (ctx.stage === 'analyzer') {
             return {
                 stage: 'analyzer',
-                cacheKey: '@vmz/plugin-codemirror:analyzer',
+                cacheKey: '@vmz/plugin-echarts:analyzer',
                 items: [
                     {
-                        id: 'component-codemirror-online',
+                        id: 'component-echarts-online',
                         kind: 'analyzer',
-                        path: 'src/components/Codemirror.vmz',
+                        path: 'src/components/Echarts.vmz',
                         severity: 'advice',
-                        message: 'Codemirror component online',
-                        code: 'vmz.plugin.codemirror',
+                        message: 'Echarts component online',
+                        code: 'vmz.plugin.echarts',
                     },
                 ],
             };

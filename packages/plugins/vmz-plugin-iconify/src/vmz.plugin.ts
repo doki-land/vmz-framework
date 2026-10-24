@@ -1,9 +1,9 @@
 import { definePlugin, loadPluginSource } from '@vmz/plugin';
 
-const source = loadPluginSource(import.meta.url, 'components/Echarts.vmz');
+const source = loadPluginSource(import.meta.url, '../components/Iconify.vmz');
 
 export default definePlugin({
-    name: '@vmz/plugin-echarts',
+    name: '@vmz/plugin-iconify',
     version: '0.1.0',
     protocol: '0.1.0',
     stages: ['workspace_resolve', 'analyzer'],
@@ -12,12 +12,12 @@ export default definePlugin({
         if (ctx.stage === 'workspace_resolve') {
             return {
                 stage: 'workspace_resolve',
-                cacheKey: `@vmz/plugin-echarts:Echarts.vmz:${source.contentHash.slice(0, 12)}`,
+                cacheKey: `@vmz/plugin-iconify:Iconify.vmz:${source.contentHash.slice(0, 12)}`,
                 items: [
                     {
-                        id: 'component-echarts',
+                        id: 'component-iconify',
                         kind: 'source',
-                        path: 'src/components/Echarts.vmz',
+                        path: 'src/components/Iconify.vmz',
                         content: source.content,
                         contentHash: source.contentHash,
                         materialize: true,
@@ -28,15 +28,15 @@ export default definePlugin({
         if (ctx.stage === 'analyzer') {
             return {
                 stage: 'analyzer',
-                cacheKey: '@vmz/plugin-echarts:analyzer',
+                cacheKey: '@vmz/plugin-iconify:analyzer',
                 items: [
                     {
-                        id: 'component-echarts-online',
+                        id: 'component-iconify-online',
                         kind: 'analyzer',
-                        path: 'src/components/Echarts.vmz',
+                        path: 'src/components/Iconify.vmz',
                         severity: 'advice',
-                        message: 'Echarts component online',
-                        code: 'vmz.plugin.echarts',
+                        message: 'Iconify component online',
+                        code: 'vmz.plugin.iconify',
                     },
                 ],
             };

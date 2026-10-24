@@ -2,6 +2,8 @@
  * CodeMirror 6 mount helper (browser).
  */
 
+import type { Extension } from '@codemirror/state';
+
 export type MountCodemirrorOptions = {
     value?: string;
     onChange?: (v: string) => void;
@@ -25,7 +27,7 @@ export async function mountCodemirror(el: HTMLElement, opts: MountCodemirrorOpti
     });
     const state = EditorState.create({
         doc: opts.value ?? '',
-        extensions: [basicSetup, sync].flat().filter(Boolean),
+        extensions: [basicSetup, sync].flat().filter(Boolean) as Extension[],
     });
     const view = new EditorView({ state, parent: el });
     return {

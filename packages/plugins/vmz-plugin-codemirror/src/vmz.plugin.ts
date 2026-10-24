@@ -1,9 +1,9 @@
 import { definePlugin, loadPluginSource } from '@vmz/plugin';
 
-const source = loadPluginSource(import.meta.url, 'components/Iconify.vmz');
+const source = loadPluginSource(import.meta.url, '../components/Codemirror.vmz');
 
 export default definePlugin({
-    name: '@vmz/plugin-iconify',
+    name: '@vmz/plugin-codemirror',
     version: '0.1.0',
     protocol: '0.1.0',
     stages: ['workspace_resolve', 'analyzer'],
@@ -12,12 +12,12 @@ export default definePlugin({
         if (ctx.stage === 'workspace_resolve') {
             return {
                 stage: 'workspace_resolve',
-                cacheKey: `@vmz/plugin-iconify:Iconify.vmz:${source.contentHash.slice(0, 12)}`,
+                cacheKey: `@vmz/plugin-codemirror:Codemirror.vmz:${source.contentHash.slice(0, 12)}`,
                 items: [
                     {
-                        id: 'component-iconify',
+                        id: 'component-codemirror',
                         kind: 'source',
-                        path: 'src/components/Iconify.vmz',
+                        path: 'src/components/Codemirror.vmz',
                         content: source.content,
                         contentHash: source.contentHash,
                         materialize: true,
@@ -28,15 +28,15 @@ export default definePlugin({
         if (ctx.stage === 'analyzer') {
             return {
                 stage: 'analyzer',
-                cacheKey: '@vmz/plugin-iconify:analyzer',
+                cacheKey: '@vmz/plugin-codemirror:analyzer',
                 items: [
                     {
-                        id: 'component-iconify-online',
+                        id: 'component-codemirror-online',
                         kind: 'analyzer',
-                        path: 'src/components/Iconify.vmz',
+                        path: 'src/components/Codemirror.vmz',
                         severity: 'advice',
-                        message: 'Iconify component online',
-                        code: 'vmz.plugin.iconify',
+                        message: 'Codemirror component online',
+                        code: 'vmz.plugin.codemirror',
                     },
                 ],
             };
