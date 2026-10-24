@@ -7,7 +7,21 @@
 .vmz-ui-content {
     flex: 1;
     min-width: 0;
-    padding: 1.5rem;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: var(--vmz-layout-max-width, 75rem);
+    margin: 0 auto;
+    padding: var(--vmz-space-6, 2rem) var(--vmz-layout-gutter, 1rem);
+    display: flex;
+    flex-direction: column;
+    gap: var(--vmz-space-6, 2rem);
+    color: var(--vmz-text-ink);
+}
+@media (max-width: 720px) {
+    .vmz-ui-content {
+        padding: var(--vmz-space-5, 1.5rem) var(--vmz-space-4, 1rem);
+        gap: var(--vmz-space-5, 1.5rem);
+    }
 }
 </style>
 <script client>

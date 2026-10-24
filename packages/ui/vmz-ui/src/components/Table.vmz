@@ -3,9 +3,16 @@
         <table class="vmz-ui-table">
             <thead @click="onHeadClick">
                 <tr>
-                    <th v-for="col in columns" :key="col.id" scope="col" :data-vmz-col="col.id">
-                        <button type="button" :data-vmz-sort="col.id" class="vmz-ui-table__sort">
-                            {{ col.title }}
+                    <th v-for="col in columns" :key="col.id" scope="col" :data-vmz-col="col.id" :data-align="columnAlign(col)" :aria-sort="sortAria(col.id)">
+                        <button type="button" :data-vmz-sort="col.id" :data-active="col.id === sortKey ? 'true' : 'false'" class="vmz-ui-table__sort">
+                            <span class="vmz-ui-table__title">
+                                {{ col.title }}
+                            </span>
+                            <span class="vmz-ui-table__sort-icon">
+                                <Icon v-if="col.id === sortKey && sortDir === 'asc'" name="action.sort-asc" size="sm" decorative />
+                                <Icon v-else-if="col.id === sortKey && sortDir === 'desc'" name="action.sort-desc" size="sm" decorative />
+                                <Icon v-else name="action.sort" size="sm" decorative />
+                            </span>
                         </button>
                     </th>
                     <th v-if="hasRowAction" scope="col">
@@ -15,7 +22,7 @@
             </thead>
             <tbody @click="onBodyClick">
                 <tr v-for="row in rows" :key="row.id" :data-vmz-row="row.id">
-                    <td v-for="cell in row.cells">
+                    <td v-for="(cell, index) in row.cells" :key="index" :data-align="cellAlign(index, cell)">
                         {{ cell }}
                     </td>
                     <td v-if="hasRowAction">
@@ -24,14 +31,30 @@
                         </button>
                     </td>
                 </tr>
+                <tr v-if="loading" class="vmz-ui-table__state-row">
+                    <td :colspan="columnSpan()" class="vmz-ui-table__state">
+                        <Spinner :label="loadingLabel" />
+                        <span v-if="loadingText" class="vmz-ui-table__state-text">
+                            {{ loadingText }}
+                        </span>
+                    </td>
+                </tr>
+                <tr v-else-if="rows.length === 0" class="vmz-ui-table__state-row">
+                    <td :colspan="columnSpan()" class="vmz-ui-table__state">
+                        <span class="vmz-ui-table__state-text">
+                            {{ emptyText }}
+                        </span>
+                    </td>
+                </tr>
             </tbody>
         </table>
     </div>
 </template>
 <style>
 .vmz-ui-table-wrap {
-    overflow-x: auto;
-    border: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
+    width: 100%;
+    overflow: auto;
+    border: 1px solid var(--vmz-line-default);
     border-radius: var(--vmz-radius-lg, 8px);
     background: var(--vmz-surface-paper);
 }
@@ -41,24 +64,37 @@
     border-collapse: collapse;
     font: inherit;
     font-size: 0.875rem;
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-table th,
 .vmz-ui-table td {
-    padding: 0.75rem 1rem;
+    height: 3rem;
+    padding: 0 1rem;
     text-align: left;
-    border-bottom: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
     vertical-align: middle;
+    border: 0;
+    border-bottom: 1px solid var(--vmz-line-subtle);
+    white-space: nowrap;
 }
 
-/* Header is structure, not brand: quiet ink on a tinted band. */
 .vmz-ui-table th {
+    height: 2.75rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    font-size: 0.8125rem;
-    letter-spacing: 0.01em;
-    color: var(--vmz-text-steel);
+    color: var(--vmz-text-tertiary);
     background: var(--vmz-surface-mist);
-    white-space: nowrap;
+}
+
+.vmz-ui-table td[data-align="right"],
+.vmz-ui-table th[data-align="right"] {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.vmz-ui-table td[data-align="center"],
+.vmz-ui-table th[data-align="center"] {
+    text-align: center;
 }
 
 .vmz-ui-table tbody tr {
@@ -67,7 +103,7 @@
 }
 
 .vmz-ui-table tbody tr:hover {
-    background: var(--vmz-surface-mist);
+    background: var(--vmz-surface-fill);
 }
 
 .vmz-ui-table tbody tr:last-child td {
@@ -77,41 +113,69 @@
 .vmz-ui-table__sort {
     display: inline-flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 0.25rem;
-    font: inherit;
-    font-weight: 600;
+    width: 100%;
     padding: 0;
     border: 0;
     background: transparent;
     color: inherit;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
     cursor: pointer;
     outline: none;
     border-radius: var(--vmz-radius-xs, 2px);
+}
+
+.vmz-ui-table th[data-align="right"] .vmz-ui-table__sort {
+    justify-content: flex-end;
+}
+
+.vmz-ui-table th[data-align="center"] .vmz-ui-table__sort {
+    justify-content: center;
+}
+
+.vmz-ui-table__sort:hover {
+    color: var(--vmz-action-primary-background);
 }
 
 .vmz-ui-table__sort:focus-visible {
     box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
+.vmz-ui-table__sort-icon {
+    display: inline-flex;
+    align-items: center;
+    color: var(--vmz-text-tertiary);
+    font-size: 0.875rem;
+}
+
+.vmz-ui-table__sort:hover .vmz-ui-table__sort-icon,
+.vmz-ui-table__sort[data-active="true"] .vmz-ui-table__sort-icon {
+    color: var(--vmz-action-primary-background);
+}
+
 .vmz-ui-table__row-action {
+    height: 2rem;
+    padding: 0 0.5rem;
     font: inherit;
+    font-size: 0.875rem;
     font-weight: 500;
-    padding: 0.25rem 0.625rem;
-    border: 1px solid var(--vmz-line-default);
+    border: 0;
     border-radius: var(--vmz-radius-md, 6px);
-    background: var(--vmz-surface-paper);
+    background: transparent;
     color: var(--vmz-action-primary-background);
     cursor: pointer;
     outline: none;
     transition:
         color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
-        border-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
         background-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
 }
 
 .vmz-ui-table__row-action:hover:not(:disabled) {
+    background: var(--vmz-action-primary-soft);
     color: var(--vmz-action-primary-hover);
-    border-color: var(--vmz-action-primary-hover);
 }
 
 .vmz-ui-table__row-action:focus-visible {
@@ -121,18 +185,37 @@
 .vmz-ui-table__row-action:disabled {
     opacity: 0.55;
     cursor: not-allowed;
+    color: var(--vmz-text-tertiary);
+}
+
+.vmz-ui-table tbody tr.vmz-ui-table__state-row:hover {
+    background: transparent;
+}
+
+.vmz-ui-table__state {
+    height: 3rem;
+    text-align: center;
+    color: var(--vmz-text-tertiary);
+    white-space: normal;
+}
+
+.vmz-ui-table__state-text {
+    margin-left: 0.5rem;
+    font-size: 0.875rem;
 }
 </style>
 <script client>
 /**
- * VMZ UI — Table (UI5 Console Surface).
+ * VMZ UI — Table (commercial data surface).
  * Column header click → onSort; row action → onRowAction; permission via rowActionDisabled.
+ * Numeric cells right-align automatically; column `align` overrides.
  */
 export default class Table {
-    /** @type {{ id: string, title: string }[]} */
+    /** @type {{ id: string, title: string, align?: string }[]} */
     public columns: {
         id: string;
         title: string;
+        align?: string;
     }[] = [];
     /** @type {{ id: string, cells: string[] }[]} */
     public rows: {
@@ -141,12 +224,34 @@ export default class Table {
     }[] = [];
     public hasRowAction: boolean = false;
     public rowActionDisabled: boolean = false;
-    public actionTitle: string = "Action";
-    public actionLabel: string = "Open";
+    public actionTitle: string = "";
+    public actionLabel: string = "";
     public sortKey: string = "";
     public sortDir: string = "asc";
+    public loading: boolean = false;
+    public loadingLabel: string = "";
+    public loadingText: string = "";
+    public emptyText: string = "";
     public onRowAction: ((rowId: string) => void) | null = null;
     public onSort: ((columnId: string) => void) | null = null;
+    columnAlign(col) {
+        return col && col.align ? col.align : "left";
+    }
+    cellAlign(index, cell) {
+        const col = (this.columns || [])[index];
+        if (col && col.align) return col.align;
+        const text = String(cell == null ? "" : cell).trim();
+        if (!text) return "left";
+        return /^[-+]?[\d.,%]+$/.test(text) ? "right" : "left";
+    }
+    columnSpan() {
+        const count = (this.columns || []).length + (this.hasRowAction ? 1 : 0);
+        return Math.max(1, count);
+    }
+    sortAria(id) {
+        if (id !== this.sortKey) return null;
+        return this.sortDir === "desc" ? "descending" : "ascending";
+    }
     onBodyClick(ev) {
         const t = ev && ev.target;
         const el = t && typeof t.closest === "function" ? t.closest("[data-vmz-row-action]") : null;

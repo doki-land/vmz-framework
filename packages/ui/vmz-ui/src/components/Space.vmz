@@ -6,19 +6,25 @@
 <style>
 .vmz-ui-space {
     display: flex;
-    gap: var(--vmz-density-control-gap, 0.75rem);
+    align-items: center;
+    gap: var(--vmz-space-3);
 }
+
 .vmz-ui-space[data-direction="vertical"] {
     flex-direction: column;
+    align-items: stretch;
 }
+
 .vmz-ui-space[data-wrap="true"] {
     flex-wrap: wrap;
 }
+
 .vmz-ui-space[data-size="small"] {
-    gap: 0.5rem;
+    gap: var(--vmz-space-2);
 }
+
 .vmz-ui-space[data-size="large"] {
-    gap: 1.5rem;
+    gap: var(--vmz-space-5);
 }
 </style>
 <script client>

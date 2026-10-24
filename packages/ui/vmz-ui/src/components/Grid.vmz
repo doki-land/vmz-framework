@@ -1,5 +1,5 @@
 <template>
-    <div data-vmz-ui="grid" class="vmz-ui-grid" :style="'--ui-grid-columns:' + columns + ';--ui-grid-gap:' + gap">
+    <div data-vmz-ui="grid" class="vmz-ui-grid" :data-columns="columns" :style="'--ui-grid-columns:' + columns + ';--ui-grid-gap:' + gap">
         <slot />
     </div>
 </template>
@@ -7,13 +7,16 @@
 .vmz-ui-grid {
     display: grid;
     grid-template-columns: repeat(var(--ui-grid-columns, 3), minmax(0, 1fr));
-    gap: var(--ui-grid-gap, 1rem);
+    gap: var(--ui-grid-gap, var(--vmz-space-4));
+    align-items: stretch;
 }
+
 @media (max-width: 900px) {
     .vmz-ui-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
+
 @media (max-width: 600px) {
     .vmz-ui-grid {
         grid-template-columns: 1fr;
@@ -23,6 +26,6 @@
 <script client>
 export default class Grid {
     public columns: number = 3;
-    public gap: string = "1rem";
+    public gap: string = "var(--vmz-space-4)";
 }
 </script>
