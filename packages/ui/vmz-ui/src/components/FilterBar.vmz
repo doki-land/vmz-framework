@@ -26,6 +26,23 @@
 .vmz-ui-filter-bar > button.vmz-ui-btn {
     margin-left: auto;
 }
+
+@media (max-width: 40rem) {
+    .vmz-ui-filter-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .vmz-ui-filter-bar > * {
+        width: 100%;
+    }
+
+    .vmz-ui-filter-bar > :has(.vmz-ui-btn),
+    .vmz-ui-filter-bar > button.vmz-ui-btn {
+        margin-left: 0;
+    }
+}
 </style>
 <script client>
 /**

@@ -325,6 +325,7 @@
 
 .vmz-commercial-panel {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0;
     overflow: hidden;
     border: 1px solid var(--vmz-line-default);

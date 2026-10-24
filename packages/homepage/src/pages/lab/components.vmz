@@ -143,6 +143,20 @@
     gap: 0.85rem;
 }
 
+/* Fixture wrappers and direct component hosts are both grid cells; make each
+   a column flex container and let the host fill it, so the card inside can
+   reach the row height. */
+.ui-lab-page__grid > * {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.ui-lab-page__grid > * > * {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .ui-lab-page__grid-wide {
     grid-column: 1 / -1;
 }

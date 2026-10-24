@@ -147,6 +147,7 @@
 
 .vmz-console-data-panel {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0;
     overflow: hidden;
     border: 1px solid var(--vmz-line-default);
@@ -576,7 +577,7 @@ export default class ConsolePage {
     refreshPage(source) {
         const list = source || this.filteredRows();
         this.filterEmpty = this.allRows.length > 0 && list.length === 0;
-        const pageSize = 4;
+        const pageSize = 5;
         this.pageCount = Math.max(1, Math.ceil(list.length / pageSize) || 1);
         if (this.page > this.pageCount) this.page = this.pageCount;
         if (this.page < 1) this.page = 1;

@@ -20,6 +20,8 @@
 .vmz-ui-card {
     display: flex;
     flex-direction: column;
+    box-sizing: border-box;
+    height: 100%;
     border: 1px solid var(--vmz-line-default, var(--vmz-line-strong));
     border-radius: var(--vmz-radius-lg, 8px);
     background: var(--vmz-surface-paper);
@@ -62,6 +64,7 @@
 .vmz-ui-card__body {
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
     gap: var(--vmz-space-3, 0.75rem);
     padding: var(--vmz-space-5, 1.5rem);
 }
