@@ -42,7 +42,7 @@ Locales layout (any product):
 | API | Role |
 |-----|------|
 | `createCli(name)` | Program name; help `{name}` |
-| `.command` / `.option` / `.action` / `.passthrough` | Command tree |
+| `.command` / `.option` / `.action` / `.actionCtx` / `.passthrough` | Command tree |
 | `.intro(id)` | Short banner only |
 | `.locales(root)` / `.use(plugin)` / `.catalog(loader)` | Localization (later `.use` wins) |
 | `.option` on CLI | Global flags (merged into action options) |
@@ -54,7 +54,34 @@ Locales layout (any product):
 
 `t` resolution: product catalog → `commander` English fallback → `{{id}}`.
 
-Action failures may throw a language-neutral diagnostic object with `code`, `args`, `path`, `span`, `severity`, and optional legacy `message`. The configured handler receives the structured row and resolved locale context. Without a handler, commander prints the legacy message or code. Plain `Error` exceptions are wrapped as `commander::action_failed` during migration. Commander does not own diagnostic formatting; products should connect `@vmz/diagnostic`.
+## Option config
+
+`.option(rawName, helpId, config?)` accepts runtime constraints in addition to the `<value>` / `[value]` / `...` syntax:
+
+| Field | Behavior |
+|-------|----------|
+| `required` | Missing value before the action → structured parse error, exit code 2 |
+| `enum` | Value outside the set → structured parse error, exit code 2 (repeatable values are checked per item) |
+| `default` | Filled into `options[key]` when omitted (boolean, string, or array) |
+| `coerce` | Runs on the supplied raw value, thrown errors become exit code 2 |
+| `hidden` | Omitted from help, still parseable |
+| `example` | Rendered after the option in help |
+| `deprecated` | Annotated in help and emits a `commander::option_deprecated` warning when used |
+| `group` | Rendered under its own help section while ungrouped options keep the default section |
+
+Validation happens before the action handler runs. Failures carry stable `commander::*` codes plus structured `args`.
+
+## Command boundaries
+
+- `.actionCtx(handler)` receives `(options, args, ctx)`, with `ctx.help`, `ctx.stdout`, `ctx.stderr`, `ctx.fail`, `ctx.warn`, and `ctx.note`. `.action` and `.actionCtx` are mutually exclusive.
+- `--` ends option parsing. Every token after it is a raw positional and is merged into `options._` — options and help markers in the tail are never reinterpreted.
+- `--help` binds to the deepest command path reached before the marker, so `demo document check --help` and `help document check` show the same node.
+
+## Diagnostics
+
+Action failures may throw a language-neutral diagnostic object with `code`, `args`, `path`, `span`, `severity`, and optional legacy `message`. The configured handler receives the structured row and resolved locale context. Without a handler, commander renders the `code` through `t` with `args` interpolation, falling back to a real business message or the code. Plain `Error` exceptions are wrapped as `commander::action_failed` during migration. Commander does not own diagnostic formatting: products should connect `@vmz/diagnostic`.
+
+Framework hints use `commander.ui.hint.available_options` (`{command}`) and `commander.ui.hint.did_you_mean` (`{suggest}`), so product catalogs can translate them. The available-options hint names the full executable command (`demo run --help`) and falls back to the root command for unknown commands.
 
 ## Layering
 
