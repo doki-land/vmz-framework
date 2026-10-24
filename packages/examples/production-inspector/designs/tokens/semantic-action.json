@@ -33,6 +33,22 @@
             "value": "#EDF5FF"
         },
         {
+            "key": { "path": ["action", "secondary", "active"] },
+            "value": "#D8E9FF"
+        },
+        {
+            "key": { "path": ["action", "primary", "soft"] },
+            "value": "#EDF5FF"
+        },
+        {
+            "key": { "path": ["action", "link", "foreground"] },
+            "value": "#176BFF"
+        },
+        {
+            "key": { "path": ["action", "link", "hover"] },
+            "value": "#0D57DB"
+        },
+        {
             "key": { "path": ["focus", "ring"] },
             "value": "#176BFF"
         }

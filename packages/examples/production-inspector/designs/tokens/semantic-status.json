@@ -9,12 +9,28 @@
             "value": "#0E4A5C"
         },
         {
+            "key": { "path": ["status", "info", "background"] },
+            "value": "#ECFAFE"
+        },
+        {
+            "key": { "path": ["status", "info", "border"] },
+            "value": "#A5E8F5"
+        },
+        {
             "key": { "path": ["status", "success", "accent"] },
             "value": "#00A86B"
         },
         {
             "key": { "path": ["status", "success", "foreground"] },
             "value": "#065F46"
+        },
+        {
+            "key": { "path": ["status", "success", "background"] },
+            "value": "#F0FDF4"
+        },
+        {
+            "key": { "path": ["status", "success", "border"] },
+            "value": "#A7E8C6"
         },
         {
             "key": { "path": ["status", "warning", "accent"] },
@@ -25,12 +41,28 @@
             "value": "#92400E"
         },
         {
+            "key": { "path": ["status", "warning", "background"] },
+            "value": "#FFFBEB"
+        },
+        {
+            "key": { "path": ["status", "warning", "border"] },
+            "value": "#F7DCA4"
+        },
+        {
             "key": { "path": ["status", "danger", "accent"] },
             "value": "#E5484D"
         },
         {
             "key": { "path": ["status", "danger", "foreground"] },
             "value": "#9F1239"
+        },
+        {
+            "key": { "path": ["status", "danger", "background"] },
+            "value": "#FFF1F2"
+        },
+        {
+            "key": { "path": ["status", "danger", "border"] },
+            "value": "#FBC5C7"
         }
     ]
 }
