@@ -5,8 +5,9 @@
         </label>
         <div data-vmz-upload="zone" class="vmz-ui-upload__zone">
             <input :id="controlId" type="file" :accept="accept" :multiple="multiple" :disabled="inputDisabled" :aria-invalid="error ? 'true' : 'false'" :aria-describedby="describedBy" :data-vmz-upload-directory="directoryAttr" @change="onPick" class="vmz-ui-upload__control" />
-            <p data-vmz-upload="hint" class="vmz-ui-upload__hint">
-                {{ hint || zoneHint }}
+            <Icon name="action.upload" size="lg" decorative />
+            <p v-if="hint" data-vmz-upload="hint" class="vmz-ui-upload__hint">
+                {{ hint }}
             </p>
         </div>
         <ul v-if="hasItems" data-vmz-upload="queue" class="vmz-ui-upload__queue">
@@ -24,7 +25,9 @@
             {{ emptyText }}
         </p>
         <div v-if="showProgress" data-vmz-upload="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="progress" :aria-label="progressLabel" class="vmz-ui-upload__progress">
-            <div class="vmz-ui-upload__bar" :style="progressStyle" />
+            <div class="vmz-ui-upload__track">
+                <div class="vmz-ui-upload__bar" :style="progressStyle" />
+            </div>
             <span data-vmz-upload="pct" class="vmz-ui-upload__pct">
                 {{ progressLabel }}
             </span>
@@ -36,11 +39,13 @@
             {{ resultText }}
         </p>
         <div v-if="showActions" data-vmz-upload="actions" class="vmz-ui-upload__actions">
-            <button v-if="canCancel" type="button" data-vmz-upload="cancel" @click="onCancelClick" class="vmz-ui-upload__cancel">
-                {{ cancelLabel }}
+            <button v-if="canCancel" type="button" data-vmz-upload="cancel" :aria-label="cancelLabel" @click="onCancelClick" class="vmz-ui-upload__cancel">
+                <Icon name="action.close" size="sm" decorative />
+                <span v-if="cancelLabel">{{ cancelLabel }}</span>
             </button>
-            <button v-if="canResume" type="button" data-vmz-upload="resume" @click="onResumeClick" class="vmz-ui-upload__resume">
-                {{ resumeLabel }}
+            <button v-if="canResume" type="button" data-vmz-upload="resume" :aria-label="resumeLabel" @click="onResumeClick" class="vmz-ui-upload__resume">
+                <Icon name="action.chevron-right" size="sm" decorative />
+                <span v-if="resumeLabel">{{ resumeLabel }}</span>
             </button>
         </div>
         <p v-if="description" :id="descriptionId" class="vmz-ui-upload__description">
@@ -55,21 +60,49 @@
 .vmz-ui-upload {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: 6px;
+    width: 100%;
     max-width: 28rem;
 }
 
 .vmz-ui-upload__label {
-    font: inherit;
+    font-size: 14px;
     font-weight: 600;
+    line-height: 22px;
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-upload__zone {
     position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-sizing: border-box;
+    min-height: 96px;
+    padding: 20px 24px;
     border: 1px dashed var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
-    background: var(--vmz-surface-paper);
-    padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-mist);
+    text-align: center;
+    transition:
+        border-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        background-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+}
+
+.vmz-ui-upload__zone:hover {
+    border-color: var(--vmz-action-primary-background);
+    background: color-mix(
+        in srgb,
+        var(--vmz-action-primary-background) 4%,
+        var(--vmz-surface-paper)
+    );
+}
+
+.vmz-ui-upload__zone:focus-within {
+    border-color: var(--vmz-action-primary-background);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-upload.is-dragover .vmz-ui-upload__zone {
@@ -82,26 +115,33 @@
 }
 
 .vmz-ui-upload__control {
-    font: inherit;
+    position: absolute;
+    inset: 0;
     width: 100%;
-    padding: 0.125rem 0;
-    color: inherit;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    cursor: pointer;
     outline: none;
 }
 
-.vmz-ui-upload__control:focus-visible {
-    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
-}
-
 .vmz-ui-upload__control:disabled {
-    opacity: 0.55;
     cursor: not-allowed;
 }
 
+.vmz-ui-upload__zone .vmz-ui-icon {
+    color: var(--vmz-text-tertiary);
+    pointer-events: none;
+}
+
 .vmz-ui-upload__hint {
-    margin: 0.375rem 0 0;
-    font-size: 0.88rem;
+    margin: 0;
+    font-size: 14px;
+    line-height: 22px;
     color: var(--vmz-text-steel);
+    pointer-events: none;
 }
 
 .vmz-ui-upload__queue {
@@ -110,22 +150,31 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    border: 1px solid var(--vmz-line-subtle);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+    overflow: hidden;
 }
 
 .vmz-ui-upload__item {
     display: grid;
     grid-template-columns: 1fr auto;
-    gap: 0.125rem 0.75rem;
-    padding: 0.375rem 0.5rem;
-    border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
+    align-items: center;
+    gap: 2px 12px;
+    min-height: 40px;
+    box-sizing: border-box;
+    padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+    border-bottom: 1px solid var(--vmz-line-subtle);
     background: var(--vmz-surface-paper);
 }
 
+.vmz-ui-upload__item:last-child {
+    border-bottom: none;
+}
+
 .vmz-ui-upload__item-name {
-    font-family: var(--vmz-font-mono);
-    font-size: 0.88rem;
+    font-size: 14px;
+    line-height: 22px;
     color: var(--vmz-text-ink);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -133,22 +182,27 @@
 }
 
 .vmz-ui-upload__item-meta {
-    font-size: 0.8rem;
-    color: var(--vmz-text-steel);
+    font-size: 12px;
+    line-height: 20px;
+    color: var(--vmz-text-tertiary);
     white-space: nowrap;
 }
 
 .vmz-ui-upload__item-bar {
     grid-column: 1 / -1;
-    height: 0.35rem;
-    border-radius: var(--vmz-radius-md, 6px);
+    height: 2px;
+    border-radius: 1px;
     background: var(--vmz-action-primary-background);
-    min-width: 0.25rem;
+    min-width: 2px;
     transition: width var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
 }
 
 .vmz-ui-upload[data-invalid="true"] .vmz-ui-upload__label {
     color: var(--vmz-status-danger-foreground);
+}
+
+.vmz-ui-upload[data-vmz-upload-status="error"] .vmz-ui-upload__zone {
+    border-color: var(--vmz-status-danger-accent);
 }
 
 /* The native file input already announces "no file chosen"; keep this node for
@@ -169,28 +223,37 @@
     display: grid;
     grid-template-columns: 1fr auto;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.375rem 0;
+    gap: 8px;
+    padding: 4px 0;
+}
+
+.vmz-ui-upload__track {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--vmz-surface-mist);
+    overflow: hidden;
 }
 
 .vmz-ui-upload__bar {
-    height: 0.45rem;
-    border-radius: var(--vmz-radius-md, 6px);
+    height: 100%;
+    border-radius: inherit;
     background: var(--vmz-action-primary-background);
-    min-width: 0.25rem;
+    min-width: 2px;
     transition: width var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
 }
 
 .vmz-ui-upload__pct {
-    font-family: var(--vmz-font-mono);
-    font-size: 0.8rem;
+    font-size: 12px;
+    line-height: 20px;
     color: var(--vmz-text-steel);
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
 .vmz-ui-upload__status {
     margin: 0;
-    font-size: 0.9em;
+    font-size: 14px;
+    line-height: 22px;
     color: var(--vmz-text-steel);
 }
 
@@ -206,25 +269,44 @@
 .vmz-ui-upload__result {
     margin: 0;
     font-family: var(--vmz-font-mono);
-    font-size: 0.88rem;
+    font-size: 12px;
+    line-height: 20px;
     color: var(--vmz-text-ink);
 }
 
 .vmz-ui-upload__actions {
     display: flex;
-    gap: 0.5rem;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .vmz-ui-upload__cancel,
 .vmz-ui-upload__resume {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: var(--vmz-control-height, 32px);
+    box-sizing: border-box;
     font: inherit;
-    padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+    font-size: 14px;
+    line-height: 22px;
+    padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
     border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
+    border-radius: var(--vmz-radius-md);
     background: var(--vmz-surface-paper);
     color: var(--vmz-text-ink);
     cursor: pointer;
     outline: none;
+    transition:
+        color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        border-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+}
+
+.vmz-ui-upload__cancel:hover,
+.vmz-ui-upload__resume:hover {
+    border-color: var(--vmz-action-primary-background);
+    color: var(--vmz-action-primary-background);
 }
 
 .vmz-ui-upload__cancel:focus-visible,
@@ -239,19 +321,24 @@
 
 .vmz-ui-upload__description {
     margin: 0;
-    opacity: 0.75;
-    font-size: 0.9em;
+    font-size: 14px;
+    line-height: 22px;
+    color: var(--vmz-text-tertiary);
 }
 
 .vmz-ui-upload__error {
     margin: 0;
+    font-size: 14px;
+    line-height: 22px;
     color: var(--vmz-status-danger-foreground);
-    font-size: 0.9em;
 }
 
 @media (prefers-reduced-motion: reduce) {
     .vmz-ui-upload__bar,
-    .vmz-ui-upload__item-bar {
+    .vmz-ui-upload__item-bar,
+    .vmz-ui-upload__zone,
+    .vmz-ui-upload__cancel,
+    .vmz-ui-upload__resume {
         transition: none;
     }
 }
@@ -272,7 +359,7 @@ export default class Upload {
     public description: string = "";
     /** Form-level validation message from parent. */
     public error: string = "";
-    public emptyText: string = "No file selected";
+    public emptyText: string = "";
     public accept: string = "";
     public disabled: boolean = false;
     public invalidAttr: string = "false";
@@ -310,10 +397,14 @@ export default class Upload {
     public onValue: ((items: UploadValueItem[]) => void) | null = null;
     /** Parent mirrors overall status for form fixture / submit gates. */
     public onStatus: ((status: string) => void) | null = null;
-    public cancelLabel: string = "Cancel upload";
-    public resumeLabel: string = "Resume upload";
-    /** Caller-supplied drop-zone hint; empty keeps the mode-aware default. */
+    public cancelLabel: string = "";
+    public resumeLabel: string = "";
+    /** Caller-supplied drop-zone hint; empty hides the hint line. */
     public hint: string = "";
+    /** Localized status / diagnostic copy. Empty keys hide the status line. */
+    public messages: Record<string, string> = {};
+    /** Suffix for multi-file success (`N <readyText>`); part of the stable result text. */
+    public readyText: string = "file(s) ready";
     // presentation (component-owned — NOT public props)
     status: string = "idle";
     progress: string = "0";
@@ -333,7 +424,6 @@ export default class Upload {
     directoryAttr: string = "false";
     chunkAttr: string = "0";
     sessionAttr: string = "";
-    zoneHint: string = "Choose a file or drop it here";
     /** @type {{ key: string, name: string, meta: string, status: string, showBar: boolean, barStyle: string }[]} */
     queue: {
         key: string;
@@ -373,6 +463,11 @@ export default class Upload {
     onMount() {
         this.applyDirectoryAttr();
         this.syncChunkAttr();
+    }
+    msg(key: string) {
+        const messages = this.messages || {};
+        const value = messages[key];
+        return typeof value === "string" ? value : "";
     }
     onPick(ev) {
         this.syncClearToken();
@@ -432,11 +527,6 @@ export default class Upload {
     applyDirectoryAttr() {
         this.directoryAttr = this.directory ? "true" : "false";
         this.selectionMode = this.directory ? "directory" : this.multiple ? "multiple" : "single";
-        this.zoneHint = this.directory
-            ? "Choose a folder or drop files here"
-            : this.multiple
-              ? "Choose files or drop them here"
-              : "Choose a file or drop it here";
         // Native directory picker (UA-specific).
         const el = typeof document !== "undefined" ? document.getElementById(this.controlId) : null;
         if (el && "webkitdirectory" in el) {
@@ -464,24 +554,24 @@ export default class Upload {
         const capped =
             this.multiple || this.directory ? files.slice(0, maxCount) : files.slice(0, 1);
         if ((this.multiple || this.directory) && files.length > maxCount) {
-            this.failAll(`At most ${maxCount} file(s)`);
+            this.failAll(this.msg("tooMany"));
             return;
         }
         const maxBytes = Number(this.maxBytes) || 0;
         for (const f of capped) {
             const acceptErr = acceptError(f, this.accept);
             if (acceptErr) {
-                this.failAll(acceptErr);
+                this.failAll(this.msg("acceptType"));
                 return;
             }
             if (maxBytes > 0 && Number(f.size) > maxBytes) {
-                this.failAll(`File too large (max ${maxBytes} bytes)`);
+                this.failAll(this.msg("fileTooLarge"));
                 return;
             }
         }
         const chunkSize = Math.max(0, Number(this.chunkSize) || 0);
         if (chunkSize > 0 && capped.length !== 1) {
-            this.failAll("Resumable chunk upload supports one file per session");
+            this.failAll(this.msg("singleFileChunk"));
             return;
         }
         this.cancelActive(false);
@@ -530,7 +620,7 @@ export default class Upload {
      */
     async runClient(gen) {
         if (gen !== this._gen) return;
-        this.setOverall("uploading", "Preparing…", true, false);
+        this.setOverall("uploading", this.msg("preparing"), true, false);
         const values = [];
         for (let i = 0; i < this._files.length; i++) {
             if (gen !== this._gen) return;
@@ -540,7 +630,7 @@ export default class Upload {
                 status: "done",
                 showBar: true,
                 barStyle: `width:${pct}%`,
-                meta: `${formatBytes(file.size)} · local`,
+                meta: formatBytes(file.size),
             });
             this.setProgress(pct);
             values.push({
@@ -565,11 +655,11 @@ export default class Upload {
         if (gen !== this._gen) return;
         const action = String(this.action || "").trim();
         if (!action) {
-            this.failAll("Upload action URL required");
+            this.failAll(this.msg("actionRequired"));
             return;
         }
         // Sequential single-XHR for thin gate; multi-file appends all parts then one request.
-        this.setOverall("uploading", "Uploading…", true, true);
+        this.setOverall("uploading", this.msg("uploading"), true, true);
         this.setProgress(0);
         for (let i = 0; i < this.queue.length; i++) {
             this.patchItem(i, {
@@ -610,7 +700,7 @@ export default class Upload {
         }
         const body = result.body;
         if (!(result.status >= 200 && result.status < 300) || !body || !body.ok) {
-            this.failAll((body && body.error) || `Upload failed (${result.status || "network"})`);
+            this.failAll((body && body.error) || this.msg("failed"));
             return;
         }
         // Single-file shape { ok, id, bytes, name } or multi { ok, items: [...] }
@@ -648,7 +738,7 @@ export default class Upload {
                 status: "done",
                 showBar: true,
                 barStyle: "width:100%",
-                meta: `${formatBytes(values[i] && values[i].bytes)} · uploaded`,
+                meta: formatBytes(values[i] && values[i].bytes),
             });
         }
         this._values = values;
@@ -666,16 +756,16 @@ export default class Upload {
             .trim()
             .replace(/\/+$/, "");
         if (!base) {
-            this.failAll("Upload action URL required");
+            this.failAll(this.msg("actionRequired"));
             return;
         }
         const file = this._files[0];
         if (!file) {
-            this.failAll("No file for resumable upload");
+            this.failAll(this.msg("noFile"));
             return;
         }
         this._activeChunkSize = chunkSize;
-        this.setOverall("uploading", this._uploadId ? "Resuming…" : "Uploading…", true, true);
+        this.setOverall("uploading", this._uploadId ? this.msg("resuming") : this.msg("uploading"), true, true);
         this.canResume = false;
         this.showActions = true;
         this.patchItem(0, {
@@ -707,7 +797,7 @@ export default class Upload {
                 this.failAll(
                     (initResult.body && initResult.body.error) ||
                         initResult.error ||
-                        `Init failed (${initResult.status || "network"})`,
+                        this.msg("initFailed"),
                 );
                 return;
             }
@@ -719,7 +809,7 @@ export default class Upload {
             this._received = [];
             this.syncChunkAttr();
             if (!this._uploadId) {
-                this.failAll("Init returned no uploadId");
+                this.failAll(this.msg("uploadIdMissing"));
                 return;
             }
         } else {
@@ -743,7 +833,7 @@ export default class Upload {
                 this.failAll(
                     (statusResult.body && statusResult.body.error) ||
                         statusResult.error ||
-                        `Status failed (${statusResult.status || "network"})`,
+                        this.msg("statusFailed"),
                 );
                 return;
             }
@@ -762,7 +852,7 @@ export default class Upload {
         this.setProgress(Math.round((receivedSet.size / total) * 100));
         this.patchItem(0, {
             barStyle: `width:${Math.round((receivedSet.size / total) * 100)}%`,
-            meta: `${receivedSet.size}/${total} chunks`,
+            meta: `${receivedSet.size}/${total}`,
         });
         for (let index = 0; index < total; index++) {
             if (gen !== this._gen) return;
@@ -805,7 +895,7 @@ export default class Upload {
                 this.failAll(
                     (result.body && result.body.error) ||
                         result.error ||
-                        `Chunk ${index} failed (${result.status || "network"})`,
+                        this.msg("chunkFailed"),
                 );
                 return;
             }
@@ -819,7 +909,7 @@ export default class Upload {
             this.setProgress(pct);
             this.patchItem(0, {
                 barStyle: `width:${pct}%`,
-                meta: `${receivedSet.size}/${total} chunks`,
+                meta: `${receivedSet.size}/${total}`,
             });
         }
         if (gen !== this._gen) return;
@@ -843,7 +933,7 @@ export default class Upload {
             this.failAll(
                 (completeResult.body && completeResult.body.error) ||
                     completeResult.error ||
-                    `Complete failed (${completeResult.status || "network"})`,
+                    this.msg("completeFailed"),
             );
             return;
         }
@@ -865,7 +955,7 @@ export default class Upload {
             status: "done",
             showBar: true,
             barStyle: "width:100%",
-            meta: `${formatBytes(values[0].bytes)} · ${total} chunks`,
+            meta: `${formatBytes(values[0].bytes)} (${total})`,
         });
         this.resetSession();
         this._values = values;
@@ -877,10 +967,10 @@ export default class Upload {
     async runObject(gen) {
         if (gen !== this._gen) return;
         if (typeof this.onPresign !== "function") {
-            this.failAll("onPresign callback required for object destination");
+            this.failAll(this.msg("presignRequired"));
             return;
         }
-        this.setOverall("uploading", "Uploading…", true, true);
+        this.setOverall("uploading", this.msg("uploading"), true, true);
         const values = [];
         for (let i = 0; i < this._files.length; i++) {
             if (gen !== this._gen) return;
@@ -894,13 +984,13 @@ export default class Upload {
             try {
                 signed = await this.onPresign(file);
             } catch (err) {
-                this.failAll(err instanceof Error ? err.message : String(err || "presign failed"));
+                this.failAll(err instanceof Error ? err.message : String(err || this.msg("presignFailed")));
                 return;
             }
             if (gen !== this._gen) return;
             const url = signed && signed.uploadUrl ? String(signed.uploadUrl) : "";
             if (!url) {
-                this.failAll("presign returned no uploadUrl");
+                this.failAll(this.msg("presignUrl"));
                 return;
             }
             const xhr = new XMLHttpRequest();
@@ -927,7 +1017,7 @@ export default class Upload {
             }
             if (result.error || !(result.status >= 200 && result.status < 300)) {
                 this.failAll(
-                    result.error || `Object upload failed (${result.status || "network"})`,
+                    result.error || this.msg("objectFailed"),
                 );
                 return;
             }
@@ -945,7 +1035,7 @@ export default class Upload {
                 status: "done",
                 showBar: true,
                 barStyle: "width:100%",
-                meta: `${formatBytes(file.size)} · object`,
+                meta: formatBytes(file.size),
             });
         }
         this._values = values;
@@ -957,7 +1047,7 @@ export default class Upload {
     finishOk(values) {
         this.setProgress(100);
         this.status = "done";
-        this.statusText = "Upload complete";
+        this.statusText = this.msg("complete");
         this.showProgress = true;
         this.canCancel = false;
         this.canResume = false;
@@ -975,7 +1065,7 @@ export default class Upload {
             const chunkNote = first.chunks ? ` chunks:${first.chunks}` : "";
             this.resultText = `${prefix}:${first.id} (${first.bytes || 0} bytes)${head}${chunkNote}`;
         } else {
-            this.resultText = `${values.length} file(s) ready`;
+            this.resultText = `${values.length} ${this.readyText}`.trim();
         }
         this.emitStatus();
         this.emitValue(values);
@@ -986,8 +1076,9 @@ export default class Upload {
     failAll(message) {
         this.cancelActive(false);
         this.resetSession();
+        const text = message || this.msg("failed");
         this.status = "error";
-        this.statusText = message || "Upload failed";
+        this.statusText = text;
         this.showProgress = false;
         this.canCancel = false;
         this.canResume = false;
@@ -1006,7 +1097,7 @@ export default class Upload {
     }
     markCancelled() {
         this.status = "cancelled";
-        this.statusText = "Upload cancelled";
+        this.statusText = this.msg("cancelled");
         this.showProgress = false;
         this.canCancel = false;
         this.canResume = false;
@@ -1020,7 +1111,7 @@ export default class Upload {
     }
     markPaused() {
         this.status = "paused";
-        this.statusText = "Upload paused — resume to continue";
+        this.statusText = this.msg("paused");
         this.showProgress = true;
         this.canCancel = false;
         this.canResume = !!this._uploadId;
@@ -1031,7 +1122,7 @@ export default class Upload {
         this.syncChunkAttr();
         this.patchItem(0, {
             status: "paused",
-            meta: `${this._received.length}/${this._chunkTotal || 0} chunks`,
+            meta: `${this._received.length}/${this._chunkTotal || 0}`,
         });
         this.emitStatus();
         this.emitValue([]);
@@ -1183,7 +1274,7 @@ function acceptError(file, accept) {
             return "";
         }
     }
-    return `File type not allowed (${raw})`;
+    return "accept";
 }
 /**
  * @param {number} n
@@ -1228,7 +1319,7 @@ function xhrSend(xhr, method, url, body, onProgress, headers) {
                 aborted: false,
                 status: 0,
                 body: null,
-                error: "Network upload failed",
+                error: "",
             });
         xhr.onload = () => {
             let parsed = null;
@@ -1274,7 +1365,7 @@ function xhrSendJson(xhr, method, url, payload) {
                 aborted: false,
                 status: 0,
                 body: null,
-                error: "Network upload failed",
+                error: "",
             });
         xhr.onload = () => {
             let parsed = null;

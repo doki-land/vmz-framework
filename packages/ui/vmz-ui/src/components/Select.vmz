@@ -3,30 +3,35 @@
         <label v-if="label" :for="controlId" class="vmz-ui-select__label">
             {{ label }}
         </label>
-        <button type="button" :id="controlId" role="combobox" :disabled="disabled" aria-haspopup="listbox" :aria-expanded="open ? 'true' : 'false'" :aria-controls="listId" :aria-invalid="error ? 'true' : 'false'" :aria-describedby="describedBy" :aria-multiselectable="isMultiple ? 'true' : 'false'" @click="toggle" :onKeyDown="onTriggerKeyDown" class="vmz-ui-select__control">
-            <span class="vmz-ui-select__value">
-                {{ displayLabel }}
-            </span>
-            <span aria-hidden="true" class="vmz-ui-select__chev" />
-        </button>
-        <div v-if="open" :id="listId" data-vmz-overlay="select" data-vmz-overlay-owner="select" data-vmz-focus="enter" class="vmz-ui-select__panel">
-            <div v-if="searchable" class="vmz-ui-select__search">
-                <input type="search" data-vmz-select="search" :value="searchQuery" :placeholder="searchPlaceholder" :aria-label="searchPlaceholder" @input="onSearchInput" :onKeyDown="onSearchKeyDown" class="vmz-ui-select__search-input" />
-            </div>
-            <ul role="listbox" :aria-multiselectable="isMultiple ? 'true' : 'false'" tabindex="-1" :onKeyDown="onListKeyDown" class="vmz-ui-select__list">
-                <li v-if="showEmpty" role="presentation" class="vmz-ui-select__empty">
-                    {{ emptyText }}
-                </li>
-                <li v-for="opt in visibleOptions" :key="opt.value" role="presentation">
-                    <button type="button" role="option" :data-vmz-option="opt.value" :aria-selected="opt.selected ? 'true' : 'false'" @click="onOptionClick" :class='"vmz-ui-select__option" + (opt.selected ? " is-on" : "")'>
-                        {{ opt.label }}
+        <div class="vmz-ui-select__field">
+            <button type="button" :id="controlId" role="combobox" :disabled="disabled" aria-haspopup="listbox" :aria-expanded="open ? 'true' : 'false'" :aria-controls="listId" :aria-invalid="error ? 'true' : 'false'" :aria-describedby="describedBy" :aria-multiselectable="isMultiple ? 'true' : 'false'" @click="toggle" :onKeyDown="onTriggerKeyDown" :class='"vmz-ui-select__control" + (displayLabel ? "" : " is-placeholder")'>
+                <span class="vmz-ui-select__value">
+                    {{ displayLabel }}
+                </span>
+                <Icon name="action.chevron-down" size="md" decorative class="vmz-ui-select__chev" />
+            </button>
+            <div v-if="open" :id="listId" data-vmz-overlay="select" data-vmz-overlay-owner="select" data-vmz-focus="enter" class="vmz-ui-select__panel">
+                <div v-if="searchable" class="vmz-ui-select__search">
+                    <input type="search" data-vmz-select="search" :value="searchQuery" :placeholder="searchPlaceholder" :aria-label="searchLabel()" @input="onSearchInput" :onKeyDown="onSearchKeyDown" class="vmz-ui-select__search-input" />
+                </div>
+                <ul role="listbox" :aria-multiselectable="isMultiple ? 'true' : 'false'" tabindex="-1" :onKeyDown="onListKeyDown" class="vmz-ui-select__list">
+                    <li v-if="showEmpty && emptyText" role="presentation" class="vmz-ui-select__empty">
+                        {{ emptyText }}
+                    </li>
+                    <li v-for="opt in visibleOptions" :key="opt.value" role="presentation">
+                        <button type="button" role="option" :data-vmz-option="opt.value" :aria-selected="opt.selected ? 'true' : 'false'" @click="onOptionClick" :class='"vmz-ui-select__option" + (opt.selected ? " is-on" : "")'>
+                            <span class="vmz-ui-select__option-label">
+                                {{ opt.label }}
+                            </span>
+                            <Icon v-if="opt.selected" name="action.check" size="md" decorative class="vmz-ui-select__option-check" />
+                        </button>
+                    </li>
+                </ul>
+                <div v-if="isMultiple && doneLabel" class="vmz-ui-select__footer">
+                    <button type="button" data-vmz-select="done" @click="close" class="vmz-ui-select__done">
+                        {{ doneLabel }}
                     </button>
-                </li>
-            </ul>
-            <div v-if="isMultiple" class="vmz-ui-select__footer">
-                <button type="button" data-vmz-select="done" @click="close" class="vmz-ui-select__done">
-                    Done
-                </button>
+                </div>
             </div>
         </div>
         <p v-if="description" :id="descriptionId" class="vmz-ui-select__description">
@@ -42,47 +47,67 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: var(--vmz-space-2);
+    width: 100%;
     max-width: 28rem;
+}
+
+.vmz-ui-select__field {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
 }
 
 .vmz-ui-select__label {
     font: inherit;
     font-weight: 500;
     font-size: 0.875rem;
+    line-height: 1.5715;
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-select__control {
     display: inline-flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
+    gap: var(--vmz-space-2);
     width: 100%;
-    min-height: var(--vmz-control-height, 2rem);
     box-sizing: border-box;
+    min-height: var(--vmz-control-height);
     font: inherit;
     font-size: 0.875rem;
+    line-height: 1.5715;
     text-align: left;
     padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
-    border: 1px solid var(--vmz-line-default, #d9d9d9);
-    border-radius: var(--vmz-radius-md, 6px);
-    background: var(--vmz-surface-paper, #fff);
-    color: inherit;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
     outline: none;
     cursor: pointer;
     transition:
-        border-color var(--vmz-motion-control-duration, 120ms)
-            var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
-        box-shadow var(--vmz-motion-control-duration, 120ms)
-            var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+        border-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        box-shadow var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        background-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+}
+
+.vmz-ui-select__control.is-placeholder .vmz-ui-select__value {
+    color: var(--vmz-text-tertiary);
 }
 
 .vmz-ui-select[data-invalid="true"] .vmz-ui-select__control {
     border-color: var(--vmz-status-danger-accent);
 }
 
-.vmz-ui-select__control:hover:not(:disabled) {
-    border-color: var(--vmz-action-primary-background);
+.vmz-ui-select[data-invalid="true"] .vmz-ui-select__control:hover:not(:disabled),
+.vmz-ui-select[data-invalid="true"] .vmz-ui-select__control:focus-visible,
+.vmz-ui-select[data-invalid="true"].is-opened .vmz-ui-select__control {
+    border-color: var(--vmz-status-danger-foreground);
+}
+
+.vmz-ui-select__control:hover:not(:disabled):not(:focus-visible) {
+    border-color: var(--vmz-action-primary-hover);
 }
 
 .vmz-ui-select__control:focus-visible,
@@ -92,8 +117,10 @@
 }
 
 .vmz-ui-select__control:disabled {
-    opacity: 0.55;
+    opacity: 0.6;
+    color: var(--vmz-text-muted);
     cursor: not-allowed;
+    background: var(--vmz-surface-mist);
 }
 
 .vmz-ui-select__value {
@@ -106,62 +133,67 @@
 
 .vmz-ui-select__chev {
     flex: 0 0 auto;
-    width: 0.45rem;
-    height: 0.45rem;
-    border-right: 1.5px solid currentColor;
-    border-bottom: 1.5px solid currentColor;
-    transform: rotate(45deg) translate(-1px, -2px);
-    opacity: 0.7;
+    color: var(--vmz-text-tertiary);
+    transition: transform var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
 }
 
 .vmz-ui-select.is-opened .vmz-ui-select__chev {
-    transform: rotate(225deg) translate(-1px, -1px);
+    transform: rotate(180deg);
 }
 
 .vmz-ui-select__panel {
     position: absolute;
     z-index: 40;
-    top: calc(100% + 0.25rem);
+    top: calc(100% + var(--vmz-space-1));
     left: 0;
     right: 0;
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--vmz-line-default, #d9d9d9);
-    border-radius: var(--vmz-radius-md, 6px);
-    background: var(--vmz-surface-paper, #fff);
-    color: inherit;
-    box-shadow: var(
-        --vmz-shadow-popup,
-        0 6px 16px 0 rgba(0, 0, 0, 0.08),
-        0 3px 6px -4px rgba(0, 0, 0, 0.12)
-    );
+    padding: var(--vmz-space-1);
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
+    box-shadow: var(--vmz-shadow-popup);
     outline: none;
 }
 
 .vmz-ui-select__search {
-    padding: 0.375rem 0.5rem 0.125rem;
+    padding: var(--vmz-space-1) var(--vmz-space-1) 0;
 }
 
 .vmz-ui-select__search-input {
     width: 100%;
     box-sizing: border-box;
+    min-height: var(--vmz-control-height);
     font: inherit;
     font-size: 0.875rem;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid var(--vmz-line-default, #d9d9d9);
-    border-radius: var(--vmz-radius-md, 6px);
-    background: var(--vmz-surface-paper, #fff);
-    color: inherit;
+    line-height: 1.5715;
+    appearance: none;
+    padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
     outline: none;
+    transition:
+        border-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        box-shadow var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+}
+
+.vmz-ui-select__search-input::placeholder {
+    color: var(--vmz-text-tertiary);
+    opacity: 1;
 }
 
 .vmz-ui-select__search-input:focus-visible {
+    border-color: var(--vmz-action-primary-background);
     box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-select__list {
     margin: 0;
-    padding: 0.25rem;
+    padding: 0;
     list-style: none;
     max-height: 16rem;
     overflow: auto;
@@ -169,64 +201,112 @@
 }
 
 .vmz-ui-select__empty {
-    padding: 0.5rem 0.625rem;
-    opacity: 0.7;
-    font-size: 0.92em;
+    padding: var(--vmz-space-2) var(--vmz-density-control-padding-x);
+    color: var(--vmz-text-tertiary);
+    font-size: 0.875rem;
+    line-height: 1.5715;
 }
 
 .vmz-ui-select__option {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vmz-space-2);
     width: 100%;
     box-sizing: border-box;
+    min-height: var(--vmz-control-height);
     text-align: left;
     font: inherit;
-    padding: 0.375rem 0.625rem;
+    font-size: 0.875rem;
+    line-height: 1.5715;
+    padding: 0 var(--vmz-density-control-padding-x);
     border: 0;
-    border-radius: var(--vmz-radius-md, 6px);
+    border-radius: var(--vmz-radius-md);
     background: transparent;
-    color: inherit;
+    color: var(--vmz-text-ink);
     cursor: pointer;
     outline: none;
+    transition: background-color var(--vmz-motion-control-duration)
+        var(--vmz-motion-control-easing);
+}
+
+.vmz-ui-select__option-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vmz-ui-select__option-check {
+    flex: 0 0 auto;
+    color: var(--vmz-action-primary-background);
 }
 
 .vmz-ui-select__option:hover,
 .vmz-ui-select__option:focus-visible {
-    background: color-mix(in srgb, var(--vmz-action-primary-background) 18%, transparent);
+    background: var(--vmz-surface-mist);
+}
+
+.vmz-ui-select__option:focus-visible {
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-select__option.is-on {
-    background: color-mix(in srgb, var(--vmz-action-primary-background) 28%, transparent);
-    font-weight: 600;
+    background: var(--vmz-action-primary-soft);
+    color: var(--vmz-action-primary-active);
 }
 
 .vmz-ui-select__footer {
     display: flex;
     justify-content: flex-end;
-    padding: 0.375rem 0.5rem 0.5rem;
-    border-top: 1px solid var(--vmz-line-default, #d9dee3);
+    padding: var(--vmz-space-1) var(--vmz-space-1) 0;
+    border-top: 1px solid var(--vmz-line-subtle);
 }
 
 .vmz-ui-select__done {
     font: inherit;
-    font-weight: 600;
-    padding: 0.25rem 0.7rem;
-    border: 1px solid var(--vmz-line-default, #d9dee3);
-    border-radius: var(--vmz-radius-md, 6px);
-    background: var(--vmz-surface-paper, #fff);
-    color: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.5715;
+    min-height: var(--vmz-control-height-sm);
+    padding: 0 var(--vmz-space-3);
+    border: 1px solid var(--vmz-action-secondary-border);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-action-secondary-background);
+    color: var(--vmz-action-secondary-foreground);
     cursor: pointer;
+    outline: none;
+    transition:
+        background-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        border-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+}
+
+.vmz-ui-select__done:hover {
+    background: var(--vmz-action-secondary-hover);
+    border-color: var(--vmz-action-primary-hover);
+}
+
+.vmz-ui-select__done:active {
+    background: var(--vmz-action-secondary-active);
+}
+
+.vmz-ui-select__done:focus-visible {
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-select__description {
     margin: 0;
-    opacity: 0.75;
-    font-size: 0.9em;
+    color: var(--vmz-text-steel);
+    font-size: 0.875rem;
+    line-height: 1.5715;
 }
 
 .vmz-ui-select__error {
     margin: 0;
     color: var(--vmz-status-danger-foreground);
-    font-size: 0.9em;
+    font-size: 0.875rem;
+    line-height: 1.5715;
 }
 </style>
 <script client>
@@ -240,6 +320,7 @@ export default class Select {
     public label: string = "";
     public description: string = "";
     public error: string = "";
+    public placeholder: string = "";
     /** single mode */
     public value: string = "";
     /** multiple mode — parent owns array */
@@ -251,8 +332,9 @@ export default class Select {
     /** "single" | "multiple" */
     public mode: string = "single";
     public searchable: boolean = false;
-    public searchPlaceholder: string = "Search";
-    public emptyText: string = "No matches";
+    public searchPlaceholder: string = "";
+    public emptyText: string = "";
+    public doneLabel: string = "";
     public disabled: boolean = false;
     public invalidAttr: string = "false";
     public controlId: string = "vmz-select";
@@ -339,13 +421,16 @@ export default class Select {
         if (this.isMultiple) {
             const selected = this._selectedSet();
             const labels = opts.filter((o) => selected.has(String(o.value))).map((o) => o.label);
-            if (!labels.length) this.displayLabel = "—";
+            if (!labels.length) this.displayLabel = this.placeholder || "";
             else if (labels.length <= 2) this.displayLabel = labels.join(", ");
             else this.displayLabel = `${labels[0]}, ${labels[1]} +${labels.length - 2}`;
             return;
         }
         const hit = opts.find((o) => String(o.value) === String(this.value));
-        this.displayLabel = hit ? hit.label : this.value || "—";
+        this.displayLabel = hit ? hit.label : this.value || this.placeholder || "";
+    }
+    searchLabel() {
+        return this.searchPlaceholder || this.label || "";
     }
     toggle() {
         if (this.disabled) return;
@@ -376,7 +461,9 @@ export default class Select {
     }
     /** Parent-owned prop writes (bindComponentProp) — keep derived label/options in sync. */
     __vmzOnParentProp(name: string) {
-        if (name === "value" || name === "values" || name === "options") this._rebuildVisible();
+        if (name === "value" || name === "values" || name === "options" || name === "placeholder") {
+            this._rebuildVisible();
+        }
     }
     choose(next: string) {
         if (!next && next !== "") return;

@@ -1,11 +1,14 @@
 <template>
-    <fieldset data-vmz-ui="radio-group" :data-invalid="invalidAttr" :aria-describedby="describedBy" :disabled="disabled" class="vmz-ui-radio-group">
+    <fieldset data-vmz-ui="radio-group" :data-invalid="invalidAttr" :data-disabled="disabled ? 'true' : 'false'" :aria-describedby="describedBy" :disabled="disabled" class="vmz-ui-radio-group">
         <legend class="vmz-ui-radio-group__legend">
             {{ label }}
         </legend>
         <div role="radiogroup" :aria-label="label" @click="onListClick" class="vmz-ui-radio-group__list">
             <label v-for="item in items" :key="item.value" :for="item.id" class="vmz-ui-radio-group__option">
-                <input :id="item.id" type="radio" :name="name" :value="item.value" :checked="value === item.value" :disabled="disabled" :data-vmz-radio="item.value" class="vmz-ui-radio-group__input" />
+                <span class="vmz-ui-radio-group__box">
+                    <input :id="item.id" type="radio" :name="name" :value="item.value" :checked="value === item.value" :disabled="disabled" :data-vmz-radio="item.value" class="vmz-ui-radio-group__input" />
+                    <span aria-hidden="true" class="vmz-ui-radio-group__dot" />
+                </span>
                 <span class="vmz-ui-radio-group__text">
                     {{ item.label }}
                 </span>
@@ -23,7 +26,8 @@
 .vmz-ui-radio-group {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--vmz-space-2);
+    width: 100%;
     max-width: 28rem;
     margin: 0;
     padding: 0;
@@ -34,28 +38,69 @@
 .vmz-ui-radio-group__legend {
     padding: 0;
     font: inherit;
-    font-weight: 600;
+    font-weight: 500;
+    font-size: 0.875rem;
+    line-height: 1.5715;
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-radio-group__list {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: var(--vmz-space-2);
 }
 
 .vmz-ui-radio-group__option {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--vmz-space-2);
     font: inherit;
+    font-size: 0.875rem;
+    line-height: 1.5715;
+    color: var(--vmz-text-ink);
     cursor: pointer;
 }
 
-.vmz-ui-radio-group__input {
+.vmz-ui-radio-group__box {
+    position: relative;
+    display: inline-flex;
+    flex: 0 0 auto;
     width: 1rem;
     height: 1rem;
-    accent-color: var(--vmz-action-primary-background);
+}
+
+.vmz-ui-radio-group__input {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    box-sizing: border-box;
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    appearance: none;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-pill);
+    background: var(--vmz-surface-paper);
     outline: none;
+    cursor: pointer;
+    transition:
+        background-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        border-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        box-shadow var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+}
+
+.vmz-ui-radio-group__input:hover:not(:disabled):not(:checked) {
+    border-color: var(--vmz-action-primary-hover);
+}
+
+.vmz-ui-radio-group__input:checked {
+    border-color: var(--vmz-action-primary-background);
+    background: var(--vmz-action-primary-background);
+}
+
+.vmz-ui-radio-group__input:checked:hover:not(:disabled) {
+    border-color: var(--vmz-action-primary-hover);
+    background: var(--vmz-action-primary-hover);
 }
 
 .vmz-ui-radio-group__input:focus-visible {
@@ -63,28 +108,63 @@
 }
 
 .vmz-ui-radio-group__input:disabled {
+    cursor: not-allowed;
+}
+
+.vmz-ui-radio-group__dot {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    width: 0.375rem;
+    height: 0.375rem;
+    margin: auto;
+    border-radius: var(--vmz-radius-pill);
+    background: var(--vmz-action-primary-foreground);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+}
+
+.vmz-ui-radio-group__input:checked + .vmz-ui-radio-group__dot {
+    opacity: 1;
+}
+
+.vmz-ui-radio-group[data-disabled="true"] {
     opacity: 0.55;
+}
+
+.vmz-ui-radio-group[data-disabled="true"] .vmz-ui-radio-group__option,
+.vmz-ui-radio-group[data-disabled="true"] .vmz-ui-radio-group__input {
     cursor: not-allowed;
 }
 
 .vmz-ui-radio-group__text {
-    font-weight: 600;
+    font-weight: 400;
 }
 
 .vmz-ui-radio-group__description {
     margin: 0;
-    opacity: 0.75;
-    font-size: 0.9em;
+    color: var(--vmz-text-steel);
+    font-size: 0.875rem;
+    line-height: 1.5715;
 }
 
 .vmz-ui-radio-group__error {
     margin: 0;
     color: var(--vmz-status-danger-foreground);
-    font-size: 0.9em;
+    font-size: 0.875rem;
+    line-height: 1.5715;
 }
 
 .vmz-ui-radio-group[data-invalid="true"] .vmz-ui-radio-group__legend {
     color: var(--vmz-status-danger-foreground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vmz-ui-radio-group__input,
+    .vmz-ui-radio-group__dot {
+        transition: none;
+    }
 }
 </style>
 <script client>

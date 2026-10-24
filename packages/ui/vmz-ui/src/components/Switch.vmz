@@ -1,6 +1,6 @@
 <template>
-    <label data-vmz-ui="switch" :for="controlId" class="vmz-ui-switch">
-        <button :id="controlId" type="button" role="switch" :aria-checked="checked" :aria-describedby="describedBy" :disabled="disabled" @click="toggle" :onKeyDown="onKeyDown" class="vmz-ui-switch__control">
+    <label data-vmz-ui="switch" :for="controlId" :data-disabled="disabled ? 'true' : 'false'" class="vmz-ui-switch">
+        <button :id="controlId" type="button" role="switch" :aria-checked="checked ? 'true' : 'false'" :data-checked="checked ? 'true' : 'false'" :aria-describedby="describedBy" :disabled="disabled" @click="toggle" :onKeyDown="onKeyDown" class="vmz-ui-switch__control">
             <span aria-hidden="true" class="vmz-ui-switch__thumb" />
         </button>
         <span class="vmz-ui-switch__label">
@@ -12,26 +12,48 @@
 .vmz-ui-switch {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--vmz-space-2);
     font: inherit;
+    font-size: 0.875rem;
+    line-height: 1.5715;
+    color: var(--vmz-text-ink);
     cursor: pointer;
 }
 
 .vmz-ui-switch__control {
     position: relative;
-    width: 2.4rem;
-    height: 1.35rem;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 2.5rem;
+    height: 1.5rem;
     padding: 0;
-    border: 1px solid var(--vmz-line-default);
-    border-radius: 999px;
-    background: transparent;
+    border: 0;
+    border-radius: var(--vmz-radius-pill);
+    background: var(--vmz-line-strong);
     cursor: pointer;
     outline: none;
+    transition:
+        background-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        box-shadow var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+}
+
+.vmz-ui-switch__control:hover:not(:disabled):not([aria-checked="true"]) {
+    background: var(--vmz-text-tertiary);
 }
 
 .vmz-ui-switch__control[aria-checked="true"],
-.vmz-ui-switch__control[aria-checked=""] {
+.vmz-ui-switch__control[data-checked="true"] {
     background: var(--vmz-action-primary-background);
+}
+
+.vmz-ui-switch__control[aria-checked="true"]:hover:not(:disabled),
+.vmz-ui-switch__control[data-checked="true"]:hover:not(:disabled) {
+    background: var(--vmz-action-primary-hover);
+}
+
+.vmz-ui-switch__control:active:not(:disabled)[aria-checked="true"],
+.vmz-ui-switch__control:active:not(:disabled)[data-checked="true"] {
+    background: var(--vmz-action-primary-active);
 }
 
 .vmz-ui-switch__control:focus-visible {
@@ -45,25 +67,36 @@
 
 .vmz-ui-switch__thumb {
     position: absolute;
-    top: 0.12rem;
-    left: 0.12rem;
+    top: var(--vmz-space-1);
+    left: var(--vmz-space-1);
     width: 1rem;
     height: 1rem;
-    border-radius: 999px;
+    border-radius: var(--vmz-radius-pill);
     background: var(--vmz-action-primary-foreground);
     transition: transform var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
 }
 
 .vmz-ui-switch__control[aria-checked="true"] .vmz-ui-switch__thumb,
-.vmz-ui-switch__control[aria-checked=""] .vmz-ui-switch__thumb {
-    transform: translateX(1.05rem);
+.vmz-ui-switch__control[data-checked="true"] .vmz-ui-switch__thumb {
+    transform: translateX(1rem);
 }
 
 .vmz-ui-switch__label {
-    font-weight: 600;
+    font-weight: 400;
+}
+
+.vmz-ui-switch[data-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.vmz-ui-switch[data-disabled="true"] .vmz-ui-switch__control,
+.vmz-ui-switch[data-disabled="true"] .vmz-ui-switch__label {
+    cursor: not-allowed;
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .vmz-ui-switch__control,
     .vmz-ui-switch__thumb {
         transition: none;
     }

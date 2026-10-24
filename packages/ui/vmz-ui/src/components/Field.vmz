@@ -3,7 +3,11 @@
         <label v-if="label" :for="controlId" class="vmz-ui-field__label">
             {{ label }}
         </label>
-        <input :id="controlId" :type="type" :value="value" :min="min" :max="max" :step="step" :disabled="disabled" :aria-invalid="error ? 'true' : 'false'" :aria-describedby="describedBy" @input="onDomInput" class="vmz-ui-field__control" />
+        <div class="vmz-ui-field__control-wrap" :data-prefix="prefix ? 'true' : 'false'" :data-suffix="suffix ? 'true' : 'false'">
+            <Icon v-if="prefix" :name="prefix" size="md" decorative class="vmz-ui-field__icon vmz-ui-field__icon--prefix" />
+            <input :id="controlId" :type="type" :value="value" :min="min" :max="max" :step="step" :placeholder="placeholder" :disabled="disabled" :readonly="readonly" :aria-invalid="error ? 'true' : 'false'" :aria-describedby="describedBy" @input="onDomInput" class="vmz-ui-field__control" />
+            <Icon v-if="suffix" :name="suffix" size="md" decorative class="vmz-ui-field__icon vmz-ui-field__icon--suffix" />
+        </div>
         <p v-if="description" :id="descriptionId" class="vmz-ui-field__description">
             {{ description }}
         </p>
@@ -16,7 +20,8 @@
 .vmz-ui-field {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: var(--vmz-space-2);
+    width: 100%;
     max-width: 28rem;
 }
 
@@ -24,32 +29,67 @@
     font: inherit;
     font-weight: 500;
     font-size: 0.875rem;
-    color: var(--vmz-text-ink, inherit);
+    line-height: 1.5715;
+    color: var(--vmz-text-ink);
+}
+
+.vmz-ui-field__control-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
 }
 
 .vmz-ui-field__control {
     box-sizing: border-box;
     width: 100%;
-    min-height: var(--vmz-control-height, 2rem);
-    font-family: var(--vmz-font-sans, inherit);
+    min-height: var(--vmz-control-height);
+    font-family: inherit;
     font-size: 0.875rem;
     line-height: 1.5715;
-    padding: var(--vmz-density-control-padding-y, 0.25rem)
-        var(--vmz-density-control-padding-x, 0.75rem);
-    border: 1px solid var(--vmz-line-default, #d9d9d9);
-    border-radius: var(--vmz-radius-md, 6px);
-    background: var(--vmz-surface-paper, #fff);
-    color: var(--vmz-text-ink, inherit);
+    padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
     outline: none;
     transition:
-        border-color var(--vmz-motion-control-duration, 120ms)
-            var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
-        box-shadow var(--vmz-motion-control-duration, 120ms)
-            var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+        border-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        box-shadow var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        background-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+}
+
+.vmz-ui-field__control-wrap[data-prefix="true"] .vmz-ui-field__control {
+    padding-left: calc(
+        var(--vmz-density-control-padding-x) + var(--vmz-space-4) + var(--vmz-space-1)
+    );
+}
+
+.vmz-ui-field__control-wrap[data-suffix="true"] .vmz-ui-field__control {
+    padding-right: calc(
+        var(--vmz-density-control-padding-x) + var(--vmz-space-4) + var(--vmz-space-1)
+    );
+}
+
+.vmz-ui-field__icon {
+    position: absolute;
+    top: 50%;
+    z-index: 1;
+    color: var(--vmz-text-tertiary);
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+
+.vmz-ui-field__icon--prefix {
+    left: var(--vmz-density-control-padding-x);
+}
+
+.vmz-ui-field__icon--suffix {
+    right: var(--vmz-density-control-padding-x);
 }
 
 .vmz-ui-field__control::placeholder {
-    color: var(--vmz-text-steel, #8c8c8c);
+    color: var(--vmz-text-tertiary);
     opacity: 1;
 }
 
@@ -57,8 +97,13 @@
     border-color: var(--vmz-status-danger-accent);
 }
 
+.vmz-ui-field[data-invalid="true"] .vmz-ui-field__control:hover:not(:disabled),
+.vmz-ui-field[data-invalid="true"] .vmz-ui-field__control:focus-visible {
+    border-color: var(--vmz-status-danger-foreground);
+}
+
 .vmz-ui-field__control:hover:not(:disabled):not(:focus-visible) {
-    border-color: var(--vmz-action-primary-background);
+    border-color: var(--vmz-action-primary-hover);
 }
 
 .vmz-ui-field__control:focus-visible {
@@ -67,22 +112,29 @@
 }
 
 .vmz-ui-field__control:disabled {
-    opacity: 0.55;
+    opacity: 0.6;
+    color: var(--vmz-text-muted);
     cursor: not-allowed;
-    background: var(--vmz-surface-mist, #fafafa);
+    background: var(--vmz-surface-mist);
+}
+
+.vmz-ui-field__control:read-only {
+    cursor: default;
+    background: var(--vmz-surface-mist);
 }
 
 .vmz-ui-field__description {
     margin: 0;
-    color: var(--vmz-text-steel, #8c8c8c);
+    color: var(--vmz-text-steel);
     font-size: 0.875rem;
-    line-height: 1.4;
+    line-height: 1.5715;
 }
 
 .vmz-ui-field__error {
     margin: 0;
     color: var(--vmz-status-danger-foreground);
     font-size: 0.875rem;
+    line-height: 1.5715;
 }
 </style>
 <script client>
@@ -97,10 +149,14 @@ export default class Field {
     public error: string = "";
     public value: string = "";
     public type: string = "text";
+    public placeholder: string = "";
+    public prefix: string = "";
+    public suffix: string = "";
     public min: string = "";
     public max: string = "";
     public step: string = "";
     public disabled: boolean = false;
+    public readonly: boolean = false;
     public invalidAttr: string = "false";
     public controlId: string = "vmz-field";
     public descriptionId: string = "vmz-field-desc";

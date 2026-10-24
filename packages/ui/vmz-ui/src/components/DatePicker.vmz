@@ -4,48 +4,37 @@
             {{ label }}
         </label>
         <button type="button" :id="controlId" :disabled="disabled" aria-haspopup="dialog" :aria-expanded="open ? 'true' : 'false'" :aria-controls="panelId" :aria-invalid="error ? 'true' : 'false'" :aria-describedby="describedBy" @click="toggle" :onKeyDown="onTriggerKeyDown" class="vmz-ui-date-picker__control">
+            <Icon name="action.calendar" size="md" decorative />
             <span data-vmz-date="value" class="vmz-ui-date-picker__value">
                 {{ displayLabel }}
             </span>
-            <span aria-hidden="true" class="vmz-ui-date-picker__chev" />
+            <span class="vmz-ui-date-picker__chev">
+                <Icon name="action.chevron-down" size="sm" decorative />
+            </span>
         </button>
-        <div v-if="open" :id="panelId" role="dialog" aria-modal="false" :aria-label="panelLabel" tabindex="-1" data-vmz-overlay="date-picker" data-vmz-overlay-owner="date-picker" data-vmz-focus="enter" data-vmz-date="panel" :onKeyDown="onPanelKeyDown" class="vmz-ui-date-picker__panel">
+        <div v-if="open" :id="panelId" role="dialog" aria-modal="false" :aria-label="panelLabel || monthLabel" tabindex="-1" data-vmz-overlay="date-picker" data-vmz-overlay-owner="date-picker" data-vmz-focus="enter" data-vmz-date="panel" :onKeyDown="onPanelKeyDown" class="vmz-ui-date-picker__panel">
             <div class="vmz-ui-date-picker__monthbar">
-                <button type="button" data-vmz-date="prev" aria-label="Previous month" @click="prevMonth" class="vmz-ui-date-picker__nav">
-                    ‹
+                <button type="button" data-vmz-date="prev" :aria-label="prevMonthLabel || monthLabel" @click="prevMonth" class="vmz-ui-date-picker__nav">
+                    <Icon name="action.chevron-left" size="sm" decorative />
                 </button>
                 <p data-vmz-date="month" class="vmz-ui-date-picker__month">
                     {{ monthLabel }}
                 </p>
-                <button type="button" data-vmz-date="next" aria-label="Next month" @click="nextMonth" class="vmz-ui-date-picker__nav">
-                    ›
+                <button type="button" data-vmz-date="next" :aria-label="nextMonthLabel || monthLabel" @click="nextMonth" class="vmz-ui-date-picker__nav">
+                    <Icon name="action.chevron-right" size="sm" decorative />
                 </button>
             </div>
             <div aria-hidden="true" class="vmz-ui-date-picker__weekdays">
-                <span>
-                    Mo
-                </span>
-                <span>
-                    Tu
-                </span>
-                <span>
-                    We
-                </span>
-                <span>
-                    Th
-                </span>
-                <span>
-                    Fr
-                </span>
-                <span>
-                    Sa
-                </span>
-                <span>
-                    Su
-                </span>
+                <span>{{ weekdayLabel(0) }}</span>
+                <span>{{ weekdayLabel(1) }}</span>
+                <span>{{ weekdayLabel(2) }}</span>
+                <span>{{ weekdayLabel(3) }}</span>
+                <span>{{ weekdayLabel(4) }}</span>
+                <span>{{ weekdayLabel(5) }}</span>
+                <span>{{ weekdayLabel(6) }}</span>
             </div>
             <div role="grid" :aria-labelledby="panelId" class="vmz-ui-date-picker__grid">
-                <button v-for="day in days" :key="day.key" type="button" role="gridcell" :data-vmz-date-iso="day.iso" :aria-selected="day.selected ? 'true' : 'false'" :aria-disabled="day.disabled ? 'true' : 'false'" :disabled="day.disabled" @click="onDayClick" :class='"vmz-ui-date-picker__day" + (day.inMonth ? "" : " is-outside") + (day.selected ? " is-on" : "") + (day.inRange ? " is-in-range" : "") + (day.rangeEdge ? " is-range-edge" : "") + (day.disabled ? " is-disabled" : "")'>
+                <button v-for="day in days" :key="day.key" type="button" role="gridcell" :data-vmz-date-iso="day.iso" :aria-selected="day.selected ? 'true' : 'false'" :aria-disabled="day.disabled ? 'true' : 'false'" :disabled="day.disabled" @click="onDayClick" :class='"vmz-ui-date-picker__day" + (day.inMonth ? "" : " is-outside") + (day.selected ? " is-on" : "") + (day.inRange ? " is-in-range" : "") + (day.rangeEdge ? " is-range-edge" : "") + (day.today ? " is-today" : "") + (day.disabled ? " is-disabled" : "")'>
                     {{ day.label }}
                 </button>
             </div>
@@ -63,31 +52,43 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: 6px;
+    width: 100%;
     max-width: 28rem;
 }
 
 .vmz-ui-date-picker__label {
-    font: inherit;
+    font-size: 14px;
     font-weight: 600;
+    line-height: 22px;
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-date-picker__control {
     display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
+    gap: 8px;
     width: 100%;
+    min-height: var(--vmz-control-height, 32px);
     box-sizing: border-box;
     font: inherit;
+    font-size: 14px;
+    line-height: 22px;
     text-align: left;
     padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
     border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
-    background: var(--vmz-surface-paper, transparent);
-    color: inherit;
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
     outline: none;
     cursor: pointer;
+    transition:
+        border-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        box-shadow var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+}
+
+.vmz-ui-date-picker__control:hover:not(:disabled) {
+    border-color: var(--vmz-action-primary-hover);
 }
 
 .vmz-ui-date-picker[data-invalid="true"] .vmz-ui-date-picker__control {
@@ -96,6 +97,7 @@
 
 .vmz-ui-date-picker__control:focus-visible,
 .vmz-ui-date-picker.is-opened .vmz-ui-date-picker__control {
+    border-color: var(--vmz-action-primary-background);
     box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
@@ -104,151 +106,215 @@
     cursor: not-allowed;
 }
 
+.vmz-ui-date-picker__control .vmz-ui-icon {
+    flex: 0 0 auto;
+    color: var(--vmz-text-tertiary);
+}
+
 .vmz-ui-date-picker__value {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-date-picker__chev {
     flex: 0 0 auto;
-    width: 0.45rem;
-    height: 0.45rem;
-    border-right: 1.5px solid currentColor;
-    border-bottom: 1.5px solid currentColor;
-    transform: rotate(45deg) translate(-1px, -2px);
-    opacity: 0.7;
+    display: inline-flex;
+    transition: transform var(--vmz-motion-control-duration)
+        var(--vmz-motion-control-easing);
 }
 
 .vmz-ui-date-picker.is-opened .vmz-ui-date-picker__chev {
-    transform: rotate(225deg) translate(-1px, -1px);
+    transform: rotate(180deg);
 }
 
 .vmz-ui-date-picker__panel {
     position: absolute;
     z-index: 40;
-    top: calc(100% + 0.25rem);
+    top: calc(100% + 6px);
     left: 0;
-    right: 0;
     box-sizing: border-box;
-    padding: 0.625rem 0.75rem 0.75rem;
-    border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
-    background: var(--vmz-surface-paper, #fff);
-    color: inherit;
-    box-shadow: 0 10px 24px color-mix(in srgb, #000 16%, transparent);
+    width: 280px;
+    max-width: calc(100vw - 32px);
+    padding: 12px;
+    border: 1px solid var(--vmz-line-subtle);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
+    box-shadow: var(--vmz-shadow-popup);
     outline: none;
+    animation: vmz-ui-date-picker-in var(--vmz-motion-overlay-duration)
+        var(--vmz-motion-overlay-easing);
+}
+
+.vmz-ui-date-picker__panel:focus-visible {
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring), var(--vmz-shadow-popup);
 }
 
 .vmz-ui-date-picker__monthbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
+    gap: 4px;
+    margin-bottom: 8px;
 }
 
 .vmz-ui-date-picker__month {
-    margin: 0;
-    font: inherit;
-    font-weight: 600;
-    text-align: center;
     flex: 1 1 auto;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 22px;
+    text-align: center;
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-date-picker__nav {
     flex: 0 0 auto;
-    width: 2rem;
-    height: 2rem;
-    font: inherit;
-    font-size: 1.15rem;
-    line-height: 1;
-    border: 1px solid transparent;
-    border-radius: var(--vmz-radius-md, 6px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--vmz-radius-md);
     background: transparent;
-    color: inherit;
+    color: var(--vmz-text-steel);
     cursor: pointer;
     outline: none;
+    transition:
+        color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        background-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
 }
 
-.vmz-ui-date-picker__nav:hover,
+.vmz-ui-date-picker__nav:hover {
+    background: var(--vmz-surface-mist);
+    color: var(--vmz-text-ink);
+}
+
 .vmz-ui-date-picker__nav:focus-visible {
-    border-color: var(--vmz-action-primary-background);
     box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-date-picker__weekdays {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 0.125rem;
-    margin-bottom: 0.25rem;
-    font-size: 0.75rem;
-    opacity: 0.7;
+    gap: 2px;
+    margin-bottom: 4px;
+    font-size: 12px;
+    line-height: 28px;
+    color: var(--vmz-text-tertiary);
     text-align: center;
 }
 
 .vmz-ui-date-picker__grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 0.125rem;
+    gap: 2px;
 }
 
 .vmz-ui-date-picker__day {
-    aspect-ratio: 1;
-    min-height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 32px;
+    box-sizing: border-box;
     font: inherit;
-    font-size: 0.9rem;
+    font-size: 14px;
+    line-height: 22px;
+    padding: 0;
     border: 0;
-    border-radius: var(--vmz-radius-md, 6px);
+    border-radius: var(--vmz-radius-md);
     background: transparent;
-    color: inherit;
+    color: var(--vmz-text-ink);
     cursor: pointer;
     outline: none;
+    transition:
+        background-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
 }
 
-.vmz-ui-date-picker__day:hover,
+.vmz-ui-date-picker__day:hover {
+    background: var(--vmz-surface-mist);
+}
+
 .vmz-ui-date-picker__day:focus-visible {
-    background: color-mix(in srgb, var(--vmz-action-primary-background) 18%, transparent);
-    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+    box-shadow: inset 0 0 0 2px var(--vmz-focus-ring);
 }
 
 .vmz-ui-date-picker__day.is-outside {
-    opacity: 0.4;
+    color: var(--vmz-text-tertiary);
+    opacity: 0.6;
 }
 
-.vmz-ui-date-picker__day.is-on {
-    background: color-mix(in srgb, var(--vmz-action-primary-background) 28%, transparent);
+.vmz-ui-date-picker__day.is-today {
+    box-shadow: inset 0 0 0 1px var(--vmz-action-primary-background);
+}
+
+.vmz-ui-date-picker__day.is-on,
+.vmz-ui-date-picker__day.is-range-edge {
+    background: var(--vmz-action-primary-background);
+    color: var(--vmz-action-primary-foreground);
     font-weight: 600;
+}
+
+.vmz-ui-date-picker__day.is-on:hover,
+.vmz-ui-date-picker__day.is-range-edge:hover {
+    background: var(--vmz-action-primary-hover);
 }
 
 .vmz-ui-date-picker__day.is-in-range {
-    background: color-mix(in srgb, var(--vmz-action-primary-background) 14%, transparent);
-}
-
-.vmz-ui-date-picker__day.is-range-edge {
-    background: color-mix(in srgb, var(--vmz-action-primary-background) 36%, transparent);
-    font-weight: 600;
+    background: color-mix(in srgb, var(--vmz-action-primary-background) 12%, transparent);
 }
 
 .vmz-ui-date-picker__day.is-disabled,
 .vmz-ui-date-picker__day:disabled {
     opacity: 0.35;
     cursor: not-allowed;
+    background: transparent;
     box-shadow: none;
+    color: var(--vmz-text-tertiary);
 }
 
 .vmz-ui-date-picker__description {
     margin: 0;
-    opacity: 0.75;
-    font-size: 0.9em;
+    font-size: 14px;
+    line-height: 22px;
+    color: var(--vmz-text-tertiary);
 }
 
 .vmz-ui-date-picker__error {
     margin: 0;
+    font-size: 14px;
+    line-height: 22px;
     color: var(--vmz-status-danger-foreground);
-    font-size: 0.9em;
+}
+
+@keyframes vmz-ui-date-picker-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vmz-ui-date-picker__panel,
+    .vmz-ui-date-picker__control,
+    .vmz-ui-date-picker__chev,
+    .vmz-ui-date-picker__nav,
+    .vmz-ui-date-picker__day {
+        animation: none;
+        transition: none;
+    }
 }
 </style>
 <script client>
@@ -258,6 +324,10 @@
  * Parent owns ISO value (YYYY-MM-DD) via onChange Event-like { target: { value } }.
  * mode=range: parent owns rangeStart + rangeEnd; onChange { target: { value, start, end } }.
  * Not @vmz/ui-scheduler — month grid only; no time / recurrence / resource layout.
+ *
+ * Localization props: `prevMonthLabel`, `nextMonthLabel`, `panelLabel` and
+ * `weekdayLabels` (7 entries, Monday-first). Empty defaults keep visible chrome
+ * free of hard-coded copy.
  */
 export default class DatePicker {
     public label: string = "";
@@ -276,6 +346,11 @@ export default class DatePicker {
     public descriptionId: string = "vmz-date-desc";
     public errorId: string = "vmz-date-err";
     public describedBy: string = "";
+    public prevMonthLabel: string = "";
+    public nextMonthLabel: string = "";
+    public panelLabel: string = "";
+    /** Seven Monday-first weekday headings. */
+    public weekdayLabels: string[] = [];
     public onInput:
         | ((e: {
               target: {
@@ -297,7 +372,6 @@ export default class DatePicker {
     open = false;
     displayLabel = "—";
     panelId = "vmz-date-panel";
-    panelLabel = "Choose date";
     monthLabel = "";
     viewYear = 0;
     viewMonth = 0;
@@ -311,6 +385,7 @@ export default class DatePicker {
         selected: boolean;
         inRange: boolean;
         rangeEdge: boolean;
+        today: boolean;
         disabled: boolean;
     }> = [];
     _docKeyHandler = null;
@@ -334,6 +409,10 @@ export default class DatePicker {
             this._observer = null;
         }
         this._teardownDoc();
+    }
+    weekdayLabel(index: number) {
+        const labels = Array.isArray(this.weekdayLabels) ? this.weekdayLabels : [];
+        return labels[index] || "";
     }
     syncFromValue(resetView: boolean) {
         const isRange = String(this.mode) === "range";
@@ -508,10 +587,8 @@ export default class DatePicker {
         this.viewYear = y;
         this.viewMonth = m;
         this.monthLabel = `${this._monthName(m)} ${y}`;
-        this.panelLabel =
-            String(this.mode) === "range"
-                ? `Choose date range — ${this.monthLabel}`
-                : `Choose date — ${this.monthLabel}`;
+        const today = this._todayParts();
+        const todayIso = this._toIso(today.y, today.m, today.d);
         const firstDow = (new Date(y, m - 1, 1).getDay() + 6) % 7;
         const dim = new Date(y, m, 0).getDate();
         const prevDim = new Date(y, m - 1, 0).getDate();
@@ -569,6 +646,7 @@ export default class DatePicker {
                 selected,
                 inRange: inRange && !rangeEdge,
                 rangeEdge,
+                today: iso === todayIso,
                 disabled: this._isOutOfRange(iso),
             });
         }

@@ -1,6 +1,9 @@
 <template>
-    <label data-vmz-ui="checkbox" :for="controlId" class="vmz-ui-checkbox">
-        <input :id="controlId" type="checkbox" :checked="checked" :disabled="disabled" :aria-describedby="describedBy" @change="onToggle" class="vmz-ui-checkbox__input" />
+    <label data-vmz-ui="checkbox" :for="controlId" :data-disabled="disabled ? 'true' : 'false'" class="vmz-ui-checkbox">
+        <span class="vmz-ui-checkbox__box">
+            <input :id="controlId" type="checkbox" :checked="checked" :disabled="disabled" :aria-describedby="describedBy" @change="onToggle" class="vmz-ui-checkbox__input" />
+            <Icon name="action.check" size="md" decorative class="vmz-ui-checkbox__check" />
+        </span>
         <span class="vmz-ui-checkbox__label">
             {{ label }}
         </span>
@@ -10,16 +13,54 @@
 .vmz-ui-checkbox {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--vmz-space-2);
     font: inherit;
+    font-size: 0.875rem;
+    line-height: 1.5715;
+    color: var(--vmz-text-ink);
     cursor: pointer;
 }
 
-.vmz-ui-checkbox__input {
+.vmz-ui-checkbox__box {
+    position: relative;
+    display: inline-flex;
+    flex: 0 0 auto;
     width: 1rem;
     height: 1rem;
-    accent-color: var(--vmz-action-primary-background);
+}
+
+.vmz-ui-checkbox__input {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    box-sizing: border-box;
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    appearance: none;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-sm);
+    background: var(--vmz-surface-paper);
     outline: none;
+    cursor: pointer;
+    transition:
+        background-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        border-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        box-shadow var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+}
+
+.vmz-ui-checkbox__input:hover:not(:disabled):not(:checked) {
+    border-color: var(--vmz-action-primary-hover);
+}
+
+.vmz-ui-checkbox__input:checked {
+    border-color: var(--vmz-action-primary-background);
+    background: var(--vmz-action-primary-background);
+}
+
+.vmz-ui-checkbox__input:checked:hover:not(:disabled) {
+    border-color: var(--vmz-action-primary-hover);
+    background: var(--vmz-action-primary-hover);
 }
 
 .vmz-ui-checkbox__input:focus-visible {
@@ -27,12 +68,47 @@
 }
 
 .vmz-ui-checkbox__input:disabled {
+    cursor: not-allowed;
+}
+
+.vmz-ui-checkbox__check {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    margin: auto;
+    color: var(--vmz-action-primary-foreground);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+}
+
+.vmz-ui-checkbox .vmz-ui-checkbox__box .vmz-ui-checkbox__check {
+    font-size: 0.75rem;
+}
+
+.vmz-ui-checkbox__input:checked + .vmz-ui-checkbox__check {
+    opacity: 1;
+}
+
+.vmz-ui-checkbox[data-disabled="true"] {
     opacity: 0.55;
     cursor: not-allowed;
 }
 
+.vmz-ui-checkbox[data-disabled="true"] .vmz-ui-checkbox__input,
+.vmz-ui-checkbox[data-disabled="true"] .vmz-ui-checkbox__label {
+    cursor: not-allowed;
+}
+
 .vmz-ui-checkbox__label {
-    font-weight: 600;
+    font-weight: 400;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vmz-ui-checkbox__input,
+    .vmz-ui-checkbox__check {
+        transition: none;
+    }
 }
 </style>
 <script client>

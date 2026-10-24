@@ -3,15 +3,25 @@
         <label v-if="label" :for="controlId" class="vmz-ui-autocomplete__label">
             {{ label }}
         </label>
-        <input :id="controlId" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" :aria-expanded="openAttr" :aria-controls="listId" :aria-invalid="error ? 'true' : 'false'" :aria-describedby="describedBy" :value="value" :disabled="disabled" @input="onDomInput" :onKeyDown="onKeyDown" class="vmz-ui-autocomplete__control" />
-        <ul v-if="listOpen" :id="listId" role="listbox" data-vmz-autocomplete="list" @click="onListClick" class="vmz-ui-autocomplete__list">
-            <li v-for="opt in options" :key="opt.value" role="option" :data-vmz-option="opt.value" tabindex="-1" class="vmz-ui-autocomplete__option">
-                {{ opt.label }}
-            </li>
-        </ul>
-        <p v-if="showEmpty" data-vmz-autocomplete="empty" class="vmz-ui-autocomplete__empty">
-            {{ emptyText }}
-        </p>
+        <div class="vmz-ui-autocomplete__field">
+            <div class="vmz-ui-autocomplete__control-wrap">
+                <Icon name="action.search" size="md" decorative class="vmz-ui-autocomplete__search-icon" />
+                <input :id="controlId" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" :aria-expanded="openAttr" :aria-controls="listId" :aria-invalid="error ? 'true' : 'false'" :aria-describedby="describedBy" :value="value" :placeholder="placeholder" :disabled="disabled" @input="onDomInput" :onKeyDown="onKeyDown" class="vmz-ui-autocomplete__control" />
+            </div>
+            <div v-if="listOpen || (showEmpty && emptyText)" class="vmz-ui-autocomplete__panel">
+                <ul v-if="listOpen" :id="listId" role="listbox" data-vmz-autocomplete="list" @click="onListClick" class="vmz-ui-autocomplete__list">
+                    <li v-for="opt in options" :key="opt.value" role="option" :data-vmz-option="opt.value" :aria-selected="opt.value === value ? 'true' : 'false'" tabindex="-1" :class='"vmz-ui-autocomplete__option" + (opt.value === value ? " is-on" : "")'>
+                        <span class="vmz-ui-autocomplete__option-label">
+                            {{ opt.label }}
+                        </span>
+                        <Icon v-if="opt.value === value" name="action.check" size="md" decorative class="vmz-ui-autocomplete__option-check" />
+                    </li>
+                </ul>
+                <p v-if="showEmpty && emptyText" data-vmz-autocomplete="empty" class="vmz-ui-autocomplete__empty">
+                    {{ emptyText }}
+                </p>
+            </div>
+        </div>
         <p v-if="description" :id="descriptionId" class="vmz-ui-autocomplete__description">
             {{ description }}
         </p>
@@ -25,55 +35,142 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: var(--vmz-space-2);
+    width: 100%;
     max-width: 28rem;
+}
+
+.vmz-ui-autocomplete__field {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
 }
 
 .vmz-ui-autocomplete__label {
     font: inherit;
-    font-weight: 600;
+    font-weight: 500;
+    font-size: 0.875rem;
+    line-height: 1.5715;
+    color: var(--vmz-text-ink);
+}
+
+.vmz-ui-autocomplete__control-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.vmz-ui-autocomplete__search-icon {
+    position: absolute;
+    left: var(--vmz-density-control-padding-x);
+    z-index: 1;
+    color: var(--vmz-text-tertiary);
+    pointer-events: none;
 }
 
 .vmz-ui-autocomplete__control {
-    font: inherit;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: var(--vmz-control-height);
+    font-family: inherit;
+    font-size: 0.875rem;
+    line-height: 1.5715;
     padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
+    padding-left: calc(
+        var(--vmz-density-control-padding-x) + var(--vmz-space-4) + var(--vmz-space-1)
+    );
     border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
-    background: transparent;
-    color: inherit;
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
     outline: none;
+    transition:
+        border-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        box-shadow var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        background-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+}
+
+.vmz-ui-autocomplete__control::placeholder {
+    color: var(--vmz-text-tertiary);
+    opacity: 1;
 }
 
 .vmz-ui-autocomplete[data-invalid="true"] .vmz-ui-autocomplete__control {
     border-color: var(--vmz-status-danger-accent);
 }
 
+.vmz-ui-autocomplete[data-invalid="true"] .vmz-ui-autocomplete__control:hover:not(:disabled),
+.vmz-ui-autocomplete[data-invalid="true"] .vmz-ui-autocomplete__control:focus-visible {
+    border-color: var(--vmz-status-danger-foreground);
+}
+
+.vmz-ui-autocomplete__control:hover:not(:disabled):not(:focus-visible) {
+    border-color: var(--vmz-action-primary-hover);
+}
+
 .vmz-ui-autocomplete__control:focus-visible {
+    border-color: var(--vmz-action-primary-background);
     box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-autocomplete__control:disabled {
-    opacity: 0.55;
+    opacity: 0.6;
+    color: var(--vmz-text-muted);
     cursor: not-allowed;
+    background: var(--vmz-surface-mist);
+}
+
+.vmz-ui-autocomplete__panel {
+    position: absolute;
+    z-index: 40;
+    top: calc(100% + var(--vmz-space-1));
+    left: 0;
+    right: 0;
+    padding: var(--vmz-space-1);
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+    box-shadow: var(--vmz-shadow-popup);
 }
 
 .vmz-ui-autocomplete__list {
     list-style: none;
     margin: 0;
-    padding: 0.25rem 0;
-    border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
-    background: var(--vmz-surface-paper);
+    padding: 0;
     max-height: 12rem;
     overflow: auto;
 }
 
 .vmz-ui-autocomplete__option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vmz-space-2);
+    box-sizing: border-box;
+    min-height: var(--vmz-control-height);
     margin: 0;
-    padding: 0.5rem 0.75rem;
-    cursor: pointer;
-    font-weight: 600;
+    padding: 0 var(--vmz-density-control-padding-x);
+    border-radius: var(--vmz-radius-md);
     color: var(--vmz-text-ink);
+    font-size: 0.875rem;
+    line-height: 1.5715;
+    cursor: pointer;
+    outline: none;
+}
+
+.vmz-ui-autocomplete__option-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vmz-ui-autocomplete__option-check {
+    flex: 0 0 auto;
+    color: var(--vmz-action-primary-background);
 }
 
 .vmz-ui-autocomplete__option:hover,
@@ -82,22 +179,31 @@
     outline: none;
 }
 
+.vmz-ui-autocomplete__option.is-on {
+    background: var(--vmz-action-primary-soft);
+    color: var(--vmz-action-primary-active);
+}
+
 .vmz-ui-autocomplete__empty {
     margin: 0;
-    color: var(--vmz-text-steel);
-    font-size: 0.9em;
+    padding: var(--vmz-space-2) var(--vmz-density-control-padding-x);
+    color: var(--vmz-text-tertiary);
+    font-size: 0.875rem;
+    line-height: 1.5715;
 }
 
 .vmz-ui-autocomplete__description {
     margin: 0;
-    opacity: 0.75;
-    font-size: 0.9em;
+    color: var(--vmz-text-steel);
+    font-size: 0.875rem;
+    line-height: 1.5715;
 }
 
 .vmz-ui-autocomplete__error {
     margin: 0;
     color: var(--vmz-status-danger-foreground);
-    font-size: 0.9em;
+    font-size: 0.875rem;
+    line-height: 1.5715;
 }
 </style>
 <script client>
@@ -111,6 +217,7 @@ export default class Autocomplete {
     public description: string = "";
     public error: string = "";
     public value: string = "";
+    public placeholder: string = "";
     public options: Array<{
         value: string;
         label: string;
@@ -118,7 +225,7 @@ export default class Autocomplete {
     public listOpen: boolean = false;
     public openAttr: string = "false";
     public showEmpty: boolean = false;
-    public emptyText: string = "No matches";
+    public emptyText: string = "";
     public disabled: boolean = false;
     public invalidAttr: string = "false";
     public controlId: string = "vmz-autocomplete";
