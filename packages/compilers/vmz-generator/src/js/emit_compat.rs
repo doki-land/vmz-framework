@@ -393,10 +393,10 @@ pub fn rewrite_virtual_import(
 
 /// Author may write `from './foo.ts'`; Node ESM under `dist/` needs `.js`.
 ///
-/// Uses Oak CST-level [`rewrite_module_specifiers`] so that module strings inside
-/// comments or regular string literals are not mistaken for import specifiers.
-/// Gracefully falls back to a conservative text-level pass when Oak cannot parse
-/// the module (e.g. malformed TS/JS).
+/// Uses Oak CST-level [`rewrite_module_specifiers`] so only the specifier string
+/// itself is replaced — other text on the same line (comments, literals) and
+/// dynamic `import("…")` calls included. When Oak cannot parse the module the
+/// source is returned unchanged rather than risk a text-level false positive.
 pub fn rewrite_ts_spec_imports(js: &str) -> String {
     let remap = |spec: &str| -> Option<String> {
         if let Some(without_ext) = spec.strip_suffix(".tsx") {
@@ -408,31 +408,7 @@ pub fn rewrite_ts_spec_imports(js: &str) -> String {
         }
     };
 
-    if let Some(oak_version) = rewrite_module_specifiers(js, remap) {
-        return oak_version;
-    }
-
-    // Oak parse failed — conservative line-level fallback that only touches
-    // lines known to contain import/export statements. This is the previous
-    // implementation; we keep it here so malformed source does not crash.
-    js.lines()
-        .map(|line| {
-            let module_line = line.contains("from \"")
-                || line.contains("from '")
-                || line.contains("import(\"")
-                || line.contains("import('")
-                || line.contains("export \"")
-                || line.contains("export '");
-            if !module_line {
-                return line.to_string();
-            }
-            line.replace(".tsx\"", ".js\"")
-                .replace(".ts\"", ".js\"")
-                .replace(".tsx'", ".js'")
-                .replace(".ts'", ".js'")
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
+    rewrite_module_specifiers(js, remap).unwrap_or_else(|| js.to_string())
 }
 
 /// Eager/lazy entry module for serve / static hosts.

@@ -1,6 +1,8 @@
 //! Rewrite ESM module specifiers with Oak CST span patches.
 
+use oak_core::{Lexer, NoLexerCache, SourceText};
 use oak_typescript::ast::{Expression, ExpressionKind, Statement};
+use oak_typescript::{TypeScriptLanguage, TypeScriptLexer, TypeScriptTokenType as T};
 use vmz_oak_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
 
 /// Rewrite import, export-from, and dynamic-import module strings with Oak CST spans.
@@ -37,6 +39,9 @@ fn rewrite_module_specifiers_via_oak(
         role: ScriptRole::Client,
     };
     let parsed = parse_script_ast(&shell);
+    if !parsed.ok {
+        return None;
+    }
     let root = parsed.root.as_ref()?;
     if root.statements.is_empty() && !source.trim().is_empty() {
         return None;
@@ -154,7 +159,9 @@ fn collect_expr_spec_patches(
             collect_expr_spec_patches(source, object, map, out);
             collect_expr_spec_patches(source, property, map, out);
         }
-        ExpressionKind::AwaitExpression(inner) | ExpressionKind::SpreadElement(inner) => {
+        ExpressionKind::AwaitExpression(inner)
+        | ExpressionKind::UnaryExpression { argument: inner, .. }
+        | ExpressionKind::SpreadElement(inner) => {
             collect_expr_spec_patches(source, inner, map, out);
         }
         ExpressionKind::ArrayLiteral { elements } => {
@@ -210,14 +217,16 @@ fn push_string_spec_patch(
     let Some(next) = map(spec) else {
         return;
     };
-    let start = span_start.min(source.len());
-    let end = span_end.min(source.len());
-    let quote = source.as_bytes().get(start).copied().unwrap_or(b'"') as char;
-    if quote == '"' || quote == '\'' {
-        out.push((start, end, format!("{quote}{next}{quote}")));
-        return;
-    }
-    if let Some((start, end, quote)) = find_quoted_spec(source, span_start, span_end, spec) {
+    let quotable = |start: usize, end: usize| -> Option<(usize, usize, char)> {
+        let quote = source.as_bytes().get(start).copied()? as char;
+        if quote != '"' && quote != '\'' {
+            return None;
+        }
+        Some((start.min(source.len()), end.min(source.len()), quote))
+    };
+    if let Some((start, end, quote)) = quotable(span_start, span_end)
+        .or_else(|| find_specifier_string(source, span_start, span_end, spec))
+    {
         out.push((start, end, format!("{quote}{next}{quote}")));
     }
 }
@@ -230,7 +239,63 @@ fn push_spec_patch(
     map: &mut dyn FnMut(&str) -> Option<String>,
     out: &mut Vec<(usize, usize, String)>,
 ) {
-    push_string_spec_patch(source, span_start, span_end, spec, map, out);
+    let Some(next) = map(spec) else {
+        return;
+    };
+    let Some((start, end, quote)) = find_specifier_string(source, span_start, span_end, spec)
+    else {
+        return;
+    };
+    out.push((start, end, format!("{quote}{next}{quote}")));
+}
+
+/// Locate the string-literal token that carries `spec` inside a declaration span.
+///
+/// Works on Oak lexer tokens, so quotes inside comments or other literals in the
+/// same span are never mistaken for the module specifier.
+fn find_specifier_string(
+    source: &str,
+    span_start: usize,
+    span_end: usize,
+    spec: &str,
+) -> Option<(usize, usize, char)> {
+    for (start, end) in string_literals_in(source, span_start, span_end) {
+        if end <= start + 1 {
+            continue;
+        }
+        let quote = source.as_bytes().get(start).copied()? as char;
+        if (quote == '"' || quote == '\'') && &source[start + 1..end - 1] == spec {
+            return Some((start, end, quote));
+        }
+    }
+    None
+}
+
+/// String-literal token spans inside `[start, end)`.
+fn string_literals_in(source: &str, start: usize, end: usize) -> Vec<(usize, usize)> {
+    let end = end.min(source.len());
+    let start = start.min(end);
+    let slice = &source[start..end];
+    if slice.is_empty() {
+        return Vec::new();
+    }
+    let text = SourceText::new(slice);
+    let language = TypeScriptLanguage::default();
+    let lexer = TypeScriptLexer::new(&language);
+    let mut cache = NoLexerCache;
+    let Ok(tokens) = lexer.lex(&text, &[], &mut cache).result else {
+        return Vec::new();
+    };
+    let mut spans = Vec::new();
+    for token in tokens.iter() {
+        if token.kind == T::Eof {
+            break;
+        }
+        if token.kind == T::StringLiteral {
+            spans.push((start + token.span.start, start + token.span.end));
+        }
+    }
+    spans
 }
 
 fn scan_span_for_quoted_specs(
@@ -240,58 +305,20 @@ fn scan_span_for_quoted_specs(
     map: &mut dyn FnMut(&str) -> Option<String>,
     out: &mut Vec<(usize, usize, String)>,
 ) {
-    let end = span_end.min(source.len());
-    let start = span_start.min(end);
-    let bytes = source[start..end].as_bytes();
-    let mut i = 0usize;
-    while i < bytes.len() {
-        let quote = bytes[i];
-        if quote != b'"' && quote != b'\'' {
-            i += 1;
+    for (start, end) in string_literals_in(source, span_start, span_end) {
+        if end <= start + 1 {
             continue;
         }
-        let mut j = i + 1;
-        while j < bytes.len() {
-            if bytes[j] == b'\\' {
-                j = (j + 2).min(bytes.len());
-                continue;
-            }
-            if bytes[j] == quote {
-                let abs_start = start + i;
-                let abs_end = start + j + 1;
-                let spec = &source[abs_start + 1..abs_end - 1];
-                if let Some(next) = map(spec) {
-                    let q = quote as char;
-                    out.push((abs_start, abs_end, format!("{q}{next}{q}")));
-                }
-                i = j + 1;
-                break;
-            }
-            j += 1;
+        let Some(quote) = source.as_bytes().get(start).copied().map(char::from) else {
+            continue;
+        };
+        if quote != '"' && quote != '\'' {
+            continue;
         }
-        if j >= bytes.len() {
-            break;
+        if let Some(next) = map(&source[start + 1..end - 1]) {
+            out.push((start, end, format!("{quote}{next}{quote}")));
         }
     }
-}
-
-fn find_quoted_spec(
-    source: &str,
-    span_start: usize,
-    span_end: usize,
-    spec: &str,
-) -> Option<(usize, usize, char)> {
-    let end = span_end.min(source.len());
-    let start = span_start.min(end);
-    let slice = &source[start..end];
-    for quote in ['"', '\''] {
-        let needle = format!("{quote}{spec}{quote}");
-        if let Some(rel) = slice.rfind(&needle) {
-            let abs = start + rel;
-            return Some((abs, abs + needle.len(), quote));
-        }
-    }
-    None
 }
 
 fn apply_span_patches(source: &str, patches: &mut [(usize, usize, String)]) -> String {
