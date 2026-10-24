@@ -46,6 +46,17 @@ struct Frame {
 /// Returns an error for syntax that cannot be erased without changing runtime
 /// behavior, such as `enum`, `namespace`, `declare module` and `declare global`.
 pub fn erase_types(source: &str) -> Result<String, String> {
+    Ok(erase_types_with_deletions(source)?.0)
+}
+
+/// Erase TypeScript syntax and report the removed byte ranges.
+///
+/// The ranges are sorted and merged, so they can be used to map erased output
+/// offsets back to the original source and to keep the minifier from emitting
+/// type-only tokens.
+pub(crate) fn erase_types_with_deletions(
+    source: &str,
+) -> Result<(String, Vec<(usize, usize)>), String> {
     let text = SourceText::new(source);
     let language = TypeScriptLanguage::default();
     let lexer = TypeScriptLexer::new(&language);
@@ -74,7 +85,7 @@ struct Eraser<'a> {
 }
 
 impl<'a> Eraser<'a> {
-    fn run(mut self) -> Result<String, String> {
+    fn run(mut self) -> Result<(String, Vec<(usize, usize)>), String> {
         let mut frames: Vec<Frame> = Vec::new();
         let mut pending_class = false;
         let mut var_decl_depth: Option<usize> = None;
@@ -439,9 +450,10 @@ impl<'a> Eraser<'a> {
         Ok(self.apply())
     }
 
-    fn apply(mut self) -> String {
+    fn apply(mut self) -> (String, Vec<(usize, usize)>) {
         self.deletions.sort_unstable();
         let mut out = String::with_capacity(self.source.len());
+        let mut merged: Vec<(usize, usize)> = Vec::with_capacity(self.deletions.len());
         let mut cursor = 0usize;
         for (start, end) in self.deletions {
             let start = start.max(cursor).min(self.source.len());
@@ -449,12 +461,21 @@ impl<'a> Eraser<'a> {
             if start > cursor {
                 out.push_str(&self.source[cursor..start]);
             }
+            if end > start {
+                if let Some(last) = merged.last_mut()
+                    && last.1 >= start
+                {
+                    last.1 = last.1.max(end);
+                } else {
+                    merged.push((start, end));
+                }
+            }
             cursor = end;
         }
         if cursor < self.source.len() {
             out.push_str(&self.source[cursor..]);
         }
-        out
+        (out, merged)
     }
 
     fn kind(&self, index: usize) -> Option<T> {
