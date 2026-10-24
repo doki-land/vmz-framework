@@ -296,6 +296,10 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'ui/ui-author-surface.ts',
         description: 'Official UI author surface: CodeBlock, Dropdown, AppShell, Link, icon alias',
     },
+    'ssr-host-lifecycle': {
+        file: 'runtime/ssr-host-lifecycle.ts',
+        description: 'I-07 repro: SSR onMount has no implicit browser location',
+    },
     'ssr-unknown-component-error-node': {
         file: 'ui/ssr-unknown-component-error-node.ts',
         description: 'Unknown Direct leaf → data-vmz-error node; document SSR does not throw',
@@ -691,6 +695,7 @@ export const CHECK_ALL = [
     'class-style-bindings',
     'ui-nav-button',
     'ui-author-surface',
+    'ssr-host-lifecycle',
     'ssr-unknown-component-error-node',
     'ui-data-grid',
     'ui-icons',
