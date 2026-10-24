@@ -6,9 +6,12 @@
         <div data-vmz-dropdown-menu="1" role="menu" class="vmz-ui-dropdown__menu">
             <div v-for="item in items" :key="item.id" class="vmz-ui-dropdown__row">
                 <div v-if="item.divider" role="separator" class="vmz-ui-dropdown__divider" />
-                <a v-else :href="item.href" role="menuitem" :data-vmz-dropdown-item="item.id" :data-danger="item.danger ? 'true' : 'false'" :data-disabled="item.disabled ? 'true' : 'false'" :aria-disabled="item.disabled ? 'true' : null" :tabindex="item.disabled ? -1 : null" class="vmz-ui-dropdown__item">
+                <a v-else-if="hasHref(item)" :href="item.href" role="menuitem" :data-vmz-dropdown-item="item.id" :data-danger="item.danger ? 'true' : 'false'" :data-disabled="item.disabled ? 'true' : 'false'" :aria-disabled="item.disabled ? 'true' : null" :tabindex="item.disabled ? -1 : null" class="vmz-ui-dropdown__item">
                     {{ item.title }}
                 </a>
+                <button v-else type="button" role="menuitem" :data-vmz-dropdown-item="item.id" :data-danger="item.danger ? 'true' : 'false'" :data-disabled="item.disabled ? 'true' : 'false'" :aria-disabled="item.disabled ? 'true' : null" :tabindex="item.disabled ? -1 : null" class="vmz-ui-dropdown__item" @click="onItemClick">
+                    {{ item.title }}
+                </button>
             </div>
         </div>
     </details>
@@ -116,11 +119,17 @@
 
 .vmz-ui-dropdown__item {
     display: block;
+    width: 100%;
     padding: 0.5rem 0.75rem;
+    border: 0;
     border-radius: var(--vmz-radius-sm, 4px);
+    background: transparent;
     color: var(--vmz-text-ink);
+    cursor: pointer;
+    font: inherit;
     font-size: 0.875rem;
     line-height: 1.4286;
+    text-align: left;
     text-decoration: none;
     outline: none;
     transition:
@@ -160,16 +169,18 @@
 <script client>
 /**
  * VMZ UI — Dropdown (Menu).
- * Native `<details>` disclosure: works without JS, menu items are plain links
- * unless a host attaches selection handlers.
+ * Native `<details>` disclosure: works without JS. An item with a non-empty
+ * `href` is a plain link; an item without `href` is an action button that
+ * notifies via `onSelect(id)`. Selection handlers never navigate.
  */
 export type DropdownItem = {
     id: string;
     title: string;
+    /** Non-empty → link item (native navigation). Empty/absent → action item. */
     href?: string;
     /** Destructive action styling. */
     danger?: boolean;
-    /** Non-interactive state. */
+    /** Non-interactive state: neither navigates nor selects. */
     disabled?: boolean;
     /** Render a separator instead of a row (title/href are ignored). */
     divider?: boolean;
@@ -178,5 +189,38 @@ export type DropdownItem = {
 export default class Dropdown {
     public label: string = "Menu";
     public items: DropdownItem[] = [];
+    /** Action-item selection callback (`:on-select`). Link items bypass it. */
+    public onSelect: ((id: string) => void) | null = null;
+
+    hasHref(item) {
+        return typeof item?.href === "string" && item.href.length > 0;
+    }
+
+    onItemClick(ev) {
+        const el = ev && ev.currentTarget;
+        const id =
+            el && typeof el.getAttribute === "function"
+                ? el.getAttribute("data-vmz-dropdown-item")
+                : null;
+        if (!id) return;
+        const item = this.items.find((candidate) => candidate.id === id);
+        if (!item || item.disabled || this.hasHref(item)) return;
+        this.close();
+        if (typeof this.onSelect === "function") this.onSelect(id);
+    }
+
+    close() {
+        const root = this.__vmzDomRoot;
+        if (!root) return;
+        const details =
+            root.tagName === "DETAILS"
+                ? root
+                : typeof root.closest === "function"
+                  ? root.closest("details")
+                  : null;
+        if (details && typeof details.removeAttribute === "function") {
+            details.removeAttribute("open");
+        }
+    }
 }
 </script>

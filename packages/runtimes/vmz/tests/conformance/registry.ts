@@ -292,6 +292,10 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'ui/ui-nav-button.ts',
         description: 'Button href renders single navigable anchor',
     },
+    'ui-author-surface': {
+        file: 'ui/ui-author-surface.ts',
+        description: 'Official UI author surface: CodeBlock, Dropdown, AppShell, Link, icon alias',
+    },
     'ssr-unknown-component-error-node': {
         file: 'ui/ssr-unknown-component-error-node.ts',
         description: 'Unknown Direct leaf → data-vmz-error node; document SSR does not throw',
@@ -686,6 +690,7 @@ export const CHECK_ALL = [
     'ui-v-if-dom',
     'class-style-bindings',
     'ui-nav-button',
+    'ui-author-surface',
     'ssr-unknown-component-error-node',
     'ui-data-grid',
     'ui-icons',
