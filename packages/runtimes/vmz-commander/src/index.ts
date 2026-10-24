@@ -78,26 +78,92 @@ function errorText(value: string): string {
     return paint(value, 'bold', 'red');
 }
 
+/** One help row: the literal flag/command plus an optional localized suffix (example, deprecation). */
+type HelpRow = { rawName: string; helpId: string; suffix?: string };
+
 /**
  * Render one help section (header + padded table).
  *
  * Both the root help and the command-node help share the same 3-line pattern:
- * push section header (`paint(t(headerId), 'bold', 'blue')`), then a loop of
- * `  ${paint(raw.padEnd(colWidth), color)} ${t(helpId)}`.
+ * push section header (`paint(header, 'bold', 'blue')`), then a loop of
+ * `  ${paint(label.padEnd(colWidth), color)} ${t(helpId)}`.
  *
  * Returns `lines[]` so callers can spread-append without trailing-empty concerns.
  */
-function renderHelpSection(
+function renderHelpSectionWithHeader(
     t: LocalizePlugin['t'],
-    headerId: string,
-    rows: ReadonlyArray<{ rawName: string; helpId: string }>,
+    header: string,
+    rows: ReadonlyArray<HelpRow>,
     color: Color,
     colWidth = 28,
 ): string[] {
     if (!rows.length) return [];
-    const out: string[] = [paint(t(headerId), 'bold', 'blue')];
+    const out: string[] = [paint(header, 'bold', 'blue')];
     for (const r of rows) {
-        out.push(`  ${paint(r.rawName.padEnd(colWidth), color)} ${t(r.helpId)}`);
+        const label = r.suffix ? `${r.rawName} ${r.suffix}` : r.rawName;
+        out.push(`  ${paint(label.padEnd(colWidth), color)} ${t(r.helpId)}`);
+    }
+    return out;
+}
+
+function renderHelpSection(
+    t: LocalizePlugin['t'],
+    headerId: string,
+    rows: ReadonlyArray<HelpRow>,
+    color: Color,
+    colWidth = 28,
+): string[] {
+    return renderHelpSectionWithHeader(t, t(headerId), rows, color, colWidth);
+}
+
+/** Resolve a catalog id, treating `{{id}}` (unresolved) as absent. */
+function localizedOrId(t: LocalizePlugin['t'], id: string, args?: Record<string, string>): string {
+    const value = t(id, args);
+    return value === `{{${id}}}` ? '' : value;
+}
+
+/** Localized suffix appended to one option row in help. */
+function optionSuffix(t: LocalizePlugin['t'], def: OptionDef): string {
+    const config = def.config;
+    if (!config) return '';
+    const parts: string[] = [];
+    if (config.example) parts.push(t('commander.ui.option_example', { example: config.example }));
+    if (config.deprecated) {
+        const label = typeof config.deprecated === 'string' && config.deprecated
+            ? (localizedOrId(t, config.deprecated) || config.deprecated)
+            : t('commander.ui.deprecated');
+        if (label) parts.push(label);
+    }
+    return parts.join(' ');
+}
+
+/**
+ * Render option help, splitting grouped options into their own sections.
+ *
+ * Options without `group` keep the default `Options:` section. `hidden` options
+ * are omitted from help but remain parseable.
+ */
+function renderOptionSections(t: LocalizePlugin['t'], options: OptionDef[], color: Color): string[] {
+    const visible = options.filter((o) => !o.config?.hidden);
+    const ungrouped: OptionDef[] = [];
+    const grouped = new Map<string, OptionDef[]>();
+    for (const option of visible) {
+        const group = option.config?.group;
+        if (!group) {
+            ungrouped.push(option);
+            continue;
+        }
+        const list = grouped.get(group) ?? [];
+        list.push(option);
+        grouped.set(group, list);
+    }
+    const rows = (list: OptionDef[]): HelpRow[] =>
+        list.map((o) => ({ rawName: o.rawName, helpId: o.helpId, suffix: optionSuffix(t, o) }));
+    const out = renderHelpSection(t, 'commander.ui.options', rows(ungrouped), color);
+    for (const [group, list] of grouped) {
+        const header = localizedOrId(t, group) || group;
+        if (out.length) out.push('');
+        out.push(...renderHelpSectionWithHeader(t, header, rows(list), color));
     }
     return out;
 }
@@ -462,13 +528,11 @@ class CliBuilder implements Cli {
             ...this.rootOptions,
             ...collectRootOptions(this.roots.map((c) => c.def)).filter((o) => !this.rootOptions.some((r) => r.key === o.key)),
         ];
-        lines.push('');
-        lines.push(...renderHelpSection(
-            t,
-            'commander.ui.options',
-            opts.map((o) => ({ rawName: o.rawName, helpId: o.helpId })),
-            'yellow',
-        ));
+        const optionSection = renderOptionSections(t, opts, 'yellow');
+        if (optionSection.length) {
+            lines.push('');
+            lines.push(...optionSection);
+        }
         return lines.join('\n');
     }
 
@@ -522,8 +586,13 @@ class CliBuilder implements Cli {
         }
 
         let options: ParsedOptions;
+        let usedOptions: Set<OptionDef> = new Set();
         try {
-            options = def.passthrough ? { _: rest.slice() } : parseOptions(rest, def.options);
+            if (def.passthrough) {
+                options = { _: rest.slice() };
+            } else {
+                ({ options, used: usedOptions } = parseOptionsDetailed(rest, def.options));
+            }
         } catch (err) {
             const cliErr = CliError.from(err, 'commander::parse_failed');
             const args = { ...(cliErr.args ?? {}), cmd: path.join(' ') };
@@ -538,6 +607,20 @@ class CliBuilder implements Cli {
         for (const [k, v] of Object.entries(globalOpts)) {
             if (k === '_') continue;
             if (options[k] === undefined) options[k] = v as string | boolean | string[];
+        }
+
+        for (const option of def.options) {
+            const deprecated = option.config?.deprecated;
+            if (!deprecated || !usedOptions.has(option)) continue;
+            const args: Record<string, string> = { option: option.key };
+            if (typeof deprecated === 'string' && deprecated) {
+                args.detail = localizedOrId(t, deprecated) || deprecated;
+            }
+            this.emitDiagnostic(
+                { code: 'commander::option_deprecated', severity: 'warning', args },
+                diagnosticContext,
+                t,
+            );
         }
 
         try {
@@ -619,14 +702,10 @@ export function formatCommandHelp(
         ));
     }
     const opts = [...rootOptions, ...def.options.filter((o) => !rootOptions.some((r) => r.key === o.key))];
-    if (opts.length) {
+    const optionSection = renderOptionSections(t, opts, 'yellow');
+    if (optionSection.length) {
         lines.push('');
-        lines.push(...renderHelpSection(
-            t,
-            'commander.ui.options',
-            opts.map((o) => ({ rawName: o.rawName, helpId: o.helpId })),
-            'yellow',
-        ));
+        lines.push(...optionSection);
     }
     return lines.join('\n').trimEnd();
 }
@@ -695,13 +774,15 @@ function parseArgvCore(
     argv: string[],
     optionDefs: OptionDef[],
     strict: boolean,
-): { options: ParsedOptions; rest: string[] } {
+): { options: ParsedOptions; rest: string[]; used: Set<OptionDef> } {
     const byAlias = new Map<string, OptionDef>();
     for (const def of optionDefs) {
         for (const a of def.aliases) byAlias.set(a, def);
     }
     const options: ParsedOptions = { _: [] };
     const rest: string[] = [];
+    /** Options explicitly supplied on the command line (defaults are not "used"). */
+    const used = new Set<OptionDef>();
 
     const handleMissing = (flagName: string) => {
         if (strict) {
@@ -736,21 +817,21 @@ function parseArgvCore(
             }
             if (def.takesValue) {
                 if (eq !== -1) {
-                    assignOption(options, def, a.slice(eq + 1));
+                    assignOption(options, def, used, a.slice(eq + 1));
                 } else {
                     const next = argv[i + 1];
                     if (next != null && !next.startsWith('-')) {
-                        assignOption(options, def, next);
+                        assignOption(options, def, used, next);
                         i += 1;
                     } else if (def.optionalValue) {
-                        assignOption(options, def, true);
+                        assignOption(options, def, used, true);
                     } else {
                         if (!handleMissing(`--${long}`)) continue;
                         continue;
                     }
                 }
             } else {
-                assignOption(options, def, true);
+                assignOption(options, def, used, true);
             }
             continue;
         }
@@ -765,22 +846,22 @@ function parseArgvCore(
             if (def.takesValue) {
                 const next = argv[i + 1];
                 if (next != null && !next.startsWith('-')) {
-                    assignOption(options, def, next);
+                    assignOption(options, def, used, next);
                     i += 1;
                 } else if (def.optionalValue) {
-                    assignOption(options, def, true);
+                    assignOption(options, def, used, true);
                 } else {
                     if (!handleMissing(`-${short}`)) continue;
                     continue;
                 }
             } else {
-                assignOption(options, def, true);
+                assignOption(options, def, used, true);
             }
             continue;
         }
         rest.push(a);
     }
-    return { options, rest };
+    return { options, rest, used };
 }
 
 /**
@@ -788,7 +869,8 @@ function parseArgvCore(
  * (unlike {@link parseOptions}, which throws on unknown options).
  */
 export function peelKnownOptions(argv: string[], optionDefs: OptionDef[]): { options: ParsedOptions; rest: string[] } {
-    return parseArgvCore(argv, optionDefs, false);
+    const { options, rest } = parseArgvCore(argv, optionDefs, false);
+    return { options, rest };
 }
 
 /** Strip `node` + script when callers pass full `process.argv`. */
@@ -881,12 +963,77 @@ function normalizeDiagnostic(error: unknown): CommandDiagnostic {
  * Non-option tokens become positionals under `options._`.
  */
 export function parseOptions(argv: string[], optionDefs: OptionDef[]): ParsedOptions {
-    const { options, rest } = parseArgvCore(argv, optionDefs, true);
-    options._.push(...rest);
-    return options;
+    return parseOptionsDetailed(argv, optionDefs).options;
 }
 
-function assignOption(out: ParsedOptions, def: OptionDef, value: string | boolean): void {
+/** Strict parse plus which option defs were actually supplied (for deprecation warnings). */
+function parseOptionsDetailed(
+    argv: string[],
+    optionDefs: OptionDef[],
+): { options: ParsedOptions; used: Set<OptionDef> } {
+    const { options, rest, used } = parseArgvCore(argv, optionDefs, true);
+    options._.push(...rest);
+    applyOptionConfig(options, optionDefs, used);
+    return { options, used };
+}
+
+/**
+ * Apply `.option(..., config)` runtime constraints (default / required / enum / coerce).
+ *
+ * Runs before any action handler executes and throws {@link CliError.parseError}
+ * (exit code 2) so callers receive structured `code` + `args` diagnostics.
+ */
+function applyOptionConfig(
+    options: ParsedOptions,
+    optionDefs: OptionDef[],
+    used: Set<OptionDef>,
+): void {
+    for (const def of optionDefs) {
+        const config = def.config;
+        if (!config) continue;
+        const provided = used.has(def);
+        if (!provided && config.default !== undefined) {
+            options[def.key] = Array.isArray(config.default) ? config.default.slice() : config.default;
+        }
+        const value = options[def.key];
+        if (config.required && value === undefined) {
+            throw CliError.parseError('commander::missing_required_option', { option: def.key });
+        }
+        if (value === undefined) continue;
+        if (config.enum && provided) {
+            const values = Array.isArray(value) ? value : [value];
+            for (const item of values) {
+                if (typeof item !== 'string') continue;
+                if (!config.enum.includes(item)) {
+                    throw CliError.parseError('commander::option_not_in_enum', {
+                        option: def.key,
+                        value: item,
+                        allowed: config.enum.join(', '),
+                    });
+                }
+            }
+        }
+        if (config.coerce && provided) {
+            try {
+                options[def.key] = config.coerce(value) as string | boolean | string[];
+            } catch (err) {
+                throw CliError.parseError('commander::option_coerce_failed', {
+                    option: def.key,
+                    value: Array.isArray(value) ? value.join(', ') : String(value),
+                    detail: err instanceof Error ? err.message : String(err),
+                });
+            }
+        }
+    }
+}
+
+function assignOption(
+    out: ParsedOptions,
+    def: OptionDef,
+    used: Set<OptionDef>,
+    value: string | boolean,
+): void {
+    used.add(def);
     if (def.repeatable) {
         const cur = out[def.key];
         const list = Array.isArray(cur) ? cur : [];
