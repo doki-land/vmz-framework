@@ -1,5 +1,5 @@
 <template>
-    <div data-vmz-ui="segmented" role="group" :aria-label="label" class="vmz-ui-segmented">
+    <div data-vmz-ui="segmented" role="group" :aria-label="label" :data-size="size" class="vmz-ui-segmented">
         <button v-for="opt in options" :key="opt.value" type="button" :data-vmz-segment="opt.value" :aria-pressed="opt.value === value ? 'true' : 'false'" @click="(() => onPick(opt.value))">
             {{ opt.label }}
         </button>
@@ -9,38 +9,73 @@
 .vmz-ui-segmented {
     display: inline-flex;
     max-width: 100%;
-    padding: 0.2rem;
-    border-radius: var(--vmz-radius-md, 6px);
+    padding: var(--vmz-space-1);
+    border-radius: var(--vmz-radius-lg);
     background: var(--vmz-surface-mist);
     overflow-x: auto;
 }
+
 .vmz-ui-segmented button {
-    min-height: 2rem;
-    padding: 0.25rem 0.75rem;
+    box-sizing: border-box;
+    min-height: var(--vmz-control-height);
+    padding: 0 var(--vmz-space-3);
     border: 0;
-    border-radius: calc(var(--vmz-radius-md, 6px) - 2px);
+    border-radius: var(--vmz-radius-md);
     background: transparent;
     color: var(--vmz-text-steel);
     font: inherit;
     font-size: 0.875rem;
-    font-weight: 550;
+    font-weight: 500;
+    line-height: 1.5715;
     white-space: nowrap;
     cursor: pointer;
+    outline: none;
+    transition:
+        background-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        box-shadow var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
 }
+
+.vmz-ui-segmented[data-size="small"] button {
+    min-height: var(--vmz-control-height-sm);
+    padding: 0 var(--vmz-space-2);
+}
+
+.vmz-ui-segmented[data-size="large"] button {
+    min-height: var(--vmz-control-height-lg);
+    padding: 0 var(--vmz-space-4);
+}
+
+.vmz-ui-segmented button:hover:not([aria-pressed="true"]) {
+    color: var(--vmz-text-ink);
+    background: var(--vmz-surface-fill);
+}
+
 .vmz-ui-segmented button[aria-pressed="true"] {
     background: var(--vmz-surface-paper);
     color: var(--vmz-text-ink);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0 0 1px var(--vmz-line-default);
 }
+
+.vmz-ui-segmented button[aria-pressed="true"]:hover {
+    color: var(--vmz-text-ink);
+}
+
 .vmz-ui-segmented button:focus-visible {
-    outline: 2px solid var(--vmz-focus-ring);
-    outline-offset: -2px;
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vmz-ui-segmented button {
+        transition: none;
+    }
 }
 </style>
 <script client>
 export default class Segmented {
-    public label: string = "Segments";
+    public label: string = "";
     public value: string = "";
+    public size: string = "middle";
     public options: Array<{ value: string; label: string }> = [];
     public onChange: ((value: string) => void) | null = null;
     onPick(next: string) {
