@@ -1,12 +1,13 @@
 /**
  * Motion compiler IR thin gate — Dialog/Drawer program.json carries MotionView
- * transitions (owner/trigger/cancel/generation) + plan motion_transition nodes + graph cancel edges.
+ * transitions (owner/trigger/cancel/generation) + plan motion-transition nodes + graph cancel edges.
  */
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { repoRoot } from '../_lib/repo-root.ts';
+import { resolveDeliveryDist } from '../_lib/serve-host-env.ts';
 
 const root = repoRoot(import.meta.url);
 const homepage = path.join(root, 'packages', 'homepage');
@@ -28,7 +29,7 @@ if (build.status !== 0) {
 }
 
 function readProgram(name) {
-    const p = path.join(homepage, 'dist', 'components', `${name}.program.json`);
+    const p = path.join(resolveDeliveryDist(homepage), 'components', `${name}.program.json`);
     if (!fs.existsSync(p)) fail(`missing ${name}.program.json`);
     return JSON.parse(fs.readFileSync(p, 'utf8'));
 }
@@ -56,8 +57,8 @@ function assertOverlayMotion(name, overlayKind) {
     if (!enter.cancelable || !enter.generation || !exit.cancelable || !exit.generation) {
         fail(`${name}: overlay transitions must be cancelable+generation`);
     }
-    if (enter.reduced_motion !== 'honor' || exit.reduced_motion !== 'honor') {
-        fail(`${name}: reduced_motion must be honor`);
+    if (enter.reducedMotion !== 'honor' || exit.reducedMotion !== 'honor') {
+        fail(`${name}: reducedMotion must be honor`);
     }
     if (enter.token !== 'motion.overlay' || exit.token !== 'motion.overlay') {
         fail(`${name}: overlay token want motion.overlay, got ${enter.token}/${exit.token}`);
@@ -76,8 +77,8 @@ function assertOverlayMotion(name, overlayKind) {
         fail(`${name}: missing motion→region affects edges`);
     }
     const planNodes = unit.plan?.nodes || [];
-    if (!planNodes.some((n) => n.kind === 'motion_transition')) {
-        fail(`${name}: Execution Plan missing motion_transition nodes`);
+    if (!planNodes.some((n) => n.kind === 'motion-transition')) {
+        fail(`${name}: Execution Plan missing motion-transition nodes`);
     }
     console.log(`motion-ir: ${name} overlay motion OK`);
 }
@@ -90,7 +91,7 @@ assertOverlayMotion('Drawer', 'drawer');
     const transitions = unit.motion?.transitions || [];
     const control = transitions.find((t) => t.kind === 'control');
     if (!control) fail(`Button: missing control motion transition: ${JSON.stringify(transitions)}`);
-    if (control.trigger !== 'control' || control.reduced_motion !== 'honor') {
+    if (control.trigger !== 'control' || control.reducedMotion !== 'honor') {
         fail(`Button: control transition shape: ${JSON.stringify(control)}`);
     }
     if (control.token !== 'motion.control') {

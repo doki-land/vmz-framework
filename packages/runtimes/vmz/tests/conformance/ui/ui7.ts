@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { repoRoot } from '../_lib/repo-root.ts';
+import { resolveDeliveryDist } from '../_lib/serve-host-env.ts';
 
 const root = repoRoot(import.meta.url);
 const homepage = path.join(root, 'packages', 'homepage');
@@ -55,8 +56,8 @@ function assertMotion(label, unit, expect) {
         fail(`${label}: motion missing generation transition`);
     }
     if (typeof expect.reducedMotion === 'string') {
-        if (!transitions.every((t) => t.reduced_motion === expect.reducedMotion)) {
-            fail(`${label}: reduced_motion want ${expect.reducedMotion}`);
+        if (!transitions.every((t) => t.reducedMotion === expect.reducedMotion)) {
+            fail(`${label}: reducedMotion want ${expect.reducedMotion}`);
         }
     }
     if (expect.hasRegion === true && !transitions.some((t) => t.region != null)) {
@@ -74,8 +75,8 @@ function assertMotion(label, unit, expect) {
             if (!hit) fail(`${label}: missing cancels from ${from}`);
         }
     }
-    if (expect.planMotionTransition === true && !planNodes.some((n) => n.kind === 'motion_transition')) {
-        fail(`${label}: plan missing motion_transition`);
+    if (expect.planMotionTransition === true && !planNodes.some((n) => n.kind === 'motion-transition')) {
+        fail(`${label}: plan missing motion-transition`);
     }
 }
 
@@ -104,7 +105,7 @@ for (const rel of pack.fixtures) {
     }
     const component = fixture.artifact?.component;
     if (!component) fail(`${rel}: artifact.component required`);
-    const programPath = path.join(homepage, 'dist', 'components', `${component}.program.json`);
+    const programPath = path.join(resolveDeliveryDist(homepage), 'components', `${component}.program.json`);
     if (!fs.existsSync(programPath)) fail(`${rel}: missing ${programPath}`);
     const unit = unitOf(JSON.parse(fs.readFileSync(programPath, 'utf8')));
     const assertions = Array.isArray(fixture.assertions) ? fixture.assertions : [];

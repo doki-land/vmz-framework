@@ -510,8 +510,8 @@ export function runCompileManifest(manifest: Record<string, unknown>, ctx: { out
                 }
             }
             if (typeof expect.reducedMotion === 'string') {
-                if (!transitions.every((t) => t.reduced_motion === expect.reducedMotion)) {
-                    fail(`motion.reduced_motion want ${expect.reducedMotion}: ${JSON.stringify(transitions)}`);
+                if (!transitions.every((t) => t.reducedMotion === expect.reducedMotion)) {
+                    fail(`motion.reducedMotion want ${expect.reducedMotion}: ${JSON.stringify(transitions)}`);
                 }
             }
             if (expect.hasRegion === true) {
@@ -533,8 +533,8 @@ export function runCompileManifest(manifest: Record<string, unknown>, ctx: { out
                 }
             }
             if (expect.planMotionTransition === true) {
-                const nodes = ((plan?.nodes as Array<Record<string, unknown>>) || []).filter((n) => n.kind === 'motion_transition');
-                if (!nodes.length) fail('plan missing motion_transition nodes');
+                const nodes = ((plan?.nodes as Array<Record<string, unknown>>) || []).filter((n) => n.kind === 'motion-transition');
+                if (!nodes.length) fail('plan missing motion-transition nodes');
             }
             continue;
         }

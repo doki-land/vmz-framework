@@ -158,12 +158,19 @@ const homeDesigns = path.join(homepage, 'designs', 'tokens', 'semantic-action.js
 const homeMotion = path.join(homepage, 'designs', 'tokens', 'semantic-motion.json');
 const homeStatus = path.join(homepage, 'designs', 'tokens', 'semantic-status.json');
 const homeDensity = path.join(homepage, 'designs', 'tokens', 'semantic-density.json');
+const homeLayout = path.join(homepage, 'designs', 'tokens', 'semantic-layout.json');
 const homeBrand = path.join(homepage, 'designs', 'tokens', 'brand.json');
 if (!fs.existsSync(homeDesigns)) fail('homepage missing designs/tokens/semantic-action.json');
 if (!fs.existsSync(homeMotion)) fail('homepage missing designs/tokens/semantic-motion.json');
 if (!fs.existsSync(homeStatus)) fail('homepage missing designs/tokens/semantic-status.json');
 if (!fs.existsSync(homeDensity)) fail('homepage missing designs/tokens/semantic-density.json');
+if (!fs.existsSync(homeLayout)) fail('homepage missing designs/tokens/semantic-layout.json');
 if (!fs.existsSync(homeBrand)) fail('homepage missing designs/tokens/brand.json');
+const homeMotionTokens = JSON.parse(fs.readFileSync(homeMotion, 'utf8'));
+const homeMotionValue = (path) =>
+    homeMotionTokens.entries.find((e) => Array.isArray(e.key?.path) && e.key.path.join('.') === path)?.value;
+const overlayDuration = homeMotionValue('motion.overlay.duration');
+if (!overlayDuration) fail('homepage semantic-motion.json missing motion.overlay.duration');
 const homeBuild = runBuild(homepage);
 if (homeBuild.status !== 0) fail(`homepage build failed\n${homeBuild.out}`);
 const designsCssPath = path.join(HOME_DIST, 'vmz-designs.css');
@@ -214,6 +221,7 @@ export default class IndexPage {}
     fs.copyFileSync(homeMotion, path.join(dir, 'designs', 'tokens', 'semantic-motion.json'));
     fs.copyFileSync(homeStatus, path.join(dir, 'designs', 'tokens', 'semantic-status.json'));
     fs.copyFileSync(homeDensity, path.join(dir, 'designs', 'tokens', 'semantic-density.json'));
+    fs.copyFileSync(homeLayout, path.join(dir, 'designs', 'tokens', 'semantic-layout.json'));
     fs.copyFileSync(homeBrand, path.join(dir, 'designs', 'tokens', 'brand.json'));
     fs.writeFileSync(
         path.join(dir, 'designs', 'styles', 'index.scss'),
@@ -2026,8 +2034,8 @@ async function proveMotionContinuity(page) {
             animation: cs.animationName || '',
         };
     });
-    if (!overlayMotion || overlayMotion.duration !== '180ms') {
-        fail(`Motion: dialog overlay duration want 180ms, got ${JSON.stringify(overlayMotion)}`);
+    if (!overlayMotion || overlayMotion.duration !== overlayDuration) {
+        fail(`Motion: dialog overlay duration want ${overlayDuration}, got ${JSON.stringify(overlayMotion)}`);
     }
     if (!overlayMotion.animation || overlayMotion.animation === 'none') {
         fail(`Motion: dialog enter animation missing: ${overlayMotion.animation}`);

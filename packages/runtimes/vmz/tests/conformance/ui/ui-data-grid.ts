@@ -1,5 +1,5 @@
 /**
- * ui-data-grid deepen gate — @vmz/ui-data-grid package + homepage /datagrid fixture.
+ * ui-data-grid deepen gate — @vmz/ui-data-grid package + homepage /lab/datagrid fixture.
  *
  * Asserts:
  * - package identity; peer @vmz/ui; no Button/Field/Dialog shells
@@ -148,8 +148,8 @@ const homePkg = JSON.parse(fs.readFileSync(path.join(homepage, 'package.json'), 
 if (!homePkg.dependencies?.['@vmz/ui-data-grid']) {
     fail('homepage must depend on @vmz/ui-data-grid');
 }
-const pageSrcPath = path.join(homepage, 'src', 'pages', 'datagrid.vmz');
-if (!fs.existsSync(pageSrcPath)) fail('homepage missing src/pages/datagrid.vmz');
+const pageSrcPath = path.join(homepage, 'src', 'pages', 'lab', 'datagrid.vmz');
+if (!fs.existsSync(pageSrcPath)) fail('homepage missing src/pages/lab/datagrid.vmz');
 const pageSrc = fs.readFileSync(pageSrcPath, 'utf8');
 if (!pageSrc.includes('<DataGrid') || !pageSrc.includes('data-vmz-fixture="datagrid"')) {
     fail('homepage /datagrid must compose <DataGrid>');
@@ -265,7 +265,7 @@ async function proveBrowser(dist) {
         try {
             const page = await browser.newPage();
             page.setDefaultTimeout(20000);
-            await page.goto(`http://127.0.0.1:${PORT}/datagrid`, { waitUntil: 'networkidle0', timeout: 20000 });
+            await page.goto(`http://127.0.0.1:${PORT}/lab/datagrid`, { waitUntil: 'networkidle0', timeout: 20000 });
             await page.waitForSelector('[data-vmz-fixture="datagrid"]', { timeout: 10000 });
             await page.waitForFunction(
                 () => {
@@ -403,9 +403,8 @@ async function proveBrowser(dist) {
                 });
 
             await page.evaluate(() => {
-                const btn = [...document.querySelectorAll('[data-vmz-fixture="datagrid"] button.vmz-ui-btn')].find((b) =>
-                    (b.textContent || '').includes('Clear'),
-                );
+                // Copy is locale-owned; select the bulk-actions clear control structurally.
+                const btn = document.querySelector('[data-vmz-ui="bulk-actions"] button.vmz-ui-btn');
                 btn?.click();
             });
             await page.waitForFunction(
