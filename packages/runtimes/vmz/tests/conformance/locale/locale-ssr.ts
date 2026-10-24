@@ -22,7 +22,7 @@ import {
     planLocalePathNavigation,
     realizeRoutePath,
     resolveLinkHref,
-} from '../../../dist/locale-router.js';
+} from '../../../dist/locale/locale-router.js';
 
 const root = repoRoot(import.meta.url);
 const fixture = path.join(root, 'packages', 'examples', 'locales-fixture');
