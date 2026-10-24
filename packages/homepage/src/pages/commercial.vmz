@@ -123,40 +123,9 @@
                     </div>
                     <Drawer v-if="drawerOpen" :open="drawerOpen" :title="commercialDrawerTitleLabel" title-id="home-commercial-drawer-title" :on-close="(() => drawerOpen = false)">
                         <div class="vmz-commercial-drawer-content">
-                            <dl data-vmz-fixture="commercial-drawer-body" class="vmz-commercial-detail">
-                                <div>
-                                    <dt>
-                                        {{ commercialDrawerProjectLabel }}
-                                    </dt>
-                                    <dd data-vmz-fixture="commercial-drawer-project">
-                                        {{ detailProject }}
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt>
-                                        {{ commercialDrawerTargetLabel }}
-                                    </dt>
-                                    <dd data-vmz-fixture="commercial-drawer-target">
-                                        {{ detailTarget }}
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt>
-                                        {{ commercialDrawerStatusLabel }}
-                                    </dt>
-                                    <dd data-vmz-fixture="commercial-drawer-status">
-                                        {{ detailStatus }}
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt>
-                                        {{ commercialDrawerActorLabel }}
-                                    </dt>
-                                    <dd data-vmz-fixture="commercial-drawer-actor">
-                                        {{ detailActor }}
-                                    </dd>
-                                </div>
-                            </dl>
+                            <div data-vmz-fixture="commercial-drawer-project" class="vmz-commercial-drawer-detail">
+                                <Descriptions columns="1" :items="drawerItems" />
+                            </div>
                             <Link href="/console">
                                 {{ commercialOpenConsoleLabel }}
                             </Link>
@@ -174,8 +143,8 @@
                     </p>
                 </div>
                 <div class="vmz-commercial-task__demo vmz-commercial-panel">
-                    <Form :label="commercialFormLabel" :error-summary="actionSummary" summary-id="home-commercial-summary" :described-by="actionDescribedBy" @submit="confirmReview" @reset="resetReview">
-                        <Field :label="commercialReviewNoteLabel" :placeholder="commercialReviewPlaceholder" :description="commercialReviewNoteDescLabel" control-id="home-commercial-review" description-id="home-commercial-review-desc" error-id="home-commercial-review-err" :described-by="reviewDescribedBy" :error="reviewError" :invalid-attr="reviewInvalid" :value="reviewNote" @input="onReviewNote" />
+                    <Form :label="commercialFormLabel" :error-summary="actionSummary" summary-id="home-commercial-summary" :described-by="actionDescribedBy" :rules="reviewRules" :values="reviewValues" @submit="confirmReview" @invalid="onReviewInvalid" @reset="resetReview">
+                        <Field :label="commercialReviewNoteLabel" :placeholder="commercialReviewPlaceholder" :description="commercialReviewNoteDescLabel" control-id="home-commercial-review" description-id="home-commercial-review-desc" error-id="home-commercial-review-err" :described-by="reviewDescribedBy" :error="reviewError" :value="reviewNote" @input="onReviewNote" />
                         <p data-vmz-fixture="commercial-review-note" class="vmz-sr-only">
                             note:
                             {{ reviewNote }}
@@ -396,29 +365,8 @@
     line-height: 1.375rem;
 }
 
-.vmz-commercial-detail {
-    display: grid;
-    gap: 0.85rem;
-    margin: 0 0 1rem;
-}
-
-.vmz-commercial-detail > div {
-    display: grid;
-    gap: 0.2rem;
-}
-
-.vmz-commercial-detail dt {
-    margin: 0;
-    color: var(--vmz-text-steel);
-    font-size: 0.8125rem;
-    line-height: 1.25rem;
-}
-
-.vmz-commercial-detail dd {
-    margin: 0;
-    color: var(--vmz-text-ink);
-    font-size: 0.875rem;
-    line-height: 1.375rem;
+.vmz-commercial-drawer-detail {
+    margin-bottom: 1rem;
 }
 
 @media (max-width: 768px) {
@@ -538,13 +486,15 @@ export default class CommercialPage {
     appliedBrowseQuery = "";
     reviewNote = "";
     reviewError = "";
-    reviewInvalid = "false";
+    reviewValues = { note: "" };
+    reviewRules = { note: { required: true, minLength: 4 } };
     reviewDescribedBy = "home-commercial-review-desc";
     actionSummary = "";
     actionDescribedBy = "";
     reviewSuccess = false;
     statusOverrides = {};
     drawerOpen = false;
+    drawerItems = [];
     detailProject = "";
     detailTarget = "";
     detailStatus = "";
@@ -695,6 +645,7 @@ export default class CommercialPage {
         this.commercialDrawerStatusLabel = commercialDrawerStatus();
         this.commercialDrawerActorLabel = commercialDrawerActor();
         this.commercialOpenConsoleLabel = commercialOpenConsole();
+        this.rebuildDrawerItems();
         this.browseColumns = [
             { id: "name", title: consoleColName() },
             { id: "target", title: consoleColTarget() },
@@ -776,6 +727,7 @@ export default class CommercialPage {
                     ? String(row.cells[2] || "")
                     : String(detail.statusLabel || "");
                 this.detailActor = String(detail.owner || "");
+                this.rebuildDrawerItems();
                 return;
             }
         } catch {
@@ -786,32 +738,39 @@ export default class CommercialPage {
         this.detailTarget = String(row.cells[1] || "");
         this.detailStatus = String(row.cells[2] || "");
         this.detailActor = String(row.cells[3] || "");
+        this.rebuildDrawerItems();
+    }
+
+    rebuildDrawerItems() {
+        this.drawerItems = [
+            { term: this.commercialDrawerProjectLabel, detail: this.detailProject },
+            { term: this.commercialDrawerTargetLabel, detail: this.detailTarget },
+            { term: this.commercialDrawerStatusLabel, detail: this.detailStatus },
+            { term: this.commercialDrawerActorLabel, detail: this.detailActor },
+        ];
     }
 
     onReviewNote(e) {
         this.reviewNote = e && e.target ? e.target.value : "";
+        this.reviewValues = { note: this.reviewNote };
         if (this.reviewError) {
             this.reviewError = "";
-            this.reviewInvalid = "false";
             this.reviewDescribedBy = "home-commercial-review-desc";
             this.actionSummary = "";
             this.actionDescribedBy = "";
         }
     }
 
+    onReviewInvalid() {
+        this.reviewError = commercialReviewError();
+        this.reviewDescribedBy = "home-commercial-review-desc home-commercial-review-err";
+        this.actionSummary = commercialContactSummaryError();
+        this.actionDescribedBy = "home-commercial-summary";
+        this.reviewSuccess = false;
+    }
+
     confirmReview() {
-        const ok = String(this.reviewNote || "").trim().length >= 4;
-        if (!ok) {
-            this.reviewError = commercialReviewError();
-            this.reviewInvalid = "true";
-            this.reviewDescribedBy = "home-commercial-review-desc home-commercial-review-err";
-            this.actionSummary = commercialContactSummaryError();
-            this.actionDescribedBy = "home-commercial-summary";
-            this.reviewSuccess = false;
-            return;
-        }
         this.reviewError = "";
-        this.reviewInvalid = "false";
         this.reviewDescribedBy = "home-commercial-review-desc";
         this.actionSummary = "";
         this.actionDescribedBy = "";
@@ -829,7 +788,7 @@ export default class CommercialPage {
     resetReview() {
         this.reviewNote = "";
         this.reviewError = "";
-        this.reviewInvalid = "false";
+        this.reviewValues = { note: "" };
         this.reviewDescribedBy = "home-commercial-review-desc";
         this.actionSummary = "";
         this.actionDescribedBy = "";

@@ -81,64 +81,13 @@
                 </section>
                 <Drawer v-if="drawerOpen" :open="drawerOpen" :title="consoleDrawerTitleLabel" title-id="home-console-drawer-title" :on-close="(() => drawerOpen = false)">
                     <div class="vmz-console-drawer-content">
-                        <dl data-vmz-fixture="console-drawer-body" class="vmz-console-detail">
-                            <div>
-                                <dt>
-                                    {{ consoleDrawerProjectLabel }}
-                                </dt>
-                                <dd data-vmz-fixture="console-drawer-project">
-                                    {{ detailProject }}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt>
-                                    {{ consoleDrawerTargetLabel }}
-                                </dt>
-                                <dd data-vmz-fixture="console-drawer-target">
-                                    {{ detailTarget }}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt>
-                                    {{ consoleDrawerStatusLabel }}
-                                </dt>
-                                <dd data-vmz-fixture="console-drawer-status">
-                                    {{ detailStatus }}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt>
-                                    {{ consoleDrawerActorLabel }}
-                                </dt>
-                                <dd data-vmz-fixture="console-drawer-actor">
-                                    {{ detailActor }}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt>
-                                    {{ consoleDrawerUpdatedLabel }}
-                                </dt>
-                                <dd data-vmz-fixture="console-drawer-updated">
-                                    {{ detailUpdated }}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt>
-                                    {{ consoleDrawerBranchLabel }}
-                                </dt>
-                                <dd data-vmz-fixture="console-drawer-branch">
-                                    {{ detailBranch }}
-                                </dd>
-                            </div>
-                        </dl>
+                        <Descriptions columns="1" :items="drawerItems" />
                         <div class="vmz-console-note">
                             <TextArea :label="noteLabel" :description="noteDescription" control-id="home-console-note" description-id="home-console-note-desc" error-id="home-console-note-err" described-by="home-console-note-desc" :value="noteDraft" :error="noteError" @input="onNoteInput" />
                             <Button type="button" variant="primary" @click="saveNote">
                                 {{ noteSaveLabel }}
                             </Button>
-                            <p v-if="noteSaved" role="status" class="vmz-console-note__saved">
-                                {{ noteSavedLabel }}
-                            </p>
+                            <Message v-if="noteSaved" :title="noteSavedLabel" tone="success" :on-close="(() => noteSaved = false)" />
                         </div>
                     </div>
                 </Drawer>
@@ -235,30 +184,6 @@
     background: var(--vmz-surface-paper);
 }
 
-.vmz-console-detail {
-    display: grid;
-    gap: 0.85rem;
-    margin: 0;
-}
-
-.vmz-console-detail > div {
-    display: grid;
-    gap: 0.2rem;
-}
-
-.vmz-console-detail dt {
-    margin: 0;
-    color: var(--vmz-text-steel);
-    font-size: 0.8125rem;
-    line-height: 1.25rem;
-}
-
-.vmz-console-detail dd {
-    margin: 0;
-    color: var(--vmz-text-ink);
-    font-size: 0.875rem;
-    line-height: 1.375rem;
-}
 .vmz-console-note {
     display: grid;
     justify-items: start;
@@ -269,11 +194,6 @@
 }
 .vmz-console-note .vmz-ui-textarea {
     width: 100%;
-}
-.vmz-console-note__saved {
-    margin: 0;
-    color: var(--vmz-status-success-foreground);
-    font-size: 0.875rem;
 }
 .vmz-console-scroll-hint {
     display: none;
@@ -424,6 +344,7 @@ export default class ConsolePage {
     selectedCount = 0;
     bulkLabel = "";
     drawerOpen = false;
+    drawerItems = [];
     detailProject = "";
     detailTarget = "";
     detailStatus = "";
@@ -574,6 +495,7 @@ export default class ConsolePage {
         this.consoleDrawerActorLabel = consoleDrawerActor();
         this.consoleDrawerUpdatedLabel = consoleDrawerUpdated();
         this.consoleDrawerBranchLabel = consoleDrawerBranch();
+        this.rebuildDrawerItems();
         this.columns = [
             { id: "name", title: consoleColName() },
             { id: "target", title: consoleColTarget() },
@@ -705,6 +627,7 @@ export default class ConsolePage {
                 this.detailActor = String(detail.owner || "");
                 this.detailUpdated = String(detail.updated || "");
                 this.detailBranch = String(detail.context || "");
+                this.rebuildDrawerItems();
                 return;
             }
         } catch {
@@ -717,6 +640,7 @@ export default class ConsolePage {
         this.detailActor = String(row.cells[3] || "");
         this.detailUpdated = String(row.cells[4] || "");
         this.detailBranch = "";
+        this.rebuildDrawerItems();
     }
 
     onNoteInput(event) {
@@ -751,6 +675,17 @@ export default class ConsolePage {
             if (row) this.detailStatus = row.cells[2];
         }
         this.refreshPage();
+    }
+
+    rebuildDrawerItems() {
+        this.drawerItems = [
+            { term: this.consoleDrawerProjectLabel, detail: this.detailProject, fixture: "console-drawer-project" },
+            { term: this.consoleDrawerTargetLabel, detail: this.detailTarget, fixture: "console-drawer-target" },
+            { term: this.consoleDrawerStatusLabel, detail: this.detailStatus, fixture: "console-drawer-status" },
+            { term: this.consoleDrawerActorLabel, detail: this.detailActor, fixture: "console-drawer-actor" },
+            { term: this.consoleDrawerUpdatedLabel, detail: this.detailUpdated, fixture: "console-drawer-updated" },
+            { term: this.consoleDrawerBranchLabel, detail: this.detailBranch, fixture: "console-drawer-branch" },
+        ];
     }
 
     saveNote() {

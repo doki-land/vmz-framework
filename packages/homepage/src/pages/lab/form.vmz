@@ -14,7 +14,7 @@
                     <Card :title="cardRequestTitle">
                         <Form :label="formLabel" :error-summary="errorSummary" summary-id="home-form-summary" :described-by="formDescribedBy" :disabled="submitting" :disabled-attr="disabledAttr" @submit="submit" @reset="reset">
                             <div data-vmz-fixture="form-email-row" class="vmz-form-email-row">
-                                <Field :label="emailLabel" :description="emailDesc" control-id="home-form-email" description-id="home-form-email-desc" error-id="home-form-email-err" :described-by="emailDescribedBy" :error="emailError" :invalid-attr="emailInvalid" :value="email" @input="onEmail" />
+                                <Field :label="emailLabel" :description="emailDesc" control-id="home-form-email" description-id="home-form-email-desc" error-id="home-form-email-err" :described-by="emailDescribedBy" :error="emailError" :value="email" @input="onEmail" />
                                 <div data-vmz-fixture="form-tip-toggle">
                                     <Button type="button" variant="ghost" @click="toggleTip">
                                         {{ emailWhy }}
@@ -24,7 +24,7 @@
                                     <span data-vmz-tooltip="anchor" aria-hidden="true" />
                                 </Tooltip>
                             </div>
-                            <FormItem :label="roleLabel" :description="roleDesc" :required="roleRequired" required-attr="true" :error="roleError" :invalid-attr="roleInvalid" control-id="home-form-role" description-id="home-form-role-desc" error-id="home-form-role-err">
+                            <FormItem :label="roleLabel" :description="roleDesc" :required="roleRequired" :error="roleError" control-id="home-form-role" description-id="home-form-role-desc" error-id="home-form-role-err">
                                 <Select control-id="home-form-role" :described-by="roleDescribedBy" :invalid-attr="roleInvalid" :value="role" :options="roleOptions" @change="onRole" />
                             </FormItem>
                             <Autocomplete :label="teamLabel" :description="teamDesc" control-id="home-form-team" list-id="home-form-team-list" description-id="home-form-team-desc" error-id="home-form-team-err" :described-by="teamDescribedBy" :error="teamError" :invalid-attr="teamInvalid" :value="team" :options="teamOptions" :list-open="teamListOpen" :open-attr="teamOpenAttr" :show-empty="teamEmpty" :empty-text="teamEmptyText" @input="onTeamInput" :on-select="onTeamSelect" :on-close="closeTeamList" />
@@ -259,7 +259,6 @@ export default class FormPage {
     errorSummary = "";
     formDescribedBy = "";
     emailError = "";
-    emailInvalid = "false";
     emailDescribedBy = "home-form-email-desc";
     roleError = "";
     roleInvalid = "false";
@@ -733,7 +732,6 @@ export default class FormPage {
 
     clearEmailError() {
         this.emailError = "";
-        this.emailInvalid = "false";
         this.emailDescribedBy = "home-form-email-desc";
     }
 
@@ -780,7 +778,6 @@ export default class FormPage {
         const agreeOk = !!this.agree;
 
         this.emailError = emailOk ? "" : this.errorEmail;
-        this.emailInvalid = emailOk ? "false" : "true";
         this.emailDescribedBy = emailOk
             ? "home-form-email-desc"
             : "home-form-email-desc home-form-email-err";
