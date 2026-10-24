@@ -1,5 +1,5 @@
 <template>
-    <div data-vmz-ui="field" :data-invalid="invalidAttr" class="vmz-ui-field">
+    <div data-vmz-ui="field" :data-invalid="error ? 'true' : 'false'" class="vmz-ui-field">
         <label v-if="label" :for="controlId" class="vmz-ui-field__label">
             {{ label }}
         </label>
@@ -157,7 +157,6 @@ export default class Field {
     public step: string = "";
     public disabled: boolean = false;
     public readonly: boolean = false;
-    public invalidAttr: string = "false";
     public controlId: string = "vmz-field";
     public descriptionId: string = "vmz-field-desc";
     public errorId: string = "vmz-field-err";

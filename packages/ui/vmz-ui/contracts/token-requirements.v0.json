@@ -192,7 +192,7 @@
                 "density.control.padding-x"
             ],
             "surfaces": ["WebSurface"],
-            "contracts": ["submit-reset", "error-summary", "no-parallel-form-store", "novalidate"]
+            "contracts": ["submit-reset", "error-summary", "no-parallel-form-store", "novalidate", "rule-validation"]
         },
         "FormItem": {
             "source": "src/components/FormItem.vmz",
@@ -325,6 +325,63 @@
                 "live-open-prop",
                 "overlay-stacking"
             ]
+        },
+        "Popconfirm": {
+            "source": "src/components/Popconfirm.vmz",
+            "stableHint": "ui.Popconfirm",
+            "tokens": [
+                "line.subtle",
+                "surface.paper",
+                "text.ink",
+                "text.steel",
+                "radius.lg",
+                "shadow.popup",
+                "status.danger.accent",
+                "status.warning.accent",
+                "status.info.accent",
+                "focus.ring",
+                "motion.overlay.duration",
+                "motion.overlay.easing"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": [
+                "destructive-confirm",
+                "overlay-ownership",
+                "outside-dismiss",
+                "focus-enter",
+                "focus-restore",
+                "escape-dismiss",
+                "overlay-stacking"
+            ]
+        },
+        "Message": {
+            "source": "src/components/Message.vmz",
+            "stableHint": "ui.Message",
+            "tokens": [
+                "surface.paper",
+                "text.ink",
+                "text.steel",
+                "text.tertiary",
+                "line.subtle",
+                "radius.lg",
+                "shadow.popup",
+                "status.info.accent",
+                "status.success.accent",
+                "status.warning.accent",
+                "status.danger.accent",
+                "focus.ring",
+                "motion.overlay.duration",
+                "motion.overlay.easing"
+            ],
+            "surfaces": ["WebSurface"],
+            "contracts": ["transient-feedback", "auto-dismiss", "tone-matrix", "status-tokens"]
+        },
+        "Descriptions": {
+            "source": "src/components/Descriptions.vmz",
+            "stableHint": "ui.Descriptions",
+            "tokens": ["text.ink", "text.steel", "line.default", "line.subtle", "radius.md"],
+            "surfaces": ["WebSurface"],
+            "contracts": ["read-only-detail", "column-layout", "no-column-inference"]
         },
         "AppShell": {
             "source": "src/components/AppShell.vmz",

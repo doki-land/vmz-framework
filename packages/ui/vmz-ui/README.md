@@ -25,6 +25,8 @@ Headline surface for this cut:
 - Upload multipart binary (parent-owned FormData → `#server` File/Blob; progress/cancel)
 - Density / RTL / preset materialize
 - Motion continuity + interrupt/cancel
+- Form rule validation (`Form#rules` + `values` → `invalid`), destructive `Popconfirm`,
+  transient `Message`, read-only `Descriptions`
 - Motion compiler IR thin gate (`pnpm verify -- motion-ir`)
 - UI7 conformance pack (`@vmz/ui/conformance` + `pnpm verify -- ui7`)
 - `@vmz/ui-data-grid` thin gate (virtualization + pinned column — not tree/group/pivot/edit)

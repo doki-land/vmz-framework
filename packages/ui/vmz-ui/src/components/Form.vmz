@@ -34,6 +34,9 @@
 /**
  * VMZ UI — Form (hand-written commercial form shell).
  * Parent owns field values + validation presentation; no parallel form store.
+ * `rules` + `values` are evaluated at submit only: failures emit `invalid`
+ * (field -> rule key: required | min | max | pattern | custom) and suppress
+ * `submit`. Copy stays author-supplied.
  * Native submit/reset guarded; browser HTML5 validation left off (data-novalidate + preventDefault).
  */
 export default class Form {
@@ -43,13 +46,51 @@ export default class Form {
     public describedBy: string = "";
     public disabled: boolean = false;
     public disabledAttr: string = "false";
+    public rules: Record<string, {
+        required?: boolean;
+        minLength?: number;
+        maxLength?: number;
+        pattern?: string;
+        test?: (value: string, values: Record<string, unknown>) => boolean;
+    }> = {};
+    public values: Record<string, unknown> = {};
     public onSubmit: (() => void) | null = null;
     public onReset: (() => void) | null = null;
+    public onInvalid: ((errors: Record<string, string>) => void) | null = null;
     onSubmitGuard(ev) {
         if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
         if (this.disabled) return;
+        const errors = this.collectErrors();
+        if (Object.keys(errors).length > 0) {
+            this.emit("invalid", errors);
+            if (typeof this.onInvalid === "function") this.onInvalid(errors);
+            return;
+        }
         this.emit("submit");
         if (typeof this.onSubmit === "function") this.onSubmit();
+    }
+    collectErrors() {
+        const errors: Record<string, string> = {};
+        const rules = this.rules || {};
+        const values = this.values || {};
+        for (const field of Object.keys(rules)) {
+            const rule = rules[field] || {};
+            const raw = values[field];
+            const text = raw == null ? "" : String(raw);
+            const filled = text.trim().length > 0;
+            if (rule.required && !filled) {
+                errors[field] = "required";
+            } else if (rule.minLength && filled && text.length < Number(rule.minLength)) {
+                errors[field] = "min";
+            } else if (rule.maxLength && text.length > Number(rule.maxLength)) {
+                errors[field] = "max";
+            } else if (rule.pattern && filled && !new RegExp(String(rule.pattern)).test(text)) {
+                errors[field] = "pattern";
+            } else if (typeof rule.test === "function" && !rule.test(text, values)) {
+                errors[field] = "custom";
+            }
+        }
+        return errors;
     }
     onResetGuard(ev) {
         if (ev && typeof ev.preventDefault === "function") ev.preventDefault();

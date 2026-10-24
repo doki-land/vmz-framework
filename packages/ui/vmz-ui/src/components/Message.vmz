@@ -1,0 +1,167 @@
+<template>
+    <span data-vmz-ui="message" :data-tone="tone" :role="roleAttr()" class="vmz-ui-message">
+        <span aria-hidden="true" class="vmz-ui-message__icon">
+            <Icon :name="toneIcon()" size="md" decorative />
+        </span>
+        <span class="vmz-ui-message__content">
+            <span class="vmz-ui-message__title">
+                {{ title }}
+            </span>
+            <span v-if="description" class="vmz-ui-message__description">
+                {{ description }}
+            </span>
+        </span>
+        <button v-if="closable" type="button" class="vmz-ui-message__close" :aria-label="closeLabel || title" @click="dismiss">
+            <Icon name="action.close" size="sm" decorative />
+        </button>
+    </span>
+</template>
+<style>
+.vmz-ui-message {
+    position: fixed;
+    top: 1.25rem;
+    left: 50%;
+    z-index: 45;
+    transform: translateX(-50%);
+    box-sizing: border-box;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--vmz-space-2, 0.5rem);
+    width: max-content;
+    max-width: min(420px, calc(100vw - 2rem));
+    padding: 0.6rem 0.85rem;
+    border: 1px solid var(--vmz-line-subtle);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
+    box-shadow: var(--vmz-shadow-popup);
+    animation: vmz-ui-message-in var(--vmz-motion-overlay-duration) var(--vmz-motion-overlay-easing);
+}
+
+.vmz-ui-message__icon {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.5rem;
+    color: var(--vmz-status-info-accent);
+}
+
+.vmz-ui-message[data-tone="success"] .vmz-ui-message__icon {
+    color: var(--vmz-status-success-accent);
+}
+
+.vmz-ui-message[data-tone="warning"] .vmz-ui-message__icon {
+    color: var(--vmz-status-warning-accent);
+}
+
+.vmz-ui-message[data-tone="danger"] .vmz-ui-message__icon {
+    color: var(--vmz-status-danger-accent);
+}
+
+.vmz-ui-message__content {
+    flex: 1 1 auto;
+    display: block;
+    min-width: 0;
+    padding-top: 0.1rem;
+}
+
+.vmz-ui-message__title {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--vmz-text-ink);
+}
+
+.vmz-ui-message__description {
+    display: block;
+    margin-top: 1px;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: var(--vmz-text-steel);
+}
+
+.vmz-ui-message__close {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--vmz-radius-sm);
+    background: transparent;
+    color: var(--vmz-text-tertiary);
+    cursor: pointer;
+    outline: none;
+    transition: color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+}
+
+.vmz-ui-message__close:hover {
+    color: var(--vmz-text-ink);
+}
+
+.vmz-ui-message__close:focus-visible {
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+}
+
+@keyframes vmz-ui-message-in {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vmz-ui-message {
+        animation: none;
+    }
+}
+</style>
+<script client>
+/**
+ * VMZ UI — Message.
+ * Transient confirmation toast for completed operations (render with `v-if`).
+ * Parent owns visibility. `duration > 0` auto-dismisses and emits `close`;
+ * the caller decides what side effects follow.
+ */
+export default class Message {
+    public title: string = "";
+    public description: string = "";
+    public tone: string = "success";
+    public closable: boolean = false;
+    public closeLabel: string = "";
+    public duration: number = 3200;
+    public onClose: (() => void) | null = null;
+    _timer = null;
+    onMount() {
+        const ms = Number(this.duration);
+        if (!Number.isFinite(ms) || ms <= 0) return;
+        this._timer = setTimeout(() => this.dismiss(), ms);
+    }
+    onDestroy() {
+        if (this._timer) clearTimeout(this._timer);
+        this._timer = null;
+    }
+    roleAttr() {
+        return String(this.tone).toLowerCase() === "danger" ? "alert" : "status";
+    }
+    toneIcon() {
+        const tone = String(this.tone || "").toLowerCase();
+        if (tone === "success" || tone === "warning" || tone === "danger") return `status.${tone}`;
+        return "status.info";
+    }
+    dismiss() {
+        if (this._timer) clearTimeout(this._timer);
+        this._timer = null;
+        this.emit("close");
+        if (typeof this.onClose === "function") this.onClose();
+    }
+}
+</script>

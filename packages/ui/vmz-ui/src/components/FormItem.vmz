@@ -1,5 +1,5 @@
 <template>
-    <div data-vmz-ui="form-item" :data-required="requiredAttr" :data-invalid="invalidAttr" class="vmz-ui-form-item">
+    <div data-vmz-ui="form-item" :data-required="required ? 'true' : 'false'" :data-invalid="error ? 'true' : 'false'" class="vmz-ui-form-item">
         <label v-if="label" :for="controlId" class="vmz-ui-form-item__label">
             <span>
                 {{ label }}
@@ -71,8 +71,6 @@ export default class FormItem {
     public description: string = "";
     public error: string = "";
     public required: boolean = false;
-    public requiredAttr: string = "false";
-    public invalidAttr: string = "false";
     public controlId: string = "vmz-form-item";
     public descriptionId: string = "vmz-form-item-desc";
     public errorId: string = "vmz-form-item-err";

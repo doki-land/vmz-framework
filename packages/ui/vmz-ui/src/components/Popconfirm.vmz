@@ -1,0 +1,287 @@
+<template>
+    <span data-vmz-ui="popconfirm" :data-tone="tone" class="vmz-ui-popconfirm-root">
+        <span class="vmz-ui-popconfirm__trigger">
+            <slot />
+        </span>
+        <span v-if="open" data-vmz-overlay="popconfirm" data-vmz-overlay-owner="popconfirm" :data-vmz-overlay-stack="stackLevel" class="vmz-ui-popconfirm">
+            <button type="button" data-vmz-overlay-layer="backdrop" :aria-label="cancelLabel || title" @click="cancel" class="vmz-ui-popconfirm__backdrop" />
+            <span role="dialog" aria-modal="false" :aria-labelledby="title ? titleId : null" tabindex="-1" data-vmz-overlay-layer="panel" data-vmz-focus="enter" :onKeyDown="onPanelKeyDown" class="vmz-ui-popconfirm__panel">
+                <span aria-hidden="true" class="vmz-ui-popconfirm__icon">
+                    <Icon :name="toneIcon()" size="md" decorative />
+                </span>
+                <span class="vmz-ui-popconfirm__content">
+                    <span v-if="title" :id="titleId" class="vmz-ui-popconfirm__title">
+                        {{ title }}
+                    </span>
+                    <span v-if="description" class="vmz-ui-popconfirm__description">
+                        {{ description }}
+                    </span>
+                    <span class="vmz-ui-popconfirm__actions">
+                        <Button type="button" variant="secondary" size="small" @click="cancel">
+                            {{ cancelLabel }}
+                        </Button>
+                        <Button type="button" :variant="tone === 'danger' ? 'danger' : 'primary'" size="small" @click="confirm">
+                            {{ confirmLabel }}
+                        </Button>
+                    </span>
+                </span>
+            </span>
+        </span>
+    </span>
+</template>
+<style>
+.vmz-ui-popconfirm-root {
+    display: inline-flex;
+}
+
+.vmz-ui-popconfirm {
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    pointer-events: none;
+}
+
+.vmz-ui-popconfirm[data-vmz-overlay-stack="1"] {
+    z-index: 50;
+}
+
+.vmz-ui-popconfirm[data-vmz-overlay-stack="2"] {
+    z-index: 60;
+}
+
+.vmz-ui-popconfirm[data-vmz-overlay-stack="3"] {
+    z-index: 70;
+}
+
+.vmz-ui-popconfirm__backdrop {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    cursor: default;
+    background: transparent;
+    pointer-events: auto;
+}
+
+.vmz-ui-popconfirm__panel {
+    position: absolute;
+    z-index: 1;
+    top: 30%;
+    left: 50%;
+    transform: translateX(-50%);
+    box-sizing: border-box;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    width: min(340px, calc(100vw - 32px));
+    padding: 12px;
+    border: 1px solid var(--vmz-line-subtle);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
+    box-shadow: var(--vmz-shadow-popup);
+    outline: none;
+    pointer-events: auto;
+    animation: vmz-ui-popconfirm-in var(--vmz-motion-overlay-duration) var(--vmz-motion-overlay-easing);
+}
+
+.vmz-ui-popconfirm__panel:focus-visible {
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring), var(--vmz-shadow-popup);
+}
+
+.vmz-ui-popconfirm__icon {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.5rem;
+    color: var(--vmz-status-warning-accent);
+}
+
+.vmz-ui-popconfirm[data-tone="danger"] .vmz-ui-popconfirm__icon {
+    color: var(--vmz-status-danger-accent);
+}
+
+.vmz-ui-popconfirm[data-tone="info"] .vmz-ui-popconfirm__icon {
+    color: var(--vmz-status-info-accent);
+}
+
+.vmz-ui-popconfirm__content {
+    flex: 1 1 auto;
+    display: block;
+    min-width: 0;
+}
+
+.vmz-ui-popconfirm__title {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.5;
+    color: var(--vmz-text-ink);
+}
+
+.vmz-ui-popconfirm__description {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--vmz-text-steel);
+}
+
+.vmz-ui-popconfirm__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+@keyframes vmz-ui-popconfirm-in {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-6px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0) scale(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vmz-ui-popconfirm__panel {
+        animation: none;
+    }
+}
+</style>
+<script client>
+/**
+ * VMZ UI — Popconfirm.
+ * Destructive-action confirmation. Same overlay contract as Popover: Escape,
+ * outside dismiss, focus enter/restore, stack-aware z-index.
+ * Parent owns `open`; confirm/cancel are emitted, the caller performs the action.
+ */
+export default class Popconfirm {
+    public open: boolean = false;
+    public title: string = "";
+    public description: string = "";
+    public tone: string = "danger";
+    public confirmLabel: string = "";
+    public cancelLabel: string = "";
+    public titleId: string = "vmz-popconfirm-title";
+    public stackLevel: string = "0";
+    public onConfirm: (() => void) | null = null;
+    public onCancel: (() => void) | null = null;
+    _restoreFocus = null;
+    _panel = null;
+    _docKeyHandler = null;
+    _observer = null;
+    onMount() {
+        if (typeof document === "undefined" || typeof MutationObserver === "undefined") return;
+        const root = this.__vmzDomRoot;
+        if (!root || typeof root.querySelector !== "function") return;
+        this._observer = new MutationObserver(() => this._syncFromDom());
+        this._observer.observe(root, {
+            childList: true,
+            subtree: true,
+        });
+        this._syncFromDom();
+    }
+    onDestroy() {
+        if (this._observer) {
+            this._observer.disconnect();
+            this._observer = null;
+        }
+        this._teardownDocKey();
+        this._panel = null;
+        this._restoreFocus = null;
+    }
+    confirm() {
+        this.emit("confirm");
+        if (typeof this.onConfirm === "function") this.onConfirm();
+    }
+    cancel() {
+        this.emit("cancel");
+        if (typeof this.onCancel === "function") this.onCancel();
+    }
+    toneIcon() {
+        const tone = String(this.tone || "").toLowerCase();
+        if (tone === "danger" || tone === "info" || tone === "success") return `status.${tone}`;
+        return "status.warning";
+    }
+    _isTopmostStack() {
+        if (typeof document === "undefined") return true;
+        const root = this.__vmzDomRoot;
+        const mine =
+            root && typeof root.querySelector === "function"
+                ? root.querySelector("[data-vmz-overlay][data-vmz-overlay-stack]")
+                : null;
+        const myStack = Number(mine?.getAttribute("data-vmz-overlay-stack") || this.stackLevel || "0");
+        const open = document.querySelectorAll("[data-vmz-overlay][data-vmz-overlay-stack]");
+        let max = -Infinity;
+        for (const el of open) {
+            const n = Number(el.getAttribute("data-vmz-overlay-stack") || "0");
+            if (Number.isFinite(n) && n > max) max = n;
+        }
+        if (!Number.isFinite(max)) return true;
+        return (Number.isFinite(myStack) ? myStack : 0) >= max;
+    }
+    onPanelKeyDown(ev) {
+        if (!ev || ev.key !== "Escape") return;
+        if (!this._isTopmostStack()) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        this.cancel();
+    }
+    _syncFromDom() {
+        const root = this.__vmzDomRoot;
+        const panel =
+            root && typeof root.querySelector === "function"
+                ? root.querySelector('[data-vmz-overlay="popconfirm"] [data-vmz-focus="enter"]')
+                : null;
+        if (panel && !this._panel) this._enterFocus(panel);
+        else if (!panel && this._panel) this._exitFocus();
+    }
+    _enterFocus(panel) {
+        if (typeof document === "undefined") return;
+        const active = document.activeElement;
+        if (!this._restoreFocus) {
+            const root = this.__vmzDomRoot;
+            const outside =
+                active instanceof HTMLElement &&
+                active !== document.body &&
+                !(root && typeof root.contains === "function" && root.contains(active));
+            if (outside) this._restoreFocus = active;
+        }
+        this._panel = panel instanceof HTMLElement ? panel : null;
+        if (this._panel && typeof this._panel.focus === "function") this._panel.focus();
+        if (!this._docKeyHandler) {
+            this._docKeyHandler = (ev) => {
+                if (ev.key !== "Escape") return;
+                if (ev.defaultPrevented) return;
+                if (!this._isTopmostStack()) return;
+                ev.preventDefault();
+                ev.stopPropagation();
+                this.cancel();
+            };
+            document.addEventListener("keydown", this._docKeyHandler);
+        }
+    }
+    _exitFocus() {
+        this._teardownDocKey();
+        this._panel = null;
+        const restore = this._restoreFocus;
+        this._restoreFocus = null;
+        if (restore && typeof restore.focus === "function" && document.contains(restore)) {
+            restore.focus();
+        }
+    }
+    _teardownDocKey() {
+        if (typeof document !== "undefined" && this._docKeyHandler) {
+            document.removeEventListener("keydown", this._docKeyHandler);
+        }
+        this._docKeyHandler = null;
+    }
+}
+</script>

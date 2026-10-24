@@ -1,0 +1,90 @@
+<template>
+    <dl data-vmz-ui="descriptions" :data-columns="normalizeColumns()" :data-bordered="bordered ? 'true' : 'false'" class="vmz-ui-descriptions">
+        <div v-for="item in items" :key="item.term" class="vmz-ui-descriptions__item">
+            <dt class="vmz-ui-descriptions__term">
+                {{ item.term }}
+            </dt>
+            <dd class="vmz-ui-descriptions__detail" :data-vmz-fixture="item.fixture || null">
+                {{ item.detail }}
+            </dd>
+        </div>
+        <slot />
+    </dl>
+</template>
+<style>
+.vmz-ui-descriptions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem 1.25rem;
+    margin: 0;
+    color: var(--vmz-text-ink);
+}
+
+.vmz-ui-descriptions[data-columns="1"] {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.vmz-ui-descriptions[data-columns="3"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.vmz-ui-descriptions__item {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.vmz-ui-descriptions__term {
+    margin: 0;
+    color: var(--vmz-text-steel);
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+}
+
+.vmz-ui-descriptions__detail {
+    margin: 0;
+    color: var(--vmz-text-ink);
+    font-size: 0.875rem;
+    line-height: 1.375rem;
+    overflow-wrap: anywhere;
+}
+
+.vmz-ui-descriptions[data-bordered="true"] {
+    gap: 0;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    overflow: hidden;
+}
+
+.vmz-ui-descriptions[data-bordered="true"] .vmz-ui-descriptions__item {
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid var(--vmz-line-subtle);
+}
+
+.vmz-ui-descriptions[data-bordered="true"] .vmz-ui-descriptions__item:last-child {
+    border-bottom: 0;
+}
+
+@media (max-width: 40rem) {
+    .vmz-ui-descriptions,
+    .vmz-ui-descriptions[data-columns="3"] {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+</style>
+<script client>
+/**
+ * VMZ UI — Descriptions.
+ * Read-only key/value detail block (drawer and record detail). Parent owns `items`.
+ * No data fetching, no column inference, no editing.
+ */
+export default class Descriptions {
+    public items: { term: string; detail: string; fixture?: string }[] = [];
+    public columns: string = "2";
+    public bordered: boolean = false;
+    normalizeColumns() {
+        const n = Number(this.columns);
+        return n === 1 || n === 2 || n === 3 ? String(n) : "2";
+    }
+}
+</script>
