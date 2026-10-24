@@ -70,6 +70,7 @@ jobs:
             packages/runtimes/vmz-test/dist \
             packages/plugins/vmz-plugin-shiki/dist \
             packages/plugins/vmz-plugin-markdown-it/dist \
+            packages/plugins/vmz-plugin-katex/dist \
             packages/runtimes/vmz-linux-x64/package.json \
             "$native"
           ls -lh runtime-build.tar.gz
@@ -159,6 +160,7 @@ jobs:
           test -f packages/runtimes/vmz/dist/cli/cli.js
           test -f packages/runtimes/vmz-runtime/dist/faces/server.js
           test -f packages/plugins/vmz-plugin-markdown-it/dist/vmz.plugin.js
+          test -f packages/plugins/vmz-plugin-katex/dist/vmz.plugin.js
           ls packages/runtimes/vmz-linux-x64/vmz.*.node
 
       - name: Assert skip-native-pre contract
