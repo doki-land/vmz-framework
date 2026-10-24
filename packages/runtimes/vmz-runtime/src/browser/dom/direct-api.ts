@@ -21,6 +21,7 @@ import {
     insertProjectedSlotNode,
     parkSlotNode,
     runDirectCreate,
+    slotAnchorFor,
     stripFns,
 } from './component.js';
 import { isEventEntryStrategy, noteDomCreate, noteDomRemove, scheduleClientOn } from './lifecycle.js';
@@ -492,8 +493,9 @@ export const directApi = {
         // call appends after the last one instead of re-searching for a slot.
         const anchor = hostEl.__vmzSlotAnchor;
         if (anchor && anchor.parentNode) {
+            const nextAnchor = slotAnchorFor(node);
             anchor.parentNode.insertBefore(node, anchor.nextSibling);
-            hostEl.__vmzSlotAnchor = node;
+            hostEl.__vmzSlotAnchor = nextAnchor;
             return;
         }
         // Component slot may live inside an unmounted `v-if` branch (closed overlay,

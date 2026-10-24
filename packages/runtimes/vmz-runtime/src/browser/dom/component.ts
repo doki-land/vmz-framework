@@ -197,14 +197,24 @@ export function destroy(inst) {
     }
 }
 
+/**
+ * DocumentFragment anchors are emptied by insertion (children move out, the
+ * fragment keeps no parentNode), so a projected fragment must anchor on its
+ * last child. Capture before inserting.
+ */
+export function slotAnchorFor(node) {
+    return node && node.nodeType === 11 ? node.lastChild : node;
+}
+
 export function insertProjectedSlotNode(target, node) {
     if (!target || !node) return null;
+    const anchor = slotAnchorFor(node);
     if (String(target.tagName || '').toLowerCase() === 'slot') {
         target.replaceWith(node);
-        return node;
+        return anchor;
     }
     target.appendChild(node);
-    return node;
+    return anchor;
 }
 
 /**
@@ -252,21 +262,22 @@ export function flushParkedSlotNodes(hostEl) {
         hostEl.__vmzSlotObserver = null;
     }
     hostEl.__vmzSlotParked = [];
+    const anchor = slotAnchorFor(parked[parked.length - 1]);
     const tag = String(target.tagName || '').toLowerCase();
     if (tag === 'slot') {
         const frag = typeof document !== 'undefined' ? document.createDocumentFragment() : null;
         if (!frag) {
             target.replaceWith(parked[0]);
-            hostEl.__vmzSlotAnchor = parked[parked.length - 1];
+            hostEl.__vmzSlotAnchor = anchor;
             return true;
         }
         for (const node of parked) frag.appendChild(node);
         target.replaceWith(frag);
-        hostEl.__vmzSlotAnchor = parked[parked.length - 1];
+        hostEl.__vmzSlotAnchor = anchor;
         return true;
     }
     for (const node of parked) target.appendChild(node);
-    hostEl.__vmzSlotAnchor = parked[parked.length - 1];
+    hostEl.__vmzSlotAnchor = anchor;
     return true;
 }
 
