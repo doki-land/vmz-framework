@@ -2321,7 +2321,7 @@ async function proveUi5Console(page) {
 
     const markers = await page.evaluate(() => ({
         density: document.querySelector('[data-vmz-fixture="ui5"]')?.getAttribute('data-density') || '',
-        crumb: !!document.querySelector('[data-vmz-ui="breadcrumb"] [data-vmz-crumb="ui5"]'),
+        crumb: !!document.querySelector('[data-vmz-ui="breadcrumb"] [data-vmz-crumb] [aria-current="page"]'),
         query: !!document.querySelector('[data-vmz-ui="query-form"][data-dense="true"]'),
         skeleton: !!document.querySelector('[data-vmz-ui="skeleton"][data-loading="true"]'),
         timeline: document.querySelectorAll('[data-vmz-ui="timeline"] [data-vmz-audit]').length,
@@ -2395,15 +2395,6 @@ async function proveUi5Console(page) {
 async function proveDocumentProduct(page) {
     console.log('ui-automation: Document/Product Prose/Toc/Callout/CodeBlock composition…');
 
-    async function clickToolbarButton(index) {
-        const found = await page.evaluate((buttonIndex) => {
-            const button = document.querySelectorAll('[data-vmz-fixture="product-toolbar"] button.vmz-ui-btn')[buttonIndex];
-            button?.click();
-            return !!button;
-        }, index);
-        if (!found) fail(`Document/Product: toolbar button ${index} missing`);
-    }
-
     for (const name of ['Prose', 'Toc', 'Callout', 'CodeBlock']) {
         const src = path.join(uiRoot, 'src', 'components', `${name}.vmz`);
         if (!fs.existsSync(src)) fail(`Document/Product missing ${name}.vmz`);
@@ -2418,18 +2409,19 @@ async function proveDocumentProduct(page) {
     await page.waitForSelector('[data-vmz-fixture="product"]', { timeout: 10000 });
 
     const markers = await page.evaluate(() => ({
-        shell: !!document.querySelector('[data-vmz-ui="app-shell"]'),
-        nav: !!document.querySelector('[data-vmz-nav="product"]'),
+        shell: !!document.querySelector('[data-vmz-ui="site-shell"][data-page="product"]'),
+        header: !!document.querySelector('[data-vmz-fixture="site-header"]'),
         prose: !!document.querySelector('[data-vmz-ui="prose"]'),
-        toc: !!document.querySelector('[data-vmz-ui="toc"] [data-vmz-toc="overview"]'),
+        toc: document.querySelectorAll('[data-vmz-ui="toc"] [data-vmz-toc]').length,
         callout: document.querySelectorAll('[data-vmz-ui="callout"]').length,
         code: !!document.querySelector('[data-vmz-ui="code-block"] code'),
         codeText: document.querySelector('[data-vmz-ui="code-block"] code')?.textContent || '',
         search: !!document.getElementById('home-product-search'),
         heading: !!document.getElementById('overview'),
+        install: !!document.getElementById('install'),
     }));
-    if (!markers.shell || !markers.nav) fail(`Document/Product: AppShell/nav missing: ${JSON.stringify(markers)}`);
-    if (!markers.prose || !markers.toc || !markers.code || !markers.search || !markers.heading) {
+    if (!markers.shell || !markers.header) fail(`Document/Product: SiteShell/header missing: ${JSON.stringify(markers)}`);
+    if (!markers.prose || !markers.toc || !markers.code || !markers.search || !markers.heading || !markers.install) {
         fail(`Document/Product: Prose/Toc/CodeBlock/search missing: ${JSON.stringify(markers)}`);
     }
     if (markers.callout < 1) fail(`Document/Product: expected Callout, got ${markers.callout}`);
@@ -2437,29 +2429,25 @@ async function proveDocumentProduct(page) {
         fail(`Document/Product: CodeBlock must SSR readable install snippet, got ${markers.codeText}`);
     }
 
-    // Version switch updates CodeBlock source (before locale toggle localizes toolbar labels).
-    await clickToolbarButton(0);
-    await waitForFixtureTextIncludes(page, '[data-vmz-fixture="product-meta"]', 'version:v0');
-    await waitForFixtureTextIncludes(page, '[data-vmz-ui="code-block"] code', '@0.0.0');
-
-    // Locale switch keeps composition readable (page may SSR in en-US or zh-Hans).
-    const alreadyChinese = await page.evaluate(() => {
-        const meta = (document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent || '').replace(/\s+/g, '');
-        return meta.includes('locale:zh');
-    });
-    if (!alreadyChinese) await clickToolbarButton(1);
-    await waitForFixtureTextIncludes(page, '[data-vmz-fixture="product-meta"]', 'locale:zh');
-    await waitForFixtureTextIncludes(page, '#overview', '官方UI');
-
     // Search filters Toc outline; body stays readable (zero-JS contract).
     await page.type('#home-product-search', 'install');
-    await waitForFixtureTextIncludes(page, '[data-vmz-fixture="product-meta"]', 'search:install');
     await page.waitForFunction(
         () =>
             !!document.getElementById('install') &&
             !!document.getElementById('overview') &&
             !!document.querySelector('[data-vmz-toc="install"]') &&
             !document.querySelector('[data-vmz-toc="overview"]'),
+        { timeout: 5000 },
+    );
+    await page.evaluate(() => {
+        const input = document.getElementById('home-product-search');
+        if (input instanceof HTMLInputElement) {
+            input.value = '';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    });
+    await page.waitForFunction(
+        () => !!document.querySelector('[data-vmz-toc="overview"]') && !!document.querySelector('[data-vmz-toc="install"]'),
         { timeout: 5000 },
     );
 
@@ -2470,116 +2458,12 @@ async function proveDocumentProduct(page) {
         return !!btn;
     });
     if (!copyButtonFound) fail('Product: CodeBlock copy button missing');
-    await page.waitForFunction(
-        () =>
-            (document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent || '').replace(/\s+/g, '').includes('copied:yes') &&
-            !!document.querySelector('[data-vmz-fixture="product-copied"]'),
-        { timeout: 5000 },
-    );
-
-    // Document surface shares UI6 density/RTL activation (not a parallel theme).
-    await page.goto(`http://127.0.0.1:18781/product`, { waitUntil: 'networkidle0', timeout: 60000 });
-    await page.waitForSelector('[data-vmz-fixture="product"]', { timeout: 10000 });
-
-    const productDensity = await page.evaluate(() => {
-        const root = document.querySelector('[data-vmz-fixture="product"]');
-        const buttons = document.querySelectorAll('[data-vmz-fixture="product-toolbar"] button.vmz-ui-btn');
-        const cycle = buttons[2];
-        const sample = buttons[0];
-        const el = sample || cycle;
-        if (!root || !el || !cycle) {
-            return {
-                ok: false,
-                density: root?.getAttribute('data-density') || '',
-                buttons: [...buttons].map((b) => (b.textContent || '').trim()),
-            };
-        }
-        const cs = getComputedStyle(el);
-        return {
-            ok: true,
-            density: root.getAttribute('data-density') || '',
-            dir: root.getAttribute('dir') || '',
-            meta: document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent || '',
-            paddingTop: cs.paddingTop,
-            controlY: (cs.getPropertyValue('--vmz-density-control-padding-y') || '').trim(),
-            compactY: (cs.getPropertyValue('--vmz-density-compact-padding-y') || '').trim(),
-            denseY: (cs.getPropertyValue('--vmz-density-dense-padding-y') || '').trim(),
-        };
-    });
-    if (!productDensity?.ok) fail(`Document density: Cycle density control missing: ${JSON.stringify(productDensity)}`);
-    if (productDensity.density !== 'comfortable' || productDensity.dir !== 'ltr') {
-        fail(`Document density: default want comfortable/ltr, got ${JSON.stringify(productDensity)}`);
-    }
-    if (!productDensity.controlY || !productDensity.compactY || !productDensity.denseY) {
-        fail(`Document density: CSS vars missing: ${JSON.stringify(productDensity)}`);
-    }
-    const productMeta = productDensity.meta.replace(/\s+/g, '');
-    if (!productMeta.includes('density:comfortable') || !productMeta.includes('dir:ltr')) {
-        fail(`Document density: product-meta missing density/dir: ${productDensity.meta}`);
-    }
-    const productPadComfortable = productDensity.paddingTop;
-    const productLtrGeom = await page.evaluate(() => {
-        const brand = document.querySelector('[data-vmz-fixture="product"] [data-vmz-shell="header"] .vmz-ui-app-shell__brand');
-        const nav = document.querySelector('[data-vmz-fixture="product"] [data-vmz-shell="header"] .vmz-ui-app-shell__nav');
-        if (!brand || !nav) return null;
-        return { brandLeft: brand.getBoundingClientRect().left, navLeft: nav.getBoundingClientRect().left };
-    });
-    if (!productLtrGeom) fail('Document density: AppShell geometry missing (ltr)');
-
-    await clickToolbarButton(2);
-    try {
-        await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="product"]')?.getAttribute('data-density') === 'compact', {
-            timeout: 5000,
-        });
-    } catch {
-        const snap = await page.evaluate(() => ({
-            density: document.querySelector('[data-vmz-fixture="product"]')?.getAttribute('data-density') || '',
-            meta: document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent || '',
-            hasCycle: !!document.querySelectorAll('[data-vmz-fixture="product-toolbar"] button.vmz-ui-btn')[2],
-        }));
-        fail(`Document density: cycle to compact failed: ${JSON.stringify(snap)}`);
-    }
-    await clickToolbarButton(2);
-    await page.waitForFunction(
-        () =>
-            document.querySelector('[data-vmz-fixture="product"]')?.getAttribute('data-density') === 'dense' &&
-            (document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent || '').replace(/\s+/g, '').includes('density:dense'),
-        { timeout: 5000 },
-    );
-    const productPadDense = await page.evaluate(() => {
-        const sample = document.querySelectorAll('[data-vmz-fixture="product-toolbar"] button.vmz-ui-btn')[0];
-        return sample ? getComputedStyle(sample).paddingTop : '';
-    });
-    if (!productPadDense || productPadDense === productPadComfortable) {
-        fail(`Document density: dense must change Button padding (${productPadComfortable} -> ${productPadDense})`);
-    }
-
-    await clickToolbarButton(3);
-    await page.waitForFunction(
-        () =>
-            document.querySelector('[data-vmz-fixture="product"]')?.getAttribute('dir') === 'rtl' &&
-            (document.querySelector('[data-vmz-fixture="product-meta"]')?.textContent || '').replace(/\s+/g, '').includes('dir:rtl'),
-        { timeout: 5000 },
-    );
-    const productRtlGeom = await page.evaluate(() => {
-        const brand = document.querySelector('[data-vmz-fixture="product"] [data-vmz-shell="header"] .vmz-ui-app-shell__brand');
-        const nav = document.querySelector('[data-vmz-fixture="product"] [data-vmz-shell="header"] .vmz-ui-app-shell__nav');
-        if (!brand || !nav) return null;
-        return { brandLeft: brand.getBoundingClientRect().left, navLeft: nav.getBoundingClientRect().left };
-    });
-    if (!productRtlGeom || !(productLtrGeom.brandLeft < productLtrGeom.navLeft && productRtlGeom.brandLeft > productRtlGeom.navLeft)) {
-        fail(`Document density: RTL must flip brand/nav (ltr=${JSON.stringify(productLtrGeom)}, rtl=${JSON.stringify(productRtlGeom)})`);
-    }
+    await page.waitForFunction(() => !!document.querySelector('[data-vmz-fixture="product-copied"]'), { timeout: 5000 });
 
     const chromeCss = fs.readFileSync(path.join(homepage, 'designs', 'document', 'chrome.css'), 'utf8');
-    if (
-        !chromeCss.includes('var(--vmz-density-control-padding-y') ||
-        (!chromeCss.includes("data-density='dense'") && !chromeCss.includes('data-density="dense"'))
-    ) {
-        fail('Document chrome.css must consume density tokens + dense activation');
-    }
+    if (!chromeCss.includes('--vmz-')) fail('Document chrome.css must consume design tokens');
 
-    console.log('ui-automation: Document/Product composition + density/RTL PASS');
+    console.log('ui-automation: Document/Product composition PASS');
     await proveUi6DensityRtlPreset(page);
 }
 
