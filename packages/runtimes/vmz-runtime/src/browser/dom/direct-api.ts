@@ -39,6 +39,31 @@ import {
 
 let directPropBindSeq = 0;
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/**
+ * Nesting depth of inline `<svg>` subtrees during create/resume.
+ *
+ * Template emit creates every element through `api.el(tag)` and brackets each
+ * subtree with `adoptEnter`/`adoptLeave`. Elements inside `<svg>` must be built
+ * with `createElementNS`, otherwise the browser returns an HTMLUnknownElement:
+ * attribute names lose their case (`viewBox` → `viewbox`) and the node lays out
+ * at 0×0. Track the depth here so the generator stays namespace-agnostic.
+ */
+const nsStack: boolean[] = [];
+
+function inSvgScope(): boolean {
+    return nsStack.length > 0 && nsStack[nsStack.length - 1] === true;
+}
+
+function isSvgNode(node: unknown): boolean {
+    if (!node || typeof node !== 'object') return false;
+    const ns = (node as { namespaceURI?: string | null }).namespaceURI;
+    if (ns === SVG_NS) return true;
+    const tag = (node as { tagName?: string }).tagName;
+    return tag != null && String(tag).toLowerCase() === 'svg' && ns == null;
+}
+
 export const directApi = {
     _inst: null as DirectInstance | null,
     _branchBinds: null as Array<{ deps: string[]; fn: PatchFn; bindingId?: BindingId }> | null,
@@ -46,16 +71,18 @@ export const directApi = {
     _eachCtx: null as EachCtx | null,
     _resumeAdopt: null as ResumeAdoptCtx | null,
     el(tag) {
-        if (directApi._resumeAdopt) return directApi._resumeAdopt.el(tag);
+        const name = tag || 'div';
+        const svg = inSvgScope() || name === 'svg';
+        if (directApi._resumeAdopt) return directApi._resumeAdopt.el(name, svg);
         noteDomCreate();
-        return document.createElement(tag || 'div');
+        return svg ? document.createElementNS(SVG_NS, name) : document.createElement(name);
     },
     elNS(ns, tag) {
         if (directApi._resumeAdopt && typeof directApi._resumeAdopt.elNS === 'function') {
             return directApi._resumeAdopt.elNS(ns, tag);
         }
         noteDomCreate();
-        return document.createElementNS(ns || 'http://www.w3.org/2000/svg', tag || 'g');
+        return document.createElementNS(ns || SVG_NS, tag || 'g');
     },
     text(value) {
         if (directApi._resumeAdopt) return directApi._resumeAdopt.text(value);
@@ -63,7 +90,15 @@ export const directApi = {
         return document.createTextNode(value == null ? '' : String(value));
     },
 
+    nsScopeDepth() {
+        return nsStack.length;
+    },
+    rewindNsScope(depth) {
+        const target = Math.max(0, Number(depth) || 0);
+        while (nsStack.length > target) nsStack.pop();
+    },
     adoptEnter(node) {
+        nsStack.push(isSvgNode(node));
         const adopt = directApi._resumeAdopt;
         if (adopt && typeof adopt.enter === 'function') {
             const ok = adopt.enter(node);
@@ -73,6 +108,7 @@ export const directApi = {
         return false;
     },
     adoptLeave() {
+        nsStack.pop();
         const adopt = directApi._resumeAdopt;
         // Emit always pairs leave after enter; if enter failed (fresh node, no
         // pool), do not pop ??unbalanced leave previously stole parent scopes

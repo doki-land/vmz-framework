@@ -29,7 +29,7 @@ globalThis.DocumentFragment = window.DocumentFragment;
 globalThis.Text = window.Text;
 globalThis.Comment = window.Comment;
 
-const { registerComponents, renderToString, hydrate, flushPending } = await import(domHref);
+const { registerComponents, renderToString, hydrate, flushPending, mount } = await import(domHref);
 
 class SiblingHost {
     static __vmzDirect = true;
@@ -454,3 +454,81 @@ if (!confirmBtn) {
 }
 
 console.log('resume-composition GATE PASS: ifBlock-rooted Button keeps projected label');
+
+console.log('resume-composition: inline SVG keeps the SVG namespace and attribute case…');
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/** Mirrors a hand-written `<svg viewBox=…>` block in a page template. */
+class SvgIconPage {
+    static __vmzDirect = true;
+    static __vmzCreate(api) {
+        const rootEl = api.el('div');
+        api.attr(rootEl, 'data-fixture', 'svg-page');
+        const svg = api.el('svg');
+        api.attr(svg, 'viewBox', '0 0 16 16');
+        api.attr(svg, 'width', '16');
+        api.attr(svg, 'height', '16');
+        // Emitted templates bracket every element subtree with adoptEnter/Leave.
+        api.adoptEnter(svg);
+        const path = api.el('path');
+        api.attr(path, 'd', 'M0 0h16v16H0z');
+        svg.appendChild(path);
+        api.adoptLeave();
+        rootEl.appendChild(svg);
+        return rootEl;
+    }
+}
+
+registerComponents({ SvgIconPage });
+
+const htmlSvg = await renderToString(SvgIconPage, { props: {} });
+if (!htmlSvg.includes('viewBox="0 0 16 16"')) fail(`SSR lost SVG attribute case: ${htmlSvg}`);
+if (!htmlSvg.includes('data-fixture="svg-page"')) fail(`SSR missing svg page root: ${htmlSvg}`);
+
+const { window: liveSvg } = parseHTML(`<!DOCTYPE html><html><body><div id="app">${htmlSvg}</div></body></html>`);
+globalThis.window = liveSvg;
+globalThis.document = liveSvg.document;
+globalThis.HTMLElement = liveSvg.HTMLElement;
+globalThis.Node = liveSvg.Node;
+globalThis.DocumentFragment = liveSvg.DocumentFragment;
+globalThis.Text = liveSvg.Text;
+globalThis.Comment = liveSvg.Comment;
+const appSvg = liveSvg.document.getElementById('app');
+await hydrate(SvgIconPage, appSvg);
+const svgAdopted = appSvg.querySelector('svg');
+if (!svgAdopted || svgAdopted.namespaceURI !== SVG_NS) {
+    fail(`resume: svg lost namespace (${svgAdopted?.namespaceURI})`);
+}
+if (svgAdopted.getAttribute('viewBox') !== '0 0 16 16') {
+    fail(`resume: viewBox lost (attrs=${[...svgAdopted.attributes].map((a) => a.name).join(',')})`);
+}
+if (!appSvg.querySelector('svg path') || appSvg.querySelector('svg path').namespaceURI !== SVG_NS) {
+    const p = appSvg.querySelector('svg path');
+    fail(`resume: svg child created outside the SVG namespace (ns=${p?.namespaceURI}, html=${appSvg.innerHTML})`);
+}
+
+// Fresh client render (no SSR pool): el/createElement must still pick SVG NS.
+const { window: liveFresh } = parseHTML('<!DOCTYPE html><html><body><div id="app"></div></body></html>');
+globalThis.window = liveFresh;
+globalThis.document = liveFresh.document;
+globalThis.HTMLElement = liveFresh.HTMLElement;
+globalThis.Node = liveFresh.Node;
+globalThis.DocumentFragment = liveFresh.DocumentFragment;
+globalThis.Text = liveFresh.Text;
+globalThis.Comment = liveFresh.Comment;
+const appFresh = liveFresh.document.getElementById('app');
+await mount(SvgIconPage, appFresh, {});
+const svgFresh = appFresh.querySelector('svg');
+if (!svgFresh || svgFresh.namespaceURI !== SVG_NS) {
+    fail(`fresh render: svg got HTML namespace (${svgFresh?.namespaceURI})`);
+}
+if (svgFresh.getAttribute('viewBox') !== '0 0 16 16') {
+    fail(`fresh render: viewBox lost (attrs=${[...svgFresh.attributes].map((a) => a.name).join(',')})`);
+}
+if (!appFresh.querySelector('svg path') || appFresh.querySelector('svg path').namespaceURI !== SVG_NS) {
+    fail('fresh render: svg child created outside the SVG namespace');
+}
+
+console.log('resume-composition GATE PASS: inline SVG children keep the SVG namespace');
+

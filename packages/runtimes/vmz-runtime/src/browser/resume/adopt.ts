@@ -24,6 +24,8 @@ import {
 } from '../dom-core.js';
 import { createUnknownComponentElement, markUnknownComponentHost, serializeUnknownComponentNode } from '../unknown-component.js';
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
 function createResumeAdopt(pool, rootEl) {
     const used = new WeakSet();
 
@@ -79,13 +81,22 @@ function createResumeAdopt(pool, rootEl) {
         }
     }
 
-    const adoptElement = (tag) => {
+    const adoptElement = (tag, svg = false) => {
         const want = String(tag || 'div').toLowerCase();
         for (const el of elementCandidates()) {
             if (String(el.tagName).toLowerCase() === want) return markElement(el);
         }
         noteDomCreate();
-        return document.createElement(tag || 'div');
+        return svg ? document.createElementNS(SVG_NS, tag || 'svg') : document.createElement(tag || 'div');
+    };
+
+    const adoptElementNS = (ns, tag) => {
+        const want = String(tag || 'g');
+        for (const el of elementCandidates()) {
+            if (el.namespaceURI === ns && String(el.localName) === want) return markElement(el);
+        }
+        noteDomCreate();
+        return document.createElementNS(ns || SVG_NS, want);
     };
 
     const adoptText = (value) => {
@@ -149,6 +160,7 @@ function createResumeAdopt(pool, rootEl) {
 
     return {
         el: adoptElement,
+        elNS: adoptElementNS,
         text: adoptText,
         componentHost,
         enter,
@@ -174,6 +186,7 @@ export function runDirectResume(Component, inst, container) {
     const prevItems = directApi._itemPatches;
     const prevEach = directApi._eachCtx;
     const prevAdopt = directApi._resumeAdopt;
+    const prevNsDepth = directApi.nsScopeDepth();
     directApi._inst = inst;
     directApi._branchBinds = null;
     directApi._itemPatches = null;
@@ -182,6 +195,7 @@ export function runDirectResume(Component, inst, container) {
     try {
         return Component.__vmzCreate.call(inst, directApi);
     } finally {
+        directApi.rewindNsScope(prevNsDepth);
         directApi._resumeAdopt = prevAdopt;
         directApi._inst = prevInst;
         directApi._branchBinds = prevBranch;

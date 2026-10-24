@@ -72,7 +72,7 @@ export type TraceBuffer = {
 };
 
 export type ResumeAdoptCtx = {
-    el: (tag: string) => Element;
+    el: (tag: string, svg?: boolean) => Element;
     elNS?: (ns: string, tag: string) => Element;
     text: (value?: unknown) => Text;
     componentHost?: (name: string) => HTMLElement | null;
