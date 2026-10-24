@@ -164,4 +164,7 @@ code {
   color: var(--vmz-brand-primary);
 }
 
-@import "./modern.scss";
+@import "./foundation.scss";
+@import "./site-chrome.scss";
+@import "./marketing.scss";
+@import "./business.scss";

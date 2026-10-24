@@ -1,0 +1,33 @@
+/* VMZ Design business surfaces: console/commercial containers and docs. */
+/* Inner pages reuse the landing measure so header, content and footer share
+   one column. Landing sections paint their own full-bleed bands, so only the
+   plain content pages need this container. */
+.vmz-product-content,
+.vmz-commercial-content {
+  width: min(calc(100% - var(--v2-gutter) * 2), var(--v2-content));
+  margin: 0 auto;
+  padding: var(--vmz-space-8) 0 var(--vmz-space-12);
+}
+.vmz-product-search { margin-bottom: var(--vmz-space-7); }
+
+.site--docs { background: var(--v2-canvas); }
+.site--docs .site-header { background: var(--v2-canvas); }
+.site--docs .doc-body { display: grid; grid-template-columns: 17rem minmax(0, 1fr); width: min(100%, 96rem); margin: 0 auto; }
+.site--docs .doc-sidebar { position: sticky; top: 5.2rem; align-self: start; height: calc(100vh - 5.2rem); padding: 2rem 1.25rem 3rem; overflow-y: auto; border-right: 1px solid var(--v2-line); background: var(--v2-surface); }
+.site--docs .doc-sidebar::before { content: "文档导航"; display: block; margin: 0 .65rem 1rem; color: var(--v2-subtle); font: .7rem var(--vmz-font-mono); text-transform: uppercase; }
+.site--docs .doc-subnav { padding: 0; border: 0; background: transparent; }
+.site--docs .doc-subnav ul { display: grid; gap: .2rem; overflow: visible; }
+.site--docs .doc-subnav li { min-width: 0; }
+.site--docs .doc-subnav a { display: block; padding: .5rem .65rem; overflow: hidden; border-radius: var(--vmz-radius-sm); color: var(--v2-muted); font-size: .84rem; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.site--docs .doc-subnav a:hover, .site--docs .doc-subnav a[aria-current="page"] { color: var(--v2-ink); background: var(--v2-line); }
+.site--docs .doc-search-fallback { margin: 1.5rem .65rem 0; padding: .75rem; border: 1px solid var(--v2-line); border-radius: var(--v2-radius); color: var(--v2-subtle); background: var(--v2-mist); font-size: .7rem; }
+.site--docs .doc-content { min-width: 0; }
+.site--docs main { width: min(calc(100% - 4rem), 52rem); margin: 0 auto; padding: 5rem 0 7rem; }
+.site--docs main h1 { max-width: 18ch; font: 600 clamp(2.8rem, 5vw, 4.8rem)/1.03 var(--vmz-font-display); letter-spacing: 0; }
+.site--docs main h2 { margin-top: 3.5rem; font-size: 1.65rem; }
+.site--docs main pre { padding: 1.3rem; border: 0; border-radius: var(--v2-radius-lg); color: var(--v2-on-inverse); background: var(--v2-code); }
+@media (max-width: 900px) {
+  .site--docs .doc-body { grid-template-columns: 1fr; }
+  .site--docs .doc-sidebar { position: relative; top: auto; height: auto; border-right: 0; border-bottom: 1px solid var(--v2-line); }
+  .site--docs .doc-subnav ul { display: flex; overflow-x: auto; }
+}
