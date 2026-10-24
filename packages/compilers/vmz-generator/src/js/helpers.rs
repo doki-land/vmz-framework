@@ -118,6 +118,14 @@ pub fn wrap_event_handler_body(
             ));
         }
     }
+    if !body.contains("=>") {
+        // Inline statement handlers (`@click="toggle(item.id)"`, `@click="count += 1"`)
+        // must run on the event, never while the listener is being registered.
+        if body.contains(';') {
+            return Ok(format!("(ev) => {{ {body} }}"));
+        }
+        return Ok(format!("(ev) => ({body})"));
+    }
     Ok(body.to_string())
 }
 
@@ -403,6 +411,25 @@ mod tests {
         let locals = vec!["bump".into()];
         let res = HandlerResolution { methods: &methods, props: &[], locals: &locals };
         assert_eq!(wrap_event_handler_body("bump", res).unwrap(), "bump");
+    }
+
+    #[test]
+    fn wrap_event_handler_inline_statement_is_lazy() {
+        let methods = vec!["toggle".into(), "onOptionClick".into()];
+        let locals = vec!["item".into()];
+        let res = HandlerResolution { methods: &methods, props: &[], locals: &locals };
+        assert_eq!(
+            wrap_event_handler_body("this.toggle(item.id)", res).unwrap(),
+            "(ev) => (this.toggle(item.id))"
+        );
+        assert_eq!(
+            wrap_event_handler_body("this.onOptionClick", res).unwrap(),
+            "(ev) => this.onOptionClick(ev)"
+        );
+        assert_eq!(
+            wrap_event_handler_body("this.count += this.step", res).unwrap(),
+            "(ev) => (this.count += this.step)"
+        );
     }
 
     #[test]

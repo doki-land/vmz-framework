@@ -1278,6 +1278,19 @@ fn emit_each_block(
           try { patches[p].call(inst); } catch {}
         }
       }
+    }
+    // Keyed identity survives a pure reorder (sort by score/owner): move nodes so DOM
+    // order matches list order. Unchanged order skips all moves.
+    var anchor = end;
+    var hostParent = anchor.parentNode;
+    if (hostParent) {
+      for (i = list.length - 1; i >= 0; i--) {
+        var ke = keyed.get(keyOf(list[i], i));
+        var knode = ke && (ke.dom || ke);
+        if (!knode || knode.nodeType !== 1 || knode.parentNode !== hostParent) continue;
+        if (knode.nextSibling !== anchor) hostParent.insertBefore(knode, anchor);
+        anchor = knode;
+      }
     }"#
         .to_string()
     } else {
@@ -1336,6 +1349,16 @@ fn emit_each_block(
     }
     if (firstNew < list.length) {
       rk.create.call(inst, list, firstNew, rowTplNode(), keyed, parent, end, keyOf, null);
+    }
+    // Keyed identity survives a pure reorder (sort by score/owner): move nodes so DOM
+    // order matches list order. Unchanged order skips all moves.
+    var anchor = end;
+    for (i = list.length - 1; i >= 0; i--) {
+      var ke = keyed.get(keyOf(list[i], i));
+      var knode = ke && (ke.dom || ke);
+      if (!knode || knode.nodeType !== 1 || knode.parentNode !== parent) continue;
+      if (knode.nextSibling !== anchor) parent.insertBefore(knode, anchor);
+      anchor = knode;
     }"#
         .to_string()
     };

@@ -888,10 +888,6 @@ impl ReducedMotionPolicy {
             Self::Honor => "honor",
         }
     }
-
-    fn is_default(&self) -> bool {
-        matches!(self, Self::Honor)
-    }
 }
 
 impl std::fmt::Display for ReducedMotionPolicy {
@@ -902,6 +898,7 @@ impl std::fmt::Display for ReducedMotionPolicy {
 
 /// One motion transition owned by this unit.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct MotionTransitionDecl {
     /// Stable transition id within this unit.
     pub id: u32,
@@ -925,8 +922,8 @@ pub struct MotionTransitionDecl {
     pub cancelable: bool,
     /// Whether generation / supersede protocol applies.
     pub generation: bool,
-    /// Reduced-motion policy (closed [`ReducedMotionPolicy`]).
-    #[serde(default, skip_serializing_if = "ReducedMotionPolicy::is_default")]
+    /// Reduced-motion policy (closed [`ReducedMotionPolicy`]). Always serialized so
+    /// conformance fixtures can assert the policy instead of inferring it from absence.
     pub reduced_motion: ReducedMotionPolicy,
 }
 
