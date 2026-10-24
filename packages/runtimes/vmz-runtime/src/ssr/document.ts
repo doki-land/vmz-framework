@@ -83,8 +83,12 @@ export function ensureSsrDocument() {
             const detail = errors.length ? `\n${errors.join('\n')}` : '';
             throw new Error(`linkedom unresolved for SSR document${detail}`);
         }
-        const { window, document } = parseHTML('<!DOCTYPE html><html><body></body></html>');
-        globalThis.window = window;
+        // SSR host contract: expose `document` only. Installing the linkedom
+        // `window` would make `typeof window !== "undefined"` true on the server
+        // while still having no browser `location`, so client code would take
+        // browser branches and diverge from the browser lifecycle. The window is
+        // still reachable as `document.defaultView` when DOM APIs need it.
+        const { document } = parseHTML('<!DOCTYPE html><html><body></body></html>');
         globalThis.document = document;
         _ssrDocumentLastError = null;
         return typeof document.createElement === 'function';

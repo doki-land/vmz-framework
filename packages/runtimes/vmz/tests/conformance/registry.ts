@@ -298,7 +298,7 @@ export const CHECKS: Record<string, CheckEntry> = {
     },
     'ssr-host-lifecycle': {
         file: 'runtime/ssr-host-lifecycle.ts',
-        description: 'I-07 repro: SSR onMount has no implicit browser location',
+        description: 'I-07: SSR host provides document but no browser window/location',
     },
     'ssr-unknown-component-error-node': {
         file: 'ui/ssr-unknown-component-error-node.ts',
