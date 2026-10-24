@@ -21,6 +21,7 @@ import {
     getProtocolVersions,
     HOST_PROTOCOL,
     materializeServeHostRuntime,
+    materializeWechatPackaging,
     resolveCoreRuntimeDist,
     resolveNativePath,
 } from '../workspace/public-api.js';
@@ -191,9 +192,10 @@ async function cmdCheck(args: ParsedOptions): Promise<number> {
     });
     const meta = readPackageMeta(project);
     log.info(`check ${project}${meta?.name ? ` (${meta.name})` : ''}`);
+    const cfg = await loadVmzConfig(project);
     const ws = createWorkspace({ root: project, outDir });
     try {
-        return runWithPlugins(ws, project, outDir, async () => {
+        return runWithPlugins(ws, cfg, project, outDir, async () => {
             const report = ws.check();
             const { checkLocales, localeHasErrors } = await import('../locale/locale-check.js');
             const localeReport = checkLocales({ projectRoot: project, checkUnused: false });
@@ -222,9 +224,15 @@ function dedupeDiagnostics(list: CommandDiagnostic[]): CommandDiagnostic[] {
     return out;
 }
 
-async function runWithPlugins(ws: Workspace, project: string, outDir: string, fn: () => Promise<number> | number): Promise<number> {
-    const { loadVmzConfig, applyPlugins } = await import('../workspace/plugin-host.js');
-    const { plugins, engines } = await loadVmzConfig(project);
+async function runWithPlugins(
+    ws: Workspace,
+    cfg: Awaited<ReturnType<typeof loadVmzConfig>>,
+    project: string,
+    outDir: string,
+    fn: () => Promise<number> | number,
+): Promise<number> {
+    const { applyPlugins } = await import('../workspace/plugin-host.js');
+    const { plugins, engines } = cfg;
     if (plugins.length) {
         await applyPlugins(ws, plugins, { project, outDir, engines });
     }
@@ -261,11 +269,12 @@ async function cmdBuild(args: ParsedOptions): Promise<number> {
     log.info(
         `build ${project} → ${outDir}${wechatPack ? ' (target=mini-program-wechat)' : ''} (out-dir=${outDirRoot}, name=${selected.profile.name})`,
     );
+    if (wechatPack) materializeWechatPackaging(project, cfg.delivery);
     const ws = createWorkspace({ root: project, outDir });
     try {
         log.info(`delivery profile ${selected.selection.profileId} (assembly=${selected.selection.assembly}, name=${selected.profile.name})`);
 
-        const code = await runWithPlugins(ws, project, outDir, () => {
+        const code = await runWithPlugins(ws, cfg, project, outDir, () => {
             const report = ws.build(Boolean(args.release));
             const errors = log.diagnostics(report.diagnostics ?? []);
             if (errors) return 1;
@@ -530,6 +539,7 @@ async function cmdDev(args: ParsedOptions): Promise<number> {
         port,
         pollMs,
         target: targetRaw,
+        delivery: cfg.delivery,
         signal: ac.signal,
     });
 

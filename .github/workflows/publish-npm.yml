@@ -127,7 +127,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
-          node-version: '24'
+          node-version: '24.12.0'
           package-manager-cache: false
 
       - name: Install dependencies
@@ -194,7 +194,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
-          node-version: '24'
+          node-version: '24.12.0'
           # Do NOT set registry-url: it writes _authToken=${NODE_AUTH_TOKEN} into
           # the runner npmrc and blocks Trusted Publisher OIDC (npm E404 on PUT).
           # Lockfile is gitignored; setup-node@v5 auto-cache requires pnpm-lock.yaml.

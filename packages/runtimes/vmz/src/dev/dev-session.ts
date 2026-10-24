@@ -15,6 +15,7 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { buildIntegratedDocuments, projectHasDocuments } from '../document/document-integrate.js';
 import { createWorkspace, resolveNativePath } from '../workspace/public-api.js';
+import { materializeWechatPackaging } from '../workspace/wechat-packaging.js';
 import { emitLocaleRuntimeModules, localeHasErrors } from '../locale/locale-check.js';
 import { log } from '../workspace/log.js';
 import {
@@ -46,6 +47,8 @@ interface DevSessionOptions {
     port?: number;
     pollMs?: number;
     target?: 'browser' | 'mini-program-wechat';
+    /** Delivery snapshot evaluated by the config host; the package contract is prepared from it. */
+    delivery?: unknown;
     signal?: AbortSignal;
     createWorkspaceFn?: typeof createWorkspace;
     spawnHostFn?: (opts: { project: string; outDir: string; host: string; port: number }) => import('node:child_process').ChildProcess;
@@ -59,6 +62,7 @@ export function createDevSession(options: DevSessionOptions) {
     const port = options.port ?? 5173;
     const pollMs = Math.max(50, options.pollMs ?? 300);
     const wechatPreview = options.target === 'mini-program-wechat';
+    let delivery = options.delivery ?? null;
     const createWs = options.createWorkspaceFn ?? createWorkspace;
     const spawnHost = options.spawnHostFn ?? defaultSpawnHost;
     const softReload = options.softReloadFn ?? defaultSoftReload;
@@ -153,6 +157,8 @@ export function createDevSession(options: DevSessionOptions) {
         }
         let report;
         try {
+            // Same prepared snapshot for this build cycle; native pack never reads config.
+            materializeWechatPackaging(project, delivery);
             const raw = ws.lowerMiniprogramWechatPackaging();
             report = typeof raw === 'string' ? JSON.parse(raw) : raw;
         } catch (err) {

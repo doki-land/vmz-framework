@@ -154,5 +154,7 @@
     "vmz::target::mini_platform_private_schema": "{detail}",
     "vmz::target::mini_shared_fork": "{detail}",
     "vmz::target::mini_static_slice_catalog_only": "{detail}",
-    "vmz::target::mini_route_server_style_catalog_only": "{detail}"
+    "vmz::target::mini_route_server_style_catalog_only": "{detail}",
+    "vmz::config::load_failed": "failed to load project config: {detail}",
+    "vmz::plugin::invalid_entry": "invalid plugin entry: {detail}"
 }

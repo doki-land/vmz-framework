@@ -1,6 +1,6 @@
 /**
  * document static gate (normative):
- * - @vmz/plugin-markdown-it/runtime.ts via host importMaybeTs
+ * - @vmz/plugin-markdown-it/runtime public JS export
  * - vmz document build → HTML + vmz.document.view.v0
  * - nav / link / anchor · /designs · no-JS readable
  */
@@ -9,10 +9,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
 import { repoRoot } from '../_lib/repo-root.ts';
-import { importMaybeTs } from '../../../dist/workspace/plugin-host.js';
 
 const root = repoRoot(import.meta.url);
 const fixture = path.join(root, 'packages', 'examples', 'documents-fixture');
@@ -31,23 +28,15 @@ function runVmz(args) {
     });
 }
 
-console.log(': load plugin runtime.ts via importMaybeTs…');
+console.log(': load plugin runtime via public JS export…');
 try {
-    const fromVmz = createRequire(path.join(root, 'packages', 'runtimes', 'vmz', 'package.json'));
-    let runtimeTs;
-    try {
-        const pkg = fromVmz.resolve('@vmz/plugin-markdown-it/package.json');
-        runtimeTs = path.join(path.dirname(pkg), 'runtime.ts');
-    } catch {
-        runtimeTs = path.join(root, 'packages', 'plugins', 'vmz-plugin-markdown-it', 'runtime.ts');
-    }
-    const mod = await importMaybeTs(runtimeTs);
+    const mod = await import('@vmz/plugin-markdown-it/runtime');
     const sample = mod.analyzeMarkdown('# Hello\n\n[x](./guide/install.md)\n');
     if (!sample.html.includes('<h1') || !sample.headings.some((h) => h.id)) {
         fail(`markdown analyze missing heading id: ${JSON.stringify(sample)}`);
     }
 } catch (e) {
-    fail(`markdown-it runtime.ts load: ${e.message || e}`);
+    fail(`markdown-it runtime load: ${e.message || e}`);
 }
 
 console.log(': document build fixture…');

@@ -14,6 +14,9 @@
     },
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
+    "engines": {
+        "node": ">=24.12.0"
+    },
     "exports": {
         ".": {
             "types": "./dist/index.d.ts",
@@ -57,8 +60,7 @@
         "@vmz/core": "workspace:*",
         "@vmz/diagnostic": "workspace:*",
         "@vmz/plugin": "workspace:*",
-        "@vmz/protocol": "workspace:*",
-        "jiti": "^2.6.1"
+        "@vmz/protocol": "workspace:*"
     },
     "peerDependencies": {
         "@vmz/plugin-markdown-it": "workspace:*",

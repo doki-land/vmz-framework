@@ -1,5 +1,8 @@
 # `@vmz/vmz` (bin: `vmz`)
 
+Requires Node `>=24.12.0`. Project `vmz.config.ts|mts` loads through native ESM (erasable TypeScript only, no runtime
+transpiler).
+
 CLI / N-API toolchain host. Runtime mental entry is **`@vmz/core`**; optional official UI is **`@vmz/ui`**; plugins are
 **`@vmz/plugin-*`**. Shelved umbrella name: `@vmz/vmz`.
 

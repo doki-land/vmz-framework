@@ -1,6 +1,6 @@
 import { definePlugin, loadPluginSource } from '@vmz/plugin';
 
-const source = loadPluginSource(import.meta.url, 'components/MarkdownIt.vmz');
+const source = loadPluginSource(import.meta.url, '../components/MarkdownIt.vmz');
 
 export default definePlugin({
     name: '@vmz/plugin-markdown-it',

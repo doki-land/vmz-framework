@@ -5,7 +5,6 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createJiti } from 'jiti';
 import { PLUGIN_PROTOCOL as PLUGIN_PROTOCOL_PKG, contentHash, defineConfig, definePlugin } from '@vmz/plugin';
 import { log } from './log.js';
 import { resolveWorkspacePackages } from './packages.js';
@@ -13,24 +12,53 @@ import { resolveWorkspacePackages } from './packages.js';
 export { contentHash, defineConfig, definePlugin };
 export const PLUGIN_PROTOCOL = PLUGIN_PROTOCOL_PKG;
 
-const CONFIG_NAMES = ['vmz.config.ts', 'vmz.config.mts', 'vmz.config.mjs', 'vmz.config.js'];
+export const CONFIG_NAMES = ['vmz.config.ts', 'vmz.config.mts', 'vmz.config.mjs', 'vmz.config.js'];
 const ROOT_PLUGIN_NAMES = ['vmz.plugin.ts', 'vmz.plugin.mts', 'vmz.plugin.mjs', 'vmz.plugin.js'];
 
+export const CONFIG_LOAD_FAILED = 'vmz::config::load_failed';
+export const PLUGIN_ENTRY_INVALID = 'vmz::plugin::invalid_entry';
+
 /**
+ * Load an ES module through the Node host (native `import()`).
+ * Project config and plugin entries must be erasable TS or JS: the host never
+ * runs a runtime TypeScript transpiler.
  * @param {string} full
  * @returns {Promise<any>}
  */
-export async function importMaybeTs(full) {
-    const ext = path.extname(full).toLowerCase();
-    if (ext === '.ts' || ext === '.mts') {
-        const jiti = createJiti(import.meta.url, {
-            interopDefault: true,
-            moduleCache: false,
-        });
-        return jiti(full);
-    }
+async function importHostModule(full) {
     const mod = await import(pathToFileURL(full).href);
     return mod.default ?? mod;
+}
+
+function errorDetail(err) {
+    const parts = [];
+    let cur = err;
+    for (let i = 0; cur && i < 4; i += 1) {
+        const message = cur instanceof Error ? cur.message : String(cur);
+        if (message && !parts.includes(message)) parts.push(message);
+        cur = cur && typeof cur === 'object' && 'cause' in cur ? cur.cause : null;
+    }
+    return parts.join(' ← ') || 'unknown error';
+}
+
+/**
+ * Build a host error carrying a product diagnostic (one print at the CLI boundary).
+ * @param {string} code
+ * @param {string} sourcePath
+ * @param {unknown} err
+ */
+function configDiagnosticError(code, sourcePath, err) {
+    const detail = errorDetail(err);
+    const error = new Error(detail);
+    if (err instanceof Error) error.cause = err;
+    return Object.assign(error, {
+        diagnostic: {
+            code,
+            severity: 'error',
+            path: sourcePath,
+            args: { detail },
+        },
+    });
 }
 
 /**
@@ -66,7 +94,12 @@ export async function loadVmzConfig(project) {
         const full = path.join(project, name);
         if (!existsSync(full)) continue;
         configPath = full;
-        const cfg = await importMaybeTs(full);
+        let cfg;
+        try {
+            cfg = await importHostModule(full);
+        } catch (err) {
+            throw configDiagnosticError(CONFIG_LOAD_FAILED, full, err);
+        }
         const raw = cfg?.plugins ?? [];
         engines = cfg?.engines && typeof cfg.engines === 'object' ? { ...cfg.engines } : {};
         if (cfg?.delivery && typeof cfg.delivery === 'object') {
@@ -103,15 +136,17 @@ async function resolvePluginEntry(project, entry) {
     let value = entry;
     if (typeof value === 'string') {
         const resolved = path.isAbsolute(value) ? value : path.join(project, value);
-        value = await importMaybeTs(resolved);
-        if (value && typeof value === 'object' && 'default' in value && value.default) {
-            value = value.default;
+        try {
+            value = await importHostModule(resolved);
+        } catch (err) {
+            throw configDiagnosticError(PLUGIN_ENTRY_INVALID, resolved, err);
         }
     }
     value = await value;
     if (value?.manifest && (value.contribute || value.manifest.stages)) return value;
     if (value?.name && value?.stages) return definePlugin(value);
-    throw new Error(`invalid vmz plugin entry: ${String(entry)}`);
+    const sourcePath = typeof entry === 'string' ? (path.isAbsolute(entry) ? entry : path.join(project, entry)) : '';
+    throw configDiagnosticError(PLUGIN_ENTRY_INVALID, sourcePath, new Error(`invalid vmz plugin entry: ${String(entry)}`));
 }
 
 /**

@@ -1,38 +1,50 @@
 {
-  "dependencies": {
-    "@vmz/plugin": "0.3.6",
-    "markdown-it": "^14.1.0"
-  },
-  "description": "VMZ markdown-it adapter — MarkdownIt + engines.markdown registration",
-  "exports": {
-    ".": {
-      "default": "./vmz.plugin.ts",
-      "types": "./vmz.plugin.ts"
+    "name": "@vmz/plugin-markdown-it",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/doki-land/vmz-framework.git",
+        "directory": "packages/plugins/vmz-plugin-markdown-it"
     },
-    "./package.json": "./package.json",
-    "./runtime": {
-      "default": "./runtime.ts",
-      "types": "./runtime.ts"
+    "version": "0.3.7",
+    "type": "module",
+    "description": "VMZ markdown-it adapter — MarkdownIt + engines.markdown registration",
+    "license": "MIT",
+    "main": "./dist/vmz.plugin.js",
+    "types": "./dist/vmz.plugin.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/vmz.plugin.d.ts",
+            "default": "./dist/vmz.plugin.js"
+        },
+        "./runtime": {
+            "types": "./dist/runtime.d.ts",
+            "default": "./dist/runtime.js"
+        },
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "dist",
+        "components",
+        "README.md"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json"
+    },
+    "dependencies": {
+        "@vmz/plugin": "workspace:*",
+        "markdown-it": "^14.1.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.15.0",
+        "typescript": "^5.8.3"
+    },
+    "keywords": [
+        "vmz",
+        "plugin",
+        "markdown",
+        "markdown-it"
+    ],
+    "publishConfig": {
+        "access": "public"
     }
-  },
-  "keywords": [
-    "vmz",
-    "plugin",
-    "markdown",
-    "markdown-it"
-  ],
-  "license": "MIT",
-  "main": "./vmz.plugin.ts",
-  "name": "@vmz/plugin-markdown-it",
-  "publishConfig": {
-    "access": "public"
-  },
-  "repository": {
-    "directory": "packages/plugins/vmz-plugin-markdown-it",
-    "type": "git",
-    "url": "git+https://github.com/doki-land/vmz-framework.git"
-  },
-  "type": "module",
-  "types": "./vmz.plugin.ts",
-  "version": "0.3.7"
 }

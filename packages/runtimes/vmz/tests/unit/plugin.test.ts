@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, it } from 'node:test';
 import { expect } from '../../../../../scripts/test/expect.mjs';
 import { PLUGIN_PROTOCOL, applyPlugins, contentHash, createWorkspace, defineConfig, definePlugin, loadVmzConfig } from 'vmz';
@@ -89,7 +89,7 @@ describe('vmz plugin protocol (N3)', () => {
 
     it('loadVmzConfig reads vmz.config.ts and root vmz.plugin.ts', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-cfg-ts-'));
-        const vmzEntry = vmzDistIndex;
+        const vmzEntry = pathToFileURL(vmzDistIndex).href;
         fs.writeFileSync(
             path.join(dir, 'vmz.config.ts'),
             `import { defineConfig } from ${JSON.stringify(vmzEntry)};

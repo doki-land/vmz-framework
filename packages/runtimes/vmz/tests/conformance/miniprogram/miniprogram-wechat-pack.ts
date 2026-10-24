@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createWorkspace, lowerMiniprogramWechatPackagingJson } from 'vmz';
+import { createWorkspace, lowerMiniprogramWechatPackagingJson, prepareWechatPackaging } from 'vmz';
 
 function fail(msg: string): never {
     console.error(`miniprogram-wechat-pack FAIL: ${msg}`);
@@ -85,7 +85,8 @@ if ((built.diagnostics || []).some((d: { severity?: string }) => d.severity === 
     fail(`build errors: ${JSON.stringify(built.diagnostics)}`);
 }
 
-console.log('miniprogram-wechat-pack: lower WeChat packaging…');
+console.log('miniprogram-wechat-pack: prepare + lower WeChat packaging…');
+await prepareWechatPackaging(dir);
 const report = JSON.parse(lowerMiniprogramWechatPackagingJson(dir));
 if (report.schema !== 'vmz.target.mini_wechat_pack.v0') fail(`schema ${report.schema}`);
 if (report.status !== 'ready') {
@@ -210,6 +211,7 @@ fs.writeFileSync(
 };
 `,
 );
+await prepareWechatPackaging(dir);
 const configured = JSON.parse(lowerMiniprogramWechatPackagingJson(dir));
 if (configured.status !== 'ready') fail(`configured pack ${configured.status}`);
 const project2 = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
@@ -221,6 +223,17 @@ if (app2.window?.navigationBarTitleText !== 'Waitrose') {
 }
 const pageJs2 = fs.readFileSync(pageJsPath, 'utf8');
 if (!pageJs2.includes('Waitrose')) fail(`configured share title ${pageJs2}`);
+
+// Sync native pack must consume the prepared snapshot, not re-read the config.
+fs.writeFileSync(
+    path.join(dir, 'vmz.config.ts'),
+    `export default { delivery: { packaging: { wechat: { appId: 'wx-late-mutation' } } } };\n`,
+);
+const reused = JSON.parse(lowerMiniprogramWechatPackagingJson(dir));
+if (reused.status !== 'ready') fail(`snapshot reuse pack ${reused.status}`);
+if (JSON.parse(fs.readFileSync(projectPath, 'utf8')).appid !== 'wx47094018073f0644') {
+    fail('sync pack must reuse the prepared snapshot, not re-evaluate vmz.config.ts');
+}
 
 ws.dispose();
 fs.rmSync(dir, { recursive: true, force: true });

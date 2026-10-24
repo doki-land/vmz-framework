@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { materializeServeHostRuntime, SERVE_HOST_RUNTIME_FILES } from '../host-materialize/serve-host-runtime.js';
 import { resolveCoreRuntimeDist } from './runtime-dist.js';
-import { materializeWechatPackaging } from './wechat-packaging.js';
+import { prepareWechatPackaging } from './wechat-packaging.js';
 
 export { resolveCoreRuntimeDist } from './runtime-dist.js';
 export { loadHostRuntimeFilesManifest, serveHostRuntimeFilePairs } from '../host-materialize/host-runtime-files.js';
@@ -635,23 +635,7 @@ export function createWorkspace(options: WorkspaceOptions): VmzNativeAddon {
             pluginProtocol: protocol.pluginProtocol,
         },
     });
-    const pack = ws.lowerMiniprogramWechatPackaging.bind(ws);
-    const wrappedPack = () => {
-        materializeWechatPackaging(options.root);
-        return pack();
-    };
-    try {
-        ws.lowerMiniprogramWechatPackaging = wrappedPack;
-        return ws;
-    } catch {
-        return new Proxy(ws, {
-            get(target, prop, receiver) {
-                if (prop === 'lowerMiniprogramWechatPackaging') return wrappedPack;
-                const value = Reflect.get(target, prop, receiver);
-                return typeof value === 'function' ? value.bind(target) : value;
-            },
-        });
-    }
+    return ws;
 }
 
 /** frozen application composition protocol catalog. */
@@ -701,9 +685,12 @@ export function lowerMiniprogramToolingDeployJson(rootPath: string): string {
     return native.lowerMiniprogramToolingDeployJson(rootPath);
 }
 
+/**
+ * Consume the prepared `dist/_vmz/wechat-packaging.json` snapshot.
+ * Callers that start from a config must `await prepareWechatPackaging(rootPath)` first.
+ */
 export function lowerMiniprogramWechatPackagingJson(rootPath: string): string {
     const native = loadNative();
-    materializeWechatPackaging(rootPath);
     return native.lowerMiniprogramWechatPackagingJson(rootPath);
 }
 
@@ -924,7 +911,13 @@ export {
     resolveServerLanguage,
     assertLangRuntimePair,
 } from './server-language-backend.js';
-export { WECHAT_PACKAGING_SCHEMA, WECHAT_PACKAGING_REL, wechatPackagingFromDelivery, materializeWechatPackaging } from './wechat-packaging.js';
+export {
+    WECHAT_PACKAGING_SCHEMA,
+    WECHAT_PACKAGING_REL,
+    wechatPackagingFromDelivery,
+    materializeWechatPackaging,
+    prepareWechatPackaging,
+} from './wechat-packaging.js';
 export {
     DELIVERY_PROFILE_AUTHORING_SCHEMA,
     BUILD_PROFILE_SELECTION_SCHEMA,

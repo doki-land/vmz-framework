@@ -3,29 +3,14 @@
  * Pure data only. Writes `dist/_vmz/wechat-packaging.json` (not a second config entry).
  */
 
-import { existsSync, mkdirSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { createJiti } from 'jiti';
 import { pickDeliveryPackaging, type WechatPackagingData } from '../delivery/delivery-profile.js';
 import { writePrettyJsonFile } from './pretty-json.js';
+import { loadVmzConfig } from './plugin-host.js';
 
 export const WECHAT_PACKAGING_SCHEMA = 'vmz.target.wechat_packaging.v0';
 export const WECHAT_PACKAGING_REL = 'dist/_vmz/wechat-packaging.json';
-
-const CONFIG_NAMES = ['vmz.config.ts', 'vmz.config.mts', 'vmz.config.mjs', 'vmz.config.js'];
-
-function loadConfigSync(project) {
-    for (const name of CONFIG_NAMES) {
-        const full = path.join(project, name);
-        if (!existsSync(full)) continue;
-        const jiti = createJiti(import.meta.url, {
-            interopDefault: true,
-            moduleCache: false,
-        });
-        return jiti(full);
-    }
-    return null;
-}
 
 /**
  * @param {unknown} delivery
@@ -56,14 +41,24 @@ export function wechatPackagingFromDelivery(delivery: unknown): WechatPackagingS
 }
 
 /**
- * Load `vmz.config.*` and write the WeChat packaging contract for the Rust packer.
+ * Write the WeChat packaging contract from an already-evaluated delivery snapshot.
+ * Sync by contract: the native packer must consume prepared data, never read a config.
  * @param {string} project
+ * @param {unknown} delivery
  */
-export function materializeWechatPackaging(project) {
-    const cfg = loadConfigSync(project);
-    const spec = wechatPackagingFromDelivery(cfg?.delivery);
+export function materializeWechatPackaging(project: string, delivery: unknown) {
+    const spec = wechatPackagingFromDelivery(delivery);
     const abs = path.join(project, WECHAT_PACKAGING_REL);
     mkdirSync(path.dirname(abs), { recursive: true });
     writePrettyJsonFile(abs, spec);
     return spec;
+}
+
+/**
+ * Async host entry: evaluate `vmz.config.*` once, then prepare the packaging snapshot.
+ * @param {string} project
+ */
+export async function prepareWechatPackaging(project: string) {
+    const cfg = await loadVmzConfig(project);
+    return materializeWechatPackaging(project, cfg.delivery);
 }

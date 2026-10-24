@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, it } from 'node:test';
 import { expect } from '../../../../../scripts/test/expect.mjs';
 import { buildProjectToOutDirRoot } from 'vmz';
@@ -14,7 +14,7 @@ import { resolveDeliveryServeRoot } from '@vmz/test';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(here, '../..');
-const vmzEntry = path.join(packageRoot, 'dist', 'index.js');
+const vmzEntry = pathToFileURL(path.join(packageRoot, 'dist', 'index.js')).href;
 
 describe('test delivery build emits nested static HTML', () => {
     it('buildProjectToOutDirRoot writes index.html under name: cdn', async () => {

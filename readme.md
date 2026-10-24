@@ -6,6 +6,12 @@ VMZ is a full-stack application compiler for TypeScript. Its authoring surface i
 architecture is VMZ-native: one program model spans components, state, server capabilities, routes, SSR, resumption, tests,
 and deployment. The compiler keeps those boundaries explicit and produces the smallest target-specific result it can prove.
 
+### Requirements
+
+- Node `>=24.12.0` for the `vmz` CLI. `vmz.config.ts|mts` and plugin entries load through native ESM: only erasable
+  TypeScript (type annotations, `interface`, `satisfies`, `import type`) with real relative extensions, and npm plugins
+  must ship a JS runtime export.
+
 ### 🤖 Build with an agent
 
 The agent is the best way to enter the VMZ architecture, install the VMZ application skill in
