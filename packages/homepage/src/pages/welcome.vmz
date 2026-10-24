@@ -2,31 +2,73 @@
     <SiteShell page="welcome" variant="welcome-shell">
         <main id="main" aria-labelledby="welcome-title" class="welcome-v2">
             <section class="welcome-v2__main">
-                <p class="v2-kicker">
-                    <span aria-hidden="true" class="v2-kicker__dot" />
-                    {{ kickerLabel }}
-                </p>
-                <h1 id="welcome-title">
-                    {{ titleLeadLabel }}
-                    <br />
-                    <em>
-                        {{ titleEmLabel }}
-                    </em>
-                </h1>
-                <p class="welcome-v2__lede">
-                    {{ ledeLabel }}
-                </p>
-                <div class="welcome-v2__actions">
-                    <a href="/" class="welcome-v2__primary">
-                        {{ exploreLabel }}
-                    </a>
-                    <a data-vmz-fixture="welcome-start" :href="guideHref" class="welcome-v2__secondary">
-                        {{ startLabel }}
-                        <span aria-hidden="true">
-                            →
-                        </span>
-                    </a>
+                <div class="welcome-v2__intro">
+                    <p class="v2-kicker">
+                        <span aria-hidden="true" class="v2-kicker__dot" />
+                        {{ kickerLabel }}
+                    </p>
+                    <h1 id="welcome-title">
+                        {{ titleLeadLabel }}
+                        <br />
+                        <em>
+                            {{ titleEmLabel }}
+                        </em>
+                    </h1>
+                    <p class="welcome-v2__lede">
+                        {{ ledeLabel }}
+                    </p>
+                    <div class="welcome-v2__actions">
+                        <a href="/" class="welcome-v2__primary">
+                            {{ exploreLabel }}
+                        </a>
+                        <a data-vmz-fixture="welcome-start" :href="guideHref" class="welcome-v2__secondary">
+                            {{ startLabel }}
+                            <span aria-hidden="true">
+                                →
+                            </span>
+                        </a>
+                    </div>
                 </div>
+                <aside data-vmz-fixture="welcome-start-panel" :aria-label="startTitleLabel" class="welcome-v2__start">
+                    <h2>
+                        {{ startTitleLabel }}
+                    </h2>
+                    <div class="welcome-v2__start-block">
+                        <span class="welcome-v2__start-label">
+                            {{ installLabel }}
+                        </span>
+                        <pre><code>pnpm add @vmz/ui</code></pre>
+                    </div>
+                    <p class="welcome-v2__start-note">
+                        {{ installNote }}
+                    </p>
+                    <div class="welcome-v2__start-block">
+                        <span class="welcome-v2__start-label">
+                            {{ exampleLabel }}
+                        </span>
+                        <pre><code>{{ exampleCode }}</code></pre>
+                    </div>
+                    <nav :aria-label="docsLabel" class="welcome-v2__docs">
+                        <a :href="guideHref">
+                            {{ docsGuideLabel }}
+                            <span aria-hidden="true">
+                                →
+                            </span>
+                        </a>
+                        <a :href="deployDocHref">
+                            {{ docsDeployLabel }}
+                            <span aria-hidden="true">
+                                →
+                            </span>
+                        </a>
+                        <a href="/lab/components">
+                            {{ docsComponentsLabel }}
+                            <span aria-hidden="true">
+                                →
+                            </span>
+                        </a>
+                    </nav>
+                </aside>
             </section>
             <div :aria-label="railAriaLabel" class="welcome-v2__rail">
                 <div>
@@ -72,6 +114,12 @@ import {
     docs,
     explore,
     start,
+    welcomeDocsComponents,
+    welcomeDocsDeploy,
+    welcomeDocsGuide,
+    welcomeExampleLabel,
+    welcomeInstallLabel,
+    welcomeInstallNote,
     welcomeKicker,
     welcomeLede,
     welcomeRail1Desc,
@@ -81,6 +129,7 @@ import {
     welcomeRail3Desc,
     welcomeRail3Title,
     welcomeRailAria,
+    welcomeStartTitle,
     welcomeTitleEm,
     welcomeTitleLead,
 } from "#locales/common";
@@ -107,8 +156,27 @@ export default class WelcomePage {
     rail2DescLabel = "";
     rail3TitleLabel = "";
     rail3DescLabel = "";
+    startTitleLabel = "";
+    installLabel = "";
+    installNote = "";
+    exampleLabel = "";
+    docsGuideLabel = "";
+    docsDeployLabel = "";
+    docsComponentsLabel = "";
+    /** Minimal counter: one template branch, one state field, no build steps. */
+    exampleCode = [
+        '<template>',
+        '    <Button @click="count++">{{ count }}</Button>',
+        '</template>',
+        '<script client>',
+        'export default class Counter {',
+        '    count = 0;',
+        '}',
+        '<\/script>',
+    ].join("\n");
     docsRootHref = "/d/zh-hans/";
     guideHref = "/d/zh-hans/guide/";
+    deployDocHref = "/d/zh-hans/guide/deploy/";
     _unwatchLocale = null;
 
     onMount() {
@@ -137,9 +205,17 @@ export default class WelcomePage {
         this.rail2DescLabel = welcomeRail2Desc();
         this.rail3TitleLabel = welcomeRail3Title();
         this.rail3DescLabel = welcomeRail3Desc();
+        this.startTitleLabel = welcomeStartTitle();
+        this.installLabel = welcomeInstallLabel();
+        this.installNote = welcomeInstallNote();
+        this.exampleLabel = welcomeExampleLabel();
+        this.docsGuideLabel = welcomeDocsGuide();
+        this.docsDeployLabel = welcomeDocsDeploy();
+        this.docsComponentsLabel = welcomeDocsComponents();
         const paths = docsPaths(this.localeId);
         this.docsRootHref = paths.docsRootHref;
         this.guideHref = paths.guideHref;
+        this.deployDocHref = paths.deployDocHref;
     }
 
     applyLocaleCopy(preferred) {

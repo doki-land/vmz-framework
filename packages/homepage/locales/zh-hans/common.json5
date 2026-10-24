@@ -284,6 +284,12 @@
   uiLabTabSecurity: '安全设置',
   uiLabTabsLabel: '账户设置分区',
   viewProductUi: '了解编译流程',
+  welcomeDocsComponents: '组件库',
+  welcomeDocsDeploy: '部署目标',
+  welcomeDocsGuide: '快速上手',
+  welcomeExampleLabel: '最小示例',
+  welcomeInstallLabel: '安装',
+  welcomeInstallNote: '按需引入组件与设计令牌，无需接入额外的运行时。',
   welcomeKicker: 'VMZ · 全栈应用编译器',
   welcomeLede: '组件、状态和服务端逻辑进入同一张程序图。开发时只重编受影响的部分，交付时为每个运行环境生成它需要的代码。',
   welcomeLink: '关于 VMZ',
@@ -294,6 +300,7 @@
   welcomeRail3Desc: 'Web、SSR、原生应用与边缘运行时',
   welcomeRail3Title: '交付',
   welcomeRailAria: 'VMZ 编译流程',
+  welcomeStartTitle: '从这里开始',
   welcomeTitleEm: '读懂整套应用。',
   welcomeTitleLead: '让编译器'
 }
