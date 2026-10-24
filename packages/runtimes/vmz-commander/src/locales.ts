@@ -23,6 +23,8 @@ export const COMMANDER_FALLBACK_EN_US: LocaleCatalog = {
     'commander.ui.options': 'Options:',
     'commander.ui.option_example': '(e.g. {example})',
     'commander.ui.deprecated': '(deprecated)',
+    'commander.ui.hint.available_options': "Run '{command} --help' for available options.",
+    'commander.ui.hint.did_you_mean': "Did you mean '{suggest}'?",
     'commander.opt.locale': 'Locale id',
     // Legacy dotted ids (product catalogs may override these).
     'commander.err.unknown_command': 'unknown command `{cmd}`',

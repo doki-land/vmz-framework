@@ -116,6 +116,17 @@ function renderHelpSection(
     return renderHelpSectionWithHeader(t, t(headerId), rows, color, colWidth);
 }
 
+/** Parse/validation diagnostics that get the framework-level "available options" hint. */
+const HINT_CODES = new Set<string>([
+    'commander::unknown_command',
+    'commander::unknown_option',
+    'commander::missing_option_value',
+    'commander::parse_failed',
+    'commander::missing_required_option',
+    'commander::option_not_in_enum',
+    'commander::option_coerce_failed',
+]);
+
 /** Resolve a catalog id, treating `{{id}}` (unresolved) as absent. */
 function localizedOrId(t: LocalizePlugin['t'], id: string, args?: Record<string, string>): string {
     const value = t(id, args);
@@ -479,34 +490,32 @@ class CliBuilder implements Cli {
     private emitDiagnostic(
         diag: CommandDiagnostic,
         ctx: DiagnosticContext,
-        _t: LocalizePlugin['t'],
+        t: LocalizePlugin['t'],
     ): void {
         if (this.diagnosticHandler) {
             this.diagnosticHandler(diag, ctx);
         } else {
-            const msg = diag.message ?? (_t(diag.code!, diag.args) ?? '');
-            console.error(errorText(msg || diag.code || String(diag)));
+            const code = diag.code ?? '';
+            // Catalog template wins so structured args stay interpolated (`--oops`).
+            // A business message is only a fallback for codes without a template.
+            const fromCatalog = code ? localizedOrId(t, code, diag.args) : '';
+            const businessMessage = diag.message && diag.message !== code ? diag.message : '';
+            const msg = fromCatalog || businessMessage || code || String(diag);
+            console.error(errorText(msg));
         }
         // hint 和 suggestion 是框架级 UI，无论 handler 是否存在都统一追加
-        if (diag.code === 'commander::unknown_command'
-            || diag.code === 'commander::unknown_option'
-            || diag.code === 'commander::missing_option_value'
-            || diag.code === 'commander::parse_failed') {
+        if (diag.code && HINT_CODES.has(diag.code)) {
             // unknown_command: hint 指向根命令（因为命令不存在）
-            // 其他: hint 指向 cmd args 里的命令路径
-            let hintTarget: string;
-            if (diag.code === 'commander::unknown_command') {
-                hintTarget = this.name;
-            } else {
-                hintTarget = typeof diag.args?.cmd === 'string' && diag.args.cmd
-                    ? diag.args.cmd.split(' ').join(' ')
-                    : this.name;
-            }
-            console.error(paint(`Run '${hintTarget} --help' for available options.`, 'dim'));
+            // 其他: hint 指向完整的可执行命令路径
+            const cmd = typeof diag.args?.cmd === 'string' ? diag.args.cmd.trim() : '';
+            const hintTarget = diag.code === 'commander::unknown_command' || !cmd
+                ? this.name
+                : `${this.name} ${cmd}`;
+            console.error(paint(t('commander.ui.hint.available_options', { command: hintTarget }), 'dim'));
         }
         const suggest = typeof diag.args?.suggest === 'string' ? diag.args.suggest : '';
         if (suggest) {
-            console.error(paint(`Did you mean '${suggest}'?`, 'dim'));
+            console.error(paint(t('commander.ui.hint.did_you_mean', { suggest }), 'dim'));
         }
     }
 
