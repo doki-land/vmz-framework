@@ -3,58 +3,7 @@
         <ConsoleShell brand="VMZ" home-href="/" :title="pageTitle" :nav-label="navLabel" :nav="navItems">
             <div class="vmz-slot-content">
                 <Alert tone="info" role-name="status" :title="introTitle" :description="introDesc" />
-                <p data-vmz-fixture="datagrid-state" class="vmz-sr-only">
-                    mode:
-                    {{ viewMode }}
-                    ;total:
-                    {{ totalRows }}
-                    ;flat:
-                    {{ flatCount }}
-                    ;visible:
-                    {{ visibleCount }}
-                    ;window:
-                    {{ windowStart }}
-                    -
-                    {{ windowEnd }}
-                    ;selected:
-                    {{ selectedAttr || 'none' }}
-                    ;count:
-                    {{ selectedCount }}
-                    ;sort:
-                    {{ sortKey }}
-                    :
-                    {{ sortDir }}
-                    ;group:
-                    {{ groupBy }}
-                    ;groups:
-                    {{ groupCount }}
-                    ;expanded:
-                    {{ expandedAttr }}
-                    ;agg:
-                    {{ aggSample }}
-                    ;tree:
-                    {{ treeAttr }}
-                    ;depthMax:
-                    {{ depthMax }}
-                    ;treeExpanded:
-                    {{ treeExpandedAttr }}
-                    ;editing:
-                    {{ editingKey || 'none' }}
-                    ;draft:
-                    {{ editDraft || '-' }}
-                    ;scoreSample:
-                    {{ scoreSample }}
-                    ;pivot:
-                    {{ pivotAttr }}
-                    ;pivotRows:
-                    {{ pivotRowCount }}
-                    ;pivotCols:
-                    {{ pivotColsLabel }}
-                    ;pivotMeasure:
-                    {{ pivotMeasure }}
-                    ;pivotSample:
-                    {{ pivotSample }}
-                </p>
+                <p data-vmz-fixture="datagrid-state" class="vmz-sr-only">mode:{{ viewMode }};total:{{ totalRows }};flat:{{ flatCount }};visible:{{ visibleCount }};window:{{ windowStart }}-{{ windowEnd }};selected:{{ selectedAttr || 'none' }};count:{{ selectedCount }};sort:{{ sortKey }}:{{ sortDir }};group:{{ groupBy }};groups:{{ groupCount }};expanded:{{ expandedAttr }};agg:{{ aggSample }};tree:{{ treeAttr }};depthMax:{{ depthMax }};treeExpanded:{{ treeExpandedAttr }};editing:{{ editingKey || 'none' }};draft:{{ editDraft || '-' }};scoreSample:{{ scoreSample }};pivot:{{ pivotAttr }};pivotRows:{{ pivotRowCount }};pivotCols:{{ pivotColsLabel }};pivotMeasure:{{ pivotMeasure }};pivotSample:{{ pivotSample }}</p>
                 <div data-vmz-fixture="datagrid-modes">
                     <span data-vmz-fixture="mode-group">
                         <Button type="button" variant="secondary" @click='(() => setMode("group"))'>
@@ -990,7 +939,33 @@ export default class DatagridPage {
             this.sortDir = "asc";
         }
         this.scrollTop = 0;
+        if (this.viewMode === "pivot") this.sortPivotRows();
         this.refreshWindow();
+    }
+
+    /** Pivot rows follow the active sort key (owner or measure total). */
+    sortPivotRows() {
+        const key = this.sortKey;
+        const dir = this.sortDir === "desc" ? -1 : 1;
+        const value = (row) => {
+            if (key === "owner") return String(row.owner || "");
+            if (key === "total") return Number(row.total) || 0;
+            const measures = row.measures || {};
+            return Number(measures[key]) || 0;
+        };
+        this.pivotRows = this.pivotRows.slice().sort((a, b) => {
+            const av = value(a);
+            const bv = value(b);
+            if (typeof av === "string" || typeof bv === "string") {
+                return String(av).localeCompare(String(bv)) * dir;
+            }
+            return (av - bv) * dir;
+        });
+        const regions = REGIONS.slice().sort();
+        const first = this.pivotRows[0];
+        this.pivotSample = first
+            ? `${first.owner}:${regions[0]}=${first.measures[regions[0]]};total=${first.total}`
+            : "";
     }
 }
 </script>
