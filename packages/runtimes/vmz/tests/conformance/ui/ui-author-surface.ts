@@ -78,3 +78,37 @@ if (picked.join(',') !== 'archive') {
 }
 
 console.log('ui-author-surface PASS: Dropdown link-vs-action contract');
+
+// --- CodeBlock: title/caption precedence, language chip, copy gating ------
+console.log('ui-author-surface: CodeBlock header surface…');
+const CodeBlock = await loadComponent('CodeBlock');
+registerComponents({ CodeBlock });
+const titled = await renderToString(CodeBlock, {
+    code: 'npm i @vmz/ui',
+    title: 'Install',
+    caption: 'Legacy caption',
+    language: 'bash',
+});
+if (!titled.includes('Install')) fail('CodeBlock must render `title`');
+if (titled.includes('Legacy caption')) fail('`title` must win over `caption`');
+if (!titled.includes('vmz-ui-code-block__lang') || !titled.includes('bash')) {
+    fail(`CodeBlock must render the \`language\` chip: ${titled.slice(0, 400)}`);
+}
+if (/<button/.test(titled)) fail('CodeBlock must not render a dead copy button without `onCopy`');
+
+const captioned = await renderToString(CodeBlock, {
+    code: 'echo hi',
+    caption: 'Legacy caption',
+});
+if (!captioned.includes('Legacy caption')) fail('`caption` must remain the fallback heading');
+
+const copyable = await renderToString(CodeBlock, {
+    code: 'echo hi',
+    title: 'Run',
+    copyLabel: 'Copy command',
+    onCopy: () => {},
+});
+if (!copyable.includes('Copy command')) fail('`copyLabel` must label the copy control');
+if (!/<button/.test(copyable)) fail('`onCopy` must render the copy control');
+
+console.log('ui-author-surface PASS: CodeBlock header contract');

@@ -12,7 +12,7 @@
                     {{ caption }}
                 </span>
             </div>
-            <Button type="button" variant="text" size="sm" @click="onCopy" class="vmz-ui-code-block__copy">
+            <Button v-if="canCopy()" type="button" variant="text" size="sm" @click="onCopy" class="vmz-ui-code-block__copy">
                 {{ copyLabel }}
             </Button>
         </div>
@@ -118,21 +118,30 @@
 <script client>
 /**
  * VMZ UI — CodeBlock (Document/Product composition).
- * Source is readable in SSR HTML; copy is progressive enhancement via onCopy.
+ * Readable `<pre><code>` shell: no syntax highlighting (use `<Shiki>` / `<Code>`).
+ * `title` wins over legacy `caption`; `language` is a display-only chip.
+ * Source and bar are server-rendered; copy is progressive enhancement via onCopy.
  */
 export default class CodeBlock {
     public code: string = "";
+    /** Legacy heading text; kept for existing callers and used when `title` is empty. */
     public caption: string = "";
     /** Preferred heading text; falls back to `caption` when absent. */
     public title: string = "";
     /** Optional syntax label rendered as a chip in the bar (e.g. `ts`, `bash`). */
     public language: string = "";
+    /** Visible label of the copy control. */
     public copyLabel: string = "Copy";
     public onCopy: ((e: Event) => void) | null = null;
 
     /** The bar renders when there is anything to show in it. */
     public barVisible(): boolean {
-        return !!(this.title || this.caption || this.language || this.onCopy);
+        return !!(this.title || this.caption || this.language || this.canCopy());
+    }
+
+    /** Copy is a real control only when a handler exists; no dead button. */
+    public canCopy(): boolean {
+        return typeof this.onCopy === "function";
     }
 }
 </script>
