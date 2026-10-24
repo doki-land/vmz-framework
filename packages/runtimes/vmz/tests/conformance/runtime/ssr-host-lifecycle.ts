@@ -81,7 +81,7 @@ try {
 if (!(unguardedError instanceof TypeError)) {
     fail(`unguarded window.location must throw a TypeError in SSR, got: ${String(unguardedError)}`);
 }
-if (!/pathname/.test(unguardedError.message)) {
+if (! /pathname/.test(unguardedError.message)) {
     fail(`unexpected reproduction error: ${unguardedError.message}`);
 }
 if (globalThis.window.location !== undefined) {

@@ -53,15 +53,15 @@ const dropdownItems = [
 ];
 registerComponents({ Dropdown });
 const dropdownHtml = await renderToString(Dropdown, { label: 'Actions', items: dropdownItems });
-if (!/<a[^>]*href="\/edit"[^>]*data-vmz-dropdown-item="edit"/.test(dropdownHtml)) {
+if (! /<a[^>]*href="\/edit"[^>]*data-vmz-dropdown-item="edit"/.test(dropdownHtml)) {
     fail(`link item must stay an anchor with href: ${dropdownHtml.slice(0, 600)}`);
 }
-if (!/<button[^>]*type="button"[^>]*data-vmz-dropdown-item="archive"/.test(dropdownHtml)) {
+if (! /<button[^>]*type="button"[^>]*data-vmz-dropdown-item="archive"/.test(dropdownHtml)) {
     fail(`href-less item must render an action button: ${dropdownHtml.slice(0, 600)}`);
 }
 if (dropdownHtml.includes('href="#"')) fail('action item must not fake `href="#"`');
-if (!/<div role="separator"/.test(dropdownHtml)) fail('divider item must render a separator');
-if (!/data-vmz-dropdown-item="delete"[^>]*data-disabled="true"/.test(dropdownHtml)) {
+if (! /<div role="separator"/.test(dropdownHtml)) fail('divider item must render a separator');
+if (! /data-vmz-dropdown-item="delete"[^>]*data-disabled="true"/.test(dropdownHtml)) {
     fail('disabled item must expose data-disabled="true"');
 }
 
@@ -109,7 +109,7 @@ const copyable = await renderToString(CodeBlock, {
     onCopy: () => {},
 });
 if (!copyable.includes('Copy command')) fail('`copyLabel` must label the copy control');
-if (!/<button/.test(copyable)) fail('`onCopy` must render the copy control');
+if (! /<button/.test(copyable)) fail('`onCopy` must render the copy control');
 
 console.log('ui-author-surface PASS: CodeBlock header contract');
 
@@ -141,7 +141,7 @@ for (const needle of [
     if (!shellHtml.includes(needle)) fail(`AppShell SSR missing ${needle}: ${shellHtml.slice(0, 600)}`);
 }
 const shellSrc = fs.readFileSync(path.join(dist, 'components', 'AppShell.client.js'), 'utf8');
-if (!/api\.attr\([^,]+, ["']name["'], ["']actions["']\)/.test(shellSrc)) {
+if (! /api\.attr\([^,]+, ["']name["'], ["']actions["']\)/.test(shellSrc)) {
     fail('AppShell has no named `actions` slot in the compiled component');
 }
 if (!shellSrc.includes('"tag":"actions"')) {
