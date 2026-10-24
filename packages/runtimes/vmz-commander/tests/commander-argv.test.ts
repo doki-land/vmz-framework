@@ -81,6 +81,18 @@ test('positionals on both sides of `--` merge in order', async () => {
     assert.deepEqual(seen, { _: ['src', '--literal', 'out'] });
 });
 
+test('a leading program-level `--` still dispatches the command', async () => {
+    const cli = mockCli();
+    let called = 0;
+    cli.command('run', 'cmd.run').action(() => {
+        called += 1;
+        return 0;
+    });
+
+    assert.equal(await cli.parse(['--', 'run']), 0);
+    assert.equal(called, 1);
+});
+
 test('help still works when `--help` appears before `--`', async () => {
     const cli = mockCli();
     let called = 0;

@@ -404,7 +404,11 @@ class CliBuilder implements Cli {
 
     async parse(argvInput: string[] = process.argv): Promise<number> {
         const argv0 = normalizeArgv(argvInput);
-        const { options: globalOpts, rest: argv } = peelKnownOptions(argv0, this.rootOptions);
+        const peeled = peelKnownOptions(argv0, this.rootOptions);
+        const globalOpts = peeled.options;
+        // A leading separator at program level only marks the end of global
+        // options. Keep the following command token dispatchable.
+        const argv = peeled.rest[0] === '--' ? peeled.rest.slice(1) : peeled.rest;
 
         let localize = this.localize;
         if (this.localesRoot) {
