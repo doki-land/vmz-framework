@@ -5,6 +5,7 @@
                 <div class="v2-hero__inner">
                     <div class="v2-hero__copy">
                         <p data-vmz-fixture="landing-hero-kicker" class="v2-kicker">
+                            <span aria-hidden="true" class="v2-kicker__dot" />
                             {{ heroKickerLabel }}
                         </p>
                         <h1 id="landing-title" data-vmz-fixture="landing-hero-title">
@@ -21,10 +22,27 @@
                             <a data-vmz-fixture="landing-primary-cta" :href="guideHref" class="v2-button v2-button--primary">
                                 {{ heroPrimaryCtaLabel }}
                             </a>
-                            <a data-vmz-fixture="landing-secondary-cta" href="#how-it-works" class="v2-button v2-button--text">
+                            <a data-vmz-fixture="landing-secondary-cta" href="#how-it-works" class="v2-button v2-button--secondary">
                                 {{ viewProductUiLabel }}
                             </a>
                         </div>
+                        <ul class="v2-targets">
+                            <li>
+                                Web
+                            </li>
+                            <li>
+                                SSR
+                            </li>
+                            <li>
+                                Server
+                            </li>
+                            <li>
+                                Edge
+                            </li>
+                            <li>
+                                Native
+                            </li>
+                        </ul>
                         <p class="v2-hero-note">
                             <a :href="docsRootHref">
                                 {{ heroFootnoteLabel }}
@@ -58,10 +76,10 @@
                                     +1
                                 </Button>
                             </div>
+                            <p class="landing-code-panel__caption">
+                                {{ heroPreviewProductionReadyLabel }}
+                            </p>
                         </div>
-                        <p class="landing-code-panel__caption">
-                            {{ heroPreviewProductionReadyLabel }}
-                        </p>
                     </div>
                 </div>
             </section>
@@ -221,10 +239,10 @@
                 </a>
             </section>
             <section aria-labelledby="statement-title" class="v2-statement">
-                <p class="v2-index">
-                    {{ statementIndexLabel }}
-                </p>
-                <div>
+                <div class="v2-statement__head">
+                    <p class="v2-index">
+                        {{ statementIndexLabel }}
+                    </p>
                     <h2 id="statement-title" data-vmz-fixture="landing-statement-title">
                         {{ statementTitleLeadLabel }}
                         <br />
@@ -232,6 +250,8 @@
                             {{ statementTitleEmLabel }}
                         </em>
                     </h2>
+                </div>
+                <div class="v2-statement__body">
                     <p data-vmz-fixture="landing-statement-body">
                         {{ statementBodyLabel }}
                     </p>
@@ -246,19 +266,21 @@
                 </div>
             </section>
             <section aria-labelledby="start-title" class="v2-start">
-                <p class="v2-index">
-                    {{ startIndexLabel }}
-                </p>
-                <h2 id="start-title" data-vmz-fixture="landing-start-title">
-                    {{ startTitleLabel }}
-                </h2>
-                <p data-vmz-fixture="landing-start-lede">
-                    {{ startLedeLabel }}
-                </p>
-                <div class="v2-actions">
-                    <a data-vmz-fixture="landing-start-cta" :href="guideHref" class="v2-button v2-button--light">
-                        {{ startLabel }}
-                    </a>
+                <div class="v2-start__inner">
+                    <p class="v2-index">
+                        {{ startIndexLabel }}
+                    </p>
+                    <h2 id="start-title" data-vmz-fixture="landing-start-title">
+                        {{ startTitleLabel }}
+                    </h2>
+                    <p data-vmz-fixture="landing-start-lede">
+                        {{ startLedeLabel }}
+                    </p>
+                    <div class="v2-actions">
+                        <a data-vmz-fixture="landing-start-cta" :href="guideHref" class="v2-button v2-button--primary">
+                            {{ startLabel }}
+                        </a>
+                    </div>
                 </div>
             </section>
         </main>
