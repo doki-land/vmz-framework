@@ -492,7 +492,7 @@ class CliBuilder implements Cli {
             if (child) {
                 return await this.dispatch(child, rest.slice(1), t, [...path, childTok], globalOpts, diagnosticContext);
             }
-            if (!def.action) {
+            if (!def.action && !def.actionCtx) {
                 const childNames = def.children.flatMap((c) => c.names);
                 const suggest = closestMatch(childTok, childNames);
                 this.emitDiagnostic(
@@ -508,7 +508,7 @@ class CliBuilder implements Cli {
             }
         }
 
-        if (!def.action) {
+        if (!def.action && !def.actionCtx) {
             if (rest.length) {
                 this.emitDiagnostic(
                     { code: 'commander::unknown_command', severity: 'error', args: { cmd: [...path, ...rest].join(' ') } },
