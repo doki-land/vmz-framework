@@ -1,6 +1,6 @@
 {
     "name": "@vmz/plugin-syntect",
-    "version": "0.3.7",
+    "version": "0.3.8",
     "private": true,
     "type": "module",
     "description": "Thin replaceable highlighter plugin shape (registers plain via @vmz/highlighter — documents third-party registration, not a real syntect binary)",

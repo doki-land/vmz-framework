@@ -5,7 +5,7 @@
         "url": "git+https://github.com/doki-land/vmz-framework.git",
         "directory": "packages/runtimes/vmz-skills"
     },
-    "version": "0.3.7",
+    "version": "0.3.8",
     "description": "Agent Skills for authoring, reviewing, testing, and deploying VMZ applications",
     "type": "module",
     "license": "MPL-2.0",

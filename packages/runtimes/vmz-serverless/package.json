@@ -1,6 +1,6 @@
 {
     "name": "@vmz/serverless",
-    "version": "0.3.7",
+    "version": "0.3.8",
     "private": true,
     "type": "module",
     "description": "VMZ edge Fetch host — Cloudflare Workers entry consuming ServerArtifact dist",
