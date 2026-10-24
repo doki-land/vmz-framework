@@ -550,59 +550,62 @@ class CliBuilder implements Cli {
         const head = separatorAt === -1 ? rest : rest.slice(0, separatorAt);
         const tail = separatorAt === -1 ? [] : rest.slice(separatorAt + 1);
 
-        // 在任何解析前先扫描 --help / -h（只扫 `--` 之前的 head）
-        if (hasHelpToken(head)) {
-            console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
+        // Resolve the deepest command node before interpreting help markers, so
+        // `demo document check --help` binds to `check` instead of `document`.
+        let target = def;
+        const targetPath = path.slice();
+        const remaining = head.slice();
+        while (target.children.length && remaining.length) {
+            const token = remaining[0]!;
+            if (token.startsWith('-') || isHelpToken(token)) break;
+            const child = target.children.find((c) => c.names.includes(token));
+            if (!child) break;
+            target = child;
+            targetPath.push(token);
+            remaining.shift();
+        }
+
+        // 扫描 --help / -h（只扫命令路径之后的 head，`--` 之后的 tail 不参与）
+        if (hasHelpToken(remaining)) {
+            console.log(formatCommandHelp(this.name, target, t, targetPath, this.rootOptions));
             return 0;
         }
 
-        if (def.children.length && rest.length && !rest[0]!.startsWith('-')) {
-            const childTok = rest[0]!;
-            const child = def.children.find((c) => c.names.includes(childTok));
-            if (child) {
-                return await this.dispatch(child, rest.slice(1), t, [...path, childTok], globalOpts, diagnosticContext);
-            }
-            if (!def.action && !def.actionCtx) {
-                const childNames = def.children.flatMap((c) => c.names);
-                const suggest = closestMatch(childTok, childNames);
+        if (!target.action && !target.actionCtx) {
+            if (remaining.length || tail.length) {
+                const childNames = target.children.flatMap((c) => c.names);
+                const unknownToken = remaining[0];
+                const suggest = unknownToken && !unknownToken.startsWith('-')
+                    ? closestMatch(unknownToken, childNames)
+                    : '';
+                const cmd = [...targetPath, ...remaining, ...tail].join(' ');
                 this.emitDiagnostic(
                     {
                         code: 'commander::unknown_command',
                         severity: 'error',
-                        args: suggest ? { cmd: [...path, childTok].join(' '), suggest } : { cmd: [...path, childTok].join(' ') },
+                        args: suggest ? { cmd, suggest } : { cmd },
                     },
                     diagnosticContext,
                     t,
                 );
                 return 2;
             }
-        }
-
-        if (!def.action && !def.actionCtx) {
-            if (rest.length) {
-                this.emitDiagnostic(
-                    { code: 'commander::unknown_command', severity: 'error', args: { cmd: [...path, ...rest].join(' ') } },
-                    diagnosticContext,
-                    t,
-                );
-                return 2;
-            }
-            console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
+            console.log(formatCommandHelp(this.name, target, t, targetPath, this.rootOptions));
             return 0;
         }
 
         let options: ParsedOptions;
         let usedOptions: Set<OptionDef> = new Set();
         try {
-            if (def.passthrough) {
-                options = { _: [...head, ...tail] };
+            if (target.passthrough) {
+                options = { _: [...remaining, ...tail] };
             } else {
-                ({ options, used: usedOptions } = parseOptionsDetailed(head, def.options));
+                ({ options, used: usedOptions } = parseOptionsDetailed(remaining, target.options));
                 options._.push(...tail);
             }
         } catch (err) {
             const cliErr = CliError.from(err, 'commander::parse_failed');
-            const args = { ...(cliErr.args ?? {}), cmd: path.join(' ') };
+            const args = { ...(cliErr.args ?? {}), cmd: targetPath.join(' ') };
             this.emitDiagnostic(
                 { code: cliErr.code, severity: 'error', args, message: cliErr.message },
                 diagnosticContext,
@@ -616,7 +619,7 @@ class CliBuilder implements Cli {
             if (options[k] === undefined) options[k] = v as string | boolean | string[];
         }
 
-        for (const option of def.options) {
+        for (const option of target.options) {
             const deprecated = option.config?.deprecated;
             if (!deprecated || !usedOptions.has(option)) continue;
             const args: Record<string, string> = { option: option.key };
@@ -632,13 +635,13 @@ class CliBuilder implements Cli {
 
         try {
             let result: void | number;
-            if (def.actionCtx) {
-                const ctx = this.buildCommandContext(def, path, diagnosticContext.locale, t);
-                result = await def.actionCtx(options, options._, ctx);
-            } else if (def.action) {
-                result = await def.action(options, ...options._);
+            if (target.actionCtx) {
+                const ctx = this.buildCommandContext(target, targetPath, diagnosticContext.locale, t);
+                result = await target.actionCtx(options, options._, ctx);
+            } else if (target.action) {
+                result = await target.action(options, ...options._);
             } else {
-                console.log(formatCommandHelp(this.name, def, t, path, this.rootOptions));
+                console.log(formatCommandHelp(this.name, target, t, targetPath, this.rootOptions));
                 return 0;
             }
             if (typeof result === 'number') return result;
