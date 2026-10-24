@@ -31,10 +31,10 @@
     outline: none;
     box-shadow: 0 2px 0 color-mix(in srgb, var(--vmz-action-primary-background) 12%, transparent);
     transition:
-        background-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
-        border-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
-        color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
-        box-shadow var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+        background-color var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+        border-color var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+        color var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+        box-shadow var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
 }
 
 .vmz-ui-btn[data-size="small"] {

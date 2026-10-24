@@ -2,7 +2,7 @@
     "entries": [
         {
             "key": { "path": ["motion", "control", "duration"] },
-            "value": "150ms"
+            "value": "120ms"
         },
         {
             "key": { "path": ["motion", "control", "easing"] },
