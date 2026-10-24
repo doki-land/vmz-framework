@@ -7,32 +7,49 @@
 .vmz-ui-tag {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
-    min-height: 1.5rem;
-    padding: 0 0.5rem;
+    gap: var(--vmz-space-1);
+    min-height: var(--vmz-space-5);
+    max-width: 100%;
+    padding: 0 var(--vmz-space-2);
     border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-sm, 4px);
+    border-radius: var(--vmz-radius-sm);
     background: var(--vmz-surface-mist);
     color: var(--vmz-text-steel);
     font-size: 0.75rem;
     font-weight: 500;
-    line-height: 1;
+    line-height: 1.6667;
     white-space: nowrap;
 }
+
 .vmz-ui-tag[data-status="success"] {
     color: var(--vmz-status-success-foreground);
-    background: color-mix(in srgb, var(--vmz-status-success-accent) 12%, var(--vmz-surface-paper));
-    border-color: color-mix(in srgb, var(--vmz-status-success-accent) 45%, var(--vmz-line-default));
+    background: var(--vmz-status-success-background);
+    border-color: var(--vmz-status-success-border);
 }
+
 .vmz-ui-tag[data-status="warning"] {
     color: var(--vmz-status-warning-foreground);
-    background: color-mix(in srgb, var(--vmz-status-warning-accent) 12%, var(--vmz-surface-paper));
-    border-color: color-mix(in srgb, var(--vmz-status-warning-accent) 45%, var(--vmz-line-default));
+    background: var(--vmz-status-warning-background);
+    border-color: var(--vmz-status-warning-border);
 }
-.vmz-ui-tag[data-status="error"] {
+
+.vmz-ui-tag[data-status="error"],
+.vmz-ui-tag[data-status="danger"] {
     color: var(--vmz-status-danger-foreground);
-    background: color-mix(in srgb, var(--vmz-status-danger-accent) 12%, var(--vmz-surface-paper));
-    border-color: color-mix(in srgb, var(--vmz-status-danger-accent) 45%, var(--vmz-line-default));
+    background: var(--vmz-status-danger-background);
+    border-color: var(--vmz-status-danger-border);
+}
+
+.vmz-ui-tag[data-status="info"] {
+    color: var(--vmz-status-info-foreground);
+    background: var(--vmz-status-info-background);
+    border-color: var(--vmz-status-info-border);
+}
+
+.vmz-ui-tag[data-status="brand"] {
+    color: var(--vmz-action-primary-active);
+    background: var(--vmz-action-primary-soft);
+    border-color: var(--vmz-action-primary-hover);
 }
 </style>
 <script client>

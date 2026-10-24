@@ -1,6 +1,9 @@
 <template>
     <div data-vmz-ui="empty" class="vmz-ui-empty">
-        <h2 class="vmz-ui-empty__title">
+        <span class="vmz-ui-empty__illustration" aria-hidden="true">
+            <Icon :name="icon" size="lg" decorative />
+        </span>
+        <h2 v-if="title" class="vmz-ui-empty__title">
             {{ title }}
         </h2>
         <p v-if="description" class="vmz-ui-empty__description">
@@ -15,40 +18,79 @@
 .vmz-ui-empty {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 0.625rem;
-    padding: 1.5rem 1.15rem;
-    border: 1px dashed var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
-    background: color-mix(in srgb, var(--vmz-surface-mist) 70%, var(--vmz-surface-paper));
+    align-items: center;
+    justify-content: center;
+    gap: var(--vmz-space-2, 0.5rem);
+    padding: var(--vmz-space-6, 2rem);
+    text-align: center;
+    background: transparent;
     color: var(--vmz-text-ink);
+}
+
+.vmz-ui-empty__illustration {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 4rem;
+    height: 4rem;
+    margin-bottom: var(--vmz-space-1, 0.25rem);
+    border: 1px solid var(--vmz-line-default, var(--vmz-line-strong));
+    border-radius: var(--vmz-radius-pill, 999px);
+    background: var(--vmz-surface-mist);
+    color: var(--vmz-text-muted);
+}
+
+.vmz-ui-empty__illustration .vmz-ui-icon[data-size] {
+    font-size: 2rem;
 }
 
 .vmz-ui-empty__title {
     margin: 0;
-    font-family: var(--vmz-font-display);
-    font-size: 1.1rem;
-    font-weight: 700;
+    font-family: var(--vmz-font-display, var(--vmz-font-sans, inherit));
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-empty__description {
     margin: 0;
-    color: var(--vmz-text-steel);
     max-width: 36rem;
-    line-height: 1.45;
+    font-size: 0.875rem;
+    line-height: 1.55;
+    color: var(--vmz-text-tertiary);
+}
+
+.vmz-ui-empty__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--vmz-space-2, 0.5rem);
+    margin-top: var(--vmz-space-2, 0.5rem);
 }
 
 .vmz-ui-empty__actions:empty {
     display: none;
 }
+
+:where([data-density="compact"]) .vmz-ui-empty {
+    gap: var(--vmz-density-compact-gap);
+    padding: var(--vmz-space-5, 1.5rem);
+}
+
+:where([data-density="dense"]) .vmz-ui-empty {
+    gap: var(--vmz-density-dense-gap);
+    padding: var(--vmz-space-4, 1rem);
+}
 </style>
 <script client>
 /**
  * VMZ UI — Empty (Commercial composition).
- * Empty / zero-state surface with optional action slot.
+ * Empty / zero-state surface with neutral registry icon and optional action slot.
  */
 export default class Empty {
-    public title: string = "Nothing here yet";
+    public title: string = "";
     public description: string = "";
+    public icon: string = "feature.runtime";
 }
 </script>

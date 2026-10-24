@@ -1,6 +1,9 @@
 <template>
     <section data-vmz-ui="result" :data-status="status" class="vmz-ui-result">
-        <p class="vmz-ui-result__title">
+        <span class="vmz-ui-result__icon" aria-hidden="true">
+            <Icon :name="statusIcon()" size="lg" decorative />
+        </span>
+        <p v-if="title" class="vmz-ui-result__title">
             {{ title }}
         </p>
         <p v-if="description" class="vmz-ui-result__description">
@@ -15,68 +18,98 @@
 .vmz-ui-result {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: var(--vmz-density-control-gap);
-    padding: calc(var(--vmz-density-control-padding-y) * 1.5) var(--vmz-density-control-padding-x);
-    border: 1px solid var(--vmz-status-info-accent);
-    border-radius: var(--vmz-radius-md, 6px);
-    color: var(--vmz-status-info-foreground);
+    align-items: center;
+    gap: var(--vmz-space-2, 0.5rem);
+    padding: var(--vmz-space-6, 2rem) var(--vmz-space-5, 1.5rem);
+    border: 1px solid var(--vmz-line-default, var(--vmz-line-strong));
+    border-radius: var(--vmz-radius-lg, 8px);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
+    text-align: center;
 }
 
-.vmz-ui-result[data-status="info"] {
-    border-color: var(--vmz-status-info-accent);
-    color: var(--vmz-status-info-foreground);
+.vmz-ui-result__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: var(--vmz-space-1, 0.25rem);
 }
 
-.vmz-ui-result[data-status="success"] {
-    border-color: var(--vmz-status-success-accent);
-    color: var(--vmz-status-success-foreground);
+.vmz-ui-result__icon .vmz-ui-icon[data-size] {
+    font-size: 2.5rem;
 }
 
-.vmz-ui-result[data-status="warning"] {
-    border-color: var(--vmz-status-warning-accent);
-    color: var(--vmz-status-warning-foreground);
+.vmz-ui-result[data-status="info"] .vmz-ui-result__icon {
+    color: var(--vmz-status-info-accent);
 }
 
-.vmz-ui-result[data-status="danger"] {
-    border-color: var(--vmz-status-danger-accent);
-    color: var(--vmz-status-danger-foreground);
+.vmz-ui-result[data-status="success"] .vmz-ui-result__icon {
+    color: var(--vmz-status-success-accent);
 }
 
-:where([data-density="compact"]) .vmz-ui-result {
-    gap: var(--vmz-density-compact-gap);
-    padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+.vmz-ui-result[data-status="warning"] .vmz-ui-result__icon {
+    color: var(--vmz-status-warning-accent);
+}
+
+.vmz-ui-result[data-status="danger"] .vmz-ui-result__icon,
+.vmz-ui-result[data-status="error"] .vmz-ui-result__icon {
+    color: var(--vmz-status-danger-accent);
 }
 
 .vmz-ui-result__title {
     margin: 0;
-    font-size: 1.15rem;
-    font-weight: 700;
+    font-family: var(--vmz-font-sans, inherit);
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.32;
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-result__description {
     margin: 0;
-    opacity: 0.9;
+    max-width: 40rem;
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    color: var(--vmz-text-tertiary);
 }
 
 .vmz-ui-result__actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    justify-content: center;
+    gap: var(--vmz-space-3, 0.75rem);
+    margin-top: var(--vmz-space-2, 0.5rem);
 }
 
 .vmz-ui-result__actions:empty {
     display: none;
 }
+
+:where([data-density="compact"]) .vmz-ui-result {
+    gap: var(--vmz-space-1, 0.25rem);
+    padding: var(--vmz-space-5, 1.5rem) var(--vmz-space-4, 1rem);
+}
+
+:where([data-density="dense"]) .vmz-ui-result {
+    gap: var(--vmz-space-1, 0.25rem);
+    padding: var(--vmz-space-4, 1rem);
+}
 </style>
 <script client>
 /**
  * VMZ UI — Result (UI4 Commercial Surface).
- * Outcome block for success/error flows; status → status.* tokens.
+ * Outcome block for success/error flows; status → status.* accent tokens.
  */
 export default class Result {
     public title: string = "";
     public description: string = "";
     public status: string = "info";
+
+    statusIcon() {
+        const status = String(this.status || "").toLowerCase();
+        if (status === "success" || status === "warning") return `status.${status}`;
+        if (status === "danger" || status === "error") return "status.danger";
+        return "status.info";
+    }
 }
 </script>

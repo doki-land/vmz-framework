@@ -9,11 +9,13 @@
 .vmz-ui-divider {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--vmz-space-3);
     width: 100%;
     color: var(--vmz-text-steel);
     font-size: 0.875rem;
+    line-height: 1.5715;
 }
+
 .vmz-ui-divider:before,
 .vmz-ui-divider:after {
     content: "";
@@ -21,18 +23,23 @@
     flex: 1;
     background: var(--vmz-line-default);
 }
+
 .vmz-ui-divider:not(:has(span)):before {
     flex: 1;
 }
+
 .vmz-ui-divider:not(:has(span)):after {
     display: none;
 }
+
 .vmz-ui-divider[data-direction="vertical"] {
     display: inline-block;
     width: 1px;
     height: 1em;
+    margin: 0 var(--vmz-space-2);
     background: var(--vmz-line-default);
 }
+
 .vmz-ui-divider[data-direction="vertical"]:before,
 .vmz-ui-divider[data-direction="vertical"]:after {
     display: none;

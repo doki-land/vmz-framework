@@ -1,77 +1,178 @@
 <template>
     <aside data-vmz-ui="callout" :data-tone="tone" :role="roleName" class="vmz-ui-callout">
-        <p v-if="title" class="vmz-ui-callout__title">
-            {{ title }}
-        </p>
-        <p v-if="description" class="vmz-ui-callout__description">
-            {{ description }}
-        </p>
-        <div class="vmz-ui-callout__body">
-            <slot />
+        <span class="vmz-ui-callout__icon" aria-hidden="true">
+            <Icon :name="toneIcon()" size="md" decorative />
+        </span>
+        <div class="vmz-ui-callout__content">
+            <p v-if="title" class="vmz-ui-callout__title">
+                {{ title }}
+            </p>
+            <p v-if="description" class="vmz-ui-callout__description">
+                {{ description }}
+            </p>
+            <div class="vmz-ui-callout__body">
+                <slot />
+            </div>
         </div>
+        <button v-if="closable" type="button" class="vmz-ui-callout__close" :aria-label="closeLabel" @click="dismiss">
+            <Icon name="action.close" size="md" decorative />
+        </button>
     </aside>
 </template>
 <style>
 .vmz-ui-callout {
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
-    border: 1px solid var(--vmz-status-info-accent);
-    border-left-width: 1px;
-    border-radius: var(--vmz-radius-md, 6px);
-    background: color-mix(in srgb, var(--vmz-status-info-accent) 10%, var(--vmz-surface-paper));
+    align-items: flex-start;
+    gap: var(--vmz-space-2, 0.5rem);
+    padding: var(--vmz-space-4, 1rem);
+    border: 1px solid var(--vmz-status-info-border, var(--vmz-line-default));
+    border-radius: var(--vmz-radius-lg, 8px);
+    background: var(--vmz-status-info-background, var(--vmz-surface-paper));
     color: var(--vmz-status-info-foreground);
 }
 
 .vmz-ui-callout[data-tone="info"] {
-    border-color: var(--vmz-status-info-accent);
-    background: color-mix(in srgb, var(--vmz-status-info-accent) 10%, var(--vmz-surface-paper));
+    border-color: var(--vmz-status-info-border, var(--vmz-line-default));
+    background: var(--vmz-status-info-background, var(--vmz-surface-paper));
     color: var(--vmz-status-info-foreground);
 }
 
 .vmz-ui-callout[data-tone="success"] {
-    border-color: var(--vmz-status-success-accent);
-    background: color-mix(in srgb, var(--vmz-status-success-accent) 10%, var(--vmz-surface-paper));
+    border-color: var(--vmz-status-success-border, var(--vmz-line-default));
+    background: var(--vmz-status-success-background, var(--vmz-surface-paper));
     color: var(--vmz-status-success-foreground);
 }
 
 .vmz-ui-callout[data-tone="warning"] {
-    border-color: var(--vmz-status-warning-accent);
-    background: color-mix(in srgb, var(--vmz-status-warning-accent) 10%, var(--vmz-surface-paper));
+    border-color: var(--vmz-status-warning-border, var(--vmz-line-default));
+    background: var(--vmz-status-warning-background, var(--vmz-surface-paper));
     color: var(--vmz-status-warning-foreground);
 }
 
 .vmz-ui-callout[data-tone="danger"] {
-    border-color: var(--vmz-status-danger-accent);
-    background: color-mix(in srgb, var(--vmz-status-danger-accent) 10%, var(--vmz-surface-paper));
+    border-color: var(--vmz-status-danger-border, var(--vmz-line-default));
+    background: var(--vmz-status-danger-background, var(--vmz-surface-paper));
     color: var(--vmz-status-danger-foreground);
+}
+
+.vmz-ui-callout[data-tone="info"] .vmz-ui-callout__icon {
+    color: var(--vmz-status-info-accent);
+}
+
+.vmz-ui-callout[data-tone="success"] .vmz-ui-callout__icon {
+    color: var(--vmz-status-success-accent);
+}
+
+.vmz-ui-callout[data-tone="warning"] .vmz-ui-callout__icon {
+    color: var(--vmz-status-warning-accent);
+}
+
+.vmz-ui-callout[data-tone="danger"] .vmz-ui-callout__icon {
+    color: var(--vmz-status-danger-accent);
+}
+
+.vmz-ui-callout__icon {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.5rem;
+}
+
+.vmz-ui-callout__content {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--vmz-space-1, 0.25rem);
+    min-width: 0;
 }
 
 .vmz-ui-callout__title {
     margin: 0;
-    font-family: var(--vmz-font-display);
-    font-weight: 700;
+    font-family: var(--vmz-font-display, inherit);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.5;
+    color: inherit;
 }
 
 .vmz-ui-callout__description {
     margin: 0;
-    line-height: 1.5;
+    color: var(--vmz-text-steel);
+}
+
+.vmz-ui-callout__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vmz-space-2, 0.5rem);
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-callout__body:empty {
     display: none;
 }
+
+.vmz-ui-callout__close {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--vmz-radius-sm, 4px);
+    background: transparent;
+    color: var(--vmz-text-tertiary);
+    cursor: pointer;
+    outline: none;
+    transition:
+        color var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, cubic-bezier(0.2, 0, 0, 1)),
+        background-color var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.vmz-ui-callout__close:hover {
+    color: var(--vmz-text-ink);
+    background: var(--vmz-surface-paper);
+}
+
+.vmz-ui-callout__close:focus-visible {
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+}
+
+:where([data-density="compact"]) .vmz-ui-callout {
+    gap: var(--vmz-space-2, 0.5rem);
+    padding: var(--vmz-space-3, 0.75rem);
+}
+
+:where([data-density="dense"]) .vmz-ui-callout {
+    gap: var(--vmz-space-1, 0.25rem);
+    padding: var(--vmz-space-3, 0.75rem);
+}
 </style>
 <script client>
 /**
  * VMZ UI — Callout (Document/Product composition).
- * Inline guidance block for prose; shares status.* tones with Alert.
+ * Inline guidance block for prose; shares status.{accent|foreground|background|border} tones with Alert.
  */
 export default class Callout {
     public title: string = "";
     public description: string = "";
     public tone: string = "info";
     public roleName: string = "note";
+    public closable: boolean = false;
+    public closeLabel: string = "";
+    public onClose: (() => void) | null = null;
+
+    toneIcon() {
+        const tone = String(this.tone || "").toLowerCase();
+        if (tone === "success" || tone === "warning" || tone === "danger") return `status.${tone}`;
+        return "status.info";
+    }
+
+    dismiss() {
+        this.emit("close");
+        if (typeof this.onClose === "function") this.onClose();
+    }
 }
 </script>

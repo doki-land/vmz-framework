@@ -1,6 +1,6 @@
 <template>
     <span data-vmz-ui="avatar" :data-size="size" :aria-label="label" class="vmz-ui-avatar">
-        <img v-if="src" :src="src" alt />
+        <img v-if="src" :src="src" :alt="label" />
         <span v-if="!src">
             {{ text }}
         </span>
@@ -9,26 +9,34 @@
 <style>
 .vmz-ui-avatar {
     display: inline-flex;
+    flex: 0 0 auto;
     align-items: center;
     justify-content: center;
-    width: 2rem;
-    height: 2rem;
+    box-sizing: border-box;
+    width: var(--vmz-control-height);
+    height: var(--vmz-control-height);
     overflow: hidden;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--vmz-action-primary-background, #1677ff) 14%, white);
-    color: var(--vmz-action-primary-active, #0958d9);
-    font-weight: 650;
+    border-radius: var(--vmz-radius-pill);
+    background: var(--vmz-action-primary-soft);
+    color: var(--vmz-action-primary-active);
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1;
+    user-select: none;
 }
+
 .vmz-ui-avatar[data-size="small"] {
-    width: 1.5rem;
-    height: 1.5rem;
+    width: var(--vmz-control-height-sm);
+    height: var(--vmz-control-height-sm);
     font-size: 0.75rem;
 }
+
 .vmz-ui-avatar[data-size="large"] {
-    width: 2.75rem;
-    height: 2.75rem;
-    font-size: 1.1rem;
+    width: var(--vmz-control-height-lg);
+    height: var(--vmz-control-height-lg);
+    font-size: 1rem;
 }
+
 .vmz-ui-avatar img {
     width: 100%;
     height: 100%;

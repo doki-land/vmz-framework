@@ -4,13 +4,14 @@
 <style>
 .vmz-ui-spinner {
     display: inline-block;
+    box-sizing: border-box;
     width: 1rem;
     height: 1rem;
-    border: 2px solid color-mix(in srgb, var(--vmz-action-primary-background) 25%, transparent);
+    border: 2px solid var(--vmz-action-primary-soft);
     border-top-color: var(--vmz-action-primary-background);
-    border-radius: 50%;
+    border-radius: var(--vmz-radius-pill);
     vertical-align: -0.15em;
-    animation: vmz-ui-spin var(--vmz-motion-overlay-duration) var(--vmz-motion-overlay-easing)
+    animation: vmz-ui-spin var(--vmz-motion-control-duration) var(--vmz-motion-control-easing)
         infinite;
 }
 
@@ -34,6 +35,6 @@
  * Loading indicator; reduced-motion keeps static feedback.
  */
 export default class Spinner {
-    public label: string = "Loading";
+    public label: string = "";
 }
 </script>

@@ -13,25 +13,26 @@
     display: flex;
     flex-direction: column;
     gap: var(--vmz-density-compact-gap);
-    min-height: 4.5rem;
+    min-height: calc(var(--vmz-space-8) + var(--vmz-space-2));
 }
 
 .vmz-ui-skeleton__block,
 .vmz-ui-skeleton__line {
-    border-radius: var(--vmz-radius-md, 6px);
-    background: color-mix(in srgb, var(--vmz-action-primary-background) 18%, transparent);
-    animation: vmz-ui-skeleton-pulse var(--vmz-motion-overlay-duration)
-        var(--vmz-motion-overlay-easing) infinite alternate;
+    background: var(--vmz-surface-mist);
+    animation: vmz-ui-skeleton-pulse calc(var(--vmz-motion-control-duration) * 10)
+        var(--vmz-motion-control-easing) infinite alternate;
 }
 
 .vmz-ui-skeleton__block {
     width: 100%;
-    height: 2.5rem;
+    height: var(--vmz-control-height-lg);
+    border-radius: var(--vmz-radius-lg);
 }
 
 .vmz-ui-skeleton__line {
     width: 72%;
-    height: 0.75rem;
+    height: var(--vmz-space-3);
+    border-radius: var(--vmz-radius-sm);
 }
 
 .vmz-ui-skeleton__line + .vmz-ui-skeleton__line {
@@ -57,6 +58,7 @@
     .vmz-ui-skeleton__block,
     .vmz-ui-skeleton__line {
         animation: none;
+        opacity: 0.75;
     }
 }
 </style>

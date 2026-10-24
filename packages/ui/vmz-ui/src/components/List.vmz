@@ -14,48 +14,70 @@
 .vmz-ui-list {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: var(--vmz-space-2, 0.5rem);
     max-width: 28rem;
 }
 
 .vmz-ui-list__label {
     margin: 0;
+    font-size: 0.875rem;
     font-weight: 600;
     color: var(--vmz-text-ink);
 }
 
 .vmz-ui-list__items {
     margin: 0;
-    padding: 0.25rem;
+    padding: 0;
     list-style: none;
-    border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
+    overflow: hidden;
+    border: 1px solid var(--vmz-line-default, var(--vmz-line-strong));
+    border-radius: var(--vmz-radius-lg, 8px);
     background: var(--vmz-surface-paper);
     color: var(--vmz-text-ink);
 }
 
 .vmz-ui-list__item {
-    padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
-    border-radius: var(--vmz-radius-md, 6px);
+    display: flex;
+    align-items: center;
+    min-height: var(--vmz-control-height, 2rem);
+    padding: var(--vmz-space-2, 0.5rem) var(--vmz-space-4, 1rem);
+    font-size: 0.875rem;
+    line-height: 1.5;
     cursor: pointer;
     outline: none;
+    transition:
+        background-color var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, cubic-bezier(0.2, 0, 0, 1)),
+        color var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, cubic-bezier(0.2, 0, 0, 1));
 }
 
-.vmz-ui-list__item[aria-selected="true"] {
-    background: var(--vmz-action-primary-background);
-    color: var(--vmz-action-primary-foreground);
+.vmz-ui-list__item + .vmz-ui-list__item {
+    border-top: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
 }
 
 .vmz-ui-list__item:hover {
-    background: color-mix(in srgb, var(--vmz-action-primary-background) 14%, transparent);
+    background: var(--vmz-surface-mist);
+}
+
+.vmz-ui-list__item[aria-selected="true"] {
+    background: var(--vmz-action-primary-soft, var(--vmz-surface-mist));
+    color: var(--vmz-action-primary-active);
+    font-weight: 500;
 }
 
 .vmz-ui-list__item[aria-selected="true"]:hover {
-    background: var(--vmz-action-primary-hover);
+    background: var(--vmz-action-primary-soft, var(--vmz-surface-mist));
 }
 
 .vmz-ui-list__item:focus-visible {
-    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+    box-shadow: inset 0 0 0 2px var(--vmz-focus-ring);
+}
+
+:where([data-density="compact"]) .vmz-ui-list__item {
+    padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+}
+
+:where([data-density="dense"]) .vmz-ui-list__item {
+    padding: var(--vmz-density-dense-padding-y) var(--vmz-density-dense-padding-x);
 }
 </style>
 <script client>
@@ -64,7 +86,7 @@
  * Parent owns `selected` id; click + Arrow/Home/End. Not a DataGrid.
  */
 export default class List {
-    public label: string = "List";
+    public label: string = "";
     public labelId: string = "vmz-list-label";
     public selected: string = "";
     /** @type {{ id: string, title: string }[]} */

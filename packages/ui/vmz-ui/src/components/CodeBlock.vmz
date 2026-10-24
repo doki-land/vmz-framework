@@ -12,8 +12,11 @@
                     {{ caption }}
                 </span>
             </div>
-            <Button v-if="canCopy()" type="button" variant="text" size="sm" @click="onCopy" class="vmz-ui-code-block__copy">
-                {{ copyLabel }}
+            <Button v-if="canCopy()" type="button" variant="text" size="small" @click="onCopy" class="vmz-ui-code-block__copy">
+                <Icon name="action.copy" size="md" decorative />
+                <span v-if="copyLabel" class="vmz-ui-code-block__copy-text">
+                    {{ copyLabel }}
+                </span>
             </Button>
         </div>
         <pre class="vmz-ui-code-block__pre">
@@ -28,9 +31,8 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--vmz-line-default);
     border-radius: var(--vmz-radius-lg, 8px);
-    background: var(--vmz-surface-mist);
+    background: var(--vmz-surface-code);
     overflow: hidden;
 }
 
@@ -38,27 +40,27 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
+    gap: var(--vmz-space-2, 0.5rem);
     min-height: 2.25rem;
-    padding: 0 0.5rem 0 0.75rem;
-    border-bottom: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
-    background: var(--vmz-surface-paper);
+    padding: 0 var(--vmz-space-2, 0.5rem) 0 var(--vmz-space-3, 0.75rem);
+    border-bottom: 1px solid color-mix(in srgb, var(--vmz-text-on-brand) 10%, transparent);
+    background: var(--vmz-surface-graphite);
 }
 
 .vmz-ui-code-block__heading {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--vmz-space-2, 0.5rem);
     min-width: 0;
 }
 
 .vmz-ui-code-block__lang {
     flex: none;
     padding: 0.0625rem 0.4375rem;
-    border: 1px solid var(--vmz-line-default);
+    border: 1px solid color-mix(in srgb, var(--vmz-text-on-brand) 18%, transparent);
     border-radius: var(--vmz-radius-xs, 2px);
-    background: var(--vmz-surface-mist);
-    color: var(--vmz-text-steel);
+    background: color-mix(in srgb, var(--vmz-text-on-brand) 8%, transparent);
+    color: color-mix(in srgb, var(--vmz-text-on-brand) 72%, transparent);
     font-family: var(--vmz-font-mono);
     font-size: 0.6875rem;
     font-weight: 600;
@@ -69,38 +71,68 @@
 
 .vmz-ui-code-block__caption {
     overflow: hidden;
-    color: var(--vmz-text-steel);
+    color: color-mix(in srgb, var(--vmz-text-on-brand) 72%, transparent);
     font-size: 0.8125rem;
     line-height: 1.5;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.vmz-ui-code-block__copy {
+.vmz-ui-code-block .vmz-ui-code-block__bar .vmz-ui-code-block__copy {
     flex: none;
-    opacity: 0.72;
-    transition: opacity var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+    min-height: 1.75rem;
+    padding: 0 var(--vmz-space-2, 0.5rem);
+    gap: var(--vmz-space-1, 0.25rem);
+    border: 1px solid transparent;
+    border-radius: var(--vmz-radius-sm, 4px);
+    background: transparent;
+    color: color-mix(in srgb, var(--vmz-text-on-brand) 72%, transparent);
+    font-family: var(--vmz-font-sans);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.5;
+    cursor: pointer;
+    outline: none;
+    transition:
+        color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+        background-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
 }
 
-.vmz-ui-code-block:hover .vmz-ui-code-block__copy,
-.vmz-ui-code-block__copy:focus-visible {
-    opacity: 1;
+.vmz-ui-code-block .vmz-ui-code-block__bar .vmz-ui-code-block__copy:hover:not(:disabled) {
+    color: var(--vmz-text-on-brand);
+    background: color-mix(in srgb, var(--vmz-text-on-brand) 12%, transparent);
+}
+
+.vmz-ui-code-block .vmz-ui-code-block__bar .vmz-ui-code-block__copy:active:not(:disabled) {
+    background: color-mix(in srgb, var(--vmz-text-on-brand) 16%, transparent);
+}
+
+.vmz-ui-code-block .vmz-ui-code-block__bar .vmz-ui-code-block__copy:focus-visible {
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+}
+
+.vmz-ui-code-block__copy-text {
+    overflow: hidden;
+    max-width: 10rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .vmz-ui-code-block__pre {
     margin: 0;
-    padding: 0.875rem 1rem;
+    padding: var(--vmz-space-4, 1rem) 1.25rem;
     overflow-x: auto;
     overflow-y: auto;
     max-height: 32rem;
+    background: var(--vmz-surface-code);
 }
 
 .vmz-ui-code-block__code {
     display: block;
-    color: var(--vmz-text-ink);
+    color: var(--vmz-text-on-brand);
     font-family: var(--vmz-font-mono);
-    font-size: 0.8125rem;
-    line-height: 1.65;
+    font-size: 0.875rem;
+    line-height: 1.5714;
     white-space: pre;
     tab-size: 2;
 }
@@ -112,13 +144,13 @@
 
 .vmz-ui-code-block__pre::-webkit-scrollbar-thumb {
     border-radius: var(--vmz-radius-pill, 999px);
-    background: var(--vmz-line-default);
+    background: color-mix(in srgb, var(--vmz-text-on-brand) 20%, transparent);
 }
 </style>
 <script client>
 /**
  * VMZ UI — CodeBlock (Document/Product composition).
- * Readable `<pre><code>` shell: no syntax highlighting (use `<Shiki>` / `<Code>`).
+ * Dark `<pre><code>` shell: no syntax highlighting (use `<Shiki>` / `<Code>`).
  * `title` wins over legacy `caption`; `language` is a display-only chip.
  * Source and bar are server-rendered; copy is progressive enhancement via onCopy.
  */
@@ -130,8 +162,8 @@ export default class CodeBlock {
     public title: string = "";
     /** Optional syntax label rendered as a chip in the bar (e.g. `ts`, `bash`). */
     public language: string = "";
-    /** Visible label of the copy control. */
-    public copyLabel: string = "Copy";
+    /** Accessible label of the copy control. */
+    public copyLabel: string = "";
     public onCopy: ((e: Event) => void) | null = null;
 
     /** The bar renders when there is anything to show in it. */

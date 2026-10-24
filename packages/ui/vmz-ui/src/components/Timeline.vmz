@@ -1,15 +1,18 @@
 <template>
     <ol data-vmz-ui="timeline" :aria-label="label" class="vmz-ui-timeline">
         <li v-for="item in items" :key="item.id" :data-vmz-audit="item.id" class="vmz-ui-timeline__item">
-            <p class="vmz-ui-timeline__time">
-                {{ item.time }}
-            </p>
-            <p class="vmz-ui-timeline__title">
-                {{ item.title }}
-            </p>
-            <p v-if="item.detail" class="vmz-ui-timeline__detail">
-                {{ item.detail }}
-            </p>
+            <span class="vmz-ui-timeline__marker" aria-hidden="true" />
+            <div class="vmz-ui-timeline__content">
+                <p class="vmz-ui-timeline__time">
+                    {{ item.time }}
+                </p>
+                <p class="vmz-ui-timeline__title">
+                    {{ item.title }}
+                </p>
+                <p v-if="item.detail" class="vmz-ui-timeline__detail">
+                    {{ item.detail }}
+                </p>
+            </div>
         </li>
     </ol>
 </template>
@@ -20,42 +23,74 @@
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: var(--vmz-density-compact-gap);
-    border-left: 2px solid var(--vmz-line-default);
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-timeline__item {
-    position: relative;
-    padding: 0.125rem 0 0.125rem 0.85rem;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--vmz-space-3, 0.75rem);
+    padding: var(--vmz-space-3, 0.75rem) 0;
+    border-bottom: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
 }
 
-.vmz-ui-timeline__item::before {
-    content: "";
-    position: absolute;
-    left: -0.35rem;
-    top: 0.45rem;
-    width: 0.55rem;
-    height: 0.55rem;
-    border-radius: 999px;
+.vmz-ui-timeline__item:first-child {
+    padding-top: 0;
+}
+
+.vmz-ui-timeline__item:last-child {
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.vmz-ui-timeline__marker {
+    flex: 0 0 auto;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-top: 0.45rem;
+    border-radius: var(--vmz-radius-pill, 999px);
     background: var(--vmz-action-primary-background);
+    box-shadow: 0 0 0 3px var(--vmz-action-primary-soft, var(--vmz-surface-mist));
+}
+
+.vmz-ui-timeline__content {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--vmz-space-1, 0.25rem);
+    min-width: 0;
 }
 
 .vmz-ui-timeline__time {
     margin: 0;
-    font-size: 0.85em;
-    opacity: 0.75;
-    color: var(--vmz-action-primary-active);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: var(--vmz-text-tertiary);
 }
 
 .vmz-ui-timeline__title {
-    margin: 0.125rem 0 0;
-    font-weight: 700;
-    color: var(--vmz-action-primary-active);
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.5;
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-timeline__detail {
-    margin: 0.2rem 0 0;
-    opacity: 0.9;
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.55;
+    color: var(--vmz-text-steel);
+}
+
+:where([data-density="compact"]) .vmz-ui-timeline__item {
+    gap: var(--vmz-density-compact-gap);
+    padding-block: var(--vmz-density-compact-gap);
+}
+
+:where([data-density="dense"]) .vmz-ui-timeline__item {
+    gap: var(--vmz-density-dense-gap);
+    padding-block: var(--vmz-density-dense-gap);
 }
 </style>
 <script client>
@@ -64,7 +99,7 @@
  * Parent owns audit items; stable ids for list identity.
  */
 export default class Timeline {
-    public label: string = "Audit";
+    public label: string = "";
     /** @type {{ id: string, time: string, title: string, detail?: string }[]} */
     public items: {
         id: string;

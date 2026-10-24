@@ -7,54 +7,46 @@
 .vmz-ui-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
-    padding: 0.125rem 0.5rem;
+    gap: var(--vmz-space-1);
+    max-width: 100%;
+    padding: 0 var(--vmz-space-2);
     border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
+    border-radius: var(--vmz-radius-sm);
     font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    line-height: 1.2;
+    font-weight: 500;
+    line-height: 1.6667;
+    white-space: nowrap;
     background: var(--vmz-surface-mist);
-    color: var(--vmz-text-ink);
+    color: var(--vmz-text-steel);
 }
 
 .vmz-ui-badge[data-tone="brand"] {
-    border-color: color-mix(
-        in srgb,
-        var(--vmz-action-primary-background) 35%,
-        var(--vmz-line-default)
-    );
-    background: color-mix(
-        in srgb,
-        var(--vmz-action-primary-background) 12%,
-        var(--vmz-surface-paper)
-    );
+    border-color: var(--vmz-action-primary-hover);
+    background: var(--vmz-action-primary-soft);
     color: var(--vmz-action-primary-active);
 }
 
 .vmz-ui-badge[data-tone="info"] {
-    border-color: var(--vmz-status-info-accent);
-    background: color-mix(in srgb, var(--vmz-status-info-accent) 12%, var(--vmz-surface-paper));
+    border-color: var(--vmz-status-info-border);
+    background: var(--vmz-status-info-background);
     color: var(--vmz-status-info-foreground);
 }
 
 .vmz-ui-badge[data-tone="success"] {
-    border-color: var(--vmz-status-success-accent);
-    background: color-mix(in srgb, var(--vmz-status-success-accent) 12%, var(--vmz-surface-paper));
+    border-color: var(--vmz-status-success-border);
+    background: var(--vmz-status-success-background);
     color: var(--vmz-status-success-foreground);
 }
 
 .vmz-ui-badge[data-tone="warning"] {
-    border-color: var(--vmz-status-warning-accent);
-    background: color-mix(in srgb, var(--vmz-status-warning-accent) 12%, var(--vmz-surface-paper));
+    border-color: var(--vmz-status-warning-border);
+    background: var(--vmz-status-warning-background);
     color: var(--vmz-status-warning-foreground);
 }
 
 .vmz-ui-badge[data-tone="danger"] {
-    border-color: var(--vmz-status-danger-accent);
-    background: color-mix(in srgb, var(--vmz-status-danger-accent) 12%, var(--vmz-surface-paper));
+    border-color: var(--vmz-status-danger-border);
+    background: var(--vmz-status-danger-background);
     color: var(--vmz-status-danger-foreground);
 }
 </style>
