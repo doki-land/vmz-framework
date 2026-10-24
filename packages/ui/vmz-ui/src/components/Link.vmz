@@ -65,7 +65,11 @@ export default class Link {
     public href: string = "#";
     public target: string = "";
     public rel: string = "";
-    /** `default` inline prose link · `muted` quiet inline link · `nav` chrome link. */
+    /**
+     * `default` inline prose link · `muted` quiet inline link · `nav` chrome link.
+     * Appearance/semantic hint only: navigation, `href`, `target` and `rel` are
+     * unaffected, and unknown values render as `default` without error.
+     */
     public variant: string = "default";
 }
 </script>

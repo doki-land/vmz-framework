@@ -161,7 +161,8 @@
 <script client>
 /**
  * VMZ UI — AppShell (Commercial composition).
- * Landmark header/nav + main slot. Parent supplies nav items; no private theme.
+ * Landmark header/nav + main slot. `nav` stays flat link-only; non-nav controls
+ * go into the named `actions` slot. Parent supplies copy; no private theme.
  */
 export default class AppShell {
     public brand: string = "VMZ";

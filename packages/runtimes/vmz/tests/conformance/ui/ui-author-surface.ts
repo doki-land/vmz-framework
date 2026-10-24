@@ -112,3 +112,74 @@ if (!copyable.includes('Copy command')) fail('`copyLabel` must label the copy co
 if (!/<button/.test(copyable)) fail('`onCopy` must render the copy control');
 
 console.log('ui-author-surface PASS: CodeBlock header contract');
+
+// --- AppShell: flat nav unchanged, `actions` slot is the extension point ---
+console.log('ui-author-surface: AppShell flat nav + actions slot…');
+const AppShell = await loadComponent('AppShell');
+registerComponents({ AppShell });
+const shellHtml = await renderToString(
+    AppShell,
+    {
+        brand: 'VMZ',
+        homeHref: '/',
+        navLabel: 'Primary',
+        activeId: 'docs',
+        nav: [
+            { id: 'docs', title: 'Docs', href: '/docs' },
+            { id: 'blog', title: 'Blog', href: '/blog' },
+        ],
+    },
+    { slotHtml: '<h1>Page</h1>' },
+);
+for (const needle of [
+    'data-vmz-ui="app-shell"',
+    'aria-label="Primary"',
+    'href="/docs"',
+    'aria-current="page"',
+    '<h1>Page</h1>',
+]) {
+    if (!shellHtml.includes(needle)) fail(`AppShell SSR missing ${needle}: ${shellHtml.slice(0, 600)}`);
+}
+const shellSrc = fs.readFileSync(path.join(dist, 'components', 'AppShell.client.js'), 'utf8');
+if (!/api\.attr\([^,]+, ["']name["'], ["']actions["']\)/.test(shellSrc)) {
+    fail('AppShell has no named `actions` slot in the compiled component');
+}
+if (!shellSrc.includes('"tag":"actions"')) {
+    fail('AppShell compiled plan is missing the `actions` slot node');
+}
+
+// --- Link: `nav` / `muted` variants keep href/target/rel ------------------
+console.log('ui-author-surface: Link variants…');
+const Link = await loadComponent('Link');
+registerComponents({ Link });
+for (const variant of ['default', 'muted', 'nav']) {
+    const html = await renderToString(
+        Link,
+        { href: `/v/${variant}`, target: '_blank', rel: 'noopener', variant },
+        { slotHtml: variant },
+    );
+    if (!html.includes(`data-variant="${variant}"`)) fail(`Link missing data-variant="${variant}"`);
+    if (!html.includes(`href="/v/${variant}"`)) fail(`Link ${variant} must keep href`);
+    if (!html.includes('target="_blank"') || !html.includes('rel="noopener"')) {
+        fail(`Link ${variant} must pass through target/rel`);
+    }
+}
+
+// --- Icons: `language` alias resolves to the `nav.language` glyph ---------
+console.log('ui-author-surface: `language` → `nav.language` icon alias…');
+const Icon = await loadComponent('Icon');
+registerComponents({ Icon });
+const glyphPaths = (html) =>
+    [...html.matchAll(/\sd="([^"]+)"/g)]
+        .map((match) => match[1])
+        .sort()
+        .join('|');
+const aliasHtml = await renderToString(Icon, { name: 'language', decorative: true });
+const canonicalHtml = await renderToString(Icon, { name: 'nav.language', decorative: true });
+if (!aliasHtml.includes('data-name="language"')) fail('Icon must keep the authored name in data-name');
+if (!glyphPaths(aliasHtml)) fail('`language` alias rendered no glyph paths');
+if (glyphPaths(aliasHtml) !== glyphPaths(canonicalHtml)) {
+    fail('`language` alias must resolve to the exact `nav.language` glyph');
+}
+
+console.log('ui-author-surface PASS: AppShell, Link and icon alias contracts');
