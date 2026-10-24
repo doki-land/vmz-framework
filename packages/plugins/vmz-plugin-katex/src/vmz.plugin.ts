@@ -1,9 +1,9 @@
 import { definePlugin, loadPluginSource } from '@vmz/plugin';
 
-const source = loadPluginSource(import.meta.url, 'components/Monaco.vmz');
+const source = loadPluginSource(import.meta.url, '../components/Katex.vmz');
 
 export default definePlugin({
-    name: '@vmz/plugin-monaco',
+    name: '@vmz/plugin-katex',
     version: '0.1.0',
     protocol: '0.1.0',
     stages: ['workspace_resolve', 'analyzer'],
@@ -12,15 +12,17 @@ export default definePlugin({
         if (ctx.stage === 'workspace_resolve') {
             return {
                 stage: 'workspace_resolve',
-                cacheKey: `@vmz/plugin-monaco:Monaco.vmz:${source.contentHash.slice(0, 12)}`,
+                cacheKey: `@vmz/plugin-katex:Katex.vmz:${source.contentHash.slice(0, 12)}`,
                 items: [
                     {
-                        id: 'component-monaco',
+                        id: 'component-katex',
                         kind: 'source',
-                        path: 'src/components/Monaco.vmz',
+                        path: 'src/components/Katex.vmz',
                         content: source.content,
                         contentHash: source.contentHash,
                         materialize: true,
+                        engine: 'katex',
+                        engineKind: 'math',
                     },
                 ],
             };
@@ -28,15 +30,17 @@ export default definePlugin({
         if (ctx.stage === 'analyzer') {
             return {
                 stage: 'analyzer',
-                cacheKey: '@vmz/plugin-monaco:analyzer',
+                cacheKey: '@vmz/plugin-katex:analyzer',
                 items: [
                     {
-                        id: 'component-monaco-online',
+                        id: 'engine-katex',
                         kind: 'analyzer',
-                        path: 'src/components/Monaco.vmz',
+                        path: 'src/components/Katex.vmz',
                         severity: 'advice',
-                        message: 'Monaco component online',
-                        code: 'vmz.plugin.monaco',
+                        message: 'math engine katex online',
+                        code: 'vmz.engine.katex',
+                        engine: 'katex',
+                        engineKind: 'math',
                     },
                 ],
             };

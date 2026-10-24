@@ -1,9 +1,9 @@
 import { definePlugin, loadPluginSource } from '@vmz/plugin';
 
-const source = loadPluginSource(import.meta.url, 'components/Mermaid.vmz');
+const source = loadPluginSource(import.meta.url, '../components/Mathjax.vmz');
 
 export default definePlugin({
-    name: '@vmz/plugin-mermaid',
+    name: '@vmz/plugin-mathjax',
     version: '0.1.0',
     protocol: '0.1.0',
     stages: ['workspace_resolve', 'analyzer'],
@@ -12,15 +12,17 @@ export default definePlugin({
         if (ctx.stage === 'workspace_resolve') {
             return {
                 stage: 'workspace_resolve',
-                cacheKey: `@vmz/plugin-mermaid:Mermaid.vmz:${source.contentHash.slice(0, 12)}`,
+                cacheKey: `@vmz/plugin-mathjax:Mathjax.vmz:${source.contentHash.slice(0, 12)}`,
                 items: [
                     {
-                        id: 'component-mermaid',
+                        id: 'component-mathjax',
                         kind: 'source',
-                        path: 'src/components/Mermaid.vmz',
+                        path: 'src/components/Mathjax.vmz',
                         content: source.content,
                         contentHash: source.contentHash,
                         materialize: true,
+                        engine: 'mathjax',
+                        engineKind: 'math',
                     },
                 ],
             };
@@ -28,15 +30,17 @@ export default definePlugin({
         if (ctx.stage === 'analyzer') {
             return {
                 stage: 'analyzer',
-                cacheKey: '@vmz/plugin-mermaid:analyzer',
+                cacheKey: '@vmz/plugin-mathjax:analyzer',
                 items: [
                     {
-                        id: 'component-mermaid-online',
+                        id: 'engine-mathjax',
                         kind: 'analyzer',
-                        path: 'src/components/Mermaid.vmz',
+                        path: 'src/components/Mathjax.vmz',
                         severity: 'advice',
-                        message: 'Mermaid component online',
-                        code: 'vmz.plugin.mermaid',
+                        message: 'math engine mathjax online',
+                        code: 'vmz.engine.mathjax',
+                        engine: 'mathjax',
+                        engineKind: 'math',
                     },
                 ],
             };

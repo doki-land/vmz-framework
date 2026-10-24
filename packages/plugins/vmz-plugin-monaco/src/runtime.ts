@@ -29,6 +29,8 @@ type MonacoEnv = {
     getWorker?: (moduleId: string, label: string) => Worker;
 };
 
+type MonacoModule = typeof import('monaco-editor');
+
 let mountSeq = 0;
 
 function ensureMonacoEnvironment(): void {
@@ -101,14 +103,13 @@ export async function mountMonaco(el: HTMLElement, opts: MountMonacoOptions = {}
 
     // Prefer vendor-injected monaco (single ESM chunk); otherwise dynamic-import.
     const injected = (globalThis as { __VMZ_MONACO__?: unknown }).__VMZ_MONACO__;
-    let MonacoNS: unknown = injected;
+    let MonacoNS = injected as MonacoModule | undefined;
     if (!MonacoNS) {
         MonacoNS = await import('monaco-editor');
         await import('monaco-editor/language/json/monaco.contribution.js');
     }
-    const monaco = (MonacoNS as { languages?: unknown; default?: unknown }).languages
-        ? MonacoNS
-        : ((MonacoNS as { default: typeof MonacoNS }).default ?? MonacoNS);
+    const monacoNs = MonacoNS as MonacoModule & { default?: MonacoModule };
+    const monaco: MonacoModule = monacoNs.languages ? monacoNs : (monacoNs.default ?? monacoNs);
 
     const language = opts.language ?? 'typescript';
     disposeHostEditor(el);
