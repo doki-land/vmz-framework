@@ -35,6 +35,97 @@ export const STROKE_ICONS: Record<string, IconDef> = {
         kind: 'stroke',
         paths: ['M9 9H17V17H9Z', 'M6 6H14V14'],
     },
+    'action.chevron-up': {
+        kind: 'stroke',
+        paths: ['M7 14L12 9L17 14'],
+    },
+    'action.chevron-left': {
+        kind: 'stroke',
+        paths: ['M14 7L9 12L14 17'],
+    },
+    'action.minus': {
+        kind: 'stroke',
+        paths: ['M5 12H19'],
+    },
+    'action.more': {
+        kind: 'stroke',
+        paths: ['M6 12H6.01', 'M12 12H12.01', 'M18 12H18.01'],
+    },
+    'action.filter': {
+        kind: 'stroke',
+        paths: ['M4 6H20L14 13V19L10 17V13L4 6Z'],
+    },
+    'action.calendar': {
+        kind: 'stroke',
+        paths: ['M4 8H20V20H4Z', 'M4 12H20', 'M8 4V8', 'M16 4V8'],
+    },
+    'action.upload': {
+        kind: 'stroke',
+        paths: ['M12 16V4', 'M7 9L12 4L17 9', 'M4 16V20H20V16'],
+    },
+    'action.download': {
+        kind: 'stroke',
+        paths: ['M12 4V16', 'M7 11L12 16L17 11', 'M4 20H20'],
+    },
+    'action.sort': {
+        kind: 'stroke',
+        paths: ['M8 18V6', 'M5 9L8 6L11 9', 'M16 6V18', 'M13 15L16 18L19 15'],
+    },
+    'action.sort-asc': {
+        kind: 'stroke',
+        paths: ['M8 18V6', 'M5 9L8 6L11 9', 'M15 18H21'],
+    },
+    'action.sort-desc': {
+        kind: 'stroke',
+        paths: ['M8 6V18', 'M5 15L8 18L11 15', 'M15 6H21'],
+    },
+    'action.external': {
+        kind: 'stroke',
+        paths: ['M14 4H20V10', 'M20 4L11 13', 'M18 14V20H4V6H10'],
+    },
+    'action.arrow-right': {
+        kind: 'stroke',
+        paths: ['M4 12H20', 'M14 6L20 12L14 18'],
+    },
+    'action.arrow-left': {
+        kind: 'stroke',
+        paths: ['M20 12H4', 'M10 6L4 12L10 18'],
+    },
+    'action.trash': {
+        kind: 'stroke',
+        paths: ['M4 7H20', 'M9 7V4H15V7', 'M6 7L7 20H17L18 7', 'M10 11V16', 'M14 11V16'],
+    },
+    'action.edit': {
+        kind: 'stroke',
+        paths: ['M4 20H8L19 9L15 5L4 16V20Z'],
+    },
+    'action.refresh': {
+        kind: 'stroke',
+        paths: ['M20 12A8 8 0 1 1 17.5 6.5', 'M20 4V9H15'],
+    },
+    'action.history': {
+        kind: 'stroke',
+        circles: [{ cx: 12, cy: 12, r: 8.5 }],
+        paths: ['M12 7V12L15.5 14'],
+    },
+    'action.moon': {
+        kind: 'stroke',
+        paths: ['M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z'],
+    },
+    'action.sun': {
+        kind: 'stroke',
+        circles: [{ cx: 12, cy: 12, r: 4 }],
+        paths: ['M12 2V4', 'M12 20V22', 'M2 12H4', 'M20 12H22', 'M5 5L6.5 6.5', 'M17.5 17.5L19 19', 'M19 5L17.5 6.5', 'M6.5 17.5L5 19'],
+    },
+    'action.monitor': {
+        kind: 'stroke',
+        paths: ['M4 5H20V17H4Z', 'M9 20H15', 'M12 17V20'],
+    },
+    'action.search-document': {
+        kind: 'stroke',
+        paths: ['M5 4H15L19 8V20H5Z', 'M15 4V8H19'],
+        circles: [{ cx: 11, cy: 14, r: 2.5 }],
+    },
     'nav.home': {
         kind: 'stroke',
         paths: ['M4 10.5L12 4L20 10.5', 'M6 10V19H18V10', 'M10 19V13H14V19'],
