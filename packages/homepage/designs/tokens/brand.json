@@ -18,24 +18,27 @@
     },
     "surface": {
         "paper": "#FFFFFF",
-        "mist": "#F5F5F5",
-        "page": "#F5F5F5",
-        "ink": "#141414",
-        "graphite": "#434343",
-        "code": "#121212",
-        "inverse": "#141414"
+        "mist": "#F7F8FA",
+        "page": "#F5F6F8",
+        "fill": "#FAFBFC",
+        "ink": "#1F2329",
+        "graphite": "#3A3F45",
+        "code": "#0F1115",
+        "inverse": "#1F2329"
     },
     "text": {
-        "ink": "#141414",
-        "steel": "#595959",
+        "ink": "#1F2329",
+        "steel": "#51565D",
+        "tertiary": "#646A73",
+        "muted": "#8A9099",
         "on-brand": "#FFFFFF",
-        "on-ink": "#FAFAFA",
-        "on-inverse": "#FAFAFA"
+        "on-ink": "#F7F8FA",
+        "on-inverse": "#F7F8FA"
     },
     "line": {
-        "default": "#D9D9D9",
-        "subtle": "#F0F0F0",
-        "strong": "#424242"
+        "default": "#E5E6EB",
+        "subtle": "#F0F1F3",
+        "strong": "#C9CDD4"
     },
     "status": {
         "success": "#52C41A",
@@ -45,8 +48,8 @@
         "runtime": "#13C2C2"
     },
     "font": {
-        "sans": "\"IBM Plex Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
-        "mono": "\"IBM Plex Mono\", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-        "display": "\"IBM Plex Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif"
+        "sans": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+        "mono": "ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, \"Liberation Mono\", monospace",
+        "display": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", Roboto, \"Helvetica Neue\", Arial, sans-serif"
     }
 }

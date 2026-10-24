@@ -2,8 +2,6 @@
  * Tokens: designs/tokens/brand.json (Style Theme CSS custom properties)
  */
 
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
-
 *,
 *::before,
 *::after {
@@ -19,8 +17,10 @@ body {
   margin: 0;
   min-height: 100%;
   font-family: var(--vmz-font-sans);
-  font-size: 14px;
-  line-height: 1.5715;
+  font-size: var(--vmz-type-body, 1rem);
+  line-height: var(--vmz-type-line-height-body, 1.625);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   color: var(--vmz-text-ink);
   background: var(--vmz-surface-page, var(--vmz-surface-mist, #f5f5f5));
 }
@@ -72,8 +72,8 @@ code {
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
-  min-height: 3rem;
-  padding: 0 clamp(1.25rem, 4vw, 2.75rem);
+  min-height: var(--vmz-layout-header-height, 4rem);
+  padding: 0 var(--vmz-layout-gutter, clamp(1rem, 4vw, 2rem));
   border-bottom: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
   background: var(--vmz-surface-paper);
 }
@@ -123,7 +123,7 @@ code {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
   gap: 1.5rem 2rem;
-  padding: 2.25rem clamp(1.25rem, 4vw, 2.75rem) 2.5rem;
+  padding: var(--vmz-space-6) var(--vmz-layout-gutter) var(--vmz-space-6);
   border-top: 1px solid var(--vmz-line-default);
   background: var(--vmz-surface-paper);
 }

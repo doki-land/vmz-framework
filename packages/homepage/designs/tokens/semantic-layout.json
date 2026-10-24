@@ -22,35 +22,35 @@
         },
         {
             "key": { "path": ["space", "5"] },
-            "value": "1.25rem"
-        },
-        {
-            "key": { "path": ["space", "6"] },
             "value": "1.5rem"
         },
         {
-            "key": { "path": ["space", "7"] },
+            "key": { "path": ["space", "6"] },
             "value": "2rem"
         },
         {
-            "key": { "path": ["space", "8"] },
-            "value": "2.5rem"
-        },
-        {
-            "key": { "path": ["space", "9"] },
+            "key": { "path": ["space", "7"] },
             "value": "3rem"
         },
         {
-            "key": { "path": ["space", "10"] },
+            "key": { "path": ["space", "8"] },
             "value": "4rem"
         },
         {
-            "key": { "path": ["space", "11"] },
+            "key": { "path": ["space", "9"] },
             "value": "5rem"
         },
         {
-            "key": { "path": ["space", "12"] },
+            "key": { "path": ["space", "10"] },
             "value": "6rem"
+        },
+        {
+            "key": { "path": ["space", "11"] },
+            "value": "8rem"
+        },
+        {
+            "key": { "path": ["space", "12"] },
+            "value": "10rem"
         },
         {
             "key": { "path": ["elevation", "0"] },
@@ -58,35 +58,39 @@
         },
         {
             "key": { "path": ["elevation", "1"] },
-            "value": "0 1px 2px 0 rgba(0,0,0,.04), 0 1px 4px -1px rgba(0,0,0,.03)"
+            "value": "0 1px 2px 0 rgba(15,23,42,.04), 0 1px 4px -1px rgba(15,23,42,.03)"
         },
         {
             "key": { "path": ["elevation", "2"] },
-            "value": "0 1px 2px -2px rgba(0,0,0,.08), 0 3px 6px 0 rgba(0,0,0,.06), 0 5px 12px 4px rgba(0,0,0,.04)"
+            "value": "0 4px 12px 0 rgba(15,23,42,.08), 0 1px 3px 0 rgba(15,23,42,.04)"
         },
         {
             "key": { "path": ["elevation", "3"] },
-            "value": "0 6px 16px 0 rgba(0,0,0,.08), 0 3px 6px -4px rgba(0,0,0,.12), 0 9px 28px 8px rgba(0,0,0,.05)"
+            "value": "0 12px 32px 0 rgba(15,23,42,.12), 0 2px 8px 0 rgba(15,23,42,.06)"
         },
         {
             "key": { "path": ["layout", "gutter"] },
-            "value": "clamp(1.25rem, 4vw, 2rem)"
+            "value": "clamp(1rem, 4vw, 2rem)"
         },
         {
             "key": { "path": ["layout", "section"] },
-            "value": "clamp(4rem, 6vw, 6rem)"
+            "value": "clamp(3rem, 6vw, 5rem)"
         },
         {
             "key": { "path": ["layout", "header-height"] },
             "value": "4rem"
         },
         {
+            "key": { "path": ["layout", "header-height-compact"] },
+            "value": "3.5rem"
+        },
+        {
             "key": { "path": ["type", "display"] },
-            "value": "clamp(2.25rem, 3.2vw, 3rem)"
+            "value": "clamp(2rem, 3.4vw, 3rem)"
         },
         {
             "key": { "path": ["type", "title"] },
-            "value": "clamp(1.625rem, 2.2vw, 2rem)"
+            "value": "clamp(1.5rem, 2.2vw, 1.875rem)"
         },
         {
             "key": { "path": ["type", "subtitle"] },
@@ -103,6 +107,38 @@
         {
             "key": { "path": ["type", "code"] },
             "value": "0.875rem"
+        },
+        {
+            "key": { "path": ["type", "weight", "regular"] },
+            "value": "400"
+        },
+        {
+            "key": { "path": ["type", "weight", "medium"] },
+            "value": "500"
+        },
+        {
+            "key": { "path": ["type", "weight", "semibold"] },
+            "value": "600"
+        },
+        {
+            "key": { "path": ["type", "line-height", "display"] },
+            "value": "1.18"
+        },
+        {
+            "key": { "path": ["type", "line-height", "title"] },
+            "value": "1.32"
+        },
+        {
+            "key": { "path": ["type", "line-height", "body"] },
+            "value": "1.625"
+        },
+        {
+            "key": { "path": ["type", "line-height", "caption"] },
+            "value": "1.55"
+        },
+        {
+            "key": { "path": ["type", "line-height", "code"] },
+            "value": "1.6"
         }
     ]
 }

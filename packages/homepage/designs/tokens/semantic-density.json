@@ -18,11 +18,11 @@
         },
         {
             "key": { "path": ["density", "compact", "padding-x"] },
-            "value": "0.5rem"
+            "value": "0.625rem"
         },
         {
             "key": { "path": ["density", "compact", "gap"] },
-            "value": "0.35rem"
+            "value": "0.375rem"
         },
         {
             "key": { "path": ["density", "dense", "padding-y"] },
@@ -30,7 +30,7 @@
         },
         {
             "key": { "path": ["density", "dense", "padding-x"] },
-            "value": "0.35rem"
+            "value": "0.4375rem"
         },
         {
             "key": { "path": ["density", "dense", "gap"] },
@@ -49,6 +49,10 @@
             "value": "2.5rem"
         },
         {
+            "key": { "path": ["control", "height", "mobile"] },
+            "value": "2.75rem"
+        },
+        {
             "key": { "path": ["radius", "xs"] },
             "value": "2px"
         },
@@ -65,6 +69,10 @@
             "value": "8px"
         },
         {
+            "key": { "path": ["radius", "xl"] },
+            "value": "12px"
+        },
+        {
             "key": { "path": ["radius", "pill"] },
             "value": "999px"
         },
@@ -74,11 +82,11 @@
         },
         {
             "key": { "path": ["shadow", "card", "hover"] },
-            "value": "0 1px 2px -2px rgba(0,0,0,.08), 0 3px 6px 0 rgba(0,0,0,.06), 0 5px 12px 4px rgba(0,0,0,.04)"
+            "value": "none"
         },
         {
             "key": { "path": ["shadow", "popup"] },
-            "value": "0 6px 16px 0 rgba(0,0,0,.08), 0 3px 6px -4px rgba(0,0,0,.12), 0 9px 28px 8px rgba(0,0,0,.05)"
+            "value": "0 12px 32px 0 rgba(15,23,42,.12), 0 2px 8px 0 rgba(15,23,42,.06)"
         },
         {
             "key": { "path": ["layout", "max", "width"] },
@@ -86,11 +94,15 @@
         },
         {
             "key": { "path": ["surface", "page"] },
-            "value": "#F5F5F5"
+            "value": "#F5F6F8"
+        },
+        {
+            "key": { "path": ["surface", "fill"] },
+            "value": "#FAFBFC"
         },
         {
             "key": { "path": ["line", "subtle"] },
-            "value": "#F0F0F0"
+            "value": "#F0F1F3"
         }
     ]
 }

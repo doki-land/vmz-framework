@@ -6,7 +6,7 @@
         },
         {
             "key": { "path": ["motion", "control", "easing"] },
-            "value": "cubic-bezier(0.4, 0, 0.2, 1)"
+            "value": "cubic-bezier(0.2, 0, 0, 1)"
         },
         {
             "key": { "path": ["motion", "emphasis", "duration"] },
@@ -18,7 +18,7 @@
         },
         {
             "key": { "path": ["motion", "overlay", "duration"] },
-            "value": "180ms"
+            "value": "160ms"
         },
         {
             "key": { "path": ["motion", "overlay", "easing"] },
