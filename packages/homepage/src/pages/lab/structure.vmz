@@ -21,12 +21,16 @@
                 <Card :title="stepsTitle" :description="stepsDesc">
                     <Steps :label="stepsLabel" :current="stepCurrent" :items="stepItems" />
                     <div class="vmz-structure-actions">
-                        <Button type="button" variant="secondary" data-vmz-action="step-back" @click="stepBack">
-                            {{ backLabel }}
-                        </Button>
-                        <Button type="button" data-vmz-action="step-next" @click="stepNext">
-                            {{ nextLabel }}
-                        </Button>
+                        <span data-vmz-fixture="structure-step-back">
+                            <Button type="button" variant="secondary" @click="stepBack">
+                                {{ backLabel }}
+                            </Button>
+                        </span>
+                        <span data-vmz-fixture="structure-step-next">
+                            <Button type="button" @click="stepNext">
+                                {{ nextLabel }}
+                            </Button>
+                        </span>
                     </div>
                 </Card>
                 <Card :title="listTitle" :description="listDesc">

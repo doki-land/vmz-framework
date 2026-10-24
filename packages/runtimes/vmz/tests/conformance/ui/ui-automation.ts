@@ -2257,9 +2257,8 @@ async function proveUi4Surface(page) {
     if (markers.density !== 'comfortable') fail(`UI4: default density want comfortable, got ${markers.density}`);
 
     const beforePad = await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui4"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Toggle density'),
-        );
+        // `data-vmz-action` lands on component props (not the DOM), so fixtures mark buttons with a native anchor.
+        const btn = document.querySelector('[data-vmz-fixture="ui4-toggle-density"] button.vmz-ui-btn');
         if (!btn) return null;
         const cs = getComputedStyle(btn);
         return {
@@ -2272,19 +2271,14 @@ async function proveUi4Surface(page) {
     if (beforePad.controlY === beforePad.compactY) fail('UI4: control and compact density must differ');
 
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui4"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Toggle density'),
-        );
-        btn?.click();
+        document.querySelector('[data-vmz-fixture="ui4-toggle-density"] button.vmz-ui-btn')?.click();
     });
     await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui4"]')?.getAttribute('data-density') === 'compact', {
         timeout: 5000,
     });
     await waitForFixtureTextIncludes(page, '[data-vmz-fixture="ui4-density"]', 'density:compact');
     const afterPad = await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui4"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Toggle density'),
-        );
+        const btn = document.querySelector('[data-vmz-fixture="ui4-toggle-density"] button.vmz-ui-btn');
         return btn ? getComputedStyle(btn).paddingTop : null;
     });
     if (!afterPad || afterPad === beforePad.paddingTop) {
@@ -2292,10 +2286,7 @@ async function proveUi4Surface(page) {
     }
 
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-ui="result"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Continue'),
-        );
-        btn?.click();
+        document.querySelector('[data-vmz-fixture="ui4-continue"] button.vmz-ui-btn')?.click();
     });
     await waitForFixtureTextIncludes(page, '[data-vmz-fixture="ui4-done"]', 'done:yes');
 
@@ -2334,9 +2325,7 @@ async function proveUi5Console(page) {
         query: !!document.querySelector('[data-vmz-ui="query-form"][data-dense="true"]'),
         skeleton: !!document.querySelector('[data-vmz-ui="skeleton"][data-loading="true"]'),
         timeline: document.querySelectorAll('[data-vmz-ui="timeline"] [data-vmz-audit]').length,
-        exportDisabled: [...document.querySelectorAll('[data-vmz-fixture="ui5"] button.vmz-ui-btn')].some(
-            (b) => (b.textContent || '').includes('Export') && b.disabled,
-        ),
+        exportDisabled: document.querySelector('[data-vmz-fixture="ui5-export"] button.vmz-ui-btn')?.disabled === true,
     }));
     if (markers.density !== 'compact') fail(`UI5: want compact density, got ${markers.density}`);
     if (!markers.crumb) fail('UI5: Breadcrumb current crumb missing');
@@ -2348,10 +2337,7 @@ async function proveUi5Console(page) {
     await page.type('#home-ui5-name', 'Beta');
     await waitForFixtureTextIncludes(page, '[data-vmz-fixture="ui5-query"]', 'name:Beta');
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui5"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Search'),
-        );
-        btn?.click();
+        document.querySelector('[data-vmz-fixture="ui5-search"] button.vmz-ui-btn')?.click();
     });
     await page.waitForFunction(
         () =>
@@ -2375,10 +2361,7 @@ async function proveUi5Console(page) {
     if (!blocked) fail('UI5: row action must be disabled while write denied');
 
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui5"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Toggle write'),
-        );
-        btn?.click();
+        document.querySelector('[data-vmz-fixture="ui5-toggle-write"] button.vmz-ui-btn')?.click();
     });
     await waitForFixtureTextIncludes(page, '[data-vmz-fixture="ui5-perm"]', 'write:allowed');
     await page.evaluate(() => {
@@ -2392,10 +2375,7 @@ async function proveUi5Console(page) {
 
     // Skeleton can return to loading with stable marker.
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui5"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Toggle loading'),
-        );
-        btn?.click();
+        document.querySelector('[data-vmz-fixture="ui5-toggle-loading"] button.vmz-ui-btn')?.click();
     });
     await page.waitForFunction(
         () =>
@@ -2666,9 +2646,7 @@ async function proveUi6DensityRtlPreset(page) {
     if (!markers.state.replace(/\s+/g, '').includes('theme:default')) fail(`UI6: default theme marker missing: ${markers.state}`);
 
     const densVars = await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui6"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Probe control'),
-        );
+        const btn = document.querySelector('[data-vmz-fixture="ui6-probe"] button.vmz-ui-btn');
         if (!btn) return null;
         const cs = getComputedStyle(btn);
         return {
@@ -2688,18 +2666,13 @@ async function proveUi6DensityRtlPreset(page) {
 
     // comfortable → compact
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui6"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Cycle density'),
-        );
-        btn?.click();
+        document.querySelector('[data-vmz-fixture="ui6-cycle-density"] button.vmz-ui-btn')?.click();
     });
     await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui6"]')?.getAttribute('data-density') === 'compact', {
         timeout: 5000,
     });
     const compactPad = await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui6"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Probe control'),
-        );
+        const btn = document.querySelector('[data-vmz-fixture="ui6-probe"] button.vmz-ui-btn');
         return btn ? getComputedStyle(btn).paddingTop : '';
     });
     if (!compactPad || compactPad === comfortPad) {
@@ -2708,10 +2681,7 @@ async function proveUi6DensityRtlPreset(page) {
 
     // compact → dense
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui6"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Cycle density'),
-        );
-        btn?.click();
+        document.querySelector('[data-vmz-fixture="ui6-cycle-density"] button.vmz-ui-btn')?.click();
     });
     await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui6"]')?.getAttribute('data-density') === 'dense', {
         timeout: 5000,
@@ -2723,9 +2693,7 @@ async function proveUi6DensityRtlPreset(page) {
         },
     );
     const densePad = await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui6"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Probe control'),
-        );
+        const btn = document.querySelector('[data-vmz-fixture="ui6-probe"] button.vmz-ui-btn');
         return btn ? getComputedStyle(btn).paddingTop : '';
     });
     if (!densePad || densePad === compactPad || densePad === comfortPad) {
@@ -2741,10 +2709,7 @@ async function proveUi6DensityRtlPreset(page) {
     });
     if (!ltrGeom) fail('UI6: shell header geometry missing (ltr)');
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui6"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Toggle RTL'),
-        );
-        btn?.click();
+        document.querySelector('[data-vmz-fixture="ui6-toggle-rtl"] button.vmz-ui-btn')?.click();
     });
     await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="ui6"]')?.getAttribute('dir') === 'rtl', {
         timeout: 5000,
@@ -2778,10 +2743,7 @@ async function proveUi6DensityRtlPreset(page) {
         return el ? (getComputedStyle(el).getPropertyValue('--vmz-text-ink') || '').trim() : '';
     });
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="ui6"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Toggle high-contrast'),
-        );
-        btn?.click();
+        document.querySelector('[data-vmz-fixture="ui6-toggle-theme"] button.vmz-ui-btn')?.click();
     });
     await page.waitForFunction(
         () =>
@@ -2871,10 +2833,7 @@ async function proveStructureComposition(page) {
 
     // Steps next/back.
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="structure"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Next'),
-        );
-        btn?.click();
+        document.querySelector('[data-vmz-fixture="structure-step-next"] button.vmz-ui-btn')?.click();
     });
     await page.waitForFunction(
         () =>
@@ -2884,10 +2843,7 @@ async function proveStructureComposition(page) {
         { timeout: 5000 },
     );
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="structure"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Back'),
-        );
-        btn?.click();
+        document.querySelector('[data-vmz-fixture="structure-step-back"] button.vmz-ui-btn')?.click();
     });
     await page.waitForFunction(
         () =>
@@ -3062,17 +3018,12 @@ async function proveOverlayStacking(page) {
 
     // Programmatic .click() — overlays cover page chrome; CDP mouse would hit backdrop.
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="stacking"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Open drawer'),
-        );
-        btn?.click();
+        document.querySelector('[data-vmz-fixture="stacking-open-drawer"] button.vmz-ui-btn')?.click();
     });
     await page.waitForSelector('[data-vmz-overlay="drawer"][data-vmz-overlay-stack="0"]', { timeout: 5000 });
 
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="stacking"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Open dialog'),
-        );
+        const btn = document.querySelector('[data-vmz-fixture="stacking-open-dialog"] button.vmz-ui-btn');
         if (!btn) throw new Error('Open dialog button missing');
         btn.click();
     });
@@ -3089,9 +3040,7 @@ async function proveOverlayStacking(page) {
     }
 
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="stacking"] button.vmz-ui-btn')].find((b) =>
-            (b.textContent || '').includes('Open popover'),
-        );
+        const btn = document.querySelector('[data-vmz-fixture="stacking-open-popover"] button.vmz-ui-btn');
         if (!btn) throw new Error('Open popover button missing');
         btn.click();
     });
@@ -3236,13 +3185,11 @@ async function proveDataTable(page) {
     await page.waitForFunction(
         () =>
             document.querySelector('[data-vmz-ui="bulk-actions"][data-open="true"]') &&
-            [...document.querySelectorAll('[data-vmz-fixture="datatable"] button')].some((b) => (b.textContent || '').includes('Clear')),
+            !!document.querySelector('[data-vmz-fixture="datatable-clear-selection"] button.vmz-ui-btn'),
         { timeout: 10000 },
     );
     await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('[data-vmz-fixture="datatable"] button')].find((b) =>
-            (b.textContent || '').includes('Clear'),
-        );
+        const btn = document.querySelector('[data-vmz-fixture="datatable-clear-selection"] button.vmz-ui-btn');
         if (!btn) throw new Error('DataTable: Clear button missing');
         btn.click();
     });
@@ -3363,9 +3310,7 @@ async function proveDocumentsPanelDensity(page) {
 
         const markers = await page.evaluate(() => {
             const root = document.querySelector('[data-vmz-fixture="inspector"]');
-            const sample = [...document.querySelectorAll('[data-vmz-fixture="inspector"] button.vmz-ui-btn')].find((b) =>
-                (b.textContent || '').includes('Cycle density'),
-            );
+            const sample = document.querySelector('[data-vmz-fixture="inspector-cycle-density"] button.vmz-ui-btn');
             const cs = sample ? getComputedStyle(sample) : null;
             return {
                 density: root?.getAttribute('data-density') || '',
@@ -3373,9 +3318,7 @@ async function proveDocumentsPanelDensity(page) {
                 state: document.querySelector('[data-vmz-fixture="inspector-state"]')?.textContent || '',
                 shell: !!document.querySelector('[data-vmz-ui="app-shell"]'),
                 field: !!document.getElementById('inspector-query'),
-                dialogBtn: [...document.querySelectorAll('[data-vmz-fixture="inspector"] button.vmz-ui-btn')].some((b) =>
-                    (b.textContent || '').includes('Replay error'),
-                ),
+                dialogBtn: !!document.querySelector('[data-vmz-fixture="inspector-replay-error"] button.vmz-ui-btn'),
                 paddingTop: cs?.paddingTop || '',
                 denseY: cs ? (cs.getPropertyValue('--vmz-density-dense-padding-y') || '').trim() : '',
             };
@@ -3398,19 +3341,13 @@ async function proveDocumentsPanelDensity(page) {
 
         const beforePad = markers.paddingTop;
         await page.evaluate(() => {
-            const btn = [...document.querySelectorAll('[data-vmz-fixture="inspector"] button.vmz-ui-btn')].find((b) =>
-                (b.textContent || '').includes('Cycle density'),
-            );
-            btn?.click();
+            document.querySelector('[data-vmz-fixture="inspector-cycle-density"] button.vmz-ui-btn')?.click();
         });
         await page.waitForFunction(() => document.querySelector('[data-vmz-fixture="inspector"]')?.getAttribute('data-density') === 'compact', {
             timeout: 5000,
         });
         await page.evaluate(() => {
-            const btn = [...document.querySelectorAll('[data-vmz-fixture="inspector"] button.vmz-ui-btn')].find((b) =>
-                (b.textContent || '').includes('Cycle density'),
-            );
-            btn?.click();
+            document.querySelector('[data-vmz-fixture="inspector-cycle-density"] button.vmz-ui-btn')?.click();
         });
         await page.waitForFunction(
             () =>
@@ -3421,9 +3358,7 @@ async function proveDocumentsPanelDensity(page) {
             { timeout: 5000 },
         );
         const afterPad = await page.evaluate(() => {
-            const btn = [...document.querySelectorAll('[data-vmz-fixture="inspector"] button.vmz-ui-btn')].find((b) =>
-                (b.textContent || '').includes('Cycle density'),
-            );
+            const btn = document.querySelector('[data-vmz-fixture="inspector-cycle-density"] button.vmz-ui-btn');
             return btn ? getComputedStyle(btn).paddingTop : '';
         });
         if (!afterPad || afterPad === beforePad) {
@@ -3431,10 +3366,7 @@ async function proveDocumentsPanelDensity(page) {
         }
 
         await page.evaluate(() => {
-            const btn = [...document.querySelectorAll('[data-vmz-fixture="inspector"] button.vmz-ui-btn')].find((b) =>
-                (b.textContent || '').includes('Toggle RTL'),
-            );
-            btn?.click();
+            document.querySelector('[data-vmz-fixture="inspector-toggle-rtl"] button.vmz-ui-btn')?.click();
         });
         await page.waitForFunction(
             () =>
@@ -3454,10 +3386,7 @@ async function proveDocumentsPanelDensity(page) {
 
         // Dialog still owns overlay after density/RTL wiring.
         await page.evaluate(() => {
-            const btn = [...document.querySelectorAll('[data-vmz-fixture="inspector"] button.vmz-ui-btn')].find((b) =>
-                (b.textContent || '').includes('Replay error'),
-            );
-            btn?.click();
+            document.querySelector('[data-vmz-fixture="inspector-replay-error"] button.vmz-ui-btn')?.click();
         });
         await page.waitForSelector('[data-vmz-overlay="dialog"]', { timeout: 5000 });
         await page.keyboard.press('Escape');

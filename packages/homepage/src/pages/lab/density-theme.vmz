@@ -12,21 +12,29 @@
                     {{ theme }}
                 </p>
                 <div class="vmz-ui6-actions">
-                    <Button type="button" data-vmz-action="cycle-density" @click="cycleDensity">
-                        {{ cycleLabel }}
-                    </Button>
-                    <Button type="button" variant="secondary" data-vmz-action="toggle-rtl" @click="toggleDir">
-                        {{ toggleDirLabel }}
-                    </Button>
-                    <Button type="button" variant="ghost" data-vmz-action="toggle-high-contrast" @click="toggleTheme">
-                        {{ toggleThemeLabel }}
-                    </Button>
+                    <span data-vmz-fixture="ui6-cycle-density">
+                        <Button type="button" @click="cycleDensity">
+                            {{ cycleLabel }}
+                        </Button>
+                    </span>
+                    <span data-vmz-fixture="ui6-toggle-rtl">
+                        <Button type="button" variant="secondary" @click="toggleDir">
+                            {{ toggleDirLabel }}
+                        </Button>
+                    </span>
+                    <span data-vmz-fixture="ui6-toggle-theme">
+                        <Button type="button" variant="ghost" @click="toggleTheme">
+                            {{ toggleThemeLabel }}
+                        </Button>
+                    </span>
                 </div>
                 <Card :title="cardTitle" :description="cardDesc">
                     <Field :label="fieldLabel" :description="fieldDesc" control-id="home-ui6-sample" description-id="home-ui6-sample-desc" :value="sample" @input="onSample" />
-                    <Button type="button" data-vmz-action="probe-control">
-                        {{ probeLabel }}
-                    </Button>
+                    <span data-vmz-fixture="ui6-probe">
+                        <Button type="button">
+                            {{ probeLabel }}
+                        </Button>
+                    </span>
                 </Card>
             </div>
         </AppShell>

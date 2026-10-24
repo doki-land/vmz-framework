@@ -6,9 +6,11 @@
                     density:
                     {{ density }}
                 </p>
-                <Button type="button" data-vmz-action="toggle-density" @click="toggleDensity">
-                    {{ densityToggleLabel }}
-                </Button>
+                <span data-vmz-fixture="ui4-toggle-density">
+                    <Button type="button" @click="toggleDensity">
+                        {{ densityToggleLabel }}
+                    </Button>
+                </span>
                 <Card :title="cardTonesLabel">
                     <Alert tone="info" role-name="status" :title="infoTitle" :description="infoDesc" />
                     <Alert tone="success" role-name="status" :title="successTitle" :description="successDesc" />
@@ -17,9 +19,11 @@
                 </Card>
                 <Notification tone="warning" role-name="status" :title="notificationTitle" :description="notificationDesc" />
                 <Result status="success" :title="resultTitle" :description="resultDesc">
-                    <Button type="button" data-vmz-action="continue" @click="(() => done = true)">
-                        {{ continueLabel }}
-                    </Button>
+                    <span data-vmz-fixture="ui4-continue">
+                        <Button type="button" @click="(() => done = true)">
+                            {{ continueLabel }}
+                        </Button>
+                    </span>
                 </Result>
                 <p data-vmz-fixture="ui4-done" class="vmz-sr-only">
                     done:

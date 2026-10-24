@@ -12,15 +12,21 @@
                     {{ popoverOpen ? 'open' : 'closed' }}
                 </p>
                 <div class="vmz-stacking-actions">
-                    <Button type="button" data-vmz-action="open-drawer" @click="openDrawer">
-                        {{ openDrawerLabel }}
-                    </Button>
-                    <Button type="button" variant="secondary" data-vmz-action="open-dialog" @click="openDialog">
-                        {{ openDialogLabel }}
-                    </Button>
-                    <Button type="button" variant="ghost" data-vmz-action="open-popover" @click="openPopover">
-                        {{ openPopoverLabel }}
-                    </Button>
+                    <span data-vmz-fixture="stacking-open-drawer">
+                        <Button type="button" @click="openDrawer">
+                            {{ openDrawerLabel }}
+                        </Button>
+                    </span>
+                    <span data-vmz-fixture="stacking-open-dialog">
+                        <Button type="button" variant="secondary" @click="openDialog">
+                            {{ openDialogLabel }}
+                        </Button>
+                    </span>
+                    <span data-vmz-fixture="stacking-open-popover">
+                        <Button type="button" variant="ghost" @click="openPopover">
+                            {{ openPopoverLabel }}
+                        </Button>
+                    </span>
                 </div>
                 <Drawer :open="drawerOpen" :title="drawerTitle" title-id="home-stack-drawer-title" stack-level="0" :on-close="closeDrawer">
                     <p data-vmz-fixture="stacking-drawer-body">

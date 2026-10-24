@@ -16,9 +16,11 @@
                     {{ detailId || 'none' }}
                 </p>
                 <BulkActions :label="bulkActionsLabel" :selected-count="selectedCount" :count-label="bulkLabel">
-                    <Button type="button" variant="secondary" data-vmz-action="clear-selection" @click="clearSelection">
-                        {{ clearLabel }}
-                    </Button>
+                    <span data-vmz-fixture="datatable-clear-selection">
+                        <Button type="button" variant="secondary" @click="clearSelection">
+                            {{ clearLabel }}
+                        </Button>
+                    </span>
                 </BulkActions>
                 <DataTable :columns="columns" :rows="rows" :has-row-action="rowAction" :action-title="actionTitle" :action-label="actionLabel" :sort-key="sortKey" :sort-dir="sortDir" :selected-count="selectedCountLabel" :all-selected="allSelected" :select-all-label="selectAllLabel" :on-sort="sortBy" :on-toggle-row="toggleRow" :on-toggle-all="toggleAll" :on-row-action="openDetail" />
                 <Drawer :open="drawerOpen" :title="drawerTitle" title-id="home-datatable-drawer-title" :on-close="(() => drawerOpen = false)">
