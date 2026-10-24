@@ -87,4 +87,30 @@ const rust = buildDeployPlan({
 });
 assert(rust.serverRuntime === 'rust-host', 'rust-host runtime id');
 
+const cjk = /[\u4e00-\u9fff]/;
+const en = buildDeployPlan({ ...DEFAULT_ANSWERS, locale: 'en-us' });
+assert(en.agentPrompt.startsWith('# VMZ deployment task'), 'en prompt title');
+assert(!cjk.test(en.agentPrompt), 'en prompt has no CJK');
+assert(!cjk.test(en.disclaimer), 'en disclaimer');
+assert(en.cautions.every((c) => !cjk.test(c)), 'en cautions');
+assert(
+    en.deepLinks.every((l) => l.href.startsWith('/d/en-us/')),
+    'en doc links',
+);
+assert(en.deepLinks.some((l) => l.href.endsWith('#static')), 'en recipe anchor');
+assert(en.externalSteps.every((s) => s.console.every((c) => !cjk.test(c))), 'en step console');
+
+const enSecrets = buildDeployPlan({
+    ...DEFAULT_ANSWERS,
+    locale: 'en-us',
+    secrets: 'yes',
+    vendors: ['cloudflare-pages'],
+    ship: 'direct-upload',
+});
+assert(!cjk.test(enSecrets.agentPrompt), 'en vendor plan has no CJK');
+assert(
+    enSecrets.agentPrompt.includes('cloudflare-pages (Uploaded from this machine, no CI involved'),
+    'en adapter note',
+);
+
 console.log('deploy-planner.selftest: ok');
