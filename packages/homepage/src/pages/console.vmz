@@ -41,8 +41,8 @@
                 </p>
                 <section v-if="!loading && !loadError" :aria-label="consoleDataPanelAriaLabel" class="vmz-console-data-panel">
                     <FilterBar :label="consoleFilterLabel">
-                        <Field :label="consoleFieldNameLabel" control-id="home-console-query" description-id="home-console-query-desc" error-id="home-console-query-err" described-by="home-console-query-desc" :value="query" @input="((e) => query = e.target.value)" />
-                        <Field :label="consoleFieldStatusLabel" control-id="home-console-status" description-id="home-console-status-desc" error-id="home-console-status-err" described-by="home-console-status-desc" :value="statusQuery" @input="((e) => statusQuery = e.target.value)" />
+                        <Field :label="consoleFieldNameLabel" :placeholder="consoleFieldNamePlaceholder" control-id="home-console-query" description-id="home-console-query-desc" error-id="home-console-query-err" described-by="home-console-query-desc" :value="query" @input="((e) => query = e.target.value)" />
+                        <Field :label="consoleFieldStatusLabel" :placeholder="consoleFieldStatusPlaceholder" control-id="home-console-status" description-id="home-console-status-desc" error-id="home-console-status-err" described-by="home-console-status-desc" :value="statusQuery" @input="((e) => statusQuery = e.target.value)" />
                         <Button type="button" variant="primary" @click="applyFilter">
                             {{ consoleApplyLabel }}
                         </Button>
@@ -156,17 +156,25 @@
 .vmz-console-summary__panel {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
-    padding: 1rem 1.15rem;
-    border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md);
-    background: var(--vmz-surface-paper);
+    gap: 0.85rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
 }
 
 .vmz-console-summary__item {
     display: grid;
     gap: 0.2rem;
     align-content: start;
+    padding: 1rem 1.15rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-paper);
+}
+
+.vmz-console-summary__item:has(.vmz-console-summary__value.is-failed) {
+    border-color: color-mix(in srgb, var(--vmz-status-danger-foreground) 24%, var(--vmz-line-default));
+    background: color-mix(in srgb, var(--vmz-status-danger-foreground) 4%, var(--vmz-surface-paper));
 }
 
 .vmz-console-summary__label {
@@ -339,7 +347,9 @@ import {
     consoleFilterEmptyTitle,
     consoleFilterEmptyBody,
     consoleFieldNameLabel,
+    consoleFieldNamePlaceholder,
     consoleFieldStatusLabel,
+    consoleFieldStatusPlaceholder,
     consoleApply,
     consoleReset,
     consoleSelectVisible,
@@ -436,7 +446,9 @@ export default class ConsolePage {
     consoleFilterEmptyTitleLabel = "";
     consoleFilterEmptyBodyLabel = "";
     consoleFieldNameLabel = "";
+    consoleFieldNamePlaceholder = "";
     consoleFieldStatusLabel = "";
+    consoleFieldStatusPlaceholder = "";
     consoleApplyLabel = "";
     consoleResetLabel = "";
     consoleSelectVisibleLabel = "";
@@ -538,7 +550,9 @@ export default class ConsolePage {
         this.consoleFilterEmptyTitleLabel = consoleFilterEmptyTitle();
         this.consoleFilterEmptyBodyLabel = consoleFilterEmptyBody();
         this.consoleFieldNameLabel = consoleFieldNameLabel();
+        this.consoleFieldNamePlaceholder = consoleFieldNamePlaceholder();
         this.consoleFieldStatusLabel = consoleFieldStatusLabel();
+        this.consoleFieldStatusPlaceholder = consoleFieldStatusPlaceholder();
         this.consoleApplyLabel = consoleApply();
         this.consoleResetLabel = consoleReset();
         this.consoleSelectVisibleLabel = consoleSelectVisible();

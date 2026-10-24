@@ -23,6 +23,7 @@ const PAGES = [
     { id: 'console', path: '/console' },
     { id: 'commercial', path: '/commercial' },
     { id: 'welcome', path: '/welcome' },
+    { id: 'deploy-planner', path: '/deploy-planner' },
     { id: 'lab', path: '/lab' },
     { id: 'lab-components', path: '/lab/components' },
     { id: 'lab-form', path: '/lab/form' },

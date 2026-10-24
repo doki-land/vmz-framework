@@ -352,7 +352,7 @@ html:has([data-vmz-ui='app-shell']) {
 .site--docs main h2 { margin-top: 3.5rem; font-size: 1.65rem; }
 .site--docs main pre { padding: 1.3rem; border: 0; border-radius: var(--v2-radius-lg); color: var(--v2-on-inverse); background: var(--v2-code); }
 
-.welcome-v2 { display: grid; grid-template-rows: auto 1fr auto; min-height: 100vh; padding: 0 max(1.5rem, calc((100% - var(--v2-content)) / 2)); overflow: hidden; color: var(--v2-ink); background: var(--v2-canvas); }
+.welcome-v2 { display: grid; grid-template-rows: 1fr auto; min-height: 100vh; padding: 0 max(1.5rem, calc((100% - var(--v2-content)) / 2)); overflow: hidden; color: var(--v2-ink); background: var(--v2-canvas); }
 .welcome-v2__header { display: flex; align-items: center; justify-content: space-between; padding: 1.4rem 0; border-bottom: 1px solid var(--vmz-line-subtle); }
 .welcome-v2__header > div { display: flex; align-items: center; gap: .35rem; }
 .welcome-v2__header a { padding: .5rem .7rem; border-radius: var(--vmz-radius-sm); color: var(--v2-muted); text-decoration: none; font-size: .88rem; font-weight: 500; }
@@ -363,7 +363,7 @@ html:has([data-vmz-ui='app-shell']) {
 .welcome-v2__github { color: var(--v2-on-inverse) !important; background: var(--v2-inverse); border: 1px solid color-mix(in srgb, var(--v2-on-inverse) 20%, transparent); }
 .welcome-v2__github:hover { color: var(--v2-on-inverse) !important; background: var(--v2-blue) !important; }
 .welcome-v2__main { display: grid; align-content: center; justify-items: start; padding: 4rem 0; }
-.welcome-v2__kicker { margin: 0 0 1.6rem; color: var(--v2-muted); font: 500 .75rem var(--vmz-font-mono); text-transform: uppercase; }
+.welcome-v2__main .v2-kicker { margin-bottom: 1.6rem; }
 .welcome-v2 h1 { margin: 0; max-width: 16ch; font: 600 clamp(2.75rem, 4.6vw, 4.5rem)/1.1 var(--vmz-font-display); letter-spacing: -0.01em; }
 .welcome-v2 h1 em { color: var(--v2-blue); font-style: normal; }
 .welcome-v2__lede { max-width: 46rem; margin: 1.7rem 0 0; color: var(--v2-muted); font-size: 1.12rem; line-height: 1.75; }

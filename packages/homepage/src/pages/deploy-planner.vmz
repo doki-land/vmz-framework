@@ -2,8 +2,8 @@
     <SiteShell page="deploy-planner" variant="planner-page">
         <main id="main" class="planner">
             <header class="planner__hero">
-                <p class="planner__kicker">
-                    <span />
+                <p class="v2-kicker">
+                    <span aria-hidden="true" class="v2-kicker__dot" />
                     {{ kicker }}
                 </p>
                 <h1 id="planner-title">
@@ -324,30 +324,18 @@
     padding: 2.5rem 0 4rem;
 }
 .planner__hero {
-    max-width: 40rem;
+    max-width: 44rem;
     margin-bottom: 2.5rem;
 }
-.planner__kicker {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    margin: 0 0 0.85rem;
-    color: var(--vmz-text-steel);
-    font: 500 0.73rem/1.2 var(--vmz-font-mono);
-    text-transform: uppercase;
-}
-.planner__kicker span {
-    width: 0.55rem;
-    height: 0.55rem;
-    border-radius: var(--vmz-radius-xs);
-    background: var(--vmz-brand-energy);
-    box-shadow: 0 0 0 5px color-mix(in srgb, var(--vmz-brand-energy) 14%, transparent);
+.planner__hero .v2-kicker {
+    margin-bottom: 0.85rem;
 }
 .planner__hero h1 {
-    margin: 0 0 0.75rem;
+    margin: 0 0 0.85rem;
     font-family: var(--vmz-font-display);
-    font-size: clamp(2.2rem, 4vw, 3.2rem);
-    letter-spacing: -0.03em;
+    font-size: clamp(2.2rem, 4vw, 3rem);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
     color: var(--vmz-text-ink);
 }
 .planner__lede {

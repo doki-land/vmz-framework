@@ -3,7 +3,8 @@
         <main id="main" data-vmz-fixture="commercial" class="vmz-commercial-content">
             <section data-vmz-fixture="commercial-hero" aria-labelledby="commercial-hero-title" class="vmz-commercial-hero">
                 <div class="vmz-commercial-hero__copy">
-                    <p class="vmz-commercial-hero__eyebrow">
+                    <p class="v2-kicker">
+                        <span aria-hidden="true" class="v2-kicker__dot" />
                         {{ commercialNavLabel }}
                     </p>
                     <h1 id="commercial-hero-title" class="vmz-commercial-hero__title">
@@ -13,12 +14,16 @@
                         {{ commercialHeroLeadLabel }}
                     </p>
                     <div class="vmz-commercial-hero__actions">
-                        <Link href="/console">
-                            {{ commercialCtaContactLabel }}
-                        </Link>
-                        <Link :href="guideHref">
-                            {{ commercialCtaDocsLabel }}
-                        </Link>
+                        <span class="vmz-commercial-hero__action is-primary">
+                            <Link href="/console">
+                                {{ commercialCtaContactLabel }}
+                            </Link>
+                        </span>
+                        <span class="vmz-commercial-hero__action">
+                            <Link :href="guideHref">
+                                {{ commercialCtaDocsLabel }}
+                            </Link>
+                        </span>
                     </div>
                     <p class="vmz-commercial-demo-note">
                         {{ demoNote }}
@@ -60,7 +65,7 @@
                 </div>
                 <div class="vmz-commercial-task__demo vmz-commercial-panel">
                     <FilterBar :label="commercialBrowseFilterLabel">
-                        <Field :label="commercialBrowseFieldLabel" control-id="home-commercial-browse-query" description-id="home-commercial-browse-desc" error-id="home-commercial-browse-err" described-by="home-commercial-browse-desc" :value="browseQuery" @input="((e) => browseQuery = e.target.value)" />
+                        <Field :label="commercialBrowseFieldLabel" :placeholder="commercialBrowsePlaceholder" control-id="home-commercial-browse-query" description-id="home-commercial-browse-desc" error-id="home-commercial-browse-err" described-by="home-commercial-browse-desc" :value="browseQuery" @input="((e) => browseQuery = e.target.value)" />
                         <Button type="button" variant="primary" @click="applyBrowseFilter">
                             {{ commercialBrowseApplyLabel }}
                         </Button>
@@ -170,7 +175,7 @@
                 </div>
                 <div class="vmz-commercial-task__demo vmz-commercial-panel">
                     <Form :label="commercialFormLabel" :error-summary="actionSummary" summary-id="home-commercial-summary" :described-by="actionDescribedBy" @submit="confirmReview" @reset="resetReview">
-                        <Field :label="commercialReviewNoteLabel" :description="commercialReviewNoteDescLabel" control-id="home-commercial-review" description-id="home-commercial-review-desc" error-id="home-commercial-review-err" :described-by="reviewDescribedBy" :error="reviewError" :invalid-attr="reviewInvalid" :value="reviewNote" @input="onReviewNote" />
+                        <Field :label="commercialReviewNoteLabel" :placeholder="commercialReviewPlaceholder" :description="commercialReviewNoteDescLabel" control-id="home-commercial-review" description-id="home-commercial-review-desc" error-id="home-commercial-review-err" :described-by="reviewDescribedBy" :error="reviewError" :invalid-attr="reviewInvalid" :value="reviewNote" @input="onReviewNote" />
                         <p data-vmz-fixture="commercial-review-note" class="vmz-sr-only">
                             note:
                             {{ reviewNote }}
@@ -212,13 +217,6 @@
     display: grid;
     justify-items: start;
     gap: 1rem;
-}
-.vmz-commercial-hero__eyebrow {
-    margin: 0;
-    color: var(--vmz-action-link-foreground);
-    font-size: 0.8rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
 }
 .vmz-commercial-hero__preview {
     display: grid;
@@ -294,25 +292,36 @@
     align-items: center;
     gap: 0.75rem;
 }
-.vmz-commercial-hero__actions a {
+.vmz-commercial-hero__action {
+    display: contents;
+}
+.vmz-commercial-hero__action a {
     display: inline-flex;
     align-items: center;
     min-height: 2.5rem;
-    padding: 0.5rem 0.9rem;
-    border-radius: var(--vmz-radius-sm);
-    color: var(--vmz-action-link-foreground);
-    font-weight: 600;
+    padding: 0.5rem 1.1rem;
+    border: 1px solid transparent;
+    border-radius: var(--v2-radius);
+    font-size: 0.875rem;
+    font-weight: 500;
     text-decoration: none;
 }
-.vmz-commercial-hero__actions a:first-child {
+.vmz-commercial-hero__action.is-primary a {
     color: var(--vmz-action-primary-foreground);
     background: var(--vmz-action-primary-background);
 }
-.vmz-commercial-hero__actions a:first-child:hover {
-    background: var(--vmz-action-primary-active);
+.vmz-commercial-hero__action.is-primary a:hover {
+    background: var(--vmz-action-primary-hover);
 }
-.vmz-commercial-hero__actions a:not(:first-child):hover {
-    background: color-mix(in srgb, var(--vmz-action-primary-background) 10%, var(--vmz-surface-paper));
+.vmz-commercial-hero__action:not(.is-primary) a {
+    color: var(--v2-ink);
+    border-color: var(--v2-line);
+    background: var(--v2-surface);
+}
+.vmz-commercial-hero__action:not(.is-primary) a:hover {
+    color: var(--v2-blue);
+    border-color: var(--vmz-action-primary-hover);
+    background: var(--v2-surface);
 }
 
 .vmz-commercial-task {
@@ -486,12 +495,14 @@ import {
     commercialBrowseFilterEmptyTitle,
     commercialBrowseFilterEmptyBody,
     commercialBrowseFieldLabel,
+    commercialBrowsePlaceholder,
     commercialBrowseApply,
     commercialBrowseReset,
     commercialDetailSummary,
     commercialDetailOpen,
     commercialFormLabel,
     commercialReviewNoteLabel,
+    commercialReviewPlaceholder,
     commercialReviewNoteDesc,
     commercialConfirm,
     commercialReset,
@@ -551,12 +562,14 @@ export default class CommercialPage {
     commercialBrowseFilterEmptyTitleLabel = "";
     commercialBrowseFilterEmptyBodyLabel = "";
     commercialBrowseFieldLabel = "";
+    commercialBrowsePlaceholder = "";
     commercialBrowseApplyLabel = "";
     commercialBrowseResetLabel = "";
     commercialDetailSummaryLabel = "";
     commercialDetailOpenLabel = "";
     commercialFormLabel = "";
     commercialReviewNoteLabel = "";
+    commercialReviewPlaceholder = "";
     commercialReviewNoteDescLabel = "";
     commercialConfirmLabel = "";
     commercialResetLabel = "";
@@ -658,12 +671,14 @@ export default class CommercialPage {
         this.commercialBrowseFilterEmptyTitleLabel = commercialBrowseFilterEmptyTitle();
         this.commercialBrowseFilterEmptyBodyLabel = commercialBrowseFilterEmptyBody();
         this.commercialBrowseFieldLabel = commercialBrowseFieldLabel();
+        this.commercialBrowsePlaceholder = commercialBrowsePlaceholder();
         this.commercialBrowseApplyLabel = commercialBrowseApply();
         this.commercialBrowseResetLabel = commercialBrowseReset();
         this.commercialDetailSummaryLabel = commercialDetailSummary();
         this.commercialDetailOpenLabel = commercialDetailOpen();
         this.commercialFormLabel = commercialFormLabel();
         this.commercialReviewNoteLabel = commercialReviewNoteLabel();
+        this.commercialReviewPlaceholder = commercialReviewPlaceholder();
         this.commercialReviewNoteDescLabel = commercialReviewNoteDesc();
         this.commercialConfirmLabel = commercialConfirm();
         this.commercialResetLabel = commercialReset();

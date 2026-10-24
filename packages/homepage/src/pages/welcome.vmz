@@ -2,7 +2,8 @@
     <SiteShell page="welcome" variant="welcome-shell">
         <main id="main" aria-labelledby="welcome-title" class="welcome-v2">
             <section class="welcome-v2__main">
-                <p class="welcome-v2__kicker">
+                <p class="v2-kicker">
+                    <span aria-hidden="true" class="v2-kicker__dot" />
                     {{ kickerLabel }}
                 </p>
                 <h1 id="welcome-title">
