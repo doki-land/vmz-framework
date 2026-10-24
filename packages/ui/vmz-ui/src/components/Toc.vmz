@@ -1,10 +1,10 @@
 <template>
-    <aside data-vmz-ui="toc" :aria-label="label" class="vmz-ui-toc">
-        <p class="vmz-ui-toc__title">
+    <aside data-vmz-ui="toc" :aria-label="label ? label : null" class="vmz-ui-toc">
+        <p v-if="label" class="vmz-ui-toc__title">
             {{ label }}
         </p>
         <nav class="vmz-ui-toc__nav">
-            <a v-for="item in items" :key="item.id" :href="item.href" :data-vmz-toc="item.id" class="vmz-ui-toc__link">
+            <a v-for="item in items" :key="item.id" :href="item.href" :data-vmz-toc="item.id" :data-level="item.level ? item.level : 1" :data-active="item.id === activeId ? 'true' : null" :aria-current="item.id === activeId ? 'location' : null" class="vmz-ui-toc__link">
                 {{ item.title }}
             </a>
         </nav>
@@ -12,63 +12,79 @@
 </template>
 <style>
 .vmz-ui-toc {
+    position: sticky;
+    top: 5rem;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    min-width: 11rem;
-    padding: 0.85rem 0.75rem;
-    border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
-    background: var(--vmz-surface-mist);
+    gap: var(--vmz-space-2, 0.5rem);
+    min-width: 0;
+    max-height: calc(100dvh - 6rem);
+    overflow-y: auto;
     color: var(--vmz-text-ink);
 }
-
 .vmz-ui-toc__title {
     margin: 0;
-    font-family: var(--vmz-font-display);
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--vmz-text-steel);
+    padding: 0 var(--vmz-space-3, 0.75rem);
+    color: var(--vmz-text-tertiary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.25rem;
 }
-
 .vmz-ui-toc__nav {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
 }
-
 .vmz-ui-toc__link {
-    font: inherit;
-    font-weight: 600;
-    font-size: 0.92rem;
+    display: block;
+    padding: 0.375rem var(--vmz-space-3, 0.75rem);
+    border-left: 2px solid transparent;
+    color: var(--vmz-text-steel);
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: 1.5;
     text-decoration: none;
-    color: var(--vmz-action-primary-active);
     outline: none;
+    transition:
+        color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+        border-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
 }
-
 .vmz-ui-toc__link:hover {
     color: var(--vmz-action-primary-background);
 }
-
+.vmz-ui-toc__link[data-active="true"] {
+    color: var(--vmz-action-primary-background);
+    font-weight: 500;
+    border-left-color: var(--vmz-action-primary-background);
+}
+.vmz-ui-toc__link[data-level="2"] {
+    padding-left: var(--vmz-space-5, 1.5rem);
+}
+.vmz-ui-toc__link[data-level="3"] {
+    padding-left: 2.25rem;
+}
+.vmz-ui-toc__link[data-level="4"] {
+    padding-left: 3rem;
+}
 .vmz-ui-toc__link:focus-visible {
+    border-radius: var(--vmz-radius-sm, 4px);
     box-shadow: 0 0 0 3px var(--vmz-focus-ring);
-    border-radius: var(--vmz-radius-md, 6px);
 }
 </style>
 <script client>
 /**
  * VMZ UI — Toc (Document/Product composition).
- * In-page outline; parent supplies items. Readable without JS.
+ * Sticky in-page outline; parent supplies items and the current anchor.
+ * Readable without JS.
  */
 export default class Toc {
-    public label: string = "On this page";
-    /** @type {{ id: string, title: string, href: string }[]} */
+    public label: string = "";
+    public activeId: string = "";
+    /** @type {{ id: string, title: string, href: string, level?: number }[]} */
     public items: {
         id: string;
         title: string;
         href: string;
+        level?: number;
     }[] = [];
 }
 </script>

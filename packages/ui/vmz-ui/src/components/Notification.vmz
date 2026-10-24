@@ -1,80 +1,175 @@
 <template>
     <div data-vmz-ui="notification" :data-tone="tone" :role="roleName" class="vmz-ui-notification">
-        <p v-if="title" class="vmz-ui-notification__title">
-            {{ title }}
-        </p>
-        <p v-if="description" class="vmz-ui-notification__description">
-            {{ description }}
-        </p>
-        <div class="vmz-ui-notification__actions">
-            <slot />
+        <span class="vmz-ui-notification__icon" aria-hidden="true">
+            <Icon :name="toneIcon()" size="md" decorative />
+        </span>
+        <div class="vmz-ui-notification__content">
+            <p v-if="title" class="vmz-ui-notification__title">
+                {{ title }}
+            </p>
+            <p v-if="description" class="vmz-ui-notification__description">
+                {{ description }}
+            </p>
+            <div class="vmz-ui-notification__actions">
+                <slot />
+            </div>
         </div>
+        <button v-if="closable" type="button" class="vmz-ui-notification__close" :aria-label="closeLabel" @click="dismiss">
+            <Icon name="action.close" size="md" decorative />
+        </button>
     </div>
 </template>
 <style>
 .vmz-ui-notification {
     display: flex;
+    align-items: flex-start;
+    gap: var(--vmz-space-2, 0.5rem);
+    padding: var(--vmz-space-4, 1rem);
+    border: 1px solid var(--vmz-line-default, var(--vmz-line-strong));
+    border-radius: var(--vmz-radius-lg, 8px);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
+    box-shadow: var(--vmz-shadow-popup, none);
+    animation: vmz-ui-notification-in var(--vmz-motion-overlay-duration, 160ms)
+        var(--vmz-motion-overlay-easing, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.vmz-ui-notification[data-tone="info"] .vmz-ui-notification__icon {
+    color: var(--vmz-status-info-accent);
+}
+
+.vmz-ui-notification[data-tone="success"] .vmz-ui-notification__icon {
+    color: var(--vmz-status-success-accent);
+}
+
+.vmz-ui-notification[data-tone="warning"] .vmz-ui-notification__icon {
+    color: var(--vmz-status-warning-accent);
+}
+
+.vmz-ui-notification[data-tone="danger"] .vmz-ui-notification__icon {
+    color: var(--vmz-status-danger-accent);
+}
+
+.vmz-ui-notification__icon {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.5rem;
+}
+
+.vmz-ui-notification__content {
+    flex: 1 1 auto;
+    display: flex;
     flex-direction: column;
-    gap: var(--vmz-density-control-gap);
-    padding: var(--vmz-density-control-padding-y) var(--vmz-density-control-padding-x);
-    border: 1px solid var(--vmz-status-info-accent);
-    border-radius: var(--vmz-radius-md, 6px);
-    background: color-mix(in srgb, var(--vmz-status-info-accent) 10%, transparent);
-    color: var(--vmz-status-info-foreground);
-}
-
-.vmz-ui-notification[data-tone="info"] {
-    border-color: var(--vmz-status-info-accent);
-    background: color-mix(in srgb, var(--vmz-status-info-accent) 10%, transparent);
-    color: var(--vmz-status-info-foreground);
-}
-
-.vmz-ui-notification[data-tone="success"] {
-    border-color: var(--vmz-status-success-accent);
-    background: color-mix(in srgb, var(--vmz-status-success-accent) 10%, transparent);
-    color: var(--vmz-status-success-foreground);
-}
-
-.vmz-ui-notification[data-tone="warning"] {
-    border-color: var(--vmz-status-warning-accent);
-    background: color-mix(in srgb, var(--vmz-status-warning-accent) 10%, transparent);
-    color: var(--vmz-status-warning-foreground);
-}
-
-.vmz-ui-notification[data-tone="danger"] {
-    border-color: var(--vmz-status-danger-accent);
-    background: color-mix(in srgb, var(--vmz-status-danger-accent) 10%, transparent);
-    color: var(--vmz-status-danger-foreground);
-}
-
-:where([data-density="compact"]) .vmz-ui-notification {
-    gap: var(--vmz-density-compact-gap);
-    padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+    gap: var(--vmz-space-1, 0.25rem);
+    min-width: 0;
 }
 
 .vmz-ui-notification__title {
     margin: 0;
-    font-weight: 700;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-notification__description {
     margin: 0;
-    opacity: 0.9;
+    font-size: 0.875rem;
+    line-height: 1.55;
+    color: var(--vmz-text-steel);
+}
+
+.vmz-ui-notification__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--vmz-space-2, 0.5rem);
+    margin-top: var(--vmz-space-1, 0.25rem);
 }
 
 .vmz-ui-notification__actions:empty {
     display: none;
 }
+
+.vmz-ui-notification__close {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--vmz-radius-sm, 4px);
+    background: transparent;
+    color: var(--vmz-text-tertiary);
+    cursor: pointer;
+    outline: none;
+    transition:
+        color var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, cubic-bezier(0.2, 0, 0, 1)),
+        background-color var(--vmz-motion-control-duration, 120ms) var(--vmz-motion-control-easing, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.vmz-ui-notification__close:hover {
+    color: var(--vmz-text-ink);
+    background: var(--vmz-surface-mist);
+}
+
+.vmz-ui-notification__close:focus-visible {
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+}
+
+@keyframes vmz-ui-notification-in {
+    from {
+        opacity: 0;
+        transform: translateY(-0.5rem);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vmz-ui-notification {
+        animation: none;
+    }
+}
+
+:where([data-density="compact"]) .vmz-ui-notification {
+    gap: var(--vmz-space-2, 0.5rem);
+    padding: var(--vmz-space-3, 0.75rem);
+}
+
+:where([data-density="dense"]) .vmz-ui-notification {
+    gap: var(--vmz-space-1, 0.25rem);
+    padding: var(--vmz-space-3, 0.75rem);
+}
 </style>
 <script client>
 /**
  * VMZ UI — Notification (UI4 Commercial Surface).
- * Ephemeral feedback surface; tones share status.* tokens with Alert.
+ * Ephemeral feedback surface: paper + popup shadow + tone accent icon; 160ms enter.
  */
 export default class Notification {
     public title: string = "";
     public description: string = "";
     public tone: string = "info";
     public roleName: string = "status";
+    public closable: boolean = false;
+    public closeLabel: string = "";
+    public onClose: (() => void) | null = null;
+
+    toneIcon() {
+        const tone = String(this.tone || "").toLowerCase();
+        if (tone === "success" || tone === "warning" || tone === "danger") return `status.${tone}`;
+        return "status.info";
+    }
+
+    dismiss() {
+        this.emit("close");
+        if (typeof this.onClose === "function") this.onClose();
+    }
 }
 </script>

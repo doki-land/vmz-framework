@@ -1,19 +1,26 @@
 <template>
     <div data-vmz-ui="popover" :data-vmz-overlay-open="open" class="vmz-ui-popover-root">
         <div v-if="open" data-vmz-overlay="popover" data-vmz-overlay-owner="popover" :data-vmz-overlay-stack="stackLevel" class="vmz-ui-popover">
-            <button type="button" data-vmz-overlay-layer="backdrop" aria-label="Dismiss popover" @click="dismiss" class="vmz-ui-popover__backdrop" />
-            <div role="dialog" aria-modal="false" :aria-labelledby="titleId" tabindex="-1" data-vmz-overlay-layer="panel" data-vmz-focus="enter" :onKeyDown="onPanelKeyDown" class="vmz-ui-popover__panel">
-                <h2 :id="titleId" class="vmz-ui-popover__title">
-                    {{ title }}
-                </h2>
+            <button type="button" data-vmz-overlay-layer="backdrop" :aria-label="dismissLabel || closeLabel || title" @click="dismiss" class="vmz-ui-popover__backdrop" />
+            <div role="dialog" aria-modal="false" :aria-labelledby="title ? titleId : null" tabindex="-1" data-vmz-overlay-layer="panel" data-vmz-focus="enter" :onKeyDown="onPanelKeyDown" class="vmz-ui-popover__panel">
+                <span aria-hidden="true" data-vmz-popover="arrow" class="vmz-ui-popover__arrow" />
+                <header v-if="title || description" class="vmz-ui-popover__header">
+                    <div class="vmz-ui-popover__heading">
+                        <h2 v-if="title" :id="titleId" class="vmz-ui-popover__title">
+                            {{ title }}
+                        </h2>
+                        <p v-if="description" class="vmz-ui-popover__description">
+                            {{ description }}
+                        </p>
+                    </div>
+                    <button type="button" data-vmz-focus="close" :aria-label="closeLabel || title" @click="dismiss" class="vmz-ui-popover__close">
+                        <Icon name="action.close" size="md" decorative />
+                    </button>
+                </header>
                 <div class="vmz-ui-popover__body">
                     <slot />
                 </div>
-                <div class="vmz-ui-popover__actions">
-                    <button type="button" data-vmz-focus="close" @click="dismiss" class="vmz-ui-popover__close">
-                        Close
-                    </button>
-                </div>
+                <div class="vmz-ui-popover__actions"><slot name="actions" /></div>
             </div>
         </div>
     </div>
@@ -60,55 +67,168 @@
     left: 50%;
     transform: translateX(-50%);
     box-sizing: border-box;
-    width: min(20rem, calc(100vw - 2rem));
-    min-height: 8rem;
-    padding: 0.85rem 1rem 1rem;
-    border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
-    background: var(--vmz-action-primary-foreground);
-    color: var(--vmz-action-primary-active);
+    width: min(320px, calc(100vw - 32px));
+    padding: 12px;
+    border: 1px solid var(--vmz-line-subtle);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
+    box-shadow: var(--vmz-shadow-popup);
     outline: none;
     pointer-events: auto;
+    animation: vmz-ui-popover-in var(--vmz-motion-overlay-duration)
+        var(--vmz-motion-overlay-easing);
+}
+
+.vmz-ui-popover__arrow {
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    border-top: 1px solid var(--vmz-line-subtle);
+    border-left: 1px solid var(--vmz-line-subtle);
+    border-radius: 1px 0 0 0;
+    background: var(--vmz-surface-paper);
+    transform: translateX(-50%) rotate(45deg);
 }
 
 .vmz-ui-popover__panel:focus-visible {
-    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring), var(--vmz-shadow-popup);
+}
+
+.vmz-ui-popover__header {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.vmz-ui-popover__heading {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .vmz-ui-popover__title {
-    margin: 0 0 0.5rem;
-    font-size: 1rem;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 22px;
+    color: var(--vmz-text-ink);
 }
 
-.vmz-ui-popover__body {
-    margin-bottom: 0.75rem;
+.vmz-ui-popover__description {
+    margin: 2px 0 0;
+    font-size: 14px;
+    line-height: 22px;
+    color: var(--vmz-text-tertiary);
 }
 
 .vmz-ui-popover__close {
-    font: inherit;
-    font-weight: 600;
-    padding: 0.375rem 0.7rem;
-    border: 1px solid transparent;
-    border-radius: var(--vmz-radius-md, 6px);
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin: -4px -4px 0 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--vmz-radius-md);
+    background: transparent;
+    color: var(--vmz-text-steel);
     cursor: pointer;
-    background: var(--vmz-action-primary-background);
-    color: var(--vmz-action-primary-foreground);
+    outline: none;
+    transition:
+        color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        background-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
+}
+
+.vmz-ui-popover__close:hover {
+    background: var(--vmz-surface-mist);
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-popover__close:focus-visible {
     box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+}
+
+.vmz-ui-popover__body {
+    margin-top: 4px;
+    font-size: 14px;
+    line-height: 22px;
+    color: var(--vmz-text-ink);
+}
+
+.vmz-ui-popover__header + .vmz-ui-popover__body {
+    margin-top: 8px;
+}
+
+.vmz-ui-popover__body :where(a) {
+    color: var(--vmz-action-primary-background);
+    text-underline-offset: 2px;
+}
+
+.vmz-ui-popover__body :where(a):hover {
+    background: var(--vmz-action-primary-background);
+    color: var(--vmz-action-primary-foreground);
+}
+
+.vmz-ui-popover__body :where(a):active {
+    background: var(--vmz-action-primary-active);
+}
+
+.vmz-ui-popover__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.vmz-ui-popover__actions:empty {
+    display: none;
+}
+
+.vmz-ui-popover__actions :where(button, a) {
+    min-height: var(--vmz-control-height, 32px);
+}
+
+@keyframes vmz-ui-popover-in {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-6px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0) scale(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vmz-ui-popover__panel,
+    .vmz-ui-popover__close {
+        animation: none;
+        transition: none;
+    }
 }
 </style>
 <script client>
 /**
  * VMZ UI — Popover (UI2).
  * Non-modal disclosure: Escape + outside dismiss + focus enter/restore.
- * Parent owns live `open`. Fixed min size for layout stability.
- * `stackLevel` raises z-index; Escape dismisses only the topmost stacked overlay.
+ * Parent owns live `open`. `stackLevel` raises z-index; Escape dismisses only
+ * the topmost stacked overlay.
+ *
+ * Appearance props: `title`, `description`. Visible copy is author-supplied;
+ * `closeLabel` / `dismissLabel` only name the icon button and backdrop.
  */
 export default class Popover {
     public open: boolean = false;
-    public title: string = "Popover";
+    public title: string = "";
+    public description: string = "";
+    public closeLabel: string = "";
+    public dismissLabel: string = "";
     public titleId: string = "vmz-popover-title";
     public stackLevel: string = "0";
     public onClose: (() => void) | null = null;
@@ -139,10 +259,6 @@ export default class Popover {
     dismiss() {
         this.emit("close");
         if (typeof this.onClose === "function") this.onClose();
-    }
-    _stackValue() {
-        const n = Number(this.stackLevel);
-        return Number.isFinite(n) ? n : 0;
     }
     _isTopmostStack() {
         if (typeof document === "undefined") return true;

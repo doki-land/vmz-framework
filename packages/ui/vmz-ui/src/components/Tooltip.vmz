@@ -4,50 +4,99 @@
             <slot />
         </div>
         <div v-if="open" role="tooltip" :id="tooltipId" data-vmz-tooltip="bubble" class="vmz-ui-tooltip__bubble">
+            <span aria-hidden="true" data-vmz-tooltip="arrow" class="vmz-ui-tooltip__arrow" />
             {{ content }}
         </div>
     </div>
 </template>
 <style>
 .vmz-ui-tooltip {
-    position: relative;
     display: inline-flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.375rem;
-    max-width: 28rem;
+    gap: 6px;
 }
 
 .vmz-ui-tooltip__trigger {
     display: inline-flex;
     align-items: center;
-    gap: 0.375rem;
+    min-height: var(--vmz-control-height, 32px);
+    border-radius: var(--vmz-radius-sm);
+}
+
+.vmz-ui-tooltip__trigger :where(button, a, [tabindex]):focus-visible {
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-tooltip__bubble {
-    box-sizing: border-box;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
     max-width: 18rem;
-    padding: 0.375rem 0.625rem;
-    border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
-    background: var(--vmz-surface-paper);
-    color: var(--vmz-text-ink);
-    font-size: 0.88rem;
-    line-height: 1.4;
-    box-shadow: 0 1px 0 color-mix(in srgb, var(--vmz-line-default) 70%, transparent);
+    padding: 6px 10px;
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-ink);
+    color: var(--vmz-text-on-ink);
+    font-size: 14px;
+    line-height: 22px;
+    box-shadow: var(--vmz-shadow-popup);
+    animation: vmz-ui-tooltip-in var(--vmz-motion-overlay-duration)
+        var(--vmz-motion-overlay-easing);
 }
 
-.vmz-ui-tooltip[data-open="true"]
-    .vmz-ui-tooltip__trigger
-    :where(button, a, [tabindex]):focus-visible {
-    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+.vmz-ui-tooltip__arrow {
+    position: absolute;
+    top: -4px;
+    left: 14px;
+    width: 8px;
+    height: 8px;
+    border-radius: 1px 0 0 0;
+    background: var(--vmz-surface-ink);
+    transform: rotate(45deg);
+}
+
+.vmz-ui-tooltip__bubble :where(a) {
+    color: inherit;
+    text-decoration: underline;
+}
+
+@keyframes vmz-ui-tooltip-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@media (prefers-contrast: more) {
+    .vmz-ui-tooltip__bubble {
+        border: 1px solid var(--vmz-line-default);
+        background: var(--vmz-surface-paper);
+        color: var(--vmz-text-ink);
+    }
+
+    .vmz-ui-tooltip__arrow {
+        border-top: 1px solid var(--vmz-line-default);
+        border-left: 1px solid var(--vmz-line-default);
+        background: var(--vmz-surface-paper);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vmz-ui-tooltip__bubble {
+        animation: none;
+    }
 }
 </style>
 <script client>
 /**
- * VMZ UI — Tooltip.
- * Parent owns live `open` + content string. Not a second overlay runtime;
+ * VMZ UI — Tooltip (UI1).
+ * Hover/focus-visible adoption + tooltipId/aria-describedby on the trigger.
  * Escape/outside policies stay with richer Popover/Dialog when needed.
+ * The parent owns live `open`; `openAttr` mirrors it for CSS and automation.
  */
 export default class Tooltip {
     public open: boolean = false;

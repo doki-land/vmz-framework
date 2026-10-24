@@ -14,30 +14,43 @@
 .vmz-ui-tabs {
     display: flex;
     flex-direction: column;
-    gap: 0.625rem;
-    max-width: 36rem;
+    gap: 1rem;
+    width: 100%;
+    min-width: 0;
 }
 
 .vmz-ui-tabs__list {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    border-bottom: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
+    flex-wrap: nowrap;
+    gap: 1.5rem;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--vmz-line-subtle);
+    scrollbar-width: thin;
 }
 
 .vmz-ui-tabs__tab {
-    font: inherit;
-    font-size: 0.875rem;
-    font-weight: 400;
-    padding: 0.5rem 0;
-    margin: 0 1rem 0 0;
+    display: inline-flex;
+    align-items: center;
+    height: 2.5rem;
+    padding: 0;
+    margin: 0;
     border: 0;
     border-bottom: 2px solid transparent;
     border-radius: 0;
     background: transparent;
     color: var(--vmz-text-ink);
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 400;
+    white-space: nowrap;
     cursor: pointer;
     outline: none;
+    transition: color var(--vmz-motion-control-duration, 150ms)
+        var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+}
+
+.vmz-ui-tabs__tab:hover {
+    color: var(--vmz-action-primary-background);
 }
 
 .vmz-ui-tabs__tab[aria-selected="true"] {
@@ -48,7 +61,9 @@
 }
 
 .vmz-ui-tabs__tab:focus-visible {
-    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+    outline: 2px solid var(--vmz-action-primary-background);
+    outline-offset: -2px;
+    border-radius: var(--vmz-radius-sm, 4px);
 }
 
 .vmz-ui-tabs__panel {
@@ -62,12 +77,12 @@
 </style>
 <script client>
 /**
- * VMZ UI — Tabs (UI2).
+ * VMZ UI — Tabs.
  * Parent owns `selected` id; keyboard Left/Right/Home/End on the tablist.
  * Panel content is the default slot (page chooses which body to show).
  */
 export default class Tabs {
-    public label: string = "Tabs";
+    public label: string = "";
     public selected: string = "";
     public panelId: string = "";
     /** @type {{ id: string, title: string, controls?: string }[]} */

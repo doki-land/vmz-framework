@@ -1,15 +1,36 @@
 <template>
     <details data-vmz-ui="dropdown" data-vmz-motion="overlay" data-vmz-motion-token="motion.overlay" class="vmz-ui-dropdown">
         <summary data-vmz-dropdown-trigger="1" class="vmz-ui-dropdown__trigger">
-            {{ label }}
+            <span class="vmz-ui-dropdown__trigger-label">{{ label }}</span>
+            <Icon name="action.chevron-down" size="sm" decorative />
         </summary>
         <div data-vmz-dropdown-menu="1" role="menu" class="vmz-ui-dropdown__menu">
             <div v-for="item in items" :key="item.id" class="vmz-ui-dropdown__row">
                 <div v-if="item.divider" role="separator" class="vmz-ui-dropdown__divider" />
-                <a v-else-if="hasHref(item)" :href="item.href" role="menuitem" :data-vmz-dropdown-item="item.id" :data-danger="item.danger ? 'true' : 'false'" :data-disabled="item.disabled ? 'true' : 'false'" :aria-disabled="item.disabled ? 'true' : null" :tabindex="item.disabled ? -1 : null" class="vmz-ui-dropdown__item">
+                <div v-else-if="item.kind === 'group'" role="presentation" class="vmz-ui-dropdown__group">
+                    {{ item.title }}
+                </div>
+                <details v-else-if="item.children && item.children.length" class="vmz-ui-dropdown__sub">
+                    <summary :data-danger="item.danger ? 'true' : 'false'" class="vmz-ui-dropdown__item vmz-ui-dropdown__item--sub">
+                        <span class="vmz-ui-dropdown__label">{{ item.title }}</span>
+                        <Icon name="action.chevron-right" size="sm" decorative />
+                    </summary>
+                    <div role="menu" class="vmz-ui-dropdown__subpanel">
+                        <div v-for="child in item.children" :key="child.id" class="vmz-ui-dropdown__row">
+                            <div v-if="child.divider" role="separator" class="vmz-ui-dropdown__divider" />
+                            <a v-else-if="hasHref(child)" :href="child.href" role="menuitem" :data-vmz-dropdown-item="child.id" :data-danger="child.danger ? 'true' : 'false'" :data-active="child.active ? 'true' : 'false'" :data-disabled="child.disabled ? 'true' : 'false'" :aria-disabled="child.disabled ? 'true' : null" :tabindex="child.disabled ? -1 : null" class="vmz-ui-dropdown__item">
+                                {{ child.title }}
+                            </a>
+                            <button v-else type="button" role="menuitem" :data-vmz-dropdown-item="child.id" :data-danger="child.danger ? 'true' : 'false'" :data-active="child.active ? 'true' : 'false'" :data-disabled="child.disabled ? 'true' : 'false'" :aria-disabled="child.disabled ? 'true' : null" :tabindex="child.disabled ? -1 : null" @click="onItemClick" class="vmz-ui-dropdown__item">
+                                {{ child.title }}
+                            </button>
+                        </div>
+                    </div>
+                </details>
+                <a v-else-if="hasHref(item)" :href="item.href" role="menuitem" :data-vmz-dropdown-item="item.id" :data-danger="item.danger ? 'true' : 'false'" :data-active="item.active ? 'true' : 'false'" :data-disabled="item.disabled ? 'true' : 'false'" :aria-disabled="item.disabled ? 'true' : null" :tabindex="item.disabled ? -1 : null" class="vmz-ui-dropdown__item">
                     {{ item.title }}
                 </a>
-                <button v-else type="button" role="menuitem" :data-vmz-dropdown-item="item.id" :data-danger="item.danger ? 'true' : 'false'" :data-disabled="item.disabled ? 'true' : 'false'" :aria-disabled="item.disabled ? 'true' : null" :tabindex="item.disabled ? -1 : null" @click="onItemClick" class="vmz-ui-dropdown__item">
+                <button v-else type="button" role="menuitem" :data-vmz-dropdown-item="item.id" :data-danger="item.danger ? 'true' : 'false'" :data-active="item.active ? 'true' : 'false'" :data-disabled="item.disabled ? 'true' : 'false'" :aria-disabled="item.disabled ? 'true' : null" :tabindex="item.disabled ? -1 : null" @click="onItemClick" class="vmz-ui-dropdown__item">
                     {{ item.title }}
                 </button>
             </div>
@@ -24,39 +45,39 @@
 
 .vmz-ui-dropdown__trigger {
     list-style: none;
-    min-height: 2.5rem;
+    min-height: 40px;
+    box-sizing: border-box;
     display: inline-flex;
     align-items: center;
-    gap: 0.375rem;
-    padding: 0 0.9375rem;
+    gap: 6px;
+    padding: 0 15px;
     border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
+    border-radius: var(--vmz-radius-md);
     background: var(--vmz-surface-paper);
     color: var(--vmz-text-ink);
     cursor: pointer;
-    font-weight: 550;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 22px;
     outline: none;
     transition:
-        border-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
-        background-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
-        box-shadow var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
-}
-
-/* Chevron: affordance that the trigger opens a surface, not a page. */
-.vmz-ui-dropdown__trigger::after {
-    content: "";
-    width: 0.4375rem;
-    height: 0.4375rem;
-    margin-top: -0.1875rem;
-    border-right: 1.5px solid currentColor;
-    border-bottom: 1.5px solid currentColor;
-    opacity: 0.55;
-    transform: rotate(45deg);
-    transition: transform var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+        border-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        background-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
 }
 
 .vmz-ui-dropdown summary::-webkit-details-marker {
     display: none;
+}
+
+.vmz-ui-dropdown__trigger-label:empty {
+    display: none;
+}
+
+.vmz-ui-dropdown__trigger .vmz-ui-icon {
+    flex: 0 0 auto;
+    color: var(--vmz-text-tertiary);
+    transition: transform var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
 }
 
 .vmz-ui-dropdown__trigger:hover {
@@ -72,34 +93,40 @@
     border-color: var(--vmz-action-primary-background);
 }
 
-.vmz-ui-dropdown[open] > .vmz-ui-dropdown__trigger::after {
-    margin-top: 0.125rem;
-    transform: rotate(-135deg);
+.vmz-ui-dropdown[open] > .vmz-ui-dropdown__trigger .vmz-ui-icon {
+    transform: rotate(180deg);
 }
 
 .vmz-ui-dropdown__menu {
     position: absolute;
-    top: calc(100% + 0.375rem);
+    top: calc(100% + 6px);
     right: 0;
     z-index: 50;
-    min-width: 11rem;
-    padding: 0.25rem;
-    border: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
-    border-radius: var(--vmz-radius-lg, 8px);
+    min-width: 176px;
+    box-sizing: border-box;
+    padding: 4px;
+    border: 1px solid var(--vmz-line-subtle);
+    border-radius: var(--vmz-radius-lg);
     background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
     box-shadow: var(--vmz-shadow-popup);
     transform-origin: top right;
-    animation: vmz-dropdown-in var(--vmz-motion-overlay-duration, 180ms) var(--vmz-motion-overlay-easing, cubic-bezier(0.2, 0, 0, 1));
+    animation: vmz-dropdown-in var(--vmz-motion-overlay-duration)
+        var(--vmz-motion-overlay-easing);
+}
+
+.vmz-ui-dropdown__item--sub {
+    list-style: none;
 }
 
 @keyframes vmz-dropdown-in {
     from {
         opacity: 0;
-        transform: translateY(-0.25rem) scale(0.98);
+        transform: translateY(-4px) scale(0.98);
     }
     to {
         opacity: 1;
-        transform: translateY(0) scale(1);
+        transform: none;
     }
 }
 
@@ -108,7 +135,7 @@
         animation: none;
     }
     .vmz-ui-dropdown__trigger,
-    .vmz-ui-dropdown__trigger::after {
+    .vmz-ui-dropdown__trigger .vmz-ui-icon {
         transition: none;
     }
 }
@@ -118,23 +145,27 @@
 }
 
 .vmz-ui-dropdown__item {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     width: 100%;
-    padding: 0.5rem 0.75rem;
+    min-height: 32px;
+    box-sizing: border-box;
+    padding: 0 12px;
     border: 0;
-    border-radius: var(--vmz-radius-sm, 4px);
+    border-radius: var(--vmz-radius-md);
     background: transparent;
     color: var(--vmz-text-ink);
     cursor: pointer;
     font: inherit;
-    font-size: 0.875rem;
-    line-height: 1.4286;
+    font-size: 14px;
+    line-height: 22px;
     text-align: left;
     text-decoration: none;
     outline: none;
     transition:
-        background-color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1)),
-        color var(--vmz-motion-control-duration, 150ms) var(--vmz-motion-control-easing, cubic-bezier(0.4, 0, 0.2, 1));
+        background-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
 }
 
 .vmz-ui-dropdown__item:hover {
@@ -143,27 +174,70 @@
 
 .vmz-ui-dropdown__item:focus-visible {
     background: var(--vmz-surface-mist);
-    box-shadow: inset 0 0 0 3px var(--vmz-focus-ring);
+    box-shadow: inset 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-dropdown__item[data-active="true"] {
+    background: color-mix(in srgb, var(--vmz-action-primary-background) 10%, transparent);
+    box-shadow: inset 2px 0 0 var(--vmz-action-primary-background);
 }
 
 .vmz-ui-dropdown__item[data-danger="true"] {
     color: var(--vmz-status-danger-foreground);
 }
 
-.vmz-ui-dropdown__item[data-danger="true"]:hover {
+.vmz-ui-dropdown__item[data-danger="true"]:hover,
+.vmz-ui-dropdown__item[data-danger="true"]:focus-visible {
     background: color-mix(in srgb, var(--vmz-status-danger-accent) 12%, transparent);
 }
 
 .vmz-ui-dropdown__item[data-disabled="true"] {
-    color: var(--vmz-text-steel);
+    color: var(--vmz-text-tertiary);
     cursor: not-allowed;
     pointer-events: none;
 }
 
 .vmz-ui-dropdown__divider {
     height: 1px;
-    margin: 0.25rem 0.5rem;
-    background: var(--vmz-line-subtle, var(--vmz-line-default));
+    margin: 4px 8px;
+    background: var(--vmz-line-subtle);
+}
+
+.vmz-ui-dropdown__group {
+    padding: 8px 12px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 20px;
+    color: var(--vmz-text-tertiary);
+}
+
+.vmz-ui-dropdown__label {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vmz-ui-dropdown__item--sub .vmz-ui-icon {
+    flex: 0 0 auto;
+    color: var(--vmz-text-tertiary);
+}
+
+.vmz-ui-dropdown__sub {
+    position: relative;
+}
+
+.vmz-ui-dropdown__sub[open] > .vmz-ui-dropdown__item--sub {
+    background: var(--vmz-surface-mist);
+}
+
+.vmz-ui-dropdown__subpanel {
+    display: flex;
+    flex-direction: column;
+    margin: 2px 0 4px;
+    padding: 4px 0 4px 12px;
+    border-left: 1px solid var(--vmz-line-subtle);
 }
 </style>
 <script client>
@@ -172,6 +246,9 @@
  * Native `<details>` disclosure: works without JS. An item with a non-empty
  * `href` is a plain link; an item without `href` is an action button that
  * notifies via `onSelect(id)`. Selection handlers never navigate.
+ *
+ * Item model adds `kind: "group"` headers, `active` styling and one level of
+ * nested `children` rendered inside a nested `<details>` submenu.
  */
 export type DropdownItem = {
     id: string;
@@ -184,10 +261,16 @@ export type DropdownItem = {
     disabled?: boolean;
     /** Render a separator instead of a row (title/href are ignored). */
     divider?: boolean;
+    /** `"group"` renders a 12px tertiary section title. */
+    kind?: string;
+    /** Current selection — light primary fill plus a 2px leading bar. */
+    active?: boolean;
+    /** One level of nested items rendered as a submenu. */
+    children?: DropdownItem[];
 };
 
 export default class Dropdown {
-    public label: string = "Menu";
+    public label: string = "";
     public items: DropdownItem[] = [];
     /** Action-item selection callback (`:on-select`). Link items bypass it. */
     public onSelect: ((id: string) => void) | null = null;
@@ -203,10 +286,21 @@ export default class Dropdown {
                 ? el.getAttribute("data-vmz-dropdown-item")
                 : null;
         if (!id) return;
-        const item = this.items.find((candidate) => candidate.id === id);
+        const item = this._findItem(id);
         if (!item || item.disabled || this.hasHref(item)) return;
         this.close();
         if (typeof this.onSelect === "function") this.onSelect(id);
+    }
+
+    _findItem(id) {
+        for (const item of this.items || []) {
+            if (item.id === id) return item;
+            if (Array.isArray(item.children)) {
+                const child = item.children.find((candidate) => candidate.id === id);
+                if (child) return child;
+            }
+        }
+        return null;
     }
 
     close() {

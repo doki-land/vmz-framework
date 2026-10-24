@@ -1,19 +1,25 @@
 <template>
     <div data-vmz-ui="drawer" :data-vmz-overlay-open="open" class="vmz-ui-drawer-root">
-        <div v-if="open" data-vmz-overlay="drawer" data-vmz-overlay-owner="drawer" :data-vmz-overlay-stack="stackLevel" class="vmz-ui-drawer">
-            <button type="button" data-vmz-overlay-layer="backdrop" aria-label="Dismiss drawer" @click="dismiss" class="vmz-ui-drawer__backdrop" />
-            <div role="dialog" aria-modal="true" :aria-labelledby="titleId" tabindex="-1" data-vmz-overlay-layer="panel" data-vmz-focus="enter" data-vmz-motion="overlay-enter" data-vmz-motion-token="motion.overlay" :onKeyDown="onPanelKeyDown" class="vmz-ui-drawer__panel">
-                <h2 :id="titleId" class="vmz-ui-drawer__title">
-                    {{ title }}
-                </h2>
+        <div v-if="open" data-vmz-overlay="drawer" data-vmz-overlay-owner="drawer" :data-vmz-overlay-stack="stackLevel" :data-size="size" class="vmz-ui-drawer">
+            <button type="button" data-vmz-overlay-layer="backdrop" :aria-label="dismissLabel || closeLabel || title" @click="dismiss" class="vmz-ui-drawer__backdrop" />
+            <div role="dialog" aria-modal="true" :aria-labelledby="title ? titleId : null" tabindex="-1" data-vmz-overlay-layer="panel" data-vmz-focus="enter" data-vmz-motion="overlay-enter" data-vmz-motion-token="motion.overlay" :onKeyDown="onPanelKeyDown" class="vmz-ui-drawer__panel">
+                <header class="vmz-ui-drawer__header">
+                    <div class="vmz-ui-drawer__heading">
+                        <h2 v-if="title" :id="titleId" class="vmz-ui-drawer__title">
+                            {{ title }}
+                        </h2>
+                        <p v-if="description" class="vmz-ui-drawer__description">
+                            {{ description }}
+                        </p>
+                    </div>
+                    <button type="button" data-vmz-focus="close" :aria-label="closeLabel || title" @click="dismiss" class="vmz-ui-drawer__close">
+                        <Icon name="action.close" size="md" decorative />
+                    </button>
+                </header>
                 <div class="vmz-ui-drawer__body">
                     <slot />
                 </div>
-                <div class="vmz-ui-drawer__actions">
-                    <button type="button" data-vmz-focus="close" @click="dismiss" class="vmz-ui-drawer__close">
-                        Close
-                    </button>
-                </div>
+                <footer class="vmz-ui-drawer__footer"><slot name="footer" /></footer>
             </div>
         </div>
     </div>
@@ -48,7 +54,7 @@
     padding: 0;
     margin: 0;
     cursor: pointer;
-    background: rgba(0, 0, 0, 0.45);
+    background: color-mix(in srgb, var(--vmz-surface-ink) 45%, transparent);
     animation: vmz-ui-drawer-fade-in var(--vmz-motion-overlay-duration)
         var(--vmz-motion-overlay-easing);
 }
@@ -59,18 +65,25 @@
     right: 0;
     z-index: 1;
     box-sizing: border-box;
-    width: min(23.75rem, 100vw);
+    display: flex;
+    flex-direction: column;
+    width: min(420px, 100vw);
     height: 100%;
-    padding: 1.25rem 1.5rem;
-    border-left: 1px solid var(--vmz-line-subtle, var(--vmz-line-default));
-    background: var(--vmz-surface-paper, #fff);
+    border-left: 1px solid var(--vmz-line-subtle);
+    background: var(--vmz-surface-paper);
     color: var(--vmz-text-ink);
     box-shadow: var(--vmz-shadow-popup);
     outline: none;
-    display: flex;
-    flex-direction: column;
     animation: vmz-ui-drawer-panel-in var(--vmz-motion-overlay-duration)
         var(--vmz-motion-overlay-easing);
+}
+
+.vmz-ui-drawer[data-size="sm"] .vmz-ui-drawer__panel {
+    width: min(320px, 100vw);
+}
+
+.vmz-ui-drawer[data-size="lg"] .vmz-ui-drawer__panel {
+    width: min(560px, 100vw);
 }
 
 .vmz-ui-drawer[data-vmz-motion-adopt="true"] .vmz-ui-drawer__backdrop,
@@ -89,43 +102,101 @@
 }
 
 .vmz-ui-drawer__panel:focus-visible {
-    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring), var(--vmz-shadow-popup);
+}
+
+.vmz-ui-drawer__header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--vmz-line-subtle);
+}
+
+.vmz-ui-drawer__heading {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .vmz-ui-drawer__title {
-    margin: 0 0 0.75rem;
-    font-size: 1rem;
+    margin: 0;
+    font-size: 16px;
     font-weight: 600;
+    line-height: 24px;
     color: var(--vmz-text-ink);
 }
 
-.vmz-ui-drawer__body {
-    flex: 1;
-    margin-bottom: 1rem;
-    overflow: auto;
-    color: var(--vmz-text-ink);
+.vmz-ui-drawer__description {
+    margin: 4px 0 0;
+    font-size: 14px;
+    line-height: 22px;
+    color: var(--vmz-text-tertiary);
 }
 
 .vmz-ui-drawer__close {
-    font: inherit;
-    font-size: 0.875rem;
-    font-weight: 400;
-    min-height: var(--vmz-control-height, 2rem);
-    padding: 0.25rem 1rem;
-    border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md, 6px);
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    margin: -4px -8px -4px 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--vmz-radius-md);
+    background: transparent;
+    color: var(--vmz-text-steel);
     cursor: pointer;
-    background: var(--vmz-surface-paper, #fff);
-    color: var(--vmz-text-ink);
+    outline: none;
+    transition:
+        color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing),
+        background-color var(--vmz-motion-control-duration) var(--vmz-motion-control-easing);
 }
 
 .vmz-ui-drawer__close:hover {
-    color: var(--vmz-action-primary-background);
-    border-color: var(--vmz-action-primary-background);
+    background: var(--vmz-surface-mist);
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-drawer__close:focus-visible {
     box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+}
+
+.vmz-ui-drawer__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 16px 20px;
+    overflow: auto;
+    font-size: 14px;
+    line-height: 22px;
+    color: var(--vmz-text-ink);
+}
+
+.vmz-ui-drawer__body :where(a) {
+    color: var(--vmz-action-primary-background);
+    text-underline-offset: 2px;
+}
+
+.vmz-ui-drawer__body :where(a):hover {
+    color: var(--vmz-action-primary-hover);
+}
+
+.vmz-ui-drawer__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--vmz-line-subtle);
+}
+
+.vmz-ui-drawer__footer:empty {
+    display: none;
+}
+
+.vmz-ui-drawer__footer :where(button, a) {
+    min-height: var(--vmz-control-height, 32px);
 }
 
 @keyframes vmz-ui-drawer-fade-in {
@@ -140,7 +211,7 @@
 @keyframes vmz-ui-drawer-panel-in {
     from {
         opacity: 0;
-        transform: translateX(0.75rem);
+        transform: translateX(16px);
     }
     to {
         opacity: 1;
@@ -164,16 +235,18 @@
     }
     to {
         opacity: 0;
-        transform: translateX(0.75rem);
+        transform: translateX(16px);
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .vmz-ui-drawer__backdrop,
     .vmz-ui-drawer__panel,
+    .vmz-ui-drawer__close,
     .vmz-ui-drawer[data-vmz-motion-phase="exit"] .vmz-ui-drawer__backdrop,
     .vmz-ui-drawer[data-vmz-motion-phase="exit"] .vmz-ui-drawer__panel {
         animation: none;
+        transition: none;
     }
 }
 </style>
@@ -182,10 +255,19 @@
  * VMZ UI — Drawer (UI2).
  * Same overlay ownership / focus / Escape / stack as Dialog.
  * SSR/resume adopt skips enter replay; dismiss plays overlay-exit then calls onClose.
+ *
+ * Appearance props: `size` (sm 320 / md 420 / lg 560), `description`.
+ * Visible copy is author-supplied; `closeLabel` / `dismissLabel` only name the
+ * icon button and backdrop for assistive tech.
  */
 export default class Drawer {
     public open: boolean = false;
-    public title: string = "Drawer";
+    public title: string = "";
+    public description: string = "";
+    /** sm | md | lg */
+    public size: string = "md";
+    public closeLabel: string = "";
+    public dismissLabel: string = "";
     public titleId: string = "vmz-drawer-title";
     public stackLevel: string = "0";
     public onClose: (() => void) | null = null;

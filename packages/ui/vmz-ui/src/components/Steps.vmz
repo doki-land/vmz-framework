@@ -2,7 +2,10 @@
     <ol data-vmz-ui="steps" :aria-label="label" class="vmz-ui-steps">
         <li v-for="item in items" :key="item.id" :data-vmz-step="item.id" :data-status="item.status" :aria-current="current === item.id ? 'step' : 'false'" class="vmz-ui-steps__item">
             <span :data-vmz-step-index="item.id" class="vmz-ui-steps__index">
-                {{ item.index }}
+                <Icon v-if="item.status === 'done'" name="action.check" size="md" decorative />
+                <span v-else class="vmz-ui-steps__number">
+                    {{ item.index }}
+                </span>
             </span>
             <span class="vmz-ui-steps__body">
                 <span class="vmz-ui-steps__title">
@@ -22,37 +25,31 @@
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: var(--vmz-density-control-gap);
+    gap: var(--vmz-space-3, 0.75rem);
     max-width: 36rem;
 }
 
 .vmz-ui-steps__item {
     display: flex;
     align-items: flex-start;
-    gap: 0.75rem;
-    color: var(--vmz-text-steel);
-}
-
-.vmz-ui-steps__item[data-status="done"] {
-    color: var(--vmz-status-success-foreground);
-}
-
-.vmz-ui-steps__item[data-status="current"] {
-    color: var(--vmz-action-primary-active);
+    gap: var(--vmz-space-3, 0.75rem);
+    color: var(--vmz-text-ink);
 }
 
 .vmz-ui-steps__index {
     flex: 0 0 auto;
-    min-width: 1.75rem;
-    height: 1.75rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--vmz-line-default);
-    border-radius: 999px;
-    font-weight: 700;
-    font-size: 0.85rem;
-    color: inherit;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 1px solid var(--vmz-line-default, var(--vmz-line-strong));
+    border-radius: var(--vmz-radius-pill, 999px);
+    background: var(--vmz-surface-paper);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--vmz-text-tertiary);
 }
 
 .vmz-ui-steps__item[data-status="current"] .vmz-ui-steps__index {
@@ -63,23 +60,41 @@
 
 .vmz-ui-steps__item[data-status="done"] .vmz-ui-steps__index {
     border-color: var(--vmz-status-success-accent);
-    background: color-mix(in srgb, var(--vmz-status-success-accent) 18%, transparent);
+    background: var(--vmz-status-success-background);
+    color: var(--vmz-status-success-foreground);
 }
 
 .vmz-ui-steps__body {
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
+    gap: var(--vmz-space-1, 0.25rem);
     padding-top: 0.125rem;
+    min-width: 0;
 }
 
 .vmz-ui-steps__title {
-    font-weight: 700;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.5;
+    color: var(--vmz-text-ink);
+}
+
+.vmz-ui-steps__item[data-status="current"] .vmz-ui-steps__title {
+    color: var(--vmz-action-primary-active);
 }
 
 .vmz-ui-steps__description {
-    font-size: 0.9em;
-    opacity: 0.9;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--vmz-text-tertiary);
+}
+
+:where([data-density="compact"]) .vmz-ui-steps {
+    gap: var(--vmz-density-compact-gap);
+}
+
+:where([data-density="dense"]) .vmz-ui-steps {
+    gap: var(--vmz-density-dense-gap);
 }
 </style>
 <script client>
@@ -89,7 +104,7 @@
  * Navigation actions stay on the page (no private wizard store).
  */
 export default class Steps {
-    public label: string = "Steps";
+    public label: string = "";
     public current: string = "";
     /** @type {{ id: string, index: string, title: string, description?: string, status: string }[]} */
     public items: {
