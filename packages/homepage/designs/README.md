@@ -1,6 +1,6 @@
 # Homepage `/designs` — VMZ Design
 
-本目录是 **VMZ 官方站点**（homepage + 一体文档）的 application design 真相源。完整数值与组件质量条见 [`06-Style-Design-UI.md`](../../../../规划设计/vmz/06-Style-Design-UI.md) 的「商业稳重视觉基线 v2」。
+本目录是 **VMZ 官方站点**（homepage + 一体文档）的 application design 真相源。完整数值与组件质量条以 `@vmz/ui` 的 token 合同与组件 conformance 为准。
 
 ```text
 brand.primary  Commercial Blue  #1677FF
