@@ -9,8 +9,45 @@ use boost_fs::walk::{Filter, Walker};
 /// Closed `.vmz` module kind — owned by `vmz-protocol` (wire / DX shared).
 pub use vmz_protocol::VmzModuleKind;
 
+/// Where a discovered `.vmz` unit comes from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VmzUnitOrigin {
+    /// Under the application root.
+    Project,
+    /// Convention component discovered from a dependency package.
+    Dependency {
+        /// Dependency package name as declared in the app `package.json`.
+        package: String,
+        /// Resolved package root.
+        root: PathBuf,
+    },
+}
+
+impl VmzUnitOrigin {
+    /// `true` when the unit belongs to the application itself.
+    pub fn is_project(&self) -> bool {
+        matches!(self, Self::Project)
+    }
+}
+
+/// One discovered `.vmz` unit with its application/dependency origin.
+#[derive(Debug, Clone)]
+pub struct VmzUnit {
+    /// Absolute or root-relative `.vmz` path.
+    pub path: PathBuf,
+    /// Closed module kind.
+    pub kind: VmzModuleKind,
+    /// Application or dependency origin.
+    pub origin: VmzUnitOrigin,
+}
+
 /// Walk `root` (and convention component deps) for `.vmz` files with module kinds.
 pub fn discover_vmz_files(root: impl AsRef<Path>) -> Vec<(PathBuf, VmzModuleKind)> {
+    discover_vmz_units(root).into_iter().map(|unit| (unit.path, unit.kind)).collect()
+}
+
+/// Walk `root` and convention component deps, keeping project/dependency origin.
+pub fn discover_vmz_units(root: impl AsRef<Path>) -> Vec<VmzUnit> {
     let root = root.as_ref();
     let mut out = Vec::new();
     let mut seen = BTreeSet::new();
@@ -36,19 +73,23 @@ pub fn discover_vmz_files(root: impl AsRef<Path>) -> Vec<(PathBuf, VmzModuleKind
         }
         let pb = path.to_path_buf();
         if seen.insert(pb.clone()) {
-            out.push((pb, classify(root, path)));
+            out.push(VmzUnit {
+                kind: classify(root, path),
+                path: pb,
+                origin: VmzUnitOrigin::Project,
+            });
         }
     }
 
     // Direct deps that follow the same convention: `src/components/**/*.vmz`.
     // No package.json "componentsRoot" — convention over configuration.
-    for (path, kind) in discover_dependency_components(root) {
-        if seen.insert(path.clone()) {
-            out.push((path, kind));
+    for unit in discover_dependency_units(root) {
+        if seen.insert(unit.path.clone()) {
+            out.push(unit);
         }
     }
 
-    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out.sort_by(|a, b| a.path.cmp(&b.path));
     out
 }
 
@@ -89,7 +130,7 @@ fn is_application_shell(rel: &str) -> bool {
 
 /// Discover components from direct dependencies that keep the hard convention
 /// `src/components/**/*.vmz` (same as application packages).
-fn discover_dependency_components(root: &Path) -> Vec<(PathBuf, VmzModuleKind)> {
+fn discover_dependency_units(root: &Path) -> Vec<VmzUnit> {
     let pkg_path = root.join("package.json");
     let Ok(text) = fs::read_to_string(&pkg_path) else {
         return Vec::new();
@@ -124,7 +165,11 @@ fn discover_dependency_components(root: &Path) -> Vec<(PathBuf, VmzModuleKind)> 
             if path.extension().and_then(|e| e.to_str()) != Some("vmz") {
                 continue;
             }
-            out.push((path.to_path_buf(), VmzModuleKind::Component));
+            out.push(VmzUnit {
+                path: path.to_path_buf(),
+                kind: VmzModuleKind::Component,
+                origin: VmzUnitOrigin::Dependency { package: name.clone(), root: pkg_root.clone() },
+            });
         }
     }
     out

@@ -5,14 +5,16 @@
 //! - unreferenced `designs/styles` siblings when `index.*` entry exists ->
 //!   `vmz::style::unreferenced_global_style` (warning)
 
-use std::collections::{BTreeSet, HashSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
 use std::ops::Range;
 
+use crate::affected::chunk_id_for;
+use crate::dep_graph::ComponentGraph;
 use crate::designs::{DesignsBundle, StyleTheme, css_var_name};
 use crate::diagnostic::ReportedDiagnostic;
-use crate::project::discover_vmz_files;
+use crate::project::{VmzUnit, VmzUnitOrigin, discover_vmz_units};
 use crate::sfc::parse_vmz;
 use crate::tw::{TwRegistration, register_tw_from_parsed};
 
@@ -48,26 +50,164 @@ pub fn validate_project_design_token_refs(
                 }
             }
         }
-        for (path, _) in discover_vmz_files(root) {
-            let Ok(source) = std::fs::read_to_string(&path) else {
+        let scope = token_scope(root);
+        for unit in &scope.project {
+            let Ok(source) = std::fs::read_to_string(&unit.path) else {
                 continue;
             };
-            let Ok(parsed) = parse_vmz(&path, source) else {
+            let Ok(parsed) = parse_vmz(&unit.path, source) else {
                 continue;
             };
             if let Some(style) = &parsed.style {
                 out.extend(validate_vmz_css_var_refs(
                     &designs.theme,
                     &known_vars,
-                    &path,
+                    &unit.path,
                     &style.content,
                 ));
             }
             out.extend(validate_style_tw_design_token_refs(&designs.theme, &parsed));
         }
-        out.extend(validate_unused_design_tokens(root, designs));
+        out.extend(validate_dependency_token_refs(designs, &known_vars, &scope.dependency));
+        out.extend(validate_unused_tokens_for_units(designs, &scope.project, &scope.dependency));
     }
     out.extend(validate_unreferenced_global_styles(designs));
+    out
+}
+
+/// `.vmz` units whose Style Theme references participate in diagnostics.
+struct TokenScope {
+    /// Application-owned units — always checked.
+    project: Vec<VmzUnit>,
+    /// Dependency components reachable from the application template graph.
+    dependency: Vec<VmzUnit>,
+}
+
+/// Partition discovered units into app-owned and reachable dependency components.
+///
+/// Reachability follows PascalCase template tags (`ComponentGraph`), not package
+/// inventories: an unreferenced `@vmz/ui` component imposes no token requirement.
+fn token_scope(root: &Path) -> TokenScope {
+    let units = discover_vmz_units(root);
+    let src_root = if root.join("src").is_dir() { root.join("src") } else { root.to_path_buf() };
+    let catalog: Vec<(PathBuf, crate::project::VmzModuleKind, String)> = units
+        .iter()
+        .map(|unit| (unit.path.clone(), unit.kind, chunk_id_for(&src_root, &unit.path)))
+        .collect();
+    let graph = ComponentGraph::build(&src_root, &catalog);
+    let project_ids: HashSet<String> = units
+        .iter()
+        .filter(|unit| unit.origin.is_project())
+        .map(|unit| chunk_id_for(&src_root, &unit.path))
+        .collect();
+
+    let mut reachable = project_ids.clone();
+    let mut stack: Vec<String> = project_ids.into_iter().collect();
+    while let Some(id) = stack.pop() {
+        if let Some(children) = graph.deps.get(&id) {
+            for child in children {
+                if reachable.insert(child.clone()) {
+                    stack.push(child.clone());
+                }
+            }
+        }
+    }
+
+    let mut scope = TokenScope { project: Vec::new(), dependency: Vec::new() };
+    for unit in units {
+        if unit.origin.is_project() {
+            scope.project.push(unit);
+        } else if reachable.contains(&chunk_id_for(&src_root, &unit.path)) {
+            scope.dependency.push(unit);
+        }
+    }
+    scope
+}
+
+/// One unknown token attributed to a dependency component.
+struct DependencyTokenRef {
+    component: String,
+    package: Option<String>,
+}
+
+/// Diagnose missing Style Theme leaves in reachable dependency components.
+///
+/// Diagnostics are aggregated by token and anchored at `designs/`, never at the
+/// dependency source path.
+fn validate_dependency_token_refs(
+    designs: &DesignsBundle,
+    known_vars: &BTreeSet<String>,
+    units: &[VmzUnit],
+) -> Vec<ReportedDiagnostic> {
+    let color_keys = designs.theme.known_ns_keys("colors");
+    let spacing_keys = designs.theme.known_ns_keys("spacing");
+    let has_colors = !color_keys.is_empty();
+    let has_spacing = !spacing_keys.is_empty();
+    let mut missing: BTreeMap<String, Vec<DependencyTokenRef>> = BTreeMap::new();
+
+    for unit in units {
+        let Some(component) = unit.path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        let package = match &unit.origin {
+            VmzUnitOrigin::Dependency { package, .. } => Some(package.clone()),
+            VmzUnitOrigin::Project => None,
+        };
+        let Ok(source) = std::fs::read_to_string(&unit.path) else {
+            continue;
+        };
+        let Ok(parsed) = parse_vmz(&unit.path, source) else {
+            continue;
+        };
+
+        let mut names = BTreeSet::new();
+        if let Some(style) = &parsed.style {
+            for name in collect_vmz_css_var_refs(&style.content) {
+                if !known_vars.contains(&name) {
+                    names.insert(name);
+                }
+            }
+        }
+        let mut regs = Vec::new();
+        register_tw_from_parsed(&parsed, &mut regs);
+        for reg in regs {
+            let Some((ns, key)) = design_token_ref_from_utility(&reg.token) else {
+                continue;
+            };
+            let known = match ns {
+                "colors" if has_colors => &color_keys,
+                "spacing" if has_spacing => &spacing_keys,
+                _ => continue,
+            };
+            if !known.contains(key) {
+                names.insert(format!("{ns}.{key}"));
+            }
+        }
+
+        for name in names {
+            let entry = missing.entry(name).or_default();
+            if !entry.iter().any(|e| e.component == component && e.package == package) {
+                entry.push(DependencyTokenRef {
+                    component: component.to_string(),
+                    package: package.clone(),
+                });
+            }
+        }
+    }
+
+    let mut out = Vec::new();
+    for (name, refs) in missing {
+        let components: Vec<&str> = refs.iter().map(|r| r.component.as_str()).collect();
+        let packages: BTreeSet<&str> = refs.iter().filter_map(|r| r.package.as_deref()).collect();
+        let mut diag = ReportedDiagnostic::error(&designs.root, DIAG_UNKNOWN_DESIGN_TOKEN)
+            .with_arg("name", name)
+            .with_arg("component", components.join(", "))
+            .with_arg("detail", "no Style Theme leaf");
+        if packages.len() == 1 {
+            diag = diag.with_arg("package", packages.into_iter().next().unwrap_or_default());
+        }
+        out.push(diag);
+    }
     out
 }
 
@@ -299,12 +439,21 @@ fn resolve_style_import(styles_dir: &Path, from_dir: &Path, spec: &str) -> Optio
 /// Warn about design-token CSS variables defined in the theme but unused in the project.
 ///
 /// Skips when designs are missing or the theme has no known vars; otherwise scans
-/// project sources for `--vmz-*` and utility references.
+/// application sources and the same reachable dependency set used by
+/// [`validate_project_design_token_refs`].
 pub fn validate_unused_design_tokens(
     root: &Path,
     designs: &DesignsBundle,
 ) -> Vec<ReportedDiagnostic> {
-    let _ = root;
+    let scope = token_scope(root);
+    validate_unused_tokens_for_units(designs, &scope.project, &scope.dependency)
+}
+
+fn validate_unused_tokens_for_units(
+    designs: &DesignsBundle,
+    project: &[VmzUnit],
+    dependency: &[VmzUnit],
+) -> Vec<ReportedDiagnostic> {
     if designs.missing || designs.theme.is_empty() {
         return Vec::new();
     }
@@ -312,7 +461,7 @@ pub fn validate_unused_design_tokens(
     if known.is_empty() {
         return Vec::new();
     }
-    let used = collect_project_used_css_vars(root, designs, &known);
+    let used = collect_project_used_css_vars(designs, &known, project, dependency);
     let mut out = Vec::new();
     let mut seen = BTreeSet::new();
     for table in &designs.theme.tables {
@@ -334,9 +483,10 @@ pub fn validate_unused_design_tokens(
 }
 
 fn collect_project_used_css_vars(
-    root: &Path,
     designs: &DesignsBundle,
     known: &BTreeSet<String>,
+    project: &[VmzUnit],
+    dependency: &[VmzUnit],
 ) -> BTreeSet<String> {
     let mut used = BTreeSet::new();
     for path in &designs.style_files {
@@ -351,11 +501,11 @@ fn collect_project_used_css_vars(
             }
         }
     }
-    for (path, _) in discover_vmz_files(root) {
-        let Ok(source) = std::fs::read_to_string(&path) else {
+    for unit in project.iter().chain(dependency.iter()) {
+        let Ok(source) = std::fs::read_to_string(&unit.path) else {
             continue;
         };
-        let Ok(parsed) = parse_vmz(&path, source) else {
+        let Ok(parsed) = parse_vmz(&unit.path, source) else {
             continue;
         };
         if let Some(style) = &parsed.style {
