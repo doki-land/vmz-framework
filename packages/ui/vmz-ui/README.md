@@ -13,6 +13,24 @@ VMZ Design  ≠  VMZ UI
   `componentsRoot` config.
 - **Never** hardcodes brand hex (`#176BFF`, etc.). Applications provide values via `/designs`.
 
+## Design preset
+
+`presets/web-surface.v0.json` is the manifest for the first official design preset. Its files live
+under `presets/web-surface/` and are exported as `@vmz/ui/presets/web-surface/*`, so an application
+can materialize an editable `designs/` starting point:
+
+```bash
+pnpm exec vmz init design
+```
+
+The CLI reads the manifest `files` list, copies it into the project `designs/` directory, and
+skips files that already exist (`--force` overwrites, `--dry-run` previews, `--designs-dir` and
+`--preset` select another target).
+
+A preset is Style Theme source files, not a runtime theme. It is never injected automatically and
+carries no hidden semantics. `contracts/token-requirements.v0.json` remains the truth source for
+which tokens the components require; the `ui-automation` gate checks this preset against it.
+
 ## Preview `0.0.4`
 
 This is a **preview** release. It is **not** `production-ready` and **not** a mature / production UI.

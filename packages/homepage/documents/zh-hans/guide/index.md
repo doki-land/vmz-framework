@@ -38,6 +38,17 @@ export default defineConfig({
 
 只装包或只注册插件都会在 `vmz dev` 挂载文档时失败。
 
+官方 UI 的样式值来自项目 `designs/`。安装 `@vmz/ui` 后，用内置 preset 生成一份可改的起点：
+
+```bash
+pnpm add @vmz/ui
+pnpm exec vmz init design
+```
+
+默认把 `web-surface` preset 物化到 `designs/`，已有文件会被跳过。要覆盖写用 `--force`，先看会写什么用 `--dry-run`，换目录用 `--designs-dir <dir>`，换 preset 用 `--preset <name>`。preset 只是 Style Theme 文件的初值，不是运行时主题，也不会被应用自动注入。
+
+编译器只要求**模板里实际引用到的组件**提供 token。没有用到的依赖组件即使用到未定义的 token 也不算错误；真正缺失时诊断指向项目 `designs/`，不会指向 `node_modules`。
+
 - [Zero-Cost](./zero-cost.md)
 - [优化](./optimizations/index.md)
 - [部署](./deploy/index.md)

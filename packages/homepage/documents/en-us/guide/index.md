@@ -39,6 +39,23 @@ export default defineConfig({
 
 Installing the package or registering the plugin alone fails when `vmz dev` mounts documents.
 
+The official UI takes its style values from your project's `designs/`. Install `@vmz/ui` and
+materialize the built-in preset as an editable starting point:
+
+```bash
+pnpm add @vmz/ui
+pnpm exec vmz init design
+```
+
+By default it copies the `web-surface` preset into `designs/` and skips files that already exist.
+Use `--force` to overwrite, `--dry-run` to preview, `--designs-dir <dir>` for another directory,
+and `--preset <name>` for another preset. A preset is only initial Style Theme files — it is not a
+runtime theme and is never injected into the app automatically.
+
+The compiler only requires tokens for components the template graph actually references. An
+unused dependency component with undefined tokens is not an error, and a real missing token is
+reported against your project `designs/`, never against `node_modules`.
+
 - [Zero-Cost](./zero-cost.md)
 - [Optimizations](./optimizations/index.md)
 - [Deploy](./deploy/index.md)
