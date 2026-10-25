@@ -43,6 +43,7 @@
   commercialReviewPlaceholder: 'Record what you concluded',
   commercialWorkspaceAria: 'Request handling demo',
   consoleActionLabel: 'View details',
+  consoleActivity: 'Recently updated',
   consoleActionTitle: 'View detail',
   consoleApply: 'Search',
   consoleBack: 'Back',

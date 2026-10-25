@@ -43,6 +43,7 @@
   commercialReviewPlaceholder: '记录这次处理的结论',
   commercialWorkspaceAria: '请求处理演示',
   consoleActionLabel: '查看详情',
+  consoleActivity: '最近更新',
   consoleActionTitle: '查看详情',
   consoleApply: '搜索',
   consoleBack: '返回',
