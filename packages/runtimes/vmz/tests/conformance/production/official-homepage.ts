@@ -318,6 +318,9 @@ if (homeBuild.status !== 0) {
         if (!hasDensityVar || !hasDense) {
             errors.push('homepage document chrome must consume density tokens');
         }
+        if (/@import\s+url\(\s*["']?https?:\/\//.test(chrome)) {
+            errors.push('homepage document chrome must not import remote stylesheets or webfonts');
+        }
     }
 }
 

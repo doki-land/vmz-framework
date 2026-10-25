@@ -1,8 +1,8 @@
 /* Document chrome — uses VMZ Design semantic tokens from vmz-designs.css
  * Integrated mounts also load host vmz.css (SiteHeader / SiteFooter).
+ * Type comes from the system stacks in `designs/tokens/brand.json`; no remote
+ * webfont is requested.
  */
-
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
 
 *,
 *::before,
@@ -17,7 +17,7 @@ html {
 body {
     margin: 0;
     min-height: 100vh;
-    font-family: var(--vmz-font-sans, "IBM Plex Sans", sans-serif);
+    font-family: var(--vmz-font-sans, sans-serif);
     color: var(--vmz-text-ink, #121416);
     background: var(--vmz-surface-paper, #ffffff);
     line-height: 1.6;
@@ -156,7 +156,7 @@ main {
 main h1,
 main h2,
 main h3 {
-    font-family: var(--vmz-font-display, "Space Grotesk", sans-serif);
+    font-family: var(--vmz-font-display, sans-serif);
     letter-spacing: -0.02em;
     line-height: 1.2;
     color: var(--vmz-text-ink, #121416);
