@@ -73,7 +73,7 @@ test('loads a project-local plugin entry and public npm plugin JS export', async
         ].join('\n'),
         'vmz.config.ts': [
             "import markdownIt from '@vmz/plugin-markdown-it';",
-            "export default { plugins: ['./local.plugin.ts', markdownIt] };",
+            "export default { plugins: ['./local.plugin.ts', markdownIt()] };",
             '',
         ].join('\n'),
     });
