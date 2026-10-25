@@ -41,6 +41,7 @@
   commercialReviewNoteDesc: '备注只用于这个演示页，不会发送给真实客户。',
   commercialReviewNoteLabel: '处理备注',
   commercialReviewPlaceholder: '记录这次处理的结论',
+  commercialWorkspaceAria: '请求处理演示',
   consoleActionLabel: '查看详情',
   consoleActionTitle: '查看详情',
   consoleApply: '搜索',

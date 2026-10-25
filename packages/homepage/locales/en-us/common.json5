@@ -41,6 +41,7 @@
   commercialReviewNoteDesc: 'The note is used by this demo page only. Nothing is sent to a real customer.',
   commercialReviewNoteLabel: 'Handling note',
   commercialReviewPlaceholder: 'Record what you concluded',
+  commercialWorkspaceAria: 'Request handling demo',
   consoleActionLabel: 'View details',
   consoleActionTitle: 'View detail',
   consoleApply: 'Search',
