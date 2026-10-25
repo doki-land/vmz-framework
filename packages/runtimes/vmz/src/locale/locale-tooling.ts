@@ -191,7 +191,7 @@ export function extractHardcodedText(projectRoot: string, opts: { check?: boolea
             // Allow import paths / comments-ish short tokens
             if (lit.includes('#locales/') || lit.includes('locales/')) continue;
             // Require a letter (Latin or CJK). Avoid `\W` without `u` — CJK is `\W` in ASCII mode.
-            if (! /\p{L}/u.test(lit)) continue;
+            if (!/\p{L}/u.test(lit)) continue;
             findings.push({
                 path: rel,
                 kind: 'cjk_literal',
@@ -228,7 +228,7 @@ export function extractHardcodedText(projectRoot: string, opts: { check?: boolea
         dynamicIdRe.lastIndex = 0;
         while ((m = dynamicIdRe.exec(text))) {
             const arg = m[1].trim();
-            if (! /^['"`]/.test(arg)) {
+            if (!/^['"`]/.test(arg)) {
                 diagnostics.push({
                     code: DIAG_MESSAGE_DYNAMIC_ID_UNBOUNDED,
                     severity: 'error',

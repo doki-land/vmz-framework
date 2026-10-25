@@ -31,7 +31,7 @@ const clientJs = fs.readFileSync(path.join(dist, 'components', 'CounterButton.cl
 if (!clientJs.includes('__vmzRunTask(this, "softLoad"') && !clientJs.includes("__vmzRunTask(this, 'softLoad'")) {
     fail('CounterButton.client.js missing __vmzRunTask wrap for softLoad');
 }
-if (! /from\s+['"].*vmz-dom/.test(clientJs)) {
+if (!/from\s+['"].*vmz-dom/.test(clientJs)) {
     fail('CounterButton.client.js must import __vmzRunTask from vmz-dom');
 }
 

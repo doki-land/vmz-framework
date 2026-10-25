@@ -54,7 +54,7 @@ export function createPlainMarkdown(id = 'plain'): MarkdownEngine {
                     const lang = fence[1] || '';
                     const bodyLines: string[] = [];
                     i += 1;
-                    while (i < lines.length && ! /^```\s*$/.test(lines[i]!)) {
+                    while (i < lines.length && !/^```\s*$/.test(lines[i]!)) {
                         bodyLines.push(lines[i]!);
                         i += 1;
                     }

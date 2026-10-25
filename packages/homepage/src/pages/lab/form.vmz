@@ -918,7 +918,7 @@ export default class FormPageServer {
             if (!name) {
                 return { ok: false, error: `Missing file name at index ${i}` };
             }
-            if (! /\.(txt|md|pdf)$/i.test(name)) {
+            if (!/\.(txt|md|pdf)$/i.test(name)) {
                 return { ok: false, error: "Only .txt, .md, or .pdf attachments" };
             }
             const size = Number(part.size);
@@ -964,7 +964,7 @@ export default class FormPageServer {
         const payload = body && typeof body === "object" ? body : {};
         const name = String(payload.name || "").trim();
         if (!name) return { ok: false, error: "Missing file name" };
-        if (! /\.(txt|md|pdf)$/i.test(name)) {
+        if (!/\.(txt|md|pdf)$/i.test(name)) {
             return { ok: false, error: "Only .txt, .md, or .pdf attachments" };
         }
         const size = Number(payload.size);
@@ -1104,7 +1104,7 @@ export default class FormPageServer {
     async presign(body) {
         const payload = body && typeof body === "object" ? body : {};
         const name = String(payload.name || "").trim() || "upload.bin";
-        if (! /\.(txt|md|pdf)$/i.test(name)) {
+        if (!/\.(txt|md|pdf)$/i.test(name)) {
             return { ok: false, error: "Only .txt, .md, or .pdf for object store" };
         }
         const size = Number(payload.size);

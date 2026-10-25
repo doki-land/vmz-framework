@@ -300,10 +300,10 @@ try {
     if (/<html[^>]*data-theme=/.test(bare.body)) fail('bare HTML must not set data-theme');
 
     const qDark = await fetchText('/?theme=dark');
-    if (! /<html[^>]*\sdata-theme="dark"/.test(qDark.body)) fail('?theme=dark');
+    if (!/<html[^>]*\sdata-theme="dark"/.test(qDark.body)) fail('?theme=dark');
 
     const cDefault = await fetchText('/', { cookie: 'vmz-theme=default' });
-    if (! /<html[^>]*\sdata-theme="default"/.test(cDefault.body)) fail('cookie default');
+    if (!/<html[^>]*\sdata-theme="default"/.test(cDefault.body)) fail('cookie default');
 } catch (err) {
     killChild();
     fail(String(err && err.message ? err.message : err));

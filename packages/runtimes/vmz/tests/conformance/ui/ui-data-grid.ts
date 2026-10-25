@@ -111,7 +111,7 @@ if (!dgSrc.includes('data-vmz-ui="data-grid"')) fail('DataGrid missing data-vmz-
 if (!dgSrc.includes('data-vmz-grid-viewport') || !dgSrc.includes('onScroll')) {
     fail('DataGrid must expose viewport scroll for parent virtualization');
 }
-if (!dgSrc.includes('data-pinned') || ! /position:\s*sticky/.test(dgSrc)) {
+if (!dgSrc.includes('data-pinned') || !/position:\s*sticky/.test(dgSrc)) {
     fail('DataGrid must sticky-pin leading column');
 }
 if (!dgSrc.includes('data-vmz-grid-spacer') || !dgSrc.includes('padTopStyle')) {

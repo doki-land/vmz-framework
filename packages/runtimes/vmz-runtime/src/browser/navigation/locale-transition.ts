@@ -45,7 +45,7 @@ export function createLocaleTransition({ document: doc, window: win, location: l
         if (!routeId || !localeId) return null;
         const table = readLocaleHrefTable();
         const href = table?.[routeId]?.[localeId];
-        return typeof href === 'string' && href && ! /\[[^\]]+\]/.test(href) && ! /\/:[^/]+/.test(href) ? href : null;
+        return typeof href === 'string' && href && !/\[[^\]]+\]/.test(href) && !/\/:[^/]+/.test(href) ? href : null;
     }
 
     function resolveRouteIdFromHrefTable(pathname: string, localeId: string | null) {

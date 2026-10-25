@@ -932,7 +932,7 @@ export default class DatagridPage {
     toggleRow(id) {
         const sid = String(id || "");
         if (this.viewMode === "tree") {
-            if (! /-l\d+$/.test(sid)) return;
+            if (!/-l\d+$/.test(sid)) return;
         } else if (this.viewMode === "pivot") {
             if (!sid.startsWith("p:")) return;
         } else if (sid.startsWith("g:")) {

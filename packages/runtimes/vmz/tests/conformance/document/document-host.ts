@@ -71,10 +71,10 @@ const evidenceHtml = path.join(outDir, 'docs', 'zh-hans', 'guide', 'evidence.htm
 if (!fs.existsSync(evidenceHtml)) fail(`missing ${evidenceHtml}`);
 const html = fs.readFileSync(evidenceHtml, 'utf8');
 if (/<script[\s>]/i.test(html)) fail('no-JS gate: evidence.html must not include <script>');
-if (! /data-vmz-hydrate="island-only"/i.test(html)) fail('missing body data-vmz-hydrate=island-only');
-if (! /data-vmz-island="DocumentSearch"/i.test(html)) fail('missing DocumentSearch island shell');
-if (! /data-vmz-island="DocumentPlayground:/i.test(html)) fail('missing DocumentPlayground island shell');
-if (! /data-vmz-search-index="[^"]*document\.search\.json"/i.test(html)) {
+if (!/data-vmz-hydrate="island-only"/i.test(html)) fail('missing body data-vmz-hydrate=island-only');
+if (!/data-vmz-island="DocumentSearch"/i.test(html)) fail('missing DocumentSearch island shell');
+if (!/data-vmz-island="DocumentPlayground:/i.test(html)) fail('missing DocumentPlayground island shell');
+if (!/data-vmz-search-index="[^"]*document\.search\.json"/i.test(html)) {
     fail('DocumentSearch must point at document.search.json');
 }
 if (/data-vmz-hydrate=["']full[-_]?page["']/i.test(html) || /hydrate-all/i.test(html)) {

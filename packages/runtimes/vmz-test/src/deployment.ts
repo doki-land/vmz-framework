@@ -149,7 +149,7 @@ export function runDeploymentManifest(manifest: Record<string, unknown>, ctx: { 
             const clientSrc = fs.readFileSync(clientPath, 'utf8');
 
             // Server body must exist as a real module (not only a callServer stub file).
-            if (! /export\s+(default\s+)?class\s+\w+/.test(serverSrc) && ! /export\s+\{/.test(serverSrc)) {
+            if (!/export\s+(default\s+)?class\s+\w+/.test(serverSrc) && !/export\s+\{/.test(serverSrc)) {
                 fail(`server artifact looks empty: ${path.relative(ctx.outDir, serverPath)}`);
             }
 

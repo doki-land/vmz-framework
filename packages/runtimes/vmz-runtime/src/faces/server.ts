@@ -67,7 +67,7 @@ async function callServerLocal(moduleId: string, method: string, args: unknown[]
 async function callServerHttp(moduleId: string, method: string, args: unknown[]): Promise<unknown> {
     let rpcPath: string = (typeof globalThis !== 'undefined' && globalThis.__VMZ_RPC_PATH) || DEFAULT_RPC_PATH;
     // Node undici `fetch` rejects relative URLs; browsers accept path-only.
-    if (typeof rpcPath === 'string' && ! /^https?:\/\//i.test(rpcPath)) {
+    if (typeof rpcPath === 'string' && !/^https?:\/\//i.test(rpcPath)) {
         const origin =
             (typeof globalThis !== 'undefined' && globalThis.__VMZ_RPC_ORIGIN) ||
             (typeof window !== 'undefined' && window.location && window.location.origin) ||

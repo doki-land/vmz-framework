@@ -163,7 +163,7 @@ try {
     if (asset.status !== 200 || !asset.body) errors.push('hashed entry-client missing (static-resume)');
     // Split DOM runtime: barrel vmz-dom.js + companions (dom-ssr.js carries renderToStream).
     const domSsr = await get(`${host.baseUrl}/dom-ssr.js`);
-    if (dom.status !== 200 || ! /dom-ssr\.js/.test(dom.body)) {
+    if (dom.status !== 200 || !/dom-ssr\.js/.test(dom.body)) {
         errors.push('vmz-dom.js missing/corrupt barrel (static-resume)');
     }
     if (domSsr.status !== 200 || !domSsr.body.includes('renderToStream')) {

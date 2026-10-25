@@ -55,7 +55,7 @@ function fail(msg: string): never {
 /** True when build output has a product unknown-token diagnostic (not rustc quoting the const). */
 function productUnknownTokenDiag(out: string): boolean {
     const text = String(out || '');
-    if (!text.includes(DIAG_UNKNOWN) && ! /unknown design token/i.test(text)) return false;
+    if (!text.includes(DIAG_UNKNOWN) && !/unknown design token/i.test(text)) return false;
     const lines = text.split(/\r?\n/);
     return lines.some((l) => {
         if (/DIAG_UNKNOWN_DESIGN_TOKEN|missing documentation for a constant|^\s*-->/.test(l)) return false;

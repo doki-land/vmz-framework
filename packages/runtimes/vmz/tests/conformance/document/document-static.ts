@@ -68,8 +68,8 @@ if (!fs.existsSync(zhInstall)) fail(`missing ${zhInstall}`);
 
 const html = fs.readFileSync(zhIndex, 'utf8');
 if (/<script[\s>]/i.test(html)) fail('no-JS gate: index.html must not require <script>');
-if (! /<nav[^>]*aria-label="Documents"/i.test(html)) fail('missing Documents nav landmark');
-if (! /<main\b/i.test(html)) fail('missing main landmark');
+if (!/<nav[^>]*aria-label="Documents"/i.test(html)) fail('missing Documents nav landmark');
+if (!/<main\b/i.test(html)) fail('missing main landmark');
 if (!html.includes('欢迎阅读') && !html.includes('VMZ')) fail('body content missing');
 if (!html.includes('vmz-designs.css')) fail('designs stylesheet not linked');
 
@@ -81,7 +81,7 @@ if (!view.noJsReadable) fail('view.noJsReadable must be true');
 if (!Array.isArray(view.nav) || view.nav.length < 2) fail('view.nav incomplete');
 
 const installHtml = fs.readFileSync(zhInstall, 'utf8');
-if (! /id="requirements"/i.test(installHtml)) {
+if (!/id="requirements"/i.test(installHtml)) {
     fail(`install page missing requirements anchor`);
 }
 

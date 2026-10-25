@@ -274,7 +274,7 @@ export function publishRelease(releasesRoot, distDir, envelope) {
                 !n.includes('/.vmz-releases/') &&
                 !n.includes('/.vmz-cdn-releases/') &&
                 !n.includes('/releases-cdn/') &&
-                ! /\/dist\/releases(\/|$)/.test(n)
+                !/\/dist\/releases(\/|$)/.test(n)
             );
         },
     });
