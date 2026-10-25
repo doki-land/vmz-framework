@@ -22,7 +22,7 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   color: var(--vmz-text-ink);
-  background: var(--vmz-surface-page, var(--vmz-surface-mist, #f5f5f5));
+  background: var(--vmz-surface-page);
 }
 
 #app {

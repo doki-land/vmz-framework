@@ -17,6 +17,17 @@ const VIEWPORTS = [
     { id: '390x844', width: 390, height: 844, isMobile: true },
 ];
 
+/** Key pages captured in dark, compact and English states on desktop. */
+const STATE_TARGETS = [
+    { id: 'home', path: '/', locale: true },
+    { id: 'welcome', path: '/welcome', locale: true },
+    { id: 'commercial', path: '/commercial', locale: true },
+    { id: 'lab-components', path: '/lab/components', locale: true },
+    { id: 'console', path: '/console', locale: false },
+];
+
+const STATE_IDS = ['dark', 'compact', 'en'];
+
 const PAGES = [
     { id: 'home', path: '/' },
     { id: 'product', path: '/product' },
@@ -120,6 +131,75 @@ async function capturePage(page, baseUrl, pageDef, viewport, outDir, manifest) {
     console.log(`wrote ${path.relative(ROOT, shotPath)} (${metrics.innerWidth}px inner, scroll ${metrics.scrollWidth}px)`);
 }
 
+async function captureState(page, baseUrl, target, stateId, viewport, outDir, manifest) {
+    await page.setViewport({
+        width: viewport.width,
+        height: viewport.height,
+        deviceScaleFactor: 1,
+    });
+    await page.evaluate(() => {
+        try {
+            document.cookie = 'vmz.locale=; path=/; max-age=0; SameSite=Lax';
+            window.localStorage.removeItem('vmz.locale');
+            window.localStorage.removeItem('vmz-theme');
+            window.localStorage.removeItem('vmz-density');
+        } catch {
+            /* storage disabled */
+        }
+        document.documentElement.removeAttribute('data-theme');
+        document.documentElement.removeAttribute('data-density');
+    });
+    await page.goto(`${baseUrl}${target.path}`, { waitUntil: 'networkidle0', timeout: 90_000 });
+    await page.waitForSelector('[data-vmz-fixture="site-header"], [data-vmz-ui="console-shell"], [data-vmz-ui="app-shell"]', {
+        timeout: 20_000,
+    });
+    if (stateId === 'dark') {
+        await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+    } else if (stateId === 'compact') {
+        await page.evaluate(() => document.documentElement.setAttribute('data-density', 'compact'));
+    } else {
+        await page.waitForFunction('typeof window.__vmzTransitionLocale === "function"', { timeout: 20_000 });
+        const result = await page.evaluate(async () => {
+            const fn = window.__vmzTransitionLocale;
+            if (typeof fn !== 'function') return { status: 'missing' };
+            return await fn('en-us', { reload: false });
+        });
+        if (!result || result.status !== 'committed') {
+            throw new Error(`${target.id}: locale transition ${result?.status || 'unknown'} (${result?.reason || 'no reason'})`);
+        }
+        await page.waitForFunction(
+            () => document.documentElement.getAttribute('data-locale') === 'en-us',
+            { timeout: 10_000 },
+        );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const metrics = await page.evaluate(() => ({
+        innerWidth: window.innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        path: location.pathname,
+        theme: document.documentElement.getAttribute('data-theme'),
+        density: document.documentElement.getAttribute('data-density'),
+        locale: document.documentElement.getAttribute('data-locale'),
+    }));
+    const file = `${target.id}-${viewport.id}-${stateId}.png`;
+    const shotPath = path.join(outDir, file);
+    await page.screenshot({ path: shotPath, fullPage: false });
+    manifest.push({
+        page: target.id,
+        viewport: viewport.id,
+        state: stateId,
+        url: `${baseUrl}${target.path}`,
+        file,
+        innerWidth: metrics.innerWidth,
+        scrollWidth: metrics.scrollWidth,
+        horizontalOverflow: metrics.scrollWidth > metrics.innerWidth,
+        appliedTheme: metrics.theme,
+        appliedDensity: metrics.density,
+        appliedLocale: metrics.locale,
+    });
+    console.log(`wrote ${path.relative(ROOT, shotPath)} (${stateId})`);
+}
+
 async function captureNoJsHome(baseUrl, outDir, manifest, chromePath, puppeteer) {
     const viewport = VIEWPORTS[0];
     const browser = await puppeteer.launch({
@@ -198,6 +278,12 @@ async function main() {
             for (const viewport of VIEWPORTS) {
                 for (const pageDef of PAGES) {
                     await capturePage(page, baseUrl, pageDef, viewport, OUT_DIR, manifest.shots);
+                }
+            }
+            for (const target of STATE_TARGETS) {
+                for (const stateId of STATE_IDS) {
+                    if (stateId === 'en' && !target.locale) continue;
+                    await captureState(page, baseUrl, target, stateId, VIEWPORTS[0], OUT_DIR, manifest.shots);
                 }
             }
             await captureNoJsHome(baseUrl, OUT_DIR, manifest.shots, chrome, puppeteer);
