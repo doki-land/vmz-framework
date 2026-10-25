@@ -31,3 +31,9 @@
   .site--docs .doc-sidebar { position: relative; top: auto; height: auto; border-right: 0; border-bottom: 1px solid var(--vmz-line-default); }
   .site--docs .doc-subnav ul { display: flex; overflow-x: auto; }
 }
+
+/* Narrow commercial pages spend their first screen on the title and primary
+   action, so the shared page rhythm tightens before the workspace starts. */
+@media (max-width: 720px) {
+  .vmz-commercial-content { padding-top: var(--vmz-space-5); padding-bottom: var(--vmz-space-9); }
+}
