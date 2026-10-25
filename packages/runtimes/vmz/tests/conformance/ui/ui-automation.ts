@@ -174,7 +174,12 @@ for (const tok of requiredTokens) {
 }
 
 console.log('ui-automation: forbid brand hex inside @vmz/ui…');
-const uiSources = walkFiles(uiRoot, (p) => /\.(vmz|css|scss|ts|js|mjs|json)$/.test(p));
+const uiSources = walkFiles(uiRoot, (p) => {
+    const rel = path.relative(uiRoot, p).replaceAll('\\', '/');
+    // presets/ are application design values to materialize, not component styling.
+    if (rel.startsWith('presets/')) return false;
+    return /\.(vmz|css|scss|ts|js|mjs|json)$/.test(p);
+});
 const forbidden = (contract.forbiddenBrandHex || []).map((h) => h.toLowerCase());
 for (const file of uiSources) {
     if (file.endsWith('token-requirements.v0.json')) continue;
