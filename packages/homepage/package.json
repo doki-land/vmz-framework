@@ -20,6 +20,7 @@
         "@vmz/ui-icons": "workspace:*",
         "@vmz/ui-data-grid": "workspace:*",
         "@vmz/plugin": "workspace:*",
+        "@vmz/plugin-markdown-it": "workspace:*",
         "@vmz/plugin-shiki": "workspace:*",
         "@vmz/core": "workspace:*",
         "vmz-textmate": "workspace:*",

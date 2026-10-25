@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, it } from 'node:test';
 import { expect } from '../../../../../scripts/test/expect.mjs';
 import { PLUGIN_PROTOCOL, applyPlugins, contentHash, createWorkspace, defineConfig, definePlugin, loadVmzConfig } from 'vmz';
-import katexPlugin from '@vmz/plugin-katex';
+import katex from '@vmz/plugin-katex';
 import shiki from '@vmz/plugin-shiki';
 import conformance from 'vmz-plugin-conformance';
 
@@ -128,7 +128,7 @@ export default definePlugin({
         );
         const outDir = path.join(dir, 'dist');
         const ws = createWorkspace({ root: dir, outDir });
-        const reports = await applyPlugins(ws, [katexPlugin, shiki()], {
+        const reports = await applyPlugins(ws, [katex(), shiki()], {
             project: dir,
             outDir,
             engines: { math: 'katex', code: 'shiki' },

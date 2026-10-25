@@ -22,6 +22,18 @@ It is especially useful for:
 - tutorials that move between prose and real VMZ components;
 - source browsers that need trustworthy language presentation.
 
+## Install
+
+`@vmz/plugin-shiki` resolves Shiki from the application. `shiki` (`>=3`) is a required peer dependency, not a
+bundled dependency, so install it alongside the plugin:
+
+```bash
+pnpm add @vmz/plugin-shiki shiki
+```
+
+The default `vmz-textmate/shiki` path also needs `shiki/core`; installing `@shikijs/*` transitively through
+`vmz-textmate` does not replace the application-level `shiki` install.
+
 ## Third-party TextMate grammar (VMZ-2)
 
 By default the runtime loads `vmz-textmate/shiki`. For other languages (e.g. VOS), pass a peer adapter:

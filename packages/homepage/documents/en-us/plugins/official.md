@@ -3,6 +3,7 @@
 | Package                  | Author surface                          | Notes              |
 |--------------------------|-----------------------------------------|--------------------|
 | `@vmz/plugin`            | `definePlugin` / `defineConfig`         | Protocol           |
+| `@vmz/plugin-markdown-it` | `<Markdown>` / `engines.markdown`      | `engines.markdown` |
 | `@vmz/plugin-katex`      | `<Katex>` / `<Math engine="katex">`     | `engines.math`     |
 | `@vmz/plugin-mathjax`    | `<Mathjax>` / `<Math engine="mathjax">` | `engines.math`     |
 | `@vmz/plugin-shiki`      | `<Shiki>` / `<Code engine="shiki">`     | `engines.code`     |
@@ -21,6 +22,7 @@ Mermaid, ECharts, and Iconify differ too much in capability — use the concrete
 
 ```ts
 import {defineConfig} from 'vmz';
+import markdownIt from '@vmz/plugin-markdown-it';
 import katex from '@vmz/plugin-katex';
 import shiki from '@vmz/plugin-shiki';
 import monaco from '@vmz/plugin-monaco';
@@ -29,8 +31,9 @@ import echarts from '@vmz/plugin-echarts';
 import iconify from '@vmz/plugin-iconify';
 
 export default defineConfig({
-    plugins: [katex, shiki, monaco, mermaid, echarts, iconify],
+    plugins: [markdownIt(), katex(), shiki(), monaco(), mermaid(), echarts(), iconify()],
     engines: {
+        markdown: 'markdown-it',
         math: 'katex',
         code: 'shiki',
     },

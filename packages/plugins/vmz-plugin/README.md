@@ -34,6 +34,24 @@ Use this package when you are creating a native VMZ integration, not when you si
 library in application code. The latter should remain a normal dependency unless it needs to participate in VMZ's
 compiler-visible boundaries.
 
+## Registration shape
+
+Official plugins export a factory: `pluginName(optional config)`, with the same function as `export default`.
+`pluginName()` must behave exactly like the plugin's default configuration.
+
+```ts
+import { defineConfig } from '@vmz/plugin';
+import katex from '@vmz/plugin-katex';
+
+export default defineConfig({
+    plugins: [katex()],
+    engines: { math: 'katex' },
+});
+```
+
+`definePlugin` still accepts a plugin object for the protocol itself and for conformance fixtures. The author-facing
+rule for official packages is the factory call: `plugins: [katex()]`, not `plugins: [katex]`.
+
 ## What a strong plugin can unlock 🚀
 
 - A content engine can contribute deterministic rendered output and diagnostics.

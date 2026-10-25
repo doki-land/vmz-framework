@@ -3,17 +3,51 @@
  */
 import MarkdownIt from 'markdown-it';
 
+export type MarkdownItRuntimeOptions = {
+    /** Allow raw HTML in Markdown (default `false`). */
+    html?: boolean;
+    /** Autoconvert URL-like text to links (default `true`). */
+    linkify?: boolean;
+    /** Typographic replacements (default `false`). */
+    typographer?: boolean;
+    /** Convert single newlines to `<br>` (default `false`). */
+    breaks?: boolean;
+};
+
+const DEFAULT_OPTIONS: Required<MarkdownItRuntimeOptions> = {
+    html: false,
+    linkify: true,
+    typographer: false,
+    breaks: false,
+};
+
+let options: Required<MarkdownItRuntimeOptions> = { ...DEFAULT_OPTIONS };
+
 /** @type {import('markdown-it').default | null} */
 let cached = null;
 
+/**
+ * Configure the renderer before use (also called by the `markdownIt()` plugin factory).
+ * Later calls rebuild the cached instance.
+ */
+export function configureMarkdownIt(next: MarkdownItRuntimeOptions = {}): void {
+    options = {
+        html: next.html ?? DEFAULT_OPTIONS.html,
+        linkify: next.linkify ?? DEFAULT_OPTIONS.linkify,
+        typographer: next.typographer ?? DEFAULT_OPTIONS.typographer,
+        breaks: next.breaks ?? DEFAULT_OPTIONS.breaks,
+    };
+    cached = null;
+}
+
+/** Current renderer options (tests / diagnostics). */
+export function getMarkdownItOptions(): Required<MarkdownItRuntimeOptions> {
+    return { ...options };
+}
+
 function createMd() {
     if (cached) return cached;
-    cached = new MarkdownIt({
-        html: false,
-        linkify: true,
-        typographer: false,
-        breaks: false,
-    });
+    cached = new MarkdownIt(options);
     return cached;
 }
 
