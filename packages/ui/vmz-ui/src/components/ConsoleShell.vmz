@@ -291,6 +291,7 @@
     }
 
     .vmz-ui-console-shell__sidebar {
+        position: relative;
         border-right: 0;
         border-bottom: 1px solid var(--vmz-line-subtle);
         gap: var(--vmz-space-2, 0.5rem);
@@ -310,8 +311,19 @@
         flex: none;
     }
 
+    /* The menu overlays the page instead of inserting a new row, so opening
+       it never moves the current task down. */
     .vmz-ui-console-shell__nav[data-open="true"] {
         display: flex;
+        position: absolute;
+        top: 100%;
+        right: 0;
+        left: 0;
+        z-index: 30;
+        padding: var(--vmz-space-2, 0.5rem) var(--vmz-space-4, 1rem);
+        border-bottom: 1px solid var(--vmz-line-subtle);
+        background: var(--vmz-surface-paper);
+        box-shadow: var(--vmz-shadow-popup);
     }
 
     .vmz-ui-console-shell__nav a {
@@ -393,6 +405,20 @@ export default class ConsoleShell {
         title: string;
         href: string;
     }[] = [];
+    _onDocumentClick = null;
+    onMount() {
+        this._onDocumentClick = (ev) => {
+            if (!this.menuOpen) return;
+            const target = ev.target;
+            if (target && target.closest && target.closest('[data-vmz-shell="sidebar"]')) return;
+            this.menuOpen = false;
+        };
+        document.addEventListener("click", this._onDocumentClick);
+    }
+    onDestroy() {
+        if (this._onDocumentClick) document.removeEventListener("click", this._onDocumentClick);
+        this._onDocumentClick = null;
+    }
     toggleMenu() {
         this.menuOpen = !this.menuOpen;
     }
