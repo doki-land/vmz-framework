@@ -23,6 +23,22 @@ export default defineConfig({
 });
 ```
 
+Official plugins are factories: `pluginName(optional config)`. Register `katex()`, not `katex`.
+
+Sites with `documents/` also need a Markdown engine. Install the package, register the plugin, and select the engine:
+
+```ts
+import {defineConfig} from 'vmz';
+import markdownIt from '@vmz/plugin-markdown-it';
+
+export default defineConfig({
+    plugins: [markdownIt()],
+    engines: {markdown: 'markdown-it'},
+});
+```
+
+Installing the package or registering the plugin alone fails when `vmz dev` mounts documents.
+
 - [Zero-Cost](./zero-cost.md)
 - [Optimizations](./optimizations/index.md)
 - [Deploy](./deploy/index.md)

@@ -22,6 +22,22 @@ export default defineConfig({
 });
 ```
 
+官方插件统一是工厂：`pluginName(optional config)`，注册时写 `katex()` 而不是 `katex`。
+
+带 `documents/` 的站点还需要 Markdown 引擎，包、插件、引擎三项都要配：
+
+```ts
+import {defineConfig} from 'vmz';
+import markdownIt from '@vmz/plugin-markdown-it';
+
+export default defineConfig({
+    plugins: [markdownIt()],
+    engines: {markdown: 'markdown-it'},
+});
+```
+
+只装包或只注册插件都会在 `vmz dev` 挂载文档时失败。
+
 - [Zero-Cost](./zero-cost.md)
 - [优化](./optimizations/index.md)
 - [部署](./deploy/index.md)
