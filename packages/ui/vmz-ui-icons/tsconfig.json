@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "declaration": true,
+        "outDir": "dist",
+        "rootDir": "src",
+        "rewriteRelativeImportExtensions": true,
+        "strict": false,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true
+    },
+    "include": ["src/icon-types.ts", "src/icons-stroke.ts", "src/icons-text-badge.ts", "src/registry.ts"]
+}

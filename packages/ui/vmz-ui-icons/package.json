@@ -12,13 +12,23 @@
     "exports": {
         "./contracts/token-requirements": "./contracts/token-requirements.v0.json",
         "./Icon": "./src/Icon.vmz",
-        "./registry": "./src/registry.ts"
+        "./registry": {
+            "types": "./dist/registry.d.ts",
+            "default": "./dist/registry.js"
+        }
     },
     "files": [
         "src",
+        "dist",
         "contracts",
         "README.md"
     ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json"
+    },
+    "devDependencies": {
+        "typescript": "^5.8.3"
+    },
     "peerDependencies": {
         "@vmz/ui": "workspace:*"
     },
