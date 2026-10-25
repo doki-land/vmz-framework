@@ -50,6 +50,14 @@ const manifestPath = path.join(outDir, 'document.manifest.json');
 if (!fs.existsSync(manifestPath)) fail('missing document.manifest.json');
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 if (!manifest.build?.designsCss) fail('expected designs CSS in build manifest');
+
+const linkDiags = (manifest.diagnostics || []).filter((d) => d.code === 'document::link::broken');
+if (linkDiags.some((d) => d.severity === 'error')) {
+    fail(`app-route link must not be a document error: ${JSON.stringify(linkDiags)}`);
+}
+if (!linkDiags.some((d) => d.severity === 'warning' && String(d.message).includes('/wire'))) {
+    fail(`expected a warning for the app-route link /wire: ${JSON.stringify(linkDiags)}`);
+}
 const cssPath = path.join(outDir, manifest.build.designsCss);
 if (!fs.existsSync(cssPath)) fail(`missing designs css at ${cssPath}`);
 

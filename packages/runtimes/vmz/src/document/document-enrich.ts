@@ -180,7 +180,7 @@ export function enrichDocumentContent(manifest: DocumentManifest, ctx: EnrichDoc
             if (resolved.ok === false) {
                 diagnostics.push({
                     code: DIAG.LINK_BROKEN,
-                    severity: 'error',
+                    severity: resolved.severity ?? 'error',
                     message: `broken link ${JSON.stringify(href)}: ${resolved.reason}`,
                     path: page.sourcePath,
                 });
@@ -212,6 +212,11 @@ interface ResolveDocHrefOk {
 interface ResolveDocHrefErr {
     ok: false;
     reason: string;
+    /**
+     * Absolute links outside the document mount belong to the application page graph.
+     * Document tooling cannot validate them, so they warn instead of failing the build.
+     */
+    severity?: 'warning';
 }
 
 function resolveDocHref(
@@ -246,6 +251,14 @@ function resolveDocHref(
         const stripped = want.replace(new RegExp(`^${escapeRe(routeBase.replace(/\/$/, ''))}/${escapeRe(locale)}/?`), '');
         const pk = stripped === '' ? 'index' : stripped;
         if (keys.has(pk)) return { ok: true, locale, pageKey: pk, anchor, anchors: [] };
+        const docBase = routeBase === '/' ? '' : routeBase.replace(/\/$/, '');
+        if (docBase !== '' && !want.startsWith(`${docBase}/`) && want !== docBase) {
+            return {
+                ok: false,
+                reason: 'not a document route (application routes are not validated here)',
+                severity: 'warning',
+            };
+        }
         return { ok: false, reason: 'unknown route' };
     }
     // Relative to current page directory
