@@ -300,8 +300,8 @@
 
     .vmz-ui-console-shell__menu {
         display: inline-flex;
-        width: var(--vmz-control-height-mobile);
-        min-height: var(--vmz-control-height-mobile);
+        width: calc(var(--vmz-control-height) * 1.5);
+        min-height: calc(var(--vmz-control-height) * 1.5);
     }
 
     .vmz-ui-console-shell__nav {
@@ -327,7 +327,7 @@
     }
 
     .vmz-ui-console-shell__nav a {
-        min-height: var(--vmz-control-height-mobile);
+        min-height: calc(var(--vmz-control-height) * 1.5);
         white-space: normal;
     }
 
@@ -336,14 +336,14 @@
         grid-template-columns: auto minmax(0, 1fr) auto;
         align-items: center;
         gap: var(--vmz-space-2, 0.5rem);
-        min-height: var(--vmz-control-height-mobile);
+        min-height: calc(var(--vmz-control-height) * 1.5);
         padding: var(--vmz-space-3, 0.75rem) var(--vmz-space-4, 1rem);
     }
 
     .vmz-ui-console-shell__back {
         display: inline-flex;
         grid-column: 1;
-        min-height: var(--vmz-control-height-mobile);
+        min-height: calc(var(--vmz-control-height) * 1.5);
     }
 
     .vmz-ui-console-shell__header-copy {
@@ -367,7 +367,7 @@
     .vmz-ui-console-shell__action {
         grid-column: 3;
         justify-self: end;
-        min-height: var(--vmz-control-height-mobile);
+        min-height: calc(var(--vmz-control-height) * 1.5);
     }
 
     .vmz-ui-console-shell__main {
