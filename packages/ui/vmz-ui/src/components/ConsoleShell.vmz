@@ -100,9 +100,9 @@
 .vmz-ui-console-shell__brand {
     padding: var(--vmz-space-1, 0.25rem) var(--vmz-space-3, 0.75rem);
     color: var(--vmz-text-ink);
-    font-size: 1rem;
-    font-weight: 600;
-    line-height: 1.5rem;
+    font-size: var(--vmz-type-body);
+    font-weight: var(--vmz-type-weight-semibold);
+    line-height: var(--vmz-type-line-height-body);
     letter-spacing: 0;
     text-decoration: none;
     outline: none;
@@ -127,13 +127,13 @@
 .vmz-ui-console-shell__nav a {
     display: flex;
     align-items: center;
-    min-height: 2.25rem;
+    min-height: calc(var(--vmz-control-height) * 1.125);
     padding: 0 var(--vmz-space-3, 0.75rem);
     border-radius: var(--vmz-radius-md, 6px);
     color: var(--vmz-text-steel);
-    font-size: 0.875rem;
-    font-weight: 500;
-    line-height: 1.25rem;
+    font-size: var(--vmz-type-code);
+    font-weight: var(--vmz-type-weight-medium);
+    line-height: var(--vmz-type-line-height-caption);
     text-decoration: none;
     outline: none;
     transition:
@@ -149,7 +149,7 @@
 .vmz-ui-console-shell__nav a[data-active="true"] {
     color: var(--vmz-action-primary-background);
     background: var(--vmz-action-primary-soft);
-    font-weight: 600;
+    font-weight: var(--vmz-type-weight-semibold);
     box-shadow: inset 2px 0 0 var(--vmz-action-primary-background);
 }
 
@@ -204,30 +204,30 @@
 
 .vmz-ui-console-shell__header-copy {
     display: grid;
-    gap: 0.125rem;
+    gap: var(--vmz-space-1, 0.25rem);
     min-width: 0;
 }
 
 .vmz-ui-console-shell__breadcrumb {
     margin: 0;
     color: var(--vmz-text-tertiary);
-    font-size: 0.75rem;
-    line-height: 1.125rem;
+    font-size: var(--vmz-type-caption);
+    line-height: var(--vmz-type-line-height-caption);
 }
 
 .vmz-ui-console-shell__title {
     margin: 0;
     color: var(--vmz-text-ink);
-    font-size: 1.25rem;
-    line-height: 1.75rem;
-    font-weight: 600;
+    font-size: var(--vmz-type-subtitle);
+    line-height: var(--vmz-type-line-height-title);
+    font-weight: var(--vmz-type-weight-semibold);
 }
 
 .vmz-ui-console-shell__subtitle {
     margin: 0;
     color: var(--vmz-text-steel);
-    font-size: 0.8125rem;
-    line-height: 1.25rem;
+    font-size: var(--vmz-type-caption);
+    line-height: var(--vmz-type-line-height-caption);
 }
 
 .vmz-ui-console-shell__action {
@@ -235,13 +235,13 @@
     align-items: center;
     justify-content: center;
     flex: none;
-    min-height: 2rem;
+    min-height: var(--vmz-control-height);
     padding: 0 var(--vmz-space-3, 0.75rem);
     border-radius: var(--vmz-radius-md, 6px);
     background: var(--vmz-action-primary-background);
     color: var(--vmz-action-primary-foreground);
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: var(--vmz-type-code);
+    font-weight: var(--vmz-type-weight-medium);
     text-decoration: none;
     white-space: nowrap;
     outline: none;
@@ -278,7 +278,7 @@
     padding: var(--vmz-space-4, 1rem) var(--vmz-space-5, 1.5rem);
     border-top: 1px solid var(--vmz-line-subtle);
     color: var(--vmz-text-tertiary);
-    font-size: 0.8125rem;
+    font-size: var(--vmz-type-caption);
     background: var(--vmz-surface-paper);
 }
 
@@ -299,8 +299,8 @@
 
     .vmz-ui-console-shell__menu {
         display: inline-flex;
-        width: calc(var(--vmz-control-height, 2rem) * 1.5);
-        min-height: calc(var(--vmz-control-height, 2rem) * 1.5);
+        width: var(--vmz-control-height-mobile);
+        min-height: var(--vmz-control-height-mobile);
     }
 
     .vmz-ui-console-shell__nav {
@@ -315,7 +315,7 @@
     }
 
     .vmz-ui-console-shell__nav a {
-        min-height: calc(var(--vmz-control-height, 2rem) * 1.5);
+        min-height: var(--vmz-control-height-mobile);
         white-space: normal;
     }
 
@@ -324,14 +324,14 @@
         grid-template-columns: auto minmax(0, 1fr) auto;
         align-items: center;
         gap: var(--vmz-space-2, 0.5rem);
-        min-height: calc(var(--vmz-control-height, 2rem) * 1.5);
+        min-height: var(--vmz-control-height-mobile);
         padding: var(--vmz-space-3, 0.75rem) var(--vmz-space-4, 1rem);
     }
 
     .vmz-ui-console-shell__back {
         display: inline-flex;
         grid-column: 1;
-        min-height: calc(var(--vmz-control-height, 2rem) * 1.5);
+        min-height: var(--vmz-control-height-mobile);
     }
 
     .vmz-ui-console-shell__header-copy {
@@ -355,7 +355,7 @@
     .vmz-ui-console-shell__action {
         grid-column: 3;
         justify-self: end;
-        min-height: calc(var(--vmz-control-height, 2rem) * 1.5);
+        min-height: var(--vmz-control-height-mobile);
     }
 
     .vmz-ui-console-shell__main {
