@@ -36,17 +36,26 @@ export function assertIntegratedDistReady(distDir: string): string {
 export function assertCompiledShellHtml(html: string): void {
     const header = html.match(/<header[^>]*data-vmz-fixture="site-header"[\s\S]*?<\/header>/i)?.[0] ?? '';
     const footer = html.match(/<footer[^>]*data-vmz-fixture="site-footer"[\s\S]*?<\/footer>/i)?.[0] ?? '';
-    for (const part of [header, footer]) {
-        const leak = part.match(/\{[A-Za-z][A-Za-z0-9]*\}/);
+    const parts = [
+        { label: 'header', tag: 'header', fixture: 'site-header', html: header },
+        { label: 'footer', tag: 'footer', fixture: 'site-footer', html: footer },
+    ];
+    for (const part of parts) {
+        if (!part.html) {
+            throw new Error(
+                `document layout SSR missing compiled <${part.tag} data-vmz-fixture="${part.fixture}"> in chrome`,
+            );
+        }
+        const leak = part.html.match(/\{[A-Za-z][A-Za-z0-9]*\}/);
         if (leak) {
-            throw new Error(`document layout SSR leaked binding placeholder ${leak[0]}`);
+            throw new Error(`document layout SSR leaked binding placeholder ${leak[0]} in ${part.label}`);
         }
-        if (/<(?:Link|Button|Icon)\b/.test(part)) {
-            throw new Error('document layout SSR leaked uncompiled VMZ component tag in chrome');
+        const leakedTag = part.html.match(/<(Link|Button|Icon)\b/)?.[1];
+        if (leakedTag) {
+            throw new Error(
+                `document layout SSR leaked uncompiled <${leakedTag}> in ${part.label} (compile it or use plain HTML)`,
+            );
         }
-    }
-    if (!header || !footer) {
-        throw new Error('document layout SSR missing compiled SiteHeader/SiteFooter fixtures');
     }
 }
 
