@@ -67,6 +67,7 @@ impl EditorSettings {
             indent_width: self.indent_width,
             line_width: self.line_width.map(usize::from).unwrap_or(144),
             type_erasure: false,
+            quote_style: oak_typescript::formatter::QuoteStyle::Preserve,
         }
     }
 }

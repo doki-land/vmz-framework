@@ -1,10 +1,15 @@
 use std::path::Path;
 
-use oak_typescript::formatter::FormatOptions;
+use oak_typescript::formatter::{FormatOptions, QuoteStyle};
 
 /// Default style aligned with the VMZ workspace contract.
 pub fn default_format_options() -> FormatOptions {
-    FormatOptions { indent_width: 4, line_width: 144, type_erasure: false }
+    FormatOptions {
+        indent_width: 4,
+        line_width: 144,
+        type_erasure: false,
+        quote_style: QuoteStyle::Preserve,
+    }
 }
 
 pub fn load_format_options(
@@ -42,5 +47,10 @@ pub fn load_format_options(
         .and_then(|v| v.as_u64())
         .and_then(|v| usize::try_from(v).ok())
         .unwrap_or(144);
-    Ok(FormatOptions { indent_width, line_width, type_erasure: false })
+    Ok(FormatOptions {
+        indent_width,
+        line_width,
+        type_erasure: false,
+        quote_style: QuoteStyle::Preserve,
+    })
 }
