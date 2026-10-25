@@ -1,18 +1,22 @@
 <template>
     <div data-vmz-ui="menu" :data-vmz-overlay-open="open" class="vmz-ui-menu">
         <button type="button" data-vmz-menu="trigger" aria-haspopup="menu" :aria-expanded="open ? 'true' : 'false'" :aria-controls="menuId" @click="toggle" :onKeyDown="onTriggerKeyDown" class="vmz-ui-menu__trigger">
-            <span class="vmz-ui-menu__trigger-label">{{ label }}</span>
+            <span class="vmz-ui-menu__trigger-label">
+                {{ label }}
+            </span>
             <Icon name="action.chevron-down" size="sm" decorative />
         </button>
         <div v-if="open" :id="menuId" role="menu" data-vmz-overlay="menu" data-vmz-overlay-owner="menu" data-vmz-focus="enter" tabindex="-1" :onKeyDown="onMenuKeyDown" class="vmz-ui-menu__panel">
             <div v-for="item in items" :key="item.id" :data-kind="item.kind || 'item'" :data-vmz-menu-row="item.id" class="vmz-ui-menu__row">
                 <div v-if="item.kind === 'divider'" role="separator" class="vmz-ui-menu__divider" />
-                <div v-else-if="item.kind === 'group'" class="vmz-ui-menu__group" role="presentation">
+                <div v-else-if="item.kind === 'group'" role="presentation" class="vmz-ui-menu__group">
                     {{ item.title }}
                 </div>
                 <div v-else-if="item.children && item.children.length" :data-open="subOpen(item.id) ? 'true' : 'false'" :data-danger="item.danger ? 'true' : 'false'" class="vmz-ui-menu__submenu">
                     <button type="button" role="menuitem" aria-haspopup="menu" :aria-expanded="subOpen(item.id) ? 'true' : 'false'" :disabled="item.disabled" @click="toggleSub(item.id)" class="vmz-ui-menu__item vmz-ui-menu__item--sub">
-                        <span class="vmz-ui-menu__label">{{ item.title }}</span>
+                        <span class="vmz-ui-menu__label">
+                            {{ item.title }}
+                        </span>
                         <Icon name="action.chevron-right" size="sm" decorative />
                     </button>
                     <div v-if="subOpen(item.id)" role="menu" class="vmz-ui-menu__subpanel">

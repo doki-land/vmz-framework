@@ -3,7 +3,9 @@
         <div v-for="item in items" :key="item.id" :data-vmz-accordion="item.id" class="vmz-ui-accordion__item">
             <h3 class="vmz-ui-accordion__heading">
                 <button type="button" :id="item.triggerId" :data-vmz-accordion-trigger="item.id" :aria-expanded="openId === item.id ? 'true' : 'false'" :aria-controls="item.panelId" @click="toggle(item.id)" class="vmz-ui-accordion__trigger">
-                    <span class="vmz-ui-accordion__title">{{ item.title }}</span>
+                    <span class="vmz-ui-accordion__title">
+                        {{ item.title }}
+                    </span>
                     <Icon name="action.chevron-down" size="sm" decorative />
                 </button>
             </h3>

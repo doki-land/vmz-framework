@@ -1,18 +1,18 @@
 <template>
-    <header data-vmz-ui="header" :data-structured="hasNav() ? 'true' : 'false'" class="vmz-ui-header" :onKeyDown="onMenuKeyDown">
+    <header data-vmz-ui="header" :data-structured="hasNav() ? 'true' : 'false'" :onKeyDown="onMenuKeyDown" class="vmz-ui-header">
         <div v-if="hasNav()" class="vmz-ui-header__inner">
             <a v-if="brand" :href="homeHref" class="vmz-ui-header__brand">
                 {{ brand }}
             </a>
             <nav :id="navId" :aria-label="navLabel" :data-open="menuOpen ? 'true' : null" class="vmz-ui-header__nav">
-                <a v-for="item in nav" :key="item.id" :href="item.href" :data-vmz-nav="item.id" :data-active="item.id === activeId ? 'true' : 'false'" :aria-current="item.id === activeId ? 'page' : null" class="vmz-ui-header__nav-item" @click="closeMenu">
+                <a v-for="item in nav" :key="item.id" :href="item.href" :data-vmz-nav="item.id" :data-active="item.id === activeId ? 'true' : 'false'" :aria-current="item.id === activeId ? 'page' : null" @click="closeMenu" class="vmz-ui-header__nav-item">
                     {{ item.title }}
                 </a>
             </nav>
             <div class="vmz-ui-header__actions">
                 <slot name="actions" />
             </div>
-            <button type="button" class="vmz-ui-header__menu" :aria-label="menuLabel ? menuLabel : navLabel" :aria-expanded="menuOpen ? 'true' : 'false'" :aria-controls="navId" @click="toggleMenu">
+            <button type="button" :aria-label="menuLabel ? menuLabel : navLabel" :aria-expanded="menuOpen ? 'true' : 'false'" :aria-controls="navId" @click="toggleMenu" class="vmz-ui-header__menu">
                 <Icon :name="menuOpen ? 'action.close' : 'action.menu'" size="md" decorative />
             </button>
         </div>

@@ -37,7 +37,11 @@
                         <span class="welcome__start-label">
                             {{ installLabel }}
                         </span>
-                        <pre><code>pnpm add @vmz/ui</code></pre>
+                        <pre>
+                            <code>
+                                pnpm add @vmz/ui
+                            </code>
+                        </pre>
                     </div>
                     <p class="welcome__start-note">
                         {{ installNote }}
@@ -46,7 +50,11 @@
                         <span class="welcome__start-label">
                             {{ exampleLabel }}
                         </span>
-                        <pre><code>{{ exampleCode }}</code></pre>
+                        <pre>
+                            <code>
+                                {{ exampleCode }}
+                            </code>
+                        </pre>
                     </div>
                     <nav :aria-label="docsLabel" class="welcome__docs">
                         <a :href="guideHref">
@@ -109,41 +117,192 @@
     </SiteShell>
 </template>
 <style>
-.welcome { display: grid; grid-template-rows: 1fr auto; min-height: 100vh; padding: 0 max(1.5rem, calc((100% - var(--vmz-layout-max-width)) / 2)); overflow: hidden; color: var(--vmz-text-ink); background: var(--vmz-surface-page); }
-.welcome__main { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: clamp(2rem, 5vw, 4.5rem); align-content: center; align-items: center; padding: 4rem 0; }
-.welcome__intro { display: grid; align-content: center; justify-items: start; }
-.welcome__main .kicker { margin-bottom: 1.6rem; }
-.welcome h1 { margin: 0; max-width: 16ch; font: 600 clamp(2.75rem, 4.6vw, 4.5rem)/1.1 var(--vmz-font-display); letter-spacing: -0.01em; }
-.welcome h1 em { color: var(--vmz-action-primary-background); font-style: normal; }
-.welcome__lede { max-width: 46rem; margin: 1.7rem 0 0; color: var(--vmz-text-steel); font-size: 1.12rem; line-height: 1.75; }
-.welcome__actions { display: flex; gap: .75rem; margin-top: 2.2rem; }
-.welcome__actions a { display: inline-flex; align-items: center; justify-content: center; min-height: 2.9rem; padding: .75rem 1.15rem; border-radius: var(--vmz-radius-md); text-decoration: none; font-size: .92rem; font-weight: 600; }
-.welcome__primary { color: var(--vmz-action-primary-foreground); background: var(--vmz-action-primary-background); box-shadow: 0 6px 16px color-mix(in srgb, var(--vmz-action-primary-background) 24%, transparent); }
-.welcome__primary:hover { color: var(--vmz-surface-paper); background: var(--vmz-action-primary-hover); }
-.welcome__secondary { color: var(--vmz-text-ink); background: var(--vmz-surface-paper); border: 1px solid var(--vmz-line-default); }
-.welcome__secondary:hover { color: var(--vmz-action-primary-background); border-color: var(--vmz-action-primary-hover); }
-.welcome__start { display: grid; align-content: start; gap: .85rem; min-width: 0; padding: 1.5rem; border: 1px solid var(--vmz-line-default); border-radius: var(--vmz-radius-lg); background: var(--vmz-surface-paper); box-shadow: var(--vmz-elevation-2); }
-.welcome__start h2 { margin: 0; font: 600 1.05rem var(--vmz-font-display); }
-.welcome__start-block { display: grid; gap: .4rem; min-width: 0; }
-.welcome__start-label { color: var(--vmz-text-steel); font-size: .74rem; letter-spacing: .04em; text-transform: uppercase; }
-.welcome__start pre { margin: 0; padding: .8rem .9rem; overflow-x: auto; border: 1px solid var(--vmz-line-subtle); border-radius: var(--vmz-radius-md); background: var(--vmz-surface-code); }
-.welcome__start code { color: var(--vmz-text-on-brand); font: .82rem/1.55 var(--vmz-font-mono); white-space: pre; }
-.welcome__start-note { margin: 0; color: var(--vmz-text-steel); font-size: .86rem; line-height: 1.6; }
-.welcome__docs { display: grid; gap: .3rem; padding-top: .8rem; border-top: 1px solid var(--vmz-line-subtle); }
-.welcome__docs a { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .5rem .6rem; border-radius: var(--vmz-radius-sm); color: var(--vmz-text-ink); font-size: .88rem; text-decoration: none; }
-.welcome__docs a:hover { color: var(--vmz-action-primary-background); background: var(--vmz-surface-mist); }
-.welcome__rail { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--vmz-line-subtle); }
-.welcome__rail > div { display: grid; align-content: start; grid-template-columns: auto 1fr; gap: .25rem .8rem; padding: 1.4rem 1.4rem 1.5rem 0; }
-.welcome__rail > div + div { padding-left: 1.4rem; border-left: 1px solid var(--vmz-line-subtle); }
-.welcome__rail span { grid-row: 1 / 3; color: var(--vmz-action-primary-background); font: .7rem var(--vmz-font-mono); }
-.welcome__rail strong { font: 600 .95rem var(--vmz-font-display); }
-.welcome__rail small { color: var(--vmz-text-steel); font-size: .9rem; line-height: 1.55; }
+.welcome {
+    display: grid;
+    grid-template-rows: 1fr auto;
+    min-height: 100vh;
+    padding: 0 max(1.5rem, calc((100% - var(--vmz-layout-max-width)) / 2));
+    overflow: hidden;
+    color: var(--vmz-text-ink);
+    background: var(--vmz-surface-page);
+}
+.welcome__main {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
+    gap: clamp(2rem, 5vw, 4.5rem);
+    align-content: center;
+    align-items: center;
+    padding: 4rem 0;
+}
+.welcome__intro {
+    display: grid;
+    align-content: center;
+    justify-items: start;
+}
+.welcome__main .kicker {
+    margin-bottom: 1.6rem;
+}
+.welcome h1 {
+    margin: 0;
+    max-width: 16ch;
+    font: 600 clamp(2.75rem, 4.6vw, 4.5rem)/1.1 var(--vmz-font-display);
+    letter-spacing: -0.01em;
+}
+.welcome h1 em {
+    color: var(--vmz-action-primary-background);
+    font-style: normal;
+}
+.welcome__lede {
+    max-width: 46rem;
+    margin: 1.7rem 0 0;
+    color: var(--vmz-text-steel);
+    font-size: 1.12rem;
+    line-height: 1.75;
+}
+.welcome__actions {
+    display: flex;
+    gap: .75rem;
+    margin-top: 2.2rem;
+}
+.welcome__actions a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.9rem;
+    padding: .75rem 1.15rem;
+    border-radius: var(--vmz-radius-md);
+    text-decoration: none;
+    font-size: .92rem;
+    font-weight: 600;
+}
+.welcome__primary {
+    color: var(--vmz-action-primary-foreground);
+    background: var(--vmz-action-primary-background);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--vmz-action-primary-background) 24%, transparent);
+}
+.welcome__primary:hover {
+    color: var(--vmz-surface-paper);
+    background: var(--vmz-action-primary-hover);
+}
+.welcome__secondary {
+    color: var(--vmz-text-ink);
+    background: var(--vmz-surface-paper);
+    border: 1px solid var(--vmz-line-default);
+}
+.welcome__secondary:hover {
+    color: var(--vmz-action-primary-background);
+    border-color: var(--vmz-action-primary-hover);
+}
+.welcome__start {
+    display: grid;
+    align-content: start;
+    gap: .85rem;
+    min-width: 0;
+    padding: 1.5rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+    box-shadow: var(--vmz-elevation-2);
+}
+.welcome__start h2 {
+    margin: 0;
+    font: 600 1.05rem var(--vmz-font-display);
+}
+.welcome__start-block {
+    display: grid;
+    gap: .4rem;
+    min-width: 0;
+}
+.welcome__start-label {
+    color: var(--vmz-text-steel);
+    font-size: .74rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+.welcome__start pre {
+    margin: 0;
+    padding: .8rem .9rem;
+    overflow-x: auto;
+    border: 1px solid var(--vmz-line-subtle);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-code);
+}
+.welcome__start code {
+    color: var(--vmz-text-on-brand);
+    font: .82rem/1.55 var(--vmz-font-mono);
+    white-space: pre;
+}
+.welcome__start-note {
+    margin: 0;
+    color: var(--vmz-text-steel);
+    font-size: .86rem;
+    line-height: 1.6;
+}
+.welcome__docs {
+    display: grid;
+    gap: .3rem;
+    padding-top: .8rem;
+    border-top: 1px solid var(--vmz-line-subtle);
+}
+.welcome__docs a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .5rem .6rem;
+    border-radius: var(--vmz-radius-sm);
+    color: var(--vmz-text-ink);
+    font-size: .88rem;
+    text-decoration: none;
+}
+.welcome__docs a:hover {
+    color: var(--vmz-action-primary-background);
+    background: var(--vmz-surface-mist);
+}
+.welcome__rail {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-top: 1px solid var(--vmz-line-subtle);
+}
+.welcome__rail > div {
+    display: grid;
+    align-content: start;
+    grid-template-columns: auto 1fr;
+    gap: .25rem .8rem;
+    padding: 1.4rem 1.4rem 1.5rem 0;
+}
+.welcome__rail > div + div {
+    padding-left: 1.4rem;
+    border-left: 1px solid var(--vmz-line-subtle);
+}
+.welcome__rail span {
+    grid-row: 1 / 3;
+    color: var(--vmz-action-primary-background);
+    font: .7rem var(--vmz-font-mono);
+}
+.welcome__rail strong {
+    font: 600 .95rem var(--vmz-font-display);
+}
+.welcome__rail small {
+    color: var(--vmz-text-steel);
+    font-size: .9rem;
+    line-height: 1.55;
+}
 @media (max-width: 1023px) {
-  .welcome__main { grid-template-columns: minmax(0, 1fr); gap: 2.5rem; }
+    .welcome__main {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 2.5rem;
+    }
 }
 @media (max-width: 900px) {
-  .welcome__rail { grid-template-columns: 1fr; }
-  .welcome__rail > div + div { padding-left: 0; border-left: 0; border-top: 1px solid var(--vmz-line-subtle); }
+    .welcome__rail {
+        grid-template-columns: 1fr;
+    }
+    .welcome__rail > div + div {
+        padding-left: 0;
+        border-left: 0;
+        border-top: 1px solid var(--vmz-line-subtle);
+    }
 }
 </style>
 <script client>

@@ -1,15 +1,15 @@
 <template>
-    <div data-vmz-ui="console-shell" class="vmz-ui-console-shell" :onKeyDown="onShellKeyDown">
+    <div data-vmz-ui="console-shell" :onKeyDown="onShellKeyDown" class="vmz-ui-console-shell">
         <aside data-vmz-shell="sidebar" :aria-label="navLabel" class="vmz-ui-console-shell__sidebar">
             <div class="vmz-ui-console-shell__sidebar-top">
                 <a v-if="brand" :href="homeHref" class="vmz-ui-console-shell__brand">
                     {{ brand }}
                 </a>
-                <button v-if="nav.length" type="button" class="vmz-ui-console-shell__menu" :aria-label="menuLabel || navLabel" :aria-expanded="menuOpen ? 'true' : 'false'" aria-controls="vmz-console-shell-nav" @click="toggleMenu">
+                <button v-if="nav.length" type="button" :aria-label="menuLabel || navLabel" :aria-expanded="menuOpen ? 'true' : 'false'" aria-controls="vmz-console-shell-nav" @click="toggleMenu" class="vmz-ui-console-shell__menu">
                     <Icon :name="menuOpen ? 'action.close' : 'action.menu'" size="md" decorative />
                 </button>
             </div>
-            <nav id="vmz-console-shell-nav" class="vmz-ui-console-shell__nav" :data-open="menuOpen ? 'true' : null">
+            <nav id="vmz-console-shell-nav" :data-open="menuOpen ? 'true' : null" class="vmz-ui-console-shell__nav">
                 <a v-for="item in nav" :key="item.id" :href="item.href" :data-vmz-nav="item.id" :data-active="item.id === activeNavId ? 'true' : null" :aria-current="item.id === activeNavId ? 'page' : null">
                     {{ item.title }}
                 </a>

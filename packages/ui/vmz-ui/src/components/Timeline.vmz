@@ -1,7 +1,7 @@
 <template>
     <ol data-vmz-ui="timeline" :aria-label="label" class="vmz-ui-timeline">
         <li v-for="item in items" :key="item.id" :data-vmz-audit="item.id" class="vmz-ui-timeline__item">
-            <span class="vmz-ui-timeline__marker" aria-hidden="true" />
+            <span aria-hidden="true" class="vmz-ui-timeline__marker" />
             <div class="vmz-ui-timeline__content">
                 <p class="vmz-ui-timeline__time">
                     {{ item.time }}

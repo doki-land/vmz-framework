@@ -1,19 +1,19 @@
 <template>
     <div data-vmz-ui="app-shell" class="vmz-ui-app-shell">
-        <header data-vmz-shell="header" class="vmz-ui-app-shell__header" :onKeyDown="onHeaderKeyDown">
+        <header data-vmz-shell="header" :onKeyDown="onHeaderKeyDown" class="vmz-ui-app-shell__header">
             <div class="vmz-ui-app-shell__header-inner">
                 <a v-if="brand" :href="homeHref" class="vmz-ui-app-shell__brand">
                     {{ brand }}
                 </a>
                 <nav :id="navId" :aria-label="navLabel" :data-open="menuOpen ? 'true' : null" class="vmz-ui-app-shell__nav">
-                    <a v-for="item in nav" :key="item.id" :href="item.href" :data-vmz-nav="item.id" :data-active="item.id === activeId ? 'true' : 'false'" :aria-current="item.id === activeId ? 'page' : null" class="vmz-ui-app-shell__nav-item" @click="closeMenu">
+                    <a v-for="item in nav" :key="item.id" :href="item.href" :data-vmz-nav="item.id" :data-active="item.id === activeId ? 'true' : 'false'" :aria-current="item.id === activeId ? 'page' : null" @click="closeMenu" class="vmz-ui-app-shell__nav-item">
                         {{ item.title }}
                     </a>
                 </nav>
                 <div class="vmz-ui-app-shell__actions">
                     <slot name="actions" />
                 </div>
-                <button type="button" class="vmz-ui-app-shell__menu" :aria-label="menuLabel ? menuLabel : navLabel" :aria-expanded="menuOpen ? 'true' : 'false'" :aria-controls="navId" @click="toggleMenu">
+                <button type="button" :aria-label="menuLabel ? menuLabel : navLabel" :aria-expanded="menuOpen ? 'true' : 'false'" :aria-controls="navId" @click="toggleMenu" class="vmz-ui-app-shell__menu">
                     <Icon :name="menuOpen ? 'action.close' : 'action.menu'" size="md" decorative />
                 </button>
             </div>

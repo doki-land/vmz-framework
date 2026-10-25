@@ -508,7 +508,7 @@ let docsDetail = '';
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
     });
-    if (r.status !== 0) {
+    if(r.status !== 0) {
         // fallback: some fixtures use `vmz document build` without path as cwd
         const r2 = spawnSync(process.execPath, [vmzBin(root), 'document', 'build'], {
             cwd: docProject,
@@ -523,7 +523,7 @@ let docsDetail = '';
     } else {
         docsOk = true;
     }
-    if (docsOk) {
+    if(docsOk) {
         const enCandidates = [
             path.join(docProject, 'dist/documents/docs/en-us/index.html'),
             path.join(docProject, 'dist/documents/en-us/index.html'),

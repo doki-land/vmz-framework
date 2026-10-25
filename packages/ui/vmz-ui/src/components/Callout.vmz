@@ -1,6 +1,6 @@
 <template>
     <aside data-vmz-ui="callout" :data-tone="tone" :role="roleName" class="vmz-ui-callout">
-        <span class="vmz-ui-callout__icon" aria-hidden="true">
+        <span aria-hidden="true" class="vmz-ui-callout__icon">
             <Icon :name="toneIcon()" size="md" decorative />
         </span>
         <div class="vmz-ui-callout__content">
@@ -14,7 +14,7 @@
                 <slot />
             </div>
         </div>
-        <button v-if="closable" type="button" class="vmz-ui-callout__close" :aria-label="closeLabel" @click="dismiss">
+        <button v-if="closable" type="button" :aria-label="closeLabel" @click="dismiss" class="vmz-ui-callout__close">
             <Icon name="action.close" size="md" decorative />
         </button>
     </aside>

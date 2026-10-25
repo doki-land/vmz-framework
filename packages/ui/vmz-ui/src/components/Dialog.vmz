@@ -19,7 +19,9 @@
                 <div class="vmz-ui-dialog__body">
                     <slot />
                 </div>
-                <div class="vmz-ui-dialog__actions"><slot name="actions" /></div>
+                <div class="vmz-ui-dialog__actions">
+                    <slot name="actions" />
+                </div>
             </div>
         </div>
     </div>

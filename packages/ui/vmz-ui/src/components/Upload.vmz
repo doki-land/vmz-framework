@@ -41,11 +41,15 @@
         <div v-if="showActions" data-vmz-upload="actions" class="vmz-ui-upload__actions">
             <button v-if="canCancel" type="button" data-vmz-upload="cancel" :aria-label="cancelLabel" @click="onCancelClick" class="vmz-ui-upload__cancel">
                 <Icon name="action.close" size="sm" decorative />
-                <span v-if="cancelLabel">{{ cancelLabel }}</span>
+                <span v-if="cancelLabel">
+                    {{ cancelLabel }}
+                </span>
             </button>
             <button v-if="canResume" type="button" data-vmz-upload="resume" :aria-label="resumeLabel" @click="onResumeClick" class="vmz-ui-upload__resume">
                 <Icon name="action.chevron-right" size="sm" decorative />
-                <span v-if="resumeLabel">{{ resumeLabel }}</span>
+                <span v-if="resumeLabel">
+                    {{ resumeLabel }}
+                </span>
             </button>
         </div>
         <p v-if="description" :id="descriptionId" class="vmz-ui-upload__description">

@@ -23,7 +23,7 @@ describe('trusted html binding', () => {
                     this,
                     null,
                     ['markup'],
-                    function() {
+                    function () {
                         return this.markup;
                     },
                     e0,

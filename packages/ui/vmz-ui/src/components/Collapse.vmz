@@ -2,7 +2,9 @@
     <div data-vmz-ui="collapse" class="vmz-ui-collapse">
         <details v-for="item in items" :key="item.id" :data-vmz-collapse-item="item.id" class="vmz-ui-collapse__item">
             <summary :data-vmz-collapse-trigger="item.id" class="vmz-ui-collapse__trigger">
-                <span class="vmz-ui-collapse__title">{{ item.title }}</span>
+                <span class="vmz-ui-collapse__title">
+                    {{ item.title }}
+                </span>
                 <Icon name="action.chevron-down" size="sm" decorative />
             </summary>
             <div :data-vmz-collapse-body="item.id" class="vmz-ui-collapse__body">

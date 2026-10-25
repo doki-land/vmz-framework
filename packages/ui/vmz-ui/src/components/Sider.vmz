@@ -1,11 +1,11 @@
 <template>
-    <aside data-vmz-ui="sider" class="vmz-ui-sider" :onKeyDown="onKeyDown">
+    <aside data-vmz-ui="sider" :onKeyDown="onKeyDown" class="vmz-ui-sider">
         <div class="vmz-ui-sider__head">
-            <button type="button" class="vmz-ui-sider__toggle" :aria-label="label" :aria-expanded="open ? 'true' : 'false'" :aria-controls="bodyId" @click="toggle">
+            <button type="button" :aria-label="label" :aria-expanded="open ? 'true' : 'false'" :aria-controls="bodyId" @click="toggle" class="vmz-ui-sider__toggle">
                 <Icon :name="open ? 'action.close' : 'action.menu'" size="md" decorative />
             </button>
         </div>
-        <div :id="bodyId" class="vmz-ui-sider__body" :data-open="open ? 'true' : null">
+        <div :id="bodyId" :data-open="open ? 'true' : null" class="vmz-ui-sider__body">
             <slot />
         </div>
     </aside>

@@ -1,7 +1,9 @@
 <template>
     <details data-vmz-ui="dropdown" data-vmz-motion="overlay" data-vmz-motion-token="motion.overlay" class="vmz-ui-dropdown">
         <summary data-vmz-dropdown-trigger="1" class="vmz-ui-dropdown__trigger">
-            <span class="vmz-ui-dropdown__trigger-label">{{ label }}</span>
+            <span class="vmz-ui-dropdown__trigger-label">
+                {{ label }}
+            </span>
             <Icon name="action.chevron-down" size="sm" decorative />
         </summary>
         <div data-vmz-dropdown-menu="1" role="menu" class="vmz-ui-dropdown__menu">
@@ -12,7 +14,9 @@
                 </div>
                 <details v-else-if="item.children && item.children.length" class="vmz-ui-dropdown__sub">
                     <summary :data-danger="item.danger ? 'true' : 'false'" class="vmz-ui-dropdown__item vmz-ui-dropdown__item--sub">
-                        <span class="vmz-ui-dropdown__label">{{ item.title }}</span>
+                        <span class="vmz-ui-dropdown__label">
+                            {{ item.title }}
+                        </span>
                         <Icon name="action.chevron-right" size="sm" decorative />
                     </summary>
                     <div role="menu" class="vmz-ui-dropdown__subpanel">

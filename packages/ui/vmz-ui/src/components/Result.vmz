@@ -1,6 +1,6 @@
 <template>
     <section data-vmz-ui="result" :data-status="status" class="vmz-ui-result">
-        <span class="vmz-ui-result__icon" aria-hidden="true">
+        <span aria-hidden="true" class="vmz-ui-result__icon">
             <Icon :name="statusIcon()" size="lg" decorative />
         </span>
         <p v-if="title" class="vmz-ui-result__title">

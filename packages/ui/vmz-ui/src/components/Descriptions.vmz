@@ -4,7 +4,7 @@
             <dt class="vmz-ui-descriptions__term">
                 {{ item.term }}
             </dt>
-            <dd class="vmz-ui-descriptions__detail" :data-vmz-fixture="item.fixture || null">
+            <dd :data-vmz-fixture="item.fixture || null" class="vmz-ui-descriptions__detail">
                 {{ item.detail }}
             </dd>
         </div>

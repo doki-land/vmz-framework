@@ -20,7 +20,9 @@
                 <div class="vmz-ui-popover__body">
                     <slot />
                 </div>
-                <div class="vmz-ui-popover__actions"><slot name="actions" /></div>
+                <div class="vmz-ui-popover__actions">
+                    <slot name="actions" />
+                </div>
             </div>
         </div>
     </div>

@@ -3,7 +3,58 @@
         <ConsoleShell brand="VMZ" home-href="/" :title="pageTitle" :nav-label="navLabel" :nav="navItems">
             <div class="vmz-slot-content">
                 <Alert tone="info" role-name="status" :title="introTitle" :description="introDesc" />
-                <p data-vmz-fixture="datagrid-state" class="vmz-sr-only">mode:{{ viewMode }};total:{{ totalRows }};flat:{{ flatCount }};visible:{{ visibleCount }};window:{{ windowStart }}-{{ windowEnd }};selected:{{ selectedAttr || 'none' }};count:{{ selectedCount }};sort:{{ sortKey }}:{{ sortDir }};group:{{ groupBy }};groups:{{ groupCount }};expanded:{{ expandedAttr }};agg:{{ aggSample }};tree:{{ treeAttr }};depthMax:{{ depthMax }};treeExpanded:{{ treeExpandedAttr }};editing:{{ editingKey || 'none' }};draft:{{ editDraft || '-' }};scoreSample:{{ scoreSample }};pivot:{{ pivotAttr }};pivotRows:{{ pivotRowCount }};pivotCols:{{ pivotColsLabel }};pivotMeasure:{{ pivotMeasure }};pivotSample:{{ pivotSample }}</p>
+                <p data-vmz-fixture="datagrid-state" class="vmz-sr-only">
+                    mode:
+                    {{ viewMode }}
+                    ;total:
+                    {{ totalRows }}
+                    ;flat:
+                    {{ flatCount }}
+                    ;visible:
+                    {{ visibleCount }}
+                    ;window:
+                    {{ windowStart }}
+                    -
+                    {{ windowEnd }}
+                    ;selected:
+                    {{ selectedAttr || 'none' }}
+                    ;count:
+                    {{ selectedCount }}
+                    ;sort:
+                    {{ sortKey }}
+                    :
+                    {{ sortDir }}
+                    ;group:
+                    {{ groupBy }}
+                    ;groups:
+                    {{ groupCount }}
+                    ;expanded:
+                    {{ expandedAttr }}
+                    ;agg:
+                    {{ aggSample }}
+                    ;tree:
+                    {{ treeAttr }}
+                    ;depthMax:
+                    {{ depthMax }}
+                    ;treeExpanded:
+                    {{ treeExpandedAttr }}
+                    ;editing:
+                    {{ editingKey || 'none' }}
+                    ;draft:
+                    {{ editDraft || '-' }}
+                    ;scoreSample:
+                    {{ scoreSample }}
+                    ;pivot:
+                    {{ pivotAttr }}
+                    ;pivotRows:
+                    {{ pivotRowCount }}
+                    ;pivotCols:
+                    {{ pivotColsLabel }}
+                    ;pivotMeasure:
+                    {{ pivotMeasure }}
+                    ;pivotSample:
+                    {{ pivotSample }}
+                </p>
                 <div data-vmz-fixture="datagrid-modes">
                     <span data-vmz-fixture="mode-group">
                         <Button type="button" variant="secondary" @click='(() => setMode("group"))'>

@@ -11,7 +11,7 @@
                 {{ description }}
             </span>
         </span>
-        <button v-if="closable" type="button" class="vmz-ui-message__close" :aria-label="closeLabel || title" @click="dismiss">
+        <button v-if="closable" type="button" :aria-label="closeLabel || title" @click="dismiss" class="vmz-ui-message__close">
             <Icon name="action.close" size="sm" decorative />
         </button>
     </span>

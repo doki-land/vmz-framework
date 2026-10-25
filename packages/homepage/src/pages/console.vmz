@@ -49,7 +49,7 @@
                                     <Button type="button" variant="primary" @click="applyFilter">
                                         {{ consoleApplyLabel }}
                                     </Button>
-                                    <div id="home-console-filter-more" class="vmz-console-filter-more" :data-open="moreFiltersOpen ? 'true' : null">
+                                    <div id="home-console-filter-more" :data-open="moreFiltersOpen ? 'true' : null" class="vmz-console-filter-more">
                                         <Button type="button" variant="secondary" @click="resetFilter">
                                             {{ consoleResetLabel }}
                                         </Button>
@@ -115,7 +115,7 @@
                                             {{ row.cells[4] }}
                                         </span>
                                     </p>
-                                    <span class="vmz-console-task__action" :data-vmz-task-action="row.id">
+                                    <span :data-vmz-task-action="row.id" class="vmz-console-task__action">
                                         <Button type="button" variant="ghost" @click="openDetail(row.id)">
                                             {{ consoleActionLabel }}
                                         </Button>

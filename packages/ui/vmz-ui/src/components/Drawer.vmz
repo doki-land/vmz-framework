@@ -19,7 +19,9 @@
                 <div class="vmz-ui-drawer__body">
                     <slot />
                 </div>
-                <footer class="vmz-ui-drawer__footer"><slot name="footer" /></footer>
+                <footer class="vmz-ui-drawer__footer">
+                    <slot name="footer" />
+                </footer>
             </div>
         </div>
     </div>

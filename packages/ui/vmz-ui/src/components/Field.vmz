@@ -3,7 +3,7 @@
         <label v-if="label" :for="controlId" class="vmz-ui-field__label">
             {{ label }}
         </label>
-        <div class="vmz-ui-field__control-wrap" :data-prefix="prefix ? 'true' : 'false'" :data-suffix="suffix ? 'true' : 'false'">
+        <div :data-prefix="prefix ? 'true' : 'false'" :data-suffix="suffix ? 'true' : 'false'" class="vmz-ui-field__control-wrap">
             <Icon v-if="prefix" :name="prefix" size="md" decorative class="vmz-ui-field__icon vmz-ui-field__icon--prefix" />
             <input :id="controlId" :type="type" :value="value" :min="min" :max="max" :step="step" :placeholder="placeholder" :disabled="disabled" :readonly="readonly" :aria-invalid="error ? 'true' : 'false'" :aria-describedby="describedBy" @input="onDomInput" class="vmz-ui-field__control" />
             <Icon v-if="suffix" :name="suffix" size="md" decorative class="vmz-ui-field__icon vmz-ui-field__icon--suffix" />

@@ -1,6 +1,6 @@
 <template>
     <div data-vmz-ui="notification" :data-tone="tone" :role="roleName" class="vmz-ui-notification">
-        <span class="vmz-ui-notification__icon" aria-hidden="true">
+        <span aria-hidden="true" class="vmz-ui-notification__icon">
             <Icon :name="toneIcon()" size="md" decorative />
         </span>
         <div class="vmz-ui-notification__content">
@@ -14,7 +14,7 @@
                 <slot />
             </div>
         </div>
-        <button v-if="closable" type="button" class="vmz-ui-notification__close" :aria-label="closeLabel" @click="dismiss">
+        <button v-if="closable" type="button" :aria-label="closeLabel" @click="dismiss" class="vmz-ui-notification__close">
             <Icon name="action.close" size="md" decorative />
         </button>
     </div>

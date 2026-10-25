@@ -8,7 +8,7 @@
                 <span v-if="!item.href" aria-current="page" class="vmz-ui-breadcrumb__current">
                     {{ item.title }}
                 </span>
-                <span v-if="index < items.length - 1" class="vmz-ui-breadcrumb__sep" aria-hidden="true">
+                <span v-if="index < items.length - 1" aria-hidden="true" class="vmz-ui-breadcrumb__sep">
                     <Icon name="action.chevron-right" size="xs" decorative />
                 </span>
             </li>

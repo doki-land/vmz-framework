@@ -1,6 +1,6 @@
 <template>
     <div data-vmz-ui="empty" class="vmz-ui-empty">
-        <span class="vmz-ui-empty__illustration" aria-hidden="true">
+        <span aria-hidden="true" class="vmz-ui-empty__illustration">
             <Icon :name="icon" size="lg" decorative />
         </span>
         <h2 v-if="title" class="vmz-ui-empty__title">
