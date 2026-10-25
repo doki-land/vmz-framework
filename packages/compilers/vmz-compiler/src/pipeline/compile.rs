@@ -482,16 +482,13 @@ fn emit_stylesheets(
     let (input_hash, project_tw) = style_input_fingerprint(root, &designs);
     report.style_bundle_hash = Some(input_hash.clone());
 
-    let prev = read_prev_style_deployment(&options.out_dir);
-    let entry_exists =
-        options.out_dir.join(prev.css_entry.as_deref().unwrap_or("vmz.css")).is_file();
-    if let (Some(prev_hash), Some(_)) = (&prev.style_bundle_hash, &prev.css_entry) {
-        if prev_hash == &input_hash && entry_exists {
-            report.css_entry = prev.css_entry;
-            if report.style_theme.is_none() {
-                report.style_theme = prev.style_theme;
+    let prev = read_style_cache(root, &options.out_dir);
+    if prev.style_bundle_hash.as_deref() == Some(input_hash.as_str()) {
+        if let Some(entry) = prev.css_entry {
+            if options.out_dir.join(&entry).is_file() {
+                report.css_entry = Some(entry);
+                return Ok(());
             }
-            return Ok(());
         }
     }
 
@@ -561,28 +558,56 @@ fn emit_stylesheets(
         report.style_assets.push(path);
     }
     report.css_entry = emitted.css_entry;
+    write_style_cache(
+        root,
+        &options.out_dir,
+        &StyleIncrementalCache {
+            css_entry: report.css_entry.clone(),
+            style_bundle_hash: Some(input_hash),
+        },
+    );
     Ok(())
 }
 
-#[derive(Default)]
-struct PrevStyleDeployment {
+#[derive(Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StyleIncrementalCache {
     css_entry: Option<String>,
-    style_theme: Option<crate::designs::StyleThemeSummary>,
     style_bundle_hash: Option<String>,
 }
 
-fn read_prev_style_deployment(out_dir: &Path) -> PrevStyleDeployment {
-    let path = out_dir.join("vmz-deployment.json");
-    let Ok(text) = fs::read_to_string(path) else {
-        return PrevStyleDeployment::default();
-    };
-    let Ok(doc) = serde_json::from_str::<DeploymentDocument>(&text) else {
-        return PrevStyleDeployment::default();
-    };
-    PrevStyleDeployment {
-        css_entry: doc.css_entry,
-        style_theme: doc.style_theme,
-        style_bundle_hash: doc.style_bundle_hash,
+/// Incremental style state belongs in the project cache, never in the delivery
+/// output. `vmz-deployment.json` is an artifact to publish, so reading it back
+/// as build state kept stale stylesheets alive after `designs/` changed.
+fn style_cache_path(root: &Path, out_dir: &Path) -> PathBuf {
+    let rel = out_dir.strip_prefix(root).unwrap_or(out_dir);
+    let mut key = String::new();
+    for ch in rel.to_string_lossy().chars() {
+        if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.') {
+            key.push(ch);
+        } else {
+            key.push('-');
+        }
+    }
+    let key = key.trim_matches('-');
+    let key = if key.is_empty() { "root" } else { key };
+    root.join(".cache").join("vmz").join(format!("style-{key}.json"))
+}
+
+fn read_style_cache(root: &Path, out_dir: &Path) -> StyleIncrementalCache {
+    fs::read_to_string(style_cache_path(root, out_dir))
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default()
+}
+
+fn write_style_cache(root: &Path, out_dir: &Path, cache: &StyleIncrementalCache) {
+    let path = style_cache_path(root, out_dir);
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    if let Ok(text) = serde_json::to_string_pretty(cache) {
+        let _ = fs::write(path, text);
     }
 }
 

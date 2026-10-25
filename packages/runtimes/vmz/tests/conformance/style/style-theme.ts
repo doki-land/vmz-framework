@@ -16,12 +16,11 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
+import { resolveDeliveryDist, serveHostChildEnv } from '../_lib/serve-host-env.ts';
 
 const root = repoRoot(import.meta.url);
 const example = path.join(root, 'packages', 'examples', 'vmz-style-tailwind');
-const dist = path.join(example, 'dist');
 const cargo = process.env.CARGO || 'cargo';
 const DIAG_UNKNOWN = 'vmz::style::unknown_design_token';
 const DIAG_UNUSED = 'vmz::style::unused_design_token';
@@ -41,14 +40,22 @@ function runBuild(projectDir) {
     return { status: r.status ?? 1, out: `${r.stdout || ''}\n${r.stderr || ''}` };
 }
 
+let distDir = '';
+
 function read(rel) {
-    const p = path.join(dist, rel);
+    const p = path.join(distDir, rel);
     if (!fs.existsSync(p)) fail(`missing ${rel}`);
     return fs.readFileSync(p, 'utf8');
 }
 
+/** Fresh build output + cache: gates must not inherit stale artifacts. */
+function resetBuildState(projectDir) {
+    fs.rmSync(path.join(projectDir, 'dist'), { recursive: true, force: true });
+    fs.rmSync(path.join(projectDir, '.cache'), { recursive: true, force: true });
+}
+
 function copyProject(src, dest) {
-    const skip = new Set(['node_modules', 'dist', '.git']);
+    const skip = new Set(['node_modules', 'dist', '.git', '.cache']);
     fs.mkdirSync(dest, { recursive: true });
     for (const ent of fs.readdirSync(src, { withFileTypes: true })) {
         if (skip.has(ent.name)) continue;
@@ -98,11 +105,13 @@ console.log('style-theme: unit…');
 
 console.log('style-theme: build…');
 {
+    resetBuildState(example);
     const r = runBuild(example);
     if (r.status !== 0) fail(`vmz build failed\n${r.out}`);
     if (r.out.includes(DIAG_UNUSED) || r.out.includes(DIAG_UNREF)) {
         fail(`happy path must not warn unused/unref:\n${r.out}`);
     }
+    distDir = resolveDeliveryDist(example);
 }
 
 const entry = read('vmz.css');
@@ -122,7 +131,7 @@ if (!dep.styleTheme?.prefersColorScheme?.dark) fail('prefersColorScheme');
 if (!dep.styleBundleHash) fail('styleBundleHash');
 
 const hash1 = dep.styleBundleHash;
-const mtime1 = fs.statSync(path.join(dist, 'vmz-designs.css')).mtimeMs;
+const mtime1 = fs.statSync(path.join(distDir, 'vmz-designs.css')).mtimeMs;
 console.log('style-theme: rebuild (expect CSS skip)…');
 {
     const r = runBuild(example);
@@ -131,7 +140,7 @@ console.log('style-theme: rebuild (expect CSS skip)…');
 if (JSON.parse(read('vmz-deployment.json')).styleBundleHash !== hash1) {
     fail('styleBundleHash changed on no-op rebuild');
 }
-if (fs.statSync(path.join(dist, 'vmz-designs.css')).mtimeMs !== mtime1) {
+if (fs.statSync(path.join(distDir, 'vmz-designs.css')).mtimeMs !== mtime1) {
     fail('vmz-designs.css rewritten despite unchanged fingerprint');
 }
 
@@ -143,16 +152,17 @@ console.log('style-theme: token JSON change rebuilds designs CSS…');
     const tokens = JSON.parse(fs.readFileSync(tokensPath, 'utf8'));
     const first = runBuild(tmp);
     if (first.status !== 0) fail(`token baseline build failed\n${first.out}`);
-    const dep1 = JSON.parse(fs.readFileSync(path.join(tmp, 'dist', 'vmz-deployment.json'), 'utf8'));
+    const tmpDist = resolveDeliveryDist(tmp);
+    const dep1 = JSON.parse(fs.readFileSync(path.join(tmpDist, 'vmz-deployment.json'), 'utf8'));
     const hashBefore = dep1.styleBundleHash;
-    const cssBefore = fs.readFileSync(path.join(tmp, 'dist', 'vmz-designs.css'), 'utf8');
+    const cssBefore = fs.readFileSync(path.join(tmpDist, 'vmz-designs.css'), 'utf8');
     tokens.colors['watch-probe'] = '#aabbcc';
     fs.writeFileSync(tokensPath, `${JSON.stringify(tokens, null, 4)}\n`, 'utf8');
     const second = runBuild(tmp);
     if (second.status !== 0) fail(`token rebuild failed\n${second.out}`);
-    const dep2 = JSON.parse(fs.readFileSync(path.join(tmp, 'dist', 'vmz-deployment.json'), 'utf8'));
+    const dep2 = JSON.parse(fs.readFileSync(path.join(tmpDist, 'vmz-deployment.json'), 'utf8'));
     if (dep2.styleBundleHash === hashBefore) fail('styleBundleHash must change when designs/tokens change');
-    const cssAfter = fs.readFileSync(path.join(tmp, 'dist', 'vmz-designs.css'), 'utf8');
+    const cssAfter = fs.readFileSync(path.join(tmpDist, 'vmz-designs.css'), 'utf8');
     if (cssAfter === cssBefore) fail('vmz-designs.css must change when designs/tokens change');
     if (!cssAfter.includes('--vmz-colors-watch-probe')) fail('token CSS var missing after rebuild');
     fs.rmSync(tmp, { recursive: true, force: true });
@@ -247,14 +257,14 @@ fn main() {
     void probe;
 }
 
-const hostJs = path.join(dist, 'vmz-serve-host.mjs');
+const hostJs = path.join(distDir, 'vmz-serve-host.mjs');
 if (!fs.existsSync(hostJs)) fail('missing vmz-serve-host.mjs');
 
 const port = 18771;
 console.log('style-theme: serve-host…');
 const child = spawn(process.execPath, [hostJs], {
-    cwd: dist,
-    env: { ...process.env, VMZ_DIST: dist, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(port) },
+    cwd: distDir,
+    env: serveHostChildEnv({ VMZ_DIST: distDir, VMZ_HOST: '127.0.0.1', VMZ_PORT: String(port) }),
     stdio: ['ignore', 'pipe', 'pipe'],
 });
 
