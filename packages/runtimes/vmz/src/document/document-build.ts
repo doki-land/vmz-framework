@@ -99,7 +99,7 @@ export async function buildDocuments(opts: BuildDocumentsOpts): Promise<BuildDoc
     }
 
     fs.mkdirSync(outDir, { recursive: true });
-    const designs = resolveDocumentDesignsCss(projectRoot);
+    const designs = resolveDocumentDesignsCss(projectRoot, appDistDir);
     let designsHref: string | null = null;
     if (designs.css && designs.href) {
         const cssPath = path.join(outDir, designs.href);

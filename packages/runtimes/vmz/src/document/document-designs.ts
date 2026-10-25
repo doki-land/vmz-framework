@@ -1,6 +1,10 @@
 /**
- * Document — wire project `/designs` into static document assets.
- * Prefer compiled `vmz-designs.css` / `vmz.css`; else emit a minimal token CSS.
+ * Document — wire project `/designs` and the compiled app stylesheet into
+ * static document assets.
+ *
+ * Layout chrome comes from `designs/document/chrome.css`. Theme tokens are not
+ * re-derived here: they come from the app build output (`vmz-designs.css` /
+ * `vmz.css` under `appDistDir`), which is the single compiled artifact.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,7 +15,10 @@ export interface DocumentDesignsCssResult {
     href: string | null;
 }
 
-export function resolveDocumentDesignsCss(projectRoot: string): DocumentDesignsCssResult {
+export function resolveDocumentDesignsCss(
+    projectRoot: string,
+    appDistDir?: string | null,
+): DocumentDesignsCssResult {
     const designsDir = path.join(projectRoot, 'designs');
     if (!fs.existsSync(designsDir) || !fs.statSync(designsDir).isDirectory()) {
         return { css: '', source: null, href: null };
@@ -20,8 +27,11 @@ export function resolveDocumentDesignsCss(projectRoot: string): DocumentDesignsC
     const parts: string[] = [];
     const sources: string[] = [];
 
-    // Layout first so @import (fonts) stays at stylesheet top; theme tokens follow.
-    const layoutCandidates = [path.join(designsDir, 'document', 'chrome.css'), path.join(designsDir, 'styles', 'document.css')];
+    // Layout first so @import stays at stylesheet top; compiled tokens follow.
+    const layoutCandidates = [
+        path.join(designsDir, 'document', 'chrome.css'),
+        path.join(designsDir, 'styles', 'document.css'),
+    ];
     for (const p of layoutCandidates) {
         if (!fs.existsSync(p)) continue;
         parts.push(fs.readFileSync(p, 'utf8'));
@@ -29,121 +39,31 @@ export function resolveDocumentDesignsCss(projectRoot: string): DocumentDesignsC
         break;
     }
 
-    const distCandidates = [path.join(projectRoot, 'dist', 'vmz-designs.css'), path.join(projectRoot, 'dist', 'vmz.css')];
-    for (const p of distCandidates) {
-        if (fs.existsSync(p)) {
-            parts.push(fs.readFileSync(p, 'utf8'));
-            sources.push(path.relative(projectRoot, p).replace(/\\/g, '/'));
-            break;
+    if (appDistDir) {
+        const compiled = [path.join(appDistDir, 'vmz-designs.css'), path.join(appDistDir, 'vmz.css')].find((p) =>
+            fs.existsSync(p),
+        );
+        if (!compiled) {
+            throw new Error(
+                `vmz.document: app dist ${appDistDir} is missing vmz-designs.css / vmz.css; build the app before the documents`,
+            );
+        }
+        parts.push(fs.readFileSync(compiled, 'utf8'));
+        sources.push(path.relative(projectRoot, compiled).replace(/\\/g, '/'));
+    } else {
+        const entry = path.join(designsDir, 'styles', 'index.css');
+        if (fs.existsSync(entry)) {
+            parts.push(fs.readFileSync(entry, 'utf8'));
+            sources.push(path.relative(projectRoot, entry).replace(/\\/g, '/'));
         }
     }
 
-    if (parts.length) {
-        return {
-            css: parts.join('\n\n'),
-            source: sources.join('+'),
-            href: 'assets/vmz-designs.css',
-        };
+    if (!parts.length) {
+        return { css: '', source: 'designs/', href: null };
     }
-
-    const styleCandidates = [path.join(designsDir, 'styles', 'index.css')];
-    for (const p of styleCandidates) {
-        if (fs.existsSync(p)) {
-            return {
-                css: fs.readFileSync(p, 'utf8'),
-                source: path.relative(projectRoot, p).replace(/\\/g, '/'),
-                href: 'assets/vmz-designs.css',
-            };
-        }
-    }
-    const emitted = emitMinimalDesignsCss(designsDir);
-    if (emitted) {
-        return { css: emitted, source: 'designs/', href: 'assets/vmz-designs.css' };
-    }
-    return { css: '', source: 'designs/', href: null };
-}
-function emitMinimalDesignsCss(designsDir: string): string | null {
-    const vars: Record<string, string> = {};
-    const tokenDir = path.join(designsDir, 'tokens');
-    if (fs.existsSync(tokenDir)) {
-        walkJson(tokenDir, (obj, prefix) => {
-            collectStyleThemeEntries(obj, vars);
-            flattenTokens(obj, prefix, vars);
-        });
-    }
-    const themeJson = path.join(designsDir, 'theme.json');
-    if (fs.existsSync(themeJson)) {
-        try {
-            const theme = JSON.parse(fs.readFileSync(themeJson, 'utf8'));
-            collectStyleThemeEntries(theme, vars);
-            flattenTokens(theme, '', vars);
-        } catch {
-            /* ignore */
-        }
-    }
-    const keys = Object.keys(vars).sort();
-    if (!keys.length) {
-        // Presence of /designs still warrants a readable baseline sheet.
-        return `/* vmz.document designs baseline */\n:root { color-scheme: light; }\nbody { font-family: system-ui, sans-serif; line-height: 1.5; margin: 0; }\nmain { max-width: 48rem; margin: 0 auto; padding: 1.5rem; }\nnav { padding: 1rem 1.5rem; border-bottom: 1px solid #ddd; }\n`;
-    }
-    const lines = keys.map((k) => `  ${cssVar(k)}: ${vars[k]};`);
-    return `/* vmz.document designs from /designs */\n:root {\n${lines.join('\n')}\n}\nbody { font-family: var(--font-sans, system-ui, sans-serif); line-height: 1.5; margin: 0; color: var(--color-fg, #111); background: var(--color-bg, #fff); }\nmain { max-width: 48rem; margin: 0 auto; padding: 1.5rem; }\nnav { padding: 1rem 1.5rem; border-bottom: 1px solid var(--color-border, #ddd); }\n`;
-}
-function cssVar(key: string): string {
-    const name = String(key)
-        .replace(/[^a-zA-Z0-9_-]+/g, '-')
-        .replace(/^-|-$/g, '');
-    return `--${name}`;
-}
-interface StyleThemeEntry {
-    key?: { path?: unknown };
-    value?: unknown;
-}
-
-interface StyleThemeObject {
-    entries?: StyleThemeEntry[];
-}
-
-/** Style Theme entries (`key.path` + `value`) → `vmz-*` CSS vars (same naming as application compile). */
-function collectStyleThemeEntries(obj: unknown, out: Record<string, string>): void {
-    if (obj == null || typeof obj !== 'object' || Array.isArray(obj)) return;
-    const entries = (obj as StyleThemeObject).entries;
-    if (!Array.isArray(entries)) return;
-    for (const e of entries) {
-        const pathParts = e?.key?.path;
-        if (!Array.isArray(pathParts) || pathParts.length === 0) continue;
-        if (typeof e.value !== 'string' && typeof e.value !== 'number') continue;
-        const dotted = pathParts.map(String).join('-');
-        out[`vmz-${dotted}`] = String(e.value);
-    }
-}
-function flattenTokens(obj: unknown, prefix: string, out: Record<string, string>): void {
-    if (obj == null || typeof obj !== 'object' || Array.isArray(obj)) return;
-    for (const [k, v] of Object.entries(obj)) {
-        if (k === 'entries') continue;
-        const key = prefix ? `${prefix}-${k}` : k;
-        if (v != null && typeof v === 'object' && !Array.isArray(v)) {
-            if ('value' in v && (typeof v.value === 'string' || typeof v.value === 'number')) {
-                out[key] = String(v.value);
-            } else {
-                flattenTokens(v, key, out);
-            }
-        } else if (typeof v === 'string' || typeof v === 'number') {
-            out[key] = String(v);
-        }
-    }
-}
-function walkJson(dir: string, fn: (obj: unknown, prefix: string) => void): void {
-    if (!fs.existsSync(dir)) return;
-    for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, ent.name);
-        if (ent.isDirectory()) walkJson(full, fn);
-        else if (ent.isFile() && ent.name.endsWith('.json')) {
-            try {
-                fn(JSON.parse(fs.readFileSync(full, 'utf8')), '');
-            } catch {
-                /* ignore */
-            }
-        }
-    }
+    return {
+        css: parts.join('\n\n'),
+        source: sources.join('+'),
+        href: 'assets/vmz-designs.css',
+    };
 }
