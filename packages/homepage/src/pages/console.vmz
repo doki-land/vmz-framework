@@ -281,10 +281,47 @@
 }
 
 .vmz-console-task__status {
+    display: inline-flex;
     flex: none;
-    color: var(--vmz-text-steel);
+    align-items: center;
+    gap: var(--vmz-space-1);
+    padding: 0 var(--vmz-space-2);
+    border: 1px solid var(--vmz-task-status-line);
+    border-radius: var(--vmz-radius-pill);
+    color: var(--vmz-task-status-ink);
+    background: var(--vmz-task-status-bg);
     font-size: var(--vmz-type-caption);
     line-height: var(--vmz-type-line-height-caption);
+    white-space: nowrap;
+}
+
+.vmz-console-task__status::before {
+    content: "";
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 50%;
+    background: var(--vmz-task-status-dot);
+}
+
+.vmz-console-task[data-status="open"] {
+    --vmz-task-status-dot: var(--vmz-status-warning-accent);
+    --vmz-task-status-ink: var(--vmz-status-warning-foreground);
+    --vmz-task-status-bg: var(--vmz-status-warning-background);
+    --vmz-task-status-line: var(--vmz-status-warning-border);
+}
+
+.vmz-console-task[data-status="in-progress"] {
+    --vmz-task-status-dot: var(--vmz-status-info-accent);
+    --vmz-task-status-ink: var(--vmz-status-info-foreground);
+    --vmz-task-status-bg: var(--vmz-status-info-background);
+    --vmz-task-status-line: var(--vmz-status-info-border);
+}
+
+.vmz-console-task[data-status="resolved"] {
+    --vmz-task-status-dot: var(--vmz-status-success-accent);
+    --vmz-task-status-ink: var(--vmz-status-success-foreground);
+    --vmz-task-status-bg: var(--vmz-status-success-background);
+    --vmz-task-status-line: var(--vmz-status-success-border);
 }
 
 .vmz-console-task__owner,
