@@ -81,6 +81,7 @@
   consoleSubtitle: '筛选、分派并跟进客户请求',
   consoleSummaryAria: '请求概览',
   consoleTitle: '客户请求',
+  consoleWorkspaceAria: '请求工作区',
   copiedCommand: '已复制',
   copyCommand: '复制',
   densityCompact: '紧凑',

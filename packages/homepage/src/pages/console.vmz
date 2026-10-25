@@ -2,82 +2,89 @@
     <div data-vmz-fixture="console" class="vmz-console-page">
         <ConsoleShell brand="VMZ" home-href="/" :active-nav-id="activeId" :title="consoleTitleLabel" :subtitle="consoleSubtitleLabel" :breadcrumb-label="consoleBreadcrumbLabel" :primary-action-label="consolePrimaryActionLabel" primary-action-href="/commercial" :nav-label="consoleNavLabel" :nav="navItems">
             <div class="vmz-console-content">
-                <section :aria-label="consoleSummaryAriaLabel" class="vmz-console-summary">
-                    <div class="vmz-console-summary__panel">
-                        <div class="vmz-console-summary__item">
-                            <span class="vmz-console-summary__label">
-                                {{ consoleStatActiveServicesLabel }}
-                            </span>
-                            <strong class="vmz-console-summary__value">
-                                {{ summaryTotal }}
-                            </strong>
-                        </div>
-                        <div class="vmz-console-summary__item">
-                            <span class="vmz-console-summary__label">
-                                {{ consoleStatPendingReleasesLabel }}
-                            </span>
-                            <strong class="vmz-console-summary__value">
-                                {{ summaryRunning }}
-                            </strong>
-                        </div>
-                        <div class="vmz-console-summary__item">
+                <section :aria-label="consoleWorkspaceAriaLabel" class="vmz-console-workspace">
+                    <div :aria-label="consoleSummaryAriaLabel" role="group" class="vmz-console-summary">
+                        <div class="vmz-console-summary__primary">
                             <span class="vmz-console-summary__label">
                                 {{ consoleStatAffectedRegionsLabel }}
                             </span>
-                            <strong class="vmz-console-summary__value" :class="summaryFailed > 0 ? 'is-failed' : ''">
+                            <strong class="vmz-console-summary__value">
                                 {{ summaryFailed }}
                             </strong>
                         </div>
-                    </div>
-                </section>
-                <p class="vmz-console-demo-note">
-                    {{ demoNote }}
-                </p>
-                <p v-if="loading" role="status" class="vmz-console-state">
-                    {{ loadingLabel }}
-                </p>
-                <p v-if="loadError" role="alert" class="vmz-console-state">
-                    {{ loadErrorLabel }}
-                </p>
-                <section v-if="!loading && !loadError" :aria-label="consoleDataPanelAriaLabel" class="vmz-console-data-panel">
-                    <FilterBar :label="consoleFilterLabel">
-                        <Field :label="consoleFieldNameLabel" :placeholder="consoleFieldNamePlaceholder" control-id="home-console-query" description-id="home-console-query-desc" error-id="home-console-query-err" described-by="home-console-query-desc" :value="query" @input="((e) => query = e.target.value)" />
-                        <Field :label="consoleFieldStatusLabel" :placeholder="consoleFieldStatusPlaceholder" control-id="home-console-status" description-id="home-console-status-desc" error-id="home-console-status-err" described-by="home-console-status-desc" :value="statusQuery" @input="((e) => statusQuery = e.target.value)" />
-                        <Button type="button" variant="primary" @click="applyFilter">
-                            {{ consoleApplyLabel }}
-                        </Button>
-                        <Button type="button" variant="secondary" @click="resetFilter">
-                            {{ consoleResetLabel }}
-                        </Button>
-                        <Button type="button" variant="ghost" @click="selectVisible">
-                            {{ consoleSelectVisibleLabel }}
-                        </Button>
-                    </FilterBar>
-                    <p data-vmz-fixture="console-query" class="vmz-sr-only">
-                        query:
-                        {{ query }}
-                    </p>
-                    <BulkActions :label="consoleBulkActionsLabel" :selected-count="selectedCount" :count-label="bulkLabel">
-                        <Button type="button" variant="ghost" @click="clearSelection">
-                            {{ consoleClearSelectionLabel }}
-                        </Button>
-                    </BulkActions>
-                    <p v-if="!filterEmpty" class="vmz-console-scroll-hint">
-                        {{ scrollHint }}
-                    </p>
-                    <div v-if="filterEmpty" data-vmz-fixture="console-filter-empty" role="status" class="vmz-console-empty">
-                        <strong>
-                            {{ consoleFilterEmptyTitleLabel }}
-                        </strong>
-                        <p>
-                            {{ consoleFilterEmptyBodyLabel }}
+                        <dl class="vmz-console-summary__secondary">
+                            <div class="vmz-console-summary__metric">
+                                <dt>
+                                    {{ consoleStatPendingReleasesLabel }}
+                                </dt>
+                                <dd>
+                                    {{ summaryRunning }}
+                                </dd>
+                            </div>
+                            <div class="vmz-console-summary__metric">
+                                <dt>
+                                    {{ consoleStatActiveServicesLabel }}
+                                </dt>
+                                <dd>
+                                    {{ summaryTotal }}
+                                </dd>
+                            </div>
+                        </dl>
+                        <p class="vmz-console-demo-note">
+                            {{ demoNote }}
                         </p>
-                        <Button type="button" variant="secondary" @click="resetFilter">
-                            {{ consoleResetLabel }}
-                        </Button>
                     </div>
-                    <Table v-if="!filterEmpty" :columns="columns" :rows="rows" :has-row-action="rowAction" :action-title="consoleActionTitleLabel" :action-label="consoleActionLabel" :on-row-action="openDetail" />
-                    <Pagination v-if="!filterEmpty" :label="consolePaginationLabel" :prev-label="consolePagePrevLabel" :next-label="consolePageNextLabel" :status="pageStatus" :prev-disabled="prevDisabled" :next-disabled="nextDisabled" :on-prev="goPrev" :on-next="goNext" />
+                    <div class="vmz-console-body">
+                        <p v-if="loading" role="status" class="vmz-console-state">
+                            {{ loadingLabel }}
+                        </p>
+                        <p v-if="loadError" role="alert" class="vmz-console-state">
+                            {{ loadErrorLabel }}
+                        </p>
+                        <div v-if="!loading && !loadError" class="vmz-console-stream">
+                            <FilterBar :label="consoleFilterLabel">
+                                <Field :label="consoleFieldNameLabel" :placeholder="consoleFieldNamePlaceholder" control-id="home-console-query" description-id="home-console-query-desc" error-id="home-console-query-err" described-by="home-console-query-desc" :value="query" @input="((e) => query = e.target.value)" />
+                                <Field :label="consoleFieldStatusLabel" :placeholder="consoleFieldStatusPlaceholder" control-id="home-console-status" description-id="home-console-status-desc" error-id="home-console-status-err" described-by="home-console-status-desc" :value="statusQuery" @input="((e) => statusQuery = e.target.value)" />
+                                <div class="vmz-console-filter-actions">
+                                    <Button type="button" variant="primary" @click="applyFilter">
+                                        {{ consoleApplyLabel }}
+                                    </Button>
+                                    <div id="home-console-filter-more" class="vmz-console-filter-more">
+                                        <Button type="button" variant="secondary" @click="resetFilter">
+                                            {{ consoleResetLabel }}
+                                        </Button>
+                                        <Button type="button" variant="ghost" @click="selectVisible">
+                                            {{ consoleSelectVisibleLabel }}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </FilterBar>
+                            <p data-vmz-fixture="console-query" class="vmz-sr-only">
+                                query:
+                                {{ query }}
+                            </p>
+                            <BulkActions :label="consoleBulkActionsLabel" :selected-count="selectedCount" :count-label="bulkLabel">
+                                <Button type="button" variant="ghost" @click="clearSelection">
+                                    {{ consoleClearSelectionLabel }}
+                                </Button>
+                            </BulkActions>
+                            <div v-if="filterEmpty" data-vmz-fixture="console-filter-empty" role="status" class="vmz-console-empty">
+                                <strong>
+                                    {{ consoleFilterEmptyTitleLabel }}
+                                </strong>
+                                <p>
+                                    {{ consoleFilterEmptyBodyLabel }}
+                                </p>
+                                <Button type="button" variant="secondary" @click="resetFilter">
+                                    {{ consoleResetLabel }}
+                                </Button>
+                            </div>
+                            <Table v-if="!filterEmpty" :columns="columns" :rows="rows" :has-row-action="rowAction" :action-title="consoleActionTitleLabel" :action-label="consoleActionLabel" :on-row-action="openDetail" />
+                            <div v-if="!filterEmpty" class="vmz-console-footer">
+                                <Pagination :label="consolePaginationLabel" :prev-label="consolePagePrevLabel" :next-label="consolePageNextLabel" :status="pageStatus" :prev-disabled="prevDisabled" :next-disabled="nextDisabled" :on-prev="goPrev" :on-next="goNext" />
+                            </div>
+                        </div>
+                    </div>
                 </section>
                 <Drawer v-if="drawerOpen" :open="drawerOpen" :title="consoleDrawerTitleLabel" title-id="home-console-drawer-title" :on-close="(() => drawerOpen = false)">
                     <div class="vmz-console-drawer-content">
@@ -96,161 +103,188 @@
     </div>
 </template>
 <style>
+.vmz-console-page {
+    min-width: 0;
+}
+
 .vmz-console-content {
     display: grid;
-    gap: 1rem;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
     align-content: start;
+    min-width: 0;
 }
 
-.vmz-console-summary__panel {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.85rem;
-    padding: 0;
-    border: 0;
-    background: transparent;
-}
-
-.vmz-console-summary__item {
-    display: grid;
-    gap: 0.2rem;
-    align-content: start;
-    padding: 1rem 1.15rem;
-    border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md);
-    background: var(--vmz-surface-paper);
-}
-
-.vmz-console-summary__item:has(.vmz-console-summary__value.is-failed) {
-    border-color: color-mix(in srgb, var(--vmz-status-danger-foreground) 24%, var(--vmz-line-default));
-    background: color-mix(in srgb, var(--vmz-status-danger-foreground) 4%, var(--vmz-surface-paper));
-}
-
-.vmz-console-summary__label {
-    color: var(--vmz-text-steel);
-    font-size: 0.8125rem;
-    line-height: 1.25rem;
-}
-
-.vmz-console-summary__value {
-    font-family: var(--vmz-font-display);
-    font-size: 1.75rem;
-    font-weight: 600;
-    line-height: 2.25rem;
-    font-variant-numeric: tabular-nums;
-    color: var(--vmz-text-ink);
-}
-
-.vmz-console-summary__value.is-failed {
-    color: var(--vmz-status-danger-foreground);
-}
-
-.vmz-console-data-panel {
+.vmz-console-workspace {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 0;
     overflow: hidden;
     border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md);
+    border-radius: var(--vmz-radius-lg);
     background: var(--vmz-surface-paper);
 }
 
-.vmz-console-data-panel .vmz-ui-filter-bar {
+.vmz-console-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--vmz-space-2) var(--vmz-space-5);
+    padding: var(--vmz-space-4) var(--vmz-space-5);
+    border-bottom: 1px solid var(--vmz-line-subtle);
+    background: var(--vmz-surface-mist);
+}
+
+.vmz-console-summary__primary {
+    display: flex;
+    align-items: baseline;
+    gap: var(--vmz-space-2);
+}
+
+.vmz-console-summary__label {
+    color: var(--vmz-text-steel);
+    font-size: var(--vmz-type-caption);
+    line-height: var(--vmz-type-line-height-caption);
+}
+
+.vmz-console-summary__value {
+    color: var(--vmz-text-ink);
+    font-family: var(--vmz-font-display);
+    font-size: var(--vmz-type-title);
+    font-weight: var(--vmz-type-weight-semibold);
+    line-height: var(--vmz-type-line-height-title);
+    font-variant-numeric: tabular-nums;
+}
+
+.vmz-console-summary__secondary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--vmz-space-2) var(--vmz-space-5);
+    margin: 0;
+}
+
+.vmz-console-summary__metric {
+    display: flex;
+    align-items: baseline;
+    gap: var(--vmz-space-2);
+}
+
+.vmz-console-summary__metric dt {
+    color: var(--vmz-text-steel);
+    font-size: var(--vmz-type-caption);
+    line-height: var(--vmz-type-line-height-caption);
+}
+
+.vmz-console-summary__metric dd {
+    margin: 0;
+    color: var(--vmz-text-ink);
+    font-size: var(--vmz-type-body);
+    font-weight: var(--vmz-type-weight-medium);
+    line-height: var(--vmz-type-line-height-body);
+    font-variant-numeric: tabular-nums;
+}
+
+.vmz-console-demo-note {
+    margin: 0 0 0 auto;
+    color: var(--vmz-text-muted);
+    font-size: var(--vmz-type-caption);
+    line-height: var(--vmz-type-line-height-caption);
+}
+
+.vmz-console-body,
+.vmz-console-stream {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    min-width: 0;
+}
+
+.vmz-console-stream .vmz-ui-filter-bar {
     margin: 0;
     border: 0;
-    border-bottom: 1px solid var(--vmz-line-default);
+    border-bottom: 1px solid var(--vmz-line-subtle);
     border-radius: 0;
     background: var(--vmz-surface-paper);
 }
 
-.vmz-console-data-panel .vmz-ui-bulk-actions {
+.vmz-console-filter-actions,
+.vmz-console-filter-more {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--vmz-space-2);
+}
+
+.vmz-console-stream .vmz-ui-bulk-actions {
     margin: 0;
     border: 0;
-    border-bottom: 1px solid var(--vmz-line-default);
+    border-bottom: 1px solid var(--vmz-line-subtle);
     border-radius: 0;
     background: var(--vmz-surface-mist);
 }
 
-.vmz-console-data-panel .vmz-ui-table-wrap {
+.vmz-console-stream .vmz-ui-table-wrap {
     margin: 0;
     border: 0;
     border-radius: 0;
 }
 
-.vmz-console-data-panel .vmz-ui-pagination {
-    margin: 0;
-    padding: 0.75rem 1rem;
-    border-top: 1px solid var(--vmz-line-default);
-    border-radius: 0;
+.vmz-console-footer {
+    padding: var(--vmz-space-3) var(--vmz-space-5);
+    border-top: 1px solid var(--vmz-line-subtle);
     background: var(--vmz-surface-paper);
 }
 
-.vmz-console-note {
-    display: grid;
-    justify-items: start;
-    gap: 0.75rem;
-    margin-top: 1.5rem;
-    padding-top: 1.25rem;
-    border-top: 1px solid var(--vmz-line-default);
-}
-.vmz-console-note .vmz-ui-textarea {
-    width: 100%;
-}
-.vmz-console-scroll-hint {
-    display: none;
+.vmz-console-footer .vmz-ui-pagination {
     margin: 0;
-    padding: 0.65rem 1rem 0;
-    color: var(--vmz-text-steel);
-    font-size: 0.75rem;
-}
-@media (max-width: 720px) {
-    .vmz-console-scroll-hint {
-        display: block;
-    }
-    .vmz-console-data-panel .vmz-ui-table {
-        min-width: 44rem;
-    }
 }
 
-@media (max-width: 720px) {
-    .vmz-console-summary__panel {
-        grid-template-columns: 1fr;
-    }
-}
-.vmz-console-demo-note {
-    margin: 0;
-    color: var(--vmz-text-steel);
-    font-size: 0.82rem;
-}
 .vmz-console-state {
     margin: 0;
-    padding: 2rem;
-    border: 1px solid var(--vmz-line-default);
-    border-radius: var(--vmz-radius-md);
-    background: var(--vmz-surface-paper);
+    padding: var(--vmz-space-5);
     color: var(--vmz-text-steel);
+    font-size: var(--vmz-type-body);
+    line-height: var(--vmz-type-line-height-body);
 }
 
 .vmz-console-empty {
     display: grid;
     justify-items: start;
-    gap: 0.75rem;
+    gap: var(--vmz-space-3);
     margin: 0;
-    padding: 1.5rem 1rem 1.25rem;
-    border-top: 1px solid var(--vmz-line-default);
+    padding: var(--vmz-space-5);
+    border-top: 1px solid var(--vmz-line-subtle);
     background: var(--vmz-surface-paper);
     color: var(--vmz-text-steel);
-    font-size: 0.875rem;
-    line-height: 1.5;
+    font-size: var(--vmz-type-body);
+    line-height: var(--vmz-type-line-height-body);
 }
 
 .vmz-console-empty strong {
     color: var(--vmz-text-ink);
-    font-weight: 600;
+    font-weight: var(--vmz-type-weight-semibold);
 }
 
 .vmz-console-empty p {
     margin: 0;
+}
+
+.vmz-console-drawer-content {
+    display: grid;
+    gap: var(--vmz-space-4);
+}
+
+.vmz-console-note {
+    display: grid;
+    justify-items: start;
+    gap: var(--vmz-space-3);
+    margin-top: var(--vmz-space-5);
+    padding-top: var(--vmz-space-5);
+    border-top: 1px solid var(--vmz-line-subtle);
+}
+
+.vmz-console-note .vmz-ui-textarea {
+    width: 100%;
 }
 </style>
 <script client>
@@ -261,6 +295,7 @@ import {
     consoleBreadcrumb,
     consolePrimaryAction,
     consoleSummaryAria,
+    consoleWorkspaceAria,
     consoleStatActiveServices,
     consoleStatPendingReleases,
     consoleStatAffectedRegions,
@@ -325,7 +360,6 @@ export default class ConsolePage {
     demoNote = "";
     loadingLabel = "";
     loadErrorLabel = "";
-    scrollHint = "";
     noteLabel = "";
     noteDescription = "";
     noteSaveLabel = "";
@@ -364,7 +398,7 @@ export default class ConsolePage {
     consoleBreadcrumbLabel = "";
     consolePrimaryActionLabel = "";
     consoleSummaryAriaLabel = "";
-    consoleDataPanelAriaLabel = "";
+    consoleWorkspaceAriaLabel = "";
     consoleStatActiveServicesLabel = "";
     consoleStatPendingReleasesLabel = "";
     consoleStatAffectedRegionsLabel = "";
@@ -451,9 +485,6 @@ export default class ConsolePage {
         this.loadErrorLabel = english
             ? "Requests are temporarily unavailable. Refresh to try again."
             : "请求暂时无法加载，请刷新页面重试。";
-        this.scrollHint = english
-            ? "Swipe the table to see all columns and actions."
-            : "左右滑动表格，查看完整字段与操作。";
         this.noteLabel = english ? "Handling note" : "处理备注";
         this.noteDescription = english
             ? "Saved only in this browser session. No customer is notified."
@@ -468,7 +499,7 @@ export default class ConsolePage {
         this.consoleBreadcrumbLabel = consoleBreadcrumb();
         this.consolePrimaryActionLabel = consolePrimaryAction();
         this.consoleSummaryAriaLabel = consoleSummaryAria();
-        this.consoleDataPanelAriaLabel = consoleFilterLabel();
+        this.consoleWorkspaceAriaLabel = consoleWorkspaceAria();
         this.consoleStatActiveServicesLabel = consoleStatActiveServices();
         this.consoleStatPendingReleasesLabel = consoleStatPendingReleases();
         this.consoleStatAffectedRegionsLabel = consoleStatAffectedRegions();

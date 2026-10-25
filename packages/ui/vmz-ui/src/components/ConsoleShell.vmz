@@ -202,20 +202,19 @@
 
 .vmz-ui-console-shell__main {
     flex: 1 1 auto;
-    padding: var(--vmz-space-5, 1.5rem);
+    padding: 0;
     display: flex;
     flex-direction: column;
 }
 
+/* The shell owns the page axis, not a card boundary. Pages place their own
+   workspace panel so header and content share one left edge. */
 .vmz-ui-console-shell__panel {
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     gap: var(--vmz-space-4, 1rem);
     padding: var(--vmz-space-5, 1.5rem);
-    border: 1px solid var(--vmz-line-subtle);
-    border-radius: var(--vmz-radius-lg, 8px);
-    background: var(--vmz-surface-paper);
 }
 
 .vmz-ui-console-shell__footer {
@@ -265,7 +264,7 @@
     }
 
     .vmz-ui-console-shell__main {
-        padding: var(--vmz-space-4, 1rem);
+        padding: 0;
     }
 
     .vmz-ui-console-shell__panel {

@@ -81,6 +81,7 @@
   consoleSubtitle: 'Filter, assign, and follow up on customer requests',
   consoleSummaryAria: 'Request overview',
   consoleTitle: 'Customer requests',
+  consoleWorkspaceAria: 'Request workspace',
   copiedCommand: 'Copied',
   copyCommand: 'Copy',
   densityCompact: 'Compact',
