@@ -31,16 +31,6 @@ function createResumeAdopt(pool, rootEl) {
 
     const scopeStack = [pool];
 
-    const walkTexts = (root, visit) => {
-        if (!root) return;
-        if (root.nodeType === 3) {
-            visit(root);
-            return;
-        }
-        if (root.nodeType !== 1) return;
-        for (let c = root.firstChild; c; c = c.nextSibling) walkTexts(c, visit);
-    };
-
     const currentScope = () => scopeStack[scopeStack.length - 1] || pool;
 
     const markElement = (n) => {
@@ -69,15 +59,16 @@ function createResumeAdopt(pool, rootEl) {
         }
     }
 
+    /**
+     * Text bindings always belong to the element whose scope is active, so only
+     * direct text children are candidates. Recursing into element children
+     * lets an earlier binding steal the text of a sibling that has not been
+     * adopted yet (soft navigation lost the landing CTA label this way).
+     */
     function* textCandidates() {
         const scope = currentScope();
-        const kids = [...scope.childNodes];
-        for (const n of kids) {
-            const found = [];
-            walkTexts(n, (t) => {
-                if (!used.has(t)) found.push(t);
-            });
-            for (const t of found) yield t;
+        for (const n of [...scope.childNodes]) {
+            if (n.nodeType === 3 && !used.has(n)) yield n;
         }
     }
 

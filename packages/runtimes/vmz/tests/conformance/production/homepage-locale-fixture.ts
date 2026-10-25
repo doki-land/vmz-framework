@@ -246,16 +246,9 @@ export async function proveHomepageLocaleTransition(opts: {
             () => location.pathname.startsWith('/en-us') && document.documentElement.getAttribute('data-locale') === 'en-us',
             { timeout: 15000 },
         );
-        // Soft-nav may remount before MutationObserver refresh lands; re-assert via URL load.
-        try {
-            await waitBodyMatches(en, 'en-us');
-        } catch {
-            await page.goto(`${baseUrl}/en-us`, { waitUntil: 'load', timeout: 60_000 });
-            await waitLocaleApi('fallback /en-us');
-            await page.waitForSelector('[data-vmz-fixture="landing-hero-lede"]', { timeout: 15_000 });
-            await waitBodyMatches(en, 'en-us');
-        }
-        const liveEn = await snapBody();
+        // Soft-nav must refresh the body itself: resuming SSR must not depend on
+        // a hard load to recover text bindings (see adopt textCandidates scope).
+        const liveEn = await waitBodyMatches(en, 'en-us');
         if (liveEn.heroLede === zhSnap.heroLede) {
             throw new Error('landing hero lede did not refresh after LocaleTransition (still zh catalog)');
         }
