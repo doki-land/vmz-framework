@@ -452,9 +452,39 @@
         line-height: var(--vmz-type-line-height-title);
     }
 
+    /* The sample-data note moves out of the first screen so the task list
+       starts earlier. It stays in the desktop summary. */
     .vmz-console-demo-note {
+        display: none;
+    }
+
+    /* Two fields share one row and their labels stay in the accessibility
+       tree, so the placeholders carry the visible hint. */
+    .vmz-console-stream .vmz-ui-filter-bar {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--vmz-space-2);
+        padding: var(--vmz-space-3) var(--vmz-space-4);
+    }
+
+    .vmz-console-stream .vmz-ui-filter-bar > * {
+        width: 100%;
+    }
+
+    .vmz-console-stream .vmz-ui-filter-bar > .vmz-console-filter-actions {
         grid-column: 1 / -1;
-        margin: 0;
+    }
+
+    .vmz-console-stream .vmz-ui-field__label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
     }
 
     .vmz-console-filter-actions {
