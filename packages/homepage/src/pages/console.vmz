@@ -1,6 +1,6 @@
 <template>
     <div data-vmz-fixture="console" class="vmz-console-page">
-        <ConsoleShell brand="VMZ" home-href="/" :active-nav-id="activeId" :title="consoleTitleLabel" :subtitle="consoleSubtitleLabel" :breadcrumb-label="consoleBreadcrumbLabel" :primary-action-label="consolePrimaryActionLabel" primary-action-href="/commercial" :nav-label="consoleNavLabel" :nav="navItems">
+        <ConsoleShell brand="VMZ" home-href="/" :active-nav-id="activeId" :title="consoleTitleLabel" :subtitle="consoleSubtitleLabel" :breadcrumb-label="consoleBreadcrumbLabel" :primary-action-label="consolePrimaryActionLabel" primary-action-href="/commercial" :nav-label="consoleNavLabel" :menu-label="navMenuLabel" :back-label="consoleBackLabel" back-href="/" :nav="navItems">
             <div class="vmz-console-content">
                 <section :aria-label="consoleWorkspaceAriaLabel" class="vmz-console-workspace">
                     <div :aria-label="consoleSummaryAriaLabel" role="group" class="vmz-console-summary">
@@ -49,7 +49,7 @@
                                     <Button type="button" variant="primary" @click="applyFilter">
                                         {{ consoleApplyLabel }}
                                     </Button>
-                                    <div id="home-console-filter-more" class="vmz-console-filter-more">
+                                    <div id="home-console-filter-more" class="vmz-console-filter-more" :data-open="moreFiltersOpen ? 'true' : null">
                                         <Button type="button" variant="secondary" @click="resetFilter">
                                             {{ consoleResetLabel }}
                                         </Button>
@@ -57,6 +57,11 @@
                                             {{ consoleSelectVisibleLabel }}
                                         </Button>
                                     </div>
+                                    <span class="vmz-console-filter-toggle">
+                                        <Button type="button" variant="secondary" aria-controls="home-console-filter-more" :aria-expanded="moreFiltersOpen ? 'true' : 'false'" @click="toggleMoreFilters">
+                                            {{ moreFiltersOpen ? consoleFewerFiltersLabel : consoleMoreFiltersLabel }}
+                                        </Button>
+                                    </span>
                                 </div>
                             </FilterBar>
                             <p data-vmz-fixture="console-query" class="vmz-sr-only">
@@ -80,6 +85,43 @@
                                 </Button>
                             </div>
                             <Table v-if="!filterEmpty" :columns="columns" :rows="rows" :has-row-action="rowAction" :action-title="consoleActionTitleLabel" :action-label="consoleActionLabel" :on-row-action="openDetail" />
+                            <ul v-if="!filterEmpty" data-vmz-fixture="console-task-list" :aria-label="consoleTaskListLabel" class="vmz-console-task-list">
+                                <li v-for="row in rows" :key="row.id" :data-vmz-task-row="row.id" :data-status="row.status" class="vmz-console-task">
+                                    <div class="vmz-console-task__head">
+                                        <span class="vmz-console-task__subject">
+                                            {{ row.cells[0] }}
+                                        </span>
+                                        <span class="vmz-console-task__status">
+                                            {{ row.cells[2] }}
+                                        </span>
+                                    </div>
+                                    <p class="vmz-console-task__owner">
+                                        <span class="vmz-console-task__label">
+                                            {{ consoleColActorLabel }}
+                                        </span>
+                                        {{ row.cells[3] }}
+                                    </p>
+                                    <p class="vmz-console-task__secondary">
+                                        <span>
+                                            <span class="vmz-console-task__label">
+                                                {{ consoleColTargetLabel }}
+                                            </span>
+                                            {{ row.cells[1] }}
+                                        </span>
+                                        <span>
+                                            <span class="vmz-console-task__label">
+                                                {{ consoleColUpdatedLabel }}
+                                            </span>
+                                            {{ row.cells[4] }}
+                                        </span>
+                                    </p>
+                                    <span class="vmz-console-task__action" :data-vmz-task-action="row.id">
+                                        <Button type="button" variant="ghost" @click="openDetail(row.id)">
+                                            {{ consoleActionLabel }}
+                                        </Button>
+                                    </span>
+                                </li>
+                            </ul>
                             <div v-if="!filterEmpty" class="vmz-console-footer">
                                 <Pagination :label="consolePaginationLabel" :prev-label="consolePagePrevLabel" :next-label="consolePageNextLabel" :status="pageStatus" :prev-disabled="prevDisabled" :next-disabled="nextDisabled" :on-prev="goPrev" :on-next="goNext" />
                             </div>
@@ -215,6 +257,63 @@
     gap: var(--vmz-space-2);
 }
 
+.vmz-console-filter-toggle {
+    display: none;
+}
+
+.vmz-console-task-list {
+    display: none;
+}
+
+.vmz-console-task__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--vmz-space-3);
+}
+
+.vmz-console-task__subject {
+    min-width: 0;
+    color: var(--vmz-text-ink);
+    font-size: var(--vmz-type-body);
+    font-weight: var(--vmz-type-weight-medium);
+    line-height: var(--vmz-type-line-height-body);
+}
+
+.vmz-console-task__status {
+    flex: none;
+    color: var(--vmz-text-steel);
+    font-size: var(--vmz-type-caption);
+    line-height: var(--vmz-type-line-height-caption);
+}
+
+.vmz-console-task__owner,
+.vmz-console-task__secondary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--vmz-space-2) var(--vmz-space-4);
+    margin: 0;
+    font-size: var(--vmz-type-caption);
+    line-height: var(--vmz-type-line-height-caption);
+}
+
+.vmz-console-task__owner {
+    color: var(--vmz-text-ink);
+}
+
+.vmz-console-task__secondary {
+    color: var(--vmz-text-steel);
+}
+
+.vmz-console-task__secondary > span {
+    display: inline-flex;
+    gap: var(--vmz-space-2);
+}
+
+.vmz-console-task__label {
+    color: var(--vmz-text-tertiary);
+}
+
 .vmz-console-stream .vmz-ui-bulk-actions {
     margin: 0;
     border: 0;
@@ -286,6 +385,95 @@
 .vmz-console-note .vmz-ui-textarea {
     width: 100%;
 }
+
+@media (max-width: 720px) {
+    .vmz-console-summary {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr));
+        align-items: start;
+        gap: var(--vmz-space-3);
+        padding: var(--vmz-space-3) var(--vmz-space-4);
+    }
+
+    .vmz-console-summary__primary {
+        display: grid;
+        gap: 0;
+    }
+
+    .vmz-console-summary__secondary {
+        display: contents;
+    }
+
+    .vmz-console-summary__metric {
+        display: grid;
+        align-content: start;
+        gap: 0;
+    }
+
+    .vmz-console-summary__metric dd {
+        font-size: var(--vmz-type-subtitle);
+        line-height: var(--vmz-type-line-height-title);
+    }
+
+    .vmz-console-demo-note {
+        grid-column: 1 / -1;
+        margin: 0;
+    }
+
+    .vmz-console-filter-actions {
+        width: 100%;
+    }
+
+    .vmz-console-filter-toggle {
+        display: inline-flex;
+        order: 2;
+    }
+
+    .vmz-console-filter-more {
+        display: none;
+        width: 100%;
+        order: 3;
+    }
+
+    .vmz-console-filter-more[data-open="true"] {
+        display: flex;
+    }
+
+    .vmz-console-stream .vmz-ui-table-wrap {
+        display: none;
+    }
+
+    .vmz-console-task-list {
+        display: grid;
+        margin: 0;
+        padding: 0;
+        border-top: 1px solid var(--vmz-line-subtle);
+        list-style: none;
+    }
+
+    .vmz-console-task {
+        display: grid;
+        gap: var(--vmz-space-2);
+        padding: var(--vmz-space-4);
+        border-bottom: 1px solid var(--vmz-line-subtle);
+    }
+
+    .vmz-console-task:last-child {
+        border-bottom: 0;
+    }
+
+    .vmz-console-task__action {
+        justify-self: start;
+    }
+
+    .vmz-console-note {
+        position: sticky;
+        bottom: 0;
+        z-index: 1;
+        padding-bottom: var(--vmz-space-4);
+        background: var(--vmz-surface-paper);
+    }
+}
 </style>
 <script client>
 import {
@@ -296,6 +484,11 @@ import {
     consolePrimaryAction,
     consoleSummaryAria,
     consoleWorkspaceAria,
+    consoleBack,
+    consoleMoreFilters,
+    consoleFewerFilters,
+    consoleTaskList,
+    navMenu,
     consoleStatActiveServices,
     consoleStatPendingReleases,
     consoleStatAffectedRegions,
@@ -399,6 +592,15 @@ export default class ConsolePage {
     consolePrimaryActionLabel = "";
     consoleSummaryAriaLabel = "";
     consoleWorkspaceAriaLabel = "";
+    consoleBackLabel = "";
+    consoleMoreFiltersLabel = "";
+    consoleFewerFiltersLabel = "";
+    consoleTaskListLabel = "";
+    consoleColActorLabel = "";
+    consoleColTargetLabel = "";
+    consoleColUpdatedLabel = "";
+    navMenuLabel = "";
+    moreFiltersOpen = false;
     consoleStatActiveServicesLabel = "";
     consoleStatPendingReleasesLabel = "";
     consoleStatAffectedRegionsLabel = "";
@@ -500,6 +702,14 @@ export default class ConsolePage {
         this.consolePrimaryActionLabel = consolePrimaryAction();
         this.consoleSummaryAriaLabel = consoleSummaryAria();
         this.consoleWorkspaceAriaLabel = consoleWorkspaceAria();
+        this.consoleBackLabel = consoleBack();
+        this.consoleMoreFiltersLabel = consoleMoreFilters();
+        this.consoleFewerFiltersLabel = consoleFewerFilters();
+        this.consoleTaskListLabel = consoleTaskList();
+        this.consoleColActorLabel = consoleColActor();
+        this.consoleColTargetLabel = consoleColTarget();
+        this.consoleColUpdatedLabel = consoleColUpdated();
+        this.navMenuLabel = navMenu();
         this.consoleStatActiveServicesLabel = consoleStatActiveServices();
         this.consoleStatPendingReleasesLabel = consoleStatPendingReleases();
         this.consoleStatAffectedRegionsLabel = consoleStatAffectedRegions();
@@ -591,6 +801,10 @@ export default class ConsolePage {
         this.page = 1;
         this.refreshPage();
         this.clearSelection();
+    }
+
+    toggleMoreFilters() {
+        this.moreFiltersOpen = !this.moreFiltersOpen;
     }
 
     filteredRows() {

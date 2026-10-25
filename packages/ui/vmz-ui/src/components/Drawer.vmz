@@ -239,6 +239,13 @@
     }
 }
 
+@media (max-width: 720px) {
+    .vmz-ui-drawer__panel {
+        width: 100vw;
+        border-left: 0;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .vmz-ui-drawer__backdrop,
     .vmz-ui-drawer__panel,

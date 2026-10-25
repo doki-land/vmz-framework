@@ -1,10 +1,15 @@
 <template>
-    <div data-vmz-ui="console-shell" class="vmz-ui-console-shell">
+    <div data-vmz-ui="console-shell" class="vmz-ui-console-shell" :onKeyDown="onShellKeyDown">
         <aside data-vmz-shell="sidebar" :aria-label="navLabel" class="vmz-ui-console-shell__sidebar">
-            <a v-if="brand" :href="homeHref" class="vmz-ui-console-shell__brand">
-                {{ brand }}
-            </a>
-            <nav class="vmz-ui-console-shell__nav">
+            <div class="vmz-ui-console-shell__sidebar-top">
+                <a v-if="brand" :href="homeHref" class="vmz-ui-console-shell__brand">
+                    {{ brand }}
+                </a>
+                <button v-if="nav.length" type="button" class="vmz-ui-console-shell__menu" :aria-label="menuLabel || navLabel" :aria-expanded="menuOpen ? 'true' : 'false'" aria-controls="vmz-console-shell-nav" @click="toggleMenu">
+                    <Icon :name="menuOpen ? 'action.close' : 'action.menu'" size="md" decorative />
+                </button>
+            </div>
+            <nav id="vmz-console-shell-nav" class="vmz-ui-console-shell__nav" :data-open="menuOpen ? 'true' : null">
                 <a v-for="item in nav" :key="item.id" :href="item.href" :data-vmz-nav="item.id" :data-active="item.id === activeNavId ? 'true' : null" :aria-current="item.id === activeNavId ? 'page' : null">
                     {{ item.title }}
                 </a>
@@ -12,6 +17,9 @@
         </aside>
         <div class="vmz-ui-console-shell__body">
             <header data-vmz-shell="header" class="vmz-ui-console-shell__header">
+                <a v-if="backLabel && backHref" :href="backHref" class="vmz-ui-console-shell__back">
+                    {{ backLabel }}
+                </a>
                 <div class="vmz-ui-console-shell__header-copy">
                     <p v-if="breadcrumbLabel" data-vmz-shell="breadcrumb" class="vmz-ui-console-shell__breadcrumb">
                         {{ breadcrumbLabel }}
@@ -60,6 +68,33 @@
     min-height: 100%;
     align-self: stretch;
     background: var(--vmz-surface-paper);
+}
+
+.vmz-ui-console-shell__sidebar-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vmz-space-2, 0.5rem);
+}
+
+.vmz-ui-console-shell__menu {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: var(--vmz-control-height, 2rem);
+    min-height: var(--vmz-control-height, 2rem);
+    padding: 0;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-steel);
+    cursor: pointer;
+    outline: none;
+}
+
+.vmz-ui-console-shell__menu:focus-visible {
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
 }
 
 .vmz-ui-console-shell__brand {
@@ -146,6 +181,27 @@
     background: var(--vmz-surface-paper);
 }
 
+.vmz-ui-console-shell__back {
+    display: none;
+    align-items: center;
+    flex: none;
+    min-height: var(--vmz-control-height, 2rem);
+    color: var(--vmz-action-link-foreground);
+    font-size: var(--vmz-type-caption);
+    line-height: var(--vmz-type-line-height-caption);
+    text-decoration: none;
+    white-space: nowrap;
+    outline: none;
+}
+
+.vmz-ui-console-shell__back:hover {
+    color: var(--vmz-action-link-hover);
+}
+
+.vmz-ui-console-shell__back:focus-visible {
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+}
+
 .vmz-ui-console-shell__header-copy {
     display: grid;
     gap: 0.125rem;
@@ -226,7 +282,7 @@
     background: var(--vmz-surface-paper);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 720px) {
     .vmz-ui-console-shell {
         grid-template-columns: 1fr;
         grid-template-rows: auto minmax(0, 1fr);
@@ -238,29 +294,68 @@
         border-right: 0;
         border-bottom: 1px solid var(--vmz-line-subtle);
         gap: var(--vmz-space-2, 0.5rem);
+        padding: var(--vmz-space-2, 0.5rem) var(--vmz-space-4, 1rem);
+    }
+
+    .vmz-ui-console-shell__menu {
+        display: inline-flex;
+        width: calc(var(--vmz-control-height, 2rem) * 1.5);
+        min-height: calc(var(--vmz-control-height, 2rem) * 1.5);
     }
 
     .vmz-ui-console-shell__nav {
-        flex-direction: row;
-        flex-wrap: nowrap;
+        display: none;
+        flex-direction: column;
+        gap: var(--vmz-space-1, 0.25rem);
         flex: none;
-        overflow-x: auto;
-        scrollbar-width: none;
     }
 
-    .vmz-ui-console-shell__nav::-webkit-scrollbar {
-        display: none;
+    .vmz-ui-console-shell__nav[data-open="true"] {
+        display: flex;
     }
 
     .vmz-ui-console-shell__nav a {
-        flex: none;
-        white-space: nowrap;
+        min-height: calc(var(--vmz-control-height, 2rem) * 1.5);
+        white-space: normal;
     }
 
     .vmz-ui-console-shell__header {
-        flex-direction: column;
-        align-items: flex-start;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: var(--vmz-space-2, 0.5rem);
+        min-height: calc(var(--vmz-control-height, 2rem) * 1.5);
         padding: var(--vmz-space-3, 0.75rem) var(--vmz-space-4, 1rem);
+    }
+
+    .vmz-ui-console-shell__back {
+        display: inline-flex;
+        grid-column: 1;
+        min-height: calc(var(--vmz-control-height, 2rem) * 1.5);
+    }
+
+    .vmz-ui-console-shell__header-copy {
+        grid-column: 2;
+        gap: 0;
+    }
+
+    .vmz-ui-console-shell__breadcrumb,
+    .vmz-ui-console-shell__subtitle {
+        display: none;
+    }
+
+    .vmz-ui-console-shell__title {
+        font-size: var(--vmz-type-subtitle);
+        line-height: var(--vmz-type-line-height-title);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .vmz-ui-console-shell__action {
+        grid-column: 3;
+        justify-self: end;
+        min-height: calc(var(--vmz-control-height, 2rem) * 1.5);
     }
 
     .vmz-ui-console-shell__main {
@@ -285,14 +380,26 @@ export default class ConsoleShell {
     public breadcrumbLabel: string = "";
     public primaryActionLabel: string = "";
     public primaryActionHref: string = "";
+    public backLabel: string = "";
+    public backHref: string = "";
     public activeNavId: string = "";
     public navLabel: string = "";
+    public menuLabel: string = "";
     public footer: string = "";
+    public menuOpen: boolean = false;
     /** @type {{ id: string, title: string, href: string }[]} */
     public nav: {
         id: string;
         title: string;
         href: string;
     }[] = [];
+    toggleMenu() {
+        this.menuOpen = !this.menuOpen;
+    }
+    onShellKeyDown(ev) {
+        if (ev && ev.key === "Escape" && this.menuOpen) {
+            this.menuOpen = false;
+        }
+    }
 }
 </script>

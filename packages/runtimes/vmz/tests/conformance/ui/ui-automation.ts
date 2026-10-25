@@ -1890,6 +1890,43 @@ async function proveConsoleComposition(page, PORT) {
         { timeout: 5000 },
     );
 
+    // Narrow-screen IA: the desktop table stays in the DOM and the task list is
+    // the default reading surface. Details open full-screen from a list row.
+    const desktopViewport = page.viewport() ?? { width: 1440, height: 900, deviceScaleFactor: 1 };
+    await page.setViewport({ width: 390, height: 844, isMobile: true, deviceScaleFactor: 1 });
+    await page.goto(`http://127.0.0.1:${PORT}/console`, { waitUntil: 'networkidle0', timeout: 60000 });
+    await page.waitForSelector('[data-vmz-fixture="console-task-list"]', { timeout: 10000 });
+    const narrow = await page.evaluate(() => {
+        const visible = (el) => !!el && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().height > 0;
+        return {
+            table: visible(document.querySelector('.vmz-console-stream .vmz-ui-table-wrap')),
+            list: visible(document.querySelector('[data-vmz-fixture="console-task-list"]')),
+            rows: document.querySelectorAll('[data-vmz-task-row]').length,
+            overflow: document.documentElement.scrollWidth > window.innerWidth,
+        };
+    });
+    if (narrow.table) fail('Console narrow: desktop table must be hidden');
+    if (!narrow.list) fail('Console narrow: task list must be visible');
+    if (narrow.rows < 1) fail(`Console narrow: expected task list rows, got ${narrow.rows}`);
+    if (narrow.overflow) fail('Console narrow: page must not overflow horizontally');
+
+    await page.evaluate(() => {
+        const btn = document.querySelector('[data-vmz-task-action] .vmz-ui-btn');
+        if (!(btn instanceof HTMLElement)) throw new Error('Console task list action missing');
+        btn.click();
+    });
+    await page.waitForSelector('[data-vmz-overlay="drawer"] [data-vmz-focus="enter"]', { timeout: 5000 });
+    const drawerWidth = await page.evaluate(() => ({
+        panel: document.querySelector('.vmz-ui-drawer__panel')?.getBoundingClientRect().width || 0,
+        viewport: window.innerWidth,
+    }));
+    if (Math.abs(drawerWidth.panel - drawerWidth.viewport) > 1) {
+        fail(`Console narrow: drawer must be full width, got ${drawerWidth.panel}/${drawerWidth.viewport}`);
+    }
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('[data-vmz-overlay="drawer"]'), { timeout: 5000 });
+    await page.setViewport(desktopViewport);
+
     console.log('ui-automation: Console composition PASS');
     await proveMotionContinuity(page);
 }
