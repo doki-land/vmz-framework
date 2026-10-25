@@ -3,8 +3,8 @@
         <main id="main" data-vmz-fixture="commercial" class="vmz-commercial-content">
             <section data-vmz-fixture="commercial-hero" aria-labelledby="commercial-hero-title" class="vmz-commercial-hero">
                 <div class="vmz-commercial-hero__copy">
-                    <p class="v2-kicker">
-                        <span aria-hidden="true" class="v2-kicker__dot" />
+                    <p class="kicker">
+                        <span aria-hidden="true" class="kicker__dot" />
                         {{ commercialNavLabel }}
                     </p>
                     <h1 id="commercial-hero-title" class="vmz-commercial-hero__title">
@@ -270,7 +270,7 @@
     min-height: 2.5rem;
     padding: 0.5rem 1.1rem;
     border: 1px solid transparent;
-    border-radius: var(--v2-radius);
+    border-radius: var(--vmz-radius-md);
     font-size: 0.875rem;
     font-weight: 500;
     text-decoration: none;
@@ -283,14 +283,14 @@
     background: var(--vmz-action-primary-hover);
 }
 .vmz-commercial-hero__action:not(.is-primary) a {
-    color: var(--v2-ink);
-    border-color: var(--v2-line);
-    background: var(--v2-surface);
+    color: var(--vmz-text-ink);
+    border-color: var(--vmz-line-default);
+    background: var(--vmz-surface-paper);
 }
 .vmz-commercial-hero__action:not(.is-primary) a:hover {
-    color: var(--v2-blue);
+    color: var(--vmz-action-primary-background);
     border-color: var(--vmz-action-primary-hover);
-    background: var(--v2-surface);
+    background: var(--vmz-surface-paper);
 }
 
 .vmz-commercial-task {

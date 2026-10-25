@@ -3,7 +3,7 @@
  * TextMate grammar via configurable peer (default `vmz-textmate/shiki`).
  */
 
-import type { Highlighter } from 'shiki';
+import type { Highlighter, ShikiTransformer } from 'shiki';
 
 export type ShikiRuntimeConfig = {
     /** Shiki + TextMate adapter module (default `vmz-textmate/shiki`). */
@@ -13,6 +13,17 @@ export type ShikiRuntimeConfig = {
 };
 
 const DEFAULT_TEXTMATE = 'vmz-textmate/shiki';
+
+/**
+ * Shiki writes `background-color` and `color` inline on `<pre>`, which makes
+ * the site stylesheet need `!important` to own code surfaces. Strip that
+ * inline style so the theme tokens stay the single source of colour.
+ */
+const stripPreInlineStyle: ShikiTransformer = {
+    pre(node) {
+        delete node.properties.style;
+    },
+};
 
 let config: ShikiRuntimeConfig = {};
 let configResolved = false;
@@ -135,6 +146,7 @@ export async function highlight(code: string, lang = 'text', theme = 'vitesse-da
         return highlighter.codeToHtml(code ?? '', {
             lang: lang || 'text',
             theme,
+            transformers: [stripPreInlineStyle],
         });
     } catch {
         return fallbackPre(code);
@@ -148,6 +160,7 @@ export function highlightSync(code: string, lang = 'text', theme = 'vitesse-dark
         return cached.codeToHtml(code ?? '', {
             lang: lang || 'text',
             theme,
+            transformers: [stripPreInlineStyle],
         });
     } catch {
         return fallbackPre(code);

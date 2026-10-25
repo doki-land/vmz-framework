@@ -2,8 +2,8 @@
     <SiteShell page="lab" variant="lab-index-page">
         <main id="main" data-vmz-fixture="lab-index" class="lab-index">
             <header class="lab-index__head">
-                <p class="v2-kicker">
-                    <span aria-hidden="true" class="v2-kicker__dot" />
+                <p class="kicker">
+                    <span aria-hidden="true" class="kicker__dot" />
                     {{ kickerLabel }}
                 </p>
                 <h1>
@@ -34,9 +34,9 @@
 </template>
 <style>
 .lab-index {
-    width: min(calc(100% - var(--v2-gutter) * 2), var(--v2-content));
+    width: min(calc(100% - var(--site-gutter) * 2), var(--vmz-layout-max-width));
     margin: 0 auto;
-    padding: calc(var(--v2-section-pad) * 0.9) 0 var(--v2-section-pad);
+    padding: calc(var(--site-section-pad) * 0.9) 0 var(--site-section-pad);
 }
 .lab-index__head {
     display: grid;
@@ -46,12 +46,12 @@
 }
 .lab-index__head h1 {
     margin: 0;
-    color: var(--v2-ink);
+    color: var(--vmz-text-ink);
     font: 600 clamp(2rem, 4vw, 2.75rem) / 1.2 var(--vmz-font-display);
 }
 .lab-index__lead {
     margin: 0;
-    color: var(--v2-muted);
+    color: var(--vmz-text-steel);
     font: 400 1rem / 1.7 var(--vmz-font-sans);
 }
 .lab-index__group + .lab-index__group {
@@ -59,7 +59,7 @@
 }
 .lab-index__group h2 {
     margin: 0 0 1rem;
-    color: var(--v2-ink);
+    color: var(--vmz-text-ink);
     font: 600 1.25rem / 1.6 var(--vmz-font-display);
 }
 .lab-index__grid {
@@ -72,28 +72,28 @@
     grid-template-rows: auto 1fr auto;
     gap: 0.4rem;
     padding: 1.15rem 1.25rem;
-    border: 1px solid var(--v2-line);
-    border-radius: var(--v2-radius-lg);
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-lg);
     color: inherit;
-    background: var(--v2-surface);
+    background: var(--vmz-surface-paper);
     text-decoration: none;
     transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 .lab-card:hover {
-    border-color: color-mix(in srgb, var(--v2-blue) 45%, var(--v2-line));
-    box-shadow: var(--v2-elevation-2);
+    border-color: color-mix(in srgb, var(--vmz-action-primary-background) 45%, var(--vmz-line-default));
+    box-shadow: var(--vmz-elevation-2);
     transform: translateY(-2px);
 }
 .lab-card:focus-visible {
-    outline: 2px solid var(--v2-blue);
+    outline: 2px solid var(--vmz-action-primary-background);
     outline-offset: 2px;
 }
 .lab-card__title {
-    color: var(--v2-ink);
+    color: var(--vmz-text-ink);
     font: 600 1rem / 1.5 var(--vmz-font-display);
 }
 .lab-card__desc {
-    color: var(--v2-muted);
+    color: var(--vmz-text-steel);
     font: 400 0.9rem / 1.6 var(--vmz-font-sans);
 }
 .lab-card__arrow {
@@ -101,7 +101,7 @@
     justify-self: end;
     width: 1rem;
     height: 1rem;
-    color: var(--v2-blue);
+    color: var(--vmz-action-primary-background);
 }
 .lab-card__arrow::before {
     content: "";

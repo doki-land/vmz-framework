@@ -1,58 +1,38 @@
-/* VMZ Design foundation: tokens, density switch, document frame and
-   accessibility primitives. Imported first so later layers can alias. */
+/* VMZ Design foundation: site rhythm, document frame and accessibility
+   primitives. Imported first so later layers can rely on these values. */
 :root {
-  --v2-ink: var(--vmz-text-ink);
-  --v2-muted: var(--vmz-text-steel);
-  --v2-subtle: var(--vmz-text-steel);
-  --v2-line: var(--vmz-line-default);
-  --v2-canvas: var(--vmz-surface-page);
-  --v2-lime: var(--vmz-brand-energy);
-  --v2-coral: var(--vmz-action-primary-background);
-  --v2-blue: var(--vmz-action-primary-background);
-  --v2-content: var(--vmz-layout-max-width);
-  --v2-surface: var(--vmz-surface-paper);
-  --v2-mist: var(--vmz-surface-mist);
-  --v2-radius: var(--vmz-radius-md);
-  --v2-radius-lg: var(--vmz-radius-lg);
-  --v2-inverse: var(--vmz-surface-inverse);
-  --v2-on-inverse: var(--vmz-text-on-inverse);
-  --v2-code: var(--vmz-surface-code);
-  --v2-elevation-1: var(--vmz-elevation-1);
-  --v2-elevation-2: var(--vmz-elevation-2);
-  --v2-elevation-3: var(--vmz-elevation-3);
-  /* Page-level scale: one type ramp and one vertical rhythm for every
-     landing section, so headings and section spacing cannot drift apart. */
-  --v2-gutter: var(--vmz-layout-gutter);
-  --v2-section-pad: var(--vmz-layout-section);
-  --v2-header-h: var(--vmz-layout-header-height);
-  --v2-fs-display: var(--vmz-type-display);
-  --v2-fs-h2: var(--vmz-type-title);
-  --v2-fs-h3: var(--vmz-type-subtitle);
-  --v2-fs-body: var(--vmz-type-body);
-  --v2-fs-caption: var(--vmz-type-caption);
-  --v2-lh-display: 1.24;
-  --v2-lh-h2: 1.4;
-  --v2-lh-body: 1.75;
+  --site-gutter: var(--vmz-layout-gutter);
+  --site-section-pad: var(--vmz-layout-section);
+  --site-header-height: var(--vmz-layout-header-height);
+  --site-line-display: 1.24;
+  --site-line-heading: 1.4;
+  --site-line-body: 1.75;
 }
 
-/* Compact density: one switch tightens the shared rhythm rather than
+/* Compact density: one switch tightens the shared rhythm instead of
    restyling each section. Only spacing changes; colour roles stay put. */
 :root[data-density="compact"] {
-  --v2-section-pad: clamp(2.5rem, 4vw, 4rem);
-  --v2-gutter: clamp(1rem, 3vw, 1.5rem);
-  --v2-header-h: 3.25rem;
+  --site-section-pad: clamp(2.5rem, 4vw, 4rem);
+  --site-gutter: clamp(1rem, 3vw, 1.5rem);
+  --site-header-height: var(--vmz-layout-header-height-compact);
 }
 
-body { background: var(--vmz-surface-paper); color: var(--v2-ink); overflow-x: clip; }
+body {
+  background: var(--vmz-surface-paper);
+  color: var(--vmz-text-ink);
+  overflow-x: clip;
+}
+
 .site {
-  display: flex !important;
+  display: flex;
+  flex: 1 0 auto;
   flex-direction: column;
   width: 100%;
   max-width: 100%;
   min-height: 100vh;
   overflow-x: clip;
-  font: 400 16px/1.625 var(--vmz-font-sans) !important;
 }
+
 .vmz-sr-only {
   position: absolute;
   width: 1px;
@@ -65,10 +45,32 @@ body { background: var(--vmz-surface-paper); color: var(--v2-ink); overflow-x: c
   border: 0;
 }
 
-/* Keyboard-only entry point. It stays off-canvas until focused so it never    affects the visual rhythm of the page. */ .skip-link {   position: absolute;   left: -9999px;   top: .5rem;   z-index: 100;   padding: .55rem .9rem;   border: 1px solid var(--v2-line);   border-radius: var(--v2-radius);   background: var(--v2-surface);   color: var(--v2-ink);   font-size: .875rem;   font-weight: 500;   text-decoration: none; } .skip-link:focus-visible { left: .75rem; }
+/* Keyboard-only entry point. It stays off-canvas until focused so it never
+   affects the visual rhythm of the page. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0.5rem;
+  z-index: 100;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--vmz-line-default);
+  border-radius: var(--vmz-radius-md);
+  background: var(--vmz-surface-paper);
+  color: var(--vmz-text-ink);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+.skip-link:focus-visible { left: 0.75rem; }
+
 .site > main { flex: 1 0 auto; }
 .site > [data-vmz="SiteFooter"] { display: block; width: 100%; flex: 0 0 auto; }
 .site > div:has(> .site-header) { display: contents; }
 .vmz-slot-content { display: contents; }
 
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
+/* Components read this token, so one reset covers every transition without
+   fighting declarations with !important. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --vmz-motion-control-duration: 0ms; }
+  html { scroll-behavior: auto; }
+}

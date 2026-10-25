@@ -2,8 +2,8 @@
     <SiteShell page="deploy-planner" variant="planner-page">
         <main id="main" class="planner">
             <header class="planner__hero">
-                <p class="v2-kicker">
-                    <span aria-hidden="true" class="v2-kicker__dot" />
+                <p class="kicker">
+                    <span aria-hidden="true" class="kicker__dot" />
                     {{ kicker }}
                 </p>
                 <h1 id="planner-title">
@@ -327,7 +327,7 @@
     max-width: 44rem;
     margin-bottom: 2.5rem;
 }
-.planner__hero .v2-kicker {
+.planner__hero .kicker {
     margin-bottom: 0.85rem;
 }
 .planner__hero h1 {

@@ -1,11 +1,11 @@
 <template>
-    <SiteShell page="home" variant="landing-page landing-v2">
+    <SiteShell page="home" variant="landing-page landing">
         <main id="main">
-            <section aria-labelledby="landing-title" data-vmz-fixture="landing-brand" class="v2-hero">
-                <div class="v2-hero__inner">
-                    <div class="v2-hero__copy">
-                        <p data-vmz-fixture="landing-hero-kicker" class="v2-kicker">
-                            <span aria-hidden="true" class="v2-kicker__dot" />
+            <section aria-labelledby="landing-title" data-vmz-fixture="landing-brand" class="hero">
+                <div class="hero__inner">
+                    <div class="hero__copy">
+                        <p data-vmz-fixture="landing-hero-kicker" class="kicker">
+                            <span aria-hidden="true" class="kicker__dot" />
                             {{ heroKickerLabel }}
                         </p>
                         <h1 id="landing-title" data-vmz-fixture="landing-hero-title">
@@ -15,18 +15,18 @@
                                 {{ heroTitleEmLabel }}
                             </em>
                         </h1>
-                        <p data-vmz-fixture="landing-hero-lede" class="v2-lede">
+                        <p data-vmz-fixture="landing-hero-lede" class="lede">
                             {{ heroLedeLabel }}
                         </p>
-                        <div class="v2-actions">
-                            <a data-vmz-fixture="landing-primary-cta" :href="guideHref" class="v2-button v2-button--primary">
+                        <div class="actions">
+                            <a data-vmz-fixture="landing-primary-cta" :href="guideHref" class="button button--primary">
                                 {{ heroPrimaryCtaLabel }}
                             </a>
-                            <a data-vmz-fixture="landing-secondary-cta" href="#how-it-works" class="v2-button v2-button--secondary">
+                            <a data-vmz-fixture="landing-secondary-cta" href="#how-it-works" class="button button--secondary">
                                 {{ viewProductUiLabel }}
                             </a>
                         </div>
-                        <ul class="v2-targets">
+                        <ul class="targets">
                             <li>
                                 Web
                             </li>
@@ -43,14 +43,14 @@
                                 Native
                             </li>
                         </ul>
-                        <p class="v2-hero-note">
+                        <p class="hero-note">
                             <a :href="docsRootHref">
                                 {{ heroFootnoteLabel }}
                             </a>
                         </p>
                     </div>
-                    <div class="v2-hero__preview-wrap">
-                        <p class="v2-hero-preview__demo-label">
+                    <div class="hero__preview-wrap">
+                        <p class="hero-preview__demo-label">
                             {{ heroPreviewDemoLabelText }}
                         </p>
                         <div data-vmz-fixture="landing-hero-preview" class="landing-code-panel">
@@ -83,9 +83,9 @@
                     </div>
                 </div>
             </section>
-            <section :aria-label="featuresAriaLabel" class="v2-features">
-                <article class="v2-feature">
-                    <div class="v2-feature__icon">
+            <section :aria-label="featuresAriaLabel" class="features">
+                <article class="feature">
+                    <div class="feature__icon">
                         <Icon name="feature.incremental" size="md" />
                     </div>
                     <h3>
@@ -95,8 +95,8 @@
                         {{ feature1BodyLabel }}
                     </p>
                 </article>
-                <article class="v2-feature">
-                    <div class="v2-feature__icon">
+                <article class="feature">
+                    <div class="feature__icon">
                         <Icon name="feature.runtime" size="md" />
                     </div>
                     <h3>
@@ -106,8 +106,8 @@
                         {{ feature2BodyLabel }}
                     </p>
                 </article>
-                <article class="v2-feature">
-                    <div class="v2-feature__icon">
+                <article class="feature">
+                    <div class="feature__icon">
                         <Icon name="feature.deploy" size="md" />
                     </div>
                     <h3>
@@ -121,7 +121,7 @@
             <section id="showcase" aria-labelledby="showcase-title" class="landing-case">
                 <div class="landing-case__inner">
                     <div class="landing-case__copy">
-                        <p class="v2-index">
+                        <p class="index">
                             {{ showcaseIndexLabel }}
                         </p>
                         <h2 id="showcase-title">
@@ -188,8 +188,8 @@
                 </div>
             </section>
             <section id="how-it-works" aria-labelledby="flow-title" class="landing-explain">
-                <div class="v2-section-head">
-                    <p class="v2-index">
+                <div class="section-head">
+                    <p class="index">
                         {{ flowIndexLabel }}
                     </p>
                     <h2 id="flow-title">
@@ -238,9 +238,9 @@
                     </span>
                 </a>
             </section>
-            <section aria-labelledby="statement-title" class="v2-statement">
-                <div class="v2-statement__head">
-                    <p class="v2-index">
+            <section aria-labelledby="statement-title" class="statement">
+                <div class="statement__head">
+                    <p class="index">
                         {{ statementIndexLabel }}
                     </p>
                     <h2 id="statement-title" data-vmz-fixture="landing-statement-title">
@@ -251,23 +251,23 @@
                         </em>
                     </h2>
                 </div>
-                <div class="v2-statement__body">
+                <div class="statement__body">
                     <p data-vmz-fixture="landing-statement-body">
                         {{ statementBodyLabel }}
                     </p>
-                    <div class="v2-statement__actions">
-                        <a :href="docsRootHref" class="v2-button v2-button--text">
+                    <div class="statement__actions">
+                        <a :href="docsRootHref" class="button button--text">
                             {{ readDocsLabel }}
                         </a>
-                        <a :href="guideHref" class="v2-button v2-button--text">
+                        <a :href="guideHref" class="button button--text">
                             {{ gettingStartedGuideLabel }}
                         </a>
                     </div>
                 </div>
             </section>
-            <section aria-labelledby="start-title" class="v2-start">
-                <div class="v2-start__inner">
-                    <p class="v2-index">
+            <section aria-labelledby="start-title" class="start">
+                <div class="start__inner">
+                    <p class="index">
                         {{ startIndexLabel }}
                     </p>
                     <h2 id="start-title" data-vmz-fixture="landing-start-title">
@@ -276,8 +276,8 @@
                     <p data-vmz-fixture="landing-start-lede">
                         {{ startLedeLabel }}
                     </p>
-                    <div class="v2-actions">
-                        <a data-vmz-fixture="landing-start-cta" :href="guideHref" class="v2-button v2-button--primary">
+                    <div class="actions">
+                        <a data-vmz-fixture="landing-start-cta" :href="guideHref" class="button button--primary">
                             {{ startLabel }}
                         </a>
                     </div>

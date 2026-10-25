@@ -22,7 +22,7 @@ import { readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/cop
  */
 export default class SiteShell {
     public page: string = "";
-    /** Extra page classes appended to the shell root, e.g. `landing-page landing-v2`. */
+    /** Extra page classes appended to the shell root, e.g. `landing-page landing`. */
     public variant: string = "";
     rootClass = "site";
     skipLabel = "";
