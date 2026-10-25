@@ -5,7 +5,7 @@
         "url": "git+https://github.com/doki-land/vmz-framework.git",
         "directory": "packages/runtimes/vmz-test"
     },
-    "version": "0.3.8",
+    "version": "0.3.9",
     "type": "module",
     "description": "VMZ native test protocol + Compile/Logic/Browser/SSR/Resume/Deployment hosts",
     "main": "./dist/index.js",

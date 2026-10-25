@@ -5,7 +5,7 @@
         "url": "git+https://github.com/doki-land/vmz-framework.git",
         "directory": "packages/runtimes/vmz-diagnostic"
     },
-    "version": "0.3.8",
+    "version": "0.3.9",
     "type": "module",
     "description": "Language-neutral diagnostic catalog render and pretty printer",
     "license": "MIT",
