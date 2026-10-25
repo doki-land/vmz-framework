@@ -16,6 +16,7 @@ import { registerDocumentCommands } from '../document/document-cmd.js';
 import { buildIntegratedDocuments, projectHasDocuments } from '../document/document-integrate.js';
 import { registerExplainCommand } from './explain-cmd.js';
 import { registerGithubActionsCommand } from './github-actions-cmd.js';
+import { registerInitCommands } from './init-cmd.js';
 import {
     createWorkspace,
     getProtocolVersions,
@@ -116,6 +117,7 @@ function buildProductCli(opts: { mode?: 'global' | 'project' } = {}): Cli {
     registerRefactorCommands(cli.command('refactor', 'cli.cmd.refactor'));
     registerExplainCommand(cli);
     registerGithubActionsCommand(cli);
+    registerInitCommands(cli.command('init', 'cli.cmd.init'));
 
     cli.command('version', 'cli.cmd.version').action(() => cmdVersion());
     return cli;

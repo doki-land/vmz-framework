@@ -18,6 +18,7 @@ const files = [
     'invocation.test.ts',
     'plugin.test.ts',
     'config-host.test.ts',
+    'init-design.test.ts',
     'wechat-packaging.test.ts',
     'dev-config-restart.test.ts',
     'port.test.ts',
