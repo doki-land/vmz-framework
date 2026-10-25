@@ -131,6 +131,48 @@ for (const tok of button.tokens) {
     }
 }
 
+console.log('ui-automation: web-surface preset covers the token contract…');
+const presetManifestPath = path.join(uiRoot, 'presets', 'web-surface.v0.json');
+if (!fs.existsSync(presetManifestPath)) fail('missing presets/web-surface.v0.json');
+const presetManifest = JSON.parse(fs.readFileSync(presetManifestPath, 'utf8'));
+if (presetManifest.files?.root !== 'presets/web-surface') fail('preset files.root');
+const presetDir = path.join(uiRoot, 'presets', 'web-surface');
+const presetLeaves = new Set<string>();
+function collectPresetLeaves(node, trail) {
+    if (Array.isArray(node)) {
+        for (const item of node) collectPresetLeaves(item, trail);
+        return;
+    }
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node.key?.path)) {
+        presetLeaves.add(node.key.path.join('.'));
+        return;
+    }
+    const entries = Object.entries(node).filter(([key]) => key !== 'key' && key !== 'value');
+    if (!entries.length) return;
+    if (entries.every(([, value]) => value === null || typeof value !== 'object')) {
+        for (const [key] of entries) presetLeaves.add([...trail, key].join('.'));
+        return;
+    }
+    for (const [key, value] of entries) collectPresetLeaves(value, [...trail, key]);
+}
+for (const rel of [
+    presetManifest.files.theme,
+    ...(presetManifest.files.tokens || []),
+    ...(presetManifest.files.themes || []),
+]) {
+    const file = path.join(presetDir, rel);
+    if (!fs.existsSync(file)) fail(`missing preset file ${rel}`);
+    collectPresetLeaves(JSON.parse(fs.readFileSync(file, 'utf8')), []);
+}
+const requiredTokens = new Set();
+for (const entry of Object.values(contract.components || {})) {
+    for (const tok of entry.tokens || []) requiredTokens.add(tok);
+}
+for (const tok of requiredTokens) {
+    if (!presetLeaves.has(tok)) fail(`web-surface preset misses token ${tok}`);
+}
+
 console.log('ui-automation: forbid brand hex inside @vmz/ui…');
 const uiSources = walkFiles(uiRoot, (p) => /\.(vmz|css|scss|ts|js|mjs|json)$/.test(p));
 const forbidden = (contract.forbiddenBrandHex || []).map((h) => h.toLowerCase());

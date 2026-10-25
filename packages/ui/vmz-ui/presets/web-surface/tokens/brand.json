@@ -1,0 +1,55 @@
+{
+    "brand": {
+        "primary": "#1677FF",
+        "energy": "#FAAD14"
+    },
+    "scale": {
+        "50": "#E6F4FF",
+        "100": "#BAE0FF",
+        "200": "#91CAFF",
+        "300": "#69B1FF",
+        "400": "#4096FF",
+        "500": "#1677FF",
+        "600": "#0958D9",
+        "700": "#003EB3",
+        "800": "#002C8C",
+        "900": "#001D66",
+        "950": "#000D33"
+    },
+    "surface": {
+        "paper": "#FFFFFF",
+        "mist": "#F7F8FA",
+        "page": "#F5F6F8",
+        "fill": "#FAFBFC",
+        "ink": "#1F2329",
+        "graphite": "#3A3F45",
+        "code": "#0F1115",
+        "inverse": "#1F2329"
+    },
+    "text": {
+        "ink": "#1F2329",
+        "steel": "#51565D",
+        "tertiary": "#646A73",
+        "muted": "#8A9099",
+        "on-brand": "#FFFFFF",
+        "on-ink": "#F7F8FA",
+        "on-inverse": "#F7F8FA"
+    },
+    "line": {
+        "default": "#E5E6EB",
+        "subtle": "#F0F1F3",
+        "strong": "#C9CDD4"
+    },
+    "status": {
+        "success": "#52C41A",
+        "warning": "#FAAD14",
+        "error": "#FF4D4F",
+        "analysis": "#722ED1",
+        "runtime": "#13C2C2"
+    },
+    "font": {
+        "sans": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+        "mono": "ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, \"Liberation Mono\", monospace",
+        "display": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", Roboto, \"Helvetica Neue\", Arial, sans-serif"
+    }
+}

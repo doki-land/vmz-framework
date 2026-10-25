@@ -3,6 +3,19 @@
     "id": "web-surface",
     "package": "@vmz/ui",
     "materialize": "Copy or resolve into application /designs Style Theme (tokens/*.json + themes/*.json). Preset is not a second runtime theme.",
+    "files": {
+        "root": "presets/web-surface",
+        "theme": "theme.json",
+        "tokens": [
+            "tokens/brand.json",
+            "tokens/semantic-action.json",
+            "tokens/semantic-density.json",
+            "tokens/semantic-layout.json",
+            "tokens/semantic-motion.json",
+            "tokens/semantic-status.json"
+        ],
+        "themes": ["themes/dark.json", "themes/high-contrast.json"]
+    },
     "foundation": {
         "radius": {
             "xs": "2px",

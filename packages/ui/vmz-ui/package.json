@@ -12,6 +12,7 @@
     "exports": {
         "./contracts/token-requirements": "./contracts/token-requirements.v0.json",
         "./presets/web-surface": "./presets/web-surface.v0.json",
+        "./presets/web-surface/*": "./presets/web-surface/*",
         "./conformance/pack": "./conformance/pack.v0.json",
         "./Button": "./src/components/Button.vmz",
         "./Link": "./src/components/Link.vmz",

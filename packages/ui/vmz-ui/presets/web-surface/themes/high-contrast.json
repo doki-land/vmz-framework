@@ -1,0 +1,176 @@
+{
+    "entries": [
+        {
+            "key": { "path": ["action", "primary", "background"] },
+            "value": "#003DB8"
+        },
+        {
+            "key": { "path": ["action", "primary", "foreground"] },
+            "value": "#FFFFFF"
+        },
+        {
+            "key": { "path": ["action", "primary", "hover"] },
+            "value": "#002A80"
+        },
+        {
+            "key": { "path": ["action", "primary", "active"] },
+            "value": "#001F5C"
+        },
+        {
+            "key": { "path": ["action", "primary", "soft"] },
+            "value": "#E6F4FF"
+        },
+        {
+            "key": { "path": ["focus", "ring"] },
+            "value": "#FFB000"
+        },
+        {
+            "key": { "path": ["surface", "paper"] },
+            "value": "#FFFFFF"
+        },
+        {
+            "key": { "path": ["surface", "mist"] },
+            "value": "#FFFFFF"
+        },
+        {
+            "key": { "path": ["surface", "page"] },
+            "value": "#FFFFFF"
+        },
+        {
+            "key": { "path": ["surface", "fill"] },
+            "value": "#F5F5F5"
+        },
+        {
+            "key": { "path": ["surface", "ink"] },
+            "value": "#000000"
+        },
+        {
+            "key": { "path": ["surface", "graphite"] },
+            "value": "#000000"
+        },
+        {
+            "key": { "path": ["surface", "code"] },
+            "value": "#000000"
+        },
+        {
+            "key": { "path": ["surface", "inverse"] },
+            "value": "#000000"
+        },
+        {
+            "key": { "path": ["text", "ink"] },
+            "value": "#000000"
+        },
+        {
+            "key": { "path": ["text", "steel"] },
+            "value": "#000000"
+        },
+        {
+            "key": { "path": ["text", "tertiary"] },
+            "value": "#1A1A1A"
+        },
+        {
+            "key": { "path": ["text", "muted"] },
+            "value": "#333333"
+        },
+        {
+            "key": { "path": ["text", "on-brand"] },
+            "value": "#FFFFFF"
+        },
+        {
+            "key": { "path": ["text", "on-ink"] },
+            "value": "#FFFFFF"
+        },
+        {
+            "key": { "path": ["text", "on-inverse"] },
+            "value": "#FFFFFF"
+        },
+        {
+            "key": { "path": ["line", "default"] },
+            "value": "#000000"
+        },
+        {
+            "key": { "path": ["line", "subtle"] },
+            "value": "#767676"
+        },
+        {
+            "key": { "path": ["line", "strong"] },
+            "value": "#000000"
+        },
+        {
+            "key": { "path": ["action", "secondary", "background"] },
+            "value": "#FFFFFF"
+        },
+        {
+            "key": { "path": ["action", "secondary", "foreground"] },
+            "value": "#000000"
+        },
+        {
+            "key": { "path": ["action", "secondary", "border"] },
+            "value": "#000000"
+        },
+        {
+            "key": { "path": ["action", "secondary", "hover"] },
+            "value": "#F2F2F2"
+        },
+        {
+            "key": { "path": ["action", "secondary", "active"] },
+            "value": "#E6E6E6"
+        },
+        {
+            "key": { "path": ["action", "link", "foreground"] },
+            "value": "#003DB8"
+        },
+        {
+            "key": { "path": ["action", "link", "hover"] },
+            "value": "#001F5C"
+        },
+        {
+            "key": { "path": ["status", "info", "foreground"] },
+            "value": "#003DB8"
+        },
+        {
+            "key": { "path": ["status", "info", "background"] },
+            "value": "#E6F4FF"
+        },
+        {
+            "key": { "path": ["status", "info", "border"] },
+            "value": "#003DB8"
+        },
+        {
+            "key": { "path": ["status", "success", "foreground"] },
+            "value": "#1A5C0A"
+        },
+        {
+            "key": { "path": ["status", "success", "background"] },
+            "value": "#F6FFED"
+        },
+        {
+            "key": { "path": ["status", "success", "border"] },
+            "value": "#2F5A22"
+        },
+        {
+            "key": { "path": ["status", "warning", "foreground"] },
+            "value": "#6B3A00"
+        },
+        {
+            "key": { "path": ["status", "warning", "background"] },
+            "value": "#FFFBE6"
+        },
+        {
+            "key": { "path": ["status", "warning", "border"] },
+            "value": "#8A5A00"
+        },
+        {
+            "key": { "path": ["status", "danger", "foreground"] },
+            "value": "#8A0A0A"
+        },
+        {
+            "key": { "path": ["status", "danger", "background"] },
+            "value": "#FFF1F0"
+        },
+        {
+            "key": { "path": ["status", "danger", "border"] },
+            "value": "#A8071A"
+        }
+    ]
+}
