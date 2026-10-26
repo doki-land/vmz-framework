@@ -194,6 +194,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'Direct v-html payload is present in the first SSR response',
         pre: ['build:runtimes'],
     },
+    'v-pre': {
+        file: 'v-pre/v-pre.ts',
+        description: 'SSR ↔ mount ↔ hydrate: v-pre region preserves Vue literals, siblings stay reactive',
+        pre: ['build:runtimes'],
+    },
     'keyed-list': { file: 'runtime/keyed-list.ts' },
     'slot-projection': { file: 'runtime/slot-projection.ts' },
     invalidation: { file: 'runtime/invalidation.ts' },
