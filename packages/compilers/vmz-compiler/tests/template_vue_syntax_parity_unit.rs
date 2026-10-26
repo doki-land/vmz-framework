@@ -219,12 +219,185 @@ fn rejects_side_effect_tags_in_templates() {
 
 #[test]
 fn accepts_v_pre() {
-    // `v-pre` is valid Vue syntax. VMZ accepts it as `Directive::Custom`; the
-    // runtime still compiles `{{ … }}`, so the author must know the directive is
-    // treated as an attribute rather than a verbatim block.
+    // `v-pre` is valid Vue syntax. VMZ accepts it and treats it as a **verbatim region**
+    // rather than a custom directive — see `verbatim_v_pre_skips_interpolation` and
+    // `verbatim_v_pre_skips_directives` for semantic coverage.
     assert_accepted(r#"<div v-pre>{{ x }}</div>"#);
     assert_accepted(r#"<div v-pre>plain</div>"#);
     assert_accepted(r#"<p v-pre :id="x">{{ y }}</p>"#);
+}
+
+#[test]
+fn verbatim_v_pre_skips_interpolation() {
+    use vmz_compiler::SemanticIr;
+
+    let body = r#"<div v-pre>{{ x }}<span>{{ y }}</span></div>"#;
+    let oak = oak_semantic(body).expect("oak parse");
+    let adapter = adapter_semantic(body).expect("adapter parse");
+
+    for (label, semantic) in [("oak", oak), ("adapter", adapter)] {
+        let SemanticIr { roots } = &semantic;
+        let SemanticNode::Element { tag, props, children, .. } = &roots[0] else {
+            panic!("{label}: expected root element");
+        };
+        assert_eq!(tag, "div");
+        // v-pre attr is preserved as plain Static (source spelling).
+        assert!(
+            props.iter().any(|p| matches!(p, SemanticProp::Static { name, .. } if name == "v-pre")),
+            "{label}: v-pre should be kept as Static prop"
+        );
+        // Verbatim subtree must contain NO Interpolation nodes — they became Text.
+        let interp_count = count_interpolations(children);
+        assert_eq!(interp_count, 0, "{label}: verbatim subtree must have zero Interpolation");
+        // And the literal `{{ x }}` / `{{ y }}` must survive as Text nodes.
+        let text_values = flatten_text_values(children);
+        assert!(
+            text_values.iter().any(|t| t == "{{ x }}"),
+            "{label}: expected literal text `{{ x }}`, got {text_values:?}"
+        );
+        assert!(
+            text_values.iter().any(|t| t == "{{ y }}"),
+            "{label}: expected literal text `{{ y }}`, got {text_values:?}"
+        );
+    }
+}
+
+#[test]
+fn verbatim_v_pre_skips_directives() {
+    let body = r#"<div v-pre :class="cls" @click="fn" v-if="ok"><span v-for="i in xs">{{ i }}</span></div>"#;
+    let semantic = oak_semantic(body).expect("oak parse");
+
+    let SemanticNode::Element { tag, props, children, .. } = &semantic.roots[0] else {
+        panic!("expected root element");
+    };
+    assert_eq!(tag, "div");
+
+    // Every prop on the verbatim root must be Static — no Bind/On/Model/ClassPlan/StylePlan.
+    for p in props {
+        assert!(
+            matches!(p, SemanticProp::Static { .. }),
+            "verbatim root prop must be Static, got {p:?}"
+        );
+    }
+
+    // And recursively through children: verbatim subtrees must have zero Interp/Bind/On/Model.
+    assert!(
+        !has_non_static_prop(children),
+        "verbatim subtree must not contain reactive props"
+    );
+    assert_eq!(count_interpolations(children), 0);
+}
+
+#[test]
+fn v_pre_does_not_affect_siblings_or_parent() {
+    let body = r#"<p>{{ a }}</p><div v-pre>{{ b }}</div><span :title="t">{{ c }}</span>"#;
+    let semantic = oak_semantic(body).expect("oak parse");
+
+    // Three roots:
+    // 1. <p>{{ a }}</p> — NORMAL, should have one Interpolation child
+    // 2. <div v-pre>{{ b }}</div> — VERBATIM
+    // 3. <span :title="t">{{ c }}</span> — NORMAL, should have Bind + Interp
+    assert_eq!(semantic.roots.len(), 3);
+
+    // Root 1: normal interpolation
+    let SemanticNode::Element { children, .. } = &semantic.roots[0] else {
+        panic!("root 1");
+    };
+    let interp_count = count_interpolations(children);
+    assert_eq!(interp_count, 1, "sibling <p> must keep its Interpolation");
+
+    // Root 3: sibling with bind + interpolation
+    let SemanticNode::Element { props, children, .. } = &semantic.roots[2] else {
+        panic!("root 3");
+    };
+    assert!(
+        props.iter().any(|p| matches!(p, SemanticProp::Bind { .. })),
+        "sibling <span> must keep its Bind prop"
+    );
+    assert_eq!(count_interpolations(children), 1);
+}
+
+fn count_interpolations(nodes: &[SemanticNode]) -> usize {
+    let mut n = 0;
+    for node in nodes {
+        match node {
+            SemanticNode::Interpolation { .. } => n += 1,
+            SemanticNode::Element { children, .. }
+            | SemanticNode::SlotOutlet { children, .. } => n += count_interpolations(children),
+            SemanticNode::IfChain { branches, .. } => {
+                for b in branches {
+                    n += count_interpolations(std::slice::from_ref(b.body.as_ref()));
+                }
+            }
+            SemanticNode::ForNode { body, .. }
+            | SemanticNode::SlotTemplate { body, .. } => {
+                n += count_interpolations(std::slice::from_ref(body.as_ref()));
+            }
+            SemanticNode::Text { .. } => {}
+        }
+    }
+    n
+}
+
+fn flatten_text_values(nodes: &[SemanticNode]) -> Vec<String> {
+    let mut out = Vec::new();
+    for node in nodes {
+        match node {
+            SemanticNode::Text { value, .. } => out.push(value.clone()),
+            SemanticNode::Element { children, .. }
+            | SemanticNode::SlotOutlet { children, .. } => out.extend(flatten_text_values(children)),
+            SemanticNode::IfChain { branches, .. } => {
+                for b in branches {
+                    out.extend(flatten_text_values(std::slice::from_ref(b.body.as_ref())));
+                }
+            }
+            SemanticNode::ForNode { body, .. }
+            | SemanticNode::SlotTemplate { body, .. } => {
+                out.extend(flatten_text_values(std::slice::from_ref(body.as_ref())));
+            }
+            SemanticNode::Interpolation { .. } => {
+                panic!("flatten_text_values: unexpected Interpolation — caller must filter verbatim first")
+            }
+        }
+    }
+    out
+}
+
+fn has_non_static_prop(nodes: &[SemanticNode]) -> bool {
+    for node in nodes {
+        match node {
+            SemanticNode::Element { props, children, .. } => {
+                for p in props {
+                    if !matches!(p, SemanticProp::Static { .. }) {
+                        return true;
+                    }
+                }
+                if has_non_static_prop(children) {
+                    return true;
+                }
+            }
+            SemanticNode::IfChain { branches, .. } => {
+                for b in branches {
+                    if has_non_static_prop(std::slice::from_ref(b.body.as_ref())) {
+                        return true;
+                    }
+                }
+            }
+            SemanticNode::ForNode { body, .. }
+            | SemanticNode::SlotTemplate { body, .. } => {
+                if has_non_static_prop(std::slice::from_ref(body.as_ref())) {
+                    return true;
+                }
+            }
+            SemanticNode::SlotOutlet { children, .. } => {
+                if has_non_static_prop(children) {
+                    return true;
+                }
+            }
+            SemanticNode::Text { .. } | SemanticNode::Interpolation { .. } => {}
+        }
+    }
+    false
 }
 
 #[test]
