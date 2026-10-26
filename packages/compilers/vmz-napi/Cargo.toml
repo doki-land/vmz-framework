@@ -25,6 +25,7 @@ vmz-github.workspace = true
 vmz-protocol.workspace = true
 vmz-plugin-tailwind.workspace = true
 vmz-plugin-sasso.workspace = true
+vmz-iris-adapter = { path = "../vmz-iris-adapter" }
 
 [build-dependencies]
 napi-build = "2"

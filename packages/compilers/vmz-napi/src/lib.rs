@@ -1878,3 +1878,45 @@ pub fn github_actions_monitor_json(request_json: String) -> Result<String> {
         vmz_github::monitor_blocking(request).map_err(|e| Error::from_reason(e.to_string()))?;
     serde_json::to_string(&result).map_err(|e| Error::from_reason(e.to_string()))
 }
+
+// ---------------------------------------------------------------------------
+// Iris generator surface (vmz-iris-adapter → iris-generator)
+// ---------------------------------------------------------------------------
+
+/// One generated Iris client file, exposed to Node hosts.
+#[napi(object)]
+pub struct VmzIrisGeneratedFile {
+    /// Relative path inside the generate root (e.g. `browser.ts`,
+    /// `_internal/synthesize.ts`).
+    pub name: String,
+    /// File content.
+    pub content: String,
+}
+
+/// Result of [`vmz_generate_iris`].
+#[napi(object)]
+pub struct VmzGenerateIrisResult {
+    /// Deterministic schema fingerprint (lowercase hex SHA-256).
+    pub fingerprint: String,
+    /// All generated files.
+    pub files: Vec<VmzIrisGeneratedFile>,
+}
+
+/// Invoke Iris TypeScript client generation from a raw VOS schema document.
+///
+/// Thin N-API shim over `vmz-iris-adapter::generate_from_vos_schema`. No CLI
+/// wiring, no filesystem I/O — callers own the write step.
+#[napi]
+pub fn vmz_generate_iris(vos_source: String) -> Result<VmzGenerateIrisResult> {
+    let result = vmz_iris_adapter::generate_from_vos_schema(&vos_source)
+        .map_err(|e| Error::from_reason(format!("vmzGenerateIris: {e}")))?;
+    let files = result
+        .files
+        .into_iter()
+        .map(|(name, content)| VmzIrisGeneratedFile { name, content })
+        .collect();
+    Ok(VmzGenerateIrisResult {
+        fingerprint: result.fingerprint,
+        files,
+    })
+}
