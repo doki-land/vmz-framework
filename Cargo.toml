@@ -9,12 +9,18 @@ members = [
     "packages/compilers/vmz-inspector",
     "packages/compilers/vmz-formatter",
     "packages/compilers/vmz-oak-frontend-adapter",
-    "packages/compilers/vmz-napi",
     "packages/compilers/vmz-artifacts",
     "packages/compilers/vmz-github",
     "packages/compilers/vmz-plugin-tailwind",
     "packages/compilers/vmz-plugin-sasso",
-    "packages/compilers/vmz-iris-adapter",
+    # vmz-napi and vmz-iris-adapter are intentionally excluded from the CI workspace
+    # because vmz-iris-adapter references iris-generator via a sibling path dep
+    # (`../../../../iris-orm/projects/iris.rs/crates/iris-generator`) that only
+    # exists on developer machines with the full multi-repo checkout.
+    # Local builds that need the N-API surface should invoke these crates directly
+    # (e.g. `cargo build -p vmz-napi --manifest-path packages/compilers/vmz-napi/Cargo.toml`)
+    # with the iris-orm sibling present. Re-enable once iris-generator is published
+    # as a standalone crate or mirrored into this repo.
 ]
 default-members = ["packages/compilers/vmz-compiler"]
 
