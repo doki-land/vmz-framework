@@ -8,8 +8,8 @@ use vmz_oak_frontend_adapter::{TemplateShellInput, parse_template_ast};
 use super::template_common::{TemplateParseError, decode_html_entities};
 use super::template_concrete::{ConcreteAttr, ConcreteIr, ConcreteNode, classify_concrete_attr};
 use super::template_semantic::{
-    ControlFlowKind, IfBranch, SemanticIr, SemanticNode, control_flow_kind, if_chain_from_branches,
-    semantic_from_element_parts, validate_root_slot_templates,
+    ControlFlowKind, IfBranch, SemanticIr, SemanticNode, SemanticProp, control_flow_kind,
+    if_chain_from_branches, semantic_from_element_parts, validate_root_slot_templates,
 };
 use super::template_span::TemplateSpan;
 use crate::sfc::TemplateBlock;
@@ -179,6 +179,11 @@ fn lower_oak_siblings(
                 i += 1;
             }
             VueNode::Element(el) => {
+                if oak_element_has_pre_directive(shell, el) {
+                    out.push(lower_oak_element_verbatim(shell, el)?);
+                    i += 1;
+                    continue;
+                }
                 let attrs = classify_oak_attrs(shell, el)?;
                 let span = to_body_span(shell, el.span);
                 match control_flow_kind(&attrs) {
@@ -417,4 +422,98 @@ fn normalize_oak_interpolation_expr(raw: &str) -> String {
 fn to_body_span(_shell: &str, range: Range<usize>) -> TemplateSpan {
     let base = TEMPLATE_OPEN.len();
     TemplateSpan::from_usize(range.start.saturating_sub(base), range.end.saturating_sub(base))
+}
+
+// ——————————————————————————————————————————————————————————————————————————
+// Verbatim (`v-pre`) lowering
+// ——————————————————————————————————————————————————————————————————————————
+
+fn oak_element_has_pre_directive(shell: &str, el: &VueElement) -> bool {
+    for attr in &el.attributes {
+        let VueAttribute::Directive(d) = attr else { continue };
+        let name_txt = slice(shell, d.name);
+        if let Some(rest) = name_txt.strip_prefix("v-") {
+            let base = rest.split(|c: char| c == ':' || c == '.').next().unwrap_or("");
+            if base == "pre" {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn lower_oak_element_verbatim(
+    shell: &str,
+    el: &VueElement,
+) -> Result<SemanticNode, TemplateParseError> {
+    let tag = slice(shell, el.tag_name).to_string();
+    let span = to_body_span(shell, el.span);
+    let props = lower_oak_props_verbatim(shell, el);
+    let children = lower_oak_siblings_verbatim(shell, &el.children)?;
+    Ok(SemanticNode::Element { tag, props, children, span })
+}
+
+fn lower_oak_siblings_verbatim(
+    shell: &str,
+    nodes: &[VueNode],
+) -> Result<Vec<SemanticNode>, TemplateParseError> {
+    let mut out = Vec::new();
+    for node in nodes {
+        match node {
+            VueNode::Comment(_) => {}
+            VueNode::Text(t) => {
+                let value = decode_html_entities(slice(shell, t.span));
+                if !value.trim().is_empty() {
+                    out.push(SemanticNode::Text {
+                        value,
+                        span: to_body_span(shell, t.span),
+                    });
+                }
+            }
+            VueNode::Interpolation(interp) => {
+                let value = slice(shell, interp.span).to_string();
+                out.push(SemanticNode::Text {
+                    value,
+                    span: to_body_span(shell, interp.span),
+                });
+            }
+            VueNode::Element(child) => {
+                out.push(lower_oak_element_verbatim(shell, child)?);
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn lower_oak_props_verbatim(shell: &str, el: &VueElement) -> Vec<SemanticProp> {
+    let mut out = Vec::with_capacity(el.attributes.len());
+    for attr in &el.attributes {
+        let (name, value, attr_span) = match attr {
+            VueAttribute::Attribute(a) => {
+                let name = slice(shell, a.name).to_string();
+                let value = a
+                    .value
+                    .as_ref()
+                    .map(|v| decode_html_entities(slice(shell, v.span)))
+                    .unwrap_or_default();
+                (name, value, a.span)
+            }
+            VueAttribute::Directive(d) => {
+                let raw = directive_source_text(shell, d);
+                let (name_part, value_str) = if let Some(eq) = raw.find('=') {
+                    let lhs = raw[..eq].trim().to_string();
+                    let rest = &raw[eq + 1..];
+                    let unquoted = unquote_attr_value(rest.trim());
+                    let decoded = decode_html_entities(&unquoted);
+                    (lhs, decoded)
+                } else {
+                    (raw.trim().to_string(), String::new())
+                };
+                (name_part, value_str, d.span)
+            }
+        };
+        let span = to_body_span(shell, attr_span);
+        out.push(SemanticProp::Static { name, value, span });
+    }
+    out
 }

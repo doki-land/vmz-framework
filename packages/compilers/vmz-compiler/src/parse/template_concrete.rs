@@ -172,6 +172,10 @@ pub enum Directive {
         /// Model modifiers (`lazy`, `number`, …).
         modifiers: Vec<String>,
     },
+    /// `v-pre` — marks this element and all descendants as verbatim (no interpolation,
+    /// no directive interpretation). Lowered as a region marker on Semantic; **not**
+    /// treated as [`Directive::Custom`].
+    Pre,
     /// Other `v-*` custom directive.
     Custom {
         /// Directive name without `v-` prefix.
@@ -307,6 +311,12 @@ fn classify_one(attr: RawAttr) -> Result<ConcreteAttr, TemplateParseError> {
     }
 
     if let Some(rest) = name.strip_prefix("v-") {
+        // `v-pre` is a recognized Vue directive with verbatim semantics; it must not
+        // fall through to `Directive::Custom` because downstream verbatim handling
+        // depends on this marker being recognizable.
+        if rest.split_once(':').is_some_and(|(n, _)| n == "pre") || rest == "pre" {
+            return Ok(ConcreteAttr::Directive { dir: Directive::Pre, span });
+        }
         let (base_and_arg, modifiers) = split_trailing_modifiers(rest);
         let (dir_name, arg) = split_v_name_arg(base_and_arg);
         if dir_name.is_empty() {

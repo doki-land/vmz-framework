@@ -534,33 +534,40 @@ fn lower_siblings(nodes: &[ConcreteNode]) -> Result<Vec<SemanticNode>, TemplateP
                 out.push(SemanticNode::Interpolation { expr: expr.clone(), span: *span });
                 i += 1;
             }
-            ConcreteNode::Element { attrs, span, .. } => match control_flow_kind(attrs) {
-                Some(ControlFlowKind::If(_)) => {
-                    let (chain, consumed) = take_if_chain(&nodes[i..])?;
-                    out.push(chain);
-                    i += consumed;
-                }
-                Some(ControlFlowKind::ElseIf(_)) => {
-                    return Err(TemplateParseError::coded(
-                        "vmz::template::illegal_directive",
-                        span.start as usize,
-                    ));
-                }
-                Some(ControlFlowKind::Else) => {
-                    return Err(TemplateParseError::coded(
-                        "vmz::template::illegal_directive",
-                        span.start as usize,
-                    ));
-                }
-                None if for_directive(attrs).is_some() => {
-                    out.push(lower_for_element(&nodes[i])?);
+            ConcreteNode::Element { attrs, span, .. } => {
+                if concrete_has_pre_directive(attrs) {
+                    out.push(lower_element_verbatim(&nodes[i])?);
                     i += 1;
+                    continue;
                 }
-                None => {
-                    out.push(lower_element_strip_control_flow(&nodes[i])?);
-                    i += 1;
+                match control_flow_kind(attrs) {
+                    Some(ControlFlowKind::If(_)) => {
+                        let (chain, consumed) = take_if_chain(&nodes[i..])?;
+                        out.push(chain);
+                        i += consumed;
+                    }
+                    Some(ControlFlowKind::ElseIf(_)) => {
+                        return Err(TemplateParseError::coded(
+                            "vmz::template::illegal_directive",
+                            span.start as usize,
+                        ));
+                    }
+                    Some(ControlFlowKind::Else) => {
+                        return Err(TemplateParseError::coded(
+                            "vmz::template::illegal_directive",
+                            span.start as usize,
+                        ));
+                    }
+                    None if for_directive(attrs).is_some() => {
+                        out.push(lower_for_element(&nodes[i])?);
+                        i += 1;
+                    }
+                    None => {
+                        out.push(lower_element_strip_control_flow(&nodes[i])?);
+                        i += 1;
+                    }
                 }
-            },
+            }
         }
     }
     Ok(out)
@@ -910,4 +917,130 @@ fn merge_span(prev: Option<TemplateSpan>, next: TemplateSpan) -> TemplateSpan {
         None => next,
         Some(p) => TemplateSpan { start: p.start.min(next.start), end: p.end.max(next.end) },
     }
+}
+
+// ——————————————————————————————————————————————————————————————————————————
+// Concrete → Semantic verbatim (`v-pre`) lowering
+// ——————————————————————————————————————————————————————————————————————————
+
+fn concrete_has_pre_directive(attrs: &[ConcreteAttr]) -> bool {
+    attrs.iter().any(|a| {
+        matches!(
+            a,
+            ConcreteAttr::Directive { dir: Directive::Pre, .. }
+        )
+    })
+}
+
+fn lower_element_verbatim(node: &ConcreteNode) -> Result<SemanticNode, TemplateParseError> {
+    let ConcreteNode::Element { tag, attrs, children, span } = node else {
+        return Err(TemplateParseError::parse_failed(
+            "internal: expected element for v-pre lowering",
+            0,
+        ));
+    };
+    let props = lower_attrs_verbatim(attrs);
+    let kids = lower_siblings_verbatim(children)?;
+    Ok(SemanticNode::Element { tag: tag.clone(), props, children: kids, span: *span })
+}
+
+fn lower_siblings_verbatim(
+    nodes: &[ConcreteNode],
+) -> Result<Vec<SemanticNode>, TemplateParseError> {
+    let mut out = Vec::new();
+    for node in nodes {
+        match node {
+            ConcreteNode::Comment { .. } => {}
+            ConcreteNode::Text { value, span } => {
+                if !value.trim().is_empty() {
+                    out.push(SemanticNode::Text { value: value.clone(), span: *span });
+                }
+            }
+            // Verbatim: `{{ x }}` must be kept as literal text including the mustache
+            // delimiters. Oak AST had the full source span here; Concrete only has
+            // the expression body, so we reconstruct `{{ expr }}`.
+            ConcreteNode::Interpolation { expr, span } => {
+                let value = format!("{{{{ {} }}}}", expr);
+                out.push(SemanticNode::Text { value, span: *span });
+            }
+            ConcreteNode::Element { .. } => {
+                out.push(lower_element_verbatim(node)?);
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Turn every ConcreteAttr on a verbatim element back into a `SemanticProp::Static`.
+///
+/// The Concrete layer already folds source spellings (`:title`, `v-bind:title`) into
+/// structured variants, so we rebuild the common spellings on a best-effort basis
+/// rather than inventing a source span round-trip. For the `v-pre` use case the
+/// exact author spelling does not affect runtime behavior — verbatim still renders
+/// a plain attribute — but keeping close to Vue's authoring surface aids parity.
+fn lower_attrs_verbatim(attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
+    let mut out = Vec::with_capacity(attrs.len());
+    for attr in attrs {
+        let (name, value, span) = match attr {
+            ConcreteAttr::Static { name, value, span } => {
+                (name.clone(), value.clone(), *span)
+            }
+            ConcreteAttr::Directive { dir, span } => {
+                match dir {
+                    Directive::Pre => ("v-pre".into(), String::new(), *span),
+                    Directive::If { test } => ("v-if".into(), test.clone(), *span),
+                    Directive::ElseIf { test } => ("v-else-if".into(), test.clone(), *span),
+                    Directive::Else => ("v-else".into(), String::new(), *span),
+                    Directive::For { source, .. } => ("v-for".into(), source.clone(), *span),
+                    Directive::Html { expr } => ("v-html".into(), expr.clone(), *span),
+                    Directive::Show { expr } => ("v-show".into(), expr.clone(), *span),
+                    Directive::Model { arg, expr, .. } => (
+                        match arg {
+                            Some(a) => format!("v-model:{a}"),
+                            None => "v-model".into(),
+                        },
+                        expr.clone(),
+                        *span,
+                    ),
+                    Directive::Bind { arg, expr, .. } => {
+                        let n = match arg {
+                            DirectiveArg::Static(s) => format!(":{s}"),
+                            DirectiveArg::Dynamic(e) => format!(":[{e}]"),
+                        };
+                        (n, expr.clone(), *span)
+                    }
+                    Directive::BindObject { expr } => {
+                        ("v-bind".into(), expr.clone(), *span)
+                    }
+                    Directive::On { arg, handler, .. } => {
+                        let n = match arg {
+                            DirectiveArg::Static(s) => format!("@{s}"),
+                            DirectiveArg::Dynamic(e) => format!("@[{e}]"),
+                        };
+                        (n, handler.clone(), *span)
+                    }
+                    Directive::OnObject { expr } => {
+                        ("v-on".into(), expr.clone(), *span)
+                    }
+                    Directive::Slot { name, props } => {
+                        let n = match name {
+                            DirectiveArg::Static(s) => format!("#{s}"),
+                            DirectiveArg::Dynamic(e) => format!("#[{e}]"),
+                        };
+                        (n, props.clone().unwrap_or_default(), *span)
+                    }
+                    Directive::Custom { name, arg, expr, .. } => {
+                        let n = match arg {
+                            Some(DirectiveArg::Static(a)) => format!("v-{name}:{a}"),
+                            Some(DirectiveArg::Dynamic(e)) => format!("v-{name}:[{e}]"),
+                            None => format!("v-{name}"),
+                        };
+                        (n, expr.clone().unwrap_or_default(), *span)
+                    }
+                }
+            }
+        };
+        out.push(SemanticProp::Static { name, value, span });
+    }
+    out
 }
