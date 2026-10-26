@@ -464,18 +464,12 @@ fn lower_oak_siblings_verbatim(
             VueNode::Text(t) => {
                 let value = decode_html_entities(slice(shell, t.span));
                 if !value.trim().is_empty() {
-                    out.push(SemanticNode::Text {
-                        value,
-                        span: to_body_span(shell, t.span),
-                    });
+                    out.push(SemanticNode::Text { value, span: to_body_span(shell, t.span) });
                 }
             }
             VueNode::Interpolation(interp) => {
                 let value = slice(shell, interp.span).to_string();
-                out.push(SemanticNode::Text {
-                    value,
-                    span: to_body_span(shell, interp.span),
-                });
+                out.push(SemanticNode::Text { value, span: to_body_span(shell, interp.span) });
             }
             VueNode::Element(child) => {
                 out.push(lower_oak_element_verbatim(shell, child)?);

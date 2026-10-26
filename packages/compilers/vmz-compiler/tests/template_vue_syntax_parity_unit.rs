@@ -281,10 +281,7 @@ fn verbatim_v_pre_skips_directives() {
     }
 
     // And recursively through children: verbatim subtrees must have zero Interp/Bind/On/Model.
-    assert!(
-        !has_non_static_prop(children),
-        "verbatim subtree must not contain reactive props"
-    );
+    assert!(!has_non_static_prop(children), "verbatim subtree must not contain reactive props");
     assert_eq!(count_interpolations(children), 0);
 }
 
@@ -322,15 +319,15 @@ fn count_interpolations(nodes: &[SemanticNode]) -> usize {
     for node in nodes {
         match node {
             SemanticNode::Interpolation { .. } => n += 1,
-            SemanticNode::Element { children, .. }
-            | SemanticNode::SlotOutlet { children, .. } => n += count_interpolations(children),
+            SemanticNode::Element { children, .. } | SemanticNode::SlotOutlet { children, .. } => {
+                n += count_interpolations(children)
+            }
             SemanticNode::IfChain { branches, .. } => {
                 for b in branches {
                     n += count_interpolations(std::slice::from_ref(b.body.as_ref()));
                 }
             }
-            SemanticNode::ForNode { body, .. }
-            | SemanticNode::SlotTemplate { body, .. } => {
+            SemanticNode::ForNode { body, .. } | SemanticNode::SlotTemplate { body, .. } => {
                 n += count_interpolations(std::slice::from_ref(body.as_ref()));
             }
             SemanticNode::Text { .. } => {}
@@ -344,19 +341,21 @@ fn flatten_text_values(nodes: &[SemanticNode]) -> Vec<String> {
     for node in nodes {
         match node {
             SemanticNode::Text { value, .. } => out.push(value.clone()),
-            SemanticNode::Element { children, .. }
-            | SemanticNode::SlotOutlet { children, .. } => out.extend(flatten_text_values(children)),
+            SemanticNode::Element { children, .. } | SemanticNode::SlotOutlet { children, .. } => {
+                out.extend(flatten_text_values(children))
+            }
             SemanticNode::IfChain { branches, .. } => {
                 for b in branches {
                     out.extend(flatten_text_values(std::slice::from_ref(b.body.as_ref())));
                 }
             }
-            SemanticNode::ForNode { body, .. }
-            | SemanticNode::SlotTemplate { body, .. } => {
+            SemanticNode::ForNode { body, .. } | SemanticNode::SlotTemplate { body, .. } => {
                 out.extend(flatten_text_values(std::slice::from_ref(body.as_ref())));
             }
             SemanticNode::Interpolation { .. } => {
-                panic!("flatten_text_values: unexpected Interpolation — caller must filter verbatim first")
+                panic!(
+                    "flatten_text_values: unexpected Interpolation — caller must filter verbatim first"
+                )
             }
         }
     }
@@ -383,8 +382,7 @@ fn has_non_static_prop(nodes: &[SemanticNode]) -> bool {
                     }
                 }
             }
-            SemanticNode::ForNode { body, .. }
-            | SemanticNode::SlotTemplate { body, .. } => {
+            SemanticNode::ForNode { body, .. } | SemanticNode::SlotTemplate { body, .. } => {
                 if has_non_static_prop(std::slice::from_ref(body.as_ref())) {
                     return true;
                 }

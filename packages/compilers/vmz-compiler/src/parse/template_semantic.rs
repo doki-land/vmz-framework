@@ -924,12 +924,7 @@ fn merge_span(prev: Option<TemplateSpan>, next: TemplateSpan) -> TemplateSpan {
 // ——————————————————————————————————————————————————————————————————————————
 
 fn concrete_has_pre_directive(attrs: &[ConcreteAttr]) -> bool {
-    attrs.iter().any(|a| {
-        matches!(
-            a,
-            ConcreteAttr::Directive { dir: Directive::Pre, .. }
-        )
-    })
+    attrs.iter().any(|a| matches!(a, ConcreteAttr::Directive { dir: Directive::Pre, .. }))
 }
 
 fn lower_element_verbatim(node: &ConcreteNode) -> Result<SemanticNode, TemplateParseError> {
@@ -982,63 +977,55 @@ fn lower_attrs_verbatim(attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
     let mut out = Vec::with_capacity(attrs.len());
     for attr in attrs {
         let (name, value, span) = match attr {
-            ConcreteAttr::Static { name, value, span } => {
-                (name.clone(), value.clone(), *span)
-            }
-            ConcreteAttr::Directive { dir, span } => {
-                match dir {
-                    Directive::Pre => ("v-pre".into(), String::new(), *span),
-                    Directive::If { test } => ("v-if".into(), test.clone(), *span),
-                    Directive::ElseIf { test } => ("v-else-if".into(), test.clone(), *span),
-                    Directive::Else => ("v-else".into(), String::new(), *span),
-                    Directive::For { source, .. } => ("v-for".into(), source.clone(), *span),
-                    Directive::Html { expr } => ("v-html".into(), expr.clone(), *span),
-                    Directive::Show { expr } => ("v-show".into(), expr.clone(), *span),
-                    Directive::Model { arg, expr, .. } => (
-                        match arg {
-                            Some(a) => format!("v-model:{a}"),
-                            None => "v-model".into(),
-                        },
-                        expr.clone(),
-                        *span,
-                    ),
-                    Directive::Bind { arg, expr, .. } => {
-                        let n = match arg {
-                            DirectiveArg::Static(s) => format!(":{s}"),
-                            DirectiveArg::Dynamic(e) => format!(":[{e}]"),
-                        };
-                        (n, expr.clone(), *span)
-                    }
-                    Directive::BindObject { expr } => {
-                        ("v-bind".into(), expr.clone(), *span)
-                    }
-                    Directive::On { arg, handler, .. } => {
-                        let n = match arg {
-                            DirectiveArg::Static(s) => format!("@{s}"),
-                            DirectiveArg::Dynamic(e) => format!("@[{e}]"),
-                        };
-                        (n, handler.clone(), *span)
-                    }
-                    Directive::OnObject { expr } => {
-                        ("v-on".into(), expr.clone(), *span)
-                    }
-                    Directive::Slot { name, props } => {
-                        let n = match name {
-                            DirectiveArg::Static(s) => format!("#{s}"),
-                            DirectiveArg::Dynamic(e) => format!("#[{e}]"),
-                        };
-                        (n, props.clone().unwrap_or_default(), *span)
-                    }
-                    Directive::Custom { name, arg, expr, .. } => {
-                        let n = match arg {
-                            Some(DirectiveArg::Static(a)) => format!("v-{name}:{a}"),
-                            Some(DirectiveArg::Dynamic(e)) => format!("v-{name}:[{e}]"),
-                            None => format!("v-{name}"),
-                        };
-                        (n, expr.clone().unwrap_or_default(), *span)
-                    }
+            ConcreteAttr::Static { name, value, span } => (name.clone(), value.clone(), *span),
+            ConcreteAttr::Directive { dir, span } => match dir {
+                Directive::Pre => ("v-pre".into(), String::new(), *span),
+                Directive::If { test } => ("v-if".into(), test.clone(), *span),
+                Directive::ElseIf { test } => ("v-else-if".into(), test.clone(), *span),
+                Directive::Else => ("v-else".into(), String::new(), *span),
+                Directive::For { source, .. } => ("v-for".into(), source.clone(), *span),
+                Directive::Html { expr } => ("v-html".into(), expr.clone(), *span),
+                Directive::Show { expr } => ("v-show".into(), expr.clone(), *span),
+                Directive::Model { arg, expr, .. } => (
+                    match arg {
+                        Some(a) => format!("v-model:{a}"),
+                        None => "v-model".into(),
+                    },
+                    expr.clone(),
+                    *span,
+                ),
+                Directive::Bind { arg, expr, .. } => {
+                    let n = match arg {
+                        DirectiveArg::Static(s) => format!(":{s}"),
+                        DirectiveArg::Dynamic(e) => format!(":[{e}]"),
+                    };
+                    (n, expr.clone(), *span)
                 }
-            }
+                Directive::BindObject { expr } => ("v-bind".into(), expr.clone(), *span),
+                Directive::On { arg, handler, .. } => {
+                    let n = match arg {
+                        DirectiveArg::Static(s) => format!("@{s}"),
+                        DirectiveArg::Dynamic(e) => format!("@[{e}]"),
+                    };
+                    (n, handler.clone(), *span)
+                }
+                Directive::OnObject { expr } => ("v-on".into(), expr.clone(), *span),
+                Directive::Slot { name, props } => {
+                    let n = match name {
+                        DirectiveArg::Static(s) => format!("#{s}"),
+                        DirectiveArg::Dynamic(e) => format!("#[{e}]"),
+                    };
+                    (n, props.clone().unwrap_or_default(), *span)
+                }
+                Directive::Custom { name, arg, expr, .. } => {
+                    let n = match arg {
+                        Some(DirectiveArg::Static(a)) => format!("v-{name}:{a}"),
+                        Some(DirectiveArg::Dynamic(e)) => format!("v-{name}:[{e}]"),
+                        None => format!("v-{name}"),
+                    };
+                    (n, expr.clone().unwrap_or_default(), *span)
+                }
+            },
         };
         out.push(SemanticProp::Static { name, value, span });
     }

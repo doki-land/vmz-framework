@@ -149,10 +149,7 @@ fn lower_directive(
         Directive::Pre => {
             // `v-pre` is consumed as a verbatim region marker on Semantic; legacy
             // TemplateIr keeps it as a static-ish attribute for round-trip parity.
-            Ok(vec![TemplateAttr {
-                name: "v-pre".into(),
-                value: AttrValue::Static(String::new()),
-            }])
+            Ok(vec![TemplateAttr { name: "v-pre".into(), value: AttrValue::Static(String::new()) }])
         }
         Directive::Custom { name, arg, expr, modifiers: _ } => {
             // Preserve as static-ish attrs so we don't silently drop; use v-name[:arg].
