@@ -1915,8 +1915,5 @@ pub fn vmz_generate_iris(vos_source: String) -> Result<VmzGenerateIrisResult> {
         .into_iter()
         .map(|(name, content)| VmzIrisGeneratedFile { name, content })
         .collect();
-    Ok(VmzGenerateIrisResult {
-        fingerprint: result.fingerprint,
-        files,
-    })
+    Ok(VmzGenerateIrisResult { fingerprint: result.fingerprint, files })
 }

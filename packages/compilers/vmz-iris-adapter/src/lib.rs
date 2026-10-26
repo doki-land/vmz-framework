@@ -41,8 +41,8 @@ pub fn generate_from_vos_schema(source: &str) -> Result<GenerateResult, String> 
     let model = iris_generator::GenerationModel::from_vos_schema(source)
         .map_err(|error| error.to_string())?;
     let fingerprint = model.schema_fingerprint.clone();
-    let files = iris_generator::emit_typescript_client(&model)
-        .map_err(|error| error.to_string())?;
+    let files =
+        iris_generator::emit_typescript_client(&model).map_err(|error| error.to_string())?;
     let files: BTreeMap<String, String> = files.into_iter().collect();
     Ok(GenerateResult { fingerprint, files })
 }

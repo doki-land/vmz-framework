@@ -8,6 +8,8 @@ description = "Thin Rust adapter bridging VMZ crate surface to iris-generator (p
 publish = false
 
 [dependencies]
-iris-generator = { path = "../../../../iris-orm/projects/iris.rs/crates/iris-generator" }
+# Git dep on iris-orm so CI (which has no sibling iris-orm workspace) can
+# resolve the crate. Rev locked to match the local sibling HEAD at 2026-10-26.
+iris-generator = { git = "https://github.com/voml/iris-orm.git", rev = "4c774dea3d81ea2e18d101cd7fba18463f345f07", subdirectory = "projects/iris.rs/crates/iris-generator" }
 serde = { workspace = true }
 serde_json = { workspace = true }
