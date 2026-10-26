@@ -6,10 +6,11 @@ on:
   pull_request:
     branches: [dev, master]
 
-# One Rust/native build, then parallel required gates (no continue-on-error on gates):
-#   build-runtimes — sole cargo/napi + JS runtime dist artifact
-#   fmt            — `pnpm fmt:check` after artifact restore (native must be built first)
-#   build-test     — pack smoke already done upstream; unit + examples
+# One JS runtime build, then parallel required gates (no continue-on-error on gates):
+#   build-runtimes — JS runtime dist artifact (native `.node` skipped; Trusted
+#                    Publisher matrix in `publish-npm.yml` builds native artifacts)
+#   fmt            — `pnpm fmt:check` after artifact restore
+#   build-test     — unit + examples
 #   ui-browser     — ui-automation + browser-production (Chrome)
 #   runtime-gates  — Slim + runtime-quality-baseline
 # Downstream jobs set VMZ_SKIP_NATIVE_BUILD=1 so verify `pre: build:runtimes` is a no-op.
@@ -19,6 +20,11 @@ jobs:
   build-runtimes:
     name: Build Runtimes
     runs-on: ubuntu-latest
+    # Native `.node` artifacts are built by the Trusted Publisher matrix in
+    # `.github/workflows/publish-npm.yml`; the CI main chain only needs the
+    # JS runtime dist for downstream jobs (fmt, unit, ui automation).
+    env:
+      VMZ_SKIP_NAPI: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -35,19 +41,10 @@ jobs:
           node-version: '24.12.0'
           package-manager-cache: false
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@nightly
-
-      - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: ci-build-test
-          cache-on-failure: true
-
       - name: Install dependencies
         run: pnpm install
 
-      - name: Build runtimes (native + JS)
+      - name: Build runtimes (JS only; native built by Trusted Publisher)
         run: pnpm build:runtimes
 
       - name: Assert @vmz/vmz dist pack contract
@@ -57,23 +54,30 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          native="$(ls packages/runtimes/vmz-linux-x64/vmz.*.node | head -n1)"
-          test -n "$native"
-          test -f "$native"
-          tar -czf runtime-build.tar.gz \
-            packages/runtimes/vmz/dist \
-            packages/runtimes/vmz-runtime/dist \
-            packages/runtimes/vmz-protocol/dist \
-            packages/runtimes/vmz-commander/dist \
-            packages/runtimes/vmz-diagnostic/dist \
-            packages/runtimes/vmz-fixtures/dist \
-            packages/runtimes/vmz-test/dist \
-            packages/plugins/vmz-plugin-shiki/dist \
-            packages/plugins/vmz-plugin-markdown-it/dist \
-            packages/plugins/vmz-plugin-katex/dist \
-            packages/ui/vmz-ui-icons/dist \
-            packages/runtimes/vmz-linux-x64/package.json \
-            "$native"
+          # `.node` is optional here — CI skips napi; Trusted Publisher supplies
+          # native artifacts later. Tolerate absence so downstream JS gates still run.
+          native_arg=""
+          if compgen -G "packages/runtimes/vmz-linux-x64/vmz.*.node" > /dev/null; then
+            native="$(ls packages/runtimes/vmz-linux-x64/vmz.*.node | head -n1)"
+            test -f "$native"
+            native_arg="$native"
+          fi
+          tar_args=(
+            packages/runtimes/vmz/dist
+            packages/runtimes/vmz-runtime/dist
+            packages/runtimes/vmz-protocol/dist
+            packages/runtimes/vmz-commander/dist
+            packages/runtimes/vmz-diagnostic/dist
+            packages/runtimes/vmz-fixtures/dist
+            packages/runtimes/vmz-test/dist
+            packages/plugins/vmz-plugin-shiki/dist
+            packages/plugins/vmz-plugin-markdown-it/dist
+            packages/plugins/vmz-plugin-katex/dist
+            packages/ui/vmz-ui-icons/dist
+            packages/runtimes/vmz-linux-x64/package.json
+          )
+          if [ -n "$native_arg" ]; then tar_args+=("$native_arg"); fi
+          tar -czf runtime-build.tar.gz "${tar_args[@]}"
           ls -lh runtime-build.tar.gz
 
       - name: Upload runtime artifact
@@ -101,9 +105,6 @@ jobs:
           node-version: '24.12.0'
           package-manager-cache: false
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@nightly
-
       - name: Install dependencies
         run: pnpm install
 
@@ -119,7 +120,9 @@ jobs:
           set -euo pipefail
           tar -xzf runtime-build.tar.gz
           test -f packages/runtimes/vmz/dist/cli/cli.js
-          ls packages/runtimes/vmz-linux-x64/vmz.*.node
+          # `.node` is optional in CI main chain (native built by Trusted Publisher)
+          compgen -G "packages/runtimes/vmz-linux-x64/vmz.*.node" > /dev/null && \
+            ls packages/runtimes/vmz-linux-x64/vmz.*.node || echo "(no native .node in CI artifact — ok)"
 
       - name: Check format (`vmz format --check` via `vmz.config` `format`; same as `pnpm fmt:check`)
         run: pnpm fmt:check
@@ -162,7 +165,8 @@ jobs:
           test -f packages/runtimes/vmz-runtime/dist/faces/server.js
           test -f packages/plugins/vmz-plugin-markdown-it/dist/vmz.plugin.js
           test -f packages/plugins/vmz-plugin-katex/dist/vmz.plugin.js
-          ls packages/runtimes/vmz-linux-x64/vmz.*.node
+          compgen -G "packages/runtimes/vmz-linux-x64/vmz.*.node" > /dev/null && \
+            ls packages/runtimes/vmz-linux-x64/vmz.*.node || echo "(no native .node in CI artifact — ok)"
 
       - name: Assert skip-native-pre contract
         run: pnpm verify:ci-skip-native-pre
@@ -291,7 +295,8 @@ jobs:
           set -euo pipefail
           tar -xzf runtime-build.tar.gz
           test -f packages/runtimes/vmz/dist/cli/cli.js
-          ls packages/runtimes/vmz-linux-x64/vmz.*.node
+          compgen -G "packages/runtimes/vmz-linux-x64/vmz.*.node" > /dev/null && \
+            ls packages/runtimes/vmz-linux-x64/vmz.*.node || echo "(no native .node in CI artifact — ok)"
 
       - name: Assert skip-native-pre contract
         run: pnpm verify:ci-skip-native-pre
@@ -345,7 +350,8 @@ jobs:
           set -euo pipefail
           tar -xzf runtime-build.tar.gz
           test -f packages/runtimes/vmz/dist/cli/cli.js
-          ls packages/runtimes/vmz-linux-x64/vmz.*.node
+          compgen -G "packages/runtimes/vmz-linux-x64/vmz.*.node" > /dev/null && \
+            ls packages/runtimes/vmz-linux-x64/vmz.*.node || echo "(no native .node in CI artifact — ok)"
 
       - name: Assert skip-native-pre contract
         run: pnpm verify:ci-skip-native-pre
