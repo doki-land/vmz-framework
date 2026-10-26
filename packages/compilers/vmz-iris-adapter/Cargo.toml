@@ -1,0 +1,13 @@
+[package]
+name = "vmz-iris-adapter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Thin Rust adapter bridging VMZ crate surface to iris-generator (path dep)"
+publish = false
+
+[dependencies]
+iris-generator = { path = "../../../../iris-orm/projects/iris.rs/crates/iris-generator" }
+serde = { workspace = true }
+serde_json = { workspace = true }
