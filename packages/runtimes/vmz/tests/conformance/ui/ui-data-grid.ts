@@ -4,11 +4,15 @@
  * Asserts:
  * - package identity; peer @vmz/ui; no Button/Field/Dialog shells
  * - token-requirements (virtualization + pinned + group + tree + edit + pivot-matrix)
+ * - first batch records contract: columns, stable row identity, sort, filter, page,
+ *   selection, empty/loading/error, keyboard focus + aria table semantics
+ * - records behavior proof against the built component (no DOM assumptions)
  * - homepage fixture modes + browser proofs for virtual window, group, tree, edit, pivot
  */
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
 
@@ -76,6 +80,14 @@ for (const c of [
     'tree-rows',
     'cell-editing',
     'pivot-matrix',
+    'records-column-definition',
+    'stable-row-identity',
+    'local-filtering',
+    'controlled-pagination',
+    'selection-single-multi-plus-page-all',
+    'empty-loading-error-states',
+    'keyboard-row-focus',
+    'aria-table-semantics',
 ]) {
     if (!dg.contracts?.includes(c)) fail(`DataGrid contract missing ${c}`);
 }
@@ -134,6 +146,75 @@ if (!dgSrc.includes('data-row-kind') || !dgSrc.includes('data-agg') || !dgSrc.in
 }
 if (/Field\.vmz|export default class Field/i.test(dgSrc)) {
     fail('DataGrid must not ship Field — reuse @vmz/ui');
+}
+
+console.log('ui-data-grid: first batch records contract + tokens…');
+for (const tok of dg.tokens || []) {
+    const cssVar = `--vmz-${String(tok).split('.').join('-')}`;
+    if (!dgSrc.includes(`var(${cssVar}`)) {
+        fail(`DataGrid must reference ${cssVar} for token ${tok}`);
+    }
+}
+for (const marker of [
+    'data-vmz-grid-records',
+    'data-vmz-grid-table',
+    'data-vmz-grid-filter',
+    'data-vmz-grid-summary',
+    'data-vmz-row-key',
+    'data-vmz-grid-status',
+    'data-vmz-grid-error',
+    'data-vmz-grid-retry',
+    'scope="col"',
+    'aria-sort',
+    'aria-selected',
+    'aria-live',
+    'role="status"',
+    'tabIndex',
+]) {
+    if (!dgSrc.includes(marker)) fail(`DataGrid records mode missing ${marker}`);
+}
+for (const api of [
+    'rowKey',
+    'selectionMode',
+    'selectedKeys',
+    'onSortChange',
+    'onFilterChange',
+    'onPageChange',
+    'onSelectionChange',
+    'onRowActivate',
+    'onRetry',
+]) {
+    if (!dgSrc.includes(api)) fail(`DataGrid records mode missing ${api}`);
+}
+for (const reuse of ['<Pagination', '<Spinner', '<Empty']) {
+    if (!dgSrc.includes(reuse)) fail(`DataGrid records mode must compose ${reuse}> from @vmz/ui`);
+}
+
+console.log('ui-data-grid: build package + prove records behavior…');
+const pkgOut = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-dg-records-'));
+// `fail()` exits immediately, so clean the scratch build on the way out.
+process.on('exit', () => {
+    try {
+        fs.rmSync(pkgOut, { recursive: true, force: true });
+    } catch {
+        /* ignore */
+    }
+});
+try {
+    const { serveHostChildEnv } = await import('../_lib/serve-host-env.ts');
+    const pkgBuild = spawnSync(process.execPath, [vmzBin(root), 'build', gridRoot, '--out-dir', pkgOut], {
+        cwd: root,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: serveHostChildEnv(),
+    });
+    const clientJs = findClientJs(pkgOut);
+    if (!clientJs) {
+        fail(`package build must emit components/DataGrid.client.js\n${pkgBuild.stdout || ''}\n${pkgBuild.stderr || ''}`);
+    }
+    await proveRecordsBehavior(clientJs);
+} finally {
+    fs.rmSync(pkgOut, { recursive: true, force: true });
 }
 
 console.log('ui-data-grid: ordinary DataTable stays in @vmz/ui…');
@@ -267,6 +348,11 @@ async function proveBrowser(dist) {
             page.setDefaultTimeout(20000);
             await page.goto(`http://127.0.0.1:${PORT}/lab/datagrid`, { waitUntil: 'networkidle0', timeout: 20000 });
             await page.waitForSelector('[data-vmz-fixture="datagrid"]', { timeout: 10000 });
+            // The fixture renders its state line across formatted template lines; compare structurally.
+            await page.evaluate(() => {
+                window.__vmzGridState = () =>
+                    (document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '').replace(/\s+/g, '');
+            });
             await page.waitForFunction(
                 () => {
                     const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
@@ -279,7 +365,7 @@ async function proveBrowser(dist) {
 
             const initial = await page.evaluate(() => {
                 const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
-                const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                const state = window.__vmzGridState();
                 const rows = [...document.querySelectorAll('[data-vmz-ui="data-grid"] [data-vmz-row]')];
                 const pinned = document.querySelector(
                     '[data-vmz-ui="data-grid"] [data-vmz-col="name"][data-pinned="true"], [data-vmz-ui="data-grid"] .vmz-ui-datagrid__cell--pinned-data',
@@ -331,7 +417,7 @@ async function proveBrowser(dist) {
                 (prev) => {
                     const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
                     const first = document.querySelector('[data-vmz-ui="data-grid"] [data-vmz-row]')?.getAttribute('data-vmz-row');
-                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                    const state = window.__vmzGridState();
                     return !!wrap && first && first !== prev && state.includes('window:') && !state.includes('window:0-');
                 },
                 { timeout: 5000 },
@@ -342,7 +428,7 @@ async function proveBrowser(dist) {
                 const rows = [...document.querySelectorAll('[data-vmz-ui="data-grid"] [data-vmz-row]')].map((r) =>
                     r.getAttribute('data-vmz-row'),
                 );
-                const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                const state = window.__vmzGridState();
                 const total = Number(document.querySelector('[data-vmz-ui="data-grid"]')?.getAttribute('data-total-rows') || 0);
                 return { rows, state, total, visible: rows.length };
             });
@@ -361,7 +447,7 @@ async function proveBrowser(dist) {
             await page.click(`[data-vmz-select="${pickId}"]`);
             await page.waitForFunction(
                 (id) => {
-                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                    const state = window.__vmzGridState();
                     return (
                         document.querySelector(`[data-vmz-row="${id}"]`)?.getAttribute('data-selected') === 'true' &&
                         state.includes(`selected:${id}`) &&
@@ -377,7 +463,7 @@ async function proveBrowser(dist) {
             await page
                 .waitForFunction(
                     () => {
-                        const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                        const state = window.__vmzGridState();
                         return state.includes('sort:status:');
                     },
                     { timeout: 5000 },
@@ -387,14 +473,14 @@ async function proveBrowser(dist) {
                         const sortBtn = document.querySelector('[data-vmz-sort="status"]');
                         sortBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
                         return {
-                            state: document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '',
+                            state: window.__vmzGridState(),
                             hasSort: !!document.querySelector('[data-vmz-sort="status"]'),
                         };
                     });
                     // Retry wait after synthetic click
                     try {
                         await page.waitForFunction(
-                            () => (document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '').includes('sort:status:'),
+                            () => (window.__vmzGridState()).includes('sort:status:'),
                             { timeout: 3000 },
                         );
                     } catch {
@@ -409,7 +495,7 @@ async function proveBrowser(dist) {
             });
             await page.waitForFunction(
                 () => {
-                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                    const state = window.__vmzGridState();
                     return (
                         state.includes('selected:none') &&
                         document.querySelector('[data-vmz-ui="bulk-actions"]')?.getAttribute('data-open') === 'false'
@@ -425,7 +511,7 @@ async function proveBrowser(dist) {
             });
             await page.waitForFunction(
                 () => {
-                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                    const state = window.__vmzGridState();
                     return !!document.querySelector('[data-vmz-ui="data-grid"] [data-row-kind="group"]') && /window:0-\d+/.test(state);
                 },
                 { timeout: 5000 },
@@ -434,7 +520,7 @@ async function proveBrowser(dist) {
             // Group + aggregation deepen: headers present, collapse removes leaves, expand restores.
             const groupProof = await page.evaluate(() => {
                 const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
-                const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                const state = window.__vmzGridState();
                 const groups = [...document.querySelectorAll('[data-vmz-ui="data-grid"] [data-row-kind="group"]')];
                 const firstGroup = groups[0];
                 const key = firstGroup?.getAttribute('data-group-key') || '';
@@ -481,7 +567,7 @@ async function proveBrowser(dist) {
                 (key) => {
                     const header = document.querySelector(`[data-vmz-ui="data-grid"] [data-row-kind="group"][data-group-key="${key}"]`);
                     const leaves = document.querySelectorAll(`[data-vmz-ui="data-grid"] [data-row-kind="row"][data-group-key="${key}"]`);
-                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                    const state = window.__vmzGridState();
                     const expandedPart = (state.split('expanded:')[1] || '').split(';')[0] || '';
                     const expandedKeys = expandedPart
                         .split(',')
@@ -498,7 +584,7 @@ async function proveBrowser(dist) {
                 (key) => {
                     const header = document.querySelector(`[data-vmz-ui="data-grid"] [data-row-kind="group"][data-group-key="${key}"]`);
                     const leaves = document.querySelectorAll(`[data-vmz-ui="data-grid"] [data-row-kind="row"][data-group-key="${key}"]`);
-                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                    const state = window.__vmzGridState();
                     const expandedPart = (state.split('expanded:')[1] || '').split(';')[0] || '';
                     const expandedKeys = expandedPart
                         .split(',')
@@ -515,7 +601,7 @@ async function proveBrowser(dist) {
             await page.waitForFunction(
                 () => {
                     const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
-                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                    const state = window.__vmzGridState();
                     return (
                         wrap?.getAttribute('data-vmz-grid-tree') === 'true' &&
                         state.includes('mode:tree') &&
@@ -528,7 +614,7 @@ async function proveBrowser(dist) {
 
             const treeProof = await page.evaluate(() => {
                 const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
-                const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                const state = window.__vmzGridState();
                 const depth0 = document.querySelector('[data-vmz-ui="data-grid"] [data-row-kind="tree"][data-depth="0"]');
                 const depth2 = document.querySelector('[data-vmz-ui="data-grid"] [data-row-kind="tree"][data-depth="2"]');
                 const rootId = depth0?.getAttribute('data-vmz-row') || '';
@@ -567,7 +653,7 @@ async function proveBrowser(dist) {
                         `[data-vmz-ui="data-grid"] [data-row-kind="tree"][data-depth="1"], [data-vmz-ui="data-grid"] [data-row-kind="tree"][data-depth="2"]`,
                     );
                     // After collapse root, no descendants of that root should remain; simpler: root expanded=false
-                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                    const state = window.__vmzGridState();
                     const part = (state.split('treeExpanded:')[1] || '').split(';')[0] || '';
                     const keys = part
                         .split(',')
@@ -583,7 +669,7 @@ async function proveBrowser(dist) {
             await page.waitForFunction(
                 (id) => {
                     const root = document.querySelector(`[data-vmz-ui="data-grid"] [data-vmz-row="${id}"]`);
-                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                    const state = window.__vmzGridState();
                     const part = (state.split('treeExpanded:')[1] || '').split(';')[0] || '';
                     const keys = part
                         .split(',')
@@ -599,7 +685,7 @@ async function proveBrowser(dist) {
             await page.click('[data-vmz-fixture="mode-group"] button');
             await page.waitForFunction(
                 () => {
-                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                    const state = window.__vmzGridState();
                     return (
                         state.includes('mode:group') &&
                         document.querySelector('[data-vmz-ui="data-grid"]')?.getAttribute('data-vmz-grid-tree') === 'false' &&
@@ -626,7 +712,7 @@ async function proveBrowser(dist) {
             await page.waitForFunction(
                 (key) => {
                     const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
-                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                    const state = window.__vmzGridState();
                     return (
                         wrap?.getAttribute('data-vmz-grid-edit') === key &&
                         !!document.querySelector(`[data-vmz-cell-editor="${key}"]`) &&
@@ -658,7 +744,7 @@ async function proveBrowser(dist) {
 
             await page.waitForFunction(
                 (key, value, prev) => {
-                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                    const state = window.__vmzGridState();
                     const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
                     const cellText =
                         document.querySelector(`[data-vmz-cell-start-edit="${key}"]`)?.textContent ||
@@ -680,7 +766,7 @@ async function proveBrowser(dist) {
             );
 
             const afterEdit = await page.evaluate((key) => {
-                const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                const state = window.__vmzGridState();
                 const text = document.querySelector(`[data-vmz-cell-start-edit="${key}"]`)?.textContent || '';
                 return { state, text, editAttr: document.querySelector('[data-vmz-ui="data-grid"]')?.getAttribute('data-vmz-grid-edit') };
             }, editTarget.key);
@@ -695,7 +781,7 @@ async function proveBrowser(dist) {
             await page.waitForFunction(
                 () => {
                     const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
-                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                    const state = window.__vmzGridState();
                     return (
                         wrap?.getAttribute('data-vmz-grid-pivot') === 'true' &&
                         state.includes('mode:pivot') &&
@@ -709,7 +795,7 @@ async function proveBrowser(dist) {
 
             const pivotProof = await page.evaluate(() => {
                 const wrap = document.querySelector('[data-vmz-ui="data-grid"]');
-                const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                const state = window.__vmzGridState();
                 const cols = [...document.querySelectorAll('[data-vmz-ui="data-grid"] [data-pivot-col="true"]')].map(
                     (c) => c.getAttribute('data-vmz-col') || '',
                 );
@@ -748,7 +834,7 @@ async function proveBrowser(dist) {
             });
             await page.waitForFunction(
                 () => {
-                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                    const state = window.__vmzGridState();
                     return state.includes('sort:total:');
                 },
                 { timeout: 5000 },
@@ -758,7 +844,7 @@ async function proveBrowser(dist) {
             });
             await page.waitForFunction(
                 (prev) => {
-                    const state = document.querySelector('[data-vmz-fixture="datagrid-state"]')?.textContent || '';
+                    const state = window.__vmzGridState();
                     const first = document.querySelector('[data-vmz-ui="data-grid"] [data-row-kind="pivot"]')?.getAttribute('data-vmz-row');
                     return state.includes('sort:total:desc') && !!first && first !== prev;
                 },
@@ -772,5 +858,210 @@ async function proveBrowser(dist) {
         }
     } finally {
         kill();
+    }
+}
+
+function findClientJs(outDir) {
+    const named = walkFiles(outDir, (p) => p.endsWith('DataGrid.client.js'));
+    if (named.length > 0) return named[0];
+    const any = walkFiles(outDir, (p) => p.endsWith('.client.js'));
+    return any.length > 0 ? any[0] : null;
+}
+
+/**
+ * First batch proof: instantiate the built records component and drive props/handlers
+ * directly (no DOM). Covers identity, sort, filter, page, selection, states, keyboard.
+ * @param {string} clientJs
+ */
+async function proveRecordsBehavior(clientJs) {
+    const { pathToFileURL } = await import('node:url');
+    const probePath = path.join(path.dirname(clientJs), 'DataGrid.probe.mjs');
+    fs.copyFileSync(clientJs, probePath);
+    try {
+        const mod = await import(pathToFileURL(probePath).href);
+        const DataGrid = mod.default;
+        if (typeof DataGrid !== 'function') fail('DataGrid.client.js must default-export the component class');
+
+        const columns = [
+            { key: 'name', label: 'Name', sortable: true },
+            { key: 'score', label: 'Score', sortable: true, align: 'right' },
+            { key: 'status', label: 'Status', sortable: false },
+        ];
+        const rows = Array.from({ length: 23 }, (_, i) => ({
+            id: `r${String(i + 1).padStart(2, '0')}`,
+            name: `Alpha ${i + 1}`,
+            score: (i * 7) % 100,
+            status: i % 2 === 0 ? 'open' : 'closed',
+        }));
+        const mount = (props = {}) => {
+            const inst = new DataGrid();
+            Object.assign(inst, { columns, rows, ...props });
+            inst.onMount();
+            return inst;
+        };
+        const clickSort = (inst, key) => {
+            const button = { getAttribute: (name) => (name === 'data-vmz-sort' ? key : null) };
+            inst.onSortClick({ target: { closest: (sel) => (sel === '[data-vmz-sort]' ? button : null) } });
+        };
+        const toggleRow = (inst, key) => {
+            const box = { getAttribute: (name) => (name === 'data-vmz-select' ? key : null) };
+            inst.onSelectRowChange({
+                stopPropagation() {},
+                target: { closest: (sel) => (sel === '[data-vmz-select]' ? box : null) },
+            });
+        };
+        const rowNode = (key) => {
+            const node = {
+                getAttribute: (name) => (name === 'data-vmz-row-key' || name === 'data-vmz-row' ? key : null),
+                focus() {},
+                closest: (sel) => (sel === '[data-vmz-row]' ? node : null),
+            };
+            return node;
+        };
+
+        const grid = mount();
+        if (grid.recordsMode !== true || grid.gridModeAttr !== 'records') {
+            fail(`records mode must auto-detect from columns/records: ${grid.gridModeAttr}`);
+        }
+        if (grid.columnViews.map((col) => col.key).join(',') !== 'name,score,status') {
+            fail(`column definition order lost: ${grid.columnViews.map((col) => col.key)}`);
+        }
+        if (grid.pageSize !== 5 || grid.pageCount !== 5 || grid.viewRows.length !== 5) {
+            fail(`pagination want 5 pages × 5 rows: ${grid.pageCount}/${grid.viewRows.length}`);
+        }
+        if (grid.viewRows[0].key !== 'r01' || grid.viewRows[4].key !== 'r05') {
+            fail(`row identity must follow rowKey, not the array slice: ${grid.viewRows.map((row) => row.key)}`);
+        }
+        if (grid.viewRows[0].tabIndex !== '0' || grid.viewRows[0].ariaSelected !== 'false') {
+            fail(`rows must stay focusable with aria-selected: ${JSON.stringify(grid.viewRows[0])}`);
+        }
+        if (grid.columnViews[0].ariaSort !== 'none' || grid.columnViews[2].ariaSort !== null) {
+            fail(`aria-sort want none/null: ${grid.columnViews.map((col) => col.ariaSort)}`);
+        }
+
+        const sorting = [];
+        grid.onSortChange = (key, dir) => sorting.push(`${key}:${dir}`);
+        clickSort(grid, 'name');
+        if (grid.sortKey !== 'name' || grid.sortDir !== 'asc' || grid.columnViews[0].ariaSort !== 'ascending') {
+            fail(`asc sort failed: ${grid.sortKey}:${grid.sortDir} ${grid.columnViews[0].ariaSort}`);
+        }
+        if (grid.viewRows[0].key !== 'r01') fail(`asc sort order wrong: ${grid.viewRows.map((row) => row.key)}`);
+        clickSort(grid, 'name');
+        if (grid.sortDir !== 'desc' || grid.columnViews[0].ariaSort !== 'descending') {
+            fail(`desc sort failed: ${grid.sortDir} ${grid.columnViews[0].ariaSort}`);
+        }
+        if (grid.viewRows[0].key !== 'r23') fail(`desc sort order wrong: ${grid.viewRows.map((row) => row.key)}`);
+        clickSort(grid, 'status');
+        if (grid.sortKey !== 'name') fail('non-sortable column must not change sort key');
+        if (sorting.join(',') !== 'name:asc,name:desc') fail(`sort events want asc then desc: ${sorting}`);
+
+        const filters = [];
+        grid.onFilterChange = (query) => filters.push(query);
+        grid.onFilterInput({ target: { value: 'Alpha 2' } });
+        if (grid.filteredCount !== '5' || grid.currentPage !== 1) {
+            fail(`query filter want 5 hits on page 1: ${grid.filteredCount}/${grid.currentPage}`);
+        }
+        if (!grid.viewRows.every((row) => row.cells[0].text.toLowerCase().includes('alpha 2'))) {
+            fail('query filter must narrow the visible rows');
+        }
+        grid.onFilterInput({ target: { value: '' } });
+        if (grid.filteredCount !== '23' || filters.join('|') !== 'Alpha 2|') {
+            fail(`clearing the query must restore rows: ${grid.filteredCount} ${filters}`);
+        }
+
+        const paging = [];
+        grid.onPageChange = (page) => paging.push(page);
+        grid.onNextPage();
+        if (grid.currentPage !== 2 || paging[0] !== 2) fail(`next page failed: ${grid.currentPage}/${paging}`);
+        if (grid.pageStatusText !== '6–10 / 23') fail(`page status wrong: ${grid.pageStatusText}`);
+        grid.onGoPage(5);
+        if (grid.currentPage !== 5 || grid.viewRows.length !== 3 || grid.nextDisabled !== true) {
+            fail(`last page wrong: ${grid.currentPage}/${grid.viewRows.length}`);
+        }
+        grid.onGoPage(1);
+        if (grid.currentPage !== 1 || grid.prevDisabled !== true || grid.nextDisabled !== false) {
+            fail(`first page wrong: ${grid.currentPage}`);
+        }
+
+        const selection = [];
+        grid.onSelectionChange = (keys) => selection.push(keys.length);
+        grid.onSelectAllChange({ stopPropagation() {} });
+        if (grid.recordsSelected !== '5' || grid.pageSelectionAria !== 'true') {
+            fail(`select-all must cover the current page: ${grid.recordsSelected}/${grid.pageSelectionAria}`);
+        }
+        const firstKey = grid.viewRows[0].key;
+        toggleRow(grid, firstKey);
+        if (grid.recordsSelected !== '4' || grid.pageSelectionAria !== 'mixed') {
+            fail(`row toggle want 4 selected + mixed: ${grid.recordsSelected}/${grid.pageSelectionAria}`);
+        }
+        if (selection.join(',') !== '5,4') fail(`selection events wrong: ${selection}`);
+
+        const single = mount({ selectionMode: 'single' });
+        if (single.showSelectAll !== false || single.showRowSelect !== true) {
+            fail(`single mode chrome wrong: selectAll=${single.showSelectAll} row=${single.showRowSelect}`);
+        }
+        const singleKey = single.viewRows[1].key;
+        toggleRow(single, singleKey);
+        if (single.selectedKeys.length !== 1 || single.selectedKeys[0] !== singleKey) {
+            fail(`single selection want one key: ${single.selectedKeys}`);
+        }
+        toggleRow(single, single.viewRows[2].key);
+        if (single.selectedKeys.length !== 1 || single.selectedKeys[0] === singleKey) {
+            fail(`single selection must replace: ${single.selectedKeys}`);
+        }
+        toggleRow(single, single.viewRows[2].key);
+        if (single.selectedKeys.length !== 0) fail(`single selection must clear on re-toggle: ${single.selectedKeys}`);
+
+        const activated = [];
+        grid.onRowActivate = (key) => activated.push(key);
+        grid.onRecordsKeyDown({ key: 'Enter', target: { closest: (sel) => (sel === '[data-vmz-row]' ? rowNode(firstKey) : null) } });
+        if (activated[0] !== firstKey) fail(`Enter must emit row activate: ${activated}`);
+        const beforeSpace = Number(grid.recordsSelected);
+        const wasSelected = grid.viewRows[0].selected;
+        grid.onRecordsKeyDown({
+            key: ' ',
+            preventDefault() {},
+            target: { closest: (sel) => (sel === '[data-vmz-row]' ? rowNode(firstKey) : null) },
+        });
+        const afterSpace = Number(grid.recordsSelected);
+        if (afterSpace !== beforeSpace + (wasSelected ? -1 : 1)) {
+            fail(`Space must toggle selection: ${beforeSpace} → ${afterSpace}`);
+        }
+
+        grid.loading = true;
+        grid.__vmzOnParentProp('loading');
+        if (grid.stateAttr !== 'loading' || grid.stateRole !== 'status' || grid.showState !== true) {
+            fail(`loading state wrong: ${grid.stateAttr}/${grid.stateRole}`);
+        }
+        grid.loading = false;
+        grid.error = 'boom';
+        grid.__vmzOnParentProp('error');
+        if (grid.stateAttr !== 'error' || grid.stateRole !== 'alert' || grid.errorMessage !== 'boom') {
+            fail(`error state wrong: ${grid.stateAttr}/${grid.stateRole}/${grid.errorMessage}`);
+        }
+        grid.error = '';
+        grid.rows = [];
+        grid.__vmzOnParentProp('rows');
+        if (grid.stateAttr !== 'empty' || grid.showState !== true || grid.pageCount !== 0) {
+            fail(`empty state wrong: ${grid.stateAttr}/${grid.pageCount}`);
+        }
+        if (grid.stateColSpan !== 4) fail(`empty row colspan want 4: ${grid.stateColSpan}`);
+
+        const custom = mount({ rowKey: (record) => `k-${record.status}-${record.id}` });
+        if (custom.viewRows[0].key !== 'k-open-r01') fail(`rowKey function must win: ${custom.viewRows[0].key}`);
+
+        const projected = new DataGrid();
+        Object.assign(projected, {
+            columns: [{ id: 'name', title: 'Name' }],
+            rows: [{ id: 'p1', cells: [{ id: 'name', text: 'P' }] }],
+        });
+        projected.onMount();
+        if (projected.recordsMode !== false || projected.gridModeAttr !== 'projected') {
+            fail(`projected shape must auto-detect: ${projected.gridModeAttr}`);
+        }
+
+        console.log('ui-data-grid: records behavior PASS (identity/sort/filter/page/selection/states/keyboard)');
+    } finally {
+        fs.rmSync(probePath, { force: true });
     }
 }

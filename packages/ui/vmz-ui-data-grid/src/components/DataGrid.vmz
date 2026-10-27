@@ -1,6 +1,70 @@
 <template>
-    <div data-vmz-ui="data-grid" data-vmz-grid="virtual-pinned" :data-vmz-grid-group="groupByAttr" :data-vmz-grid-tree="treeAttr" :data-vmz-grid-pivot="pivotAttr" :data-vmz-grid-edit="editingAttr" :data-total-rows="totalRows" :data-visible-count="visibleCount" :data-pinned-cols="pinnedCols" :data-sort-key="sortKey" :data-sort-dir="sortDir" :data-selected-count="selectedCount" :data-group-count="groupCount" :data-pivot-cols="pivotColsAttr" class="vmz-ui-datagrid">
-        <div data-vmz-grid-viewport="true" :onScroll="onViewportScroll" class="vmz-ui-datagrid__viewport">
+    <div data-vmz-ui="data-grid" data-vmz-grid="virtual-pinned" :data-vmz-grid-mode="gridModeAttr" :data-vmz-grid-state="stateAttr" :data-vmz-page="currentPage" :data-vmz-page-count="pageCount" :data-vmz-filtered-rows="filteredCount" :data-vmz-grid-group="groupByAttr" :data-vmz-grid-tree="treeAttr" :data-vmz-grid-pivot="pivotAttr" :data-vmz-grid-edit="editingAttr" :data-total-rows="recordsMode ? recordsTotal : totalRows" :data-visible-count="recordsMode ? recordsVisible : visibleCount" :data-pinned-cols="pinnedCols" :data-sort-key="sortKey" :data-sort-dir="sortDir" :data-selected-count="recordsMode ? recordsSelected : selectedCount" :data-group-count="groupCount" :data-pivot-cols="pivotColsAttr" class="vmz-ui-datagrid">
+        <div v-if="recordsMode" data-vmz-grid-records="true" class="vmz-ui-datagrid__records">
+            <div class="vmz-ui-datagrid__toolbar">
+                <label class="vmz-ui-datagrid__filter">
+                    <span class="vmz-ui-datagrid__filter-label">{{ filterLabel }}</span>
+                    <input type="search" data-vmz-grid-filter="true" :value="filterValue" :placeholder="filterPlaceholder" :aria-label="filterLabel" @input="onFilterInput" class="vmz-ui-datagrid__filter-input" />
+                </label>
+                <p data-vmz-grid-summary="true" role="status" aria-live="polite" class="vmz-ui-datagrid__summary">
+                    {{ summaryText }}
+                </p>
+            </div>
+            <div class="vmz-ui-datagrid__table-wrap">
+                <table data-vmz-grid-table="true" class="vmz-ui-datagrid__table">
+                    <caption v-if="caption" class="vmz-ui-datagrid__caption">
+                        {{ caption }}
+                    </caption>
+                    <thead>
+                        <tr>
+                            <th v-if="showSelectAll" scope="col" class="vmz-ui-datagrid__th vmz-ui-datagrid__th--check">
+                                <input type="checkbox" data-vmz-select-all="true" :aria-label="selectAllLabel" :checked="pageAllSelected" :aria-checked="pageSelectionAria" @change="onSelectAllChange" class="vmz-ui-datagrid__box" />
+                            </th>
+                            <th v-for="col in columnViews" :key="col.key" scope="col" :data-vmz-col="col.key" :data-align="col.align" :aria-sort="col.ariaSort" :style="col.widthStyle" class="vmz-ui-datagrid__th">
+                                <button v-if="col.sortable" type="button" :data-vmz-sort="col.key" :data-active="col.sortActive" :aria-label="col.sortLabel" @click="onSortClick" class="vmz-ui-datagrid__sort">
+                                    <span class="vmz-ui-datagrid__head-label">
+                                        {{ col.label }}
+                                    </span>
+                                    <span aria-hidden="true" class="vmz-ui-datagrid__sort-glyph">
+                                        {{ col.glyph }}
+                                    </span>
+                                </button>
+                                <span v-else class="vmz-ui-datagrid__head-label">{{ col.label }}</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody @click="onRecordsBodyClick" @keydown="onRecordsKeyDown">
+                        <tr v-for="row in viewRows" :key="row.key" :data-vmz-row="row.key" :data-vmz-row-key="row.key" :data-vmz-row-index="row.index" :data-selected="row.selectedAttr" :aria-selected="row.ariaSelected" :tabindex="row.tabIndex" class="vmz-ui-datagrid__tr">
+                            <td v-if="showRowSelect" class="vmz-ui-datagrid__td vmz-ui-datagrid__td--check">
+                                <input type="checkbox" :data-vmz-select="row.key" :aria-label="row.selectLabel" :checked="row.selected" @change="onSelectRowChange" class="vmz-ui-datagrid__box" />
+                            </td>
+                            <td v-for="cell in row.cells" :key="cell.key" :data-vmz-cell="cell.key" :data-align="cell.align" class="vmz-ui-datagrid__td">
+                                {{ cell.text }}
+                            </td>
+                        </tr>
+                        <tr v-if="showState" data-vmz-grid-state-row="true" class="vmz-ui-datagrid__tr vmz-ui-datagrid__tr--state">
+                            <td :colspan="stateColSpan" class="vmz-ui-datagrid__td vmz-ui-datagrid__td--state">
+                                <div :role="stateRole" aria-live="polite" data-vmz-grid-status="true" class="vmz-ui-datagrid__state">
+                                    <Spinner v-if="loading" :label="loadingLabel" />
+                                    <span v-if="loading && loadingText" class="vmz-ui-datagrid__state-text">
+                                        {{ loadingText }}
+                                    </span>
+                                    <span v-if="!loading && errorMessage" data-vmz-grid-error="true" class="vmz-ui-datagrid__state-text">
+                                        {{ errorMessage }}
+                                    </span>
+                                    <button v-if="!loading && errorMessage && retryLabel" type="button" data-vmz-grid-retry="true" @click="onRetryClick" class="vmz-ui-datagrid__retry">
+                                        {{ retryLabel }}
+                                    </button>
+                                    <Empty v-if="!loading && !errorMessage" :title="emptyTitle" :description="emptyText" />
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <Pagination :page="currentPage" :page-count="pageCount" :status="pageStatusText" :prev-label="prevLabel" :next-label="nextLabel" :page-label="pageLabel" :prev-disabled="prevDisabled" :next-disabled="nextDisabled" :on-prev="onPrevPage" :on-next="onNextPage" :on-page="onGoPage" />
+        </div>
+        <div v-else data-vmz-grid-viewport="true" :onScroll="onViewportScroll" class="vmz-ui-datagrid__viewport">
             <div class="vmz-ui-datagrid__canvas" :style="canvasStyle">
                 <div data-vmz-grid-head="true" @click="onHeadClick" class="vmz-ui-datagrid__head" :style="rowLayoutStyle">
                     <div data-pinned="true" class="vmz-ui-datagrid__cell vmz-ui-datagrid__cell--check vmz-ui-datagrid__cell--pinned">
@@ -46,6 +110,181 @@
     background: var(--vmz-surface-paper);
     color: var(--vmz-text-ink);
 }
+
+/* ---- first-batch records table (HTML table semantics) ---- */
+
+.vmz-ui-datagrid__records {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vmz-space-2, 0.5rem);
+    padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+}
+
+.vmz-ui-datagrid__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--vmz-space-2, 0.5rem);
+}
+
+.vmz-ui-datagrid__filter {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vmz-space-1, 0.25rem);
+}
+
+.vmz-ui-datagrid__filter-label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--vmz-text-steel);
+}
+
+.vmz-ui-datagrid__filter-input {
+    font: inherit;
+    font-size: 0.875rem;
+    height: 2rem;
+    min-width: 11rem;
+    padding: 0 0.5rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
+    outline: none;
+}
+
+.vmz-ui-datagrid__filter-input:focus-visible {
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+}
+
+.vmz-ui-datagrid__summary {
+    margin: 0 0 0 auto;
+    font-size: 0.8125rem;
+    color: var(--vmz-text-tertiary);
+    font-variant-numeric: tabular-nums;
+}
+
+.vmz-ui-datagrid__table-wrap {
+    overflow: auto;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-lg, 8px);
+    background: var(--vmz-surface-paper);
+}
+
+.vmz-ui-datagrid__table {
+    width: 100%;
+    border-collapse: collapse;
+    font: inherit;
+    font-size: 0.875rem;
+    color: var(--vmz-text-ink);
+}
+
+.vmz-ui-datagrid__caption {
+    caption-side: top;
+    padding: 0 0 var(--vmz-density-compact-padding-y) 0;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--vmz-text-steel);
+}
+
+.vmz-ui-datagrid__th,
+.vmz-ui-datagrid__td {
+    height: 2.25rem;
+    padding: var(--vmz-density-compact-padding-y) var(--vmz-density-compact-padding-x);
+    text-align: left;
+    vertical-align: middle;
+    border: 0;
+    border-bottom: 1px solid var(--vmz-line-subtle);
+    white-space: nowrap;
+}
+
+.vmz-ui-datagrid__table thead .vmz-ui-datagrid__th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--vmz-action-primary-active);
+    background: var(--vmz-surface-mist);
+}
+
+.vmz-ui-datagrid__th[data-align="right"],
+.vmz-ui-datagrid__td[data-align="right"] {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.vmz-ui-datagrid__th[data-align="center"],
+.vmz-ui-datagrid__td[data-align="center"] {
+    text-align: center;
+}
+
+.vmz-ui-datagrid__th--check,
+.vmz-ui-datagrid__td--check {
+    width: 2.5rem;
+    padding-right: 0;
+}
+
+.vmz-ui-datagrid__tr[data-selected="true"] {
+    background: var(--vmz-action-primary-soft);
+}
+
+.vmz-ui-datagrid__tr:hover {
+    background: var(--vmz-surface-fill);
+}
+
+.vmz-ui-datagrid__tr:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-datagrid__tr--state:hover {
+    background: transparent;
+}
+
+.vmz-ui-datagrid__td--state {
+    white-space: normal;
+    text-align: center;
+    padding-top: var(--vmz-space-4, 1rem);
+    padding-bottom: var(--vmz-space-4, 1rem);
+}
+
+.vmz-ui-datagrid__state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--vmz-space-2, 0.5rem);
+}
+
+.vmz-ui-datagrid__state-text {
+    font-size: 0.875rem;
+    color: var(--vmz-text-tertiary);
+}
+
+.vmz-ui-datagrid__retry {
+    height: 2rem;
+    padding: 0 0.75rem;
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md, 6px);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-action-primary-background);
+    cursor: pointer;
+    outline: none;
+}
+
+.vmz-ui-datagrid__retry:focus-visible {
+    box-shadow: 0 0 0 3px var(--vmz-focus-ring);
+}
+
+.vmz-ui-datagrid__head-label {
+    font-size: inherit;
+    font-weight: inherit;
+}
+
+/* ---- projected (parent-virtualized) chrome ---- */
 
 .vmz-ui-datagrid__viewport {
     max-height: 18rem;
@@ -198,6 +437,10 @@
 }
 
 .vmz-ui-datagrid__sort {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--vmz-space-1, 0.25rem);
     font: inherit;
     font-weight: 700;
     padding: 0;
@@ -208,8 +451,21 @@
     outline: none;
 }
 
+.vmz-ui-datagrid__sort:hover {
+    color: var(--vmz-action-primary-background);
+}
+
 .vmz-ui-datagrid__sort:focus-visible {
     box-shadow: 0 0 0 2px var(--vmz-focus-ring);
+}
+
+.vmz-ui-datagrid__sort-glyph {
+    color: var(--vmz-text-tertiary);
+    font-size: 0.75rem;
+}
+
+.vmz-ui-datagrid__sort[data-active="true"] .vmz-ui-datagrid__sort-glyph {
+    color: var(--vmz-action-primary-background);
 }
 
 .vmz-ui-datagrid__spacer {
@@ -219,64 +475,114 @@
 </style>
 <script client>
 /**
- * VMZ UI DataGrid — virtualized body + pinned column + group/tree/pivot + cell editing chrome.
- * Parent owns dataset, flatten/pivot projection, selection, sort, expand, and edit draft/commit.
- * Inline editor is grid chrome (tokens); page may mirror draft with @vmz/ui Field.
- * Not ordinary @vmz/ui DataTable.
+ * VMZ UI DataGrid — two first-class data contracts.
+ *
+ * records (first batch, default for raw data):
+ *   `columns: { key, label, sortable?, align?, width? }` + `rows: record[]` + `rowKey`.
+ *   Local single-column sort, controlled query filter, controlled page/pageSize,
+ *   single/multi selection (select-all applies to the current page), and
+ *   empty / loading / error states. Interaction state is mirrored in fields so
+ *   every template binding reads a field; handlers recompute and emit intent
+ *   (`onSortChange` / `onFilterChange` / `onPageChange` / `onSelectionChange`).
+ *   No remote sort/filter/page protocol — the host data layer owns that.
+ *
+ * projected (parent-virtualized chrome, retained for large/grouped/pivot data):
+ *   parent owns flatten/pivot projection, selection, sort, expand, edit draft.
+ *   Keeps the sticky pinned column, spacers, group/tree/pivot markers and the
+ *   inline editor mirror. Virtualization and pinned columns belong to batch two
+ *   of the records path.
  */
 export default class DataGrid {
-    /** @type {{ id: string, title: string, pinnedAttr: string, cellClass: string, pivotColAttr?: string }[]} */
-    public columns: {
-        id: string;
-        title: string;
-        pinnedAttr: string;
-        cellClass: string;
-        pivotColAttr: string;
-    }[] = [];
-    /**
-     * Visible window only — parent virtualizes over a flattened list (group / tree / pivot / leaves).
-     */
-    public rows: {
-        id: string;
-        kindAttr: string;
-        isGroup: boolean;
-        isTreeExpandable: boolean;
-        isLeaf: boolean;
-        rowClass: string;
-        groupKey: string;
-        depthAttr: string;
-        expandedAttr: string;
-        twist: string;
-        twistLabel: string;
-        selected: boolean;
-        selectedAttr: string;
-        selectLabel: string;
-        pivotRowAttr: string;
-        cells: {
-            id: string;
-            text: string;
-            pinnedAttr: string;
-            cellClass: string;
-            aggAttr: string;
-            cellStyle: string;
-            editableAttr: string;
-            editingAttr: string;
-            editing: boolean;
-            showText: boolean;
-            startEditKey: string;
-            cellKey: string;
-            editValue: string;
-            editLabel: string;
-        }[];
-    }[] = [];
+    /** "records" | "projected"; empty = auto-detect from `columns` / `rows` shape. */
+    public mode: string = "";
+
+    /* ---------- records: column definitions ---------- */
+
+    /** @type {{ key: string, label: string, sortable?: boolean, align?: string, width?: string }[]} */
+    public columns: any[] = [];
+    /** @type {Record<string, unknown>[]} */
+    public rows: any[] = [];
+    /** Stable row identity: record field name, or `(record) => string`. */
+    public rowKey: string | ((row: any) => string) = "id";
+
+    /* ---------- records: controlled view state ---------- */
+
+    public sortKey: string = "";
+    public sortDir: string = "asc";
+    public query: string = "";
+    public page: number = 1;
+    public pageSize: number = 5;
+    public selectedKeys: string[] = [];
+    public selectionMode: string = "multi";
+    /** Optional host predicate applied before the query string. */
+    public filter: ((row: any) => boolean) | null = null;
+    public loading: boolean = false;
+    public error: string = "";
+
+    /* ---------- records: labels ---------- */
+
+    public caption: string = "";
+    public filterLabel: string = "";
+    public filterPlaceholder: string = "";
+    public summaryTemplate: string = "{rows} / {total} · {selected} selected · {page}/{pages}";
+    public selectAllLabel: string = "";
+    public selectRowLabel: string = "";
+    public emptyTitle: string = "";
+    public emptyText: string = "";
+    public loadingLabel: string = "";
+    public loadingText: string = "";
+    public errorText: string = "";
+    public retryLabel: string = "";
+    public prevLabel: string = "";
+    public nextLabel: string = "";
+    public pageLabel: string = "";
+
+    /* ---------- records: emitted intent ---------- */
+
+    public onSortChange: ((key: string, dir: string) => void) | null = null;
+    public onFilterChange: ((query: string) => void) | null = null;
+    public onPageChange: ((page: number) => void) | null = null;
+    public onSelectionChange: ((keys: string[]) => void) | null = null;
+    public onRowActivate: ((key: string) => void) | null = null;
+    public onRetry: (() => void) | null = null;
+
+    /* ---------- records: render fields (single source per binding) ---------- */
+
+    public recordsMode: boolean = false;
+    public gridModeAttr: string = "projected";
+    public stateAttr: string = "rows";
+    /** @type {{ key: string, label: string, align: string, widthStyle: string, sortable: boolean, sortActive: string, ariaSort: string | null, glyph: string, sortLabel: string }[]} */
+    public columnViews: any[] = [];
+    /** @type {{ key: string, index: number, selected: boolean, selectedAttr: string, ariaSelected: string, tabIndex: string, selectLabel: string, cells: { key: string, text: string, align: string }[] }[]} */
+    public viewRows: any[] = [];
+    public filterValue: string = "";
+    public summaryText: string = "";
+    public showState: boolean = false;
+    public stateRole: string = "status";
+    public stateColSpan: number = 1;
+    public showRowSelect: boolean = false;
+    public showSelectAll: boolean = false;
+    public errorMessage: string = "";
+    public pageAllSelected: boolean = false;
+    public pageSelectionAria: string = "false";
+    public currentPage: number = 1;
+    public pageCount: number = 0;
+    public pageStatusText: string = "";
+    public filteredCount: string = "0";
+    /** Records mode counters; projected chrome keeps its own parent-owned totals. */
+    public recordsTotal: string = "0";
+    public recordsVisible: string = "0";
+    public recordsSelected: string = "0";
+    public prevDisabled: boolean = true;
+    public nextDisabled: boolean = true;
+
+    /* ---------- projected chrome (parent-owned) ---------- */
+
     public totalRows: string = "0";
     public visibleCount: string = "0";
     public pinnedCols: string = "1";
-    public sortKey: string = "";
-    public sortDir: string = "asc";
     public selectedCount: string = "0";
     public allSelected: boolean = false;
-    public selectAllLabel: string = "Select all rows";
     public groupByAttr: string = "";
     public groupCount: string = "0";
     public treeAttr: string = "false";
@@ -301,6 +607,413 @@ export default class DataGrid {
     public onEditInput: ((value: string) => void) | null = null;
     public onCommitEdit: (() => void) | null = null;
     public onCancelEdit: (() => void) | null = null;
+
+    /* ---------- internal records state (never read by the template) ---------- */
+
+    _modeResolved: boolean = false;
+    _sortKey: string = "";
+    _sortDir: string = "asc";
+    _query: string = "";
+    _page: number = 1;
+    _pageSize: number = 5;
+    /** @type {string[]} */
+    _selected: string[] = [];
+    _seenSort: string = "";
+    _seenQuery: string = "";
+    _seenPage: string = "";
+    _seenSelected: string = "";
+
+    onMount() {
+        this._detectMode();
+        if (this.recordsMode) {
+            this._adoptControlled();
+            this._render();
+        }
+    }
+
+    /** Parent-owned prop writes: re-classify the shape, adopt controlled state, recompute. */
+    __vmzOnParentProp(name: string) {
+        if (name === "mode" || name === "columns" || name === "rows") this._detectMode();
+        if (this.recordsMode) {
+            this._adoptControlled();
+            this._render();
+        }
+    }
+
+    _detectMode() {
+        const explicit = String(this.mode || "").trim();
+        if (explicit === "projected" || explicit === "records") {
+            this.recordsMode = explicit === "records";
+            this._modeResolved = true;
+            this.gridModeAttr = this.recordsMode ? "records" : "projected";
+            return;
+        }
+        const cols = Array.isArray(this.columns) ? this.columns : [];
+        const legacyColumns = cols.some(
+            (col) => col && col.key == null && col.label == null && (col.id != null || col.title != null),
+        );
+        const list = Array.isArray(this.rows) ? this.rows : [];
+        const projectedRows = list.some((row) => row && Array.isArray(row.cells));
+        if (legacyColumns || projectedRows) {
+            this.recordsMode = false;
+            this._modeResolved = true;
+            this.gridModeAttr = "projected";
+            return;
+        }
+        // Empty props cannot classify yet; stay on the default until real data arrives.
+        if (!cols.length && !list.length && !this._modeResolved) {
+            this.recordsMode = true;
+            this.gridModeAttr = "records";
+            return;
+        }
+        this.recordsMode = true;
+        this._modeResolved = true;
+        this.gridModeAttr = "records";
+    }
+
+    _adoptControlled() {
+        const sortKey = String(this.sortKey == null ? "" : this.sortKey);
+        const sortDir = this.sortDir === "desc" ? "desc" : "asc";
+        const sortSignature = `${sortKey}:${sortDir}`;
+        if (sortSignature !== this._seenSort) {
+            this._sortKey = sortKey;
+            this._sortDir = sortDir;
+            this._seenSort = sortSignature;
+        }
+        const query = String(this.query == null ? "" : this.query);
+        if (query !== this._seenQuery) {
+            this._query = query;
+            this._seenQuery = query;
+        }
+        const pageSize = Math.max(1, Math.floor(Number(this.pageSize) || 5));
+        if (pageSize !== this._pageSize) this._pageSize = pageSize;
+        const page = Math.max(1, Math.floor(Number(this.page) || 1));
+        const pageSignature = String(page);
+        if (pageSignature !== this._seenPage) {
+            this._page = page;
+            this._seenPage = pageSignature;
+        }
+        const incoming = (Array.isArray(this.selectedKeys) ? this.selectedKeys : []).map((key) => String(key));
+        const selectedSignature = incoming.slice().sort().join("\u0001");
+        if (selectedSignature !== this._seenSelected) {
+            this._selected = incoming;
+            this._seenSelected = selectedSignature;
+        }
+    }
+
+    _render() {
+        const columns = (Array.isArray(this.columns) ? this.columns : []).map((col, index) => {
+            const key = String(col && col.key != null ? col.key : `column-${index}`);
+            const align = col && (col.align === "right" || col.align === "center") ? col.align : "left";
+            const width = col && col.width ? String(col.width) : "";
+            return {
+                key,
+                label: String(col && col.label != null ? col.label : key),
+                align,
+                width,
+                sortable: !(col && col.sortable === false),
+            };
+        });
+        const selectionEnabled = this.selectionMode !== "none" && this.selectionMode !== "";
+        const multi = this.selectionMode === "multi";
+
+        const normalized = [];
+        const list = Array.isArray(this.rows) ? this.rows : [];
+        for (let i = 0; i < list.length; i += 1) {
+            const record = list[i];
+            normalized.push({ key: this._rowKeyOf(record, i), record });
+        }
+
+        const query = this._query.trim().toLowerCase();
+        const predicate = typeof this.filter === "function" ? this.filter : null;
+        const filtered = normalized.filter((entry) => {
+            if (predicate && !predicate(entry.record)) return false;
+            if (!query) return true;
+            return this._rowSearchText(entry.record, columns).includes(query);
+        });
+
+        const sortKey = this._sortKey;
+        const sorted =
+            sortKey && columns.some((col) => col.key === sortKey)
+                ? filtered.slice().sort((a, b) => this._compare(a.record, b.record, sortKey) * (this._sortDir === "desc" ? -1 : 1))
+                : filtered;
+
+        const total = sorted.length;
+        const pageSize = this._pageSize;
+        const pageCount = total === 0 ? 0 : Math.ceil(total / pageSize);
+        const page = Math.min(Math.max(1, this._page), Math.max(1, pageCount));
+        this._page = page;
+        const start = (page - 1) * pageSize;
+        const pageSlice = sorted.slice(start, start + pageSize);
+
+        const selectedSet = new Set(this._selected);
+        const pageKeys = pageSlice.map((entry) => entry.key);
+        const pageSelectedCount = pageKeys.filter((key) => selectedSet.has(key)).length;
+        const allOnPage = pageKeys.length > 0 && pageSelectedCount === pageKeys.length;
+
+        this.columnViews = columns.map((col) => {
+            const active = col.sortable && col.key === sortKey;
+            const ariaSort = col.sortable ? (active ? (this._sortDir === "desc" ? "descending" : "ascending") : "none") : null;
+            return {
+                key: col.key,
+                label: col.label,
+                align: col.align,
+                widthStyle: col.width ? `width:${col.width}` : "",
+                sortable: col.sortable,
+                sortActive: active ? "true" : "false",
+                ariaSort,
+                glyph: active ? (this._sortDir === "desc" ? "▼" : "▲") : "",
+                sortLabel: col.label,
+            };
+        });
+
+        this.viewRows = pageSlice.map((entry, index) => {
+            const selected = selectedSet.has(entry.key);
+            const rowLabel = this.selectRowLabel ? `${this.selectRowLabel} ${entry.key}` : entry.key;
+            return {
+                key: entry.key,
+                index: start + index,
+                selected,
+                selectedAttr: selected ? "true" : "false",
+                ariaSelected: selected ? "true" : "false",
+                tabIndex: "0",
+                selectLabel: rowLabel,
+                cells: columns.map((col) => {
+                    const text = this._cellText(entry.record, col.key);
+                    return { key: col.key, text, align: col.align };
+                }),
+            };
+        });
+
+        this.filterValue = this._query;
+        this.filteredCount = String(total);
+        this.showRowSelect = selectionEnabled;
+        this.showSelectAll = selectionEnabled && multi;
+        this.pageAllSelected = allOnPage;
+        this.pageSelectionAria = allOnPage ? "true" : pageSelectedCount > 0 ? "mixed" : "false";
+        this.currentPage = page;
+        this.pageCount = pageCount;
+        this.prevDisabled = page <= 1;
+        this.nextDisabled = pageCount === 0 || page >= pageCount;
+        const end = Math.min(total, start + pageKeys.length);
+        this.pageStatusText = total === 0 ? "" : `${start + 1}–${end} / ${total}`;
+        this.summaryText = this._summary(total, pageKeys.length, pageCount);
+        this.stateColSpan = Math.max(1, columns.length + (this.showRowSelect ? 1 : 0));
+
+        const errorMessage = String(this.errorText || this.error || "").trim();
+        this.errorMessage = errorMessage;
+        const hasError = errorMessage.length > 0;
+        this.showState = this.loading || hasError || total === 0;
+        this.stateRole = hasError ? "alert" : "status";
+        this.stateAttr = this.loading ? "loading" : hasError ? "error" : total === 0 ? "empty" : "rows";
+
+        this.recordsTotal = String(total);
+        this.recordsVisible = String(pageKeys.length);
+        this.recordsSelected = String(this._selected.length);
+        this.sortKey = sortKey;
+        this.sortDir = this._sortDir;
+    }
+
+    _summary(total: number, visible: number, pages: number) {
+        const template = String(this.summaryTemplate || "");
+        if (!template) return "";
+        return template
+            .replace(/\{rows\}/g, String(visible))
+            .replace(/\{total\}/g, String(total))
+            .replace(/\{selected\}/g, String(this._selected.length))
+            .replace(/\{page\}/g, String(this.currentPage))
+            .replace(/\{pages\}/g, String(pages));
+    }
+
+    _rowKeyOf(record, index) {
+        const source = this.rowKey;
+        let raw;
+        if (typeof source === "function") raw = source(record);
+        else raw = record && typeof record === "object" ? record[String(source)] : undefined;
+        if (raw == null || raw === "") {
+            // Stable identity is the host's contract; index is only a last resort.
+            return `row-index-${index}`;
+        }
+        return String(raw);
+    }
+
+    _cellText(record, key) {
+        const value = record && typeof record === "object" ? record[key] : undefined;
+        if (value == null) return "";
+        if (value instanceof Date) return value.toISOString();
+        if (typeof value === "object") return JSON.stringify(value);
+        return String(value);
+    }
+
+    _rowSearchText(record, columns) {
+        return columns.map((col) => this._cellText(record, col.key)).join(" ").toLowerCase();
+    }
+
+    _compare(a, b, key) {
+        const av = this._sortValue(a, key);
+        const bv = this._sortValue(b, key);
+        if (typeof av === "number" && typeof bv === "number") return av - bv;
+        const as = String(av);
+        const bs = String(bv);
+        if (as === "" && bs !== "") return 1;
+        if (bs === "" && as !== "") return -1;
+        return as.localeCompare(bs, undefined, { numeric: true, sensitivity: "base" });
+    }
+
+    _sortValue(record, key) {
+        const value = record && typeof record === "object" ? record[key] : undefined;
+        if (value == null) return "";
+        if (typeof value === "number") return value;
+        if (typeof value === "boolean") return value ? 1 : 0;
+        const text = String(value).trim();
+        if (/^[-+]?[\d,]*\.?\d+$/.test(text)) {
+            const numeric = Number(text.replace(/,/g, ""));
+            if (Number.isFinite(numeric)) return numeric;
+        }
+        return text.toLowerCase();
+    }
+
+    _emitSelection(next) {
+        this._selected = next;
+        this.selectedKeys = next.slice();
+        this._render();
+        if (typeof this.onSelectionChange === "function") this.onSelectionChange(next.slice());
+    }
+
+    _toggleKey(key) {
+        const current = this._selected.slice();
+        const at = current.indexOf(key);
+        if (this.selectionMode === "single") {
+            this._emitSelection(at >= 0 ? [] : [key]);
+            return;
+        }
+        if (at >= 0) current.splice(at, 1);
+        else current.push(key);
+        this._emitSelection(current);
+    }
+
+    _goToPage(page) {
+        const next = Math.min(Math.max(1, Math.floor(Number(page) || 1)), Math.max(1, this.pageCount));
+        if (next === this.currentPage) return;
+        this._page = next;
+        this.page = next;
+        this._render();
+        if (typeof this.onPageChange === "function") this.onPageChange(next);
+    }
+
+    onSortClick(ev) {
+        const t = ev && ev.target;
+        if (!t || typeof t.closest !== "function") return;
+        const button = t.closest("[data-vmz-sort]");
+        if (!button) return;
+        const key = button.getAttribute("data-vmz-sort");
+        if (!key) return;
+        const view = this.columnViews.find((col) => col.key === key);
+        if (view && !view.sortable) return;
+        const dir = this._sortKey === key && this._sortDir === "asc" ? "desc" : this._sortKey === key ? "asc" : "asc";
+        this._sortKey = key;
+        this._sortDir = dir;
+        this.sortKey = key;
+        this.sortDir = dir;
+        this._page = 1;
+        this.page = 1;
+        this._render();
+        if (typeof this.onSortChange === "function") this.onSortChange(key, dir);
+    }
+
+    onFilterInput(ev) {
+        const t = ev && ev.target;
+        const value = t && "value" in t ? String(t.value == null ? "" : t.value) : "";
+        this._query = value;
+        this.query = value;
+        this._page = 1;
+        this.page = 1;
+        this._render();
+        if (typeof this.onFilterChange === "function") this.onFilterChange(value);
+    }
+
+    onSelectAllChange(ev) {
+        if (ev && typeof ev.stopPropagation === "function") ev.stopPropagation();
+        const pageKeys = this.viewRows.map((row) => row.key);
+        const selectedSet = new Set(this._selected);
+        const allOnPage = pageKeys.length > 0 && pageKeys.every((key) => selectedSet.has(key));
+        if (allOnPage) {
+            this._emitSelection(this._selected.filter((key) => pageKeys.indexOf(key) < 0));
+            return;
+        }
+        const next = this._selected.slice();
+        for (const key of pageKeys) if (next.indexOf(key) < 0) next.push(key);
+        this._emitSelection(next);
+    }
+
+    onSelectRowChange(ev) {
+        if (ev && typeof ev.stopPropagation === "function") ev.stopPropagation();
+        const t = ev && ev.target;
+        if (!t || typeof t.closest !== "function") return;
+        const box = t.closest("[data-vmz-select]");
+        const key = box ? box.getAttribute("data-vmz-select") : "";
+        if (key) this._toggleKey(key);
+    }
+
+    onRecordsBodyClick(ev) {
+        const t = ev && ev.target;
+        if (!t || typeof t.closest !== "function") return;
+        if (t.closest("[data-vmz-select]") || t.closest("button") || t.closest("input")) return;
+        const row = t.closest("[data-vmz-row]");
+        if (!row) return;
+        const key = row.getAttribute("data-vmz-row-key") || row.getAttribute("data-vmz-row") || "";
+        if (key && this.showRowSelect) this._toggleKey(key);
+    }
+
+    onRecordsKeyDown(ev) {
+        const t = ev && ev.target;
+        if (!t || typeof t.closest !== "function") return;
+        const row = t.closest("[data-vmz-row]");
+        if (!row) return;
+        const key = row.getAttribute("data-vmz-row-key") || "";
+        if (ev.key === "Enter") {
+            if (key && typeof this.onRowActivate === "function") this.onRowActivate(key);
+            return;
+        }
+        if (ev.key === " " || ev.key === "Spacebar") {
+            if (!key || !this.showRowSelect) return;
+            if (typeof ev.preventDefault === "function") ev.preventDefault();
+            this._toggleKey(key);
+            return;
+        }
+        if (ev.key !== "ArrowDown" && ev.key !== "ArrowUp" && ev.key !== "Home" && ev.key !== "End") return;
+        const table = row.closest("[data-vmz-grid-table]");
+        if (!table) return;
+        const rows = Array.prototype.slice.call(table.querySelectorAll("tbody [data-vmz-row]"));
+        const at = rows.indexOf(row);
+        if (at < 0) return;
+        let next = at;
+        if (ev.key === "ArrowDown") next = Math.min(rows.length - 1, at + 1);
+        if (ev.key === "ArrowUp") next = Math.max(0, at - 1);
+        if (ev.key === "Home") next = 0;
+        if (ev.key === "End") next = rows.length - 1;
+        const target = rows[next];
+        if (target && typeof ev.preventDefault === "function") ev.preventDefault();
+        if (target && typeof target.focus === "function") target.focus();
+    }
+
+    onPrevPage() {
+        this._goToPage(this.currentPage - 1);
+    }
+
+    onNextPage() {
+        this._goToPage(this.currentPage + 1);
+    }
+
+    onGoPage(page) {
+        this._goToPage(page);
+    }
+
+    onRetryClick() {
+        if (typeof this.onRetry === "function") this.onRetry();
+    }
+
+    /* ---------- projected chrome handlers (parent-owned) ---------- */
 
     onViewportScroll(ev) {
         const t = ev && ev.target;

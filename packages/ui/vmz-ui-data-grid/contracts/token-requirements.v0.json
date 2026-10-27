@@ -13,15 +13,24 @@
             "tokens": [
                 "surface.paper",
                 "surface.mist",
+                "surface.fill",
                 "text.ink",
                 "text.steel",
+                "text.tertiary",
                 "line.default",
+                "line.subtle",
                 "action.primary.background",
                 "action.primary.active",
+                "action.primary.soft",
                 "focus.ring",
                 "font.mono",
                 "density.compact.padding-y",
-                "density.compact.padding-x"
+                "density.compact.padding-x",
+                "radius.md",
+                "radius.lg",
+                "space.1",
+                "space.2",
+                "space.4"
             ],
             "surfaces": ["WebSurface"],
             "contracts": [
@@ -35,13 +44,21 @@
                 "tree-rows",
                 "cell-editing",
                 "pivot-matrix",
-                "not-ordinary-datatable"
+                "not-ordinary-datatable",
+                "records-column-definition",
+                "stable-row-identity",
+                "local-filtering",
+                "controlled-pagination",
+                "selection-single-multi-plus-page-all",
+                "empty-loading-error-states",
+                "keyboard-row-focus",
+                "aria-table-semantics"
             ]
         }
     },
     "composition": {
         "reuseFrom": "@vmz/ui",
         "mustNotShip": ["Button", "Field", "Dialog", "Form", "Empty", "Skeleton"],
-        "composeWith": ["BulkActions", "FilterBar", "Pagination", "ConsoleShell", "Field"]
+        "composeWith": ["Pagination", "Empty", "Spinner", "BulkActions", "FilterBar", "ConsoleShell", "Field"]
     }
 }
