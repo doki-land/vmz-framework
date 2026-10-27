@@ -1,0 +1,51 @@
+{
+    "name": "@vmz/davinci-diagram",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/doki-land/vmz-framework.git",
+        "directory": "packages/davinci/vmz-davinci-diagram"
+    },
+    "version": "0.0.0",
+    "type": "module",
+    "description": "DaVinci Diagram domain: DiagramSpec -> DiagramLayoutPlan -> SemanticScene -> DisplayScene.",
+    "license": "MIT",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./spec": {
+            "types": "./dist/spec.d.ts",
+            "default": "./dist/spec.js"
+        },
+        "./layout": {
+            "types": "./dist/layout.d.ts",
+            "default": "./dist/layout.js"
+        },
+        "./mermaid": {
+            "types": "./dist/mermaid.d.ts",
+            "default": "./dist/mermaid.js"
+        }
+    },
+    "files": [
+        "src",
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json"
+    },
+    "dependencies": {
+        "@vmz/davinci-scene": "workspace:*",
+        "@vmz/davinci-types": "workspace:*"
+    },
+    "devDependencies": {
+        "typescript": "^5.8.3"
+    },
+    "keywords": [
+        "vmz",
+        "davinci",
+        "diagram",
+        "mermaid",
+        "graph"
+    ]
+}

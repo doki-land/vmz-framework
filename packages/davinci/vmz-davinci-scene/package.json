@@ -1,0 +1,50 @@
+{
+    "name": "@vmz/davinci-scene",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/doki-land/vmz-framework.git",
+        "directory": "packages/davinci/vmz-davinci-scene"
+    },
+    "version": "0.0.0",
+    "type": "module",
+    "description": "DaVinci Scene: SemanticScene / DisplayScene separation, resolve pipeline, stable ids.",
+    "license": "MIT",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./semantic": {
+            "types": "./dist/semantic.d.ts",
+            "default": "./dist/semantic.js"
+        },
+        "./display": {
+            "types": "./dist/display.d.ts",
+            "default": "./dist/display.js"
+        },
+        "./resolve": {
+            "types": "./dist/resolve.d.ts",
+            "default": "./dist/resolve.js"
+        }
+    },
+    "files": [
+        "src",
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json"
+    },
+    "dependencies": {
+        "@vmz/davinci-types": "workspace:*"
+    },
+    "devDependencies": {
+        "typescript": "^5.8.3"
+    },
+    "keywords": [
+        "vmz",
+        "davinci",
+        "scene",
+        "semantic",
+        "display"
+    ]
+}

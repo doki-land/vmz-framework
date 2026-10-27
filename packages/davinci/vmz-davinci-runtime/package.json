@@ -1,0 +1,51 @@
+{
+    "name": "@vmz/davinci-runtime",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/doki-land/vmz-framework.git",
+        "directory": "packages/davinci/vmz-davinci-runtime"
+    },
+    "version": "0.0.0",
+    "type": "module",
+    "description": "DaVinci Runtime: RuntimeState, normalized events, reducer, invalidation graph, hit test.",
+    "license": "MIT",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./state": {
+            "types": "./dist/state.d.ts",
+            "default": "./dist/state.js"
+        },
+        "./event": {
+            "types": "./dist/event.d.ts",
+            "default": "./dist/event.js"
+        },
+        "./invalidation": {
+            "types": "./dist/invalidation.d.ts",
+            "default": "./dist/invalidation.js"
+        }
+    },
+    "files": [
+        "src",
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json"
+    },
+    "dependencies": {
+        "@vmz/davinci-scene": "workspace:*",
+        "@vmz/davinci-types": "workspace:*"
+    },
+    "devDependencies": {
+        "typescript": "^5.8.3"
+    },
+    "keywords": [
+        "vmz",
+        "davinci",
+        "runtime",
+        "state",
+        "invalidation"
+    ]
+}

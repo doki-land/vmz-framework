@@ -1,0 +1,56 @@
+{
+    "name": "@vmz/davinci-types",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/doki-land/vmz-framework.git",
+        "directory": "packages/davinci/vmz-davinci-types"
+    },
+    "version": "0.0.0",
+    "type": "module",
+    "description": "DaVinci shared types: geometry, color, text, bounds, diagnostics. No dependencies.",
+    "license": "MIT",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./geometry": {
+            "types": "./dist/geometry.d.ts",
+            "default": "./dist/geometry.js"
+        },
+        "./color": {
+            "types": "./dist/color.d.ts",
+            "default": "./dist/color.js"
+        },
+        "./text": {
+            "types": "./dist/text.d.ts",
+            "default": "./dist/text.js"
+        },
+        "./bounds": {
+            "types": "./dist/bounds.d.ts",
+            "default": "./dist/bounds.js"
+        },
+        "./diagnostics": {
+            "types": "./dist/diagnostics.d.ts",
+            "default": "./dist/diagnostics.js"
+        }
+    },
+    "files": [
+        "src",
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json"
+    },
+    "devDependencies": {
+        "typescript": "^5.8.3"
+    },
+    "keywords": [
+        "vmz",
+        "davinci",
+        "types",
+        "geometry",
+        "color",
+        "bounds"
+    ]
+}

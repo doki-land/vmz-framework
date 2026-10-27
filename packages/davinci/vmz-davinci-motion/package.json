@@ -1,0 +1,51 @@
+{
+    "name": "@vmz/davinci-motion",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/doki-land/vmz-framework.git",
+        "directory": "packages/davinci/vmz-davinci-motion"
+    },
+    "version": "0.0.0",
+    "type": "module",
+    "description": "DaVinci Motion: scene correspondence, transition plan, timeline, interruption.",
+    "license": "MIT",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./correspondence": {
+            "types": "./dist/correspondence.d.ts",
+            "default": "./dist/correspondence.js"
+        },
+        "./transition": {
+            "types": "./dist/transition.d.ts",
+            "default": "./dist/transition.js"
+        },
+        "./timeline": {
+            "types": "./dist/timeline.d.ts",
+            "default": "./dist/timeline.js"
+        }
+    },
+    "files": [
+        "src",
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json"
+    },
+    "dependencies": {
+        "@vmz/davinci-scene": "workspace:*",
+        "@vmz/davinci-types": "workspace:*"
+    },
+    "devDependencies": {
+        "typescript": "^5.8.3"
+    },
+    "keywords": [
+        "vmz",
+        "davinci",
+        "motion",
+        "transition",
+        "animation"
+    ]
+}

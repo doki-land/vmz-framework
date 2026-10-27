@@ -1,0 +1,54 @@
+{
+    "name": "@vmz/davinci-chart",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/doki-land/vmz-framework.git",
+        "directory": "packages/davinci/vmz-davinci-chart"
+    },
+    "version": "0.0.0",
+    "type": "module",
+    "description": "DaVinci Chart domain: data snapshot, mark, encoding, scale, statistic -> compile plan -> scene.",
+    "license": "MIT",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./data": {
+            "types": "./dist/data.d.ts",
+            "default": "./dist/data.js"
+        },
+        "./compile": {
+            "types": "./dist/compile.d.ts",
+            "default": "./dist/compile.js"
+        },
+        "./scale": {
+            "types": "./dist/scale.d.ts",
+            "default": "./dist/scale.js"
+        },
+        "./statistic": {
+            "types": "./dist/statistic.d.ts",
+            "default": "./dist/statistic.js"
+        }
+    },
+    "files": [
+        "src",
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json"
+    },
+    "dependencies": {
+        "@vmz/davinci-scene": "workspace:*",
+        "@vmz/davinci-types": "workspace:*"
+    },
+    "devDependencies": {
+        "typescript": "^5.8.3"
+    },
+    "keywords": [
+        "vmz",
+        "davinci",
+        "chart",
+        "visualization"
+    ]
+}

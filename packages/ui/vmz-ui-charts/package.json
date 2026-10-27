@@ -1,0 +1,54 @@
+{
+    "name": "@vmz/ui-charts",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/doki-land/vmz-framework.git",
+        "directory": "packages/ui/vmz-ui-charts"
+    },
+    "version": "0.0.0",
+    "type": "module",
+    "description": "VMZ UI Charts — author-facing Vue bindings for DaVinci. Container sizing, lifecycle, property/attribute/event binding. Not a second chart engine.",
+    "license": "MIT",
+    "exports": {
+        "./Chart": "./src/components/Chart.vmz",
+        "./Diagram": "./src/components/Diagram.vmz",
+        "./DataGrid": "./src/components/DataGrid.vmz"
+    },
+    "files": [
+        "src"
+    ],
+    "peerDependencies": {
+        "@vmz/davinci-chart": "workspace:*",
+        "@vmz/davinci-diagram": "workspace:*",
+        "@vmz/davinci-runtime": "workspace:*",
+        "@vmz/davinci-scene": "workspace:*",
+        "@vmz/davinci-types": "workspace:*",
+        "@vmz/ui": "workspace:*"
+    },
+    "peerDependenciesMeta": {
+        "@vmz/davinci-chart": {
+            "optional": true
+        },
+        "@vmz/davinci-diagram": {
+            "optional": true
+        },
+        "@vmz/davinci-runtime": {
+            "optional": true
+        },
+        "@vmz/davinci-scene": {
+            "optional": true
+        },
+        "@vmz/davinci-types": {
+            "optional": true
+        },
+        "@vmz/ui": {
+            "optional": true
+        }
+    },
+    "keywords": [
+        "vmz",
+        "ui",
+        "charts",
+        "davinci"
+    ]
+}

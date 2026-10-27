@@ -1,4 +1,5 @@
 packages:
+  - 'packages/davinci/*'
   - 'packages/examples/*'
   - 'packages/runtimes/*'
   - 'packages/editors/*'
