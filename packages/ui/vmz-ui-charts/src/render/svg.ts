@@ -100,8 +100,10 @@ function elementMarkup(node: DisplayLeaf, transform: string): string {
             return `<image x="${num(node.x)}" y="${num(node.y)}" width="${num(node.w)}" height="${num(node.h)}" href="${esc(node.resourceRef)}" preserveAspectRatio="xMidYMid meet"${transformAttr}/>`;
         }
         case "text": {
+            // DisplayText.anchor is the centre of the text block, so alignment
+            // is fixed: middle horizontally, middle vertically.
             const font = node.fontCss ? ` style="font:${esc(node.fontCss)}"` : "";
-            return `<text x="${num(node.anchor.x)}" y="${num(node.anchor.y)}"${fillAttrs(node.color)}${font}${transformAttr}>${esc(node.text)}</text>`;
+            return `<text x="${num(node.anchor.x)}" y="${num(node.anchor.y)}" text-anchor="middle" dominant-baseline="middle"${fillAttrs(node.color)}${font}${transformAttr}>${esc(node.text)}</text>`;
         }
     }
 }

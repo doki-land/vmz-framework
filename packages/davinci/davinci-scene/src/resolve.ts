@@ -18,6 +18,7 @@ import {
     multiplyTransform,
     type Affine2D,
     type BoundsRect,
+    type FontSpec,
     type Point2D,
     type RGBA,
 } from "@doki-land/davinci-types";
@@ -49,6 +50,34 @@ function resolveStroke(s: Stroke | undefined): DisplayStroke | undefined {
 function resolveFill(f: Fill | undefined): DisplayFill | undefined {
     if (!f) return undefined;
     return { color: f.color ?? DEFAULT_FILL.color };
+}
+
+// ─── Text metrics (deterministic estimate, no host measurement) ──────────
+
+/** Average glyph advance as a fraction of font size. CJK and half-width
+ *  glyphs share one coefficient so bounds stay deterministic. */
+const TEXT_ADVANCE_RATIO = 0.6;
+/** Line box height as a fraction of font size. */
+const TEXT_LINE_RATIO = 1.2;
+const DEFAULT_TEXT_SIZE = 12;
+
+/** Estimate a text block's size without a font measurement provider.
+ *  Width = longest line's character count × size × 0.6,
+ *  height = line count × size × 1.2. */
+export function estimateTextSize(text: string, sizePx: number): { width: number; height: number } {
+    const size = Number.isFinite(sizePx) && sizePx > 0 ? sizePx : DEFAULT_TEXT_SIZE;
+    const lines = text.split("\n");
+    let longest = 0;
+    for (const line of lines) longest = Math.max(longest, Array.from(line).length);
+    return { width: longest * size * TEXT_ADVANCE_RATIO, height: lines.length * size * TEXT_LINE_RATIO };
+}
+
+function fontCssOf(font: FontSpec): string {
+    const size = Number.isFinite(font.sizePx) && font.sizePx > 0 ? font.sizePx : DEFAULT_TEXT_SIZE;
+    const family = font.family || "sans-serif";
+    const style = font.italic ? "italic " : "";
+    const weight = font.weight ?? 400;
+    return `${style}${weight} ${size}px ${family.includes(" ") ? `"${family}"` : family}`;
 }
 
 /** Resolve a SemanticScene into a DisplayScene.
@@ -101,11 +130,25 @@ function resolveNode(
         }
         case "text": {
             const anchor = node.anchor ?? { x: 0, y: 0 };
-            // NOTE: text metrics require host-provided measurement — we keep
-            // bounds as the anchor point for now. Future: integrate a metrics
-            // provider interface.
-            const bounds: BoundsRect = { x: anchor.x, y: anchor.y, w: 0, h: 0 };
-            return { kind: "text", text: node.text, fontCss: "", anchor, color: node.color ?? BLACK, bounds, ...base };
+            // The anchor is the centre of the text block, so bounds come from
+            // a deterministic estimate (no host font metrics are involved).
+            const size = estimateTextSize(node.text, node.font.sizePx);
+            const localRect: BoundsRect = {
+                x: anchor.x - size.width / 2,
+                y: anchor.y - size.height / 2,
+                w: size.width,
+                h: size.height,
+            };
+            const bounds = transformRect(localRect, worldTransform);
+            return {
+                kind: "text",
+                text: node.text,
+                fontCss: fontCssOf(node.font),
+                anchor,
+                color: node.color ?? BLACK,
+                bounds,
+                ...base,
+            };
         }
         case "marker": {
             // Markers expand into multiple identical DisplayNode copies —

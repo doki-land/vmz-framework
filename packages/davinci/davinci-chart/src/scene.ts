@@ -3,13 +3,14 @@
 // The compile plan carries scales with a host-independent range (linear stays
 // in [0, 1], band uses one step per category). This module is the only place
 // that turns those ranges into pixels, so `compile` never guesses a viewport.
-// It emits mark geometry only — no theme, motion, interaction state or guides.
+// It emits mark geometry plus axis baselines, tick labels and a minimal legend
+// — no theme, motion or interaction state.
 //
 // Node identity comes from `rowIndex` (bar / point) or the series value (line),
 // never from the position of an item in a temporary array.
 
-import { rgb8, type PathCommand, type RGBA } from "@doki-land/davinci-types";
-import type { SemanticNode, SemanticScene } from "@doki-land/davinci-scene";
+import { rgb8, type FontSpec, type PathCommand, type RGBA } from "@doki-land/davinci-types";
+import { estimateTextSize, type SemanticNode, type SemanticScene } from "@doki-land/davinci-scene";
 import type { ChartCompilePlan } from "./compile.js";
 import { column, type DataColumn } from "./data.js";
 import { apply, bandwidth, type Scale } from "./scale.js";
@@ -50,6 +51,29 @@ const LINE_STROKE = { color: MARK_FILL, width: 2 };
 const POINT_RADIUS = 3;
 const BAR_RATIO = 0.8;
 
+// Guides (baselines, ticks, labels, legend) share one muted palette so the
+// marks stay visually dominant.
+const AXIS_STROKE = { color: rgb8(160, 160, 160), width: 1 };
+const LABEL_COLOR: RGBA = rgb8(85, 85, 85);
+const LABEL_FONT: FontSpec = { family: "sans-serif", sizePx: 10 };
+const LEGEND_FONT: FontSpec = { family: "sans-serif", sizePx: 11 };
+const TICK_LENGTH = 4;
+const LABEL_GAP = 4;
+const LEGEND_SWATCH = 10;
+const LEGEND_SWATCH_GAP = 6;
+const LEGEND_EDGE_GAP = 6;
+const LEGEND_ITEM_STEP = 15;
+const MAX_TICK_DECIMALS = 6;
+const MAX_TICKS = 12;
+const LEGEND_PALETTE: ReadonlyArray<RGBA> = [
+    rgb8(31, 119, 180),
+    rgb8(255, 127, 14),
+    rgb8(44, 160, 44),
+    rgb8(214, 39, 40),
+    rgb8(148, 103, 189),
+    rgb8(140, 86, 75),
+];
+
 /** Build a SemanticScene from a ChartCompilePlan and a pixel viewport. */
 export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport): SemanticScene {
     const plot = plotRect(viewport);
@@ -70,7 +94,10 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport): Sem
 
         if (xScale && yScale && xCol && yCol) {
             const rows = positionedRows(plan, xScale, yScale, xCol, yCol, seriesCol);
+            children.push(buildAxis("x-axis", plot, xScale, "horizontal"));
+            children.push(buildAxis("y-axis", plot, yScale, "vertical"));
             children.push(...buildMarks(plan, rows, plot, xScale));
+            children.push(...buildLegend(plan, plot));
         }
     }
 
@@ -188,6 +215,207 @@ function buildPoints(plan: ChartCompilePlan, rows: ReadonlyArray<PositionedMark>
         ry: POINT_RADIUS,
         fill: { color: MARK_FILL },
     }));
+}
+
+// ─── Guides: baselines, ticks, labels, legend ────────────────────────────
+
+interface AxisTick {
+    readonly label: string;
+    readonly position: number;
+}
+
+/** One axis group: baseline + short tick marks + data-derived tick labels. */
+function buildAxis(
+    id: string,
+    plot: PlotRect,
+    scale: Scale,
+    orientation: "horizontal" | "vertical",
+): SemanticNode {
+    const ticks = axisTicks(scale);
+    const nodes: SemanticNode[] = [axisBaseline(id, plot, orientation)];
+
+    if (orientation === "horizontal") {
+        const baseline = plot.y + plot.h;
+        ticks.forEach((tick, i) => {
+            nodes.push(shortLine(`${id}:tick:${i}`, tick.position, baseline, tick.position, baseline + TICK_LENGTH));
+            const height = estimateTextSize(tick.label, LABEL_FONT.sizePx).height;
+            nodes.push(labelNode(`${id}:label:${i}`, tick.label, tick.position, baseline + TICK_LENGTH + height / 2));
+        });
+    } else {
+        ticks.forEach((tick, i) => {
+            nodes.push(shortLine(`${id}:tick:${i}`, plot.x - TICK_LENGTH, tick.position, plot.x, tick.position));
+            const width = estimateTextSize(tick.label, LABEL_FONT.sizePx).width;
+            const x = Math.max(width / 2 + 1, plot.x - TICK_LENGTH - LABEL_GAP - width / 2);
+            nodes.push(labelNode(`${id}:label:${i}`, tick.label, x, tick.position));
+        });
+    }
+
+    return { kind: "group", id, role: "chart.axis", children: nodes };
+}
+
+function axisBaseline(id: string, plot: PlotRect, orientation: "horizontal" | "vertical"): SemanticNode {
+    const baseline = plot.y + plot.h;
+    const commands: PathCommand[] =
+        orientation === "horizontal"
+            ? [
+                  { kind: "move", to: { x: plot.x, y: baseline } },
+                  { kind: "line", to: { x: plot.x + plot.w, y: baseline } },
+              ]
+            : [
+                  { kind: "move", to: { x: plot.x, y: plot.y } },
+                  { kind: "line", to: { x: plot.x, y: baseline } },
+              ];
+    return {
+        kind: "path",
+        id: `${id}:baseline`,
+        role: "chart.axis",
+        path: { commands },
+        stroke: AXIS_STROKE,
+    };
+}
+
+function shortLine(id: string, x1: number, y1: number, x2: number, y2: number): SemanticNode {
+    return {
+        kind: "path",
+        id,
+        role: "chart.axis",
+        path: {
+            commands: [
+                { kind: "move", to: { x: x1, y: y1 } },
+                { kind: "line", to: { x: x2, y: y2 } },
+            ],
+        },
+        stroke: AXIS_STROKE,
+    };
+}
+
+function labelNode(id: string, text: string, x: number, y: number): SemanticNode {
+    return { kind: "text", id, role: "chart.axis", text, font: LABEL_FONT, anchor: { x, y }, color: LABEL_COLOR };
+}
+
+/** Ticks derived from the scale domain — never from a hardcoded list. */
+function axisTicks(scale: Scale): AxisTick[] {
+    switch (scale.kind) {
+        case "band":
+        case "point":
+            return scale.domain
+                .map((category) => ({ label: String(category), position: project(scale, category) }))
+                .filter((tick) => Number.isFinite(tick.position));
+        case "log": {
+            const [lo, hi] = scale.domain;
+            const values = lo > 0 && hi > 0 ? [lo, Math.sqrt(lo * hi), hi] : [lo, hi];
+            return values
+                .map((value) => ({ label: formatTick(value, 2), position: project(scale, value) }))
+                .filter((tick) => Number.isFinite(tick.position));
+        }
+        case "linear": {
+            const { values, decimals } = niceTicks(scale.domain);
+            return values
+                .map((value) => ({ label: formatTick(value, decimals), position: project(scale, value) }))
+                .filter((tick) => Number.isFinite(tick.position));
+        }
+        default:
+            return [];
+    }
+}
+
+/** 4–6 evenly spaced "nice" values covering the domain (single value when flat). */
+function niceTicks(domain: [number, number]): { values: number[]; decimals: number } {
+    let [lo, hi] = domain;
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return { values: [], decimals: 0 };
+    if (lo > hi) [lo, hi] = [hi, lo];
+    if (lo === hi) {
+        const single = normalizeNumber(lo);
+        return { values: [single], decimals: decimalsForStep(Math.abs(single) || 1) };
+    }
+
+    const rawStep = (hi - lo) / 4;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+    const normalized = rawStep / magnitude;
+    const step = (normalized <= 1 ? 1 : normalized <= 2.5 ? 2 : normalized <= 5 ? 5 : 10) * magnitude;
+    const decimals = decimalsForStep(step);
+
+    const first = Math.ceil(lo / step - 1e-9);
+    const last = Math.floor(hi / step + 1e-9);
+    const values: number[] = [];
+    for (let i = first; i <= last && values.length < MAX_TICKS; i++) {
+        values.push(normalizeNumber(i * step));
+    }
+    if (values.length === 0) values.push(normalizeNumber((lo + hi) / 2));
+    return { values, decimals };
+}
+
+function decimalsForStep(step: number): number {
+    if (!(step > 0) || !Number.isFinite(step)) return 0;
+    let decimals = 0;
+    while (decimals < MAX_TICK_DECIMALS && Math.abs(Number(step.toFixed(decimals)) - step) > step * 1e-6) {
+        decimals += 1;
+    }
+    return decimals;
+}
+
+function formatTick(value: number, decimals: number): string {
+    if (!Number.isFinite(value)) return "";
+    const places = Math.min(Math.max(decimals, 0), MAX_TICK_DECIMALS);
+    let text = value.toFixed(places);
+    if (text.includes(".")) text = text.replace(/0+$/, "").replace(/\.$/, "");
+    return text === "-0" ? "0" : text;
+}
+
+/** Kill floating point tails such as 0.30000000000000004. */
+function normalizeNumber(value: number): number {
+    return Number(value.toPrecision(12));
+}
+
+/** Color swatches live in the plot's upper-right corner, clear of the ticks. */
+function buildLegend(plan: ChartCompilePlan, plot: PlotRect): SemanticNode[] {
+    const enc = plan.spec.encoding.find((e) => e.channel === "color" || e.channel === "series");
+    if (!enc) return [];
+    const col = column(plan.resolvedData, enc.field);
+    if (!col) return [];
+
+    const categories: string[] = [];
+    for (const value of col.values) {
+        if (value === null || value === undefined) continue;
+        const key = String(value);
+        if (!categories.includes(key)) categories.push(key);
+    }
+    if (categories.length === 0) return [];
+
+    const size = LEGEND_FONT.sizePx;
+    const widths = categories.map((category) => estimateTextSize(category, size).width);
+    const blockWidth = LEGEND_SWATCH + LEGEND_SWATCH_GAP + Math.max(...widths);
+    const right = plot.x + plot.w - LEGEND_EDGE_GAP;
+    const left = Math.max(plot.x + LEGEND_EDGE_GAP, right - blockWidth);
+    const capacity = Math.max(1, Math.floor((plot.h - LEGEND_EDGE_GAP * 2) / LEGEND_ITEM_STEP));
+
+    const items: SemanticNode[] = [];
+    categories.slice(0, capacity).forEach((category, i) => {
+        const top = plot.y + LEGEND_EDGE_GAP + i * LEGEND_ITEM_STEP;
+        items.push({
+            kind: "rect",
+            id: `legend:swatch:${i}`,
+            role: "chart.legend",
+            x: left,
+            y: top + (LEGEND_ITEM_STEP - LEGEND_SWATCH) / 2,
+            w: LEGEND_SWATCH,
+            h: LEGEND_SWATCH,
+            rx: 1,
+            ry: 1,
+            fill: { color: LEGEND_PALETTE[i % LEGEND_PALETTE.length] },
+        });
+        items.push({
+            kind: "text",
+            id: `legend:label:${i}`,
+            role: "chart.legend",
+            text: category,
+            font: LEGEND_FONT,
+            anchor: { x: left + LEGEND_SWATCH + LEGEND_SWATCH_GAP + widths[i] / 2, y: top + LEGEND_ITEM_STEP / 2 },
+            color: LABEL_COLOR,
+        });
+    });
+
+    return [{ kind: "group", id: "chart-legend", role: "chart.legend", children: items }];
 }
 
 // ─── Scale → pixel mapping ───────────────────────────────────────────────
