@@ -252,3 +252,26 @@ export default class CatalogList {
     );
     assert!(!js.contains("api.text(\"@click=\")"), "{js}");
 }
+
+#[test]
+fn v_show_reactive_emits_display_toggle_patch() {
+    let src = r#"
+export default class ShowDemo {
+  ok = true;
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<div v-show="ok">hi</div>"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains("api.trackPatch(this,"), "reactive v-show must trackPatch: {js}");
+    assert!(
+        js.contains("style.display") || js.contains("el.style.display"),
+        "v-show patch must toggle style.display: {js}"
+    );
+    assert!(
+        !js.contains("api.attr(") || !js.contains("\"show\""),
+        "v-show must not emit api.attr(el, \"show\", ...): {js}"
+    );
+}
