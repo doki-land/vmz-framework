@@ -129,6 +129,7 @@ export type DirectApi = {
     adoptLeave: () => void;
     projectDefaultSlot: (hostEl: HTMLElement, node: Node) => void;
     setHtml: (el: Element, value: unknown) => void;
+    setShow: (el: HTMLElement, condition: unknown) => void;
     bindHtml: (inst: DirectInstance, bindingId: BindingId, deps: string[], get: PatchFn, el: Element) => void;
     bindComponentProp: (
         inst: DirectInstance,

@@ -325,6 +325,15 @@ export const directApi = {
     setHtml(el, value) {
         el.innerHTML = value == null ? '' : String(value);
     },
+    /**
+     * Vue `v-show` — toggles `style.display` between empty string (visible,
+     * original CSS wins) and `'none'`.  Element stays in the DOM tree (unlike
+     * `v-if`).  Used for static-show values; reactive bindings emit inline
+     * patches in {@link trackPatch}.
+     */
+    setShow(el, condition) {
+        el.style.display = condition ? '' : 'none';
+    },
     bindHtml(inst, bindingId, deps, get, el) {
         directApi.trackPatch(
             inst,
