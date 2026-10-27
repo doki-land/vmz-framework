@@ -1,6 +1,6 @@
 {
     "name": "@vmz/markdown",
-    "version": "0.3.10",
+    "version": "0.3.11",
     "private": true,
     "type": "module",
     "description": "Replaceable markdown render surface (plain safe subset; no markdown-it default)",

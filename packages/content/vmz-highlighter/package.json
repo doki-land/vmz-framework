@@ -1,6 +1,6 @@
 {
     "name": "@vmz/highlighter",
-    "version": "0.3.10",
+    "version": "0.3.11",
     "private": true,
     "type": "module",
     "description": "Language-neutral highlighter API + token/span contract (plain fallback; replaceable)",
