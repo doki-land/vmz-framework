@@ -9,7 +9,8 @@ use super::template_common::{TemplateParseError, decode_html_entities};
 use super::template_concrete::{ConcreteAttr, ConcreteIr, ConcreteNode, classify_concrete_attr};
 use super::template_semantic::{
     ControlFlowKind, IfBranch, SemanticIr, SemanticNode, SemanticProp, control_flow_kind,
-    if_chain_from_branches, semantic_from_element_parts, validate_root_slot_templates,
+    for_directive, if_chain_from_branches, semantic_from_element_parts,
+    validate_root_slot_templates,
 };
 use super::template_span::TemplateSpan;
 use crate::sfc::TemplateBlock;
@@ -186,6 +187,19 @@ fn lower_oak_siblings(
                 }
                 let attrs = classify_oak_attrs(shell, el)?;
                 let span = to_body_span(shell, el.span);
+                // Vue 3 rejects mixing `v-for` with any `v-if`-family directive on
+                // the same element — the author must wrap one in `<template>`.
+                if for_directive(&attrs).is_some() && control_flow_kind(&attrs).is_some() {
+                    return Err(TemplateParseError::coded(
+                        "vmz::template::v_for_v_if_conflict",
+                        span.start as usize,
+                    )
+                    .with_arg(
+                        "detail",
+                        "cannot use `v-for` together with `v-if` / `v-else-if` / \
+                         `v-else` on the same element; wrap one side in `<template>`",
+                    ));
+                }
                 match control_flow_kind(&attrs) {
                     Some(ControlFlowKind::If(_)) => {
                         let (chain, consumed) = take_oak_if_chain(shell, &nodes[i..])?;

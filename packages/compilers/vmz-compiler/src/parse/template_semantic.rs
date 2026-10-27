@@ -540,6 +540,19 @@ fn lower_siblings(nodes: &[ConcreteNode]) -> Result<Vec<SemanticNode>, TemplateP
                     i += 1;
                     continue;
                 }
+                // Vue 3 rejects mixing `v-for` with any `v-if`-family directive on
+                // the same element — the author must wrap one in `<template>`.
+                if for_directive(attrs).is_some() && control_flow_kind(attrs).is_some() {
+                    return Err(TemplateParseError::coded(
+                        "vmz::template::v_for_v_if_conflict",
+                        span.start as usize,
+                    )
+                    .with_arg(
+                        "detail",
+                        "cannot use `v-for` together with `v-if` / `v-else-if` / \
+                         `v-else` on the same element; wrap one side in `<template>`",
+                    ));
+                }
                 match control_flow_kind(attrs) {
                     Some(ControlFlowKind::If(_)) => {
                         let (chain, consumed) = take_if_chain(&nodes[i..])?;
@@ -618,7 +631,7 @@ fn take_if_chain(nodes: &[ConcreteNode]) -> Result<(SemanticNode, usize), Templa
     Ok((if_chain_from_branches(branches), i))
 }
 
-fn for_directive(attrs: &[ConcreteAttr]) -> Option<&Directive> {
+pub(crate) fn for_directive(attrs: &[ConcreteAttr]) -> Option<&Directive> {
     for a in attrs {
         if let ConcreteAttr::Directive { dir: Directive::For { .. }, .. } = a {
             return match a {

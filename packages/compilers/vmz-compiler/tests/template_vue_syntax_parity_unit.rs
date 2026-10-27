@@ -482,3 +482,34 @@ fn first_bind_expr(body: &str) -> String {
         })
         .unwrap_or_else(|| panic!("expected bind prop, got {props:?}"))
 }
+
+#[test]
+fn v_for_accepts_object_destructuring_aliases() {
+    assert_accepted(r#"<div v-for="{ a, b } in items" :key="a">{{ a }} {{ b }}</div>"#);
+    assert_accepted(r#"<div v-for="{ a = 1, b } in items" :key="a">{{ a }}</div>"#);
+    assert_accepted(
+        r#"<div v-for="{ a, b: { c } } in items" :key="a">{{ a }} {{ c }}</div>"#,
+    );
+}
+
+#[test]
+fn v_for_accepts_array_destructuring_aliases() {
+    assert_accepted(r#"<div v-for="[ first, second ] in list" :key="first">{{ first }}</div>"#);
+    assert_accepted(r#"<div v-for="[ first, ...rest ] in list" :key="first">{{ first }}</div>"#);
+}
+
+#[test]
+fn v_for_rejects_same_element_v_if() {
+    assert_rejected(r#"<div v-for="i in xs" v-if="ok">{{ i }}</div>"#);
+    assert_rejected(r#"<div v-if="ok" v-for="i in xs">{{ i }}</div>"#);
+}
+
+#[test]
+fn v_for_rejects_same_element_v_else_if() {
+    assert_rejected(r#"<div v-for="i in xs" v-else-if="ok">{{ i }}</div>"#);
+}
+
+#[test]
+fn v_for_rejects_same_element_v_else() {
+    assert_rejected(r#"<div v-for="i in xs" v-else>{{ i }}</div>"#);
+}

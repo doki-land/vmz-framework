@@ -507,13 +507,48 @@ fn parse_for_aliases(alias_part: &str) -> Option<(String, Option<String>, Option
     if inner.is_empty() {
         return None;
     }
-    let parts: Vec<&str> = inner.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
-    match parts.as_slice() {
-        [v] => Some(((*v).to_string(), None, None)),
-        [v, k] => Some(((*v).to_string(), Some((*k).to_string()), None)),
-        [v, k, i] => Some(((*v).to_string(), Some((*k).to_string()), Some((*i).to_string()))),
-        _ => None,
+    // Split on top-level commas only — skips commas inside nested `{…}` / `[…]`
+    // so that object / array destructuring in `v-for` value alias survives intact.
+    let parts = split_top_level_commas(inner);
+    if parts.is_empty() || parts.iter().all(|s| s.is_empty()) {
+        return None;
     }
+    let mut it = parts.into_iter().filter(|s| !s.is_empty());
+    let v = it.next()?;
+    let k = it.next();
+    let i = it.next();
+    if it.next().is_some() {
+        // More than 3 alias slots — reject, mirroring prior behaviour.
+        return None;
+    }
+    Some((v.to_string(), k.map(|s| s.to_string()), i.map(|s| s.to_string())))
+}
+
+/// Split `s` on top-level commas only — commas inside matching `{}` / `[]` are
+/// treated as content, not separators. Used by `parse_for_aliases` to preserve
+/// object/array destructuring patterns as a single alias slot.
+fn split_top_level_commas(s: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut depth_curly = 0i32;
+    let mut depth_square = 0i32;
+    let mut cur = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '{' => depth_curly += 1,
+            '}' => depth_curly -= 1,
+            '[' => depth_square += 1,
+            ']' => depth_square -= 1,
+            ',' if depth_curly == 0 && depth_square == 0 => {
+                out.push(cur.trim().to_string());
+                cur.clear();
+                continue;
+            }
+            _ => {}
+        }
+        cur.push(c);
+    }
+    out.push(cur.trim().to_string());
+    out
 }
 
 fn split_v_for(expr: &str) -> Option<(&str, &str)> {
