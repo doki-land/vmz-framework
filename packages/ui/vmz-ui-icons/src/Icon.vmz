@@ -1,5 +1,5 @@
 <template>
-    <span data-vmz-ui="icon" :data-icon="name" :data-size="size" :role="roleAttr" :aria-hidden="hiddenAttr" :aria-label="labelAttr" class="vmz-ui-icon">
+    <span data-vmz-ui="icon" :data-icon="name" :data-size="size" :role="roleAttr()" :aria-hidden="hiddenAttr()" :aria-label="labelAttr()" class="vmz-ui-icon">
         <span v-if="isTextBadge()" class="vmz-ui-icon__badge">
             {{ badgeLabel() }}
         </span>
@@ -56,21 +56,15 @@
 }
 
 .vmz-ui-icon[data-size="sm"] {
-    width: 1.5rem;
-    height: 1.5rem;
-    font-size: 0.95rem;
+    font-size: 16px;
 }
 
 .vmz-ui-icon[data-size="md"] {
-    width: 2.35rem;
-    height: 2.35rem;
-    font-size: 1.15rem;
+    font-size: 20px;
 }
 
 .vmz-ui-icon[data-size="lg"] {
-    width: 2.85rem;
-    height: 2.85rem;
-    font-size: 1.35rem;
+    font-size: 24px;
 }
 </style>
 <script client>
@@ -84,17 +78,28 @@ export default class Icon {
     static __vmzHostBox = "contents";
     /** Semantic icon id, e.g. tool.base64 / action.search */
     public name: string = "";
-    /** sm | md | lg */
+    /** sm | md | lg → 16 / 20 / 24 px glyph */
     public size: string = "md";
     /** Accessible name; empty ⇒ decorative */
     public label: string = "";
+    /** Optional role override when labelled; defaults to `img`. */
+    public role: string = "";
 
-    roleAttr = "";
-    hiddenAttr = "true";
-    labelAttr = "";
+    labelText() {
+        return String(this.label || "").trim();
+    }
 
-    onMount() {
-        this.syncA11y();
+    roleAttr() {
+        if (!this.labelText()) return "";
+        return String(this.role || "").trim() || "img";
+    }
+
+    hiddenAttr() {
+        return this.labelText() ? "" : "true";
+    }
+
+    labelAttr() {
+        return this.labelText();
     }
 
     iconDef() {
@@ -218,19 +223,6 @@ export default class Icon {
                 stroke: node.attrs.stroke ?? "currentColor",
                 strokeWidth: node.attrs["stroke-width"] ?? DEFAULT_STROKE_WIDTH,
             }));
-    }
-
-    syncA11y() {
-        const labelled = String(this.label || "").trim();
-        if (labelled) {
-            this.roleAttr = "img";
-            this.hiddenAttr = "";
-            this.labelAttr = labelled;
-        } else {
-            this.roleAttr = "";
-            this.hiddenAttr = "true";
-            this.labelAttr = "";
-        }
     }
 }
 </script>

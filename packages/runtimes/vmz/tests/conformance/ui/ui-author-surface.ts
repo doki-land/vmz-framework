@@ -3,12 +3,13 @@
  *
  * Asserts the contracted props render and behave, not just that a prop name
  * exists: CodeBlock header precedence, Dropdown link-vs-action items, AppShell
- * flat nav + `actions` slot, Link variants, and the `language → nav.language`
- * icon alias resolving to the same glyph.
+ * flat nav + `actions` slot, Link variants, and canonical semantic icon names
+ * (bare legacy names must be rejected by the registry).
  */
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { repoRoot } from '../_lib/repo-root.ts';
@@ -23,14 +24,24 @@ function fail(msg) {
 }
 
 console.log('ui-author-surface: build homepage (official @vmz/ui dogfood)…');
-const build = spawnSync(process.execPath, [vmzBin, 'build', homepage], {
+// Build into a scratch dir: `packages/homepage/dist` is incremental, so a stale
+// vendored `@vmz/ui-icons` copy there would silently test old registry code.
+const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-author-surface-'));
+process.on('exit', () => {
+    try {
+        fs.rmSync(outDir, { recursive: true, force: true });
+    } catch {
+        /* ignore */
+    }
+});
+const build = spawnSync(process.execPath, [vmzBin, 'build', homepage, '--out-dir', outDir], {
     cwd: root,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
 });
 if (build.status !== 0) fail(`homepage build failed\n${build.stdout}\n${build.stderr}`);
 
-const dist = path.join(homepage, 'dist', 'web-ssr');
+const dist = path.join(outDir, 'web-ssr');
 const domHref = pathToFileURL(
     path.join(root, 'packages', 'runtimes', 'vmz-runtime', 'dist', 'faces', 'dom.js'),
 ).href;
@@ -165,8 +176,8 @@ for (const variant of ['default', 'muted', 'nav']) {
     }
 }
 
-// --- Icons: `language` alias resolves to the `nav.language` glyph ---------
-console.log('ui-author-surface: `language` → `nav.language` icon alias…');
+// --- Icons: canonical semantic names only, bare legacy names fail loudly ---
+console.log('ui-author-surface: canonical icon names…');
 const Icon = await loadComponent('Icon');
 registerComponents({ Icon });
 const glyphPaths = (html) =>
@@ -174,12 +185,17 @@ const glyphPaths = (html) =>
         .map((match) => match[1])
         .sort()
         .join('|');
-const aliasHtml = await renderToString(Icon, { name: 'language', decorative: true });
-const canonicalHtml = await renderToString(Icon, { name: 'nav.language', decorative: true });
-if (!aliasHtml.includes('data-name="language"')) fail('Icon must keep the authored name in data-name');
-if (!glyphPaths(aliasHtml)) fail('`language` alias rendered no glyph paths');
-if (glyphPaths(aliasHtml) !== glyphPaths(canonicalHtml)) {
-    fail('`language` alias must resolve to the exact `nav.language` glyph');
+const iconHtml = await renderToString(Icon, { name: 'nav.language', decorative: true });
+if (!iconHtml.includes('data-name="nav.language"')) fail('Icon must keep the authored semantic name in data-name');
+if (!glyphPaths(iconHtml)) fail('`nav.language` rendered no glyph paths');
+// SSR records component-render failures as diagnostics, so the registry throw may
+// surface as an empty/absent subtree. What must not happen is a silent alias hit.
+let bareHtml = '';
+try {
+    bareHtml = await renderToString(Icon, { name: 'language', decorative: true });
+} catch {
+    bareHtml = '';
 }
+if (glyphPaths(bareHtml)) fail('bare legacy icon name `language` must not resolve to a glyph');
 
-console.log('ui-author-surface PASS: AppShell, Link and icon alias contracts');
+console.log('ui-author-surface PASS: AppShell, Link and canonical icon-name contracts');

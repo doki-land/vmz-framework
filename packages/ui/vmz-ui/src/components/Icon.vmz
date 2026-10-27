@@ -66,7 +66,7 @@ import { DEFAULT_STROKE_WIDTH, resolveIconDef } from "@vmz/ui-icons/registry";
  */
 export default class Icon {
     static __vmzHostBox = "contents";
-    public name: string = "info";
+    public name: string = "status.info";
     public size: string = "md";
     public label: string = "";
     public decorative: boolean = true;

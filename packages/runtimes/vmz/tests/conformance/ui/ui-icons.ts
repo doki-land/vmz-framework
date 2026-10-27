@@ -116,7 +116,28 @@ if (!textBadgeSrc.includes("kind: 'text-badge'") || !iconSrc.includes('vmz-ui-ic
 if (!registrySrc.includes('resolveIconDef') || !strokeSrc.includes("kind: 'stroke'")) {
     fail('registry must use structured IconDef entries via icons-stroke.ts');
 }
-if (!registrySrc.includes('LEGACY_ICON_ALIASES')) fail('registry.ts must export legacy @vmz/ui Icon aliases');
+if (registrySrc.includes('LEGACY_ICON_ALIASES') || registrySrc.includes('resolveIconPath')) {
+    fail('registry.ts must not keep legacy alias tables or the deprecated resolveIconPath export');
+}
+if (!/throw new Error\([\s\S]*unknown icon name/.test(registrySrc)) {
+    fail('registry must fail loudly on unknown icon names');
+}
+const iconKeys = [
+    ...[...strokeSrc.matchAll(/^\s*'([^']+)':\s*\{/gm)].map((match) => match[1]),
+    ...[...textBadgeSrc.matchAll(/^\s*'([^']+)':\s*\{/gm)].map((match) => match[1]),
+];
+if (iconKeys.length === 0) fail('registry ships no icon entries');
+for (const key of iconKeys) {
+    if (!/^[a-z][a-z0-9-]*\.[a-z0-9-]+$/.test(key)) {
+        fail(`registry key "${key}" must be a dotted semantic name`);
+    }
+}
+for (const px of ['16px', '20px', '24px']) {
+    if (!iconSrc.includes(px)) fail(`Icon must ship the ${px} size step`);
+}
+if (!iconSrc.includes(':role="roleAttr()"') || !iconSrc.includes(':aria-hidden="hiddenAttr()"')) {
+    fail('Icon a11y must be derived during render (SSR-stable), not from onMount state');
+}
 if (!iconSrc.includes('public name') || !iconSrc.includes('public label') || !iconSrc.includes('public size')) {
     fail('Icon must expose public name / size / label props');
 }
