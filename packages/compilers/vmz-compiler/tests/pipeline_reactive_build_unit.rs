@@ -122,6 +122,34 @@ fn keyed_each_item_prop_is_list_item() {
 }
 
 #[test]
+fn v_memo_marker_has_no_binding_but_children_do() {
+    let mut decl = ComponentDecl::new("MemoDemo", Span::default(), Span::default());
+    for name in ["x", "y"] {
+        decl.fields.push(FieldDecl {
+            name: name.into(),
+            type_text: None,
+            init_text: None,
+            kind: FieldKind::State,
+            visibility: Visibility::Private,
+            span: Span::default(),
+            name_span: Span::default(),
+        });
+    }
+    let tpl = parse_template(r#"<div v-memo="[x]">{{ y }}</div>"#).unwrap();
+    let module = build_reactive_module("MemoDemo.vmz", &decl, &tpl);
+    let c = &module.components[0];
+    // 标记本身不是 prop / attr：只有子节点插值的 binding。
+    assert!(
+        !c.bindings.iter().any(|b| b.kind() == BindingKind::Attr && b.attr() == Some("v-memo")),
+        "v-memo marker must not create an attr binding: {:?}",
+        c.bindings.iter().map(|b| (b.kind(), b.attr())).collect::<Vec<_>>()
+    );
+    let text = c.bindings.iter().find(|b| b.kind() == BindingKind::Text).expect("text binding");
+    let deps = c.transitional_deps(text.reads());
+    assert_eq!(deps, vec!["y".to_string()], "child interpolation keeps its own deps: {deps:?}");
+}
+
+#[test]
 fn dynamic_index_path_is_dynamic_path() {
     let mut decl = ComponentDecl::new("Pick", Span::default(), Span::default());
     for name in ["items", "selected"] {
@@ -535,12 +563,16 @@ export default class Chart {
   }
 }
 "#;
-    let analyzed = vmz_compiler::parse::analyze::analyze_script(vmz_compiler::ScriptKind::Client, src);
+    let analyzed =
+        vmz_compiler::parse::analyze::analyze_script(vmz_compiler::ScriptKind::Client, src);
     let decl = analyzed.decl;
     let method_reads: Vec<(String, Vec<String>)> =
         decl.methods.iter().map(|m| (m.name.clone(), m.reads.clone())).collect();
     assert!(analyzed.parse_errors.is_empty(), "{:?}", analyzed.parse_errors);
-    assert!(method_reads.iter().any(|(n, r)| n == "hostStyle" && r.iter().any(|x| x == "width")), "{method_reads:?}");
+    assert!(
+        method_reads.iter().any(|(n, r)| n == "hostStyle" && r.iter().any(|x| x == "width")),
+        "{method_reads:?}"
+    );
     let tpl = parse_template(r#"<div :style="hostStyle()" v-html="markup()"></div>"#).unwrap();
     let module = build_reactive_module("Chart.vmz", &decl, &tpl);
     let html = binding_reads(&module, "html");
@@ -587,7 +619,8 @@ export default class Chart {
   }
 }
 "#;
-    let analyzed = vmz_compiler::parse::analyze::analyze_script(vmz_compiler::ScriptKind::Client, src);
+    let analyzed =
+        vmz_compiler::parse::analyze::analyze_script(vmz_compiler::ScriptKind::Client, src);
     let decl = analyzed.decl;
     let (sem, _ir) =
         vmz_compiler::parse_template_asts(r#"<div :style="hostStyle()" v-html="markup()"></div>"#)
@@ -636,10 +669,8 @@ fn unknown_member_and_dynamic_access_stay_conservative() {
 fn constant_attr_and_text_add_no_binding() {
     let mut decl = ComponentDecl::new("ConstBindings", Span::default(), Span::default());
     decl.fields.push(state_field("seed"));
-    let tpl = parse_template(
-        r#"<div :title="'a' + 'b'" :data-n="1 + 2">{{ 'x' + 'y' }}</div>"#,
-    )
-    .unwrap();
+    let tpl =
+        parse_template(r#"<div :title="'a' + 'b'" :data-n="1 + 2">{{ 'x' + 'y' }}</div>"#).unwrap();
     let module = build_reactive_module("ConstBindings.vmz", &decl, &tpl);
     let c = &module.components[0];
     let json = module.to_json();

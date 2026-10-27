@@ -896,6 +896,15 @@ fn lower_props(tag: &str, attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
                         span: *span,
                     });
                 }
+                // `v-memo` is the same kind of region marker, but it keeps its dependency
+                // array as the marker value so emit can build the snapshot gate.
+                Directive::Memo { deps } => {
+                    out.push(SemanticProp::Static {
+                        name: "v-memo".into(),
+                        value: deps.clone(),
+                        span: *span,
+                    });
+                }
                 other => {
                     if matches!(
                         other,
@@ -999,6 +1008,7 @@ fn lower_attrs_verbatim(attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
             ConcreteAttr::Directive { dir, span } => match dir {
                 Directive::Pre => ("v-pre".into(), String::new(), *span),
                 Directive::Once => ("v-once".into(), String::new(), *span),
+                Directive::Memo { deps } => ("v-memo".into(), deps.clone(), *span),
                 Directive::If { test } => ("v-if".into(), test.clone(), *span),
                 Directive::ElseIf { test } => ("v-else-if".into(), test.clone(), *span),
                 Directive::Else => ("v-else".into(), String::new(), *span),

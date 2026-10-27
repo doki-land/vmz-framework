@@ -108,9 +108,10 @@ export default class OnceDemo {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl =
-        parse_template(r#"<div v-once :title="title">{{ label }}<span v-text="label"></span></div>"#)
-            .unwrap();
+    let tpl = parse_template(
+        r#"<div v-once :title="title">{{ label }}<span v-text="label"></span></div>"#,
+    )
+    .unwrap();
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
@@ -131,17 +132,119 @@ export default class OnceSiblings {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl = parse_template(r#"<div><p>{{ live }}</p><span v-once>{{ frozen }}</span></div>"#).unwrap();
+    let tpl =
+        parse_template(r#"<div><p>{{ live }}</p><span v-once>{{ frozen }}</span></div>"#).unwrap();
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
     // Only the sibling keeps a reactive patch; the once subtree writes once.
     assert_eq!(
-        js.matches("api.specFieldText(this,").count()
-            + js.matches("api.trackPatch(this,").count(),
+        js.matches("api.specFieldText(this,").count() + js.matches("api.trackPatch(this,").count(),
         1,
         "exactly one sibling patch expected: {js}"
     );
+}
+
+#[test]
+fn v_memo_gates_subtree_patches_with_snapshot_and_root_dep() {
+    let src = r#"
+export default class MemoDemo {
+  dep = 0;
+  label = "a";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<div v-memo="[dep]">{{ label }}</div>"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    // 快照变量 + 浅比较函数（每个补丁一份快照）。
+    assert!(js.contains("Object.is("), "expected shallow memo comparison: {js}");
+    assert!(js.contains("function memoSame"), "expected inline memo comparison: {js}");
+    assert!(js.contains("var memoSnap"), "expected a per-patch snapshot: {js}");
+    assert!(js.contains("memoSet"), "expected a snapshot-init flag: {js}");
+    // 子节点补丁依赖里含 memo 根依赖 `dep`，自身依赖 `label` 仍在。
+    let patch = js
+        .split("api.trackPatch(this, [")
+        .skip(1)
+        .find(|s| s.contains("label"))
+        .unwrap_or_else(|| panic!("expected gated interpolation patch: {js}"));
+    let deps = patch.split(']').next().unwrap_or("");
+    assert!(deps.contains("\"label\""), "own dep must stay: {js}");
+    assert!(deps.contains("\"dep\""), "memo root dep must be appended: {js}");
+    // 门控在补丁体内，先比较再应用。
+    assert!(patch.contains("memoSame"), "{js}");
+    assert!(!js.contains(r#""v-memo""#), "marker must not leak as a DOM attribute: {js}");
+}
+
+#[test]
+fn v_memo_gates_show_and_html_patches_with_own_snapshots() {
+    let src = r#"
+export default class MemoShow {
+  dep = 0;
+  on = true;
+  html = "<b>x</b>";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<div v-memo="[dep]"><span v-show="on">x</span><p v-html="html"></p></div>"#,
+    )
+    .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains(".style.display ="), "v-show keeps its patch: {js}");
+    assert!(js.contains(".innerHTML ="), "v-html keeps its patch: {js}");
+    // v-show 与 v-html 两个补丁都被门控，且各自持有独立快照。
+    assert_eq!(js.matches("var memoSnap").count(), 2, "one snapshot per patch: {js}");
+    assert_eq!(js.matches("__memoNext)) return;").count(), 2, "both patches gated: {js}");
+}
+
+#[test]
+fn v_once_inside_v_memo_still_registers_no_patch() {
+    let src = r#"
+export default class MemoOnce {
+  dep = 0;
+  frozen = "a";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl =
+        parse_template(r#"<div v-memo="[dep]"><span v-once>{{ frozen }}</span></div>"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    // v-once 优先：冻结子树不产生任何补丁，因此外层 memo 没有可门控的补丁。
+    assert!(!js.contains("api.trackPatch("), "v-once subtree must stay patch-free: {js}");
+    assert!(js.contains(".textContent = String("), "expected create-time text write: {js}");
+}
+
+#[test]
+fn nested_v_memo_uses_nearest_dependency_array() {
+    let src = r#"
+export default class NestedMemo {
+  outer = 0;
+  inner = 0;
+  label = "a";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<div v-memo="[outer]"><section v-memo="[inner]">{{ label }}</section></div>"#,
+    )
+    .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view), "nested memo must stay Direct-eligible");
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    let patch = js
+        .split("api.trackPatch(this, [")
+        .skip(1)
+        .find(|s| s.contains("label"))
+        .unwrap_or_else(|| panic!("expected gated interpolation patch: {js}"));
+    let deps = patch.split(']').next().unwrap_or("");
+    assert!(deps.contains("\"inner\""), "nearest memo dep expected: {js}");
+    assert!(!deps.contains("\"outer\""), "outer memo must not gate inner patches: {js}");
 }
 
 #[test]
@@ -170,9 +273,10 @@ export default class OnceList {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl =
-        parse_template(r#"<ul><li v-for="tag in tags" :key="tag.id" v-once>{{ tag.label }}</li></ul>"#)
-            .unwrap();
+    let tpl = parse_template(
+        r#"<ul><li v-for="tag in tags" :key="tag.id" v-once>{{ tag.label }}</li></ul>"#,
+    )
+    .unwrap();
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();

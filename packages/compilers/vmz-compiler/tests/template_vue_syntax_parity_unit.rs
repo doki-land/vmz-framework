@@ -354,12 +354,63 @@ fn v_once_keeps_subtree_expressions_structured() {
             panic!("{label}: expected root element");
         };
         assert!(
-            props.iter().any(|p| matches!(p, SemanticProp::Static { name, .. } if name == "v-once")),
+            props
+                .iter()
+                .any(|p| matches!(p, SemanticProp::Static { name, .. } if name == "v-once")),
             "{label}: v-once should be kept as a Static region marker"
         );
         assert!(
             props.iter().any(|p| matches!(p, SemanticProp::Bind { .. })),
             "{label}: v-once must not drop the subtree binding"
+        );
+        assert_eq!(count_interpolations(children), 2, "{label}: interpolations must survive");
+    }
+}
+
+#[test]
+fn accepts_v_memo() {
+    // `v-memo` takes exactly one dependency array expression — Vue accepts these forms.
+    assert_accepted(r#"<div v-memo="[a, b]">{{ x }}</div>"#);
+    assert_accepted(r#"<div v-memo="[]">plain</div>"#);
+    assert_accepted(r#"<p v-memo="[a]" :id="x">{{ y }}</p>"#);
+    // Vue documents `v-memo` on the `v-for` row itself.
+    assert_accepted(r#"<li v-for="i in xs" v-memo="[i]">{{ i }}</li>"#);
+    assert_accepted(r#"<section v-pre v-memo="[a]">{{ x }}</section>"#);
+}
+
+#[test]
+fn rejects_v_memo_without_expression_or_with_argument() {
+    // Not a custom directive: a bare `v-memo`, an empty value, an argument and a
+    // modifier are structured errors on both the Oak-direct and Concrete→Semantic paths.
+    assert_rejected(r#"<div v-memo>y</div>"#);
+    assert_rejected(r#"<div v-memo="">y</div>"#);
+    assert_rejected(r#"<div v-memo:x="[a]">y</div>"#);
+    assert_rejected(r#"<div v-memo.foo="[a]">y</div>"#);
+}
+
+#[test]
+fn v_memo_keeps_dependency_array_and_subtree_bindings() {
+    // The marker keeps the author expression as its value (emit builds the snapshot gate
+    // from it) and does not consume the subtree: interpolations / bindings survive.
+    let body = r#"<div v-memo="[a, b]" :title="t">{{ x }}<span>{{ y }}</span></div>"#;
+    let oak = oak_semantic(body).expect("oak parse");
+    let adapter = adapter_semantic(body).expect("adapter parse");
+
+    for (label, semantic) in [("oak", oak), ("adapter", adapter)] {
+        let SemanticNode::Element { props, children, .. } = &semantic.roots[0] else {
+            panic!("{label}: expected root element");
+        };
+        assert!(
+            props.iter().any(|p| matches!(
+                p,
+                SemanticProp::Static { name, value, .. }
+                    if name == "v-memo" && value == "[a, b]"
+            )),
+            "{label}: v-memo should keep its dependency array as a Static marker"
+        );
+        assert!(
+            props.iter().any(|p| matches!(p, SemanticProp::Bind { .. })),
+            "{label}: v-memo must not drop the subtree binding"
         );
         assert_eq!(count_interpolations(children), 2, "{label}: interpolations must survive");
     }

@@ -323,9 +323,8 @@ fn v_once_is_a_static_region_marker_through_both_layers() {
     match &ir.roots[0] {
         vmz_compiler::TemplateNode::Element { attrs, .. } => {
             assert!(
-                attrs
-                    .iter()
-                    .any(|a| a.name == "v-once" && matches!(a.value, vmz_compiler::AttrValue::Static(ref v) if v.is_empty())),
+                attrs.iter().any(|a| a.name == "v-once"
+                    && matches!(a.value, vmz_compiler::AttrValue::Static(ref v) if v.is_empty())),
                 "expected bare `v-once` attr, got {attrs:?}"
             );
         }
@@ -339,6 +338,59 @@ fn v_once_argument_or_expression_is_illegal_directive() {
         let err = parse_template_concrete_body_primary(src).unwrap_err();
         assert_eq!(err.code, "vmz::template::illegal_directive", "{src}: {err:?}");
         assert!(err.render_plain().contains("v-once"), "{src}: {err:?}");
+    }
+}
+
+#[test]
+fn v_memo_keeps_dependency_array_marker_through_both_layers() {
+    let src = r#"<div v-memo="[a, b]" :title="t">{{ x }}</div>"#;
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
+    let sem = lower_concrete_to_semantic(&concrete).unwrap();
+    match &sem.roots[0] {
+        SemanticNode::Element { props, .. } => {
+            assert!(
+                props.iter().any(|p| matches!(
+                    p,
+                    SemanticProp::Static { name, value, .. } if name == "v-memo" && value == "[a, b]"
+                )),
+                "v-memo must survive Semantic with its dependency array: {props:?}"
+            );
+            assert!(
+                props.iter().any(|p| matches!(p, SemanticProp::Bind { .. })),
+                "v-memo must keep the structured subtree binding: {props:?}"
+            );
+            assert!(
+                !props.iter().any(|p| matches!(p, SemanticProp::Directive { .. })),
+                "v-memo is a region marker, not a custom directive: {props:?}"
+            );
+        }
+        other => panic!("expected Element, got {other:?}"),
+    }
+    // Legacy TemplateIr keeps the dependency array on the marker attr so emit can gate.
+    let ir = parse_template(src).unwrap();
+    match &ir.roots[0] {
+        vmz_compiler::TemplateNode::Element { attrs, .. } => {
+            assert!(
+                attrs.iter().any(|a| a.name == "v-memo"
+                    && matches!(a.value, vmz_compiler::AttrValue::Static(ref v) if v == "[a, b]")),
+                "expected `v-memo=\"[a, b]\"` attr, got {attrs:?}"
+            );
+        }
+        other => panic!("expected Element, got {other:?}"),
+    }
+}
+
+#[test]
+fn v_memo_without_expression_or_with_argument_is_illegal_directive() {
+    for src in [
+        r#"<div v-memo>y</div>"#,
+        r#"<div v-memo="">y</div>"#,
+        r#"<div v-memo:x="[a]">y</div>"#,
+        r#"<div v-memo.foo="[a]">y</div>"#,
+    ] {
+        let err = parse_template_concrete_body_primary(src).unwrap_err();
+        assert_eq!(err.code, "vmz::template::illegal_directive", "{src}: {err:?}");
+        assert!(err.render_plain().contains("v-memo"), "{src}: {err:?}");
     }
 }
 

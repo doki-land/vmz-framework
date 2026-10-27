@@ -118,6 +118,8 @@ fn directive_exprs(dir: &Directive) -> Vec<&str> {
         | Directive::Model { expr, .. } => vec![expr.as_str()],
         Directive::Slot { props, .. } => props.as_deref().into_iter().collect(),
         Directive::Custom { expr, .. } => expr.as_deref().into_iter().collect(),
+        // `v-memo` 的依赖数组是作者表达式，需要参与表达式校验；marker 本身不建 binding。
+        Directive::Memo { deps } => vec![deps.as_str()],
         Directive::Pre | Directive::Once => vec![],
     }
 }
@@ -782,7 +784,8 @@ fn walk_nodes(
 
                 let region_id = b.add_control_region(stable.clone(), branches);
                 // IfCond binding: structural switch keyed by stable cond deps (BindingId hot path).
-                if let Some(first_cond) = branch_specs[fold.kept[0]].0.as_ref().map(|c| sanitize(c)) {
+                if let Some(first_cond) = branch_specs[fold.kept[0]].0.as_ref().map(|c| sanitize(c))
+                {
                     let cond_expr = b.intern_expr(first_cond);
                     b.add_binding(
                         BindingKind::IfCond,
@@ -1058,8 +1061,7 @@ fn expr_to_paths(
     each_frames: &[EachFrame],
 ) -> Vec<IrDepPath> {
     let deps = b.deps;
-    let (keys, member_refs) =
-        collect_template_dep_ctx(expr, fields, scope, &deps.member_names);
+    let (keys, member_refs) = collect_template_dep_ctx(expr, fields, scope, &deps.member_names);
     let mut out = keys_to_paths(b, &keys);
     for name in &member_refs {
         let Some(reads) = deps.member_reads.get(name) else {

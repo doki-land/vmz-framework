@@ -23,6 +23,12 @@ pub fn is_once_marker(name: &str) -> bool {
     name == "v-once"
 }
 
+/// Vue `v-memo` region marker — a control attribute carrying the dependency array
+/// expression as its value. Never a real DOM / component prop.
+pub fn is_memo_marker(name: &str) -> bool {
+    name == "v-memo"
+}
+
 /// True when the attr is a **DOM** event listener (`@click` / `on:click` / `onClick`).
 /// Does **not** treat `on-submit` kebab as an event — that is a prop name on components.
 pub fn is_event_attr(name: &str) -> bool {

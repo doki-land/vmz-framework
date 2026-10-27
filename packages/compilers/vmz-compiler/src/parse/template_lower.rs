@@ -218,6 +218,15 @@ fn lower_directive(
                 ..Default::default()
             }])
         }
+        Directive::Memo { deps } => {
+            // `v-memo` carries its dependency array as the marker value: emit reads it
+            // to build the per-subtree snapshot gate, so the marker itself is not a prop.
+            Ok(vec![TemplateAttr {
+                name: "v-memo".into(),
+                value: AttrValue::Static(deps.clone()),
+                ..Default::default()
+            }])
+        }
         Directive::Custom { name, arg, expr, modifiers } => {
             // Preserve as static-ish attrs so we don't silently drop; use v-name[:arg].
             let ir_name = match arg {

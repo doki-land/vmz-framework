@@ -185,6 +185,13 @@ pub enum Directive {
     /// subtree is evaluated when it is first created and never re-patched afterwards.
     /// Takes no argument, expression or modifier; **not** treated as [`Directive::Custom`].
     Once,
+    /// `v-memo="[a, b]"` — dependency array; when its items are shallow-equal to the last
+    /// render the subtree's reactive updates are skipped. Requires a non-empty expression
+    /// and takes no argument or modifier; **not** treated as [`Directive::Custom`].
+    Memo {
+        /// Dependency array expression text as written (e.g. `[a, b]`).
+        deps: String,
+    },
     /// Other `v-*` custom directive.
     Custom {
         /// Directive name without `v-` prefix.
@@ -236,12 +243,9 @@ fn classify_one(attr: RawAttr) -> Result<ConcreteAttr, TemplateParseError> {
         // Vue `v-once` has no argument, no expression and no modifiers. Anything else
         // is a structured rejection instead of silently becoming a custom directive.
         if val.is_some_and(|v| !v.is_empty()) {
-            return Err(TemplateParseError::coded(
-                "vmz::template::illegal_directive",
-                offset,
-            )
-            .with_arg("directive", "v-once")
-            .with_arg("detail", "`v-once` does not take an expression"));
+            return Err(TemplateParseError::coded("vmz::template::illegal_directive", offset)
+                .with_arg("directive", "v-once")
+                .with_arg("detail", "`v-once` does not take an expression"));
         }
         return Ok(ConcreteAttr::Directive { dir: Directive::Once, span });
     }
@@ -249,6 +253,28 @@ fn classify_one(attr: RawAttr) -> Result<ConcreteAttr, TemplateParseError> {
         return Err(TemplateParseError::coded("vmz::template::illegal_directive", offset)
             .with_arg("directive", name)
             .with_arg("detail", "`v-once` does not take an argument or modifiers"));
+    }
+    if name == "v-memo" {
+        // Vue `v-memo` requires a dependency array expression and takes no argument or
+        // modifier. Reject structured instead of silently becoming a custom directive.
+        match val {
+            Some(v) if !v.is_empty() => {
+                return Ok(ConcreteAttr::Directive {
+                    dir: Directive::Memo { deps: v.to_string() },
+                    span,
+                });
+            }
+            _ => {
+                return Err(TemplateParseError::coded("vmz::template::illegal_directive", offset)
+                    .with_arg("directive", "v-memo")
+                    .with_arg("detail", "`v-memo` requires a dependency array expression"));
+            }
+        }
+    }
+    if name.starts_with("v-memo:") || name.starts_with("v-memo.") {
+        return Err(TemplateParseError::coded("vmz::template::illegal_directive", offset)
+            .with_arg("directive", name)
+            .with_arg("detail", "`v-memo` does not take an argument or modifiers"));
     }
     if name == "v-html" {
         let expr = require_expr(&name, val, offset)?;

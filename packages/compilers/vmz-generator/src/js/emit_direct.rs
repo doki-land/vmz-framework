@@ -11,9 +11,9 @@ use super::deps::collect_template_deps;
 use super::emit_ir::IrDepCursor;
 use super::helpers::{
     HandlerResolution, bind_field_idents_ctx, component_event_name, component_prop_wire_name,
-    event_dom_type, is_component_event_attr, is_event_attr, is_html_attr, is_once_marker,
-    is_show_attr, is_text_attr, looks_like_ternary, parse_this_method_call_arrow, sanitize_interp,
-    single_field_binding_target, split_ternary_parts, wrap_event_handler_body,
+    event_dom_type, is_component_event_attr, is_event_attr, is_html_attr, is_memo_marker,
+    is_once_marker, is_show_attr, is_text_attr, looks_like_ternary, parse_this_method_call_arrow,
+    sanitize_interp, single_field_binding_target, split_ternary_parts, wrap_event_handler_body,
 };
 use std::collections::HashMap;
 
@@ -122,6 +122,122 @@ fn subtree_has_once_marker(node: &ViewNode) -> bool {
     }
 }
 
+/// `v-memo` present on this element's own attrs.
+fn has_memo_marker(attrs: &[ViewAttr]) -> bool {
+    attrs.iter().any(|a| is_memo_marker(&a.name))
+}
+
+/// `v-memo` dependency array text (lowering keeps it on the marker's static value).
+fn memo_marker_expr(attrs: &[ViewAttr]) -> Option<&str> {
+    attrs.iter().find(|a| is_memo_marker(&a.name)).and_then(|a| match &a.value {
+        ViewAttrValue::Static { value } if !value.trim().is_empty() => Some(value.as_str()),
+        ViewAttrValue::Interp { expr } if !expr.trim().is_empty() => Some(expr.as_str()),
+        _ => None,
+    })
+}
+
+/// `v-memo` anywhere in this subtree — a row kernel cannot honor the snapshot gate.
+fn subtree_has_memo_marker(node: &ViewNode) -> bool {
+    match node {
+        ViewNode::Element { attrs, children, .. }
+        | ViewNode::Component { attrs, children, .. }
+        | ViewNode::Slot { attrs, children, .. } => {
+            has_memo_marker(attrs) || children.iter().any(subtree_has_memo_marker)
+        }
+        ViewNode::If { branches, .. } => branches.iter().any(|b| subtree_has_memo_marker(&b.body)),
+        ViewNode::Text { .. } | ViewNode::Interp { .. } => false,
+    }
+}
+
+/// `v-memo` 门控上下文。
+///
+/// 子树内**每个补丁**持有自己的快照变量（create 时求值一次），补丁执行前重新求值 memo
+/// 数组并逐项 `Object.is` 浅比较：相同则跳过本次更新，不同则推进自己的快照后继续应用。
+/// 快照必须逐补丁隔离：同一轮里多个补丁都要按各自的旧值决定，共享一份快照会让后执行
+/// 的补丁把「刚被第一个补丁消费掉的变更」误判成未变。
+/// 嵌套 `v-memo` 时内层元素使用最近一层的上下文，外层只门控自己的属性和非 memo 子节点。
+struct MemoCtx {
+    /// 生成的浅比较函数名（纯函数，无共享状态）。
+    same: String,
+    /// memo 数组表达式（已绑定 `this`）。
+    expr: String,
+    /// memo 数组表达式的根依赖，追加进每个补丁的依赖列表。
+    roots: Vec<String>,
+}
+
+/// 生成 memo 浅比较函数，返回子树补丁共享的上下文。
+fn emit_memo_gate(
+    deps_expr: &str,
+    fields: &[String],
+    methods: &[String],
+    scope: &[String],
+    aliases: &[(String, String)],
+    stmts: &mut Vec<String>,
+    next_id: &mut u32,
+) -> MemoCtx {
+    let same = fresh("memoSame", next_id);
+    let body = bind_template_expr(deps_expr, fields, methods, scope, aliases);
+    stmts.push(format!(
+        "function {same}(a, b) {{\n\
+  if (a === b) return true;\n\
+  if (!a || !b || a.length !== b.length) return false;\n\
+  for (var i = 0; i < a.length; i++) {{\n\
+    if (!Object.is(a[i], b[i])) return false;\n\
+  }}\n\
+  return true;\n\
+}}"
+    ));
+    MemoCtx { same, expr: body, roots: collect_template_deps(deps_expr, fields, scope) }
+}
+
+/// 把 memo 根依赖追加进补丁依赖列表（重复项跳过）。
+fn with_memo_deps(deps: Vec<String>, memo: Option<&MemoCtx>) -> Vec<String> {
+    let Some(m) = memo else {
+        return deps;
+    };
+    let mut out = deps;
+    for r in &m.roots {
+        if !out.iter().any(|d| d == r) {
+            out.push(r.clone());
+        }
+    }
+    out
+}
+
+/// 补丁函数体的 memo 门控前置语句。
+///
+/// 快照变量声明进补丁所在的 `stmts` 作用域（每个补丁一份，列表行 / 分支各自实例化）。
+/// `skip_return` 是跳过时补丁应返回的值：普通 DOM 补丁直接 `return;`，组件 prop 补丁
+/// 必须回写上一次已应用的值。
+fn memo_gate_prelude(
+    memo: Option<&MemoCtx>,
+    stmts: &mut Vec<String>,
+    next_id: &mut u32,
+    skip_return: &str,
+) -> String {
+    let Some(m) = memo else {
+        return String::new();
+    };
+    let snap = fresh("memoSnap", next_id);
+    let set = fresh("memoSet", next_id);
+    stmts.push(format!("var {snap} = null, {set} = false;"));
+    format!(
+        "var __memoNext; try {{ __memoNext = {expr}; }} catch {{ __memoNext = null; }} \
+if (!Array.isArray(__memoNext)) __memoNext = null; \
+if ({set} && {same}({snap}, __memoNext)) {skip_return} {snap} = __memoNext; {set} = true; ",
+        expr = m.expr,
+        same = m.same
+    )
+}
+
+/// memo 根依赖的 JS 字面量（无 memo 时为空数组，便于模板统一）。
+fn memo_roots_js(memo: Option<&MemoCtx>) -> String {
+    match memo {
+        Some(m) if !m.roots.is_empty() => format!("[{}]", deps_js(&m.roots)),
+        _ => "[]".to_string(),
+    }
+}
+
 fn emit_merge_attr(
     attr_name: &str,
     merge_api: &str,
@@ -134,7 +250,9 @@ fn emit_merge_attr(
     aliases: &[(String, String)],
     ir: &IrDepCursor<'_>,
     once: bool,
+    memo: Option<&MemoCtx>,
     stmts: &mut Vec<String>,
+    next_id: &mut u32,
 ) {
     if binds.is_empty() {
         if let Some(s) = static_base.filter(|s| !s.is_empty()) {
@@ -180,10 +298,12 @@ fn emit_merge_attr(
         }
     }
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
-    let deps_js = deps_js(&all_deps);
+    let deps_js = deps_js(&with_memo_deps(all_deps, memo));
+    let gate = memo_gate_prelude(memo, stmts, next_id, "return;");
     let name_q = q(attr_name);
 
-    if bind_bodies.len() == 1
+    if memo.is_none()
+        && bind_bodies.len() == 1
         && static_base.is_none()
         && let Some(field) = single_field_binding_target(&binds[0].0, fields, scope, aliases)
     {
@@ -194,7 +314,7 @@ fn emit_merge_attr(
     if bind_bodies.len() == 1 {
         let body = &bind_bodies[0];
         stmts.push(format!(
-            "api.trackPatch(this, [{deps_js}], function() {{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} api.attr({el}, {name_q}, api.{merge_api}({static_arg}, __v)); }}, {id_arg});"
+            "api.trackPatch(this, [{deps_js}], function() {{ {gate}var __v; try {{ __v = {body}; }} catch {{ __v = null; }} api.attr({el}, {name_q}, api.{merge_api}({static_arg}, __v)); }}, {id_arg});"
         ));
         return;
     }
@@ -208,7 +328,7 @@ fn emit_merge_attr(
         merge_args.push_str(&format!(", __v{i}"));
     }
     stmts.push(format!(
-        "api.trackPatch(this, [{deps_js}], function() {{ {eval_stmts}api.attr({el}, {name_q}, api.{merge_api}({merge_args})); }}, {id_arg});"
+        "api.trackPatch(this, [{deps_js}], function() {{ {gate}{eval_stmts}api.attr({el}, {name_q}, api.{merge_api}({merge_args})); }}, {id_arg});"
     ));
 }
 
@@ -401,6 +521,7 @@ fn emit_create_body(
         next_id,
         child_ctors,
         false,
+        None,
     )?;
     let return_expr = match roots.len() {
         0 => "null".to_string(),
@@ -456,6 +577,7 @@ fn emit_nodes(
     next_id: &mut u32,
     child_ctors: &HashMap<String, String>,
     once: bool,
+    memo: Option<&MemoCtx>,
 ) -> Result<Vec<String>, String> {
     let mut out = Vec::new();
     for node in nodes {
@@ -471,6 +593,7 @@ fn emit_nodes(
             next_id,
             child_ctors,
             once,
+            memo,
         )?);
     }
     Ok(out)
@@ -488,6 +611,7 @@ fn emit_node(
     next_id: &mut u32,
     child_ctors: &HashMap<String, String>,
     once: bool,
+    memo: Option<&MemoCtx>,
 ) -> Result<String, String> {
     match node {
         ViewNode::Text { value: t } => {
@@ -506,6 +630,7 @@ fn emit_node(
             stmts,
             next_id,
             once,
+            memo,
         ),
         ViewNode::Element { .. } => emit_element(
             node,
@@ -519,6 +644,7 @@ fn emit_node(
             next_id,
             child_ctors,
             once,
+            memo,
         ),
         ViewNode::If { .. } => emit_if_block(
             node,
@@ -532,6 +658,7 @@ fn emit_node(
             next_id,
             child_ctors,
             once,
+            memo,
         ),
         ViewNode::Component { tag, attrs, children } => emit_component(
             tag,
@@ -547,6 +674,7 @@ fn emit_node(
             next_id,
             child_ctors,
             once,
+            memo,
         ),
         ViewNode::Slot { name, attrs, children } => {
             let mut attrs = attrs.clone();
@@ -577,6 +705,7 @@ fn emit_node(
                 next_id,
                 child_ctors,
                 once,
+                memo,
             )
         }
     }
@@ -594,6 +723,7 @@ fn emit_if_block(
     next_id: &mut u32,
     child_ctors: &HashMap<String, String>,
     once: bool,
+    memo: Option<&MemoCtx>,
 ) -> Result<String, String> {
     let ViewNode::If { binding, branches, region } = node else {
         return Ok("null".to_string());
@@ -602,7 +732,7 @@ fn emit_if_block(
     let once = once || branches.iter().any(|b| node_has_once_marker(&b.body));
     let first_cond = branches.iter().find_map(|b| b.cond.as_deref()).unwrap_or("");
     let (binding_id, all_deps) = binding_deps(ir, *binding, first_cond, fields, scope);
-    let deps = deps_js(&all_deps);
+    let deps = deps_js(&with_memo_deps(all_deps, memo));
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
     let region_arg = region.map(|r| r.0.to_string()).unwrap_or_else(|| "null".into());
     let mut branch_objs = Vec::new();
@@ -618,6 +748,7 @@ fn emit_if_block(
             next_id,
             child_ctors,
             once,
+            memo,
         )?;
         match &br.cond {
             Some(c) => {
@@ -640,6 +771,8 @@ fn emit_if_block(
             "  api.trackPatch(inst, [{deps}], apply, {id_arg});\n  if (api._itemPatches) api._itemPatches.push(apply);\n"
         )
     };
+    // `v-memo`: 条件切换同样被最近一层 memo 门控。
+    let memo_gate = memo_gate_prelude(memo, stmts, next_id, "return;");
     stmts.push(format!(
         "var {v} = (function() {{
   var inst = this;
@@ -732,7 +865,7 @@ fn emit_if_block(
   }}
   function apply() {{
     if (inst.__vmzDestroyed) return;
-    var applied = ++gen;
+    {memo_gate}var applied = ++gen;
     var next = pick();
     if (next === active) return;
     if (next >= 0 && !cached[next]) {{
@@ -783,7 +916,8 @@ fn emit_if_block(
         v = v,
         region_arg = region_arg,
         branch_objs = branch_objs.join(", "),
-        track_line = track_line
+        track_line = track_line,
+        memo_gate = memo_gate
     ));
     Ok(v)
 }
@@ -799,6 +933,7 @@ fn emit_branch_create_fn(
     next_id: &mut u32,
     child_ctors: &HashMap<String, String>,
     once: bool,
+    memo: Option<&MemoCtx>,
 ) -> Result<String, String> {
     let mut stmts = Vec::new();
     let root = emit_node(
@@ -813,6 +948,7 @@ fn emit_branch_create_fn(
         next_id,
         child_ctors,
         once,
+        memo,
     )?;
     Ok(format!("function(api) {{\n{}  return {root};\n}}", indent_block(&stmts.join("\n"))))
 }
@@ -829,6 +965,7 @@ fn emit_element(
     next_id: &mut u32,
     child_ctors: &HashMap<String, String>,
     once: bool,
+    memo: Option<&MemoCtx>,
 ) -> Result<String, String> {
     let ViewNode::Element { tag, attrs, children, each } = node else {
         return Ok("null".to_string());
@@ -849,6 +986,7 @@ fn emit_element(
             next_id,
             child_ctors,
             once,
+            memo,
         );
     }
     emit_plain_element(
@@ -865,6 +1003,7 @@ fn emit_element(
         next_id,
         child_ctors,
         once,
+        memo,
     )
 }
 
@@ -882,15 +1021,31 @@ fn emit_plain_element(
     next_id: &mut u32,
     child_ctors: &HashMap<String, String>,
     once: bool,
+    memo: Option<&MemoCtx>,
 ) -> Result<String, String> {
     // `v-once` on this element freezes this subtree (all descendants inherit it).
     let once = once || has_once_marker(attrs);
     let el = fresh("e", next_id);
     stmts.push(format!("var {el} = api.el({});", q(tag)));
     stmts.push(format!("api.adoptEnter({el});"));
+    // `v-memo`：v-once 优先；否则本元素成为子树最近一层 memo 门控。
+    let memo_owned;
+    let memo = if once {
+        memo
+    } else if let Some(deps_expr) = memo_marker_expr(attrs) {
+        memo_owned =
+            emit_memo_gate(deps_expr, fields, handler_ctx.methods, scope, aliases, stmts, next_id);
+        Some(&memo_owned)
+    } else {
+        memo
+    };
     let merge_plan = collect_merge_attr_plan(attrs);
     for a in attrs {
-        if a.name == "style:tw" || is_merge_attr(&a.name) || is_once_marker(&a.name) {
+        if a.name == "style:tw"
+            || is_merge_attr(&a.name)
+            || is_once_marker(&a.name)
+            || is_memo_marker(&a.name)
+        {
             continue;
         }
         match &a.value {
@@ -921,6 +1076,8 @@ fn emit_plain_element(
                     ir,
                     stmts,
                     once,
+                    memo,
+                    next_id,
                 );
             }
             ViewAttrValue::Interp { expr: e } if is_text_attr(&a.name) => {
@@ -935,6 +1092,8 @@ fn emit_plain_element(
                     ir,
                     stmts,
                     once,
+                    memo,
+                    next_id,
                 );
             }
             ViewAttrValue::Interp { expr: e } if is_event_attr(&a.name) => {
@@ -1050,6 +1209,8 @@ fn emit_plain_element(
                     ir,
                     stmts,
                     once,
+                    memo,
+                    next_id,
                 );
             }
             ViewAttrValue::Interp { expr: e } => {
@@ -1065,6 +1226,8 @@ fn emit_plain_element(
                     ir,
                     stmts,
                     once,
+                    memo,
+                    next_id,
                 );
             }
         }
@@ -1081,7 +1244,9 @@ fn emit_plain_element(
         aliases,
         ir,
         once,
+        memo,
         stmts,
+        next_id,
     );
     emit_merge_attr(
         "style",
@@ -1095,7 +1260,9 @@ fn emit_plain_element(
         aliases,
         ir,
         once,
+        memo,
         stmts,
+        next_id,
     );
     for child in emit_nodes(
         children,
@@ -1109,6 +1276,7 @@ fn emit_plain_element(
         next_id,
         child_ctors,
         once,
+        memo,
     )? {
         stmts.push(format!("{el}.appendChild({child});"));
     }
@@ -1130,14 +1298,26 @@ fn emit_component(
     next_id: &mut u32,
     child_ctors: &HashMap<String, String>,
     once: bool,
+    memo: Option<&MemoCtx>,
 ) -> Result<String, String> {
     // `v-once`: the host component and its slot subtree are frozen after create.
     let once = once || has_once_marker(attrs);
+    // `v-memo`：v-once 优先；否则本组件成为子树最近一层 memo 门控。
+    let memo_owned;
+    let memo = if once {
+        memo
+    } else if let Some(deps_expr) = memo_marker_expr(attrs) {
+        memo_owned =
+            emit_memo_gate(deps_expr, fields, handler_ctx.methods, scope, aliases, stmts, next_id);
+        Some(&memo_owned)
+    } else {
+        memo
+    };
     let mut client: Option<String> = None;
     let mut prop_parts = Vec::new();
     let mut event_parts: Vec<(String, String)> = Vec::new();
     for a in attrs {
-        if a.name == "style:tw" || is_once_marker(&a.name) {
+        if a.name == "style:tw" || is_once_marker(&a.name) || is_memo_marker(&a.name) {
             continue;
         }
         if let Some(strategy) = a.name.strip_prefix("client:") {
@@ -1194,23 +1374,39 @@ fn emit_component(
                 || a.name.starts_with("client:")
                 || is_component_event_attr(&a.name)
                 || is_once_marker(&a.name)
+                || is_memo_marker(&a.name)
             {
                 continue;
             }
             let ViewAttrValue::Interp { expr: e } = &a.value else {
                 continue;
             };
-            let deps = collect_template_deps(e, fields, scope);
+            let deps = with_memo_deps(collect_template_deps(e, fields, scope), memo);
             if deps.is_empty() {
                 continue;
             }
             let deps = deps_js(&deps);
             let body = bind_template_expr(e, fields, handler_ctx.methods, scope, aliases);
             let wire = component_prop_wire_name(&a.name);
-            stmts.push(format!(
-                "api.bindComponentProp(this, {v}, {}, [{deps}], function() {{ return {body}; }});",
-                q(&wire)
-            ));
+            match memo {
+                Some(_) => {
+                    // 每个 prop 补丁持有自己的快照；被跳过的轮次写回上一次已应用的值，
+                    // 保持子组件 prop 不变。
+                    let last = fresh("memoProp", next_id);
+                    stmts.push(format!("var {last} = 0;"));
+                    let gate = memo_gate_prelude(memo, stmts, next_id, &format!("return {last};"));
+                    stmts.push(format!(
+                        "api.bindComponentProp(this, {v}, {}, [{deps}], function() {{ {gate}{last} = {body}; return {last}; }});",
+                        q(&wire)
+                    ));
+                }
+                None => {
+                    stmts.push(format!(
+                        "api.bindComponentProp(this, {v}, {}, [{deps}], function() {{ return {body}; }});",
+                        q(&wire)
+                    ));
+                }
+            }
         }
     }
     if !children.is_empty() {
@@ -1227,6 +1423,7 @@ fn emit_component(
             next_id,
             child_ctors,
             once,
+            memo,
         )?;
         for kid in kids {
             stmts.push(format!("api.projectDefaultSlot({v}, {kid});"));
@@ -1248,6 +1445,8 @@ fn emit_bind_attr(
     ir: &IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     once: bool,
+    memo: Option<&MemoCtx>,
+    next_id: &mut u32,
 ) {
     let e = sanitize_interp(expr);
     let name = if attr_name == "className" { "class" } else { attr_name };
@@ -1262,23 +1461,27 @@ fn emit_bind_attr(
     }
     let (binding_id, deps, cf_js) = bind_payload(&e, binding, fields, methods, scope, aliases, ir);
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
-    if cf_js.is_none()
+    if memo.is_none()
+        && cf_js.is_none()
         && let Some(field) = single_field_binding_target(&e, fields, scope, aliases)
     {
         stmts.push(format!("api.specFieldAttr(this, {id_arg}, {}, {el}, {});", q(&field), q(name)));
         return;
     }
-    let deps_js = deps_js(&deps);
+    let deps_js = deps_js(&with_memo_deps(deps, memo));
+    let memo_gate = memo_gate_prelude(memo, stmts, next_id, "return;");
+    let memo_roots = memo_roots_js(memo);
     let patch_name =
         format!("__patchAttr{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
     if let Some(cf) = cf_js {
         stmts.push(format!(
             "(function() {{
   var __cf = {cf};
+  var __memoRoots = {memo_roots};
   var __liveDeps = [{deps_js}];
   var __activeBranch = -1;
   function {patch_name}() {{
-    var __raw;
+    {memo_gate}var __raw;
     try {{ __raw = {body}; }} catch {{ __raw = null; }}
     api.attr({el}, {name_q}, __raw);
     if (!__cf || !__cf.branches) return;
@@ -1291,7 +1494,7 @@ fn emit_bind_attr(
     if (__next === __activeBranch) return;
     __activeBranch = __next;
     var __br = __cf.branches[__next];
-    var __nd = [].concat(__cf.stable || []).concat((__br && __br.deps) || []);
+    var __nd = [].concat(__cf.stable || []).concat((__br && __br.deps) || []).concat(__memoRoots);
     __nd = Array.from(new Set(__nd));
     var __same = __nd.length === __liveDeps.length;
     if (__same) for (var __j = 0; __j < __nd.length; __j++) if (__nd[__j] !== __liveDeps[__j]) {{ __same = false; break; }}
@@ -1304,7 +1507,9 @@ fn emit_bind_attr(
   api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
 }}).call(this);",
             cf = cf,
+            memo_roots = memo_roots,
             deps_js = deps_js,
+            memo_gate = memo_gate,
             body = body,
             el = el,
             name_q = q(name),
@@ -1313,8 +1518,9 @@ fn emit_bind_attr(
         ));
     } else {
         stmts.push(format!(
-            "api.trackPatch(this, [{deps_js}], function() {{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} api.attr({el}, {name_q}, __v); }}, {id_arg});",
+            "api.trackPatch(this, [{deps_js}], function() {{ {memo_gate}var __v; try {{ __v = {body}; }} catch {{ __v = null; }} api.attr({el}, {name_q}, __v); }}, {id_arg});",
             deps_js = deps_js,
+            memo_gate = memo_gate,
             body = body,
             el = el,
             name_q = q(name),
@@ -1334,6 +1540,8 @@ fn emit_bind_html(
     ir: &IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     once: bool,
+    memo: Option<&MemoCtx>,
+    next_id: &mut u32,
 ) {
     let e = sanitize_interp(expr);
     let body = bind_template_expr(&e, fields, methods, scope, aliases);
@@ -1345,7 +1553,9 @@ fn emit_bind_html(
         return;
     }
     let (binding_id, deps, cf_js) = bind_payload(&e, binding, fields, methods, scope, aliases, ir);
-    let deps_js = deps_js(&deps);
+    let deps_js = deps_js(&with_memo_deps(deps, memo));
+    let memo_gate = memo_gate_prelude(memo, stmts, next_id, "return;");
+    let memo_roots = memo_roots_js(memo);
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
     let patch_name =
         format!("__patchHtml{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
@@ -1353,10 +1563,11 @@ fn emit_bind_html(
         stmts.push(format!(
             "(function() {{
   var __cf = {cf};
+  var __memoRoots = {memo_roots};
   var __liveDeps = [{deps_js}];
   var __activeBranch = -1;
   function {patch_name}() {{
-    var __raw;
+    {memo_gate}var __raw;
     try {{ __raw = {body}; }} catch {{ __raw = null; }}
     {el}.innerHTML = __raw == null ? '' : String(__raw);
     if (!__cf || !__cf.branches) return;
@@ -1369,7 +1580,7 @@ fn emit_bind_html(
     if (__next === __activeBranch) return;
     __activeBranch = __next;
     var __br = __cf.branches[__next];
-    var __nd = [].concat(__cf.stable || []).concat((__br && __br.deps) || []);
+    var __nd = [].concat(__cf.stable || []).concat((__br && __br.deps) || []).concat(__memoRoots);
     __nd = Array.from(new Set(__nd));
     var __same = __nd.length === __liveDeps.length;
     if (__same) for (var __j = 0; __j < __nd.length; __j++) if (__nd[__j] !== __liveDeps[__j]) {{ __same = false; break; }}
@@ -1382,7 +1593,9 @@ fn emit_bind_html(
   api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
 }}).call(this);",
             cf = cf,
+            memo_roots = memo_roots,
             deps_js = deps_js,
+            memo_gate = memo_gate,
             body = body,
             el = el,
             patch_name = patch_name,
@@ -1390,8 +1603,9 @@ fn emit_bind_html(
         ));
     } else {
         stmts.push(format!(
-            "api.trackPatch(this, [{deps_js}], function {patch_name}() {{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} {el}.innerHTML = __v == null ? '' : String(__v); }}, {id_arg});",
+            "api.trackPatch(this, [{deps_js}], function {patch_name}() {{ {memo_gate}var __v; try {{ __v = {body}; }} catch {{ __v = null; }} {el}.innerHTML = __v == null ? '' : String(__v); }}, {id_arg});",
             deps_js = deps_js,
+            memo_gate = memo_gate,
             body = body,
             el = el,
             patch_name = patch_name,
@@ -1412,6 +1626,8 @@ fn emit_bind_show(
     ir: &IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     once: bool,
+    memo: Option<&MemoCtx>,
+    next_id: &mut u32,
 ) {
     let e = sanitize_interp(expr);
     let body = bind_template_expr(&e, fields, methods, scope, aliases);
@@ -1423,13 +1639,15 @@ fn emit_bind_show(
         return;
     }
     let (binding_id, deps, _cf_js) = bind_payload(&e, binding, fields, methods, scope, aliases, ir);
-    let deps_js = deps_js(&deps);
+    let deps_js = deps_js(&with_memo_deps(deps, memo));
+    let memo_gate = memo_gate_prelude(memo, stmts, next_id, "return;");
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
     let patch_name =
         format!("__patchShow{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
     stmts.push(format!(
-        "api.trackPatch(this, [{deps_js}], function {patch_name}() {{ var __cond; try {{ __cond = {body}; }} catch {{ __cond = false; }} {el}.style.display = __cond ? '' : 'none'; }}, {id_arg});",
+        "api.trackPatch(this, [{deps_js}], function {patch_name}() {{ {memo_gate}var __cond; try {{ __cond = {body}; }} catch {{ __cond = false; }} {el}.style.display = __cond ? '' : 'none'; }}, {id_arg});",
         deps_js = deps_js,
+        memo_gate = memo_gate,
         body = body,
         el = el,
         patch_name = patch_name,
@@ -1449,6 +1667,8 @@ fn emit_bind_text_content(
     ir: &IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     once: bool,
+    memo: Option<&MemoCtx>,
+    next_id: &mut u32,
 ) {
     let e = sanitize_interp(expr);
     let body = bind_template_expr(&e, fields, methods, scope, aliases);
@@ -1460,13 +1680,15 @@ fn emit_bind_text_content(
         return;
     }
     let (binding_id, deps, _cf_js) = bind_payload(&e, binding, fields, methods, scope, aliases, ir);
-    let deps_js = deps_js(&deps);
+    let deps_js = deps_js(&with_memo_deps(deps, memo));
+    let memo_gate = memo_gate_prelude(memo, stmts, next_id, "return;");
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
     let patch_name =
         format!("__patchText{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
     stmts.push(format!(
-        "api.trackPatch(this, [{deps_js}], function {patch_name}() {{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} {el}.textContent = __v == null ? '' : String(__v); }}, {id_arg});",
+        "api.trackPatch(this, [{deps_js}], function {patch_name}() {{ {memo_gate}var __v; try {{ __v = {body}; }} catch {{ __v = null; }} {el}.textContent = __v == null ? '' : String(__v); }}, {id_arg});",
         deps_js = deps_js,
+        memo_gate = memo_gate,
         body = body,
         el = el,
         patch_name = patch_name,
@@ -1489,9 +1711,29 @@ fn emit_each_block(
     next_id: &mut u32,
     child_ctors: &HashMap<String, String>,
     once: bool,
+    memo: Option<&MemoCtx>,
 ) -> Result<String, String> {
     // `v-once` on the list element (or an ancestor) freezes the rendered rows.
     let once = once || has_once_marker(attrs);
+    // `v-memo` on the list element gates the list patch and its rows: v-once 优先。
+    // 快照落在列表外层作用域，即整张列表共享一份（逐行快照不在本次范围内）。
+    let memo_owned;
+    let memo = if once {
+        memo
+    } else if let Some(deps_expr) = memo_marker_expr(attrs) {
+        memo_owned = emit_memo_gate(
+            deps_expr,
+            fields,
+            handler_ctx.methods,
+            outer_scope,
+            outer_aliases,
+            stmts,
+            next_id,
+        );
+        Some(&memo_owned)
+    } else {
+        memo
+    };
     let depth = each_depth + 1;
     let box_id = format!("box{depth}");
     let mut child_scope = outer_scope.to_vec();
@@ -1511,7 +1753,7 @@ fn emit_each_block(
         .first()
         .map(|d| d.split('.').next().unwrap_or(d.as_str()).to_string())
         .unwrap_or_else(|| "list".into());
-    let deps = deps_js(&dep_list);
+    let deps = deps_js(&with_memo_deps(dep_list, memo));
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
     let list_body = bind_template_expr(
         &each.list_expr,
@@ -1533,7 +1775,12 @@ fn emit_each_block(
         .map(|k| bind_template_expr(k, fields, handler_ctx.methods, &child_scope, &child_aliases));
     // `v-once` rows never re-render, so the fast clone kernel (and its host-field
     // subscriptions) is disabled — the fat createItem evaluates each row once.
-    let row_kernel = if once || children.iter().any(subtree_has_once_marker) {
+    // `v-memo` rows need the snapshot gate, which the clone kernel cannot express.
+    let row_kernel = if once
+        || has_memo_marker(attrs)
+        || children.iter().any(subtree_has_once_marker)
+        || children.iter().any(subtree_has_memo_marker)
+    {
         String::new()
     } else {
         super::row_kernel::try_emit_row_kernel_js(
@@ -1568,6 +1815,7 @@ fn emit_each_block(
             next_id,
             child_ctors,
             once,
+            memo,
         )?;
         Ok(format!(
             "function(api, {box_id}) {{\n{}  return {item_root};\n}}",
@@ -1736,6 +1984,8 @@ fn emit_each_block(
     } else {
         format!("  api.trackPatch(inst, [{deps}], apply, {id_arg});\n")
     };
+    // `v-memo`: 列表重建同样被最近一层 memo 门控。
+    let memo_gate = memo_gate_prelude(memo, stmts, next_id, "return;");
     stmts.push(format!(
         "var {v} = (function() {{
   var inst = this;
@@ -1767,7 +2017,7 @@ fn emit_each_block(
   }}
 {row_tpl_helper}  function apply() {{
     if (inst.__vmzDestroyed) return;
-    var list = readList();
+    {memo_gate}var list = readList();
 {apply_body}
   }}
 {track_line}  apply();
@@ -1783,7 +2033,8 @@ fn emit_each_block(
         serialize_item_field = serialize_item_field,
         create_item = create_item,
         region_arg = region_arg,
-        track_line = track_line
+        track_line = track_line,
+        memo_gate = memo_gate
     ));
     Ok(v)
 }
@@ -1799,6 +2050,7 @@ fn emit_bind_text(
     stmts: &mut Vec<String>,
     next_id: &mut u32,
     once: bool,
+    memo: Option<&MemoCtx>,
 ) -> Result<String, String> {
     let e = sanitize_interp(expr);
     let v = fresh("t", next_id);
@@ -1814,23 +2066,27 @@ fn emit_bind_text(
     let (binding_id, deps, cf_js) =
         bind_payload(&e, binding, fields, handler_ctx.methods, scope, aliases, ir);
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
-    if cf_js.is_none()
+    if memo.is_none()
+        && cf_js.is_none()
         && let Some(field) = single_field_binding_target(&e, fields, scope, aliases)
     {
         stmts.push(format!("api.specFieldText(this, {id_arg}, {}, {v});", q(&field)));
         return Ok(v);
     }
-    let deps = deps_js(&deps);
+    let deps = deps_js(&with_memo_deps(deps, memo));
+    let memo_gate = memo_gate_prelude(memo, stmts, next_id, "return;");
+    let memo_roots = memo_roots_js(memo);
     let patch_name =
         format!("__patchText{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
     if let Some(cf) = cf_js {
         stmts.push(format!(
             "(function() {{
   var __cf = {cf};
+  var __memoRoots = {memo_roots};
   var __liveDeps = [{deps}];
   var __activeBranch = -1;
   function {patch_name}() {{
-    var __raw;
+    {memo_gate}var __raw;
     try {{ __raw = {body}; }} catch {{ __raw = null; }}
     {v}.textContent = String(__raw != null ? __raw : '');
     if (!__cf || !__cf.branches) return;
@@ -1843,7 +2099,7 @@ fn emit_bind_text(
     if (__next === __activeBranch) return;
     __activeBranch = __next;
     var __br = __cf.branches[__next];
-    var __nd = [].concat(__cf.stable || []).concat((__br && __br.deps) || []);
+    var __nd = [].concat(__cf.stable || []).concat((__br && __br.deps) || []).concat(__memoRoots);
     __nd = Array.from(new Set(__nd));
     var __same = __nd.length === __liveDeps.length;
     if (__same) for (var __j = 0; __j < __nd.length; __j++) if (__nd[__j] !== __liveDeps[__j]) {{ __same = false; break; }}
@@ -1856,7 +2112,9 @@ fn emit_bind_text(
   api.trackPatch(this, __liveDeps, {patch_name}, {id_arg});
 }}).call(this);",
             cf = cf,
+            memo_roots = memo_roots,
             deps = deps,
+            memo_gate = memo_gate,
             body = body,
             v = v,
             patch_name = patch_name,
@@ -1864,8 +2122,9 @@ fn emit_bind_text(
         ));
     } else {
         stmts.push(format!(
-            "api.trackPatch(this, [{deps}], function {patch_name}() {{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} {text}.textContent = String(__v != null ? __v : ''); }}, {id_arg});",
+            "api.trackPatch(this, [{deps}], function {patch_name}() {{ {memo_gate}var __v; try {{ __v = {body}; }} catch {{ __v = null; }} {text}.textContent = String(__v != null ? __v : ''); }}, {id_arg});",
             deps = deps,
+            memo_gate = memo_gate,
             body = body,
             text = v,
             patch_name = patch_name,
