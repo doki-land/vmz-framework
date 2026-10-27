@@ -14,6 +14,7 @@ use vmz_types::{
 };
 
 use crate::field_rw::{collect_each_alias_prop_paths, collect_template_dep_ctx};
+use crate::parse::template_const::{fold_const_expr, fold_if_chain};
 use crate::template::{
     AttrValue, ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg, SemanticIr,
     SemanticNode, SemanticProp, TemplateAttr, TemplateIr, TemplateNode, TemplateSpan,
@@ -358,7 +359,7 @@ fn walk_semantic_nodes(
                 add_text_binding(expr, fields, scope, each_frames, b, region);
             }
             SemanticNode::IfChain { branches, .. } => {
-                walk_semantic_if_chain(branches, fields, scope, each_frames, b);
+                walk_semantic_if_chain(branches, fields, scope, each_frames, b, region);
             }
             SemanticNode::ForNode { .. } => {
                 walk_semantic_for(node, fields, scope, each_frames, b, region);
@@ -397,13 +398,34 @@ fn walk_semantic_if_chain(
     scope: &[String],
     each_frames: &[EachFrame],
     b: &mut WalkCtx<'_>,
+    region: Option<RegionId>,
 ) {
+    let conds: Vec<Option<String>> = branches.iter().map(|br| br.test.clone()).collect();
+    let fold = fold_if_chain(&conds);
+    if fold.kept.is_empty() {
+        // Fully constant-dead chain: no region, no binding, no deps.
+        return;
+    }
+    if let Some(only) = fold.resolved {
+        // Single unconditional survivor: walk it inline under the parent region.
+        walk_semantic_nodes(
+            std::slice::from_ref(branches[only].body.as_ref()),
+            fields,
+            scope,
+            each_frames,
+            b,
+            region,
+        );
+        return;
+    }
+
     let mut stable: Vec<IrDepPath> = Vec::new();
     let mut control_branches: Vec<ControlBranch> = Vec::new();
     let mut body_binding_lists: Vec<Vec<BindingId>> = Vec::new();
     let mut first_cond: Option<String> = None;
 
-    for branch in branches {
+    for &idx in &fold.kept {
+        let branch = &branches[idx];
         let mut cond_reads = Vec::new();
         let cond_expr = if let Some(c) = &branch.test {
             let e = sanitize(c);
@@ -712,11 +734,27 @@ fn walk_nodes(
                     break;
                 }
 
+                // Constant conditions drop dead branches before any dep/binding work.
+                let conds: Vec<Option<String>> =
+                    branch_specs.iter().map(|(c, _)| c.clone()).collect();
+                let fold = fold_if_chain(&conds);
+                if fold.kept.is_empty() {
+                    i = j;
+                    continue;
+                }
+                if let Some(only) = fold.resolved {
+                    let idx = branch_specs[only].1;
+                    walk_element_branch(&nodes[idx], fields, scope, each_frames, b, region);
+                    i = j;
+                    continue;
+                }
+
                 let mut stable: Vec<IrDepPath> = Vec::new();
                 let mut branches: Vec<ControlBranch> = Vec::new();
                 let mut body_binding_lists: Vec<Vec<BindingId>> = Vec::new();
 
-                for (cond_opt, idx) in &branch_specs {
+                for spec_idx in &fold.kept {
+                    let (cond_opt, idx) = &branch_specs[*spec_idx];
                     let mut cond_reads = Vec::new();
                     let cond_expr = if let Some(c) = cond_opt {
                         let e = sanitize(c);
@@ -730,7 +768,7 @@ fn walk_nodes(
                     };
 
                     let before = b.binding_count();
-                    walk_element_branch(&nodes[*idx], fields, scope, each_frames, b);
+                    walk_element_branch(&nodes[*idx], fields, scope, each_frames, b, None);
                     let after = b.binding_count();
                     let body_bindings: Vec<BindingId> = (before..after).map(BindingId).collect();
                     body_binding_lists.push(body_bindings.clone());
@@ -744,9 +782,7 @@ fn walk_nodes(
 
                 let region_id = b.add_control_region(stable.clone(), branches);
                 // IfCond binding: structural switch keyed by stable cond deps (BindingId hot path).
-                if let Some(first_cond) =
-                    branch_specs.iter().find_map(|(c, _)| c.as_ref()).map(|c| sanitize(c))
-                {
+                if let Some(first_cond) = branch_specs[fold.kept[0]].0.as_ref().map(|c| sanitize(c)) {
                     let cond_expr = b.intern_expr(first_cond);
                     b.add_binding(
                         BindingKind::IfCond,
@@ -806,6 +842,7 @@ fn walk_element_branch(
     scope: &[String],
     each_frames: &[EachFrame],
     b: &mut WalkCtx<'_>,
+    region: Option<RegionId>,
 ) {
     let TemplateNode::Element { attrs, .. } = node else {
         return;
@@ -817,7 +854,7 @@ fn walk_element_branch(
     } else {
         "else"
     };
-    walk_element_stripping(node, fields, scope, each_frames, b, None, &[strip_name], true);
+    walk_element_stripping(node, fields, scope, each_frames, b, region, &[strip_name], true);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -964,6 +1001,11 @@ fn add_expr_binding(
     region: Option<RegionId>,
 ) {
     let e = sanitize(expr);
+    // Compile-time constants need no binding: the View emits a static write.
+    // `v-show` stays a runtime style toggle in this fold's scope.
+    if attr.as_deref() != Some("show") && fold_const_expr(&e).is_some() {
+        return;
+    }
     if let Some((test, cons, alt)) = split_ternary(&e) {
         let stable = expr_to_paths(b, &test, fields, scope, each_frames);
         let cons_reads = expr_to_paths(b, &cons, fields, scope, each_frames);

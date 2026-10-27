@@ -9,6 +9,7 @@ use vmz_types::{
 
 use crate::emit::{attr_interp, attr_static, has_bare_attr, is_component_tag, is_event_attr};
 use crate::emit_ir::IrDepCursor;
+use crate::parse::template_const::{fold_const_expr, fold_if_chain};
 use crate::pipeline::link::RouteTable;
 use crate::template::{AttrValue, TemplateAttr, TemplateIr, TemplateNode};
 
@@ -68,25 +69,48 @@ fn build_nodes(
                     }
                     break;
                 }
+                // Constant conditions are decided here: dead branches never reach
+                // the View, and a single unconditional survivor replaces the chain.
+                let conds: Vec<Option<String>> =
+                    branches.iter().map(|(c, _)| c.clone()).collect();
+                let fold = fold_if_chain(&conds);
+                if fold.kept.is_empty() {
+                    i = j;
+                    continue;
+                }
+                let branch_strip = |idx: usize| -> &'static [&'static str] {
+                    if idx == 0 {
+                        &["if"]
+                    } else if branches[idx].0.is_some() {
+                        &["else-if"]
+                    } else {
+                        &["else"]
+                    }
+                };
+                if let Some(only) = fold.resolved {
+                    out.push(build_branch_body(
+                        branches[only].1,
+                        branch_strip(only),
+                        ir,
+                        routes,
+                    ));
+                    i = j;
+                    continue;
+                }
                 // Consume IfCond before body bindings (same order as emit_direct).
-                let taken = ir.take_if(&sanitize(&cond));
+                let first_cond = branches[fold.kept[0]].0.as_deref().unwrap_or("");
+                let taken = ir.take_if(&sanitize(first_cond));
                 let binding = taken.as_ref().and_then(|t| t.binding_id.map(BindingId));
                 let region = binding.and_then(|id| ir.binding_region(id.0));
 
                 let mut view_branches = Vec::new();
-                for (idx, (c, node)) in branches.iter().enumerate() {
-                    let strip: &[&str] = if idx == 0 {
-                        &["if"]
-                    } else if c.is_some() {
-                        &["else-if"]
-                    } else {
-                        &["else"]
-                    };
+                for &idx in &fold.kept {
+                    let (c, node) = &branches[idx];
                     // Branch bodies may be PascalCase components (Alert / DaVinciChart) —
                     // must not force build_element, or emit falls back to api.el("Foo").
                     view_branches.push(ViewIfBranch {
                         cond: c.clone().map(|s| sanitize(&s)),
-                        body: Box::new(build_branch_body(node, strip, ir, routes)),
+                        body: Box::new(build_branch_body(node, branch_strip(idx), ir, routes)),
                     });
                 }
                 out.push(ViewNode::If { region, binding, branches: view_branches });
@@ -109,6 +133,10 @@ fn build_node(
         TemplateNode::Text(t) => ViewNode::Text { value: t.clone() },
         TemplateNode::Interp(expr) => {
             let e = sanitize(expr);
+            // Constant interpolation lowers to static text — no runtime read.
+            if let Some(text) = fold_const_expr(&e).map(|v| v.text_content()) {
+                return ViewNode::Text { value: text };
+            }
             let binding = ir.take_binding(&[BindingKind::Text], &e).map(|t| BindingId(t.id));
             ViewNode::Interp { expr: e, binding }
         }
@@ -359,6 +387,24 @@ fn build_attrs(
             }
             AttrValue::Interp(e) => {
                 let se = sanitize(e);
+                // Constant bindings become static attribute writes: no patch, no read.
+                // Events (`@x`) and `v-show` stay runtime (out of this fold's scope).
+                if !is_event_attr(&a.name)
+                    && a.name != "show"
+                    && let Some(value) = fold_const_expr(&se).and_then(|v| v.attr_text())
+                {
+                    out.push(ViewAttr {
+                        name: a.name.clone(),
+                        value: if value.is_empty() {
+                            ViewAttrValue::Bare
+                        } else {
+                            ViewAttrValue::Static { value }
+                        },
+                        binding: None,
+                        modifiers: a.modifiers.clone(),
+                    });
+                    continue;
+                }
                 let binding = if is_event_attr(&a.name) {
                     ir.take_binding(&[BindingKind::Event], &se).map(|t| BindingId(t.id))
                 } else if is_component_tag(tag) {

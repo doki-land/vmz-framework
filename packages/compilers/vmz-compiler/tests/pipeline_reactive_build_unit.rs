@@ -631,3 +631,36 @@ fn unknown_member_and_dynamic_access_stay_conservative() {
     let module = build_reactive_module("Chart.vmz", &decl, &tpl);
     assert_eq!(binding_reads(&module, "html"), vec!["keyName".to_string()]);
 }
+
+#[test]
+fn constant_attr_and_text_add_no_binding() {
+    let mut decl = ComponentDecl::new("ConstBindings", Span::default(), Span::default());
+    decl.fields.push(state_field("seed"));
+    let tpl = parse_template(
+        r#"<div :title="'a' + 'b'" :data-n="1 + 2">{{ 'x' + 'y' }}</div>"#,
+    )
+    .unwrap();
+    let module = build_reactive_module("ConstBindings.vmz", &decl, &tpl);
+    let c = &module.components[0];
+    let json = module.to_json();
+    assert!(c.bindings.is_empty(), "constant bindings must not subscribe: {json}");
+    assert!(c.control_regions.is_empty(), "{json}");
+    assert!(!json.contains("'a' + 'b'"), "constant expr must not be interned: {json}");
+    assert!(!json.contains("'x' + 'y'"), "constant expr must not be interned: {json}");
+}
+
+#[test]
+fn constant_v_if_adds_no_control_region() {
+    let mut decl = ComponentDecl::new("ConstBranch", Span::default(), Span::default());
+    decl.fields.push(state_field("enabled"));
+    let tpl = parse_template(
+        r#"<p v-if="false">{{ enabled }}</p><p v-else-if="true">{{ 'live' }}</p><p v-else>x</p>"#,
+    )
+    .unwrap();
+    let module = build_reactive_module("ConstBranch.vmz", &decl, &tpl);
+    let c = &module.components[0];
+    let json = module.to_json();
+    assert!(c.control_regions.is_empty(), "constant if chain needs no region: {json}");
+    assert!(c.bindings.is_empty(), "dead branch reads and constant text must not bind: {json}");
+    assert!(!json.contains("if-cond"), "{json}");
+}

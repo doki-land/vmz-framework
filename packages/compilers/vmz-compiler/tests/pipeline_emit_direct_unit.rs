@@ -486,3 +486,65 @@ export default class MarkupPanel {
     assert!(js.contains("this.markup"), "getter binding must read the instance: {js}");
     assert!(!js.contains("= markup"), "bare member identifier emitted: {js}");
 }
+
+#[test]
+fn constant_bindings_fold_to_static_writes() {
+    let src = r#"
+export default class ConstAttrDemo {
+  seed = "seed";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<div :title="'a' + 'b'" :data-n="1 + 2" :hidden="!false">{{ 'x' + 'y' }}</div>"#,
+    )
+    .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains(r#", "title", "ab");"#), "constant attr must be static: {js}");
+    assert!(js.contains(r#", "data-n", "3");"#), "constant number must be static: {js}");
+    assert!(js.contains(r#", "hidden", "true");"#), "constant boolean must be static: {js}");
+    assert!(js.contains(r#"api.text("xy")"#), "constant interpolation must be static text: {js}");
+    assert!(!js.contains("api.trackPatch"), "constant bindings must not patch: {js}");
+}
+
+#[test]
+fn constant_v_if_drops_dead_branches() {
+    let src = r#"
+export default class ConstBranchDemo {
+  seed = "seed";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<div><p v-if="false">dead-a</p><p v-else-if="true">live-b</p><p v-else>dead-c</p></div>"#,
+    )
+    .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(!js.contains("dead-a"), "constant-false branch dropped: {js}");
+    assert!(!js.contains("dead-c"), "branch after constant-true dropped: {js}");
+    assert!(js.contains(r#"api.text("live-b")"#), "surviving branch stays static: {js}");
+    assert!(!js.contains("vmz-if"), "no runtime if region: {js}");
+    assert!(!js.contains("api.trackPatch"), "no runtime condition subscription: {js}");
+}
+
+#[test]
+fn non_constant_method_call_keeps_runtime_binding() {
+    let src = r#"
+export default class RuntimeAttrDemo {
+  title = "t";
+  titleOf() {
+    return this.title;
+  }
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<div :title="this.titleOf()"></div>"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains("api.trackPatch"), "method call must stay runtime: {js}");
+}
