@@ -3,7 +3,7 @@
     "repository": {
         "type": "git",
         "url": "git+https://github.com/doki-land/vmz-framework.git",
-        "directory": "packages/davinci/vmz-davinci-chart"
+        "directory": "packages/davinci/davinci-chart"
     },
     "version": "0.0.0",
     "type": "module",
