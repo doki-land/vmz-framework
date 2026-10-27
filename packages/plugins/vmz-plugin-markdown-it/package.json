@@ -5,7 +5,7 @@
         "url": "git+https://github.com/doki-land/vmz-framework.git",
         "directory": "packages/plugins/vmz-plugin-markdown-it"
     },
-    "version": "0.3.9",
+    "version": "0.3.10",
     "type": "module",
     "description": "VMZ markdown-it adapter — MarkdownIt + engines.markdown registration",
     "license": "MIT",

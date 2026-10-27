@@ -1,6 +1,6 @@
 {
     "name": "vmz-fixtures",
-    "version": "0.3.9",
+    "version": "0.3.10",
     "private": true,
     "type": "module",
     "description": "Private gate fixtures (not a plugin package — name must not contain plugin)",

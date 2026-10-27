@@ -1,6 +1,6 @@
 {
     "name": "@vmz/homepage",
-    "version": "0.3.9",
+    "version": "0.3.10",
     "private": true,
     "type": "module",
     "description": "VMZ official site — homepage + integrated documents at /d/",

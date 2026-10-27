@@ -5,7 +5,7 @@
         "url": "git+https://github.com/doki-land/vmz-framework.git",
         "directory": "packages/plugins/vmz-plugin-shiki"
     },
-    "version": "0.3.9",
+    "version": "0.3.10",
     "type": "module",
     "description": "VMZ Shiki adapter - <Shiki> + code engine registration",
     "license": "MIT",
