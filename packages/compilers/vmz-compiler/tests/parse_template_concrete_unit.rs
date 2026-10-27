@@ -85,12 +85,8 @@ fn v_for_aliases_lower_to_template_ir() {
                         && matches!(&a.value, AttrValue::Static(s) if s == "item"))
             );
             // key_alias (`index`) now preserved as its own TemplateAttr
-            assert!(
-                attrs
-                    .iter()
-                    .any(|a| a.name == "key-alias"
-                        && matches!(&a.value, AttrValue::Static(s) if s == "index"))
-            );
+            assert!(attrs.iter().any(|a| a.name == "key-alias"
+                && matches!(&a.value, AttrValue::Static(s) if s == "index")));
             // index_alias was None in Concrete so no index-alias attr
             assert!(!attrs.iter().any(|a| a.name == "index-alias"));
         }

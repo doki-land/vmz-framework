@@ -583,9 +583,7 @@ fn walk_semantic_prop_bindings(
             }
         }
         SemanticProp::Directive { dir, .. } => match dir {
-            Directive::Html { expr }
-            | Directive::Text { expr }
-            | Directive::Show { expr } => {
+            Directive::Html { expr } | Directive::Text { expr } | Directive::Show { expr } => {
                 let name = if matches!(dir, Directive::Html { .. }) {
                     "html"
                 } else if matches!(dir, Directive::Text { .. }) {

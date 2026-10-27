@@ -192,7 +192,7 @@ export const directApi = {
     mergeStyle(...parts) {
         return mergeStyleParts(...parts);
     },
-    on(el, type, handler, options?) {
+    on(el, type, handler, options ?) {
         // options: { capture?: boolean; passive?: boolean; once?: boolean }
         const listenerOpts = options && (options.capture || options.passive || options.once)
             ? { capture: !!options.capture, passive: !!options.passive, once: !!options.once }

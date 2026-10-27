@@ -12,8 +12,7 @@ use super::emit_ir::IrDepCursor;
 use super::helpers::{
     HandlerResolution, bind_field_idents_ctx, component_event_name, component_prop_wire_name,
     event_dom_type, is_component_event_attr, is_event_attr, is_html_attr, is_show_attr,
-    is_text_attr,
-    looks_like_ternary, parse_this_method_call_arrow, sanitize_interp,
+    is_text_attr, looks_like_ternary, parse_this_method_call_arrow, sanitize_interp,
     single_field_binding_target, split_ternary_parts, wrap_event_handler_body,
 };
 use std::collections::HashMap;
@@ -274,9 +273,7 @@ fn parse_wrapped_instance_method(handler: &str) -> Option<String> {
     }
     // call: `this.method(args)`
     let (name, call) = after_this.split_once('(')?;
-    if name.is_empty()
-        || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
-    {
+    if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$') {
         return None;
     }
     let close = call.find(')')?;
@@ -910,10 +907,7 @@ fn emit_plain_element(
                                 q(&method)
                             ));
                         } else {
-                            stmts.push(format!(
-                                "api.on({el}, {}, {handler});",
-                                q(&effective_type)
-                            ));
+                            stmts.push(format!("api.on({el}, {}, {handler});", q(&effective_type)));
                         }
                     }
                 } else {
@@ -923,9 +917,15 @@ fn emit_plain_element(
                     // capture / passive / once → addEventListener options object
                     let opts_str = if has_capture || has_passive || has_once {
                         let mut parts = Vec::new();
-                        if has_capture { parts.push("capture: true".to_string()); }
-                        if has_passive { parts.push("passive: true".to_string()); }
-                        if has_once { parts.push("once: true".to_string()); }
+                        if has_capture {
+                            parts.push("capture: true".to_string());
+                        }
+                        if has_passive {
+                            parts.push("passive: true".to_string());
+                        }
+                        if has_once {
+                            parts.push("once: true".to_string());
+                        }
                         format!("{{{}}}", parts.join(", "))
                     } else {
                         "undefined".to_string()

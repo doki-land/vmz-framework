@@ -226,7 +226,12 @@ pub struct ViewAttr {
 
 impl Default for ViewAttr {
     fn default() -> Self {
-        Self { name: String::new(), value: ViewAttrValue::Bare, binding: None, modifiers: Vec::new() }
+        Self {
+            name: String::new(),
+            value: ViewAttrValue::Bare,
+            binding: None,
+            modifiers: Vec::new(),
+        }
     }
 }
 

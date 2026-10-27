@@ -487,9 +487,7 @@ fn first_bind_expr(body: &str) -> String {
 fn v_for_accepts_object_destructuring_aliases() {
     assert_accepted(r#"<div v-for="{ a, b } in items" :key="a">{{ a }} {{ b }}</div>"#);
     assert_accepted(r#"<div v-for="{ a = 1, b } in items" :key="a">{{ a }}</div>"#);
-    assert_accepted(
-        r#"<div v-for="{ a, b: { c } } in items" :key="a">{{ a }} {{ c }}</div>"#,
-    );
+    assert_accepted(r#"<div v-for="{ a, b: { c } } in items" :key="a">{{ a }} {{ c }}</div>"#);
 }
 
 #[test]
