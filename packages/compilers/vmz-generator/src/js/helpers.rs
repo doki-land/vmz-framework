@@ -5,6 +5,12 @@ pub fn is_html_attr(name: &str) -> bool {
     name == "html"
 }
 
+/// Vue `v-show` directive — CSS `display` toggle, not a DOM attribute binding.
+/// Template lowering normalizes `v-show` → `ViewAttr { name: "show", value: Interp }`.
+pub fn is_show_attr(name: &str) -> bool {
+    name == "show"
+}
+
 /// True when the attr is a **DOM** event listener (`@click` / `on:click` / `onClick`).
 /// Does **not** treat `on-submit` kebab as an event — that is a prop name on components.
 pub fn is_event_attr(name: &str) -> bool {
@@ -144,36 +150,76 @@ pub fn single_field_binding_target(
     Some(field.to_string())
 }
 
-/// `() => this.foo()` / `(ev) => this.foo(ev)` → `Some("foo")`.
-pub fn parse_this_method_call_arrow(body: &str) -> Option<String> {
+/// Arrow handler shapes that collapse to a single instance method on `this`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArrowHandler {
+    /// `() => this.foo()` / `() => this.foo` / `(ev) => this.foo(ev)` /
+    /// `(e) => this.foo(e)` / `click => this.handleClick(click)`.
+    ThisMethod { name: &'static str, passthrough: bool },
+}
+
+/// Arrow handler body → simplified shape. Internal to the handler parser family.
+fn classify_arrow_body(body: &str) -> Option<(&str, Option<&str>)> {
     let b = body.trim();
-    let after_arrow = if let Some(rest) = b.strip_prefix("()") {
-        rest
-    } else {
-        let i = b.find("=>")?;
-        if b.as_bytes().first() == Some(&b'(') {
-            &b[i..]
+    let arrow_idx = b.find("=>")?;
+    let (params_part, rest_with_arrow) = b.split_at(arrow_idx);
+    let rest = rest_with_arrow[2..].trim();
+    let params = params_part.trim();
+
+    let param_name = if params == "()" {
+        None
+    } else if params.starts_with('(') && params.ends_with(')') {
+        let inner = params[1..params.len() - 1].trim();
+        if inner.is_empty() {
+            None
+        } else if inner.contains(',') {
+            return None; // multi-param → bail out, not a single-method passthrough
         } else {
+            Some(inner)
+        }
+    } else if is_simple_ident(params) {
+        Some(params)
+    } else {
+        return None;
+    };
+
+    let rest = rest.trim_end_matches(';').trim();
+    let after_this = rest.strip_prefix("this.")?;
+
+    // `this.method` bare reference
+    if is_simple_ident(after_this) {
+        return Some((after_this, param_name));
+    }
+
+    // `this.method(args)` call
+    let (name, call) = after_this.split_once('(')?;
+    if name.is_empty() || !is_simple_ident(name) {
+        return None;
+    }
+    let close = call.find(')')?;
+    let args = call[..close].trim();
+    let trail = call[close + 1..].trim();
+    if !trail.is_empty() {
+        return None;
+    }
+    // allow empty args OR a single simple ident matching the param name (passthrough)
+    if !args.is_empty() {
+        if !is_simple_ident(args) {
             return None;
         }
-    };
-    let after_arrow = after_arrow.trim().strip_prefix("=>")?.trim();
-    let rest = after_arrow.strip_prefix("this.")?;
-    let (name, after_name) = rest.split_once('(')?;
-    if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$') {
-        return None;
+        if let Some(p) = param_name {
+            if args != p {
+                return None;
+            }
+        }
     }
-    let after_name = after_name.trim();
-    let close = after_name.find(')')?;
-    let args = after_name[..close].trim();
-    let trail = after_name[close + 1..].trim();
-    if !trail.is_empty() && trail != ";" {
-        return None;
-    }
-    if !args.is_empty() && !args.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
-    {
-        return None;
-    }
+    Some((name, param_name))
+}
+
+/// `() => this.foo()` / `(ev) => this.foo(ev)` / `click => this.handleClick(click)` /
+/// `() => this.method` / `(ev) => this.method` → `Some("foo")`.
+pub fn parse_this_method_call_arrow(body: &str) -> Option<String> {
+    let (name, _param) = classify_arrow_body(body)?;
     Some(name.to_string())
 }
 
