@@ -150,14 +150,6 @@ pub fn single_field_binding_target(
     Some(field.to_string())
 }
 
-/// Arrow handler shapes that collapse to a single instance method on `this`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ArrowHandler {
-    /// `() => this.foo()` / `() => this.foo` / `(ev) => this.foo(ev)` /
-    /// `(e) => this.foo(e)` / `click => this.handleClick(click)`.
-    ThisMethod { name: &'static str, passthrough: bool },
-}
-
 /// Arrow handler body → simplified shape. Internal to the handler parser family.
 fn classify_arrow_body(body: &str) -> Option<(&str, Option<&str>)> {
     let b = body.trim();

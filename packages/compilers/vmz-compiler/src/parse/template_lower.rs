@@ -61,9 +61,11 @@ fn normalize_render_text(value: &str) -> String {
 
 fn lower_attr(attr: &ConcreteAttr) -> Result<Vec<TemplateAttr>, TemplateParseError> {
     match attr {
-        ConcreteAttr::Static { name, value, .. } => {
-            Ok(vec![TemplateAttr { name: name.clone(), value: AttrValue::Static(value.clone()) }])
-        }
+        ConcreteAttr::Static { name, value, .. } => Ok(vec![TemplateAttr {
+            name: name.clone(),
+            value: AttrValue::Static(value.clone()),
+            ..Default::default()
+        }]),
         ConcreteAttr::Directive { dir, span } => lower_directive(dir, span.start as usize),
     }
 }
@@ -73,33 +75,71 @@ fn lower_directive(
     offset: usize,
 ) -> Result<Vec<TemplateAttr>, TemplateParseError> {
     match dir {
-        Directive::If { test } => {
-            Ok(vec![TemplateAttr { name: "if".into(), value: AttrValue::Interp(test.clone()) }])
-        }
+        Directive::If { test } => Ok(vec![TemplateAttr {
+            name: "if".into(),
+            value: AttrValue::Interp(test.clone()),
+            ..Default::default()
+        }]),
         Directive::ElseIf { test } => Ok(vec![TemplateAttr {
             name: "else-if".into(),
             value: AttrValue::Interp(test.clone()),
+            ..Default::default()
         }]),
-        Directive::Else => {
-            Ok(vec![TemplateAttr { name: "else".into(), value: AttrValue::Static(String::new()) }])
+        Directive::Else => Ok(vec![TemplateAttr {
+            name: "else".into(),
+            value: AttrValue::Static(String::new()),
+            ..Default::default()
+        }]),
+        Directive::For { source, value_alias, key_alias, index_alias } => {
+            // Preserve full alias list: value_alias (always) + optional key_alias and index_alias.
+            let mut attrs = vec![
+                TemplateAttr {
+                    name: "each".into(),
+                    value: AttrValue::Interp(source.clone()),
+                    ..Default::default()
+                },
+                TemplateAttr {
+                    name: "as".into(),
+                    value: AttrValue::Static(value_alias.clone()),
+                    ..Default::default()
+                },
+            ];
+            if let Some(k) = key_alias {
+                attrs.push(TemplateAttr {
+                    name: "key-alias".into(),
+                    value: AttrValue::Static(k.clone()),
+                    ..Default::default()
+                });
+            }
+            if let Some(i) = index_alias {
+                attrs.push(TemplateAttr {
+                    name: "index-alias".into(),
+                    value: AttrValue::Static(i.clone()),
+                    ..Default::default()
+                });
+            }
+            Ok(attrs)
         }
-        Directive::For { source, value_alias, .. } => Ok(vec![
-            TemplateAttr { name: "each".into(), value: AttrValue::Interp(source.clone()) },
-            TemplateAttr { name: "as".into(), value: AttrValue::Static(value_alias.clone()) },
-        ]),
-        Directive::Bind { arg, expr, modifiers: _ } => {
+        Directive::Bind { arg, expr, modifiers } => {
             let ir_name = match arg {
                 DirectiveArg::Static(s) if s == "key" => "key".to_string(),
                 DirectiveArg::Static(s) => s.clone(),
                 DirectiveArg::Dynamic(e) => format!("[{e}]"),
             };
-            Ok(vec![TemplateAttr { name: ir_name, value: AttrValue::Interp(expr.clone()) }])
+            Ok(vec![TemplateAttr {
+                name: ir_name,
+                value: AttrValue::Interp(expr.clone()),
+                modifiers: modifiers.clone(),
+            }])
         }
-        Directive::BindObject { expr } => {
-            Ok(vec![TemplateAttr { name: "v-bind".into(), value: AttrValue::Interp(expr.clone()) }])
-        }
-        Directive::On { arg, handler, modifiers: _ } => {
-            // Modifiers stay on Concrete only; IR event name is bare `@event` or `@[dyn]`.
+        Directive::BindObject { expr } => Ok(vec![TemplateAttr {
+            name: "v-bind".into(),
+            value: AttrValue::Interp(expr.clone()),
+            ..Default::default()
+        }]),
+        Directive::On { arg, handler, modifiers } => {
+            // Modifiers retained on TemplateAttr so downstream emit can act on
+            // `@click.stop.prevent` without re-parsing the name string.
             let event = match arg {
                 DirectiveArg::Static(s) => s.clone(),
                 DirectiveArg::Dynamic(e) => format!("[{e}]"),
@@ -107,51 +147,64 @@ fn lower_directive(
             Ok(vec![TemplateAttr {
                 name: format!("@{event}"),
                 value: AttrValue::Interp(handler.clone()),
+                modifiers: modifiers.clone(),
             }])
         }
-        Directive::OnObject { expr } => {
-            Ok(vec![TemplateAttr { name: "v-on".into(), value: AttrValue::Interp(expr.clone()) }])
-        }
+        Directive::OnObject { expr } => Ok(vec![TemplateAttr {
+            name: "v-on".into(),
+            value: AttrValue::Interp(expr.clone()),
+            ..Default::default()
+        }]),
         Directive::Slot { name, props } => {
+            // Allow both static and dynamic slot names. Dynamic form keeps `[[expr]]`
+            // syntax so structural_build can distinguish it from a static literal name.
             let slot_name = match name {
                 DirectiveArg::Static(s) => s.clone(),
-                DirectiveArg::Dynamic(_) => {
-                    return Err(TemplateParseError::coded(
-                        "vmz::template::illegal_directive",
-                        offset,
-                    )
-                    .with_arg("detail", "dynamic `v-slot` argument"));
-                }
+                DirectiveArg::Dynamic(e) => format!("[{e}]"),
             };
             Ok(vec![TemplateAttr {
                 name: format!("#{slot_name}"),
                 value: AttrValue::Static(props.clone().unwrap_or_default()),
+                ..Default::default()
             }])
         }
-        Directive::Html { expr } => {
-            Ok(vec![TemplateAttr { name: "html".into(), value: AttrValue::Interp(expr.clone()) }])
-        }
-        Directive::Show { expr } => {
-            Ok(vec![TemplateAttr { name: "show".into(), value: AttrValue::Interp(expr.clone()) }])
-        }
-        Directive::Model { arg, expr, modifiers: _ } => {
+        Directive::Html { expr } => Ok(vec![TemplateAttr {
+            name: "html".into(),
+            value: AttrValue::Interp(expr.clone()),
+            ..Default::default()
+        }]),
+        Directive::Show { expr } => Ok(vec![TemplateAttr {
+            name: "show".into(),
+            value: AttrValue::Interp(expr.clone()),
+            ..Default::default()
+        }]),
+        Directive::Model { arg, expr, modifiers } => {
             // Vue 3 contract: v-model → :modelValue + @update:modelValue;
             // v-model:arg → :arg + @update:arg.
             let prop = arg.clone().unwrap_or_else(|| "modelValue".into());
             Ok(vec![
-                TemplateAttr { name: prop.clone(), value: AttrValue::Interp(expr.clone()) },
+                TemplateAttr {
+                    name: prop.clone(),
+                    value: AttrValue::Interp(expr.clone()),
+                    modifiers: modifiers.clone(),
+                },
                 TemplateAttr {
                     name: format!("@update:{prop}"),
                     value: AttrValue::Interp(format!("$event => (({expr}) = $event)")),
+                    modifiers: modifiers.clone(),
                 },
             ])
         }
         Directive::Pre => {
             // `v-pre` is consumed as a verbatim region marker on Semantic; legacy
             // TemplateIr keeps it as a static-ish attribute for round-trip parity.
-            Ok(vec![TemplateAttr { name: "v-pre".into(), value: AttrValue::Static(String::new()) }])
+            Ok(vec![TemplateAttr {
+                name: "v-pre".into(),
+                value: AttrValue::Static(String::new()),
+                ..Default::default()
+            }])
         }
-        Directive::Custom { name, arg, expr, modifiers: _ } => {
+        Directive::Custom { name, arg, expr, modifiers } => {
             // Preserve as static-ish attrs so we don't silently drop; use v-name[:arg].
             let ir_name = match arg {
                 None => format!("v-{name}"),
@@ -167,6 +220,7 @@ fn lower_directive(
             Ok(vec![TemplateAttr {
                 name: ir_name,
                 value: AttrValue::Static(expr.clone().unwrap_or_default()),
+                modifiers: modifiers.clone(),
             }])
         }
     }

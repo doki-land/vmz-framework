@@ -34,6 +34,15 @@ pub struct TemplateAttr {
     pub name: String,
     /// Static string or expression binding.
     pub value: AttrValue,
+    /// Optional directive modifiers retained from Concrete (`stop`, `prevent`, `lazy`, …).
+    /// Downstream emit can pick them up without re-parsing the name string.
+    pub modifiers: Vec<String>,
+}
+
+impl Default for TemplateAttr {
+    fn default() -> Self {
+        Self { name: String::new(), value: AttrValue::Static(String::new()), modifiers: Vec::new() }
+    }
 }
 
 /// Attribute value form after template parse / directive lower.

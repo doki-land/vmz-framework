@@ -165,6 +165,7 @@ fn build_link(
                 name: "href".into(),
                 value: ViewAttrValue::Static { value: href },
                 binding: None,
+                modifiers: Vec::new(),
             },
         );
         // Client SPA takeover: same-app Link carries stable RouteId for intercept.
@@ -175,6 +176,7 @@ fn build_link(
                     name: "data-vmz-route".into(),
                     value: ViewAttrValue::Static { value: route_id },
                     binding: None,
+                    modifiers: Vec::new(),
                 },
             );
         }
@@ -348,7 +350,12 @@ fn build_attrs(
                 } else {
                     ViewAttrValue::Static { value: value_text }
                 };
-                out.push(ViewAttr { name: a.name.clone(), value, binding: None });
+                out.push(ViewAttr {
+                    name: a.name.clone(),
+                    value,
+                    binding: None,
+                    modifiers: a.modifiers.clone(),
+                });
             }
             AttrValue::Interp(e) => {
                 let se = sanitize(e);
@@ -365,6 +372,7 @@ fn build_attrs(
                     name: a.name.clone(),
                     value: ViewAttrValue::Interp { expr: se },
                     binding,
+                    modifiers: a.modifiers.clone(),
                 });
             }
         }
@@ -374,6 +382,7 @@ fn build_attrs(
             name: "class".into(),
             value: ViewAttrValue::Static { value: tw_tokens.join(" ") },
             binding: None,
+            modifiers: Vec::new(),
         });
     }
     out

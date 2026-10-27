@@ -382,6 +382,7 @@ mod tests {
                 name: "class".into(),
                 value: ViewAttrValue::Static { value: "page".into() },
                 binding: None,
+                modifiers: vec![],
             }],
             children: vec![
                 ViewNode::Element {
@@ -391,11 +392,13 @@ mod tests {
                             name: "class".into(),
                             value: ViewAttrValue::Static { value: "loc".into() },
                             binding: None,
+                            modifiers: vec![],
                         },
                         ViewAttr {
                             name: "@click".into(),
                             value: ViewAttrValue::Interp { expr: "onStore".into() },
                             binding: Some(BindingId(2)),
+                            modifiers: vec![],
                         },
                     ],
                     children: vec![ViewNode::Element {
@@ -404,6 +407,7 @@ mod tests {
                             name: "class".into(),
                             value: ViewAttrValue::Static { value: "loc-name".into() },
                             binding: None,
+                            modifiers: vec![],
                         }],
                         children: vec![ViewNode::Interp {
                             expr: "store".into(),
@@ -420,11 +424,13 @@ mod tests {
                             name: "class".into(),
                             value: ViewAttrValue::Static { value: "deal".into() },
                             binding: None,
+                            modifiers: vec![],
                         },
                         ViewAttr {
                             name: "data-id".into(),
                             value: ViewAttrValue::Interp { expr: "item.id".into() },
                             binding: None,
+                            modifiers: vec![],
                         },
                     ],
                     children: vec![ViewNode::Interp {

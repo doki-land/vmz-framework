@@ -219,6 +219,15 @@ pub struct ViewAttr {
     pub value: ViewAttrValue,
     /// Binding that owns this attribute, when known.
     pub binding: Option<BindingId>,
+    /// Optional directive modifiers (`stop`, `prevent`, `lazy`, …).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub modifiers: Vec<String>,
+}
+
+impl Default for ViewAttr {
+    fn default() -> Self {
+        Self { name: String::new(), value: ViewAttrValue::Bare, binding: None, modifiers: Vec::new() }
+    }
 }
 
 /// Attribute value forms in Native View.
