@@ -1,0 +1,108 @@
+<template>
+    <div data-vmz-ui-charts="datagrid" class="vmz-ui-charts__datagrid" :style="hostStyle">
+        <!-- HTML 表格语义：保留可访问性、键盘、选择、粘贴。
+             §9.2 明确 DataGrid 不属于绘图 Scene。 -->
+        <table class="vmz-ui-charts__table" role="grid">
+            <thead>
+                <tr>
+                    <th v-for="col in columns" :key="col.name" class="vmz-ui-charts__th">
+                        {{ col.label }}
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="(row, ri) in rows" :key="ri" class="vmz-ui-charts__tr" :data-row="ri">
+                    <td v-for="(col, ci) in columns" :key="ci" class="vmz-ui-charts__td" :data-col="col.name">
+                        {{ row[col.name] }}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</template>
+<script client>
+/**
+ * VMZ UI Charts — DataGrid 组件。
+ *
+ * 作者面：
+ *   <DataGrid :snapshot="dataSnapshot" />
+ *
+ * §9.2 合同：DataGrid 保留 HTML 表格语义（可访问性、键盘导航、复制粘贴），
+ * 不是 Scene / DisplayScene 渲染路径。DaVinci 的 DataSnapshot 直接投影为行+列。
+ * 图表 / 图 / 表格三条管线各自独立，表格不被迫降为绘图 Scene。
+ */
+import type { DataSnapshot } from "@doki-land/davinci-chart";
+
+export default class DataGrid {
+    /** DaVinci DataSnapshot（columnar）。 */
+    public snapshot: DataSnapshot | null = null;
+    /** 可选列标签覆盖（{ field: label }）。未提供时用 field 名。 */
+    public labels: Record<string, string> = {};
+    public width: number = "100%";
+    public height: number = "auto";
+
+    /** 已解析的列元信息（计算属性）。 */
+    public get columns(): { name: string; label: string }[] {
+        if (!this.snapshot) return [];
+        return this.snapshot.columns.map((c) => ({
+            name: c.name,
+            label: this.labels[c.name] ?? c.name,
+        }));
+    }
+
+    /** 已投影的行数据（每行列名→值）。 */
+    public get rows(): Record<string, unknown>[] {
+        if (!this.snapshot) return [];
+        const cols = this.snapshot.columns;
+        const out: Record<string, unknown>[] = [];
+        for (let r = 0; r < this.snapshot.rowCount; r++) {
+            const row: Record<string, unknown> = {};
+            for (const c of cols) {
+                row[c.name] = c.values[r];
+            }
+            out.push(row);
+        }
+        return out;
+    }
+
+    get hostStyle(): string {
+        return `width:${typeof this.width === "number" ? `${this.width}px` : this.width};height:${typeof this.height === "number" ? `${this.height}px` : this.height};overflow:auto`;
+    }
+}
+</script>
+<style>
+.vmz-ui-charts__datagrid {
+    display: inline-block;
+    background: var(--vmz-surface-paper, #fff);
+    border: 1px solid var(--vmz-line-default, #e5e5e5);
+    border-radius: 2px;
+    overflow: auto;
+}
+.vmz-ui-charts__table {
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    min-width: 100%;
+}
+.vmz-ui-charts__th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.375rem 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    background: var(--vmz-surface-mist, #fafafa);
+    border-bottom: 1px solid var(--vmz-line-default, #e5e5e5);
+    white-space: nowrap;
+}
+.vmz-ui-charts__td {
+    padding: 0.25rem 0.75rem;
+    border-bottom: 1px solid var(--vmz-line-default, #e5e5e5);
+    white-space: nowrap;
+    max-width: 24rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.vmz-ui-charts__tr:hover .vmz-ui-charts__td {
+    background: color-mix(in srgb, var(--vmz-action-primary-background, #1f5bd0) 6%, var(--vmz-surface-paper, #fff));
+}
+</style>

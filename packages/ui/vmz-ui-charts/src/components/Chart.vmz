@@ -1,0 +1,126 @@
+<template>
+    <div data-vmz-ui-charts="chart" class="vmz-ui-charts__chart" :style="hostStyle">
+        <svg :viewBox="viewBoxAttr" preserveAspectRatio="xMidYMid meet" class="vmz-ui-charts__svg">
+            <!-- SVG 渲染 DisplayScene（DaVinci compile + resolve 后由 HostRenderer 消费） -->
+        </svg>
+        <div v-if="diagnostics.length > 0" class="vmz-ui-charts__diag">
+            <div v-for="d in diagnostics" :key="d.code" class="vmz-ui-charts__diag-item" :data-sev="d.severity">
+                {{ d.severity }}: {{ d.message }}
+            </div>
+        </div>
+    </div>
+</template>
+<script client>
+/**
+ * VMZ UI Charts — Chart 组件。
+ *
+ * 作者面：
+ *   <Chart :spec="{...}" :data="[...]" width="600" height="400" />
+ *
+ * 管线：ChartSpec + DataSnapshot → compile → resolve → DisplayScene。
+ * HostRenderer 消费 DisplayScene 做 SVG 渲染；本组件不画形状。
+ *
+ * §9.2 定位：DaVinci 绘图引擎作者面包，不是独立 ECharts 封装。
+ */
+import { compile, type ChartSpec } from "@doki-land/davinci-chart";
+import { fromRows, type DataSnapshot } from "@doki-land/davinci-chart";
+import { resolve } from "@doki-land/davinci-scene";
+import { initialState, reduce, type RuntimeState, type Action } from "@doki-land/davinci-runtime";
+
+export default class Chart {
+    /** DaVinci ChartSpec（mark + encoding）。 */
+    public spec: ChartSpec | null = null;
+    /** 原始数据（行数组）。优先于 snapshot。 */
+    public data: Record<string, unknown>[] | null = null;
+    /** 预构建 DataSnapshot（与 data 二选一）。 */
+    public snapshot: DataSnapshot | null = null;
+    public width: number = 600;
+    public height: number = 400;
+
+    /** 编译后 DisplayScene（v-html 注入占位 SVG 待 HostRenderer 填充）。 */
+    public scene: import("@doki-land/davinci-scene").DisplayScene | null = null;
+    /** 交互 runtime state。 */
+    public state: RuntimeState | null = null;
+    public diagnostics: ReadonlyArray<{ severity: string; code: string; message: string }> = [];
+
+    get hostStyle(): string {
+        return `width:${this.width}px;height:${this.height}px;position:relative`;
+    }
+    get viewBoxAttr(): string {
+        return `0 0 ${this.width} ${this.height}`;
+    }
+
+    onMount() {
+        this.recompile();
+    }
+
+    /** 重新执行 compile → resolve。 */
+    public recompile() {
+        if (!this.spec) return;
+        const snap = this.snapshot ?? (this.data ? fromRows(this.data) : null);
+        if (!snap) return;
+        const plan = compile(this.spec, snap);
+        const sem = buildSemanticFromPlan(plan);
+        this.scene = resolve(sem, { width: this.width, height: this.height });
+        this.state = initialState(this.width, this.height);
+    }
+
+    /** 派发交互 action → 返回新 runtime state。 */
+    public dispatch(action: Action): RuntimeState | null {
+        if (!this.state) return null;
+        this.state = reduce(this.state, action);
+        return this.state;
+    }
+}
+
+// ─── Internal helpers ────────────────────────────────────────────────────
+
+function buildSemanticFromPlan(_plan: any): import("@doki-land/davinci-scene").SemanticScene {
+    // TODO: 完整实现 — 把 ChartCompilePlan 转成 SemanticScene。
+    // 当前返回空 root group，让 resolve 管线跑通。
+    return {
+        root: {
+            kind: "group",
+            id: "chart-root",
+            role: "group",
+            children: [],
+        },
+    };
+}
+</script>
+<style>
+.vmz-ui-charts__chart {
+    display: inline-block;
+    background: var(--vmz-surface-paper, #fff);
+    border: 1px solid var(--vmz-line-default, #e5e5e5);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.vmz-ui-charts__svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+.vmz-ui-charts__diag {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: color-mix(in srgb, var(--vmz-surface-paper, #fff) 88%, transparent);
+    max-height: 40%;
+    overflow: auto;
+    font-family: var(--vmz-font-mono, monospace);
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-top: 1px solid var(--vmz-line-default, #e5e5e5);
+}
+.vmz-ui-charts__diag-item {
+    padding: 1px 0;
+}
+.vmz-ui-charts__diag-item[data-sev="error"] {
+    color: #c0392b;
+}
+.vmz-ui-charts__diag-item[data-sev="warning"] {
+    color: #b7791f;
+}
+</style>
