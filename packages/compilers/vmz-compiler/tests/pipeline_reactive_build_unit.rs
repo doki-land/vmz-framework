@@ -3,7 +3,7 @@
 use vmz_compiler::pipeline::reactive_build::*;
 use vmz_compiler::template::parse_template;
 use vmz_types::SourceRange as Span;
-use vmz_types::{BindingKind, ComponentDecl, FieldDecl, FieldKind, Visibility};
+use vmz_types::{BindingKind, ComponentDecl, FieldDecl, FieldKind, MethodDecl, Visibility};
 
 #[test]
 fn ternary_builds_control_region_with_body_reads() {
@@ -469,4 +469,165 @@ fn semantic_if_chain_builds_control_region_without_flat_attr_guess() {
     let legacy_if =
         legacy.components[0].control_regions.iter().filter(|r| r.branches.len() == 2).count();
     assert_eq!(if_regions.len(), legacy_if.max(1));
+}
+
+fn state_field(name: &str) -> FieldDecl {
+    FieldDecl {
+        name: name.into(),
+        type_text: None,
+        init_text: None,
+        kind: FieldKind::State,
+        visibility: Visibility::Private,
+        span: Span::default(),
+        name_span: Span::default(),
+    }
+}
+
+fn member(name: &str, reads: &[&str], calls: &[&str]) -> MethodDecl {
+    MethodDecl {
+        name: name.into(),
+        is_async: false,
+        is_static: false,
+        is_private: false,
+        http: None,
+        reads: reads.iter().map(|s| (*s).to_string()).collect(),
+        writes: vec![],
+        calls: calls.iter().map(|s| (*s).to_string()).collect(),
+        opaque_callee: false,
+        star_reasons: Vec::new(),
+        span: Span::default(),
+        name_span: Span::default(),
+    }
+}
+
+fn binding_reads(module: &vmz_types::ReactiveModule, attr: &str) -> Vec<String> {
+    let c = &module.components[0];
+    let binding = c
+        .bindings
+        .iter()
+        .find(|b| b.kind() == BindingKind::Attr && b.attr() == Some(attr))
+        .unwrap_or_else(|| panic!("missing `{attr}` binding"));
+    binding
+        .reads()
+        .iter()
+        .map(|r| r.to_stable_string(&c.state_slots, &c.properties, &c.exprs))
+        .collect()
+}
+
+#[test]
+fn html_binding_expands_method_reads_end_to_end() {
+    // Whole chain: Oak analysis (getter / call edges + template-string holes) →
+    // reactive binding reads.
+    let src = r#"
+export default class Chart {
+  spec = null;
+  data = [];
+  width = 0;
+  height = 0;
+  scene() {
+    return { spec: this.spec, rows: this.data, w: this.width, h: this.height };
+  }
+  markup() {
+    return this.scene();
+  }
+  hostStyle() {
+    return `width:${this.width}px;height:${this.height}px;position:relative`;
+  }
+}
+"#;
+    let analyzed = vmz_compiler::parse::analyze::analyze_script(vmz_compiler::ScriptKind::Client, src);
+    let decl = analyzed.decl;
+    let method_reads: Vec<(String, Vec<String>)> =
+        decl.methods.iter().map(|m| (m.name.clone(), m.reads.clone())).collect();
+    assert!(analyzed.parse_errors.is_empty(), "{:?}", analyzed.parse_errors);
+    assert!(method_reads.iter().any(|(n, r)| n == "hostStyle" && r.iter().any(|x| x == "width")), "{method_reads:?}");
+    let tpl = parse_template(r#"<div :style="hostStyle()" v-html="markup()"></div>"#).unwrap();
+    let module = build_reactive_module("Chart.vmz", &decl, &tpl);
+    let html = binding_reads(&module, "html");
+    for name in ["spec", "data", "width", "height"] {
+        assert!(html.iter().any(|r| r == name), "html binding must read `{name}`: {html:?}");
+    }
+    let style = binding_reads(&module, "style");
+    assert!(style.iter().any(|r| r == "width"), "style binding reads: {style:?}");
+    assert!(style.iter().any(|r| r == "height"), "style binding reads: {style:?}");
+    assert!(
+        !style.iter().any(|r| r == "spec" || r == "data"),
+        "style must stay precise: {style:?}"
+    );
+    let c = &module.components[0];
+    let markup = c.effects.iter().find(|e| e.name == "markup").expect("markup effect");
+    let markup_reads: Vec<String> = markup
+        .reads
+        .iter()
+        .map(|r| r.to_stable_string(&c.state_slots, &c.properties, &c.exprs))
+        .collect();
+    assert!(markup_reads.iter().any(|r| r == "spec"), "markup effect reads: {markup_reads:?}");
+    assert!(markup_reads.iter().any(|r| r == "data"), "markup effect reads: {markup_reads:?}");
+    let host = c.effects.iter().find(|e| e.name == "hostStyle").expect("hostStyle effect");
+    assert!(!host.reads.is_empty(), "template-string holes must reach the effect summary");
+}
+
+#[test]
+fn semantic_path_html_binding_expands_method_reads() {
+    // Production builds walk the Semantic AST; keep the same member expansion there.
+    let src = r#"
+export default class Chart {
+  spec = null;
+  data = [];
+  width = 0;
+  height = 0;
+  scene() {
+    return { spec: this.spec, rows: this.data, w: this.width, h: this.height };
+  }
+  markup() {
+    return this.scene();
+  }
+  hostStyle() {
+    return `width:${this.width}px;height:${this.height}px;position:relative`;
+  }
+}
+"#;
+    let analyzed = vmz_compiler::parse::analyze::analyze_script(vmz_compiler::ScriptKind::Client, src);
+    let decl = analyzed.decl;
+    let (sem, _ir) =
+        vmz_compiler::parse_template_asts(r#"<div :style="hostStyle()" v-html="markup()"></div>"#)
+            .unwrap();
+    let module = build_reactive_module_from_semantic("Chart.vmz", &decl, &sem);
+    let html = binding_reads(&module, "html");
+    for name in ["spec", "data", "width", "height"] {
+        assert!(html.iter().any(|r| r == name), "html binding must read `{name}`: {html:?}");
+    }
+    let style = binding_reads(&module, "style");
+    assert!(style.iter().any(|r| r == "width"), "style binding reads: {style:?}");
+    assert!(style.iter().any(|r| r == "height"), "style binding reads: {style:?}");
+}
+
+#[test]
+fn getter_binding_value_expands_composed_reads() {
+    let mut decl = ComponentDecl::new("Chart", Span::default(), Span::default());
+    decl.fields.push(state_field("spec"));
+    decl.fields.push(state_field("data"));
+    decl.methods.push(member("markup", &["spec", "data"], &[]));
+    // A getter used as a binding value (no call parentheses).
+    let tpl = parse_template(r#"<div v-html="markup"></div>"#).unwrap();
+    let module = build_reactive_module("Chart.vmz", &decl, &tpl);
+    let reads = binding_reads(&module, "html");
+    assert!(reads.iter().any(|r| r == "spec"), "{reads:?}");
+    assert!(reads.iter().any(|r| r == "data"), "{reads:?}");
+}
+
+#[test]
+fn unknown_member_and_dynamic_access_stay_conservative() {
+    let mut decl = ComponentDecl::new("Chart", Span::default(), Span::default());
+    decl.fields.push(state_field("data"));
+    decl.fields.push(state_field("keyName"));
+    decl.methods.push(member("markup", &["data"], &[]));
+    // Imported / external callee: only the field it passes is a dep.
+    let tpl = parse_template(r#"<div v-html="format(data)"></div>"#).unwrap();
+    let module = build_reactive_module("Chart.vmz", &decl, &tpl);
+    assert_eq!(binding_reads(&module, "html"), vec!["data".to_string()]);
+    // Dynamic member access: no member dep, no field guess.
+    let tpl = parse_template(r#"<div v-html="this[keyName]"></div>"#).unwrap();
+    let module = build_reactive_module("Chart.vmz", &decl, &tpl);
+    assert_eq!(binding_reads(&module, "html"), vec!["keyName".to_string()]);
 }

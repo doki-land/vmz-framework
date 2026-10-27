@@ -19,6 +19,20 @@ use vmz_types::MethodDecl;
 ///
 /// Idempotent. Cycles are handled by monotonic set growth until a fixed point.
 pub fn compose_cross_method_rw(methods: &mut [MethodDecl], fields: &[String]) {
+    compose_cross_method_rw_with_edges(methods, fields, &HashMap::new());
+}
+
+/// Same as [`compose_cross_method_rw`] plus read-by-value edges (`this.getter`).
+///
+/// A getter is read without being called, so its field reads must still reach the
+/// caller. `member_edges` maps a method / getter name to the sibling members it
+/// reads by value; both edge kinds feed the same monotonic fixed point, so cycles
+/// between calls and value reads terminate instead of recursing.
+pub fn compose_cross_method_rw_with_edges(
+    methods: &mut [MethodDecl],
+    fields: &[String],
+    member_edges: &HashMap<String, Vec<String>>,
+) {
     if methods.is_empty() {
         return;
     }
@@ -28,7 +42,20 @@ pub fn compose_cross_method_rw(methods: &mut [MethodDecl], fields: &[String]) {
 
     let callees: Vec<Vec<usize>> = methods
         .iter()
-        .map(|m| m.calls.iter().filter_map(|c| name_to_idx.get(c).copied()).collect())
+        .map(|m| {
+            let mut edges: Vec<usize> =
+                m.calls.iter().filter_map(|c| name_to_idx.get(c).copied()).collect();
+            if let Some(members) = member_edges.get(&m.name) {
+                for member in members {
+                    if let Some(&idx) = name_to_idx.get(member) {
+                        if !edges.contains(&idx) {
+                            edges.push(idx);
+                        }
+                    }
+                }
+            }
+            edges
+        })
         .collect();
     drop(name_to_idx);
 

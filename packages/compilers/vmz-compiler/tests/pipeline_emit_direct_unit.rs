@@ -467,3 +467,22 @@ export default class TrimNumberDemo {
     // .trim → handler body must reference .trim()
     assert!(js.contains(".trim()"), "v-model.trim must rewrite handler to call .trim(): {js}");
 }
+
+#[test]
+fn getter_binding_emits_instance_property_not_free_identifier() {
+    let src = r#"
+export default class MarkupPanel {
+  spec = null;
+  get markup() {
+    return `<b>${this.spec}</b>`;
+  }
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<div v-html="markup"></div>"#).unwrap();
+    let program = build_program_module("MarkupPanel.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains("this.markup"), "getter binding must read the instance: {js}");
+    assert!(!js.contains("= markup"), "bare member identifier emitted: {js}");
+}

@@ -1,5 +1,7 @@
 //! Lower Oak TypeScript AST into [`ComponentDecl`] surface.
 
+use std::collections::HashMap;
+
 use oak_typescript::TypeScriptRoot;
 use oak_typescript::ast::{
     ClassDeclaration, ClassMember, Expression, ExpressionKind, ImportSpecifier, Statement,
@@ -437,6 +439,17 @@ fn fill_members_from_oak(decl: &mut ComponentDecl, body: &[ClassMember], source:
             }
         }
     }
+    // Instance members usable as `this.x` from a template or sibling method.
+    // Static members are excluded: they are not instance properties.
+    let mut member_names: Vec<String> = Vec::new();
+    for member in body {
+        if let ClassMember::Method { name, is_static, .. } = member {
+            if !*is_static && !name.is_empty() && name != "constructor" {
+                member_names.push(name.clone());
+            }
+        }
+    }
+    let mut member_reads: HashMap<String, Vec<String>> = HashMap::new();
 
     for member in body {
         match member {
@@ -484,8 +497,14 @@ fn fill_members_from_oak(decl: &mut ComponentDecl, body: &[ClassMember], source:
                 let is_private =
                     name.starts_with('#') || matches!(visibility, Some(OakVisibility::Private));
                 let http = decorators.iter().find_map(|d| http_route_from_oak_expr(&d.expression));
-                let mut rw = OakFieldRw::new(field_names.iter().cloned());
-                rw.walk_body(method_body);
+                let mut rw = OakFieldRw::with_methods(
+                    field_names.iter().cloned(),
+                    member_names.iter().cloned(),
+                );
+                rw.walk_body_in_source(method_body, Some(source));
+                if !rw.member_reads.is_empty() {
+                    member_reads.insert(name.clone(), rw.member_reads);
+                }
                 decl.methods.push(MethodDecl {
                     name: name.clone(),
                     is_async: *is_async,
@@ -522,7 +541,11 @@ fn fill_members_from_oak(decl: &mut ComponentDecl, body: &[ClassMember], source:
         }
         m.calls = known;
     }
-    crate::method_compose::compose_cross_method_rw(&mut decl.methods, &field_names);
+    crate::method_compose::compose_cross_method_rw_with_edges(
+        &mut decl.methods,
+        &field_names,
+        &member_reads,
+    );
 }
 
 fn http_route_from_oak_expr(expr: &Expression) -> Option<HttpRoute> {

@@ -13,7 +13,7 @@ mod oak_expr_print;
 mod print;
 mod row_kernel;
 mod transpile;
-pub use deps::{collect_template_dep_keys, collect_template_deps};
+pub use deps::{collect_template_dep_ctx, collect_template_dep_keys, collect_template_deps};
 pub use emit_compat::{
     ServerBridge, emit_client_module, emit_entry_client, emit_server_module,
     rewrite_ts_spec_imports, rewrite_virtual_import,
@@ -35,7 +35,7 @@ pub use locale::{
     emit_locale_typed_module,
 };
 pub use module_rewrite::{rewrite_module_specifiers, rewrite_module_specifiers_required};
-pub use oak_expr_ops::collect_each_alias_prop_paths_via_oak;
+pub use oak_expr_ops::{TemplateDeps, collect_each_alias_prop_paths_via_oak};
 pub use print::{EmittedJs, JsPrintOptions, print_js_source};
 pub use row_kernel::try_emit_row_kernel_js;
 pub use transpile::{transpile_ts, transpile_ts_printed, transpile_ts_with_map};

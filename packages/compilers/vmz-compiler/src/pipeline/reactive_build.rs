@@ -4,13 +4,16 @@
 //! Static property paths + if/each regions + method effects.
 //! 8.9: keyed `each` item props ?[`IrDepPath::ListItem`] when list root is a field.
 
+use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
+
 use vmz_types::{
     BindingId, BindingKind, ComponentDecl, ControlBranch, FieldId, FieldKind, IrDepPath,
     ListItemFrame, ProgramModule, REACTIVE_SCHEMA, ReactiveComponentBuilder, ReactiveModule,
     RegionId, WritePath,
 };
 
-use crate::field_rw::{collect_each_alias_prop_paths, collect_template_dep_keys};
+use crate::field_rw::{collect_each_alias_prop_paths, collect_template_dep_ctx};
 use crate::template::{
     AttrValue, ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg, SemanticIr,
     SemanticNode, SemanticProp, TemplateAttr, TemplateIr, TemplateNode, TemplateSpan,
@@ -136,6 +139,68 @@ struct EachFrame {
     as_name: String,
 }
 
+/// Composed sibling method / getter summaries used to expand template references.
+///
+/// A template may reference a class member by name (`markup`, `markup()`,
+/// `this.markup`). Field deps come from the expression itself; a member's own
+/// body reads are added from here, so an update patches the binding that
+/// actually changed. Nothing is guessed: unknown members, imported functions and
+/// dynamic member access (`this[key]`) contribute no entry.
+struct MethodDeps {
+    fields: Vec<String>,
+    member_names: Vec<String>,
+    /// Member name → composed stable read deps (already transitive, cycle-safe).
+    member_reads: HashMap<String, Vec<String>>,
+}
+
+impl MethodDeps {
+    fn new(decl: &ComponentDecl) -> Self {
+        let fields: Vec<String> =
+            decl.properties.iter().chain(decl.fields.iter()).map(|f| f.name.clone()).collect();
+        let mut methods = decl.methods.clone();
+        crate::method_compose::compose_cross_method_rw(&mut methods, &fields);
+        let member_names: Vec<String> = methods.iter().map(|m| m.name.clone()).collect();
+        let mut member_reads: HashMap<String, Vec<String>> = HashMap::new();
+        for m in &methods {
+            if !m.reads.is_empty() {
+                member_reads.insert(m.name.clone(), m.reads.clone());
+            }
+        }
+        Self { fields, member_names, member_reads }
+    }
+}
+
+/// Template walk context: the builder allocates ids while `deps` carries the
+/// component's composed member summaries.
+struct WalkCtx<'a> {
+    builder: ReactiveComponentBuilder,
+    deps: &'a MethodDeps,
+}
+
+impl<'a> WalkCtx<'a> {
+    fn new(name: String, deps: &'a MethodDeps) -> Self {
+        Self { builder: ReactiveComponentBuilder::new(name), deps }
+    }
+
+    fn into_builder(self) -> ReactiveComponentBuilder {
+        self.builder
+    }
+}
+
+impl Deref for WalkCtx<'_> {
+    type Target = ReactiveComponentBuilder;
+
+    fn deref(&self) -> &Self::Target {
+        &self.builder
+    }
+}
+
+impl DerefMut for WalkCtx<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.builder
+    }
+}
+
 /// Build a [`ReactiveModule`] from component decl + **Semantic** template AST.
 ///
 /// `IfChain` / `ForNode` drive control regions — no sibling flat-attr guessing.
@@ -144,7 +209,8 @@ pub fn build_reactive_module_from_semantic(
     decl: &ComponentDecl,
     semantic: &SemanticIr,
 ) -> ReactiveModule {
-    let mut b = ReactiveComponentBuilder::new(decl.name.clone());
+    let deps = MethodDeps::new(decl);
+    let mut b = WalkCtx::new(decl.name.clone(), &deps);
     for f in &decl.properties {
         b.add_field(f.name.clone(), FieldKind::Prop);
     }
@@ -152,16 +218,13 @@ pub fn build_reactive_module_from_semantic(
         b.add_field(f.name.clone(), FieldKind::State);
     }
 
-    let fields: Vec<String> =
-        decl.properties.iter().chain(decl.fields.iter()).map(|f| f.name.clone()).collect();
-
-    walk_semantic_nodes(&semantic.roots, &fields, &[], &[], &mut b, None);
-    finish_effects(&mut b, decl, &fields);
+    walk_semantic_nodes(&semantic.roots, &deps.fields, &[], &[], &mut b, None);
+    finish_effects(&mut b, decl, &deps.fields);
 
     ReactiveModule {
         schema: REACTIVE_SCHEMA.into(),
         source: source.to_string(),
-        components: vec![b.finish()],
+        components: vec![b.into_builder().finish()],
     }
 }
 
@@ -173,7 +236,8 @@ pub fn build_reactive_module(
     decl: &ComponentDecl,
     template: &TemplateIr,
 ) -> ReactiveModule {
-    let mut b = ReactiveComponentBuilder::new(decl.name.clone());
+    let deps = MethodDeps::new(decl);
+    let mut b = WalkCtx::new(decl.name.clone(), &deps);
     for f in &decl.properties {
         b.add_field(f.name.clone(), FieldKind::Prop);
     }
@@ -181,20 +245,17 @@ pub fn build_reactive_module(
         b.add_field(f.name.clone(), FieldKind::State);
     }
 
-    let fields: Vec<String> =
-        decl.properties.iter().chain(decl.fields.iter()).map(|f| f.name.clone()).collect();
-
-    walk_nodes(&template.roots, &fields, &[], &[], &mut b, None);
-    finish_effects(&mut b, decl, &fields);
+    walk_nodes(&template.roots, &deps.fields, &[], &[], &mut b, None);
+    finish_effects(&mut b, decl, &deps.fields);
 
     ReactiveModule {
         schema: REACTIVE_SCHEMA.into(),
         source: source.to_string(),
-        components: vec![b.finish()],
+        components: vec![b.into_builder().finish()],
     }
 }
 
-fn finish_effects(b: &mut ReactiveComponentBuilder, decl: &ComponentDecl, fields: &[String]) {
+fn finish_effects(b: &mut WalkCtx<'_>, decl: &ComponentDecl, fields: &[String]) {
     let mut methods = decl.methods.clone();
     crate::method_compose::compose_cross_method_rw(&mut methods, fields);
     for m in &methods {
@@ -287,7 +348,7 @@ fn walk_semantic_nodes(
     fields: &[String],
     scope: &[String],
     each_frames: &[EachFrame],
-    b: &mut ReactiveComponentBuilder,
+    b: &mut WalkCtx<'_>,
     region: Option<RegionId>,
 ) {
     for node in nodes {
@@ -335,7 +396,7 @@ fn walk_semantic_if_chain(
     fields: &[String],
     scope: &[String],
     each_frames: &[EachFrame],
-    b: &mut ReactiveComponentBuilder,
+    b: &mut WalkCtx<'_>,
 ) {
     let mut stable: Vec<IrDepPath> = Vec::new();
     let mut control_branches: Vec<ControlBranch> = Vec::new();
@@ -403,7 +464,7 @@ fn walk_semantic_for(
     fields: &[String],
     scope: &[String],
     each_frames: &[EachFrame],
-    b: &mut ReactiveComponentBuilder,
+    b: &mut WalkCtx<'_>,
     region: Option<RegionId>,
 ) {
     let SemanticNode::ForNode { source, value_alias, key_alias, index_alias, key, body, .. } = node
@@ -468,7 +529,7 @@ fn walk_semantic_element(
     fields: &[String],
     scope: &[String],
     each_frames: &[EachFrame],
-    b: &mut ReactiveComponentBuilder,
+    b: &mut WalkCtx<'_>,
     region: Option<RegionId>,
 ) {
     let SemanticNode::Element { tag, props, children, .. } = node else {
@@ -488,7 +549,7 @@ fn walk_semantic_prop_bindings(
     fields: &[String],
     scope: &[String],
     each_frames: &[EachFrame],
-    b: &mut ReactiveComponentBuilder,
+    b: &mut WalkCtx<'_>,
     region: Option<RegionId>,
 ) {
     match p {
@@ -612,7 +673,7 @@ fn walk_nodes(
     fields: &[String],
     scope: &[String],
     each_frames: &[EachFrame],
-    b: &mut ReactiveComponentBuilder,
+    b: &mut WalkCtx<'_>,
     region: Option<RegionId>,
 ) {
     let mut i = 0;
@@ -725,7 +786,7 @@ fn walk_node(
     fields: &[String],
     scope: &[String],
     each_frames: &[EachFrame],
-    b: &mut ReactiveComponentBuilder,
+    b: &mut WalkCtx<'_>,
     region: Option<RegionId>,
 ) {
     match node {
@@ -744,7 +805,7 @@ fn walk_element_branch(
     fields: &[String],
     scope: &[String],
     each_frames: &[EachFrame],
-    b: &mut ReactiveComponentBuilder,
+    b: &mut WalkCtx<'_>,
 ) {
     let TemplateNode::Element { attrs, .. } = node else {
         return;
@@ -765,7 +826,7 @@ fn walk_element_stripping(
     fields: &[String],
     scope: &[String],
     each_frames: &[EachFrame],
-    b: &mut ReactiveComponentBuilder,
+    b: &mut WalkCtx<'_>,
     region: Option<RegionId>,
     strip: &[&str],
     allow_each: bool,
@@ -885,7 +946,7 @@ fn add_text_binding(
     fields: &[String],
     scope: &[String],
     each_frames: &[EachFrame],
-    b: &mut ReactiveComponentBuilder,
+    b: &mut WalkCtx<'_>,
     region: Option<RegionId>,
 ) {
     add_expr_binding(expr, BindingKind::Text, None, fields, scope, each_frames, b, region);
@@ -899,7 +960,7 @@ fn add_expr_binding(
     fields: &[String],
     scope: &[String],
     each_frames: &[EachFrame],
-    b: &mut ReactiveComponentBuilder,
+    b: &mut WalkCtx<'_>,
     region: Option<RegionId>,
 ) {
     let e = sanitize(expr);
@@ -944,14 +1005,30 @@ fn split_ternary(expr: &str) -> Option<(String, String, String)> {
 }
 
 /// Field deps + keyed each-alias props as [`IrDepPath::ListItem`] (flat or nested).
+///
+/// Sibling method / getter references expand to their composed read deps, so a
+/// binding such as `v-html="markup()"` re-patches when `spec` / `data` change.
 fn expr_to_paths(
-    b: &mut ReactiveComponentBuilder,
+    b: &mut WalkCtx<'_>,
     expr: &str,
     fields: &[String],
     scope: &[String],
     each_frames: &[EachFrame],
 ) -> Vec<IrDepPath> {
-    let mut out = keys_to_paths(b, &collect_template_dep_keys(expr, fields, scope));
+    let deps = b.deps;
+    let (keys, member_refs) =
+        collect_template_dep_ctx(expr, fields, scope, &deps.member_names);
+    let mut out = keys_to_paths(b, &keys);
+    for name in &member_refs {
+        let Some(reads) = deps.member_reads.get(name) else {
+            continue;
+        };
+        for s in reads {
+            if let Some(path) = stable_to_ir(b, s) {
+                push_unique_path(&mut out, path);
+            }
+        }
+    }
     for frame in each_frames {
         for prop_segs in collect_each_alias_prop_paths(expr, &frame.as_name) {
             let path: Vec<_> = prop_segs.iter().map(|p| b.intern_prop(p.clone())).collect();
@@ -978,7 +1055,7 @@ fn nest_from_list_reads(
     }
 }
 
-fn keys_to_paths(b: &mut ReactiveComponentBuilder, keys: &[vmz_types::DepKey]) -> Vec<IrDepPath> {
+fn keys_to_paths(b: &mut WalkCtx<'_>, keys: &[vmz_types::DepKey]) -> Vec<IrDepPath> {
     let mut out = Vec::new();
     for k in keys {
         if let Some(p) = b.from_dep_key(k) {
@@ -989,7 +1066,7 @@ fn keys_to_paths(b: &mut ReactiveComponentBuilder, keys: &[vmz_types::DepKey]) -
 }
 
 /// Parse stable dep string (`user.name` / `count`) into IR path.
-fn stable_to_ir(b: &mut ReactiveComponentBuilder, s: &str) -> Option<IrDepPath> {
+fn stable_to_ir(b: &mut WalkCtx<'_>, s: &str) -> Option<IrDepPath> {
     if s.ends_with(".*") {
         let root = s.trim_end_matches(".*");
         return b.field_id(root).map(IrDepPath::Unknown);

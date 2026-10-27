@@ -12,12 +12,35 @@ pub fn collect_template_deps(expr: &str, fields: &[String], scope: &[String]) ->
 
 /// Collect structured dependencies without a legacy parser fallback.
 pub fn collect_template_dep_keys(expr: &str, fields: &[String], scope: &[String]) -> Vec<DepKey> {
+    collect_template_dep_ctx(expr, fields, scope, &[]).0
+}
+
+/// Collect structured deps plus sibling class method / getter references.
+///
+/// Expanding a referenced method's body reads stays with the caller: this layer
+/// only reports names. When Oak cannot lower the snippet the lexical fallback
+/// still reports field keys but deliberately reports no method names, because
+/// the scanner cannot tell a method from a global.
+pub fn collect_template_dep_ctx(
+    expr: &str,
+    fields: &[String],
+    scope: &[String],
+    methods: &[String],
+) -> (Vec<DepKey>, Vec<String>) {
     let trimmed = expr.trim();
-    if trimmed.is_empty() || fields.is_empty() {
-        return Vec::new();
+    if trimmed.is_empty() || (fields.is_empty() && methods.is_empty()) {
+        return (Vec::new(), Vec::new());
     }
-    super::oak_expr_ops::collect_template_dep_keys_via_oak(trimmed, fields, scope)
-        .unwrap_or_else(|| collect_template_deps_scan(trimmed, fields, scope))
+    match super::oak_expr_ops::collect_template_deps_via_oak(trimmed, fields, scope, methods) {
+        Some(deps) => (deps.keys, deps.methods),
+        None => {
+            if fields.is_empty() {
+                (Vec::new(), Vec::new())
+            } else {
+                (collect_template_deps_scan(trimmed, fields, scope), Vec::new())
+            }
+        }
+    }
 }
 
 fn collect_template_deps_scan(expr: &str, fields: &[String], scope: &[String]) -> Vec<DepKey> {
@@ -53,4 +76,48 @@ fn collect_template_deps_scan(expr: &str, fields: &[String], scope: &[String]) -
         }
     }
     deps
+}
+
+#[cfg(test)]
+mod tests {
+    use super::collect_template_dep_ctx;
+
+    fn stable(keys: &[vmz_types::DepKey]) -> Vec<String> {
+        keys.iter().map(|k| k.to_stable_string()).collect()
+    }
+
+    #[test]
+    fn reports_member_refs_without_expanding_them() {
+        let fields = vec!["data".to_string()];
+        let members = vec!["markup".to_string(), "scene".to_string()];
+        let (keys, refs) = collect_template_dep_ctx("markup()", &fields, &[], &members);
+        assert!(keys.is_empty(), "{keys:?}");
+        assert_eq!(refs, vec!["markup".to_string()]);
+        let (keys, refs) = collect_template_dep_ctx("this.markup(data)", &fields, &[], &members);
+        assert_eq!(stable(&keys), vec!["data".to_string()]);
+        assert_eq!(refs, vec!["markup".to_string()]);
+    }
+
+    #[test]
+    fn unknown_callee_and_dynamic_member_stay_conservative() {
+        let fields = vec!["data".to_string(), "keyName".to_string()];
+        let members = vec!["markup".to_string()];
+        // External import / global: no member dep is invented.
+        let (keys, refs) = collect_template_dep_ctx("format(data)", &fields, &[], &members);
+        assert!(refs.is_empty(), "{refs:?}");
+        assert_eq!(stable(&keys), vec!["data".to_string()]);
+        // Dynamic member access resolves no member and guesses no field.
+        let (keys, refs) = collect_template_dep_ctx("this[keyName]", &fields, &[], &members);
+        assert!(refs.is_empty(), "{refs:?}");
+        assert_eq!(stable(&keys), vec!["keyName".to_string()]);
+    }
+
+    #[test]
+    fn each_alias_shadows_member_name() {
+        let (keys, refs) =
+            collect_template_dep_ctx("markup", &[], &["markup".to_string()], &["markup"
+                .to_string()]);
+        assert!(keys.is_empty(), "{keys:?}");
+        assert!(refs.is_empty(), "{refs:?}");
+    }
 }

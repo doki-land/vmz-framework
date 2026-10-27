@@ -71,3 +71,16 @@ pub fn collect_each_alias_prop_paths(expr: &str, as_name: &str) -> Vec<Vec<Strin
 pub fn collect_template_dep_keys(expr: &str, fields: &[String], scope: &[String]) -> Vec<DepKey> {
     vmz_generator::js::collect_template_dep_keys(expr, fields, scope)
 }
+
+/// Structured deps plus sibling method / getter names referenced by the expression.
+///
+/// The caller expands those names against composed method summaries; this layer
+/// never guesses a body it does not own.
+pub fn collect_template_dep_ctx(
+    expr: &str,
+    fields: &[String],
+    scope: &[String],
+    methods: &[String],
+) -> (Vec<DepKey>, Vec<String>) {
+    vmz_generator::js::collect_template_dep_ctx(expr, fields, scope, methods)
+}

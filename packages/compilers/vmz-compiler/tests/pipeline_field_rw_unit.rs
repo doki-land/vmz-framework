@@ -1,6 +1,8 @@
 //! Oak-backed field read/write and template dependency contracts.
 
 use oak_typescript::ast::{ClassMember, Statement};
+use vmz_compiler::ScriptKind;
+use vmz_compiler::parse::analyze::analyze_script;
 use vmz_compiler::parse::field_rw_oak::OakFieldRw;
 use vmz_compiler::pipeline::field_rw::*;
 use vmz_oak_frontend_adapter::{ScriptRole, ScriptShellInput, require_script_ast};
@@ -202,6 +204,106 @@ fn each_alias_prop_paths_for_list_item() {
     assert_eq!(paths, vec![vec!["label".to_string()]]);
     let whole = collect_each_alias_prop_paths("tag", "tag");
     assert_eq!(whole, vec![Vec::<String>::new()]);
+}
+
+#[test]
+fn records_getter_member_read_by_name() {
+    let src = r#"
+        class C {
+          render() {
+            return this.markup;
+          }
+        }
+    "#;
+    let mut rw = OakFieldRw::with_methods(["spec".into()], ["markup".into()]);
+    walk_named_method(&mut rw, src, "render");
+    assert_eq!(rw.member_reads, vec!["markup".to_string()]);
+    assert!(rw.calls.is_empty(), "value read is not a call: {:?}", rw.calls);
+    assert!(rw.reads.is_empty(), "member read is not a field read: {:?}", rw.reads);
+}
+
+#[test]
+fn reads_fields_inside_template_string_holes() {
+    // Oak's builder drops template-literal expressions (`argument: None`), so the
+    // walker recovers the `${...}` holes from the statement source slice.
+    let src = r#"
+        export default class C {
+          width = 0;
+          height = 0;
+          hostStyle() {
+            return `width:${this.width}px;height:${this.height}px`;
+          }
+        }
+    "#;
+    let analyzed = analyze_script(ScriptKind::Client, src);
+    let host = analyzed.decl.methods.iter().find(|m| m.name == "hostStyle").expect("hostStyle");
+    assert!(host.reads.iter().any(|r| r == "width"), "reads={:?}", host.reads);
+    assert!(host.reads.iter().any(|r| r == "height"), "reads={:?}", host.reads);
+}
+
+#[test]
+fn dynamic_member_access_stays_conservative() {
+    // `this[expr]` resolves no member and reads no field.
+    let src = r#"
+        class C {
+          pick(key) {
+            return this[key];
+          }
+        }
+    "#;
+    let mut rw = OakFieldRw::with_methods(["spec".into()], ["markup".into()]);
+    walk_named_method(&mut rw, src, "pick");
+    assert!(rw.member_reads.is_empty(), "this[key] must not resolve a member");
+    assert!(rw.reads.is_empty(), "this[key] must not read a field: {:?}", rw.reads);
+    // A dynamic index on a field widens that field and still no member.
+    let src2 = r#"
+        class C {
+          pick(name) {
+            return this.spec[name];
+          }
+        }
+    "#;
+    let mut rw2 = OakFieldRw::with_methods(["spec".into()], ["markup".into()]);
+    walk_named_method(&mut rw2, src2, "pick");
+    assert!(rw2.member_reads.is_empty(), "reads={:?}", rw2.member_reads);
+    assert!(rw2.reads.iter().any(|r| r == "spec.*"), "reads={:?}", rw2.reads);
+}
+
+#[test]
+fn getter_chain_composes_reads_and_terminates() {
+    let src = r#"
+        export default class Chart {
+          spec = null;
+          data = [];
+          get x() { return this.y + this.spec; }
+          get y() { return this.x + this.data; }
+          markup() { return this.x; }
+        }
+    "#;
+    let analyzed = analyze_script(ScriptKind::Client, src);
+    let markup = analyzed.decl.methods.iter().find(|m| m.name == "markup").expect("markup");
+    assert!(markup.reads.iter().any(|r| r == "spec"), "reads={:?}", markup.reads);
+    assert!(markup.reads.iter().any(|r| r == "data"), "reads={:?}", markup.reads);
+}
+
+fn walk_named_method(visitor: &mut OakFieldRw, source: &str, name: &str) {
+    let root = require_script_ast(&ScriptShellInput {
+        content: source.to_string(),
+        content_start: 0,
+        role: ScriptRole::Client,
+    })
+    .expect("Oak must parse the method fixture");
+    for statement in &root.statements {
+        if let Statement::ClassDeclaration(class) = statement {
+            for member in &class.body {
+                if let ClassMember::Method { name: member_name, body, .. } = member {
+                    if member_name == name {
+                        visitor.walk_body(body);
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn walk_script(visitor: &mut OakFieldRw, source: &str) {

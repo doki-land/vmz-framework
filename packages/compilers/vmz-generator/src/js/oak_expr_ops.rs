@@ -6,15 +6,33 @@ use oak_typescript::ast::{Expression, ExpressionKind, ObjectProperty, Statement}
 use vmz_oak_frontend_adapter::parse_expression_snippet;
 use vmz_types::{DepKey, DepPath, PathSegment};
 
-/// Collect template deps via Oak AST; `None` when Oak cannot lower the snippet.
-pub fn collect_template_dep_keys_via_oak(
+/// Template expression dependencies: field keys plus referenced component methods/getters.
+#[derive(Debug, Default)]
+pub struct TemplateDeps {
+    /// Field / path keys read by the expression itself.
+    pub keys: Vec<DepKey>,
+    /// Sibling class method / getter names referenced by value or call.
+    pub methods: Vec<String>,
+}
+
+/// Collect template deps and referenced sibling methods/getters via Oak AST.
+///
+/// A method / getter name in the expression is reported by name only: expanding
+/// its body reads is the caller's job (the compiler owns composed summaries).
+///
+/// Conservative boundaries (never guessed):
+/// - external imports / globals / unknown identifiers contribute no deps
+/// - dynamic member access (`obj[key]`, `this[key]`) is not expanded to a field
+/// - `scope` aliases (`each` values) shadow fields and method names
+pub fn collect_template_deps_via_oak(
     expr: &str,
     fields: &[String],
     scope: &[String],
-) -> Option<Vec<DepKey>> {
+    methods: &[String],
+) -> Option<TemplateDeps> {
     let trimmed = expr.trim();
-    if trimmed.is_empty() || fields.is_empty() {
-        return Some(Vec::new());
+    if trimmed.is_empty() {
+        return Some(TemplateDeps::default());
     }
     let parsed = parse_expression_snippet(trimmed);
     if !parsed.ok {
@@ -24,10 +42,12 @@ pub fn collect_template_dep_keys_via_oak(
     let mut v = DepCollector {
         fields: fields.iter().map(|s| s.as_str()).collect(),
         scope: scope.iter().map(|s| s.as_str()).collect(),
+        methods: methods.iter().map(|s| s.as_str()).collect(),
         deps: Vec::new(),
+        method_refs: Vec::new(),
     };
     v.visit_expr(&root);
-    Some(v.deps)
+    Some(TemplateDeps { keys: v.deps, methods: v.method_refs })
 }
 
 /// Each-alias property paths via Oak; `None` when Oak cannot lower the snippet.
@@ -103,7 +123,12 @@ fn collect_bind_rewrites(
                 });
                 return;
             }
-            if fields.contains(name.as_str()) && !scope.contains(name.as_str()) {
+            if scope.contains(name.as_str()) {
+                return;
+            }
+            // A bare method / getter name is an instance member read; leaving it
+            // bare would emit a free identifier (`__v = markup`) and throw at runtime.
+            if fields.contains(name.as_str()) || methods.contains(name.as_str()) {
                 out.push(Patch::InsertPrefix { at: expr.span.start, prefix: "this." });
             }
         }
@@ -171,7 +196,8 @@ fn collect_bind_rewrites(
                                     end: span.end,
                                     text: format!("{name}: {to}"),
                                 });
-                            } else if fields.contains(name.as_str())
+                            } else if (fields.contains(name.as_str())
+                                || methods.contains(name.as_str()))
                                 && !scope.contains(name.as_str())
                             {
                                 out.push(Patch::Replace {
@@ -263,7 +289,9 @@ fn apply_rewrites(src: &str, patches: &mut [Patch]) -> String {
 struct DepCollector<'a> {
     fields: HashSet<&'a str>,
     scope: HashSet<&'a str>,
+    methods: HashSet<&'a str>,
     deps: Vec<DepKey>,
+    method_refs: Vec<String>,
 }
 
 impl DepCollector<'_> {
@@ -274,14 +302,41 @@ impl DepCollector<'_> {
         }
     }
 
+    fn push_method_ref(&mut self, name: &str) {
+        if !self.method_refs.iter().any(|m| m == name) {
+            self.method_refs.push(name.to_string());
+        }
+    }
+
     fn visit_expr(&mut self, expr: &Expression) {
         match expr.kind.as_ref() {
             ExpressionKind::Identifier(name) => {
-                if !self.scope.contains(name.as_str()) && self.fields.contains(name.as_str()) {
+                if self.scope.contains(name.as_str()) {
+                    return;
+                }
+                if self.fields.contains(name.as_str()) {
                     self.push(DepKey::field(name));
+                } else if self.methods.contains(name.as_str()) {
+                    self.push_method_ref(name);
                 }
             }
             ExpressionKind::MemberExpression { object, property, computed, .. } => {
+                // `this.method` / `this.getter` (Templates may spell either the bare
+                // name or the explicit instance path.) Dynamic `this[key]` stays opaque.
+                if !*computed
+                    && is_this(object)
+                    && let ExpressionKind::Identifier(name) = property.kind.as_ref()
+                    && !self.scope.contains(name.as_str())
+                {
+                    if self.fields.contains(name.as_str()) {
+                        self.push(DepKey::field(name));
+                        return;
+                    }
+                    if self.methods.contains(name.as_str()) {
+                        self.push_method_ref(name);
+                        return;
+                    }
+                }
                 if let Some((root, segs)) = path_from_member(expr) {
                     if !self.scope.contains(root.as_str()) && self.fields.contains(root.as_str()) {
                         self.push(DepKey::path(DepPath { root, segments: segs }));
@@ -488,6 +543,10 @@ fn path_from_member(expr: &Expression) -> Option<(String, Vec<PathSegment>)> {
         }
         _ => None,
     }
+}
+
+fn is_this(expr: &Expression) -> bool {
+    matches!(expr.kind.as_ref(), ExpressionKind::Identifier(n) if n == "this")
 }
 
 fn path_seg_from_index(expr: &Expression) -> Option<PathSegment> {

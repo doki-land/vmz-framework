@@ -5,18 +5,23 @@
 use std::collections::{HashMap, HashSet};
 
 use oak_typescript::ast::{Expression, ExpressionKind, ObjectProperty, Statement};
+use vmz_oak_frontend_adapter::parse_expression_snippet;
 use vmz_types::{DepKey, DepPath, PathSegment};
 
 /// Accumulated field reads/writes/calls from an Oak method body walk.
 #[derive(Debug, Default)]
 pub struct OakFieldRw {
     field_names: Vec<String>,
+    /// Sibling method / getter names usable as instance members.
+    method_names: Vec<String>,
     /// Stable dep path strings read during the visit.
     pub reads: Vec<String>,
     /// Stable dep path strings written during the visit.
     pub writes: Vec<String>,
     /// Direct `this.method` / `this.#method` callees.
     pub calls: Vec<String>,
+    /// Sibling methods / getters read by value (`this.someGetter`).
+    pub member_reads: Vec<String>,
     /// Dynamic / unresolvable `this[...]` callee.
     pub opaque_callee: bool,
     /// Provenance for FieldStar widenings: `(field, reason)`.
@@ -32,10 +37,35 @@ impl OakFieldRw {
         Self { field_names: field_names.into_iter().collect(), ..Default::default() }
     }
 
+    /// Start a visitor that also recognizes sibling methods / getters.
+    ///
+    /// Reads of a sibling member are recorded by name in [`Self::member_reads`];
+    /// their own body reads enter through cross-method composition.
+    pub fn with_methods(
+        field_names: impl IntoIterator<Item = String>,
+        method_names: impl IntoIterator<Item = String>,
+    ) -> Self {
+        Self {
+            field_names: field_names.into_iter().collect(),
+            method_names: method_names.into_iter().collect(),
+            ..Default::default()
+        }
+    }
+
     /// Walk every statement in a method body.
     pub fn walk_body(&mut self, body: &[Statement]) {
+        self.walk_body_in_source(body, None);
+    }
+
+    /// Walk a method body with the enclosing class source available.
+    ///
+    /// Oak's pinned TypeScript builder drops some expression nodes (template
+    /// literals among them). A statement without an AST expression therefore
+    /// recovers only its `${...}` holes from the source slice — nothing else is
+    /// guessed, and locals / aliases keep their normal scope.
+    pub fn walk_body_in_source(&mut self, body: &[Statement], source: Option<&str>) {
         for stmt in body {
-            self.walk_stmt(stmt);
+            self.walk_stmt(stmt, source);
         }
     }
 
@@ -48,6 +78,10 @@ impl OakFieldRw {
         self.field_names.iter().any(|f| f == name)
     }
 
+    fn is_method(&self, name: &str) -> bool {
+        self.method_names.iter().any(|m| m == name)
+    }
+
     fn push_read_key(&mut self, key: &DepKey) {
         let root = key.root_field();
         if !self.is_field(root) {
@@ -56,6 +90,20 @@ impl OakFieldRw {
         let s = key.to_stable_string();
         if !self.reads.iter().any(|r| r == &s) {
             self.reads.push(s);
+        }
+    }
+
+    /// Record a sibling method / getter read by value.
+    ///
+    /// Only the member name is kept: its own field reads arrive through
+    /// cross-method composition, so a getter chain is never expanded twice.
+    fn note_member_read(&mut self, key: &DepKey) {
+        let root = key.root_field();
+        if self.is_field(root) || !self.is_method(root) {
+            return;
+        }
+        if !self.member_reads.iter().any(|m| m == root) {
+            self.member_reads.push(root.to_string());
         }
     }
 
@@ -86,6 +134,7 @@ impl OakFieldRw {
             self.push_write_key(&key);
         } else {
             self.push_read_key(&key);
+            self.note_member_read(&key);
         }
     }
 
@@ -138,7 +187,7 @@ impl OakFieldRw {
         self.aliases.insert(pattern.to_string(), base);
     }
 
-    fn walk_stmt(&mut self, stmt: &Statement) {
+    fn walk_stmt(&mut self, stmt: &Statement, source: Option<&str>) {
         match stmt {
             Statement::ExpressionStatement(es) => self.walk_expr(&es.expression),
             Statement::VariableDeclaration(v) => {
@@ -149,36 +198,40 @@ impl OakFieldRw {
                             self.bind_pattern(&v.name, base);
                         }
                     }
+                } else {
+                    self.walk_dropped_expr(v.span.start, v.span.end, source);
                 }
             }
             Statement::ReturnStatement(r) => {
                 if let Some(e) = &r.argument {
                     self.walk_expr(e);
+                } else {
+                    self.walk_dropped_expr(r.span.start, r.span.end, source);
                 }
             }
             Statement::IfStatement(i) => {
                 self.walk_expr(&i.test);
-                self.walk_stmt(&i.consequent);
+                self.walk_stmt(&i.consequent, source);
                 if let Some(alt) = &i.alternate {
-                    self.walk_stmt(alt);
+                    self.walk_stmt(alt, source);
                 }
             }
             Statement::BlockStatement(b) => {
                 for s in &b.statements {
-                    self.walk_stmt(s);
+                    self.walk_stmt(s, source);
                 }
             }
             Statement::WhileStatement(w) => {
                 self.walk_expr(&w.test);
-                self.walk_stmt(&w.body);
+                self.walk_stmt(&w.body, source);
             }
             Statement::DoWhileStatement(d) => {
-                self.walk_stmt(&d.body);
+                self.walk_stmt(&d.body, source);
                 self.walk_expr(&d.test);
             }
             Statement::ForStatement(f) => {
                 if let Some(init) = &f.initializer {
-                    self.walk_stmt(init);
+                    self.walk_stmt(init, source);
                 }
                 if let Some(test) = &f.test {
                     self.walk_expr(test);
@@ -186,28 +239,28 @@ impl OakFieldRw {
                 if let Some(update) = &f.incrementor {
                     self.walk_expr(update);
                 }
-                self.walk_stmt(&f.body);
+                self.walk_stmt(&f.body, source);
             }
             Statement::ForInStatement(f) => {
                 self.walk_expr(&f.right);
-                self.walk_stmt(&f.body);
+                self.walk_stmt(&f.body, source);
             }
             Statement::ForOfStatement(f) => {
                 self.walk_expr(&f.right);
-                self.walk_stmt(&f.body);
+                self.walk_stmt(&f.body, source);
             }
             Statement::TryStatement(t) => {
                 for s in &t.block {
-                    self.walk_stmt(s);
+                    self.walk_stmt(s, source);
                 }
                 if let Some(handler) = &t.handler {
                     for s in &handler.body {
-                        self.walk_stmt(s);
+                        self.walk_stmt(s, source);
                     }
                 }
                 if let Some(finalizer) = &t.finalizer {
                     for s in finalizer {
-                        self.walk_stmt(s);
+                        self.walk_stmt(s, source);
                     }
                 }
             }
@@ -219,19 +272,37 @@ impl OakFieldRw {
                         self.walk_expr(test);
                     }
                     for st in &c.consequent {
-                        self.walk_stmt(st);
+                        self.walk_stmt(st, source);
                     }
                 }
             }
             Statement::FunctionDeclaration(f) => {
                 let saved = self.aliases.clone();
                 for s in &f.body {
-                    self.walk_stmt(s);
+                    self.walk_stmt(s, source);
                 }
                 self.aliases = saved;
             }
             _ => {}
         }
+    }
+
+    /// Recover `${...}` holes from a statement whose AST expression Oak dropped.
+    ///
+    /// Only statements that actually contain a template literal are scanned, and
+    /// only the interpolation expressions are re-parsed; surrounding statement
+    /// text is never treated as a dependency.
+    fn walk_dropped_expr(&mut self, start: usize, end: usize, source: Option<&str>) {
+        let Some(source) = source else {
+            return;
+        };
+        let Some(text) = source.get(start..end) else {
+            return;
+        };
+        if !text.contains('`') {
+            return;
+        }
+        self.walk_template_text(text);
     }
 
     fn walk_expr(&mut self, expr: &Expression) {
@@ -316,13 +387,13 @@ impl OakFieldRw {
             }
             ExpressionKind::ArrowFunction { body, .. } => {
                 let saved = self.aliases.clone();
-                self.walk_stmt(body);
+                self.walk_stmt(body, None);
                 self.aliases = saved;
             }
             ExpressionKind::FunctionExpression { body, .. } => {
                 let saved = self.aliases.clone();
                 for s in body {
-                    self.walk_stmt(s);
+                    self.walk_stmt(s, None);
                 }
                 self.aliases = saved;
             }
@@ -330,10 +401,28 @@ impl OakFieldRw {
                 self.walk_expr(tag);
                 self.walk_expr(template);
             }
+            ExpressionKind::TemplateString(raw) => self.walk_template_text(raw),
             ExpressionKind::ImportExpression { module_specifier } => {
                 self.walk_expr(module_specifier);
             }
             _ => {}
+        }
+    }
+
+    /// Walk the `${...}` holes of a template literal.
+    ///
+    /// Oak keeps interpolation as raw source text, so each hole is parsed again.
+    /// Recursion terminates because every hole is a strict substring of its
+    /// parent literal.
+    fn walk_template_text(&mut self, raw: &str) {
+        for hole in template_holes(raw) {
+            let parsed = parse_expression_snippet(hole.trim());
+            if !parsed.ok {
+                continue;
+            }
+            if let Some(expr) = parsed.expression {
+                self.walk_expr(&expr);
+            }
         }
     }
 
@@ -437,6 +526,57 @@ impl OakFieldRw {
 
 fn is_this(expr: &Expression) -> bool {
     matches!(expr.kind.as_ref(), ExpressionKind::Identifier(n) if n == "this")
+}
+
+/// Extract the raw source of every `${...}` hole in a template literal.
+///
+/// Skips quoted strings and nested braces so `${\`a${b}\`}` and
+/// `${ { k: 1 } }` stay balanced. Unbalanced input yields no hole.
+fn template_holes(raw: &str) -> Vec<String> {
+    let bytes = raw.as_bytes();
+    let mut holes = Vec::new();
+    let mut index = 0usize;
+    while index + 1 < bytes.len() {
+        if bytes[index] == b'$' && bytes[index + 1] == b'{' {
+            let start = index + 2;
+            let mut cursor = start;
+            let mut depth = 1usize;
+            let mut quote: Option<u8> = None;
+            while cursor < bytes.len() {
+                let byte = bytes[cursor];
+                if let Some(active) = quote {
+                    if byte == b'\\' {
+                        cursor += 2;
+                        continue;
+                    }
+                    if byte == active {
+                        quote = None;
+                    }
+                } else {
+                    match byte {
+                        b'\'' | b'"' | b'`' => quote = Some(byte),
+                        b'{' => depth += 1,
+                        b'}' => {
+                            depth -= 1;
+                            if depth == 0 {
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                cursor += 1;
+            }
+            if depth == 0 && cursor > start {
+                holes.push(raw[start..cursor].to_string());
+                index = cursor + 1;
+                continue;
+            }
+            break;
+        }
+        index += 1;
+    }
+    holes
 }
 
 fn is_array_mutator(name: &str) -> bool {

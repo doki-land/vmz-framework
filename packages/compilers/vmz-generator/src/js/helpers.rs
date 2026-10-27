@@ -522,6 +522,22 @@ mod tests {
     }
 
     #[test]
+    fn binds_bare_class_getter_as_instance_property() {
+        let members = vec!["markup".into()];
+        // A getter used as a binding value is an instance read, not a free identifier.
+        assert_eq!(bind_field_idents_ctx("markup", &[], &members, &[], &[]), "this.markup");
+        assert_eq!(
+            bind_field_idents_ctx("markup.length", &[], &members, &[], &[]),
+            "this.markup.length"
+        );
+        // `each` aliases still shadow a same-named member.
+        assert_eq!(
+            bind_field_idents_ctx("markup", &[], &members, &["markup".into()], &[]),
+            "markup"
+        );
+    }
+
+    #[test]
     fn binds_bare_class_method_in_v_if_cond() {
         let methods = vec!["isStroke".into(), "strokePaths".into()];
         let out = bind_field_idents_ctx("isStroke()", &[], &methods, &[], &[]);
