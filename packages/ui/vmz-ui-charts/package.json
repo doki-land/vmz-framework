@@ -11,8 +11,7 @@
     "license": "MIT",
     "exports": {
         "./Chart": "./src/components/Chart.vmz",
-        "./Diagram": "./src/components/Diagram.vmz",
-        "./DataGrid": "./src/components/DataGrid.vmz"
+        "./Diagram": "./src/components/Diagram.vmz"
     },
     "files": [
         "src"
