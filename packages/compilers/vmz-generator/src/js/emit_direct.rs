@@ -1313,11 +1313,17 @@ fn emit_component(
     } else {
         memo
     };
+    // `<Comp #header>` / `<Comp #[expr]>`: every child belongs to that slot, and the
+    // marker must never reach component props.
+    let component_slot = slot_marker(attrs);
     let mut client: Option<String> = None;
     let mut prop_parts = Vec::new();
     let mut event_parts: Vec<(String, String)> = Vec::new();
     for a in attrs {
         if a.name == "style:tw" || is_once_marker(&a.name) || is_memo_marker(&a.name) {
+            continue;
+        }
+        if a.name.starts_with('#') {
             continue;
         }
         if let Some(strategy) = a.name.strip_prefix("client:") {
@@ -1372,6 +1378,7 @@ fn emit_component(
         for a in attrs {
             if a.name == "style:tw"
                 || a.name.starts_with("client:")
+                || a.name.starts_with('#')
                 || is_component_event_attr(&a.name)
                 || is_once_marker(&a.name)
                 || is_memo_marker(&a.name)
@@ -1411,26 +1418,131 @@ fn emit_component(
     }
     if !children.is_empty() {
         stmts.push(format!("api.adoptEnter({v});"));
-        let kids = emit_nodes(
-            children,
-            fields,
-            scope,
-            aliases,
-            each_depth,
-            handler_ctx,
-            ir,
-            stmts,
-            next_id,
-            child_ctors,
-            once,
-            memo,
-        )?;
-        for kid in kids {
-            stmts.push(format!("api.projectDefaultSlot({v}, {kid});"));
+        for child in children {
+            // `<template #name>` is a transparent wrapper: it must not become a DOM
+            // element, and its children project into the named slot.
+            //
+            // Limits (name-only projection): scope-slot values (`#header="props"`) are
+            // ignored instead of dropped, and a dynamic name is evaluated once at create
+            // time — a name change later does not move already projected nodes.
+            if let Some((slot_name, body)) = slot_template(child) {
+                let kids = emit_nodes(
+                    body,
+                    fields,
+                    scope,
+                    aliases,
+                    each_depth,
+                    handler_ctx,
+                    ir,
+                    stmts,
+                    next_id,
+                    child_ctors,
+                    once,
+                    memo,
+                )?;
+                for kid in kids {
+                    stmts.push(project_slot_stmt(
+                        &v,
+                        &slot_name,
+                        &kid,
+                        fields,
+                        handler_ctx.methods,
+                        scope,
+                        aliases,
+                    ));
+                }
+                continue;
+            }
+            let kid = emit_node(
+                child,
+                fields,
+                scope,
+                aliases,
+                each_depth,
+                handler_ctx,
+                ir,
+                stmts,
+                next_id,
+                child_ctors,
+                once,
+                memo,
+            )?;
+            let slot_name = component_slot.clone().unwrap_or(SlotName::Default);
+            stmts.push(project_slot_stmt(
+                &v,
+                &slot_name,
+                &kid,
+                fields,
+                handler_ctx.methods,
+                scope,
+                aliases,
+            ));
         }
         stmts.push(format!("api.adoptLeave();"));
     }
     Ok(v)
+}
+
+/// Slot target of a `<template #name>` child (transparent wrapper, never a DOM element).
+fn slot_template(node: &ViewNode) -> Option<(SlotName, &[ViewNode])> {
+    let ViewNode::Element { tag, attrs, children, .. } = node else {
+        return None;
+    };
+    if tag != "template" {
+        return None;
+    }
+    Some((slot_marker(attrs)?, children.as_slice()))
+}
+
+/// Slot name carried by a `#name` / `#[expr]` attr (`v-slot` on a component or `<template>`).
+#[derive(Clone)]
+enum SlotName {
+    /// `#default` / `v-slot` with no argument.
+    Default,
+    /// `#header` — literal name.
+    Static(String),
+    /// `#[expr]` — template expression evaluated where the child is projected.
+    Dynamic(String),
+}
+
+fn slot_marker(attrs: &[ViewAttr]) -> Option<SlotName> {
+    for a in attrs {
+        let Some(rest) = a.name.strip_prefix('#') else {
+            continue;
+        };
+        return Some(if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+            let inner = inner.trim();
+            if inner.is_empty() {
+                SlotName::Default
+            } else {
+                SlotName::Dynamic(inner.to_string())
+            }
+        } else if rest.is_empty() || rest == "default" {
+            SlotName::Default
+        } else {
+            SlotName::Static(rest.to_string())
+        });
+    }
+    None
+}
+
+fn project_slot_stmt(
+    host: &str,
+    slot: &SlotName,
+    kid: &str,
+    fields: &[String],
+    methods: &[String],
+    scope: &[String],
+    aliases: &[(String, String)],
+) -> String {
+    match slot {
+        SlotName::Default => format!("api.projectDefaultSlot({host}, {kid});"),
+        SlotName::Static(name) => format!("api.projectNamedSlot({host}, {}, {kid});", q(name)),
+        SlotName::Dynamic(expr) => {
+            let body = bind_template_expr(expr, fields, methods, scope, aliases);
+            format!("api.projectNamedSlot({host}, ({body}), {kid});")
+        }
+    }
 }
 
 fn emit_bind_attr(

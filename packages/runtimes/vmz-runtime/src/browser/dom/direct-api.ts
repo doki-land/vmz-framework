@@ -18,6 +18,7 @@ import {
     createInstance,
     disposeDomTree,
     findOwnedDefaultSlotTarget,
+    findOwnedNamedSlot,
     insertProjectedSlotNode,
     parkSlotNode,
     runDirectCreate,
@@ -547,5 +548,40 @@ export const directApi = {
         // loading skeleton). Parking the child until the slot appears keeps it out of
         // the component root, where it would otherwise leak into the rendered page.
         parkSlotNode(hostEl, node);
+    },
+    /**
+     * Project parent children into a nested Direct component's `<slot name="…">`.
+     *
+     * Named projections are name-only (scope-slot values are not passed yet). The
+     * outlet search stops at nested component hosts, so a `header` projection never
+     * steals a nested Button's own named slot. A name with no outlet parks under that
+     * name — it must not fall through into the default slot.
+     */
+    projectNamedSlot(hostEl, name, node) {
+        if (!hostEl || node == null) return;
+        const key = name == null ? '' : String(name);
+        if (!key || key === 'default') {
+            directApi.projectDefaultSlot(hostEl, node);
+            return;
+        }
+        const child = hostEl.__vmzInst;
+        let root = (child && child.__vmzDomRoot) || hostEl;
+        if (!root || root.nodeType !== 1) root = hostEl;
+        const target = root && root.nodeType === 1 ? findOwnedNamedSlot(root, key) : null;
+        if (target && target.parentNode) {
+            const anchors = hostEl.__vmzNamedSlotAnchor || (hostEl.__vmzNamedSlotAnchor = new Map());
+            anchors.set(key, insertProjectedSlotNode(target, node));
+            return;
+        }
+        // The named `<slot>` was replaced by an earlier projected child: append after
+        // the last one for the same name instead of re-searching.
+        const anchors = hostEl.__vmzNamedSlotAnchor;
+        const anchor = anchors && anchors.get(key);
+        if (anchor && anchor.parentNode) {
+            anchors.set(key, slotAnchorFor(node));
+            anchor.parentNode.insertBefore(node, anchor.nextSibling);
+            return;
+        }
+        parkSlotNode(hostEl, node, key);
     },
 };

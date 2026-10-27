@@ -652,3 +652,67 @@ export default class RuntimeAttrDemo {
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
     assert!(js.contains("api.trackPatch"), "method call must stay runtime: {js}");
 }
+
+#[test]
+fn static_named_slot_projects_named_and_is_transparent() {
+    let src = r#"
+export default class SlotHost {
+  title = "hello";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<section><Card class="c"><template #header><h2>{{ title }}</h2></template><p>body</p></Card></section>"#,
+    )
+    .unwrap();
+    let program = build_program_module("SlotHost.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains("api.projectNamedSlot("), "expected named projection: {js}");
+    assert!(js.contains(r#", "header", "#), "static slot name must be a literal: {js}");
+    assert!(js.contains("api.projectDefaultSlot("), "default child stays default: {js}");
+    assert!(!js.contains(r#"api.el("template")"#), "`<template #header>` must stay transparent: {js}");
+    assert!(!js.contains("#header"), "slot marker must not reach props: {js}");
+}
+
+#[test]
+fn dynamic_named_slot_projects_bound_expression() {
+    let src = r#"
+export default class DynamicSlotHost {
+  currentTab = "header";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<div><Card><template #[currentTab]><h2>H</h2></template></Card></div>"#,
+    )
+    .unwrap();
+    let program = build_program_module("DynamicSlotHost.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains("api.projectNamedSlot("), "expected named projection: {js}");
+    assert!(js.contains("this.currentTab"), "dynamic name must bind `this`: {js}");
+    assert!(!js.contains("#[currentTab]"), "dynamic marker must not leak: {js}");
+    assert!(!js.contains(r#"api.el("template")"#), "`<template #[x]>` must stay transparent: {js}");
+}
+
+#[test]
+fn component_level_slot_marker_moves_all_children_into_named_slot() {
+    let src = r#"
+export default class MarkerSlotHost {
+  seed = "x";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl =
+        parse_template(r#"<div><Card #header><h2>H</h2><p>P</p></Card></div>"#).unwrap();
+    let program = build_program_module("MarkerSlotHost.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(
+        js.matches("api.projectNamedSlot(").count() == 2,
+        "both children belong to the named slot: {js}"
+    );
+    assert!(!js.contains("api.projectDefaultSlot("), "no default projection: {js}");
+    assert!(!js.contains("#header"), "component slot marker must not reach props: {js}");
+}

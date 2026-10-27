@@ -27,6 +27,7 @@ const files = [
     'locale-import-rewrite.test.ts',
     'layout-slot-inject.test.ts',
     'slot-fragment-anchor.test.ts',
+    'named-slot-projection.test.ts',
     'rowkernel-ssr.test.ts',
     'locale-none-host.test.ts',
     'diag-locale-catalog.test.ts',

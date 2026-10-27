@@ -112,6 +112,14 @@ fn emit_node(
             }
             let mut inner = String::new();
             for c in children {
+                // Mini dialects have no named-slot projection: `<template #x>` children
+                // are inlined instead of leaking a marker attribute into markup.
+                if let Some(kids) = slot_template_children(c) {
+                    for k in kids {
+                        inner.push_str(&emit_node(k, patch_bindings, ctx)?);
+                    }
+                    continue;
+                }
                 inner.push_str(&emit_node(c, patch_bindings, ctx)?);
             }
             if inner.is_empty() {
@@ -222,6 +230,17 @@ fn emit_plain_attr(
     emit_mapped_attr("", a, attr_s, patch_bindings, ctx);
 }
 
+/// Children of a `<template #name>` wrapper: mini dialects inline them (no named projection).
+fn slot_template_children(node: &ViewNode) -> Option<&[ViewNode]> {
+    let ViewNode::Element { tag, attrs, children, .. } = node else {
+        return None;
+    };
+    if tag != "template" || !attrs.iter().any(|a| a.name.starts_with('#')) {
+        return None;
+    }
+    Some(children.as_slice())
+}
+
 fn emit_mapped_attr(
     wtag: &str,
     a: &ViewAttr,
@@ -232,6 +251,10 @@ fn emit_mapped_attr(
     let name = if wtag == "navigator" && a.name == "href" { "url" } else { a.name.as_str() };
     // `v-once` / `v-memo` are control markers on the Native View, never rendered attributes.
     if is_once_marker(name) || is_memo_marker(name) {
+        return;
+    }
+    // `#name` / `#[expr]` slot markers are projection-only, never props.
+    if name.starts_with('#') {
         return;
     }
     match &a.value {

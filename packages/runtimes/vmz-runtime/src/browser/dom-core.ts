@@ -21,6 +21,7 @@ export { settlePendingChildMounts } from './dom/component.js';
 export { runDirectCreate } from './dom/component.js';
 export { findOwnedDefaultSlot } from './dom/component.js';
 export { findOwnedDefaultSlotTarget } from './dom/component.js';
+export { findOwnedNamedSlot } from './dom/component.js';
 export { createInstance } from './dom/component.js';
 export { destroy } from './dom/component.js';
 export { disposeDomTree } from './dom/component.js';

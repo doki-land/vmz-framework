@@ -138,6 +138,31 @@ export function findOwnedDefaultSlotTarget(root) {
     return walk(root);
 }
 
+/**
+ * Owned `<slot name="…">` outlet for a named projection.
+ *
+ * Same ownership rule as {@link findOwnedDefaultSlot}: a nested component host
+ * (`[data-vmz]` / `__vmzInst`) is a boundary, so projecting `header` into a Card
+ * can never capture a Button's own named slot.
+ */
+export function findOwnedNamedSlot(root, name) {
+    if (!root || root.nodeType !== 1) return null;
+    if (name == null || name === '') return null;
+    const wanted = String(name);
+    const tag = String(root.tagName || '').toLowerCase();
+    if (tag === 'slot' && root.getAttribute('name') === wanted) return root;
+    const kids = root.children;
+    if (!kids || !kids.length) return null;
+    for (let i = 0; i < kids.length; i++) {
+        const c = kids[i];
+        if (c.nodeType !== 1) continue;
+        if (c.hasAttribute('data-vmz') || c.__vmzInst) continue;
+        const hit = findOwnedNamedSlot(c, wanted);
+        if (hit) return hit;
+    }
+    return null;
+}
+
 export function createInstance(Component, props: any = {}) {
     if (precision.enabled) precision.componentExecs++;
     const inst = new Component(props || {});
@@ -218,16 +243,22 @@ export function insertProjectedSlotNode(target, node) {
 }
 
 /**
- * Hold projected children until the component's default slot exists.
+ * Hold projected children until the component slot exists.
  *
  * A slot inside an unmounted `v-if` branch (closed drawer/dialog, loading
  * skeleton) is absent at projection time. Appending to the component root would
  * paint the child into the live page, so keep it detached and splice it in when
  * the slot is mounted.
+ *
+ * `name` parks for a specific `slot name="…"` outlet. Named projections never
+ * fall back into the default slot: a missing named outlet keeps the node parked
+ * (or drops it on hosts without MutationObserver) instead of polluting it.
  */
-export function parkSlotNode(hostEl, node) {
+export function parkSlotNode(hostEl, node, name = null) {
     if (!hostEl || !node) return;
+    const slotName = name == null ? null : String(name);
     if (typeof MutationObserver === 'undefined') {
+        if (slotName != null) return;
         // Non-browser DOM (unit hosts): preserve the legacy root fallback.
         const child = hostEl.__vmzInst;
         const root = (child && child.__vmzDomRoot) || hostEl;
@@ -235,8 +266,29 @@ export function parkSlotNode(hostEl, node) {
         else if (typeof hostEl.appendChild === 'function') hostEl.appendChild(node);
         return;
     }
-    const parked = hostEl.__vmzSlotParked || (hostEl.__vmzSlotParked = []);
-    parked.push(node);
+    if (slotName == null) {
+        const parked = hostEl.__vmzSlotParked || (hostEl.__vmzSlotParked = []);
+        parked.push(node);
+    } else {
+        namedSlotParked(hostEl, slotName).push(node);
+    }
+    ensureSlotObserver(hostEl);
+}
+
+function namedSlotParked(hostEl, name) {
+    const map = hostEl.__vmzNamedSlotParked || (hostEl.__vmzNamedSlotParked = new Map());
+    const list = map.get(name);
+    if (list) return list;
+    const fresh = [];
+    map.set(name, fresh);
+    return fresh;
+}
+
+function namedSlotAnchor(hostEl) {
+    return hostEl.__vmzNamedSlotAnchor || (hostEl.__vmzNamedSlotAnchor = new Map());
+}
+
+function ensureSlotObserver(hostEl) {
     if (hostEl.__vmzSlotObserver) return;
     hostEl.__vmzSlotObserver = new MutationObserver(() => {
         flushParkedSlotNodes(hostEl);
@@ -247,38 +299,61 @@ export function parkSlotNode(hostEl, node) {
     }
 }
 
-/** Move parked children into the now-mounted default slot. Returns true when drained. */
+/** Move parked children into the now-mounted slot. Returns true when any drained. */
 export function flushParkedSlotNodes(hostEl) {
     if (!hostEl) return false;
-    const parked = hostEl.__vmzSlotParked;
-    if (!parked || !parked.length) return false;
     const child = hostEl.__vmzInst;
     const root = (child && child.__vmzDomRoot) || hostEl;
     if (!root || root.nodeType !== 1) return false;
-    const target = findOwnedDefaultSlotTarget(root);
-    if (!target || !target.parentNode) return false;
-    if (hostEl.__vmzSlotObserver) {
+    let drained = false;
+    const parkedDefault = hostEl.__vmzSlotParked;
+    if (parkedDefault && parkedDefault.length) {
+        const target = findOwnedDefaultSlotTarget(root);
+        if (target && target.parentNode) {
+            hostEl.__vmzSlotParked = [];
+            hostEl.__vmzSlotAnchor = insertParked(hostEl, target, parkedDefault);
+            drained = true;
+        }
+    }
+    const named = hostEl.__vmzNamedSlotParked;
+    if (named && named.size) {
+        for (const [name, nodes] of named) {
+            if (!nodes.length) {
+                named.delete(name);
+                continue;
+            }
+            const target = findOwnedNamedSlot(root, name);
+            if (!target || !target.parentNode) continue;
+            named.delete(name);
+            namedSlotAnchor(hostEl).set(name, insertParked(hostEl, target, nodes));
+            drained = true;
+        }
+    }
+    const stillParked =
+        (hostEl.__vmzSlotParked && hostEl.__vmzSlotParked.length > 0) ||
+        (hostEl.__vmzNamedSlotParked && hostEl.__vmzNamedSlotParked.size > 0);
+    if (drained && !stillParked && hostEl.__vmzSlotObserver) {
         hostEl.__vmzSlotObserver.disconnect();
         hostEl.__vmzSlotObserver = null;
     }
-    hostEl.__vmzSlotParked = [];
+    return drained;
+}
+
+function insertParked(hostEl, target, parked) {
     const anchor = slotAnchorFor(parked[parked.length - 1]);
     const tag = String(target.tagName || '').toLowerCase();
     if (tag === 'slot') {
         const frag = typeof document !== 'undefined' ? document.createDocumentFragment() : null;
         if (!frag) {
             target.replaceWith(parked[0]);
-            hostEl.__vmzSlotAnchor = anchor;
-            return true;
+            return anchor;
         }
         for (const node of parked) frag.appendChild(node);
         target.replaceWith(frag);
-        hostEl.__vmzSlotAnchor = anchor;
-        return true;
+        return anchor;
     }
     for (const node of parked) target.appendChild(node);
-    hostEl.__vmzSlotAnchor = anchor;
-    return true;
+    return anchor;
 }
 
 export function disposeDomTree(root) {
@@ -306,6 +381,8 @@ export function disposeDomTree(root) {
         }
         if (node.__vmzSlotParked) node.__vmzSlotParked = [];
         if (node.__vmzSlotAnchor) node.__vmzSlotAnchor = null;
+        if (node.__vmzNamedSlotParked) node.__vmzNamedSlotParked = null;
+        if (node.__vmzNamedSlotAnchor) node.__vmzNamedSlotAnchor = null;
         let child = node.firstChild;
         while (child) {
             const next = child.nextSibling;

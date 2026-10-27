@@ -257,6 +257,10 @@ fn emit_node(
                 if is_once_marker(&a.name) || is_memo_marker(&a.name) {
                     continue;
                 }
+                // `#name` / `#[expr]` slot markers are projection-only: never props.
+                if a.name.starts_with('#') {
+                    continue;
+                }
                 if is_event_attr(&a.name) {
                     wire_event(a, &mut attr_s, ctx)?;
                     continue;
@@ -286,6 +290,14 @@ fn emit_node(
             }
             let mut inner = String::new();
             for c in children {
+                // Mini dialects have no named-slot projection: `<template #x>` children
+                // are inlined instead of leaking a marker attribute into markup.
+                if let Some(kids) = slot_template_children(c) {
+                    for k in kids {
+                        inner.push_str(&emit_node(k, patch_bindings, ctx)?);
+                    }
+                    continue;
+                }
                 inner.push_str(&emit_node(c, patch_bindings, ctx)?);
             }
             if inner.is_empty() {
@@ -335,9 +347,24 @@ fn sanitize_prop(name: &str) -> String {
         .collect()
 }
 
+/// Children of a `<template #name>` wrapper: mini dialects inline them (no named projection).
+fn slot_template_children(node: &ViewNode) -> Option<&[ViewNode]> {
+    let ViewNode::Element { tag, attrs, children, .. } = node else {
+        return None;
+    };
+    if tag != "template" || !attrs.iter().any(|a| a.name.starts_with('#')) {
+        return None;
+    }
+    Some(children.as_slice())
+}
+
 fn emit_plain_attr(a: &ViewAttr, attr_s: &mut String, patch_bindings: &mut BTreeMap<u32, ()>) {
     // `v-once` / `v-memo` are control markers on the Native View, never rendered attributes.
     if is_once_marker(&a.name) || is_memo_marker(&a.name) {
+        return;
+    }
+    // `#name` / `#[expr]` slot markers are projection-only, never rendered attributes.
+    if a.name.starts_with('#') {
         return;
     }
     match &a.value {

@@ -314,6 +314,54 @@ function makeVirtualEl(tag) {
     return node;
 }
 
+/**
+ * Owned `<slot>` outlet in a serialize el tree.
+ *
+ * `name === null` matches the default outlet (no `name` attr). Named lookups require
+ * an exact match and stop at nested component shells (`data-vmz`), mirroring the
+ * browser runtime ownership boundary.
+ */
+function findOwnedSerializeSlot(n, name) {
+    if (!n || typeof n !== 'object') return null;
+    if (n.__kind === 'frag') {
+        for (const c of n.children || []) {
+            const hit = findOwnedSerializeSlot(c, name);
+            if (hit) return hit;
+        }
+        return null;
+    }
+    if (n.__kind !== 'el') return null;
+    if (n.tag === 'slot') {
+        const outletName = n.attrs && n.attrs.name != null ? String(n.attrs.name) : '';
+        if (name == null ? !outletName : outletName === name) return n;
+    }
+    for (const c of n.children || []) {
+        if (c && c.__kind === 'el' && c.attrs && c.attrs['data-vmz'] != null) continue;
+        const hit = findOwnedSerializeSlot(c, name);
+        if (hit) return hit;
+    }
+    return null;
+}
+
+function findOwnedSerializeSlotTarget(n, name) {
+    const slot = findOwnedSerializeSlot(n, name);
+    if (slot) return slot;
+    if (name != null) return null;
+    if (!n || n.__kind !== 'el') return null;
+    const tag = String(n.tag || '').toLowerCase();
+    if ((tag === 'button' || tag === 'a') && n.attrs && n.attrs['data-vmz-ui'] === 'button') return n;
+    if (n.attrs && n.attrs['data-vmz'] != null) return null;
+    for (const c of n.children || []) {
+        if (c && c.__kind === 'el' && c.attrs && c.attrs['data-vmz'] != null) continue;
+        const hit = findOwnedSerializeSlotTarget(c, name);
+        if (hit) return hit;
+    }
+    return null;
+}
+
+/** Outlets that already received projected content (fallback children dropped once). */
+const filledSerializeSlots = new WeakSet();
+
 const serializeApi = {
     _inst: null,
 
@@ -481,53 +529,21 @@ const serializeApi = {
         if (!hostEl || node == null) return;
         // serializeApi.component returns a serialize el tree (or island shell).
         const root = hostEl.__kind === 'el' ? hostEl : null;
-        const findOwnedSlot = (n) => {
-            if (!n || typeof n !== 'object') return null;
-            if (n.__kind === 'frag') {
-                for (const c of n.children || []) {
-                    const hit = findOwnedSlot(c);
-                    if (hit) return hit;
-                }
-                return null;
-            }
-            if (n.__kind !== 'el') return null;
-            if (n.tag === 'slot' && !(n.attrs && n.attrs.name)) return n;
-            for (const c of n.children || []) {
-                if (c && c.__kind === 'el' && c.attrs && c.attrs['data-vmz'] != null) continue;
-                const hit = findOwnedSlot(c);
-                if (hit) return hit;
-            }
-            return null;
-        };
-        const findOwnedSlotTarget = (n) => {
-            const slot = findOwnedSlot(n);
-            if (slot) return slot;
-            if (!n || n.__kind !== 'el') return null;
-            const tag = String(n.tag || '').toLowerCase();
-            if ((tag === 'button' || tag === 'a') && n.attrs && n.attrs['data-vmz-ui'] === 'button') return n;
-            if (n.attrs && n.attrs['data-vmz'] != null) return null;
-            for (const c of n.children || []) {
-                if (c && c.__kind === 'el' && c.attrs && c.attrs['data-vmz'] != null) continue;
-                const hit = findOwnedSlotTarget(c);
-                if (hit) return hit;
-            }
-            return null;
-        };
         // Prefer searching the component body (first child of host wrapper).
         let target = null;
         if (root) {
             for (const c of root.children || []) {
                 if (c && c.__kind === 'el' && c.attrs && c.attrs['data-vmz'] != null) continue;
-                target = findOwnedSlotTarget(c);
+                target = findOwnedSerializeSlotTarget(c, null);
                 if (target) break;
             }
-            if (!target) target = findOwnedSlotTarget(root);
+            if (!target) target = findOwnedSerializeSlotTarget(root, null);
         }
         if (target) {
             if (target.tag === 'slot') {
                 target.__rawHtml = null;
                 if (!Array.isArray(target.children)) target.children = [];
-                // Append ??multiple projectDefaultSlot calls must accumulate (SSR).
+                // Append — multiple projectDefaultSlot calls must accumulate (SSR).
                 // Client path replaces the live <slot> then appends siblings; serialize must push.
                 target.children.push(node);
                 return;
@@ -539,6 +555,40 @@ const serializeApi = {
         // No default slot in this render: children belong to a branch that is not
         // mounted (closed overlay, loading skeleton). Mirror the browser runtime and
         // drop them instead of painting them into the component root.
+    },
+    /**
+     * Project parent children into a nested component's `<slot name="…">` outlet.
+     *
+     * Named projections are name-only (scope-slot values are not passed yet). Only an
+     * outlet with the exact `name` accepts the node — a missing name drops it instead
+     * of landing in the default slot. Fallback children stop rendering once the outlet
+     * has projected content.
+     */
+    projectNamedSlot(hostEl, name, node) {
+        if (!hostEl || node == null) return;
+        const key = name == null ? '' : String(name);
+        if (!key || key === 'default') {
+            serializeApi.projectDefaultSlot(hostEl, node);
+            return;
+        }
+        const root = hostEl.__kind === 'el' ? hostEl : null;
+        let target = null;
+        if (root) {
+            for (const c of root.children || []) {
+                if (c && c.__kind === 'el' && c.attrs && c.attrs['data-vmz'] != null) continue;
+                target = findOwnedSerializeSlotTarget(c, key);
+                if (target) break;
+            }
+            if (!target) target = findOwnedSerializeSlotTarget(root, key);
+        }
+        if (!target) return;
+        target.__rawHtml = null;
+        if (!Array.isArray(target.children)) target.children = [];
+        if (!filledSerializeSlots.has(target)) {
+            filledSerializeSlots.add(target);
+            target.children.length = 0;
+        }
+        target.children.push(node);
     },
     setHtml(el, value) {
         if (!el || el.__kind !== 'el') return;
