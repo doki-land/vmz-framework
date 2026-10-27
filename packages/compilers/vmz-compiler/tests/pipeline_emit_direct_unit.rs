@@ -275,3 +275,42 @@ export default class ShowDemo {
         "v-show must not emit api.attr(el, \"show\", ...): {js}"
     );
 }
+
+#[test]
+fn v_text_reactive_emits_textcontent_patch() {
+    let src = r#"
+export default class TextDemo {
+  msg = "hello";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<div v-text="msg"></div>"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains("api.trackPatch(this,"), "reactive v-text must trackPatch: {js}");
+    assert!(
+        js.contains("textContent") || js.contains(".textContent"),
+        "v-text patch must write textContent: {js}"
+    );
+    assert!(
+        !js.contains("api.attr(") || !js.contains("\"text\""),
+        "v-text must not emit api.attr(el, \"text\", ...): {js}"
+    );
+}
+
+#[test]
+fn v_text_static_emits_setText() {
+    let src = r#"export default class T {}"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    // Static v-text authoring is unusual (Vue author would just write the text), but
+    // Template lowering still accepts `text="literal"` as Static attr.
+    let tpl = parse_template(r#"<div text="literal">ignored</div>"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(
+        js.contains("api.setText("),
+        "static v-text must emit api.setText(el, ...): {js}"
+    );
+}

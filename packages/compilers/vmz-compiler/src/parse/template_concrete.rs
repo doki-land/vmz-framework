@@ -158,6 +158,11 @@ pub enum Directive {
         /// HTML expression.
         expr: String,
     },
+    /// `v-text` — sets `element.textContent`, overrides all children.
+    Text {
+        /// Text expression.
+        expr: String,
+    },
     /// `v-show`.
     Show {
         /// Visibility expression.
@@ -226,6 +231,10 @@ fn classify_one(attr: RawAttr) -> Result<ConcreteAttr, TemplateParseError> {
     if name == "v-html" {
         let expr = require_expr(&name, val, offset)?;
         return Ok(ConcreteAttr::Directive { dir: Directive::Html { expr }, span });
+    }
+    if name == "v-text" {
+        let expr = require_expr(&name, val, offset)?;
+        return Ok(ConcreteAttr::Directive { dir: Directive::Text { expr }, span });
     }
     if name == "v-show" {
         let expr = require_expr(&name, val, offset)?;

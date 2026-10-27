@@ -12,6 +12,7 @@ use super::emit_ir::IrDepCursor;
 use super::helpers::{
     HandlerResolution, bind_field_idents_ctx, component_event_name, component_prop_wire_name,
     event_dom_type, is_component_event_attr, is_event_attr, is_html_attr, is_show_attr,
+    is_text_attr,
     looks_like_ternary, parse_this_method_call_arrow, sanitize_interp,
     single_field_binding_target, split_ternary_parts, wrap_event_handler_body,
 };
@@ -821,6 +822,9 @@ fn emit_plain_element(
                 let cond = bind_template_expr(s, fields, handler_ctx.methods, scope, aliases);
                 stmts.push(format!("api.setShow({el}, {cond});"));
             }
+            ViewAttrValue::Static { value: s } if is_text_attr(&a.name) => {
+                stmts.push(format!("api.setText({el}, {});", q(s)));
+            }
             ViewAttrValue::Static { value: s } => {
                 let attr_name = if a.name == "className" { "class" } else { a.name.as_str() };
                 stmts.push(format!("api.attr({el}, {}, {});", q(attr_name), q(s)));
@@ -828,6 +832,19 @@ fn emit_plain_element(
             ViewAttrValue::Bare => {}
             ViewAttrValue::Interp { expr: e } if is_show_attr(&a.name) => {
                 emit_bind_show(
+                    e,
+                    a.binding,
+                    &el,
+                    fields,
+                    handler_ctx.methods,
+                    scope,
+                    aliases,
+                    ir,
+                    stmts,
+                );
+            }
+            ViewAttrValue::Interp { expr: e } if is_text_attr(&a.name) => {
+                emit_bind_text_content(
                     e,
                     a.binding,
                     &el,
@@ -1213,6 +1230,35 @@ fn emit_bind_show(
         format!("__patchShow{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
     stmts.push(format!(
         "api.trackPatch(this, [{deps_js}], function {patch_name}() {{ var __cond; try {{ __cond = {body}; }} catch {{ __cond = false; }} {el}.style.display = __cond ? '' : 'none'; }}, {id_arg});",
+        deps_js = deps_js,
+        body = body,
+        el = el,
+        patch_name = patch_name,
+        id_arg = id_arg
+    ));
+}
+
+/// Emit reactive v-text textContent binding: `el.textContent = expr`.
+fn emit_bind_text_content(
+    expr: &str,
+    binding: Option<BindingId>,
+    el: &str,
+    fields: &[String],
+    methods: &[String],
+    scope: &[String],
+    aliases: &[(String, String)],
+    ir: &IrDepCursor<'_>,
+    stmts: &mut Vec<String>,
+) {
+    let e = sanitize_interp(expr);
+    let (binding_id, deps, _cf_js) = bind_payload(&e, binding, fields, methods, scope, aliases, ir);
+    let deps_js = deps_js(&deps);
+    let body = bind_template_expr(&e, fields, methods, scope, aliases);
+    let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
+    let patch_name =
+        format!("__patchText{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
+    stmts.push(format!(
+        "api.trackPatch(this, [{deps_js}], function {patch_name}() {{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} {el}.textContent = __v == null ? '' : String(__v); }}, {id_arg});",
         deps_js = deps_js,
         body = body,
         el = el,

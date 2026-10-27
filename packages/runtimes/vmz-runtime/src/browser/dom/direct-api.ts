@@ -326,6 +326,14 @@ export const directApi = {
         el.innerHTML = value == null ? '' : String(value);
     },
     /**
+     * Vue `v-text` — sets `textContent`, escaping all HTML (unlike `setHtml`).
+     * Overrides any existing children on the element. Static create-time path;
+     * reactive bindings use {@link bindText}.
+     */
+    setText(el, value) {
+        el.textContent = value == null ? '' : String(value);
+    },
+    /**
      * Vue `v-show` — toggles `style.display` between empty string (visible,
      * original CSS wins) and `'none'`.  Element stays in the DOM tree (unlike
      * `v-if`).  Used for static-show values; reactive bindings emit inline
@@ -346,6 +354,26 @@ export const directApi = {
                     raw = '';
                 }
                 el.innerHTML = raw == null ? '' : String(raw);
+            },
+            bindingId,
+        );
+    },
+    /**
+     * Reactive `v-text` textContent binding — mirrors {@link bindHtml} but
+     * writes `textContent` (HTML-escaped, safe).
+     */
+    bindText(inst, bindingId, deps, get, el) {
+        directApi.trackPatch(
+            inst,
+            deps || [],
+            function bindTextPatch() {
+                let raw;
+                try {
+                    raw = get.call(inst);
+                } catch {
+                    raw = '';
+                }
+                el.textContent = raw == null ? '' : String(raw);
             },
             bindingId,
         );

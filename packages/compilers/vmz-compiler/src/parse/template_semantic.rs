@@ -344,7 +344,7 @@ fn validate_vue_element_syntax(
             Directive::Html { .. } if has_author_children => {
                 return Err(fail("`v-html` will override element children"));
             }
-            Directive::Custom { name, arg: None, .. } if name == "text" && has_author_children => {
+            Directive::Text { .. } if has_author_children => {
                 return Err(fail("`v-text` will override element children"));
             }
             Directive::Model { .. }
@@ -985,6 +985,7 @@ fn lower_attrs_verbatim(attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
                 Directive::Else => ("v-else".into(), String::new(), *span),
                 Directive::For { source, .. } => ("v-for".into(), source.clone(), *span),
                 Directive::Html { expr } => ("v-html".into(), expr.clone(), *span),
+                Directive::Text { expr } => ("v-text".into(), expr.clone(), *span),
                 Directive::Show { expr } => ("v-show".into(), expr.clone(), *span),
                 Directive::Model { arg, expr, .. } => (
                     match arg {

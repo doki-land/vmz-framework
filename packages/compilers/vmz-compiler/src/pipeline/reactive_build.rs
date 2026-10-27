@@ -108,9 +108,10 @@ fn directive_exprs(dir: &Directive) -> Vec<&str> {
         Directive::Bind { expr, .. } | Directive::BindObject { expr } => vec![expr.as_str()],
         Directive::On { handler, .. } => vec![handler.as_str()],
         Directive::OnObject { expr } => vec![expr.as_str()],
-        Directive::Html { expr } | Directive::Show { expr } | Directive::Model { expr, .. } => {
-            vec![expr.as_str()]
-        }
+        Directive::Html { expr }
+        | Directive::Text { expr }
+        | Directive::Show { expr }
+        | Directive::Model { expr, .. } => vec![expr.as_str()],
         Directive::Slot { props, .. } => props.as_deref().into_iter().collect(),
         Directive::Custom { expr, .. } => expr.as_deref().into_iter().collect(),
         Directive::Pre => vec![],
@@ -582,8 +583,16 @@ fn walk_semantic_prop_bindings(
             }
         }
         SemanticProp::Directive { dir, .. } => match dir {
-            Directive::Html { expr } | Directive::Show { expr } => {
-                let name = if matches!(dir, Directive::Html { .. }) { "html" } else { "show" };
+            Directive::Html { expr }
+            | Directive::Text { expr }
+            | Directive::Show { expr } => {
+                let name = if matches!(dir, Directive::Html { .. }) {
+                    "html"
+                } else if matches!(dir, Directive::Text { .. }) {
+                    "text"
+                } else {
+                    "show"
+                };
                 add_expr_binding(
                     expr,
                     BindingKind::Attr,

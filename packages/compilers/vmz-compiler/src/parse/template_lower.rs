@@ -173,6 +173,11 @@ fn lower_directive(
             value: AttrValue::Interp(expr.clone()),
             ..Default::default()
         }]),
+        Directive::Text { expr } => Ok(vec![TemplateAttr {
+            name: "text".into(),
+            value: AttrValue::Interp(expr.clone()),
+            ..Default::default()
+        }]),
         Directive::Show { expr } => Ok(vec![TemplateAttr {
             name: "show".into(),
             value: AttrValue::Interp(expr.clone()),

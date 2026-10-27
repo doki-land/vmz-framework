@@ -11,6 +11,12 @@ pub fn is_show_attr(name: &str) -> bool {
     name == "show"
 }
 
+/// Vue `v-text` directive — sets `element.textContent`, not a DOM attribute binding.
+/// Template lowering normalizes `v-text` → `ViewAttr { name: "text", value: Interp }`.
+pub fn is_text_attr(name: &str) -> bool {
+    name == "text"
+}
+
 /// True when the attr is a **DOM** event listener (`@click` / `on:click` / `onClick`).
 /// Does **not** treat `on-submit` kebab as an event — that is a prop name on components.
 pub fn is_event_attr(name: &str) -> bool {
