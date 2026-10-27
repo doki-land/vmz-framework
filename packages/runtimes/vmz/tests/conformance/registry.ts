@@ -327,6 +327,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'ui/ui-icons.ts',
         description: '@vmz/ui-icons thin gate — semantic Icon registry (not loose SVG dump)',
     },
+    'charts-render': {
+        file: 'ui/charts-render.ts',
+        description: '@vmz/ui-charts real pipeline — bar/line/point scene → deterministic SVG',
+        pre: ['build:davinci'],
+    },
     'event-flow': {
         description: 'EventEntry + async cancel + HTTP stream (+ zero-js / mixed-pack)',
         pre: ['build:vmz-test'],
@@ -714,6 +719,7 @@ export const CHECK_ALL = [
     'ssr-unknown-component-error-node',
     'ui-data-grid',
     'ui-icons',
+    'charts-render',
     'ui7',
     // 0.1.27 Production Evidence Baseline — aggregate (includes official-dogfood via official-homepage)
     'browser-production',

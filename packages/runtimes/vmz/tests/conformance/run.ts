@@ -32,6 +32,7 @@ const PRESETS: Record<string, [string, string[]]> = {
         process.env.VMZ_SKIP_NATIVE_BUILD === '1'
             ? ['pnpm', ['--filter', '@vmz/protocol', 'run', 'build']]
             : ['pnpm', ['--filter', '@vmz/protocol', '--filter', 'vmz', 'run', 'build']],
+    'build:davinci': ['pnpm', ['--filter', './packages/davinci/*', 'run', 'build']],
     'build:content-engines': [
         'pnpm',
         [

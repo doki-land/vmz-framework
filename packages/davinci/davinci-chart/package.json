@@ -22,6 +22,10 @@
             "types": "./dist/compile.d.ts",
             "default": "./dist/compile.js"
         },
+        "./scene": {
+            "types": "./dist/scene.d.ts",
+            "default": "./dist/scene.js"
+        },
         "./scale": {
             "types": "./dist/scale.d.ts",
             "default": "./dist/scale.js"

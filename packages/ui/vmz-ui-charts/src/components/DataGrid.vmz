@@ -20,6 +20,42 @@
         </table>
     </div>
 </template>
+<style>
+.vmz-ui-charts__datagrid {
+    display: inline-block;
+    background: var(--vmz-surface-paper, #fff);
+    border: 1px solid var(--vmz-line-default, #e5e5e5);
+    border-radius: 2px;
+    overflow: auto;
+}
+.vmz-ui-charts__table {
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    min-width: 100%;
+}
+.vmz-ui-charts__th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.375rem 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    background: var(--vmz-surface-mist, #fafafa);
+    border-bottom: 1px solid var(--vmz-line-default, #e5e5e5);
+    white-space: nowrap;
+}
+.vmz-ui-charts__td {
+    padding: 0.25rem 0.75rem;
+    border-bottom: 1px solid var(--vmz-line-default, #e5e5e5);
+    white-space: nowrap;
+    max-width: 24rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.vmz-ui-charts__tr:hover .vmz-ui-charts__td {
+    background: color-mix(in srgb, var(--vmz-action-primary-background, #1f5bd0) 6%, var(--vmz-surface-paper, #fff));
+}
+</style>
 <script client>
 /**
  * VMZ UI Charts — DataGrid 组件。
@@ -70,39 +106,3 @@ export default class DataGrid {
     }
 }
 </script>
-<style>
-.vmz-ui-charts__datagrid {
-    display: inline-block;
-    background: var(--vmz-surface-paper, #fff);
-    border: 1px solid var(--vmz-line-default, #e5e5e5);
-    border-radius: 2px;
-    overflow: auto;
-}
-.vmz-ui-charts__table {
-    border-collapse: collapse;
-    font-size: 0.875rem;
-    min-width: 100%;
-}
-.vmz-ui-charts__th {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    padding: 0.375rem 0.75rem;
-    text-align: left;
-    font-weight: 600;
-    background: var(--vmz-surface-mist, #fafafa);
-    border-bottom: 1px solid var(--vmz-line-default, #e5e5e5);
-    white-space: nowrap;
-}
-.vmz-ui-charts__td {
-    padding: 0.25rem 0.75rem;
-    border-bottom: 1px solid var(--vmz-line-default, #e5e5e5);
-    white-space: nowrap;
-    max-width: 24rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.vmz-ui-charts__tr:hover .vmz-ui-charts__td {
-    background: color-mix(in srgb, var(--vmz-action-primary-background, #1f5bd0) 6%, var(--vmz-surface-paper, #fff));
-}
-</style>

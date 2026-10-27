@@ -46,6 +46,9 @@ export interface ChartCompilePlan {
     readonly marks: ReadonlyArray<PlanMark>;
 }
 
+/** Mark kinds measured from a zero baseline. */
+const zeroBasedMarks: ReadonlySet<MarkKind> = new Set(["bar", "rect", "area"]);
+
 /** Compile a ChartSpec against a DataSnapshot. */
 export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
     const scales = new Map<string, Scale>();
@@ -65,7 +68,15 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
                 if (numeric.length === 0) {
                     scales.set(enc.channel, { kind: "linear", domain: [0, 1], range: [0, 1] });
                 } else {
-                    const domain: [number, number] = [Math.min(...numeric), Math.max(...numeric)];
+                    // Bar-like marks are measured from a zero baseline, so the
+                    // quantitative domain includes zero when values are one-sided.
+                    let lo = Math.min(...numeric);
+                    let hi = Math.max(...numeric);
+                    if (zeroBasedMarks.has(spec.mark)) {
+                        if (lo > 0) lo = 0;
+                        if (hi < 0) hi = 0;
+                    }
+                    const domain: [number, number] = [lo, hi];
                     // Default range — caller should override.
                     scales.set(enc.channel, { kind: "linear", domain, range: [0, 1] });
                 }
