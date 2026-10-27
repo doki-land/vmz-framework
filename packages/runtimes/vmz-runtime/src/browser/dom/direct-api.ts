@@ -192,7 +192,11 @@ export const directApi = {
     mergeStyle(...parts) {
         return mergeStyleParts(...parts);
     },
-    on(el, type, handler) {
+    on(el, type, handler, options?) {
+        // options: { capture?: boolean; passive?: boolean; once?: boolean }
+        const listenerOpts = options && (options.capture || options.passive || options.once)
+            ? { capture: !!options.capture, passive: !!options.passive, once: !!options.once }
+            : undefined;
         const inst = directApi._inst;
         if (directApi._eachCtx && typeof handler === 'function') {
             const bag = el.__vmzEvt || (el.__vmzEvt = Object.create(null));
@@ -213,7 +217,7 @@ export const directApi = {
             };
             bag[type] = listener;
             directApi._eachCtx.needDelegate(type);
-            el.addEventListener(type, listener);
+            el.addEventListener(type, listener, listenerOpts);
             return;
         }
         // Infer once at bind time ??never Function#toString on the click hot path.
@@ -229,7 +233,7 @@ export const directApi = {
                     if (typeof m === 'function') return m.call(inst, ev);
                     return handler.call(inst, ev);
                 });
-            });
+            }, listenerOpts);
             return;
         }
         el.addEventListener(type, (ev) => {
@@ -240,7 +244,7 @@ export const directApi = {
             if (typeof handler === 'function') {
                 runDomEventHandler(inst, methodHint, () => handler.call(inst, ev));
             }
-        });
+        }, listenerOpts);
     },
     /**
      * Bind a named instance method (no arrow / Function#toString).
@@ -248,6 +252,10 @@ export const directApi = {
      * (stride / transpose self-apply DOM).
      */
     onMethod(el, type, methodName, opts) {
+        // opts: { skipFlush?: boolean; capture?: boolean; passive?: boolean; once?: boolean }
+        const listenerOpts = opts && (opts.capture || opts.passive || opts.once)
+            ? { capture: !!opts.capture, passive: !!opts.passive, once: !!opts.once }
+            : undefined;
         // Prefer each-block owner: item create often runs during flush when `_inst` is unset.
         const eachOwner = directApi._eachCtx && directApi._eachCtx.inst;
         const inst = eachOwner || directApi._inst;
@@ -280,10 +288,10 @@ export const directApi = {
             const listener = (ev: Event) => invoke(ev);
             bag[type] = listener;
             directApi._eachCtx.needDelegate(type);
-            el.addEventListener(type, listener);
+            el.addEventListener(type, listener, listenerOpts);
             return;
         }
-        el.addEventListener(type, (ev) => invoke(ev));
+        el.addEventListener(type, (ev) => invoke(ev), listenerOpts);
     },
     /**
      * Specialized single-field attr bind (0.1.29): compile-time field name, no generic get closure in artifact.

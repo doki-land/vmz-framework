@@ -314,3 +314,96 @@ fn v_text_static_emits_setText() {
         "static v-text must emit api.setText(el, ...): {js}"
     );
 }
+
+#[test]
+fn v_on_with_stop_prevents_propagation() {
+    let src = r#"
+export default class StopDemo {
+  count = 0;
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl =
+        parse_template(r#"<div @click.stop="() => count++">stop</div>"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    // modifier: .stop → handler wrapper must call ev.stopPropagation()
+    assert!(
+        js.contains("ev.stopPropagation()"),
+        ".stop modifier must inline ev.stopPropagation() into handler: {js}"
+    );
+    assert!(
+        js.contains("api.on("),
+        "expect api.on call for event with modifiers: {js}"
+    );
+    // .stop-only → no addEventListener options (opts_str should be undefined)
+    assert!(!js.contains("capture: true"), "unexpected capture option: {js}");
+}
+
+#[test]
+fn v_model_with_lazy_uses_change_event() {
+    let src = r#"
+export default class LazyDemo {
+  name = "";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<input v-model.lazy="name" />"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    // .lazy → api.on must listen to "change" event (not "input")
+    assert!(
+        js.contains(r#", "change","#),
+        "v-model.lazy must api.on(event=\"change\"): {js}"
+    );
+    // ensure NO api.on with "input" event (v-model default)
+    assert!(
+        !js.contains(r#", "input", $"#),
+        "v-model.lazy must NOT api.on(event=\"input\"): {js}"
+    );
+}
+
+#[test]
+fn v_model_without_lazy_defaults_to_input_event() {
+    let src = r#"
+export default class PlainDemo {
+  value = "";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<input v-model="value" />"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    // plain v-model → api.on must listen to "input" event
+    assert!(
+        js.contains(r#", "input","#),
+        "plain v-model must api.on(event=\"input\"): {js}"
+    );
+    // :value prop bind + @input event
+    assert!(
+        js.contains("api.on("),
+        "expect api.on for v-model update event: {js}"
+    );
+}
+
+#[test]
+fn v_model_trim_and_number_rewrite_handler() {
+    let src = r#"
+export default class TrimNumberDemo {
+  text = "";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<input v-model.trim="text" />"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    // .trim → handler body must reference .trim()
+    assert!(
+        js.contains(".trim()"),
+        "v-model.trim must rewrite handler to call .trim(): {js}"
+    );
+}

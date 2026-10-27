@@ -859,19 +859,99 @@ fn emit_plain_element(
             ViewAttrValue::Interp { expr: e } if is_event_attr(&a.name) => {
                 let body = bind_template_expr(e, fields, handler_ctx.methods, scope, aliases);
                 let type_name = event_dom_type(&a.name);
-                if let Some(method) = parse_this_method_call_arrow(&body) {
-                    stmts.push(format!("api.onMethod({el}, {}, {});", q(&type_name), q(&method)));
+
+                // ---- modifiers extraction ----
+                let mods = &a.modifiers;
+                let has_stop = mods.iter().any(|m| m == "stop");
+                let has_prevent = mods.iter().any(|m| m == "prevent");
+                let has_self = mods.iter().any(|m| m == "self");
+                let has_capture = mods.iter().any(|m| m == "capture");
+                let has_passive = mods.iter().any(|m| m == "passive");
+                let has_once = mods.iter().any(|m| m == "once");
+                let has_trim = mods.iter().any(|m| m == "trim");
+                let has_number = mods.iter().any(|m| m == "number");
+
+                // v-model: @update:xxx → input (default) / change (.lazy)
+                let is_vmodel_event = a.name.strip_prefix("@update:").is_some();
+                let effective_type = if is_vmodel_event {
+                    let has_lazy = mods.iter().any(|m| m == "lazy");
+                    if has_lazy { "change".to_string() } else { "input".to_string() }
                 } else {
-                    let handler = wrap_handler(&body, handler_ctx, scope)?;
-                    if let Some(method) = parse_wrapped_instance_method(&handler) {
+                    type_name.clone()
+                };
+
+                // v-model .trim / .number: rewrite handler body `$event`
+                let body = if is_vmodel_event && (has_trim || has_number) {
+                    let replacement = match (has_trim, has_number) {
+                        (true, true) => "Number($event.trim())",
+                        (true, false) => "$event.trim()",
+                        (false, true) => "Number($event)",
+                        (false, false) => unreachable!(),
+                    };
+                    body.replace("= $event)", &format!("= {replacement})"))
+                } else {
+                    body
+                };
+
+                if mods.is_empty() {
+                    // ---- no modifiers: zero-overhead path, keep onMethod optimization ----
+                    if let Some(method) = parse_this_method_call_arrow(&body) {
                         stmts.push(format!(
                             "api.onMethod({el}, {}, {});",
-                            q(&type_name),
+                            q(&effective_type),
                             q(&method)
                         ));
                     } else {
-                        stmts.push(format!("api.on({el}, {}, {handler});", q(&type_name)));
+                        let handler = wrap_handler(&body, handler_ctx, scope)?;
+                        if let Some(method) = parse_wrapped_instance_method(&handler) {
+                            stmts.push(format!(
+                                "api.onMethod({el}, {}, {});",
+                                q(&effective_type),
+                                q(&method)
+                            ));
+                        } else {
+                            stmts.push(format!(
+                                "api.on({el}, {}, {handler});",
+                                q(&effective_type)
+                            ));
+                        }
                     }
+                } else {
+                    // ---- with modifiers: inline guards + addEventListener options ----
+                    let handler = wrap_handler(&body, handler_ctx, scope)?;
+
+                    // capture / passive / once → addEventListener options object
+                    let opts_str = if has_capture || has_passive || has_once {
+                        let mut parts = Vec::new();
+                        if has_capture { parts.push("capture: true".to_string()); }
+                        if has_passive { parts.push("passive: true".to_string()); }
+                        if has_once { parts.push("once: true".to_string()); }
+                        format!("{{{}}}", parts.join(", "))
+                    } else {
+                        "undefined".to_string()
+                    };
+
+                    // stop / prevent / self → guards prepended to handler body
+                    let mut guards = String::new();
+                    if has_self {
+                        guards.push_str(&format!("if (ev.target !== {el}) return; "));
+                    }
+                    if has_stop {
+                        guards.push_str("ev.stopPropagation(); ");
+                    }
+                    if has_prevent {
+                        guards.push_str("ev.preventDefault(); ");
+                    }
+                    let wrapped = if guards.is_empty() {
+                        handler
+                    } else {
+                        format!("(ev) => {{ {guards} return ({handler})(ev); }}")
+                    };
+
+                    stmts.push(format!(
+                        "api.on({el}, {}, {wrapped}, {opts_str});",
+                        q(&effective_type)
+                    ));
                 }
             }
             ViewAttrValue::Interp { expr: e } if is_html_attr(&a.name) => {
