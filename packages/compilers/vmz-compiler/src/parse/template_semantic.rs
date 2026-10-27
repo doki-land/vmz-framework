@@ -86,7 +86,7 @@ pub enum SemanticNode {
     },
     /// `#name` / `v-slot` filler (`<template #x>` fragment or component slot).
     SlotTemplate {
-        /// Slot name argument (static only in this peel; dynamic → structured error).
+        /// Slot name argument (`#name` static or `#[expr]` / `v-slot:[expr]` dynamic).
         name: DirectiveArg,
         /// Optional slot props binding (`#default="slotProps"`).
         slot_props: Option<String>,
@@ -410,7 +410,8 @@ fn validate_slot_usage(
         }
     }
 
-    // `X_V_SLOT_DUPLICATE_SLOT_NAMES` (static names only; dynamic slots are rejected earlier).
+    // `X_V_SLOT_DUPLICATE_SLOT_NAMES` for static names. Dynamic names (`#[expr]`) resolve at
+    // runtime, so they cannot be compared at compile time and are excluded here.
     let mut seen = std::collections::HashSet::new();
     for (name, span) in &slots {
         let DirectiveArg::Static(name) = name else {
@@ -783,13 +784,7 @@ fn slot_template_from_lowered(
     slot_props: Option<String>,
     slot_span: TemplateSpan,
 ) -> Result<SemanticNode, TemplateParseError> {
-    if matches!(slot_name, DirectiveArg::Dynamic(_)) {
-        return Err(TemplateParseError::coded(
-            "vmz::template::illegal_directive",
-            slot_span.start as usize,
-        )
-        .with_arg("detail", "dynamic `v-slot` / `#` argument"));
-    }
+    let _ = slot_span;
     let attrs_no_slot: Vec<ConcreteAttr> = attrs
         .iter()
         .filter(|a| !matches!(a, ConcreteAttr::Directive { dir: Directive::Slot { .. }, .. }))

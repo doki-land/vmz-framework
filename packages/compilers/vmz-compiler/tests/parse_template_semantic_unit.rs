@@ -343,14 +343,24 @@ fn v_once_argument_or_expression_is_illegal_directive() {
 }
 
 #[test]
-fn dynamic_slot_arg_is_structured_error() {
-    let concrete = parse_template_concrete_body_primary(r#"<Comp v-slot:[name]>x</Comp>"#).unwrap();
-    let err = lower_concrete_to_semantic(&concrete).unwrap_err();
-    assert_eq!(err.code, "vmz::template::illegal_directive");
-    assert!(
-        err.args.get("detail").is_some_and(|v| v.contains("dynamic") && v.contains("slot")),
-        "{err:?}",
-    );
+fn dynamic_slot_name_survives_semantic_and_ir() {
+    let src = r#"<Comp v-slot:[name]>x</Comp>"#;
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
+    let sem = lower_concrete_to_semantic(&concrete).unwrap();
+    match &sem.roots[0] {
+        SemanticNode::SlotTemplate { name, .. } => {
+            assert_eq!(name, &vmz_compiler::DirectiveArg::Dynamic("name".into()));
+        }
+        other => panic!("expected SlotTemplate, got {other:?}"),
+    }
+    // TemplateIr keeps the dynamic name as `#[expr]` so structural/emit see it as an attr.
+    let ir = parse_template(src).unwrap();
+    match &ir.roots[0] {
+        vmz_compiler::TemplateNode::Element { attrs, .. } => {
+            assert!(attrs.iter().any(|a| a.name == "#[name]"), "{attrs:?}");
+        }
+        other => panic!("expected Element, got {other:?}"),
+    }
 }
 
 #[test]

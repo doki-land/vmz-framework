@@ -101,6 +101,14 @@ fn rejects_mixed_v_slot_usage() {
 }
 
 #[test]
+fn accepts_dynamic_slot_names() {
+    // Vue 3 supports `#[expr]` / `v-slot:[expr]`; the name resolves at runtime.
+    assert_accepted(r#"<Comp><template #[name]>x</template></Comp>"#);
+    assert_accepted(r#"<Comp><template v-slot:[name]>x</template></Comp>"#);
+    assert_accepted(r#"<Comp #[name]="p">x</Comp>"#);
+}
+
+#[test]
 fn rejects_duplicate_slot_names() {
     assert_rejected(r#"<Comp><template #a>1</template><template #a>2</template></Comp>"#);
     assert_rejected(r#"<Comp><template #a>1</template><template v-slot:a>2</template></Comp>"#);
