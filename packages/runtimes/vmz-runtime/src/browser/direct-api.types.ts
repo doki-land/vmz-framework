@@ -95,6 +95,14 @@ export type ComponentCtorLike = (new (props?: object) => DirectInstance) & {
     __vmzProps?: string[];
     __vmzWBInstalled?: boolean;
     __vmzCtorAppliesProps?: boolean;
+    /**
+     * Compile-time embedded BindingId → deps[] map.  When the Rust generator
+     * emits this static map on the component class, `registerBind` resolves
+     * deps by lookup instead of rebuilding O(N×M) indices from the string[]
+     * the artifact passes per call.  Absent (today) — falls back to the call
+     * site argument unchanged.
+     */
+    __vmzDepsMap?: Record<string | number, string[]>;
     name?: string;
 };
 

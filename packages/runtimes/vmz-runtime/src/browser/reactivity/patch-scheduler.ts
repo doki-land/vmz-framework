@@ -597,6 +597,8 @@ function reindexBindingDeps(inst, bindingId, deps) {
     if (!inst.__vmzDepToBindings) inst.__vmzDepToBindings = Object.create(null);
     const entry = inst.__vmzBindings[bindingId];
     if (!entry) return;
+    // Fast path: deps 完全相同 → 无需重建 dep→bindings 索引。
+    if (arraysEqual(entry.deps, deps)) return;
     for (const dep of entry.deps || []) {
         const list = inst.__vmzDepToBindings[dep];
         if (!list) continue;
@@ -613,9 +615,41 @@ function reindexBindingDeps(inst, bindingId, deps) {
     }
 }
 
+function arraysEqual(a, b) {
+    if (a === b) return true;
+    const la = a ? a.length : 0;
+    const lb = b ? b.length : 0;
+    if (la !== lb) return false;
+    for (let i = 0; i < la; i++) if (a[i] !== b[i]) return false;
+    return true;
+}
+
+/**
+ * Resolve deps for a binding: prefer the argument from generated artifact,
+ * fall back to a compile-time-embedded static map on the component class.
+ *
+ * The Rust generator will later emit `Ctor.__vmzDepsMap = { [bindingId]: deps[] }`
+ * so runtime can do a single lookup instead of rebuilding O(N×M) dep→binding
+ * indices from the string[] the artifact passes today.
+ */
+function resolveDeps(inst, depsArg, bindingId) {
+    if (depsArg && depsArg.length) return depsArg;
+    if (bindingId == null) return depsArg || [];
+    const ctor = inst && inst.constructor;
+    const map = ctor && (ctor as { __vmzDepsMap?: Record<string | number, string[]> }).__vmzDepsMap;
+    if (map) {
+        const hit = map[bindingId];
+        if (hit) return hit;
+    }
+    return depsArg || [];
+}
+
 export function registerBind(inst, deps, fn, bindingId = null) {
+    // 查表优先: generator 侧若已在 Ctor.__vmzDepsMap 嵌入完整 deps map
+    // 则直接取用, 避免每次 registerBind 都用传入 string[] 重建索引.
+    const resolvedDeps = resolveDeps(inst, deps, bindingId);
     if (!inst.__vmzBinders) inst.__vmzBinders = Object.create(null);
-    for (const dep of deps || []) {
+    for (const dep of resolvedDeps) {
         if (!inst.__vmzBinders[dep]) inst.__vmzBinders[dep] = [];
         // Dedup: cf untrack/retrack with identical deps must not grow the binder list.
         if (!inst.__vmzBinders[dep].includes(fn)) inst.__vmzBinders[dep].push(fn);
@@ -628,7 +662,7 @@ export function registerBind(inst, deps, fn, bindingId = null) {
         inst.__vmzBindings[bindingId] = entry;
     }
     if (!entry.patches.includes(fn)) entry.patches.push(fn);
-    reindexBindingDeps(inst, bindingId, deps || []);
+    reindexBindingDeps(inst, bindingId, resolvedDeps);
 }
 
 export function unregisterBind(inst, deps, fn, bindingId = null) {
