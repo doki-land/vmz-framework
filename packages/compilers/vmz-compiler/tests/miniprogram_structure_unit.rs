@@ -37,6 +37,7 @@ fn sample_unit() -> ProgramUnit {
                     name: "label".into(),
                     value: ViewAttrValue::Interp { expr: "title".into() },
                     binding: Some(BindingId(2)),
+                    modifiers: Vec::new(),
                 }],
                 children: vec![],
             },

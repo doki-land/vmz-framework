@@ -24,6 +24,7 @@ fn home_unit() -> ProgramUnit {
                 name: "class".into(),
                 value: ViewAttrValue::Static { value: "page".into() },
                 binding: None,
+                modifiers: Vec::new(),
             }],
             children: vec![
                 ViewNode::Element {
@@ -33,11 +34,13 @@ fn home_unit() -> ProgramUnit {
                             name: "class".into(),
                             value: ViewAttrValue::Static { value: "loc".into() },
                             binding: None,
+                            modifiers: Vec::new(),
                         },
                         ViewAttr {
                             name: "@click".into(),
                             value: ViewAttrValue::Interp { expr: "onStore".into() },
                             binding: Some(BindingId(2)),
+                            modifiers: Vec::new(),
                         },
                     ],
                     children: vec![ViewNode::Interp {
@@ -52,6 +55,7 @@ fn home_unit() -> ProgramUnit {
                         name: "class".into(),
                         value: ViewAttrValue::Static { value: "deal".into() },
                         binding: None,
+                        modifiers: Vec::new(),
                     }],
                     children: vec![ViewNode::Interp {
                         expr: "item.title".into(),

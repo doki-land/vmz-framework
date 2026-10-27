@@ -7,6 +7,7 @@ fn attr_static(name: &str, value: &str) -> ViewAttr {
         name: name.into(),
         value: ViewAttrValue::Static { value: value.into() },
         binding: None,
+        modifiers: Vec::new(),
     }
 }
 
@@ -15,6 +16,7 @@ fn attr_interp(name: &str, expr: &str) -> ViewAttr {
         name: name.into(),
         value: ViewAttrValue::Interp { expr: expr.into() },
         binding: None,
+        modifiers: Vec::new(),
     }
 }
 

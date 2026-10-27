@@ -49,7 +49,7 @@ fn on_modifiers_structured_and_ir_strips() {
 }
 
 #[test]
-fn v_for_keeps_index_alias_on_concrete_only() {
+fn v_for_aliases_lower_to_template_ir() {
     let src = r#"<li v-for="(item, index) in items" :key="item.id">{{ item }}</li>"#;
     let concrete = parse_template_concrete_body_primary(src).unwrap();
     match &concrete.roots[0] {
@@ -64,6 +64,7 @@ fn v_for_keeps_index_alias_on_concrete_only() {
             let (source, value, key, index) = for_dir.expect("For");
             assert_eq!(source, "items");
             assert_eq!(value, "item");
+            // Vue (item, index) → second slot is key_alias, third absent
             assert_eq!(key.as_deref(), Some("index"));
             assert!(index.is_none());
         }
@@ -83,9 +84,15 @@ fn v_for_keeps_index_alias_on_concrete_only() {
                     .any(|a| a.name == "as"
                         && matches!(&a.value, AttrValue::Static(s) if s == "item"))
             );
+            // key_alias (`index`) now preserved as its own TemplateAttr
             assert!(
-                !attrs.iter().any(|a| matches!(&a.value, AttrValue::Static(s) if s == "index"))
+                attrs
+                    .iter()
+                    .any(|a| a.name == "key-alias"
+                        && matches!(&a.value, AttrValue::Static(s) if s == "index"))
             );
+            // index_alias was None in Concrete so no index-alias attr
+            assert!(!attrs.iter().any(|a| a.name == "index-alias"));
         }
         other => panic!("expected element, got {other:?}"),
     }

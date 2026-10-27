@@ -19,6 +19,7 @@ fn counter_fixture() -> (ViewView, ReactiveComponent) {
                 name: "@click".into(),
                 value: ViewAttrValue::Interp { expr: "increment".into() },
                 binding: Some(BindingId(0)),
+                modifiers: Vec::new(),
             }],
             children: vec![ViewNode::Interp { expr: "n".into(), binding: Some(BindingId(1)) }],
             each: None,
