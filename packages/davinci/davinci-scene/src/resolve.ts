@@ -20,7 +20,7 @@ import {
     type BoundsRect,
     type Point2D,
     type RGBA,
-} from "@vmz/davinci-types";
+} from "@doki-land/davinci-types";
 import type { DisplayNode, DisplayScene, DisplayGroup, DisplayStroke, DisplayFill } from "./display.js";
 import type { SemanticNode, SemanticScene, Stroke, Fill } from "./semantic.js";
 

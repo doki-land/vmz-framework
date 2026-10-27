@@ -4,7 +4,7 @@
 // Full Mermaid parsing lives upstream (oak-mermaid / host). This module
 // is intentionally thin — host produces structured input, we accept it.
 
-import { EMPTY_DIAGNOSTICS, type DiagnosticSet } from "@vmz/davinci-types";
+import { EMPTY_DIAGNOSTICS, type DiagnosticSet } from "@doki-land/davinci-types";
 import type { DiagramSpec } from "./spec.js";
 
 /** Raw Mermaid source block — host provides fence contents. */

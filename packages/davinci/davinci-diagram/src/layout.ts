@@ -6,7 +6,7 @@
 // scene builder consumes. Full graph layout (layered Sugiyama for flowcharts,
 // force-directed for custom graphs) is future work.
 
-import type { BoundsRect, DiagnosticSet } from "@vmz/davinci-types";
+import type { BoundsRect, DiagnosticSet } from "@doki-land/davinci-types";
 import type { DiagramEdgeSpec, DiagramNodeSpec, DiagramSpec } from "./spec.js";
 
 /** A placed node from layout. */

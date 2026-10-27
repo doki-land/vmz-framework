@@ -1,5 +1,5 @@
 {
-    "name": "@vmz/davinci-scene",
+    "name": "@doki-land/davinci-scene",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/doki-land/vmz-framework.git",
@@ -35,7 +35,7 @@
         "build": "tsc -p tsconfig.json"
     },
     "dependencies": {
-        "@vmz/davinci-types": "workspace:*"
+        "@doki-land/davinci-types": "workspace:*"
     },
     "devDependencies": {
         "typescript": "^5.8.3"

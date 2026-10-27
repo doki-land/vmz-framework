@@ -1,8 +1,8 @@
 // Diagram scene builder — DiagramLayoutPlan → SemanticScene.
 // Follow design: `规划设计/davinci/00-概述与架构边界.md` §5.
 
-import { BLACK, TRANSPARENT, WHITE, type PathCommand, type RGBA } from "@vmz/davinci-types";
-import type { SemanticGroup, SemanticNode, SemanticScene } from "@vmz/davinci-scene";
+import { BLACK, TRANSPARENT, WHITE, type PathCommand, type RGBA } from "@doki-land/davinci-types";
+import type { SemanticGroup, SemanticNode, SemanticScene } from "@doki-land/davinci-scene";
 import type { DiagramLayoutPlan } from "./layout.js";
 import type { DiagramSpec } from "./spec.js";
 

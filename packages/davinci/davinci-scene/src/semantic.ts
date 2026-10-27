@@ -5,7 +5,7 @@
 // resolved transform, clip inheritance, or backend-ready geometry. Those live
 // in DisplayScene after `resolve()` runs.
 
-import type { Affine2D, Path, Point2D, RGBA, Rect as BoundsRect } from "@vmz/davinci-types";
+import type { Affine2D, Path, Point2D, RGBA, Rect as BoundsRect } from "@doki-land/davinci-types";
 
 /** A stable identifier assigned by the domain (chart, diagram, ...). */
 export type StableId = string;
@@ -121,7 +121,7 @@ export interface SemanticImage extends BaseSemantic, SemanticTransform {
 export interface SemanticText extends BaseSemantic, SemanticTransform {
     readonly kind: "text";
     readonly text: string;
-    readonly font: import("@vmz/davinci-types").FontSpec;
+    readonly font: import("@doki-land/davinci-types").FontSpec;
     /** Anchor point (where transform-origin of the text block lives). */
     readonly anchor?: Point2D;
     readonly color?: RGBA;

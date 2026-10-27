@@ -6,7 +6,7 @@
 // node positions, layer assignments, port anchors, edge routes, and label
 // placements.
 
-import type { BoundsRect } from "@vmz/davinci-types";
+import type { BoundsRect } from "@doki-land/davinci-types";
 
 /** Diagram kind hints the layout engine. */
 export type DiagramKind = "flowchart" | "sequence" | "class" | "graph" | "custom";

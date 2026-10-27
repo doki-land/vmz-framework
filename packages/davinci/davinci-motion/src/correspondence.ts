@@ -5,7 +5,7 @@
 // key (not array index). Transitions operate only on matched pairs; new nodes
 // pop in, removed nodes pop out.
 
-import type { DisplayNode, DisplayScene } from "@vmz/davinci-scene";
+import type { DisplayNode, DisplayScene } from "@doki-land/davinci-scene";
 
 /** A matched pair across two scenes. */
 export interface SceneMatch {

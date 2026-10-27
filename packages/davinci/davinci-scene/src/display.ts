@@ -5,7 +5,7 @@
 // every bounds is final. Renderers consume this directly — no data reload,
 // no scale inference, no layout recomputation.
 
-import type { Affine2D, BoundsRect, Path, RGBA } from "@vmz/davinci-types";
+import type { Affine2D, BoundsRect, Path, RGBA } from "@doki-land/davinci-types";
 
 /** Final stroke style (resolved). */
 export interface DisplayStroke {

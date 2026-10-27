@@ -1,7 +1,7 @@
 // Transition plan — between two matched DisplayNodes.
 // Follow design: `规划设计/davinci/00-概述与架构边界.md` §8.
 
-import type { DisplayNode } from "@vmz/davinci-scene";
+import type { DisplayNode } from "@doki-land/davinci-scene";
 
 /** Easing function — t ∈ [0, 1] → t ∈ [0, 1]. */
 export type EasingFn = (t: number) => number;
@@ -15,8 +15,8 @@ export type AnimatableProp = "x" | "y" | "w" | "h" | "cx" | "cy" | "rx" | "ry" |
 /** One property animation segment. */
 export interface PropertyAnim {
     readonly prop: AnimatableProp;
-    readonly from: number | import("@vmz/davinci-types").RGBA;
-    readonly to: number | import("@vmz/davinci-types").RGBA;
+    readonly from: number | import("@doki-land/davinci-types").RGBA;
+    readonly to: number | import("@doki-land/davinci-types").RGBA;
     readonly durationMs: number;
     readonly easing: EasingPreset | EasingFn;
 }
