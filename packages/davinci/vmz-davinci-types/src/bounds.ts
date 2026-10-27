@@ -9,6 +9,9 @@ export interface Rect {
     readonly h: number;
 }
 
+/** Semantic alias — used by Scene packages for clarity. */
+export type BoundsRect = Rect;
+
 /** Rect from two corner points. */
 export function rectFromPoints(a: { readonly x: number; readonly y: number }, b: { readonly x: number; readonly y: number }): Rect {
     const x = Math.min(a.x, b.x);
