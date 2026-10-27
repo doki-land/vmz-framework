@@ -1,5 +1,7 @@
-// DaVinci Diagram domain — graph topology, layout, Mermaid importer.
-// Subpath modules: spec, layout, mermaid.
-// Implementation follows `规划设计/davinci/00-概述与架构边界.md`.
+// DaVinci Diagram — graph topology, layout, scene builder, Mermaid importer.
+// Follow design: `规划设计/davinci/00-概述与架构边界.md` §5.
 
-export type {};
+export * from "./spec.js";
+export * from "./layout.js";
+export * from "./builder.js";
+export * from "./mermaid.js";

@@ -1,5 +1,6 @@
 // DaVinci Motion — scene correspondence, transition plan, timeline.
-// Subpath modules: correspondence, transition, timeline.
-// Implementation follows `规划设计/davinci/00-概述与架构边界.md`.
+// Follow design: `规划设计/davinci/00-概述与架构边界.md` §8.
 
-export type {};
+export * from "./correspondence.js";
+export * from "./transition.js";
+export * from "./timeline.js";
