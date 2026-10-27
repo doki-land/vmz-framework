@@ -671,7 +671,10 @@ export default class SlotHost {
     assert!(js.contains("api.projectNamedSlot("), "expected named projection: {js}");
     assert!(js.contains(r#", "header", "#), "static slot name must be a literal: {js}");
     assert!(js.contains("api.projectDefaultSlot("), "default child stays default: {js}");
-    assert!(!js.contains(r#"api.el("template")"#), "`<template #header>` must stay transparent: {js}");
+    assert!(
+        !js.contains(r#"api.el("template")"#),
+        "`<template #header>` must stay transparent: {js}"
+    );
     assert!(!js.contains("#header"), "slot marker must not reach props: {js}");
 }
 
@@ -683,10 +686,9 @@ export default class DynamicSlotHost {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl = parse_template(
-        r#"<div><Card><template #[currentTab]><h2>H</h2></template></Card></div>"#,
-    )
-    .unwrap();
+    let tpl =
+        parse_template(r#"<div><Card><template #[currentTab]><h2>H</h2></template></Card></div>"#)
+            .unwrap();
     let program = build_program_module("DynamicSlotHost.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
@@ -704,8 +706,7 @@ export default class MarkerSlotHost {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl =
-        parse_template(r#"<div><Card #header><h2>H</h2><p>P</p></Card></div>"#).unwrap();
+    let tpl = parse_template(r#"<div><Card #header><h2>H</h2><p>P</p></Card></div>"#).unwrap();
     let program = build_program_module("MarkerSlotHost.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();

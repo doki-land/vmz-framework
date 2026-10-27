@@ -3,7 +3,9 @@
         <div v-if="recordsMode" data-vmz-grid-records="true" class="vmz-ui-datagrid__records">
             <div class="vmz-ui-datagrid__toolbar">
                 <label class="vmz-ui-datagrid__filter">
-                    <span class="vmz-ui-datagrid__filter-label">{{ filterLabel }}</span>
+                    <span class="vmz-ui-datagrid__filter-label">
+                        {{ filterLabel }}
+                    </span>
                     <input type="search" data-vmz-grid-filter="true" :value="filterValue" :placeholder="filterPlaceholder" :aria-label="filterLabel" @input="onFilterInput" class="vmz-ui-datagrid__filter-input" />
                 </label>
                 <p data-vmz-grid-summary="true" role="status" aria-live="polite" class="vmz-ui-datagrid__summary">
@@ -20,7 +22,7 @@
                             <th v-if="showSelectAll" scope="col" class="vmz-ui-datagrid__th vmz-ui-datagrid__th--check">
                                 <input type="checkbox" data-vmz-select-all="true" :aria-label="selectAllLabel" :checked="pageAllSelected" :aria-checked="pageSelectionAria" @change="onSelectAllChange" class="vmz-ui-datagrid__box" />
                             </th>
-                            <th v-for="col in columnViews" :key="col.key" scope="col" :data-vmz-col="col.key" :data-align="col.align" :aria-sort="col.ariaSort" :style="col.widthStyle" class="vmz-ui-datagrid__th">
+                            <th v-for="col in columnViews" :key="col.key" scope="col" :data-vmz-col="col.key" :data-align="col.align" :aria-sort="col.ariaSort" class="vmz-ui-datagrid__th" :style="col.widthStyle">
                                 <button v-if="col.sortable" type="button" :data-vmz-sort="col.key" :data-active="col.sortActive" :aria-label="col.sortLabel" @click="onSortClick" class="vmz-ui-datagrid__sort">
                                     <span class="vmz-ui-datagrid__head-label">
                                         {{ col.label }}
@@ -29,7 +31,9 @@
                                         {{ col.glyph }}
                                     </span>
                                 </button>
-                                <span v-else class="vmz-ui-datagrid__head-label">{{ col.label }}</span>
+                                <span v-else class="vmz-ui-datagrid__head-label">
+                                    {{ col.label }}
+                                </span>
                             </th>
                         </tr>
                     </thead>

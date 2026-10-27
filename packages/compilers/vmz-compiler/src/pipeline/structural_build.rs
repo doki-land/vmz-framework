@@ -71,8 +71,7 @@ fn build_nodes(
                 }
                 // Constant conditions are decided here: dead branches never reach
                 // the View, and a single unconditional survivor replaces the chain.
-                let conds: Vec<Option<String>> =
-                    branches.iter().map(|(c, _)| c.clone()).collect();
+                let conds: Vec<Option<String>> = branches.iter().map(|(c, _)| c.clone()).collect();
                 let fold = fold_if_chain(&conds);
                 if fold.kept.is_empty() {
                     i = j;
@@ -88,12 +87,7 @@ fn build_nodes(
                     }
                 };
                 if let Some(only) = fold.resolved {
-                    out.push(build_branch_body(
-                        branches[only].1,
-                        branch_strip(only),
-                        ir,
-                        routes,
-                    ));
+                    out.push(build_branch_body(branches[only].1, branch_strip(only), ir, routes));
                     i = j;
                     continue;
                 }

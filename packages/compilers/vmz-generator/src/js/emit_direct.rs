@@ -1510,18 +1510,20 @@ fn slot_marker(attrs: &[ViewAttr]) -> Option<SlotName> {
         let Some(rest) = a.name.strip_prefix('#') else {
             continue;
         };
-        return Some(if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-            let inner = inner.trim();
-            if inner.is_empty() {
+        return Some(
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                let inner = inner.trim();
+                if inner.is_empty() {
+                    SlotName::Default
+                } else {
+                    SlotName::Dynamic(inner.to_string())
+                }
+            } else if rest.is_empty() || rest == "default" {
                 SlotName::Default
             } else {
-                SlotName::Dynamic(inner.to_string())
-            }
-        } else if rest.is_empty() || rest == "default" {
-            SlotName::Default
-        } else {
-            SlotName::Static(rest.to_string())
-        });
+                SlotName::Static(rest.to_string())
+            },
+        );
     }
     None
 }

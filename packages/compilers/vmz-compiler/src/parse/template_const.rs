@@ -132,12 +132,7 @@ fn eval(src: &str, expr: &Expression) -> Option<ConstValue> {
 /// Oak's unary builder takes the text of the *last* leaf, so `typeof 'a'` reports
 /// a bare space instead of the keyword. Fall back to the source slice between
 /// the expression start and the argument start, which is exactly the operator.
-fn unary_operator(
-    src: &str,
-    expr: &Expression,
-    operator: &str,
-    argument: &Expression,
-) -> String {
+fn unary_operator(src: &str, expr: &Expression, operator: &str, argument: &Expression) -> String {
     let text = operator.trim();
     if !text.is_empty() {
         return text.to_string();

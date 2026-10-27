@@ -2,8 +2,10 @@
     <div data-vmz-ui-charts="chart" class="vmz-ui-charts__chart" :style="hostStyle()">
         <div v-html="markup()" class="vmz-ui-charts__svg" />
         <div v-if="diagnostics.length > 0" class="vmz-ui-charts__diag">
-            <div v-for="(d, i) in diagnostics" :key="i" class="vmz-ui-charts__diag-item" :data-sev="d.severity">
-                {{ d.severity }}: {{ d.message }}
+            <div v-for="(d, i) in diagnostics" :key="i" :data-sev="d.severity" class="vmz-ui-charts__diag-item">
+                {{ d.severity }}
+                :
+                {{ d.message }}
             </div>
         </div>
     </div>

@@ -114,9 +114,12 @@ mod tests {
 
     #[test]
     fn each_alias_shadows_member_name() {
-        let (keys, refs) =
-            collect_template_dep_ctx("markup", &[], &["markup".to_string()], &["markup"
-                .to_string()]);
+        let (keys, refs) = collect_template_dep_ctx(
+            "markup",
+            &[],
+            &["markup".to_string()],
+            &["markup".to_string()],
+        );
         assert!(keys.is_empty(), "{keys:?}");
         assert!(refs.is_empty(), "{refs:?}");
     }
