@@ -1,9 +1,10 @@
-// Host SVG renderer — DisplayScene → deterministic SVG markup.
+// Reference SVG serializer — DisplayScene → deterministic SVG markup.
 //
-// This is a host renderer, not a DaVinci layer: it never re-loads data,
-// re-computes scales, resolves themes or re-runs layout. It only serializes
-// the already-resolved DisplayScene into an SVG string, so the same output
-// works for SSR (`v-html`) and for tests that assert markup directly.
+// This is the DaVinci reference renderer for the SVG target, not another
+// domain layer: it never re-loads data, re-computes scales, resolves themes
+// or re-runs layout. It only serializes the already-resolved DisplayScene into
+// an SVG string, so the same output works for SSR (`v-html`) and for tests
+// that assert markup directly.
 
 import { toHex, type Affine2D, type BoundsRect, type Path, type PathCommand, type RGBA } from "@doki-land/davinci-types";
 import type {
@@ -16,7 +17,7 @@ import type {
     DisplayScene,
     DisplayStroke,
     DisplayText,
-} from "@doki-land/davinci-scene";
+} from "./display.js";
 
 type DisplayLeaf = DisplayPath | DisplayRect | DisplayEllipse | DisplayImage | DisplayText;
 

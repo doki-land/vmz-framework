@@ -62,6 +62,10 @@ const TEXT_LINE_RATIO = 1.2;
 const DEFAULT_TEXT_SIZE = 12;
 
 /** Estimate a text block's size without a font measurement provider.
+ *  This is a deterministic approximation that marks the current limitation,
+ *  not real metrics: browser font metrics are only available after
+ *  `document.fonts.ready`, so a host needing tight bounds must re-measure
+ *  there instead of trusting these numbers.
  *  Width = longest line's character count × size × 0.6,
  *  height = line count × size × 1.2. */
 export function estimateTextSize(text: string, sizePx: number): { width: number; height: number } {

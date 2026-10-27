@@ -2,7 +2,7 @@
     <div data-vmz-ui-charts="chart" class="vmz-ui-charts__chart" :style="hostStyle()">
         <div v-html="markup()" class="vmz-ui-charts__svg" />
         <div v-if="diagnostics.length > 0" class="vmz-ui-charts__diag">
-            <div v-for="d in diagnostics" :key="d.code" class="vmz-ui-charts__diag-item" :data-sev="d.severity">
+            <div v-for="(d, i) in diagnostics" :key="i" class="vmz-ui-charts__diag-item" :data-sev="d.severity">
                 {{ d.severity }}: {{ d.message }}
             </div>
         </div>
@@ -67,9 +67,8 @@ import {
     type ChartSpec,
     type DataSnapshot,
 } from "@doki-land/davinci-chart";
-import { resolve, type DisplayScene } from "@doki-land/davinci-scene";
+import { resolve, renderSvg, type DisplayScene } from "@doki-land/davinci-scene";
 import { initialState, reduce, type RuntimeState, type Action } from "@doki-land/davinci-runtime";
-import { renderSvg } from "../render/svg.ts";
 
 export default class Chart {
     /** DaVinci ChartSpec（mark + encoding）。 */
@@ -83,13 +82,22 @@ export default class Chart {
 
     /** 交互 runtime state。 */
     public state: RuntimeState | null = null;
+    /** `compile` 产出的只读诊断（code / severity / message），宿主只读展示。 */
     public diagnostics: ReadonlyArray<{ severity: string; code: string; message: string }> = [];
 
     /** 计算属性：spec / data / 尺寸变化时重新编译并解析为 DisplayScene。 */
     public scene(): DisplayScene | null {
         const snapshot = this.snapshot ?? (this.data ? fromRows(this.data) : null);
-        if (!this.spec || !snapshot) return null;
+        if (!this.spec || !snapshot) {
+            this.diagnostics = [];
+            return null;
+        }
         const plan = compile(this.spec, snapshot);
+        this.diagnostics = plan.diagnostics.items.map((d) => ({
+            severity: d.severity,
+            code: d.code,
+            message: d.message,
+        }));
         const semantic = buildScene(plan, { width: this.width, height: this.height });
         return resolve(semantic, { width: this.width, height: this.height });
     }

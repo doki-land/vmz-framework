@@ -13,11 +13,23 @@
  * - text bounds are a deterministic size estimate centred on the anchor
  * - `renderSvg` is deterministic, viewBox comes from the scene size, numbers
  *   stay at ≤3 decimals, text/attributes are escaped and empty data is safe
+ * - rows with null / non-finite cells are skipped with structured diagnostics
+ *   (`davinci.chart.missing-value` / `davinci.chart.non-finite-value`), and NaN
+ *   or Infinity never reaches the markup
+ * - bars grow away from the zero pixel, so negative values keep a positive
+ *   height and never flip above zero
+ * - line marks never bridge two series (one path per series, legend order is
+ *   first appearance)
+ * - diagram spec → layout → builder → DisplayScene → SVG carries nodes, edges,
+ *   labels, and ids that survive a spec update
  */
 
 import { buildScene, compile, fromRows } from '../../../../../davinci/davinci-chart/src/index.ts';
-import { resolve } from '../../../../../davinci/davinci-scene/src/index.ts';
-import { renderSvg } from '../../../../../ui/vmz-ui-charts/src/render/svg.ts';
+import { renderSvg, resolve } from '../../../../../davinci/davinci-scene/src/index.ts';
+import {
+    buildScene as buildDiagramScene,
+    simpleLayout,
+} from '../../../../../davinci/davinci-diagram/src/index.ts';
 
 const WIDTH = 640;
 const HEIGHT = 360;
@@ -353,4 +365,242 @@ console.log('charts-render: rendering is deterministic and escaped…');
     if (!renderSvg(moved).includes('matrix(1,0,0,1,3,4)')) fail('non-identity transform must emit matrix()');
 }
 
-console.log('charts-render PASS: bar / line / point pipeline + axes, legend, text bounds, deterministic SVG');
+console.log('charts-render: null / non-finite rows are skipped with diagnostics…');
+{
+    const spec = {
+        mark: 'bar',
+        encoding: [
+            { field: 'category', channel: 'x' },
+            { field: 'value', channel: 'y' },
+        ],
+    };
+    const rows = [
+        { category: 'alpha', value: 4 },
+        { category: 'beta', value: Number.NaN },
+        { category: 'gamma', value: Number.POSITIVE_INFINITY },
+        { category: 'delta', value: null },
+        { category: 'epsilon', value: 6 },
+    ];
+    const { plan, semantic, svg } = pipeline(spec, rows);
+    const marks = semantic.root.children.filter((n) => n.kind === 'rect');
+    if (marks.length !== 2) fail(`want 2 usable bars, got ${marks.length}`);
+    if (marks[0].id !== 'bar:0' || marks[1].id !== 'bar:4') {
+        fail(`skipped rows must not renumber ids: ${marks.map((m) => m.id).join(',')}`);
+    }
+    const codes = plan.diagnostics.items.map((d) => d.code);
+    if (codes.filter((c) => c === 'davinci.chart.non-finite-value').length !== 2) {
+        fail(`want 2 non-finite diagnostics, got ${codes.join(',')}`);
+    }
+    if (codes.filter((c) => c === 'davinci.chart.missing-value').length !== 1) {
+        fail(`want 1 missing-value diagnostic, got ${codes.join(',')}`);
+    }
+    for (const d of plan.diagnostics.items) {
+        if (!d.code || !d.message) fail('diagnostics need code + message');
+        if (d.severity !== 'info' && d.severity !== 'warning' && d.severity !== 'error') {
+            fail(`unexpected diagnostic severity: ${d.severity}`);
+        }
+    }
+    if (svg.includes('NaN') || svg.includes('Infinity')) fail('markup must never carry NaN / Infinity');
+    if (count(svg, '<rect') !== 2) fail(`svg want 2 usable bars, got ${count(svg, '<rect')}`);
+
+    const xLabels = guideGroups(semantic, 'chart.axis')
+        .find((g) => g.id === 'x-axis')
+        .children.filter((n) => n.kind === 'text')
+        .map((n) => n.text);
+    if (xLabels.join(',') !== 'alpha,beta,gamma,delta,epsilon') {
+        fail(`band categories must stay complete when only y is invalid: ${xLabels}`);
+    }
+}
+
+console.log('charts-render: unknown encoding field is an error diagnostic…');
+{
+    const spec = {
+        mark: 'bar',
+        encoding: [
+            { field: 'category', channel: 'x' },
+            { field: 'missing', channel: 'y' },
+        ],
+    };
+    const { plan, semantic, svg } = pipeline(spec, [{ category: 'alpha', value: 4 }]);
+    const unknown = plan.diagnostics.items.find((d) => d.code === 'davinci.chart.unknown-field');
+    if (!unknown) fail(`want davinci.chart.unknown-field, got ${plan.diagnostics.items.map((d) => d.code)}`);
+    if (unknown.severity !== 'error') fail(`unknown-field must be an error, got ${unknown.severity}`);
+    if (!unknown.message.includes('missing')) fail(`diagnostic must name the field: ${unknown.message}`);
+    if (semantic.root.children.length !== 0) fail('an unusable y field must not emit geometry');
+    if (svg.includes('NaN')) fail('unknown field must not emit NaN');
+}
+
+console.log('charts-render: negative values keep a zero baseline…');
+{
+    const PAD = 16;
+    const spec = {
+        mark: 'bar',
+        encoding: [
+            { field: 'category', channel: 'x' },
+            { field: 'value', channel: 'y' },
+        ],
+    };
+    const rows = [
+        { category: 'deep', value: -4 },
+        { category: 'up', value: 2 },
+        { category: 'shallow', value: -1 },
+        { category: 'zero', value: 0 },
+    ];
+    const { semantic, svg } = pipeline(spec, rows);
+    const marks = semantic.root.children.filter((n) => n.kind === 'rect');
+    if (marks.length !== rows.length) fail(`want ${rows.length} bars, got ${marks.length}`);
+    for (const m of marks) {
+        if (!Number.isFinite(m.y) || !Number.isFinite(m.h) || !Number.isFinite(m.w)) {
+            fail(`bar geometry must stay finite: ${m.id}`);
+        }
+        if (m.h < 0) fail(`bar height must never be negative: ${m.id} h=${m.h}`);
+        if (!(m.w > 0)) fail(`bar width must stay positive: ${m.id}`);
+        if (m.y < PAD - 1e-9 || m.y + m.h > HEIGHT - PAD + 1e-9) fail(`bar must stay inside the plot: ${m.id}`);
+    }
+    const [deep, up, shallow, zero] = marks;
+    // Every bar is anchored on the zero pixel, which sits inside the plot for
+    // this mixed-sign domain.
+    const zeroLine = deep.y;
+    if (!(zeroLine > PAD && zeroLine < HEIGHT - PAD)) fail(`zero baseline must sit inside the plot: ${zeroLine}`);
+    if (Math.abs(shallow.y - zeroLine) > 1e-9) fail(`negative bars must hang from zero: shallow.y=${shallow.y} zero=${zeroLine}`);
+    if (Math.abs(up.y + up.h - zeroLine) > 1e-9) fail('positive bars must end on zero');
+    if (!(deep.h > shallow.h && shallow.h > 0)) fail(`negative bars must grow with magnitude: ${deep.h}/${shallow.h}`);
+    if (!(up.y < zeroLine)) fail('positive bars must sit above zero');
+    if (Math.abs(zero.h) > 1e-9) fail(`a zero value must have zero height, got ${zero.h}`);
+    if (count(svg, '<rect') !== rows.length) fail(`svg want ${rows.length} bars, got ${count(svg, '<rect')}`);
+}
+
+console.log('charts-render: line marks never bridge two series…');
+{
+    const spec = {
+        mark: 'line',
+        encoding: [
+            { field: 'step', channel: 'x' },
+            { field: 'score', channel: 'y' },
+            { field: 'series', channel: 'color' },
+        ],
+    };
+    const rows = [
+        { step: 1, score: 10, series: 'A' },
+        { step: 2, score: 20, series: 'B' },
+        { step: 3, score: 15, series: 'A' },
+        { step: 4, score: 5, series: 'B' },
+    ];
+    const { semantic, svg } = pipeline(spec, rows);
+    const paths = semantic.root.children.filter((n) => n.kind === 'path');
+    if (paths.length !== 2) fail(`want one path per series, got ${paths.length}`);
+    if (paths.map((p) => p.id).join(',') !== 'line:A,line:B') {
+        fail(`series paths must follow first appearance: ${paths.map((p) => p.id).join(',')}`);
+    }
+    const a = paths[0].path.commands.map((c) => c.to);
+    const b = paths[1].path.commands.map((c) => c.to);
+    // A owns rows 0 and 2, B owns rows 1 and 3 — a shared path would carry 4 points.
+    if (a.length !== 2 || b.length !== 2) fail(`each series must link only its own rows: A=${a.length} B=${b.length}`);
+    for (const points of [a, b]) {
+        for (let i = 1; i < points.length; i++) {
+            if (!(points[i].x > points[i - 1].x)) fail('each series path must follow x order');
+        }
+    }
+    const yA = new Set(a.map((p) => p.y));
+    if (b.some((p) => yA.has(p.y))) fail('one line path must not connect points from two series');
+
+    const legend = guideGroups(semantic, 'chart.legend')[0];
+    if (!legend) fail('series legend missing');
+    const labels = legend.children.filter((n) => n.kind === 'text').map((n) => n.text);
+    if (labels.join(',') !== 'A,B') fail(`legend must list first-seen series, got ${labels}`);
+
+    if (count(svg, '<path') !== paths.length + axisStats(semantic).paths) {
+        fail(`svg want ${paths.length} series + axis <path>, got ${count(svg, '<path')}`);
+    }
+    if (svg.includes('NaN')) fail('series paths must not emit NaN');
+}
+
+// ─── Diagram: topology → layout → DisplayScene → SVG ─────────────────────
+
+function diagramPipeline(spec) {
+    const plan = simpleLayout(spec);
+    const semantic = buildDiagramScene(spec, plan);
+    const display = resolve(semantic, { width: plan.canvasBounds.w, height: plan.canvasBounds.h });
+    return { plan, semantic, display, svg: renderSvg(display) };
+}
+
+const diagramSpec = {
+    kind: 'flowchart',
+    direction: 'LR',
+    nodes: [
+        { id: 'a', label: 'Start' },
+        { id: 'b', label: 'Work' },
+        { id: 'c', label: 'End' },
+    ],
+    edges: [
+        { id: 'e1', fromNode: 'a', toNode: 'b', label: 'go' },
+        { id: 'e2', fromNode: 'b', toNode: 'c' },
+    ],
+};
+
+console.log('charts-render: diagram carries nodes, edges and labels as SVG…');
+{
+    const { plan, semantic, display, svg } = diagramPipeline(diagramSpec);
+    const nodes = semantic.root.children.filter((n) => n.role === 'diagram.node');
+    const edges = semantic.root.children.filter((n) => n.role === 'diagram.edge');
+    const labels = semantic.root.children.filter((n) => n.kind === 'text');
+
+    if (nodes.length !== 3 || edges.length !== 2) {
+        fail(`want 3 nodes / 2 edges, got ${nodes.length}/${edges.length}`);
+    }
+    if (nodes.map((n) => n.id).join(',') !== 'node-a,node-b,node-c') {
+        fail(`node ids must come from the spec: ${nodes.map((n) => n.id).join(',')}`);
+    }
+    if (edges.map((n) => n.id).join(',') !== 'edge-e1,edge-e2') {
+        fail(`edge ids must come from the spec: ${edges.map((n) => n.id).join(',')}`);
+    }
+    if (!labels.some((n) => n.id === 'edge-label-e1' && n.text === 'go')) fail('edge label must be part of the scene');
+    for (const text of ['Start', 'Work', 'End', 'go']) {
+        if (!labels.some((n) => n.text === text)) fail(`missing diagram label: ${text}`);
+    }
+
+    if (!(display.width > 0 && display.height > 0)) fail('diagram display scene must carry the layout canvas');
+    if (!svg.includes(`viewBox="0 0 ${display.width} ${display.height}"`)) {
+        fail('diagram viewBox must come from the layout canvas');
+    }
+    if (count(svg, '<rect') !== nodes.length) fail(`diagram want ${nodes.length} node <rect>, got ${count(svg, '<rect')}`);
+    if (count(svg, '<path') !== edges.length) fail(`diagram want ${edges.length} edge <path>, got ${count(svg, '<path')}`);
+    if (count(svg, '<text') !== labels.length) fail(`diagram want ${labels.length} <text>, got ${count(svg, '<text')}`);
+    if (!svg.includes('>go</text>')) fail(`edge label markup missing: ${svg.slice(-200)}`);
+    if (svg.includes('NaN') || svg.includes('Infinity')) fail('diagram markup must never carry NaN / Infinity');
+
+    for (const edge of edges) {
+        const cmds = edge.path.commands;
+        if (cmds.length !== 2 || cmds[0].kind !== 'move' || cmds[1].kind !== 'line') {
+            fail(`edge ${edge.id} must be move → line`);
+        }
+        if (!(cmds[1].to.x > cmds[0].to.x) || cmds[0].to.y !== cmds[1].to.y) {
+            fail(`edge ${edge.id} must run left → right between node centres`);
+        }
+    }
+    if (!plan.edges.every((e) => Number.isFinite(e.from.x) && Number.isFinite(e.to.x))) {
+        fail('routed edges must stay finite');
+    }
+
+    // Same spec → byte-identical markup; a grown spec must not renumber ids.
+    if (diagramPipeline(diagramSpec).svg !== svg) fail('diagram SVG must be deterministic');
+    const grown = diagramPipeline({
+        ...diagramSpec,
+        nodes: [...diagramSpec.nodes, { id: 'd', label: 'After' }],
+        edges: [...diagramSpec.edges, { id: 'e3', fromNode: 'c', toNode: 'd' }],
+    });
+    const grownNodes = grown.semantic.root.children.filter((n) => n.role === 'diagram.node');
+    if (grownNodes.length !== 4) fail(`grown diagram want 4 nodes, got ${grownNodes.length}`);
+    for (const id of ['node-a', 'node-label-a', 'edge-e1', 'edge-label-e1']) {
+        if (!grown.semantic.root.children.some((n) => n.id === id)) fail(`id ${id} drifted after the spec update`);
+    }
+    for (const node of nodes) {
+        const same = grownNodes.find((n) => n.id === node.id);
+        if (!same) fail(`node ${node.id} lost after the spec update`);
+        if (same.x !== node.x || same.y !== node.y || same.w !== node.w || same.h !== node.h) {
+            fail(`node ${node.id} moved after appending an unrelated node`);
+        }
+    }
+}
+
+console.log('charts-render PASS: chart pipeline + diagnostics + zero baseline + series + diagram SVG');

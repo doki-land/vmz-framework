@@ -96,7 +96,7 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport): Sem
             const rows = positionedRows(plan, xScale, yScale, xCol, yCol, seriesCol);
             children.push(buildAxis("x-axis", plot, xScale, "horizontal"));
             children.push(buildAxis("y-axis", plot, yScale, "vertical"));
-            children.push(...buildMarks(plan, rows, plot, xScale));
+            children.push(...buildMarks(plan, rows, plot, xScale, yScale));
             children.push(...buildLegend(plan, plot));
         }
     }
@@ -135,11 +135,12 @@ function buildMarks(
     rows: ReadonlyArray<PositionedMark>,
     plot: PlotRect,
     xScale: Scale,
+    yScale: Scale,
 ): SemanticNode[] {
     switch (plan.spec.mark) {
         case "bar":
         case "rect":
-            return buildBars(plan, rows, plot, xScale);
+            return buildBars(plan, rows, plot, xScale, yScale);
         case "line":
             return buildLines(rows);
         case "point":
@@ -156,11 +157,14 @@ function buildBars(
     rows: ReadonlyArray<PositionedMark>,
     plot: PlotRect,
     xScale: Scale,
+    yScale: Scale,
 ): SemanticNode[] {
     const bandWidth = xScale.kind === "band" ? bandwidth(xScale) : 0;
     const step = bandWidth > 0 ? bandWidth : plot.w / Math.max(1, rows.length);
     const w = step * BAR_RATIO;
-    const baseline = plot.y + plot.h;
+    // Bars grow away from the zero pixel, not from the plot floor: negative
+    // values must hang below zero without flipping or inverting their height.
+    const baseline = zeroBaseline(yScale, plot);
 
     return rows.map((row) => ({
         kind: "rect" as const,
@@ -173,6 +177,16 @@ function buildBars(
         h: Math.abs(baseline - row.y),
         fill: { color: MARK_FILL },
     }));
+}
+
+/** Pixel y of data value 0, clamped to the plot (log scales have no zero). */
+function zeroBaseline(yScale: Scale, plot: PlotRect): number {
+    const top = plot.y;
+    const bottom = plot.y + plot.h;
+    if (yScale.kind === "log") return bottom;
+    const y = project(yScale, 0);
+    if (!Number.isFinite(y)) return bottom;
+    return Math.min(bottom, Math.max(top, y));
 }
 
 function buildLines(rows: ReadonlyArray<PositionedMark>): SemanticNode[] {
@@ -377,6 +391,7 @@ function buildLegend(plan: ChartCompilePlan, plot: PlotRect): SemanticNode[] {
     const categories: string[] = [];
     for (const value of col.values) {
         if (value === null || value === undefined) continue;
+        if (typeof value === "number" && !Number.isFinite(value)) continue;
         const key = String(value);
         if (!categories.includes(key)) categories.push(key);
     }

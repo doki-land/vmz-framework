@@ -329,7 +329,7 @@ export const CHECKS: Record<string, CheckEntry> = {
     },
     'charts-render': {
         file: 'ui/charts-render.ts',
-        description: '@vmz/ui-charts real pipeline — bar/line/point scene → deterministic SVG',
+        description: '@vmz/ui-charts real pipeline — chart/diagram scenes → deterministic SVG + diagnostics',
         pre: ['build:davinci'],
     },
     'event-flow': {

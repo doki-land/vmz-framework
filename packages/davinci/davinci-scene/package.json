@@ -25,6 +25,10 @@
         "./resolve": {
             "types": "./dist/resolve.d.ts",
             "default": "./dist/resolve.js"
+        },
+        "./svg": {
+            "types": "./dist/svg.d.ts",
+            "default": "./dist/svg.js"
         }
     },
     "files": [

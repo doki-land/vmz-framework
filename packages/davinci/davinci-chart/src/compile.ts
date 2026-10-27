@@ -2,12 +2,14 @@
 // Follow design: `规划设计/davinci/00-概述与架构边界.md` §6.
 //
 // ChartCompilePlan is the resolved stage between domain spec and scene. It
-// contains fully-instantiated scales, resolved encodings, and one row per
-// mark (after statistics / faceting). The plan does NOT carry scene shapes
-// — those are produced by the scene builder.
+// contains fully-instantiated scales, resolved encodings, one row per mark
+// (after statistics / faceting) plus the diagnostics raised while reading the
+// data. The plan does NOT carry scene shapes — those are produced by the scene
+// builder.
 
-import type { DataSnapshot } from "./data.js";
-import type { Scale } from "./scale.js";
+import { diag, type Diagnostic, type DiagnosticSet } from "@doki-land/davinci-types";
+import { column, type DataSnapshot } from "./data.js";
+import { apply as scaleApply, type Scale } from "./scale.js";
 
 /** Mark kind (geometric primitive family). */
 export type MarkKind = "point" | "line" | "rect" | "bar" | "circle" | "area" | "text" | "tick";
@@ -44,19 +46,39 @@ export interface ChartCompilePlan {
     readonly resolvedData: DataSnapshot;
     readonly scales: ReadonlyMap<string, Scale>;
     readonly marks: ReadonlyArray<PlanMark>;
+    /** Data problems found while compiling — row-level, never fatal to the host. */
+    readonly diagnostics: DiagnosticSet;
 }
 
 /** Mark kinds measured from a zero baseline. */
 const zeroBasedMarks: ReadonlySet<MarkKind> = new Set(["bar", "rect", "area"]);
 
+/** Channels whose value decides whether a row can be positioned at all. */
+const positionChannels: ReadonlySet<string> = new Set(["x", "y"]);
+
 /** Compile a ChartSpec against a DataSnapshot. */
 export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
     const scales = new Map<string, Scale>();
     const marks: PlanMark[] = [];
+    const diagnostics: Diagnostic[] = [];
 
     for (const enc of spec.encoding) {
-        const col = data.columns.find((c) => c.name === enc.field);
-        if (!col) continue;
+        const col = column(data, enc.field);
+        if (!col) {
+            // An empty snapshot has no columns at all — that is "no data", not
+            // a missing field, so only a populated snapshot can raise this.
+            if (data.columns.length > 0) {
+                diagnostics.push(
+                    diag(
+                        "error",
+                        "davinci.chart.unknown-field",
+                        `encoding channel "${enc.channel}" references field "${enc.field}", which is not in the data`,
+                        enc.field,
+                    ),
+                );
+            }
+            continue;
+        }
         // Auto-derive scales based on field semantics (simple heuristic).
         if (spec.scales?.has(enc.channel)) {
             scales.set(enc.channel, spec.scales.get(enc.channel)!);
@@ -64,7 +86,9 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
         }
         switch (col.semantic) {
             case "quantitative": {
-                const numeric = col.values.filter((v): v is number => typeof v === "number");
+                const numeric = col.values.filter(
+                    (v): v is number => typeof v === "number" && Number.isFinite(v),
+                );
                 if (numeric.length === 0) {
                     scales.set(enc.channel, { kind: "linear", domain: [0, 1], range: [0, 1] });
                 } else {
@@ -84,8 +108,21 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
             }
             case "nominal":
             case "ordinal": {
-                const cats = Array.from(new Set(col.values.map((v) => String(v))));
-                scales.set(enc.channel, { kind: "band", domain: cats, range: [0, cats.length] });
+                // Missing / non-finite cells are not categories; `String(null)`
+                // would otherwise become a real "null" / "NaN" band.
+                const categories = Array.from(
+                    new Set(
+                        col.values
+                            .filter(
+                                (v) =>
+                                    v !== null &&
+                                    v !== undefined &&
+                                    !(typeof v === "number" && !Number.isFinite(v)),
+                            )
+                            .map((v) => String(v)),
+                    ),
+                );
+                scales.set(enc.channel, { kind: "band", domain: categories, range: [0, categories.length] });
                 break;
             }
             default:
@@ -93,26 +130,63 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
         }
     }
 
-    // Build one mark per row, applying scales.
+    // Build one mark per usable row, applying scales.
     for (let r = 0; r < data.rowCount; r++) {
         const channels = new Map<string, number | string>();
+        let positioned = true;
         for (const enc of spec.encoding) {
-            const col = data.columns.find((c) => c.name === enc.field);
+            const col = column(data, enc.field);
             if (!col) continue;
-            const raw = col.values[r];
+            const raw = col.values[r] ?? null;
             const scale = scales.get(enc.channel);
-            if (scale) {
-                channels.set(enc.channel, applyScale(scale, raw));
-            } else if (typeof raw === "number") {
-                channels.set(enc.channel, raw);
-            } else {
-                channels.set(enc.channel, String(raw));
+
+            if (raw === null || raw === undefined) {
+                diagnostics.push(
+                    diag(
+                        "warning",
+                        "davinci.chart.missing-value",
+                        `field "${enc.field}" has no value for row ${r}`,
+                        `${enc.field}#${r}`,
+                    ),
+                );
+                if (positionChannels.has(enc.channel)) positioned = false;
+                continue;
             }
+            if (!isFiniteValue(raw, scale)) {
+                diagnostics.push(
+                    diag(
+                        "warning",
+                        "davinci.chart.non-finite-value",
+                        `field "${enc.field}" is not a finite number for row ${r} (${String(raw)})`,
+                        `${enc.field}#${r}`,
+                    ),
+                );
+                if (positionChannels.has(enc.channel)) positioned = false;
+                continue;
+            }
+
+            if (scale) {
+                const key = scale.kind === "band" || scale.kind === "point" ? String(raw) : raw;
+                channels.set(enc.channel, applyScale(scale, key));
+            } else if (typeof raw === "number") channels.set(enc.channel, raw);
+            else channels.set(enc.channel, String(raw));
         }
-        marks.push({ rowIndex: r, channels });
+        // Rows without a usable x / y position never become marks; the rest
+        // still keep their original row index so ids do not renumber.
+        if (positioned) marks.push({ rowIndex: r, channels });
     }
 
-    return { spec, resolvedData: data, scales, marks };
+    return { spec, resolvedData: data, scales, marks, diagnostics: { items: diagnostics } };
+}
+
+/** Whether a raw cell can be turned into a finite number (or a real category). */
+function isFiniteValue(value: number | string | boolean, scale: Scale | undefined): boolean {
+    if (typeof value === "number") return Number.isFinite(value);
+    if (typeof value === "boolean") return true;
+    // Band / point domains are built from the column itself, so any string is
+    // a real category — otherwise it must parse as a finite number.
+    if (scale && (scale.kind === "band" || scale.kind === "point")) return true;
+    return Number.isFinite(Number(value));
 }
 
 function applyScale(scale: Scale, value: number | string | boolean | null): number | string {
@@ -120,6 +194,3 @@ function applyScale(scale: Scale, value: number | string | boolean | null): numb
     if (typeof value === "boolean") return scaleApply(scale, value ? 1 : 0);
     return scaleApply(scale, value as number | string);
 }
-
-// Scale import at end to avoid circular deps in this module's own scope.
-import { apply as scaleApply } from "./scale.js";

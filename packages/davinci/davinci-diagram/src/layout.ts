@@ -62,27 +62,30 @@ export function simpleLayout(spec: DiagramSpec): DiagramLayoutPlan {
 
     const layers: string[][] = [];
     const placed = new Set<string>();
-    const queue: string[] = [];
+    let frontier: string[] = [];
 
     for (const [id, count] of incoming) {
-        if (count === 0) queue.push(id);
+        if (count === 0) frontier.push(id);
     }
 
-    while (queue.length > 0) {
+    // Only the current frontier is visited; each pass places at least the
+    // unplaced members and hands their successors over as the next frontier, so
+    // the walk always terminates (cycles end up in the leftover layer).
+    while (frontier.length > 0) {
         const layer: string[] = [];
-        const nextQueue: string[] = [];
-        for (const id of queue) {
+        const nextFrontier: string[] = [];
+        for (const id of frontier) {
             if (placed.has(id)) continue;
             placed.add(id);
             layer.push(id);
             for (const e of spec.edges) {
-                if (e.fromNode === id && !placed.has(e.toNode)) {
-                    nextQueue.push(e.toNode);
+                if (e.fromNode === id && !placed.has(e.toNode) && !nextFrontier.includes(e.toNode)) {
+                    nextFrontier.push(e.toNode);
                 }
             }
         }
         if (layer.length > 0) layers.push(layer);
-        queue.push(...nextQueue);
+        frontier = nextFrontier;
     }
 
     // Place unplaced nodes in a final layer.

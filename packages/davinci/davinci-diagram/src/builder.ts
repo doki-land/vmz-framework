@@ -61,6 +61,19 @@ export function buildScene(spec: DiagramSpec, plan: DiagramLayoutPlan): Semantic
             path: { commands: pathCmds },
             stroke: EDGE_STROKE,
         });
+        const specEdge = spec.edges.find((s) => s.id === e.id);
+        if (specEdge?.label) {
+            children.push({
+                kind: "text",
+                id: `edge-label-${e.id}`,
+                role: "diagram.label",
+                source: { domain: "diagram", path: ["edge", e.id, "label"] },
+                text: specEdge.label,
+                font: DEFAULT_EDGE_LABEL_FONT,
+                anchor: { x: (e.from.x + e.to.x) / 2, y: (e.from.y + e.to.y) / 2 },
+                color: LABEL_COLOR,
+            });
+        }
     }
 
     return {

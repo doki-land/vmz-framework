@@ -4,3 +4,4 @@
 export * from "./semantic.js";
 export * from "./display.js";
 export * from "./resolve.js";
+export * from "./svg.js";
