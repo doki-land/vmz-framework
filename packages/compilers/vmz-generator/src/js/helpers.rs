@@ -17,6 +17,12 @@ pub fn is_text_attr(name: &str) -> bool {
     name == "text"
 }
 
+/// Vue `v-once` region marker — a control attribute on the Native View, never a real
+/// DOM / component prop. Direct emit uses it to stop subscribing inside the subtree.
+pub fn is_once_marker(name: &str) -> bool {
+    name == "v-once"
+}
+
 /// True when the attr is a **DOM** event listener (`@click` / `on:click` / `onClick`).
 /// Does **not** treat `on-submit` kebab as an event — that is a prop name on components.
 pub fn is_event_attr(name: &str) -> bool {

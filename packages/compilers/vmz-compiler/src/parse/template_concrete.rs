@@ -181,6 +181,10 @@ pub enum Directive {
     /// no directive interpretation). Lowered as a region marker on Semantic; **not**
     /// treated as [`Directive::Custom`].
     Pre,
+    /// `v-once` — marks this element and all descendants as a create-once region: the
+    /// subtree is evaluated when it is first created and never re-patched afterwards.
+    /// Takes no argument, expression or modifier; **not** treated as [`Directive::Custom`].
+    Once,
     /// Other `v-*` custom directive.
     Custom {
         /// Directive name without `v-` prefix.
@@ -227,6 +231,24 @@ fn classify_one(attr: RawAttr) -> Result<ConcreteAttr, TemplateParseError> {
     }
     if name == "v-else" {
         return Ok(ConcreteAttr::Directive { dir: Directive::Else, span });
+    }
+    if name == "v-once" {
+        // Vue `v-once` has no argument, no expression and no modifiers. Anything else
+        // is a structured rejection instead of silently becoming a custom directive.
+        if val.is_some_and(|v| !v.is_empty()) {
+            return Err(TemplateParseError::coded(
+                "vmz::template::illegal_directive",
+                offset,
+            )
+            .with_arg("directive", "v-once")
+            .with_arg("detail", "`v-once` does not take an expression"));
+        }
+        return Ok(ConcreteAttr::Directive { dir: Directive::Once, span });
+    }
+    if name.starts_with("v-once:") || name.starts_with("v-once.") {
+        return Err(TemplateParseError::coded("vmz::template::illegal_directive", offset)
+            .with_arg("directive", name)
+            .with_arg("detail", "`v-once` does not take an argument or modifiers"));
     }
     if name == "v-html" {
         let expr = require_expr(&name, val, offset)?;

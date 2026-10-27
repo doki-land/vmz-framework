@@ -209,6 +209,15 @@ fn lower_directive(
                 ..Default::default()
             }])
         }
+        Directive::Once => {
+            // `v-once` is carried to emit as a bare region marker attribute so Direct
+            // emit can stop subscribing to bindings inside the subtree.
+            Ok(vec![TemplateAttr {
+                name: "v-once".into(),
+                value: AttrValue::Static(String::new()),
+                ..Default::default()
+            }])
+        }
         Directive::Custom { name, arg, expr, modifiers } => {
             // Preserve as static-ish attrs so we don't silently drop; use v-name[:arg].
             let ir_name = match arg {

@@ -199,6 +199,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'SSR ↔ mount ↔ hydrate: v-pre region preserves Vue literals, siblings stay reactive',
         pre: ['build:runtimes'],
     },
+    'v-once': {
+        file: 'v-once/v-once.ts',
+        description: 'SSR ↔ mount ↔ hydrate: v-once region froze at create, siblings stay reactive',
+        pre: ['build:runtimes'],
+    },
     'keyed-list': { file: 'runtime/keyed-list.ts' },
     'slot-projection': { file: 'runtime/slot-projection.ts' },
     invalidation: { file: 'runtime/invalidation.ts' },

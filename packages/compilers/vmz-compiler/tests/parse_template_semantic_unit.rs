@@ -298,6 +298,51 @@ fn template_hash_slot_becomes_slot_template() {
 }
 
 #[test]
+fn v_once_is_a_static_region_marker_through_both_layers() {
+    let src = r#"<div v-once :title="t">{{ x }}</div>"#;
+    let concrete = parse_template_concrete_body_primary(src).unwrap();
+    let sem = lower_concrete_to_semantic(&concrete).unwrap();
+    match &sem.roots[0] {
+        SemanticNode::Element { props, .. } => {
+            assert!(
+                props.iter().any(|p| matches!(
+                    p,
+                    SemanticProp::Static { name, value, .. } if name == "v-once" && value.is_empty()
+                )),
+                "v-once must survive Semantic as a Static marker: {props:?}"
+            );
+            assert!(
+                props.iter().any(|p| matches!(p, SemanticProp::Bind { .. })),
+                "v-once must keep the structured subtree binding: {props:?}"
+            );
+        }
+        other => panic!("expected Element, got {other:?}"),
+    }
+    // Legacy TemplateIr keeps the marker as a bare attr so emit can see the region.
+    let ir = parse_template(src).unwrap();
+    match &ir.roots[0] {
+        vmz_compiler::TemplateNode::Element { attrs, .. } => {
+            assert!(
+                attrs
+                    .iter()
+                    .any(|a| a.name == "v-once" && matches!(a.value, vmz_compiler::AttrValue::Static(ref v) if v.is_empty())),
+                "expected bare `v-once` attr, got {attrs:?}"
+            );
+        }
+        other => panic!("expected Element, got {other:?}"),
+    }
+}
+
+#[test]
+fn v_once_argument_or_expression_is_illegal_directive() {
+    for src in [r#"<div v-once:x>y</div>"#, r#"<div v-once="x">y</div>"#] {
+        let err = parse_template_concrete_body_primary(src).unwrap_err();
+        assert_eq!(err.code, "vmz::template::illegal_directive", "{src}: {err:?}");
+        assert!(err.render_plain().contains("v-once"), "{src}: {err:?}");
+    }
+}
+
+#[test]
 fn dynamic_slot_arg_is_structured_error() {
     let concrete = parse_template_concrete_body_primary(r#"<Comp v-slot:[name]>x</Comp>"#).unwrap();
     let err = lower_concrete_to_semantic(&concrete).unwrap_err();

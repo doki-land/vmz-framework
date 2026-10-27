@@ -9,6 +9,7 @@ use serde::Serialize;
 use vmz_types::{BindingKind, IrDepPath, ReactiveComponent, ViewAttr, ViewAttrValue, ViewNode};
 
 use crate::core::{escape_xml_attr, escape_xml_text};
+use crate::js::helpers::is_once_marker;
 
 /// Template dialect marker (vendor-neutral; not WeChat `wxml`).
 pub const MINI_TEMPLATE_DIALECT: &str = "vmz.mini.template.v0";
@@ -253,6 +254,9 @@ fn emit_node(
             }
             let mut attr_s = format!(" name=\"{}\"", escape_xml_attr(tag));
             for a in attrs {
+                if is_once_marker(&a.name) {
+                    continue;
+                }
                 if is_event_attr(&a.name) {
                     wire_event(a, &mut attr_s, ctx)?;
                     continue;
@@ -332,6 +336,10 @@ fn sanitize_prop(name: &str) -> String {
 }
 
 fn emit_plain_attr(a: &ViewAttr, attr_s: &mut String, patch_bindings: &mut BTreeMap<u32, ()>) {
+    // `v-once` is a control marker on the Native View, never a rendered attribute.
+    if is_once_marker(&a.name) {
+        return;
+    }
     match &a.value {
         ViewAttrValue::Static { value } => {
             attr_s.push_str(&format!(" {}=\"{}\"", a.name, escape_xml_attr(value)));

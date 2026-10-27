@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use vmz_types::{ReactiveComponent, ViewAttr, ViewAttrValue, ViewNode};
 
 use crate::core::{escape_xml_attr, escape_xml_text};
+use crate::js::helpers::is_once_marker;
 
 use super::wxml::{
     MiniEmitError, MiniEmitErrorKind, MiniEventHandler, MiniTemplateEmit, is_event_attr,
@@ -229,6 +230,10 @@ fn emit_mapped_attr(
     ctx: &WechatCtx<'_>,
 ) {
     let name = if wtag == "navigator" && a.name == "href" { "url" } else { a.name.as_str() };
+    // `v-once` is a control marker on the Native View, never a rendered attribute.
+    if is_once_marker(name) {
+        return;
+    }
     match &a.value {
         ViewAttrValue::Static { value } => {
             attr_s.push_str(&format!(" {name}=\"{}\"", escape_xml_attr(value)));

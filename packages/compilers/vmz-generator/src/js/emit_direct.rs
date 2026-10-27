@@ -11,8 +11,8 @@ use super::deps::collect_template_deps;
 use super::emit_ir::IrDepCursor;
 use super::helpers::{
     HandlerResolution, bind_field_idents_ctx, component_event_name, component_prop_wire_name,
-    event_dom_type, is_component_event_attr, is_event_attr, is_html_attr, is_show_attr,
-    is_text_attr, looks_like_ternary, parse_this_method_call_arrow, sanitize_interp,
+    event_dom_type, is_component_event_attr, is_event_attr, is_html_attr, is_once_marker,
+    is_show_attr, is_text_attr, looks_like_ternary, parse_this_method_call_arrow, sanitize_interp,
     single_field_binding_target, split_ternary_parts, wrap_event_handler_body,
 };
 use std::collections::HashMap;
@@ -94,6 +94,34 @@ fn is_merge_attr(name: &str) -> bool {
     matches!(norm_attr_name(name), "class" | "style")
 }
 
+/// `v-once` present on this element's own attrs (a create-once region marker).
+fn has_once_marker(attrs: &[ViewAttr]) -> bool {
+    attrs.iter().any(|a| is_once_marker(&a.name))
+}
+
+/// `v-once` on the node itself (shallow — descendants carry their own marker).
+fn node_has_once_marker(node: &ViewNode) -> bool {
+    match node {
+        ViewNode::Element { attrs, .. }
+        | ViewNode::Component { attrs, .. }
+        | ViewNode::Slot { attrs, .. } => has_once_marker(attrs),
+        ViewNode::Text { .. } | ViewNode::Interp { .. } | ViewNode::If { .. } => false,
+    }
+}
+
+/// `v-once` anywhere in this subtree — a row kernel must not keep patching it.
+fn subtree_has_once_marker(node: &ViewNode) -> bool {
+    match node {
+        ViewNode::Element { attrs, children, .. }
+        | ViewNode::Component { attrs, children, .. }
+        | ViewNode::Slot { attrs, children, .. } => {
+            has_once_marker(attrs) || children.iter().any(subtree_has_once_marker)
+        }
+        ViewNode::If { branches, .. } => branches.iter().any(|b| subtree_has_once_marker(&b.body)),
+        ViewNode::Text { .. } | ViewNode::Interp { .. } => false,
+    }
+}
+
 fn emit_merge_attr(
     attr_name: &str,
     merge_api: &str,
@@ -105,12 +133,32 @@ fn emit_merge_attr(
     scope: &[String],
     aliases: &[(String, String)],
     ir: &IrDepCursor<'_>,
+    once: bool,
     stmts: &mut Vec<String>,
 ) {
     if binds.is_empty() {
         if let Some(s) = static_base.filter(|s| !s.is_empty()) {
             stmts.push(format!("api.attr({el}, {}, {});", q(attr_name), q(s)));
         }
+        return;
+    }
+
+    // `v-once`: evaluate once at create time, never register a patch.
+    if once {
+        let mut eval_stmts = String::new();
+        let mut merge_args =
+            static_base.filter(|s| !s.is_empty()).map(q).unwrap_or_else(|| "null".to_string());
+        for (i, (expr, _)) in binds.iter().enumerate() {
+            let body = bind_template_expr(expr, fields, methods, scope, aliases);
+            eval_stmts.push_str(&format!(
+                "var __v{i}; try {{ __v{i} = {body}; }} catch {{ __v{i} = null; }} "
+            ));
+            merge_args.push_str(&format!(", __v{i}"));
+        }
+        stmts.push(format!(
+            "{{ {eval_stmts}api.attr({el}, {}, api.{merge_api}({merge_args})); }}",
+            q(attr_name)
+        ));
         return;
     }
 
@@ -352,6 +400,7 @@ fn emit_create_body(
         &mut stmts,
         next_id,
         child_ctors,
+        false,
     )?;
     let return_expr = match roots.len() {
         0 => "null".to_string(),
@@ -406,6 +455,7 @@ fn emit_nodes(
     stmts: &mut Vec<String>,
     next_id: &mut u32,
     child_ctors: &HashMap<String, String>,
+    once: bool,
 ) -> Result<Vec<String>, String> {
     let mut out = Vec::new();
     for node in nodes {
@@ -420,6 +470,7 @@ fn emit_nodes(
             stmts,
             next_id,
             child_ctors,
+            once,
         )?);
     }
     Ok(out)
@@ -436,6 +487,7 @@ fn emit_node(
     stmts: &mut Vec<String>,
     next_id: &mut u32,
     child_ctors: &HashMap<String, String>,
+    once: bool,
 ) -> Result<String, String> {
     match node {
         ViewNode::Text { value: t } => {
@@ -443,9 +495,18 @@ fn emit_node(
             stmts.push(format!("var {v} = api.text({});", q(t)));
             Ok(v)
         }
-        ViewNode::Interp { expr, binding } => {
-            emit_bind_text(expr, *binding, fields, scope, aliases, handler_ctx, ir, stmts, next_id)
-        }
+        ViewNode::Interp { expr, binding } => emit_bind_text(
+            expr,
+            *binding,
+            fields,
+            scope,
+            aliases,
+            handler_ctx,
+            ir,
+            stmts,
+            next_id,
+            once,
+        ),
         ViewNode::Element { .. } => emit_element(
             node,
             fields,
@@ -457,6 +518,7 @@ fn emit_node(
             stmts,
             next_id,
             child_ctors,
+            once,
         ),
         ViewNode::If { .. } => emit_if_block(
             node,
@@ -469,6 +531,7 @@ fn emit_node(
             stmts,
             next_id,
             child_ctors,
+            once,
         ),
         ViewNode::Component { tag, attrs, children } => emit_component(
             tag,
@@ -483,6 +546,7 @@ fn emit_node(
             stmts,
             next_id,
             child_ctors,
+            once,
         ),
         ViewNode::Slot { name, attrs, children } => {
             let mut attrs = attrs.clone();
@@ -512,6 +576,7 @@ fn emit_node(
                 stmts,
                 next_id,
                 child_ctors,
+                once,
             )
         }
     }
@@ -528,10 +593,13 @@ fn emit_if_block(
     stmts: &mut Vec<String>,
     next_id: &mut u32,
     child_ctors: &HashMap<String, String>,
+    once: bool,
 ) -> Result<String, String> {
     let ViewNode::If { binding, branches, region } = node else {
         return Ok("null".to_string());
     };
+    // `v-once` on a branch element freezes the whole if region (control + contents).
+    let once = once || branches.iter().any(|b| node_has_once_marker(&b.body));
     let first_cond = branches.iter().find_map(|b| b.cond.as_deref()).unwrap_or("");
     let (binding_id, all_deps) = binding_deps(ir, *binding, first_cond, fields, scope);
     let deps = deps_js(&all_deps);
@@ -549,6 +617,7 @@ fn emit_if_block(
             ir,
             next_id,
             child_ctors,
+            once,
         )?;
         match &br.cond {
             Some(c) => {
@@ -563,6 +632,14 @@ fn emit_if_block(
         }
     }
     let v = fresh("i", next_id);
+    // `v-once`: apply once at create, never subscribe the branch condition.
+    let track_line = if once {
+        String::new()
+    } else {
+        format!(
+            "  api.trackPatch(inst, [{deps}], apply, {id_arg});\n  if (api._itemPatches) api._itemPatches.push(apply);\n"
+        )
+    };
     stmts.push(format!(
         "var {v} = (function() {{
   var inst = this;
@@ -692,9 +769,7 @@ fn emit_if_block(
       }}
     }}
   }}
-  api.trackPatch(inst, [{deps}], apply, {id_arg});
-  if (api._itemPatches) api._itemPatches.push(apply);
-  start.__vmzDispose = function() {{
+{track_line}  start.__vmzDispose = function() {{
     for (var i = 0; i < cached.length; i++) {{
       unwireBranch(i);
       if (cached[i]) api.disposeTree(cached[i]);
@@ -708,8 +783,7 @@ fn emit_if_block(
         v = v,
         region_arg = region_arg,
         branch_objs = branch_objs.join(", "),
-        deps = deps,
-        id_arg = id_arg
+        track_line = track_line
     ));
     Ok(v)
 }
@@ -724,6 +798,7 @@ fn emit_branch_create_fn(
     ir: &mut IrDepCursor<'_>,
     next_id: &mut u32,
     child_ctors: &HashMap<String, String>,
+    once: bool,
 ) -> Result<String, String> {
     let mut stmts = Vec::new();
     let root = emit_node(
@@ -737,6 +812,7 @@ fn emit_branch_create_fn(
         &mut stmts,
         next_id,
         child_ctors,
+        once,
     )?;
     Ok(format!("function(api) {{\n{}  return {root};\n}}", indent_block(&stmts.join("\n"))))
 }
@@ -752,6 +828,7 @@ fn emit_element(
     stmts: &mut Vec<String>,
     next_id: &mut u32,
     child_ctors: &HashMap<String, String>,
+    once: bool,
 ) -> Result<String, String> {
     let ViewNode::Element { tag, attrs, children, each } = node else {
         return Ok("null".to_string());
@@ -771,6 +848,7 @@ fn emit_element(
             stmts,
             next_id,
             child_ctors,
+            once,
         );
     }
     emit_plain_element(
@@ -786,6 +864,7 @@ fn emit_element(
         stmts,
         next_id,
         child_ctors,
+        once,
     )
 }
 
@@ -802,13 +881,16 @@ fn emit_plain_element(
     stmts: &mut Vec<String>,
     next_id: &mut u32,
     child_ctors: &HashMap<String, String>,
+    once: bool,
 ) -> Result<String, String> {
+    // `v-once` on this element freezes this subtree (all descendants inherit it).
+    let once = once || has_once_marker(attrs);
     let el = fresh("e", next_id);
     stmts.push(format!("var {el} = api.el({});", q(tag)));
     stmts.push(format!("api.adoptEnter({el});"));
     let merge_plan = collect_merge_attr_plan(attrs);
     for a in attrs {
-        if a.name == "style:tw" || is_merge_attr(&a.name) {
+        if a.name == "style:tw" || is_merge_attr(&a.name) || is_once_marker(&a.name) {
             continue;
         }
         match &a.value {
@@ -838,6 +920,7 @@ fn emit_plain_element(
                     aliases,
                     ir,
                     stmts,
+                    once,
                 );
             }
             ViewAttrValue::Interp { expr: e } if is_text_attr(&a.name) => {
@@ -851,6 +934,7 @@ fn emit_plain_element(
                     aliases,
                     ir,
                     stmts,
+                    once,
                 );
             }
             ViewAttrValue::Interp { expr: e } if is_event_attr(&a.name) => {
@@ -965,6 +1049,7 @@ fn emit_plain_element(
                     aliases,
                     ir,
                     stmts,
+                    once,
                 );
             }
             ViewAttrValue::Interp { expr: e } => {
@@ -979,6 +1064,7 @@ fn emit_plain_element(
                     aliases,
                     ir,
                     stmts,
+                    once,
                 );
             }
         }
@@ -994,6 +1080,7 @@ fn emit_plain_element(
         scope,
         aliases,
         ir,
+        once,
         stmts,
     );
     emit_merge_attr(
@@ -1007,6 +1094,7 @@ fn emit_plain_element(
         scope,
         aliases,
         ir,
+        once,
         stmts,
     );
     for child in emit_nodes(
@@ -1020,6 +1108,7 @@ fn emit_plain_element(
         stmts,
         next_id,
         child_ctors,
+        once,
     )? {
         stmts.push(format!("{el}.appendChild({child});"));
     }
@@ -1040,12 +1129,15 @@ fn emit_component(
     stmts: &mut Vec<String>,
     next_id: &mut u32,
     child_ctors: &HashMap<String, String>,
+    once: bool,
 ) -> Result<String, String> {
+    // `v-once`: the host component and its slot subtree are frozen after create.
+    let once = once || has_once_marker(attrs);
     let mut client: Option<String> = None;
     let mut prop_parts = Vec::new();
     let mut event_parts: Vec<(String, String)> = Vec::new();
     for a in attrs {
-        if a.name == "style:tw" {
+        if a.name == "style:tw" || is_once_marker(&a.name) {
             continue;
         }
         if let Some(strategy) = a.name.strip_prefix("client:") {
@@ -1096,11 +1188,12 @@ fn emit_component(
     for (ev, handler) in &event_parts {
         stmts.push(format!("api.onComponentEvent({v}, {}, {handler});", q(ev)));
     }
-    if client.is_none() && aliases.is_empty() {
+    if !once && client.is_none() && aliases.is_empty() {
         for a in attrs {
             if a.name == "style:tw"
                 || a.name.starts_with("client:")
                 || is_component_event_attr(&a.name)
+                || is_once_marker(&a.name)
             {
                 continue;
             }
@@ -1133,6 +1226,7 @@ fn emit_component(
             stmts,
             next_id,
             child_ctors,
+            once,
         )?;
         for kid in kids {
             stmts.push(format!("api.projectDefaultSlot({v}, {kid});"));
@@ -1153,9 +1247,19 @@ fn emit_bind_attr(
     aliases: &[(String, String)],
     ir: &IrDepCursor<'_>,
     stmts: &mut Vec<String>,
+    once: bool,
 ) {
     let e = sanitize_interp(expr);
     let name = if attr_name == "className" { "class" } else { attr_name };
+    let body = bind_template_expr(&e, fields, methods, scope, aliases);
+    // `v-once`: evaluate at create time only, never register a patch.
+    if once {
+        stmts.push(format!(
+            "{{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} api.attr({el}, {}, __v); }}",
+            q(name)
+        ));
+        return;
+    }
     let (binding_id, deps, cf_js) = bind_payload(&e, binding, fields, methods, scope, aliases, ir);
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
     if cf_js.is_none()
@@ -1165,7 +1269,6 @@ fn emit_bind_attr(
         return;
     }
     let deps_js = deps_js(&deps);
-    let body = bind_template_expr(&e, fields, methods, scope, aliases);
     let patch_name =
         format!("__patchAttr{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
     if let Some(cf) = cf_js {
@@ -1230,11 +1333,19 @@ fn emit_bind_html(
     aliases: &[(String, String)],
     ir: &IrDepCursor<'_>,
     stmts: &mut Vec<String>,
+    once: bool,
 ) {
     let e = sanitize_interp(expr);
+    let body = bind_template_expr(&e, fields, methods, scope, aliases);
+    // `v-once`: write raw HTML once at create, never register a patch.
+    if once {
+        stmts.push(format!(
+            "{{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} {el}.innerHTML = __v == null ? '' : String(__v); }}"
+        ));
+        return;
+    }
     let (binding_id, deps, cf_js) = bind_payload(&e, binding, fields, methods, scope, aliases, ir);
     let deps_js = deps_js(&deps);
-    let body = bind_template_expr(&e, fields, methods, scope, aliases);
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
     let patch_name =
         format!("__patchHtml{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
@@ -1300,11 +1411,19 @@ fn emit_bind_show(
     aliases: &[(String, String)],
     ir: &IrDepCursor<'_>,
     stmts: &mut Vec<String>,
+    once: bool,
 ) {
     let e = sanitize_interp(expr);
+    let body = bind_template_expr(&e, fields, methods, scope, aliases);
+    // `v-once`: toggle display once at create, never register a patch.
+    if once {
+        stmts.push(format!(
+            "{{ var __cond; try {{ __cond = {body}; }} catch {{ __cond = false; }} {el}.style.display = __cond ? '' : 'none'; }}"
+        ));
+        return;
+    }
     let (binding_id, deps, _cf_js) = bind_payload(&e, binding, fields, methods, scope, aliases, ir);
     let deps_js = deps_js(&deps);
-    let body = bind_template_expr(&e, fields, methods, scope, aliases);
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
     let patch_name =
         format!("__patchShow{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
@@ -1329,11 +1448,19 @@ fn emit_bind_text_content(
     aliases: &[(String, String)],
     ir: &IrDepCursor<'_>,
     stmts: &mut Vec<String>,
+    once: bool,
 ) {
     let e = sanitize_interp(expr);
+    let body = bind_template_expr(&e, fields, methods, scope, aliases);
+    // `v-once`: set textContent once at create, never register a patch.
+    if once {
+        stmts.push(format!(
+            "{{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} {el}.textContent = __v == null ? '' : String(__v); }}"
+        ));
+        return;
+    }
     let (binding_id, deps, _cf_js) = bind_payload(&e, binding, fields, methods, scope, aliases, ir);
     let deps_js = deps_js(&deps);
-    let body = bind_template_expr(&e, fields, methods, scope, aliases);
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
     let patch_name =
         format!("__patchText{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
@@ -1361,7 +1488,10 @@ fn emit_each_block(
     stmts: &mut Vec<String>,
     next_id: &mut u32,
     child_ctors: &HashMap<String, String>,
+    once: bool,
 ) -> Result<String, String> {
+    // `v-once` on the list element (or an ancestor) freezes the rendered rows.
+    let once = once || has_once_marker(attrs);
     let depth = each_depth + 1;
     let box_id = format!("box{depth}");
     let mut child_scope = outer_scope.to_vec();
@@ -1401,18 +1531,24 @@ fn emit_each_block(
         .key_expr
         .as_ref()
         .map(|k| bind_template_expr(k, fields, handler_ctx.methods, &child_scope, &child_aliases));
-    let row_kernel = super::row_kernel::try_emit_row_kernel_js(
-        tag,
-        attrs,
-        children,
-        &each.as_name,
-        &box_id,
-        fields,
-        &child_scope,
-        &child_aliases,
-        key_bound.as_deref(),
-    )
-    .unwrap_or_default();
+    // `v-once` rows never re-render, so the fast clone kernel (and its host-field
+    // subscriptions) is disabled — the fat createItem evaluates each row once.
+    let row_kernel = if once || children.iter().any(subtree_has_once_marker) {
+        String::new()
+    } else {
+        super::row_kernel::try_emit_row_kernel_js(
+            tag,
+            attrs,
+            children,
+            &each.as_name,
+            &box_id,
+            fields,
+            &child_scope,
+            &child_aliases,
+            key_bound.as_deref(),
+        )
+        .unwrap_or_default()
+    };
     // Client hot path: rowKernel.create / cloneNode. With a kernel, omit fat createItem to
     // shrink bundles — but still emit IR-homologous serializeItem for SSR (same schedule as
     // today's fat createItem). Do not treat rowKernel.html as SSR truth source.
@@ -1431,6 +1567,7 @@ fn emit_each_block(
             &mut item_stmts,
             next_id,
             child_ctors,
+            once,
         )?;
         Ok(format!(
             "function(api, {box_id}) {{\n{}  return {item_root};\n}}",
@@ -1593,6 +1730,12 @@ fn emit_each_block(
     };
     let v = fresh("k", next_id);
     let region_arg = each.region.map(|r| r.0.to_string()).unwrap_or_else(|| "null".into());
+    // `v-once`: render the list once at create, never subscribe the list binding.
+    let track_line = if once {
+        String::new()
+    } else {
+        format!("  api.trackPatch(inst, [{deps}], apply, {id_arg});\n")
+    };
     stmts.push(format!(
         "var {v} = (function() {{
   var inst = this;
@@ -1627,8 +1770,7 @@ fn emit_each_block(
     var list = readList();
 {apply_body}
   }}
-  api.trackPatch(inst, [{deps}], apply, {id_arg});
-  apply();
+{track_line}  apply();
   return frag;
 }}).call(this);",
         row_tpl_helper = row_tpl_helper,
@@ -1641,8 +1783,7 @@ fn emit_each_block(
         serialize_item_field = serialize_item_field,
         create_item = create_item,
         region_arg = region_arg,
-        deps = deps,
-        id_arg = id_arg
+        track_line = track_line
     ));
     Ok(v)
 }
@@ -1657,12 +1798,21 @@ fn emit_bind_text(
     ir: &IrDepCursor<'_>,
     stmts: &mut Vec<String>,
     next_id: &mut u32,
+    once: bool,
 ) -> Result<String, String> {
     let e = sanitize_interp(expr);
-    let (binding_id, deps, cf_js) =
-        bind_payload(&e, binding, fields, handler_ctx.methods, scope, aliases, ir);
     let v = fresh("t", next_id);
     stmts.push(format!("var {v} = api.text(\"\");"));
+    let body = bind_template_expr(&e, fields, handler_ctx.methods, scope, aliases);
+    // `v-once`: write the interpolated value once at create, never register a patch.
+    if once {
+        stmts.push(format!(
+            "{{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} {v}.textContent = String(__v != null ? __v : ''); }}"
+        ));
+        return Ok(v);
+    }
+    let (binding_id, deps, cf_js) =
+        bind_payload(&e, binding, fields, handler_ctx.methods, scope, aliases, ir);
     let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
     if cf_js.is_none()
         && let Some(field) = single_field_binding_target(&e, fields, scope, aliases)
@@ -1671,7 +1821,6 @@ fn emit_bind_text(
         return Ok(v);
     }
     let deps = deps_js(&deps);
-    let body = bind_template_expr(&e, fields, handler_ctx.methods, scope, aliases);
     let patch_name =
         format!("__patchText{}", binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into()));
     if let Some(cf) = cf_js {

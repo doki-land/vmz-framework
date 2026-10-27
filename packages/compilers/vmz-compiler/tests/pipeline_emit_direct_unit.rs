@@ -100,6 +100,88 @@ export default class DealsPage {
 }
 
 #[test]
+fn v_once_region_emits_create_time_writes_without_any_subscription() {
+    let src = r#"
+export default class OnceDemo {
+  title = "t";
+  label = "hi";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl =
+        parse_template(r#"<div v-once :title="title">{{ label }}<span v-text="label"></span></div>"#)
+            .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    // Create-once: attributes / text are written once, no patch or dep subscription.
+    assert!(!js.contains("api.trackPatch("), "v-once region must not subscribe: {js}");
+    assert!(!js.contains("api.specField"), "v-once region must not specialize fields: {js}");
+    assert!(js.contains("api.attr("), "expected create-time attr write: {js}");
+    assert!(js.contains(".textContent = String("), "expected create-time text write: {js}");
+    assert!(!js.contains(r#""v-once""#), "marker must not leak as a DOM attribute: {js}");
+}
+
+#[test]
+fn v_once_does_not_freeze_parent_or_siblings() {
+    let src = r#"
+export default class OnceSiblings {
+  live = "a";
+  frozen = "b";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<div><p>{{ live }}</p><span v-once>{{ frozen }}</span></div>"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    // Only the sibling keeps a reactive patch; the once subtree writes once.
+    assert_eq!(
+        js.matches("api.specFieldText(this,").count()
+            + js.matches("api.trackPatch(this,").count(),
+        1,
+        "exactly one sibling patch expected: {js}"
+    );
+}
+
+#[test]
+fn v_once_if_freeze_keeps_structure_but_drops_condition_patch() {
+    let src = r#"
+export default class OnceBranch {
+  show = true;
+  label = "a";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<div><p v-if="show" v-once>{{ label }}</p></div>"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains(r#"api.comment("vmz-if")"#), "if structure must stay: {js}");
+    assert!(js.contains("apply();"), "branch create still runs once: {js}");
+    assert!(!js.contains("], apply, "), "v-once if must not subscribe cond: {js}");
+}
+
+#[test]
+fn v_once_each_freezes_rows_and_drops_row_kernel() {
+    let src = r#"
+export default class OnceList {
+  tags: { id: string; label: string }[] = [];
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl =
+        parse_template(r#"<ul><li v-for="tag in tags" :key="tag.id" v-once>{{ tag.label }}</li></ul>"#)
+            .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(!js.contains("rowKernel:"), "row kernel must be disabled for frozen rows: {js}");
+    assert!(js.contains("createItem: function("), "fat item create expected: {js}");
+    assert!(!js.contains("], apply, "), "v-once each must not subscribe the list: {js}");
+}
+
+#[test]
 fn component_tag_is_eligible() {
     let src = r#"
 export default class Host {

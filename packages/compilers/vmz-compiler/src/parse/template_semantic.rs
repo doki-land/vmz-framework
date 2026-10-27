@@ -891,6 +891,16 @@ fn lower_props(tag: &str, attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
                         span: *span,
                     });
                 }
+                // `v-once` is a region marker, not a prop: keep it as a Static marker
+                // (same shape as the verbatim `v-pre` marker) so it survives printing
+                // and reaches emit, while the subtree stays fully structured.
+                Directive::Once => {
+                    out.push(SemanticProp::Static {
+                        name: "v-once".into(),
+                        value: String::new(),
+                        span: *span,
+                    });
+                }
                 other => {
                     if matches!(
                         other,
@@ -993,6 +1003,7 @@ fn lower_attrs_verbatim(attrs: &[ConcreteAttr]) -> Vec<SemanticProp> {
             ConcreteAttr::Static { name, value, span } => (name.clone(), value.clone(), *span),
             ConcreteAttr::Directive { dir, span } => match dir {
                 Directive::Pre => ("v-pre".into(), String::new(), *span),
+                Directive::Once => ("v-once".into(), String::new(), *span),
                 Directive::If { test } => ("v-if".into(), test.clone(), *span),
                 Directive::ElseIf { test } => ("v-else-if".into(), test.clone(), *span),
                 Directive::Else => ("v-else".into(), String::new(), *span),

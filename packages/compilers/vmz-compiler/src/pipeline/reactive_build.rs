@@ -114,7 +114,7 @@ fn directive_exprs(dir: &Directive) -> Vec<&str> {
         | Directive::Model { expr, .. } => vec![expr.as_str()],
         Directive::Slot { props, .. } => props.as_deref().into_iter().collect(),
         Directive::Custom { expr, .. } => expr.as_deref().into_iter().collect(),
-        Directive::Pre => vec![],
+        Directive::Pre | Directive::Once => vec![],
     }
 }
 

@@ -314,6 +314,49 @@ fn v_pre_does_not_affect_siblings_or_parent() {
     assert_eq!(count_interpolations(children), 1);
 }
 
+#[test]
+fn accepts_v_once() {
+    // `v-once` takes no argument, no expression and no modifier — Vue accepts the bare
+    // form, and VMZ lowers it to a create-once region (see the emit tests).
+    assert_accepted(r#"<div v-once>{{ x }}</div>"#);
+    assert_accepted(r#"<div v-once>plain</div>"#);
+    assert_accepted(r#"<p v-once :id="x">{{ y }}</p>"#);
+    assert_accepted(r#"<li v-for="i in xs" v-once>{{ i }}</li>"#);
+    assert_accepted(r#"<section v-pre v-once>{{ x }}</section>"#);
+}
+
+#[test]
+fn rejects_v_once_with_argument_or_expression() {
+    // Not a custom directive: `v-once:x` / `v-once="x"` are structured errors on both
+    // the Oak-direct and Concrete→Semantic paths.
+    assert_rejected(r#"<div v-once:x>y</div>"#);
+    assert_rejected(r#"<div v-once="x">y</div>"#);
+}
+
+#[test]
+fn v_once_keeps_subtree_expressions_structured() {
+    // Unlike `v-pre`, `v-once` freezes evaluation frequency, not parsing: the subtree keeps
+    // its interpolations / bindings (validated and emitted once at create).
+    let body = r#"<div v-once :title="t">{{ x }}<span>{{ y }}</span></div>"#;
+    let oak = oak_semantic(body).expect("oak parse");
+    let adapter = adapter_semantic(body).expect("adapter parse");
+
+    for (label, semantic) in [("oak", oak), ("adapter", adapter)] {
+        let SemanticNode::Element { props, children, .. } = &semantic.roots[0] else {
+            panic!("{label}: expected root element");
+        };
+        assert!(
+            props.iter().any(|p| matches!(p, SemanticProp::Static { name, .. } if name == "v-once")),
+            "{label}: v-once should be kept as a Static region marker"
+        );
+        assert!(
+            props.iter().any(|p| matches!(p, SemanticProp::Bind { .. })),
+            "{label}: v-once must not drop the subtree binding"
+        );
+        assert_eq!(count_interpolations(children), 2, "{label}: interpolations must survive");
+    }
+}
+
 fn count_interpolations(nodes: &[SemanticNode]) -> usize {
     let mut n = 0;
     for node in nodes {
