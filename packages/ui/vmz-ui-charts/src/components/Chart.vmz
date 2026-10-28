@@ -68,9 +68,9 @@ import {
     fromRows,
     type ChartSpec,
     type DataSnapshot,
-} from "@doki-land/davinci-chart";
-import { resolve, renderSvg, type DisplayScene } from "@doki-land/davinci-scene";
-import { initialState, reduce, type RuntimeState, type Action } from "@doki-land/davinci-runtime";
+} from "@doki-land/davinci/chart";
+import { resolve, renderSvg, type DisplayScene } from "@doki-land/davinci/scene";
+import { initialState, reduce, type RuntimeState, type Action } from "@doki-land/davinci/runtime";
 
 export default class Chart {
     /** DaVinci ChartSpec（mark + encoding）。 */

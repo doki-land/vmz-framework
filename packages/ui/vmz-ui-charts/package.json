@@ -18,27 +18,11 @@
         "src"
     ],
     "peerDependencies": {
-        "@doki-land/davinci-chart": "workspace:*",
-        "@doki-land/davinci-diagram": "workspace:*",
-        "@doki-land/davinci-runtime": "workspace:*",
-        "@doki-land/davinci-scene": "workspace:*",
-        "@doki-land/davinci-types": "workspace:*",
+        "@doki-land/davinci": "workspace:*",
         "@vmz/ui": "workspace:*"
     },
     "peerDependenciesMeta": {
-        "@doki-land/davinci-chart": {
-            "optional": true
-        },
-        "@doki-land/davinci-diagram": {
-            "optional": true
-        },
-        "@doki-land/davinci-runtime": {
-            "optional": true
-        },
-        "@doki-land/davinci-scene": {
-            "optional": true
-        },
-        "@doki-land/davinci-types": {
+        "@doki-land/davinci": {
             "optional": true
         },
         "@vmz/ui": {
