@@ -1,0 +1,75 @@
+{
+    "name": "@doki-land/davinci",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/doki-land/vmz-framework.git",
+        "directory": "packages/davinci/davinci"
+    },
+    "version": "0.0.0",
+    "private": false,
+    "type": "module",
+    "description": "DaVinci engine facade — single public entry for chart/diagram/scene/types/runtime/motion. Tree-shakeable ESM.",
+    "license": "MIT",
+    "sideEffects": false,
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./types": {
+            "types": "./dist/types.d.ts",
+            "default": "./dist/types.js"
+        },
+        "./scene": {
+            "types": "./dist/scene.d.ts",
+            "default": "./dist/scene.js"
+        },
+        "./scene/svg": {
+            "types": "./dist/scene-svg.d.ts",
+            "default": "./dist/scene-svg.js"
+        },
+        "./chart": {
+            "types": "./dist/chart.d.ts",
+            "default": "./dist/chart.js"
+        },
+        "./diagram": {
+            "types": "./dist/diagram.d.ts",
+            "default": "./dist/diagram.js"
+        },
+        "./runtime": {
+            "types": "./dist/runtime.d.ts",
+            "default": "./dist/runtime.js"
+        },
+        "./motion": {
+            "types": "./dist/motion.d.ts",
+            "default": "./dist/motion.js"
+        }
+    },
+    "files": [
+        "src",
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json"
+    },
+    "dependencies": {
+        "@doki-land/davinci-chart": "workspace:*",
+        "@doki-land/davinci-diagram": "workspace:*",
+        "@doki-land/davinci-motion": "workspace:*",
+        "@doki-land/davinci-runtime": "workspace:*",
+        "@doki-land/davinci-scene": "workspace:*",
+        "@doki-land/davinci-types": "workspace:*"
+    },
+    "devDependencies": {
+        "typescript": "^5.8.3"
+    },
+    "keywords": [
+        "vmz",
+        "davinci",
+        "facade",
+        "chart",
+        "diagram",
+        "scene",
+        "visualization"
+    ]
+}
