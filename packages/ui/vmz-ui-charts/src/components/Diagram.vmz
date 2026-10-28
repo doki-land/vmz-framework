@@ -1,5 +1,5 @@
 <template>
-    <div data-vmz-ui-charts="diagram" class="vmz-ui-charts__diagram" :style="hostStyle()" @mouseover="_onMouseOver" @mouseout="_onMouseOut" @mousemove="_onMouseMove" @click="_onClick">
+    <div data-vmz-ui-charts="diagram" class="vmz-ui-charts__diagram" :style="hostStyle" @mouseover="_onMouseOver" @mouseout="_onMouseOut" @mousemove="_onMouseMove" @click="_onClick">
         <div v-if="_isEmpty()" class="vmz-ui-charts__empty">No diagram spec.</div>
         <div v-else>
             <div v-if="_hasError()" class="vmz-ui-charts__error-banner">
@@ -162,11 +162,11 @@ export default class Diagram {
         return this.diagnostics.some((d) => d.severity === "error");
     }
 
-    public hostStyle(): string {
+    public get hostStyle(): string {
         const w = this.scene && this.autoSize ? this.scene.width : this.width;
         const h = this.scene && this.autoSize ? this.scene.height : this.height;
         const hide = this._zeroSize() ? "display:none;" : "";
-        return "width:" + w + "px;height:" + h + "px;position:relative;" + hide;
+        return `width:${w}px;height:${h}px;position:relative;${hide}`;
     }
 
     /** DisplayScene → 确定性 SVG markup（SSR 安全，无 DOM API）。 */
@@ -271,7 +271,7 @@ export default class Diagram {
     }
 
     public _tooltipStyle(): string {
-        return "left:" + this._tooltip.x + "px;top:" + this._tooltip.y + "px";
+        return `left:${this._tooltip.x}px;top:${this._tooltip.y}px`;
     }
 
     // ---- Click → select dispatch + emit ----
