@@ -1,12 +1,25 @@
 <template>
-    <div data-vmz-ui-charts="chart" class="vmz-ui-charts__chart" :style="hostStyle()">
-        <div v-html="markup()" class="vmz-ui-charts__svg" />
+    <div data-vmz-ui-charts="chart" class="vmz-ui-charts__chart" :style="hostStyle()" @mouseover="_onMouseOver" @mouseout="_onMouseOut" @mousemove="_onMouseMove">
+        <div v-if="_isEmpty()" class="vmz-ui-charts__empty">No chart spec or data.</div>
+        <div v-else>
+            <div v-if="_hasError()" class="vmz-ui-charts__error-banner">
+                Chart compile failed — see diagnostics below.
+            </div>
+            <div v-html="markup()" class="vmz-ui-charts__svg" />
+        </div>
         <div v-if="diagnostics.length > 0" class="vmz-ui-charts__diag">
             <div v-for="(d, i) in diagnostics" :key="i" :data-sev="d.severity" class="vmz-ui-charts__diag-item">
                 {{ d.severity }}
                 :
                 {{ d.message }}
             </div>
+        </div>
+        <div
+            v-if="_tooltip.visible"
+            class="vmz-ui-charts__tooltip"
+            :style="_tooltipStyle()"
+        >
+            {{ _tooltip.text }}
         </div>
     </div>
 </template>
@@ -27,6 +40,26 @@
     width: 100%;
     height: 100%;
     display: block;
+}
+.vmz-ui-charts__empty {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--vmz-text-muted, #999);
+    font-size: 0.875rem;
+}
+.vmz-ui-charts__error-banner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: #c0392b;
+    color: #fff;
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    z-index: 2;
 }
 .vmz-ui-charts__diag {
     position: absolute;
@@ -49,6 +82,18 @@
 }
 .vmz-ui-charts__diag-item[data-sev="warning"] {
     color: #b7791f;
+}
+.vmz-ui-charts__tooltip {
+    position: absolute;
+    z-index: 999;
+    pointer-events: none;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 3px;
+    transform: translate(8px, 8px);
+    white-space: nowrap;
 }
 </style>
 <script client>
@@ -97,9 +142,29 @@ export default class Chart {
     public _widthAuto: boolean = false;
     public _heightAuto: boolean = false;
 
+    /** Tooltip 状态 —— 简化占位，真实 hit test 未来接入 runtime。 */
+    public _tooltip: { visible: boolean; x: number; y: number; text: string } = {
+        visible: false,
+        x: 0,
+        y: 0,
+        text: "",
+    };
+
     /** 零尺寸 guard —— 宽或高为 0 时跳过渲染避免 NaN / 空 SVG 闪烁。 */
     public _zeroSize(): boolean {
         return this.width <= 0 || this.height <= 0;
+    }
+
+    /** 空态判断 —— spec 或数据均缺失时渲染空态面板。 */
+    public _isEmpty(): boolean {
+        if (!this.spec) return true;
+        const hasData = !!(this.snapshot || (this.data && this.data.length > 0));
+        return !hasData;
+    }
+
+    /** 编译错误判断 —— diagnostics 中存在 severity="error"。 */
+    public _hasError(): boolean {
+        return this.diagnostics.some((d) => d.severity === "error");
     }
 
     /** 计算属性：spec / data / 尺寸变化时重新编译并解析为 DisplayScene。 */
@@ -179,6 +244,45 @@ export default class Chart {
         if (!this.state) return null;
         this.state = reduce(this.state, action);
         return this.state;
+    }
+
+    // ---- Mouse → tooltip placeholder ----
+
+    /** 当前 hover 的 row key —— 简化占位，真实 hit test 未来由 runtime 提供。 */
+    public _hoverRowKey: string | null = null;
+
+    /** 宿主可 override 的 hover 回调（事件名 `chart-hover`）。 */
+    public onchartHover(payload: { rowKey: string | number; x: number; y: number }): void {
+        // 默认空实现，宿主在组件实例上 override 即可接收事件。
+    }
+
+    public _onMouseOver(ev: MouseEvent): void {
+        // 简化占位：没有真实 hit test，用 runtime hoveredId（若存在）或 "row" 字样。
+        const rowKey = this.state && this.state.hoveredId ? this.state.hoveredId : "row";
+        this._hoverRowKey = rowKey;
+        this._tooltip.text = `hovering (${rowKey})`;
+    }
+
+    public _onMouseMove(ev: MouseEvent): void {
+        const root = (this as any).__vmzDomRoot as HTMLElement | undefined;
+        if (!root) return;
+        const rect = root.getBoundingClientRect();
+        this._tooltip.x = ev.clientX - rect.left;
+        this._tooltip.y = ev.clientY - rect.top;
+        this._tooltip.visible = true;
+        if (this._hoverRowKey !== null) {
+            this.onchartHover({ rowKey: this._hoverRowKey, x: this._tooltip.x, y: this._tooltip.y });
+        }
+    }
+
+    public _onMouseOut(): void {
+        this._tooltip.visible = false;
+        this._hoverRowKey = null;
+    }
+
+    /** tooltip inline style —— Oak template 不接受 `${}` 模板字符串，用拼接方法。 */
+    public _tooltipStyle(): string {
+        return "left:" + this._tooltip.x + "px;top:" + this._tooltip.y + "px";
     }
 }
 </script>
