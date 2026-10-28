@@ -1,0 +1,254 @@
+<template>
+    <SiteShell page="charts" variant="charts-gallery-page">
+        <main id="main" class="charts-gallery">
+            <header class="charts-gallery__head">
+                <p class="kicker">
+                    <span aria-hidden="true" class="kicker__dot" />
+                    {{ kickerLabel }}
+                </p>
+                <h1>
+                    {{ titleLabel }}
+                </h1>
+                <p class="charts-gallery__lead">
+                    {{ leadLabel }}
+                </p>
+            </header>
+
+            <section v-for="item in examples" :key="item.id" class="chart-card">
+                <header class="chart-card__head">
+                    <h2>{{ item.title }}</h2>
+                    <button type="button" class="chart-card__toggle" :aria-expanded="activeDetail === item.id ? 'true' : 'false'" @click="() => toggleDetail(item.id)">
+                        {{ getToggleLabel(item.id) }}
+                    </button>
+                </header>
+                <div class="chart-card__body">
+                    <div class="chart-card__canvas" v-html="item.svg" />
+                    <div v-if="activeDetail === item.id" class="chart-card__detail">
+                        <h3>{{ specTitleLabel }}</h3>
+                        <pre class="chart-card__code"><code>{{ item.specText }}</code></pre>
+                        <h3>{{ dataTitleLabel }}</h3>
+                        <pre class="chart-card__code"><code>{{ item.dataText }}</code></pre>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </SiteShell>
+</template>
+<style>
+.charts-gallery {
+    width: min(calc(100% - var(--site-gutter) * 2), var(--vmz-layout-max-width));
+    margin: 0 auto;
+    padding: calc(var(--site-section-pad) * 0.9) 0 var(--site-section-pad);
+}
+.charts-gallery__head {
+    display: grid;
+    gap: 0.75rem;
+    max-width: 46rem;
+    margin-bottom: 2rem;
+}
+.charts-gallery__head h1 {
+    margin: 0;
+    color: var(--vmz-text-ink);
+    font: 600 clamp(2rem, 4vw, 2.75rem) / 1.2 var(--vmz-font-display);
+}
+.charts-gallery__lead {
+    margin: 0;
+    color: var(--vmz-text-steel);
+    font: 400 1rem / 1.7 var(--vmz-font-sans);
+}
+.chart-card {
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+}
+.chart-card__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+.chart-card__head h2 {
+    margin: 0;
+    color: var(--vmz-text-ink);
+    font: 600 1.15rem / 1.6 var(--vmz-font-display);
+}
+.chart-card__toggle {
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-steel);
+    font: 500 0.8rem / 1 var(--vmz-font-sans);
+    cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease;
+}
+.chart-card__toggle:hover {
+    border-color: var(--vmz-text-steel);
+    color: var(--vmz-text-ink);
+}
+.chart-card__body {
+    display: grid;
+    gap: 1rem;
+}
+.chart-card__canvas {
+    padding: 1rem;
+    border: 1px dashed var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--vmz-surface-paper);
+}
+.chart-card__canvas svg {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+.chart-card__detail {
+    display: grid;
+    gap: 1rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--vmz-line-default);
+}
+.chart-card__detail h3 {
+    margin: 0;
+    color: var(--vmz-text-ink);
+    font: 600 0.9rem / 1.4 var(--vmz-font-display);
+}
+.chart-card__code {
+    margin: 0;
+    padding: 0.8rem 1rem;
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-fill);
+    overflow-x: auto;
+    font: 400 0.78rem / 1.55 var(--vmz-font-mono);
+    color: var(--vmz-text-ink);
+    white-space: pre;
+}
+</style>
+<script client>
+import { fromRows, compile } from "@doki-land/davinci-chart";
+import { buildScene } from "@doki-land/davinci-chart/scene";
+import { resolve } from "@doki-land/davinci-scene/resolve";
+import { renderSvg } from "@doki-land/davinci-scene/svg";
+import type { ChartSpec } from "@doki-land/davinci-chart/compile";
+import { pageMeta } from "./page-meta.ts";
+
+interface ChartExample {
+    id: string;
+    title: string;
+    svg: string;
+    specText: string;
+    dataText: string;
+}
+
+function buildExample(
+    id: string,
+    title: string,
+    spec: ChartSpec,
+    rows: Record<string, unknown>[],
+    width = 480,
+    height = 260,
+): ChartExample {
+    const data = fromRows(rows);
+    const plan = compile(spec, data);
+    const semantic = buildScene(plan, { width, height, padding: 32 });
+    const display = resolve(semantic, { width, height });
+    const svg = renderSvg(display);
+    return {
+        id,
+        title,
+        svg,
+        specText: JSON.stringify(spec, null, 2),
+        dataText: JSON.stringify(rows, null, 2),
+    };
+}
+
+const BAR_SPEC: ChartSpec = {
+    mark: "bar",
+    encoding: [
+        { field: "month", channel: "x" },
+        { field: "sales", channel: "y" },
+    ],
+};
+const BAR_ROWS = [
+    { month: "Jan", sales: 42 },
+    { month: "Feb", sales: 68 },
+    { month: "Mar", sales: 55 },
+    { month: "Apr", sales: 81 },
+    { month: "May", sales: 93 },
+    { month: "Jun", sales: 74 },
+];
+
+const LINE_SPEC: ChartSpec = {
+    mark: "line",
+    encoding: [
+        { field: "day", channel: "x" },
+        { field: "visitors", channel: "y" },
+    ],
+};
+const LINE_ROWS = [
+    { day: "Mon", visitors: 120 },
+    { day: "Tue", visitors: 145 },
+    { day: "Wed", visitors: 98 },
+    { day: "Thu", visitors: 187 },
+    { day: "Fri", visitors: 210 },
+    { day: "Sat", visitors: 176 },
+    { day: "Sun", visitors: 142 },
+];
+
+const SCATTER_SPEC: ChartSpec = {
+    mark: "point",
+    encoding: [
+        { field: "score", channel: "x" },
+        { field: "time", channel: "y" },
+    ],
+};
+const SCATTER_ROWS = [
+    { score: 82, time: 45 },
+    { score: 75, time: 38 },
+    { score: 91, time: 52 },
+    { score: 68, time: 41 },
+    { score: 88, time: 48 },
+    { score: 73, time: 35 },
+    { score: 95, time: 55 },
+    { score: 61, time: 32 },
+    { score: 84, time: 44 },
+];
+
+export default class ChartGalleryPage {
+    static meta = pageMeta(
+        "图表预览 · VMZ",
+        "Chart gallery · VMZ",
+        "VMZ 集成的 DaVinci 图表库预览，展示静态 bar、line、scatter 示例。",
+        "Preview of VMZ-integrated DaVinci charts with static bar, line, and scatter examples.",
+    );
+
+    kickerLabel = "VMZ · DaVinci Charts";
+    titleLabel = "图表预览";
+    leadLabel = "消费 workspace 内的 @doki-land/davinci-chart 与 @doki-land/davinci-scene，展示编译→场景→SVG 流水线的静态输出。";
+    specTitleLabel = "ChartSpec";
+    dataTitleLabel = "示例数据";
+    showSpecLabel = "查看规格";
+    hideSpecLabel = "收起规格";
+
+    activeDetail = "";
+
+    examples: ChartExample[] = [
+        buildExample("bar", "柱状图 · Bar", BAR_SPEC, BAR_ROWS),
+        buildExample("line", "折线图 · Line", LINE_SPEC, LINE_ROWS),
+        buildExample("scatter", "散点图 · Scatter", SCATTER_SPEC, SCATTER_ROWS),
+    ];
+
+    toggleDetail(id: string) {
+        this.activeDetail = this.activeDetail === id ? "" : id;
+    }
+
+    getToggleLabel(id: string): string {
+        return this.activeDetail === id ? this.hideSpecLabel : this.showSpecLabel;
+    }
+}
+</script>
