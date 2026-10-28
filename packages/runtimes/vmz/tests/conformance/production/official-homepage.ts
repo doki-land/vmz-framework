@@ -12,6 +12,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { addLimitation, readProof, runVmzBuild, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
+import { ensureDavinciFacade } from '../_lib/ensure-davinci-facade.ts';
 import { fetchHomepageSsrHtml, waitServeReady } from '../_lib/homepage-ssr-fetch.ts';
 import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
 import { proveHomepageLocaleTransition as proveHomepageLocaleTransitionImpl } from './homepage-locale-fixture.ts';
@@ -122,6 +123,7 @@ if (!dialogSrc.includes('dismiss') || !dialogSrc.includes('Escape')) {
 }
 
 console.log('official-homepage: build homepage…');
+ensureDavinciFacade(root);
 const homeBuild = runVmzBuild(HOMEPAGE, root);
 if (homeBuild.status !== 0) {
     errors.push(`homepage build failed: ${(homeBuild.stderr || homeBuild.stdout).slice(0, 1200)}`);

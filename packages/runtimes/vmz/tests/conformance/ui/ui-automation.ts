@@ -17,6 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
+import { ensureDavinciFacade } from '../_lib/ensure-davinci-facade.ts';
 import { serveHostChildEnv, serveHostProjectEnv } from '../_lib/serve-host-env.ts';
 
 const root = repoRoot(import.meta.url);
@@ -201,6 +202,7 @@ if (pkg.vmz?.componentsRoot) {
 }
 
 console.log('ui-automation: homepage semantic action tokens…');
+ensureDavinciFacade(root);
 const homeDesigns = path.join(homepage, 'designs', 'tokens', 'semantic-action.json');
 const homeMotion = path.join(homepage, 'designs', 'tokens', 'semantic-motion.json');
 const homeStatus = path.join(homepage, 'designs', 'tokens', 'semantic-status.json');

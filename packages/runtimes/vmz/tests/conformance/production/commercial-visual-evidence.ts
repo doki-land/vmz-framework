@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { addLimitation, readProof, runVmzBuild, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 import { repoRoot } from '../_lib/repo-root.ts';
+import { ensureDavinciFacade } from '../_lib/ensure-davinci-facade.ts';
 
 const root = repoRoot(import.meta.url);
 const HOMEPAGE = 'packages/homepage';
@@ -21,6 +22,7 @@ function fail(msg: string): never {
 }
 
 console.log('commercial-visual-evidence: build homepage…');
+ensureDavinciFacade(root);
 const build = runVmzBuild(HOMEPAGE, root);
 if (build.status !== 0) {
     fail(`homepage build exited ${build.status}\n${(build.stderr || build.stdout).slice(0, 1200)}`);

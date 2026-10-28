@@ -9,6 +9,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { listenLocalStaticHost } from 'vmz';
 import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
+import { ensureDavinciFacade } from '../_lib/ensure-davinci-facade.ts';
 import { assertHashedCssImportsHttp } from '../_lib/assert-hashed-css-imports.ts';
 import { serveHostChildEnv, resolveProfileArtifactDir } from '../_lib/serve-host-env.ts';
 import { addLimitation, readProof, upsertCheck, writeProof } from '../_lib/production-proof.ts';
@@ -272,6 +273,7 @@ writeProof(proof, root);
 
 // Nested @vmz/ui: official homepage static assemble (component registry preload).
 console.log('static-delivery: homepage @vmz/ui static assemble…');
+ensureDavinciFacade(root);
 const homepage = path.join(root, 'packages/homepage');
 const homepageOutRoot = path.join(homepage, 'dist');
 const homepageStatic = path.join(homepageOutRoot, 'static');

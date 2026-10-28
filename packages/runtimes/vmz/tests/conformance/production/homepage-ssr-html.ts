@@ -9,6 +9,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { addLimitation, readProof, runVmzBuild, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 import { repoRoot } from '../_lib/repo-root.ts';
+import { ensureDavinciFacade } from '../_lib/ensure-davinci-facade.ts';
 import { fetchHomepageSsrHtml, waitServeReady } from '../_lib/homepage-ssr-fetch.ts';
 import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
 
@@ -42,6 +43,7 @@ async function stopServeChild(child: ReturnType<typeof spawn> | null | undefined
 }
 
 console.log('homepage-ssr-html: build homepage…');
+ensureDavinciFacade(root);
 const build = runVmzBuild(HOMEPAGE, root);
 if (build.status !== 0) {
     fail(`homepage build exited ${build.status}\n${(build.stderr || build.stdout).slice(0, 1200)}`);
