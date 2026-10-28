@@ -6,6 +6,7 @@
         "directory": "packages/davinci/davinci-diagram"
     },
     "version": "0.0.0",
+    "private": true,
     "type": "module",
     "description": "DaVinci Diagram domain: DiagramSpec -> DiagramLayoutPlan -> SemanticScene -> DisplayScene.",
     "license": "MIT",

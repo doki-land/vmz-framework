@@ -6,6 +6,7 @@
         "directory": "packages/ui/vmz-ui-charts"
     },
     "version": "0.0.0",
+    "private": true,
     "type": "module",
     "description": "VMZ UI Charts — author-facing Vue bindings for DaVinci. Container sizing, lifecycle, property/attribute/event binding. Not a second chart engine.",
     "license": "MIT",

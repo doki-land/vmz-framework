@@ -6,6 +6,7 @@
         "directory": "packages/davinci/davinci-runtime"
     },
     "version": "0.0.0",
+    "private": true,
     "type": "module",
     "description": "DaVinci Runtime: RuntimeState, normalized events, reducer, invalidation graph, hit test.",
     "license": "MIT",

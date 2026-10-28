@@ -6,6 +6,7 @@
         "directory": "packages/davinci/davinci-motion"
     },
     "version": "0.0.0",
+    "private": true,
     "type": "module",
     "description": "DaVinci Motion: scene correspondence, transition plan, timeline, interruption.",
     "license": "MIT",

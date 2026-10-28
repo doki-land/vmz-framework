@@ -6,6 +6,7 @@
         "directory": "packages/davinci/davinci-types"
     },
     "version": "0.0.0",
+    "private": true,
     "type": "module",
     "description": "DaVinci shared types: geometry, color, text, bounds, diagnostics. No dependencies.",
     "license": "MIT",
