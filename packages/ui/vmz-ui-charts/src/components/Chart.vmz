@@ -87,8 +87,28 @@ export default class Chart {
     /** `compile` 产出的只读诊断（code / severity / message），宿主只读展示。 */
     public diagnostics: ReadonlyArray<{ severity: string; code: string; message: string }> = [];
 
+    // ---- 交互与生命周期内部字段 ----
+
+    /** 每次 scene() 计算递增。异步返回时先比对再应用，为未来异步管线预留。 */
+    public _latestRevision: number = 0;
+    /** ResizeObserver 实例，onMount 创建 onUnmount 断开。 */
+    public _resizeObserver: ResizeObserver | null = null;
+    /** 宿主显式传了 width / height 时为 true。ResizeObserver 只在 auto 模式下回写。 */
+    public _widthAuto: boolean = false;
+    public _heightAuto: boolean = false;
+
+    /** 零尺寸 guard —— 宽或高为 0 时跳过渲染避免 NaN / 空 SVG 闪烁。 */
+    public _zeroSize(): boolean {
+        return this.width <= 0 || this.height <= 0;
+    }
+
     /** 计算属性：spec / data / 尺寸变化时重新编译并解析为 DisplayScene。 */
     public scene(): DisplayScene | null {
+        this._latestRevision++;
+        if (this._zeroSize()) {
+            this.diagnostics = [];
+            return null;
+        }
         const snapshot = this.snapshot ?? (this.data ? fromRows(this.data) : null);
         if (!this.spec || !snapshot) {
             this.diagnostics = [];
@@ -106,16 +126,52 @@ export default class Chart {
 
     /** DisplayScene → 确定性 SVG markup（SSR 安全，无 DOM API）。 */
     public markup(): string {
+        if (this._zeroSize()) return "";
         const scene = this.scene();
         return scene ? renderSvg(scene) : "";
     }
 
     public hostStyle(): string {
-        return `width:${this.width}px;height:${this.height}px;position:relative`;
+        const hideSvg = this._zeroSize() ? "display:none;" : "";
+        return `width:${this.width}px;height:${this.height}px;position:relative;${hideSvg}`;
     }
 
     onMount() {
         this.state = initialState(this.width, this.height);
+        this._attachResizeObserver();
+    }
+
+    onUnmount() {
+        this._detachResizeObserver();
+    }
+
+    public _attachResizeObserver(): void {
+        if (typeof ResizeObserver === "undefined") return;
+        const root = (this as any).__vmzDomRoot as HTMLElement | undefined;
+        if (!root || typeof (root as any).getBoundingClientRect !== "function") return;
+        const ro = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const cr = (entry as any).contentRect as DOMRectReadOnly | undefined;
+                if (!cr) continue;
+                const w = Math.round(cr.width);
+                const h = Math.round(cr.height);
+                if (this._widthAuto && w > 0 && w !== this.width) this.width = w;
+                if (this._heightAuto && h > 0 && h !== this.height) this.height = h;
+                // 无论 auto 与否，runtime container state 总是同步。
+                if (this.state) {
+                    this.state = reduce(this.state, { kind: "container-resize", w, h });
+                }
+            }
+        });
+        ro.observe(root);
+        this._resizeObserver = ro;
+    }
+
+    public _detachResizeObserver(): void {
+        if (this._resizeObserver) {
+            this._resizeObserver.disconnect();
+            this._resizeObserver = null;
+        }
     }
 
     /** 派发交互 action → 返回新 runtime state。 */
