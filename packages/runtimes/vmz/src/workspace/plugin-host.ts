@@ -329,13 +329,12 @@ function buildMathFacade(defaultEngine, engines) {
             const tag = engineToTag(eng);
             const kw = i === 0 ? 'v-if' : 'v-else-if';
             const engLit = jsSingleQuoted(eng);
-            return `  <${tag} ${kw}="(engine || ${defaultLit}) === ${engLit}" :tex="tex" :display="display" />`;
+            return `    <${tag} ${kw}="(engine || ${defaultLit}) === ${engLit}" :tex="tex" :display="display" />`;
         })
         .join('\n');
     return `<template>
 ${branches}
 </template>
-
 <script client>
 export default class Math {
   public tex: string = '';
@@ -357,13 +356,12 @@ function buildCodeFacade(defaultEngine, engines) {
             const tag = engineToTag(eng);
             const kw = i === 0 ? 'v-if' : 'v-else-if';
             const engLit = jsSingleQuoted(eng);
-            return `  <${tag} ${kw}="(engine || ${defaultLit}) === ${engLit}" :code="code" :lang="lang" :theme="theme" />`;
+            return `    <${tag} ${kw}="(engine || ${defaultLit}) === ${engLit}" :code="code" :lang="lang" :theme="theme" />`;
         })
         .join('\n');
     return `<template>
 ${branches}
 </template>
-
 <script client>
 export default class Code {
   public code: string = '';
@@ -386,13 +384,12 @@ function buildMarkdownFacade(defaultEngine, engines) {
             const tag = engineToTag(eng);
             const kw = i === 0 ? 'v-if' : 'v-else-if';
             const engLit = jsSingleQuoted(eng);
-            return `  <${tag} ${kw}="(engine || ${defaultLit}) === ${engLit}" :source="source" />`;
+            return `    <${tag} ${kw}="(engine || ${defaultLit}) === ${engLit}" :source="source" />`;
         })
         .join('\n');
     return `<template>
 ${branches}
 </template>
-
 <script client>
 export default class Markdown {
   public source: string = '';
