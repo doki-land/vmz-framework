@@ -13,82 +13,46 @@
                     {{ leadLabel }}
                 </p>
             </header>
-
-            <section class="icons-gallery__toolbar" aria-label="Icon gallery controls">
+            <section aria-label="Icon gallery controls" class="icons-gallery__toolbar">
                 <label class="icons-gallery__search">
-                    <span class="sr-only">搜索图标</span>
-                    <input
-                        type="search"
-                        placeholder="{{ searchPlaceholderLabel }}"
-                        :value="searchQuery"
-                        @input="(e) => (searchQuery = (e.target as HTMLInputElement).value)"
-                    />
+                    <span class="sr-only">
+                        搜索图标
+                    </span>
+                    <input type="search" placeholder="{{ searchPlaceholderLabel }}" :value="searchQuery" @input="(e) => (searchQuery = (e.target as HTMLInputElement).value)" />
                 </label>
-
-                <div class="icons-gallery__size-switch" role="group" :aria-label="sizeAriaLabel">
-                    <button
-                        v-for="sz in sizeOptions"
-                        :key="sz.value"
-                        type="button"
-                        class="icons-gallery__size-btn"
-                        :data-active="sizePx === sz.value ? 'true' : 'false'"
-                        :aria-pressed="sizePx === sz.value ? 'true' : 'false'"
-                        @click="() => (sizePx = sz.value)"
-                    >
+                <div role="group" :aria-label="sizeAriaLabel" class="icons-gallery__size-switch">
+                    <button v-for="sz in sizeOptions" :key="sz.value" type="button" :data-active="sizePx === sz.value ? 'true' : 'false'" :aria-pressed="sizePx === sz.value ? 'true' : 'false'" @click="() => (sizePx = sz.value)" class="icons-gallery__size-btn">
                         {{ sz.label }}
                     </button>
                 </div>
-
-                <div class="icons-gallery__theme-switch" role="group" :aria-label="themeAriaLabel">
-                    <button
-                        type="button"
-                        class="icons-gallery__theme-btn"
-                        :data-active="themeMode === 'light' ? 'true' : 'false'"
-                        :aria-pressed="themeMode === 'light' ? 'true' : 'false'"
-                        @click="() => (themeMode = 'light')"
-                    >
+                <div role="group" :aria-label="themeAriaLabel" class="icons-gallery__theme-switch">
+                    <button type="button" :data-active="themeMode === 'light' ? 'true' : 'false'" :aria-pressed="themeMode === 'light' ? 'true' : 'false'" @click="() => (themeMode = 'light')" class="icons-gallery__theme-btn">
                         {{ themeLightLabel }}
                     </button>
-                    <button
-                        type="button"
-                        class="icons-gallery__theme-btn"
-                        :data-active="themeMode === 'night' ? 'true' : 'false'"
-                        :aria-pressed="themeMode === 'night' ? 'true' : 'false'"
-                        @click="() => (themeMode = 'night')"
-                    >
+                    <button type="button" :data-active="themeMode === 'night' ? 'true' : 'false'" :aria-pressed="themeMode === 'night' ? 'true' : 'false'" @click="() => (themeMode = 'night')" class="icons-gallery__theme-btn">
                         {{ themeNightLabel }}
                     </button>
                 </div>
             </section>
-
-            <section
-                v-for="group in filteredGroups"
-                :key="group.prefix"
-                :aria-labelledby="'icons-group-' + group.prefix"
-                class="icons-group"
-            >
+            <section v-for="group in filteredGroups" :key="group.prefix" :aria-labelledby="'icons-group-' + group.prefix" class="icons-group">
                 <h2 :id="'icons-group-' + group.prefix">
                     {{ group.label }}
-                    <span class="icons-group__count">{{ group.items.length }}</span>
+                    <span class="icons-group__count">
+                        {{ group.items.length }}
+                    </span>
                 </h2>
                 <div class="icons-group__grid">
-                    <button
-                        v-for="entry in group.items"
-                        :key="entry.name"
-                        type="button"
-                        class="icon-card"
-                        :data-active="selectedName === entry.name ? 'true' : 'false'"
-                        @click="() => (selectedName = entry.name)"
-                    >
+                    <button v-for="entry in group.items" :key="entry.name" type="button" :data-active="selectedName === entry.name ? 'true' : 'false'" @click="() => (selectedName = entry.name)" class="icon-card">
                         <span class="icon-card__glyph" :style="{ fontSize: sizePx + 'px' }">
                             <Icon :name="entry.name" :size="sizeToken" />
                         </span>
-                        <span class="icon-card__name">{{ entry.name }}</span>
+                        <span class="icon-card__name">
+                            {{ entry.name }}
+                        </span>
                     </button>
                 </div>
             </section>
-
-            <section v-if="selectedEntry" class="icons-gallery__detail" aria-live="polite">
+            <section v-if="selectedEntry" aria-live="polite" class="icons-gallery__detail">
                 <h2>
                     {{ detailTitleLabel }}
                 </h2>
@@ -97,15 +61,30 @@
                         <Icon :name="selectedEntry.name" :size="sizeToken" />
                     </div>
                     <dl class="icons-gallery__detail-meta">
-                        <dt>{{ detailNameLabel }}</dt>
-                        <dd><code>{{ selectedEntry.name }}</code></dd>
-                        <dt>{{ detailKindLabel }}</dt>
-                        <dd><code>{{ selectedEntry.def.kind }}</code></dd>
+                        <dt>
+                            {{ detailNameLabel }}
+                        </dt>
+                        <dd>
+                            <code>
+                                {{ selectedEntry.name }}
+                            </code>
+                        </dd>
+                        <dt>
+                            {{ detailKindLabel }}
+                        </dt>
+                        <dd>
+                            <code>
+                                {{ selectedEntry.def.kind }}
+                            </code>
+                        </dd>
                     </dl>
-                    <pre class="icons-gallery__code"><code>{{ usageCode }}</code></pre>
+                    <pre class="icons-gallery__code">
+                        <code>
+                            {{ usageCode }}
+                        </code>
+                    </pre>
                 </div>
             </section>
-
             <p v-if="filteredGroups.length === 0" class="icons-gallery__empty">
                 {{ emptyLabel }}
             </p>
