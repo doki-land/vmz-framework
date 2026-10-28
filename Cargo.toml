@@ -41,11 +41,12 @@ vmz-plugin-tailwind = { path = "packages/compilers/vmz-plugin-tailwind" }
 vmz-plugin-sasso = { path = "packages/compilers/vmz-plugin-sasso" }
 vmz-oak-frontend-adapter = { path = "packages/compilers/vmz-oak-frontend-adapter" }
 
-# Oaks frontend (Vue SFC / CST). CI / publish resolve git `dev` only.
+# Oaks frontend (Vue SFC / CST). Git deps are pinned to a fixed `rev` so CI and
+# local resolve the exact same commit.
 # Overlaid by local path `.cargo/config.toml` (git ignored).
-oak-core = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
-oak-vue = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
-oak-typescript = { git = "https://github.com/yggdrasil-language/oaks.git", branch = "dev" }
+oak-core = { git = "https://github.com/yggdrasil-language/oaks.git", rev = "8c85395188b882cef129f32cf5e8588bb91f1186" }
+oak-vue = { git = "https://github.com/yggdrasil-language/oaks.git", rev = "8c85395188b882cef129f32cf5e8588bb91f1186" }
+oak-typescript = { git = "https://github.com/yggdrasil-language/oaks.git", rev = "8c85395188b882cef129f32cf5e8588bb91f1186" }
 editorconfig = "1.0.0"
 
 clap = { version = "4.6.6", features = ["derive"] }
@@ -59,15 +60,15 @@ yaml_serde = "0.10.6"
 sha2 = "0.11.0"
 thiserror = "2.0.20"
 # Overlaid by local path `.cargo/config.toml` (git ignored).
-boost-fs = { git = "https://github.com/oovm/rust-boost", branch = "dev" }
-boost-http = { git = "https://github.com/oovm/rust-boost", branch = "dev" }
+boost-fs = { git = "https://github.com/oovm/rust-boost", rev = "7ba022a049cafef979dfe7a8adf81d9a0d3dd373" }
+boost-http = { git = "https://github.com/oovm/rust-boost", rev = "7ba022a049cafef979dfe7a8adf81d9a0d3dd373" }
 tokio = { version = "1", features = ["rt", "time", "macros"] }
 
 napi = { version = "3.12.1", default-features = true, features = ["napi4"] }
 napi-derive = "3.6.3"
 sasso = "0.8.1"
-tailwind = { git = "https://github.com/oovm/tailwind-rs.git", branch = "dev" }
-tailwind-css = { git = "https://github.com/oovm/tailwind-rs.git", branch = "dev" }
+tailwind = { git = "https://github.com/oovm/tailwind-rs.git", rev = "0ea043f3194e4abf02759d05f64a978b0042727a" }
+tailwind-css = { git = "https://github.com/oovm/tailwind-rs.git", rev = "0ea043f3194e4abf02759d05f64a978b0042727a" }
 
 [profile.release]
 lto = true
