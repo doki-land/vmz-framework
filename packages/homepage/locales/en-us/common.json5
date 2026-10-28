@@ -162,6 +162,8 @@
   langZh: '简中',
   langZhFull: '简体中文',
   navAbout: 'About VMZ',
+  navCharts: 'Chart gallery',
+  navIcons: 'Icon gallery',
   skipToContent: 'Skip to main content',
   navDocs: 'Docs',
   navLab: 'Components',

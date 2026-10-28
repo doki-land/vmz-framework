@@ -70,6 +70,8 @@ import {
     navProduct,
     navShowcase,
     navLab,
+    navIcons,
+    navCharts,
     navAbout,
 } from "#locales/common";
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
@@ -138,6 +140,8 @@ export default class SiteFooter {
                 docs: docs(),
                 showcase: navShowcase(),
                 lab: navLab(),
+                icons: navIcons(),
+                charts: navCharts(),
                 about: navAbout(),
             },
             paths.docsRootHref,

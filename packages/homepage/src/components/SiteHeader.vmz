@@ -68,6 +68,8 @@ import {
     navDocs,
     navShowcase,
     navLab,
+    navIcons,
+    navCharts,
     navAbout,
 } from "#locales/common";
 import { docsPaths, readLocaleId, withLocaleHint, watchDocumentLocale } from "../locale/copy.ts";
@@ -123,6 +125,8 @@ export default class SiteHeader {
                 docs: navDocs(),
                 showcase: navShowcase(),
                 lab: navLab(),
+                icons: navIcons(),
+                charts: navCharts(),
                 about: navAbout(),
             },
             paths.docsRootHref,

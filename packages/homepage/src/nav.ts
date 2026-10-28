@@ -4,13 +4,15 @@
 
 const DEFAULT_LOCALE = 'zh-hans';
 
-const NAV_ORDER = ['product', 'docs', 'showcase', 'lab', 'about'];
+const NAV_ORDER = ['product', 'docs', 'showcase', 'lab', 'icons', 'charts', 'about'];
 
 const ACTIVE_PREFIXES = {
     product: ['/product'],
     docs: ['/d'],
     showcase: ['/commercial', '/console'],
     lab: ['/lab'],
+    icons: ['/icons'],
+    charts: ['/charts'],
     about: ['/welcome'],
 };
 
@@ -29,6 +31,8 @@ export function navHref(id: string, localeId: string, docsRootHref: string): str
     if (id === 'product') return `${prefix}/product`;
     if (id === 'showcase') return `${prefix}/commercial`;
     if (id === 'lab') return `${prefix}/lab`;
+    if (id === 'icons') return `${prefix}/icons`;
+    if (id === 'charts') return `${prefix}/charts`;
     return `${prefix}/welcome`;
 }
 
