@@ -46,23 +46,25 @@ interface PositionedMark {
 }
 
 const DEFAULT_PADDING = 16;
+// Base fill for ungrouped marks (no color/series encoding). Grouped marks use
+// LEGEND_PALETTE via `seriesColor` so each series is visually distinct.
 const MARK_FILL: RGBA = rgb8(51, 51, 51);
-const LINE_STROKE = { color: MARK_FILL, width: 2 };
-const POINT_RADIUS = 3;
-const BAR_RATIO = 0.8;
+const LINE_STROKE_WIDTH = 2;
+const POINT_RADIUS = 5;
+const BAR_RATIO = 0.72;
 
 // Guides (baselines, ticks, labels, legend) share one muted palette so the
 // marks stay visually dominant.
 const AXIS_STROKE = { color: rgb8(160, 160, 160), width: 1 };
 const LABEL_COLOR: RGBA = rgb8(85, 85, 85);
-const LABEL_FONT: FontSpec = { family: "sans-serif", sizePx: 10 };
+const LABEL_FONT: FontSpec = { family: "sans-serif", sizePx: 11 };
 const LEGEND_FONT: FontSpec = { family: "sans-serif", sizePx: 11 };
 const TICK_LENGTH = 4;
-const LABEL_GAP = 4;
+const LABEL_GAP = 6;
 const LEGEND_SWATCH = 10;
 const LEGEND_SWATCH_GAP = 6;
 const LEGEND_EDGE_GAP = 6;
-const LEGEND_ITEM_STEP = 15;
+const LEGEND_ITEM_STEP = 18;
 const MAX_TICK_DECIMALS = 6;
 const MAX_TICKS = 12;
 const LEGEND_PALETTE: ReadonlyArray<RGBA> = [
@@ -74,16 +76,50 @@ const LEGEND_PALETTE: ReadonlyArray<RGBA> = [
     rgb8(140, 86, 75),
 ];
 
+/** Given a series label, return its LEGEND_PALETTE index (stable across callers). */
+function seriesPaletteIndex(categories: ReadonlyArray<string>, series: string): number {
+    const idx = categories.indexOf(series);
+    return idx < 0 ? 0 : idx;
+}
+
+/** Given a series label, return its palette color. Falls back to MARK_FILL when ungrouped. */
+function seriesColor(categories: ReadonlyArray<string> | undefined, series: string | null): RGBA {
+    if (!categories || categories.length === 0 || series === null) return MARK_FILL;
+    return LEGEND_PALETTE[seriesPaletteIndex(categories, series) % LEGEND_PALETTE.length];
+}
+
+/** Collect unique non-null category values from a data column, preserving first-seen order. */
+function collectCategories(col: { values: ReadonlyArray<unknown> } | undefined): string[] {
+    if (!col) return [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const v of col.values) {
+        if (v === null || v === undefined) continue;
+        if (typeof v === "number" && !Number.isFinite(v)) continue;
+        const key = String(v);
+        if (!seen.has(key)) {
+            seen.add(key);
+            out.push(key);
+        }
+    }
+    return out;
+}
+
 /** Build a SemanticScene from a ChartCompilePlan and a pixel viewport. */
 export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport): SemanticScene {
-    const plot = plotRect(viewport);
-    const children: SemanticNode[] = [];
-
     const xEnc = plan.spec.encoding.find((e) => e.channel === "x");
     const yEnc = plan.spec.encoding.find((e) => e.channel === "y");
     const seriesEnc = plan.spec.encoding.find(
         (e) => e.channel === "series" || e.channel === "color" || e.channel === "group",
     );
+    const seriesCategories = seriesEnc ? collectCategories(column(plan.resolvedData, seriesEnc.field)) : undefined;
+
+    // Compute adaptive plot padding so axis labels and tick marks do not get
+    // clipped. Defaults are only a floor — Y-axis label width and X-axis
+    // label height expand left and bottom padding as needed.
+    const padding = adaptivePadding(viewport, plan, xEnc, yEnc);
+    const plot = plotRect(viewport, padding);
+    const children: SemanticNode[] = [];
 
     if (xEnc && yEnc && plot.w > 0 && plot.h > 0) {
         const xScale = pixelScale(plan.scales.get(xEnc.channel), [plot.x, plot.x + plot.w]);
@@ -96,7 +132,7 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport): Sem
             const rows = positionedRows(plan, xScale, yScale, xCol, yCol, seriesCol);
             children.push(buildAxis("x-axis", plot, xScale, "horizontal"));
             children.push(buildAxis("y-axis", plot, yScale, "vertical"));
-            children.push(...buildMarks(plan, rows, plot, xScale, yScale));
+            children.push(...buildMarks(plan, rows, plot, xScale, yScale, seriesCategories));
             children.push(...buildLegend(plan, plot));
         }
     }
@@ -109,6 +145,54 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport): Sem
             children,
         },
     };
+}
+
+/** Compute per-side padding that fits tick labels for both axes. */
+function adaptivePadding(
+    viewport: ChartViewport,
+    plan: ChartCompilePlan,
+    xEnc: { field: string; channel: string } | undefined,
+    yEnc: { field: string; channel: string } | undefined,
+): ScenePadding {
+    const userOverride = viewport.padding;
+    const base =
+        typeof userOverride === "number" && Number.isFinite(userOverride)
+            ? { top: userOverride, right: userOverride, bottom: userOverride, left: userOverride }
+            : typeof userOverride === "object" && userOverride
+              ? {
+                    top: userOverride.top ?? DEFAULT_PADDING,
+                    right: userOverride.right ?? DEFAULT_PADDING,
+                    bottom: userOverride.bottom ?? DEFAULT_PADDING,
+                    left: userOverride.left ?? DEFAULT_PADDING,
+                }
+              : { top: DEFAULT_PADDING, right: DEFAULT_PADDING, bottom: DEFAULT_PADDING, left: DEFAULT_PADDING };
+
+    let left = base.left;
+    let bottom = base.bottom;
+
+    // Y-axis labels → expand left padding so tick labels aren't clipped.
+    const yScale = yEnc ? plan.scales.get(yEnc.channel) : undefined;
+    if (yScale) {
+        const ticks = axisTickLabels(yScale);
+        const maxWidth = ticks.reduce(
+            (acc, label) => Math.max(acc, estimateTextSize(label, LABEL_FONT.sizePx).width),
+            0,
+        );
+        const needed = TICK_LENGTH + LABEL_GAP + maxWidth + 2; // +2 safety
+        if (needed > left) left = needed;
+    }
+    // X-axis labels → expand bottom padding similarly.
+    const xScale = xEnc ? plan.scales.get(xEnc.channel) : undefined;
+    if (xScale) {
+        const ticks = axisTickLabels(xScale);
+        const maxHeight = ticks.reduce(
+            (acc, label) => Math.max(acc, estimateTextSize(label, LABEL_FONT.sizePx).height),
+            0,
+        );
+        const needed = TICK_LENGTH + LABEL_GAP + maxHeight + 2;
+        if (needed > bottom) bottom = needed;
+    }
+    return { top: base.top, right: base.right, bottom, left };
 }
 
 function positionedRows(
@@ -136,18 +220,18 @@ function buildMarks(
     plot: PlotRect,
     xScale: Scale,
     yScale: Scale,
+    seriesCategories: ReadonlyArray<string> | undefined,
 ): SemanticNode[] {
     switch (plan.spec.mark) {
         case "bar":
         case "rect":
-            return buildBars(plan, rows, plot, xScale, yScale);
+            return buildBars(plan, rows, plot, xScale, yScale, seriesCategories);
         case "line":
-            return buildLines(rows);
+            return buildLines(rows, seriesCategories);
         case "point":
         case "circle":
-            return buildPoints(plan, rows);
+            return buildPoints(plan, rows, seriesCategories);
         default:
-            // Other mark families (area / text / tick) are not lowered yet.
             return [];
     }
 }
@@ -158,12 +242,11 @@ function buildBars(
     plot: PlotRect,
     xScale: Scale,
     yScale: Scale,
+    seriesCategories: ReadonlyArray<string> | undefined,
 ): SemanticNode[] {
     const bandWidth = xScale.kind === "band" ? bandwidth(xScale) : 0;
     const step = bandWidth > 0 ? bandWidth : plot.w / Math.max(1, rows.length);
     const w = step * BAR_RATIO;
-    // Bars grow away from the zero pixel, not from the plot floor: negative
-    // values must hang below zero without flipping or inverting their height.
     const baseline = zeroBaseline(yScale, plot);
 
     return rows.map((row) => ({
@@ -175,7 +258,7 @@ function buildBars(
         y: Math.min(row.y, baseline),
         w,
         h: Math.abs(baseline - row.y),
-        fill: { color: MARK_FILL },
+        fill: { color: seriesColor(seriesCategories, row.series) },
     }));
 }
 
@@ -189,7 +272,10 @@ function zeroBaseline(yScale: Scale, plot: PlotRect): number {
     return Math.min(bottom, Math.max(top, y));
 }
 
-function buildLines(rows: ReadonlyArray<PositionedMark>): SemanticNode[] {
+function buildLines(
+    rows: ReadonlyArray<PositionedMark>,
+    seriesCategories: ReadonlyArray<string> | undefined,
+): SemanticNode[] {
     const series = new Map<string, PositionedMark[]>();
     for (const row of rows) {
         const key = row.series ?? "series";
@@ -211,13 +297,17 @@ function buildLines(rows: ReadonlyArray<PositionedMark>): SemanticNode[] {
             role: "chart.mark",
             source: { domain: "chart", path: ["series", name] },
             path: { commands },
-            stroke: LINE_STROKE,
+            stroke: { color: seriesColor(seriesCategories, name), width: LINE_STROKE_WIDTH },
         });
     }
     return nodes;
 }
 
-function buildPoints(plan: ChartCompilePlan, rows: ReadonlyArray<PositionedMark>): SemanticNode[] {
+function buildPoints(
+    plan: ChartCompilePlan,
+    rows: ReadonlyArray<PositionedMark>,
+    seriesCategories: ReadonlyArray<string> | undefined,
+): SemanticNode[] {
     return rows.map((row) => ({
         kind: "ellipse" as const,
         id: `${plan.spec.mark}:${row.rowIndex}`,
@@ -227,7 +317,7 @@ function buildPoints(plan: ChartCompilePlan, rows: ReadonlyArray<PositionedMark>
         cy: row.y,
         rx: POINT_RADIUS,
         ry: POINT_RADIUS,
-        fill: { color: MARK_FILL },
+        fill: { color: seriesColor(seriesCategories, row.series) },
     }));
 }
 
@@ -333,6 +423,11 @@ function axisTicks(scale: Scale): AxisTick[] {
     }
 }
 
+/** Extract just the tick label strings from a scale (used by adaptive padding). */
+function axisTickLabels(scale: Scale): string[] {
+    return axisTicks(scale).map((t) => t.label);
+}
+
 /** 4–6 evenly spaced "nice" values covering the domain (single value when flat). */
 function niceTicks(domain: [number, number]): { values: number[]; decimals: number } {
     let [lo, hi] = domain;
@@ -387,14 +482,7 @@ function buildLegend(plan: ChartCompilePlan, plot: PlotRect): SemanticNode[] {
     if (!enc) return [];
     const col = column(plan.resolvedData, enc.field);
     if (!col) return [];
-
-    const categories: string[] = [];
-    for (const value of col.values) {
-        if (value === null || value === undefined) continue;
-        if (typeof value === "number" && !Number.isFinite(value)) continue;
-        const key = String(value);
-        if (!categories.includes(key)) categories.push(key);
-    }
+    const categories = collectCategories(col);
     if (categories.length === 0) return [];
 
     const size = LEGEND_FONT.sizePx;
@@ -406,6 +494,9 @@ function buildLegend(plan: ChartCompilePlan, plot: PlotRect): SemanticNode[] {
 
     const items: SemanticNode[] = [];
     categories.slice(0, capacity).forEach((category, i) => {
+        // Use the same palette index as `seriesColor` so legend swatches match
+        // mark colors one-for-one.
+        const color = LEGEND_PALETTE[seriesPaletteIndex(categories, category) % LEGEND_PALETTE.length];
         const top = plot.y + LEGEND_EDGE_GAP + i * LEGEND_ITEM_STEP;
         items.push({
             kind: "rect",
@@ -417,7 +508,7 @@ function buildLegend(plan: ChartCompilePlan, plot: PlotRect): SemanticNode[] {
             h: LEGEND_SWATCH,
             rx: 1,
             ry: 1,
-            fill: { color: LEGEND_PALETTE[i % LEGEND_PALETTE.length] },
+            fill: { color },
         });
         items.push({
             kind: "text",
@@ -473,28 +564,14 @@ function project(scale: Scale, raw: number | string | boolean | null): number {
 
 // ─── Viewport ────────────────────────────────────────────────────────────
 
-function plotRect(viewport: ChartViewport): PlotRect {
-    const p = paddingOf(viewport.padding);
+function plotRect(viewport: ChartViewport, padding: ScenePadding): PlotRect {
     const width = dimension(viewport.width);
     const height = dimension(viewport.height);
     return {
-        x: p.left,
-        y: p.top,
-        w: Math.max(0, width - p.left - p.right),
-        h: Math.max(0, height - p.top - p.bottom),
-    };
-}
-
-function paddingOf(padding: number | Partial<ScenePadding> | undefined): ScenePadding {
-    if (typeof padding === "number" && Number.isFinite(padding)) {
-        return { top: padding, right: padding, bottom: padding, left: padding };
-    }
-    const sides = typeof padding === "object" && padding ? padding : {};
-    return {
-        top: sides.top ?? DEFAULT_PADDING,
-        right: sides.right ?? DEFAULT_PADDING,
-        bottom: sides.bottom ?? DEFAULT_PADDING,
-        left: sides.left ?? DEFAULT_PADDING,
+        x: padding.left,
+        y: padding.top,
+        w: Math.max(0, width - padding.left - padding.right),
+        h: Math.max(0, height - padding.top - padding.bottom),
     };
 }
 
