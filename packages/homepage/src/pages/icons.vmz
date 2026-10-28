@@ -1,0 +1,422 @@
+<template>
+    <SiteShell page="icons" variant="icons-gallery-page">
+        <main id="main" class="icons-gallery">
+            <header class="icons-gallery__head">
+                <p class="kicker">
+                    <span aria-hidden="true" class="kicker__dot" />
+                    {{ kickerLabel }}
+                </p>
+                <h1>
+                    {{ titleLabel }}
+                </h1>
+                <p class="icons-gallery__lead">
+                    {{ leadLabel }}
+                </p>
+            </header>
+
+            <section class="icons-gallery__toolbar" aria-label="Icon gallery controls">
+                <label class="icons-gallery__search">
+                    <span class="sr-only">搜索图标</span>
+                    <input
+                        type="search"
+                        placeholder="{{ searchPlaceholderLabel }}"
+                        :value="searchQuery"
+                        @input="(e) => (searchQuery = (e.target as HTMLInputElement).value)"
+                    />
+                </label>
+
+                <div class="icons-gallery__size-switch" role="group" :aria-label="sizeAriaLabel">
+                    <button
+                        v-for="sz in sizeOptions"
+                        :key="sz.value"
+                        type="button"
+                        class="icons-gallery__size-btn"
+                        :data-active="sizePx === sz.value ? 'true' : 'false'"
+                        :aria-pressed="sizePx === sz.value ? 'true' : 'false'"
+                        @click="() => (sizePx = sz.value)"
+                    >
+                        {{ sz.label }}
+                    </button>
+                </div>
+
+                <div class="icons-gallery__theme-switch" role="group" :aria-label="themeAriaLabel">
+                    <button
+                        type="button"
+                        class="icons-gallery__theme-btn"
+                        :data-active="themeMode === 'light' ? 'true' : 'false'"
+                        :aria-pressed="themeMode === 'light' ? 'true' : 'false'"
+                        @click="() => (themeMode = 'light')"
+                    >
+                        {{ themeLightLabel }}
+                    </button>
+                    <button
+                        type="button"
+                        class="icons-gallery__theme-btn"
+                        :data-active="themeMode === 'night' ? 'true' : 'false'"
+                        :aria-pressed="themeMode === 'night' ? 'true' : 'false'"
+                        @click="() => (themeMode = 'night')"
+                    >
+                        {{ themeNightLabel }}
+                    </button>
+                </div>
+            </section>
+
+            <section
+                v-for="group in filteredGroups"
+                :key="group.prefix"
+                :aria-labelledby="'icons-group-' + group.prefix"
+                class="icons-group"
+            >
+                <h2 :id="'icons-group-' + group.prefix">
+                    {{ group.label }}
+                    <span class="icons-group__count">{{ group.items.length }}</span>
+                </h2>
+                <div class="icons-group__grid">
+                    <button
+                        v-for="entry in group.items"
+                        :key="entry.name"
+                        type="button"
+                        class="icon-card"
+                        :data-active="selectedName === entry.name ? 'true' : 'false'"
+                        @click="() => (selectedName = entry.name)"
+                    >
+                        <span class="icon-card__glyph" :style="{ fontSize: sizePx + 'px' }">
+                            <Icon :name="entry.name" :size="sizeToken" />
+                        </span>
+                        <span class="icon-card__name">{{ entry.name }}</span>
+                    </button>
+                </div>
+            </section>
+
+            <section v-if="selectedEntry" class="icons-gallery__detail" aria-live="polite">
+                <h2>
+                    {{ detailTitleLabel }}
+                </h2>
+                <div class="icons-gallery__detail-body">
+                    <div class="icons-gallery__detail-preview" :style="{ fontSize: (sizePx * 2) + 'px' }">
+                        <Icon :name="selectedEntry.name" :size="sizeToken" />
+                    </div>
+                    <dl class="icons-gallery__detail-meta">
+                        <dt>{{ detailNameLabel }}</dt>
+                        <dd><code>{{ selectedEntry.name }}</code></dd>
+                        <dt>{{ detailKindLabel }}</dt>
+                        <dd><code>{{ selectedEntry.def.kind }}</code></dd>
+                    </dl>
+                    <pre class="icons-gallery__code"><code>{{ usageCode }}</code></pre>
+                </div>
+            </section>
+
+            <p v-if="filteredGroups.length === 0" class="icons-gallery__empty">
+                {{ emptyLabel }}
+            </p>
+        </main>
+    </SiteShell>
+</template>
+<style>
+.icons-gallery {
+    width: min(calc(100% - var(--site-gutter) * 2), var(--vmz-layout-max-width));
+    margin: 0 auto;
+    padding: calc(var(--site-section-pad) * 0.9) 0 var(--site-section-pad);
+}
+.icons-gallery__head {
+    display: grid;
+    gap: 0.75rem;
+    max-width: 46rem;
+    margin-bottom: 2rem;
+}
+.icons-gallery__head h1 {
+    margin: 0;
+    color: var(--vmz-text-ink);
+    font: 600 clamp(2rem, 4vw, 2.75rem) / 1.2 var(--vmz-font-display);
+}
+.icons-gallery__lead {
+    margin: 0;
+    color: var(--vmz-text-steel);
+    font: 400 1rem / 1.7 var(--vmz-font-sans);
+}
+.icons-gallery__toolbar {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+}
+.icons-gallery__search input {
+    width: min(18rem, 60vw);
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    font: inherit;
+    color: var(--vmz-text-ink);
+    background: var(--vmz-surface-paper);
+}
+.icons-gallery__size-switch,
+.icons-gallery__theme-switch {
+    display: inline-flex;
+    gap: 0.25rem;
+    padding: 0.2rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-paper);
+}
+.icons-gallery__size-btn,
+.icons-gallery__theme-btn {
+    padding: 0.3rem 0.7rem;
+    border: none;
+    border-radius: var(--vmz-radius-sm);
+    font: 500 0.875rem / 1 var(--vmz-font-sans);
+    color: var(--vmz-text-steel);
+    background: transparent;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+.icons-gallery__size-btn[data-active="true"],
+.icons-gallery__theme-btn[data-active="true"] {
+    color: var(--vmz-text-ink);
+    background: var(--vmz-surface-fill);
+}
+.icons-group {
+    margin-top: 1.5rem;
+}
+.icons-group h2 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+    color: var(--vmz-text-ink);
+    font: 600 1.25rem / 1.6 var(--vmz-font-display);
+}
+.icons-group__count {
+    font: 500 0.875rem / 1 var(--vmz-font-sans);
+    color: var(--vmz-text-steel);
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: var(--vmz-surface-fill);
+}
+.icons-group__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+    gap: 0.75rem;
+}
+.icon-card {
+    display: grid;
+    gap: 0.4rem;
+    padding: 0.9rem 0.6rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-ink);
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+.icon-card:hover {
+    border-color: var(--vmz-text-steel);
+}
+.icon-card[data-active="true"] {
+    border-color: var(--vmz-action-primary-background);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--vmz-action-primary-background) 18%, transparent);
+}
+.icon-card__glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.5rem;
+}
+.icon-card__name {
+    font: 400 0.68rem / 1.3 var(--vmz-font-mono);
+    color: var(--vmz-text-steel);
+    word-break: break-all;
+}
+.icons-gallery__detail {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+}
+.icons-gallery__detail h2 {
+    margin: 0 0 1rem;
+    color: var(--vmz-text-ink);
+    font: 600 1.15rem / 1.6 var(--vmz-font-display);
+}
+.icons-gallery__detail-body {
+    display: grid;
+    grid-template-columns: auto 1fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+@media (max-width: 60rem) {
+    .icons-gallery__detail-body {
+        grid-template-columns: 1fr;
+    }
+}
+.icons-gallery__detail-preview {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    border: 1px dashed var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    min-width: 6rem;
+    min-height: 6rem;
+}
+.icons-gallery__detail-meta {
+    margin: 0;
+    display: grid;
+    gap: 0.5rem;
+}
+.icons-gallery__detail-meta dt {
+    font: 500 0.75rem / 1 var(--vmz-font-sans);
+    color: var(--vmz-text-steel);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.icons-gallery__detail-meta dd {
+    margin: 0;
+    font: 400 0.875rem / 1.4 var(--vmz-font-mono);
+    color: var(--vmz-text-ink);
+}
+.icons-gallery__code {
+    margin: 0;
+    padding: 1rem;
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-fill);
+    overflow-x: auto;
+    font: 400 0.8rem / 1.5 var(--vmz-font-mono);
+    color: var(--vmz-text-ink);
+}
+.icons-gallery__empty {
+    margin-top: 2rem;
+    color: var(--vmz-text-steel);
+    font: 400 0.95rem / 1.6 var(--vmz-font-sans);
+    text-align: center;
+}
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+</style>
+<script client>
+import { REGISTRY, type IconDef } from "@vmz/ui-icons/registry";
+import { pageMeta } from "./page-meta.ts";
+
+interface IconEntry {
+    name: string;
+    def: IconDef;
+}
+
+interface IconGroup {
+    prefix: string;
+    label: string;
+    items: IconEntry[];
+}
+
+const PREFIX_LABELS: Record<string, string> = {
+    action: "操作",
+    nav: "导航",
+    status: "状态",
+    tool: "工具",
+    feature: "特性",
+};
+
+const SIZE_TO_TOKEN: Record<number, string> = {
+    16: "sm",
+    20: "md",
+    24: "lg",
+};
+
+function buildGroups(query: string): IconGroup[] {
+    const q = query.trim().toLowerCase();
+    const filtered: Record<string, IconEntry[]> = {};
+    for (const name of Object.keys(REGISTRY)) {
+        if (q && !name.toLowerCase().includes(q)) continue;
+        const dot = name.indexOf(".");
+        const prefix = dot > 0 ? name.slice(0, dot) : "other";
+        if (!filtered[prefix]) filtered[prefix] = [];
+        filtered[prefix].push({ name, def: REGISTRY[name] });
+    }
+    const groups: IconGroup[] = [];
+    const order = ["action", "nav", "status", "tool", "feature"];
+    for (const p of order) {
+        if (filtered[p]) {
+            filtered[p].sort((a, b) => a.name.localeCompare(b.name));
+            groups.push({
+                prefix: p,
+                label: PREFIX_LABELS[p] ?? p,
+                items: filtered[p],
+            });
+        }
+    }
+    for (const p of Object.keys(filtered).sort()) {
+        if (order.includes(p)) continue;
+        filtered[p].sort((a, b) => a.name.localeCompare(b.name));
+        groups.push({ prefix: p, label: PREFIX_LABELS[p] ?? p, items: filtered[p] });
+    }
+    return groups;
+}
+
+export default class IconGalleryPage {
+    static meta = pageMeta(
+        "图标预览 · VMZ",
+        "Icon gallery · VMZ",
+        "浏览 VMZ 官方图标库的语义名、尺寸与主题切换。",
+        "Browse the VMZ icon registry with semantic names, sizes, and theme toggle.",
+    );
+
+    kickerLabel = "VMZ · UI Icons";
+    titleLabel = "图标预览";
+    leadLabel = "消费 @vmz/ui-icons registry 的语义图标。按前缀分组，支持搜索、尺寸切换与主题切换。";
+    searchPlaceholderLabel = "输入语义名，如 action.search";
+    sizeAriaLabel = "图标尺寸";
+    themeAriaLabel = "主题模式";
+    themeLightLabel = "浅色";
+    themeNightLabel = "深色";
+    detailTitleLabel = "图标详情";
+    detailNameLabel = "语义名";
+    detailKindLabel = "类型";
+    emptyLabel = "没有匹配的图标，换个关键词试试。";
+
+    searchQuery = "";
+    sizePx = 24;
+    themeMode: "light" | "night" = "light";
+    selectedName = "";
+
+    sizeOptions = [
+        { value: 16, label: "16px" },
+        { value: 20, label: "20px" },
+        { value: 24, label: "24px" },
+    ];
+
+    get sizeToken(): string {
+        return SIZE_TO_TOKEN[this.sizePx] ?? "md";
+    }
+
+    get filteredGroups(): IconGroup[] {
+        return buildGroups(this.searchQuery);
+    }
+
+    get selectedEntry(): IconEntry | null {
+        if (!this.selectedName) return null;
+        const def = REGISTRY[this.selectedName];
+        return def ? { name: this.selectedName, def } : null;
+    }
+
+    get usageCode(): string {
+        if (!this.selectedEntry) return "";
+        const size = SIZE_TO_TOKEN[this.sizePx] ?? "md";
+        return `<Icon name="${this.selectedEntry.name}" size="${size}" />`;
+    }
+}
+</script>
