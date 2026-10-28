@@ -1,5 +1,5 @@
 <template>
-    <div data-vmz-ui-charts="chart" class="vmz-ui-charts__chart" :style="hostStyle()" @mouseover="_onMouseOver" @mouseout="_onMouseOut" @mousemove="_onMouseMove">
+    <div data-vmz-ui-charts="chart" class="vmz-ui-charts__chart" :style="hostStyle()" @mouseover="_onMouseOver" @mouseout="_onMouseOut" @mousemove="_onMouseMove" @click="_onClick">
         <div v-if="_isEmpty()" class="vmz-ui-charts__empty">No chart spec or data.</div>
         <div v-else>
             <div v-if="_hasError()" class="vmz-ui-charts__error-banner">
@@ -283,6 +283,24 @@ export default class Chart {
     /** tooltip inline style —— Oak template 不接受 `${}` 模板字符串，用拼接方法。 */
     public _tooltipStyle(): string {
         return "left:" + this._tooltip.x + "px;top:" + this._tooltip.y + "px";
+    }
+
+    // ---- Click → select dispatch + emit ----
+
+    /** 宿主可 override 的选择回调（事件名 `chart-select`）。 */
+    public onchartSelect(payload: { rowKey: string | number }): void {
+        // 默认空实现，宿主在组件实例上 override 即可接收事件。
+    }
+
+    public _onClick(ev: MouseEvent): void {
+        if (!this.state) return;
+        const rowKey = this.state.hoveredId;
+        if (!rowKey) {
+            this.dispatch({ kind: "clear-selection" });
+            return;
+        }
+        this.dispatch({ kind: "select-toggle", nodeId: rowKey });
+        this.onchartSelect({ rowKey });
     }
 }
 </script>
