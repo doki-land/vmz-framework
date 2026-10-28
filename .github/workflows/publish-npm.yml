@@ -243,6 +243,9 @@ jobs:
           VMZ_NATIVE_ARTIFACTS: ${{ github.workspace }}/dist/native-flat
         run: node scripts/ci/assert-vmz-pack.mjs
 
+      - name: Verify @doki-land/davinci facade pack
+        run: node scripts/ci/verify-davinci-facade.mjs
+
       - name: Strip token-style npmrc (OIDC only)
         shell: bash
         run: |
