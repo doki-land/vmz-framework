@@ -134,7 +134,7 @@ import { fromRows, compile, buildScene } from "@doki-land/davinci/chart";
 import { resolve } from "@doki-land/davinci/scene";
 import { renderSvg } from "@doki-land/davinci/scene/svg";
 import type { ChartSpec } from "@doki-land/davinci/chart";
-import { pageMeta } from "./page-meta.ts";
+import { pageMeta } from "../page-meta.ts";
 
 interface ChartExample {
     id: string;
