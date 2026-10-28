@@ -105,14 +105,14 @@
  *   <Diagram :spec="{...nodes, edges...}" direction="LR" />
  *
  * 管线：DiagramSpec → simpleLayout → buildScene → resolve → DisplayScene →
- * `@doki-land/davinci-scene` 的 SVG 串行化。组件不画形状。
+ * `@doki-land/davinci/scene` 的 SVG 串行化。组件不画形状。
  */
 import {
     simpleLayout,
     buildScene as buildDiagramScene,
     type DiagramSpec,
 } from "@doki-land/davinci/diagram";
-import { renderSvg, resolve } from "@doki-land/davinci/scene";
+import { renderSvg, resolve, type DisplayScene } from "@doki-land/davinci/scene";
 import { initialState, reduce, type RuntimeState, type Action } from "@doki-land/davinci/runtime";
 
 export default class Diagram {
@@ -125,7 +125,7 @@ export default class Diagram {
     /** 是否自动适应布局画布（忽略 width/height 用 canvasBounds）。 */
     public autoSize: boolean = true;
 
-    public scene: import("@doki-land/davinci-scene").DisplayScene | null = null;
+    public scene: DisplayScene | null = null;
     public state: RuntimeState | null = null;
     public diagnostics: ReadonlyArray<{ severity: string; code: string; message: string }> = [];
 

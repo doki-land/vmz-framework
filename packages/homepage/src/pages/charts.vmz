@@ -130,11 +130,10 @@
 }
 </style>
 <script client>
-import { fromRows, compile } from "@doki-land/davinci-chart";
-import { buildScene } from "@doki-land/davinci-chart/scene";
-import { resolve } from "@doki-land/davinci-scene/resolve";
-import { renderSvg } from "@doki-land/davinci-scene/svg";
-import type { ChartSpec } from "@doki-land/davinci-chart/compile";
+import { fromRows, compile, buildScene } from "@doki-land/davinci/chart";
+import { resolve } from "@doki-land/davinci/scene";
+import { renderSvg } from "@doki-land/davinci/scene/svg";
+import type { ChartSpec } from "@doki-land/davinci/chart";
 import { pageMeta } from "./page-meta.ts";
 
 interface ChartExample {
@@ -229,7 +228,7 @@ export default class ChartGalleryPage {
 
     kickerLabel = "VMZ · DaVinci Charts";
     titleLabel = "图表预览";
-    leadLabel = "消费 workspace 内的 @doki-land/davinci-chart 与 @doki-land/davinci-scene，展示编译→场景→SVG 流水线的静态输出。";
+    leadLabel = "消费公开引擎包 @doki-land/davinci 的 chart 与 scene 入口，展示编译→场景→SVG 流水线的静态输出。";
     specTitleLabel = "ChartSpec";
     dataTitleLabel = "示例数据";
     showSpecLabel = "查看规格";

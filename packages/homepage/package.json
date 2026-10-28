@@ -16,8 +16,7 @@
         "evidence:ssr": "node ../../scripts/dev/inspect-ssr-html.mjs"
     },
     "dependencies": {
-        "@doki-land/davinci-chart": "workspace:*",
-        "@doki-land/davinci-scene": "workspace:*",
+        "@doki-land/davinci": "workspace:*",
         "@vmz/ui": "workspace:*",
         "@vmz/ui-icons": "workspace:*",
         "@vmz/ui-data-grid": "workspace:*",
