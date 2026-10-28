@@ -1,12 +1,25 @@
 <template>
-    <div data-vmz-ui-charts="diagram" class="vmz-ui-charts__diagram" :style="hostStyle">
-        <div v-html="markup()" class="vmz-ui-charts__svg" />
+    <div data-vmz-ui-charts="diagram" class="vmz-ui-charts__diagram" :style="hostStyle()" @mouseover="_onMouseOver" @mouseout="_onMouseOut" @mousemove="_onMouseMove" @click="_onClick">
+        <div v-if="_isEmpty()" class="vmz-ui-charts__empty">No diagram spec.</div>
+        <div v-else>
+            <div v-if="_hasError()" class="vmz-ui-charts__error-banner">
+                Diagram layout failed — see diagnostics below.
+            </div>
+            <div v-html="markup()" class="vmz-ui-charts__svg" />
+        </div>
         <div v-if="diagnostics.length > 0" class="vmz-ui-charts__diag">
             <div v-for="(d, i) in diagnostics" :key="i" :data-sev="d.severity" class="vmz-ui-charts__diag-item">
                 {{ d.severity }}
                 :
                 {{ d.message }}
             </div>
+        </div>
+        <div
+            v-if="_tooltip.visible"
+            class="vmz-ui-charts__tooltip"
+            :style="_tooltipStyle()"
+        >
+            {{ _tooltip.text }}
         </div>
     </div>
 </template>
@@ -51,6 +64,38 @@
 .vmz-ui-charts__diagram .vmz-ui-charts__diag-item[data-sev="warning"] {
     color: #b7791f;
 }
+.vmz-ui-charts__diagram .vmz-ui-charts__empty {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--vmz-text-muted, #999);
+    font-size: 0.875rem;
+}
+.vmz-ui-charts__diagram .vmz-ui-charts__error-banner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: #c0392b;
+    color: #fff;
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    z-index: 2;
+}
+.vmz-ui-charts__diagram .vmz-ui-charts__tooltip {
+    position: absolute;
+    z-index: 999;
+    pointer-events: none;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 3px;
+    transform: translate(8px, 8px);
+    white-space: nowrap;
+}
 </style>
 <script client>
 /**
@@ -84,23 +129,68 @@ export default class Diagram {
     public state: RuntimeState | null = null;
     public diagnostics: ReadonlyArray<{ severity: string; code: string; message: string }> = [];
 
-    get hostStyle(): string {
+    // ---- 交互与生命周期内部字段 ----
+
+    /** 每次 recompile 递增。异步返回时先比对再应用，为未来异步管线预留。 */
+    public _latestRevision: number = 0;
+    /** ResizeObserver 实例，onMount 创建 onUnmount 断开。 */
+    public _resizeObserver: ResizeObserver | null = null;
+    /** 当前 hover 的节点或边 id —— 简化占位。 */
+    public _hoverNodeId: string | null = null;
+    /** Tooltip 状态。 */
+    public _tooltip: { visible: boolean; x: number; y: number; text: string } = {
+        visible: false,
+        x: 0,
+        y: 0,
+        text: "",
+    };
+
+    /** 零尺寸 guard —— 宽或高为 0 时跳过渲染避免 NaN。 */
+    public _zeroSize(): boolean {
         const w = this.scene && this.autoSize ? this.scene.width : this.width;
         const h = this.scene && this.autoSize ? this.scene.height : this.height;
-        return `width:${w}px;height:${h}px;position:relative`;
+        return w <= 0 || h <= 0;
+    }
+
+    /** 空态判断 —— spec 缺失时渲染空态面板。 */
+    public _isEmpty(): boolean {
+        return !this.spec;
+    }
+
+    /** 编译错误判断 —— diagnostics 中存在 severity="error"。 */
+    public _hasError(): boolean {
+        return this.diagnostics.some((d) => d.severity === "error");
+    }
+
+    public hostStyle(): string {
+        const w = this.scene && this.autoSize ? this.scene.width : this.width;
+        const h = this.scene && this.autoSize ? this.scene.height : this.height;
+        const hide = this._zeroSize() ? "display:none;" : "";
+        return "width:" + w + "px;height:" + h + "px;position:relative;" + hide;
     }
 
     /** DisplayScene → 确定性 SVG markup（SSR 安全，无 DOM API）。 */
     public markup(): string {
+        if (this._zeroSize()) return "";
         return this.scene ? renderSvg(this.scene) : "";
     }
 
     onMount() {
         this.recompile();
+        this._attachResizeObserver();
+    }
+
+    onUnmount() {
+        this._detachResizeObserver();
     }
 
     public recompile() {
-        if (!this.spec) return;
+        this._latestRevision++;
+        if (!this.spec) {
+            this.scene = null;
+            this.diagnostics = [];
+            return;
+        }
         const effectiveSpec: DiagramSpec = this.direction ? { ...this.spec, direction: this.direction } : this.spec;
         const plan = simpleLayout(effectiveSpec);
         this.diagnostics = plan.diagnostics.items.map((d) => ({
@@ -117,6 +207,89 @@ export default class Diagram {
         if (!this.state) return null;
         this.state = reduce(this.state, action);
         return this.state;
+    }
+
+    // ---- ResizeObserver ----
+
+    public _attachResizeObserver(): void {
+        if (typeof ResizeObserver === "undefined") return;
+        const root = (this as any).__vmzDomRoot as HTMLElement | undefined;
+        if (!root || typeof (root as any).getBoundingClientRect !== "function") return;
+        const ro = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const cr = (entry as any).contentRect as DOMRectReadOnly | undefined;
+                if (!cr) continue;
+                const w = Math.round(cr.width);
+                const h = Math.round(cr.height);
+                if (this.autoSize) continue; // autoSize 跟随 scene 尺寸，不跟随容器
+                if (w > 0 && w !== this.width) this.width = w;
+                if (h > 0 && h !== this.height) this.height = h;
+                if (this.state) {
+                    this.state = reduce(this.state, { kind: "container-resize", w, h });
+                }
+            }
+        });
+        ro.observe(root);
+        this._resizeObserver = ro;
+    }
+
+    public _detachResizeObserver(): void {
+        if (this._resizeObserver) {
+            this._resizeObserver.disconnect();
+            this._resizeObserver = null;
+        }
+    }
+
+    // ---- Mouse → tooltip placeholder ----
+
+    /** 宿主可 override 的 hover 回调（事件名 `diagram-hover`）。 */
+    public ondiagramHover(payload: { nodeId: string }): void {
+        // 默认空实现，宿主在组件实例上 override 即可接收事件。
+    }
+
+    public _onMouseOver(ev: MouseEvent): void {
+        const id = this.state && this.state.hoveredId ? this.state.hoveredId : "node";
+        this._hoverNodeId = id;
+        this._tooltip.text = "hovering (" + id + ")";
+    }
+
+    public _onMouseMove(ev: MouseEvent): void {
+        const root = (this as any).__vmzDomRoot as HTMLElement | undefined;
+        if (!root) return;
+        const rect = root.getBoundingClientRect();
+        this._tooltip.x = ev.clientX - rect.left;
+        this._tooltip.y = ev.clientY - rect.top;
+        this._tooltip.visible = true;
+        if (this._hoverNodeId !== null) {
+            this.ondiagramHover({ nodeId: this._hoverNodeId });
+        }
+    }
+
+    public _onMouseOut(): void {
+        this._tooltip.visible = false;
+        this._hoverNodeId = null;
+    }
+
+    public _tooltipStyle(): string {
+        return "left:" + this._tooltip.x + "px;top:" + this._tooltip.y + "px";
+    }
+
+    // ---- Click → select dispatch + emit ----
+
+    /** 宿主可 override 的选择回调（事件名 `diagram-select`）。 */
+    public ondiagramSelect(payload: { nodeId: string }): void {
+        // 默认空实现，宿主在组件实例上 override 即可接收事件。
+    }
+
+    public _onClick(ev: MouseEvent): void {
+        if (!this.state) return;
+        const id = this.state.hoveredId;
+        if (!id) {
+            this.dispatch({ kind: "clear-selection" });
+            return;
+        }
+        this.dispatch({ kind: "select-toggle", nodeId: id });
+        this.ondiagramSelect({ nodeId: id });
     }
 }
 </script>
