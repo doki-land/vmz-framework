@@ -75,6 +75,7 @@ jobs:
             packages/plugins/vmz-plugin-markdown-it/dist \
             packages/plugins/vmz-plugin-katex/dist \
             packages/ui/vmz-ui-icons/dist \
+            packages/davinci/davinci/dist \
             packages/runtimes/vmz-linux-x64/package.json \
             "$native"
           ls -lh runtime-build.tar.gz

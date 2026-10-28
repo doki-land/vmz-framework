@@ -10,7 +10,7 @@
         "vmz:check": "cargo check --manifest-path Cargo.toml --workspace",
         "napi:build": "node scripts/build/napi.mjs",
         "build:vmz-test": "pnpm --filter @vmz/test run build",
-        "build:runtimes": "pnpm --filter @vmz/protocol --filter @vmz/commander --filter @vmz/diagnostic --filter vmz-fixtures --filter @vmz/core --filter @vmz/ui-icons --filter @vmz/plugin-shiki --filter @vmz/plugin-markdown-it --filter @vmz/plugin-katex --filter vmz --filter @vmz/test run build",
+        "build:runtimes": "pnpm --filter @vmz/protocol --filter @vmz/commander --filter @vmz/diagnostic --filter vmz-fixtures --filter @vmz/core --filter @vmz/ui-icons --filter @vmz/plugin-shiki --filter @vmz/plugin-markdown-it --filter @vmz/plugin-katex --filter @doki-land/davinci --filter vmz --filter @vmz/test run build",
         "build:runtimes:js": "pnpm --filter @vmz/protocol --filter @vmz/commander --filter @vmz/diagnostic --filter vmz-fixtures --filter @vmz/core --filter @vmz/ui-icons --filter @vmz/plugin-shiki --filter @vmz/plugin-markdown-it --filter @vmz/plugin-katex --filter @vmz/test run build && pnpm --filter vmz run build:js",
         "build:examples": "pnpm -r --filter \"./packages/examples/*\" --filter \"!@vmz-examples/test-utils\" --filter \"!@vmz-examples/documents-fixture\" --filter \"!@vmz-examples/analysis\" run build",
         "check:examples": "pnpm -r --filter \"./packages/examples/*\" --filter \"!@vmz-examples/test-utils\" run check",
