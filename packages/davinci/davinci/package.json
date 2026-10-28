@@ -46,21 +46,20 @@
         }
     },
     "files": [
-        "src",
         "dist"
     ],
     "scripts": {
-        "build": "tsc -p tsconfig.json"
+        "build": "node scripts/build.mjs"
     },
-    "dependencies": {
+    "devDependencies": {
         "@doki-land/davinci-chart": "workspace:*",
         "@doki-land/davinci-diagram": "workspace:*",
         "@doki-land/davinci-motion": "workspace:*",
         "@doki-land/davinci-runtime": "workspace:*",
         "@doki-land/davinci-scene": "workspace:*",
-        "@doki-land/davinci-types": "workspace:*"
-    },
-    "devDependencies": {
+        "@doki-land/davinci-types": "workspace:*",
+        "dts-bundle-generator": "^9.5.1",
+        "esbuild": "0.28.1",
         "typescript": "^5.8.3"
     },
     "keywords": [
