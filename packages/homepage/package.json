@@ -6,8 +6,10 @@
     "description": "VMZ official site — homepage + integrated documents at /d/",
     "scripts": {
         "check": "vmz check .",
+        "prebuild": "pnpm --filter @doki-land/davinci run build",
         "build": "vmz build .",
         "build:cloudflare": "npx --yes @vmz/vmz@0.3.5 build .",
+        "predev": "pnpm --filter @doki-land/davinci run build",
         "dev": "vmz dev .",
         "test:deploy-planner": "node --experimental-strip-types ./tests/deploy-planner.selftest.ts",
         "document:check": "vmz document check . --strict",
