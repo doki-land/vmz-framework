@@ -288,8 +288,7 @@
 }
 </style>
 <script client>
-import { REGISTRY } from "@vmz/ui-icons/registry";
-import type { IconDef } from "@vmz/ui-icons/registry";
+import { REGISTRY, type IconDef } from "@vmz/ui-icons/registry";
 import { pageMeta } from "../page-meta.ts";
 
 interface IconEntry {
