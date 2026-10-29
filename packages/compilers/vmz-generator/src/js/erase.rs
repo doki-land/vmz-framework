@@ -25,6 +25,28 @@ struct TypeSpan {
     end: usize,
 }
 
+/// One `{ ... }` import / export specifier list with inline `type` specifiers
+/// removed.
+struct SpecifierList {
+    /// Token index of the closing `}`.
+    close: usize,
+    /// Whether at least one inline type specifier was removed.
+    removed: bool,
+    /// Number of specifiers left in the list.
+    remaining: usize,
+}
+
+/// One specifier between two commas of an import / export list.
+#[derive(Clone, Copy)]
+struct SpecItem {
+    first: usize,
+    last: usize,
+    /// Token index of the comma before the specifier.
+    leading_comma: Option<usize>,
+    /// Token index of the comma after the specifier.
+    trailing_comma: Option<usize>,
+}
+
 #[derive(Clone, Copy)]
 enum FrameKind {
     ClassBody,
@@ -124,6 +146,34 @@ impl<'a> Eraser<'a> {
                         let end = self.statement_end(i);
                         self.delete_to(i, end);
                         i = end;
+                        continue;
+                    }
+                    if let Some(open) = self.import_specifier_brace(i) {
+                        let list = self.erase_specifier_list(open)?;
+                        let clause_binding = self.tokens[i + 1..open]
+                            .iter()
+                            .any(|token| matches!(token.kind, T::IdentifierName | T::Star));
+                        if list.removed && list.remaining == 0 && !clause_binding {
+                            let end = self.statement_end(i);
+                            self.delete_to(i, end);
+                            i = end;
+                            continue;
+                        }
+                        i = list.close + 1;
+                        continue;
+                    }
+                    i += 1;
+                }
+                T::Export => {
+                    if self.kind(i + 1) == Some(T::LeftBrace) {
+                        let list = self.erase_specifier_list(i + 1)?;
+                        if list.removed && list.remaining == 0 {
+                            let end = self.statement_end(i);
+                            self.delete_to(i, end);
+                            i = end;
+                            continue;
+                        }
+                        i = list.close + 1;
                         continue;
                     }
                     i += 1;
@@ -642,6 +692,128 @@ impl<'a> Eraser<'a> {
         }
     }
 
+    /// Locate the `{ ... }` named-import list that follows `import` at `at`.
+    ///
+    /// Returns `None` for side-effect imports, namespace imports and dynamic
+    /// `import(...)` / `import.meta` expressions.
+    fn import_specifier_brace(&self, at: usize) -> Option<usize> {
+        let mut index = at + 1;
+        while index < self.tokens.len() {
+            match self.tokens[index].kind {
+                T::LeftBrace => return Some(index),
+                T::IdentifierName | T::Comma | T::Star | T::As => index += 1,
+                _ => return None,
+            }
+        }
+        None
+    }
+
+    /// Remove inline `type` specifiers from the `{ ... }` list opened at `open`.
+    ///
+    /// Each `type X` / `type X as Y` specifier is deleted together with the
+    /// comma after it, falling back to the comma before it for the last entry,
+    /// so the remaining list keeps valid comma syntax at every position.
+    fn erase_specifier_list(&mut self, open: usize) -> Result<SpecifierList, String> {
+        let Some(close) = self.matching(open) else {
+            return Err(format!(
+                "type erasure found an unterminated import/export specifier list at byte {}",
+                self.tokens[open].start
+            ));
+        };
+        let mut items: Vec<SpecItem> = Vec::new();
+        let mut leading: Option<usize> = None;
+        let mut first = open + 1;
+        let mut index = open + 1;
+        while index < close {
+            if self.tokens[index].kind == T::Comma {
+                if index > first {
+                    items.push(SpecItem {
+                        first,
+                        last: index - 1,
+                        leading_comma: leading,
+                        trailing_comma: Some(index),
+                    });
+                }
+                leading = Some(index);
+                first = index + 1;
+            }
+            index += 1;
+        }
+        if close > first {
+            items.push(SpecItem {
+                first,
+                last: close - 1,
+                leading_comma: leading,
+                trailing_comma: None,
+            });
+        }
+        let mut removed = false;
+        let mut remaining = 0usize;
+        for item in &items {
+            if !self.is_inline_type_specifier(item.first, item.last)? {
+                remaining += 1;
+                continue;
+            }
+            let (start, end) = match (item.trailing_comma, item.leading_comma) {
+                (Some(comma), _) => (self.tokens[item.first].start, self.tokens[comma].end),
+                (None, Some(comma)) => (self.tokens[comma].start, self.tokens[item.last].end),
+                (None, None) => (self.tokens[item.first].start, self.tokens[item.last].end),
+            };
+            self.check_splice(start, end)?;
+            self.delete(start, end);
+            removed = true;
+        }
+        Ok(SpecifierList { close, removed, remaining })
+    }
+
+    /// Decide whether the specifier spanning `first..=last` is inline type-only.
+    fn is_inline_type_specifier(&self, first: usize, last: usize) -> Result<bool, String> {
+        // A lone `type` entry imports the value named `type`.
+        if self.tokens[first].kind != T::Type || first == last {
+            return Ok(false);
+        }
+        match self.kind(first + 1) {
+            Some(T::IdentifierName | T::StringLiteral) if first + 1 == last => Ok(true),
+            Some(T::IdentifierName | T::StringLiteral)
+                if self.kind(first + 2) == Some(T::As)
+                    && matches!(
+                        self.kind(first + 3),
+                        Some(T::IdentifierName | T::StringLiteral)
+                    )
+                    && first + 3 == last =>
+            {
+                Ok(true)
+            }
+            // `import { type as local }` imports the value named `type`.
+            Some(T::As) => Ok(false),
+            _ => Err(format!(
+                "type erasure cannot parse the import/export specifier at byte {}",
+                self.tokens[first].start
+            )),
+        }
+    }
+
+    /// Reject removals that would glue the surrounding bytes into another token.
+    fn check_splice(&self, start: usize, end: usize) -> Result<(), String> {
+        let bytes = self.source.as_bytes();
+        let before = start.checked_sub(1).and_then(|index| bytes.get(index)).copied();
+        let after = bytes.get(end).copied();
+        let ident = |byte: Option<u8>| {
+            byte.is_some_and(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'$'))
+        };
+        if ident(before) && ident(after) {
+            return Err(format!(
+                "type erasure cannot remove the inline type specifier at byte {start} without gluing identifiers"
+            ));
+        }
+        if before == Some(b'/') && matches!(after, Some(b'/' | b'*')) {
+            return Err(format!(
+                "type erasure cannot remove the inline type specifier at byte {start} without gluing a comment"
+            ));
+        }
+        Ok(())
+    }
+
     fn in_import_clause(&self, at: usize) -> bool {
         let mut index = at;
         while index > 0 {
@@ -1060,4 +1232,97 @@ fn is_after_non_null(kind: T) -> bool {
             | T::In
             | T::Instanceof
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{erase_types, erase_types_with_deletions};
+
+    #[test]
+    fn erases_trailing_inline_type_specifier() {
+        let js = erase_types("import { a, type B } from \"./x\";\nconst value = a;\n").unwrap();
+        assert_eq!(js, "import { a } from \"./x\";\nconst value = a;\n");
+    }
+
+    #[test]
+    fn erases_leading_inline_type_specifier() {
+        let js = erase_types("import { type B, a } from \"./x\";\n").unwrap();
+        assert!(!js.contains("type"), "{js}");
+        assert!(js.contains("a } from \"./x\";"), "{js}");
+    }
+
+    #[test]
+    fn erases_aliased_inline_type_specifier() {
+        let js = erase_types("import { a, type B as C } from \"./x\";\n").unwrap();
+        assert_eq!(js, "import { a } from \"./x\";\n");
+    }
+
+    #[test]
+    fn erases_multiline_inline_type_specifiers() {
+        let js =
+            erase_types("import {\n  a,\n  type B,\n  c,\n} from \"./x\";\nconst value = a + c;\n")
+                .unwrap();
+        assert!(!js.contains("type B"), "{js}");
+        assert!(js.contains("  a,"), "{js}");
+        assert!(js.contains("  c,"), "{js}");
+        assert!(js.contains("} from \"./x\";"), "{js}");
+    }
+
+    #[test]
+    fn erases_inline_type_specifiers_from_export_lists() {
+        let js = erase_types("export { type B, keep };\n").unwrap();
+        assert_eq!(js, "export {  keep };\n");
+        let only_type = erase_types("const keep = 1;\nexport { type B };\n").unwrap();
+        assert!(!only_type.contains("export"), "{only_type}");
+        assert!(only_type.contains("const keep = 1;"), "{only_type}");
+    }
+
+    #[test]
+    fn erases_all_type_only_import_lists() {
+        let js =
+            erase_types("import { type B, type C as D } from \"./x\";\nconst a = 1;\n").unwrap();
+        assert!(!js.contains("import"), "{js}");
+        assert!(js.contains("const a = 1;"), "{js}");
+    }
+
+    #[test]
+    fn keeps_value_bindings_named_type() {
+        let js = erase_types("import { type } from \"./x\";\nimport { type as t } from \"./y\";\n")
+            .unwrap();
+        assert!(js.contains("import { type } from \"./x\";"), "{js}");
+        assert!(js.contains("import { type as t } from \"./y\";"), "{js}");
+    }
+
+    #[test]
+    fn keeps_whole_statement_type_only_imports_erased() {
+        let js = erase_types(
+            "import type { X } from \"./x\";\nimport type Y from \"./y\";\nconst value = 1;\n",
+        )
+        .unwrap();
+        assert!(!js.contains("import"), "{js}");
+        assert!(js.contains("const value = 1;"), "{js}");
+    }
+
+    #[test]
+    fn reports_specifier_deletions_with_the_comma() {
+        let (js, deletions) =
+            erase_types_with_deletions("import { a, type B } from \"./x\";\n").unwrap();
+        assert_eq!(js, "import { a } from \"./x\";\n");
+        assert_eq!(deletions, vec![(10, 18)]);
+        let source = "import { a, type B } from \"./x\";\n";
+        assert_eq!(&source[deletions[0].0..deletions[0].1], ", type B");
+    }
+
+    #[test]
+    fn reports_monotonic_specifier_deletions() {
+        let source = "import { type A, b, type C } from \"./x\";\nexport { type D, e };\n";
+        let (js, deletions) = erase_types_with_deletions(source).unwrap();
+        assert!(!js.contains("type"), "{js}");
+        let mut previous_end = 0usize;
+        for (start, end) in &deletions {
+            assert!(start < end, "{deletions:?}");
+            assert!(previous_end <= *start, "{deletions:?}");
+            previous_end = *end;
+        }
+    }
 }
