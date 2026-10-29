@@ -432,6 +432,12 @@ function contentType(file) {
     if (file.endsWith('.html')) return 'text/html; charset=utf-8';
     if (file.endsWith('.js') || file.endsWith('.mjs')) return 'text/javascript; charset=utf-8';
     if (file.endsWith('.css')) return 'text/css; charset=utf-8';
+    if (file.endsWith('.wasm')) return 'application/wasm';
+    if (file.endsWith('.woff2')) return 'font/woff2';
+    if (file.endsWith('.woff')) return 'font/woff';
+    if (file.endsWith('.otf')) return 'font/otf';
+    if (file.endsWith('.ttf')) return 'font/ttf';
+    if (file.endsWith('.svg')) return 'image/svg+xml';
     if (file.endsWith('.xml')) return 'application/xml';
     if (file.endsWith('.txt')) return 'text/plain; charset=utf-8';
     if (file.endsWith('.json')) return 'application/json; charset=utf-8';
