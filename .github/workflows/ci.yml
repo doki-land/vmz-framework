@@ -56,6 +56,9 @@ jobs:
       - name: Verify @doki-land/davinci facade pack
         run: node scripts/ci/verify-davinci-facade.mjs
 
+      - name: Verify @vmz/ui-charts pack surface
+        run: node scripts/ci/verify-ui-charts-pack.mjs
+
       - name: Pack runtime artifact
         shell: bash
         run: |
