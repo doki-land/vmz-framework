@@ -62,6 +62,7 @@ fn nyar_projection_collects_static_imports() {
 <script client>
 import { helper } from './lib';
 import type { T } from '@pkg/types';
+import { REGISTRY, type IconDef } from './icons';
 import * as ns from '../ns';
 export default class Page {
   public x = 1;
@@ -70,7 +71,7 @@ export default class Page {
 "#;
     let input = project_nyar_from_vmz("Page.vmz", source).expect("project nyar");
     let client = &input.programs[0];
-    assert_eq!(client.imports.len(), 3, "imports={:?}", client.imports);
+    assert_eq!(client.imports.len(), 4, "imports={:?}", client.imports);
 
     let named = &client.imports[0];
     assert_eq!(named.module_specifier, "./lib");
@@ -80,18 +81,32 @@ export default class Page {
     assert_eq!(named.specifiers[0].local, "helper");
     assert_eq!(named.specifiers[0].imported.as_deref(), Some("helper"));
     assert_eq!(named.specifiers[0].binding_kind, NyarBindingKind::Named);
+    assert!(!named.specifiers[0].is_type_only);
     assert!(named.decl_span.start >= client.content_span.start);
     assert!(named.specifier_span.start >= named.decl_span.start);
 
     let type_only = &client.imports[1];
     assert_eq!(type_only.module_specifier, "@pkg/types");
     assert!(type_only.is_type_only);
+    assert!(type_only.specifiers.iter().all(|specifier| specifier.is_type_only));
 
-    let ns = &client.imports[2];
+    let mixed = &client.imports[2];
+    assert_eq!(mixed.module_specifier, "./icons");
+    assert!(!mixed.is_type_only, "an inline `type` specifier must not mark the whole declaration");
+    let [registry, icon_def] = mixed.specifiers.as_slice() else {
+        panic!("expected two bindings, got {:?}", mixed.specifiers);
+    };
+    assert_eq!(registry.local, "REGISTRY");
+    assert!(!registry.is_type_only);
+    assert_eq!(icon_def.local, "IconDef");
+    assert!(icon_def.is_type_only);
+
+    let ns = &client.imports[3];
     assert_eq!(ns.module_specifier, "../ns");
     assert_eq!(ns.specifiers.len(), 1);
     assert_eq!(ns.specifiers[0].local, "ns");
     assert_eq!(ns.specifiers[0].binding_kind, NyarBindingKind::Namespace);
+    assert!(!ns.specifiers[0].is_type_only);
 }
 
 #[test]

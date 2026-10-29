@@ -271,6 +271,7 @@ fn imports_from_root(root: &TypeScriptRoot, source: &str) -> Vec<NyarImportDecl>
                         local: local_name,
                         imported: Some(spec.local.clone()),
                         binding_kind: NyarBindingKind::Named,
+                        is_type_only: exp.is_type_only() || spec.is_inline_type_only(),
                         name_span: name_byte_span(
                             source,
                             exp.span.start,
@@ -284,7 +285,7 @@ fn imports_from_root(root: &TypeScriptRoot, source: &str) -> Vec<NyarImportDecl>
                     kind: NyarImportKind::ExportFrom,
                     module_specifier: module_specifier.clone(),
                     specifiers,
-                    is_type_only: exp.is_type_only,
+                    is_type_only: exp.is_type_only(),
                     decl_span,
                     specifier_span,
                 });
@@ -314,6 +315,7 @@ fn nyar_from_oak_import(
                     local: local.clone(),
                     imported: None,
                     binding_kind: NyarBindingKind::Default,
+                    is_type_only: decl.is_type_only(),
                     name_span: name_byte_span(source, decl.span.start, decl.span.end, local)
                         .unwrap_or(decl_span),
                 });
@@ -326,11 +328,12 @@ fn nyar_from_oak_import(
                     local: local.clone(),
                     imported: None,
                     binding_kind: NyarBindingKind::Namespace,
+                    is_type_only: decl.is_type_only(),
                     name_span: name_byte_span(source, decl.span.start, decl.span.end, local)
                         .unwrap_or(decl_span),
                 });
             }
-            ImportSpecifier::Named { local, imported } => {
+            ImportSpecifier::Named { local, imported, .. } => {
                 if !is_simple_ident(local) {
                     continue;
                 }
@@ -338,6 +341,7 @@ fn nyar_from_oak_import(
                     local: local.clone(),
                     imported: Some(imported.clone()),
                     binding_kind: NyarBindingKind::Named,
+                    is_type_only: decl.is_type_only() || spec.is_inline_type_only(),
                     name_span: name_byte_span(source, decl.span.start, decl.span.end, local)
                         .unwrap_or(decl_span),
                 });
@@ -348,7 +352,7 @@ fn nyar_from_oak_import(
         kind: NyarImportKind::Static,
         module_specifier: decl.module_specifier.clone(),
         specifiers,
-        is_type_only: decl.is_type_only,
+        is_type_only: decl.is_type_only(),
         decl_span,
         specifier_span,
     }
@@ -391,7 +395,7 @@ pub(crate) fn component_decl_from_root(
 
     for stmt in &root.statements {
         match stmt {
-            Statement::ExportDeclaration(exp) if exp.is_default => {
+            Statement::ExportDeclaration(exp) if exp.is_default() => {
                 if let Some(Statement::ClassDeclaration(class)) = exp.declaration.as_deref() {
                     default_class = Some(class);
                 }
@@ -401,7 +405,7 @@ pub(crate) fn component_decl_from_root(
                     internals.push(class);
                 }
             }
-            Statement::ExportDeclaration(exp) if !exp.is_default => {
+            Statement::ExportDeclaration(exp) if !exp.is_default() => {
                 if let Some(Statement::ClassDeclaration(class)) = exp.declaration.as_deref() {
                     if !class.name.is_empty() {
                         internals.push(class);
@@ -433,8 +437,8 @@ pub(crate) fn component_decl_from_root(
 fn fill_members_from_oak(decl: &mut ComponentDecl, body: &[ClassMember], source: &str) {
     let mut field_names: Vec<String> = Vec::new();
     for member in body {
-        if let ClassMember::Property { name, is_static, .. } = member {
-            if !*is_static && !name.is_empty() {
+        if let ClassMember::Property { name, .. } = member {
+            if !member.is_static() && !name.is_empty() {
                 field_names.push(name.clone());
             }
         }
@@ -443,8 +447,8 @@ fn fill_members_from_oak(decl: &mut ComponentDecl, body: &[ClassMember], source:
     // Static members are excluded: they are not instance properties.
     let mut member_names: Vec<String> = Vec::new();
     for member in body {
-        if let ClassMember::Method { name, is_static, .. } = member {
-            if !*is_static && !name.is_empty() && name != "constructor" {
+        if let ClassMember::Method { name, .. } = member {
+            if !member.is_static() && !name.is_empty() && name != "constructor" {
                 member_names.push(name.clone());
             }
         }
@@ -453,10 +457,8 @@ fn fill_members_from_oak(decl: &mut ComponentDecl, body: &[ClassMember], source:
 
     for member in body {
         match member {
-            ClassMember::Property {
-                name, ty, initializer, visibility, is_static, span, ..
-            } => {
-                if *is_static || name.is_empty() {
+            ClassMember::Property { name, ty, initializer, visibility, span, .. } => {
+                if member.is_static() || name.is_empty() {
                     continue;
                 }
                 let visibility = map_visibility(visibility.as_ref());
@@ -482,14 +484,7 @@ fn fill_members_from_oak(decl: &mut ComponentDecl, body: &[ClassMember], source:
                 }
             }
             ClassMember::Method {
-                name,
-                body: method_body,
-                decorators,
-                visibility,
-                is_static,
-                is_async,
-                span,
-                ..
+                name, body: method_body, decorators, visibility, span, ..
             } => {
                 if name.is_empty() || name == "constructor" {
                     continue;
@@ -507,8 +502,8 @@ fn fill_members_from_oak(decl: &mut ComponentDecl, body: &[ClassMember], source:
                 }
                 decl.methods.push(MethodDecl {
                     name: name.clone(),
-                    is_async: *is_async,
-                    is_static: *is_static,
+                    is_async: member.is_async(),
+                    is_static: member.is_static(),
                     is_private,
                     http,
                     reads: rw.reads,

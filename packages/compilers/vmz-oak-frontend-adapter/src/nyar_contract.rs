@@ -70,6 +70,8 @@ pub struct NyarImportBinding {
     pub imported: Option<String>,
     /// Default / named / namespace.
     pub binding_kind: NyarBindingKind,
+    /// `true` when this binding is type-only (`import type` or an inline `type` specifier).
+    pub is_type_only: bool,
     /// Span of the local name in the `.vmz` file (best-effort; may equal `decl_span`).
     pub name_span: ByteSpan,
 }

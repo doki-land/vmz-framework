@@ -221,7 +221,7 @@ impl SecretVisitor {
         self.imported_secrets_module = true;
         for specifier in &declaration.specifiers {
             match specifier {
-                ImportSpecifier::Named { local, imported } if imported == "secret" => {
+                ImportSpecifier::Named { local, imported, .. } if imported == "secret" => {
                     self.secret_locals.insert(local.clone());
                 }
                 ImportSpecifier::Default(local) | ImportSpecifier::Namespace(local) => {
@@ -415,7 +415,7 @@ impl ClientBoundaryVisitor {
                 source_span(&declaration.span, &self.source),
             );
             for specifier in &declaration.specifiers {
-                if let ImportSpecifier::Named { local, imported } = specifier {
+                if let ImportSpecifier::Named { local, imported, .. } = specifier {
                     if imported == "secret" {
                         self.secret_locals.insert(local.clone());
                     }

@@ -67,7 +67,7 @@ fn default_export_class_name(root: &TypeScriptRoot) -> Option<String> {
         let Statement::ExportDeclaration(exp) = stmt else {
             continue;
         };
-        if !exp.is_default {
+        if !exp.is_default() {
             continue;
         }
         let Some(decl) = exp.declaration.as_ref() else {

@@ -44,9 +44,9 @@ vmz-oak-frontend-adapter = { path = "packages/compilers/vmz-oak-frontend-adapter
 # Oaks frontend (Vue SFC / CST). Git deps are pinned to a fixed `rev` so CI and
 # local resolve the exact same commit.
 # Overlaid by local path `.cargo/config.toml` (git ignored).
-oak-core = { git = "https://github.com/yggdrasil-language/oaks.git", rev = "8c85395188b882cef129f32cf5e8588bb91f1186" }
-oak-vue = { git = "https://github.com/yggdrasil-language/oaks.git", rev = "8c85395188b882cef129f32cf5e8588bb91f1186" }
-oak-typescript = { git = "https://github.com/yggdrasil-language/oaks.git", rev = "8c85395188b882cef129f32cf5e8588bb91f1186" }
+oak-core = { git = "https://github.com/yggdrasil-language/oaks.git", rev = "d5d49c3f43a53b390141a726830a7711bce57548" }
+oak-vue = { git = "https://github.com/yggdrasil-language/oaks.git", rev = "d5d49c3f43a53b390141a726830a7711bce57548" }
+oak-typescript = { git = "https://github.com/yggdrasil-language/oaks.git", rev = "d5d49c3f43a53b390141a726830a7711bce57548" }
 editorconfig = "1.0.0"
 
 clap = { version = "4.6.6", features = ["derive"] }
