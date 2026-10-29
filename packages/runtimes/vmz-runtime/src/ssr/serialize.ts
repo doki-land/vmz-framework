@@ -674,7 +674,13 @@ const serializeApi = {
         const child = serializeApi._ssrChildInstance(Ctor, resolved);
         if (Ctor.__vmzDirect && typeof Ctor.__vmzCreate === 'function') {
             const prev = serializeApi._inst;
+            // A child nested inside the parent's `v-for` must not feed the parent
+            // item patch sink: those patches belong to the child instance (`this`).
+            // Replaying them with the parent's each host clears child output
+            // (innerHTML / text) that was already correct at create time.
+            const prevItemPatches = serializeApi._itemPatches;
             serializeApi._inst = child;
+            serializeApi._itemPatches = null;
             try {
                 const node = Ctor.__vmzCreate.call(child, serializeApi);
                 const attrs: Record<string, string> = { 'data-vmz': name };
@@ -691,6 +697,7 @@ const serializeApi = {
                 };
             } finally {
                 serializeApi._inst = prev;
+                serializeApi._itemPatches = prevItemPatches;
             }
         }
         throw new Error(`vmz:dom serialize component <${name}> requires __vmzCreate (rebuild child with Direct)`);

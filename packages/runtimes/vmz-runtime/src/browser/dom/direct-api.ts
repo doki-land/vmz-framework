@@ -449,10 +449,16 @@ export const directApi = {
         // Enter the host's private child pool so nested create cannot see uncle siblings.
         const adopt = directApi._resumeAdopt;
         const entered = adopt && typeof adopt.enter === 'function' ? adopt.enter(host) : false;
+        // A child nested inside the parent's `v-for` must not feed the parent item
+        // patch sink: those patches belong to the child instance (`this`) and the
+        // parent's each replays them with the parent host, wiping child output.
+        const prevItemPatches = directApi._itemPatches;
+        directApi._itemPatches = null;
         let node;
         try {
             node = runDirectCreate(Ctor, child);
         } finally {
+            directApi._itemPatches = prevItemPatches;
             if (entered && adopt && typeof adopt.leave === 'function') adopt.leave();
         }
         if (node) {
