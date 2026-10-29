@@ -12,6 +12,14 @@
                 <p class="charts-gallery__lead">
                     {{ leadLabel }}
                 </p>
+                <div role="group" :aria-label="sizeLabel" class="charts-gallery__sizes">
+                    <button type="button" :data-active="chartWidth === 480 ? 'true' : 'false'" @click="() => setChartWidth(480)" class="charts-gallery__size">
+                        480 px
+                    </button>
+                    <button type="button" :data-active="chartWidth === 720 ? 'true' : 'false'" @click="() => setChartWidth(720)" class="charts-gallery__size">
+                        720 px
+                    </button>
+                </div>
             </header>
             <section v-for="item in examples" :key="item.id" class="chart-card">
                 <header class="chart-card__head">
@@ -23,7 +31,9 @@
                     </button>
                 </header>
                 <div class="chart-card__body">
-                    <div v-html="item.svg" class="chart-card__canvas" />
+                    <div class="chart-card__canvas">
+                        <Chart :spec="item.spec" :data="item.rows" :width="chartWidth" :height="chartHeight" />
+                    </div>
                     <div v-if="activeDetail === item.id" class="chart-card__detail">
                         <h3>
                             {{ specTitleLabel }}
@@ -39,6 +49,28 @@
                         <pre class="chart-card__code">
                             <code>
                                 {{ item.dataText }}
+                            </code>
+                        </pre>
+                    </div>
+                </div>
+            </section>
+            <section class="chart-card">
+                <header class="chart-card__head">
+                    <h2>
+                        {{ diagramTitle }}
+                    </h2>
+                </header>
+                <div class="chart-card__body">
+                    <div class="chart-card__canvas">
+                        <Diagram :spec="diagramSpec" />
+                    </div>
+                    <div class="chart-card__detail">
+                        <h3>
+                            {{ diagramSpecTitleLabel }}
+                        </h3>
+                        <pre class="chart-card__code">
+                            <code>
+                                {{ diagramSpecText }}
                             </code>
                         </pre>
                     </div>
@@ -68,6 +100,28 @@
     margin: 0;
     color: var(--vmz-text-steel);
     font: 400 1rem / 1.7 var(--vmz-font-sans);
+}
+.charts-gallery__sizes {
+    display: flex;
+    gap: 0.5rem;
+}
+.charts-gallery__size {
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-steel);
+    font: 500 0.8rem / 1 var(--vmz-font-sans);
+    cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease;
+}
+.charts-gallery__size[data-active="true"] {
+    border-color: var(--vmz-text-ink);
+    color: var(--vmz-text-ink);
+}
+.charts-gallery__size:hover {
+    border-color: var(--vmz-text-steel);
+    color: var(--vmz-text-ink);
 }
 .chart-card {
     margin-top: 1.5rem;
@@ -113,12 +167,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow-x: auto;
     background: var(--vmz-surface-paper);
-}
-.chart-card__canvas svg {
-    max-width: 100%;
-    height: auto;
-    display: block;
 }
 .chart-card__detail {
     display: grid;
@@ -143,117 +193,65 @@
 }
 </style>
 <script client>
-import { fromRows, compile, buildScene } from "@doki-land/davinci/chart";
-import { resolve } from "@doki-land/davinci/scene";
-import { renderSvg } from "@doki-land/davinci/scene/svg";
-import type { ChartSpec } from "@doki-land/davinci/chart";
+/**
+ * 图表预览页。
+ *
+ * 作者面只消费 `@vmz/ui-charts` 的 `<Chart />` 与 `<Diagram />`，不导入
+ * `@doki-land/davinci/*`，也不自行拼接 SVG。演示输入只存在于同页
+ * `<script server>` 与 `../demo/chart-gallery.ts`（构建期输入），一份 spec /
+ * rows 同时驱动渲染与展示文本。
+ */
+import {
+    chartGalleryDiagram,
+    chartGalleryExamples,
+    type ChartGalleryDiagram,
+    type ChartGalleryExample,
+} from "../demo/chart-gallery.ts";
 import { pageMeta } from "../page-meta.ts";
-
-interface ChartExample {
-    id: string;
-    title: string;
-    svg: string;
-    specText: string;
-    dataText: string;
-}
-
-function buildExample(
-    id: string,
-    title: string,
-    spec: ChartSpec,
-    rows: Record<string, unknown>[],
-    width = 480,
-    height = 260,
-): ChartExample {
-    const data = fromRows(rows);
-    const plan = compile(spec, data);
-    const semantic = buildScene(plan, { width, height, padding: 32 });
-    const display = resolve(semantic, { width, height });
-    const svg = renderSvg(display);
-    return {
-        id,
-        title,
-        svg,
-        specText: JSON.stringify(spec, null, 2),
-        dataText: JSON.stringify(rows, null, 2),
-    };
-}
-
-const BAR_SPEC: ChartSpec = {
-    mark: "bar",
-    encoding: [
-        { field: "month", channel: "x" },
-        { field: "sales", channel: "y" },
-    ],
-};
-const BAR_ROWS = [
-    { month: "Jan", sales: 42 },
-    { month: "Feb", sales: 68 },
-    { month: "Mar", sales: 55 },
-    { month: "Apr", sales: 81 },
-    { month: "May", sales: 93 },
-    { month: "Jun", sales: 74 },
-];
-
-const LINE_SPEC: ChartSpec = {
-    mark: "line",
-    encoding: [
-        { field: "day", channel: "x" },
-        { field: "visitors", channel: "y" },
-    ],
-};
-const LINE_ROWS = [
-    { day: "Mon", visitors: 120 },
-    { day: "Tue", visitors: 145 },
-    { day: "Wed", visitors: 98 },
-    { day: "Thu", visitors: 187 },
-    { day: "Fri", visitors: 210 },
-    { day: "Sat", visitors: 176 },
-    { day: "Sun", visitors: 142 },
-];
-
-const SCATTER_SPEC: ChartSpec = {
-    mark: "point",
-    encoding: [
-        { field: "score", channel: "x" },
-        { field: "time", channel: "y" },
-    ],
-};
-const SCATTER_ROWS = [
-    { score: 82, time: 45 },
-    { score: 75, time: 38 },
-    { score: 91, time: 52 },
-    { score: 68, time: 41 },
-    { score: 88, time: 48 },
-    { score: 73, time: 35 },
-    { score: 95, time: 55 },
-    { score: 61, time: 32 },
-    { score: 84, time: 44 },
-];
 
 export default class ChartGalleryPage {
     static meta = pageMeta(
         "图表预览 · VMZ",
         "Chart gallery · VMZ",
-        "VMZ 集成的 DaVinci 图表库预览，展示静态 bar、line、scatter 示例。",
-        "Preview of VMZ-integrated DaVinci charts with static bar, line, and scatter examples.",
+        "VMZ 图表预览，消费公开 UI 作者面 @vmz/ui-charts 的 Chart 与 Diagram 组件。",
+        "VMZ chart gallery consuming the public @vmz/ui-charts Chart and Diagram components.",
     );
+
+    /** 构建期与 SSR 取数：读同一份演示输入，静态预渲染不依赖 `#server` RPC。 */
+    static load() {
+        const examples = chartGalleryExamples();
+        const diagram = chartGalleryDiagram();
+        return {
+            examples,
+            diagramTitle: diagram.title,
+            diagramSpec: diagram.spec,
+            diagramSpecText: diagram.specText,
+        };
+    }
 
     kickerLabel = "VMZ · DaVinci Charts";
     titleLabel = "图表预览";
-    leadLabel = "消费公开引擎包 @doki-land/davinci 的 chart 与 scene 入口，展示编译→场景→SVG 流水线的静态输出。";
+    leadLabel = "预览消费公开 UI 作者面 @vmz/ui-charts，由它绑定 @doki-land/davinci 引擎完成编译、场景解析与 SVG 呈现。";
     specTitleLabel = "ChartSpec";
     dataTitleLabel = "示例数据";
+    diagramSpecTitleLabel = "DiagramSpec";
+    sizeLabel = "图表尺寸";
     showSpecLabel = "查看规格";
     hideSpecLabel = "收起规格";
 
     activeDetail = "";
+    chartWidth = 480;
+    chartHeight = 260;
 
-    examples: ChartExample[] = [
-        buildExample("bar", "柱状图 · Bar", BAR_SPEC, BAR_ROWS),
-        buildExample("line", "折线图 · Line", LINE_SPEC, LINE_ROWS),
-        buildExample("scatter", "散点图 · Scatter", SCATTER_SPEC, SCATTER_ROWS),
-    ];
+    /** 由 `static load` 注入的示例输入（public = 页面 props）。 */
+    public examples: ChartGalleryExample[] = [];
+    public diagramTitle = "";
+    public diagramSpec: ChartGalleryDiagram["spec"] | null = null;
+    public diagramSpecText = "";
+
+    setChartWidth(width: number) {
+        this.chartWidth = width;
+    }
 
     toggleDetail(id: string) {
         this.activeDetail = this.activeDetail === id ? "" : id;
@@ -261,6 +259,23 @@ export default class ChartGalleryPage {
 
     getToggleLabel(id: string): string {
         return this.activeDetail === id ? this.hideSpecLabel : this.showSpecLabel;
+    }
+}
+</script>
+<script server>
+/**
+ * 图表预览的服务端取数能力。spec / rows 与展示文本来自
+ * `../../demo/chart-gallery.ts` 的同一份构建期输入，页面不在作者面另写常量。
+ */
+import { chartGalleryDiagram, chartGalleryExamples } from "../../demo/chart-gallery.ts";
+
+export default class ChartGalleryPageServer {
+    getExamples() {
+        return chartGalleryExamples();
+    }
+
+    getDiagram() {
+        return chartGalleryDiagram();
     }
 }
 </script>

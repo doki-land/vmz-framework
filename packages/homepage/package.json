@@ -20,6 +20,7 @@
     "dependencies": {
         "@doki-land/davinci": "workspace:*",
         "@vmz/ui": "workspace:*",
+        "@vmz/ui-charts": "workspace:*",
         "@vmz/ui-icons": "workspace:*",
         "@vmz/ui-data-grid": "workspace:*",
         "@vmz/plugin": "workspace:*",
