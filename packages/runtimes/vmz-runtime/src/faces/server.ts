@@ -472,6 +472,20 @@ function contentType(filePath: string, nodePath: NodePathModule): string {
             return 'image/svg+xml';
         case '.map':
             return 'application/json; charset=utf-8';
+        case '.wasm':
+            return 'application/wasm';
+        case '.woff2':
+            return 'font/woff2';
+        case '.woff':
+            return 'font/woff';
+        case '.otf':
+            return 'font/otf';
+        case '.ttf':
+            return 'font/ttf';
+        case '.xml':
+            return 'application/xml';
+        case '.txt':
+            return 'text/plain; charset=utf-8';
         default:
             return 'application/octet-stream';
     }
