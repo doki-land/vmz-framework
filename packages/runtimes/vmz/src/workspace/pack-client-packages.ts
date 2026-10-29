@@ -10,7 +10,7 @@
  * Not full oxc chunk-split/minify (`oxc-pending` remains for release minify).
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { resolvePackageRoot } from './packages.js';
@@ -18,6 +18,11 @@ import { requireNativeAddon } from './native-addon.js';
 
 const VENDOR_DIR = 'vendor';
 const SKIP_PREFIXES = ['node:', 'nodejs:', 'cloudflare:', 'data:', 'http:', 'https:', 'vmz:', '#'];
+const STYLE_EXT = /\.css$/i;
+/** `new URL('<file>', import.meta.url)` — runtime assets a vendored module loads itself. */
+const IMPORT_META_URL_RE = /\bnew\s+URL\s*\(\s*(['"])([^'"\n]+)\1\s*,\s*import\.meta\.url\s*\)/g;
+/** `url(<file>)` inside a vendored stylesheet. */
+const CSS_URL_RE = /\burl\s*\(\s*(['"]?)([^'")\n]+)\1\s*\)/g;
 
 /**
  * @param {string} outDir
@@ -58,6 +63,22 @@ export function packClientBareImports(outDir: string, opts: PackClientBareImport
         }
         if (/\.vmz$/i.test(resolved.sourceFile)) {
             if (!skippedVmz.includes(spec)) skippedVmz.push(spec);
+            continue;
+        }
+
+        // Stylesheets are not browser modules: materialize the CSS (plus its
+        // `url()` assets) and expose a loader module that links it once.
+        if (STYLE_EXT.test(resolved.sourceFile)) {
+            const styleDest = vendorPathForSource(
+                outDir,
+                resolved.pkgName,
+                resolved.pkgRoot,
+                resolved.sourceFile,
+            );
+            materializeStyleFile(resolved.sourceFile, styleDest);
+            const loaderDest = `${styleDest}.js`;
+            writeFileSync(loaderDest, styleLoaderSource(path.basename(styleDest)), 'utf8');
+            bareToVendor.set(spec, loaderDest);
             continue;
         }
 
@@ -122,6 +143,7 @@ function materializeSourceTree(outDir, resolved, materializedSources, bareQueue)
         mkdirSync(path.dirname(destAbs), { recursive: true });
         const js = materializeModule(sourceFile);
         writeFileSync(destAbs, js, 'utf8');
+        materializeRuntimeAssets(sourceFile, destAbs, js);
         if (sourceFile === resolved.sourceFile) entryDest = destAbs;
 
         for (const bare of collectBareSpecs(js)) bareQueue.push({ spec: String(bare), from: sourceFile });
@@ -270,6 +292,7 @@ function resolveExportFile(pkgRoot, subpath) {
     if (pkg.exports && typeof pkg.exports === 'object' && !Array.isArray(pkg.exports)) {
         const entry = pkg.exports[key] ?? (!subpath ? pkg.exports['.'] : null);
         target = flattenExportTarget(entry);
+        if (!target && subpath) target = matchWildcardExport(pkg.exports, key);
     }
     if (!target && !subpath) target = pkg.module || pkg.main || './index.js';
     if (!target && subpath) {
@@ -293,6 +316,27 @@ function resolveExportFile(pkgRoot, subpath) {
         if (existsSync(c) && statSync(c).isFile()) return c;
     }
     return null;
+}
+
+/** Longest-prefix `./*` / `./js/*` style export match for a subpath key. */
+function matchWildcardExport(exportsMap, key) {
+    let best = null;
+    let bestPrefix = -1;
+    for (const [pattern, entry] of Object.entries(exportsMap)) {
+        const star = pattern.indexOf('*');
+        if (star < 0) continue;
+        const prefix = pattern.slice(0, star);
+        const suffix = pattern.slice(star + 1);
+        if (!key.startsWith(prefix) || !key.endsWith(suffix)) continue;
+        const target = flattenExportTarget(entry);
+        if (typeof target !== 'string') continue;
+        const middle = key.slice(prefix.length, key.length - suffix.length);
+        if (prefix.length > bestPrefix) {
+            best = target.replace('*', middle);
+            bestPrefix = prefix.length;
+        }
+    }
+    return best;
 }
 
 function flattenExportTarget(entry) {
@@ -327,6 +371,76 @@ function materializeModule(sourceFile) {
     } catch (error) {
         throw new Error(`pack source ${sourceFile}: ${error instanceof Error ? error.message : String(error)}`);
     }
+}
+
+function isLocalAssetRef(ref) {
+    const value = ref.trim();
+    if (!value) return false;
+    if (value.startsWith('/') || value.startsWith('\\') || value.startsWith('#')) return false;
+    return !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(value);
+}
+
+function copyVendoredAsset(fromDir, destDir, ref) {
+    const cleaned = ref.replace(/[?#].*$/, '');
+    if (!isLocalAssetRef(cleaned)) return;
+    const source = path.resolve(fromDir, cleaned);
+    let stat;
+    try {
+        stat = statSync(source);
+    } catch {
+        return;
+    }
+    if (!stat.isFile()) return;
+    const dest = path.resolve(destDir, cleaned);
+    mkdirSync(path.dirname(dest), { recursive: true });
+    copyFileSync(source, dest);
+}
+
+/**
+ * Copy files a vendored module loads by URL at runtime (`new URL(…, import.meta.url)`),
+ * so `.wasm`, `.json` payloads, … stay reachable next to their module.
+ */
+function materializeRuntimeAssets(sourceFile, destAbs, js) {
+    IMPORT_META_URL_RE.lastIndex = 0;
+    let match;
+    while ((match = IMPORT_META_URL_RE.exec(js))) {
+        copyVendoredAsset(path.dirname(sourceFile), path.dirname(destAbs), match[2]);
+    }
+}
+
+/** Copy a stylesheet and everything its `url()` references. */
+function materializeStyleFile(sourceFile, destAbs) {
+    const css = readFileSync(sourceFile, 'utf8');
+    mkdirSync(path.dirname(destAbs), { recursive: true });
+    writeFileSync(destAbs, css, 'utf8');
+    CSS_URL_RE.lastIndex = 0;
+    let match;
+    while ((match = CSS_URL_RE.exec(css))) {
+        copyVendoredAsset(path.dirname(sourceFile), path.dirname(destAbs), match[2]);
+    }
+}
+
+/**
+ * Loader module for a vendored stylesheet: links it once and exposes the load
+ * promise as the default export.
+ */
+function styleLoaderSource(fileName) {
+    return `const href = new URL(${JSON.stringify(`./${fileName}`)}, import.meta.url).href;
+const ready =
+    typeof document === 'undefined'
+        ? Promise.resolve()
+        : Array.from(document.querySelectorAll('link[rel="stylesheet"]')).some((el) => el.href === href)
+            ? Promise.resolve()
+            : new Promise((resolve, reject) => {
+                  const link = document.createElement('link');
+                  link.rel = 'stylesheet';
+                  link.href = href;
+                  link.onload = () => resolve();
+                  link.onerror = () => reject(new Error('VMZ stylesheet failed to load: ' + href));
+                  document.head.appendChild(link);
+              });
+export default ready;
+`;
 }
 
 function transpileTs(source, filename) {
