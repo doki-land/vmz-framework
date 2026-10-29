@@ -15,7 +15,12 @@
         "./Diagram": "./src/components/Diagram.vmz"
     },
     "files": [
-        "src"
+        "src/components/Chart.vmz",
+        "src/components/Diagram.vmz"
+    ],
+    "sideEffects": [
+        "./src/components/Chart.vmz",
+        "./src/components/Diagram.vmz"
     ],
     "peerDependencies": {
         "@doki-land/davinci": "workspace:*",
