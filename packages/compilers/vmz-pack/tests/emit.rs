@@ -185,6 +185,151 @@ fn dynamic_import_rewrites_specifier() {
     assert!(!entry.code.contains("__vmz_chunk_"), "{}", entry.code);
 }
 
+/// CSS 导入端到端：节点级拒绝诊断沿 chunk `incomplete_facts` 链路传到
+/// emit 整体拒绝，不静默产出把 CSS 当 JS 的错误文本。
+#[test]
+fn css_import_is_rejected_end_to_end() {
+    let root = temp_tree(
+        "cssemit",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import './s.css';\nexport const x = 1;\n"),
+            ("src/s.css", "body{margin:0}\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["x".into()]) }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    assert!(
+        codes(&chunks.diagnostics).contains(&"vmz::pack::chunk::incomplete_facts".to_string()),
+        "{:?}",
+        chunks.diagnostics
+    );
+    let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
+    assert!(
+        codes(&errors).contains(&"vmz::pack::emit::incomplete_facts".to_string()),
+        "{errors:?}"
+    );
+    assert!(
+        errors.iter().any(|d| d.path.as_deref().is_some_and(|p| p.ends_with("s.css"))),
+        "{errors:?}"
+    );
+}
+
+/// bootstrap 端到端：对象字面量箭头包裹的动态 import 建独立 async chunk、
+/// 说明符重写为目标 chunk 文件且查询串随身份剥离；裸包经 `exports` browser
+/// 条件进图；入口 `used_exports = None` 整体执行（全部模块保留）；两懒页
+/// 共享 lib 落 shared chunk，且 bootstrap chunk 不预载 lib。
+#[test]
+fn bootstrap_dynamic_map_emits_async_chunks() {
+    let root = temp_tree(
+        "bootstrap",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/bootstrap.js",
+                "import { helper } from 'fake-pkg';\nconst __vmzPageModules = {\n  \"pages/index\": () => import(\"./pages/index.client.js\"),\n  \"pages/about\": () => import(\"./pages/about.client.js?v=1\"),\n};\nexport const registry = { modules: __vmzPageModules, helper };\n",
+            ),
+            (
+                "src/pages/index.client.js",
+                "import { shared } from '../lib.js';\nexport const page = shared + 1;\n",
+            ),
+            (
+                "src/pages/about.client.js",
+                "import { shared } from '../lib.js';\nexport const about = shared + 2;\n",
+            ),
+            ("src/lib.js", "export const shared = 42;\n"),
+            (
+                "node_modules/fake-pkg/package.json",
+                r#"{
+                    "name": "fake-pkg",
+                    "version": "1.0.0",
+                    "exports": {
+                        ".": { "browser": "./browser.js", "import": "./import.js", "default": "./default.js" }
+                    }
+                }"#,
+            ),
+            ("node_modules/fake-pkg/browser.js", "export const helper = 'browser';\n"),
+            ("node_modules/fake-pkg/import.js", "export const helper = 'import';\n"),
+            ("node_modules/fake-pkg/default.js", "export const helper = 'default';\n"),
+        ],
+    );
+    let graph = build_graph(
+        &[("bootstrap".to_string(), root.join("src/bootstrap.js"))],
+        Target::Browser,
+        &root,
+    );
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    // bootstrap + fake-pkg/browser + 两个页面 client + 共享 lib = 5 节点。
+    assert_eq!(graph.nodes.len(), 5);
+    let bootstrap_node = &graph.nodes[0];
+    assert_eq!(bootstrap_node.dynamic_edges.len(), 2);
+    assert!(bootstrap_node.dynamic_edges.iter().all(|edge| edge.target.is_ok()));
+    assert_eq!(bootstrap_node.dynamic_edges[1].specifier, "./pages/about.client.js?v=1");
+
+    // 入口不声明导出使用：整体执行，全部模块保留。
+    let link_plan =
+        link(&graph, &[EntryUse { entry_logical: "bootstrap".to_string(), used_exports: None }]);
+    assert_eq!(link_plan.modules.len(), graph.nodes.len(), "入口整体执行应保留全部模块");
+
+    let chunks = plan_chunks(&graph, &link_plan);
+    assert!(chunks.diagnostics.is_empty(), "{:?}", chunks.diagnostics);
+    assert_eq!(chunks.dynamic_boundaries.len(), 2);
+    assert!(chunks.dynamic_boundaries.iter().all(|(source, _)| *source == 0));
+
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert_eq!(plan.artifacts.len(), 4);
+    let entry = plan.artifacts.iter().find(|a| a.chunk_id == "entry/bootstrap").unwrap();
+    assert!(entry.imports.is_empty(), "{:?}", entry.imports);
+    assert_eq!(entry.dynamic.len(), 2, "bootstrap 动态数组非空");
+    assert_eq!(plan.dynamic_files.len(), 2);
+    assert!(plan.dynamic_files.iter().all(|(from, _)| from == &entry.file_name));
+    for (_, to) in &plan.dynamic_files {
+        assert!(entry.dynamic.contains(to), "{:?}", entry.dynamic);
+    }
+
+    // 箭头包裹形态保留，说明符重写为目标 chunk 文件；查询串不残留。
+    assert!(entry.code.contains("() => import(\"./"), "{}", entry.code);
+    assert!(!entry.code.contains("./pages/"), "{}", entry.code);
+    assert!(!entry.code.contains("?v=1"), "{}", entry.code);
+    assert!(!entry.code.contains("__vmz_chunk_"), "{}", entry.code);
+    assert!(entry.code.contains("__vmzPageModules"), "{}", entry.code);
+    assert!(entry.code.contains("export { registry }"), "{}", entry.code);
+    // 裸包经 `browser` 条件解析进图并拼入入口 chunk。
+    assert!(
+        entry.modules.iter().any(|m| m.ends_with("node_modules/fake-pkg/browser.js")),
+        "{:?}",
+        entry.modules
+    );
+    // 共享 lib 不在 bootstrap chunk（触发前不加载）。
+    assert!(!entry.modules.iter().any(|m| m.ends_with("src/lib.js")), "{:?}", entry.modules);
+
+    // 两个独立 async chunk 与一个 shared chunk。
+    let async_chunks: Vec<_> =
+        plan.artifacts.iter().filter(|a| a.chunk_id.starts_with("async/")).collect();
+    assert_eq!(async_chunks.len(), 2);
+    assert!(async_chunks.iter().any(|a| a.chunk_id.ends_with("src/pages/about.client.js")));
+    assert!(async_chunks.iter().any(|a| a.chunk_id.ends_with("src/pages/index.client.js")));
+    let shared =
+        plan.artifacts.iter().find(|a| a.chunk_id.starts_with("shared/")).expect("shared chunk");
+    assert!(shared.modules.iter().any(|m| m.ends_with("src/lib.js")), "{:?}", shared.modules);
+    assert!(shared.code.contains("export { shared }"), "{}", shared.code);
+    for lazy in &async_chunks {
+        assert_eq!(lazy.imports, vec![shared.file_name.clone()]);
+        assert!(
+            lazy.code.contains(&format!("import {{ shared }} from \"./{}\";", shared.file_name)),
+            "{}",
+            lazy.code
+        );
+    }
+
+    assert_eq!(plan.entry_files, vec![("bootstrap".to_string(), entry.file_name.clone())]);
+}
+
 /// 同 chunk 两个模块声明同名绑定：拼接会产生非法重复声明，显式拒绝。
 #[test]
 fn name_conflict_is_rejected() {

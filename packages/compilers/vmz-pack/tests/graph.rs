@@ -124,6 +124,36 @@ fn shared_dependency_is_a_single_node() {
     assert!(shared.resolved.package.as_ref().unwrap().name == "app");
 }
 
+/// CSS 导入在节点展开时显式拒绝：边仍解析到文件，节点带
+/// `css_import_unsupported` 诊断且没有模块事实，不被当 JS 读取。
+#[test]
+fn css_import_is_rejected_at_node_expansion() {
+    let root = temp_tree(
+        "cssreject",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import './s.css';\nexport const x = 1;\n"),
+            ("src/s.css", "body{margin:0}\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    assert_eq!(graph.nodes.len(), 2);
+
+    // 边目标解析成功（身份层只回答文件身份，语义拒绝在图展开层）。
+    let edge = &graph.nodes[0].static_edges[0];
+    assert_eq!(edge.specifier, "./s.css");
+    assert!(edge.target.is_ok(), "{:?}", edge.target);
+
+    let css = &graph.nodes[1];
+    assert!(css.resolved.path.ends_with("s.css"));
+    assert_eq!(css.diagnostics.len(), 1);
+    assert_eq!(css.diagnostics[0].code, "vmz::pack::graph::css_import_unsupported");
+    assert!(css.record.statements.is_empty(), "CSS 不得按 JS 源码收集事实");
+    assert!(css.static_edges.is_empty() && css.dynamic_edges.is_empty());
+}
+
 #[test]
 fn parse_failure_keeps_node_with_diagnostics() {
     let root = temp_tree(

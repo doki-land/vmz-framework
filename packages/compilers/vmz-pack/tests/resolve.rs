@@ -461,6 +461,57 @@ fn diagnostic_codes_are_stable() {
     assert_eq!(empty.code, "vmz::pack::resolve::invalid_specifier");
 }
 
+/// `?` 查询与 `#` 片段不是文件身份：先剥离再解析；`#` 开头的 imports
+/// 说明符在剥离之前分流，不受影响。
+#[test]
+fn query_and_fragment_are_stripped_before_file_identity() {
+    let tree = Tree::new();
+    tree.file(
+        "app/package.json",
+        r##"{ "name": "app", "version": "0.0.1", "imports": { "#lib": "./src/lib.js" } }"##,
+    );
+    tree.file("app/src/main.js", "export {};\n");
+    tree.file("app/src/helper.js", "export const helper = 1;\n");
+    tree.file("app/src/lib.js", "export const lib = 1;\n");
+    tree.file(
+        "app/node_modules/widgets/package.json",
+        r#"{ "name": "widgets", "version": "2.3.4", "exports": { ".": "./dist/index.js", "./sub": "./dist/sub.js" } }"#,
+    );
+    tree.file("app/node_modules/widgets/dist/index.js", "export const a = 1;\n");
+    tree.file("app/node_modules/widgets/dist/sub.js", "export const b = 2;\n");
+
+    let plain =
+        attempt(&tree, "./helper.js", "app/src/main.js", Target::Browser).expect("plain path");
+    let queried =
+        attempt(&tree, "./helper.js?v=2", "app/src/main.js", Target::Browser).expect("query");
+    let fragmented = attempt(&tree, "./helper.js#section", "app/src/main.js", Target::Browser)
+        .expect("fragment");
+    let both = attempt(&tree, "./helper.js?v=2#section", "app/src/main.js", Target::Browser)
+        .expect("query and fragment");
+    assert_eq!(queried.path, plain.path, "查询不属于文件身份");
+    assert_eq!(fragmented.path, plain.path, "片段不属于文件身份");
+    assert_eq!(both.path, plain.path, "查询与片段同时剥离");
+
+    // 剥离后扩展推断照常生效。
+    let inferred = attempt(&tree, "./helper?inline=1", "app/src/main.js", Target::Browser)
+        .expect("extension inference after strip");
+    assert_eq!(inferred.path, plain.path);
+
+    // 裸包与子路径的查询在拆分包段前剥离，exports 匹配与实例身份不受影响。
+    let sub = attempt(&tree, "widgets/sub?raw=1", "app/src/main.js", Target::Browser)
+        .expect("bare subpath query stripped");
+    assert_eq!(sub.path, tree.canon("app/node_modules/widgets/dist/sub.js"));
+    assert_eq!(sub.package.expect("bare identity kept").name, "widgets");
+
+    let entry = attempt(&tree, "widgets?cache=1", "app/src/main.js", Target::Browser)
+        .expect("bare entry query stripped");
+    assert_eq!(entry.path, tree.canon("app/node_modules/widgets/dist/index.js"));
+
+    // `#` 开头是 imports 说明符，不是片段，不被剥离。
+    let hash = attempt(&tree, "#lib", "app/src/main.js", Target::Browser).expect("imports intact");
+    assert_eq!(hash.path, tree.canon("app/src/lib.js"));
+}
+
 /// importer 上溯找不到时从项目根上溯兜底。
 #[test]
 fn root_fallback_walks_from_project_root_when_importer_chain_has_none() {

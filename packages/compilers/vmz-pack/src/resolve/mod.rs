@@ -7,6 +7,8 @@
 //!
 //! - [`Resolved::path`] 一律 `canonicalize` 后的真实文件（跟随符号链接，
 //!   pnpm 链接包由此得到真实包根）。
+//! - `?` 查询与 `#` 片段不是文件身份的一部分：解析入口先按首个出现处
+//!   剥离再解析；`#` 开头的 `imports` 说明符在剥离之前分流，不受影响。
 //! - 包实例身份 [`PackageIdentity`] = canonical 包根 + `name` + `version`；
 //!   同名不同物理根或不同版本即不同实例，**不得**仅按裸 specifier 或包名
 //!   作为缓存键或输出单位。解析结果同时依赖 importer 与 target，缓存键必须
@@ -157,6 +159,9 @@ pub fn resolve(req: &ResolveRequest) -> Result<Resolved, PackDiagnostic> {
     if spec.starts_with('#') {
         return resolve_hash(req, spec, 0);
     }
+    // 身份规则：`?` 查询与 `#` 片段按首个出现处剥离，剥离后才是文件路径；
+    // 裸包名段不含这两个字符，剥离发生在拆分包段之前（相对与子路径同样适用）。
+    let spec = strip_query_and_fragment(spec);
     let importer_dir = req.importer.parent().unwrap_or_else(|| Path::new("."));
     if is_relative_spec(spec) || spec.starts_with('/') || Path::new(spec).is_absolute() {
         let base =
@@ -387,6 +392,11 @@ fn split_package_specifier(
     let rest: Vec<&str> = segments.collect();
     let subpath = if rest.is_empty() { ".".to_string() } else { format!("./{}", rest.join("/")) };
     Ok((pkg_name, subpath))
+}
+
+/// 剥离 `?` 查询与 `#` 片段：模块身份是物理文件本身，两者不属于路径。
+fn strip_query_and_fragment(spec: &str) -> &str {
+    spec.find(|c| c == '?' || c == '#').map_or(spec, |index| &spec[..index])
 }
 
 /// 相对 specifier：`.`、`..`、`./`、`../` 前缀（作者面恒用 `/`）。

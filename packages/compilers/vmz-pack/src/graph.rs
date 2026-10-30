@@ -4,6 +4,11 @@
 //! 身份口径：节点以 canonical 文件路径为身份（`resolve` 已保证包实例区分）；
 //! 同一文件被多个 importer 引用时只建一个节点。类型-only 导入不建立边——
 //! 类型不进入运行时图。解析失败保留为边上的诊断，不静默丢边。
+//!
+//! CSS 导入在节点展开时显式拒绝（`vmz::pack::graph::css_import_unsupported`）：
+//! 不得按 JS 源码读取而静默产出错误文本；拒绝节点无模块事实，沿 `chunk` 与
+//! `emit` 的事实不完整链路整体拒绝。CSS 的正式支持（抽取、注入、按入口聚合）
+//! 是未实现的独立缺口。
 
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
@@ -162,6 +167,21 @@ fn expand(
     graph_diags: &mut Vec<PackDiagnostic>,
 ) -> ModuleNode {
     let path = &resolved.path;
+    // CSS 不是 JS 模块：不读源码、不猜测，节点级显式拒绝，
+    // 下游 chunk/emit 按事实不完整链路整体拒绝。
+    if path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("css")) {
+        return ModuleNode {
+            resolved: resolved.clone(),
+            record: ModuleRecord::empty(Some(path.display().to_string())),
+            static_edges: Vec::new(),
+            dynamic_edges: Vec::new(),
+            diagnostics: vec![PackDiagnostic::new(
+                "vmz::pack::graph::css_import_unsupported",
+                "CSS import cannot be linked as a JS module; formal CSS support is not implemented",
+            )
+            .with_path(path.display().to_string())],
+        };
+    }
     let source = match std::fs::read_to_string(path) {
         Ok(source) => source,
         Err(err) => {
