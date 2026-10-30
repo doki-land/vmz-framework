@@ -32,7 +32,7 @@ function parseDir() {
 const dist = parseDir();
 if (!fs.existsSync(dist)) fail(`missing dist dir: ${dist}`);
 
-/** Publish job stages matrix natives under VMZ_NATIVE_ARTIFACTS — wire before oxc smoke. */
+/** Publish job stages matrix natives under VMZ_NATIVE_ARTIFACTS — wire them before the native-backed smoke below. */
 function bootstrapNativeForSmoke() {
     if (process.env.VMZ_NATIVE_NODE?.trim()) return;
     const artifactsRoot = process.env.VMZ_NATIVE_ARTIFACTS || path.join(ROOT, 'dist', 'native-flat');

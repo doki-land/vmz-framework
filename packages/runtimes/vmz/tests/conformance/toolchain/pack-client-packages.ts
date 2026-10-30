@@ -1,9 +1,15 @@
 /**
- * Client bare package specifier → dist/vendor + relative rewrite.
+ * Client bare package specifier → resolvable relative rewrite (executable graph).
  * verify id: pack-client-packages
  *
  * Author surface may import '@scope/pkg' / '@scope/pkg/subpath' (01/04).
  * Browser ESM cannot resolve bare names; Pack must lower them.
+ *
+ * What this gate keeps: bare specifiers are rewritten to relative paths that
+ * resolve, and the resulting module graph evaluates via dynamic import.
+ * The concrete `dist/vendor/**` layout and vendored file counts are only
+ * intermediate vendoring behavior of the current thin pack slice — not a
+ * product packaging target, so they are not pinned here.
  */
 
 import fs from 'node:fs';
@@ -114,24 +120,37 @@ try {
         fail(`remaining bare after pack: ${JSON.stringify(result.remainingBareSpecs)}`);
     }
 
-    const useJs = fs.readFileSync(path.join(dist, 'lib', 'use.js'), 'utf8');
+    // Keep: bare specifiers are lowered to relative specifiers that resolve on disk.
+    const useJsPath = path.join(dist, 'lib', 'use.js');
+    const useJs = fs.readFileSync(useJsPath, 'utf8');
     if (useJs.includes("'@vmz/fixture-client-lib'") || useJs.includes('"@vmz/fixture-client-lib"')) {
         fail(`importer still has bare root: ${useJs}`);
     }
     if (useJs.includes('@vmz/fixture-client-lib/query')) {
         fail(`importer still has bare subpath: ${useJs}`);
     }
-    if (!useJs.includes('../vendor/vmz/fixture-client-lib/')) {
-        fail(`expected relative vendor import: ${useJs}`);
+    const importerSpecs = [...useJs.matchAll(/\bfrom\s*['"]([^'"]+)['"]/g)].map((m) => m[1]);
+    if (!importerSpecs.length || importerSpecs.some((s: string) => !s.startsWith('.'))) {
+        fail(`expected relative import specifiers after pack: ${useJs}`);
+    }
+    for (const spec of importerSpecs) {
+        if (!fs.existsSync(path.resolve(path.dirname(useJsPath), spec))) {
+            fail(`rewritten specifier does not resolve: ${spec}`);
+        }
     }
 
-    const vendorIndex = path.join(dist, 'vendor', 'vmz', 'fixture-client-lib', 'src', 'index.js');
-    const vendorQuery = path.join(dist, 'vendor', 'vmz', 'fixture-client-lib', 'src', 'query.js');
-    if (!fs.existsSync(vendorIndex)) fail(`missing ${vendorIndex}`);
-    if (!fs.existsSync(vendorQuery)) fail(`missing ${vendorQuery}`);
-
-    const vendorIndexJs = fs.readFileSync(vendorIndex, 'utf8');
-    if (vendorIndexJs.includes('.ts')) fail(`vendor index still references .ts: ${vendorIndexJs}`);
+    // Intermediate vendoring behavior only: the thin pack slice materializes the
+    // reachable closure under a vendor tree. Check the transpiled output (no
+    // remaining `.ts` module specifiers) across whatever was vendored — do not
+    // pin an exact `dist/vendor/**` path set or a vendored file count.
+    if (!result.vendoredModules.length) {
+        fail(`expected intermediate vendoring to materialize reachable modules: ${JSON.stringify(result)}`);
+    }
+    const tsSpecifier = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"][^'"]+\.tsx?['"]/;
+    for (const rel of result.vendoredModules) {
+        const text = fs.readFileSync(path.join(dist, rel), 'utf8');
+        if (tsSpecifier.test(text)) fail(`vendored module still references a .ts specifier (${rel}): ${text}`);
+    }
 
     // Browser-shaped load: dynamic import of rewritten module graph.
     const mod = await import(pathToFileURL(path.join(dist, 'lib', 'use.js')).href);

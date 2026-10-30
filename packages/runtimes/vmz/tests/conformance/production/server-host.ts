@@ -67,7 +67,11 @@ const routes = readJson(path.join(build.dist, 'vmz-routes.json'));
 
 if (pack.schema !== 'vmz.pack.manifest.v0') fail(`bad pack schema ${pack.schema}`);
 if (pack.bundler !== 'vmz-pack') fail('pack must use vmz-pack (not external Rollup)');
+// `treeShakeBasis` is the semantic-unit basis of the manifest — it is not
+// evidence that JavaScript dead-code elimination ran (that is unimplemented).
 if (pack.treeShakeBasis !== 'vpg-deployment-ir') fail('treeShakeBasis must be vpg-deployment-ir');
+// Manifest must not advertise a minifier that does not exist.
+if (pack.release === true && pack.minify !== 'none') fail(`release minify must be none, got ${pack.minify}`);
 
 if (assemble.assembly !== 'server-host') fail(`expected assembly server-host got ${assemble.assembly}`);
 const serverStep = (assemble.steps || []).find((s: any) => s.kind === 'server-host');

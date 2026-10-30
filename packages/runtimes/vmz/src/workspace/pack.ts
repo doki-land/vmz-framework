@@ -1,7 +1,13 @@
 /**
  * Pack stage: consume Deployment IR (VPG-owned units), emit pack manifest,
  * and lower browser-unreachable bare package imports to `dist/vendor/**`.
- * Full oxc minify/chunk-split lands progressively (`oxc-pending` on release minify).
+ *
+ * Current status: a thin module-moving slice — reachable module closure
+ * materialization, specifier rewriting, and TypeScript `transpileModule` type
+ * erasure. Linking, dead-code elimination, chunk splitting, and minification
+ * are NOT implemented in this stage; the manifest reports that honestly.
+ * (Any compaction of compile-emitted modules happens upstream in the compiler,
+ * not here — pack never rewrites bytes beyond specifier lowering.)
  */
 
 import crypto from 'node:crypto';
@@ -114,7 +120,13 @@ export function packFromDeploymentIr(outDir: string, opts: PackFromDeploymentIrO
         deploymentSchema: ir.schema,
         unitCount: units.length,
         units,
-        minify: opts.release ? 'oxc-pending' : 'dev-identity',
+        // Pack runs no compressor in either mode: it reports the bytes it was
+        // given (dev output written verbatim). Release artifacts may already be
+        // compacted by the compiler's release print path upstream — pack does not
+        // claim, add, or verify that compaction.
+        minify: opts.release ? 'none' : 'dev-identity',
+        // Names how VPG deployment units are selected for this manifest. It does
+        // NOT mean JavaScript dead-code elimination ran — that is not implemented.
         treeShakeBasis: 'vpg-deployment-ir',
         bundler: 'vmz-pack',
         clientPackageLowering: {

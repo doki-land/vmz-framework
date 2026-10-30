@@ -7,7 +7,9 @@
  * via a bounded rewrite of generated module syntax. Pack must not re-enter the
  * parser pipeline for every emitted JavaScript file.
  *
- * Not full oxc chunk-split/minify (`oxc-pending` remains for release minify).
+ * This stage is only that thin slice. Linking, dead-code elimination, chunk
+ * splitting, and minification are NOT implemented here — the pack manifest
+ * reports their absence rather than a placeholder backend.
  */
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
@@ -471,7 +473,7 @@ function rewriteTsExt(p) {
         .replace(/\.ts$/i, '.js');
 }
 
-/** oxc AST module specifier rewrite (`.ts`→`.js` + optional exact map). */
+/** Native (N-API) module specifier rewrite (`.ts`→`.js` + optional exact map). */
 export function rewriteRelativeTsSpecs(js, exactMap = null) {
     const source = String(js ?? '');
     const hasModuleTsSpecifier = /(?:import\s*(?:[^'"()]*?\s*from\s*)?|export\s+[^'"()]*?\s*from\s*|import\s*\()(['"])[^'"\r\n]+\.tsx?\1/i.test(
