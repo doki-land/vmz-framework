@@ -23,6 +23,7 @@ vmz-inspector.workspace = true
 vmz-artifacts.workspace = true
 vmz-github.workspace = true
 vmz-protocol.workspace = true
+vmz-pack.workspace = true
 vmz-plugin-tailwind.workspace = true
 vmz-plugin-sasso.workspace = true
 vmz-iris-adapter = { path = "../vmz-iris-adapter" }
