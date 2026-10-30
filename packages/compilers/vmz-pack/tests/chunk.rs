@@ -45,6 +45,11 @@ fn dynamic_edge(specifier: &str, target: &str) -> ModuleEdge {
 }
 
 fn graph(entries: &[(&str, &str)], nodes: Vec<ModuleNode>) -> ModuleGraph {
+    let node_index = nodes
+        .iter()
+        .enumerate()
+        .map(|(index, node)| (node.resolved.path.clone(), index))
+        .collect();
     ModuleGraph {
         target: Target::Browser,
         root: PathBuf::from("/"),
@@ -56,6 +61,7 @@ fn graph(entries: &[(&str, &str)], nodes: Vec<ModuleNode>) -> ModuleGraph {
             })
             .collect(),
         nodes,
+        node_index,
         diagnostics: Vec::new(),
     }
 }

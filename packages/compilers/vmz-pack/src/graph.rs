@@ -105,6 +105,9 @@ pub struct ModuleGraph {
     pub entries: Vec<GraphEntry>,
     /// 节点表，索引即节点号。
     pub nodes: Vec<ModuleNode>,
+    /// 节点身份 → 索引。`link` / `chunk` / `emit` 热路径按身份查节点，
+    /// 线性扫描在全图打包时是 O(n²)；此表与 `nodes` 同建同序。
+    pub node_index: HashMap<ModuleId, usize>,
     /// 图级诊断（入口解析失败、读文件失败等）。
     pub diagnostics: Vec<PackDiagnostic>,
 }
@@ -112,7 +115,7 @@ pub struct ModuleGraph {
 impl ModuleGraph {
     /// 按身份查节点索引。
     pub fn index_of(&self, id: &ModuleId) -> Option<usize> {
-        self.nodes.iter().position(|node| &node.resolved.path == id)
+        self.node_index.get(id).copied()
     }
 }
 
@@ -127,6 +130,7 @@ pub fn build_graph(entries: &[(String, PathBuf)], target: Target, root: &Path) -
         root: root.canonicalize().unwrap_or_else(|_| root.to_path_buf()),
         entries: Vec::new(),
         nodes: Vec::new(),
+        node_index: HashMap::new(),
         diagnostics: Vec::new(),
     };
     let mut by_id: HashMap<ModuleId, usize> = HashMap::new();
@@ -198,6 +202,7 @@ pub fn build_graph(entries: &[(String, PathBuf)], target: Target, root: &Path) -
         }
     }
 
+    graph.node_index = by_id;
     graph
 }
 

@@ -844,11 +844,18 @@ fn incomplete_facts_member_is_rejected() {
         "facts incomplete",
     ));
 
+    let nodes = vec![app_node, pending_node];
+    let node_index = nodes
+        .iter()
+        .enumerate()
+        .map(|(index, node)| (node.resolved.path.clone(), index))
+        .collect();
     let graph = ModuleGraph {
         target: Target::Browser,
         root: root.clone(),
         entries: vec![GraphEntry { logical: "main".to_string(), id: app.clone() }],
-        nodes: vec![app_node, pending_node],
+        nodes,
+        node_index,
         diagnostics: Vec::new(),
     };
     let link_plan = LinkPlan {
@@ -894,11 +901,13 @@ fn missing_source_file_is_rejected() {
         dynamic_edges: Vec::new(),
         diagnostics: Vec::new(),
     };
+    let node_path = node.resolved.path.clone();
     let graph = ModuleGraph {
         target: Target::Browser,
         root: root.clone(),
         entries: vec![GraphEntry { logical: "main".to_string(), id: gone.clone() }],
         nodes: vec![node],
+        node_index: std::collections::HashMap::from([(node_path, 0usize)]),
         diagnostics: Vec::new(),
     };
     let link_plan = LinkPlan {
