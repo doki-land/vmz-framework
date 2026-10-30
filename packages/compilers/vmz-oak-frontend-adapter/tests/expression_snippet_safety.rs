@@ -35,6 +35,7 @@ fn collect_identifier_spans(expr: &Expression, out: &mut Vec<ByteSpan>) {
                     ObjectProperty::Property { value, .. } => {
                         collect_identifier_spans(value, out);
                     }
+                    ObjectProperty::Method { .. } => {}
                     ObjectProperty::Spread(value) => collect_identifier_spans(value, out),
                 }
             }

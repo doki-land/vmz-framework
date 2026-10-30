@@ -386,6 +386,13 @@ impl OakFieldRw {
                 for p in properties {
                     match p {
                         ObjectProperty::Property { value, .. } => self.walk_expr(value),
+                        ObjectProperty::Method { body, .. } => {
+                            let saved = self.aliases.clone();
+                            for s in body {
+                                self.walk_stmt(s, None);
+                            }
+                            self.aliases = saved;
+                        }
                         ObjectProperty::Spread(e) => self.walk_expr(e),
                     }
                 }

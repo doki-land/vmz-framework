@@ -494,6 +494,11 @@ fn walk_expression(expression: &Expression, visit: &mut impl FnMut(&Expression))
                     ObjectProperty::Property { value, .. } | ObjectProperty::Spread(value) => {
                         visit(value)
                     }
+                    ObjectProperty::Method { body, .. } => {
+                        for statement in body {
+                            walk_statement_expression(statement, visit);
+                        }
+                    }
                 }
             }
         }

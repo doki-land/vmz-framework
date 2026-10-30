@@ -413,6 +413,13 @@ fn shift_expression_spans(expr: &mut Expression, delta: isize) {
                         shift_range(span, delta);
                         shift_expression_spans(value, delta);
                     }
+                    ObjectProperty::Method { params, body, span, .. } => {
+                        shift_range(span, delta);
+                        shift_type_spans(&mut [], params, delta);
+                        for stmt in body {
+                            shift_statement_spans(stmt, delta);
+                        }
+                    }
                     ObjectProperty::Spread(value) => shift_expression_spans(value, delta),
                 }
             }

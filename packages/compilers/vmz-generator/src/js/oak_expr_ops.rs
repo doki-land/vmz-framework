@@ -210,6 +210,9 @@ fn collect_bind_rewrites(
                             collect_bind_rewrites(value, fields, methods, scope, aliases, out);
                         }
                     }
+                    // A method owns `this`; bind rewrites do not descend, like
+                    // `FunctionExpression`.
+                    ObjectProperty::Method { .. } => {}
                     ObjectProperty::Spread(e) => {
                         collect_bind_rewrites(e, fields, methods, scope, aliases, out);
                     }
@@ -387,6 +390,7 @@ impl DepCollector<'_> {
                 for p in properties {
                     match p {
                         ObjectProperty::Property { value, .. } => self.visit_expr(value),
+                        ObjectProperty::Method { .. } => {}
                         ObjectProperty::Spread(e) => self.visit_expr(e),
                     }
                 }
@@ -500,6 +504,7 @@ impl AliasPathCollector<'_> {
                 for p in properties {
                     match p {
                         ObjectProperty::Property { value, .. } => self.visit_expr(value),
+                        ObjectProperty::Method { .. } => {}
                         ObjectProperty::Spread(e) => self.visit_expr(e),
                     }
                 }

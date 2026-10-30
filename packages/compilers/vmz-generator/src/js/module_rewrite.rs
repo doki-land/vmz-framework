@@ -175,6 +175,13 @@ fn collect_expr_spec_patches(
                     oak_typescript::ast::ObjectProperty::Property { value, .. } => {
                         collect_expr_spec_patches(source, value, map, out);
                     }
+                    // Method bodies are function statements; specifiers inside them
+                    // still need rewriting, like `FunctionExpression`.
+                    oak_typescript::ast::ObjectProperty::Method { body, .. } => {
+                        for s in body {
+                            collect_stmt_spec_patches(source, s, map, out);
+                        }
+                    }
                     oak_typescript::ast::ObjectProperty::Spread(e) => {
                         collect_expr_spec_patches(source, e, map, out);
                     }

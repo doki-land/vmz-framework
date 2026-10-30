@@ -810,6 +810,9 @@ impl<'a> Collector<'a> {
                 for property in properties {
                     match property {
                         ObjectProperty::Property { value, .. } => self.walk_expr(value),
+                        // A method body is a real function boundary; its statements
+                        // still carry module facts (e.g. dynamic `import(...)`).
+                        ObjectProperty::Method { body, .. } => self.walk_stmts(body),
                         ObjectProperty::Spread(value) => self.walk_expr(value),
                     }
                 }
@@ -902,6 +905,8 @@ fn expr_pure(expression: &Expression) -> bool {
         ExpressionKind::ObjectLiteral { properties } => {
             properties.iter().all(|property| match property {
                 ObjectProperty::Property { value, .. } => expr_pure(value),
+                // Method creation is a closure, like `FunctionExpression`.
+                ObjectProperty::Method { .. } => true,
                 ObjectProperty::Spread(value) => expr_pure(value),
             })
         }
@@ -1100,6 +1105,11 @@ fn collect_refs_expression(expression: &Expression, names: &mut Vec<String>) {
             for property in properties {
                 match property {
                     ObjectProperty::Property { value, .. } => collect_refs_expression(value, names),
+                    ObjectProperty::Method { body, .. } => {
+                        for statement in body {
+                            collect_refs_statement(statement, names);
+                        }
+                    }
                     ObjectProperty::Spread(value) => collect_refs_expression(value, names),
                 }
             }

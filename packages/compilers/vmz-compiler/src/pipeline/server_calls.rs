@@ -224,6 +224,7 @@ impl ServerCallVisitor {
                         ObjectProperty::Property { value, .. } | ObjectProperty::Spread(value) => {
                             self.visit_expression(value);
                         }
+                        ObjectProperty::Method { body, .. } => self.visit_statements(body),
                     }
                 }
             }
