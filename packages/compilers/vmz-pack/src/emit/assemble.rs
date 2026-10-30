@@ -18,6 +18,12 @@
 //! `export default <JSON>;` 的 default 绑定内联）。未被活跃语句引用的绑定
 //! 不合成（与跨 chunk 绑定同口径）。具名/命名空间绑定、重导出与动态导入
 //! 显式诊断拒绝——不透明值节点给不出其它导出形态。
+//!
+//! 行级 source map 合同：每个活跃语句切片的生成行在列 0 记一条回指段，
+//! 映射链为 生成行起点 → 类型擦除删除表 → 切片内替换表 → 模块源行列，
+//! 逐段复合（复用 `vmz_generator::js` 的擦除偏移映射，不平行重写）。
+//! 合成行（跨 chunk import/export、JSON `const` 内联）无原文来源，不产段；
+//! `imports_text` 定稿后按行数整体平移段号。
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -45,16 +51,35 @@ struct DeferredExport {
     is_default: bool,
 }
 
+/// 装配产物：chunk 文本（含占位符）与行级映射段。
+pub(crate) struct AssembledChunk {
+    /// 第一遍装配文本（`imports_text + body + exports_text`）。
+    pub(crate) code: String,
+    /// 行级映射段，`gen_line` 为最终 chunk 文本内的 0-based 行号。
+    pub(crate) segments: Vec<ChunkSegment>,
+}
+
+/// 一条生成行回指原模块位置的段（列恒 0，行级合同）。
+pub(crate) struct ChunkSegment {
+    pub(crate) gen_line: u32,
+    /// 规范化模块路径，与 manifest `modules` 同口径。
+    pub(crate) source: String,
+    pub(crate) src_line: u32,
+    pub(crate) src_col: u32,
+}
+
 pub(crate) fn assemble_chunk(
     context: &EmitContext<'_>,
     chunk_index: usize,
     errors: &mut Vec<PackDiagnostic>,
     warnings: &mut Vec<PackDiagnostic>,
-) -> Option<String> {
+) -> Option<AssembledChunk> {
     let chunk = &context.chunks.chunks[chunk_index];
     let errors_before = errors.len();
 
     let mut body = String::new();
+    let mut segments: Vec<ChunkSegment> = Vec::new();
+    let mut body_line: u32 = 0;
     let mut imports_text = String::new();
     let mut exports_text = String::new();
     // (a) 活跃声明名 / (b) 合成 import 绑定 local / (c) 对外导出名。
@@ -76,6 +101,7 @@ pub(crate) fn assemble_chunk(
         let Some(source) = context.sources.get(&node_index) else { continue };
         let module_path = normalize_path(&node.resolved.path);
         let record = &node.record;
+        let source_lines = vmz_generator::js::SourceLines::new(source);
 
         // 存活动态边分类：一次判定，避免按语句重复诊断。
         let mut dynamic_replacements: Vec<(String, usize)> = Vec::new();
@@ -277,15 +303,16 @@ pub(crate) fn assemble_chunk(
                 replacements
                     .insert(specifier_span, json_string(&format!("./{}", artifact.file_name)));
             }
-            let replaced = match apply_replacements(raw, statement.span.0, replacements) {
+            let replaced = match apply_replacements(raw, statement.span.0, &replacements) {
                 Ok(text) => text,
                 Err(diagnostic) => {
                     errors.push(diagnostic.with_path(module_path.clone()));
                     continue;
                 }
             };
-            let erased = match vmz_generator::js::erase_types(&replaced) {
-                Ok(erased) => erased,
+            let (erased, deletions) = match vmz_generator::js::erase_types_with_deletions(&replaced)
+            {
+                Ok(pair) => pair,
                 Err(err) => {
                     errors.push(
                         PackDiagnostic::new(
@@ -300,6 +327,22 @@ pub(crate) fn assemble_chunk(
             };
             // 擦除后为空（纯类型语句）跳过；非空补 `;` 防 ASI 粘连。
             if !erased.trim().is_empty() {
+                // 行级映射：生成行起点 → 擦除删除表 → 切片替换表 → 模块行列。
+                let mut line_off = 0usize;
+                for (line_index, generated) in erased.split('\n').enumerate() {
+                    let replaced_off = vmz_generator::js::map_erased_offset(line_off, &deletions);
+                    let raw_off =
+                        map_replaced_offset(replaced_off, raw, statement.span.0, &replacements);
+                    let (src_line, src_col) = source_lines.line_col(statement.span.0 + raw_off);
+                    segments.push(ChunkSegment {
+                        gen_line: body_line + line_index as u32,
+                        source: module_path.clone(),
+                        src_line,
+                        src_col,
+                    });
+                    line_off += generated.len() + 1;
+                }
+                body_line += erased.matches('\n').count() as u32 + 1;
                 body.push_str(&erased);
                 body.push_str(";\n");
             }
@@ -737,7 +780,38 @@ pub(crate) fn assemble_chunk(
     if errors.len() > errors_before {
         return None;
     }
-    Some(format!("{imports_text}{body}{exports_text}"))
+    // `imports_text` 定稿：body 段号整体平移合成 import 行数。
+    let shift = imports_text.matches('\n').count() as u32;
+    for segment in &mut segments {
+        segment.gen_line += shift;
+    }
+    Some(AssembledChunk { code: format!("{imports_text}{body}{exports_text}"), segments })
+}
+
+/// 替换文本偏移 → 切片原文偏移：落在替换新文本内取替换起点，
+/// 否则扣除此前替换的长度增量；结果夹到切片长度。
+fn map_replaced_offset(
+    replaced_off: usize,
+    raw: &str,
+    base: usize,
+    replacements: &BTreeMap<(usize, usize), String>,
+) -> usize {
+    let mut pos = 0usize; // 当前原文段在替换文本中的起点。
+    let mut raw_pos = 0usize; // 当前原文段在切片中的起点。
+    for ((start, end), text) in replacements {
+        let (rel_start, rel_end) = (start - base, end - base);
+        let gap = rel_start - raw_pos;
+        if replaced_off < pos + gap {
+            return (raw_pos + (replaced_off - pos)).min(raw.len());
+        }
+        pos += gap;
+        if replaced_off < pos + text.len() {
+            return rel_start;
+        }
+        pos += text.len();
+        raw_pos = rel_end;
+    }
+    (raw_pos + replaced_off.saturating_sub(pos)).min(raw.len())
 }
 
 /// (a) 声明名 + (b) import 绑定两两不相交（同模块内重复忽略——源本身非法），
@@ -800,7 +874,7 @@ fn check_names(
 pub(crate) fn apply_replacements(
     raw: &str,
     base: usize,
-    replacements: BTreeMap<(usize, usize), String>,
+    replacements: &BTreeMap<(usize, usize), String>,
 ) -> Result<String, PackDiagnostic> {
     let mut out = String::with_capacity(raw.len());
     let mut cursor = 0usize; // 相对切片偏移。

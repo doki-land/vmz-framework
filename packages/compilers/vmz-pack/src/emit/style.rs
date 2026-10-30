@@ -209,7 +209,7 @@ fn rewrite_style_file(
         let replacement = if url_ref.quoted { new_value } else { super::json_string(&new_value) };
         replacements.insert(url_ref.value_span, replacement);
     }
-    match apply_replacements(&text, 0, replacements) {
+    match apply_replacements(&text, 0, &replacements) {
         Ok(rewritten) => Some(rewritten),
         Err(diagnostic) => {
             errors.push(diagnostic.with_path(path_display));

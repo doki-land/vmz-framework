@@ -89,11 +89,207 @@ fn single_entry_prunes_and_erases_types() {
     assert!(code.contains("export { helper }"), "{code}");
     assert!(code.contains("export { run }"), "{code}");
     assert!(!code.contains("__vmz_chunk_"), "{code}");
-    assert!(code.ends_with(";\n"));
+    // 末尾是 sourceMappingURL 注释行，注释行之前的装配文本以 `;\n` 收口。
+    let comment = format!("//# sourceMappingURL={}.map\n", artifact.file_name);
+    assert!(code.ends_with(&comment), "{code}");
+    assert!(code[..code.len() - comment.len()].ends_with(";\n"), "{code}");
 
     assert_eq!(plan.entry_files, vec![("main".to_string(), artifact.file_name.clone())]);
     assert!(plan.assets.is_empty());
     assert!(plan.dynamic_files.is_empty());
+}
+
+/// source map v3 产物形状：`version`/`file`/`sources`（与 manifest `modules`
+/// 同口径）/`sourcesContent` 内嵌/`mappings` 非空；`code` 末尾注释行与
+/// map 文件名一致；manifest `chunks[].sourceMap` 如实报告 `<file>.map`。
+#[test]
+fn source_map_shape_matches_chunk_contract() {
+    let root = temp_tree(
+        "smapshape",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/one.js", "import { shared } from './shared.js';\nexport const a1 = shared;\n"),
+            ("src/two.js", "import { shared } from './shared.js';\nexport const a2 = shared;\n"),
+            ("src/shared.js", "export const shared = 7;\n"),
+        ],
+    );
+    let graph = build_graph(
+        &[
+            ("one".to_string(), root.join("src/one.js")),
+            ("two".to_string(), root.join("src/two.js")),
+        ],
+        Target::Browser,
+        &root,
+    );
+    let link_plan = link(
+        &graph,
+        &[
+            EntryUse { entry_logical: "one".to_string(), used_exports: Some(vec!["a1".into()]) },
+            EntryUse { entry_logical: "two".to_string(), used_exports: Some(vec!["a2".into()]) },
+        ],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+
+    let manifest: serde_json::Value = serde_json::from_str(&plan.manifest_json).unwrap();
+    for (index, artifact) in plan.artifacts.iter().enumerate() {
+        let map: serde_json::Value = serde_json::from_str(&artifact.source_map).unwrap();
+        assert_eq!(map["version"], 3, "{}", artifact.file_name);
+        assert_eq!(map["file"], artifact.file_name.as_str());
+        let sources: Vec<&str> =
+            map["sources"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
+        assert_eq!(sources, artifact.modules.iter().map(String::as_str).collect::<Vec<_>>());
+        assert_eq!(map["sourcesContent"].as_array().unwrap().len(), sources.len());
+        let mappings = map["mappings"].as_str().unwrap();
+        assert!(!mappings.is_empty(), "{}", artifact.file_name);
+        assert!(
+            artifact.code.ends_with(&format!("//# sourceMappingURL={}.map\n", artifact.file_name)),
+            "{}",
+            artifact.code
+        );
+        assert_eq!(
+            manifest["chunks"][index]["sourceMap"],
+            format!("{}.map", artifact.file_name).as_str()
+        );
+    }
+}
+
+/// 解码 source map v3 `mappings` 为逐生成行的绝对
+/// `(gen_col, src_index, src_line, src_col)` 段序列。
+fn decode_mappings(mappings: &str) -> Vec<Vec<(u32, u32, u32, u32)>> {
+    const B64: &[u8; 64] =
+        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out: Vec<Vec<(u32, u32, u32, u32)>> = Vec::new();
+    let (mut src_index, mut src_line, mut src_col) = (0i64, 0i64, 0i64);
+    for line in mappings.split(';') {
+        let mut gen_col = 0i64;
+        let mut segments = Vec::new();
+        if !line.is_empty() {
+            for field in line.split(',') {
+                let bytes = field.as_bytes();
+                let mut pos = 0usize;
+                let mut values: Vec<i64> = Vec::new();
+                while pos < bytes.len() {
+                    let mut result = 0i64;
+                    let mut shift = 0u32;
+                    loop {
+                        let digit = B64
+                            .iter()
+                            .position(|b| *b == bytes[pos])
+                            .expect("base64 digit") as i64;
+                        pos += 1;
+                        result += (digit & 31) << shift;
+                        shift += 5;
+                        if digit & 32 == 0 {
+                            break;
+                        }
+                    }
+                    values.push(if result & 1 == 1 { -(result >> 1) } else { result >> 1 });
+                }
+                gen_col += values.first().copied().unwrap_or(0);
+                if values.len() >= 4 {
+                    src_index += values[1];
+                    src_line += values[2];
+                    src_col += values[3];
+                    segments.push((
+                        gen_col as u32,
+                        src_index as u32,
+                        src_line as u32,
+                        src_col as u32,
+                    ));
+                }
+            }
+        }
+        out.push(segments);
+    }
+    out
+}
+
+/// 行级映射链端到端：多行函数切片逐行回指原模块行列，跨模块切片按
+/// `sources` 下标分流；合成行（`export {}` 与注释行）无映射段。
+#[test]
+fn source_map_line_mappings_decode_to_module_lines() {
+    let root = temp_tree(
+        "smaplines",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/lib.js",
+                "export function helper(n) {\n  return n + 1;\n}\nexport const VALUE = 41;\n",
+            ),
+            (
+                "src/entry.js",
+                "import { helper, VALUE } from './lib.js';\nexport const run = helper(VALUE);\n",
+            ),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["run".into()]) }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert_eq!(plan.artifacts.len(), 1);
+    let artifact = &plan.artifacts[0];
+    assert!(artifact.modules[0].ends_with("src/lib.js"));
+    assert!(artifact.modules[1].ends_with("src/entry.js"));
+
+    let map: serde_json::Value = serde_json::from_str(&artifact.source_map).unwrap();
+    let decoded = decode_mappings(map["mappings"].as_str().unwrap());
+    // 装配体 5 行有映射（函数 3 行 + VALUE 1 行 + entry 1 行），
+    // 合成 export 行与注释行不产段。切片起点在 `export ` 关键字之后
+    // （声明起点列 7），多行切片的续行回指原模块行起点（列 0）。
+    assert_eq!(
+        decoded,
+        vec![
+            vec![(0, 0, 0, 7)],
+            vec![(0, 0, 1, 0)],
+            vec![(0, 0, 2, 0)],
+            vec![(0, 0, 3, 7)],
+            vec![(0, 1, 1, 7)],
+        ],
+        "mappings: {}",
+        map["mappings"].as_str().unwrap()
+    );
+    // 段与生成文本逐行对得上：第 2 行是 `  return n + 1;`（lib 第 2 行）。
+    let body_lines: Vec<&str> = artifact.code.lines().collect();
+    assert_eq!(body_lines[1].trim(), "return n + 1;", "{}", body_lines[1]);
+    assert!(body_lines[4].contains("helper(VALUE)"), "{}", body_lines[4]);
+}
+
+/// write_emit 物化 `.map`：每个 chunk 的 `<file_name>.map` 落盘且字节
+/// 与产物 `source_map` 一致。
+#[test]
+fn write_emit_lands_source_maps() {
+    let root = temp_tree(
+        "smapwrite",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/app.js", "export const load = () => import('./lazy.js');\n"),
+            ("src/lazy.js", "export const later = 1;\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("app".to_string(), root.join("src/app.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse { entry_logical: "app".to_string(), used_exports: Some(vec!["load".into()]) }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+
+    let out = root.join("dist");
+    write_emit(&plan, &out).unwrap();
+    for artifact in &plan.artifacts {
+        let map_path = out.join(format!("{}.map", artifact.file_name));
+        assert!(map_path.is_file(), "{}", map_path.display());
+        assert_eq!(fs::read_to_string(&map_path).unwrap(), artifact.source_map);
+        let js = fs::read_to_string(out.join(&artifact.file_name)).unwrap();
+        assert!(js.contains(&format!("//# sourceMappingURL={}.map\n", artifact.file_name)), "{js}");
+    }
 }
 
 /// 双入口共享模块：公共 chunk 独立成文件，两个入口 chunk 合成跨 chunk

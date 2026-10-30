@@ -17,6 +17,10 @@ pub fn write_emit(plan: &EmitPlan, out_dir: &Path) -> Result<(), Vec<PackDiagnos
         if let Err(err) = std::fs::write(&path, artifact.code.as_bytes()) {
             diagnostics.push(write_failed(&path, &err));
         }
+        let map_path = out_dir.join(format!("{}.map", artifact.file_name));
+        if let Err(err) = std::fs::write(&map_path, artifact.source_map.as_bytes()) {
+            diagnostics.push(write_failed(&map_path, &err));
+        }
     }
     for style in &plan.styles {
         let path = out_dir.join(&style.file_name);

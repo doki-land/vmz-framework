@@ -26,6 +26,10 @@
 //! - 根绝对 URL 动态 import（`'/…'`，如运行时 face 加载 `/dom.browser.js`）
 //!   文本原样保留、由站点 origin 运行时解析，给非致命诊断
 //!   `vmz::pack::emit::dynamic_url_kept`；其余未解析动态 import 仍显式拒绝。
+//! - 每个 chunk 产出 source map v3（行级合同，见 `assemble` 模块文档）：
+//!   `code` 末尾追加 `//# sourceMappingURL=<file_name>.map` 注释行，
+//!   map JSON 内容不上 wire、只有 [`write_emit`] 物化；内容指纹仍只覆盖
+//!   第一遍装配文本，map 注释与 map 本身不参与指纹与占位符替换。
 //! - 未实现的语义（同 chunk 重命名绑定、星号合成、同 chunk 动态边界、
 //!   事实不完整、无法重写的说明符、样式/JSON 绑定、重导出与动态导入等）
 //!   一律显式诊断拒绝，禁止猜测、禁止静默产出错误 JS、禁止兼容层。
@@ -96,6 +100,11 @@ pub struct ChunkArtifact {
     pub imports: Vec<String>,
     /// 动态加载目标 chunk 的文件名，升序去重。
     pub dynamic: Vec<String>,
+    /// source map v3 JSON 文本（行级映射，`sources` 与 `modules` 同口径）。
+    /// 不上 N-API wire（与 [`StyleArtifact::content`] 同姿态），只有
+    /// [`write_emit`] 把它物化为 `<file_name>.map`；`code` 末尾已追加
+    /// `//# sourceMappingURL=` 注释行。
+    pub source_map: String,
 }
 
 /// 一个 chunk 的聚合 CSS 产物。
@@ -293,20 +302,27 @@ pub fn plan_emit(
 
     let context = EmitContext { graph, chunks, node_chunk, retained, linked, sources, asset_index };
 
-    // 第一遍装配（含占位符）。
+    // 第一遍装配（含占位符）与行级映射段。
     let mut codes: Vec<String> = Vec::with_capacity(chunks.chunks.len());
+    let mut segments: Vec<Vec<assemble::ChunkSegment>> = Vec::with_capacity(chunks.chunks.len());
     for chunk_index in 0..chunks.chunks.len() {
         match assemble::assemble_chunk(&context, chunk_index, &mut errors, &mut warnings) {
-            Some(code) => codes.push(code),
-            None => codes.push(String::new()),
+            Some(assembled) => {
+                codes.push(assembled.code);
+                segments.push(assembled.segments);
+            }
+            None => {
+                codes.push(String::new());
+                segments.push(Vec::new());
+            }
         }
     }
     if !errors.is_empty() {
         return Err(errors);
     }
 
-    // 第二/三遍：指纹定名、占位符替换、manifest 序列化。
-    Ok(manifest::finalize(&context, codes, styles, warnings))
+    // 第二/三遍：指纹定名、占位符替换、source map 组装、manifest 序列化。
+    Ok(manifest::finalize(&context, codes, segments, styles, warnings))
 }
 
 /// 解析并指纹化全部 [`crate::module::AssetFact`]。同一磁盘路径只读一次；
