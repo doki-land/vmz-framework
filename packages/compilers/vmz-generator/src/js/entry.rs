@@ -8,7 +8,7 @@ fn js_string_literal(value: &str) -> String {
     serde_json::to_string(value).unwrap_or_else(|_| "\"\"".into())
 }
 
-/// Component entry descriptor for [`emit_serve_entry_client`].
+/// Component entry descriptor for [`emit_serve_entry_client`] / [`emit_serve_entry_event`].
 #[derive(Debug, Clone)]
 pub struct EntryComponent {
     /// Export / register name.
@@ -17,37 +17,51 @@ pub struct EntryComponent {
     pub entry: String,
 }
 
+fn cache_suffix(cache_query: &str) -> String {
+    if cache_query.is_empty() {
+        String::new()
+    } else if cache_query.starts_with('?') {
+        cache_query.to_string()
+    } else {
+        format!("?{cache_query}")
+    }
+}
+
+fn entry_map(eager: &[EntryComponent], lazy: &[EntryComponent]) -> BTreeMap<String, String> {
+    let mut map = BTreeMap::new();
+    for e in eager.iter().chain(lazy.iter()) {
+        map.insert(e.name.clone(), e.entry.clone());
+    }
+    map
+}
+
+/// Static literal `import()` table `{ "<name>": () => import("./<entry><cache>") }`.
+///
+/// Every lazy boundary is a literal specifier so `vmz-pack` can see the edge at
+/// build time; the runtime only looks the table up by key and never concatenates
+/// specifiers. Unknown keys throw an explicit diagnostic.
+fn emit_import_table(decl: &str, entries: &BTreeMap<String, String>, q: &str) -> String {
+    let rows: Vec<String> = entries
+        .iter()
+        .map(|(name, entry)| {
+            format!(
+                "{}: () => import({})",
+                js_string_literal(name),
+                js_string_literal(&format!("./{entry}{q}"))
+            )
+        })
+        .collect();
+    format!("const {decl} = {{{}}};", rows.join(", "))
+}
+
 /// Full serve-host `entry-client.js` (hydrateRoute + client nav).
 pub fn emit_serve_entry_client(
     eager: &[EntryComponent],
     lazy: &[EntryComponent],
     cache_query: &str,
 ) -> EmittedJs {
-    let q = if cache_query.is_empty() {
-        String::new()
-    } else if cache_query.starts_with('?') {
-        cache_query.to_string()
-    } else {
-        format!("?{cache_query}")
-    };
-    // Pages hydrate via dynamic import by chunkId; no eager static imports / registerComponents.
-    let mut entry_by_name = BTreeMap::new();
-    for e in eager.iter().chain(lazy.iter()) {
-        entry_by_name.insert(e.name.clone(), e.entry.clone());
-    }
-    let entry_json = crate::to_json(&entry_by_name).unwrap_or_else(|_| "{}".into());
-    let loader = if lazy.is_empty() {
-        String::new()
-    } else {
-        format!(
-            r#"const __vmzComponentEntries = {entry_json};
-globalThis.__vmzLoadComponent = async (name) => {{
-  const entry = __vmzComponentEntries[name] || ("components/" + name + ".client.js");
-  const mod = await import("./" + entry + "{q}");
-  return mod.default;
-}};"#
-        )
-    };
+    let q = cache_suffix(cache_query);
+    let page_table = emit_import_table("__vmzPageModules", &entry_map(eager, lazy), &q);
     let dom = js_string_literal(&format!("./dom.browser.js{q}"));
     let nav = js_string_literal(&format!("./vmz-client-nav.js{q}"));
     let code = format!(
@@ -56,7 +70,13 @@ globalThis.__vmzLoadComponent = async (name) => {{
  */
 import {{ hydrate, hydrateRoute, hydrateRoutePage, destroy }} from {dom};
 import {{ installClientNavigation }} from {nav};
-{loader}
+{page_table}
+globalThis.__vmzLoadComponent = async (name) => {{
+  const load = __vmzPageModules[name];
+  if (!load) throw new Error("vmz: unknown component " + name);
+  const mod = await load();
+  return mod.default;
+}};
 const root = document.getElementById("app");
 if (!root) throw new Error("vmz: missing #app");
 const chunkId = root.getAttribute("data-vmz-page");
@@ -69,16 +89,24 @@ try {{
 const layoutChain = (root.getAttribute("data-vmz-layout") || "").split(",").map((s) => s.trim()).filter(Boolean);
 const layoutCtors = [];
 for (const id of layoutChain) {{
-  layoutCtors.push((await import("./" + id + ".client.js{q}")).default);
+  const load = __vmzPageModules[id];
+  if (!load) throw new Error("vmz: unknown page module " + id);
+  layoutCtors.push((await load()).default);
 }}
-const Page = (await import("./" + chunkId + ".client.js{q}")).default;
+const loadPage = __vmzPageModules[chunkId];
+if (!loadPage) throw new Error("vmz: unknown page module " + chunkId);
+const Page = (await loadPage()).default;
 await hydrateRoute(Page, root, props, layoutCtors);
 installClientNavigation({{
   hydrate,
   hydrateRoute,
   hydrateRoutePage,
   destroy,
-  importPage: async (id) => (await import("./" + id + ".client.js{q}")).default,
+  importPage: async (id) => {{
+    const load = __vmzPageModules[id];
+    if (!load) throw new Error("vmz: unknown page module " + id);
+    return (await load()).default;
+  }},
 }});
 "#
     );
@@ -86,19 +114,19 @@ installClientNavigation({{
 }
 
 /// EventEntry zero-framework bootstrap shell (island resume on first event).
-pub fn emit_serve_entry_event(cache_query: &str) -> EmittedJs {
-    let q = if cache_query.is_empty() {
-        String::new()
-    } else if cache_query.starts_with('?') {
-        cache_query.to_string()
-    } else {
-        format!("?{cache_query}")
-    };
+pub fn emit_serve_entry_event(
+    eager: &[EntryComponent],
+    lazy: &[EntryComponent],
+    cache_query: &str,
+) -> EmittedJs {
+    let q = cache_suffix(cache_query);
+    let island_table = emit_import_table("__vmzIslandModules", &entry_map(eager, lazy), &q);
     let dom = js_string_literal(&format!("./dom.browser.js{q}"));
     let code = format!(
         r#"/**
  * Generated by vmz-generator - EventEntry zero-framework JS shell.
  */
+{island_table}
 (async () => {{
   const roots = [...document.querySelectorAll(
     '[data-vmz-entry="event"], [data-vmz-client="event"], [data-vmz-client^="event:"]',
@@ -116,7 +144,9 @@ pub fn emit_serve_entry_event(cache_query: &str) -> EmittedJs {
         const {{ resume }} = await import({dom});
         const name = el.getAttribute("data-vmz-island");
         if (!name) throw new Error("vmz: EventEntry missing data-vmz-island");
-        const Comp = (await import("./components/" + name + ".client.js{q}")).default;
+        const load = __vmzIslandModules[name];
+        if (!load) throw new Error("vmz: unknown island " + name);
+        const Comp = (await load()).default;
         await resume(Comp, el);
       }},
       {{ once: true }},
@@ -126,4 +156,64 @@ pub fn emit_serve_entry_event(cache_query: &str) -> EmittedJs {
 "#
     );
     EmittedJs { code, map: None }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ec(name: &str, entry: &str) -> EntryComponent {
+        EntryComponent { name: name.into(), entry: entry.into() }
+    }
+
+    #[test]
+    fn client_emits_literal_import_table_no_concatenation() {
+        let out = emit_serve_entry_client(
+            &[ec("pages/index", "pages/index.client.js")],
+            &[ec("LikeButton", "components/LikeButton.client.js")],
+            "",
+        );
+        assert!(out.code.contains(
+            "const __vmzPageModules = {\"LikeButton\": () => import(\"./components/LikeButton.client.js\"), \"pages/index\": () => import(\"./pages/index.client.js\")};"
+        ));
+        assert!(!out.code.contains("+ \".client.js\""));
+        assert!(!out.code.contains("import(\"./\" +"));
+        assert!(!out.code.contains("\"components/\" + name"));
+    }
+
+    #[test]
+    fn client_lookups_throw_on_unknown_keys() {
+        let out = emit_serve_entry_client(&[], &[], "");
+        assert!(out.code.contains("const __vmzPageModules = {};"));
+        assert!(out.code.contains("throw new Error(\"vmz: unknown page module \" + id)"));
+        assert!(out.code.contains("throw new Error(\"vmz: unknown page module \" + chunkId)"));
+        assert!(out.code.contains("throw new Error(\"vmz: unknown component \" + name)"));
+        assert!(out.code.contains("globalThis.__vmzLoadComponent"));
+    }
+
+    #[test]
+    fn client_cache_query_appends_to_literal_specifiers() {
+        let out =
+            emit_serve_entry_client(&[ec("pages/index", "pages/index.client.js")], &[], "t=42");
+        assert!(out.code.contains("import(\"./pages/index.client.js?t=42\")"));
+        assert!(out.code.contains("from \"./dom.browser.js?t=42\""));
+        let out2 =
+            emit_serve_entry_client(&[ec("pages/index", "pages/index.client.js")], &[], "?t=42");
+        assert!(out2.code.contains("import(\"./pages/index.client.js?t=42\")"));
+    }
+
+    #[test]
+    fn event_emits_literal_island_table_no_concatenation() {
+        let out = emit_serve_entry_event(
+            &[],
+            &[ec("LikeButton", "components/LikeButton.client.js")],
+            "?t=7",
+        );
+        assert!(out.code.contains(
+            "const __vmzIslandModules = {\"LikeButton\": () => import(\"./components/LikeButton.client.js?t=7\")};"
+        ));
+        assert!(!out.code.contains("./components/\" + name"));
+        assert!(!out.code.contains("+ \".client.js\""));
+        assert!(out.code.contains("throw new Error(\"vmz: unknown island \" + name)"));
+    }
 }

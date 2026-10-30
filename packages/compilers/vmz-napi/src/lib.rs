@@ -1275,8 +1275,20 @@ pub fn generate_serve_entry_client(
 
 /// Generate `entry-event.js` via `vmz-generator`.
 #[napi]
-pub fn generate_serve_entry_event(cache_query: String) -> String {
-    vmz_generator::js::emit_serve_entry_event(&cache_query).code
+pub fn generate_serve_entry_event(
+    eager: Vec<JsEntryComponent>,
+    lazy: Vec<JsEntryComponent>,
+    cache_query: String,
+) -> String {
+    let eager: Vec<_> = eager
+        .into_iter()
+        .map(|e| vmz_generator::js::EntryComponent { name: e.name, entry: e.entry })
+        .collect();
+    let lazy: Vec<_> = lazy
+        .into_iter()
+        .map(|e| vmz_generator::js::EntryComponent { name: e.name, entry: e.entry })
+        .collect();
+    vmz_generator::js::emit_serve_entry_event(&eager, &lazy, &cache_query).code
 }
 
 /// Hreflang alternate for [`generate_page_shell`].
