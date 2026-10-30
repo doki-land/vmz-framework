@@ -129,7 +129,7 @@ export async function buildProjectToOutDirRoot(
     const profileId = String(selected.selection.profileId || '');
 
     // Dynamic import avoids init cycle with `./index.js` re-exports.
-    const { createWorkspace, resolveCoreRuntimeDist } = await import('./public-api.js');
+    const { createWorkspace } = await import('./public-api.js');
 
     const ws = createWorkspace({ root: project, outDir: artifactDir });
     try {
@@ -213,7 +213,6 @@ export async function buildProjectToOutDirRoot(
                 release: Boolean(opts.release),
                 profileId,
                 assembly,
-                coreDist: resolveCoreRuntimeDist(),
                 projectRoot: project,
             });
         } catch (err) {

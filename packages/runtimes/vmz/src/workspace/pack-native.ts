@@ -8,9 +8,9 @@
  * mirror of that contract: no renames, no guessed defaults, no dual-format
  * tolerance, and diagnostics always propagate explicitly.
  *
- * This slice is the integration layer only — the delivery path still runs
- * through `pack.ts` / `pack-client-packages.ts` until real-build evidence
- * closes the switch.
+ * This slice is the integration layer: `pack.ts` runs the delivery path
+ * through `buildPackRequest` / `runPackWrite` against this contract; real-build
+ * evidence closes the switch (see the toolchain plan's delivery-path design).
  */
 
 import path from 'node:path';

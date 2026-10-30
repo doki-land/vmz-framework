@@ -66,7 +66,8 @@ export type BrowserArtifactBoundary = {
     thinRuntimeClaim: boolean;
     productionReadyClaim: false;
     pack: {
-        unitCount: number | null;
+        chunkCount: number | null;
+        entryCount: number | null;
         preferredClientFace: string | null;
         packDigest: string | null;
         generatedEntries: string[];
@@ -120,34 +121,39 @@ function listJsFiles(distDir: string): string[] {
 }
 
 function readPack(distDir: string): {
-    unitCount: number | null;
+    chunkCount: number | null;
+    entryCount: number | null;
     preferredClientFace: string | null;
     packDigest: string | null;
     generatedEntries: string[];
 } {
     const packPath = path.join(distDir, '_vmz', 'pack-manifest.json');
     if (!fs.existsSync(packPath)) {
-        return { unitCount: null, preferredClientFace: null, packDigest: null, generatedEntries: [] };
+        return { chunkCount: null, entryCount: null, preferredClientFace: null, packDigest: null, generatedEntries: [] };
     }
     try {
         const pack = JSON.parse(fs.readFileSync(packPath, 'utf8')) as {
-            unitCount?: number;
+            chunkCount?: number;
+            entryCount?: number;
             preferredClientFace?: string;
             packDigest?: string;
-            units?: Array<{ entry?: string }>;
+            chunks?: Array<{ modules?: string[] }>;
         };
-        const generatedEntries = (pack.units || [])
-            .map((u) => (typeof u.entry === 'string' ? u.entry.replace(/\\/g, '/') : ''))
-            .filter(Boolean)
+        // Chunk `modules` are the absolute module paths linked into the browser graph.
+        const generatedEntries = (pack.chunks || [])
+            .flatMap((c) => c.modules || [])
+            .map((m) => path.relative(distDir, m.replace(/\\/g, '/')).replace(/\\/g, '/'))
+            .filter((rel) => rel && !rel.startsWith('..'))
             .sort();
         return {
-            unitCount: typeof pack.unitCount === 'number' ? pack.unitCount : generatedEntries.length,
+            chunkCount: typeof pack.chunkCount === 'number' ? pack.chunkCount : null,
+            entryCount: typeof pack.entryCount === 'number' ? pack.entryCount : generatedEntries.length,
             preferredClientFace: typeof pack.preferredClientFace === 'string' ? pack.preferredClientFace : null,
             packDigest: typeof pack.packDigest === 'string' ? pack.packDigest : null,
             generatedEntries,
         };
     } catch {
-        return { unitCount: null, preferredClientFace: null, packDigest: null, generatedEntries: [] };
+        return { chunkCount: null, entryCount: null, preferredClientFace: null, packDigest: null, generatedEntries: [] };
     }
 }
 
@@ -245,7 +251,8 @@ export function recordBrowserArtifactBoundary(opts: {
         thinRuntimeClaim: true,
         productionReadyClaim: false,
         pack: {
-            unitCount: pack.unitCount,
+            chunkCount: pack.chunkCount,
+            entryCount: pack.entryCount,
             preferredClientFace: pack.preferredClientFace,
             packDigest: pack.packDigest,
             generatedEntries: pack.generatedEntries,

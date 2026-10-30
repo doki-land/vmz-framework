@@ -442,13 +442,16 @@ export function applySecurityHeadersToCdnPolicy(cdnPolicy, security) {
 
 /**
  * Measure dist sizes for budget gates.
+ * Browser delivery JS final set = packed chunks under `_vmz/pack/`
+ * (root `*.client.js` / bootstrap files are Node SSR / pack inputs, not delivery bytes).
  * @param {string} distDir
  */
 export function measureDistBudgets(distDir) {
     let htmlBytes = 0;
     let clientJsBytes = 0;
     let artifactBytes = 0;
-    const stack = [distDir];
+    const abs = path.resolve(distDir);
+    const stack = [abs];
     while (stack.length) {
         const dir = stack.pop();
         if (!fs.existsSync(dir)) continue;
@@ -461,7 +464,8 @@ export function measureDistBudgets(distDir) {
             }
             artifactBytes += st.size;
             if (name.endsWith('.html')) htmlBytes += st.size;
-            if (name.endsWith('.client.js') || name === 'entry-client.js' || name === 'entry-event.js') {
+            const rel = path.relative(abs, full).replace(/\\/g, '/');
+            if (rel.startsWith('_vmz/pack/') && name.endsWith('.js')) {
                 clientJsBytes += st.size;
             }
         }

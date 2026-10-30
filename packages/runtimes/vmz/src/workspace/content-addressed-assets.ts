@@ -1,10 +1,12 @@
 /**
  * A3: content-addressed assets/<hash> layout for immutable CDN objects.
  * Logical paths stay available for serve/dev. Static HTML must receive hashed
- * `cssEntry` / `moduleScriptSrc` at shell emit time — this module does **not**
- * post-rewrite HTML. CSS aggregators rewrite `@import` before hash. JS under
- * `assets/` rewrites ESM `./` → `../` via oxc (plus dynamic `import("./"+)` form)
- * so barrels resolve at dist root.
+ * `cssEntry` at shell emit time — this module does **not** post-rewrite HTML.
+ * CSS aggregators rewrite `@import` before hash.
+ *
+ * Browser JS is NOT handled here: `vmz-pack` emits the final content-hashed
+ * chunk set under `_vmz/pack/` and the pack manifest `entryFiles` is the only
+ * logical→physical mapping. This layer only covers non-packed static assets.
  */
 
 import crypto from 'node:crypto';
@@ -42,24 +44,11 @@ interface IngestCandidateOpts {
     transform?: ((buf: Buffer) => Buffer) | null;
 }
 
-/** Immutable delivery candidates (client-facing bytes). */
-const DEFAULT_CANDIDATES = [
-    'entry-client.js',
-    'entry-event.js',
-    'vmz.css',
-    'vmz-designs.css',
-    'vmz-style.css',
-    'vmz-dom.js',
-    'vmz-runtime.js',
-    'vmz-http.js',
-    'vmz-client-nav.js',
-];
+/** Immutable delivery candidates (non-packed static bytes; browser JS is final-named by vmz-pack). */
+const DEFAULT_CANDIDATES = ['vmz.css', 'vmz-designs.css', 'vmz-style.css'];
 
 /** CSS files that may @import other logical CSS; processed after leaf CSS is hashed. */
 const CSS_AGGREGATORS = new Set(['vmz.css']);
-
-/** JS entry shells hashed under assets/; relative ESM must be rewritten first. */
-const JS_ENTRY_AGGREGATORS = new Set(['entry-client.js', 'entry-event.js']);
 
 const CSS_IMPORT_RE = /@import\s*(?:url\()?['"]?(\.\/)?([^'")\s;]+)['"]?\)?/gi;
 
@@ -78,33 +67,6 @@ export function rewriteCssImports(cssText, rewrites) {
         const sibling = rel.startsWith('assets/') ? `./${path.basename(rel)}` : `./${rel}`;
         return `@import"${sibling}"`;
     });
-}
-
-/**
- * Rewrite relative ESM so a file served from `/assets/<hash>.js` resolves against
- * dist root (static `from "./x"` / `export * from "./x"` + dynamic `import("./"+…)`).
- *
- * Always use `../…` (Fix A). Do **not** prefer hashed siblings under `assets/`:
- * barrels like `vmz-dom.js` (`export * from './dom-core.js'`) would then resolve
- * as `/assets/dom-core.js` and 404. `rewrites` is accepted for API parity with CSS
- * but intentionally ignored for JS path choice.
- *
- * @param {string} jsText
- * @param {Record<string, string>} [_rewrites]
- */
-export function rewriteJsEntryRelativeImports(jsText, _rewrites = {}) {
-    // These files are already generated JavaScript. Re-parsing them through
-    // the native module parser here creates a second parser boundary during
-    // static assembly and can re-enter the generated graph indefinitely.
-    // Restrict the rewrite to import/export module-specifier positions and
-    // keep it bounded to the source text.
-    let out = String(jsText ?? '').replace(
-        /(\b(?:from|import)\s*)(["'])\.\/([^"'\\]+)\2/g,
-        (_match, prefix, quote, specifier) => `${prefix}${quote}../${specifier}${quote}`,
-    );
-    out = out.replace(/import\(\s*(["'])\.\/([^"'\\]+)\1\s*\)/g, (_match, quote, specifier) => `import(${quote}../${specifier}${quote})`);
-    out = out.replace(/import\(\s*(["'])\.\/\1\s*\+/g, (_match, quote) => `import(${quote}../${quote}+`);
-    return out;
 }
 
 /**
@@ -136,21 +98,6 @@ export function emitContentAddressedAssets(distDir: string, opts: EmitContentAdd
     });
 
     for (const rel of ordered) {
-        // Aggregators are replaced in later passes; leaf JS must rewrite ./ → ../ so a
-        // hashed barrel under assets/ never 404s on second-hop relative re-exports.
-        if (CSS_AGGREGATORS.has(rel) || JS_ENTRY_AGGREGATORS.has(rel)) {
-            ingestCandidate(abs, rel, rewrites, objects, { transform: null });
-            continue;
-        }
-        if (/\.m?js$/i.test(rel)) {
-            const src = path.join(abs, rel);
-            if (!fs.existsSync(src)) continue;
-            const rewritten = rewriteJsEntryRelativeImports(fs.readFileSync(src, 'utf8'), {});
-            ingestCandidate(abs, rel, rewrites, objects, {
-                transform: () => Buffer.from(rewritten, 'utf8'),
-            });
-            continue;
-        }
         ingestCandidate(abs, rel, rewrites, objects, { transform: null });
     }
 
@@ -160,20 +107,6 @@ export function emitContentAddressedAssets(distDir: string, opts: EmitContentAdd
         const src = path.join(abs, rel);
         if (!fs.existsSync(src)) continue;
         const rewritten = rewriteCssImports(fs.readFileSync(src, 'utf8'), rewrites);
-        removeLogicalObject(objects, rel);
-        delete rewrites[`/${rel}`];
-        delete rewrites[rel];
-        ingestCandidate(abs, rel, rewrites, objects, {
-            transform: () => Buffer.from(rewritten, 'utf8'),
-        });
-    }
-
-    // JS entry shells: rewrite relative ESM (static + dynamic) then re-hash.
-    for (const rel of ordered) {
-        if (!JS_ENTRY_AGGREGATORS.has(rel)) continue;
-        const src = path.join(abs, rel);
-        if (!fs.existsSync(src)) continue;
-        const rewritten = rewriteJsEntryRelativeImports(fs.readFileSync(src, 'utf8'), rewrites);
         removeLogicalObject(objects, rel);
         delete rewrites[`/${rel}`];
         delete rewrites[rel];
@@ -209,17 +142,12 @@ function orderCandidates(candidates: string[]) {
     const set = new Set(candidates.map((c) => String(c).replace(/\\/g, '/').replace(/^\//, '')));
     const out: string[] = [];
     for (const name of DEFAULT_CANDIDATES) {
-        if (set.has(name) && !CSS_AGGREGATORS.has(name) && !JS_ENTRY_AGGREGATORS.has(name)) out.push(name);
+        if (set.has(name) && !CSS_AGGREGATORS.has(name)) out.push(name);
     }
     for (const name of [...set].sort()) {
-        if (!CSS_AGGREGATORS.has(name) && !JS_ENTRY_AGGREGATORS.has(name) && !out.includes(name)) {
-            out.push(name);
-        }
+        if (!CSS_AGGREGATORS.has(name) && !out.includes(name)) out.push(name);
     }
     if (set.has('vmz.css')) out.push('vmz.css');
-    for (const name of ['entry-client.js', 'entry-event.js']) {
-        if (set.has(name)) out.push(name);
-    }
     return out;
 }
 
@@ -325,20 +253,7 @@ function collectCandidates(distDir: string) {
     for (const name of DEFAULT_CANDIDATES) {
         if (fs.existsSync(path.join(distDir, name))) out.push(name);
     }
-    walk(distDir, distDir, (rel) => {
-        if (/\.client\.js$/i.test(rel)) out.push(rel);
-    });
     return [...new Set(out)].sort();
-}
-
-function walk(root: string, dir: string, onFile: (rel: string) => void) {
-    for (const name of fs.readdirSync(dir)) {
-        if (name === 'assets' || name === '_vmz' || name === 'node_modules') continue;
-        const full = path.join(dir, name);
-        const st = fs.statSync(full);
-        if (st.isDirectory()) walk(root, full, onFile);
-        else onFile(path.relative(root, full).replace(/\\/g, '/'));
-    }
 }
 
 /** Resolve `/logical` → hashed href from emit rewrites (`/assets/<sha>.ext`). */

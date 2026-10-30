@@ -23,7 +23,6 @@ import {
     HOST_PROTOCOL,
     materializeServeHostRuntime,
     materializeWechatPackaging,
-    resolveCoreRuntimeDist,
     resolveNativePath,
 } from '../workspace/public-api.js';
 import { gateGlobalProjectCommand, getInvocationContext, isGlobalAllowedCommand } from '../workspace/invocation.js';
@@ -351,19 +350,11 @@ async function cmdBuild(args: ParsedOptions): Promise<number> {
                 release: Boolean(args.release),
                 profileId: selected.selection.profileId,
                 assembly: selected.selection.assembly,
-                coreDist: resolveCoreRuntimeDist(),
                 projectRoot: project,
             });
-            const lower = pack.manifest?.clientPackageLowering;
-            if (lower?.bareSpecs?.length) {
-                log.info(`pack client packages (${lower.bareSpecs.length} bare → vendor; rewritten=${lower.rewrittenFiles})`);
-            }
-            if (lower?.remainingBareSpecs?.length) {
-                log.warn(
-                    `pack client packages: ${lower.remainingBareSpecs.length} bare specifier(s) still unresolved for browser: ${lower.remainingBareSpecs.slice(0, 8).join(', ')}${lower.remainingBareSpecs.length > 8 ? '…' : ''}`,
-                );
-            }
-            log.info(`pack ok (units=${pack.manifest.unitCount}, digest=${String(pack.manifest.packDigest).slice(0, 12)}…)`);
+            log.info(
+                `pack ok (entries=${pack.manifest.entryCount}, chunks=${pack.manifest.chunkCount}, digest=${String(pack.manifest.packDigest).slice(0, 12)}…)`,
+            );
         } catch (err) {
             log.error(`pack failed: ${err instanceof Error ? err.message : String(err)}`);
             return 1;

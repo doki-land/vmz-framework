@@ -7,6 +7,7 @@ import { listClientComponents } from '../list-client-components.js';
 import { LOCALE_LINK_PLAN_SCHEMA, linkRouteAliasesFromUnits } from '../localize-body-links.js';
 import { loadNativeAddon } from '../native-addon.js';
 import { createRenderHost } from '../render/render-host.js';
+import { resolveRouteLayoutChain } from '../render/route-layout-chain.js';
 import { setRoutes } from '../../faces/vmz-runtime.js';
 import { LOCALE_LINK_PLAN_REL } from './constants.js';
 import { loadDeploymentStyle } from './locale-theme.js';
@@ -135,13 +136,13 @@ function emitEntryClient(eager: unknown[], lazy: unknown[], token: number) {
     return native.generateServeEntryClient(eager, lazy, q);
 }
 
-function emitEntryEvent(token: number) {
+function emitEntryEvent(eager: unknown[], lazy: unknown[], token: number) {
     const q = `?t=${token}`;
     const native = loadNativeAddon();
     if (typeof native.generateServeEntryEvent !== 'function') {
         throw new Error('vmz native addon missing generateServeEntryEvent — rebuild with `pnpm napi:build`');
     }
-    return native.generateServeEntryEvent(q);
+    return native.generateServeEntryEvent(eager, lazy, q);
 }
 
 export async function softReload(opts: { quiet?: boolean; payload?: Record<string, unknown> } = {}) {
@@ -233,14 +234,26 @@ export async function softReload(opts: { quiet?: boolean; payload?: Record<strin
             .map((e) => e.component)
             .filter(Boolean);
         const lazySet = new Set(lazyEventNames);
+        const eagerComponents = componentEntries.filter((e) => !lazySet.has(e.name));
+        const lazyComponents = componentEntries.filter((e) => lazySet.has(e.name));
+
+        // Bootstrap tables are literal maps keyed by chunkId / island name:
+        // page/layout units must be enumerated (name = chunkId, entry =
+        // `<chunkId>.client.js`), unknown names throw at runtime by design.
+        const pageEntries = serveState.pageCatalog.map((p) => ({ name: p.chunkId, entry: `${p.chunkId}.client.js` }));
+        const layoutNames = new Set<string>();
+        for (const p of serveState.pageCatalog) {
+            try {
+                for (const id of resolveRouteLayoutChain(serveState.distDir, p.chunkId)) layoutNames.add(String(id));
+            } catch {
+                /* page unit without layoutChain in a partial dev build */
+            }
+        }
+        const layoutEntries = [...layoutNames].sort().map((id) => ({ name: id, entry: `${id}.client.js` }));
 
         await writeFile(
             path.join(serveState.distDir, 'entry-client.js'),
-            emitEntryClient(
-                componentEntries.filter((e) => !lazySet.has(e.name)),
-                componentEntries.filter((e) => lazySet.has(e.name)),
-                skipEntryRewrite ? serveState.reloadToken : nextToken,
-            ),
+            emitEntryClient([...eagerComponents, ...pageEntries, ...layoutEntries], lazyComponents, skipEntryRewrite ? serveState.reloadToken : nextToken),
             'utf8',
         );
 
@@ -248,7 +261,7 @@ export async function softReload(opts: { quiet?: boolean; payload?: Record<strin
         const eventOnlyShell = isEventOnlyShell(strategies);
         await writeFile(
             path.join(serveState.distDir, 'entry-event.js'),
-            emitEntryEvent(skipEntryRewrite ? serveState.reloadToken : nextToken),
+            emitEntryEvent([], lazyComponents, skipEntryRewrite ? serveState.reloadToken : nextToken),
             'utf8',
         );
 

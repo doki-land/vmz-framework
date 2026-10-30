@@ -31,9 +31,8 @@ const files = [
     'rowkernel-ssr.test.ts',
     'locale-none-host.test.ts',
     'diag-locale-catalog.test.ts',
-    'pack-vendor-module-closure.test.ts',
-    'pack-vendor-assets.test.ts',
     'pack-native-contract.test.ts',
+    'pack-delivery-native.test.ts',
 ].map((f) => path.join(here, 'unit', f));
 
 const r = spawnSync(process.execPath, ['--import', resolveHook, '--test', '--experimental-strip-types', ...files], {

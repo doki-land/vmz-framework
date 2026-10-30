@@ -21,6 +21,7 @@ import {
     linkRouteAliasesFromUnits,
 } from '../locale/locale-router.js';
 import { requireNativeAddon } from './native-addon.js';
+import { packEntryHref } from './pack.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 import { emitPublicStaticAssets } from './public-static-assets.js';
 import { emitRouteCatalog, loadRouteCatalog, ROUTE_CATALOG_SCHEMA } from './route-catalog-emit.js';
@@ -110,7 +111,9 @@ export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {
     const assets = emitContentAddressedAssets(distDir);
     const cssLogical = readCssEntry(distDir);
     const cssEntry = hashedAssetHref(assets.rewrites, cssLogical) || hashedAssetHref(assets.rewrites, 'vmz.css');
-    const moduleScriptSrc = hashedAssetHref(assets.rewrites, 'entry-client.js') || '/entry-client.js';
+    // Packed browser JS is final-named under `_vmz/pack/` — resolve via the pack
+    // manifest entryFiles mapping; unpacked root bytes are never a fallback.
+    const moduleScriptSrc = packEntryHref(distDir, 'entry-client.js');
     const localeArt = loadLocaleArtifact(distDir);
     const localeLinkPlan = loadLocaleLinkPlan(distDir) || buildLocaleLinkPlan(withLinkRouteAliases(localeArt, distDir, pageCatalog));
 
@@ -666,7 +669,11 @@ function buildSitemap(_origin, generations) {
 }
 
 /**
- * Static CDN must ship entry-client/event like serve-host (content-addressed + HTML rewrite).
+ * Static CDN must ship entry-client/event like serve-host. The bootstrap tables
+ * are literal dynamic-import maps: page/layout units are keyed by chunkId
+ * (`data-vmz-page` / `data-vmz-layout` lookups) and islands are enumerated
+ * explicitly — unknown names throw at runtime by design, never via fallback
+ * specifier concatenation.
  * @param {string} distDir
  * @param {Array<{ chunkId: string }>} pageCatalog
  */
@@ -680,16 +687,52 @@ function emitStaticClientEntries(distDir, pageCatalog) {
             .map((e) => e.component)
             .filter(Boolean),
     );
-    const eager = componentEntries.filter((e) => !lazySet.has(e.name));
-    const lazy = componentEntries.filter((e) => lazySet.has(e.name));
+    const eagerComponents = componentEntries.filter((e) => !lazySet.has(e.name));
+    const lazyComponents = componentEntries.filter((e) => lazySet.has(e.name));
+
+    // Pages/layouts resolve `<chunkId>.client.js` at the dist root (SSR loadCtor
+    // uses the same path); they must be in the table or hydration throws.
+    const pageEntries = pageCatalog.map((p) => ({ name: p.chunkId, entry: `${p.chunkId}.client.js` }));
+    const layoutNames = new Set();
+    for (const page of pageCatalog) {
+        for (const id of resolveRouteLayoutChain(distDir, page.chunkId)) layoutNames.add(String(id));
+    }
+    const layoutEntries = [...layoutNames].sort().map((id) => ({ name: id, entry: `${id}.client.js` }));
+    const eager = [...eagerComponents, ...pageEntries, ...layoutEntries];
+
     const native = requireNativeAddon();
     if (typeof native.generateServeEntryClient !== 'function') {
         throw new Error('vmz native addon missing generateServeEntryClient — rebuild with `pnpm napi:build`');
     }
-    fs.writeFileSync(path.join(distDir, 'entry-client.js'), native.generateServeEntryClient(eager, lazy, ''), 'utf8');
+    fs.writeFileSync(path.join(distDir, 'entry-client.js'), native.generateServeEntryClient(eager, lazyComponents, ''), 'utf8');
     if (typeof native.generateServeEntryEvent === 'function') {
-        fs.writeFileSync(path.join(distDir, 'entry-event.js'), native.generateServeEntryEvent(''), 'utf8');
+        // Event shell islands: event-strategy components + document islands whose
+        // compiled module exists in the component set (explicit enumeration).
+        const islandNames = readDocumentIslandNames(distDir);
+        const islands = [...lazyComponents];
+        for (const entry of eagerComponents) {
+            if (islandNames.has(entry.name)) islands.push(entry);
+        }
+        fs.writeFileSync(path.join(distDir, 'entry-event.js'), native.generateServeEntryEvent([], islands, ''), 'utf8');
     }
+}
+
+/**
+ * Island names from an integrated document surface (`document.islands.json`,
+ * written by the document build into the same dist). Absent file → no islands.
+ * @param {string} distDir
+ */
+function readDocumentIslandNames(distDir) {
+    const names = new Set();
+    try {
+        const plan = JSON.parse(fs.readFileSync(path.join(distDir, 'document.islands.json'), 'utf8'));
+        for (const island of plan?.islands || []) {
+            if (typeof island?.name === 'string' && island.name) names.add(island.name);
+        }
+    } catch {
+        /* no document surface */
+    }
+    return names;
 }
 
 /**

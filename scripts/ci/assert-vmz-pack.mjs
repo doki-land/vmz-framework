@@ -80,6 +80,8 @@ const required = [
     'index.js',
     'workspace/static-emit.js',
     'workspace/content-addressed-assets.js',
+    'workspace/pack.js',
+    'workspace/pack-native.js',
     'workspace/public-static-assets.js',
     'workspace/site-favicon.js',
     'workspace/pretty-json.js',
@@ -106,11 +108,19 @@ for (const srcRel of [
 }
 
 const ca = fs.readFileSync(path.join(dist, 'workspace/content-addressed-assets.js'), 'utf8');
-if (!ca.includes('rewriteJsEntryRelativeImports')) {
-    fail('content-addressed-assets.js missing export rewriteJsEntryRelativeImports (stale dist)');
+if (ca.includes('rewriteJsEntryRelativeImports') || ca.includes('JS_ENTRY_AGGREGATORS')) {
+    fail('content-addressed-assets.js still carries the retired JS entry rewrite (browser JS is final-named by vmz-pack)');
 }
-if (!ca.includes('JS_ENTRY_AGGREGATORS') && !ca.includes('entry-client')) {
-    fail('content-addressed-assets.js looks incomplete for entry ESM rewrite');
+if (!ca.includes('rewriteCssImports')) {
+    fail('content-addressed-assets.js missing CSS aggregator rewrite (stale dist)');
+}
+
+const packJs = fs.readFileSync(path.join(dist, 'workspace/pack.js'), 'utf8');
+if (!packJs.includes('packEntryHref') || !packJs.includes('runPackWrite')) {
+    fail('pack.js must consume the vmz-pack binding and expose packEntryHref (stale dist)');
+}
+if (packJs.includes('packClientBareImports')) {
+    fail('pack.js still references the retired vendor lowering (packClientBareImports)');
 }
 
 const se = fs.readFileSync(path.join(dist, 'workspace/static-emit.js'), 'utf8');
@@ -128,27 +138,26 @@ if (!dp.includes('resolveProfileArtifactDir') && !dp.includes('nameExplicit')) {
     fail('delivery-profile.js missing profile name / artifact dir helpers (stale dist)');
 }
 
-const modUrl = pathToFileURL(path.join(dist, 'workspace/content-addressed-assets.js')).href;
-const mod = await import(modUrl);
-if (typeof mod.rewriteJsEntryRelativeImports !== 'function') {
-    fail('rewriteJsEntryRelativeImports is not an exported function');
+const packNative = await import(pathToFileURL(path.join(dist, 'workspace/pack-native.js')).href);
+for (const fn of ['buildPackRequest', 'runPackPlan', 'runPackWrite']) {
+    if (typeof packNative[fn] !== 'function') fail(`pack-native.js missing exported function ${fn}`);
 }
-const sample = mod.rewriteJsEntryRelativeImports('import x from "./vmz-dom.js";', {});
-if (typeof sample !== 'string') fail('rewriteJsEntryRelativeImports must return string');
-if (!sample.includes('../vmz-dom.js')) {
-    fail('rewriteJsEntryRelativeImports must rewrite ./vmz-dom.js → ../vmz-dom.js');
-}
-const withSibling = mod.rewriteJsEntryRelativeImports('import x from "./vmz-dom.js";', {
-    'vmz-dom.js': 'assets/deadbeef.js',
-    '/vmz-dom.js': '/assets/deadbeef.js',
+if (typeof packNative.PackNativeError !== 'function') fail('pack-native.js missing PackNativeError');
+const requestJson = packNative.buildPackRequest({
+    entries: { 'entry-client.js': path.resolve(dist, 'entry-client.js') },
+    target: 'browser',
+    root: ROOT,
+    uses: [{ logical: 'entry-client.js', usedExports: null }],
+    publicBase: '/',
 });
-if (!withSibling.includes('../vmz-dom.js') || withSibling.includes('./deadbeef.js')) {
-    fail('rewriteJsEntryRelativeImports must prefer ../ over hashed sibling (Bug B)');
+const request = JSON.parse(requestJson);
+if (request.target !== 'browser' || request.publicBase !== '/' || request.uses[0].usedExports !== null) {
+    fail('buildPackRequest must pass target/publicBase/usedExports through without guessing');
 }
-const barrel = mod.rewriteJsEntryRelativeImports("export * from './dom-core.js';", {});
-if (!barrel.includes('../dom-core.js')) {
-    fail('rewriteJsEntryRelativeImports must rewrite barrel export * from ./ → ../');
-}
+
+const packMod = await import(pathToFileURL(path.join(dist, 'workspace/pack.js')).href);
+if (typeof packMod.packEntryHref !== 'function') fail('pack.js missing exported packEntryHref');
+if (typeof packMod.packFromDeploymentIr !== 'function') fail('pack.js missing exported packFromDeploymentIr');
 
 const indexPath = path.join(dist, 'index.js');
 if (fs.existsSync(indexPath)) {
@@ -161,8 +170,8 @@ if (fs.existsSync(indexPath)) {
 const pubApiPath = path.join(dist, 'workspace/public-api.js');
 if (fs.existsSync(pubApiPath)) {
     const pub = fs.readFileSync(pubApiPath, 'utf8');
-    if (!pub.includes('rewriteJsEntryRelativeImports')) {
-        fail('workspace/public-api.js does not re-export rewriteJsEntryRelativeImports');
+    if (!pub.includes('packEntryHref') || !pub.includes('PackNativeError')) {
+        fail('workspace/public-api.js does not re-export the vmz-pack consumption surface');
     }
     if (!pub.includes('resolveProfileArtifactDir')) {
         fail('workspace/public-api.js does not re-export resolveProfileArtifactDir');

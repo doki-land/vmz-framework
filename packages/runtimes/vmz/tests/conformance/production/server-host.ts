@@ -66,12 +66,11 @@ const rustAdapter = readJson(rustAdapterPath);
 const routes = readJson(path.join(build.dist, 'vmz-routes.json'));
 
 if (pack.schema !== 'vmz.pack.manifest.v0') fail(`bad pack schema ${pack.schema}`);
-if (pack.bundler !== 'vmz-pack') fail('pack must use vmz-pack (not external Rollup)');
-// `treeShakeBasis` is the semantic-unit basis of the manifest — it is not
-// evidence that JavaScript dead-code elimination ran (that is unimplemented).
-if (pack.treeShakeBasis !== 'vpg-deployment-ir') fail('treeShakeBasis must be vpg-deployment-ir');
-// Manifest must not advertise a minifier that does not exist.
-if (pack.release === true && pack.minify !== 'none') fail(`release minify must be none, got ${pack.minify}`);
+// `vmz-pack` runs no compressor — the manifest must never advertise minification.
+if (pack.minify !== 'none') fail(`minify must be none, got ${pack.minify}`);
+// Tree-shaking basis is the Rust link active fixed-point (entries keep all exports).
+if (pack.treeShake !== 'vmz-pack-link-pruning') fail(`treeShake must be vmz-pack-link-pruning, got ${pack.treeShake}`);
+if (!Array.isArray(pack.chunks) || !pack.chunks.length) fail('pack manifest must list vmz-pack chunks');
 
 if (assemble.assembly !== 'server-host') fail(`expected assembly server-host got ${assemble.assembly}`);
 const serverStep = (assemble.steps || []).find((s: any) => s.kind === 'server-host');
@@ -266,7 +265,7 @@ upsertCheck(proof, {
 upsertCheck(proof, {
     id: 'server-host.pack',
     status: 'passed',
-    detail: `units=${pack.unitCount}`,
+    detail: `chunks=${pack.chunkCount}`,
 });
 upsertCheck(proof, {
     id: 'server-host.artifact',

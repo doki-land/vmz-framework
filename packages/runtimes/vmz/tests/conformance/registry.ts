@@ -89,16 +89,6 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'tooling/deployment-proof.ts',
         description: 'Deployment boundary proof',
     },
-    'pack-client-packages': {
-        file: 'toolchain/pack-client-packages.ts',
-        description: 'Pack: bare client package → dist/vendor + relative rewrite',
-        pre: ['build:runtimes'],
-    },
-    'static-ts-first-consumer': {
-        file: 'toolchain/static-ts-first-consumer.ts',
-        description: 'Static assemble: workspace TS-first package + conditional/subpath/transitive imports on plain Node',
-        pre: ['build:runtimes'],
-    },
     'causal-trace': { file: 'tooling/causal-trace.ts', description: 'Trace ingest / causal replay' },
 
     // profile/
@@ -735,6 +725,4 @@ export const CHECK_ALL = [
     'thin-runtime-production-proof',
     // 0.2.0 Runtime Quality Baseline + Package Layout Hygiene (tag gate)
     'runtime-quality-baseline',
-    // Static/prerender lowering of workspace TS-first packages (no consumer loader)
-    'static-ts-first-consumer',
 ];

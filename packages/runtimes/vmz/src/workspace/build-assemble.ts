@@ -229,7 +229,7 @@ export function emitBuildProof(outDir: string, ctx: Record<string, unknown>) {
             slots[id] = {
                 status: packCtx?.packDigest ? 'pack-digest' : 'pending',
                 detail: packCtx?.packDigest
-                    ? `pack=${String(packCtx.packDigest).slice(0, 12)} units=${packCtx.unitCount ?? '?'}`
+                    ? `pack=${String(packCtx.packDigest).slice(0, 12)} chunks=${packCtx.chunkCount ?? '?'}`
                     : 'pack missing',
             };
         }

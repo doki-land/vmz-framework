@@ -25,7 +25,6 @@ const PRESETS = {
         'thin-runtime-host-boundary',
         'thin-runtime-production-proof',
         'runtime-quality-baseline',
-        'static-ts-first-consumer',
     ],
     'ui-browser': ['--keep-going', 'ui-automation', 'browser-production'],
 };

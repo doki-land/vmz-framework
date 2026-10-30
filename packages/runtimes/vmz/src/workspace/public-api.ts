@@ -876,7 +876,6 @@ export {
     assertSharedAssetPath,
     contentAddressedAssetsDigest,
     rewriteCssImports,
-    rewriteJsEntryRelativeImports,
 } from './content-addressed-assets.js';
 export { SITE_FAVICON_SCHEMA, emitSiteFavicon, readSiteFaviconHeadHtml, packPngsIntoIco } from './site-favicon.js';
 export { PUBLIC_STATIC_ASSETS_SCHEMA, emitPublicStaticAssets } from './public-static-assets.js';
@@ -932,7 +931,25 @@ export {
     selectBuildProfile,
     semanticIdsForAssembly,
 } from '../delivery/delivery-profile.js';
-export { PACK_MANIFEST_SCHEMA, packFromDeploymentIr, ensureRuntimeCompanions } from './pack.js';
+export {
+    PACK_MANIFEST_SCHEMA,
+    PACK_OUTPUT_DIR_REL,
+    PACK_PUBLIC_BASE,
+    packFromDeploymentIr,
+    packEntryHref,
+    ensureRuntimeCompanions,
+} from './pack.js';
+export { buildPackRequest, runPackPlan, runPackWrite, PackNativeError } from './pack-native.js';
+export type {
+    PackNativeBinding,
+    PackPlan,
+    PackPlanResponse,
+    PackDiagnostic,
+    PackRequest,
+    PackRequestEntry,
+    PackRequestUse,
+    PackTarget,
+} from './pack-native.js';
 export {
     SERVER_ARTIFACT_SCHEMA,
     HTTP_CONTRACT_SCHEMA,

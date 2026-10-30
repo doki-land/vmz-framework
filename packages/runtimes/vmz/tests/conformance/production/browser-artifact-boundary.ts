@@ -43,7 +43,7 @@ if (boundary.thinRuntimeClaim !== true) fail('thinRuntimeClaim must be true (0.1
 if (boundary.productionReadyClaim !== false) fail('productionReadyClaim must stay false');
 if (!boundary.modules.generatedComponents.length) fail('expected generated *.client.js entries');
 if (!boundary.modules.runtimeShared.length) fail('expected runtimeShared modules in delivery dist');
-if (!boundary.pack.generatedEntries.length) fail('pack-manifest units missing');
+if (!boundary.pack.generatedEntries.length) fail('pack-manifest chunks missing');
 
 const proof = readProof(root);
 proof.hostProfile = proof.hostProfile ?? 'browser-web-surface';
