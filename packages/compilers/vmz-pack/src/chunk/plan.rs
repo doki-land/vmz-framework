@@ -189,8 +189,8 @@ pub fn plan_chunks(graph: &ModuleGraph, plan: &LinkPlan) -> ChunkPlan {
                 (format!("entry/{logical}"), ChunkOrigin::Entry { logical })
             }
             Some(&RootId::Async(node)) if signature.len() == 1 => {
-                let path = normalize_path(&graph.nodes[node].resolved.path);
-                (format!("async/{path}"), ChunkOrigin::Async { root_node: node })
+                let label = relative_label(graph, &graph.nodes[node].resolved.path);
+                (format!("async/{label}"), ChunkOrigin::Async { root_node: node })
             }
             _ => {
                 let labels: Vec<String> =
@@ -328,12 +328,36 @@ fn root_unit_of(root: RootId, entry_node: &[Option<usize>], unit_of: &[usize]) -
     }
 }
 
-/// 根的稳定标签：入口用逻辑名，异步根用规范化路径。
+/// 根的稳定标签：入口用逻辑名，异步根用相对项目根的路径。
 fn root_label(graph: &ModuleGraph, root: RootId) -> String {
     match root {
         RootId::Entry(index) => graph.entries[index].logical.clone(),
-        RootId::Async(node) => normalize_path(&graph.nodes[node].resolved.path),
+        RootId::Async(node) => relative_label(graph, &graph.nodes[node].resolved.path),
     }
+}
+
+/// 相对 `graph.root` 的规范化路径标签：同内容跨机器产出相同 chunk id。
+/// 与项目根不同树（跨盘）时退回规范化绝对路径——同机稳定，不假装跨机可重现。
+fn relative_label(graph: &ModuleGraph, path: &Path) -> String {
+    let root: Vec<std::path::Component<'_>> = graph.root.components().collect();
+    let target: Vec<std::path::Component<'_>> = path.components().collect();
+    let common = root.iter().zip(target.iter()).take_while(|(a, b)| a == b).count();
+    if target[common..]
+        .iter()
+        .any(|c| matches!(c, std::path::Component::Prefix(_) | std::path::Component::RootDir))
+    {
+        return normalize_path(path);
+    }
+    let mut out = String::new();
+    for component in &root[common..] {
+        if matches!(component, std::path::Component::Normal(_)) {
+            out.push_str("../");
+        }
+    }
+    let rest: Vec<String> =
+        target[common..].iter().map(|c| c.as_os_str().to_string_lossy().into_owned()).collect();
+    out.push_str(&rest.join("/"));
+    if out.is_empty() { normalize_path(path) } else { out }
 }
 
 /// 路径规范化：分隔符统一为 `/`，保证跨平台稳定 id。

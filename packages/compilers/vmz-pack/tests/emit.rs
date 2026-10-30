@@ -464,6 +464,7 @@ fn incomplete_facts_member_is_rejected() {
 
     let graph = ModuleGraph {
         target: Target::Browser,
+        root: root.clone(),
         entries: vec![GraphEntry { logical: "main".to_string(), id: app.clone() }],
         nodes: vec![app_node, pending_node],
         diagnostics: Vec::new(),
@@ -512,6 +513,7 @@ fn missing_source_file_is_rejected() {
     };
     let graph = ModuleGraph {
         target: Target::Browser,
+        root: root.clone(),
         entries: vec![GraphEntry { logical: "main".to_string(), id: gone.clone() }],
         nodes: vec![node],
         diagnostics: Vec::new(),

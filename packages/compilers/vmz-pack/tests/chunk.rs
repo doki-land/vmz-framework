@@ -46,6 +46,7 @@ fn dynamic_edge(specifier: &str, target: &str) -> ModuleEdge {
 fn graph(entries: &[(&str, &str)], nodes: Vec<ModuleNode>) -> ModuleGraph {
     ModuleGraph {
         target: Target::Browser,
+        root: PathBuf::from("/"),
         entries: entries
             .iter()
             .map(|(logical, path)| GraphEntry {
@@ -137,12 +138,12 @@ fn dynamic_import_becomes_async_chunk() {
     let out = plan_chunks(&graph, &link);
     assert_eq!(out.chunks.len(), 2);
     let entry_chunk = chunk(&out, "entry/app");
-    let async_chunk = chunk(&out, "async//virtual/lazy.js");
+    let async_chunk = chunk(&out, "async/virtual/lazy.js");
     assert_eq!(entry_chunk.modules, vec![1, 0]);
     assert!(!entry_chunk.modules.contains(&2));
     assert_eq!(async_chunk.modules, vec![2]);
     assert_eq!(async_chunk.origin, ChunkOrigin::Async { root_node: 2 });
-    let async_index = out.chunks.iter().position(|c| c.id == "async//virtual/lazy.js").unwrap();
+    let async_index = out.chunks.iter().position(|c| c.id == "async/virtual/lazy.js").unwrap();
     assert_eq!(out.dynamic_boundaries, vec![(0, async_index)]);
     assert_eq!(
         out.entry_chunks,
@@ -211,7 +212,7 @@ fn same_input_same_plan() {
     let ids: Vec<&str> = first.chunks.iter().map(|c| c.id.as_str()).collect();
     assert_eq!(
         ids,
-        vec!["entry/one", "entry/two", "shared/one+two", "shared/one+two+/virtual/lazy.js"]
+        vec!["entry/one", "entry/two", "shared/one+two", "shared/one+two+virtual/lazy.js"]
     );
     assert_eq!(first.dynamic_boundaries.len(), 1);
 }
@@ -277,14 +278,14 @@ fn entry_and_async_reachable_goes_to_shared() {
 
     let out = plan_chunks(&graph, &link);
     assert_eq!(out.chunks.len(), 3);
-    let shared_chunk = chunk(&out, "shared/app+/virtual/lazy.js");
+    let shared_chunk = chunk(&out, "shared/app+virtual/lazy.js");
     assert_eq!(shared_chunk.modules, vec![2]);
     assert_eq!(
         shared_chunk.origin,
-        ChunkOrigin::Shared { roots: vec!["app".to_string(), "/virtual/lazy.js".to_string()] }
+        ChunkOrigin::Shared { roots: vec!["app".to_string(), "virtual/lazy.js".to_string()] }
     );
     let shared_index = out.chunks.iter().position(|c| c.id == shared_chunk.id).unwrap();
-    let async_chunk = chunk(&out, "async//virtual/lazy.js");
+    let async_chunk = chunk(&out, "async/virtual/lazy.js");
     assert_eq!(async_chunk.depends_on, vec![shared_index]);
     let entry_chunk = chunk(&out, "entry/app");
     assert_eq!(entry_chunk.depends_on, vec![shared_index]);

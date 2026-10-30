@@ -72,6 +72,8 @@ pub struct GraphEntry {
 pub struct ModuleGraph {
     /// 解析目标条件（browser / node）。
     pub target: Target,
+    /// 项目根：chunk id 的相对命名基准，保证同内容跨机器产出稳定 id。
+    pub root: PathBuf,
     /// 入口映射（保序）。
     pub entries: Vec<GraphEntry>,
     /// 节点表，索引即节点号。
@@ -92,8 +94,14 @@ impl ModuleGraph {
 /// 入口本身解析失败（读文件/parse）记入图级诊断并跳过该入口；
 /// 依赖边解析失败保留为 `Err` 诊断边，遍历不因单点失败中断。
 pub fn build_graph(entries: &[(String, PathBuf)], target: Target, root: &Path) -> ModuleGraph {
-    let mut graph =
-        ModuleGraph { target, entries: Vec::new(), nodes: Vec::new(), diagnostics: Vec::new() };
+    let mut graph = ModuleGraph {
+        target,
+        // 与节点路径同口径 canonicalize，否则 `\\?\` 前缀差异使相对标签退化为绝对路径。
+        root: root.canonicalize().unwrap_or_else(|_| root.to_path_buf()),
+        entries: Vec::new(),
+        nodes: Vec::new(),
+        diagnostics: Vec::new(),
+    };
     let mut by_id: HashMap<ModuleId, usize> = HashMap::new();
     let mut queue: VecDeque<ModuleId> = VecDeque::new();
 
