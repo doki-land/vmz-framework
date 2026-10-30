@@ -219,18 +219,28 @@ pub fn plan_emit(
                 continue;
             }
             // 事实不完整时名字唯一性检查不可信，宁拒绝不产出错误 JS。
-            if module_node.record.path.is_none()
-                || !module_node.diagnostics.is_empty()
-                || module_node
-                    .record
-                    .diagnostics
-                    .iter()
-                    .any(|diagnostic| diagnostic.code == STATEMENT_FACT_INCOMPLETE)
-            {
+            let mut reasons: Vec<String> = module_node
+                .diagnostics
+                .iter()
+                .map(|diagnostic| format!("{} ({})", diagnostic.code, diagnostic.message))
+                .collect();
+            if module_node.record.path.is_none() {
+                reasons.push("record-path-missing".to_string());
+            }
+            let statement_gaps = module_node
+                .record
+                .diagnostics
+                .iter()
+                .filter(|diagnostic| diagnostic.code == STATEMENT_FACT_INCOMPLETE)
+                .count();
+            if statement_gaps > 0 {
+                reasons.push(format!("statement-fact-incomplete x{statement_gaps}"));
+            }
+            if module_node.record.path.is_none() || !reasons.is_empty() {
                 errors.push(
                     PackDiagnostic::new(
                         "vmz::pack::emit::incomplete_facts",
-                        "模块事实不完整，无法安全装配产物文本",
+                        format!("模块事实不完整，无法安全装配产物文本: {}", reasons.join(", ")),
                     )
                     .with_path(path_display),
                 );
