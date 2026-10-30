@@ -54,6 +54,15 @@ export interface PackAssetArtifact {
     sourcePath: string;
 }
 
+export interface PackStyleArtifact {
+    fileName: string;
+    url: string;
+    /** Referring JS module paths (execution order, first-wins dedup on Rust side). */
+    modules: string[];
+    /** Aggregated source CSS paths in cascade order. */
+    sourcePaths: string[];
+}
+
 export interface PackEntryFile {
     logical: string;
     file: string;
@@ -66,6 +75,7 @@ export interface PackDynamicFile {
 
 export interface PackPlan {
     artifacts: PackChunkArtifact[];
+    styles: PackStyleArtifact[];
     assets: PackAssetArtifact[];
     entryFiles: PackEntryFile[];
     dynamicFiles: PackDynamicFile[];
@@ -190,6 +200,17 @@ function parseAssetArtifact(value: unknown, where: string): PackAssetArtifact {
     };
 }
 
+function parseStyleArtifact(value: unknown, where: string): PackStyleArtifact {
+    if (!isPlainObject(value)) throw responseShape(`${where} must be an object`);
+    rejectUnknownKeys(value, ['fileName', 'url', 'modules', 'sourcePaths'], where);
+    return {
+        fileName: requireString(value.fileName, `${where}.fileName`),
+        url: requireString(value.url, `${where}.url`),
+        modules: requireStringArray(value.modules, `${where}.modules`),
+        sourcePaths: requireStringArray(value.sourcePaths, `${where}.sourcePaths`),
+    };
+}
+
 function parseEntryFile(value: unknown, where: string): PackEntryFile {
     if (!isPlainObject(value)) throw responseShape(`${where} must be an object`);
     rejectUnknownKeys(value, ['logical', 'file'], where);
@@ -204,13 +225,15 @@ function parseDynamicFile(value: unknown, where: string): PackDynamicFile {
 
 function parsePackPlan(value: unknown): PackPlan {
     if (!isPlainObject(value)) throw responseShape('response.plan must be an object');
-    rejectUnknownKeys(value, ['artifacts', 'assets', 'entryFiles', 'dynamicFiles', 'manifestJson'], 'response.plan');
+    rejectUnknownKeys(value, ['artifacts', 'styles', 'assets', 'entryFiles', 'dynamicFiles', 'manifestJson'], 'response.plan');
     if (!Array.isArray(value.artifacts)) throw responseShape('response.plan.artifacts must be an array');
+    if (!Array.isArray(value.styles)) throw responseShape('response.plan.styles must be an array');
     if (!Array.isArray(value.assets)) throw responseShape('response.plan.assets must be an array');
     if (!Array.isArray(value.entryFiles)) throw responseShape('response.plan.entryFiles must be an array');
     if (!Array.isArray(value.dynamicFiles)) throw responseShape('response.plan.dynamicFiles must be an array');
     return {
         artifacts: value.artifacts.map((a, i) => parseChunkArtifact(a, `response.plan.artifacts[${i}]`)),
+        styles: value.styles.map((s, i) => parseStyleArtifact(s, `response.plan.styles[${i}]`)),
         assets: value.assets.map((a, i) => parseAssetArtifact(a, `response.plan.assets[${i}]`)),
         entryFiles: value.entryFiles.map((e, i) => parseEntryFile(e, `response.plan.entryFiles[${i}]`)),
         dynamicFiles: value.dynamicFiles.map((d, i) => parseDynamicFile(d, `response.plan.dynamicFiles[${i}]`)),

@@ -122,9 +122,11 @@ export function packFromDeploymentIr(outDir: string, opts: PackFromDeploymentIrO
         entries: Array<{ logical: string; file: string }>;
         entryFiles: unknown[];
         dynamicFiles: unknown[];
+        styles: unknown[];
         assets: unknown[];
         chunks: unknown[];
         chunkCount: number;
+        styleCount: number;
         entryCount: number;
         minify: string;
         treeShake: string;
@@ -145,9 +147,13 @@ export function packFromDeploymentIr(outDir: string, opts: PackFromDeploymentIrO
             .map((logical) => ({ logical, file: path.relative(absOut, entries[logical]).replace(/\\/g, '/') })),
         entryFiles: plan.entryFiles,
         dynamicFiles: plan.dynamicFiles,
+        // CSS artifacts are final bytes under `_vmz/pack/` (`packWrite` wrote
+        // them); the wire carries identity/provenance only, never content.
+        styles: plan.styles,
         assets: plan.assets,
         chunks,
         chunkCount: chunks.length,
+        styleCount: plan.styles.length,
         entryCount: plan.entryFiles.length,
         // `vmz-pack` runs no compressor: chunk bytes are the linked output verbatim.
         minify: 'none',

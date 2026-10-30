@@ -45,6 +45,14 @@ const planResponse = {
                 dynamic: [],
             },
         ],
+        styles: [
+            {
+                fileName: 'style-ee55.css',
+                url: '/_vmz/pack/style-ee55.css',
+                modules: ['E:/app/dist/entry-client.js'],
+                sourcePaths: ['E:/app/dist/theme.css'],
+            },
+        ],
         assets: [],
         entryFiles: [
             { logical: 'entry-client.js', file: 'entry-client-aa11.js' },
@@ -122,6 +130,8 @@ describe('packFromDeploymentIr on the vmz-pack binding (v0)', () => {
         assert.match(manifest.chunks[0].digest, /^[a-f0-9]{64}$/);
         assert.deepEqual(manifest.entryFiles, planResponse.plan.entryFiles);
         assert.deepEqual(manifest.dynamicFiles, planResponse.plan.dynamicFiles);
+        assert.deepEqual(manifest.styles, planResponse.plan.styles);
+        assert.equal(manifest.styleCount, 1);
         assert.deepEqual(manifest.nativeManifest, JSON.parse(planResponse.plan.manifestJson));
         assert.match(manifest.packDigest as string, /^[a-f0-9]{64}$/);
         // Retired vendor-era fields must not reappear.

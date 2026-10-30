@@ -33,6 +33,14 @@ const validPlan = {
             sourcePath: 'E:/abs/src/logo.svg',
         },
     ],
+    styles: [
+        {
+            fileName: 'style-1234abcd.css',
+            url: '/_vmz/style-1234abcd.css',
+            modules: ['E:/abs/src/entry.js'],
+            sourcePaths: ['E:/abs/src/theme.css'],
+        },
+    ],
     entryFiles: [{ logical: 'main', file: 'entry-main-ab12cd34.js' }],
     dynamicFiles: [{ from: 'entry-main-ab12cd34.js', to: 'shared-9f8e7d6c.js' }],
     manifestJson: JSON.stringify({ version: 'v0', entries: { main: 'entry-main-ab12cd34.js' } }),
@@ -216,6 +224,12 @@ describe('pack-native runPackPlan / runPackWrite (v0)', () => {
             },
             (plan) => {
                 plan.entryFiles = [{ logical: 'main' }];
+            },
+            (plan) => {
+                plan.styles = [{ fileName: 'style.css', url: '/style.css', modules: 'nope', sourcePaths: [] }];
+            },
+            (plan) => {
+                delete plan.styles;
             },
             (plan) => {
                 plan.manifestJson = 42;
