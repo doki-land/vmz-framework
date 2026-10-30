@@ -476,6 +476,11 @@ fn walk_expression(expression: &Expression, visit: &mut impl FnMut(&Expression))
             visit(consequent);
             visit(alternate);
         }
+        ExpressionKind::SequenceExpression(expressions) => {
+            for part in expressions {
+                visit(part);
+            }
+        }
         ExpressionKind::MemberExpression { object, property, .. } => {
             visit(object);
             visit(property);

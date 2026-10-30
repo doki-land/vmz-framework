@@ -431,6 +431,11 @@ fn shift_expression_spans(expr: &mut Expression, delta: isize) {
             shift_expression_spans(tag, delta);
             shift_expression_spans(template, delta);
         }
+        ExpressionKind::SequenceExpression(expressions) => {
+            for expression in expressions {
+                shift_expression_spans(expression, delta);
+            }
+        }
         ExpressionKind::ArrowFunction { type_params, params, body, .. } => {
             shift_type_spans(type_params, params, delta);
             shift_statement_spans(body, delta);

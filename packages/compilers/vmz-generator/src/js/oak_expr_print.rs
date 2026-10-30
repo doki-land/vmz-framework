@@ -85,6 +85,12 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
             };
             wrap_prec(spaced, prec, min_prec)
         }
+        ExpressionKind::SequenceExpression(expressions) => {
+            // 逗号序列与 `,` 二元打印同优先级；子表达式按逗号拼接。
+            let parts: Option<Vec<String>> =
+                expressions.iter().map(|part| print_expr(part, Prec::Assign)).collect();
+            wrap_prec(parts?.join(","), Prec::Assign, min_prec)
+        }
         ExpressionKind::ConditionalExpression { test, consequent, alternate } => {
             let test_s = print_expr(test, Prec::Or)?;
             let cons_s = print_expr(consequent, Prec::Assign)?;

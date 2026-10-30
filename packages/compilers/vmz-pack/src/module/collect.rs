@@ -800,6 +800,11 @@ impl<'a> Collector<'a> {
                 self.walk_expr(consequent);
                 self.walk_expr(alternate);
             }
+            ExpressionKind::SequenceExpression(expressions) => {
+                for part in expressions {
+                    self.walk_expr(part);
+                }
+            }
             ExpressionKind::MemberExpression { object, property, .. } => {
                 self.walk_expr(object);
                 self.walk_expr(property);
