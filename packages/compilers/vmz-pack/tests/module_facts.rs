@@ -2,11 +2,20 @@
 //! 所有事实用 `&source[span.0..span.1]` 切片回到原文核对，不接受正则识别。
 
 use vmz_pack::PackDiagnostic;
-use vmz_pack::module::{ExportFact, ImportKind, ImportedName, parse_module};
+use vmz_pack::module::{ExportFact, ImportKind, ImportedName, StatementEffect, parse_module};
 
 /// 记录 span 切片回原文（UTF-8 字节区间，exclusive end）。
 fn slice(source: &str, span: (usize, usize)) -> &str {
     &source[span.0..span.1]
+}
+
+/// 该记录的 `statement_fact_incomplete` 诊断（应恒为空表示无事实缺口）。
+fn statement_fact_incomplete(record: &vmz_pack::module::ModuleRecord) -> Vec<&PackDiagnostic> {
+    record
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.code == "vmz::pack::module::statement_fact_incomplete")
+        .collect()
 }
 
 fn ok(source: &str) -> vmz_pack::module::ModuleRecord {
@@ -313,4 +322,61 @@ fn import_meta_is_plain_expression() {
     assert!(record.imports.is_empty(), "{:?}", record.imports);
     assert!(record.assets.is_empty(), "{:?}", record.assets);
     assert!(record.diagnostics.is_empty(), "{:?}", record.diagnostics);
+}
+
+/// 多 declarator：绑定名全部来自 AST，所有初值纯时整体判 `Pure`。
+#[test]
+fn multi_declarator_names_and_effect_are_complete() {
+    let source = "const a = 1, b = 2;";
+    let record = ok(source);
+    assert!(record.diagnostics.is_empty(), "{:?}", record.diagnostics);
+    assert_eq!(record.statements.len(), 1);
+    let statement = &record.statements[0];
+    assert_eq!(statement.declared_names, ["a", "b"]);
+    assert_eq!(statement.effect, StatementEffect::Pure);
+    assert_eq!(slice(source, statement.span), "const a = 1, b = 2;");
+}
+
+/// 解构声明：绑定名由 declarator 给出，不再产生 `statement_fact_incomplete`。
+#[test]
+fn destructuring_names_are_facts_without_diagnostics() {
+    let source = "const { a, b } = require('./m');";
+    let record = ok(source);
+    assert!(statement_fact_incomplete(&record).is_empty(), "{:?}", record.diagnostics);
+    let statement = &record.statements[0];
+    assert_eq!(statement.declared_names, ["a", "b"]);
+    assert_eq!(statement.effect, StatementEffect::SideEffect);
+    assert_eq!(slice(source, statement.span), "const { a, b } = require('./m');");
+
+    // 解构按属性读取处理：初值纯也判副作用，与无初值的 `let` 区分。
+    let pattern = ok("const { a } = pureCall();");
+    assert!(statement_fact_incomplete(&pattern).is_empty(), "{:?}", pattern.diagnostics);
+    assert_eq!(pattern.statements[0].declared_names, ["a"]);
+    assert_eq!(pattern.statements[0].effect, StatementEffect::SideEffect);
+
+    let uninitialized = ok("let x;");
+    assert!(
+        statement_fact_incomplete(&uninitialized).is_empty(),
+        "{:?}",
+        uninitialized.diagnostics
+    );
+    assert_eq!(uninitialized.statements[0].declared_names, ["x"]);
+    assert_eq!(uninitialized.statements[0].effect, StatementEffect::Init);
+}
+
+/// `export const { a } = x`：导出名来自 declarator 绑定名。
+#[test]
+fn destructured_export_resolves_local_name() {
+    let source = "export const { a } = x;";
+    let record = ok(source);
+    assert!(statement_fact_incomplete(&record).is_empty(), "{:?}", record.diagnostics);
+    assert_eq!(record.exports.len(), 1);
+    match &record.exports[0] {
+        ExportFact::Local { local, exported, .. } => {
+            assert_eq!(local, "a");
+            assert_eq!(exported, "a");
+        }
+        other => panic!("期望 Local 导出，实际 {other:?}"),
+    }
+    assert_eq!(record.statements[0].declared_names, ["a"]);
 }

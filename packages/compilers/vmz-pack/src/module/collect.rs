@@ -14,9 +14,10 @@
 //!   `top_level_await_spans` 事实给出（见 `ModuleFlags::has_tla`）。一元
 //!   关键字运算符在关键字后带空白时仍被 trivia 覆盖为空格，与
 //!   `typeof`/`void`/`!`/`-` 同形不可区分。
-//! - 多变量声明只保留第一个 declarator；解构声明的 `name` 是原文文本；
-//!   含初始值的 enum、`for…of` 解构、`namespace` 体会被误建成残缺语句；
-//!   模板字符串的插值表达式整体丢失。以上形态只按保守效果记录并给
+//! - 变量声明按 `declarators` 给事实：每个 declarator 的 `binding_names`
+//!   就是绑定名（多 declarator 与解构都展开），`pattern_text` 保留原文
+//!   形态；含初始值的 enum、`for…of` 解构、`namespace` 体会被误建成残缺
+//!   语句，模板字符串的插值表达式整体丢失。这些形态只按保守效果记录并给
 //!   `statement_fact_incomplete` 诊断，不做猜测性还原。
 
 use vmz_oak_frontend_adapter::{
@@ -40,7 +41,7 @@ const PARSE_FAILED: &str = "vmz::pack::module::parse_failed";
 const DYNAMIC_IMPORT_UNRESOLVED: &str = "vmz::pack::module::dynamic_import_unresolved";
 /// import 形态无法提取模块说明符（如 `import.meta`、残缺语句）。
 const IMPORT_WITHOUT_SPECIFIER: &str = "vmz::pack::module::import_without_specifier";
-/// Oak 无法给出完整语句事实（多 declarator、解构、误解析形态等），
+/// Oak 无法给出完整语句事实（绑定名缺失、误解析形态等），
 /// 链接层必须按副作用保守保留。
 const STATEMENT_FACT_INCOMPLETE: &str = "vmz::pack::module::statement_fact_incomplete";
 /// 表达式位置动态 import 的最小 span 间隙：`import(` 的字节数。
@@ -138,10 +139,21 @@ fn fingerprint_hole(statement: &Statement) -> Option<(usize, usize)> {
     }
 }
 
-/// 声明语句的顶层名字（原样保留 Oak 的 `name` 字段，包括解构原始文本）。
+/// 声明语句引入的全部绑定名：多 declarator 与解构都按 Oak 的
+/// `binding_names` 展开，去重保序。
 fn declared_names(statement: &Statement) -> Vec<String> {
+    if let Statement::VariableDeclaration(d) = statement {
+        let mut names: Vec<String> = Vec::new();
+        for declarator in &d.declarators {
+            for binding in &declarator.binding_names {
+                if !binding.is_empty() && !names.contains(binding) {
+                    names.push(binding.clone());
+                }
+            }
+        }
+        return names;
+    }
     let name = match statement {
-        Statement::VariableDeclaration(d) => d.name(),
         Statement::FunctionDeclaration(d) => &d.name,
         Statement::ClassDeclaration(d) => &d.name,
         Statement::Interface(d) => &d.name,
@@ -295,30 +307,34 @@ impl<'a> Collector<'a> {
                 if d.is_declare() {
                     return (StatementEffect::Pure, false);
                 }
-                let trimmed = d.name().trim_start();
-                if trimmed.starts_with('{') || trimmed.starts_with('[') {
+                // 绑定名缺失才是真正的 AST 缺事实，保守保留并诊断。
+                if d.declarators.iter().any(|declarator| declarator.binding_names.is_empty()) {
                     return (StatementEffect::SideEffect, true);
                 }
-                if self.has_extra_declarator(&d.span, d.value()) {
-                    return (StatementEffect::SideEffect, true);
+                // 解构会触发属性读取（可能是 getter），不按初值形态判纯。
+                if d.declarators.iter().any(|declarator| declarator.pattern_text.is_some()) {
+                    return (StatementEffect::SideEffect, false);
                 }
-                match d.value() {
-                    None => {
-                        if matches!(d.kind, VariableKind::Const) {
-                            (StatementEffect::SideEffect, true)
-                        } else {
-                            (StatementEffect::Init, false)
+                let mut pure = true;
+                for declarator in &d.declarators {
+                    match &declarator.value {
+                        Some(value) => pure &= expr_pure(value),
+                        // `const x` 缺初值是语法错误（Oak 已带诊断），不再谎报事实缺口。
+                        None => {
+                            return if matches!(d.kind, VariableKind::Const) {
+                                (StatementEffect::SideEffect, false)
+                            } else {
+                                (StatementEffect::Init, false)
+                            };
                         }
                     }
-                    Some(value) => {
-                        if !expr_pure(value) {
-                            (StatementEffect::SideEffect, false)
-                        } else if matches!(d.kind, VariableKind::Const) {
-                            (StatementEffect::Pure, false)
-                        } else {
-                            (StatementEffect::Init, false)
-                        }
-                    }
+                }
+                if !pure {
+                    (StatementEffect::SideEffect, false)
+                } else if matches!(d.kind, VariableKind::Const) {
+                    (StatementEffect::Pure, false)
+                } else {
+                    (StatementEffect::Init, false)
                 }
             }
             Statement::FunctionDeclaration(d) => {
@@ -436,24 +452,6 @@ impl<'a> Collector<'a> {
         (effect, incomplete)
     }
 
-    /// 多变量声明检测：Oak 只保留第一个 declarator，初值之后到语句末尾
-    /// （去尾分号与空白）的原文里还含逗号即判定为多 declarator。
-    fn has_extra_declarator(
-        &self,
-        statement_span: &core::range::Range<usize>,
-        value: Option<&Expression>,
-    ) -> bool {
-        let bytes = self.source.as_bytes();
-        let start = value
-            .map(|v| v.span.end.min(bytes.len()))
-            .unwrap_or(statement_span.start.min(bytes.len()));
-        let mut end = statement_span.end.min(bytes.len());
-        while end > start && (bytes[end - 1] == b';' || bytes[end - 1].is_ascii_whitespace()) {
-            end -= 1;
-        }
-        bytes[start..end].contains(&b',')
-    }
-
     /// Oak 误解析指纹：表达式语句的表达式 span 与语句 span（去尾分号/空白）
     /// 不重合，即语句里还有表达式未覆盖的原文（`for (…)`、`namespace` 等
     /// 被误建成残缺标识符/成员表达式的形态）。
@@ -472,8 +470,10 @@ impl<'a> Collector<'a> {
     fn walk_stmt(&mut self, statement: &Statement) {
         match statement {
             Statement::VariableDeclaration(d) => {
-                if let Some(value) = d.value() {
-                    self.walk_expr(value);
+                for declarator in &d.declarators {
+                    if let Some(value) = &declarator.value {
+                        self.walk_expr(value);
+                    }
                 }
             }
             Statement::FunctionDeclaration(d) => {
@@ -893,8 +893,10 @@ fn expr_pure(expression: &Expression) -> bool {
 fn collect_refs_statement(statement: &Statement, names: &mut Vec<String>) {
     match statement {
         Statement::VariableDeclaration(d) => {
-            if let Some(value) = d.value() {
-                collect_refs_expression(value, names);
+            for declarator in &d.declarators {
+                if let Some(value) = &declarator.value {
+                    collect_refs_expression(value, names);
+                }
             }
         }
         Statement::FunctionDeclaration(d) => {

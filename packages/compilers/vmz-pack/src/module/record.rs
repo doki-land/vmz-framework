@@ -163,8 +163,8 @@ pub struct StatementFact {
     /// 声明自身的 span（`export` 包裹时是被包裹声明的 span；
     /// `export default <表达式>` 是整条 export 语句的 span）。
     pub span: (usize, usize),
-    /// 声明的顶层名字。解构声明在 Oak 中整体存为原始文本
-    /// （如 `"{ a }"`）原样记录；多变量声明只保留第一个名字（Oak 限制）。
+    /// 声明引入的顶层绑定名。多 declarator 与解构都按 Oak 的
+    /// `binding_names` 展开，去重保序。
     pub declared_names: Vec<String>,
     /// 语句子树中出现的标识符（含嵌套函数/类体与属性名，保守多收录），
     /// 按首次出现顺序去重。
