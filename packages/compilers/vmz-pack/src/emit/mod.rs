@@ -17,9 +17,15 @@
 //!   身份去重先到先得；产出独立 CSS artifact（`style-<hash8>.css`，
 //!   指纹规则与 chunk 一致），CSS 内相对 `url()` 按 asset 规则搬迁并
 //!   重写。`@import` 跨文件级联未实现，显式拒绝，不静默拼接错误顺序。
+//! - Json 值节点按 default 导入语义合成绑定：被导入的 JSON 模块在 chunk
+//!   文本头部合成为 `const <local> = <原始 JSON 文本>;`——JSON 文本本身是
+//!   合法 JS 表达式，字节保真、不重新序列化、不改缩进（即合成模块
+//!   `export default <JSON>;` 的 default 绑定内联）。同 chunk 同身份同名
+//!   绑定去重；具名/命名空间绑定、重导出与动态导入显式拒绝
+//!   （`vmz::pack::emit::json_binding_unsupported` 等），不猜导出形态。
 //! - 未实现的语义（同 chunk 重命名绑定、星号合成、同 chunk 动态边界、
-//!   事实不完整、无法重写的说明符、样式绑定/重导出/动态导入等）一律
-//!   显式诊断拒绝，禁止猜测、禁止静默产出错误 JS、禁止兼容层。
+//!   事实不完整、无法重写的说明符、样式/JSON 绑定、重导出与动态导入等）
+//!   一律显式诊断拒绝，禁止猜测、禁止静默产出错误 JS、禁止兼容层。
 //!
 //! [`plan_emit`] 是纯计算（只按 [`crate::graph::ModuleNode::resolved`] 路径
 //! 重读模块源码与资源字节，IO 姿态与 `graph` 层一致）；[`write_emit`]

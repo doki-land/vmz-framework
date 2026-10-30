@@ -18,7 +18,7 @@
 use std::collections::{HashSet, VecDeque};
 
 use crate::diag::PackDiagnostic;
-use crate::graph::{EdgeKind, ModuleGraph};
+use crate::graph::{EdgeKind, ModuleGraph, NodeKind};
 use crate::module::{ExportFact, ImportKind, ImportedName, StatementEffect};
 
 /// 请求的导出名在模块导出事实中不存在。
@@ -282,6 +282,11 @@ impl<'g> Linker<'g> {
 
     /// 解析 `Symbol(node, name)`。
     fn resolve_symbol(&mut self, node: usize, name: &str) {
+        if self.graph.nodes[node].kind == NodeKind::Json {
+            // JSON 值节点无导出事实：`default` 即值本身，具名/命名空间与
+            // 重导出形态由 `emit` 层显式拒绝；这里只保留节点（demand 已 retain）。
+            return;
+        }
         let exports: Vec<_> = self.graph.nodes[node].record.exports.iter().cloned().collect();
         let mut matched = false;
         for (index, export) in exports.into_iter().enumerate() {

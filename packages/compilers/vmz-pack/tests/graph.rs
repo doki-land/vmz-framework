@@ -173,6 +173,55 @@ fn css_entry_is_rejected() {
     assert!(graph.nodes.is_empty());
 }
 
+/// JSON 导入进图成为不透明值节点：不按 JS 源码解析、无出边、无诊断；
+/// 宿主 importer→json 的静态值绑定边保留。
+#[test]
+fn json_import_becomes_opaque_value_node() {
+    let root = temp_tree(
+        "jsonvalue",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import data from './d.json';\nexport const x = data;\n"),
+            ("src/d.json", "{\n  \"k\": 1\n}\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    assert_eq!(graph.nodes.len(), 2);
+
+    let edge = &graph.nodes[0].static_edges[0];
+    assert_eq!(edge.specifier, "./d.json");
+    assert_eq!(edge.kind, EdgeKind::Static);
+    assert!(edge.target.is_ok(), "{:?}", edge.target);
+
+    let json = &graph.nodes[1];
+    assert_eq!(json.kind, NodeKind::Json);
+    assert!(json.resolved.path.ends_with("d.json"));
+    assert!(json.diagnostics.is_empty(), "JSON 不得按 JS 解析产生 parse_failed");
+    assert!(json.record.statements.is_empty(), "JSON 不得按 JS 源码收集事实");
+    assert!(json.record.imports.is_empty());
+    assert!(json.static_edges.is_empty() && json.dynamic_edges.is_empty());
+}
+
+/// JSON 作为图入口显式拒绝：值节点只有被 JS 宿主消费才有意义。
+#[test]
+fn json_entry_is_rejected() {
+    let root = temp_tree(
+        "jsonentry",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/d.json", "{\"k\":1}\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/d.json"))], Target::Browser, &root);
+    assert_eq!(graph.diagnostics.len(), 1);
+    assert_eq!(graph.diagnostics[0].code, "vmz::pack::graph::json_entry_unsupported");
+    assert!(graph.entries.is_empty());
+    assert!(graph.nodes.is_empty());
+}
+
 #[test]
 fn parse_failure_keeps_node_with_diagnostics() {
     let root = temp_tree(

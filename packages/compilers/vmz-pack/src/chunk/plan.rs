@@ -73,11 +73,14 @@ pub struct ChunkPlan {
 /// 活跃性，只消费保留集合与存活动态边。
 pub fn plan_chunks(graph: &ModuleGraph, plan: &LinkPlan) -> ChunkPlan {
     let node_count = graph.nodes.len();
-    // Style 节点不参与分包：它们没有 JS 文本可装配，级联归属由 emit 层
-    // 按「chunk 成员模块的执行序 × 有序副作用边」聚合，不是 chunk 成员。
+    // Style/Json 节点不参与分包：它们没有 JS 文本可装配。Style 的级联归属由
+    // emit 层按「chunk 成员模块的执行序 × 有序副作用边」聚合；Json 的值绑定
+    // 文本由 emit 层在导入者所属 chunk 内合成，二者都不是 chunk 成员。
     let mut retained = vec![false; node_count];
     for module in &plan.modules {
-        if module.node < node_count && graph.nodes[module.node].kind != NodeKind::Style {
+        if module.node < node_count
+            && !matches!(graph.nodes[module.node].kind, NodeKind::Style | NodeKind::Json)
+        {
             retained[module.node] = true;
         }
     }

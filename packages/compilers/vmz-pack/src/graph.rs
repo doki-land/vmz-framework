@@ -11,6 +11,13 @@
 //! 在 `emit` 层；内容指纹身份也在 emit 读取字节时派生。CSS 作为图入口
 //! 显式拒绝（`vmz::pack::graph::style_entry_unsupported`）：样式必须挂在
 //! JS 宿主模块的执行序上，没有宿主的 CSS 无法进入任何 chunk 的级联。
+//!
+//! `.json` 文件进图成为 [`NodeKind::Json`] 不透明值节点：绝不按 JS 源码解析、
+//! 绝不进 module collect、无出边；importer→json 的静态值绑定边保留（JSON 是
+//! 值导入不是副作用）。绑定文本合成（default 值内联）在 `emit` 层，原始
+//! JSON 字节保真、不重新序列化。JSON 作为图入口显式拒绝
+//! （`vmz::pack::graph::json_entry_unsupported`）：值节点只有被 JS 宿主模块
+//! 消费才有意义，入口没有可绑定的宿主。
 
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
@@ -50,13 +57,15 @@ pub enum EdgeKind {
     Dynamic,
 }
 
-/// 节点类别：JS 模块或不透明样式节点。
+/// 节点类别：JS 模块、不透明样式节点或不透明 JSON 值节点。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeKind {
     /// JS/TS 模块：经 Oak 事实收集参与链接与分包。
     Js,
     /// `.css` 样式节点：不透明，绝不按 JS 源码解析，只承载有序副作用边。
     Style,
+    /// `.json` 值节点：不透明，绝不按 JS 源码解析，只承载 default 值绑定边。
+    Json,
 }
 
 /// 一个可达模块节点。
@@ -141,6 +150,16 @@ pub fn build_graph(entries: &[(String, PathBuf)], target: Target, root: &Path) -
             );
             continue;
         }
+        if canonical.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("json")) {
+            graph.diagnostics.push(
+                PackDiagnostic::new(
+                    "vmz::pack::graph::json_entry_unsupported",
+                    "JSON cannot be a graph entry; JSON values bind to JS host modules",
+                )
+                .with_path(canonical.display().to_string()),
+            );
+            continue;
+        }
         let resolved = Resolved {
             path: canonical.clone(),
             package: crate::resolve::package_of_path(&canonical),
@@ -195,6 +214,18 @@ fn expand(
     if path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("css")) {
         return ModuleNode {
             kind: NodeKind::Style,
+            resolved: resolved.clone(),
+            record: ModuleRecord::empty(Some(path.display().to_string())),
+            static_edges: Vec::new(),
+            dynamic_edges: Vec::new(),
+            diagnostics: Vec::new(),
+        };
+    }
+    // JSON 进图成为不透明值节点：不读源码、不收集 JS 事实、无出边；
+    // importer→json 的静态值绑定边由宿主模块承载，文本合成在 emit 层。
+    if path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("json")) {
+        return ModuleNode {
+            kind: NodeKind::Json,
             resolved: resolved.clone(),
             record: ModuleRecord::empty(Some(path.display().to_string())),
             static_edges: Vec::new(),

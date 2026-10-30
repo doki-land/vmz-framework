@@ -370,6 +370,87 @@ fn unsupported_style_forms_are_rejected() {
     }
 }
 
+/// JSON default 导入端到端：值节点不透明进图，chunk 文本头部内联原样
+/// JSON（字节保真、不改缩进），无 `./d.json` 引用残留，链接层不产生
+/// 虚假 `unknown_export`。
+#[test]
+fn json_default_import_inlines_raw_text() {
+    let root = temp_tree(
+        "jsonvalue",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import data from './d.json';\nexport const k = data.k;\n"),
+            ("src/d.json", "{\n  \"k\": 1\n}\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["k".into()]) }],
+    );
+    assert!(link_plan.diagnostics.is_empty(), "{:?}", link_plan.diagnostics);
+    let chunks = plan_chunks(&graph, &link_plan);
+    assert!(chunks.diagnostics.is_empty(), "{:?}", chunks.diagnostics);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+
+    let code = &plan.artifacts[0].code;
+    // 原始 JSON 文本字节保真内联为 default 绑定的 const 声明（含原文件
+    // 的缩进与尾换行，不重新序列化）。
+    assert!(code.contains("const data = {\n  \"k\": 1\n}\n;"), "{code}");
+    assert!(!code.contains("./d.json"), "{code}");
+    assert!(!code.contains("import"), "{code}");
+    assert!(code.contains("export { k }"), "{code}");
+}
+
+/// JSON 的具名/命名空间绑定、重导出与动态导入保持显式拒绝：
+/// 值节点只支持 default 导入，不猜导出形态。
+#[test]
+fn unsupported_json_forms_are_rejected() {
+    let cases: [(&str, &str, &str); 4] = [
+        (
+            "named",
+            "import { k } from './d.json';\nexport const x = k;\n",
+            "vmz::pack::emit::json_binding_unsupported",
+        ),
+        (
+            "namespace",
+            "import * as ns from './d.json';\nexport const x = ns;\n",
+            "vmz::pack::emit::json_binding_unsupported",
+        ),
+        (
+            "reexport",
+            "export { k } from './d.json';\n",
+            "vmz::pack::emit::json_reexport_unsupported",
+        ),
+        (
+            "dynamic",
+            "export const load = () => import('./d.json');\n",
+            "vmz::pack::emit::dynamic_json_unsupported",
+        ),
+    ];
+    for (name, source, expected) in cases {
+        let root = temp_tree(
+            &format!("jsonreject-{name}"),
+            &[
+                ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+                ("src/entry.js", source),
+                ("src/d.json", "{\"k\":1}\n"),
+            ],
+        );
+        let graph =
+            build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+        assert!(graph.diagnostics.is_empty(), "{name}: {:?}", graph.diagnostics);
+        let link_plan =
+            link(&graph, &[EntryUse { entry_logical: "main".to_string(), used_exports: None }]);
+        let chunks = plan_chunks(&graph, &link_plan);
+        let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
+        assert!(codes(&errors).contains(&expected.to_string()), "{name}: {errors:?}");
+    }
+}
+
 /// bootstrap 端到端：对象字面量箭头包裹的动态 import 建独立 async chunk、
 /// 说明符重写为目标 chunk 文件且查询串随身份剥离；裸包经 `exports` browser
 /// 条件进图；入口 `used_exports = None` 整体执行（全部模块保留）；两懒页

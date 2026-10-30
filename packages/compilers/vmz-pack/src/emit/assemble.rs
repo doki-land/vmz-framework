@@ -11,8 +11,15 @@
 //! import 语句整体移除（级联由 `style` 层聚合为独立 CSS artifact），
 //! 绑定、重导出与动态导入形态显式诊断拒绝。资源引用只重写
 //! `new URL` 第一参数，保留 URL 构造外壳。
+//!
+//! Json 目标节点的边按 default 值绑定合成：被导入的 JSON 模块在 chunk 文本
+//! 头部合成为 `const <local> = <原始 JSON 文本>;`——JSON 文本本身是合法 JS
+//! 表达式，字节保真、不重新序列化、不改缩进（等价于合成模块
+//! `export default <JSON>;` 的 default 绑定内联）。未被活跃语句引用的绑定
+//! 不合成（与跨 chunk 绑定同口径）。具名/命名空间绑定、重导出与动态导入
+//! 显式诊断拒绝——不透明值节点给不出其它导出形态。
 
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::chunk::Chunk;
 use crate::diag::PackDiagnostic;
@@ -58,6 +65,10 @@ pub(crate) fn assemble_chunk(
     let mut merged: BTreeMap<usize, Bindings> = BTreeMap::new();
     let mut side_effects: BTreeSet<usize> = BTreeSet::new();
     let mut deferred: Vec<DeferredExport> = Vec::new();
+    // JSON 值节点：(节点, 绑定名) 去重（同 chunk 同名绑定共享一条 const），
+    // 原始文本按节点缓存（读失败缓存 `None`，诊断不重复报）。
+    let mut json_locals: BTreeSet<(usize, String)> = BTreeSet::new();
+    let mut json_texts: HashMap<usize, Option<String>> = HashMap::new();
 
     for &node_index in &chunk.modules {
         let Some(node) = context.graph.nodes.get(node_index) else { continue };
@@ -115,6 +126,19 @@ pub(crate) fn assemble_chunk(
                                 "vmz::pack::emit::dynamic_style_unsupported",
                                 format!(
                                     "动态 import `{}` 目标是 CSS：样式只经宿主模块静态副作用边进入级联",
+                                    edge.specifier
+                                ),
+                            )
+                            .with_path(module_path.clone()),
+                        );
+                        continue;
+                    }
+                    if context.graph.nodes[target].kind == NodeKind::Json {
+                        errors.push(
+                            PackDiagnostic::new(
+                                "vmz::pack::emit::dynamic_json_unsupported",
+                                format!(
+                                    "动态 import `{}` 目标是 JSON：值节点只经宿主模块静态 default 导入合成绑定",
                                     edge.specifier
                                 ),
                             )
@@ -494,6 +518,48 @@ pub(crate) fn assemble_chunk(
                 }
                 continue;
             }
+            if context.graph.nodes[target].kind == NodeKind::Json {
+                // JSON 值节点：default 绑定在 chunk 文本头部合成为
+                // `const <local> = <原始 JSON 文本>;`（字节保真）；具名与
+                // 命名空间绑定显式拒绝——不透明值节点给不出其它导出形态。
+                for binding in &import.bindings {
+                    if binding.inline_type_only {
+                        continue;
+                    }
+                    match &binding.imported {
+                        ImportedName::Default => {
+                            // 未被活跃语句引用的绑定不合成（与跨 chunk 同口径）。
+                            if !used_names.contains(binding.local.as_str()) {
+                                continue;
+                            }
+                            if !json_locals.insert((target, binding.local.clone())) {
+                                continue;
+                            }
+                            let Some(text) =
+                                json_text(context, target, &mut json_texts, errors)
+                            else {
+                                continue;
+                            };
+                            let json_path =
+                                normalize_path(&context.graph.nodes[target].resolved.path);
+                            imports_text.push_str(&format!("const {} = {text};\n", binding.local));
+                            declared.push((binding.local.clone(), json_path));
+                        }
+                        _ => errors.push(
+                            PackDiagnostic::new(
+                                "vmz::pack::emit::json_binding_unsupported",
+                                format!(
+                                    "import `{}` 从 JSON 获取非 default 绑定：值节点只支持 default 导入，未实现",
+                                    import.specifier
+                                ),
+                            )
+                            .with_path(module_path.clone())
+                            .with_span(import.span),
+                        ),
+                    }
+                }
+                continue;
+            }
             if !context.retained[target] {
                 // 目标被链接层剪除：绑定必未被活跃语句引用，import 文本一并消失。
                 continue;
@@ -777,6 +843,18 @@ fn edge_target_node(
             );
             None
         }
+        Some(target) if context.graph.nodes[target].kind == NodeKind::Json => {
+            errors.push(
+                PackDiagnostic::new(
+                    "vmz::pack::emit::json_reexport_unsupported",
+                    format!(
+                        "重导出 `{specifier}` 目标是 JSON：值节点只提供 default 绑定，无法重导出具名"
+                    ),
+                )
+                .with_path(module_path.to_string()),
+            );
+            None
+        }
         Some(target) => Some(target),
         None => {
             errors.push(
@@ -819,6 +897,37 @@ fn chunk_of_node(
             None
         }
     }
+}
+
+/// 读取 JSON 值节点的原始文本：按 chunk 装配缓存，读失败显式拒绝
+/// （`vmz::pack::emit::read_failed`，与模块/样式重读同口径），失败缓存
+/// `None` 不重复报诊断。
+fn json_text(
+    context: &EmitContext<'_>,
+    node: usize,
+    cache: &mut HashMap<usize, Option<String>>,
+    errors: &mut Vec<PackDiagnostic>,
+) -> Option<String> {
+    if let Some(cached) = cache.get(&node) {
+        return cached.clone();
+    }
+    let path = &context.graph.nodes[node].resolved.path;
+    let path_display = normalize_path(path);
+    let built = match std::fs::read_to_string(path) {
+        Ok(text) => Some(text),
+        Err(err) => {
+            errors.push(
+                PackDiagnostic::new(
+                    "vmz::pack::emit::read_failed",
+                    format!("cannot re-read json module file: {err}"),
+                )
+                .with_path(path_display),
+            );
+            None
+        }
+    };
+    cache.insert(node, built.clone());
+    built
 }
 
 /// 目标模块的直接非类型导出名（`export *` 的 (c) 收集口径，不递归星号链）。
