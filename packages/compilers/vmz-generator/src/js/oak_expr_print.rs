@@ -54,6 +54,7 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
         ExpressionKind::NullLiteral => Some("null".into()),
         ExpressionKind::RegexLiteral(s) => Some(s.clone()),
         ExpressionKind::TemplateString(s) => Some(format!("`{s}`")),
+        ExpressionKind::MetaProperty { meta, property } => Some(format!("{meta}.{property}")),
         ExpressionKind::UnaryExpression { operator, argument } => {
             let inner = print_expr(argument, Prec::Unary)?;
             let text = if operator == "typeof" || operator == "void" || operator == "delete" {

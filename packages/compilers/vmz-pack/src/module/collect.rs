@@ -7,10 +7,13 @@
 //! - 表达式位置 `import(…)` 的 `import` 关键字是 leaf，builder 丢弃后
 //!   CallExpression 的 span 仍从 `import` 起算，与 callee 的 span 之间
 //!   留下至少 `import(` 长度的间隙。
-//! - `import.meta` 在语句头同空指纹，后随对象为 `meta` 的成员表达式。
+//! - `import.meta` 是正式 `MetaProperty` 节点；语句头 `import.meta` 解析为
+//!   表达式语句，不再产生空指纹。
 //! - 静态 import/export 的说明符在 AST 中带原文与含引号的字面量 span。
-//! - 一元运算符在关键字后带空白时，`operator` 被 trivia 覆盖为空格，
-//!   与 `typeof`/`void`/`!`/`-` 完全同形，无法区分（见 `ModuleFlags::has_tla`）。
+//! - `await` 是独立 `AwaitExpression` 节点；顶层 await 由 root 级
+//!   `top_level_await_spans` 事实给出（见 `ModuleFlags::has_tla`）。一元
+//!   关键字运算符在关键字后带空白时仍被 trivia 覆盖为空格，与
+//!   `typeof`/`void`/`!`/`-` 同形不可区分。
 //! - 多变量声明只保留第一个 declarator；解构声明的 `name` 是原文文本；
 //!   含初始值的 enum、`for…of` 解构、`namespace` 体会被误建成残缺语句；
 //!   模板字符串的插值表达式整体丢失。以上形态只按保守效果记录并给
@@ -64,6 +67,8 @@ pub fn parse_module(path: Option<&str>, source: &str) -> Result<ModuleRecord, Ve
     let mut collector = Collector::new(path, source);
     collector.walk_stmts(&root.statements);
     collector.record_top(&root.statements);
+    // TLA 资格直接取 Oak root 级正式事实，不扫语句树、不猜测。
+    collector.record.flags.has_tla = root.has_top_level_await();
     Ok(collector.record)
 }
 
@@ -193,7 +198,7 @@ impl<'a> Collector<'a> {
                 match statements.get(index + 1) {
                     Some(Statement::ExpressionStatement(next)) => {
                         let span = (hole.0, next.span.end);
-                        self.dynamic_pair(span, &next.expression);
+                        self.push_dynamic(span, &next.expression);
                     }
                     _ => self.diagnostic(
                         IMPORT_WITHOUT_SPECIFIER,
@@ -204,24 +209,6 @@ impl<'a> Collector<'a> {
             }
             self.walk_stmt(statement);
         }
-    }
-
-    /// 空指纹与后随表达式语句配对成动态 import 事实或诊断。
-    fn dynamic_pair(&mut self, span: (usize, usize), expression: &Expression) {
-        // `import.meta…`：对象为 `meta` 的成员表达式，没有模块说明符可取。
-        if let ExpressionKind::MemberExpression { object, .. } = &*expression.kind {
-            if let ExpressionKind::Identifier(name) = &*object.kind {
-                if name == "meta" {
-                    self.diagnostic(
-                        IMPORT_WITHOUT_SPECIFIER,
-                        "import.meta 不是模块导入，无说明符可取",
-                        span,
-                    );
-                    return;
-                }
-            }
-        }
-        self.push_dynamic(span, expression);
     }
 
     /// 从说明符表达式产出动态 import 事实；非字面量记空说明符事实并诊断。
@@ -755,17 +742,19 @@ impl<'a> Collector<'a> {
                 }
             }
             ExpressionKind::NewExpression { func, args } => {
-                if let ExpressionKind::Identifier(name) = &*func.kind {
-                    if name == "URL" {
-                        if let Some(first) = args.first() {
-                            if let ExpressionKind::StringLiteral(specifier) = &*first.kind {
-                                self.record.assets.push(AssetFact {
-                                    specifier: specifier.clone(),
-                                    specifier_span: Some(range(first.span.clone())),
-                                    span: range(expression.span.clone()),
-                                });
-                            }
-                        }
+                // 只有规范形态 `new URL('<literal>', import.meta.url)` 才是资源
+                // 引用：第二参必须是正式的 `import.meta.url` 成员表达式。
+                // 单参 `new URL('<lit>')` 相对文档基址解析，不是模块相对资源。
+                if matches!(&*func.kind, ExpressionKind::Identifier(name) if name == "URL")
+                    && args.len() >= 2
+                    && is_import_meta_url(&args[1])
+                {
+                    if let ExpressionKind::StringLiteral(specifier) = &*args[0].kind {
+                        self.record.assets.push(AssetFact {
+                            specifier: specifier.clone(),
+                            specifier_span: Some(range(args[0].span.clone())),
+                            span: range(expression.span.clone()),
+                        });
                     }
                 }
                 self.walk_expr(func);
@@ -830,12 +819,30 @@ impl<'a> Collector<'a> {
             | ExpressionKind::NullLiteral
             | ExpressionKind::RegexLiteral(_)
             | ExpressionKind::TemplateString(_)
+            | ExpressionKind::MetaProperty { .. }
             // JSX 在本 crate 中关闭（jsx: false），不可达。
             | ExpressionKind::JsxElement(_)
             | ExpressionKind::JsxFragment(_)
             | ExpressionKind::JsxSelfClosingElement(_) => {}
         }
     }
+}
+
+/// 表达式是否为正式的 `import.meta.url` 成员访问（非计算、非可选链）。
+fn is_import_meta_url(expression: &Expression) -> bool {
+    let ExpressionKind::MemberExpression { object, property, computed, optional } =
+        &*expression.kind
+    else {
+        return false;
+    };
+    !computed
+        && !optional
+        && matches!(
+            &*object.kind,
+            ExpressionKind::MetaProperty { meta, property }
+                if meta == "import" && property == "meta"
+        )
+        && matches!(&*property.kind, ExpressionKind::Identifier(name) if name == "url")
 }
 
 /// 表达式在模块求值时是否可证明无副作用（保守：判不了即非纯）。

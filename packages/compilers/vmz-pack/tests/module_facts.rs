@@ -263,52 +263,54 @@ fn syntax_errors_return_diagnostics() {
         assert!(diagnostic.span.is_some(), "Oak 诊断应带 span：{diagnostic:?}");
         assert!(!diagnostic.message.is_empty());
     }
-
-    // 规范资源形态 `new URL('<lit>', import.meta.url)` 在 Oak 中解析失败，
-    // 按合同同样必须报错，不得静默当作 JS 放行（已知 Oak 缺口，见交付报告）。
-    let asset_error = parse_module(None, "const u = new URL('./logo.svg', import.meta.url);")
-        .expect_err("规范 new URL 二参形态解析失败必须暴露");
-    assert!(
-        asset_error.iter().all(|d: &PackDiagnostic| d.code == "vmz::pack::module::parse_failed"),
-        "{asset_error:?}"
-    );
 }
 
-/// ⑨ 顶层 await（TLA）：Oak AST 无法可靠判定，本层明确不支持，不猜测。
+/// ⑨ 顶层 await（TLA）：由 Oak root 级 `top_level_await_spans` 正式事实驱动。
 #[test]
-fn top_level_await_is_explicitly_unsupported() {
-    // Oak 把 `await …` 建成一元表达式且 operator 被 trivia 覆盖为空格，
-    // 与 `typeof x` 同形，无法可靠识别 TLA；flags.has_tla 恒为 false。
+fn top_level_await_is_recorded() {
     let source = "await fetch('/x');\nconst later = await(1);";
     let record = ok(source);
     assert!(record.diagnostics.is_empty(), "{:?}", record.diagnostics);
-    assert!(
-        !record.flags.has_tla,
-        "当前合同明确不支持 TLA 判定：Oak AST 无可靠 TLA 事实，不得猜测"
-    );
+    assert!(record.flags.has_tla, "两个顶层 await 形态都必须置位 TLA 事实");
     assert!(!record.flags.dynamic_import_nonliteral);
+
+    // 函数边界内的 await 不是 TLA。
+    let nested = ok("async function main() { await fetch('/x'); }");
+    assert!(!nested.flags.has_tla, "await 穿越函数边界不得记为 TLA");
+    let for_await = ok("for await (const c of stream()) { }");
+    assert!(for_await.flags.has_tla, "`for await` 标记必须记为 TLA");
 }
 
-/// 资源引用：单参 `new URL('<lit>')` 记录为资源事实。
+/// 资源引用：规范形态 `new URL('<lit>', import.meta.url)` 记录为资源事实。
 #[test]
-fn literal_url_asset_is_recorded() {
-    let source = "const u = new URL('./logo.svg');";
+fn canonical_url_asset_is_recorded() {
+    let source = "const u = new URL('./logo.svg', import.meta.url);";
     let record = ok(source);
     assert_eq!(record.assets.len(), 1, "{:?}", record.assets);
     let asset = &record.assets[0];
     assert_eq!(asset.specifier, "./logo.svg");
-    assert_eq!(slice(source, asset.span), "new URL('./logo.svg')");
+    assert_eq!(slice(source, asset.span), "new URL('./logo.svg', import.meta.url)");
     assert_eq!(slice(source, asset.specifier_span.unwrap()), "'./logo.svg'");
     assert!(record.diagnostics.is_empty(), "{:?}", record.diagnostics);
 }
 
-/// `import.meta.url` 不是模块导入：必须给诊断，不得编造说明符。
+/// 非规范 URL 形态不是模块相对资源：单参相对文档基址，非 `import.meta.url`
+/// 基址无法静态确定，都不记资源事实、不猜测。
 #[test]
-fn import_meta_is_diagnosed_not_guessed() {
+fn non_canonical_url_is_not_asset() {
+    let single = ok("const u = new URL('./logo.svg');");
+    assert!(single.assets.is_empty(), "{:?}", single.assets);
+    let other_base = ok("const u = new URL('./logo.svg', document.baseURI);");
+    assert!(other_base.assets.is_empty(), "{:?}", other_base.assets);
+}
+
+/// 语句头 `import.meta.url` 是普通表达式语句：不是模块导入，
+/// 不再按空指纹给诊断。
+#[test]
+fn import_meta_is_plain_expression() {
     let source = "import.meta.url;";
     let record = ok(source);
     assert!(record.imports.is_empty(), "{:?}", record.imports);
-    assert_eq!(record.diagnostics.len(), 1, "{:?}", record.diagnostics);
-    assert_eq!(record.diagnostics[0].code, "vmz::pack::module::import_without_specifier");
-    assert_eq!(slice(source, record.diagnostics[0].span.unwrap()), "import.meta.url;");
+    assert!(record.assets.is_empty(), "{:?}", record.assets);
+    assert!(record.diagnostics.is_empty(), "{:?}", record.diagnostics);
 }

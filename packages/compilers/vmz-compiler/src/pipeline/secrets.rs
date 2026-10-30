@@ -522,6 +522,7 @@ fn walk_expression(expression: &Expression, visit: &mut impl FnMut(&Expression))
         | ExpressionKind::NullLiteral
         | ExpressionKind::RegexLiteral(_)
         | ExpressionKind::TemplateString(_)
+        | ExpressionKind::MetaProperty { .. }
         | ExpressionKind::JsxElement(_)
         | ExpressionKind::JsxFragment(_)
         | ExpressionKind::JsxSelfClosingElement(_) => {}

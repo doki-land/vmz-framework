@@ -361,6 +361,7 @@ fn shift_expression_spans(expr: &mut Expression, delta: isize) {
         | ExpressionKind::NullLiteral
         | ExpressionKind::RegexLiteral(_)
         | ExpressionKind::TemplateString(_)
+        | ExpressionKind::MetaProperty { .. }
         | ExpressionKind::YieldExpression(None)
         | ExpressionKind::JsxElement(_)
         | ExpressionKind::JsxFragment(_)

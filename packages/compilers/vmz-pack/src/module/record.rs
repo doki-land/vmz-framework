@@ -203,9 +203,9 @@ pub struct AssetFact {
 pub struct ModuleFlags {
     /// 模块是否含顶层 await（TLA）。
     ///
-    /// **恒为 `false`**：Oak AST 无法可靠判定 TLA——`await` 关键字后存在空白时，
-    /// builder 的一元运算符字段被 trivia 叶覆盖为空格，与 `typeof x` / `void 0`
-    /// 完全同形；只有 `await(…)` 无空白形态会留下 `"await"`。不可靠即不猜测。
+    /// 由 Oak root 级正式事实驱动：`await` 是独立 `AwaitExpression` 节点，
+    /// 未穿越函数边界的 await 与 `for await` 标记被记入
+    /// `TypeScriptRoot::top_level_await_spans`，本标志取其非空性，不猜测。
     pub has_tla: bool,
     /// 存在无法静态解析说明符的动态 import（对应
     /// `vmz::pack::module::dynamic_import_unresolved` 诊断）。
