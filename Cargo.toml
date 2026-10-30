@@ -9,6 +9,7 @@ members = [
     "packages/compilers/vmz-inspector",
     "packages/compilers/vmz-formatter",
     "packages/compilers/vmz-oak-frontend-adapter",
+    "packages/compilers/vmz-pack",
     "packages/compilers/vmz-artifacts",
     "packages/compilers/vmz-github",
     "packages/compilers/vmz-plugin-tailwind",
@@ -40,6 +41,7 @@ vmz-formatter = { path = "packages/compilers/vmz-formatter" }
 vmz-plugin-tailwind = { path = "packages/compilers/vmz-plugin-tailwind" }
 vmz-plugin-sasso = { path = "packages/compilers/vmz-plugin-sasso" }
 vmz-oak-frontend-adapter = { path = "packages/compilers/vmz-oak-frontend-adapter" }
+vmz-pack = { path = "packages/compilers/vmz-pack" }
 
 # Oaks frontend (Vue SFC / CST). Git deps are pinned to a fixed `rev` so CI and
 # local resolve the exact same commit.

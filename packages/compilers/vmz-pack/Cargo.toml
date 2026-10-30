@@ -1,0 +1,18 @@
+[package]
+name = "vmz-pack"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "VMZ Pack: module facts and module resolution for the in-house bundling chain"
+publish = false
+
+[dependencies]
+oak-core.workspace = true
+oak-typescript.workspace = true
+vmz-oak-frontend-adapter.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lib]
+path = "src/lib.rs"
