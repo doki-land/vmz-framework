@@ -519,6 +519,28 @@ fn walk_expression(expression: &Expression, visit: &mut impl FnMut(&Expression))
                 walk_statement_expression(statement, visit);
             }
         }
+        ExpressionKind::ClassExpression { body, .. } => {
+            for member in body {
+                match member {
+                    ClassMember::Property { decorators, initializer, .. } => {
+                        for decorator in decorators {
+                            visit(&decorator.expression);
+                        }
+                        if let Some(initializer) = initializer {
+                            visit(initializer);
+                        }
+                    }
+                    ClassMember::Method { decorators, body, .. } => {
+                        for decorator in decorators {
+                            visit(&decorator.expression);
+                        }
+                        for statement in body {
+                            walk_statement_expression(statement, visit);
+                        }
+                    }
+                }
+            }
+        }
         ExpressionKind::TaggedTemplateExpression { tag, template } => {
             visit(tag);
             visit(template);

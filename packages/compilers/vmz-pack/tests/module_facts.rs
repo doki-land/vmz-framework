@@ -389,6 +389,75 @@ fn destructuring_names_are_facts_without_diagnostics() {
     assert_eq!(uninitialized.statements[0].effect, StatementEffect::Init);
 }
 
+/// 类表达式：`ClassExpression` 的声明/引用事实与同形态 `ClassDeclaration` 同构，
+/// 不再产生 `statement_fact_incomplete`。
+#[test]
+fn class_expression_facts_mirror_class_declaration() {
+    // 匿名类表达式：字段初值依赖与方法体引用照常收集。
+    let source = "var X = class { a = 1; constructor(v) { this.a = v; } b = f(this.a); };";
+    let record = ok(source);
+    assert!(statement_fact_incomplete(&record).is_empty(), "{:?}", record.diagnostics);
+    let statement = &record.statements[0];
+    assert_eq!(statement.declared_names, ["X"]);
+    assert_eq!(slice(source, statement.span), source);
+
+    // 与同形态具名声明的引用事实逐字段一致（两边同走保守收录规则）。
+    let decl_source = "class X { a = 1; constructor(v) { this.a = v; } b = f(this.a); }";
+    let decl = ok(decl_source);
+    assert!(statement_fact_incomplete(&decl).is_empty(), "{:?}", decl.diagnostics);
+    assert_eq!(
+        statement.referenced_names, decl.statements[0].referenced_names,
+        "类表达式与同形态声明的引用事实必须同构"
+    );
+    assert!(
+        statement.referenced_names.iter().any(|name| name == "f"),
+        "字段初值 `f(this.a)` 的依赖必须收录：{:?}",
+        statement.referenced_names
+    );
+
+    // 具名 + `extends`：heritage 原文取首段标识符作为运行时引用。
+    let extends_source = "const C = class Named extends Base { static s = 1; m() {} };";
+    let record = ok(extends_source);
+    assert!(statement_fact_incomplete(&record).is_empty(), "{:?}", record.diagnostics);
+    assert_eq!(record.statements[0].declared_names, ["C"]);
+    assert_eq!(record.statements[0].referenced_names, ["Base"]);
+    assert_eq!(slice(extends_source, record.statements[0].span), extends_source);
+    // 同形态声明：成员事实同构；`extends` 引用暂缺是上游 builder 缺口
+    // （parser 从不产出 `HeritageClause` 节点，`ClassDeclaration.extends` 恒为 `None`），
+    // 上游补齐后本断言自动收紧为与表达式侧一致。
+    let decl = ok("class C extends Base { static s = 1; m() {} }");
+    assert!(statement_fact_incomplete(&decl).is_empty(), "{:?}", decl.diagnostics);
+    assert_eq!(decl.statements[0].declared_names, ["C"]);
+    assert!(
+        decl.statements[0]
+            .referenced_names
+            .iter()
+            .all(|name| record.statements[0].referenced_names.contains(name)),
+        "声明侧引用必须是表达式侧引用的子集（上游 `extends` 缺口只会让声明侧少收）"
+    );
+
+    // 调用实参位置：匿名空类表达式是普通表达式事实，无缺口。
+    let call_source = "f(class {});";
+    let record = ok(call_source);
+    assert!(statement_fact_incomplete(&record).is_empty(), "{:?}", record.diagnostics);
+    assert!(record.statements[0].declared_names.is_empty());
+    assert_eq!(record.statements[0].referenced_names, ["f"]);
+    assert_eq!(slice(call_source, record.statements[0].span), "f(class {});");
+
+    // 匿名 `export default class`：按既有空名语义（无本地绑定名、默认导出 local 为空）。
+    let default_source = "export default class { c = 3; }";
+    let record = ok(default_source);
+    assert!(statement_fact_incomplete(&record).is_empty(), "{:?}", record.diagnostics);
+    match &record.exports[0] {
+        ExportFact::Default { local, span } => {
+            assert_eq!(local, &None);
+            assert_eq!(slice(default_source, *span), "export default class { c = 3; }");
+        }
+        other => panic!("期望 Default 导出，实际 {other:?}"),
+    }
+    assert!(record.statements[0].declared_names.is_empty(), "{:?}", record.statements[0]);
+}
+
 /// `export const { a } = x`：导出名来自 declarator 绑定名。
 #[test]
 fn destructured_export_resolves_local_name() {

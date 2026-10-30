@@ -21,6 +21,9 @@
 //!   形态；含初始值的 enum、`for…of` 解构、`namespace` 体会被误建成残缺
 //!   语句，模板字符串的插值表达式整体丢失。这些形态只按保守效果记录并给
 //!   `statement_fact_incomplete` 诊断，不做猜测性还原。
+//! - 类表达式是正式 `ClassExpression` 节点，成员与 `ClassDeclaration` 同构；
+//!   `extends` 以 `TypeAnnotation::Reference { name: 原文 }` 承载运行时父类
+//!   引用。匿名 `export default class` 仍落为空名 `ClassDeclaration`。
 
 use vmz_oak_frontend_adapter::{
     OakFrontendDiagnostic, ScriptRole, ScriptShellInput, parse_script_ast,
@@ -28,7 +31,7 @@ use vmz_oak_frontend_adapter::{
 
 use oak_typescript::ast::{
     ClassMember, ExportDeclaration, ExportSpecifier, Expression, ExpressionKind,
-    ExpressionStatement, ImportSpecifier, ObjectProperty, Statement, VariableKind,
+    ExpressionStatement, ImportSpecifier, ObjectProperty, Statement, TypeAnnotation, VariableKind,
 };
 
 use super::record::{
@@ -811,6 +814,20 @@ impl<'a> Collector<'a> {
             }
             ExpressionKind::ArrowFunction { body, .. } => self.walk_stmt(body),
             ExpressionKind::FunctionExpression { body, .. } => self.walk_stmts(body),
+            // 类表达式与 `ClassDeclaration` 同构下钻：初值仍是表达式，
+            // 方法体是函数作用域边界，内部仍可能承载动态 import 等事实。
+            ExpressionKind::ClassExpression { body, .. } => {
+                for member in body {
+                    match member {
+                        ClassMember::Property { initializer, .. } => {
+                            if let Some(value) = initializer {
+                                self.walk_expr(value);
+                            }
+                        }
+                        ClassMember::Method { body, .. } => self.walk_stmts(body),
+                    }
+                }
+            }
             ExpressionKind::ObjectLiteral { properties } => {
                 for property in properties {
                     match property {
@@ -937,6 +954,7 @@ fn collect_refs_statement(statement: &Statement, names: &mut Vec<String>) {
             }
         }
         Statement::ClassDeclaration(d) => {
+            push_heritage_reference(&d.extends, names);
             for decorator in &d.decorators {
                 collect_refs_expression(&decorator.expression, names);
             }
@@ -1106,6 +1124,31 @@ fn collect_refs_expression(expression: &Expression, names: &mut Vec<String>) {
                 collect_refs_statement(statement, names);
             }
         }
+        // 类表达式与 `ClassDeclaration` 同构收集：heritage 引用、成员装饰器、
+        // 字段初值与方法体（方法体是函数作用域边界，内部引用保守收录）。
+        ExpressionKind::ClassExpression { extends, body, .. } => {
+            push_heritage_reference(extends, names);
+            for member in body {
+                match member {
+                    ClassMember::Property { decorators, initializer, .. } => {
+                        for decorator in decorators {
+                            collect_refs_expression(&decorator.expression, names);
+                        }
+                        if let Some(value) = initializer {
+                            collect_refs_expression(value, names);
+                        }
+                    }
+                    ClassMember::Method { decorators, body, .. } => {
+                        for decorator in decorators {
+                            collect_refs_expression(&decorator.expression, names);
+                        }
+                        for statement in body {
+                            collect_refs_statement(statement, names);
+                        }
+                    }
+                }
+            }
+        }
         ExpressionKind::ObjectLiteral { properties } => {
             for property in properties {
                 match property {
@@ -1145,4 +1188,16 @@ fn push_unique_name(names: &mut Vec<String>, name: &str) {
     if !name.is_empty() && !names.iter().any(|existing| existing == name) {
         names.push(name.to_string());
     }
+}
+
+/// `extends` 在上游是 `TypeAnnotation::Reference { name: 原文, args: [] }`：
+/// 取首段标识符作为引用名（`ns.Base` 取 `ns`、`mix(A)` 取 `mix`），
+/// 其余原文不是可匹配的绑定名，不收录。
+fn push_heritage_reference(extends: &Option<TypeAnnotation>, names: &mut Vec<String>) {
+    let Some(TypeAnnotation::Reference { name, .. }) = extends else {
+        return;
+    };
+    let head: String =
+        name.chars().take_while(|c| c.is_alphanumeric() || *c == '_' || *c == '$').collect();
+    push_unique_name(names, &head);
 }

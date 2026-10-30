@@ -187,6 +187,7 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
             wrap_prec(format!("{}!", print_expr(inner, Prec::Postfix)?), Prec::Postfix, min_prec)
         }
         ExpressionKind::FunctionExpression { .. }
+        | ExpressionKind::ClassExpression { .. }
         | ExpressionKind::TaggedTemplateExpression { .. }
         | ExpressionKind::JsxElement(_)
         | ExpressionKind::JsxFragment(_)

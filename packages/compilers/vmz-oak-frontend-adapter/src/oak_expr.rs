@@ -2,7 +2,8 @@
 
 use oak_core::{Builder, Lexer, OakError, ParseSession, Range, SourceText};
 use oak_typescript::ast::{
-    Expression, ExpressionKind, FunctionParam, ObjectProperty, Statement, TypeParameter,
+    ClassMember, Expression, ExpressionKind, FunctionParam, ObjectProperty, Statement,
+    TypeParameter,
 };
 use oak_typescript::{
     TypeScriptBuilder, TypeScriptLanguage, TypeScriptLexer, TypeScriptRoot, TypeScriptTokenType,
@@ -444,6 +445,28 @@ fn shift_expression_spans(expr: &mut Expression, delta: isize) {
             shift_type_spans(type_params, params, delta);
             for stmt in body {
                 shift_statement_spans(stmt, delta);
+            }
+        }
+        ExpressionKind::ClassExpression { type_params, body, .. } => {
+            for param in type_params.iter_mut() {
+                shift_range(&mut param.span, delta);
+            }
+            for member in body {
+                match member {
+                    ClassMember::Property { initializer, span, .. } => {
+                        shift_range(span, delta);
+                        if let Some(value) = initializer {
+                            shift_expression_spans(value, delta);
+                        }
+                    }
+                    ClassMember::Method { type_params, params, body, span, .. } => {
+                        shift_range(span, delta);
+                        shift_type_spans(type_params, params, delta);
+                        for stmt in body {
+                            shift_statement_spans(stmt, delta);
+                        }
+                    }
+                }
             }
         }
     }
