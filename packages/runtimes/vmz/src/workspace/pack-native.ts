@@ -44,6 +44,8 @@ export interface PackChunkArtifact {
     modules: string[];
     imports: string[];
     dynamic: string[];
+    /** Map file name (`<fileName>.map`); the map JSON itself stays Rust-side. */
+    sourceMapFileName: string;
 }
 
 export interface PackAssetArtifact {
@@ -177,7 +179,11 @@ function parsePackDiagnostic(value: unknown, where: string): PackDiagnostic {
 
 function parseChunkArtifact(value: unknown, where: string): PackChunkArtifact {
     if (!isPlainObject(value)) throw responseShape(`${where} must be an object`);
-    rejectUnknownKeys(value, ['chunkId', 'fileName', 'code', 'modules', 'imports', 'dynamic'], where);
+    rejectUnknownKeys(
+        value,
+        ['chunkId', 'fileName', 'code', 'modules', 'imports', 'dynamic', 'sourceMapFileName'],
+        where,
+    );
     return {
         chunkId: requireString(value.chunkId, `${where}.chunkId`),
         fileName: requireString(value.fileName, `${where}.fileName`),
@@ -185,6 +191,7 @@ function parseChunkArtifact(value: unknown, where: string): PackChunkArtifact {
         modules: requireStringArray(value.modules, `${where}.modules`),
         imports: requireStringArray(value.imports, `${where}.imports`),
         dynamic: requireStringArray(value.dynamic, `${where}.dynamic`),
+        sourceMapFileName: requireString(value.sourceMapFileName, `${where}.sourceMapFileName`),
     };
 }
 

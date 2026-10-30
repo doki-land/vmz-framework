@@ -35,6 +35,7 @@ const planResponse = {
                 modules: ['E:/app/dist/entry-client.js', 'E:/app/dist/dom.browser.js'],
                 imports: [],
                 dynamic: ['pages-index-bb22.js'],
+                sourceMapFileName: 'entry-client-aa11.js.map',
             },
             {
                 chunkId: 'pages/index',
@@ -43,6 +44,7 @@ const planResponse = {
                 modules: ['E:/app/dist/pages/index.client.js'],
                 imports: ['entry-client-aa11.js'],
                 dynamic: [],
+                sourceMapFileName: 'pages-index-bb22.js.map',
             },
         ],
         styles: [
@@ -123,11 +125,12 @@ describe('packFromDeploymentIr on the vmz-pack binding (v0)', () => {
         assert.equal(manifest.entryCount, 2);
         assert.equal(manifest.minify, 'none');
         assert.equal(manifest.treeShake, 'vmz-pack-link-pruning');
-        assert.equal(manifest.sourceMaps, 'none');
+        assert.equal(manifest.sourceMaps, 'chunk-v3-line-mappings');
         assert.equal(manifest.chunks.length, 2);
         assert.equal(manifest.chunks[0].fileName, 'entry-client-aa11.js');
         assert.equal(manifest.chunks[0].bytes, Buffer.byteLength(planResponse.plan.artifacts[0].code, 'utf8'));
         assert.match(manifest.chunks[0].digest, /^[a-f0-9]{64}$/);
+        assert.equal(manifest.chunks[0].sourceMap, 'entry-client-aa11.js.map');
         assert.deepEqual(manifest.entryFiles, planResponse.plan.entryFiles);
         assert.deepEqual(manifest.dynamicFiles, planResponse.plan.dynamicFiles);
         assert.deepEqual(manifest.styles, planResponse.plan.styles);

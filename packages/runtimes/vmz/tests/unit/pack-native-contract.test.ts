@@ -22,6 +22,7 @@ const validPlan = {
             modules: ['E:/abs/src/lib.js'],
             imports: ['shared-9f8e7d6c.js'],
             dynamic: [],
+            sourceMapFileName: 'entry-main-ab12cd34.js.map',
         },
     ],
     assets: [
@@ -221,6 +222,9 @@ describe('pack-native runPackPlan / runPackWrite (v0)', () => {
             },
             (plan) => {
                 plan.artifacts = [{ chunkId: 'entry/main', code: '', modules: [], imports: [], dynamic: [] }];
+            },
+            (plan) => {
+                delete (plan.artifacts as Record<string, unknown>[])[0].sourceMapFileName;
             },
             (plan) => {
                 plan.entryFiles = [{ logical: 'main' }];

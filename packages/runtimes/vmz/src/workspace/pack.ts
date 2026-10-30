@@ -107,6 +107,7 @@ export function packFromDeploymentIr(outDir: string, opts: PackFromDeploymentIrO
             modules: a.modules,
             bytes: buf.length,
             digest: sha256Hex(buf),
+            sourceMap: a.sourceMapFileName,
         };
     });
 
@@ -160,8 +161,10 @@ export function packFromDeploymentIr(outDir: string, opts: PackFromDeploymentIrO
         // `link` active fixed-point pruning really ran — entries keep all exports
         // (`usedExports: null`), internal modules are pruned to reachable exports.
         treeShake: 'vmz-pack-link-pruning',
-        // Source-map closure is not part of the v0 write contract yet.
-        sourceMaps: 'none',
+        // Chunk source maps are line-level v3: every assembled line maps back
+        // to its module line (`<packOut>/<fileName>.map`, `sourceMapFileName`
+        // on the wire); token-level mappings and `names` are not implemented.
+        sourceMaps: 'chunk-v3-line-mappings',
         nativeManifest,
     };
     body.packDigest = sha256Hex(stableStringify({ ...body }));
