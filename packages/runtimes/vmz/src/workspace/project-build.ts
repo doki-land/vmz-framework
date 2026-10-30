@@ -13,6 +13,7 @@ import { emitLocaleRouteRealization } from '../locale/locale-route-emit.js';
 import { packFromDeploymentIr } from './pack.js';
 import { loadVmzConfig } from './plugin-host.js';
 import { emitRouteCatalog } from './route-catalog-emit.js';
+import { emitStaticBootstrapEntries } from './static-emit.js';
 
 export type BuildProjectOptions = {
     /** `--profile` id; empty → delivery default. */
@@ -209,6 +210,9 @@ export async function buildProjectToOutDirRoot(
 
         let pack: ReturnType<typeof packFromDeploymentIr>;
         try {
+            // Browser pack entries are the static bootstrap modules; static emit
+            // runs after pack (HTML resolves `_vmz/pack/`), so write them first.
+            emitStaticBootstrapEntries(artifactDir);
             pack = packFromDeploymentIr(artifactDir, {
                 release: Boolean(opts.release),
                 profileId,

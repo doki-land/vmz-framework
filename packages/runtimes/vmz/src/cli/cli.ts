@@ -41,6 +41,7 @@ import { registerArtifactCommands } from './release-cmd.js';
 import { readPackageMeta, resolveWorkspaceDirs } from '../workspace/resolve.js';
 import { emitRouteCatalog } from '../workspace/route-catalog-emit.js';
 import { registerTestCommand } from './test-cmd.js';
+import { emitStaticBootstrapEntries } from '../workspace/static-emit.js';
 
 export function printGlobalHelp(): Promise<number> {
     return buildProductCli({ mode: 'global' }).parse(['help']);
@@ -346,6 +347,9 @@ async function cmdBuild(args: ParsedOptions): Promise<number> {
 
         let pack = null;
         try {
+            // Browser pack entries are the static bootstrap modules; static emit
+            // runs after pack (HTML resolves `_vmz/pack/`), so write them first.
+            emitStaticBootstrapEntries(outDir);
             pack = packFromDeploymentIr(outDir, {
                 release: Boolean(args.release),
                 profileId: selected.selection.profileId,

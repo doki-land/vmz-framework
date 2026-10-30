@@ -676,6 +676,7 @@ function buildSitemap(_origin, generations) {
  * specifier concatenation.
  * @param {string} distDir
  * @param {Array<{ chunkId: string }>} pageCatalog
+ * @returns {string[]} written bootstrap file names
  */
 function emitStaticClientEntries(distDir, pageCatalog) {
     const componentEntries = listClientComponentsSync(distDir, { strict: true });
@@ -704,6 +705,7 @@ function emitStaticClientEntries(distDir, pageCatalog) {
     if (typeof native.generateServeEntryClient !== 'function') {
         throw new Error('vmz native addon missing generateServeEntryClient — rebuild with `pnpm napi:build`');
     }
+    const written = ['entry-client.js'];
     fs.writeFileSync(path.join(distDir, 'entry-client.js'), native.generateServeEntryClient(eager, lazyComponents, ''), 'utf8');
     if (typeof native.generateServeEntryEvent === 'function') {
         // Event shell islands: event-strategy components + document islands whose
@@ -714,7 +716,22 @@ function emitStaticClientEntries(distDir, pageCatalog) {
             if (islandNames.has(entry.name)) islands.push(entry);
         }
         fs.writeFileSync(path.join(distDir, 'entry-event.js'), native.generateServeEntryEvent([], islands, ''), 'utf8');
+        written.push('entry-event.js');
     }
+    return written;
+}
+
+/**
+ * Write the browser bootstrap modules ahead of the pack stage: `pack` needs the
+ * literal dynamic-import tables in `entry-client.js` / `entry-event.js` as graph
+ * entries and must run before HTML emit (HTML resolves `_vmz/pack/` URLs). The
+ * static emit stage re-runs the same function, so both passes produce identical
+ * bytes.
+ * @param {string} distDir
+ * @returns {string[]} written bootstrap file names
+ */
+export function emitStaticBootstrapEntries(distDir) {
+    return emitStaticClientEntries(distDir, listPageClientFiles(distDir));
 }
 
 /**
