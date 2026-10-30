@@ -91,7 +91,7 @@ impl ServerCallVisitor {
                 self.visit_expression(&statement.expression)
             }
             Statement::VariableDeclaration(declaration) => {
-                if let Some(value) = &declaration.value {
+                if let Some(value) = declaration.value() {
                     self.visit_expression(value);
                 }
             }

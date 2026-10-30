@@ -84,7 +84,7 @@ fn walk_stmt_forbidden(stmt: &Statement, out: &mut Vec<ForbiddenFactory>) {
         }
         Statement::ExpressionStatement(es) => walk_expr_forbidden(&es.expression, out),
         Statement::VariableDeclaration(v) => {
-            if let Some(init) = &v.value {
+            if let Some(init) = v.value() {
                 walk_expr_forbidden(init, out);
             }
         }

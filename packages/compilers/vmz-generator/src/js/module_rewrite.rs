@@ -76,7 +76,7 @@ fn collect_stmt_spec_patches(
             collect_expr_spec_patches(source, &es.expression, map, out);
         }
         Statement::VariableDeclaration(v) => {
-            if let Some(init) = &v.value {
+            if let Some(init) = v.value() {
                 collect_expr_spec_patches(source, init, map, out);
             }
         }

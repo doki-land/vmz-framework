@@ -191,11 +191,16 @@ impl OakFieldRw {
         match stmt {
             Statement::ExpressionStatement(es) => self.walk_expr(&es.expression),
             Statement::VariableDeclaration(v) => {
-                if let Some(init) = &v.value {
+                if let Some(init) = v.value() {
                     self.walk_expr(init);
-                    if !v.name.is_empty() {
+                    let binding = v
+                        .declarators
+                        .first()
+                        .and_then(|declarator| declarator.pattern_text.as_deref())
+                        .unwrap_or_else(|| v.name());
+                    if !binding.is_empty() {
                         if let Some(base) = self.expr_to_key(init) {
-                            self.bind_pattern(&v.name, base);
+                            self.bind_pattern(binding, base);
                         }
                     }
                 } else {

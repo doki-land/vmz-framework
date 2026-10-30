@@ -207,8 +207,8 @@ class Client {
     let initializer = body
         .iter()
         .find_map(|statement| match statement {
-            Statement::VariableDeclaration(declaration) if declaration.name == "config" => {
-                declaration.value.as_ref()
+            Statement::VariableDeclaration(declaration) if declaration.name() == "config" => {
+                declaration.value()
             }
             _ => None,
         })

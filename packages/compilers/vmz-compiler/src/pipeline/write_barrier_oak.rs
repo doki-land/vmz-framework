@@ -61,9 +61,11 @@ fn collect_statements(
     for statement in statements {
         match statement {
             Statement::VariableDeclaration(decl) => {
-                if let Some(value) = &decl.value {
-                    if let Some(path) = owned_path(value, owned, aliases, source) {
-                        aliases.insert(decl.name.clone(), path);
+                if let Some(value) = decl.value() {
+                    if let Some(path) = owned_path(value, owned, aliases, source)
+                        && decl.declarators.first().is_some_and(|d| d.pattern_text.is_none())
+                    {
+                        aliases.insert(decl.name().to_string(), path);
                     }
                     collect_expression(value, source, owned, aliases, hits);
                 }
@@ -456,8 +458,11 @@ fn match_transpose_pair(
     owned: &HashSet<String>,
 ) -> Option<TransposeHit> {
     let Statement::VariableDeclaration(decl) = first else { return None };
-    let local = decl.name.as_str();
-    let Some((field, _)) = slice_source(decl.value.as_ref()?, owned) else { return None };
+    if decl.declarators.first().is_some_and(|d| d.pattern_text.is_some()) {
+        return None;
+    }
+    let local = decl.name();
+    let Some((field, _)) = slice_source(decl.value()?, owned) else { return None };
     let Statement::IfStatement(if_stmt) = second else { return None };
     let (op, rhs) = transpose_length_test(&if_stmt.test, source, local)?;
     let Statement::BlockStatement(body) = if_stmt.consequent.as_ref() else { return None };
@@ -527,9 +532,9 @@ fn transpose_tmp_read(
     local: &str,
 ) -> Option<(String, String)> {
     let Statement::VariableDeclaration(decl) = statement else { return None };
-    let value = decl.value.as_ref()?;
+    let value = decl.value()?;
     let (object, index) = transpose_indexed_member(value)?;
-    (ident(object) == Some(local)).then(|| (decl.name.clone(), text(source, index)))
+    (ident(object) == Some(local)).then(|| (decl.name().to_string(), text(source, index)))
 }
 
 fn transpose_swap_write(
@@ -595,7 +600,7 @@ fn walk_statements(
     while index < statements.len() {
         if index + 1 < statements.len()
             && let Statement::VariableDeclaration(decl) = &statements[index]
-            && let Some(root) = decl.value.as_ref().and_then(this_root)
+            && let Some(root) = decl.value().and_then(this_root)
             && owned.contains(&root)
             && let Statement::ForStatement(for_stmt) = &statements[index + 1]
             && let Some(mut hit) = match_for(for_stmt, source, owned, aliases)
@@ -608,10 +613,11 @@ fn walk_statements(
         }
         match &statements[index] {
             Statement::VariableDeclaration(decl) => {
-                if let Some(root) = decl.value.as_ref().and_then(this_root)
+                if let Some(root) = decl.value().and_then(this_root)
                     && owned.contains(&root)
+                    && decl.declarators.first().is_some_and(|d| d.pattern_text.is_none())
                 {
-                    aliases.insert(decl.name.clone(), root);
+                    aliases.insert(decl.name().to_string(), root);
                 }
             }
             Statement::ForStatement(for_stmt) => {
@@ -671,8 +677,8 @@ fn match_for(
     let Statement::VariableDeclaration(init) = statement.initializer.as_deref()? else {
         return None;
     };
-    let index_name = init.name.clone();
-    let start = init.value.as_ref().map(|expr| text(source, expr)).unwrap_or_default();
+    let index_name = init.name().to_string();
+    let start = init.value().map(|expr| text(source, expr)).unwrap_or_default();
     let ExpressionKind::BinaryExpression { left, operator, right } =
         statement.test.as_ref()?.kind.as_ref()
     else {

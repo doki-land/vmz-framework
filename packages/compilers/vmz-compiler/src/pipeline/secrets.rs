@@ -132,7 +132,7 @@ impl SecretVisitor {
                 for decorator in &declaration.decorators {
                     self.visit_expression(&decorator.expression);
                 }
-                if let Some(value) = &declaration.value {
+                if let Some(value) = declaration.value() {
                     self.visit_expression(value);
                 }
             }
@@ -325,7 +325,7 @@ impl ClientBoundaryVisitor {
                 for decorator in &declaration.decorators {
                     self.visit_expression(&decorator.expression);
                 }
-                if let Some(value) = &declaration.value {
+                if let Some(value) = declaration.value() {
                     self.visit_expression(value);
                 }
             }
@@ -533,7 +533,7 @@ fn walk_statement_expression(statement: &Statement, visit: &mut impl FnMut(&Expr
     match statement {
         Statement::ExpressionStatement(statement) => visit(&statement.expression),
         Statement::VariableDeclaration(statement) => {
-            if let Some(value) = &statement.value {
+            if let Some(value) = statement.value() {
                 visit(value);
             }
         }

@@ -141,7 +141,9 @@ pub fn parse_expression_snippet(expr: &str) -> ExpressionSnippetParse {
             continue;
         }
         let Some(value) = root.statements.iter().find_map(|stmt| match stmt {
-            Statement::VariableDeclaration(decl) if decl.name == "__vmz_expr" => decl.value.clone(),
+            Statement::VariableDeclaration(decl) if decl.name() == "__vmz_expr" => {
+                decl.value().cloned()
+            }
             _ => None,
         }) else {
             continue;
@@ -468,8 +470,11 @@ fn shift_statement_spans(stmt: &mut Statement, delta: isize) {
         }
         Statement::VariableDeclaration(decl) => {
             shift_range(&mut decl.span, delta);
-            if let Some(value) = &mut decl.value {
-                shift_expression_spans(value, delta);
+            for declarator in &mut decl.declarators {
+                shift_range(&mut declarator.span, delta);
+                if let Some(value) = &mut declarator.value {
+                    shift_expression_spans(value, delta);
+                }
             }
         }
         Statement::IfStatement(node) => {

@@ -141,7 +141,7 @@ fn fingerprint_hole(statement: &Statement) -> Option<(usize, usize)> {
 /// 声明语句的顶层名字（原样保留 Oak 的 `name` 字段，包括解构原始文本）。
 fn declared_names(statement: &Statement) -> Vec<String> {
     let name = match statement {
-        Statement::VariableDeclaration(d) => &d.name,
+        Statement::VariableDeclaration(d) => d.name(),
         Statement::FunctionDeclaration(d) => &d.name,
         Statement::ClassDeclaration(d) => &d.name,
         Statement::Interface(d) => &d.name,
@@ -150,7 +150,7 @@ fn declared_names(statement: &Statement) -> Vec<String> {
         Statement::Namespace(d) => &d.name,
         _ => return Vec::new(),
     };
-    if name.is_empty() { Vec::new() } else { vec![name.clone()] }
+    if name.is_empty() { Vec::new() } else { vec![name.to_string()] }
 }
 
 /// 类型空间的导出声明（`export type Foo = string` 的声明级修饰符在 Oak 中
@@ -295,14 +295,14 @@ impl<'a> Collector<'a> {
                 if d.is_declare() {
                     return (StatementEffect::Pure, false);
                 }
-                let trimmed = d.name.trim_start();
+                let trimmed = d.name().trim_start();
                 if trimmed.starts_with('{') || trimmed.starts_with('[') {
                     return (StatementEffect::SideEffect, true);
                 }
-                if self.has_extra_declarator(&d.span, d.value.as_ref()) {
+                if self.has_extra_declarator(&d.span, d.value()) {
                     return (StatementEffect::SideEffect, true);
                 }
-                match &d.value {
+                match d.value() {
                     None => {
                         if matches!(d.kind, VariableKind::Const) {
                             (StatementEffect::SideEffect, true)
@@ -472,7 +472,7 @@ impl<'a> Collector<'a> {
     fn walk_stmt(&mut self, statement: &Statement) {
         match statement {
             Statement::VariableDeclaration(d) => {
-                if let Some(value) = &d.value {
+                if let Some(value) = d.value() {
                     self.walk_expr(value);
                 }
             }
@@ -893,7 +893,7 @@ fn expr_pure(expression: &Expression) -> bool {
 fn collect_refs_statement(statement: &Statement, names: &mut Vec<String>) {
     match statement {
         Statement::VariableDeclaration(d) => {
-            if let Some(value) = &d.value {
+            if let Some(value) = d.value() {
                 collect_refs_expression(value, names);
             }
         }

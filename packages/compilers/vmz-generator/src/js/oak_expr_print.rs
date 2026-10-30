@@ -267,11 +267,16 @@ fn print_stmt(stmt: &Statement) -> Option<String> {
         }
         Statement::ExpressionStatement(es) => print_expr(&es.expression, Prec::Assign),
         Statement::VariableDeclaration(v) => {
-            let init = match &v.value {
+            let init = match v.value() {
                 Some(e) => format!(" = {}", print_expr(e, Prec::Assign)?),
                 None => String::new(),
             };
-            Some(format!("const {}{}", v.name, init))
+            let binding = v
+                .declarators
+                .first()
+                .and_then(|declarator| declarator.pattern_text.clone())
+                .unwrap_or_else(|| v.name().to_string());
+            Some(format!("const {}{}", binding, init))
         }
         _ => None,
     }

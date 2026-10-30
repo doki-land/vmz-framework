@@ -504,8 +504,8 @@ pub fn parse_static_link_params(expr: &str) -> Option<BTreeMap<String, String>> 
     }
     let root = parsed.root?;
     let expression = root.statements.iter().find_map(|statement| match statement {
-        Statement::VariableDeclaration(declaration) if declaration.name == "__vmzLinkParams" => {
-            declaration.value.as_ref()
+        Statement::VariableDeclaration(declaration) if declaration.name() == "__vmzLinkParams" => {
+            declaration.value()
         }
         _ => None,
     })?;
