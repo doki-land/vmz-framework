@@ -102,6 +102,25 @@ pub(crate) fn assemble_chunk(
                     }
                     warnings.push(diagnostic);
                 }
+                Err(_) if edge.specifier.starts_with('/') => {
+                    // 根绝对 URL 动态 import（如运行时 face 加载 `/dom.browser.js`）：
+                    // 文本原样保留，由站点 origin 运行时解析，与非字面量保留同构，
+                    // 属非致命诊断。
+                    let mut diagnostic = PackDiagnostic::new(
+                        "vmz::pack::emit::dynamic_url_kept",
+                        format!(
+                            "根绝对 URL 动态 import `{}` 原样保留，由站点 origin 运行时解析",
+                            edge.specifier
+                        ),
+                    )
+                    .with_path(module_path.clone());
+                    if let Some(import) = record.imports.iter().find(|import| {
+                        import.kind == ImportKind::Dynamic && import.specifier == edge.specifier
+                    }) {
+                        diagnostic = diagnostic.with_span(import.span);
+                    }
+                    warnings.push(diagnostic);
+                }
                 Err(_) => errors.push(
                     PackDiagnostic::new(
                         "vmz::pack::emit::dynamic_unresolved",

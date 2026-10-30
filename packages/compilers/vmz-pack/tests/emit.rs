@@ -914,3 +914,59 @@ fn missing_source_file_is_rejected() {
     let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
     assert!(codes(&errors).contains(&"vmz::pack::emit::read_failed".to_string()), "{errors:?}");
 }
+
+/// 根绝对 URL 动态 import（运行时 face 加载 `/dom.browser.js`）文本原样
+/// 保留，给非致命诊断 `dynamic_url_kept`，不阻断产物、不产生 chunk 重写。
+#[test]
+fn root_absolute_dynamic_import_is_kept_verbatim() {
+    let root = temp_tree(
+        "urlkeep",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "export const loadFace = () => import('/dom.browser.js');\n",
+            ),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan =
+        link(&graph, &[EntryUse { entry_logical: "main".to_string(), used_exports: None }]);
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(
+        codes(&plan.diagnostics).contains(&"vmz::pack::emit::dynamic_url_kept".to_string()),
+        "{:?}",
+        plan.diagnostics
+    );
+    let code = &plan.artifacts[0].code;
+    assert!(code.contains("import('/dom.browser.js')"), "{code}");
+    assert!(plan.dynamic_files.is_empty(), "{:?}", plan.dynamic_files);
+}
+
+/// 非根绝对（相对/裸说明符）的未解析动态 import 仍显式拒绝，
+/// 保留通道只覆盖 `/` 开头的站点 origin URL。
+#[test]
+fn unresolved_relative_dynamic_import_still_errors() {
+    let root = temp_tree(
+        "urlreject",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "export const loadFace = () => import('./gone.js');\n",
+            ),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan =
+        link(&graph, &[EntryUse { entry_logical: "main".to_string(), used_exports: None }]);
+    let chunks = plan_chunks(&graph, &link_plan);
+    let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
+    assert!(
+        codes(&errors).contains(&"vmz::pack::emit::dynamic_unresolved".to_string()),
+        "{errors:?}"
+    );
+}

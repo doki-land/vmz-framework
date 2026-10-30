@@ -23,6 +23,9 @@
 //!   `export default <JSON>;` 的 default 绑定内联）。同 chunk 同身份同名
 //!   绑定去重；具名/命名空间绑定、重导出与动态导入显式拒绝
 //!   （`vmz::pack::emit::json_binding_unsupported` 等），不猜导出形态。
+//! - 根绝对 URL 动态 import（`'/…'`，如运行时 face 加载 `/dom.browser.js`）
+//!   文本原样保留、由站点 origin 运行时解析，给非致命诊断
+//!   `vmz::pack::emit::dynamic_url_kept`；其余未解析动态 import 仍显式拒绝。
 //! - 未实现的语义（同 chunk 重命名绑定、星号合成、同 chunk 动态边界、
 //!   事实不完整、无法重写的说明符、样式/JSON 绑定、重导出与动态导入等）
 //!   一律显式诊断拒绝，禁止猜测、禁止静默产出错误 JS、禁止兼容层。
@@ -141,7 +144,7 @@ pub struct EmitPlan {
     pub dynamic_files: Vec<(String, String)>,
     /// 序列化的产物 manifest（合同版本命名空间 `v0`）。
     pub manifest_json: String,
-    /// 非致命诊断（保留的非字面量动态 import、命名空间加宽）。
+    /// 非致命诊断（保留的非字面量动态 import、保留的根绝对 URL 动态 import、命名空间加宽）。
     pub diagnostics: Vec<PackDiagnostic>,
 }
 
